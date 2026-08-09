@@ -12,11 +12,12 @@
   platformAutomerge: false,
   customManagers: [
     {
-      description: "Renovate does not extract devEngines.packageManager as a dependency yet (renovatebot/renovate#38067). Without this the pnpm rule below never fires.",
+      description: "Renovate does not extract devEngines as dependencies yet (renovatebot/renovate#38067). Without this the node and pnpm rules below never fire.",
       customType: "jsonata",
       fileFormat: "json",
       managerFilePatterns: ["/package.json/"],
       matchStrings: [
+        'devEngines.runtime ? [{ "depName": devEngines.runtime.name, "currentValue": devEngines.runtime.version, "datasource": "node-version", "versioning": "node" }] : []',
         'devEngines.packageManager ? [{ "depName": devEngines.packageManager.name = "yarn" ? "@yarnpkg/cli" : devEngines.packageManager.name, "currentValue": devEngines.packageManager.version, "datasource": "npm", "versioning": "npm" }] : []',
       ],
     },

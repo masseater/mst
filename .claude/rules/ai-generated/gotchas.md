@@ -63,6 +63,19 @@ pack: { exports: { customExports: { './tsconfig/*': './tsconfig/*' } } }
 - 上流に issue はなく、公開リポジトリでもそのまま残している例が複数ある
 - IF: `packages/utils` を publish する; THEN MUST: これらを実際の値に書き換える
 
+## `vp env` は `.tool-versions` を読まない
+
+- 症状: `.tool-versions` に node のバージョンを書いても `vp` が拾わない。`vp env current` が `Source: lts` を返す
+- 原因: `vp env` の解決ソースは `.node-version` → `package.json` の `devEngines.runtime` → `package.json` の `engines.node` → `.nvmrc` の4つだけで、`.tool-versions` は含まれない
+- 上流: [voidzero-dev/vite-plus#984](https://github.com/voidzero-dev/vite-plus/issues/984) が「out of scope for Vite+ at this time」でクローズされている。asdf/mise のマルチツール形式を読む予定はない。一方 `.nvmrc` は [#2207](https://github.com/voidzero-dev/vite-plus/issues/2207) で追加された
+- 紛らわしい点: CI の `voidzero-dev/setup-vp` は `node-version-file` に `.tool-versions` を指定できる（[実装](https://github.com/voidzero-dev/setup-vp/blob/313600b80b104eadebb9111787d37a2e83e014ca/src/node-version-file.ts)）。CLI が読めないだけで Action は読める。`.tool-versions` に寄せると CI だけ通ってローカルが `engines.node` の range 解決に落ちる
+- 対処: node のバージョンは `package.json` の `devEngines.runtime` に書く。`vp`・`setup-vp`・mise の3者が読む唯一の形式である（詳細は [EDR 0003](../../../docs/engineering-decision-logs/0003-pin-node-via-dev-engines.md)）
+
+- IF: node 以外のツールを pin する必要が出た; THEN
+  - MUST: `mise.toml` を追加してそこに書く
+  - PROHIBIT: `mise.toml` に node を書く
+    - node を書くと `mise.toml` が `package.json` より優先され、`vp` が見る値と mise が見る値が割れる。node を書かなければ mise は他ツールを `mise.toml` から、node を `package.json` から解決する
+
 ## catalog に寄せるときは catalog 側の値が実態と合っているか確認する
 
 - 症状: knip の「未使用 catalog エントリ」を解消するため、ワークスペースの直書きバージョンを `catalog:` に変えたところ、`vite-plus` と `vitest` がそれぞれ `1 version, 2 instances` に分裂した

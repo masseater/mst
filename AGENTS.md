@@ -8,7 +8,9 @@ mst は、リポジトリ運用の仕組みを再利用可能な単位として�
 
 ## ツールチェーン
 
-Vite+（vite-plus）に一本化している。`vp` はマシンに導入するグローバル CLI、`vite-plus` はプロジェクトローカルの devDependency という 2 部構成をとる。vp は Node.js と pnpm を自前で管理し、`vp env current` は Package Manager として pnpm 11.20.0（Source: `devEngines.packageManager`）を報告する。叩くコマンドは vp だけだが、実体としては pnpm がワークスペースと lockfile を扱っている。
+Vite+（vite-plus）に一本化している。`vp` はマシンに導入するグローバル CLI、`vite-plus` はプロジェクトローカルの devDependency という 2 部構成をとる。vp は Node.js と pnpm を自前で管理し、`vp env current` は Node を Source: `devEngines.runtime`、Package Manager を Source: `devEngines.packageManager` として報告する。叩くコマンドは vp だけだが、実体としては pnpm がワークスペースと lockfile を扱っている。
+
+Node のバージョンは `package.json` の `devEngines.runtime` に置く。`.node-version` や `.tool-versions` は置かない。node 以外のツールを pin する必要が出たら `mise.toml` を追加し、そこに node は書かない（[EDR 0003](docs/engineering-decision-logs/0003-pin-node-via-dev-engines.md)）。
 
 npm 経由（`npm i -g vite-plus` や mise の `npm:vite-plus`）でグローバル導入した vp は使ってはいけない。`vp test` がプロジェクトローカルの vite-plus と二重インスタンスになり、`Vitest failed to find the current suite` で必ず失敗する。上流も [voidzero-dev/vite-plus#2097](https://github.com/voidzero-dev/vite-plus/issues/2097) で「npm でのグローバルインストールは期待されるグローバル CLI ではない」と明言している。
 
@@ -27,15 +29,15 @@ npm 経由（`npm i -g vite-plus` や mise の `npm:vite-plus`）でグローバ
 
 ### トップレベルファイル
 
-| ファイル              | 説明                                                                                                       |
-| --------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `package.json`        | ルートワークスペースのマニフェスト。`devEngines.packageManager` が pnpm、`engines.node` が Node を宣言する |
-| `pnpm-workspace.yaml` | ワークスペース定義と catalog（依存バージョンの一元管理）                                                   |
-| `vite.config.ts`      | lint / fmt / staged / run タスクの設定を集約する唯一の設定ファイル                                         |
-| `tsconfig.json`       | ルートの TypeScript 設定                                                                                   |
-| `knip.json`           | 未使用の依存・export・ファイルの検出設定                                                                   |
-| `AGENTS.md`           | AI エージェント向けガイド（このリポジトリの SSOT）                                                         |
-| `CLAUDE.md`           | `AGENTS.md` へのシンボリックリンク                                                                         |
+| ファイル              | 説明                                                                                                                                                                 |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `package.json`        | ルートワークスペースのマニフェスト。`devEngines.runtime` が Node、`devEngines.packageManager` が pnpm を pin し、`engines.node` が利用者向けのサポート範囲を宣言する |
+| `pnpm-workspace.yaml` | ワークスペース定義と catalog（依存バージョンの一元管理）                                                                                                             |
+| `vite.config.ts`      | lint / fmt / staged / run タスクの設定を集約する唯一の設定ファイル                                                                                                   |
+| `tsconfig.json`       | ルートの TypeScript 設定                                                                                                                                             |
+| `knip.json`           | 未使用の依存・export・ファイルの検出設定                                                                                                                             |
+| `AGENTS.md`           | AI エージェント向けガイド（このリポジトリの SSOT）                                                                                                                   |
+| `CLAUDE.md`           | `AGENTS.md` へのシンボリックリンク                                                                                                                                   |
 
 ### ワークスペース内の規約（`apps/*`, `packages/*`）
 
@@ -84,7 +86,7 @@ vp run ready     # check → test → build をまとめて実行
 
 ## CI
 
-`.github/workflows/ci.yml` が main への push と pull request で `vp check` → `vp run -r test` → `vp run -r build` → `vp run knip` を実行する。`voidzero-dev/setup-vp` は commit SHA で固定し、コメントにタグを書いて Renovate が更新できるようにしている。
+`.github/workflows/ci.yml` が main への push と pull request で `vp check` → `vp run -r test` → `vp run -r build` → `vp run knip` を実行する。`voidzero-dev/setup-vp` は commit SHA で固定し、コメントにタグを書いて Renovate が更新できるようにしている。Node のバージョンは `node-version-file: package.json` で参照する。
 
 ## 依存更新
 
