@@ -1,3 +1,5 @@
+import * as dontReviewIt from "@mst/dont-review-it";
+import * as lintRuleAuthoring from "@mst/lint-rule-authoring";
 import { defineConfig } from "vite-plus";
 
 export default defineConfig({
@@ -6,6 +8,7 @@ export default defineConfig({
   },
   fmt: {},
   lint: {
+    extends: [lintRuleAuthoring.oxlint, dontReviewIt.oxlint],
     plugins: ["unicorn", "typescript", "oxc", "vitest"],
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
     rules: {

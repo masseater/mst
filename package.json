@@ -2,6 +2,10 @@
   "name": "mst",
   "version": "0.0.0",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/masseater/mst.git"
+  },
   "type": "module",
   "scripts": {
     "ready": "vp check && vp run -r test && vp run -r build && vp run knip",
@@ -10,6 +14,8 @@
     "prepare": "vp config"
   },
   "devDependencies": {
+    "@mst/dont-review-it": "workspace:*",
+    "@mst/lint-rule-authoring": "workspace:*",
     "knip": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"

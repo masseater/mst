@@ -205,12 +205,18 @@ settings:
 
 catalogs:
   default:
+    '@oxlint/plugins':
+      specifier: 1.73.0
+      version: 1.73.0
     '@types/node':
       specifier: ^26
       version: 26.2.0
     knip:
       specifier: ^6.32.0
       version: 6.32.0
+    oxlint:
+      specifier: 1.76.0
+      version: 1.76.0
     typescript:
       specifier: ^7.0.2
       version: 7.0.2
@@ -225,6 +231,12 @@ importers:
 
   .:
     devDependencies:
+      '@mst/dont-review-it':
+        specifier: workspace:*
+        version: link:packages/dont-review-it
+      '@mst/lint-rule-authoring':
+        specifier: workspace:*
+        version: link:packages/lint-rule-authoring
       knip:
         specifier: 'catalog:'
         version: 6.32.0
@@ -237,6 +249,53 @@ importers:
 
   apps/website:
     devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vite:
+        specifier: npm:@voidzero-dev/vite-plus-core@0.2.8
+        version: '@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)'
+      vite-plus:
+        specifier: 'catalog:'
+        version: 0.2.8(@types/node@26.2.0)(@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)
+
+  packages/dont-review-it:
+    dependencies:
+      '@mst/lint-rule-authoring':
+        specifier: workspace:*
+        version: link:../lint-rule-authoring
+      '@oxlint/plugins':
+        specifier: 'catalog:'
+        version: 1.73.0
+      oxlint:
+        specifier: 'catalog:'
+        version: 1.76.0(oxlint-tsgolint@7.0.2001)(vite-plus@0.2.8(@types/node@26.2.0)(@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.2.0
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vite:
+        specifier: npm:@voidzero-dev/vite-plus-core@0.2.8
+        version: '@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)'
+      vite-plus:
+        specifier: 'catalog:'
+        version: 0.2.8(@types/node@26.2.0)(@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)
+
+  packages/lint-rule-authoring:
+    dependencies:
+      '@oxlint/plugins':
+        specifier: 'catalog:'
+        version: 1.73.0
+      oxlint:
+        specifier: 'catalog:'
+        version: 1.76.0(oxlint-tsgolint@7.0.2001)(vite-plus@0.2.8(@types/node@26.2.0)(@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.2.0
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
