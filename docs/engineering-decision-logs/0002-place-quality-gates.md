@@ -47,7 +47,7 @@ self-host が必要になるのは依存グラフが Mend 側の 3GiB メモリ�
 
 **`devEngines.packageManager` を Renovate は依存として抽出しない。** lockfile 更新時に使う pnpm を決める用途では読むが、更新対象にはならない（[renovatebot/renovate#38067](https://github.com/renovatebot/renovate/issues/38067) が OPEN）。`matchPackageNames: ["pnpm"]` のルールは、jsonata の customManager を足して初めて発火する。
 
-CI 側も同様で、`voidzero-dev/setup-vp` は `actions/setup-*` でも Renovate の community actions リストにも含まれないため、`node-version` をワークフローに直書きすると Renovate の管理外になる。`.node-version` を置いて `node-version-file` で参照すれば nodenv manager が管理する。
+`devEngines.runtime` も同じで、node の更新は customManager を足して初めて拾われる。CI 側も、`voidzero-dev/setup-vp` は `actions/setup-*` でも Renovate の community actions リストにも含まれないため、`node-version` をワークフローに直書きすると Renovate の管理外になる。`node-version-file` に `package.json` を指定すれば、node のバージョンの出所は `devEngines.runtime` の1箇所に保たれる。
 
 なお setup-vp が使う Vite+ のバージョンは、`version` / `version-file` を書かなければ `package.json` の `vite-plus` エントリ（`catalog:` なら catalog 経由）を自動解決する。明示しない方がバージョンの出所が1箇所に保たれる。
 

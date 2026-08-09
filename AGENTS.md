@@ -10,7 +10,7 @@ mst は、リポジトリ運用の仕組みを再利用可能な単位として�
 
 Vite+（vite-plus）に一本化している。`vp` はマシンに導入するグローバル CLI、`vite-plus` はプロジェクトローカルの devDependency という 2 部構成をとる。vp は Node.js と pnpm を自前で管理し、`vp env current` は Node を Source: `devEngines.runtime`、Package Manager を Source: `devEngines.packageManager` として報告する。叩くコマンドは vp だけだが、実体としては pnpm がワークスペースと lockfile を扱っている。
 
-Node のバージョンは `package.json` の `devEngines.runtime` に置く。`.node-version` や `.tool-versions` は置かない。node 以外のツールを pin する必要が出たら `mise.toml` を追加し、そこに node は書かない（[EDR 0003](docs/engineering-decision-logs/0003-pin-node-via-dev-engines.md)）。
+Node のバージョンは `package.json` の `devEngines.runtime` に置き、`onFail` は `error` にする。`.node-version` や `.tool-versions` は置かない。node 以外のツールを pin する必要が出たら `mise.toml` を追加し、そこに node は書かない。
 
 npm 経由（`npm i -g vite-plus` や mise の `npm:vite-plus`）でグローバル導入した vp は使ってはいけない。`vp test` がプロジェクトローカルの vite-plus と二重インスタンスになり、`Vitest failed to find the current suite` で必ず失敗する。上流も [voidzero-dev/vite-plus#2097](https://github.com/voidzero-dev/vite-plus/issues/2097) で「npm でのグローバルインストールは期待されるグローバル CLI ではない」と明言している。
 
@@ -80,6 +80,7 @@ vp run ready     # check → test → build をまとめて実行
 - 依存バージョンは `pnpm-workspace.yaml` の catalog に集約し、各ワークスペースは `catalog:` で参照する
 - ルートと `packages/utils` の `vite` 直接依存を「未使用」と判断して削除しない。pnpm では `overrides` が実際の依存エッジを持つワークスペースにしか効かず、直接依存のないワークスペースでは autoInstallPeers が上流の素の vite を別途入れて vite/vitest が二重インスタンス化する。テンプレートがこの依存を入れているのは [voidzero-dev/vite-plus#1932](https://github.com/voidzero-dev/vite-plus/issues/1932) の対策であり、`knip.json` が `vite` を `ignoreDependencies` に入れているのも同じ理由
 - テストは CI で実行する。pre-push には含めない
+- `package.json` の依存や `devEngines` を変更したら、コミット前に `vp install --frozen-lockfile` が通ることを確認する。`vp check` / test / build / knip は `pnpm-lock.yaml` との齟齬を検出しない
 - スキャフォールド生成物は独自設計に置き換えない。生成物のまま問題が出たら、まず [voidzero-dev/vite-plus](https://github.com/voidzero-dev/vite-plus/issues) の issue を調べる
 - 実装の根拠はコードコメントに書かない。なぜそうしたのか、何を検討して採らなかったのかといった経緯はコミットメッセージの本文に残す。コードコメントで説明を代替しない
 - コードレベルではなく大きな設計上の意思決定は `docs/engineering-decision-logs/` に markdown ファイルとして残す。EDR（Engineering Decision Log）は ADR（Architecture Decision Record）を含むが architecture に限らず、ツールチェーンの選定・運用方針・依存の扱い方などあらゆる種類の意思決定を対象とする。コミットログに収まらない粒度の判断、後から「なぜこうなっているのか」を辿る必要がある判断がここに来る
