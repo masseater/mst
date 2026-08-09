@@ -11,6 +11,7 @@
   },
   "devDependencies": {
     "knip": "catalog:",
+    "vite": "catalog:",
     "vite-plus": "catalog:"
   },
   "devEngines": {
