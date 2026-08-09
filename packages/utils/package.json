@@ -28,10 +28,12 @@
     "dev": "vp pack --watch",
     "test": "vp test",
     "check": "vp check",
+    "release": "bumpp",
     "prepublishOnly": "vp run build"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "bumpp": "^11.1.0",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
