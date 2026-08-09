@@ -31,6 +31,9 @@ dist-ssr
 
 # AI agent worktrees
 .claude/worktrees/
+
+# AI agent scratch space
+.local-agents/
 !.vscode/
 !.vscode/settings.json
 !.vscode/extensions.json
