@@ -9,7 +9,7 @@
   prConcurrentLimit: 5,
   separateMajorMinor: true,
   separateMultipleMajor: true,
-  platformAutomerge: true,
+  platformAutomerge: false,
   customManagers: [
     {
       description: "Renovate does not extract devEngines.packageManager as a dependency yet (renovatebot/renovate#38067). Without this the pnpm rule below never fires.",
@@ -50,7 +50,7 @@
       extends: ["schedule:monthly"],
     },
     {
-      description: "Automerge patch/minor updates (major requires human review)",
+      description: "Automerge patch/minor updates (major requires human review). platformAutomerge is off because GitHub's native auto-merge is unavailable on private repositories under this plan, so Renovate waits for the checks itself before merging.",
       matchUpdateTypes: ["patch", "minor"],
       automerge: true,
     },
