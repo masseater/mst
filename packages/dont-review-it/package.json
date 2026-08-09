@@ -1,0 +1,45 @@
+{
+  "name": "@mst/dont-review-it",
+  "version": "0.0.0",
+  "description": "Machine-enforced answers to the writing questions that would otherwise be raised in review.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/masseater/mst.git",
+    "directory": "packages/dont-review-it"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./plugin": "./src/plugin.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vp pack",
+    "dev": "vp pack --watch",
+    "test": "vp test",
+    "check": "vp check"
+  },
+  "dependencies": {
+    "@mst/lint-rule-authoring": "workspace:*",
+    "@oxlint/plugins": "catalog:",
+    "oxlint": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "lintRules": [
+    "src/lint/oxlint/rules"
+  ]
+}

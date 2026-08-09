@@ -1,0 +1,58 @@
+import { createDontReviewItRule } from "../../../create-rule.ts";
+
+import type { Comment, ESTree } from "@oxlint/plugins";
+
+const LINT_DIRECTIVES = new Set([
+  "eslint-disable",
+  "eslint-disable-line",
+  "eslint-disable-next-line",
+  "eslint-enable",
+  "oxlint-disable",
+  "oxlint-disable-line",
+  "oxlint-disable-next-line",
+  "oxlint-enable",
+]);
+
+const COMPILER_DIRECTIVE_PREFIX = "@ts-";
+
+const firstToken = (text: string): string => {
+  const trimmed = text.trim();
+  return trimmed.length === 0 ? "" : trimmed.split(/\s+/u, 1)[0];
+};
+
+const isMachineReadDirective = (comment: Comment): boolean => {
+  const token = firstToken(comment.value);
+  return LINT_DIRECTIVES.has(token) || token.startsWith(COMPILER_DIRECTIVE_PREFIX);
+};
+
+const isJsdoc = (comment: Comment): boolean =>
+  comment.type === "Block" && comment.value.startsWith("*");
+
+export const noExplanatoryComment = createDontReviewItRule({
+  name: "no-explanatory-comment--delete-or-move-to-commit-message",
+  meta: {
+    type: "problem",
+    docs: {
+      description:
+        "Disallow comments that explain the code, so reasoning lives in the commit message instead of drifting beside an implementation that moves on without it",
+      relatedGuidelines: [],
+    },
+    messages: {
+      explanatoryComment:
+        "A comment that explains the code must not stay in the source, because it drifts as soon as the code changes and nothing fails when it does. Delete it, and put the reasoning in the body of the commit that makes the change. Comment syntax is reserved for declarations a machine reads: lint suppression directives, compiler directives, and JSDoc tag content.",
+    },
+    schema: [],
+  },
+  create(context) {
+    return {
+      Program(node: ESTree.Program) {
+        for (const comment of node.comments) {
+          if (comment.type === "Shebang") continue;
+          if (isJsdoc(comment)) continue;
+          if (isMachineReadDirective(comment)) continue;
+          context.report({ loc: comment.loc, messageId: "explanatoryComment" });
+        }
+      },
+    };
+  },
+});
