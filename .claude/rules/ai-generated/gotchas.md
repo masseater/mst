@@ -62,3 +62,12 @@ pack: { exports: { customExports: { './tsconfig/*': './tsconfig/*' } } }
 - 出自: Vite+ のテンプレートが [sxzz/tsdown-templates](https://github.com/sxzz/tsdown-templates) の default テンプレートを取り込んだもの。vite-plus の CLI スナップショットテストで期待値として固定されているため、テンプレートの未整備ではなく既知の出力
 - 上流に issue はなく、公開リポジトリでもそのまま残している例が複数ある
 - IF: `packages/utils` を publish する; THEN MUST: これらを実際の値に書き換える
+
+## catalog に寄せるときは catalog 側の値が実態と合っているか確認する
+
+- 症状: knip の「未使用 catalog エントリ」を解消するため、ワークスペースの直書きバージョンを `catalog:` に変えたところ、`vite-plus` と `vitest` がそれぞれ `1 version, 2 instances` に分裂した
+- 原因: catalog の `@types/node` が `^24` のままだったため `packages/utils` だけ 24 系に解決され、26 系に解決されるルート・`apps/website` と peer が食い違った。テンプレートがワークスペース側に `^26.1.1` を直書きしていたのは、この整合を取るためだった
+- 検出方法: `vp check` / `vp run -r test` / `vp run -r build` はすべて緑のままなので、これらでは気づけない。`vp why <パッケージ名>` が `Found 1 version` を返すか、`Found 1 version, N instances` を返すかで判断する
+- 対処: catalog 側の値を実態に合わせる（`^24` → `^26`）。ワークスペース側を直書きに戻すと catalog エントリが未使用になるため、catalog 側を上げるのが筋
+
+- IF: ワークスペースの依存を `catalog:` 参照に変える; THEN MUST: 変更後に `vp why` で単一インスタンスを保っていることを確認する

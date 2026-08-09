@@ -4,20 +4,30 @@
   timezone: "Asia/Tokyo",
   schedule: ["before 9am on monday"],
   minimumReleaseAge: "3 days",
-  minimumReleaseAgeBehaviour: "timestamp-required",
-  statusCheckNames: {
-    minimumReleaseAge: null,
-  },
+  statusCheckNames: { minimumReleaseAge: null },
   internalChecksFilter: "strict",
   prConcurrentLimit: 5,
   separateMajorMinor: true,
   separateMultipleMajor: true,
   platformAutomerge: true,
+  customManagers: [
+    {
+      description: "Renovate does not extract devEngines.packageManager as a dependency yet (renovatebot/renovate#38067). Without this the pnpm rule below never fires.",
+      customType: "jsonata",
+      fileFormat: "json",
+      managerFilePatterns: ["/package.json/"],
+      matchStrings: [
+        'devEngines.packageManager ? [{ "depName": devEngines.packageManager.name = "yarn" ? "@yarnpkg/cli" : devEngines.packageManager.name, "currentValue": devEngines.packageManager.version, "datasource": "npm", "versioning": "npm" }] : []',
+      ],
+    },
+  ],
   packageRules: [
     {
-      description: "Vite+ releases its CLI, core and bundled toolchain on one version train",
-      matchPackageNames: ["vite-plus", "vite", "/^@voidzero-dev\\//"],
+      description: "Vite+ publishes vite-plus and the vite catalog alias (@voidzero-dev/vite-plus-core) at the same version seconds apart. matchPackageNames sees the alias target, not the catalog key, so listing 'vite' here would be a dead entry. Eligibility is evaluated per package even inside a group, so schedule and minimumReleaseAge are pinned here to keep members from becoming eligible at different times. See voidzero-dev/vite-plus#2356",
       groupName: "vite-plus",
+      matchPackageNames: ["vite-plus", "@voidzero-dev/vite-plus-*", "vitest", "@vitest/coverage-*"],
+      minimumReleaseAge: "1 day",
+      schedule: ["at any time"],
     },
     {
       description: "GitHub Actions - all updates grouped",
