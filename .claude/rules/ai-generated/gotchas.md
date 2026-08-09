@@ -71,3 +71,31 @@ pack: { exports: { customExports: { './tsconfig/*': './tsconfig/*' } } }
 - 対処: catalog 側の値を実態に合わせる（`^24` → `^26`）。ワークスペース側を直書きに戻すと catalog エントリが未使用になるため、catalog 側を上げるのが筋
 
 - IF: ワークスペースの依存を `catalog:` 参照に変える; THEN MUST: 変更後に `vp why` で単一インスタンスを保っていることを確認する
+
+## `lint.plugins` を書くと既定のプラグインが消える
+
+- 症状: vitest プラグインを有効にしたくて `lint.plugins: ["vitest"]` と書いたところ、`unicorn` / `typescript` / `oxc` の 53 ルールが無効になった。`vp check` は緑のままなので気づけない
+- 原因: `plugins` は追加ではなく置換である。oxlint の型定義にも「Setting the `plugins` field will overwrite the base set of plugins」と書かれている。既定は `["unicorn", "typescript", "oxc"]`
+- 検出方法: `vp lint --print-config` が解決後の `plugins` と全ルールを吐く。設定変更の前後で取って diff を取ると、消えたルールが行として見える
+- 対処: 既定を明示して足す（`["unicorn", "typescript", "oxc", "vitest"]`）
+
+- IF: `lint.plugins` を触る; THEN MUST: 変更前後で `vp lint --print-config` を diff し、差分が追加だけであることを確認する
+
+## `vitest/consistent-test-filename` の `pattern` は素直に書くと壊れる
+
+テストの配置規約（対象ソースと同じディレクトリに `<ソース名>.test.ts`）は、ルートの `vite.config.ts` でこのルールを使って強制している。実装は [oxc の consistent_test_filename.rs](https://github.com/oxc-project/oxc/blob/367f730a7b578d24e8106713abaf517304b6b655/crates/oxc_linter/src/rules/vitest/consistent_test_filename.rs) にあり、設定を書くときに引っかかる仕様が3つある。
+
+- **`pattern` を `/` で始めると正規表現リテラルとして解釈され、黙って別物になる**
+  - 症状: `pattern: "/src/.*\\.test\\.tsx?$"` と書いたら、診断の help に出るパターンが `src` だけになり、パスに `src` を含むファイルが何でも通るようになった。エラーにはならないので気づけない
+  - 原因: `compile_matcher_pattern` が「`/` 始まりなら `/pattern/flags` 形式」とみなし、`strip_prefix('/')` した文字列の**最後の `/`** で切る。`src/.*\.test\.tsx?$` の最後の `/` は `src` の直後なので、パターンが `src`、フラグが `/.*\.test\.tsx?$` に割れる
+  - 対処: `/` で始めない。パス区切りを先頭に置きたいときは `[/]` と書く
+- **マッチ対象は絶対パス全体**
+  - `ctx.file_path()` をそのまま `is_match` にかける。`^packages/` のようなリポジトリルート起点のアンカーは一致しない（`^/Users/` は一致する）
+  - 裏返しとして、チェックアウト先のパスに `tests/` のような文字列が含まれるとパス判定が意図せず動く可能性がある
+- **先読みが使えない**
+  - `lazy_regex`（Rust の `regex` crate）なので `(?!...)` が書けない。「`tests` セグメントを含まない」を `pattern` 単体では表現できない
+  - そのため設定は2段構えにしている。ベースの `rules` で命名（`\.test\.tsx?$`）だけを見て `.spec.ts` を弾き、`overrides` の glob でテスト用ディレクトリを捕まえて到達不能な `pattern` を与えて必ず error にする
+  - `overrides` 側の `pattern` に置いた `place-the-test-file-next-to-its-source-instead-of-a-test-directory` は、正規表現として意味を持たせるためではなく、help 行が `Rename the file that match the pattern (?u)place-the-test-file-next-to-its-source-instead-of-a-test-directory` と読めて直し方が伝わるようにするための文字列
+
+- IF: `vitest/consistent-test-filename` の `pattern` を変更する; THEN MUST: 変更後に違反ファイルを実際に置いて error になることを確認する
+  - このルールは条件に合わなければ黙って何も言わない。設定ミスは「lint が緑」として現れるため、正のケースだけでは検出できない

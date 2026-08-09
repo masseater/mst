@@ -6,8 +6,23 @@ export default defineConfig({
   },
   fmt: {},
   lint: {
+    plugins: ["unicorn", "typescript", "oxc", "vitest"],
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
-    rules: { "vite-plus/prefer-vite-plus-imports": "error" },
+    rules: {
+      "vite-plus/prefer-vite-plus-imports": "error",
+      "vitest/consistent-test-filename": ["error", { pattern: "\\.test\\.tsx?$" }],
+    },
+    overrides: [
+      {
+        files: ["**/{test,tests,__tests__,spec,specs,__specs__}/**"],
+        rules: {
+          "vitest/consistent-test-filename": [
+            "error",
+            { pattern: "place-the-test-file-next-to-its-source-instead-of-a-test-directory" },
+          ],
+        },
+      },
+    ],
     options: { typeAware: true, typeCheck: true },
   },
   run: {
