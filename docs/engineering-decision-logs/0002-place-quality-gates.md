@@ -31,7 +31,11 @@ Mend-hosted Renovate App を使う。self-hosted の workflow は使わない。
 
 self-host が必要になるのは依存グラフが Mend 側の 3GiB メモリ上限を超えて完走できない規模のときで、mst にはその事情がない。Mend-hosted では `postUpgradeTasks` が使えないが、lockfile の更新は Renovate 本体が行い、そのとき使う pnpm のバージョンは `devEngines.packageManager` を尊重する。
 
-設定ファイルを置くだけでは動かない。GitHub 側で masseater/mst に Renovate App を許可する操作が別途必要になる。
+設定ファイルを置くだけでは動かない。GitHub 側で masseater/mst を Renovate App の対象リポジトリに含める操作が別途必要になる。App 自体は masseater アカウントに導入済みで、他のリポジトリでは稼働している。
+
+マージは Renovate 自身に行わせる（`platformAutomerge: false`）。GitHub のネイティブ auto-merge は、このアカウントのプランでは private リポジトリで利用できない。`allow_auto_merge` を API で有効化しようとしても、エラーにならずに `false` のまま無視される（同じリクエストに含めた `delete_branch_on_merge` は反映されるため、権限やリクエストの問題ではない）。public リポジトリでは有効化できている。
+
+ネイティブ auto-merge が使えないまま `platformAutomerge: true` にしておくと、Renovate は有効化に失敗して自前マージにフォールバックするため実害は小さいが、意図が設定に現れない。`false` を明示している。Renovate 自前のマージはステータスチェックの完了を待つので、必須チェックのルールセットがなくても CI を無視してマージされることはない。
 
 ### Vite+ 構成で Renovate に効かせるために必要なこと
 
