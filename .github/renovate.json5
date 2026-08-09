@@ -1,0 +1,48 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: ["config:recommended"],
+  timezone: "Asia/Tokyo",
+  schedule: ["before 9am on monday"],
+  minimumReleaseAge: "3 days",
+  minimumReleaseAgeBehaviour: "timestamp-required",
+  statusCheckNames: {
+    minimumReleaseAge: null,
+  },
+  internalChecksFilter: "strict",
+  prConcurrentLimit: 5,
+  separateMajorMinor: true,
+  separateMultipleMajor: true,
+  platformAutomerge: true,
+  packageRules: [
+    {
+      description: "Vite+ releases its CLI, core and bundled toolchain on one version train",
+      matchPackageNames: ["vite-plus", "vite", "/^@voidzero-dev\\//"],
+      groupName: "vite-plus",
+    },
+    {
+      description: "GitHub Actions - all updates grouped",
+      matchManagers: ["github-actions"],
+      matchUpdateTypes: ["patch", "minor", "major"],
+      groupName: "github-actions",
+    },
+    {
+      description: "Node.js - monthly, all sources grouped",
+      matchPackageNames: ["node", "@types/node"],
+      matchUpdateTypes: ["patch", "minor", "major"],
+      groupName: "node",
+      extends: ["schedule:monthly"],
+    },
+    {
+      description: "pnpm - monthly, all sources grouped",
+      matchPackageNames: ["pnpm"],
+      matchUpdateTypes: ["patch", "minor", "major"],
+      groupName: "pnpm",
+      extends: ["schedule:monthly"],
+    },
+    {
+      description: "Automerge patch/minor updates (major requires human review)",
+      matchUpdateTypes: ["patch", "minor"],
+      automerge: true,
+    },
+  ],
+}
