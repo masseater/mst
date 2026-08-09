@@ -41,13 +41,13 @@ npm 経由（`npm i -g vite-plus` や mise の `npm:vite-plus`）でグローバ
 
 ### ワークスペース内の規約（`apps/*`, `packages/*`）
 
-| ファイル/ディレクトリ | 説明                                            |
-| --------------------- | ----------------------------------------------- |
-| `src/`                | ソース                                          |
-| `tests/*.test.ts`     | テストファイル（`packages/utils` の規約）       |
-| `vite.config.ts`      | そのワークスペース固有の pack / lint / fmt 設定 |
-| `tsconfig.json`       | そのワークスペースの TypeScript 設定            |
-| `package.json`        | そのワークスペースのマニフェストとスクリプト    |
+| ファイル/ディレクトリ | 説明                                               |
+| --------------------- | -------------------------------------------------- |
+| `src/`                | ソース                                             |
+| `<ソース名>.test.ts`  | テストファイル。対象ソースと同じディレクトリに置く |
+| `vite.config.ts`      | そのワークスペース固有の pack / lint / fmt 設定    |
+| `tsconfig.json`       | そのワークスペースの TypeScript 設定               |
+| `package.json`        | そのワークスペースのマニフェストとスクリプト       |
 
 ### Git フックの規約（`.vite-hooks/`）
 
@@ -79,6 +79,7 @@ vp run ready     # check → test → build をまとめて実行
 - 設定は `vite.config.ts` に集約する。`oxlint.config.ts` / `.oxlintrc.json` / `.oxfmtrc.json` / `vitest.config.ts` を作らない（Vite+ が明示的に非推奨としている）
 - 依存バージョンは `pnpm-workspace.yaml` の catalog に集約し、各ワークスペースは `catalog:` で参照する
 - ルートと `packages/utils` の `vite` 直接依存を「未使用」と判断して削除しない。pnpm では `overrides` が実際の依存エッジを持つワークスペースにしか効かず、直接依存のないワークスペースでは autoInstallPeers が上流の素の vite を別途入れて vite/vitest が二重インスタンス化する。テンプレートがこの依存を入れているのは [voidzero-dev/vite-plus#1932](https://github.com/voidzero-dev/vite-plus/issues/1932) の対策であり、`knip.json` が `vite` を `ignoreDependencies` に入れているのも同じ理由
+- テストは対象ソースと同じディレクトリに `<ソース名>.test.ts` として置く。`tests/` `test/` `__tests__/` `spec/` などのディレクトリを作らず、`.spec.ts` も使わない。ルートの `vite.config.ts` にある `vitest/consistent-test-filename` がどちらも error にする。テストの置き場所は `src/` 配下に限らない
 - テストは CI で実行する。pre-push には含めない
 - `package.json` の依存や `devEngines` を変更したら、コミット前に `vp install --frozen-lockfile` が通ることを確認する。`vp check` / test / build / knip は `pnpm-lock.yaml` との齟齬を検出しない
 - スキャフォールド生成物は独自設計に置き換えない。生成物のまま問題が出たら、まず [voidzero-dev/vite-plus](https://github.com/voidzero-dev/vite-plus/issues) の issue を調べる
