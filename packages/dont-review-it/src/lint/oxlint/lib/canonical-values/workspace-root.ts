@@ -1,7 +1,8 @@
 import { dirname, join, resolve } from "node:path";
 
+import { MANIFEST_FILE_NAME } from "./package-manifest.ts";
 import { readJsonFile } from "./read-json-file.ts";
-import { isFile, MANIFEST_FILE_NAME } from "./source-files.ts";
+import { isFile } from "./source-files.ts";
 
 const WORKSPACE_MANIFEST_FILE_NAMES: readonly string[] = [
   "pnpm-workspace.yaml",

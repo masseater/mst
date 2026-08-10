@@ -15,15 +15,31 @@ const OTHER_PATH = "packages/utils/src/other.ts";
 
 const subjectFilename = join(repositoryRoot, SUBJECT_PATH);
 
+const NODES_IN_A_REPORTED_BODY = 8;
+
 const indexWith = (fingerprintOfSubject: string, fingerprintOfOther: string) =>
   buildBodyIndex([
     {
       relativePath: SUBJECT_PATH,
-      bodies: [{ name: "twice", line: 1, fingerprint: fingerprintOfSubject }],
+      bodies: [
+        {
+          name: "twice",
+          line: 1,
+          fingerprint: fingerprintOfSubject,
+          nodeCount: NODES_IN_A_REPORTED_BODY,
+        },
+      ],
     },
     {
       relativePath: OTHER_PATH,
-      bodies: [{ name: "doubled", line: 7, fingerprint: fingerprintOfOther }],
+      bodies: [
+        {
+          name: "doubled",
+          line: 7,
+          fingerprint: fingerprintOfOther,
+          nodeCount: NODES_IN_A_REPORTED_BODY,
+        },
+      ],
     },
   ]);
 
