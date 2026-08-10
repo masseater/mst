@@ -34,4 +34,6 @@ jobs:
 
       - run: vp run -r build
 
+      - run: vp node packages/dont-review-it/dist/cli.mjs verify
+
       - run: vp run knip

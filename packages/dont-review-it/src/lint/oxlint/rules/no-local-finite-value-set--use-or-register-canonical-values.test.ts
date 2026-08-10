@@ -1,0 +1,344 @@
+import { testLintRule } from "@mst/lint-rule-authoring";
+import { describe } from "vite-plus/test";
+
+import { buildCatalog, EMPTY_CANONICAL_VALUES_CATALOG } from "../lib/canonical-values/catalog.ts";
+import { fingerprintValues } from "../lib/canonical-values/fingerprint.ts";
+import { createNoLocalFiniteValueSet } from "./no-local-finite-value-set--use-or-register-canonical-values.ts";
+
+import type { CanonicalValuesEntry } from "../lib/canonical-values/catalog.ts";
+import type { CanonicalValue } from "../lib/canonical-values/fingerprint.ts";
+
+const ORDER_STATUS_VALUES: readonly CanonicalValue[] = ["draft", "published"];
+
+const entry = (
+  conceptId: string,
+  workspace: string,
+  vocabulary: readonly CanonicalValue[],
+): CanonicalValuesEntry => ({
+  conceptId,
+  declarationPath: `packages/${workspace}/src/${conceptId}.ts`,
+  exportPath: `@mst/${workspace}`,
+  values: vocabulary,
+  fingerprint: fingerprintValues(vocabulary),
+});
+
+const ownedCatalog = buildCatalog([entry("order-status", "order-vocabulary", ORDER_STATUS_VALUES)]);
+
+const ambiguousCatalog = buildCatalog([
+  entry("order-status", "order-vocabulary", ORDER_STATUS_VALUES),
+  entry("article-status", "article-vocabulary", ORDER_STATUS_VALUES),
+]);
+
+const subpathCatalog = buildCatalog([
+  {
+    ...entry("order-status", "order-vocabulary", ORDER_STATUS_VALUES),
+    exportPath: "#internal/statuses",
+  },
+]);
+
+const withOwner = createNoLocalFiniteValueSet({ loadCatalog: () => ownedCatalog });
+const withoutCatalog = createNoLocalFiniteValueSet({
+  loadCatalog: () => EMPTY_CANONICAL_VALUES_CATALOG,
+});
+const withAmbiguousOwners = createNoLocalFiniteValueSet({ loadCatalog: () => ambiguousCatalog });
+const withSubpathOwner = createNoLocalFiniteValueSet({ loadCatalog: () => subpathCatalog });
+
+describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-values", () => {
+  describe("against a catalog that owns the value set", () => {
+    testLintRule(withOwner, {
+      valid: [
+        {
+          name: "an array that only fixes display order defines no type",
+          code: 'const DISPLAY_ORDER = ["draft", "published"];\nexport const first = DISPLAY_ORDER[0];',
+        },
+        {
+          name: "a set assembled at run time is not a static vocabulary",
+          code: "export const seen = (rows) => new Set(rows.map((row) => row.status));",
+        },
+        {
+          name: "an enum fed from an external package is not a repository vocabulary",
+          code: 'import { STATUSES } from "order-statuses";\nexport const schema = z.enum(STATUSES);',
+        },
+        {
+          name: "an alias keeps one value once null is set aside",
+          code: 'export type MaybeStatus = "draft" | null;',
+        },
+        {
+          name: "both booleans spelled out are not a vocabulary",
+          code: "export type Flag = true | false;",
+        },
+        {
+          name: "a union widened by a keyword is not finite",
+          code: 'export type Loose = string | "draft";',
+        },
+        {
+          name: "a discriminated union carries structure rather than values",
+          code: 'export type Event = { kind: "draft" } | { kind: "published" };',
+        },
+        {
+          name: "a union written in a parameter position is outside the grammar",
+          code: 'export const label = (status: "draft" | "published") => status;',
+        },
+        {
+          name: "a union written in a return position is outside the grammar",
+          code: 'export const initial = (): "draft" | "published" => "draft";',
+        },
+        {
+          name: "two hops away from the array is outside the one hop grammar",
+          code: 'const RAW = ["draft", "published"];\nconst STATUSES = RAW;\nexport const schema = z.enum(STATUSES);',
+        },
+        {
+          name: "an indexed access over a registered export path stays derived",
+          code: 'import { ORDER_STATUSES } from "@mst/order-vocabulary";\nexport type OrderStatus = (typeof ORDER_STATUSES)[number];',
+        },
+        {
+          name: "a relative import that resolves to the annotated declaration stays derived",
+          code: 'import { ORDER_STATUSES } from "./order-status.ts";\nexport const schema = z.enum(ORDER_STATUSES);',
+          filename: "packages/order-vocabulary/src/schema.ts",
+        },
+        {
+          name: "a relative import written without an extension resolves the same way",
+          code: 'import { ORDER_STATUSES } from "./order-status";\nexport const schema = z.enum(ORDER_STATUSES);',
+          filename: "packages/order-vocabulary/src/schema.ts",
+        },
+        {
+          name: "a relative import written with the js extension resolves to the ts declaration",
+          code: 'import { ORDER_STATUSES } from "./order-status.js";\nexport const schema = z.enum(ORDER_STATUSES);',
+          filename: "packages/order-vocabulary/src/schema.ts",
+        },
+        {
+          name: "the annotated declaration is the place the concept is defined",
+          code: '/** @canonical-values order-status */\nexport const ORDER_STATUSES = ["draft", "published"] as const;\nexport type OrderStatus = (typeof ORDER_STATUSES)[number];',
+        },
+        {
+          name: "blank lines between the annotation and its declaration keep them paired",
+          code: '/** @canonical-values order-status */\n\nexport const ORDER_STATUSES = ["draft", "published"] as const;\nexport type OrderStatus = (typeof ORDER_STATUSES)[number];',
+        },
+        {
+          name: "a set whose values no concept owns is not a candidate",
+          code: 'const CACHE_KEYS = new Set(["alpha", "beta"]);\nexport const has = (key) => CACHE_KEYS.has(key);',
+        },
+        {
+          name: "an indexed access array whose values no concept owns is not a candidate",
+          code: 'const SIZES = ["small", "large"] as const;\nexport type Size = (typeof SIZES)[number];',
+        },
+        {
+          name: "a set filled from a repository import declares no vocabulary here",
+          code: 'import { HTTP_METHOD_HINTS } from "./probe-plain.ts";\nconst known = new Set(HTTP_METHOD_HINTS);\nexport const has = (hint) => known.has(hint);',
+          filename: "packages/order/src/known.ts",
+        },
+        {
+          name: "an indexed access over a repository import declares no vocabulary here",
+          code: 'import { HTTP_METHOD_HINTS } from "./probe-plain.ts";\nexport type Hint = (typeof HTTP_METHOD_HINTS)[number];',
+          filename: "packages/order/src/hint.ts",
+        },
+        {
+          name: "a test file is not production source",
+          code: 'export type OrderStatus = "draft" | "published";',
+          filename: "packages/order/src/order-status.test.ts",
+        },
+        {
+          name: "a story is not production source",
+          code: 'export type OrderStatus = "draft" | "published";',
+          filename: "packages/order/src/order-status.story.tsx",
+        },
+        {
+          name: "a fixture directory is not production source",
+          code: 'export type OrderStatus = "draft" | "published";',
+          filename: "packages/order/fixtures/order-status.ts",
+        },
+        {
+          name: "a tests directory is not production source",
+          code: 'export type OrderStatus = "draft" | "published";',
+          filename: "packages/order/tests/order-status.ts",
+        },
+      ],
+      invalid: [
+        {
+          name: "a static array handed straight to a schema enum defines the vocabulary here",
+          code: 'export const schema = z.enum(["draft", "published"]);',
+          errors: [{ messageId: "localFiniteValueSetWithOwner" }],
+        },
+        {
+          name: "one hop through a local const does not move the definition",
+          code: 'const STATUSES = ["draft", "published"] as const;\nexport const schema = z.enum(STATUSES);',
+          errors: [{ messageId: "localFiniteValueSetWithOwner" }],
+        },
+        {
+          name: "a scalar literal type alias declares a vocabulary",
+          code: 'export type OrderStatus = "draft" | "published";',
+          errors: [{ messageId: "localFiniteValueSetWithOwner" }],
+        },
+        {
+          name: "template literals spell the same vocabulary as quoted literals",
+          code: "export type OrderStatus = `draft` | `published`;",
+          errors: [{ messageId: "localFiniteValueSetWithOwner" }],
+        },
+        {
+          name: "a schema union of literals is the same vocabulary in another syntax",
+          code: 'export const schema = z.union([z.literal("draft"), z.literal("published")]);',
+          errors: [{ messageId: "localFiniteValueSetWithOwner" }],
+        },
+        {
+          name: "an options schema of a lint rule declares an enum",
+          code: 'export const schema = [{ type: "object", properties: { status: { enum: ["draft", "published"] } } }];',
+          errors: [{ messageId: "localFiniteValueSetWithOwner" }],
+        },
+        {
+          name: "a static array behind an indexed access matches a registered value set",
+          code: 'const STATUSES = ["draft", "published"] as const;\nexport type OrderStatus = (typeof STATUSES)[number];',
+          errors: [{ messageId: "localFiniteValueSetWithOwner" }],
+        },
+        {
+          name: "a static set initializer matches a registered value set",
+          code: 'const STATUSES = new Set(["draft", "published"]);\nexport const has = (status) => STATUSES.has(status);',
+          errors: [{ messageId: "localFiniteValueSetWithOwner" }],
+        },
+        {
+          name: "one array feeding two constructs is reported once",
+          code: 'const STATUSES = ["draft", "published"] as const;\nexport type OrderStatus = (typeof STATUSES)[number];\nexport const schema = z.enum(STATUSES);',
+          errors: [{ messageId: "localFiniteValueSetWithOwner" }],
+        },
+        {
+          name: "a relative import the catalog does not resolve is an unregistered route",
+          code: 'import { STATUSES } from "./statuses.ts";\nexport const schema = z.enum(STATUSES);',
+          filename: "packages/order/src/schema.ts",
+          errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
+        },
+        {
+          name: "a line comment carrying the tag does not annotate the declaration below it",
+          code: '// @canonical-values order-status\nexport const ORDER_STATUSES = ["draft", "published"] as const;\nexport type OrderStatus = (typeof ORDER_STATUSES)[number];',
+          errors: [{ messageId: "localFiniteValueSetWithOwner" }],
+        },
+        {
+          name: "a block comment that is not a doc comment does not annotate either",
+          code: '/* @canonical-values order-status */\nexport const ORDER_STATUSES = ["draft", "published"] as const;\nexport type OrderStatus = (typeof ORDER_STATUSES)[number];',
+          errors: [{ messageId: "localFiniteValueSetWithOwner" }],
+        },
+        {
+          name: "an annotation buried in a function body annotates nothing at the top level",
+          code: 'export const probeNoop = () => {\n  /** @canonical-values order-status */\n  return 1;\n};\n\nexport type OrderStatus = "draft" | "published";',
+          errors: [{ messageId: "localFiniteValueSetWithOwner" }],
+        },
+        {
+          name: "a comment wedged between the annotation and the declaration breaks the pair",
+          code: '/** @canonical-values order-status */\n// sorted by the order the api returns\nexport const ORDER_STATUSES = ["draft", "published"] as const;\nexport type OrderStatus = (typeof ORDER_STATUSES)[number];',
+          errors: [{ messageId: "localFiniteValueSetWithOwner" }],
+        },
+        {
+          name: "the configured ownership policy reaches the report",
+          code: 'export type OrderStatus = "draft" | "published";',
+          options: [
+            { ownershipPolicy: "service wide operational vocabulary lives in @mst/vocabulary" },
+          ],
+          errors: [
+            {
+              message:
+                /Ownership policy: service wide operational vocabulary lives in @mst\/vocabulary\./u,
+            },
+          ],
+        },
+        {
+          name: "the report names the owner it found",
+          code: 'export type OrderStatus = "draft" | "published";',
+          errors: [{ message: /order-status \(@mst\/order-vocabulary\)/u }],
+        },
+      ],
+    });
+  });
+
+  describe("against a catalog that resolves nothing", () => {
+    testLintRule(withoutCatalog, {
+      valid: [
+        {
+          name: "a set stays silent because it is only a candidate when a concept owns it",
+          code: 'const STATUSES = new Set(["draft", "published"]);\nexport const has = (status) => STATUSES.has(status);',
+        },
+        {
+          name: "an indexed access array stays silent for the same reason",
+          code: 'const STATUSES = ["draft", "published"] as const;\nexport type OrderStatus = (typeof STATUSES)[number];',
+        },
+        {
+          name: "a set filled from a repository import stays silent for the same reason",
+          code: 'import { HTTP_METHOD_HINTS } from "./probe-plain.ts";\nconst known = new Set(HTTP_METHOD_HINTS);\nexport const has = (hint) => known.has(hint);',
+          filename: "packages/order/src/known.ts",
+        },
+        {
+          name: "an indexed access over a repository import stays silent for the same reason",
+          code: 'import { HTTP_METHOD_HINTS } from "./probe-plain.ts";\nexport type Hint = (typeof HTTP_METHOD_HINTS)[number];',
+          filename: "packages/order/src/hint.ts",
+        },
+      ],
+      invalid: [
+        {
+          name: "a vocabulary with no owner still has to be registered somewhere",
+          code: 'export type OrderStatus = "draft" | "published";',
+          errors: [{ messageId: "localFiniteValueSetWithoutOwner" }],
+        },
+        {
+          name: "an unconfigured ownership policy says so instead of inventing one",
+          code: 'export const schema = z.enum(["draft", "published"]);',
+          errors: [
+            {
+              message:
+                /Ownership policy: not configured \(set the ownershipPolicy option of this rule\)\./u,
+            },
+          ],
+        },
+        {
+          name: "a relative route is unregistered while nothing is registered",
+          code: 'import { STATUSES } from "./statuses.ts";\nexport const schema = z.enum(STATUSES);',
+          filename: "packages/order/src/schema.ts",
+          errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
+        },
+      ],
+    });
+  });
+
+  describe("against a catalog whose owner is published through a subpath import", () => {
+    testLintRule(withSubpathOwner, {
+      valid: [
+        {
+          name: "a subpath import that matches the registered export path stays derived",
+          code: 'import { ORDER_STATUSES } from "#internal/statuses";\nexport const schema = z.enum(ORDER_STATUSES);',
+          filename: "packages/order/src/schema.ts",
+        },
+      ],
+      invalid: [
+        {
+          name: "a subpath import the catalog does not resolve is an unregistered route",
+          code: 'import { STATUSES } from "#internal/order";\nexport const schema = z.enum(STATUSES);',
+          filename: "packages/order/src/schema.ts",
+          errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
+        },
+      ],
+    });
+  });
+
+  describe("against a catalog where two concepts share the values", () => {
+    testLintRule(withAmbiguousOwners, {
+      valid: [
+        {
+          name: "an array that only fixes display order defines no type",
+          code: 'const DISPLAY_ORDER = ["draft", "published"];\nexport const first = DISPLAY_ORDER[0];',
+        },
+      ],
+      invalid: [
+        {
+          name: "every candidate is listed instead of one being picked",
+          code: 'export type OrderStatus = "draft" | "published";',
+          errors: [
+            {
+              messageId: "localFiniteValueSetWithOwnerCandidates",
+              data: {
+                owners:
+                  "order-status (@mst/order-vocabulary), article-status (@mst/article-vocabulary)",
+                ownershipPolicy: "not configured (set the ownershipPolicy option of this rule)",
+              },
+            },
+          ],
+        },
+      ],
+    });
+  });
+});
