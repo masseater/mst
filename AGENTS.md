@@ -10,6 +10,8 @@ mst は、リポジトリ運用の仕組みを再利用可能な単位として�
 
 規範の書き方は `docs/normative-notation.md` に従う。
 
+この文書はリポジトリの運用規約を持つ。実装とレビューで個々の判断をどう下すかは `docs/guidelines/` が持つ。
+
 ## 規約
 
 - IF: ツールチェーンに関わる道具を選ぶ; THEN MUST: Vite+（vite-plus）に一本化する
@@ -73,7 +75,7 @@ mst は、リポジトリ運用の仕組みを再利用可能な単位として�
 - `vp run dev` — 開発サーバー（`apps/website`）
 - `vp run docs` — 規範文書の検査
 - `vp run docs:write` — 生成部分の更新
-- `vp run ready` — check → test → build → knip → 規範文書の検査。CI と同じ
+- `vp run ready` — CI と同じ検査をまとめて実行する。何を実行するかは `package.json` の `ready` が持つ
 
 ## 自作 lint ルールの実行時間を見る
 

@@ -34,6 +34,10 @@ jobs:
 
       - run: vp run -r build
 
+      - run: vp run knip
+
       - run: vp exec dont-review-it verify
 
-      - run: vp run knip
+      - run: vp exec dont-review-it duplicated-bodies
+
+      - run: vp run docs

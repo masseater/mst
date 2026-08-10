@@ -60,7 +60,4 @@ export default defineConfig({
     ],
     options: { typeAware: true, typeCheck: true },
   }),
-  run: {
-    cache: true,
-  },
 });

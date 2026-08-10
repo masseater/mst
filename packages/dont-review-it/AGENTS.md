@@ -26,10 +26,7 @@ description: Machine-enforced answers to the writing questions that would otherw
 
 ルールごとに `docs/lint/<ルール名>.md` を持つ。何を検出するか、なぜそれが要るか、どう直すか、どんな回避策を禁じるかを書く。報告メッセージには直し方だけを載せ、理由は文書側が持つ。
 
-- IF: ルールの説明に例を載せる; THEN
-  - MUST: このリポジトリのコードから作る
-  - PROHIBIT: 良い例と悪い例を対で並べる
-    - 差が機械で判別できるならルールにできるはずで、判別できないなら例を並べても読み手は何を見比べるか決められない
+説明に載せる例をどこから作るかは [文書](../../docs/guidelines/documents.md) が持つ。良い例と悪い例を対で置かないことは [規範の書き方](../../docs/normative-notation.md) が持つ。
 
 ## 検証コマンド
 

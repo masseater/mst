@@ -1,5 +1,5 @@
 ---
-description: Small text helpers shared by the packages in this repository.
+description: The neutral home for declarations that more than one package needs and none of them owns.
 ---
 
 # @mst/utils
