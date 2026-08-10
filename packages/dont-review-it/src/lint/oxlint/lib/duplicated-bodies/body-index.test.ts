@@ -39,6 +39,20 @@ describe("duplicatedClustersIn", () => {
     expect(duplicatedClustersIn(index)).toStrictEqual([]);
   });
 
+  test("orders the clusters by the site each of them starts at", () => {
+    const index = buildBodyIndex([
+      { relativePath: "z.ts", bodies: [indexedBodyAt(1, "later")] },
+      { relativePath: "y.ts", bodies: [indexedBodyAt(2, "later")] },
+      { relativePath: "a.ts", bodies: [indexedBodyAt(3, "earlier")] },
+      { relativePath: "b.ts", bodies: [indexedBodyAt(4, "earlier")] },
+    ]);
+
+    expect(duplicatedClustersIn(index).map((cluster) => cluster[0].relativePath)).toStrictEqual([
+      "a.ts",
+      "y.ts",
+    ]);
+  });
+
   test("reports a cluster once, with every site in it", () => {
     const index = buildBodyIndex([
       { relativePath: "a.ts", bodies: [indexedBodyAt(1, "shared")] },
