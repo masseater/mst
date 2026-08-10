@@ -37,6 +37,13 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
     });
   });
 
+  test("a command given no repository root scans the working directory", () => {
+    const run = runDontReviewIt(["equivalent-concepts"]);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.error).toBe("");
+  });
+
   test("verify returns the problem as output and exits one", () => {
     const root = repositoryWith({
       "src/order.ts": `/** ${CANONICAL_VALUES_TAG} */
