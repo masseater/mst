@@ -1,6 +1,12 @@
-export const LINT_RULE_SEVERITIES = ["error", "warn", "off"] as const;
+import type { AllowWarnDeny } from "oxlint";
 
-export type LintRuleSeverity = (typeof LINT_RULE_SEVERITIES)[number];
+export type LintRuleSeverity = Extract<AllowWarnDeny, "error" | "warn" | "off">;
+
+export const LINT_RULE_SEVERITIES = [
+  "error",
+  "warn",
+  "off",
+] as const satisfies readonly LintRuleSeverity[];
 
 export const LINT_SEVERITY = {
   ERROR: LINT_RULE_SEVERITIES[0],
