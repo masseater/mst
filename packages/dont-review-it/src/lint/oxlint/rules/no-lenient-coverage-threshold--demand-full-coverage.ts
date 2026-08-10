@@ -1,19 +1,19 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
 import { defaultExportedObject } from "../lib/default-exported-object.ts";
 import { nestedObjectAt, objectPropertyOf, objectValueOf } from "../lib/object-literal.ts";
-import { withoutParentheses } from "../lib/parenthesized-expression.ts";
-import { segmentsOf } from "../lib/path-segments.ts";
 import { toPosixPath } from "../lib/posix-path.ts";
 
 import type { ESTree, Options } from "@oxlint/plugins";
 
-const TEST_CONFIG_FILE_NAME = /^vite(?:st)?\.config\.[cm]?[jt]s$/u;
+const TEST_CONFIG_PATH = /(?:^|\/)vite(?:st)?\.config\.[cm]?[jt]s$/u;
 
 const THRESHOLDS_PATH = ["test", "coverage", "thresholds"];
 
 const FULL_COVERAGE = 100;
 
 const COVERAGE_METRICS = ["branches", "functions", "lines", "statements"];
+
+const PER_FILE_KEY = "perFile";
 
 const THRESHOLD_SCHEMA = { type: "number", minimum: 0, maximum: FULL_COVERAGE } as const;
 
@@ -28,13 +28,12 @@ type CoverageViolation = {
   readonly data: Record<string, number | string>;
 };
 
-const fileNameOf = (path: string): string =>
-  segmentsOf({ path: toPosixPath(path), separator: "/" }).at(-1) ?? "";
+const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  value instanceof Object;
 
 const requirementsFrom = (options: Readonly<Options>): readonly CoverageRequirement[] => {
   const [first] = options;
-  const overrides =
-    typeof first === "object" && first !== null && !Array.isArray(first) ? first : {};
+  const overrides = isRecord(first) ? first : {};
   return COVERAGE_METRICS.map((metric) => {
     const override = overrides[metric];
     return { metric, required: typeof override === "number" ? override : FULL_COVERAGE };
@@ -44,14 +43,18 @@ const requirementsFrom = (options: Readonly<Options>): readonly CoverageRequirem
 const requirementSummaryOf = (requirements: readonly CoverageRequirement[]): string =>
   requirements.map(({ metric, required }) => `\`${metric}\` to ${required}`).join(", ");
 
-const declaredNumberOf = (expression: ESTree.Expression): number | null => {
-  const literal = withoutParentheses(expression);
-  return literal.type === "Literal" && typeof literal.value === "number" ? literal.value : null;
-};
+const declaredNumberOf = (literal: ESTree.Expression): number | null =>
+  literal.type === "Literal" && typeof literal.value === "number" ? literal.value : null;
 
-const demandsFullCoverage = (thresholds: ESTree.ObjectExpression): boolean => {
-  const shorthand = objectValueOf({ object: thresholds, key: String(FULL_COVERAGE) });
-  return shorthand !== null && shorthand.type === "Literal" && shorthand.value === true;
+const declaresTrueAt = ({
+  thresholds,
+  key,
+}: {
+  readonly thresholds: ESTree.ObjectExpression;
+  readonly key: string;
+}): boolean => {
+  const declared = objectValueOf({ object: thresholds, key });
+  return declared !== null && declared.type === "Literal" && declared.value === true;
 };
 
 const violationsIn = ({
@@ -61,7 +64,10 @@ const violationsIn = ({
   readonly thresholds: ESTree.ObjectExpression;
   readonly requirements: readonly CoverageRequirement[];
 }): readonly CoverageViolation[] => {
-  const shorthandDemandsFullCoverage = demandsFullCoverage(thresholds);
+  const shorthandDemandsFullCoverage = declaresTrueAt({
+    thresholds,
+    key: String(FULL_COVERAGE),
+  });
   return requirements.flatMap<CoverageViolation>(({ metric, required }) => {
     if (shorthandDemandsFullCoverage && required <= FULL_COVERAGE) return [];
     const property = objectPropertyOf({ object: thresholds, key: metric });
@@ -92,7 +98,9 @@ export const noLenientCoverageThreshold = createDontReviewItRule({
     },
     messages: {
       missingCoverageThresholds:
-        "A test config must demand a coverage number, because a suite that measures coverage without demanding a number lets it fall commit by commit and nothing ever turns red. `{{path}}` is absent from this config. Add it and set {{requirement}}, or write `100: true` to demand full coverage on every metric at once. If a metric genuinely cannot reach the required number, lower that one metric in this rule's options so the exemption is decided once for every config, instead of leaving the whole config silent.",
+        "A test config must demand a coverage number, because a suite that measures coverage without demanding a number lets it fall commit by commit and nothing ever turns red. `{{path}}` is absent from this config. Add it and set {{requirement}} together with `perFile: true`, or write `100: true` alongside `perFile: true` to demand full coverage on every metric at once. If a metric genuinely cannot reach the required number, lower that one metric in this rule's options so the exemption is decided once for every config, instead of leaving the whole config silent.",
+      aggregateCoverageThreshold:
+        "A coverage threshold must be checked file by file, because a threshold checked against the package total lets a file with no tests at all sit behind the files that are well covered, and the total says nothing about which file that is. `perFile` is not set to `true` in `test.coverage.thresholds`. Add it. The number then means the same thing for every file in the package, which is the only reading under which a newly added file cannot arrive uncovered and still pass.",
       unsetCoverageThreshold:
         "Every coverage metric must carry a threshold, because a metric left out is a metric nobody is watching, and the ones nobody watches are the ones that erode first. `{{metric}}` carries no number in `test.coverage.thresholds`. Set it to {{required}}, or write `100: true` to demand full coverage on every metric at once. A value that is not a plain number cannot be read here, so a computed or imported threshold counts as absent.",
       lenientCoverageThreshold:
@@ -112,7 +120,7 @@ export const noLenientCoverageThreshold = createDontReviewItRule({
     ],
   },
   create(context) {
-    if (!TEST_CONFIG_FILE_NAME.test(fileNameOf(context.filename))) return {};
+    if (!TEST_CONFIG_PATH.test(toPosixPath(context.filename))) return {};
     const requirements = requirementsFrom(context.options);
 
     return {
@@ -130,6 +138,9 @@ export const noLenientCoverageThreshold = createDontReviewItRule({
             },
           });
           return;
+        }
+        if (!declaresTrueAt({ thresholds, key: PER_FILE_KEY })) {
+          context.report({ node: thresholds, messageId: "aggregateCoverageThreshold" });
         }
         for (const violation of violationsIn({ thresholds, requirements })) {
           context.report(violation);

@@ -30,7 +30,7 @@ jobs:
 
       - run: vp check
 
-      - run: vp run -r test
+      - run: vp run -r test --coverage
 
       - run: vp run -r build
 

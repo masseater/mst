@@ -15,6 +15,14 @@ describe("dont-review-it/no-tautological-assertion--assert-on-a-computed-value",
         code: "expect(parsed).toBe(3);",
       },
       {
+        name: "a matcher reached through a computed name is not read as a matcher",
+        code: "expect(1)['toBe'](1);",
+      },
+      {
+        name: "a private method call is not read as a matcher",
+        code: "class Suite { #toBe(expected) { return expected; } run() { this.#toBe(1); } }",
+      },
+      {
         name: "two different literals compare something even if the code never runs",
         code: "expect(1).toBe(2);",
       },

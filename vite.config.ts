@@ -45,7 +45,7 @@ export default defineConfig({
   },
   test: {
     coverage: {
-      thresholds: { 100: true },
+      thresholds: { 100: true, perFile: true },
     },
   },
   run: {

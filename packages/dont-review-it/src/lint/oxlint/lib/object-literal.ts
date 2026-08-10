@@ -1,5 +1,3 @@
-import { withoutParentheses } from "./parenthesized-expression.ts";
-
 import type { ESTree } from "@oxlint/plugins";
 
 type ObjectLookup = {
@@ -8,11 +6,9 @@ type ObjectLookup = {
 };
 
 const propertyKeyOf = (property: ESTree.ObjectProperty): string | null => {
-  if (property.computed) return null;
   const { key } = property;
-  if (key.type === "Identifier") return key.name;
-  if (key.type !== "Literal") return null;
-  return typeof key.value === "string" || typeof key.value === "number" ? String(key.value) : null;
+  if (key.type === "Literal") return String(key.value);
+  return key.type === "Identifier" && !property.computed ? key.name : null;
 };
 
 export const objectPropertyOf = ({ object, key }: ObjectLookup): ESTree.ObjectProperty | null =>
@@ -23,7 +19,7 @@ export const objectPropertyOf = ({ object, key }: ObjectLookup): ESTree.ObjectPr
 
 export const objectValueOf = (lookup: ObjectLookup): ESTree.Expression | null => {
   const property = objectPropertyOf(lookup);
-  return property === null ? null : withoutParentheses(property.value);
+  return property === null ? null : property.value;
 };
 
 export const nestedObjectAt = ({

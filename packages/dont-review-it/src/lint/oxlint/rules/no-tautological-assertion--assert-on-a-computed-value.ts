@@ -1,7 +1,6 @@
 import { isEqual } from "es-toolkit";
 
 import { createDontReviewItRule } from "../../../create-rule.ts";
-import { withoutParentheses } from "../lib/parenthesized-expression.ts";
 import { staticMemberOf } from "../lib/static-member.ts";
 
 import type { ESTree } from "@oxlint/plugins";
@@ -14,9 +13,7 @@ const EQUALITY_MATCHER_NAMES: ReadonlySet<string> = new Set(["toBe", "toEqual", 
 
 const MODIFIER_NAMES: ReadonlySet<string> = new Set(["not", "resolves", "rejects"]);
 
-const fixedValueOf = (expression: ESTree.Expression): FixedValue | null => {
-  const written = withoutParentheses(expression);
-
+const fixedValueOf = (written: ESTree.Expression): FixedValue | null => {
   if (written.type === "Literal") {
     return "regex" in written ? null : { held: written.value };
   }
@@ -30,11 +27,9 @@ const fixedValueOf = (expression: ESTree.Expression): FixedValue | null => {
   return { held: -negated.held };
 };
 
-const subjectOfExpect = (expression: ESTree.Expression): ESTree.Expression | null => {
-  const asserted = withoutParentheses(expression);
-
+const subjectOfExpect = (asserted: ESTree.Expression): ESTree.Expression | null => {
   if (asserted.type === "CallExpression") {
-    const callee = withoutParentheses(asserted.callee);
+    const { callee } = asserted;
     if (callee.type !== "Identifier" || callee.name !== EXPECT_NAME) return null;
     if (asserted.arguments.length !== 1) return null;
     const [subject] = asserted.arguments;

@@ -36,6 +36,10 @@ describe("matchesGlobSegment", () => {
     expect(matches("a-two-one-z", "a*one*two*z")).toBe(false);
   });
 
+  test("stops looking once an inner literal is missing rather than resuming at a later one", () => {
+    expect(matches("a-two-three-z", "a*one*two*three*z")).toBe(false);
+  });
+
   test("refuses an inner literal that only appears inside the tail", () => {
     expect(matches("a-z-one", "a*one*z-one")).toBe(false);
   });
