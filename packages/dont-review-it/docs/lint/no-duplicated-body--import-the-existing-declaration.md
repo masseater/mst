@@ -71,5 +71,5 @@ AST のノードが 8 個に満たない本体は報告しない。短い本体�
 
 - 完全一致に満たない類似。同じ処理が違う綴りで書かれている状態は捕まらない。実際にこのリポジトリには、パスの区切りを揃える処理が 3 つの綴りで存在する。類似度に閾値を置けば拾えるが、閾値で決まる報告は「既定でエラーにする」という強制度と噛み合わない。ここは決定的に判定できるものだけを扱う
 - 依存パッケージに同じ関数があるのに自前で書いた状態。import が無いので構文に手掛かりが残らない
-- 一度しか使われていない値の宣言。判定は決定的にできるが、規範として成立しない。このリポジトリの非 export のトップレベル宣言 204 件のうち 140 件が 1 回しか参照されておらず、その大半は長い手続きを名前付きの段に割る良い書き方である。export を 1 箇所からしか参照されないものに絞っても 116 件中 58 件が該当する。数えたうえで、ルールにしないと決めた。型についてはこの判断を [EDR 0020](../../../../docs/engineering-decision-logs/0020-name-a-type-only-where-two-places-agree.md) で覆し、[no-single-use-local-type--inline-at-the-use-site](./no-single-use-local-type--inline-at-the-use-site.md) が受け持っている
+- 一度しか使われていない値の宣言。判定は決定的にできるが、規範として成立しない。このリポジトリの非 export のトップレベル宣言 204 件のうち 140 件が 1 回しか参照されておらず、その大半は長い手続きを名前付きの段に割る良い書き方である。export を 1 箇所からしか参照されないものに絞っても 116 件中 58 件が該当する。数えたうえで、ルールにしないと決めた。型についてはこの判断を [EDR 0019](../../../../docs/engineering-decision-logs/0019-name-a-type-only-where-two-places-agree.md) で覆し、[no-single-use-local-type--inline-at-the-use-site](./no-single-use-local-type--inline-at-the-use-site.md) が受け持っている
 - 名前も本体も一致する宣言のうち、本体が 8 ノードに満たないもの。[no-twin-declaration--merge-into-one-owner](./no-twin-declaration--merge-into-one-owner.md) が受け持つ
