@@ -1,8 +1,8 @@
 import { defineConfig } from "oxlint";
 
+import { LINT_SEVERITY } from "../lint-rule-severity.ts";
 import { forbidSymbolPrefixedName } from "../lint/oxlint/rules/forbid-symbol-prefixed-name--rename-to-alphanumeric-start.ts";
 import { noBroadLintDisable } from "../lint/oxlint/rules/no-broad-lint-disable--use-next-line-with-reason.ts";
-import { LINT_SEVERITY } from "../lint-rule-severity.ts";
 
 const PLUGIN_NAME = "lint-rule-authoring";
 

@@ -15,7 +15,7 @@ const parseJsonc: (text: string) => unknown = parse;
 
 const specifiersOf = (config: unknown): readonly string[] => {
   if (typeof config !== "object" || config === null) return [];
-  const declared: unknown = (config as Record<string, unknown>)["extends"];
+  const declared: unknown = (config as Record<string, unknown>).extends;
   if (typeof declared === "string") return [declared];
   if (!Array.isArray(declared)) return [];
   return declared.filter((entry: unknown): entry is string => typeof entry === "string");

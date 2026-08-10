@@ -105,5 +105,7 @@ export const writeCachedEntries = (
     writeFileSync(path, JSON.stringify(payload), "utf8");
   });
   if (unwritableCache === null || isEnvironmentFailure(unwritableCache)) return;
-  throw unwritableCache;
+  throw new Error(`the derived catalog cache at ${path} could not be written`, {
+    cause: unwritableCache,
+  });
 };

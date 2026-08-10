@@ -18,5 +18,6 @@ export const readUnlessMissing = <Read>(read: () => Read): Read | null => {
 
   const code = failureCodeOf(unreadablePath);
   if (code === MISSING_PATH_CODE || code === MISSING_PARENT_CODE) return null;
-  throw unreadablePath;
+  if (unreadablePath instanceof Error) throw unreadablePath;
+  throw new Error("the path exists but the read failed", { cause: unreadablePath });
 };

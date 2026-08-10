@@ -40,7 +40,6 @@ const bindsFailure = (binding: ESTree.BindingPattern | ESTree.BindingRestElement
 };
 
 const readsResultElement = (member: ESTree.MemberExpression): boolean =>
-  member.type === "MemberExpression" &&
   member.computed &&
   member.property.type === "Literal" &&
   member.property.value === RESULT_ELEMENT_INDEX;

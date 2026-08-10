@@ -18,10 +18,10 @@ const directoryEntries = (directory: string): readonly string[] => {
   return found;
 };
 
-const baseNameOf = (fileName: string): string => fileName.split(".")[0];
+const baseNameOf = (fileName: string): string => fileName.split(".")[0] ?? fileName;
 
 const ordinalPrefixOf = (fileName: string): string | null =>
-  ORDINAL_NAME_PATTERN.exec(baseNameOf(fileName))?.groups?.["prefix"] ?? null;
+  ORDINAL_NAME_PATTERN.exec(baseNameOf(fileName))?.groups?.prefix ?? null;
 
 const isSplitSibling = (input: {
   readonly entryName: string;

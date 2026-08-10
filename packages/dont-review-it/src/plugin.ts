@@ -15,11 +15,13 @@ import { noExplanatoryComment } from "./lint/oxlint/rules/no-explanatory-comment
 import { noIdentityWrapper } from "./lint/oxlint/rules/no-identity-wrapper--call-the-target-directly.ts";
 import { createNoLocalFiniteValueSet } from "./lint/oxlint/rules/no-local-finite-value-set--use-or-register-canonical-values.ts";
 import { noLoggedAndContinuedFailure } from "./lint/oxlint/rules/no-logged-and-continued-failure--stop-or-recover.ts";
+import { noMultiBindingDeclaration } from "./lint/oxlint/rules/no-multi-binding-declaration--declare-one-binding-per-statement.ts";
 import { noPromiseChain } from "./lint/oxlint/rules/no-promise-chain--use-async-await.ts";
 import { noReassign } from "./lint/oxlint/rules/no-reassign--use-spread-or-iife.ts";
 import { noStandaloneTsconfig } from "./lint/oxlint/rules/no-standalone-tsconfig--extend-shared-preset.ts";
 import { createNoStrictCanonicalLiteralUseRule } from "./lint/oxlint/rules/no-strict-canonical-literal-use--use-canonical-import.ts";
 import { noTautologicalAssertion } from "./lint/oxlint/rules/no-tautological-assertion--assert-on-a-computed-value.ts";
+import { noUnorderedImport } from "./lint/oxlint/rules/no-unordered-import--group-by-origin-then-sort-by-specifier.ts";
 import { requireReExportOnlyFiles } from "./lint/oxlint/rules/require-re-export-only-files--move-declaration-to-owning-module.ts";
 
 import type { Plugin } from "@oxlint/plugins";
@@ -52,11 +54,13 @@ const plugin: Plugin = {
     [noIdentityWrapper.name]: noIdentityWrapper,
     [noLocalFiniteValueSet.name]: noLocalFiniteValueSet,
     [noLoggedAndContinuedFailure.name]: noLoggedAndContinuedFailure,
+    [noMultiBindingDeclaration.name]: noMultiBindingDeclaration,
     [noPromiseChain.name]: noPromiseChain,
     [noReassign.name]: noReassign,
     [noStandaloneTsconfig.name]: noStandaloneTsconfig,
     [noStrictCanonicalLiteralUse.name]: noStrictCanonicalLiteralUse,
     [noTautologicalAssertion.name]: noTautologicalAssertion,
+    [noUnorderedImport.name]: noUnorderedImport,
     [requireReExportOnlyFiles.name]: requireReExportOnlyFiles,
   },
 };

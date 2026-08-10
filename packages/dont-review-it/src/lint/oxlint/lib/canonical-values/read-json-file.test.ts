@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { expect, onTestFinished, test } from "vite-plus/test";
+import { describe, expect, onTestFinished, test } from "vite-plus/test";
 
 import { readJsonFile } from "./read-json-file.ts";
 
@@ -20,29 +20,31 @@ const writeManifest = (root: string, text: string): string => {
   return path;
 };
 
-test("a manifest that parses hands back what it declares", () => {
-  const root = createFixtureDirectory();
-  const path = writeManifest(root, '{ "name": "order" }');
+describe("readJsonFile", () => {
+  test("a manifest that parses hands back what it declares", () => {
+    const root = createFixtureDirectory();
+    const path = writeManifest(root, '{ "name": "order" }');
 
-  expect(readJsonFile(path)).toEqual({ name: "order" });
-});
+    expect(readJsonFile(path)).toStrictEqual({ name: "order" });
+  });
 
-test("a manifest that is not there is an absence", () => {
-  const root = createFixtureDirectory();
+  test("a manifest that is not there is an absence", () => {
+    const root = createFixtureDirectory();
 
-  expect(readJsonFile(join(root, "package.json"))).toBe(null);
-});
+    expect(readJsonFile(join(root, "package.json"))).toBe(null);
+  });
 
-test("a manifest that is there but does not parse is raised rather than reported as absent", () => {
-  const root = createFixtureDirectory();
-  const path = writeManifest(root, '{ "name": ');
+  test("a manifest that is there but does not parse is raised rather than reported as absent", () => {
+    const root = createFixtureDirectory();
+    const path = writeManifest(root, '{ "name": ');
 
-  expect(() => readJsonFile(path)).toThrow("does not parse as JSON");
-});
+    expect(() => readJsonFile(path)).toThrow("does not parse as JSON");
+  });
 
-test("the raised failure names the file that could not be parsed", () => {
-  const root = createFixtureDirectory();
-  const path = writeManifest(root, "not json at all");
+  test("the raised failure names the file that could not be parsed", () => {
+    const root = createFixtureDirectory();
+    const path = writeManifest(root, "not json at all");
 
-  expect(() => readJsonFile(path)).toThrow(path);
+    expect(() => readJsonFile(path)).toThrow(path);
+  });
 });
