@@ -57,7 +57,7 @@ const negatedNumericValue = (node: ESTree.UnaryExpression): CanonicalValue | nul
 
 const templateLiteralValue = (node: ESTree.TemplateLiteral): CanonicalValue | null => {
   if (node.expressions.length !== 0 || node.quasis.length !== 1) return null;
-  return node.quasis[0].value.cooked;
+  return node.quasis[0]?.value.cooked ?? null;
 };
 
 const isStructuralKeyPosition = (parent: ESTree.Node, node: ESTree.Node): boolean => {
@@ -106,10 +106,10 @@ const isKeySelectorArgument = (ancestors: readonly ESTree.Node[], node: ESTree.N
     if (ancestor.type !== "TSTypeReference") continue;
     if (ancestor.typeName.type !== "Identifier") continue;
     if (!KEY_SELECTION_TYPE_NAMES.has(ancestor.typeName.name)) continue;
-    if (index + 1 >= ancestors.length) continue;
     const instantiation = ancestors[index + 1];
+    if (instantiation === undefined) continue;
     if (instantiation.type !== "TSTypeParameterInstantiation") continue;
-    const selector = index + 2 < ancestors.length ? ancestors[index + 2] : node;
+    const selector = ancestors[index + 2] ?? node;
     if (instantiation.params[1] === selector) return true;
   }
   return false;

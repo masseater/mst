@@ -26,8 +26,8 @@ const matchesAllowedName = (segment: string, pattern: string): boolean => {
   const literals = pattern.split("*");
   if (literals.length === 1) return segment === pattern;
 
-  const head = literals[0];
-  const tail = literals[literals.length - 1];
+  const head = literals[0] ?? "";
+  const tail = literals.at(-1) ?? "";
   if (!segment.startsWith(head)) return false;
   if (!segment.endsWith(tail)) return false;
   if (segment.length < head.length + tail.length) return false;

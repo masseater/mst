@@ -4,7 +4,10 @@ import viteLogo from "./assets/vite.svg";
 import heroImg from "./assets/hero.png";
 import { setupCounter } from "./counter.ts";
 
-document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
+const appRoot = document.querySelector<HTMLDivElement>("#app");
+if (appRoot === null) throw new Error("#app is missing from index.html");
+
+appRoot.innerHTML = `
 <section id="center">
   <div class="hero">
     <img src="${heroImg}" class="base" width="170" height="179">
@@ -57,4 +60,7 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 <section id="spacer"></section>
 `;
 
-setupCounter(document.querySelector<HTMLButtonElement>("#counter")!);
+const counterButton = document.querySelector<HTMLButtonElement>("#counter");
+if (counterButton === null) throw new Error("#counter is missing from the rendered markup");
+
+setupCounter(counterButton);

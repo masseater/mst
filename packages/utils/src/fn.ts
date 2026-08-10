@@ -1,3 +1,1 @@
-export function fn() {
-  return "Hello, tsdown!";
-}
+export const fn = (): string => "Hello, tsdown!";

@@ -184,9 +184,10 @@ export const createNoLocalFiniteValueSet = ({
             reportOnce(node, "localFiniteValueSetWithoutOwner", { ownershipPolicy });
             return;
           }
-          if (libraries.length === 1) {
+          const [onlyLibrary] = libraries;
+          if (libraries.length === 1 && onlyLibrary !== undefined) {
             reportOnce(node, "localFiniteValueSetOwnedByLibraryType", {
-              owner: describeLibraryOwner(libraries[0], values),
+              owner: describeLibraryOwner(onlyLibrary, values),
               ownershipPolicy,
             });
             return;
@@ -197,9 +198,10 @@ export const createNoLocalFiniteValueSet = ({
           });
           return;
         }
-        if (owners.length === 1) {
+        const [onlyOwner] = owners;
+        if (owners.length === 1 && onlyOwner !== undefined) {
           reportOnce(node, "localFiniteValueSetWithOwner", {
-            owner: describeOwner(owners[0]),
+            owner: describeOwner(onlyOwner),
             ownershipPolicy,
           });
           return;

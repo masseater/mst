@@ -43,8 +43,8 @@ const matchesSegmentName = (segment: string, pattern: string): boolean => {
   const literals = pattern.split("*");
   if (literals.length === 1) return segment === pattern;
 
-  const head = literals[0];
-  const tail = literals[literals.length - 1];
+  const head = literals[0] ?? "";
+  const tail = literals.at(-1) ?? "";
   if (!segment.startsWith(head)) return false;
   if (!segment.endsWith(tail)) return false;
   if (segment.length < head.length + tail.length) return false;
@@ -64,15 +64,17 @@ const matchesSegments = (
   if (patternSegments.length === 0) return pathSegments.length === 0;
 
   const [head, ...remainingPatternSegments] = patternSegments;
+  if (head === undefined) return pathSegments.length === 0;
   if (head === "**") {
     return range(0, pathSegments.length + 1).some((skipped) =>
       matchesSegments(pathSegments.slice(skipped), remainingPatternSegments),
     );
   }
 
-  if (pathSegments.length === 0) return false;
-  if (!matchesSegmentName(pathSegments[0], head)) return false;
-  return matchesSegments(pathSegments.slice(1), remainingPatternSegments);
+  const [firstPathSegment, ...remainingPathSegments] = pathSegments;
+  if (firstPathSegment === undefined) return false;
+  if (!matchesSegmentName(firstPathSegment, head)) return false;
+  return matchesSegments(remainingPathSegments, remainingPatternSegments);
 };
 
 const segmentsOf = (path: string, separator: string): readonly string[] =>
