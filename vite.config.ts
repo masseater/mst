@@ -6,8 +6,8 @@ export default defineConfig({
   staged: {
     "*": "vp check --fix",
   },
-  fmt: {},
-  lint: {
+  fmt: dontReviewIt.withGitExcludes({}),
+  lint: dontReviewIt.withGitExcludes({
     extends: [lintRuleAuthoring.oxlint, dontReviewIt.oxlint],
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
     rules: {
@@ -41,7 +41,7 @@ export default defineConfig({
       },
     ],
     options: { typeAware: true, typeCheck: true },
-  },
+  }),
   run: {
     cache: true,
   },
