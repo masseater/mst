@@ -1,7 +1,7 @@
 {
   "name": "@mst/utils",
   "version": "0.0.0",
-  "description": "Small text helpers shared by the packages in this repository.",
+  "description": "The neutral home for declarations that more than one package needs and none of them owns.",
   "license": "MIT",
   "repository": {
     "type": "git",

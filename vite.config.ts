@@ -65,7 +65,4 @@ export default defineConfig({
       thresholds: { 100: true, perFile: true },
     },
   },
-  run: {
-    cache: true,
-  },
 });
