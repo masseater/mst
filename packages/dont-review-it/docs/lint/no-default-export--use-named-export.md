@@ -12,9 +12,11 @@
 
 報告位置は、系統 1 と 3 はその文全体、系統 2 は `default` として出ている specifier そのもの。1 つの文が複数の specifier を持つ場合、報告されるのは `default` になっている 1 つだけである。
 
-ツールが規約として default エクスポートを要求するファイルは、ルールが既定で対象外にする。既定は `plugin.ts`（oxlint が `jsPlugins` の指定子から読むエントリ）と `vite.config.ts`（ビルドツールの設定）の 2 つ。設定を 1 行も書かなくても、この 2 つで報告は出ない。
+ファイル名による例外をルールは 1 つも持たない。ツールが規約として default エクスポートを要求するファイルはあるが、その綴りは配備先が何のツールを使い、どう名付けたかで決まる。`vite.config.ts` は Vite を使う配備先にしか存在しないし、oxlint の JS プラグインの実体は `jsPlugins` の指定子が指すファイルであって、`plugin.ts` という名前はどのツールも要求していない。ルールが持てば、持っていない配備先にまで他所の綴りを配ることになる。
 
-判定に使うのはベース名の完全一致である。`my-plugin.ts` や `plugin.entry.ts` は `plugin.ts` ではないので例外にならない。`vite.config.js` も `vite.config.ts` ではないので例外にならない。ディレクトリの位置は見ないので、どのワークスペースの `plugin.ts` / `vite.config.ts` でも同じく例外になる。
+例外にする綴りは `toolRequiredFileNames` で配備先が名指しする。名指ししたファイルで通るのは直接の default エクスポート（系統 1）だけで、系統 2 と 3 は同じファイルでも報告される。ツールが要求しているのは `export default` という 1 つの形であって、`default` という名前を外に出す手段すべてではないためである。
+
+判定はベース名の完全一致である。`my-plugin.ts` や `plugin.entry.ts` は `plugin.ts` ではないので例外にならない。`vite.config.js` も `vite.config.ts` ではないので例外にならない。ディレクトリの位置は見ないので、名指しした綴りはどのワークスペースでも同じく例外になる。
 
 ## なぜそれが要るか
 
@@ -68,12 +70,12 @@ import { parseUser } from "./parse-user.ts";
 
 ## オプション
 
-`toolRequiredFileNames`（文字列の配列、既定値 `["plugin.ts", "vite.config.ts"]`）だけを取る。default エクスポートを要求するツールが他にもある配備先が、その綴りを名指しできる。
+`toolRequiredFileNames`（文字列の配列、既定は空）だけを取る。ツールが default エクスポートを要求するファイルの綴りを、配備先が名指しする。
 
 ```jsonc
-["error", { "toolRequiredFileNames": ["plugin.ts", "vite.config.ts", "rollup.config.ts"] }]
+["error", { "toolRequiredFileNames": ["plugin.ts", "vite.config.ts"] }]
 ```
 
-与えた配列は既定を**置き換える**。足すつもりで自分の綴りだけを書くと、`plugin.ts` と `vite.config.ts` がルールの対象に戻る。残したいものは書き並べること。未知のキーは schema が拒否する（`additionalProperties: false`）。
+既定が空なので、何も書かなければ例外は 1 つも無い。未知のキーは schema が拒否する（`additionalProperties: false`）。
 
-例外をこのオプションではなく設定側の `overrides` で表現することもできるが、その形は「どのファイルが例外か」がルールを読んでも分からなくなる。ツールの規約に属する例外はルールが既定として持ち、配備先の事情に属する例外だけを設定側に置く。
+例外を設定側の `overrides` でファイルパターンごと off にする形でも同じ結果は作れるが、その形はルールを丸ごと止める。オプションで名指しすれば、そのファイルの中の他の違反（`export { total as default }` など）は報告され続ける。

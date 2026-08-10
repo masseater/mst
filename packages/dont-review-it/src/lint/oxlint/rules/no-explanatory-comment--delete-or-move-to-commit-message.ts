@@ -1,4 +1,7 @@
+import { firstToken } from "@mst/lint-rule-authoring";
+
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { isJsdoc } from "../lib/jsdoc-comment.ts";
 
 import type { Comment, ESTree } from "@oxlint/plugins";
 
@@ -15,18 +18,10 @@ const LINT_DIRECTIVES = new Set([
 
 const COMPILER_DIRECTIVE_PREFIX = "@ts-";
 
-const firstToken = (text: string): string => {
-  const trimmed = text.trim();
-  return trimmed.length === 0 ? "" : trimmed.split(/\s+/u, 1)[0];
-};
-
 const isMachineReadDirective = (comment: Comment): boolean => {
   const token = firstToken(comment.value);
   return LINT_DIRECTIVES.has(token) || token.startsWith(COMPILER_DIRECTIVE_PREFIX);
 };
-
-const isJsdoc = (comment: Comment): boolean =>
-  comment.type === "Block" && comment.value.startsWith("*");
 
 export const noExplanatoryComment = createDontReviewItRule({
   name: "no-explanatory-comment--delete-or-move-to-commit-message",
@@ -39,7 +34,7 @@ export const noExplanatoryComment = createDontReviewItRule({
     },
     messages: {
       explanatoryComment:
-        "A comment that explains the code must not stay in the source, because it drifts as soon as the code changes and nothing fails when it does. Delete it, and put the reasoning in the body of the commit that makes the change. Comment syntax is reserved for declarations a machine reads: lint suppression directives, compiler directives, and JSDoc tag content.",
+        "A comment that explains the code must not stay in the source. Delete it and put the reasoning in the body of the commit that makes the change.",
     },
     schema: [],
   },

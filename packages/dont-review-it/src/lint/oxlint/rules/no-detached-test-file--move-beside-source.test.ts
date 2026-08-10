@@ -1,13 +1,15 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { testLintRule } from "@mst/lint-rule-authoring";
-import { afterAll, describe, expect, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { noDetachedTestFile } from "./no-detached-test-file--move-beside-source.ts";
 
-const fixtureDir = mkdtempSync(join(tmpdir(), "no-detached-test-file-"));
+const fixtureDir = join(tmpdir(), "dont-review-it-no-detached-test-file");
+rmSync(fixtureDir, { recursive: true, force: true });
+mkdirSync(fixtureDir, { recursive: true });
 
 const fixturePath = (name: string): string => join(fixtureDir, name);
 
@@ -31,13 +33,12 @@ writeSourceFixture("renamed.ts");
 writeSourceFixture("tests/co-located.ts");
 writeSourceFixture("spec/nested/buried.ts");
 
+writeSourceFixture("a.ts");
+writeSourceFixture("alpha");
+
 const rememberedSourcePath = writeSourceFixture("remembered.ts");
 
 describe("dont-review-it/no-detached-test-file--move-beside-source", () => {
-  afterAll(() => {
-    rmSync(fixtureDir, { recursive: true, force: true });
-  });
-
   testLintRule(noDetachedTestFile, {
     valid: [
       {
@@ -69,6 +70,18 @@ describe("dont-review-it/no-detached-test-file--move-beside-source", () => {
         name: "a test file outside the vocabulary is not recognised as a test",
         code: "const total = 1;",
         filename: fixturePath("legacy.test.js"),
+      },
+      {
+        name: "the longest matching suffix decides which source is looked for",
+        code: "export const total = 1;",
+        filename: fixturePath("ax.test.ts"),
+        options: [{ testFileSuffixes: ["st.ts", "x.test.ts"] }],
+      },
+      {
+        name: "a suffix carrying no extension looks for a source without one",
+        code: "export const total = 1;",
+        filename: fixturePath("alpha_test"),
+        options: [{ testFileSuffixes: ["_test"] }],
       },
       {
         name: "a suffix from the deployment is added to the vocabulary rather than replacing it",

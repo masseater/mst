@@ -1,22 +1,39 @@
 import { parseCanonicalValuesAnnotation } from "./annotation.ts";
 
-import type { Comment, ESTree } from "@oxlint/plugins";
-
 export type AnnotatedDeclarationRange = {
   readonly conceptId: string;
   readonly start: number;
   readonly end: number;
 };
 
+type SourceSpan = {
+  readonly start: number;
+  readonly end: number;
+};
+
+type SourceComment = SourceSpan & {
+  readonly type: string;
+  readonly value: string;
+};
+
+type AnnotatedProgram = {
+  readonly body: readonly SourceSpan[];
+  readonly comments: readonly SourceComment[];
+};
+
+type ParsedSource = {
+  readonly program: AnnotatedProgram;
+  readonly sourceText: string;
+};
+
 const JSDOC_COMMENT_VALUE_PREFIX = "*";
 
-const isJsDocComment = (comment: Comment): boolean =>
+const isJsDocComment = (comment: SourceComment): boolean =>
   comment.type === "Block" && comment.value.startsWith(JSDOC_COMMENT_VALUE_PREFIX);
 
 const annotatedDeclarationRange = (
-  program: ESTree.Program,
-  sourceText: string,
-  comment: Comment,
+  { program, sourceText }: ParsedSource,
+  comment: SourceComment,
 ): AnnotatedDeclarationRange | null => {
   if (!isJsDocComment(comment)) return null;
 
@@ -36,14 +53,16 @@ const annotatedDeclarationRange = (
 };
 
 export const annotatedDeclarationRanges = (
-  program: ESTree.Program,
+  program: AnnotatedProgram,
   sourceText: string,
-): readonly AnnotatedDeclarationRange[] =>
-  program.comments
-    .map((comment) => annotatedDeclarationRange(program, sourceText, comment))
+): readonly AnnotatedDeclarationRange[] => {
+  const source: ParsedSource = { program, sourceText };
+  return program.comments
+    .map((comment) => annotatedDeclarationRange(source, comment))
     .filter((range) => range !== null);
+};
 
 export const isInsideAnnotatedDeclaration = (
   ranges: readonly AnnotatedDeclarationRange[],
-  node: ESTree.Span,
+  node: SourceSpan,
 ): boolean => ranges.some((range) => node.start >= range.start && node.end <= range.end);

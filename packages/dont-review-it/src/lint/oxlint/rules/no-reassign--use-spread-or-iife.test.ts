@@ -40,6 +40,15 @@ describe("dont-review-it/no-reassign--use-spread-or-iife", () => {
         code: "const base = load();\nconst first = 1,\n  second = 2;",
       },
       {
+        name: "options that list no assign-only target leave the platform list in place",
+        code: "const base = load();",
+        options: [{}],
+      },
+      {
+        name: "a unary operator other than delete writes nothing",
+        code: "const negated = -total;\nconst missing = !present;\nconst kind = typeof base;",
+      },
+      {
         name: "a pattern used by a new declaration binds each name once",
         code: "const [head, ...tail] = entries;\nconst { count, ...rest } = holder;",
       },
@@ -93,13 +102,14 @@ describe("dont-review-it/no-reassign--use-spread-or-iife", () => {
         code: "process.exitCode = 1;",
       },
       {
-        name: "the rule tester statics are set the only way the test framework offers",
-        code: "RuleTester.describe = describe;\nRuleTester.it = it;\nRuleTester.itOnly = it.only;",
+        name: "a target named by the configuration joins the platform one",
+        code: "RuleTester.describe = describe;",
+        options: [{ assignOnlyTargets: ["RuleTester.describe"] }],
       },
       {
-        name: "a target named by the option joins the ones the rule ships with",
-        code: "Reporter.output = sink;",
-        options: [{ assignOnlyTargets: ["Reporter.output"] }],
+        name: "the platform target survives a configuration that names others",
+        code: "process.exitCode = 1;",
+        options: [{ assignOnlyTargets: ["RuleTester.describe"] }],
       },
     ],
     invalid: [
@@ -251,9 +261,8 @@ describe("dont-review-it/no-reassign--use-spread-or-iife", () => {
         errors: [{ messageId: "propertyAssignment" }],
       },
       {
-        name: "replacing the allowed targets puts the ones the rule ships with back under the rule",
-        code: "process.exitCode = 1;",
-        options: [{ assignOnlyTargets: ["Reporter.output"] }],
+        name: "a target the configuration does not name is written to like any other",
+        code: "RuleTester.describe = describe;",
         errors: [{ messageId: "propertyAssignment" }],
       },
     ],

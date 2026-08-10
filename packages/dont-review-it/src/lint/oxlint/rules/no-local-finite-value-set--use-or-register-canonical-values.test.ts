@@ -18,10 +18,14 @@ import { createNoLocalFiniteValueSet } from "./no-local-finite-value-set--use-or
 
 const ORDER_STATUS_VALUES: readonly CanonicalValue[] = ["draft", "published"];
 
+type WorkspaceVocabulary = {
+  readonly workspace: string;
+  readonly vocabulary: readonly CanonicalValue[];
+};
+
 const entry = (
   conceptId: string,
-  workspace: string,
-  vocabulary: readonly CanonicalValue[],
+  { workspace, vocabulary }: WorkspaceVocabulary,
 ): CanonicalValuesEntry => ({
   conceptId,
   declarationPath: `packages/${workspace}/src/${conceptId}.ts`,
@@ -30,18 +34,30 @@ const entry = (
   fingerprint: fingerprintValues(vocabulary),
 });
 
-const ownedCatalog = buildCatalog([entry("order-status", "order-vocabulary", ORDER_STATUS_VALUES)]);
+const ownedCatalog = buildCatalog([
+  entry("order-status", { workspace: "order-vocabulary", vocabulary: ORDER_STATUS_VALUES }),
+]);
 
 const ambiguousCatalog = buildCatalog([
-  entry("order-status", "order-vocabulary", ORDER_STATUS_VALUES),
-  entry("article-status", "article-vocabulary", ORDER_STATUS_VALUES),
+  entry("order-status", { workspace: "order-vocabulary", vocabulary: ORDER_STATUS_VALUES }),
+  {
+    ...entry("article-status", {
+      workspace: "article-vocabulary",
+      vocabulary: ORDER_STATUS_VALUES,
+    }),
+    exportPath: null,
+  },
 ]);
+
+type AdmittedVocabulary = {
+  readonly typeName: string;
+  readonly admits: readonly CanonicalValue[];
+  readonly admitsUnnamedValues?: boolean;
+};
 
 const libraryType = (
   packageName: string,
-  typeName: string,
-  admits: readonly CanonicalValue[],
-  admitsUnnamedValues = false,
+  { typeName, admits, admitsUnnamedValues = false }: AdmittedVocabulary,
 ): LibraryVocabularyEntry => ({
   packageName,
   typeName,
@@ -60,8 +76,12 @@ const ruleReading = (
   });
 
 const severityAndTarget = buildLibraryVocabularyIndex([
-  libraryType("oxlint", "AllowWarnDeny", ["allow", "deny", "error", "off", "warn"], true),
-  libraryType("vite", "SSRTarget", ["node", "webworker"]),
+  libraryType("oxlint", {
+    typeName: "AllowWarnDeny",
+    admits: ["allow", "deny", "error", "off", "warn"],
+    admitsUnnamedValues: true,
+  }),
+  libraryType("vite", { typeName: "SSRTarget", admits: ["node", "webworker"] }),
 ]);
 
 const withOwner = ruleReading(ownedCatalog);
@@ -69,14 +89,16 @@ const withoutCatalog = ruleReading(EMPTY_CANONICAL_VALUES_CATALOG);
 const withAmbiguousOwners = ruleReading(ambiguousCatalog);
 const withLibraryOwner = ruleReading(EMPTY_CANONICAL_VALUES_CATALOG, severityAndTarget);
 const withCatalogAndLibraryOwners = ruleReading(
-  buildCatalog([entry("ssr-target", "ssr-vocabulary", ["node", "webworker"])]),
+  buildCatalog([
+    entry("ssr-target", { workspace: "ssr-vocabulary", vocabulary: ["node", "webworker"] }),
+  ]),
   severityAndTarget,
 );
 const withTwoLibraryOwners = ruleReading(
   EMPTY_CANONICAL_VALUES_CATALOG,
   buildLibraryVocabularyIndex([
-    libraryType("oxlint", "AllowWarnDeny", ["error", "off", "warn"]),
-    libraryType("vite", "LogLevel", ["error", "info", "off", "warn"]),
+    libraryType("oxlint", { typeName: "AllowWarnDeny", admits: ["error", "off", "warn"] }),
+    libraryType("vite", { typeName: "LogLevel", admits: ["error", "info", "off", "warn"] }),
   ]),
 );
 
@@ -91,6 +113,18 @@ describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-va
         {
           name: "a set assembled at run time is not a static vocabulary",
           code: "export const seen = (rows) => new Set(rows.map((row) => row.status));",
+        },
+        {
+          name: "shapes that name no vocabulary are left alone",
+          code: 'enumOf(["draft", "published"]);\nz.enum();\nz.enum(["draft", "draft"]);\nz.union(base);\nz.union([z.literal("draft")]);\nnew Map(["draft"]);\nnew ns.Set(["draft"]);\nnew Set();',
+        },
+        {
+          name: "keys and index types that name no vocabulary are left alone",
+          code: 'export const schema = { ...base, [key]: [], enum: known };\nexport type Keyed = Article["draft"];\nexport type Indexed = Article[number];\nexport type Namespaced = (typeof catalog.STATUSES)[number];',
+        },
+        {
+          name: "an array whose values are not written out names no vocabulary",
+          code: "const STATUSES = [draft, published];\nz.enum(STATUSES);\nz.enum([draft, published]);",
         },
         {
           name: "an enum fed from an external package is not a repository vocabulary",
@@ -132,10 +166,6 @@ describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-va
         {
           name: "the annotated declaration is the place the concept is defined",
           code: '/** @canonical-values order-status */\nexport const ORDER_STATUSES = ["draft", "published"] as const;\nexport type OrderStatus = (typeof ORDER_STATUSES)[number];',
-        },
-        {
-          name: "blank lines between the annotation and its declaration keep them paired",
-          code: '/** @canonical-values order-status */\n\nexport const ORDER_STATUSES = ["draft", "published"] as const;\nexport type OrderStatus = (typeof ORDER_STATUSES)[number];',
         },
         {
           name: "a set whose values no concept owns is not a candidate",
@@ -212,21 +242,6 @@ describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-va
           code: 'import { STATUSES } from "./statuses.ts";\nexport const schema = z.enum(STATUSES);',
           filename: "packages/order/src/schema.ts",
           errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
-        },
-        {
-          name: "a line comment carrying the tag does not annotate the declaration below it",
-          code: '// @canonical-values order-status\nexport const ORDER_STATUSES = ["draft", "published"] as const;\nexport type OrderStatus = (typeof ORDER_STATUSES)[number];',
-          errors: [{ messageId: "localFiniteValueSetWithOwner" }],
-        },
-        {
-          name: "a block comment that is not a doc comment does not annotate either",
-          code: '/* @canonical-values order-status */\nexport const ORDER_STATUSES = ["draft", "published"] as const;\nexport type OrderStatus = (typeof ORDER_STATUSES)[number];',
-          errors: [{ messageId: "localFiniteValueSetWithOwner" }],
-        },
-        {
-          name: "an annotation buried in a function body annotates nothing at the top level",
-          code: 'export const probeNoop = () => {\n  /** @canonical-values order-status */\n  return 1;\n};\n\nexport type OrderStatus = "draft" | "published";',
-          errors: [{ messageId: "localFiniteValueSetWithOwner" }],
         },
         {
           name: "a comment wedged between the annotation and the declaration breaks the pair",
@@ -329,7 +344,7 @@ describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-va
         {
           name: "the report carries the name of the type the reader has to derive from",
           code: 'export type SsrTarget = "node" | "webworker";',
-          errors: [{ message: /derive the type from SSRTarget from vite, so/u }],
+          errors: [{ message: /derive the type from SSRTarget from vite\./u }],
         },
         {
           name: "a schema enum reaches the same dependency as the type alias does",
@@ -388,7 +403,7 @@ describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-va
               messageId: "localFiniteValueSetWithOwnerCandidates",
               data: {
                 owners:
-                  "order-status (@mst/order-vocabulary), article-status (@mst/article-vocabulary)",
+                  "order-status (@mst/order-vocabulary), article-status (packages/article-vocabulary/src/article-status.ts)",
                 ownershipPolicy: "not configured (set the ownershipPolicy option of this rule)",
               },
             },

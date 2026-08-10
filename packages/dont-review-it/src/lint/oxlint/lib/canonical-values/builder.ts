@@ -3,13 +3,13 @@ import { dirname, resolve } from "node:path";
 import { memoize, sortBy } from "es-toolkit";
 
 import { readDeclarationSources, type AnnotatedSource } from "./annotated-sources.ts";
+import { cacheInputFingerprint, readCachedEntries, writeCachedEntries } from "./catalog-cache.ts";
 import {
   buildCatalog,
   EMPTY_CANONICAL_VALUES_CATALOG,
   type CanonicalValuesCatalog,
   type CanonicalValuesEntry,
 } from "./catalog.ts";
-import { cacheInputFingerprint, readCachedEntries, writeCachedEntries } from "./catalog-cache.ts";
 import { buildExportSpecifierIndex } from "./export-specifier-index.ts";
 import { fingerprintValues } from "./fingerprint.ts";
 import { listRepositoryFiles, nearestPackageDirectory } from "./source-files.ts";
@@ -58,7 +58,7 @@ export const buildCanonicalValuesCatalog = ({
   if (cached !== null) return buildCatalog(cached);
 
   const entries = canonicalValuesEntriesIn(root, readDeclarationSources(repositoryFiles));
-  writeCachedEntries(root, fingerprint, entries);
+  writeCachedEntries(root, { fingerprint, entries });
   return buildCatalog(entries);
 };
 

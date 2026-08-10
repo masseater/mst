@@ -14,7 +14,7 @@ const noDebugger = createRule({
       relatedGuidelines: [],
     },
     messages: {
-      debuggerFound: "Remove this debugger statement.",
+      debuggerFound: "A debugger statement must not stay in the source. Delete it.",
     },
     schema: [],
   },

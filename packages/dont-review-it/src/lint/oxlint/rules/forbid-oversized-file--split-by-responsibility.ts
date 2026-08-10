@@ -29,13 +29,13 @@ export const forbidOversizedFile = createDontReviewItRule({
     },
     messages: {
       oversizedFile:
-        "A file must not carry more code lines than the budget set for it, because a file that long has already taken on more than one responsibility and every later split has to move code that other files import by then. This file carries {{codeLines}} code lines against a budget of {{maxLines}}. Name the responsibilities it has taken on and move each one into a file named after it. Do not split it by number (`subject-1.ts`, `subject-2.ts`): that leaves one responsibility spread across files whose names say nothing about what is in them.",
+        "A file must not carry more code lines than the budget set for it. This file carries {{codeLines}} code lines against a budget of {{maxLines}}. Name the responsibilities it has taken on and move each one into a file named after it.",
     },
     schema: [
       {
         type: "object",
         properties: {
-          maxLines: { type: "integer", minimum: 1, default: DEFAULT_MAX_LINES },
+          maxLines: { type: "integer", minimum: 1 },
         },
         additionalProperties: false,
       },

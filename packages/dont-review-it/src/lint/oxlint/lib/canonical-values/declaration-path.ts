@@ -1,6 +1,6 @@
-import type { CanonicalValuesCatalog, CanonicalValuesEntry } from "./catalog.ts";
+import { toPosixPath } from "../posix-path.ts";
 
-const toPosixPath = (path: string): string => path.replaceAll("\\", "/");
+import type { CanonicalValuesCatalog, CanonicalValuesEntry } from "./catalog.ts";
 
 const matchesDeclarationPath = (path: string, entry: CanonicalValuesEntry): boolean => {
   const normalized = toPosixPath(path);
@@ -9,8 +9,7 @@ const matchesDeclarationPath = (path: string, entry: CanonicalValuesEntry): bool
 
 export const declaresConceptAt = (
   catalog: CanonicalValuesCatalog,
-  conceptId: string,
-  path: string,
+  { conceptId, path }: { readonly conceptId: string; readonly path: string },
 ): boolean =>
   catalog.entries.some(
     (entry) => entry.conceptId === conceptId && matchesDeclarationPath(path, entry),

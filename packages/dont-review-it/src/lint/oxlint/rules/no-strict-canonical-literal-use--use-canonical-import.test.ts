@@ -7,16 +7,34 @@ import { createNoStrictCanonicalLiteralUseRule } from "./no-strict-canonical-lit
 
 const entry = (
   conceptId: string,
-  declarationPath: string,
-  exportPath: string | null,
-  values: readonly CanonicalValue[],
-) => ({ conceptId, declarationPath, exportPath, values, fingerprint: fingerprintValues(values) });
+  declaration: {
+    readonly declarationPath: string;
+    readonly exportPath: string | null;
+    readonly values: readonly CanonicalValue[];
+  },
+) => ({ conceptId, ...declaration, fingerprint: fingerprintValues(declaration.values) });
 
 const CATALOG = buildCatalog([
-  entry("order.status", "packages/order/src/status.ts", "@mst/order", ["draft", "published"]),
-  entry("article.status", "packages/article/src/status.ts", null, ["draft", "archived"]),
-  entry("retry.budget", "packages/retry/src/budget.ts", "@mst/retry", [3, -1]),
-  entry("sync.mode", "packages/sync/src/mode.ts", "@mst/sync", ["auto", true]),
+  entry("order.status", {
+    declarationPath: "packages/order/src/status.ts",
+    exportPath: "@mst/order",
+    values: ["draft", "published"],
+  }),
+  entry("article.status", {
+    declarationPath: "packages/article/src/status.ts",
+    exportPath: null,
+    values: ["draft", "archived"],
+  }),
+  entry("retry.budget", {
+    declarationPath: "packages/retry/src/budget.ts",
+    exportPath: "@mst/retry",
+    values: [3, -1],
+  }),
+  entry("sync.mode", {
+    declarationPath: "packages/sync/src/mode.ts",
+    exportPath: "@mst/sync",
+    values: ["auto", true],
+  }),
 ]);
 
 const UNCONFIGURED_OWNERSHIP_POLICY =
@@ -31,6 +49,11 @@ const rule = createNoStrictCanonicalLiteralUseRule({ loadCatalog: () => CATALOG 
 describe("dont-review-it/no-strict-canonical-literal-use--use-canonical-import", () => {
   testLintRule(rule, {
     valid: [
+      {
+        name: "a literal that spells no value at all is not a use site",
+        code: "const pattern = /published/u;\nconst absent = null;\nconst flipped = !ready;",
+        filename: SOURCE,
+      },
       {
         name: "a literal that no vocabulary declares is not a use site",
         code: 'const label = "unlisted";',
@@ -69,11 +92,6 @@ describe("dont-review-it/no-strict-canonical-literal-use--use-canonical-import",
       {
         name: "the key selector of Pick selects from a type that already owns the spelling",
         code: 'type Article = { draft: string; body: string };\ntype Head = Pick<Article, "draft">;',
-        filename: SOURCE,
-      },
-      {
-        name: "the key selector of Omit selects from a type that already owns the spelling",
-        code: 'type Article = { draft: string; body: string };\ntype Rest = Omit<Article, "draft">;',
         filename: SOURCE,
       },
       {

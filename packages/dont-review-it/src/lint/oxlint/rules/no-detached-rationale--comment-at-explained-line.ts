@@ -1,13 +1,11 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { isJsdoc } from "../lib/jsdoc-comment.ts";
 
 import type { Comment, ESTree } from "@oxlint/plugins";
 
-type ProseLine = { readonly lineOffset: number; readonly text: string };
-
-const isJsdoc = (comment: Comment): boolean =>
-  comment.type === "Block" && comment.value.startsWith("*");
-
-const descriptionProse = (comment: Comment): readonly ProseLine[] => {
+const descriptionProse = (
+  comment: Comment,
+): readonly { readonly lineOffset: number; readonly text: string }[] => {
   const stripped = comment.value.split("\n").map((line, lineOffset) => ({
     lineOffset,
     text: line.replace(/^\s*\*?\s?/u, "").trim(),
@@ -28,7 +26,7 @@ export const noDetachedRationale = createDontReviewItRule({
     },
     messages: {
       jsdocDescriptionProse:
-        "Free description prose must not sit above a signature instead of on the code it explains, because nothing ties it to the lines it describes once they change. Move contract prose under the JSDoc tag that owns it (`@param`, `@returns`, `@throws`, `@example`, `@see`, `@remarks`), and delete the rest.",
+        "Free description prose must not sit above a signature. Move contract prose under the JSDoc tag that owns it (`@param`, `@returns`, `@throws`, `@example`, `@see`, `@remarks`), and delete the rest.",
     },
     schema: [],
   },
@@ -38,12 +36,12 @@ export const noDetachedRationale = createDontReviewItRule({
         for (const comment of node.comments) {
           if (!isJsdoc(comment)) continue;
 
-          const prose = descriptionProse(comment);
-          if (prose.length === 0) continue;
+          const [firstProse] = descriptionProse(comment);
+          if (firstProse === undefined) continue;
 
           context.report({
             loc: {
-              start: { line: comment.loc.start.line + prose[0].lineOffset, column: 0 },
+              start: { line: comment.loc.start.line + firstProse.lineOffset, column: 0 },
               end: comment.loc.end,
             },
             messageId: "jsdocDescriptionProse",

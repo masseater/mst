@@ -6,7 +6,7 @@
 
 mst は、リポジトリ運用の仕組み（開発フロー、チェック体系、エージェント向けの文脈整備など）を、他のプロジェクトでも使える単位に切り出して整備していく先です。
 
-現時点では Vite+ による monorepo の土台が立ったところで、仕組みの整備そのものはこれからです。ワークスペースは web アプリの `apps/website` と、ライブラリパッケージの `packages/utils` の 2 つで構成されています。
+現時点では Vite+ による monorepo の土台が立ったところで、仕組みの整備そのものはこれからです。どのワークスペースがあるかは [docs/workspaces.md](./docs/workspaces.md) を参照してください（`pnpm-workspace.yaml` から生成されます）。
 
 詳細な構成・アーキテクチャ・開発上の注意事項は `AGENTS.md` を参照してください。
 
@@ -52,7 +52,7 @@ vp install
 | `vp run -r build` | 全ワークスペースのビルド             |
 | `vp run knip`     | 未使用の依存・export・ファイルの検出 |
 | `vp run dev`      | 開発サーバー起動（`apps/website`）   |
-| `vp run ready`    | check → test → build をまとめて実行  |
+| `vp run guard`    | check → test → build をまとめて実行  |
 
 > Development commands last updated: 2026-08-09
 

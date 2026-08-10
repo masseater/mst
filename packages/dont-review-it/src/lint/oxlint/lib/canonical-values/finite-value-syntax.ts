@@ -15,28 +15,30 @@ export const unwrapExpression = (node: ESTree.Expression): ESTree.Expression => 
   if (node.type === "TSAsExpression") return unwrapExpression(node.expression);
   if (node.type === "TSSatisfiesExpression") return unwrapExpression(node.expression);
   if (node.type === "TSTypeAssertion") return unwrapExpression(node.expression);
-  if (node.type === "ParenthesizedExpression") return unwrapExpression(node.expression);
   return node;
 };
-
-export const unwrapType = (node: ESTree.TSType): ESTree.TSType =>
-  node.type === "TSParenthesizedType" ? unwrapType(node.typeAnnotation) : node;
 
 const templateSpelling = (
   quasis: readonly ESTree.TemplateElement[],
   substitutions: readonly unknown[],
 ): CanonicalValue | null =>
-  substitutions.length === 0 && quasis.length === 1 ? quasis[0].value.cooked : null;
+  substitutions.length === 0
+    ? quasis
+        .slice(0, 1)
+        .map((quasi) => quasi.value.cooked)
+        .join("")
+    : null;
+
+const literalSpelling = (value: unknown): CanonicalValue | null => {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return value;
+  if (typeof value === "boolean") return value;
+  return null;
+};
 
 const scalarLiteralValue = (node: ESTree.Expression): CanonicalValue | null => {
   const expression = unwrapExpression(node);
-  if (expression.type === "Literal") {
-    const { value } = expression;
-    if (typeof value === "string") return value;
-    if (typeof value === "number") return value;
-    if (typeof value === "boolean") return value;
-    return null;
-  }
+  if (expression.type === "Literal") return literalSpelling(expression.value);
   if (expression.type === "TemplateLiteral") {
     return templateSpelling(expression.quasis, expression.expressions);
   }
@@ -62,19 +64,16 @@ export const isFiniteVocabulary = (values: readonly CanonicalValue[]): boolean =
   return !values.every((value) => typeof value === "boolean");
 };
 
-const literalTypeValue = (node: ESTree.TSType): CanonicalValue | null => {
-  const type = unwrapType(node);
+const literalTypeValue = (type: ESTree.TSType): CanonicalValue | null => {
   if (type.type === "TSLiteralType") return scalarLiteralValue(type.literal);
   if (type.type === "TSTemplateLiteralType") return templateSpelling(type.quasis, type.types);
   return null;
 };
 
-export const literalUnionValues = (node: ESTree.TSType): readonly CanonicalValue[] | null => {
-  const type = unwrapType(node);
+export const literalUnionValues = (type: ESTree.TSType): readonly CanonicalValue[] | null => {
   if (type.type !== "TSUnionType") return null;
 
   const spellings = type.types
-    .map((member) => unwrapType(member))
     .filter((member) => member.type !== "TSNullKeyword" && member.type !== "TSUndefinedKeyword")
     .map((member) => literalTypeValue(member));
   return spellings.every((spelling) => spelling !== null) ? spellings : null;
@@ -93,11 +92,6 @@ export const propertyKeyName = (key: ESTree.ObjectProperty["key"]): string | nul
   return null;
 };
 
-export type SchemaUnionLiterals = {
-  readonly values: readonly CanonicalValue[];
-  readonly node: ESTree.ArrayExpression;
-};
-
 const schemaLiteralArgumentValue = (
   element: ESTree.ArrayExpression["elements"][number],
 ): CanonicalValue | null => {
@@ -112,7 +106,9 @@ const schemaLiteralArgumentValue = (
   return scalarLiteralValue(literal);
 };
 
-export const schemaUnionLiterals = (node: ESTree.CallExpression): SchemaUnionLiterals | null => {
+export const schemaUnionLiterals = (
+  node: ESTree.CallExpression,
+): { readonly values: readonly CanonicalValue[]; readonly node: ESTree.ArrayExpression } | null => {
   const [argument] = node.arguments;
   if (argument === undefined || argument.type === "SpreadElement") return null;
   const array = unwrapExpression(argument);

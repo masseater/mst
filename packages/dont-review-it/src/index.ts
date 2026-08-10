@@ -1,2 +1,4 @@
+/** @public */
 export { oxlint } from "./configs/oxlint.ts";
-export { createDontReviewItRule } from "./create-rule.ts";
+/** @public */
+export { withGitExcludes } from "./configs/with-git-excludes.ts";
