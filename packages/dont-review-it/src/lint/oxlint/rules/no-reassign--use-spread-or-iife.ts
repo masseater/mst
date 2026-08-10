@@ -4,22 +4,20 @@ import type { ESTree, Options } from "@oxlint/plugins";
 
 const AMBIENT_ONLY_FILE_NAME = /\.d\.[cm]?ts$/u;
 
-const DEFAULT_ASSIGN_ONLY_TARGETS = [
-  "process.exitCode",
-  "RuleTester.describe",
-  "RuleTester.it",
-  "RuleTester.itOnly",
-];
+const PLATFORM_ASSIGN_ONLY_TARGETS = ["process.exitCode"];
 
 const assignOnlyTargetsFrom = (options: Readonly<Options>): readonly string[] => {
   const [first] = options;
   if (typeof first !== "object" || first === null || Array.isArray(first)) {
-    return DEFAULT_ASSIGN_ONLY_TARGETS;
+    return PLATFORM_ASSIGN_ONLY_TARGETS;
   }
 
   const { assignOnlyTargets } = first;
-  if (!Array.isArray(assignOnlyTargets)) return DEFAULT_ASSIGN_ONLY_TARGETS;
-  return assignOnlyTargets.filter((entry): entry is string => typeof entry === "string");
+  if (!Array.isArray(assignOnlyTargets)) return PLATFORM_ASSIGN_ONLY_TARGETS;
+  return [
+    ...PLATFORM_ASSIGN_ONLY_TARGETS,
+    ...assignOnlyTargets.filter((entry): entry is string => typeof entry === "string"),
+  ];
 };
 
 const REASSIGNABLE_DECLARATION_KINDS: ReadonlySet<string> = new Set(["let", "var"]);

@@ -1,6 +1,6 @@
-import type { CanonicalValuesCatalog, CanonicalValuesEntry } from "./catalog.ts";
+import { toPosixPath } from "../posix-path.ts";
 
-const toPosixPath = (path: string): string => path.replaceAll("\\", "/");
+import type { CanonicalValuesCatalog, CanonicalValuesEntry } from "./catalog.ts";
 
 const matchesDeclarationPath = (path: string, entry: CanonicalValuesEntry): boolean => {
   const normalized = toPosixPath(path);

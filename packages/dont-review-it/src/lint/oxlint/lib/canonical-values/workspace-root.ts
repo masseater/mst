@@ -3,6 +3,8 @@ import { dirname, join, resolve } from "node:path";
 
 import { attempt } from "es-toolkit";
 
+import { parseJson } from "./read-json-file.ts";
+
 const WORKSPACE_MANIFEST_FILE_NAMES: readonly string[] = [
   "pnpm-workspace.yaml",
   "pnpm-workspace.yml",
@@ -13,8 +15,6 @@ const MANIFEST_FILE_NAME = "package.json";
 const WORKSPACES_FIELD = "workspaces";
 
 const isFile = (path: string): boolean => attempt(() => statSync(path).isFile())[1] === true;
-
-const parseJson: (text: string) => unknown = JSON.parse;
 
 const manifestDeclaresWorkspaces = (directory: string): boolean => {
   const path = join(directory, MANIFEST_FILE_NAME);

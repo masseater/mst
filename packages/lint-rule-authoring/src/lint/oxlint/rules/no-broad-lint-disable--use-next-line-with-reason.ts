@@ -1,4 +1,5 @@
 import { createLintRuleAuthoringRule } from "../../../create-rule.ts";
+import { firstToken } from "../../../first-token.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
@@ -8,11 +9,6 @@ const BROAD_LINT_DIRECTIVES = new Map([
   ["oxlint-disable", "oxlint-disable-next-line"],
   ["oxlint-disable-line", "oxlint-disable-next-line"],
 ]);
-
-const firstToken = (text: string): string => {
-  const trimmed = text.trim();
-  return trimmed.length === 0 ? "" : trimmed.split(/\s+/u, 1)[0];
-};
 
 export const noBroadLintDisable = createLintRuleAuthoringRule({
   name: "no-broad-lint-disable--use-next-line-with-reason",

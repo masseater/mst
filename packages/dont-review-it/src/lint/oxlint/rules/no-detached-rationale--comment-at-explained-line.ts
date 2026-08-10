@@ -1,11 +1,9 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { isJsdoc } from "../lib/jsdoc-comment.ts";
 
 import type { Comment, ESTree } from "@oxlint/plugins";
 
 type ProseLine = { readonly lineOffset: number; readonly text: string };
-
-const isJsdoc = (comment: Comment): boolean =>
-  comment.type === "Block" && comment.value.startsWith("*");
 
 const descriptionProse = (comment: Comment): readonly ProseLine[] => {
   const stripped = comment.value.split("\n").map((line, lineOffset) => ({

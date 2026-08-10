@@ -144,3 +144,42 @@ test("an unknown option exits two instead of falling back to a default", () => {
   expect(run.out).toBe("");
   expect(run.error).not.toBe("");
 });
+
+test("duplicated-bodies stays silent when no body is spelled twice", () => {
+  const root = repositoryWith({
+    "src/twice.ts": "export const twice = (value: number): number => value * 2;\n",
+    "src/thrice.ts": "export const thrice = (value: number): number => value * 3;\n",
+  });
+
+  expect(runDontReviewIt(["duplicated-bodies", "--repository-root", root])).toStrictEqual({
+    exitCode: 0,
+    out: "",
+    error: "",
+  });
+});
+
+test("duplicated-bodies names both sites when a body is spelled twice", () => {
+  const root = repositoryWith({
+    "src/twice.ts": "export const twice = (value: number): number => value * 2;\n",
+    "src/doubled.ts": "export const doubled = (value: number): number => value * 2;\n",
+  });
+
+  expect(runDontReviewIt(["duplicated-bodies", "--repository-root", root])).toStrictEqual({
+    exitCode: 0,
+    out: "src/doubled.ts:1 doubled == src/twice.ts:1 twice\n",
+    error: "",
+  });
+});
+
+test("duplicated-bodies leaves test files out of the scan", () => {
+  const root = repositoryWith({
+    "src/twice.ts": "export const twice = (value: number): number => value * 2;\n",
+    "src/twice.test.ts": "export const doubled = (value: number): number => value * 2;\n",
+  });
+
+  expect(runDontReviewIt(["duplicated-bodies", "--repository-root", root])).toStrictEqual({
+    exitCode: 0,
+    out: "",
+    error: "",
+  });
+});
