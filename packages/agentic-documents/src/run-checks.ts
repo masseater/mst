@@ -5,6 +5,7 @@ import { repeatedConditions } from "./checks/duplicate-condition.ts";
 import { duplicatedNormativeUnits } from "./checks/duplicate-normative-units.ts";
 import { frontmatterProblems } from "./checks/frontmatter-description.ts";
 import { tablesInNormativeDocument } from "./checks/no-table.ts";
+import { missingNormativeDocuments } from "./checks/normative-document-coverage.ts";
 import { brokenOrderedSequences } from "./checks/ordered-sequence.ts";
 import { negatedKeywordSpellings } from "./checks/prohibition-spelling.ts";
 import { brokenReferences } from "./checks/reference-targets.ts";
@@ -61,6 +62,7 @@ export const runChecks = async ({
 
   const acrossDocuments = [
     ...duplicatedNormativeUnits({ documents, config }),
+    ...(await missingNormativeDocuments({ repositoryRoot, config })),
     ...(await companionFileProblems({ repositoryRoot, documents, config })),
     ...(await workspaceListProblems({ repositoryRoot, config, write })),
   ];

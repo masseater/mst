@@ -122,8 +122,8 @@ export const workspaceListProblems = async ({
 
   const collection = await collectWorkspaces({
     repositoryRoot,
-    definitionFile: listConfig.definitionFile,
-    definitionField: listConfig.definitionField,
+    definitionFile: config.workspaceDefinition.file,
+    definitionField: config.workspaceDefinition.field,
   });
 
   if (collection.incomplete.length > 0) {
