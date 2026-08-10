@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { expect, onTestFinished, test } from "vite-plus/test";
+import { expect, onTestFinished, test, vi } from "vite-plus/test";
 
 import { RETIRED_ANNOTATION_TAGS } from "./annotation.ts";
 import { buildCanonicalValuesCatalog } from "./builder.ts";
@@ -15,6 +15,22 @@ import {
 } from "./verify.ts";
 
 const CANONICAL_VALUES_TAG = "@canonical-values";
+
+const UNREADABLE_FILE_NAME = "unreadable.ts";
+
+vi.mock("node:fs", async (importOriginal) => {
+  const real = await importOriginal<typeof import("node:fs")>();
+  return {
+    ...real,
+    readFileSync: (
+      path: Parameters<typeof real.readFileSync>[0],
+      options?: Parameters<typeof real.readFileSync>[1],
+    ) => {
+      if (String(path).endsWith(UNREADABLE_FILE_NAME)) throw new Error("the file cannot be read");
+      return real.readFileSync(path, options);
+    },
+  };
+});
 
 const repositoryWith = (files: Readonly<Record<string, string>>): string => {
   const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
@@ -192,6 +208,17 @@ test("a retired tag is reported with the location and the tag it found", () => {
   ).toBe(
     `src/order.ts:4 The retired annotation tag ${retired} must not stay in the source, because opting a value set out of the canonical vocabulary is no longer possible. Delete the tag, and declare the concept it belonged to so every use derives from that declaration.`,
   );
+});
+
+test("a source that cannot be read is left out instead of stopping the scan", () => {
+  const root = repositoryWith({
+    [`src/${UNREADABLE_FILE_NAME}`]: annotatedWith("order.status", "export const ORDER = [];"),
+    "src/readable.ts": annotatedWith("article.status", "export const ARTICLE = [];"),
+  });
+
+  expect(
+    verifyCanonicalValues({ repositoryRoot: root }).map((problem) => problem.filePath),
+  ).toStrictEqual(["src/readable.ts"]);
 });
 
 test("an annotation that sits on nothing is reported with the concept it named", () => {
