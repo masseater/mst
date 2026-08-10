@@ -27,6 +27,7 @@ const SHARED_TSCONFIG_PRESETS = [
 ];
 
 export const oxlint = defineConfig({
+  categories: { correctness: LINT_SEVERITY.ERROR },
   jsPlugins: [{ name: PLUGIN_NAME, specifier: "@mst/dont-review-it/plugin" }],
   overrides: [
     {
