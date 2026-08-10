@@ -30,20 +30,19 @@ const specifiersOf = (config: unknown): readonly string[] => {
 
 const extendsByDirectory = new Map<string, TsconfigExtends | null>();
 
+const declaredIn = (directory: string): TsconfigExtends | null => {
+  const candidatePath = join(directory, TSCONFIG_FILE_NAME);
+  const text = readTextFile(candidatePath);
+  if (text === null) return null;
+  return { tsconfigPath: candidatePath, specifiers: specifiersOf(parseJsonc(text)) };
+};
+
 const nearestFrom = (directory: string): TsconfigExtends | null => {
   const remembered = extendsByDirectory.get(directory);
   if (remembered !== undefined) return remembered;
 
-  const candidatePath = join(directory, TSCONFIG_FILE_NAME);
-  const text = readTextFile(candidatePath);
-  if (text !== null) {
-    const found = { tsconfigPath: candidatePath, specifiers: specifiersOf(parseJsonc(text)) };
-    extendsByDirectory.set(directory, found);
-    return found;
-  }
-
   const parent = dirname(directory);
-  const found = parent === directory ? null : nearestFrom(parent);
+  const found = declaredIn(directory) ?? (parent === directory ? null : nearestFrom(parent));
   extendsByDirectory.set(directory, found);
   return found;
 };

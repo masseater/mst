@@ -38,6 +38,11 @@ const ARRAY_TYPE_NAMES: ReadonlySet<string> = new Set(["Array", "ReadonlyArray"]
 
 type ScopeLookup = (node: ESTree.Node) => Scope;
 
+type BindingResolution = {
+  readonly scopeAt: ScopeLookup;
+  readonly seenBindings: ReadonlySet<Variable>;
+};
+
 const staticPropertyName = (node: ESTree.MemberExpression): string | null => {
   if (!node.computed) return node.property.type === "Identifier" ? node.property.name : null;
 
@@ -106,11 +111,7 @@ const resolveBinding = (scope: Scope | null, name: string): Variable | null => {
   return scope.set.get(name) ?? resolveBinding(scope.upper, name);
 };
 
-const isArrayLikeDefinition = (
-  definition: Definition,
-  scopeAt: ScopeLookup,
-  seenBindings: ReadonlySet<Variable>,
-): boolean => {
+const isArrayLikeDefinition = (definition: Definition, resolution: BindingResolution): boolean => {
   const annotation = definition.name.typeAnnotation;
   if (annotation !== null && annotation !== undefined) {
     if (isArrayLikeType(annotation.typeAnnotation, new Set())) return true;
@@ -119,25 +120,25 @@ const isArrayLikeDefinition = (
   const declarator = definition.node;
   if (declarator.type !== "VariableDeclarator") return false;
   if (declarator.id.type !== "Identifier" || declarator.init === null) return false;
-  return isArrayLikeExpression(declarator.init, scopeAt, seenBindings);
+  return isArrayLikeExpression(declarator.init, resolution);
 };
 
 const isArrayLikeBinding = (
   node: ESTree.IdentifierReference,
-  scopeAt: ScopeLookup,
-  seenBindings: ReadonlySet<Variable>,
+  { scopeAt, seenBindings }: BindingResolution,
 ): boolean => {
   const binding = resolveBinding(scopeAt(node), node.name);
   if (binding === null || seenBindings.has(binding)) return false;
 
   const seen = new Set([...seenBindings, binding]);
-  return binding.defs.some((definition) => isArrayLikeDefinition(definition, scopeAt, seen));
+  return binding.defs.some((definition) =>
+    isArrayLikeDefinition(definition, { scopeAt, seenBindings: seen }),
+  );
 };
 
 const isArrayProducingCall = (
   node: ESTree.CallExpression,
-  scopeAt: ScopeLookup,
-  seenBindings: ReadonlySet<Variable>,
+  resolution: BindingResolution,
 ): boolean => {
   const { callee } = node;
   if (callee.type !== "MemberExpression") return false;
@@ -149,35 +150,44 @@ const isArrayProducingCall = (
   }
   return (
     ARRAY_RETURNING_ARRAY_METHODS.has(methodName) &&
-    isArrayLikeExpression(callee.object, scopeAt, seenBindings)
+    isArrayLikeExpression(callee.object, resolution)
   );
 };
 
-const isArrayLikeExpression = (
+const isArrayLikeThroughWrapper = (
   node: ESTree.Expression,
-  scopeAt: ScopeLookup,
-  seenBindings: ReadonlySet<Variable>,
-): boolean => {
+  resolution: BindingResolution,
+): boolean | null => {
   switch (node.type) {
-    case "ArrayExpression":
-      return true;
     case "ChainExpression":
     case "ParenthesizedExpression":
     case "TSNonNullExpression":
-      return isArrayLikeExpression(node.expression, scopeAt, seenBindings);
+      return isArrayLikeExpression(node.expression, resolution);
     case "TSAsExpression":
     case "TSSatisfiesExpression":
     case "TSTypeAssertion":
       return (
         isArrayLikeType(node.typeAnnotation, new Set()) ||
-        isArrayLikeExpression(node.expression, scopeAt, seenBindings)
+        isArrayLikeExpression(node.expression, resolution)
       );
+    default:
+      return null;
+  }
+};
+
+const isArrayLikeExpression = (node: ESTree.Expression, resolution: BindingResolution): boolean => {
+  const throughWrapper = isArrayLikeThroughWrapper(node, resolution);
+  if (throughWrapper !== null) return throughWrapper;
+
+  switch (node.type) {
+    case "ArrayExpression":
+      return true;
     case "NewExpression":
       return isArrayGlobalReference(node.callee);
     case "CallExpression":
-      return isArrayProducingCall(node, scopeAt, seenBindings);
+      return isArrayProducingCall(node, resolution);
     case "Identifier":
-      return isArrayLikeBinding(node, scopeAt, seenBindings);
+      return isArrayLikeBinding(node, resolution);
     default:
       return false;
   }
@@ -209,7 +219,7 @@ export const noArrayMutation = createDontReviewItRule({
         const methodName = staticPropertyName(callee);
         if (methodName === null) return;
         if (!IN_PLACE_ARRAY_METHODS.has(methodName)) return;
-        if (!isArrayLikeExpression(callee.object, scopeAt, new Set())) return;
+        if (!isArrayLikeExpression(callee.object, { scopeAt, seenBindings: new Set() })) return;
 
         context.report({
           node: callee.property,

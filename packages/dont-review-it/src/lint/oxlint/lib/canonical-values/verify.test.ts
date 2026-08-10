@@ -38,6 +38,9 @@ ${declaration}
   const declaring = (conceptId: string, binding: string): string =>
     annotatedWith(conceptId, `export const ${binding} = ["draft"] as const;`);
 
+  const conceptIdsOf = (group: readonly { readonly conceptId: string }[]): readonly string[] =>
+    group.map((entry) => entry.conceptId);
+
   const catalogPathsOf = (repositoryRoot: string): readonly string[] =>
     buildCanonicalValuesCatalog({ repositoryRoot }).entries.map((entry) => entry.declarationPath);
 
@@ -102,7 +105,8 @@ export const BROKEN_STATUSES = ["draft"] as const;
   });
 
   test("a retired annotation tag is rejected wherever it sits, including a test file", () => {
-    const retired = RETIRED_ANNOTATION_TAGS[0];
+    const [retired] = RETIRED_ANNOTATION_TAGS;
+    if (retired === undefined) throw new Error("the retired tag vocabulary must not be empty");
     const repositoryRoot = repositoryWith({
       "scripts/legacy.mjs": `/** ${retired} */
 export const LEGACY_STATUSES = ["draft"];
@@ -160,9 +164,9 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
 
     const { entries } = buildCanonicalValuesCatalog({ repositoryRoot });
 
-    expect(
-      findEquivalentConcepts(entries).map((group) => group.map((entry) => entry.conceptId)),
-    ).toStrictEqual([["article.status", "order.status"]]);
+    expect(findEquivalentConcepts(entries).map((group) => conceptIdsOf(group))).toStrictEqual([
+      ["article.status", "order.status"],
+    ]);
   });
 
   test("concepts that declare different value sets form no group", () => {
@@ -273,6 +277,16 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
     },
   ];
 
+  const cataloguedRows = (repositoryRoot: string): readonly unknown[] =>
+    buildCanonicalValuesCatalog({ repositoryRoot }).entries.map((entry) => [
+      entry.declarationPath,
+      entry.conceptId,
+      entry.values,
+    ]);
+
+  const verifiedRows = (repositoryRoot: string): readonly unknown[] =>
+    verifyCanonicalValues({ repositoryRoot }).map((problem) => [problem.kind, problem.filePath]);
+
   test("the catalog and the verification read the same declarations out of the same source", () => {
     const observed = AGREEMENT_CASES.map(({ form, conceptId, declaration }) => {
       const repositoryRoot = repositoryWith({
@@ -281,15 +295,8 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
       });
       return {
         form,
-        catalogued: buildCanonicalValuesCatalog({ repositoryRoot }).entries.map((entry) => [
-          entry.declarationPath,
-          entry.conceptId,
-          entry.values,
-        ]),
-        verified: verifyCanonicalValues({ repositoryRoot }).map((problem) => [
-          problem.kind,
-          problem.filePath,
-        ]),
+        catalogued: cataloguedRows(repositoryRoot),
+        verified: verifiedRows(repositoryRoot),
       };
     });
 

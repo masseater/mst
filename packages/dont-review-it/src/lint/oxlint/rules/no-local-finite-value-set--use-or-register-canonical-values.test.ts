@@ -18,10 +18,14 @@ import { createNoLocalFiniteValueSet } from "./no-local-finite-value-set--use-or
 
 const ORDER_STATUS_VALUES: readonly CanonicalValue[] = ["draft", "published"];
 
+type WorkspaceVocabulary = {
+  readonly workspace: string;
+  readonly vocabulary: readonly CanonicalValue[];
+};
+
 const entry = (
   conceptId: string,
-  workspace: string,
-  vocabulary: readonly CanonicalValue[],
+  { workspace, vocabulary }: WorkspaceVocabulary,
 ): CanonicalValuesEntry => ({
   conceptId,
   declarationPath: `packages/${workspace}/src/${conceptId}.ts`,
@@ -30,18 +34,24 @@ const entry = (
   fingerprint: fingerprintValues(vocabulary),
 });
 
-const ownedCatalog = buildCatalog([entry("order-status", "order-vocabulary", ORDER_STATUS_VALUES)]);
+const ownedCatalog = buildCatalog([
+  entry("order-status", { workspace: "order-vocabulary", vocabulary: ORDER_STATUS_VALUES }),
+]);
 
 const ambiguousCatalog = buildCatalog([
-  entry("order-status", "order-vocabulary", ORDER_STATUS_VALUES),
-  entry("article-status", "article-vocabulary", ORDER_STATUS_VALUES),
+  entry("order-status", { workspace: "order-vocabulary", vocabulary: ORDER_STATUS_VALUES }),
+  entry("article-status", { workspace: "article-vocabulary", vocabulary: ORDER_STATUS_VALUES }),
 ]);
+
+type AdmittedVocabulary = {
+  readonly typeName: string;
+  readonly admits: readonly CanonicalValue[];
+  readonly admitsUnnamedValues?: boolean;
+};
 
 const libraryType = (
   packageName: string,
-  typeName: string,
-  admits: readonly CanonicalValue[],
-  admitsUnnamedValues = false,
+  { typeName, admits, admitsUnnamedValues = false }: AdmittedVocabulary,
 ): LibraryVocabularyEntry => ({
   packageName,
   typeName,
@@ -60,8 +70,12 @@ const ruleReading = (
   });
 
 const severityAndTarget = buildLibraryVocabularyIndex([
-  libraryType("oxlint", "AllowWarnDeny", ["allow", "deny", "error", "off", "warn"], true),
-  libraryType("vite", "SSRTarget", ["node", "webworker"]),
+  libraryType("oxlint", {
+    typeName: "AllowWarnDeny",
+    admits: ["allow", "deny", "error", "off", "warn"],
+    admitsUnnamedValues: true,
+  }),
+  libraryType("vite", { typeName: "SSRTarget", admits: ["node", "webworker"] }),
 ]);
 
 const withOwner = ruleReading(ownedCatalog);
@@ -69,14 +83,16 @@ const withoutCatalog = ruleReading(EMPTY_CANONICAL_VALUES_CATALOG);
 const withAmbiguousOwners = ruleReading(ambiguousCatalog);
 const withLibraryOwner = ruleReading(EMPTY_CANONICAL_VALUES_CATALOG, severityAndTarget);
 const withCatalogAndLibraryOwners = ruleReading(
-  buildCatalog([entry("ssr-target", "ssr-vocabulary", ["node", "webworker"])]),
+  buildCatalog([
+    entry("ssr-target", { workspace: "ssr-vocabulary", vocabulary: ["node", "webworker"] }),
+  ]),
   severityAndTarget,
 );
 const withTwoLibraryOwners = ruleReading(
   EMPTY_CANONICAL_VALUES_CATALOG,
   buildLibraryVocabularyIndex([
-    libraryType("oxlint", "AllowWarnDeny", ["error", "off", "warn"]),
-    libraryType("vite", "LogLevel", ["error", "info", "off", "warn"]),
+    libraryType("oxlint", { typeName: "AllowWarnDeny", admits: ["error", "off", "warn"] }),
+    libraryType("vite", { typeName: "LogLevel", admits: ["error", "info", "off", "warn"] }),
   ]),
 );
 

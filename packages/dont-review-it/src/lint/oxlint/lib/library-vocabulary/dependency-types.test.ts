@@ -16,21 +16,36 @@ describe("dependency-types", () => {
     return directory;
   };
 
-  const writeFile = (packageDirectory: string, relativePath: string, contents: string): void => {
+  type PackageFile = {
+    readonly relativePath: string;
+    readonly contents: string;
+  };
+
+  const writeFile = (packageDirectory: string, { relativePath, contents }: PackageFile): void => {
     const absolutePath = join(packageDirectory, relativePath);
     mkdirSync(dirname(absolutePath), { recursive: true });
     writeFileSync(absolutePath, contents, "utf8");
   };
 
+  type InstalledDependency = {
+    readonly name: string;
+    readonly manifest: Record<string, unknown>;
+    readonly declarationsPath: string | null;
+  };
+
   const installDependency = (
     packageDirectory: string,
-    name: string,
-    manifest: Record<string, unknown>,
-    declarationsPath: string | null,
+    { name, manifest, declarationsPath }: InstalledDependency,
   ): void => {
-    writeFile(packageDirectory, `node_modules/${name}/package.json`, JSON.stringify(manifest));
+    writeFile(packageDirectory, {
+      relativePath: `node_modules/${name}/package.json`,
+      contents: JSON.stringify(manifest),
+    });
     if (declarationsPath !== null) {
-      writeFile(packageDirectory, `node_modules/${name}/${declarationsPath}`, "export {};\n");
+      writeFile(packageDirectory, {
+        relativePath: `node_modules/${name}/${declarationsPath}`,
+        contents: "export {};\n",
+      });
     }
   };
 
@@ -39,12 +54,11 @@ describe("dependency-types", () => {
 
   test("a dependency that names its declarations through its export map becomes an entry", () => {
     const packageDirectory = createPackage({ dependencies: { oxlint: "1.76.0" } });
-    installDependency(
-      packageDirectory,
-      "oxlint",
-      { exports: { ".": { types: "./dist/index.d.ts", default: "./dist/index.js" } } },
-      "dist/index.d.ts",
-    );
+    installDependency(packageDirectory, {
+      name: "oxlint",
+      manifest: { exports: { ".": { types: "./dist/index.d.ts", default: "./dist/index.js" } } },
+      declarationsPath: "dist/index.d.ts",
+    });
 
     expect(dependencyTypeEntries(packageDirectory)).toStrictEqual([
       {
@@ -56,19 +70,22 @@ describe("dependency-types", () => {
 
   test("a dependency declared for development is reachable the same way", () => {
     const packageDirectory = createPackage({ devDependencies: { vite: "8.0.0" } });
-    installDependency(
-      packageDirectory,
-      "vite",
-      { types: "./dist/node/index.d.ts" },
-      "dist/node/index.d.ts",
-    );
+    installDependency(packageDirectory, {
+      name: "vite",
+      manifest: { types: "./dist/node/index.d.ts" },
+      declarationsPath: "dist/node/index.d.ts",
+    });
 
     expect(packageNamesOf(packageDirectory)).toStrictEqual(["vite"]);
   });
 
   test("a dependency declared as a peer is reachable the same way", () => {
     const packageDirectory = createPackage({ peerDependencies: { oxlint: "*" } });
-    installDependency(packageDirectory, "oxlint", { typings: "./index.d.ts" }, "index.d.ts");
+    installDependency(packageDirectory, {
+      name: "oxlint",
+      manifest: { typings: "./index.d.ts" },
+      declarationsPath: "index.d.ts",
+    });
 
     expect(packageNamesOf(packageDirectory)).toStrictEqual(["oxlint"]);
   });
@@ -77,68 +94,73 @@ describe("dependency-types", () => {
     const packageDirectory = createPackage({
       dependencies: { "@mst/lint-rule-authoring": "workspace:*", oxlint: "1.76.0" },
     });
-    installDependency(
-      packageDirectory,
-      "@mst/lint-rule-authoring",
-      { exports: { ".": "./src/index.ts" } },
-      "src/index.ts",
-    );
-    installDependency(packageDirectory, "oxlint", { types: "./index.d.ts" }, "index.d.ts");
+    installDependency(packageDirectory, {
+      name: "@mst/lint-rule-authoring",
+      manifest: { exports: { ".": "./src/index.ts" } },
+      declarationsPath: "src/index.ts",
+    });
+    installDependency(packageDirectory, {
+      name: "oxlint",
+      manifest: { types: "./index.d.ts" },
+      declarationsPath: "index.d.ts",
+    });
 
     expect(packageNamesOf(packageDirectory)).toStrictEqual(["oxlint"]);
   });
 
   test("a types condition nested under another condition is still found", () => {
     const packageDirectory = createPackage({ dependencies: { nested: "1.0.0" } });
-    installDependency(
-      packageDirectory,
-      "nested",
-      { exports: { ".": { import: { types: "./index.d.mts", default: "./index.mjs" } } } },
-      "index.d.mts",
-    );
+    installDependency(packageDirectory, {
+      name: "nested",
+      manifest: {
+        exports: { ".": { import: { types: "./index.d.mts", default: "./index.mjs" } } },
+      },
+      declarationsPath: "index.d.mts",
+    });
 
     expect(packageNamesOf(packageDirectory)).toStrictEqual(["nested"]);
   });
 
   test("an export map that names conditions without a subpath is read as the root entry", () => {
     const packageDirectory = createPackage({ dependencies: { rootonly: "1.0.0" } });
-    installDependency(
-      packageDirectory,
-      "rootonly",
-      { exports: { types: "./index.d.ts", default: "./index.js" } },
-      "index.d.ts",
-    );
+    installDependency(packageDirectory, {
+      name: "rootonly",
+      manifest: { exports: { types: "./index.d.ts", default: "./index.js" } },
+      declarationsPath: "index.d.ts",
+    });
 
     expect(packageNamesOf(packageDirectory)).toStrictEqual(["rootonly"]);
   });
 
   test("a package that only names its runtime entry points at the declarations beside it", () => {
     const packageDirectory = createPackage({ dependencies: { runtimeonly: "1.0.0" } });
-    installDependency(
-      packageDirectory,
-      "runtimeonly",
-      { main: "./dist/index.js" },
-      "dist/index.d.ts",
-    );
+    installDependency(packageDirectory, {
+      name: "runtimeonly",
+      manifest: { main: "./dist/index.js" },
+      declarationsPath: "dist/index.d.ts",
+    });
 
     expect(packageNamesOf(packageDirectory)).toStrictEqual(["runtimeonly"]);
   });
 
   test("a package that ships no type declarations is left out", () => {
     const packageDirectory = createPackage({ dependencies: { runtimeonly: "1.0.0" } });
-    installDependency(
-      packageDirectory,
-      "runtimeonly",
-      { main: "./dist/index.js" },
-      "dist/index.js",
-    );
+    installDependency(packageDirectory, {
+      name: "runtimeonly",
+      manifest: { main: "./dist/index.js" },
+      declarationsPath: "dist/index.js",
+    });
 
     expect(packageNamesOf(packageDirectory)).toStrictEqual([]);
   });
 
   test("a dependency missing from the checkout costs only that dependency", () => {
     const packageDirectory = createPackage({ dependencies: { oxlint: "1.76.0", pruned: "1.0.0" } });
-    installDependency(packageDirectory, "oxlint", { types: "./index.d.ts" }, "index.d.ts");
+    installDependency(packageDirectory, {
+      name: "oxlint",
+      manifest: { types: "./index.d.ts" },
+      declarationsPath: "index.d.ts",
+    });
 
     expect(packageNamesOf(packageDirectory)).toStrictEqual(["oxlint"]);
   });
@@ -148,9 +170,21 @@ describe("dependency-types", () => {
       dependencies: { oxlint: "1.76.0" },
       devDependencies: { "@oxlint/plugins": "1.76.0", vite: "8.0.0" },
     });
-    installDependency(packageDirectory, "oxlint", { types: "./index.d.ts" }, "index.d.ts");
-    installDependency(packageDirectory, "@oxlint/plugins", { types: "./index.d.ts" }, "index.d.ts");
-    installDependency(packageDirectory, "vite", { types: "./index.d.ts" }, "index.d.ts");
+    installDependency(packageDirectory, {
+      name: "oxlint",
+      manifest: { types: "./index.d.ts" },
+      declarationsPath: "index.d.ts",
+    });
+    installDependency(packageDirectory, {
+      name: "@oxlint/plugins",
+      manifest: { types: "./index.d.ts" },
+      declarationsPath: "index.d.ts",
+    });
+    installDependency(packageDirectory, {
+      name: "vite",
+      manifest: { types: "./index.d.ts" },
+      declarationsPath: "index.d.ts",
+    });
 
     expect(packageNamesOf(packageDirectory)).toStrictEqual(["@oxlint/plugins", "oxlint", "vite"]);
   });

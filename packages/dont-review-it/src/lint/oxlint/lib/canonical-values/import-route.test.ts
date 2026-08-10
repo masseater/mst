@@ -19,7 +19,10 @@ describe("import-route", () => {
   const catalog = buildCatalog([entry({})]);
 
   const statusOf = (specifier: string, filename: string): string =>
-    importRouteStatus(specifier, filename, REPOSITORY_ROOT, catalog);
+    importRouteStatus(
+      { specifier: specifier, filename: filename, repositoryRoot: REPOSITORY_ROOT },
+      catalog,
+    );
 
   test("a specifier that is the registered export path is registered", () => {
     expect(statusOf("@mst/order-vocabulary", "/repository/packages/order/src/schema.ts")).toBe(
@@ -74,9 +77,11 @@ describe("import-route", () => {
 
     expect(
       importRouteStatus(
-        "#internal/statuses",
-        "/repository/packages/order/src/schema.ts",
-        REPOSITORY_ROOT,
+        {
+          specifier: "#internal/statuses",
+          filename: "/repository/packages/order/src/schema.ts",
+          repositoryRoot: REPOSITORY_ROOT,
+        },
         subpathCatalog,
       ),
     ).toBe("registered");
@@ -93,9 +98,11 @@ describe("import-route", () => {
 
     expect(
       importRouteStatus(
-        "./index.ts",
-        "/repository/packages/order-vocabulary/src/schema.ts",
-        REPOSITORY_ROOT,
+        {
+          specifier: "./index.ts",
+          filename: "/repository/packages/order-vocabulary/src/schema.ts",
+          repositoryRoot: REPOSITORY_ROOT,
+        },
         indexCatalog,
       ),
     ).toBe("registered");
