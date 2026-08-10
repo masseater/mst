@@ -4,7 +4,7 @@ import { join, sep } from "node:path";
 
 import { describe, expect, onTestFinished, test, vi } from "vite-plus/test";
 
-import { listRepositoryFiles, nearestPackageDirectory } from "./source-files.ts";
+import { listRepositoryFiles, nearestPackageDirectory, type ScannedFile } from "./source-files.ts";
 
 const VANISHED_FILE_NAME = "vanished.ts";
 
@@ -24,6 +24,9 @@ vi.mock(import("node:fs"), async (importOriginal) => {
   }) as typeof real.statSync;
   return { ...real, statSync };
 });
+
+const pathsOf = (files: readonly ScannedFile[]): readonly string[] =>
+  files.map((file) => file.relativePath);
 
 describe("source-files", () => {
   const createRepository = (): string => {
@@ -54,9 +57,24 @@ describe("source-files", () => {
     writeFileSync(join(source, "order.ts"), "export const total = 1;\n", "utf8");
     writeFileSync(join(source, "README.md"), "# order\n", "utf8");
 
-    expect(listRepositoryFiles(root).commentSources.map((file) => file.relativePath)).toStrictEqual(
-      ["src/order.ts"],
-    );
+    expect(pathsOf(listRepositoryFiles(root).commentSources)).toStrictEqual(["src/order.ts"]);
+  });
+
+  test("a style sheet and a markup file are listed apart from the scripts", () => {
+    const root = createRepository();
+    createManifest(root);
+    const source = createDirectory(root, "src");
+    writeFileSync(join(source, "order.ts"), "export const total = 1;\n", "utf8");
+    writeFileSync(join(source, "order.css"), ".total {\n  color: red;\n}\n", "utf8");
+    writeFileSync(join(source, "icon.svg"), "<svg></svg>\n", "utf8");
+    writeFileSync(join(root, "index.html"), "<div></div>\n", "utf8");
+
+    const listed = listRepositoryFiles(root);
+
+    expect(pathsOf(listed.commentSources)).toStrictEqual(["src/order.ts"]);
+    expect(pathsOf(listed.styleSheets)).toStrictEqual(["src/order.css"]);
+    expect(pathsOf(listed.markupSources)).toStrictEqual(["index.html", "src/icon.svg"]);
+    expect(pathsOf(listed.manifests)).toStrictEqual(["package.json"]);
   });
 
   test("a file that disappears between the listing and the reading is left out", () => {
@@ -65,9 +83,7 @@ describe("source-files", () => {
     writeFileSync(join(source, "present.ts"), "export const total = 1;\n", "utf8");
     writeFileSync(join(source, VANISHED_FILE_NAME), "export const gone = 1;\n", "utf8");
 
-    expect(listRepositoryFiles(root).commentSources.map((file) => file.relativePath)).toStrictEqual(
-      ["src/present.ts"],
-    );
+    expect(pathsOf(listRepositoryFiles(root).commentSources)).toStrictEqual(["src/present.ts"]);
   });
 
   test("a directory that holds a manifest is its own package", () => {
