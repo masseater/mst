@@ -44,13 +44,18 @@ const filesReachableByReExport = (entryFile: string): ReadonlySet<string> => {
   return reached;
 };
 
+type ExportsFieldPosition = {
+  readonly subpath: string;
+  readonly depth: number;
+};
+
 const exportSubpathTargets = (
   packageDirectory: string,
   exportsField: unknown,
 ): ReadonlyMap<string, readonly string[]> => {
   const targets = new Map<string, string[]>();
 
-  const collect = (subpath: string, value: unknown, depth: number): void => {
+  const collect = (value: unknown, { subpath, depth }: ExportsFieldPosition): void => {
     if (typeof value === "string") {
       if (!value.startsWith("./") || value.endsWith(".d.ts")) return;
       const resolved = resolve(packageDirectory, value);
@@ -64,11 +69,11 @@ const exportSubpathTargets = (
     const conditions: readonly (readonly [string, unknown])[] = Object.entries(value);
     for (const [key, nested] of conditions) {
       if (key === `./${MANIFEST_FILE_NAME}`) continue;
-      collect(key.startsWith(".") ? key : subpath, nested, depth + 1);
+      collect(nested, { subpath: key.startsWith(".") ? key : subpath, depth: depth + 1 });
     }
   };
 
-  collect(".", exportsField, 0);
+  collect(exportsField, { subpath: ".", depth: 0 });
   return targets;
 };
 

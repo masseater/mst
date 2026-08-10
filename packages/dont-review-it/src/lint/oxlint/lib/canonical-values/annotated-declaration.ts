@@ -13,9 +13,13 @@ const JSDOC_COMMENT_VALUE_PREFIX = "*";
 const isJsDocComment = (comment: Comment): boolean =>
   comment.type === "Block" && comment.value.startsWith(JSDOC_COMMENT_VALUE_PREFIX);
 
+type ParsedSource = {
+  readonly program: ESTree.Program;
+  readonly sourceText: string;
+};
+
 const annotatedDeclarationRange = (
-  program: ESTree.Program,
-  sourceText: string,
+  { program, sourceText }: ParsedSource,
   comment: Comment,
 ): AnnotatedDeclarationRange | null => {
   if (!isJsDocComment(comment)) return null;
@@ -38,10 +42,12 @@ const annotatedDeclarationRange = (
 export const annotatedDeclarationRanges = (
   program: ESTree.Program,
   sourceText: string,
-): readonly AnnotatedDeclarationRange[] =>
-  program.comments
-    .map((comment) => annotatedDeclarationRange(program, sourceText, comment))
+): readonly AnnotatedDeclarationRange[] => {
+  const source: ParsedSource = { program, sourceText };
+  return program.comments
+    .map((comment) => annotatedDeclarationRange(source, comment))
     .filter((range) => range !== null);
+};
 
 export const isInsideAnnotatedDeclaration = (
   ranges: readonly AnnotatedDeclarationRange[],

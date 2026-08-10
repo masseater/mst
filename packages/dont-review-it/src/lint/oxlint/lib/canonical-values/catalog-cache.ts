@@ -17,10 +17,13 @@ const CACHE_FILE_SEGMENTS: readonly string[] = [
   "canonical-values.json",
 ];
 
-type CachedCatalog = {
-  readonly version: number;
+export type FingerprintedEntries = {
   readonly fingerprint: string;
   readonly entries: readonly CanonicalValuesEntry[];
+};
+
+type CachedCatalog = FingerprintedEntries & {
+  readonly version: number;
 };
 
 export const cacheInputFingerprint = (files: readonly ScannedFile[]): string => {
@@ -74,8 +77,7 @@ export const readCachedEntries = (
 
 export const writeCachedEntries = (
   repositoryRoot: string,
-  fingerprint: string,
-  entries: readonly CanonicalValuesEntry[],
+  { fingerprint, entries }: FingerprintedEntries,
 ): void => {
   const path = cacheFilePath(repositoryRoot);
   const payload: CachedCatalog = { version: CACHE_FORMAT_VERSION, fingerprint, entries };

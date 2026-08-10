@@ -8,18 +8,26 @@ import type { ESTree, Options } from "@oxlint/plugins";
 
 const startsWithAlphanumeric = (segment: string): boolean => /^[a-zA-Z0-9]/u.test(segment);
 
+type LiteralSearchWindow = {
+  readonly literals: readonly string[];
+  readonly cursor: number;
+  readonly lastMatchableEnd: number;
+};
+
 const literalsFollowInOrder = (
   segment: string,
-  literals: readonly string[],
-  cursor: number,
-  lastMatchableEnd: number,
+  { literals, cursor, lastMatchableEnd }: LiteralSearchWindow,
 ): boolean => {
   const [literal, ...remaining] = literals;
   if (literal === undefined) return true;
 
   const found = segment.indexOf(literal, cursor);
   if (found === -1 || found + literal.length > lastMatchableEnd) return false;
-  return literalsFollowInOrder(segment, remaining, found + literal.length, lastMatchableEnd);
+  return literalsFollowInOrder(segment, {
+    literals: remaining,
+    cursor: found + literal.length,
+    lastMatchableEnd,
+  });
 };
 
 const matchesAllowedName = (segment: string, pattern: string): boolean => {
@@ -32,12 +40,11 @@ const matchesAllowedName = (segment: string, pattern: string): boolean => {
   if (!segment.endsWith(tail)) return false;
   if (segment.length < head.length + tail.length) return false;
 
-  return literalsFollowInOrder(
-    segment,
-    literals.slice(1, -1),
-    head.length,
-    segment.length - tail.length,
-  );
+  return literalsFollowInOrder(segment, {
+    literals: literals.slice(1, -1),
+    cursor: head.length,
+    lastMatchableEnd: segment.length - tail.length,
+  });
 };
 
 const allowedNamesFrom = (options: Readonly<Options>): readonly string[] => {

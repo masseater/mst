@@ -7,16 +7,34 @@ import { createNoStrictCanonicalLiteralUseRule } from "./no-strict-canonical-lit
 
 const entry = (
   conceptId: string,
-  declarationPath: string,
-  exportPath: string | null,
-  values: readonly CanonicalValue[],
-) => ({ conceptId, declarationPath, exportPath, values, fingerprint: fingerprintValues(values) });
+  declaration: {
+    readonly declarationPath: string;
+    readonly exportPath: string | null;
+    readonly values: readonly CanonicalValue[];
+  },
+) => ({ conceptId, ...declaration, fingerprint: fingerprintValues(declaration.values) });
 
 const CATALOG = buildCatalog([
-  entry("order.status", "packages/order/src/status.ts", "@mst/order", ["draft", "published"]),
-  entry("article.status", "packages/article/src/status.ts", null, ["draft", "archived"]),
-  entry("retry.budget", "packages/retry/src/budget.ts", "@mst/retry", [3, -1]),
-  entry("sync.mode", "packages/sync/src/mode.ts", "@mst/sync", ["auto", true]),
+  entry("order.status", {
+    declarationPath: "packages/order/src/status.ts",
+    exportPath: "@mst/order",
+    values: ["draft", "published"],
+  }),
+  entry("article.status", {
+    declarationPath: "packages/article/src/status.ts",
+    exportPath: null,
+    values: ["draft", "archived"],
+  }),
+  entry("retry.budget", {
+    declarationPath: "packages/retry/src/budget.ts",
+    exportPath: "@mst/retry",
+    values: [3, -1],
+  }),
+  entry("sync.mode", {
+    declarationPath: "packages/sync/src/mode.ts",
+    exportPath: "@mst/sync",
+    values: ["auto", true],
+  }),
 ]);
 
 const UNCONFIGURED_OWNERSHIP_POLICY =

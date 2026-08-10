@@ -58,7 +58,7 @@ export const buildCanonicalValuesCatalog = ({
   if (cached !== null) return buildCatalog(cached);
 
   const entries = canonicalValuesEntriesIn(root, readDeclarationSources(repositoryFiles));
-  writeCachedEntries(root, fingerprint, entries);
+  writeCachedEntries(root, { fingerprint, entries });
   return buildCatalog(entries);
 };
 

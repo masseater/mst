@@ -25,18 +25,26 @@ const patternsFrom = (
   return patterns.filter((entry): entry is string => typeof entry === "string");
 };
 
+type LiteralSearchWindow = {
+  readonly literals: readonly string[];
+  readonly cursor: number;
+  readonly lastMatchableEnd: number;
+};
+
 const literalsFollowInOrder = (
   segment: string,
-  literals: readonly string[],
-  cursor: number,
-  lastMatchableEnd: number,
+  { literals, cursor, lastMatchableEnd }: LiteralSearchWindow,
 ): boolean => {
   const [literal, ...remaining] = literals;
   if (literal === undefined) return true;
 
   const found = segment.indexOf(literal, cursor);
   if (found === -1 || found + literal.length > lastMatchableEnd) return false;
-  return literalsFollowInOrder(segment, remaining, found + literal.length, lastMatchableEnd);
+  return literalsFollowInOrder(segment, {
+    literals: remaining,
+    cursor: found + literal.length,
+    lastMatchableEnd,
+  });
 };
 
 const matchesSegmentName = (segment: string, pattern: string): boolean => {
@@ -49,12 +57,11 @@ const matchesSegmentName = (segment: string, pattern: string): boolean => {
   if (!segment.endsWith(tail)) return false;
   if (segment.length < head.length + tail.length) return false;
 
-  return literalsFollowInOrder(
-    segment,
-    literals.slice(1, -1),
-    head.length,
-    segment.length - tail.length,
-  );
+  return literalsFollowInOrder(segment, {
+    literals: literals.slice(1, -1),
+    cursor: head.length,
+    lastMatchableEnd: segment.length - tail.length,
+  });
 };
 
 const matchesSegments = (
@@ -78,7 +85,15 @@ const matchesSegments = (
 const segmentsOf = (path: string, separator: string): readonly string[] =>
   path.split(separator).filter((segment) => segment !== "");
 
-const matchesPattern = (pathSegments: readonly string[], pattern: string, cwd: string): boolean => {
+type AnchoredPattern = {
+  readonly pattern: string;
+  readonly cwd: string;
+};
+
+const matchesPattern = (
+  pathSegments: readonly string[],
+  { pattern, cwd }: AnchoredPattern,
+): boolean => {
   if (ANCHORED_PATTERN_PREFIXES.some((prefix) => pattern.startsWith(prefix))) {
     return matchesSegments(pathSegments, segmentsOf(resolve(cwd, pattern), sep));
   }
@@ -125,8 +140,9 @@ export const requireReExportOnlyFiles = createDontReviewItRule({
     return {
       Program(node: ESTree.Program) {
         const pathSegments = segmentsOf(resolve(context.cwd, context.filename), sep);
-        if (!targets.some((pattern) => matchesPattern(pathSegments, pattern, context.cwd))) return;
-        if (exclude.some((pattern) => matchesPattern(pathSegments, pattern, context.cwd))) return;
+        const { cwd } = context;
+        if (!targets.some((pattern) => matchesPattern(pathSegments, { pattern, cwd }))) return;
+        if (exclude.some((pattern) => matchesPattern(pathSegments, { pattern, cwd }))) return;
 
         if (!node.body.some(isDirectReExport)) {
           context.report({ node, messageId: "missingReExport" });
