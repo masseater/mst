@@ -16,11 +16,13 @@ Vite+ の `defineConfig` に渡すオブジェクトが持つ `lint` と `fmt` �
 
 守っている不変条件は「git が無視しろと言っているものを、linter と formatter が読みに行かない」ことである。
 
-oxlint はリポジトリの `.gitignore` を歩く時点で尊重するが、`core.excludesFile` が指すマシン全体の ignore と `$GIT_DIR/info/exclude` は見ない。したがってエージェントの作業ディレクトリや個人用のスクラッチ置き場のように、リポジトリの `.gitignore` ではなく手元のグローバル設定で無視しているものは、そのまま lint 対象に入り込む。formatter も同じで、無視しているはずのディレクトリの中身を書き換える。
+oxlint はリポジトリの `.gitignore` と `$GIT_DIR/info/exclude` を歩く時点で尊重するが、`core.excludesFile` が指すマシン全体の ignore だけは見ない。したがってエージェントの作業ディレクトリや個人用のスクラッチ置き場のように、リポジトリに書かず手元のグローバル設定で無視しているものは、そのまま lint 対象に入り込む。formatter も同じで、無視しているはずのディレクトリの中身を書き換える。
 
 その差を埋めるのが `ignorePatterns` だが、oxlint は `extends` で名指しした設定が持つ `ignorePatterns` を捨て、`extends` を書いた側の設定に書かれたものだけを使う。`rules` や `overrides` や `plugins` は継承されるのに、`ignorePatterns` だけが継承されない。つまり preset をいくら整えても、preset からこのパターン列を配ることはできない。パターン列は、必ず `defineConfig` に直接渡すオブジェクト自身が持っていなければならない。
 
 `withGitExcludes` はその 1 点だけを担う。設定を受け取り、git の ignore 設定（グローバル → `$GIT_DIR/info/exclude` → リポジトリの `.gitignore` の順、gitignore の last-match-wins に合わせてある）から作ったパターン列を `ignorePatterns` の先頭に置いて返す。呼び出し側が書くべきことは何もなく、忘れたときだけこのルールが報告する。
+
+埋めたい穴はグローバルの 1 経路だけだが、読むのは 3 経路すべてである。パターンの優先順位は経路をまたいで決まるため、1 か所に並べないと、グローバル側の指定をリポジトリ側の `!` が打ち消す関係を表現できない。
 
 ラッパを忘れても lint は緑のまま通る。無視されるはずのファイルが増えるだけで、失敗として現れない。人間が気づく契機がないため、機械が見張る。
 
