@@ -1,7 +1,9 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { basename, dirname, join, relative, sep } from "node:path";
+import { basename, dirname, join, relative } from "node:path";
 
 import { attempt, partition, sortBy } from "es-toolkit";
+
+import { toPosixPath } from "../posix-path.ts";
 
 import type { Dirent, Stats } from "node:fs";
 
@@ -54,8 +56,6 @@ export const nearestPackageDirectory = (
 
 export const readTextFile = (path: string): string | null =>
   attempt(() => readFileSync(path, "utf8"))[1];
-
-const toPosixPath = (value: string): string => value.split(sep).join("/");
 
 const directoryEntriesOf = (directory: string): readonly Dirent[] =>
   attempt(() => readdirSync(directory, { withFileTypes: true }))[1] ?? [];

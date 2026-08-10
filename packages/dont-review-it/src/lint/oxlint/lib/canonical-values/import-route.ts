@@ -1,5 +1,7 @@
 import { dirname, relative, resolve } from "node:path";
 
+import { toPosixPath } from "../posix-path.ts";
+
 import type { CanonicalValuesCatalog, CanonicalValuesEntry } from "./catalog.ts";
 
 const MODULE_FILE_SUFFIX = /\.[cm]?[jt]sx?$/u;
@@ -14,8 +16,6 @@ const isRelativeSpecifier = (specifier: string): boolean =>
 const matchesExportPath = (specifier: string, entry: CanonicalValuesEntry): boolean =>
   entry.exportPath !== null &&
   (specifier === entry.exportPath || specifier.startsWith(`${entry.exportPath}/`));
-
-const toPosixPath = (path: string): string => path.split(/[\\/]/u).join("/");
 
 const withoutModuleSuffix = (path: string): string =>
   toPosixPath(path).replace(MODULE_FILE_SUFFIX, "").replace(INDEX_MODULE_SUFFIX, "");

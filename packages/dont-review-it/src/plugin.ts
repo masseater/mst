@@ -1,4 +1,5 @@
 import { loadCanonicalValuesCatalog } from "./lint/oxlint/lib/canonical-values/builder.ts";
+import { loadRepositoryBodyIndex } from "./lint/oxlint/lib/duplicated-bodies/builder.ts";
 import { loadLibraryVocabulary } from "./lint/oxlint/lib/library-vocabulary/harvester.ts";
 import { forbidOversizedFile } from "./lint/oxlint/rules/forbid-oversized-file--split-by-responsibility.ts";
 import { noAmbiguousVariableName } from "./lint/oxlint/rules/no-ambiguous-variable-name--rename-to-concrete-noun.ts";
@@ -6,6 +7,7 @@ import { noArrayMutation } from "./lint/oxlint/rules/no-array-mutation--derive-n
 import { noDefaultExport } from "./lint/oxlint/rules/no-default-export--use-named-export.ts";
 import { noDetachedRationale } from "./lint/oxlint/rules/no-detached-rationale--comment-at-explained-line.ts";
 import { noDetachedTestFile } from "./lint/oxlint/rules/no-detached-test-file--move-beside-source.ts";
+import { createNoDuplicatedBody } from "./lint/oxlint/rules/no-duplicated-body--import-the-existing-declaration.ts";
 import { noExplanatoryComment } from "./lint/oxlint/rules/no-explanatory-comment--delete-or-move-to-commit-message.ts";
 import { createNoLocalFiniteValueSet } from "./lint/oxlint/rules/no-local-finite-value-set--use-or-register-canonical-values.ts";
 import { noPromiseChain } from "./lint/oxlint/rules/no-promise-chain--use-async-await.ts";
@@ -25,6 +27,8 @@ export const noStrictCanonicalLiteralUse = createNoStrictCanonicalLiteralUseRule
   loadCatalog: loadCanonicalValuesCatalog,
 });
 
+export const noDuplicatedBody = createNoDuplicatedBody({ loadIndex: loadRepositoryBodyIndex });
+
 const plugin: Plugin = {
   meta: { name: "dont-review-it" },
   rules: {
@@ -34,6 +38,7 @@ const plugin: Plugin = {
     [noDefaultExport.name]: noDefaultExport,
     [noDetachedRationale.name]: noDetachedRationale,
     [noDetachedTestFile.name]: noDetachedTestFile,
+    [noDuplicatedBody.name]: noDuplicatedBody,
     [noExplanatoryComment.name]: noExplanatoryComment,
     [noLocalFiniteValueSet.name]: noLocalFiniteValueSet,
     [noPromiseChain.name]: noPromiseChain,
