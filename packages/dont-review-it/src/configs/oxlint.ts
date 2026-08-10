@@ -8,6 +8,7 @@ import { noDefaultExport } from "../lint/oxlint/rules/no-default-export--use-nam
 import { noDetachedRationale } from "../lint/oxlint/rules/no-detached-rationale--comment-at-explained-line.ts";
 import { noDetachedTestFile } from "../lint/oxlint/rules/no-detached-test-file--move-beside-source.ts";
 import { noExplanatoryComment } from "../lint/oxlint/rules/no-explanatory-comment--delete-or-move-to-commit-message.ts";
+import { noStandaloneTsconfig } from "../lint/oxlint/rules/no-standalone-tsconfig--extend-shared-preset.ts";
 import { requireReExportOnlyFiles } from "../lint/oxlint/rules/require-re-export-only-files--move-declaration-to-owning-module.ts";
 import { noLocalFiniteValueSet, noStrictCanonicalLiteralUse } from "../plugin.ts";
 
@@ -16,6 +17,11 @@ const PLUGIN_NAME = "dont-review-it";
 const MAX_LINES_PER_FILE = 400;
 
 const TOOL_REQUIRED_DEFAULT_EXPORT_FILES = ["**/plugin.ts", "**/vite.config.ts"];
+
+const SHARED_TSCONFIG_PRESETS = [
+  "dont-review-it/tsconfig/library.json",
+  "dont-review-it/tsconfig/app.json",
+];
 
 export const oxlint = defineConfig({
   jsPlugins: [{ name: PLUGIN_NAME, specifier: "@mst/dont-review-it/plugin" }],
@@ -39,6 +45,10 @@ export const oxlint = defineConfig({
     [`${PLUGIN_NAME}/${noDetachedTestFile.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noExplanatoryComment.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noLocalFiniteValueSet.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noStandaloneTsconfig.name}`]: [
+      LINT_SEVERITY.ERROR,
+      [...SHARED_TSCONFIG_PRESETS],
+    ],
     [`${PLUGIN_NAME}/${noStrictCanonicalLiteralUse.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${requireReExportOnlyFiles.name}`]: LINT_SEVERITY.ERROR,
   },

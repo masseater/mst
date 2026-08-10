@@ -1,9 +1,4 @@
 {
-  "compilerOptions": {
-    "noEmit": true,
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "allowImportingTsExtensions": true,
-    "esModuleInterop": true
-  }
+  "extends": "@mst/dont-review-it/tsconfig/library.json",
+  "include": ["*.ts"]
 }

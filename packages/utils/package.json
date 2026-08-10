@@ -32,6 +32,7 @@
     "prepublishOnly": "vp run build"
   },
   "devDependencies": {
+    "@mst/dont-review-it": "workspace:*",
     "@types/node": "catalog:",
     "bumpp": "^11.1.0",
     "typescript": "catalog:",
