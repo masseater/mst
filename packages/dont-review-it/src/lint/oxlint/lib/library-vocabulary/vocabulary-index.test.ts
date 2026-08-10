@@ -1,8 +1,10 @@
 import { expect, test } from "vite-plus/test";
 
-import { buildLibraryVocabularyIndex, libraryOwnersOf } from "./vocabulary-index.ts";
-
-import type { LibraryVocabularyEntry } from "./vocabulary-index.ts";
+import {
+  buildLibraryVocabularyIndex,
+  libraryOwnersOf,
+  type LibraryVocabularyEntry,
+} from "./vocabulary-index.ts";
 
 const harvested = (
   overrides: Partial<LibraryVocabularyEntry> & Pick<LibraryVocabularyEntry, "typeName">,

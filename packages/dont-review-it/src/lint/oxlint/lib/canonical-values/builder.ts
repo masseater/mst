@@ -2,15 +2,17 @@ import { dirname, resolve } from "node:path";
 
 import { memoize, sortBy } from "es-toolkit";
 
-import { readDeclarationSources } from "./annotated-sources.ts";
-import { buildCatalog, EMPTY_CANONICAL_VALUES_CATALOG } from "./catalog.ts";
+import { readDeclarationSources, type AnnotatedSource } from "./annotated-sources.ts";
+import {
+  buildCatalog,
+  EMPTY_CANONICAL_VALUES_CATALOG,
+  type CanonicalValuesCatalog,
+  type CanonicalValuesEntry,
+} from "./catalog.ts";
 import { cacheInputFingerprint, readCachedEntries, writeCachedEntries } from "./catalog-cache.ts";
 import { buildExportSpecifierIndex } from "./export-specifier-index.ts";
 import { fingerprintValues } from "./fingerprint.ts";
 import { listRepositoryFiles, nearestPackageDirectory } from "./source-files.ts";
-
-import type { AnnotatedSource } from "./annotated-sources.ts";
-import type { CanonicalValuesCatalog, CanonicalValuesEntry } from "./catalog.ts";
 
 const canonicalValuesEntriesIn = (
   repositoryRoot: string,

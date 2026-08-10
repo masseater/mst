@@ -2,9 +2,7 @@ import { expect, test } from "vite-plus/test";
 
 import { buildCatalog } from "./catalog.ts";
 import { declaresConceptAt } from "./declaration-path.ts";
-import { fingerprintValues } from "./fingerprint.ts";
-
-import type { CanonicalValue } from "./fingerprint.ts";
+import { fingerprintValues, type CanonicalValue } from "./fingerprint.ts";
 
 const ORDER_STATUS: CanonicalValue[] = ["draft", "published"];
 

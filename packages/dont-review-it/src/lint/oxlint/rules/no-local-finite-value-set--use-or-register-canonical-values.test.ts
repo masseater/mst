@@ -1,24 +1,20 @@
-import { testLintRule } from "@mst/lint-rule-authoring";
+import { testLintRule, type WorkspaceLintRule } from "@mst/lint-rule-authoring";
 import { describe } from "vite-plus/test";
 
-import { buildCatalog, EMPTY_CANONICAL_VALUES_CATALOG } from "../lib/canonical-values/catalog.ts";
-import { fingerprintValues } from "../lib/canonical-values/fingerprint.ts";
+import {
+  buildCatalog,
+  EMPTY_CANONICAL_VALUES_CATALOG,
+  type CanonicalValuesCatalog,
+  type CanonicalValuesEntry,
+} from "../lib/canonical-values/catalog.ts";
+import { fingerprintValues, type CanonicalValue } from "../lib/canonical-values/fingerprint.ts";
 import {
   buildLibraryVocabularyIndex,
   EMPTY_LIBRARY_VOCABULARY_INDEX,
+  type LibraryVocabularyEntry,
+  type LibraryVocabularyIndex,
 } from "../lib/library-vocabulary/vocabulary-index.ts";
 import { createNoLocalFiniteValueSet } from "./no-local-finite-value-set--use-or-register-canonical-values.ts";
-
-import type { WorkspaceLintRule } from "@mst/lint-rule-authoring";
-import type {
-  CanonicalValuesCatalog,
-  CanonicalValuesEntry,
-} from "../lib/canonical-values/catalog.ts";
-import type { CanonicalValue } from "../lib/canonical-values/fingerprint.ts";
-import type {
-  LibraryVocabularyEntry,
-  LibraryVocabularyIndex,
-} from "../lib/library-vocabulary/vocabulary-index.ts";
 
 const ORDER_STATUS_VALUES: readonly CanonicalValue[] = ["draft", "published"];
 

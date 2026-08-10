@@ -21,6 +21,8 @@ const MAX_LINES_PER_FILE = 400;
 
 const TOOL_REQUIRED_DEFAULT_EXPORT_FILES = ["**/plugin.ts", "**/vite.config.ts"];
 
+const TEST_FILES = ["**/*.test.ts", "**/*.test.tsx"];
+
 const SHARED_TSCONFIG_PRESETS = [
   "dont-review-it/tsconfig/library.json",
   "dont-review-it/tsconfig/app.json",
@@ -32,6 +34,15 @@ export const oxlint = defineConfig({
     {
       files: TOOL_REQUIRED_DEFAULT_EXPORT_FILES,
       rules: { [`${PLUGIN_NAME}/${noDefaultExport.name}`]: LINT_SEVERITY.OFF },
+    },
+    {
+      files: TEST_FILES,
+      rules: {
+        "max-lines-per-function": [
+          LINT_SEVERITY.ERROR,
+          { max: 320, skipBlankLines: true, skipComments: true },
+        ],
+      },
     },
   ],
   rules: {
@@ -57,5 +68,18 @@ export const oxlint = defineConfig({
     ],
     [`${PLUGIN_NAME}/${noStrictCanonicalLiteralUse.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${requireReExportOnlyFiles.name}`]: LINT_SEVERITY.ERROR,
+    "max-depth": [LINT_SEVERITY.ERROR, { max: 4 }],
+    "max-lines-per-function": [
+      LINT_SEVERITY.ERROR,
+      { max: 200, skipBlankLines: true, skipComments: true },
+    ],
+    "max-params": [LINT_SEVERITY.ERROR, { max: 4 }],
+    "no-console": LINT_SEVERITY.ERROR,
+    "no-duplicate-imports": LINT_SEVERITY.ERROR,
+    "no-empty": LINT_SEVERITY.ERROR,
+    "no-empty-function": LINT_SEVERITY.ERROR,
+    "typescript/ban-ts-comment": LINT_SEVERITY.ERROR,
+    "typescript/no-explicit-any": LINT_SEVERITY.ERROR,
+    "typescript/no-unnecessary-type-conversion": LINT_SEVERITY.ERROR,
   },
 });

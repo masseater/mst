@@ -4,8 +4,13 @@ import { createDontReviewItRule } from "../../../create-rule.ts";
 import {
   annotatedDeclarationRanges,
   isInsideAnnotatedDeclaration,
+  type AnnotatedDeclarationRange,
 } from "../lib/canonical-values/annotated-declaration.ts";
-import { canonicalValueKey } from "../lib/canonical-values/catalog.ts";
+import {
+  canonicalValueKey,
+  type CanonicalValuesCatalog,
+  type CanonicalValuesEntry,
+} from "../lib/canonical-values/catalog.ts";
 import { declaresConceptAt } from "../lib/canonical-values/declaration-path.ts";
 import {
   OWNERSHIP_POLICY_SCHEMA,
@@ -14,12 +19,7 @@ import {
 import { findWorkspaceRoot } from "../lib/canonical-values/workspace-root.ts";
 import { isOutOfScopeSource } from "../lib/out-of-scope-source.ts";
 
-import type { AnnotatedDeclarationRange } from "../lib/canonical-values/annotated-declaration.ts";
 import type { CanonicalValuesCatalogLoader } from "../lib/canonical-values/catalog-loader.ts";
-import type {
-  CanonicalValuesCatalog,
-  CanonicalValuesEntry,
-} from "../lib/canonical-values/catalog.ts";
 import type { CanonicalValue } from "../lib/canonical-values/fingerprint.ts";
 import type { ESTree, Visitor } from "@oxlint/plugins";
 

@@ -2,10 +2,8 @@ import { testLintRule } from "@mst/lint-rule-authoring";
 import { describe } from "vite-plus/test";
 
 import { buildCatalog, EMPTY_CANONICAL_VALUES_CATALOG } from "../lib/canonical-values/catalog.ts";
-import { fingerprintValues } from "../lib/canonical-values/fingerprint.ts";
+import { fingerprintValues, type CanonicalValue } from "../lib/canonical-values/fingerprint.ts";
 import { createNoStrictCanonicalLiteralUseRule } from "./no-strict-canonical-literal-use--use-canonical-import.ts";
-
-import type { CanonicalValue } from "../lib/canonical-values/fingerprint.ts";
 
 const entry = (
   conceptId: string,
