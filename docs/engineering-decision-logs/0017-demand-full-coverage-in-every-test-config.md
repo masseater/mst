@@ -13,9 +13,11 @@
 
 ## 決定
 
-`test.coverage.thresholds` の宣言を lint ルール `dont-review-it/no-lenient-coverage-threshold--demand-full-coverage` で強制する。要求値は 4 メトリクス（`branches` / `functions` / `lines` / `statements`）すべて 100 を既定とし、下げる操作はルールのオプションだけで行う。
+`test.coverage.thresholds` の宣言を lint ルール `dont-review-it/no-lenient-coverage-threshold--demand-full-coverage` で強制する。要求値は 4 メトリクス（`branches` / `functions` / `lines` / `statements`）すべて 100 を既定とし、下げる操作はルールのオプションだけで行う。あわせて `perFile: true` を要求し、下限をファイル単位の主張として読ませる。
 
-このリポジトリの 4 つの設定ファイル（ルート・`packages/utils`・`packages/dont-review-it`・`packages/lint-rule-authoring`）は、いずれも Vitest の短縮記法 `thresholds: { 100: true }` で宣言する。
+このリポジトリの 4 つの設定ファイル（ルート・`packages/utils`・`packages/dont-review-it`・`packages/lint-rule-authoring`）は、いずれも Vitest の短縮記法 `thresholds: { 100: true, perFile: true }` で宣言する。
+
+宣言を実際のゲートにするため、CI と `vp run ready` のテスト実行を `vp run -r test --coverage` に切り替える。
 
 ## 根拠
 
@@ -36,6 +38,12 @@
 100 未満の下限は「許容する未検証コードの量」を宣言している。90 と書けば、テストの無いコードが 10% まで存在してよいという合意になり、その枠がどこに使われるかは誰も指定しない。実際には最も書きにくい箇所に集まる。
 
 100 を既定にすると、枠を作るという判断が明示的な操作になる。オプションで下げた数字は 1 箇所に現れ、いつ戻すのかをコミットログに書かせられる。
+
+### ファイル単位で見る
+
+Vitest の `thresholds` は既定でパッケージ全体の集計に対する下限である。要求値が 100 の間は per-file と一致するが、オプションで 1 つでも下げた瞬間に意味が変わる。集計 90 は「テストの無いファイルが 1 つあっても、よく書かれたファイルが埋めれば通る」を意味し、埋められている側がどれかは数字に出ない。
+
+`perFile: true` を要求すると、下限は「どのファイルについても言えること」になる。新しく足したファイルがテストなしで着地して通る余地が消える。この読み方はオプションで下げられるようにしない。ファイル単位で見るかどうかは下限の読み方そのものであって、下げられる数字ではないため。
 
 ### 4 メトリクスすべてを要求する
 
@@ -61,6 +69,8 @@
 
 `@vitest/coverage-v8` が catalog とテストを持つ 3 ワークスペース、およびルートの依存に入る。ルートに入れているのは、ルートの `vite.config.ts` が coverage を宣言しており、knip がそれを未宣言依存として報告するためである。
 
-`vp run -r test` は既定ではカバレッジを集めないため、宣言した下限はこの時点では検査されない。`--coverage` を付けて走らせたときに初めて効く。宣言を実際のゲートにするかどうか（CI をカバレッジ付きに切り替え、リポジトリを 100% まで持ち上げるかどうか）は、この決定には含まれていない。
+計測されるのはテストを走らせる 3 パッケージ（`packages/utils`・`packages/dont-review-it`・`packages/lint-rule-authoring`）である。`apps/website` は `test` スクリプトも `vite.config.ts` も持たないため、このゲートの外にいる。「100%」はこの 3 パッケージについての主張であって、リポジトリ全体についての主張ではない。
 
-宣言を入れた時点の実測値は、`packages/utils` が 4 メトリクスすべて 100、`packages/lint-rule-authoring` が statements 96.11 / branches 85.71、`packages/dont-review-it` が statements 93.18 / branches 84.42 / functions 99.5 / lines 97.8 である。
+`--coverage` を付けたことで、届いていないコードは CI と merge のゲートで赤くなる。宣言を入れた時点の実測値は、`packages/utils` が 4 メトリクスすべて 100、`packages/lint-rule-authoring` が statements 96.11 / branches 85.71、`packages/dont-review-it` が statements 93.18 / branches 84.42 / functions 99.5 / lines 97.8 だった。
+
+届いていなかった箇所の多くは、実行され得ない防御だった。型が文法より広いために書かれた分岐、`noUncheckedIndexedAccess` が要求する索引の `undefined` 判定、網羅済みの `switch` の `default`、schema の `default` が埋めてしまうオプションの既定値経路がそれにあたる。これらは順序を入れ替えるか、到達可能な分岐に畳むか、消すことで解消した。テストで踏めないものを踏めるようにするのではなく、踏めない記述を残さない形に寄せている。
