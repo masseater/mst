@@ -21,9 +21,11 @@ const isNode = (value: unknown): value is Fields =>
 const namedFieldsOf = (node: Fields): readonly (readonly [string, unknown])[] =>
   Object.entries(node).filter(([field]) => !POSITION_FIELDS.has(field));
 
+const jsonTextOf: (value: unknown) => string = JSON.stringify;
+
 const structureOf = (value: unknown): string => {
   if (Array.isArray(value)) return `[${value.map(structureOf).join(",")}]`;
-  if (!isNode(value)) return value === undefined ? "undefined" : JSON.stringify(value);
+  if (!isNode(value)) return jsonTextOf(value);
   return `{${namedFieldsOf(value)
     .map(([field, nested]) => `${field}:${structureOf(nested)}`)
     .join(",")}}`;
@@ -53,41 +55,37 @@ const declarationFrom = ({
   nodeCount: nodeCountOf(described.body),
 });
 
-const bindingsOf = (statement: Fields): readonly Fields[] => {
-  const { declarations } = statement;
-  return Array.isArray(declarations) ? declarations.filter(isNode) : [];
-};
+const bindingsOf = (statement: Fields): readonly Fields[] =>
+  (statement.declarations as readonly unknown[]).filter(isNode);
 
 const namedBindingIn = (binding: Fields): string | null => {
-  const { id } = binding;
-  if (!isNode(id) || id[NODE_TYPE_FIELD] !== "Identifier") return null;
-  return typeof id.name === "string" ? id.name : null;
+  const id = binding.id as Fields;
+  return id[NODE_TYPE_FIELD] === "Identifier" ? String(id.name) : null;
 };
 
-const bindingBodyOf = (binding: Fields): unknown => {
-  const { id, init } = binding;
-  const typeAnnotation = isNode(id) ? (id.typeAnnotation ?? null) : null;
-  return { typeAnnotation, init: init ?? null };
-};
+const bindingBodyOf = (binding: Fields): unknown => ({
+  typeAnnotation: (binding.id as Fields).typeAnnotation,
+  init: binding.init,
+});
 
 const functionBodyOf = (statement: Fields): unknown => ({
-  typeParameters: statement.typeParameters ?? null,
-  params: statement.params ?? null,
-  returnType: statement.returnType ?? null,
-  body: statement.body ?? null,
-  async: statement.async ?? false,
-  generator: statement.generator ?? false,
+  typeParameters: statement.typeParameters,
+  params: statement.params,
+  returnType: statement.returnType,
+  body: statement.body,
+  async: statement.async,
+  generator: statement.generator,
 });
 
 const typeAliasBodyOf = (statement: Fields): unknown => ({
-  typeParameters: statement.typeParameters ?? null,
-  typeAnnotation: statement.typeAnnotation ?? null,
+  typeParameters: statement.typeParameters,
+  typeAnnotation: statement.typeAnnotation,
 });
 
 const interfaceBodyOf = (statement: Fields): unknown => ({
-  typeParameters: statement.typeParameters ?? null,
-  extends: statement.extends ?? null,
-  body: statement.body ?? null,
+  typeParameters: statement.typeParameters,
+  extends: statement.extends,
+  body: statement.body,
 });
 
 const BODY_BY_STATEMENT_KIND: Readonly<Record<string, (statement: Fields) => unknown>> = {
@@ -96,14 +94,9 @@ const BODY_BY_STATEMENT_KIND: Readonly<Record<string, (statement: Fields) => unk
   TSTypeAliasDeclaration: typeAliasBodyOf,
 };
 
-const declaredNameOf = (statement: Fields): string | null => {
-  const { id } = statement;
-  if (!isNode(id)) return null;
-  return typeof id.name === "string" ? id.name : null;
-};
+const declaredNameOf = (statement: Fields): string => String((statement.id as Fields).name);
 
-const startOf = (statement: Fields): number =>
-  typeof statement.start === "number" ? statement.start : 0;
+const startOf = (statement: Fields): number => Number(statement.start);
 
 const bindingDeclarationsIn = (source: string, statement: Fields): readonly BodyDeclaration[] =>
   bindingsOf(statement).flatMap((binding) => {
@@ -118,12 +111,10 @@ const bindingDeclarationsIn = (source: string, statement: Fields): readonly Body
   });
 
 const namedDeclarationsIn = (source: string, statement: Fields): readonly BodyDeclaration[] => {
-  const kind = statement[NODE_TYPE_FIELD];
-  const bodyOf = typeof kind === "string" ? BODY_BY_STATEMENT_KIND[kind] : undefined;
+  const bodyOf = BODY_BY_STATEMENT_KIND[String(statement[NODE_TYPE_FIELD])];
   if (bodyOf === undefined) return [];
 
   const name = declaredNameOf(statement);
-  if (name === null) return [];
   return [
     declarationFrom({
       source,
