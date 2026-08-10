@@ -1,8 +1,9 @@
-import { readdirSync, readFileSync, statSync, type Dirent, type Stats } from "node:fs";
+import { readdirSync, readFileSync, statSync, type Stats } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 
-import { attempt, partition, sortBy } from "es-toolkit";
+import { partition, sortBy } from "es-toolkit";
 
+import { readUnlessMissing } from "../path-failure.ts";
 import { toPosixPath } from "../posix-path.ts";
 
 export type ScannedFile = {
@@ -35,7 +36,7 @@ const DECLARATION_SOURCE_NAME_PATTERN = /\.[cm]?tsx?$/u;
 
 const TEST_FILE_NAME_PATTERN = /\.(?:test|spec)\.[cm]?[jt]sx?$/u;
 
-const statOf = (path: string): Stats | null => attempt(() => statSync(path))[1];
+const statOf = (path: string): Stats | null => readUnlessMissing(() => statSync(path));
 
 export const isFile = (path: string): boolean => statOf(path)?.isFile() === true;
 
@@ -53,10 +54,7 @@ export const nearestPackageDirectory = (
 };
 
 export const readTextFile = (path: string): string | null =>
-  attempt(() => readFileSync(path, "utf8"))[1];
-
-const directoryEntriesOf = (directory: string): readonly Dirent[] =>
-  attempt(() => readdirSync(directory, { withFileTypes: true }))[1] ?? [];
+  readUnlessMissing(() => readFileSync(path, "utf8"));
 
 const scannedFileAt = (repositoryRoot: string, absolutePath: string): ScannedFile | null => {
   const stats = statOf(absolutePath);
@@ -73,7 +71,7 @@ const isScannedName = (name: string): boolean =>
   name === MANIFEST_FILE_NAME || SCRIPT_FILE_NAME_PATTERN.test(name);
 
 const scannedFilesUnder = (repositoryRoot: string, directory: string): readonly ScannedFile[] =>
-  directoryEntriesOf(directory).flatMap((directoryEntry) => {
+  readdirSync(directory, { withFileTypes: true }).flatMap((directoryEntry) => {
     const absolutePath = join(directory, directoryEntry.name);
     if (directoryEntry.isDirectory()) {
       return UNSCANNED_DIRECTORY_NAMES.has(directoryEntry.name)
@@ -94,7 +92,15 @@ const isDeclarationSource = (file: ScannedFile): boolean => {
   return DECLARATION_SOURCE_NAME_PATTERN.test(name) && !TEST_FILE_NAME_PATTERN.test(name);
 };
 
+const NO_REPOSITORY_FILES: RepositoryFiles = {
+  declarationSources: [],
+  commentSources: [],
+  manifests: [],
+};
+
 export const listRepositoryFiles = (repositoryRoot: string): RepositoryFiles => {
+  if (!isDirectory(repositoryRoot)) return NO_REPOSITORY_FILES;
+
   const scanned = sortBy(scannedFilesUnder(repositoryRoot, repositoryRoot), ["relativePath"]);
   const [manifests, commentSources] = partition(scanned, isManifest);
 

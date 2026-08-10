@@ -9,6 +9,7 @@ import { noArrayMutation } from "../lint/oxlint/rules/no-array-mutation--derive-
 import { noDefaultExport } from "../lint/oxlint/rules/no-default-export--use-named-export.ts";
 import { noDetachedRationale } from "../lint/oxlint/rules/no-detached-rationale--comment-at-explained-line.ts";
 import { noDetachedTestFile } from "../lint/oxlint/rules/no-detached-test-file--move-beside-source.ts";
+import { noDiscardedFailure } from "../lint/oxlint/rules/no-discarded-failure--receive-and-surface-it.ts";
 import { noDoubleTypeAssertion } from "../lint/oxlint/rules/no-double-type-assertion--declare-the-real-type.ts";
 import { noExplanatoryComment } from "../lint/oxlint/rules/no-explanatory-comment--delete-or-move-to-commit-message.ts";
 import { noHardcodedEndpoint } from "../lint/oxlint/rules/no-hardcoded-endpoint--read-from-configuration.ts";
@@ -83,6 +84,7 @@ export const oxlint: OxlintConfig = defineConfig({
     [`${PLUGIN_NAME}/${noDefaultExport.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noDetachedRationale.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noDetachedTestFile.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noDiscardedFailure.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noDoubleTypeAssertion.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noDuplicatedBody.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noExplanatoryComment.name}`]: LINT_SEVERITY.ERROR,
