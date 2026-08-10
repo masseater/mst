@@ -2,48 +2,24 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { afterEach, expect, test } from "vite-plus/test";
+import { expect, onTestFinished, test } from "vite-plus/test";
 
 import { RETIRED_ANNOTATION_TAGS } from "./lint/oxlint/lib/canonical-values/annotation.ts";
 import { runDontReviewIt } from "./run-cli.ts";
 
 const CANONICAL_VALUES_TAG = "@canonical-values";
 
-const createdRoots: string[] = [];
-
-afterEach(() => {
-  for (const root of createdRoots.splice(0)) rmSync(root, { recursive: true, force: true });
-});
-
 const repositoryWith = (files: Readonly<Record<string, string>>): string => {
   const root = mkdtempSync(join(tmpdir(), "dont-review-it-cli-"));
-  createdRoots.push(root);
+  onTestFinished(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
   for (const [path, text] of Object.entries(files)) {
     const target = join(root, path);
     mkdirSync(dirname(target), { recursive: true });
     writeFileSync(target, text, "utf8");
   }
   return root;
-};
-
-type CliRun = {
-  readonly exitCode: number;
-  readonly stdout: string;
-  readonly stderr: string;
-};
-
-const runCli = (argv: readonly string[]): CliRun => {
-  let stdout = "";
-  let stderr = "";
-  const exitCode = runDontReviewIt(argv, {
-    writeOut: (text) => {
-      stdout += text;
-    },
-    writeError: (text) => {
-      stderr += text;
-    },
-  });
-  return { exitCode, stdout, stderr };
 };
 
 test("verify stays silent and exits zero when every annotation is well formed", () => {
@@ -53,25 +29,25 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
 `,
   });
 
-  expect(runCli(["verify", "--repository-root", root])).toStrictEqual({
+  expect(runDontReviewIt(["verify", "--repository-root", root])).toStrictEqual({
     exitCode: 0,
-    stdout: "",
-    stderr: "",
+    out: "",
+    error: "",
   });
 });
 
-test("verify writes the problem to stdout and exits one", () => {
+test("verify returns the problem as output and exits one", () => {
   const root = repositoryWith({
     "src/order.ts": `/** ${CANONICAL_VALUES_TAG} */
 export const ORDER_STATUSES = ["draft"] as const;
 `,
   });
 
-  const run = runCli(["verify", "--repository-root", root]);
+  const run = runDontReviewIt(["verify", "--repository-root", root]);
 
   expect(run.exitCode).toBe(1);
-  expect(run.stdout).toContain("src/order.ts:1");
-  expect(run.stderr).toBe("");
+  expect(run.out).toContain("src/order.ts:1");
+  expect(run.error).toBe("");
 });
 
 test("verify reaches a broken annotation that sits in a dot directory", () => {
@@ -81,10 +57,10 @@ export const BROKEN_STATUSES = ["draft"] as const;
 `,
   });
 
-  const run = runCli(["verify", "--repository-root", root]);
+  const run = runDontReviewIt(["verify", "--repository-root", root]);
 
   expect(run.exitCode).toBe(1);
-  expect(run.stdout).toContain(".config/broken.ts:1");
+  expect(run.out).toContain(".config/broken.ts:1");
 });
 
 test("verify rejects a retired annotation tag left in a JavaScript file", () => {
@@ -95,11 +71,11 @@ export const LEGACY_STATUSES = ["draft"];
 `,
   });
 
-  const run = runCli(["verify", "--repository-root", root]);
+  const run = runDontReviewIt(["verify", "--repository-root", root]);
 
   expect(run.exitCode).toBe(1);
-  expect(run.stdout).toContain("scripts/legacy.mjs:1");
-  expect(run.stdout).toContain(retired);
+  expect(run.out).toContain("scripts/legacy.mjs:1");
+  expect(run.out).toContain(retired);
 });
 
 test("a concept a test file repeats is never reported against the declaration that owns it", () => {
@@ -112,14 +88,14 @@ export const ORDER_STATUSES = ["draft"] as const;
 `,
   });
 
-  expect(runCli(["verify", "--repository-root", root])).toStrictEqual({
+  expect(runDontReviewIt(["verify", "--repository-root", root])).toStrictEqual({
     exitCode: 0,
-    stdout: "",
-    stderr: "",
+    out: "",
+    error: "",
   });
 });
 
-test("equivalent-concepts writes the group it found and still exits zero", () => {
+test("equivalent-concepts returns the group it found and still exits zero", () => {
   const root = repositoryWith({
     "src/article.ts": `/** ${CANONICAL_VALUES_TAG} article.status */
 export const ARTICLE_STATUSES = ["published", "draft"] as const;
@@ -129,42 +105,42 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
 `,
   });
 
-  const run = runCli(["equivalent-concepts", "--repository-root", root]);
+  const run = runDontReviewIt(["equivalent-concepts", "--repository-root", root]);
 
   expect(run.exitCode).toBe(0);
-  expect(run.stdout).toContain("article.status");
-  expect(run.stdout).toContain("order.status");
+  expect(run.out).toContain("article.status");
+  expect(run.out).toContain("order.status");
 });
 
-test("an unknown command writes the usage to stderr and exits two", () => {
-  const run = runCli(["publish"]);
+test("an unknown command returns the usage as an error and exits two", () => {
+  const run = runDontReviewIt(["publish"]);
 
   expect(run.exitCode).toBe(2);
-  expect(run.stdout).toBe("");
-  expect(run.stderr).toContain("Usage: dont-review-it <command> [--repository-root <path>]");
-  expect(run.stderr).toContain("verify");
-  expect(run.stderr).toContain("equivalent-concepts");
-  expect(run.stderr).toContain("--repository-root <path>");
+  expect(run.out).toBe("");
+  expect(run.error).toContain("Usage: dont-review-it <command> [--repository-root <path>]");
+  expect(run.error).toContain("verify");
+  expect(run.error).toContain("equivalent-concepts");
+  expect(run.error).toContain("--repository-root <path>");
 });
 
 test("no command at all is answered the same way an unknown command is", () => {
-  expect(runCli([])).toStrictEqual(runCli(["publish"]));
+  expect(runDontReviewIt([])).toStrictEqual(runDontReviewIt(["publish"]));
 });
 
 test("a repository root that is not a directory exits two instead of scanning nothing", () => {
   const root = repositoryWith({});
 
-  const run = runCli(["verify", "--repository-root", join(root, "missing")]);
+  const run = runDontReviewIt(["verify", "--repository-root", join(root, "missing")]);
 
   expect(run.exitCode).toBe(2);
-  expect(run.stdout).toBe("");
-  expect(run.stderr).toContain("missing");
+  expect(run.out).toBe("");
+  expect(run.error).toContain("missing");
 });
 
 test("an unknown option exits two instead of falling back to a default", () => {
-  const run = runCli(["verify", "--repo-root", "."]);
+  const run = runDontReviewIt(["verify", "--repo-root", "."]);
 
   expect(run.exitCode).toBe(2);
-  expect(run.stdout).toBe("");
-  expect(run.stderr).not.toBe("");
+  expect(run.out).toBe("");
+  expect(run.error).not.toBe("");
 });

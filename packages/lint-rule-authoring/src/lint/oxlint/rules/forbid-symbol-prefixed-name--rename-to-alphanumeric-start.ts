@@ -1,10 +1,26 @@
 import { isAbsolute, relative, sep } from "node:path";
 
+import { uniq } from "es-toolkit";
+
 import { createLintRuleAuthoringRule } from "../../../create-rule.ts";
 
 import type { ESTree, Options } from "@oxlint/plugins";
 
 const startsWithAlphanumeric = (segment: string): boolean => /^[a-zA-Z0-9]/u.test(segment);
+
+const literalsFollowInOrder = (
+  segment: string,
+  literals: readonly string[],
+  cursor: number,
+  lastMatchableEnd: number,
+): boolean => {
+  const [literal, ...remaining] = literals;
+  if (literal === undefined) return true;
+
+  const found = segment.indexOf(literal, cursor);
+  if (found === -1 || found + literal.length > lastMatchableEnd) return false;
+  return literalsFollowInOrder(segment, remaining, found + literal.length, lastMatchableEnd);
+};
 
 const matchesAllowedName = (segment: string, pattern: string): boolean => {
   const literals = pattern.split("*");
@@ -16,14 +32,12 @@ const matchesAllowedName = (segment: string, pattern: string): boolean => {
   if (!segment.endsWith(tail)) return false;
   if (segment.length < head.length + tail.length) return false;
 
-  const lastMatchableEnd = segment.length - tail.length;
-  let cursor = head.length;
-  for (const literal of literals.slice(1, -1)) {
-    const found = segment.indexOf(literal, cursor);
-    if (found === -1 || found + literal.length > lastMatchableEnd) return false;
-    cursor = found + literal.length;
-  }
-  return true;
+  return literalsFollowInOrder(
+    segment,
+    literals.slice(1, -1),
+    head.length,
+    segment.length - tail.length,
+  );
 };
 
 const allowedNamesFrom = (options: Readonly<Options>): readonly string[] => {
@@ -43,17 +57,13 @@ const repositoryRelativePathOf = (cwd: string, filename: string): string | null 
 const offendingSegmentsOf = (
   repositoryRelativePath: string,
   allowedNames: readonly string[],
-): readonly string[] => {
-  const reported = new Set<string>();
-  const offending: string[] = [];
-  for (const segment of repositoryRelativePath.split(sep)) {
-    if (segment === "" || startsWithAlphanumeric(segment) || reported.has(segment)) continue;
-    if (allowedNames.some((pattern) => matchesAllowedName(segment, pattern))) continue;
-    reported.add(segment);
-    offending.push(segment);
-  }
-  return offending;
-};
+): readonly string[] =>
+  uniq(
+    repositoryRelativePath
+      .split(sep)
+      .filter((segment) => segment !== "" && !startsWithAlphanumeric(segment))
+      .filter((segment) => !allowedNames.some((pattern) => matchesAllowedName(segment, pattern))),
+  );
 
 export const forbidSymbolPrefixedName = createLintRuleAuthoringRule({
   name: "forbid-symbol-prefixed-name--rename-to-alphanumeric-start",

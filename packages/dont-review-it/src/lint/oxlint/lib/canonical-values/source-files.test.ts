@@ -2,19 +2,15 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, expect, test } from "vite-plus/test";
+import { expect, onTestFinished, test } from "vite-plus/test";
 
 import { nearestPackageDirectory } from "./source-files.ts";
 
-const createdRoots: string[] = [];
-
-afterEach(() => {
-  for (const root of createdRoots.splice(0)) rmSync(root, { recursive: true, force: true });
-});
-
 const createRepository = (): string => {
   const root = mkdtempSync(join(tmpdir(), "source-files-"));
-  createdRoots.push(root);
+  onTestFinished(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
   return root;
 };
 

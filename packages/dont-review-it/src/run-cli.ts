@@ -1,6 +1,8 @@
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 
+import { attempt } from "es-toolkit";
+
 import { buildCanonicalValuesCatalog } from "./lint/oxlint/lib/canonical-values/builder.ts";
 import { isDirectory } from "./lint/oxlint/lib/canonical-values/source-files.ts";
 import {
@@ -20,9 +22,10 @@ Options:
   --repository-root <path>  Root of the repository to scan. Defaults to the current working directory.
 `;
 
-export type CliStreams = {
-  readonly writeOut: (text: string) => void;
-  readonly writeError: (text: string) => void;
+export type CliResult = {
+  readonly exitCode: number;
+  readonly out: string;
+  readonly error: string;
 };
 
 const EXIT_SUCCESS = 0;
@@ -35,7 +38,10 @@ const VERIFY_COMMAND = "verify";
 
 const EQUIVALENT_CONCEPTS_COMMAND = "equivalent-concepts";
 
-const dispatch = (argv: readonly string[], streams: CliStreams): number => {
+const asLines = (entries: readonly string[]): string =>
+  entries.map((entry) => `${entry}\n`).join("");
+
+const dispatch = (argv: readonly string[]): CliResult => {
   const parsed = parseArgs({
     args: [...argv],
     allowPositionals: true,
@@ -43,34 +49,44 @@ const dispatch = (argv: readonly string[], streams: CliStreams): number => {
   });
   const [command] = parsed.positionals;
   if (command !== VERIFY_COMMAND && command !== EQUIVALENT_CONCEPTS_COMMAND) {
-    streams.writeError(USAGE);
-    return EXIT_MISUSE;
+    return { exitCode: EXIT_MISUSE, out: "", error: USAGE };
   }
 
   const repositoryRoot = resolve(parsed.values["repository-root"] ?? process.cwd());
   if (!isDirectory(repositoryRoot)) {
-    streams.writeError(`${repositoryRoot} is not a directory that can be scanned.\n`);
-    return EXIT_MISUSE;
+    return {
+      exitCode: EXIT_MISUSE,
+      out: "",
+      error: `${repositoryRoot} is not a directory that can be scanned.\n`,
+    };
   }
 
   if (command === VERIFY_COMMAND) {
     const problems = verifyCanonicalValues({ repositoryRoot });
-    for (const problem of problems) streams.writeOut(`${formatCanonicalValuesProblem(problem)}\n`);
-    return problems.length === 0 ? EXIT_SUCCESS : EXIT_PROBLEMS_FOUND;
+    return {
+      exitCode: problems.length === 0 ? EXIT_SUCCESS : EXIT_PROBLEMS_FOUND,
+      out: asLines(problems.map((problem) => formatCanonicalValuesProblem(problem))),
+      error: "",
+    };
   }
 
   const catalog = buildCanonicalValuesCatalog({ repositoryRoot });
-  for (const group of findEquivalentConcepts(catalog.entries)) {
-    streams.writeOut(`${formatEquivalentConceptGroup(group)}\n`);
-  }
-  return EXIT_SUCCESS;
+  return {
+    exitCode: EXIT_SUCCESS,
+    out: asLines(
+      findEquivalentConcepts(catalog.entries).map((group) => formatEquivalentConceptGroup(group)),
+    ),
+    error: "",
+  };
 };
 
-export const runDontReviewIt = (argv: readonly string[], streams: CliStreams): number => {
-  try {
-    return dispatch(argv, streams);
-  } catch (error) {
-    streams.writeError(`${error instanceof Error ? error.message : String(error)}\n`);
-    return EXIT_MISUSE;
-  }
+export const runDontReviewIt = (argv: readonly string[]): CliResult => {
+  const [failure, result] = attempt(() => dispatch(argv));
+  if (result !== null) return result;
+
+  return {
+    exitCode: EXIT_MISUSE,
+    out: "",
+    error: `${failure instanceof Error ? failure.message : String(failure)}\n`,
+  };
 };

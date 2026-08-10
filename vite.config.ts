@@ -25,6 +25,22 @@ export default defineConfig({
           ],
         },
       },
+      {
+        files: ["apps/website/src/**"],
+        rules: {
+          "dont-review-it/no-array-mutation--derive-new-array": "off",
+          "dont-review-it/no-reassign--use-spread-or-iife": "off",
+        },
+      },
+      {
+        files: [
+          "packages/dont-review-it/src/cli.ts",
+          "packages/lint-rule-authoring/src/rule-tester.ts",
+        ],
+        rules: {
+          "dont-review-it/no-reassign--use-spread-or-iife": "off",
+        },
+      },
     ],
     options: { typeAware: true, typeCheck: true },
   },

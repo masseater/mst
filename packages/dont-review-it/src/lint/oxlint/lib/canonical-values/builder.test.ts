@@ -2,7 +2,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { afterEach, expect, test } from "vite-plus/test";
+import { sortBy } from "es-toolkit";
+import { expect, onTestFinished, test } from "vite-plus/test";
 
 const CANONICAL_VALUES_TAG = "@canonical-values";
 import { buildCanonicalValuesCatalog, loadCanonicalValuesCatalog } from "./builder.ts";
@@ -12,15 +13,11 @@ import { listRepositoryFiles } from "./source-files.ts";
 
 import type { CanonicalValue } from "./fingerprint.ts";
 
-const createdRoots: string[] = [];
-
-afterEach(() => {
-  for (const root of createdRoots.splice(0)) rmSync(root, { recursive: true, force: true });
-});
-
 const createRepository = (): string => {
   const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-  createdRoots.push(root);
+  onTestFinished(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
   return root;
 };
 
@@ -422,9 +419,10 @@ const DECLARATION_FORMS: readonly { readonly conceptId: string; readonly declara
 
 test("the catalog carries exactly what the shared scan reads out of the same source", () => {
   const root = createRepository();
-  const sources = [...DECLARATION_FORMS]
-    .sort((left, right) => (left.conceptId < right.conceptId ? -1 : 1))
-    .map(({ conceptId, declaration }) => ({ conceptId, text: annotate(conceptId, declaration) }));
+  const sources = sortBy(DECLARATION_FORMS, ["conceptId"]).map(({ conceptId, declaration }) => ({
+    conceptId,
+    text: annotate(conceptId, declaration),
+  }));
   for (const source of sources) {
     writeRepositoryFile(root, `src/${source.conceptId}.ts`, source.text);
   }

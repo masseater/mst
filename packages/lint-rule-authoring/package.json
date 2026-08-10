@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@oxlint/plugins": "catalog:",
+    "es-toolkit": "catalog:",
     "oxlint": "catalog:"
   },
   "devDependencies": {
