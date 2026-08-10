@@ -32,6 +32,7 @@ const SHARED_TSCONFIG_PRESETS = [
 ];
 
 export const oxlint = defineConfig({
+  categories: { correctness: LINT_SEVERITY.ERROR },
   jsPlugins: [{ name: PLUGIN_NAME, specifier: "@mst/dont-review-it/plugin" }],
   overrides: [
     {
@@ -83,7 +84,7 @@ export const oxlint = defineConfig({
       LINT_SEVERITY.ERROR,
       { max: 200, skipBlankLines: true, skipComments: true },
     ],
-    "max-params": [LINT_SEVERITY.ERROR, { max: 4 }],
+    "max-params": [LINT_SEVERITY.ERROR, { max: 2 }],
     "no-console": LINT_SEVERITY.ERROR,
     "no-duplicate-imports": LINT_SEVERITY.ERROR,
     "no-empty": LINT_SEVERITY.ERROR,

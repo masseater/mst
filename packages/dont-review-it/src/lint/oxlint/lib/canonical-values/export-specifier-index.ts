@@ -44,6 +44,11 @@ const filesReachableByReExport = (entryFile: string): ReadonlySet<string> => {
   return reached;
 };
 
+type ExportsFieldPosition = {
+  readonly subpath: string;
+  readonly depth: number;
+};
+
 const exportSubpathTargets = (
   packageDirectory: string,
   exportsField: unknown,
@@ -58,7 +63,7 @@ const exportSubpathTargets = (
     else if (!bucket.includes(resolved)) bucket.push(resolved);
   };
 
-  const collect = (subpath: string, value: unknown, depth: number): void => {
+  const collect = (value: unknown, { subpath, depth }: ExportsFieldPosition): void => {
     if (typeof value === "string") {
       record(subpath, value);
       return;
@@ -68,11 +73,11 @@ const exportSubpathTargets = (
     const conditions: readonly (readonly [string, unknown])[] = Object.entries(value);
     for (const [key, nested] of conditions) {
       if (key === `./${MANIFEST_FILE_NAME}`) continue;
-      collect(key.startsWith(".") ? key : subpath, nested, depth + 1);
+      collect(nested, { subpath: key.startsWith(".") ? key : subpath, depth: depth + 1 });
     }
   };
 
-  collect(".", exportsField, 0);
+  collect(exportsField, { subpath: ".", depth: 0 });
   return targets;
 };
 

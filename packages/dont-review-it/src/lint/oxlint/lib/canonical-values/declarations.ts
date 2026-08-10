@@ -94,12 +94,19 @@ const spelledOutValuesIn = (node: unknown): readonly CanonicalValue[] => {
 const declarationAfter = (program: ParseResult["program"], comment: Comment): unknown =>
   program.body.find((statement) => statement.start >= comment.end) ?? null;
 
-const scanAnnotatedComment = (
-  program: ParseResult["program"],
-  comment: Comment,
-  annotation: CanonicalValuesAnnotation,
-  line: number,
-): CanonicalValuesTextScan => {
+type AnnotatedComment = {
+  readonly program: ParseResult["program"];
+  readonly comment: Comment;
+  readonly annotation: CanonicalValuesAnnotation;
+  readonly line: number;
+};
+
+const scanAnnotatedComment = ({
+  program,
+  comment,
+  annotation,
+  line,
+}: AnnotatedComment): CanonicalValuesTextScan => {
   const vocabulary = uniq(spelledOutValuesIn(declarationAfter(program, comment)));
   if (vocabulary.length === 0) {
     return {
@@ -114,9 +121,13 @@ const scanAnnotatedComment = (
   };
 };
 
+type ParsedSource = {
+  readonly sourceText: string;
+  readonly program: ParseResult["program"];
+};
+
 const scanComment = (
-  sourceText: string,
-  program: ParseResult["program"],
+  { sourceText, program }: ParsedSource,
   comment: Comment,
 ): CanonicalValuesTextScan => {
   const bodyOffset = comment.start + COMMENT_BODY_OFFSET;
@@ -138,7 +149,7 @@ const scanComment = (
     return { declarations: [], problems: [...problems, { kind: "unparsable-annotation", line }] };
   }
 
-  const scan = scanAnnotatedComment(program, comment, annotation, line);
+  const scan = scanAnnotatedComment({ program, comment, annotation, line });
   return { declarations: scan.declarations, problems: [...problems, ...scan.problems] };
 };
 
@@ -147,7 +158,8 @@ export const scanCanonicalValuesText = (
   sourceName: string = DEFAULT_SOURCE_NAME,
 ): CanonicalValuesTextScan => {
   const parsed = parseSync(sourceName, sourceText);
-  const scans = parsed.comments.map((comment) => scanComment(sourceText, parsed.program, comment));
+  const source: ParsedSource = { sourceText, program: parsed.program };
+  const scans = parsed.comments.map((comment) => scanComment(source, comment));
 
   return {
     declarations: scans.flatMap((scan) => scan.declarations),

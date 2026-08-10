@@ -45,7 +45,15 @@ const matchesSegments = (
   return matchesSegments(pathSegments.slice(1), remainingPatternSegments);
 };
 
-const matchesPattern = (pathSegments: readonly string[], pattern: string, cwd: string): boolean => {
+type AnchoredPattern = {
+  readonly pattern: string;
+  readonly cwd: string;
+};
+
+const matchesPattern = (
+  pathSegments: readonly string[],
+  { pattern, cwd }: AnchoredPattern,
+): boolean => {
   if (ANCHORED_PATTERN_PREFIXES.some((prefix) => pattern.startsWith(prefix))) {
     return matchesSegments(
       pathSegments,
@@ -98,8 +106,9 @@ export const requireReExportOnlyFiles = createDontReviewItRule({
           path: resolve(context.cwd, context.filename),
           separator: sep,
         });
-        if (!targets.some((pattern) => matchesPattern(pathSegments, pattern, context.cwd))) return;
-        if (exclude.some((pattern) => matchesPattern(pathSegments, pattern, context.cwd))) return;
+        const { cwd } = context;
+        if (!targets.some((pattern) => matchesPattern(pathSegments, { pattern, cwd }))) return;
+        if (exclude.some((pattern) => matchesPattern(pathSegments, { pattern, cwd }))) return;
 
         if (!node.body.some(isDirectReExport)) {
           context.report({ node, messageId: "missingReExport" });

@@ -64,10 +64,14 @@ const isExemptPath = (pathSegments: readonly string[], exemptPaths: readonly str
     containsSegmentRun(pathSegments, segmentsOf({ path: entry, separator: "/" })),
   );
 
+type PlacementRules = {
+  readonly suffixes: readonly string[];
+  readonly exemptPaths: readonly string[];
+};
+
 const findingFor = (
   testPath: string,
-  suffixes: readonly string[],
-  exemptPaths: readonly string[],
+  { suffixes, exemptPaths }: PlacementRules,
 ): DetachedTestFinding | null => {
   const suffix = longestMatchingSuffix(testPath, suffixes);
   const pathSegments = segmentsOf({ path: testPath, separator: sep });
@@ -117,7 +121,10 @@ export const noDetachedTestFile = createDontReviewItRule({
 
     return {
       Program(node: ESTree.Program) {
-        const finding = findingFor(resolve(context.cwd, context.filename), suffixes, exemptPaths);
+        const finding = findingFor(resolve(context.cwd, context.filename), {
+          suffixes,
+          exemptPaths,
+        });
         if (finding === null) return;
         context.report({ node, messageId: finding.messageId, data: finding.data });
       },
