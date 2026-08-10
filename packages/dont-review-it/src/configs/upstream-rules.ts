@@ -150,6 +150,8 @@ export const UPSTREAM_RULES: NonNullable<OxlintConfig["rules"]> = {
   "typescript/use-unknown-in-catch-callback-variable": LINT_SEVERITY.ERROR,
 };
 
+const MAX_NESTED_DESCRIBE = 2;
+
 export const UPSTREAM_TEST_RULES: NonNullable<OxlintConfig["rules"]> = {
   "no-empty-pattern": LINT_SEVERITY.OFF,
   "typescript/require-await": LINT_SEVERITY.OFF,
@@ -158,8 +160,10 @@ export const UPSTREAM_TEST_RULES: NonNullable<OxlintConfig["rules"]> = {
   "vitest/expect-expect": LINT_SEVERITY.ERROR,
   "vitest/hoisted-apis-on-top": LINT_SEVERITY.ERROR,
   "vitest/no-commented-out-tests": LINT_SEVERITY.ERROR,
+  "vitest/max-nested-describe": [LINT_SEVERITY.ERROR, { max: MAX_NESTED_DESCRIBE }],
   "vitest/no-conditional-tests": LINT_SEVERITY.ERROR,
   "vitest/no-disabled-tests": LINT_SEVERITY.ERROR,
+  "vitest/no-large-snapshots": LINT_SEVERITY.ERROR,
   "vitest/no-focused-tests": LINT_SEVERITY.ERROR,
   "vitest/no-hooks": LINT_SEVERITY.ERROR,
   "vitest/no-identical-title": LINT_SEVERITY.ERROR,
