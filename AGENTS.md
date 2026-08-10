@@ -10,6 +10,7 @@ mst は、リポジトリ運用の仕組みを再利用可能な単位として�
 - `vp` は公式インストーラ（`curl -fsSL https://vite.plus | bash`）で導入する。npm 経由（`npm i -g vite-plus`、mise の `npm:vite-plus`）で導入した `vp` は使わない
 - 設定は `vite.config.ts` に集約する。`oxlint.config.ts` / `.oxlintrc.json` / `.oxfmtrc.json` / `vitest.config.ts` を作らない
 - lint の重大度は、warn を人間に確認せず無視してよいもの、error を基本的にすべて解消するものとして扱う
+- lint ルールは error で追加し、追加した時点で出た error をすべて解消してから merge する。warn にするかは人間が決めるので、自分の判断で warn にしない
 - 依存バージョンは `pnpm-workspace.yaml` の catalog に集約し、各ワークスペースは `catalog:` で参照する
 - Node のバージョンは `package.json` の `devEngines.runtime` に置き、`onFail` は `error` にする。`.node-version` や `.tool-versions` は置かない。node 以外のツールを pin するときは `mise.toml` を追加し、そこに node は書かない
 - ルートと `packages/utils` の `vite` 直接依存を削除しない。`knip.json` の `ignoreDependencies` から `vite` を外さない
