@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 
-import { fingerprintValues, normalizeValues } from "./fingerprint.ts";
+import { canonicalValueKey, fingerprintValues } from "./fingerprint.ts";
 
 test("the fingerprint does not depend on the order the values were written in", () => {
   expect(fingerprintValues(["draft", "published"])).toBe(fingerprintValues(["published", "draft"]));
@@ -21,10 +21,8 @@ test("different value sets get different fingerprints", () => {
   expect(fingerprintValues(["draft"])).not.toBe(fingerprintValues(["draft", "published"]));
 });
 
-test("normalization tags each value with its runtime type", () => {
-  expect(normalizeValues(["draft", 1, true])).toStrictEqual([
-    "boolean:true",
-    "number:1",
-    "string:draft",
-  ]);
+test("a value is keyed by its runtime type as well as its spelling", () => {
+  expect(canonicalValueKey("draft")).toBe("string:draft");
+  expect(canonicalValueKey(1)).toBe("number:1");
+  expect(canonicalValueKey(true)).toBe("boolean:true");
 });

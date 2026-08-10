@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 
 import { afterEach, expect, test } from "vite-plus/test";
 
-import { CANONICAL_VALUES_TAG, RETIRED_ANNOTATION_TAGS } from "./annotation.ts";
+import { RETIRED_ANNOTATION_TAGS } from "./annotation.ts";
 import { buildCanonicalValuesCatalog } from "./builder.ts";
 import { fingerprintValues } from "./fingerprint.ts";
 import {
@@ -15,6 +15,8 @@ import {
 } from "./verify.ts";
 
 import type { CanonicalValue } from "./fingerprint.ts";
+
+const CANONICAL_VALUES_TAG = "@canonical-values";
 
 const createdRoots: string[] = [];
 

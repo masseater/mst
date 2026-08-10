@@ -1,12 +1,13 @@
 import { expect, test } from "vite-plus/test";
 
 import {
-  CANONICAL_VALUES_TAG,
   containsCanonicalValuesAnnotation,
   findRetiredAnnotationTags,
   parseCanonicalValuesAnnotation,
   RETIRED_ANNOTATION_TAGS,
 } from "./annotation.ts";
+
+const CANONICAL_VALUES_TAG = "@canonical-values";
 
 test("an annotation on its own line yields the concept it declares", () => {
   expect(
