@@ -68,6 +68,50 @@ describe("dependency-types", () => {
     ]);
   });
 
+  test("an export map spelled as one path is read as that path", () => {
+    const packageDirectory = createPackage({ dependencies: { oxlint: "1.76.0" } });
+    installDependency(packageDirectory, {
+      name: "oxlint",
+      manifest: { exports: "./index.d.ts" },
+      declarationsPath: "index.d.ts",
+    });
+
+    expect(packageNamesOf(packageDirectory)).toStrictEqual(["oxlint"]);
+  });
+
+  test("an export map that names only subpaths hands back no root entry", () => {
+    const packageDirectory = createPackage({ dependencies: { oxlint: "1.76.0" } });
+    installDependency(packageDirectory, {
+      name: "oxlint",
+      manifest: { exports: { "./plugins": "./plugins.d.ts" }, types: "./index.d.ts" },
+      declarationsPath: "index.d.ts",
+    });
+
+    expect(packageNamesOf(packageDirectory)).toStrictEqual(["oxlint"]);
+  });
+
+  test("an export map holding conditions that name nothing hands back no entry", () => {
+    const packageDirectory = createPackage({ dependencies: { oxlint: "1.76.0" } });
+    installDependency(packageDirectory, {
+      name: "oxlint",
+      manifest: { exports: { ".": { node: { import: {} } } }, types: "./index.d.ts" },
+      declarationsPath: "index.d.ts",
+    });
+
+    expect(packageNamesOf(packageDirectory)).toStrictEqual(["oxlint"]);
+  });
+
+  test("an entry path that carries no suffix names no declarations", () => {
+    const packageDirectory = createPackage({ dependencies: { oxlint: "1.76.0" } });
+    installDependency(packageDirectory, {
+      name: "oxlint",
+      manifest: { exports: { ".": { default: "./index" } }, types: "./index.d.ts" },
+      declarationsPath: "index.d.ts",
+    });
+
+    expect(packageNamesOf(packageDirectory)).toStrictEqual(["oxlint"]);
+  });
+
   test("a dependency declared for development is reachable the same way", () => {
     const packageDirectory = createPackage({ devDependencies: { vite: "8.0.0" } });
     installDependency(packageDirectory, {
