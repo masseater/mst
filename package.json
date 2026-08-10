@@ -8,12 +8,14 @@
   },
   "type": "module",
   "scripts": {
-    "ready": "vp check && vp run -r test && vp run -r build && vp run knip && vp exec dont-review-it verify && vp exec dont-review-it duplicated-bodies",
+    "ready": "vp check && vp run -r test && vp run -r build && vp run knip && vp exec dont-review-it verify && vp exec dont-review-it duplicated-bodies && vp run docs",
     "dev": "vp run website#dev",
+    "docs": "vp exec agentic-documents check",
     "knip": "knip",
     "prepare": "vp config && git config merge.ff false"
   },
   "devDependencies": {
+    "@mst/agentic-documents": "workspace:*",
     "@mst/dont-review-it": "workspace:*",
     "@mst/lint-rule-authoring": "workspace:*",
     "@types/node": "catalog:",

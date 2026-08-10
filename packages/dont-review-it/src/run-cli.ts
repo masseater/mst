@@ -1,6 +1,13 @@
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 
+import {
+  EXIT_MISUSE,
+  EXIT_PROBLEMS_FOUND,
+  EXIT_SUCCESS,
+  toLines,
+  type CliResult,
+} from "@mst/utils";
 import { attempt } from "es-toolkit";
 
 import { buildCanonicalValuesCatalog } from "./lint/oxlint/lib/canonical-values/builder.ts";
@@ -25,32 +32,17 @@ Options:
   --repository-root <path>  Root of the repository to scan. Defaults to the current working directory.
 `;
 
-export type CliResult = {
-  readonly exitCode: number;
-  readonly out: string;
-  readonly error: string;
-};
-
-const EXIT_SUCCESS = 0;
-
-const EXIT_PROBLEMS_FOUND = 1;
-
-const EXIT_MISUSE = 2;
-
 const VERIFY_COMMAND = "verify";
 
 const EQUIVALENT_CONCEPTS_COMMAND = "equivalent-concepts";
 
 const DUPLICATED_BODIES_COMMAND = "duplicated-bodies";
 
-const asLines = (entries: readonly string[]): string =>
-  entries.map((entry) => `${entry}\n`).join("");
-
 const verified = (repositoryRoot: string): CliResult => {
   const problems = verifyCanonicalValues({ repositoryRoot });
   return {
     exitCode: problems.length === 0 ? EXIT_SUCCESS : EXIT_PROBLEMS_FOUND,
-    out: asLines(problems.map((problem) => formatCanonicalValuesProblem(problem))),
+    out: toLines(problems.map((problem) => formatCanonicalValuesProblem(problem))),
     error: "",
   };
 };
@@ -59,7 +51,7 @@ const equivalentConcepts = (repositoryRoot: string): CliResult => {
   const catalog = buildCanonicalValuesCatalog({ repositoryRoot });
   return {
     exitCode: EXIT_SUCCESS,
-    out: asLines(
+    out: toLines(
       findEquivalentConcepts(catalog.entries).map((group) => formatEquivalentConceptGroup(group)),
     ),
     error: "",
@@ -70,7 +62,7 @@ const duplicatedBodies = (repositoryRoot: string): CliResult => {
   const clusters = duplicatedClustersIn(buildRepositoryBodyIndex({ repositoryRoot }));
   return {
     exitCode: EXIT_SUCCESS,
-    out: asLines(
+    out: toLines(
       clusters.map((sites) =>
         sites.map((site) => `${site.relativePath}:${site.line} ${site.name}`).join(" == "),
       ),
