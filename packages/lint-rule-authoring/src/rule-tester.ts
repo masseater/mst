@@ -1,5 +1,5 @@
-import { describe, it } from "vite-plus/test";
 import { RuleTester } from "oxlint/plugins-dev";
+import { describe, it } from "vite-plus/test";
 
 import type { WorkspaceLintRule } from "./create-workspace-lint-rule.ts";
 

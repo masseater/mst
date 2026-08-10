@@ -35,7 +35,7 @@ const declaredVocabularyOf = (
   const declared = checker.getDeclaredTypeOfSymbol(declaring);
   if (declared.isErrorType() || !declared.isUnionType()) return null;
 
-  const members = declared.getTypes() ?? [];
+  const members = declared.getTypes();
   const admitted: readonly CanonicalValue[] = members.flatMap((member) =>
     member.isStringLiteralType() || member.isNumberLiteralType() ? [member.value] : [],
   );
