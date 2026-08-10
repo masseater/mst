@@ -2,7 +2,7 @@ import { createDontReviewItRule } from "../../../create-rule.ts";
 
 import type { ESTree, Options } from "@oxlint/plugins";
 
-const DEFAULT_MAX_LINES = 100;
+const DEFAULT_MAX_LINES = 400;
 
 const maxLinesFrom = (options: Readonly<Options>): number => {
   const [first] = options;
@@ -13,18 +13,28 @@ const maxLinesFrom = (options: Readonly<Options>): number => {
   return typeof maxLines === "number" ? maxLines : DEFAULT_MAX_LINES;
 };
 
+const codeLineCountOf = (tokens: readonly ESTree.Token[]): number => {
+  const codeLines = new Set<number>();
+  for (const token of tokens) {
+    for (let line = token.loc.start.line; line <= token.loc.end.line; line += 1) {
+      codeLines.add(line);
+    }
+  }
+  return codeLines.size;
+};
+
 export const forbidOversizedFile = createDontReviewItRule({
   name: "forbid-oversized-file--split-by-responsibility",
   meta: {
     type: "problem",
     docs: {
       description:
-        "Disallow a file longer than the configured line budget, so a file is split while it still has one seam instead of after it has accumulated several responsibilities",
+        "Disallow a file carrying more code lines than the budget set for it, so a file is split while it still has one seam instead of after it has accumulated several responsibilities",
       relatedGuidelines: [],
     },
     messages: {
       oversizedFile:
-        "A file must not grow past its line budget, because a file that long has already taken on more than one responsibility and every later split has to move code that other files import by then. This file is {{lineCount}} lines against a budget of {{maxLines}}. Name the responsibilities this file has taken on and move each one into its own file now, while nothing outside depends on where they sit.",
+        "A file must not carry more code lines than the budget set for it, because a file that long has already taken on more than one responsibility and every later split has to move code that other files import by then. This file carries {{codeLines}} code lines against a budget of {{maxLines}}. Name the responsibilities it has taken on and move each one into a file named after it. Do not split it by number (`subject-1.ts`, `subject-2.ts`): that leaves one responsibility spread across files whose names say nothing about what is in them.",
     },
     schema: [
       {
@@ -40,12 +50,12 @@ export const forbidOversizedFile = createDontReviewItRule({
     const maxLines = maxLinesFrom(context.options);
     return {
       Program(node: ESTree.Program) {
-        const lineCount = context.sourceCode.lines.length;
-        if (lineCount <= maxLines) return;
+        const codeLines = codeLineCountOf(context.sourceCode.ast.tokens);
+        if (codeLines <= maxLines) return;
         context.report({
           node,
           messageId: "oversizedFile",
-          data: { lineCount, maxLines },
+          data: { codeLines, maxLines },
         });
       },
     };
