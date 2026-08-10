@@ -1,40 +1,79 @@
+---
+description: mst のリポジトリ運用規約
+---
+
 # AGENTS.md
 
 ## プロジェクト概要
 
 mst は、リポジトリ運用の仕組みを再利用可能な単位として整備していくリポジトリ。現時点では Vite+ による土台が立ったところ。
 
+規範の書き方は `docs/normative-notation.md` に従う。
+
 ## 規約
 
-- ツールチェーンは Vite+（vite-plus）に一本化する。`vp` はグローバル CLI、`vite-plus` はプロジェクトローカルの devDependency
-- `vp` は公式インストーラ（`curl -fsSL https://vite.plus | bash`）で導入する。npm 経由（`npm i -g vite-plus`、mise の `npm:vite-plus`）で導入した `vp` は使わない
-- 設定は `vite.config.ts` に集約する。`oxlint.config.ts` / `.oxlintrc.json` / `.oxfmtrc.json` / `vitest.config.ts` を作らない
-- lint の重大度は、warn を人間に確認せず無視してよいもの、error を基本的にすべて解消するものとして扱う
-- lint ルールは error で追加し、追加した時点で出た error をすべて解消してから merge する。warn にするかは人間が決めるので、自分の判断で warn にしない
-- 依存バージョンは `pnpm-workspace.yaml` の catalog に集約し、各ワークスペースは `catalog:` で参照する
-- Node のバージョンは `package.json` の `devEngines.runtime` に置き、`onFail` は `error` にする。`.node-version` や `.tool-versions` は置かない。node 以外のツールを pin するときは `mise.toml` を追加し、そこに node は書かない
-- ルートと `packages/utils` の `vite` 直接依存を削除しない。`knip.json` の `ignoreDependencies` から `vite` を外さない
-- テストは対象ソースと同じディレクトリに `<ソース名>.test.ts` として置く。`tests/` `test/` `__tests__/` `spec/` を作らず、`.spec.ts` も使わない
-- テストは CI で実行する。pre-push には含めない
-- `package.json` の依存や `devEngines` を変更したら、コミット前に `vp install --frozen-lockfile` が通ることを確認する
-- `.github/workflows/ci.yml` の `voidzero-dev/setup-vp` は commit SHA で固定し、コメントにタグを書く
-- スキャフォールド生成物は独自設計に置き換えない。問題が出たら [voidzero-dev/vite-plus](https://github.com/voidzero-dev/vite-plus/issues) の issue を調べる
-- 関数を実装する前に、同じ処理が [es-toolkit](https://github.com/toss/es-toolkit) で提供されていないか調べる。あれば自前実装せずそれを使い、`es-toolkit` の関数を包み直すだけのラッパーも作らない
-- 実装の根拠をコードコメントに書かない。経緯はコミットメッセージの本文に残す
-- 設計上の意思決定は `docs/engineering-decision-logs/` に残す。EDR は architecture に限らず、ツールチェーンの選定・運用方針・依存の扱い方も対象
+- IF: ツールチェーンに関わる道具を選ぶ; THEN MUST: Vite+（vite-plus）に一本化する
+  - `vp` はグローバル CLI、`vite-plus` はプロジェクトローカルの devDependency
+- IF: `vp` を導入する; THEN
+  - MUST: 公式インストーラ（`curl -fsSL https://vite.plus | bash`）を使う
+  - PROHIBIT: npm 経由（`npm i -g vite-plus`、mise の `npm:vite-plus`）で導入した `vp` を使う
+- IF: ツールの設定を書く; THEN
+  - MUST: `vite.config.ts` に集約する
+  - PROHIBIT: `oxlint.config.ts` / `.oxlintrc.json` / `.oxfmtrc.json` / `vitest.config.ts` を作る
+- IF: lint の重大度を読む; THEN MUST: warn を人間に確認せず無視してよいもの、error を基本的にすべて解消するものとして扱う
+- IF: lint ルールを追加する; THEN
+  - MUST: error で追加する
+  - MUST: 追加した時点で出た error をすべて解消してから merge する
+  - PROHIBIT: 自分の判断で warn にする
+    - warn にするかは人間が決める
+- IF: 依存のバージョンを宣言する; THEN
+  - MUST: `pnpm-workspace.yaml` の catalog に集約する
+  - MUST: 各ワークスペースから `catalog:` で参照する
+- IF: Node のバージョンを固定する; THEN
+  - MUST: `package.json` の `devEngines.runtime` に置き、`onFail` を `error` にする
+  - PROHIBIT: `.node-version` や `.tool-versions` を置く
+- IF: node 以外のツールを pin する; THEN
+  - MUST: `mise.toml` を追加する
+  - PROHIBIT: `mise.toml` に node を書く
+- IF: `vite` の依存を整理する; THEN
+  - PROHIBIT: ルートと `packages/utils` の `vite` 直接依存を削除する
+  - PROHIBIT: `knip.json` の `ignoreDependencies` から `vite` を外す
+- IF: テストを置く; THEN
+  - MUST: 対象ソースと同じディレクトリに `<ソース名>.test.ts` として置く
+  - PROHIBIT: `tests/` `test/` `__tests__/` `spec/` を作る
+  - PROHIBIT: `.spec.ts` を使う
+- IF: テストの実行経路を決める; THEN
+  - MUST: CI で実行する
+  - PROHIBIT: pre-push に含める
+- IF: `package.json` の依存や `devEngines` を変更した; THEN MUST: コミット前に `vp install --frozen-lockfile` が通ることを確認する
+- IF: `.github/workflows/ci.yml` の `voidzero-dev/setup-vp` を書く; THEN
+  - MUST: commit SHA で固定する
+  - MUST: コメントにタグを書く
+- IF: スキャフォールド生成物に問題が出た; THEN
+  - PROHIBIT: 独自設計に置き換える
+  - MUST: [voidzero-dev/vite-plus](https://github.com/voidzero-dev/vite-plus/issues) の issue を調べる
+- IF: 関数を実装する; THEN
+  - MUST: 同じ処理が [es-toolkit](https://github.com/toss/es-toolkit) で提供されていないか先に調べる
+  - PROHIBIT: 提供されているものを自前実装する
+  - PROHIBIT: `es-toolkit` の関数を包み直すだけのラッパーを作る
+- IF: 実装の根拠を書き残す; THEN
+  - PROHIBIT: コードコメントに書く
+  - MUST: コミットメッセージの本文に残す
+- IF: 設計上の意思決定をした; THEN MUST: `docs/engineering-decision-logs/` に残す
+  - EDR は architecture に限らず、ツールチェーンの選定・運用方針・依存の扱い方も対象
 
 ## 開発コマンド
 
 `vp <name>` は組み込みコマンド、`vp run <name>` は `package.json` のスクリプトまたは `vite.config.ts` のタスク。組み込みをスクリプトで上書きすることはできない。
 
-| コマンド          | 内容                                       |
-| ----------------- | ------------------------------------------ |
-| `vp check`        | format・lint・型検査（`--fix` で自動修正） |
-| `vp run -r test`  | 全ワークスペースのテスト                   |
-| `vp run -r build` | 全ワークスペースのビルド                   |
-| `vp run knip`     | 未使用の依存・export・ファイルの検出       |
-| `vp run dev`      | 開発サーバー（`apps/website`）             |
-| `vp run ready`    | check → test → build → knip。CI と同じ     |
+- `vp check` — format・lint・型検査（`--fix` で自動修正）
+- `vp run -r test` — 全ワークスペースのテスト
+- `vp run -r build` — 全ワークスペースのビルド
+- `vp run knip` — 未使用の依存・export・ファイルの検出
+- `vp run dev` — 開発サーバー（`apps/website`）
+- `vp run docs` — 規範文書の検査
+- `vp run docs:write` — 生成部分の更新
+- `vp run ready` — check → test → build → knip → 規範文書の検査。CI と同じ
 
 ## 自作 lint ルールの実行時間を見る
 
