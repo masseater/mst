@@ -75,6 +75,18 @@ mst は、リポジトリ運用の仕組みを再利用可能な単位として�
 - `vp run docs:write` — 生成部分の更新
 - `vp run ready` — check → test → build → knip → 規範文書の検査。CI と同じ
 
+## 自作 lint ルールの実行時間を見る
+
+どのルールが遅いかを知りたいときだけ使う。既定では何も測らず何も送らない。
+
+1. `docker compose up -d` で受け皿を起動する
+2. `MST_LINT_RULE_DURATION=1 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 OTEL_SERVICE_NAME=mst-lint vp lint` を実行する
+3. <http://localhost:3000> を開き、`lint_rule_duration_milliseconds_sum` をルール名で集計する
+
+有効にしたまま受け皿を止めていると lint は失敗する。観測しているつもりで何も残らない状態を避けるためで、止めたいときは有効化の環境変数を外す。
+
+`lint_run_duration_milliseconds_sum` は lint 全体の時間で、自作ルールの合計との差が oxlint 本体・型検査・プラグインの橋渡しに使われた時間になる。判断は [EDR 0021](docs/engineering-decision-logs/0021-measure-our-own-lint-rules-and-let-the-user-choose-the-sink.md) にある。
+
 <!--VITE PLUS START-->
 
 # Using Vite+, the Unified Toolchain for the Web

@@ -1,3 +1,4 @@
+import { measureVisitor } from "./measure-rule-duration.ts";
 import {
   workspaceLintRuleDocsRelativePath,
   workspaceLintRuleDocsUrl,
@@ -49,6 +50,7 @@ export const createWorkspaceLintRule = ({ workspaceDir }: { readonly workspaceDi
         docs: { ...rule.meta.docs, url: workspaceLintRuleDocsUrl(identity) },
         messages: withDocPointers(rule.meta.messages, identity),
       },
+      create: (context) => measureVisitor({ ruleName: rule.name, visitor: rule.create(context) }),
     };
   };
 };
