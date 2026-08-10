@@ -30,12 +30,10 @@ const soleReturnedExpression = (body: ESTree.FunctionBody): ESTree.Expression | 
 };
 
 const forwardedCall = (declared: FunctionLike): ESTree.CallExpression | null => {
-  const { body } = declared;
-  if (body === null) return null;
+  const body = declared.body as ESTree.FunctionBody | ESTree.Expression;
 
   const forwarded = body.type === "BlockStatement" ? soleReturnedExpression(body) : body;
   if (forwarded?.type !== "CallExpression") return null;
-  if (forwarded.optional) return null;
   return (forwarded.typeArguments ?? null) === null ? forwarded : null;
 };
 

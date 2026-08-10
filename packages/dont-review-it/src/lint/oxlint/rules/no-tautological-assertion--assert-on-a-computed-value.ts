@@ -30,9 +30,8 @@ const fixedValueOf = (expression: ESTree.Expression): { readonly held: unknown }
 const soleExpectArgumentOf = (call: ESTree.CallExpression): ESTree.Expression | null => {
   const callee = call.callee;
   if (callee.type !== "Identifier" || callee.name !== EXPECT_NAME) return null;
-  if (call.arguments.length !== 1) return null;
   const [subject] = call.arguments;
-  if (subject === undefined) return null;
+  if (subject === undefined || call.arguments.length !== 1) return null;
   return subject.type === "SpreadElement" ? null : subject;
 };
 
