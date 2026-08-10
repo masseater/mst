@@ -14,6 +14,14 @@ export default defineConfig({
     rules: {
       "vite-plus/prefer-vite-plus-imports": "error",
       "vitest/consistent-test-filename": ["error", { pattern: "\\.test\\.tsx?$" }],
+      "dont-review-it/no-default-export--use-named-export": [
+        "error",
+        { toolRequiredFileNames: ["plugin.ts", "vite.config.ts"] },
+      ],
+      "dont-review-it/no-reassign--use-spread-or-iife": [
+        "error",
+        { assignOnlyTargets: ["RuleTester.describe", "RuleTester.it", "RuleTester.itOnly"] },
+      ],
     },
     overrides: [
       {
@@ -29,15 +37,6 @@ export default defineConfig({
         files: ["apps/website/src/**"],
         rules: {
           "dont-review-it/no-array-mutation--derive-new-array": "off",
-          "dont-review-it/no-reassign--use-spread-or-iife": "off",
-        },
-      },
-      {
-        files: [
-          "packages/dont-review-it/src/cli.ts",
-          "packages/lint-rule-authoring/src/rule-tester.ts",
-        ],
-        rules: {
           "dont-review-it/no-reassign--use-spread-or-iife": "off",
         },
       },

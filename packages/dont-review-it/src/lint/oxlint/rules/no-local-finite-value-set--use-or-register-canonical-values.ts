@@ -4,8 +4,9 @@ import { createDontReviewItRule } from "../../../create-rule.ts";
 import {
   annotatedDeclarationRanges,
   isInsideAnnotatedDeclaration,
+  type AnnotatedDeclarationRange,
 } from "../lib/canonical-values/annotated-declaration.ts";
-import { fingerprintValues } from "../lib/canonical-values/fingerprint.ts";
+import { fingerprintValues, type CanonicalValue } from "../lib/canonical-values/fingerprint.ts";
 import {
   calleeMemberName,
   isFiniteVocabulary,
@@ -27,19 +28,19 @@ import {
 } from "../lib/canonical-values/ownership-policy.ts";
 import { findWorkspaceRoot } from "../lib/canonical-values/workspace-root.ts";
 import { describeLibraryOwner } from "../lib/library-vocabulary/owner-description.ts";
-import { libraryOwnersOf } from "../lib/library-vocabulary/vocabulary-index.ts";
+import {
+  libraryOwnersOf,
+  type LibraryVocabularyIndex,
+} from "../lib/library-vocabulary/vocabulary-index.ts";
 import { isOutOfScopeSource } from "../lib/out-of-scope-source.ts";
 
 import type { WorkspaceLintRule } from "@mst/lint-rule-authoring";
 import type { ESTree } from "@oxlint/plugins";
-import type { AnnotatedDeclarationRange } from "../lib/canonical-values/annotated-declaration.ts";
 import type { CanonicalValuesCatalogLoader } from "../lib/canonical-values/catalog-loader.ts";
 import type {
   CanonicalValuesCatalog,
   CanonicalValuesEntry,
 } from "../lib/canonical-values/catalog.ts";
-import type { CanonicalValue } from "../lib/canonical-values/fingerprint.ts";
-import type { LibraryVocabularyIndex } from "../lib/library-vocabulary/vocabulary-index.ts";
 import type { LibraryVocabularyLoader } from "../lib/library-vocabulary/vocabulary-loader.ts";
 
 type FileBindings = {

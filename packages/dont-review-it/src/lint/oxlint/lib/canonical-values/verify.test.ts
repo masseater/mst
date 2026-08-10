@@ -6,15 +6,13 @@ import { expect, onTestFinished, test } from "vite-plus/test";
 
 import { RETIRED_ANNOTATION_TAGS } from "./annotation.ts";
 import { buildCanonicalValuesCatalog } from "./builder.ts";
-import { fingerprintValues } from "./fingerprint.ts";
+import { fingerprintValues, type CanonicalValue } from "./fingerprint.ts";
 import {
   findEquivalentConcepts,
   formatCanonicalValuesProblem,
   formatEquivalentConceptGroup,
   verifyCanonicalValues,
 } from "./verify.ts";
-
-import type { CanonicalValue } from "./fingerprint.ts";
 
 const CANONICAL_VALUES_TAG = "@canonical-values";
 

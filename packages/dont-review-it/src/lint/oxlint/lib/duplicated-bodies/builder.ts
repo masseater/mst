@@ -1,11 +1,18 @@
 import { resolve } from "node:path";
 
-import { listRepositoryFiles, readTextFile } from "../canonical-values/source-files.ts";
-import { buildBodyIndex, EMPTY_BODY_INDEX, MINIMUM_BODY_NODES } from "./body-index.ts";
+import {
+  listRepositoryFiles,
+  readTextFile,
+  type ScannedFile,
+} from "../canonical-values/source-files.ts";
+import {
+  buildBodyIndex,
+  EMPTY_BODY_INDEX,
+  MINIMUM_BODY_NODES,
+  type BodyIndex,
+  type IndexedFile,
+} from "./body-index.ts";
 import { declarationsIn } from "./declarations.ts";
-
-import type { ScannedFile } from "../canonical-values/source-files.ts";
-import type { BodyIndex, IndexedFile } from "./body-index.ts";
 
 const indexedFileAt = (file: ScannedFile): IndexedFile | null => {
   const source = readTextFile(file.absolutePath);

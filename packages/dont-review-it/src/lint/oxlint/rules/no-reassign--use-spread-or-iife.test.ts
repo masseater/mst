@@ -88,6 +88,20 @@ describe("dont-review-it/no-reassign--use-spread-or-iife", () => {
         name: "a deletion whose target is not a member expression removes no property",
         code: "const dropped = delete parse(text);\nconst gone = delete pending;",
       },
+      {
+        name: "the process exit code is set the only way the platform offers",
+        code: "process.exitCode = 1;",
+      },
+      {
+        name: "a target named by the configuration joins the platform one",
+        code: "RuleTester.describe = describe;",
+        options: [{ assignOnlyTargets: ["RuleTester.describe"] }],
+      },
+      {
+        name: "the platform target survives a configuration that names others",
+        code: "process.exitCode = 1;",
+        options: [{ assignOnlyTargets: ["RuleTester.describe"] }],
+      },
     ],
     invalid: [
       {
@@ -226,6 +240,21 @@ describe("dont-review-it/no-reassign--use-spread-or-iife", () => {
           { messageId: "propertyAssignment" },
           { messageId: "patternAssignment" },
         ],
+      },
+      {
+        name: "another property of an allowed target's receiver is still a write",
+        code: "process.env = {};",
+        errors: [{ messageId: "propertyAssignment" }],
+      },
+      {
+        name: "reaching an allowed target through a computed key is still a write",
+        code: "process['exitCode'] = 1;",
+        errors: [{ messageId: "propertyAssignment" }],
+      },
+      {
+        name: "a target the configuration does not name is written to like any other",
+        code: "RuleTester.describe = describe;",
+        errors: [{ messageId: "propertyAssignment" }],
       },
     ],
   });

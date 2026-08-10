@@ -1,7 +1,6 @@
-import { canonicalValueKey } from "./fingerprint.ts";
+import { canonicalValueKey, type CanonicalValue } from "./fingerprint.ts";
 
 import type { ESTree } from "@oxlint/plugins";
-import type { CanonicalValue } from "./fingerprint.ts";
 
 const MIN_VOCABULARY_SIZE = 2;
 

@@ -1,6 +1,5 @@
-import { canonicalValueKey } from "../canonical-values/fingerprint.ts";
+import { canonicalValueKey, type CanonicalValue } from "../canonical-values/fingerprint.ts";
 
-import type { CanonicalValue } from "../canonical-values/fingerprint.ts";
 import type { LibraryVocabularyEntry } from "./vocabulary-index.ts";
 
 const spellValues = (values: readonly CanonicalValue[]): string =>
