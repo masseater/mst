@@ -6,9 +6,9 @@ export default defineConfig({
   staged: {
     "*": "vp check --fix",
   },
-  fmt: {},
-  lint: {
-    extends: [lintRuleAuthoring.oxlint, dontReviewIt.oxlint],
+  fmt: dontReviewIt.defineFmtConfig({}),
+  lint: dontReviewIt.defineLintConfig({
+    extends: [lintRuleAuthoring.oxlint],
     plugins: ["unicorn", "typescript", "oxc", "vitest"],
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
     rules: {
@@ -42,7 +42,7 @@ export default defineConfig({
       },
     ],
     options: { typeAware: true, typeCheck: true },
-  },
+  }),
   run: {
     cache: true,
   },
