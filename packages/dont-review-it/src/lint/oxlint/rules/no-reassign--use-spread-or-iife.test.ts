@@ -88,6 +88,19 @@ describe("dont-review-it/no-reassign--use-spread-or-iife", () => {
         name: "a deletion whose target is not a member expression removes no property",
         code: "const dropped = delete parse(text);\nconst gone = delete pending;",
       },
+      {
+        name: "the process exit code is set the only way the platform offers",
+        code: "process.exitCode = 1;",
+      },
+      {
+        name: "the rule tester statics are set the only way the test framework offers",
+        code: "RuleTester.describe = describe;\nRuleTester.it = it;\nRuleTester.itOnly = it.only;",
+      },
+      {
+        name: "a target named by the option joins the ones the rule ships with",
+        code: "Reporter.output = sink;",
+        options: [{ assignOnlyTargets: ["Reporter.output"] }],
+      },
     ],
     invalid: [
       {
@@ -226,6 +239,22 @@ describe("dont-review-it/no-reassign--use-spread-or-iife", () => {
           { messageId: "propertyAssignment" },
           { messageId: "patternAssignment" },
         ],
+      },
+      {
+        name: "another property of an allowed target's receiver is still a write",
+        code: "process.env = {};",
+        errors: [{ messageId: "propertyAssignment" }],
+      },
+      {
+        name: "reaching an allowed target through a computed key is still a write",
+        code: "process['exitCode'] = 1;",
+        errors: [{ messageId: "propertyAssignment" }],
+      },
+      {
+        name: "replacing the allowed targets puts the ones the rule ships with back under the rule",
+        code: "process.exitCode = 1;",
+        options: [{ assignOnlyTargets: ["Reporter.output"] }],
+        errors: [{ messageId: "propertyAssignment" }],
       },
     ],
   });

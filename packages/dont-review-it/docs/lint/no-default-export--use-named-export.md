@@ -12,19 +12,9 @@
 
 報告位置は、系統 1 と 3 はその文全体、系統 2 は `default` として出ている specifier そのもの。1 つの文が複数の specifier を持つ場合、報告されるのは `default` になっている 1 つだけである。
 
-ファイル名による例外はルール側に持たせていない。フレームワークやビルドツールが規約として default エクスポートを要求するファイル（oxlint の `plugin.ts`、`vite.config.ts` など）は、ルール本体で条件分岐せず、設定側で対象外に落とす。ルールにファイル名の知識を持たせると、規約が変わるたびにルール本体を直すことになり、かつ「どのファイルが例外か」が設定を読んでも分からなくなる。
+ツールが規約として default エクスポートを要求するファイルは、ルールが既定で対象外にする。既定は `plugin.ts`（oxlint が `jsPlugins` の指定子から読むエントリ）と `vite.config.ts`（ビルドツールの設定）の 2 つ。設定を 1 行も書かなくても、この 2 つで報告は出ない。
 
-```jsonc
-// 設定側
-{
-  "overrides": [
-    {
-      "files": ["**/plugin.ts", "**/vite.config.ts"],
-      "rules": { "dont-review-it/no-default-export--use-named-export": "off" },
-    },
-  ],
-}
-```
+判定に使うのはベース名の完全一致である。`my-plugin.ts` や `plugin.entry.ts` は `plugin.ts` ではないので例外にならない。`vite.config.js` も `vite.config.ts` ではないので例外にならない。ディレクトリの位置は見ないので、どのワークスペースの `plugin.ts` / `vite.config.ts` でも同じく例外になる。
 
 ## なぜそれが要るか
 
@@ -72,10 +62,18 @@ import { parseUser } from "./parse-user.ts";
 - エクスポート名を実行時に組み立てるなど、静的な一致を避けることだけを目的とした間接化
 - 例外を得るためにファイル名を `plugin.ts` や `vite.config.ts` に変える。ツールが読むエントリでないファイルにその名前を付けるのは、例外の前提そのものを壊す
 - named export を 1 つ書いた上で default export を併置する。呼び出し側がどちらを使うかは選べるままなので、名前が保たれる保証は得られない
-- 抑制ディレクティブ。例外は設定側の対象指定だけを正規の経路とする
+- 抑制ディレクティブ。例外はルールが持つ既定と、それを置き換える `toolRequiredFileNames` だけを正規の経路とする
 
 機械検出の範囲と規律の範囲は一致しない。検出は不変条件を守るための下限であって、上限ではない。
 
 ## オプション
 
-取らない。有効か無効かだけを設定側で決める。
+`toolRequiredFileNames`（文字列の配列、既定値 `["plugin.ts", "vite.config.ts"]`）だけを取る。default エクスポートを要求するツールが他にもある配備先が、その綴りを名指しできる。
+
+```jsonc
+["error", { "toolRequiredFileNames": ["plugin.ts", "vite.config.ts", "rollup.config.ts"] }]
+```
+
+与えた配列は既定を**置き換える**。足すつもりで自分の綴りだけを書くと、`plugin.ts` と `vite.config.ts` がルールの対象に戻る。残したいものは書き並べること。未知のキーは schema が拒否する（`additionalProperties: false`）。
+
+例外をこのオプションではなく設定側の `overrides` で表現することもできるが、その形は「どのファイルが例外か」がルールを読んでも分からなくなる。ツールの規約に属する例外はルールが既定として持ち、配備先の事情に属する例外だけを設定側に置く。

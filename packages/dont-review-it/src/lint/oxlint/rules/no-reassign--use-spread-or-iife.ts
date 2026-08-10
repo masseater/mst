@@ -1,8 +1,26 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
 
-import type { ESTree } from "@oxlint/plugins";
+import type { ESTree, Options } from "@oxlint/plugins";
 
 const AMBIENT_ONLY_FILE_NAME = /\.d\.[cm]?ts$/u;
+
+const DEFAULT_ASSIGN_ONLY_TARGETS = [
+  "process.exitCode",
+  "RuleTester.describe",
+  "RuleTester.it",
+  "RuleTester.itOnly",
+];
+
+const assignOnlyTargetsFrom = (options: Readonly<Options>): readonly string[] => {
+  const [first] = options;
+  if (typeof first !== "object" || first === null || Array.isArray(first)) {
+    return DEFAULT_ASSIGN_ONLY_TARGETS;
+  }
+
+  const { assignOnlyTargets } = first;
+  if (!Array.isArray(assignOnlyTargets)) return DEFAULT_ASSIGN_ONLY_TARGETS;
+  return assignOnlyTargets.filter((entry): entry is string => typeof entry === "string");
+};
 
 const REASSIGNABLE_DECLARATION_KINDS: ReadonlySet<string> = new Set(["let", "var"]);
 
@@ -51,7 +69,17 @@ const isDirectClassStateTarget = (node: ESTree.MemberExpression): boolean => {
   return isClassMemberScope(node);
 };
 
-const assignmentMessageId = (node: ESTree.Node): string | null => {
+const staticMemberPath = (node: ESTree.MemberExpression): string | null => {
+  if (node.computed) return null;
+  const receiver = unwrapSugar(node.object);
+  if (receiver.type !== "Identifier" || node.property.type !== "Identifier") return null;
+  return `${receiver.name}.${node.property.name}`;
+};
+
+const assignmentMessageId = (
+  node: ESTree.Node,
+  assignOnlyTargets: readonly string[],
+): string | null => {
   const stripped = unwrapSugar(node);
   switch (stripped.type) {
     case "ArrayPattern":
@@ -59,8 +87,11 @@ const assignmentMessageId = (node: ESTree.Node): string | null => {
       return "patternAssignment";
     case "Identifier":
       return "identifierAssignment";
-    case "MemberExpression":
-      return isDirectClassStateTarget(stripped) ? null : "propertyAssignment";
+    case "MemberExpression": {
+      if (isDirectClassStateTarget(stripped)) return null;
+      const path = staticMemberPath(stripped);
+      return path !== null && assignOnlyTargets.includes(path) ? null : "propertyAssignment";
+    }
     default:
       return null;
   }
@@ -129,10 +160,20 @@ export const noReassign = createDontReviewItRule({
       reassignableDeclaration:
         "A `{{kind}}` declaration must not be used, whether or not the binding is ever written to again, because a name that can be re-bound leaves its final value undecided at the declaration and forces a reader to scan the rest of the scope. Bind it once with `const` and produce the value in a single expression: a conditional expression for two branches, an immediately invoked function returning from each branch or from `try` / `catch` for more, `reduce` for an accumulation, `filter` / `map` for a collection, a return from inside a loop for a search. Hiding the same declaration inside an immediately invoked function only shrinks its scope; the immediately invoked function is there to remove the declaration, not to store it. This rule accepts no suppression comment, so a declaration that truly cannot be avoided stays reported and goes to review.",
     },
-    schema: [],
+    schema: [
+      {
+        type: "object",
+        properties: {
+          assignOnlyTargets: { type: "array", items: { type: "string" } },
+        },
+        additionalProperties: false,
+      },
+    ],
   },
   create(context) {
     if (AMBIENT_ONLY_FILE_NAME.test(context.filename)) return {};
+
+    const assignOnlyTargets = assignOnlyTargetsFrom(context.options);
 
     const reportWrite = (node: ESTree.Node, messageId: string | null): void => {
       if (messageId === null) return;
@@ -141,12 +182,12 @@ export const noReassign = createDontReviewItRule({
 
     const reportLoopHead = (node: ESTree.Node): void => {
       if (node.type === "VariableDeclaration") return;
-      reportWrite(node, assignmentMessageId(node));
+      reportWrite(node, assignmentMessageId(node, assignOnlyTargets));
     };
 
     return {
       AssignmentExpression(node: ESTree.AssignmentExpression) {
-        reportWrite(node.left, assignmentMessageId(node.left));
+        reportWrite(node.left, assignmentMessageId(node.left, assignOnlyTargets));
       },
       CallExpression(node: ESTree.CallExpression) {
         const callee = mutatingCalleeName(node);
