@@ -3,7 +3,6 @@ import { describe } from "vite-plus/test";
 
 import { buildCatalog, EMPTY_CANONICAL_VALUES_CATALOG } from "../lib/canonical-values/catalog.ts";
 import { fingerprintValues } from "../lib/canonical-values/fingerprint.ts";
-import { UNCONFIGURED_OWNERSHIP_POLICY } from "../lib/canonical-values/ownership-policy.ts";
 import { createNoStrictCanonicalLiteralUseRule } from "./no-strict-canonical-literal-use--use-canonical-import.ts";
 
 import type { CanonicalValue } from "../lib/canonical-values/fingerprint.ts";
@@ -21,6 +20,9 @@ const CATALOG = buildCatalog([
   entry("retry.budget", "packages/retry/src/budget.ts", "@mst/retry", [3, -1]),
   entry("sync.mode", "packages/sync/src/mode.ts", "@mst/sync", ["auto", true]),
 ]);
+
+const UNCONFIGURED_OWNERSHIP_POLICY =
+  "not configured (set the ownershipPolicy option of this rule)";
 
 const SOURCE = "/repo/packages/order/src/order.ts";
 

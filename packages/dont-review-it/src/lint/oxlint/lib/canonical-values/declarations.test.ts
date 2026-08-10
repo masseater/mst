@@ -1,7 +1,9 @@
 import { expect, test } from "vite-plus/test";
 
-import { CANONICAL_VALUES_TAG, RETIRED_ANNOTATION_TAGS } from "./annotation.ts";
+import { RETIRED_ANNOTATION_TAGS } from "./annotation.ts";
 import { scanCanonicalValuesText } from "./declarations.ts";
+
+const CANONICAL_VALUES_TAG = "@canonical-values";
 
 const declaredValuesIn = (sourceText: string): readonly (readonly unknown[])[] =>
   scanCanonicalValuesText(sourceText).declarations.map((declaration) => declaration.values);

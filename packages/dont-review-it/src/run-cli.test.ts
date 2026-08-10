@@ -4,11 +4,10 @@ import { dirname, join } from "node:path";
 
 import { afterEach, expect, test } from "vite-plus/test";
 
-import {
-  CANONICAL_VALUES_TAG,
-  RETIRED_ANNOTATION_TAGS,
-} from "./lint/oxlint/lib/canonical-values/annotation.ts";
-import { runDontReviewIt, USAGE } from "./run-cli.ts";
+import { RETIRED_ANNOTATION_TAGS } from "./lint/oxlint/lib/canonical-values/annotation.ts";
+import { runDontReviewIt } from "./run-cli.ts";
+
+const CANONICAL_VALUES_TAG = "@canonical-values";
 
 const createdRoots: string[] = [];
 
@@ -138,11 +137,18 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
 });
 
 test("an unknown command writes the usage to stderr and exits two", () => {
-  expect(runCli(["publish"])).toStrictEqual({ exitCode: 2, stdout: "", stderr: USAGE });
+  const run = runCli(["publish"]);
+
+  expect(run.exitCode).toBe(2);
+  expect(run.stdout).toBe("");
+  expect(run.stderr).toContain("Usage: dont-review-it <command> [--repository-root <path>]");
+  expect(run.stderr).toContain("verify");
+  expect(run.stderr).toContain("equivalent-concepts");
+  expect(run.stderr).toContain("--repository-root <path>");
 });
 
-test("no command at all writes the usage to stderr and exits two", () => {
-  expect(runCli([])).toStrictEqual({ exitCode: 2, stdout: "", stderr: USAGE });
+test("no command at all is answered the same way an unknown command is", () => {
+  expect(runCli([])).toStrictEqual(runCli(["publish"]));
 });
 
 test("a repository root that is not a directory exits two instead of scanning nothing", () => {

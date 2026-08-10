@@ -10,7 +10,7 @@ import {
   verifyCanonicalValues,
 } from "./lint/oxlint/lib/canonical-values/verify.ts";
 
-export const USAGE = `Usage: dont-review-it <command> [--repository-root <path>]
+const USAGE = `Usage: dont-review-it <command> [--repository-root <path>]
 
 Commands:
   verify               Report every broken or retired canonical values annotation, and exit non-zero when any is found.

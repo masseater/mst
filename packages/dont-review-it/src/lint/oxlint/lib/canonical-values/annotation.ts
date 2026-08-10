@@ -1,4 +1,4 @@
-export const CANONICAL_VALUES_TAG = "@canonical-values";
+const CANONICAL_VALUES_TAG = "@canonical-values";
 
 export const RETIRED_ANNOTATION_TAGS: readonly string[] = [
   "@canonical-values-exempt",

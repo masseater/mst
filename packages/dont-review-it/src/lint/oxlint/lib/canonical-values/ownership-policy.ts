@@ -1,6 +1,6 @@
 import type { Context, RuleMeta } from "@oxlint/plugins";
 
-export const UNCONFIGURED_OWNERSHIP_POLICY =
+const UNCONFIGURED_OWNERSHIP_POLICY =
   "not configured (set the ownershipPolicy option of this rule)";
 
 export const OWNERSHIP_POLICY_SCHEMA: RuleMeta["schema"] = [
