@@ -1,4 +1,4 @@
-# 0004. tsconfig プリセットは dont-review-it のサブパス export として配る
+# 0010. tsconfig プリセットは dont-review-it のサブパス export として配る
 
 - ステータス: Accepted
 - 日付: 2026-08-10

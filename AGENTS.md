@@ -17,6 +17,7 @@ mst は、リポジトリ運用の仕組みを再利用可能な単位として�
 - `package.json` の依存や `devEngines` を変更したら、コミット前に `vp install --frozen-lockfile` が通ることを確認する
 - `.github/workflows/ci.yml` の `voidzero-dev/setup-vp` は commit SHA で固定し、コメントにタグを書く
 - スキャフォールド生成物は独自設計に置き換えない。問題が出たら [voidzero-dev/vite-plus](https://github.com/voidzero-dev/vite-plus/issues) の issue を調べる
+- 関数を実装する前に、同じ処理が [es-toolkit](https://github.com/toss/es-toolkit) で提供されていないか調べる。あれば自前実装せずそれを使い、`es-toolkit` の関数を包み直すだけのラッパーも作らない
 - 実装の根拠をコードコメントに書かない。経緯はコミットメッセージの本文に残す
 - 設計上の意思決定は `docs/engineering-decision-logs/` に残す。EDR は architecture に限らず、ツールチェーンの選定・運用方針・依存の扱い方も対象
 

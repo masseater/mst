@@ -7,7 +7,7 @@ import {
 
 import type { CanonicalValue } from "./fingerprint.ts";
 
-type CanonicalValuesDeclaration = {
+export type CanonicalValuesDeclaration = {
   readonly conceptId: string;
   readonly values: readonly CanonicalValue[];
   readonly line: number;
