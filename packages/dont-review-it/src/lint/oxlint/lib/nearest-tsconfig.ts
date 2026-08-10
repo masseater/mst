@@ -22,7 +22,7 @@ const readTextFile = (path: string): string | null => {
 
 const specifiersOf = (config: unknown): readonly string[] => {
   if (typeof config !== "object" || config === null) return [];
-  const declared: unknown = (config as Record<string, unknown>)["extends"];
+  const declared: unknown = (config as Record<string, unknown>).extends;
   if (typeof declared === "string") return [declared];
   if (!Array.isArray(declared)) return [];
   return declared.filter((entry: unknown): entry is string => typeof entry === "string");
@@ -30,20 +30,19 @@ const specifiersOf = (config: unknown): readonly string[] => {
 
 const extendsByDirectory = new Map<string, TsconfigExtends | null>();
 
+const declaredIn = (directory: string): TsconfigExtends | null => {
+  const candidatePath = join(directory, TSCONFIG_FILE_NAME);
+  const text = readTextFile(candidatePath);
+  if (text === null) return null;
+  return { tsconfigPath: candidatePath, specifiers: specifiersOf(parseJsonc(text)) };
+};
+
 const nearestFrom = (directory: string): TsconfigExtends | null => {
   const remembered = extendsByDirectory.get(directory);
   if (remembered !== undefined) return remembered;
 
-  const candidatePath = join(directory, TSCONFIG_FILE_NAME);
-  const text = readTextFile(candidatePath);
-  if (text !== null) {
-    const found = { tsconfigPath: candidatePath, specifiers: specifiersOf(parseJsonc(text)) };
-    extendsByDirectory.set(directory, found);
-    return found;
-  }
-
   const parent = dirname(directory);
-  const found = parent === directory ? null : nearestFrom(parent);
+  const found = declaredIn(directory) ?? (parent === directory ? null : nearestFrom(parent));
   extendsByDirectory.set(directory, found);
   return found;
 };

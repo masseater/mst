@@ -21,7 +21,7 @@ const fixedValueOf = (expression: ESTree.Expression): FixedValue | null => {
     return "regex" in written ? null : { held: written.value };
   }
   if (written.type === "TemplateLiteral") {
-    return written.expressions.length === 0 ? { held: written.quasis[0].value.cooked } : null;
+    return written.expressions.length === 0 ? { held: written.quasis[0]?.value.cooked } : null;
   }
   if (written.type !== "UnaryExpression" || written.operator !== "-") return null;
 
@@ -30,20 +30,46 @@ const fixedValueOf = (expression: ESTree.Expression): FixedValue | null => {
   return { held: -negated.held };
 };
 
+const soleExpectArgumentOf = (call: ESTree.CallExpression): ESTree.Expression | null => {
+  const callee = withoutParentheses(call.callee);
+  if (callee.type !== "Identifier" || callee.name !== EXPECT_NAME) return null;
+  if (call.arguments.length !== 1) return null;
+  const [subject] = call.arguments;
+  if (subject === undefined) return null;
+  return subject.type === "SpreadElement" ? null : subject;
+};
+
 const subjectOfExpect = (expression: ESTree.Expression): ESTree.Expression | null => {
   const asserted = withoutParentheses(expression);
-
-  if (asserted.type === "CallExpression") {
-    const callee = withoutParentheses(asserted.callee);
-    if (callee.type !== "Identifier" || callee.name !== EXPECT_NAME) return null;
-    if (asserted.arguments.length !== 1) return null;
-    const [subject] = asserted.arguments;
-    return subject.type === "SpreadElement" ? null : subject;
-  }
+  if (asserted.type === "CallExpression") return soleExpectArgumentOf(asserted);
 
   const member = staticMemberOf(asserted);
   if (member === null || !MODIFIER_NAMES.has(member.name)) return null;
   return subjectOfExpect(member.object);
+};
+
+const equalityOperandsOf = (
+  node: ESTree.CallExpression,
+): { readonly expectedNode: ESTree.Expression; readonly subjectNode: ESTree.Expression } | null => {
+  const matcher = staticMemberOf(node.callee);
+  if (matcher === null || !EQUALITY_MATCHER_NAMES.has(matcher.name)) return null;
+  if (node.arguments.length !== 1) return null;
+
+  const [expectedNode] = node.arguments;
+  if (expectedNode === undefined || expectedNode.type === "SpreadElement") return null;
+
+  const subjectNode = subjectOfExpect(matcher.object);
+  return subjectNode === null ? null : { expectedNode, subjectNode };
+};
+
+const isTautologicalAssertion = (node: ESTree.CallExpression): boolean => {
+  const operands = equalityOperandsOf(node);
+  if (operands === null) return false;
+
+  const expected = fixedValueOf(operands.expectedNode);
+  const subject = fixedValueOf(operands.subjectNode);
+  if (expected === null || subject === null) return false;
+  return isEqual(expected.held, subject.held);
 };
 
 export const noTautologicalAssertion = createDontReviewItRule({
@@ -64,21 +90,7 @@ export const noTautologicalAssertion = createDontReviewItRule({
   create(context) {
     return {
       CallExpression(node: ESTree.CallExpression) {
-        const matcher = staticMemberOf(node.callee);
-        if (matcher === null || !EQUALITY_MATCHER_NAMES.has(matcher.name)) return;
-        if (node.arguments.length !== 1) return;
-
-        const [expectedNode] = node.arguments;
-        if (expectedNode.type === "SpreadElement") return;
-
-        const subjectNode = subjectOfExpect(matcher.object);
-        if (subjectNode === null) return;
-
-        const expected = fixedValueOf(expectedNode);
-        const subject = fixedValueOf(subjectNode);
-        if (expected === null || subject === null) return;
-        if (!isEqual(expected.held, subject.held)) return;
-
+        if (!isTautologicalAssertion(node)) return;
         context.report({ node, messageId: "tautologicalAssertion" });
       },
     };

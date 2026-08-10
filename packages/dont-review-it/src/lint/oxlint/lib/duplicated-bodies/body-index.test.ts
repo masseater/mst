@@ -8,6 +8,9 @@ const indexedBodyAt = (line: number, fingerprint: string) => ({
   fingerprint,
 });
 
+const linesOf = (sites: readonly { readonly line: number }[] | undefined): readonly number[] =>
+  (sites ?? []).map((site) => site.line);
+
 describe("buildBodyIndex", () => {
   test("gathers the sites that share a fingerprint", () => {
     const index = buildBodyIndex([
@@ -27,9 +30,7 @@ describe("buildBodyIndex", () => {
       { relativePath: "b.ts", bodies: [indexedBodyAt(9, "shared")] },
       { relativePath: "a.ts", bodies: [indexedBodyAt(4, "shared"), indexedBodyAt(1, "shared")] },
     ]);
-    expect(index.sitesByFingerprint.get("shared")?.map((site) => site.line)).toStrictEqual([
-      1, 4, 9,
-    ]);
+    expect(linesOf(index.sitesByFingerprint.get("shared"))).toStrictEqual([1, 4, 9]);
   });
 });
 

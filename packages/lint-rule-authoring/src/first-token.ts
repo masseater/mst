@@ -1,4 +1,1 @@
-export const firstToken = (text: string): string => {
-  const trimmed = text.trim();
-  return trimmed.length === 0 ? "" : trimmed.split(/\s+/u, 1)[0];
-};
+export const firstToken = (text: string): string => text.trim().split(/\s+/u, 1)[0] ?? "";

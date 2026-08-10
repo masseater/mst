@@ -23,7 +23,7 @@ const namedFieldsOf = (node: Fields): readonly (readonly [string, unknown])[] =>
 
 const structureOf = (value: unknown): string => {
   if (Array.isArray(value)) return `[${value.map(structureOf).join(",")}]`;
-  if (!isNode(value)) return JSON.stringify(value) ?? "undefined";
+  if (!isNode(value)) return value === undefined ? "undefined" : JSON.stringify(value);
   return `{${namedFieldsOf(value)
     .map(([field, nested]) => `${field}:${structureOf(nested)}`)
     .join(",")}}`;

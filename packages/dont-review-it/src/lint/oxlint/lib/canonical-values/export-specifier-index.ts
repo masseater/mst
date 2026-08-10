@@ -36,7 +36,9 @@ const filesReachableByReExport = (entryFile: string): ReadonlySet<string> => {
     const text = readTextFile(file);
     if (text === null) return;
     for (const match of text.matchAll(RE_EXPORT_PATTERN)) {
-      const target = resolveRelativeSpecifier(file, match[1]);
+      const [, specifier] = match;
+      if (specifier === undefined) continue;
+      const target = resolveRelativeSpecifier(file, specifier);
       if (target !== null) visit(target, depth + 1);
     }
   };
@@ -55,13 +57,17 @@ const exportSubpathTargets = (
 ): ReadonlyMap<string, readonly string[]> => {
   const targets = new Map<string, string[]>();
 
+  const record = (subpath: string, value: string): void => {
+    if (!value.startsWith("./") || value.endsWith(".d.ts")) return;
+    const resolved = resolve(packageDirectory, value);
+    const bucket = targets.get(subpath);
+    if (bucket === undefined) targets.set(subpath, [resolved]);
+    else if (!bucket.includes(resolved)) bucket.push(resolved);
+  };
+
   const collect = (value: unknown, { subpath, depth }: ExportsFieldPosition): void => {
     if (typeof value === "string") {
-      if (!value.startsWith("./") || value.endsWith(".d.ts")) return;
-      const resolved = resolve(packageDirectory, value);
-      const bucket = targets.get(subpath);
-      if (bucket === undefined) targets.set(subpath, [resolved]);
-      else if (!bucket.includes(resolved)) bucket.push(resolved);
+      record(subpath, value);
       return;
     }
     if (depth > EXPORTS_CONDITION_DEPTH_LIMIT) return;
@@ -80,22 +86,35 @@ const exportSubpathTargets = (
 const exportSpecifierOf = (packageName: string, subpath: string): string =>
   subpath === "." ? packageName : `${packageName}${subpath.slice(1)}`;
 
+type ManifestSurface = {
+  readonly packageName: string;
+  readonly exportsField: unknown;
+};
+
+const manifestSurfaceOf = (packageDirectory: string): ManifestSurface | null => {
+  const manifest = readJsonFile(join(packageDirectory, MANIFEST_FILE_NAME));
+  if (manifest === null || typeof manifest !== "object") return null;
+  if (!("name" in manifest) || typeof manifest.name !== "string" || manifest.name.length === 0) {
+    return null;
+  }
+  return {
+    packageName: manifest.name,
+    exportsField: "exports" in manifest ? manifest.exports : undefined,
+  };
+};
+
 export const buildExportSpecifierIndex = (
   packageDirectory: string,
 ): ReadonlyMap<string, string> => {
   const index = new Map<string, string>();
-  const manifest = readJsonFile(join(packageDirectory, MANIFEST_FILE_NAME));
-  if (manifest === null || typeof manifest !== "object") return index;
-  if (!("name" in manifest) || typeof manifest.name !== "string" || manifest.name.length === 0) {
-    return index;
-  }
-  const packageName = manifest.name;
+  const surface = manifestSurfaceOf(packageDirectory);
+  if (surface === null) return index;
 
   for (const [subpath, entryFiles] of exportSubpathTargets(
     packageDirectory,
-    "exports" in manifest ? manifest.exports : undefined,
+    surface.exportsField,
   )) {
-    const specifier = exportSpecifierOf(packageName, subpath);
+    const specifier = exportSpecifierOf(surface.packageName, subpath);
     for (const entryFile of entryFiles) {
       for (const reached of filesReachableByReExport(entryFile)) {
         if (!index.has(reached)) index.set(reached, specifier);
