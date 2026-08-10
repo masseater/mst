@@ -42,6 +42,8 @@ const SHARED_TSCONFIG_PRESETS = [
   "dont-review-it/tsconfig/app.json",
 ];
 
+const RE_EXPORT_ONLY_FILES = ["**/index.ts", "**/index.tsx"];
+
 export const oxlint: OxlintConfig = defineConfig({
   categories: { correctness: LINT_SEVERITY.ERROR },
   plugins: [...UPSTREAM_PLUGINS],
@@ -105,7 +107,10 @@ export const oxlint: OxlintConfig = defineConfig({
     [`${PLUGIN_NAME}/${noTautologicalAssertion.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noUnorderedImport.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noUnwrappedToolchainConfig.name}`]: LINT_SEVERITY.ERROR,
-    [`${PLUGIN_NAME}/${requireReExportOnlyFiles.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${requireReExportOnlyFiles.name}`]: [
+      LINT_SEVERITY.ERROR,
+      { targets: [...RE_EXPORT_ONLY_FILES] },
+    ],
     complexity: [LINT_SEVERITY.ERROR, { max: 10 }],
     "max-classes-per-file": [LINT_SEVERITY.ERROR, { max: 1 }],
     "max-depth": [LINT_SEVERITY.ERROR, { max: 4 }],
