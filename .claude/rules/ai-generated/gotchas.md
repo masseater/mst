@@ -99,3 +99,15 @@ pack: { exports: { customExports: { './tsconfig/*': './tsconfig/*' } } }
 
 - IF: `vitest/consistent-test-filename` の `pattern` を変更する; THEN MUST: 変更後に違反ファイルを実際に置いて error になることを確認する
   - このルールは条件に合わなければ黙って何も言わない。設定ミスは「lint が緑」として現れるため、正のケースだけでは検出できない
+
+## `vp lint --print-config` は jsPlugin のルールを解決しない
+
+- 症状: 自前ルールを base preset に追加した前後で `vp lint --print-config` を取って diff したところ、差分が 1 行も出なかった。ルールは実際に有効になっていて、違反ファイルを置けば error が出る
+- 原因: `--print-config` が吐くのは組み込みルールの解決結果だけである。`jsPlugins` の欄にはルートの `vite.config.ts` が直接書いた `vite-plus` しか現れず、`extends` した先（`@mst/dont-review-it` の preset）が宣言した jsPlugin もそのルールも出てこない。`rules` の欄に `dont-review-it/...` が現れるのは、ルート側の `overrides` が名指しで off にしている 2 本だけ
+- したがって、この diff は自前ルールの増減については常に空になる。「差分が追加だけだった」を配線の確認として読むと、何も確認していないことになる
+
+- IF: 自前ルールを追加・削除して配線を確認したい; THEN
+  - MUST: 違反する現物をリポジトリ内に置き、`vp lint <その パス>` が該当ルールの error を出すことを確認する。確認後にそのファイルを消す
+  - PROHIBIT: `vp lint --print-config` の diff が空であることをもって、ルールが有効になった根拠とする
+- IF: `lint.plugins` を触った; THEN MUST: 引き続き `--print-config` の diff を取る
+  - 組み込みプラグインの置換（前項）はこの出力に現れる。`--print-config` が役に立つのはそちらの用途である
