@@ -60,26 +60,37 @@ const templateLiteralValue = (node: ESTree.TemplateLiteral): CanonicalValue | nu
   return node.quasis[0].value.cooked;
 };
 
-const isStructuralKeyPosition = (parent: ESTree.Node, node: ESTree.Node): boolean => {
+const isValueMemberKeyPosition = (parent: ESTree.Node, node: ESTree.Node): boolean | null => {
   switch (parent.type) {
     case "AccessorProperty":
     case "MethodDefinition":
     case "Property":
     case "PropertyDefinition":
+      return !parent.computed && parent.key === node;
+    default:
+      return null;
+  }
+};
+
+const isTypeMemberKeyPosition = (parent: ESTree.Node, node: ESTree.Node): boolean | null => {
+  switch (parent.type) {
     case "TSAbstractAccessorProperty":
     case "TSAbstractMethodDefinition":
     case "TSAbstractPropertyDefinition":
     case "TSMethodSignature":
     case "TSPropertySignature":
       return !parent.computed && parent.key === node;
-    case "TSEnumMember":
-      return parent.id === node;
     default:
-      return false;
+      return null;
   }
 };
 
-const isModuleSyntaxPosition = (parent: ESTree.Node, node: ESTree.Node): boolean => {
+const isStructuralKeyPosition = (parent: ESTree.Node, node: ESTree.Node): boolean =>
+  isValueMemberKeyPosition(parent, node) ??
+  isTypeMemberKeyPosition(parent, node) ??
+  (parent.type === "TSEnumMember" && parent.id === node);
+
+const isModuleSourcePosition = (parent: ESTree.Node, node: ESTree.Node): boolean | null => {
   switch (parent.type) {
     case "ExportNamedDeclaration":
     case "ImportDeclaration":
@@ -88,6 +99,13 @@ const isModuleSyntaxPosition = (parent: ESTree.Node, node: ESTree.Node): boolean
       return parent.source === node;
     case "ExportAllDeclaration":
       return parent.source === node || parent.exported === node;
+    default:
+      return null;
+  }
+};
+
+const isModuleNamePosition = (parent: ESTree.Node, node: ESTree.Node): boolean | null => {
+  switch (parent.type) {
     case "ImportAttribute":
       return parent.key === node || parent.value === node;
     case "ImportSpecifier":
@@ -97,9 +115,12 @@ const isModuleSyntaxPosition = (parent: ESTree.Node, node: ESTree.Node): boolean
     case "TSModuleDeclaration":
       return parent.id === node;
     default:
-      return false;
+      return null;
   }
 };
+
+const isModuleSyntaxPosition = (parent: ESTree.Node, node: ESTree.Node): boolean =>
+  isModuleSourcePosition(parent, node) ?? isModuleNamePosition(parent, node) ?? false;
 
 const isKeySelectorArgument = (ancestors: readonly ESTree.Node[], node: ESTree.Node): boolean => {
   for (const [index, ancestor] of ancestors.entries()) {
