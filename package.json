@@ -8,7 +8,7 @@
   },
   "type": "module",
   "scripts": {
-    "ready": "vp check && vp run -r test && vp run -r build && vp run knip && vp exec dont-review-it verify && vp exec dont-review-it duplicated-bodies && vp run docs",
+    "ready": "vp check && vp run -r test --coverage && vp run -r build && vp run knip && vp exec dont-review-it verify && vp exec dont-review-it duplicated-bodies && vp run docs",
     "dev": "vp run website#dev",
     "docs": "vp exec agentic-documents check",
     "docs:write": "vp exec agentic-documents check --write",
@@ -20,6 +20,7 @@
     "@mst/dont-review-it": "workspace:*",
     "@mst/lint-rule-authoring": "workspace:*",
     "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
     "knip": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"

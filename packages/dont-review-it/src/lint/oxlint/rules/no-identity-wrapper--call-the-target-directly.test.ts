@@ -11,6 +11,30 @@ describe("dont-review-it/no-identity-wrapper--call-the-target-directly", () => {
         code: "const parseUser = (input) => JSON.parse(input).user;",
       },
       {
+        name: "a binding taken apart by a pattern is not a named function",
+        code: "const [parseUser] = parsers;",
+      },
+      {
+        name: "a binding declared without a value is not a named function",
+        code: "let parseUser;",
+      },
+      {
+        name: "a block body that returns nothing is not a forwarding call",
+        code: "const parseUser = (input) => {\n  record(input);\n};",
+      },
+      {
+        name: "a rest parameter taken apart by a pattern forwards no name",
+        code: "function parseUser(...[input]) {\n  return parse(...[input]);\n}",
+      },
+      {
+        name: "spreading something other than a parameter is not forwarding it",
+        code: "function parseUser(input) {\n  return parse(...[input]);\n}",
+      },
+      {
+        name: "a function declared without a body forwards nothing",
+        code: "declare function parseUser(input: string): unknown;",
+      },
+      {
         name: "a call that adds an argument is a partial application and not a pass through",
         code: "const parseUser = (input) => parse(input, DEFAULT_OPTIONS);",
       },

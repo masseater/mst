@@ -110,21 +110,11 @@ const referencesIn = ({
       if (node.type !== "text") return [];
 
       const baseOffset = offsetOf(node);
-      return [...node.value.matchAll(pointerPattern)].flatMap((match): readonly Reference[] => {
-        const target = match[1];
-        if (target === undefined) return [];
-
-        return [
-          {
-            target,
-            fromRepositoryRoot: true,
-            line:
-              baseOffset === undefined
-                ? lineOf(node)
-                : lineAtOffset(document.source, baseOffset + match.index),
-          },
-        ];
-      });
+      return [...node.value.matchAll(pointerPattern)].map((match) => ({
+        target: String(match[1]),
+        fromRepositoryRoot: true,
+        line: lineAtOffset(document.source, baseOffset + match.index),
+      }));
     });
 };
 

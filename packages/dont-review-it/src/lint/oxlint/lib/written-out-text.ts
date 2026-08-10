@@ -1,11 +1,9 @@
-import { withoutParentheses } from "./parenthesized-expression.ts";
-
 import type { ESTree } from "@oxlint/plugins";
 
 const CONCATENATION_OPERATOR = "+";
 
 export const hasWrittenOutText = (expression: ESTree.Expression): boolean => {
-  const written = withoutParentheses(expression);
+  const written = expression;
 
   if (written.type === "Literal") return typeof written.value === "string";
   if (written.type === "TemplateLiteral") {

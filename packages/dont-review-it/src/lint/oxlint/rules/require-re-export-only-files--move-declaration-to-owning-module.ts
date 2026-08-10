@@ -29,8 +29,6 @@ const matchesSegments = (
   pathSegments: readonly string[],
   patternSegments: readonly string[],
 ): boolean => {
-  if (patternSegments.length === 0) return pathSegments.length === 0;
-
   const [head, ...remainingPatternSegments] = patternSegments;
   if (head === undefined) return pathSegments.length === 0;
   if (head === "**") {

@@ -15,6 +15,7 @@ import { noExplanatoryComment } from "../lint/oxlint/rules/no-explanatory-commen
 import { noHardcodedEndpoint } from "../lint/oxlint/rules/no-hardcoded-endpoint--read-from-configuration.ts";
 import { noHardcodedProviderId } from "../lint/oxlint/rules/no-hardcoded-provider-id--read-from-configuration.ts";
 import { noIdentityWrapper } from "../lint/oxlint/rules/no-identity-wrapper--call-the-target-directly.ts";
+import { noLenientCoverageThreshold } from "../lint/oxlint/rules/no-lenient-coverage-threshold--demand-full-coverage.ts";
 import { noLoggedAndContinuedFailure } from "../lint/oxlint/rules/no-logged-and-continued-failure--stop-or-recover.ts";
 import { noMultiBindingDeclaration } from "../lint/oxlint/rules/no-multi-binding-declaration--declare-one-binding-per-statement.ts";
 import { noPromiseChain } from "../lint/oxlint/rules/no-promise-chain--use-async-await.ts";
@@ -100,6 +101,7 @@ export const oxlint: OxlintConfig = defineConfig({
     [`${PLUGIN_NAME}/${noHardcodedEndpoint.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noHardcodedProviderId.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noIdentityWrapper.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noLenientCoverageThreshold.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noLocalFiniteValueSet.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noLoggedAndContinuedFailure.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noMultiBindingDeclaration.name}`]: LINT_SEVERITY.ERROR,

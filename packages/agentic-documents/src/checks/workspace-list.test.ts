@@ -33,6 +33,18 @@ const WORKSPACE_DEFINITION = "packages:\n  - packages/*\n";
 const DESCRIBED_MANIFEST = JSON.stringify({ name: "example", description: "説明" });
 
 describe("workspaceListProblems", () => {
+  test("一覧の設定が無い配置では何も要求しない", async () => {
+    const repositoryRoot = repositoryWith({});
+
+    expect(
+      await workspaceListProblems({
+        repositoryRoot,
+        config: { ...defaultConfig, workspaceList: null },
+        write: false,
+      }),
+    ).toStrictEqual([]);
+  });
+
   test("一覧の文書が無いと報告する", async () => {
     const root = repositoryWith({
       "pnpm-workspace.yaml": WORKSPACE_DEFINITION,
@@ -92,6 +104,19 @@ describe("workspaceListProblems", () => {
     expect(readFileSync(join(root, "docs/workspaces.md"), "utf8")).toContain(
       "- `packages/example` — 説明",
     );
+  });
+
+  test("境界の内側が生成結果と一致していれば報告しない", async () => {
+    const root = repositoryWith({
+      "pnpm-workspace.yaml": WORKSPACE_DEFINITION,
+      "packages/example/package.json": DESCRIBED_MANIFEST,
+      "docs/workspaces.md": `# ワークスペース\n\n${BEGIN}\n\n古い内容\n\n${END}\n`,
+    });
+    await workspaceListProblems({ repositoryRoot: root, config: defaultConfig, write: true });
+
+    expect(
+      await workspaceListProblems({ repositoryRoot: root, config: defaultConfig, write: false }),
+    ).toStrictEqual([]);
   });
 
   test("説明の無いワークスペースがあると生成の失敗として報告する", async () => {

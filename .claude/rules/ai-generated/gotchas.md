@@ -128,3 +128,15 @@ pack: { exports: { customExports: { './tsconfig/*': './tsconfig/*' } } }
 - 上流: 意図的な非対応である。[公式ドキュメント](https://oxc.rs/docs/guide/usage/linter/ignore-files.html)に `global gitignore files are not respected` と明記があり、[oxc#14926](https://github.com/oxc-project/oxc/issues/14926) は「開発者ごとに検査対象が変わるのは紛らわしい」として NOT_PLANNED で閉じられた。[oxc#22155](https://github.com/oxc-project/oxc/issues/22155) が `$XDG_CONFIG_HOME/git/ignore` の対応を求めて OPEN のまま残っている
 - 検出方法: 片方の経路だけが拾うパスに違反ファイルを置き、`vp lint` と `vp fmt --list-different` にかける。`git check-ignore -v` でどの経路が拾っているかを先に確かめる
 - 対処: `@mst/dont-review-it` の `withGitExcludes` が 3 経路すべてを読んで `ignorePatterns` に変換する。埋めたい穴はグローバルの 1 経路だけだが、残り 2 経路も読む。順序はグローバル → `$GIT_DIR/info/exclude` → リポジトリの `.gitignore` で、gitignore は last-match-wins なので、この順でないと `!` による再包含が負ける。経路をまたぐ再包含は 1 か所で並べないと表現できない
+
+## oxlint がルールに渡す AST に `ParenthesizedExpression` は現れない
+
+- 症状: 括弧を剥がすヘルパを書いても、その再帰の分岐に一度も入らない。`vp lint` は緑のまま通り、剥がす処理が要らないことに気づけない
+- 原因: `oxc-parser` を直接呼ぶと `export default ({ a: 1 })` は `ParenthesizedExpression` を生成する。oxlint が JS プラグインに渡す AST では括弧が落ちている。同じ AST 定義を共有しているため型には現れ続ける
+- 実測: 括弧付きの設定 (`export default ({...})`)、括弧付きの数値 (`branches: (100)`)、括弧付きの転送呼び出しの 3 通りをテストに置き、いずれもヘルパの再帰に入らないことをカバレッジで確認した。ヘルパと 16 か所の呼び出しを削除しても 983 件のテストは全て通った
+- 対処: ルールの中で括弧を剥がさない
+
+- IF: ルールの中で `ParenthesizedExpression` を扱おうとしている; THEN PROHIBIT: 書く
+  - 型に現れるのは AST 定義の共有によるもので、oxlint 経由では到達しない
+- IF: パーサの出力そのものを扱うコード（`parseSync` を直接呼ぶ側）を書いている; THEN MUST: 括弧を考慮する
+  - こちらには実際に現れる

@@ -15,6 +15,7 @@ import { noExplanatoryComment } from "./lint/oxlint/rules/no-explanatory-comment
 import { noHardcodedEndpoint } from "./lint/oxlint/rules/no-hardcoded-endpoint--read-from-configuration.ts";
 import { noHardcodedProviderId } from "./lint/oxlint/rules/no-hardcoded-provider-id--read-from-configuration.ts";
 import { noIdentityWrapper } from "./lint/oxlint/rules/no-identity-wrapper--call-the-target-directly.ts";
+import { noLenientCoverageThreshold } from "./lint/oxlint/rules/no-lenient-coverage-threshold--demand-full-coverage.ts";
 import { createNoLocalFiniteValueSet } from "./lint/oxlint/rules/no-local-finite-value-set--use-or-register-canonical-values.ts";
 import { noLoggedAndContinuedFailure } from "./lint/oxlint/rules/no-logged-and-continued-failure--stop-or-recover.ts";
 import { noMultiBindingDeclaration } from "./lint/oxlint/rules/no-multi-binding-declaration--declare-one-binding-per-statement.ts";
@@ -61,6 +62,7 @@ const plugin: Plugin = {
     [noHardcodedEndpoint.name]: noHardcodedEndpoint,
     [noHardcodedProviderId.name]: noHardcodedProviderId,
     [noIdentityWrapper.name]: noIdentityWrapper,
+    [noLenientCoverageThreshold.name]: noLenientCoverageThreshold,
     [noLocalFiniteValueSet.name]: noLocalFiniteValueSet,
     [noLoggedAndContinuedFailure.name]: noLoggedAndContinuedFailure,
     [noMultiBindingDeclaration.name]: noMultiBindingDeclaration,

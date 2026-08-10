@@ -14,7 +14,7 @@ const WORKSPACES_FIELD = "workspaces";
 const manifestDeclaresWorkspaces = (directory: string): boolean => {
   const manifest = readJsonFile(join(directory, MANIFEST_FILE_NAME));
   if (manifest === null || typeof manifest !== "object") return false;
-  return WORKSPACES_FIELD in manifest && manifest.workspaces !== undefined;
+  return WORKSPACES_FIELD in manifest;
 };
 
 const isWorkspaceRoot = (directory: string): boolean =>

@@ -1,7 +1,6 @@
 import { isEqual } from "es-toolkit";
 
 import { createDontReviewItRule } from "../../../create-rule.ts";
-import { withoutParentheses } from "../lib/parenthesized-expression.ts";
 import { staticMemberOf } from "../lib/static-member.ts";
 
 import type { ESTree } from "@oxlint/plugins";
@@ -13,7 +12,7 @@ const EQUALITY_MATCHER_NAMES: ReadonlySet<string> = new Set(["toBe", "toEqual", 
 const MODIFIER_NAMES: ReadonlySet<string> = new Set(["not", "resolves", "rejects"]);
 
 const fixedValueOf = (expression: ESTree.Expression): { readonly held: unknown } | null => {
-  const written = withoutParentheses(expression);
+  const written = expression;
 
   if (written.type === "Literal") {
     return "regex" in written ? null : { held: written.value };
@@ -29,16 +28,15 @@ const fixedValueOf = (expression: ESTree.Expression): { readonly held: unknown }
 };
 
 const soleExpectArgumentOf = (call: ESTree.CallExpression): ESTree.Expression | null => {
-  const callee = withoutParentheses(call.callee);
+  const callee = call.callee;
   if (callee.type !== "Identifier" || callee.name !== EXPECT_NAME) return null;
-  if (call.arguments.length !== 1) return null;
   const [subject] = call.arguments;
-  if (subject === undefined) return null;
+  if (subject === undefined || call.arguments.length !== 1) return null;
   return subject.type === "SpreadElement" ? null : subject;
 };
 
 const subjectOfExpect = (expression: ESTree.Expression): ESTree.Expression | null => {
-  const asserted = withoutParentheses(expression);
+  const asserted = expression;
   if (asserted.type === "CallExpression") return soleExpectArgumentOf(asserted);
 
   const member = staticMemberOf(asserted);

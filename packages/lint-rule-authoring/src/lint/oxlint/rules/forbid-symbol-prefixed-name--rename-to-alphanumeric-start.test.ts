@@ -41,9 +41,10 @@ describe("lint-rule-authoring/forbid-symbol-prefixed-name--rename-to-alphanumeri
         options: [{ allowedNames: ["_*.ts"] }],
       },
       {
-        name: "a path outside the working directory is not judged",
+        name: "options that list no allowed name leave the default empty list in place",
         code: "const total = 1;",
-        filename: "/tmp/_scratch/draft.ts",
+        filename: "packages/lint-rule-authoring/src/index.ts",
+        options: [{}],
       },
     ],
     invalid: [

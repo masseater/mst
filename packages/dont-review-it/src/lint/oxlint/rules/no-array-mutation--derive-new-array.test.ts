@@ -11,6 +11,38 @@ describe("dont-review-it/no-array-mutation--derive-new-array", () => {
         code: "const router = useRouter();\nrouter.push('/home');",
       },
       {
+        name: "a private method named push is not an array method",
+        code: "class Bag {\n  #push(entry) {\n    return entry;\n  }\n  add(entry) {\n    return this.#push(entry);\n  }\n}",
+      },
+      {
+        name: "a member reached through a number names no method",
+        code: "const rows = [];\nrows[0](1);",
+      },
+      {
+        name: "a factory reached through a template with a substitution names no factory method",
+        code: "Array[`from${suffix}`]([]).push('a');",
+      },
+      {
+        name: "a member reached through a chain that may stop short is not a tracked binding",
+        code: "const holder = { items: [] };\n(holder?.items).push('a');",
+      },
+      {
+        name: "a member reached through a template with a substitution names no method",
+        code: "const rows = [];\nrows[`push${suffix}`](1);",
+      },
+      {
+        name: "a member reached through a template without a substitution names the method it spells",
+        code: "const router = useRouter();\nrouter[`push`]('/home');",
+      },
+      {
+        name: "a type reached through a namespace is not read as an array type",
+        code: "const collect = (rows: catalog.Rows) => rows.push(1);",
+      },
+      {
+        name: "a type parameter constrained by one that leads back to it is not an array type",
+        code: "const collect = <A extends B, B extends A>(rows: A) => rows.push(1);",
+      },
+      {
         name: "an undeclared global named push is not an array",
         code: "git.push();",
       },
@@ -107,6 +139,46 @@ describe("dont-review-it/no-array-mutation--derive-new-array", () => {
       {
         name: "pushing onto an annotated array is an in-place change",
         code: "const items: string[] = [];\nitems.push('a');",
+        errors: [{ messageId: "inPlaceArrayMutation" }],
+      },
+      {
+        name: "a type written in parentheses is read as the array type it wraps",
+        code: "const collect = (rows: (number[])) => rows.push(1);",
+        errors: [{ messageId: "inPlaceArrayMutation" }],
+      },
+      {
+        name: "an array reached through a wrapper is still that array",
+        code: "const items: string[] = [];\nitems!.push('a');",
+        errors: [{ messageId: "inPlaceArrayMutation" }],
+      },
+      {
+        name: "an array reached through an optional chain is still that array",
+        code: "const items: string[] = [];\nitems?.push('a');",
+        errors: [{ messageId: "inPlaceArrayMutation" }],
+      },
+      {
+        name: "a tuple is an array",
+        code: "const pair: [string, string] = ['a', 'b'];\npair.push('c');",
+        errors: [{ messageId: "inPlaceArrayMutation" }],
+      },
+      {
+        name: "a type that is an array among other things is an array",
+        code: "const items: string[] & Tagged = [];\nitems.push('a');",
+        errors: [{ messageId: "inPlaceArrayMutation" }],
+      },
+      {
+        name: "an expression checked against an array type where it is written is an array",
+        code: "([] satisfies string[]).push('a');",
+        errors: [{ messageId: "inPlaceArrayMutation" }],
+      },
+      {
+        name: "an expression asserted with the older syntax where it is written is an array",
+        code: "(<string[]>[]).push('a');",
+        errors: [{ messageId: "inPlaceArrayMutation" }],
+      },
+      {
+        name: "an expression asserted where it is written is an array",
+        code: "([] as string[]).push('a');",
         errors: [{ messageId: "inPlaceArrayMutation" }],
       },
       {

@@ -11,7 +11,7 @@ const OUT_OF_SCOPE_DIRECTORIES: ReadonlySet<string> = new Set([
 ]);
 
 export const isOutOfScopeSource = (filename: string): boolean => {
+  if (OUT_OF_SCOPE_FILE_NAME.test(filename)) return true;
   const segments = filename.split(/[/\\]/u);
-  if (OUT_OF_SCOPE_FILE_NAME.test(segments.at(-1) ?? "")) return true;
   return segments.slice(0, -1).some((segment) => OUT_OF_SCOPE_DIRECTORIES.has(segment));
 };

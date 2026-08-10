@@ -60,6 +60,11 @@ export default defineConfig({
     ],
     options: { typeAware: true, typeCheck: true },
   }),
+  test: {
+    coverage: {
+      thresholds: { 100: true, perFile: true },
+    },
+  },
   run: {
     cache: true,
   },

@@ -22,7 +22,6 @@ export const negatedKeywordSpellings = ({
     .filter((node) => node.type === "text")
     .flatMap((node): readonly DocumentProblem[] => {
       const baseOffset = offsetOf(node);
-      if (baseOffset === undefined) return [];
 
       return [...node.value.matchAll(negatedKeywordPattern(config))]
         .map((match) => ({ offset: baseOffset + match.index, found: match[0] }))

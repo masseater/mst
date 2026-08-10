@@ -5,8 +5,8 @@ const literalsFollowInOrder = ({
   readonly segment: string;
   readonly literals: readonly string[];
 }): boolean => {
-  const head = literals[0] ?? "";
-  const tail = literals.at(-1) ?? "";
+  const head = literals.slice(0, 1).join("");
+  const tail = literals.slice(-1).join("");
   const lastMatchableEnd = segment.length - tail.length;
 
   return (
@@ -29,8 +29,8 @@ export const matchesGlobSegment = ({
   const literals = pattern.split("*");
   if (literals.length === 1) return segment === pattern;
 
-  const head = literals[0] ?? "";
-  const tail = literals.at(-1) ?? "";
+  const head = literals.slice(0, 1).join("");
+  const tail = literals.slice(-1).join("");
   if (!segment.startsWith(head)) return false;
   if (!segment.endsWith(tail)) return false;
   if (segment.length < head.length + tail.length) return false;

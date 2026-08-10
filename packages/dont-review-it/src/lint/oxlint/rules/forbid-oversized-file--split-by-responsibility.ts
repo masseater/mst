@@ -35,7 +35,7 @@ export const forbidOversizedFile = createDontReviewItRule({
       {
         type: "object",
         properties: {
-          maxLines: { type: "integer", minimum: 1, default: DEFAULT_MAX_LINES },
+          maxLines: { type: "integer", minimum: 1 },
         },
         additionalProperties: false,
       },

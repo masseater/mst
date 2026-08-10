@@ -1,4 +1,5 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { propertyKeyOf } from "../lib/object-literal.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
@@ -51,13 +52,6 @@ const isCallOf = (
   );
 };
 
-const propertyNameOf = (property: ESTree.ObjectProperty): string | null => {
-  if (property.computed) return null;
-  if (property.key.type === "Identifier") return property.key.name;
-  if (property.key.type === "Literal") return String(property.key.value);
-  return null;
-};
-
 export const noUnwrappedToolchainConfig = createDontReviewItRule({
   name: "no-unwrapped-toolchain-config--wrap-with-git-excludes",
   meta: {
@@ -78,7 +72,7 @@ export const noUnwrappedToolchainConfig = createDontReviewItRule({
     const wrapper = { exportedName: WRAPPER_NAME, binding: newBinding() };
 
     const reportUnwrapped = (property: ESTree.ObjectProperty): void => {
-      const name = propertyNameOf(property);
+      const name = propertyKeyOf(property);
       if (name !== "lint" && name !== "fmt") return;
       if (property.value.type === "CallExpression" && isCallOf(property.value.callee, wrapper)) {
         return;

@@ -33,7 +33,6 @@ export const versionLiteralsInProse = ({
     .filter((node) => node.type === "text" || node.type === "inlineCode")
     .flatMap((node): readonly DocumentProblem[] => {
       const baseOffset = offsetOf(node);
-      if (baseOffset === undefined) return [];
 
       return [
         ...node.value.matchAll(PREFIXED_VERSION_PATTERN),

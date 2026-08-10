@@ -44,15 +44,13 @@ const readsResultElement = (member: ESTree.MemberExpression): boolean =>
   member.property.type === "Literal" &&
   member.property.value === RESULT_ELEMENT_INDEX;
 
-const receiverOf = (node: ESTree.Node): ESTree.Node | null => {
-  const { parent } = node;
-  if (parent === null) return null;
+const receiverOf = (node: ESTree.Node): ESTree.Node => {
+  const parent = node.parent as ESTree.Node;
   return CARRIED_THROUGH_TYPES.has(parent.type) ? receiverOf(parent) : parent;
 };
 
 const discardsFailure = (node: ESTree.CallExpression): boolean => {
   const receiver = receiverOf(node);
-  if (receiver === null) return true;
   if (receiver.type === "ExpressionStatement") return true;
   if (receiver.type === "UnaryExpression") return receiver.operator === VOID_OPERATOR;
   if (receiver.type === "VariableDeclarator") return !bindsFailure(receiver.id);

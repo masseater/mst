@@ -200,6 +200,19 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
     );
   });
 
+  test("an annotation that sits on nothing is reported with the concept it named", () => {
+    expect(
+      formatCanonicalValuesProblem({
+        kind: "vocabulary-without-values",
+        filePath: "src/order.ts",
+        line: 3,
+        conceptId: "order.status",
+      }),
+    ).toBe(
+      "src/order.ts:3 A canonical values annotation must sit on a declaration that spells out the values of order.status. Move the annotation onto the declaration that lists them, or delete it.",
+    );
+  });
+
   test("a second declaration of a concept is reported with both locations", () => {
     expect(
       formatCanonicalValuesProblem({

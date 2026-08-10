@@ -9,7 +9,8 @@ const staticPropertyName = (property: ESTree.Expression): string | null => {
     return typeof property.value === "string" ? property.value : null;
   }
   if (property.type === "TemplateLiteral") {
-    return property.expressions.length === 0 ? (property.quasis[0]?.value.cooked ?? null) : null;
+    if (property.expressions.length !== 0) return null;
+    return property.quasis.map((quasi) => quasi.value.cooked).join("");
   }
   return null;
 };

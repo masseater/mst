@@ -12,6 +12,14 @@ describe("catalog", () => {
     fingerprint: fingerprintValues(values),
   });
 
+  test("a concept that spells the same value twice is listed against it once", () => {
+    const repeated = entry("order-status", ["draft", "draft"]);
+
+    expect(buildCatalog([repeated]).entriesByValue.get(canonicalValueKey("draft"))).toStrictEqual([
+      repeated,
+    ]);
+  });
+
   test("an empty catalog resolves nothing", () => {
     expect(EMPTY_CANONICAL_VALUES_CATALOG.entries).toStrictEqual([]);
     expect(EMPTY_CANONICAL_VALUES_CATALOG.entriesByValue.size).toBe(0);

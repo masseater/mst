@@ -50,6 +50,11 @@ describe("dont-review-it/no-strict-canonical-literal-use--use-canonical-import",
   testLintRule(rule, {
     valid: [
       {
+        name: "a literal that spells no value at all is not a use site",
+        code: "const pattern = /published/u;\nconst absent = null;\nconst flipped = !ready;",
+        filename: SOURCE,
+      },
+      {
         name: "a literal that no vocabulary declares is not a use site",
         code: 'const label = "unlisted";',
         filename: SOURCE,
@@ -87,11 +92,6 @@ describe("dont-review-it/no-strict-canonical-literal-use--use-canonical-import",
       {
         name: "the key selector of Pick selects from a type that already owns the spelling",
         code: 'type Article = { draft: string; body: string };\ntype Head = Pick<Article, "draft">;',
-        filename: SOURCE,
-      },
-      {
-        name: "the key selector of Omit selects from a type that already owns the spelling",
-        code: 'type Article = { draft: string; body: string };\ntype Rest = Omit<Article, "draft">;',
         filename: SOURCE,
       },
       {

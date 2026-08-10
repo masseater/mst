@@ -23,6 +23,11 @@ describe("dont-review-it/no-default-export--use-named-export", () => {
         options: [{ toolRequiredFileNames: ["vite.config.ts"] }],
       },
       {
+        name: "options that list no exempt file name leave the empty list in place",
+        code: "export const total = 1 + 2;",
+        options: [{}],
+      },
+      {
         name: "re-exporting under the defined name is not a default export",
         code: "export { total } from './total.ts';",
       },
