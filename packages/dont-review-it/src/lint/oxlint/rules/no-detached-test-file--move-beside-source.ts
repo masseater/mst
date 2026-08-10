@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { resolve, sep } from "node:path";
 
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { segmentsOf } from "../lib/path-segments.ts";
 
 import type { ESTree, Options } from "@oxlint/plugins";
 
@@ -43,9 +44,6 @@ const sourcePathFor = (testPath: string, suffix: string): string => {
   const extension = lastDot === -1 ? "" : suffix.slice(lastDot);
   return `${testPath.slice(0, testPath.length - suffix.length)}${extension}`;
 };
-
-const segmentsOf = (path: string, separator: string): readonly string[] =>
-  path.split(separator).filter((segment) => segment !== "");
 
 const containsSegmentRun = (
   pathSegments: readonly string[],
@@ -95,8 +93,12 @@ export const noDetachedTestFile = createDontReviewItRule({
         const suffix = longestMatchingSuffix(testPath, suffixes);
         if (suffix === null) return;
 
-        const pathSegments = segmentsOf(testPath, sep);
-        if (exemptPaths.some((entry) => containsSegmentRun(pathSegments, segmentsOf(entry, "/")))) {
+        const pathSegments = segmentsOf({ path: testPath, separator: sep });
+        if (
+          exemptPaths.some((entry) =>
+            containsSegmentRun(pathSegments, segmentsOf({ path: entry, separator: "/" })),
+          )
+        ) {
           return;
         }
 

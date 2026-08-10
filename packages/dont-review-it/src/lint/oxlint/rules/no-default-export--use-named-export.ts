@@ -6,19 +6,15 @@ import type { ESTree, Options } from "@oxlint/plugins";
 
 const DEFAULT_EXPORT_NAME = "default";
 
-const DEFAULT_TOOL_REQUIRED_FILE_NAMES = ["plugin.ts", "vite.config.ts"];
-
 const exportedNameOf = (exported: ESTree.ModuleExportName): string =>
   exported.type === "Literal" ? exported.value : exported.name;
 
 const toolRequiredFileNamesFrom = (options: Readonly<Options>): readonly string[] => {
   const [first] = options;
-  if (typeof first !== "object" || first === null || Array.isArray(first)) {
-    return DEFAULT_TOOL_REQUIRED_FILE_NAMES;
-  }
+  if (typeof first !== "object" || first === null || Array.isArray(first)) return [];
 
   const { toolRequiredFileNames } = first;
-  if (!Array.isArray(toolRequiredFileNames)) return DEFAULT_TOOL_REQUIRED_FILE_NAMES;
+  if (!Array.isArray(toolRequiredFileNames)) return [];
   return toolRequiredFileNames.filter((entry): entry is string => typeof entry === "string");
 };
 
@@ -52,10 +48,13 @@ export const noDefaultExport = createDontReviewItRule({
     ],
   },
   create(context) {
-    if (toolRequiredFileNamesFrom(context.options).includes(basename(context.filename))) return {};
+    const isToolRequiredEntry = toolRequiredFileNamesFrom(context.options).includes(
+      basename(context.filename),
+    );
 
     return {
       ExportDefaultDeclaration(node: ESTree.ExportDefaultDeclaration) {
+        if (isToolRequiredEntry) return;
         context.report({ node, messageId: "defaultExport" });
       },
       ExportNamedDeclaration(node: ESTree.ExportNamedDeclaration) {

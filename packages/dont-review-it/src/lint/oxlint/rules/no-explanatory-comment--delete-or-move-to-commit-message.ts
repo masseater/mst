@@ -1,4 +1,7 @@
+import { firstToken } from "@mst/lint-rule-authoring";
+
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { isJsdoc } from "../lib/jsdoc-comment.ts";
 
 import type { Comment, ESTree } from "@oxlint/plugins";
 
@@ -15,15 +18,10 @@ const LINT_DIRECTIVES = new Set([
 
 const COMPILER_DIRECTIVE_PREFIX = "@ts-";
 
-const firstToken = (text: string): string => text.trim().split(/\s+/u, 1)[0] ?? "";
-
 const isMachineReadDirective = (comment: Comment): boolean => {
   const token = firstToken(comment.value);
   return LINT_DIRECTIVES.has(token) || token.startsWith(COMPILER_DIRECTIVE_PREFIX);
 };
-
-const isJsdoc = (comment: Comment): boolean =>
-  comment.type === "Block" && comment.value.startsWith("*");
 
 export const noExplanatoryComment = createDontReviewItRule({
   name: "no-explanatory-comment--delete-or-move-to-commit-message",

@@ -13,6 +13,14 @@ export default defineConfig({
     rules: {
       "vite-plus/prefer-vite-plus-imports": "error",
       "vitest/consistent-test-filename": ["error", { pattern: "\\.test\\.tsx?$" }],
+      "dont-review-it/no-default-export--use-named-export": [
+        "error",
+        { toolRequiredFileNames: ["plugin.ts", "vite.config.ts"] },
+      ],
+      "dont-review-it/no-reassign--use-spread-or-iife": [
+        "error",
+        { assignOnlyTargets: ["RuleTester.describe", "RuleTester.it", "RuleTester.itOnly"] },
+      ],
     },
     overrides: [
       {
