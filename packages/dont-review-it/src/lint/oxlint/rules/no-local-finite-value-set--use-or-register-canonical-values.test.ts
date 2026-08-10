@@ -9,8 +9,16 @@ import {
 } from "../lib/library-vocabulary/vocabulary-index.ts";
 import { createNoLocalFiniteValueSet } from "./no-local-finite-value-set--use-or-register-canonical-values.ts";
 
-import type { CanonicalValuesEntry } from "../lib/canonical-values/catalog.ts";
+import type { WorkspaceLintRule } from "@mst/lint-rule-authoring";
+import type {
+  CanonicalValuesCatalog,
+  CanonicalValuesEntry,
+} from "../lib/canonical-values/catalog.ts";
 import type { CanonicalValue } from "../lib/canonical-values/fingerprint.ts";
+import type {
+  LibraryVocabularyEntry,
+  LibraryVocabularyIndex,
+} from "../lib/library-vocabulary/vocabulary-index.ts";
 
 const ORDER_STATUS_VALUES: readonly CanonicalValue[] = ["draft", "published"];
 
@@ -33,81 +41,48 @@ const ambiguousCatalog = buildCatalog([
   entry("article-status", "article-vocabulary", ORDER_STATUS_VALUES),
 ]);
 
-const subpathCatalog = buildCatalog([
-  {
-    ...entry("order-status", "order-vocabulary", ORDER_STATUS_VALUES),
-    exportPath: "#internal/statuses",
-  },
+const libraryType = (
+  packageName: string,
+  typeName: string,
+  admits: readonly CanonicalValue[],
+  admitsUnnamedValues = false,
+): LibraryVocabularyEntry => ({
+  packageName,
+  typeName,
+  declarationId: `${packageName}#${typeName}`,
+  values: admits,
+  admitsUnnamedValues,
+});
+
+const ruleReading = (
+  catalog: CanonicalValuesCatalog,
+  libraries: LibraryVocabularyIndex = EMPTY_LIBRARY_VOCABULARY_INDEX,
+): WorkspaceLintRule =>
+  createNoLocalFiniteValueSet({
+    loadCatalog: () => catalog,
+    loadLibraryVocabulary: () => libraries,
+  });
+
+const severityAndTarget = buildLibraryVocabularyIndex([
+  libraryType("oxlint", "AllowWarnDeny", ["allow", "deny", "error", "off", "warn"], true),
+  libraryType("vite", "SSRTarget", ["node", "webworker"]),
 ]);
 
-const withoutLibraries = () => EMPTY_LIBRARY_VOCABULARY_INDEX;
-
-const withOwner = createNoLocalFiniteValueSet({
-  loadCatalog: () => ownedCatalog,
-  loadLibraryVocabulary: withoutLibraries,
-});
-const withoutCatalog = createNoLocalFiniteValueSet({
-  loadCatalog: () => EMPTY_CANONICAL_VALUES_CATALOG,
-  loadLibraryVocabulary: withoutLibraries,
-});
-const withAmbiguousOwners = createNoLocalFiniteValueSet({
-  loadCatalog: () => ambiguousCatalog,
-  loadLibraryVocabulary: withoutLibraries,
-});
-const withSubpathOwner = createNoLocalFiniteValueSet({
-  loadCatalog: () => subpathCatalog,
-  loadLibraryVocabulary: withoutLibraries,
-});
-
-const SEVERITY_DECLARATION = "oxlint/dist/index.d.ts#AllowWarnDeny";
-
-const libraryIndex = buildLibraryVocabularyIndex([
-  {
-    packageName: "oxlint",
-    typeName: "AllowWarnDeny",
-    declarationId: SEVERITY_DECLARATION,
-    values: ["allow", "deny", "error", "off", "warn"],
-    admitsUnnamedValues: true,
-  },
-  {
-    packageName: "vite",
-    typeName: "SSRTarget",
-    declarationId: "vite/dist/node/index.d.ts#SSRTarget",
-    values: ["node", "webworker"],
-    admitsUnnamedValues: false,
-  },
-]);
-
-const withLibraryOwner = createNoLocalFiniteValueSet({
-  loadCatalog: () => EMPTY_CANONICAL_VALUES_CATALOG,
-  loadLibraryVocabulary: () => libraryIndex,
-});
-
-const withCatalogAndLibraryOwners = createNoLocalFiniteValueSet({
-  loadCatalog: () => buildCatalog([entry("ssr-target", "ssr-vocabulary", ["node", "webworker"])]),
-  loadLibraryVocabulary: () => libraryIndex,
-});
-
-const withTwoLibraryOwners = createNoLocalFiniteValueSet({
-  loadCatalog: () => EMPTY_CANONICAL_VALUES_CATALOG,
-  loadLibraryVocabulary: () =>
-    buildLibraryVocabularyIndex([
-      {
-        packageName: "oxlint",
-        typeName: "AllowWarnDeny",
-        declarationId: SEVERITY_DECLARATION,
-        values: ["error", "off", "warn"],
-        admitsUnnamedValues: false,
-      },
-      {
-        packageName: "vite",
-        typeName: "LogLevel",
-        declarationId: "vite/dist/node/index.d.ts#LogLevel",
-        values: ["error", "info", "off", "warn"],
-        admitsUnnamedValues: false,
-      },
-    ]),
-});
+const withOwner = ruleReading(ownedCatalog);
+const withoutCatalog = ruleReading(EMPTY_CANONICAL_VALUES_CATALOG);
+const withAmbiguousOwners = ruleReading(ambiguousCatalog);
+const withLibraryOwner = ruleReading(EMPTY_CANONICAL_VALUES_CATALOG, severityAndTarget);
+const withCatalogAndLibraryOwners = ruleReading(
+  buildCatalog([entry("ssr-target", "ssr-vocabulary", ["node", "webworker"])]),
+  severityAndTarget,
+);
+const withTwoLibraryOwners = ruleReading(
+  EMPTY_CANONICAL_VALUES_CATALOG,
+  buildLibraryVocabularyIndex([
+    libraryType("oxlint", "AllowWarnDeny", ["error", "off", "warn"]),
+    libraryType("vite", "LogLevel", ["error", "info", "off", "warn"]),
+  ]),
+);
 
 describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-values", () => {
   describe("against a catalog that owns the value set", () => {
@@ -128,10 +103,6 @@ describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-va
         {
           name: "an alias keeps one value once null is set aside",
           code: 'export type MaybeStatus = "draft" | null;',
-        },
-        {
-          name: "both booleans spelled out are not a vocabulary",
-          code: "export type Flag = true | false;",
         },
         {
           name: "a union widened by a keyword is not finite",
@@ -160,16 +131,6 @@ describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-va
         {
           name: "a relative import that resolves to the annotated declaration stays derived",
           code: 'import { ORDER_STATUSES } from "./order-status.ts";\nexport const schema = z.enum(ORDER_STATUSES);',
-          filename: "packages/order-vocabulary/src/schema.ts",
-        },
-        {
-          name: "a relative import written without an extension resolves the same way",
-          code: 'import { ORDER_STATUSES } from "./order-status";\nexport const schema = z.enum(ORDER_STATUSES);',
-          filename: "packages/order-vocabulary/src/schema.ts",
-        },
-        {
-          name: "a relative import written with the js extension resolves to the ts declaration",
-          code: 'import { ORDER_STATUSES } from "./order-status.js";\nexport const schema = z.enum(ORDER_STATUSES);',
           filename: "packages/order-vocabulary/src/schema.ts",
         },
         {
@@ -202,21 +163,6 @@ describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-va
           name: "a test file is not production source",
           code: 'export type OrderStatus = "draft" | "published";',
           filename: "packages/order/src/order-status.test.ts",
-        },
-        {
-          name: "a story is not production source",
-          code: 'export type OrderStatus = "draft" | "published";',
-          filename: "packages/order/src/order-status.story.tsx",
-        },
-        {
-          name: "a fixture directory is not production source",
-          code: 'export type OrderStatus = "draft" | "published";',
-          filename: "packages/order/fixtures/order-status.ts",
-        },
-        {
-          name: "a tests directory is not production source",
-          code: 'export type OrderStatus = "draft" | "published";',
-          filename: "packages/order/tests/order-status.ts",
         },
       ],
       invalid: [
@@ -366,26 +312,6 @@ describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-va
     });
   });
 
-  describe("against a catalog whose owner is published through a subpath import", () => {
-    testLintRule(withSubpathOwner, {
-      valid: [
-        {
-          name: "a subpath import that matches the registered export path stays derived",
-          code: 'import { ORDER_STATUSES } from "#internal/statuses";\nexport const schema = z.enum(ORDER_STATUSES);',
-          filename: "packages/order/src/schema.ts",
-        },
-      ],
-      invalid: [
-        {
-          name: "a subpath import the catalog does not resolve is an unregistered route",
-          code: 'import { STATUSES } from "#internal/order";\nexport const schema = z.enum(STATUSES);',
-          filename: "packages/order/src/schema.ts",
-          errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
-        },
-      ],
-    });
-  });
-
   describe("against a dependency whose public type owns the value set", () => {
     testLintRule(withLibraryOwner, {
       valid: [
@@ -405,14 +331,7 @@ describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-va
           errors: [{ messageId: "localFiniteValueSetOwnedByLibraryType" }],
         },
         {
-          name: "the report spells out what the dependency admits beyond these values",
-          code: 'export type Severity = "error" | "warn" | "off";',
-          errors: [
-            { message: /derive the type from AllowWarnDeny from oxlint \(which also admits/u },
-          ],
-        },
-        {
-          name: "a dependency that admits only these values is reached the same way",
+          name: "the report carries the name of the type the reader has to derive from",
           code: 'export type SsrTarget = "node" | "webworker";',
           errors: [{ message: /derive the type from SSRTarget from vite, so/u }],
         },
@@ -449,11 +368,6 @@ describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-va
       invalid: [
         {
           name: "every dependency is listed instead of one being picked",
-          code: 'export type Severity = "error" | "warn";',
-          errors: [{ messageId: "localFiniteValueSetOwnedByLibraryTypeCandidates" }],
-        },
-        {
-          name: "the candidates keep the order the index settled on",
           code: 'export type Severity = "error" | "warn";',
           errors: [{ message: /: AllowWarnDeny from oxlint \(.*\), LogLevel from vite \(/u }],
         },

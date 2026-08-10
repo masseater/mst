@@ -1,9 +1,8 @@
 import { resolve } from "node:path";
 
-import { containsCanonicalValuesAnnotation } from "./annotation.ts";
+import { readAnnotatedSources } from "./annotated-sources.ts";
 import { buildCatalog } from "./catalog.ts";
-import { scanCanonicalValuesText } from "./declarations.ts";
-import { listRepositoryFiles, readTextFile } from "./source-files.ts";
+import { listRepositoryFiles } from "./source-files.ts";
 
 import type { CanonicalValuesEntry } from "./catalog.ts";
 import type { CanonicalValuesTextProblem } from "./declarations.ts";
@@ -23,37 +22,26 @@ export type CanonicalValuesProblem =
 export const verifyCanonicalValues = (options: {
   readonly repositoryRoot: string;
 }): readonly CanonicalValuesProblem[] => {
-  const { commentSources, declarationSources } = listRepositoryFiles(
-    resolve(options.repositoryRoot),
-  );
-  const declaringPaths = new Set(declarationSources.map((file) => file.absolutePath));
-
   const problems: CanonicalValuesProblem[] = [];
   const declaredBy = new Map<string, { readonly filePath: string; readonly line: number }>();
 
-  for (const file of commentSources) {
-    const sourceText = readTextFile(file.absolutePath);
-    if (sourceText === null) continue;
-    if (!containsCanonicalValuesAnnotation(sourceText)) continue;
-
-    const scanned = scanCanonicalValuesText(sourceText);
-    for (const problem of scanned.problems) {
-      problems.push({ ...problem, filePath: file.relativePath });
+  for (const source of readAnnotatedSources(listRepositoryFiles(resolve(options.repositoryRoot)))) {
+    for (const problem of source.problems) {
+      problems.push({ ...problem, filePath: source.relativePath });
     }
-    if (!declaringPaths.has(file.absolutePath)) continue;
 
-    for (const declaration of scanned.declarations) {
+    for (const declaration of source.declarations) {
       const declared = declaredBy.get(declaration.conceptId);
       if (declared === undefined) {
         declaredBy.set(declaration.conceptId, {
-          filePath: file.relativePath,
+          filePath: source.relativePath,
           line: declaration.line,
         });
         continue;
       }
       problems.push({
         kind: "duplicate-concept",
-        filePath: file.relativePath,
+        filePath: source.relativePath,
         line: declaration.line,
         conceptId: declaration.conceptId,
         declaredFilePath: declared.filePath,

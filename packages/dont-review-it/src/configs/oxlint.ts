@@ -13,10 +13,18 @@ import { noLocalFiniteValueSet, noStrictCanonicalLiteralUse } from "../plugin.ts
 
 const PLUGIN_NAME = "dont-review-it";
 
-const MAX_LINES_PER_FILE = 500;
+const MAX_LINES_PER_FILE = 400;
+
+const TOOL_REQUIRED_DEFAULT_EXPORT_FILES = ["**/plugin.ts", "**/vite.config.ts"];
 
 export const oxlint = defineConfig({
   jsPlugins: [{ name: PLUGIN_NAME, specifier: "@mst/dont-review-it/plugin" }],
+  overrides: [
+    {
+      files: TOOL_REQUIRED_DEFAULT_EXPORT_FILES,
+      rules: { [`${PLUGIN_NAME}/${noDefaultExport.name}`]: LINT_SEVERITY.OFF },
+    },
+  ],
   rules: {
     [`${PLUGIN_NAME}/${forbidOversizedFile.name}`]: [
       LINT_SEVERITY.ERROR,

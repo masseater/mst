@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { testLintRule } from "@mst/lint-rule-authoring";
-import { afterAll, describe } from "vite-plus/test";
+import { afterAll, describe, expect, test } from "vite-plus/test";
 
 import { noDetachedTestFile } from "./no-detached-test-file--move-beside-source.ts";
 
@@ -17,10 +17,19 @@ const writeSourceFixture = (name: string): string => {
   return path;
 };
 
+mkdirSync(fixturePath("isolated-tests"));
+mkdirSync(fixturePath("e2e"));
+mkdirSync(fixturePath("tests"));
+mkdirSync(fixturePath("spec"));
+mkdirSync(fixturePath("spec/nested"), { recursive: true });
+
 writeSourceFixture("beside-source.ts");
 writeSourceFixture("component.tsx");
 writeSourceFixture("widget.ts");
-mkdirSync(fixturePath("isolated-tests"));
+writeSourceFixture("scenario.ts");
+writeSourceFixture("renamed.ts");
+writeSourceFixture("tests/co-located.ts");
+writeSourceFixture("spec/nested/buried.ts");
 
 const rememberedSourcePath = writeSourceFixture("remembered.ts");
 
@@ -42,6 +51,11 @@ describe("dont-review-it/no-detached-test-file--move-beside-source", () => {
         filename: fixturePath("component.test.tsx"),
       },
       {
+        name: "the spec suffix is part of the vocabulary the runner already picks up",
+        code: "export const total = 1;",
+        filename: fixturePath("scenario.spec.ts"),
+      },
+      {
         name: "a file that is not a test file is never looked up",
         code: "export const total = 1;",
         filename: fixturePath("plain.ts"),
@@ -52,9 +66,21 @@ describe("dont-review-it/no-detached-test-file--move-beside-source", () => {
         filename: fixturePath("contest.ts"),
       },
       {
-        name: "a test file outside ts and tsx is out of scope",
+        name: "a test file outside the vocabulary is not recognised as a test",
         code: "const total = 1;",
         filename: fixturePath("legacy.test.js"),
+      },
+      {
+        name: "a suffix from the deployment is added to the vocabulary rather than replacing it",
+        code: "export const total = 1;",
+        filename: fixturePath("beside-source.test.ts"),
+        options: [{ testFileSuffixes: ["-test.ts"] }],
+      },
+      {
+        name: "a path the deployment exempts is left out of the invariant",
+        code: "export const total = 1;",
+        filename: join(fixtureDir, "e2e", "checkout-journey.test.ts"),
+        options: [{ exemptPaths: ["e2e"] }],
       },
       {
         name: "the source beside a test file is looked up on disk",
@@ -75,20 +101,106 @@ describe("dont-review-it/no-detached-test-file--move-beside-source", () => {
         name: "a test file whose source is not beside it is reported",
         code: "export const total = 1;",
         filename: fixturePath("vanished.test.ts"),
-        errors: [{ messageId: "detachedTestFile" }],
+        errors: [
+          {
+            messageId: "detachedTestFile",
+            data: { sourcePath: fixturePath("vanished.ts") },
+          },
+        ],
       },
       {
         name: "a test file parked in an isolation directory is reported",
         code: "export const total = 1;",
         filename: join(fixtureDir, "isolated-tests", "orphan.test.ts"),
-        errors: [{ messageId: "detachedTestFile" }],
+        errors: [
+          {
+            messageId: "detachedTestFile",
+            data: { sourcePath: join(fixtureDir, "isolated-tests", "orphan.ts") },
+          },
+        ],
       },
       {
         name: "a tsx test file is not answered by a ts source of the same name",
         code: "export const total = 1;",
         filename: fixturePath("widget.test.tsx"),
-        errors: [{ messageId: "detachedTestFile" }],
+        errors: [
+          {
+            messageId: "detachedTestFile",
+            data: { sourcePath: fixturePath("widget.tsx") },
+          },
+        ],
+      },
+      {
+        name: "a spec file whose source is not beside it is reported",
+        code: "export const total = 1;",
+        filename: fixturePath("absent.spec.tsx"),
+        errors: [
+          {
+            messageId: "detachedTestFile",
+            data: { sourcePath: fixturePath("absent.tsx") },
+          },
+        ],
+      },
+      {
+        name: "a suffix the deployment added is recognised, and the extension it carries names the source",
+        code: "export const total = 1;",
+        filename: fixturePath("gone-test.ts"),
+        options: [{ testFileSuffixes: ["-test.ts"] }],
+        errors: [
+          {
+            messageId: "detachedTestFile",
+            data: { sourcePath: fixturePath("gone.ts") },
+          },
+        ],
+      },
+      {
+        name: "an exempt entry has to cover whole segments, not the start of one",
+        code: "export const total = 1;",
+        filename: join(fixtureDir, "e2e", "checkout-journey.test.ts"),
+        options: [{ exemptPaths: ["e2"] }],
+        errors: [
+          {
+            messageId: "detachedTestFile",
+            data: { sourcePath: join(fixtureDir, "e2e", "checkout-journey.ts") },
+          },
+        ],
+      },
+      {
+        name: "a source moved into the test tree to satisfy the pairing is reported on its own message",
+        code: "export const total = 1;",
+        filename: join(fixtureDir, "tests", "co-located.test.ts"),
+        errors: [{ messageId: "testOnlyDirectory", data: { directory: "tests" } }],
+      },
+      {
+        name: "a test only directory is found anywhere on the path, not only directly above the file",
+        code: "export const total = 1;",
+        filename: join(fixtureDir, "spec", "nested", "buried.test.ts"),
+        errors: [{ messageId: "testOnlyDirectory", data: { directory: "spec" } }],
+      },
+      {
+        name: "a test with no source in a test only directory is reported once, on the missing source",
+        code: "export const total = 1;",
+        filename: join(fixtureDir, "tests", "abandoned.test.ts"),
+        errors: [
+          {
+            messageId: "detachedTestFile",
+            data: { sourcePath: join(fixtureDir, "tests", "abandoned.ts") },
+          },
+        ],
       },
     ],
+  });
+
+  test("the options schema declares the vocabulary and the exemptions, and refuses any other key", () => {
+    expect(noDetachedTestFile.meta.schema).toStrictEqual([
+      {
+        type: "object",
+        properties: {
+          testFileSuffixes: { type: "array", items: { type: "string" } },
+          exemptPaths: { type: "array", items: { type: "string" } },
+        },
+        additionalProperties: false,
+      },
+    ]);
   });
 });
