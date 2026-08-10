@@ -22,6 +22,7 @@ import { noReassign } from "../lint/oxlint/rules/no-reassign--use-spread-or-iife
 import { noStandaloneTsconfig } from "../lint/oxlint/rules/no-standalone-tsconfig--extend-shared-preset.ts";
 import { noTautologicalAssertion } from "../lint/oxlint/rules/no-tautological-assertion--assert-on-a-computed-value.ts";
 import { noUnorderedImport } from "../lint/oxlint/rules/no-unordered-import--group-by-origin-then-sort-by-specifier.ts";
+import { noUnwrappedToolchainConfig } from "../lint/oxlint/rules/no-unwrapped-toolchain-config--wrap-with-git-excludes.ts";
 import { requireReExportOnlyFiles } from "../lint/oxlint/rules/require-re-export-only-files--move-declaration-to-owning-module.ts";
 import { noDuplicatedBody, noLocalFiniteValueSet, noStrictCanonicalLiteralUse } from "../plugin.ts";
 import { UPSTREAM_PLUGINS, UPSTREAM_RULES, UPSTREAM_TEST_RULES } from "./upstream-rules.ts";
@@ -105,6 +106,7 @@ export const oxlint: OxlintConfig = defineConfig({
     [`${PLUGIN_NAME}/${noStrictCanonicalLiteralUse.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noTautologicalAssertion.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noUnorderedImport.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noUnwrappedToolchainConfig.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${requireReExportOnlyFiles.name}`]: [
       LINT_SEVERITY.ERROR,
       { targets: [...RE_EXPORT_ONLY_FILES] },
