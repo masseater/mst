@@ -11,6 +11,7 @@ import { noDetachedTestFile } from "../lint/oxlint/rules/no-detached-test-file--
 import { noDoubleTypeAssertion } from "../lint/oxlint/rules/no-double-type-assertion--declare-the-real-type.ts";
 import { noExplanatoryComment } from "../lint/oxlint/rules/no-explanatory-comment--delete-or-move-to-commit-message.ts";
 import { noIdentityWrapper } from "../lint/oxlint/rules/no-identity-wrapper--call-the-target-directly.ts";
+import { noLenientCoverageThreshold } from "../lint/oxlint/rules/no-lenient-coverage-threshold--demand-full-coverage.ts";
 import { noLoggedAndContinuedFailure } from "../lint/oxlint/rules/no-logged-and-continued-failure--stop-or-recover.ts";
 import { noPromiseChain } from "../lint/oxlint/rules/no-promise-chain--use-async-await.ts";
 import { noReassign } from "../lint/oxlint/rules/no-reassign--use-spread-or-iife.ts";
@@ -61,6 +62,7 @@ export const oxlint = defineConfig({
     [`${PLUGIN_NAME}/${noDuplicatedBody.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noExplanatoryComment.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noIdentityWrapper.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noLenientCoverageThreshold.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noLocalFiniteValueSet.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noLoggedAndContinuedFailure.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noPromiseChain.name}`]: LINT_SEVERITY.ERROR,

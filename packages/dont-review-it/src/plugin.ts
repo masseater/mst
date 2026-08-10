@@ -12,6 +12,7 @@ import { createNoDuplicatedBody } from "./lint/oxlint/rules/no-duplicated-body--
 import { noExplanatoryComment } from "./lint/oxlint/rules/no-explanatory-comment--delete-or-move-to-commit-message.ts";
 import { noIdentityWrapper } from "./lint/oxlint/rules/no-identity-wrapper--call-the-target-directly.ts";
 import { createNoLocalFiniteValueSet } from "./lint/oxlint/rules/no-local-finite-value-set--use-or-register-canonical-values.ts";
+import { noLenientCoverageThreshold } from "./lint/oxlint/rules/no-lenient-coverage-threshold--demand-full-coverage.ts";
 import { noLoggedAndContinuedFailure } from "./lint/oxlint/rules/no-logged-and-continued-failure--stop-or-recover.ts";
 import { noPromiseChain } from "./lint/oxlint/rules/no-promise-chain--use-async-await.ts";
 import { noReassign } from "./lint/oxlint/rules/no-reassign--use-spread-or-iife.ts";
@@ -46,6 +47,7 @@ const plugin: Plugin = {
     [noDuplicatedBody.name]: noDuplicatedBody,
     [noExplanatoryComment.name]: noExplanatoryComment,
     [noIdentityWrapper.name]: noIdentityWrapper,
+    [noLenientCoverageThreshold.name]: noLenientCoverageThreshold,
     [noLocalFiniteValueSet.name]: noLocalFiniteValueSet,
     [noLoggedAndContinuedFailure.name]: noLoggedAndContinuedFailure,
     [noPromiseChain.name]: noPromiseChain,

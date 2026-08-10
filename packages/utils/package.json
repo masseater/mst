@@ -34,6 +34,7 @@
   "devDependencies": {
     "@mst/dont-review-it": "workspace:*",
     "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
     "bumpp": "^11.1.0",
     "typescript": "catalog:",
     "vite": "catalog:",

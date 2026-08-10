@@ -17,6 +17,7 @@
     "@mst/dont-review-it": "workspace:*",
     "@mst/lint-rule-authoring": "workspace:*",
     "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
     "knip": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"

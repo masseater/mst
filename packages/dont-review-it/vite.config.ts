@@ -1,6 +1,11 @@
 import { defineConfig } from "vite-plus";
 
 export default defineConfig({
+  test: {
+    coverage: {
+      thresholds: { 100: true },
+    },
+  },
   pack: {
     entry: ["src/cli.ts", "src/index.ts", "src/plugin.ts"],
     dts: {
