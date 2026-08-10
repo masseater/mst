@@ -1,6 +1,7 @@
 import { loadCanonicalValuesCatalog } from "./lint/oxlint/lib/canonical-values/builder.ts";
 import { loadRepositoryBodyIndex } from "./lint/oxlint/lib/duplicated-bodies/builder.ts";
 import { loadLibraryVocabulary } from "./lint/oxlint/lib/library-vocabulary/harvester.ts";
+import { loadStyleClassIndex } from "./lint/oxlint/lib/style-classes/builder.ts";
 import { forbidNumberedSiblingFile } from "./lint/oxlint/rules/forbid-numbered-sibling-file--name-what-each-file-owns.ts";
 import { forbidOversizedFile } from "./lint/oxlint/rules/forbid-oversized-file--split-by-responsibility.ts";
 import { noAmbiguousVariableName } from "./lint/oxlint/rules/no-ambiguous-variable-name--rename-to-concrete-noun.ts";
@@ -27,6 +28,7 @@ import { createNoStrictCanonicalLiteralUseRule } from "./lint/oxlint/rules/no-st
 import { noTautologicalAssertion } from "./lint/oxlint/rules/no-tautological-assertion--assert-on-a-computed-value.ts";
 import { createNoTwinDeclaration } from "./lint/oxlint/rules/no-twin-declaration--merge-into-one-owner.ts";
 import { noUnorderedImport } from "./lint/oxlint/rules/no-unordered-import--group-by-origin-then-sort-by-specifier.ts";
+import { createNoUnusedStyleClass } from "./lint/oxlint/rules/no-unused-style-class--delete-or-reference-it.ts";
 import { noUnwrappedToolchainConfig } from "./lint/oxlint/rules/no-unwrapped-toolchain-config--wrap-with-git-excludes.ts";
 import { requireReExportOnlyFiles } from "./lint/oxlint/rules/require-re-export-only-files--move-declaration-to-owning-module.ts";
 
@@ -44,6 +46,8 @@ export const noStrictCanonicalLiteralUse = createNoStrictCanonicalLiteralUseRule
 export const noDuplicatedBody = createNoDuplicatedBody({ loadIndex: loadRepositoryBodyIndex });
 
 export const noTwinDeclaration = createNoTwinDeclaration({ loadIndex: loadRepositoryBodyIndex });
+
+export const noUnusedStyleClass = createNoUnusedStyleClass({ loadIndex: loadStyleClassIndex });
 
 const plugin: Plugin = {
   meta: { name: "dont-review-it" },
@@ -74,6 +78,7 @@ const plugin: Plugin = {
     [noTautologicalAssertion.name]: noTautologicalAssertion,
     [noTwinDeclaration.name]: noTwinDeclaration,
     [noUnorderedImport.name]: noUnorderedImport,
+    [noUnusedStyleClass.name]: noUnusedStyleClass,
     [noUnwrappedToolchainConfig.name]: noUnwrappedToolchainConfig,
     [requireReExportOnlyFiles.name]: requireReExportOnlyFiles,
   },
