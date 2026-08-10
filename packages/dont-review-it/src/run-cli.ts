@@ -41,6 +41,26 @@ const EQUIVALENT_CONCEPTS_COMMAND = "equivalent-concepts";
 const asLines = (entries: readonly string[]): string =>
   entries.map((entry) => `${entry}\n`).join("");
 
+const verified = (repositoryRoot: string): CliResult => {
+  const problems = verifyCanonicalValues({ repositoryRoot });
+  return {
+    exitCode: problems.length === 0 ? EXIT_SUCCESS : EXIT_PROBLEMS_FOUND,
+    out: asLines(problems.map((problem) => formatCanonicalValuesProblem(problem))),
+    error: "",
+  };
+};
+
+const equivalentConcepts = (repositoryRoot: string): CliResult => {
+  const catalog = buildCanonicalValuesCatalog({ repositoryRoot });
+  return {
+    exitCode: EXIT_SUCCESS,
+    out: asLines(
+      findEquivalentConcepts(catalog.entries).map((group) => formatEquivalentConceptGroup(group)),
+    ),
+    error: "",
+  };
+};
+
 const dispatch = (argv: readonly string[]): CliResult => {
   const parsed = parseArgs({
     args: [...argv],
@@ -61,23 +81,7 @@ const dispatch = (argv: readonly string[]): CliResult => {
     };
   }
 
-  if (command === VERIFY_COMMAND) {
-    const problems = verifyCanonicalValues({ repositoryRoot });
-    return {
-      exitCode: problems.length === 0 ? EXIT_SUCCESS : EXIT_PROBLEMS_FOUND,
-      out: asLines(problems.map((problem) => formatCanonicalValuesProblem(problem))),
-      error: "",
-    };
-  }
-
-  const catalog = buildCanonicalValuesCatalog({ repositoryRoot });
-  return {
-    exitCode: EXIT_SUCCESS,
-    out: asLines(
-      findEquivalentConcepts(catalog.entries).map((group) => formatEquivalentConceptGroup(group)),
-    ),
-    error: "",
-  };
+  return command === VERIFY_COMMAND ? verified(repositoryRoot) : equivalentConcepts(repositoryRoot);
 };
 
 export const runDontReviewIt = (argv: readonly string[]): CliResult => {

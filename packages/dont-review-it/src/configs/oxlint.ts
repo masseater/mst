@@ -62,7 +62,11 @@ export const oxlint = defineConfig({
     ],
     [`${PLUGIN_NAME}/${noStrictCanonicalLiteralUse.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${requireReExportOnlyFiles.name}`]: LINT_SEVERITY.ERROR,
+    complexity: [LINT_SEVERITY.ERROR, { max: 10 }],
+    "max-classes-per-file": [LINT_SEVERITY.ERROR, { max: 1 }],
     "max-depth": [LINT_SEVERITY.ERROR, { max: 4 }],
+    "max-nested-callbacks": [LINT_SEVERITY.ERROR, { max: 2 }],
+    "max-statements": [LINT_SEVERITY.ERROR, { max: 10 }],
     "max-lines-per-function": [
       LINT_SEVERITY.ERROR,
       { max: 200, skipBlankLines: true, skipComments: true },

@@ -66,6 +66,18 @@ const vocabulariesExportedBy = (
     .filter((entry) => entry !== null);
 };
 
+const harvestedFrom = (
+  api: API,
+  typeEntries: readonly DependencyTypeEntry[],
+): LibraryVocabularyIndex => {
+  const snapshot = api.updateSnapshot({
+    openFiles: typeEntries.map((entry) => entry.declarationsPath),
+  });
+  return buildLibraryVocabularyIndex(
+    typeEntries.flatMap((entry) => vocabulariesExportedBy(snapshot, entry)),
+  );
+};
+
 const harvestLibraryVocabulary = memoize((packageDirectory: string): LibraryVocabularyIndex => {
   const typeEntries = dependencyTypeEntries(packageDirectory);
   if (typeEntries.length === 0) return EMPTY_LIBRARY_VOCABULARY_INDEX;
@@ -73,14 +85,7 @@ const harvestLibraryVocabulary = memoize((packageDirectory: string): LibraryVoca
   const [, api] = attempt(() => new API({ cwd: packageDirectory }));
   if (api === null) return EMPTY_LIBRARY_VOCABULARY_INDEX;
 
-  const [, harvested] = attempt(() => {
-    const snapshot = api.updateSnapshot({
-      openFiles: typeEntries.map((entry) => entry.declarationsPath),
-    });
-    return buildLibraryVocabularyIndex(
-      typeEntries.flatMap((entry) => vocabulariesExportedBy(snapshot, entry)),
-    );
-  });
+  const [, harvested] = attempt(() => harvestedFrom(api, typeEntries));
   api.close();
 
   return harvested ?? EMPTY_LIBRARY_VOCABULARY_INDEX;

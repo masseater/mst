@@ -56,6 +56,32 @@ const containsSegmentRun = (
     runSegments.every((segment, offset) => pathSegments[index + offset] === segment),
   );
 
+type DetachedTestFinding = {
+  readonly messageId: "detachedTestFile" | "testOnlyDirectory";
+  readonly data: Readonly<Record<string, string>>;
+};
+
+const isExemptPath = (pathSegments: readonly string[], exemptPaths: readonly string[]): boolean =>
+  exemptPaths.some((entry) => containsSegmentRun(pathSegments, segmentsOf(entry, "/")));
+
+const findingFor = (
+  testPath: string,
+  suffixes: readonly string[],
+  exemptPaths: readonly string[],
+): DetachedTestFinding | null => {
+  const suffix = longestMatchingSuffix(testPath, suffixes);
+  const pathSegments = segmentsOf(testPath, sep);
+  if (suffix === null || isExemptPath(pathSegments, exemptPaths)) return null;
+
+  const sourcePath = sourcePathFor(testPath, suffix);
+  if (!pathExists(sourcePath)) return { messageId: "detachedTestFile", data: { sourcePath } };
+
+  const directory = pathSegments
+    .slice(0, -1)
+    .find((segment) => TEST_ONLY_DIRECTORY_NAMES.has(segment));
+  return directory === undefined ? null : { messageId: "testOnlyDirectory", data: { directory } };
+};
+
 export const noDetachedTestFile = createDontReviewItRule({
   name: "no-detached-test-file--move-beside-source",
   meta: {
@@ -91,26 +117,9 @@ export const noDetachedTestFile = createDontReviewItRule({
 
     return {
       Program(node: ESTree.Program) {
-        const testPath = resolve(context.cwd, context.filename);
-        const suffix = longestMatchingSuffix(testPath, suffixes);
-        if (suffix === null) return;
-
-        const pathSegments = segmentsOf(testPath, sep);
-        if (exemptPaths.some((entry) => containsSegmentRun(pathSegments, segmentsOf(entry, "/")))) {
-          return;
-        }
-
-        const sourcePath = sourcePathFor(testPath, suffix);
-        if (!pathExists(sourcePath)) {
-          context.report({ node, messageId: "detachedTestFile", data: { sourcePath } });
-          return;
-        }
-
-        const directory = pathSegments
-          .slice(0, -1)
-          .find((segment) => TEST_ONLY_DIRECTORY_NAMES.has(segment));
-        if (directory === undefined) return;
-        context.report({ node, messageId: "testOnlyDirectory", data: { directory } });
+        const finding = findingFor(resolve(context.cwd, context.filename), suffixes, exemptPaths);
+        if (finding === null) return;
+        context.report({ node, messageId: finding.messageId, data: finding.data });
       },
     };
   },

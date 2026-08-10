@@ -153,14 +153,12 @@ const isArrayProducingCall = (
   );
 };
 
-const isArrayLikeExpression = (
+const isArrayLikeThroughWrapper = (
   node: ESTree.Expression,
   scopeAt: ScopeLookup,
   seenBindings: ReadonlySet<Variable>,
-): boolean => {
+): boolean | null => {
   switch (node.type) {
-    case "ArrayExpression":
-      return true;
     case "ChainExpression":
     case "ParenthesizedExpression":
     case "TSNonNullExpression":
@@ -172,6 +170,22 @@ const isArrayLikeExpression = (
         isArrayLikeType(node.typeAnnotation, new Set()) ||
         isArrayLikeExpression(node.expression, scopeAt, seenBindings)
       );
+    default:
+      return null;
+  }
+};
+
+const isArrayLikeExpression = (
+  node: ESTree.Expression,
+  scopeAt: ScopeLookup,
+  seenBindings: ReadonlySet<Variable>,
+): boolean => {
+  const throughWrapper = isArrayLikeThroughWrapper(node, scopeAt, seenBindings);
+  if (throughWrapper !== null) return throughWrapper;
+
+  switch (node.type) {
+    case "ArrayExpression":
+      return true;
     case "NewExpression":
       return isArrayGlobalReference(node.callee);
     case "CallExpression":
