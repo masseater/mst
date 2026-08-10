@@ -28,7 +28,7 @@ export const STATUSES = ["draft"] as const;
 
   test("a source that vanished after the listing is left out instead of stopping the scan", () => {
     const root = repositoryWith({
-      "src/gone.ts": annotated("order.status"),
+      "src/gone.ts": annotated("user.status"),
       "src/kept.ts": annotated("article.status"),
     });
     const listed = listRepositoryFiles(root);
@@ -42,7 +42,7 @@ export const STATUSES = ["draft"] as const;
   test("a source carrying no annotation is left out", () => {
     const root = repositoryWith({
       "src/plain.ts": "export const total = 1;\n",
-      "src/annotated.ts": annotated("order.status"),
+      "src/annotated.ts": annotated("user.status"),
     });
 
     expect(
@@ -52,7 +52,7 @@ export const STATUSES = ["draft"] as const;
 
   test("a test file carries its problems but declares no concept", () => {
     const root = repositoryWith({
-      "src/order.test.ts": annotated("order.status"),
+      "src/user.test.ts": annotated("user.status"),
     });
 
     expect(

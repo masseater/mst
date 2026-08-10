@@ -30,25 +30,25 @@ describe("buildExportSpecifierIndex", () => {
 
   test("a package that names its root export reaches the file behind it", () => {
     const root = packageWith({
-      "package.json": manifest({ name: "@mst/order", exports: { ".": "./src/index.ts" } }),
+      "package.json": manifest({ name: "@mst/user", exports: { ".": "./src/index.ts" } }),
       "src/index.ts": "export const total = 1;\n",
     });
 
-    expect(specifiersIn(root)).toStrictEqual([["src/index.ts", "@mst/order"]]);
+    expect(specifiersIn(root)).toStrictEqual([["src/index.ts", "@mst/user"]]);
   });
 
   test("a subpath export carries the specifier that names it", () => {
     const root = packageWith({
-      "package.json": manifest({ name: "@mst/order", exports: { "./plugin": "./src/plugin.ts" } }),
+      "package.json": manifest({ name: "@mst/user", exports: { "./plugin": "./src/plugin.ts" } }),
       "src/plugin.ts": "export const total = 1;\n",
     });
 
-    expect(specifiersIn(root)).toStrictEqual([["src/plugin.ts", "@mst/order/plugin"]]);
+    expect(specifiersIn(root)).toStrictEqual([["src/plugin.ts", "@mst/user/plugin"]]);
   });
 
   test("a re-export chain carries the specifier to every file it reaches", () => {
     const root = packageWith({
-      "package.json": manifest({ name: "@mst/order", exports: "./src/index.ts" }),
+      "package.json": manifest({ name: "@mst/user", exports: "./src/index.ts" }),
       "src/index.ts": 'export * from "./status.ts";\nexport type { Draft } from "./draft.js";\n',
       "src/status.ts": 'export { STATUSES } from "./vocabulary/index.ts";\n',
       "src/draft.ts": "export type Draft = { readonly id: string };\n",
@@ -65,17 +65,17 @@ describe("buildExportSpecifierIndex", () => {
 
   test("a re-export that names a file which is not there reaches nothing further", () => {
     const root = packageWith({
-      "package.json": manifest({ name: "@mst/order", exports: "./src/index.ts" }),
+      "package.json": manifest({ name: "@mst/user", exports: "./src/index.ts" }),
       "src/index.ts": 'export * from "./missing.ts";\nexport * from "node:path";\n',
     });
 
-    expect(specifiersIn(root)).toStrictEqual([["src/index.ts", "@mst/order"]]);
+    expect(specifiersIn(root)).toStrictEqual([["src/index.ts", "@mst/user"]]);
   });
 
   test("a file re-exported from two places keeps the specifier that reached it first", () => {
     const root = packageWith({
       "package.json": manifest({
-        name: "@mst/order",
+        name: "@mst/user",
         exports: { ".": "./src/index.ts", "./plugin": "./src/plugin.ts" },
       }),
       "src/index.ts": 'export * from "./shared.ts";\n',
@@ -84,16 +84,16 @@ describe("buildExportSpecifierIndex", () => {
     });
 
     expect(specifiersIn(root)).toStrictEqual([
-      ["src/index.ts", "@mst/order"],
-      ["src/shared.ts", "@mst/order"],
-      ["src/plugin.ts", "@mst/order/plugin"],
+      ["src/index.ts", "@mst/user"],
+      ["src/shared.ts", "@mst/user"],
+      ["src/plugin.ts", "@mst/user/plugin"],
     ]);
   });
 
   test("an export map that names conditions reaches the file each of them names", () => {
     const root = packageWith({
       "package.json": manifest({
-        name: "@mst/order",
+        name: "@mst/user",
         exports: {
           ".": { types: "./src/index.d.ts", import: "./src/index.ts", require: "./src/index.ts" },
           "./package.json": "./package.json",
@@ -102,12 +102,12 @@ describe("buildExportSpecifierIndex", () => {
       "src/index.ts": "export const total = 1;\n",
     });
 
-    expect(specifiersIn(root)).toStrictEqual([["src/index.ts", "@mst/order"]]);
+    expect(specifiersIn(root)).toStrictEqual([["src/index.ts", "@mst/user"]]);
   });
 
   test("a re-export cycle is walked once", () => {
     const root = packageWith({
-      "package.json": manifest({ name: "@mst/order", exports: "./src/index.ts" }),
+      "package.json": manifest({ name: "@mst/user", exports: "./src/index.ts" }),
       "src/index.ts": 'export * from "./status.ts";\n',
       "src/status.ts": 'export * from "./index.ts";\n',
     });
@@ -121,7 +121,7 @@ describe("buildExportSpecifierIndex", () => {
   test("a re-export chain deeper than the limit stops there", () => {
     const step = (next: string): string => `export * from "./${next}.ts";\n`;
     const root = packageWith({
-      "package.json": manifest({ name: "@mst/order", exports: "./src/a.ts" }),
+      "package.json": manifest({ name: "@mst/user", exports: "./src/a.ts" }),
       "src/a.ts": step("b"),
       "src/b.ts": step("c"),
       "src/c.ts": step("d"),
@@ -141,16 +141,16 @@ describe("buildExportSpecifierIndex", () => {
 
   test("an entry file the manifest names but the package does not hold reaches only itself", () => {
     const root = packageWith({
-      "package.json": manifest({ name: "@mst/order", exports: "./src/missing.ts" }),
+      "package.json": manifest({ name: "@mst/user", exports: "./src/missing.ts" }),
     });
 
-    expect(specifiersIn(root)).toStrictEqual([["src/missing.ts", "@mst/order"]]);
+    expect(specifiersIn(root)).toStrictEqual([["src/missing.ts", "@mst/user"]]);
   });
 
   test("two conditions that name different files both stand behind the subpath", () => {
     const root = packageWith({
       "package.json": manifest({
-        name: "@mst/order",
+        name: "@mst/user",
         exports: { ".": { import: "./src/modern.ts", require: "./src/legacy.ts" } },
       }),
       "src/modern.ts": "export const total = 1;\n",
@@ -165,7 +165,7 @@ describe("buildExportSpecifierIndex", () => {
 
   test("an export target that does not start with a relative marker is left out", () => {
     const root = packageWith({
-      "package.json": manifest({ name: "@mst/order", exports: { ".": "src/index.ts" } }),
+      "package.json": manifest({ name: "@mst/user", exports: { ".": "src/index.ts" } }),
       "src/index.ts": "export const total = 1;\n",
     });
 
@@ -175,7 +175,7 @@ describe("buildExportSpecifierIndex", () => {
   test("an export map nested deeper than the limit is not followed", () => {
     const root = packageWith({
       "package.json": manifest({
-        name: "@mst/order",
+        name: "@mst/user",
         exports: {
           ".": { a: { b: { c: { d: { e: { f: { g: { h: { i: "./src/index.ts" } } } } } } } } },
         },
@@ -188,7 +188,7 @@ describe("buildExportSpecifierIndex", () => {
 
   test("an export map holding a list is not read as conditions", () => {
     const root = packageWith({
-      "package.json": manifest({ name: "@mst/order", exports: { ".": ["./src/index.ts"] } }),
+      "package.json": manifest({ name: "@mst/user", exports: { ".": ["./src/index.ts"] } }),
       "src/index.ts": "export const total = 1;\n",
     });
 
@@ -196,7 +196,7 @@ describe("buildExportSpecifierIndex", () => {
   });
 
   test("a package that names no export surface reaches nothing", () => {
-    const root = packageWith({ "package.json": manifest({ name: "@mst/order" }) });
+    const root = packageWith({ "package.json": manifest({ name: "@mst/user" }) });
 
     expect(specifiersIn(root)).toStrictEqual([]);
   });
@@ -220,7 +220,7 @@ describe("buildExportSpecifierIndex", () => {
   });
 
   test("a manifest that is not an object reaches nothing", () => {
-    const root = packageWith({ "package.json": '"@mst/order"' });
+    const root = packageWith({ "package.json": '"@mst/user"' });
 
     expect(specifiersIn(root)).toStrictEqual([]);
   });

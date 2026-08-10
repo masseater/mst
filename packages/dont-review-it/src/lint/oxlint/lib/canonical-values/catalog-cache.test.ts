@@ -21,8 +21,8 @@ vi.mock(import("node:fs"), async (importOriginal) => {
 const CACHE_SEGMENTS = ["node_modules", ".cache", "mst-dont-review-it", "canonical-values.json"];
 
 const ENTRY = {
-  conceptId: "order.status",
-  declarationPath: "src/order.ts",
+  conceptId: "user.status",
+  declarationPath: "src/user.ts",
   exportPath: null,
   values: ["draft", "published"],
   fingerprint: "vocabulary",
@@ -149,10 +149,10 @@ describe("catalog-cache", () => {
 
   test("the fingerprint of the inputs changes when a file changes", () => {
     const before = cacheInputFingerprint([
-      { absolutePath: "/repo/src/order.ts", relativePath: "src/order.ts", size: 1, mtimeMs: 1 },
+      { absolutePath: "/repo/src/user.ts", relativePath: "src/user.ts", size: 1, mtimeMs: 1 },
     ]);
     const after = cacheInputFingerprint([
-      { absolutePath: "/repo/src/order.ts", relativePath: "src/order.ts", size: 2, mtimeMs: 1 },
+      { absolutePath: "/repo/src/user.ts", relativePath: "src/user.ts", size: 2, mtimeMs: 1 },
     ]);
 
     expect(before).not.toBe(after);
