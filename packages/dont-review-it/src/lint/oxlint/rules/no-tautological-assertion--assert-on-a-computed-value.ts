@@ -6,15 +6,13 @@ import { staticMemberOf } from "../lib/static-member.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
-type FixedValue = { readonly held: unknown };
-
 const EXPECT_NAME = "expect";
 
 const EQUALITY_MATCHER_NAMES: ReadonlySet<string> = new Set(["toBe", "toEqual", "toStrictEqual"]);
 
 const MODIFIER_NAMES: ReadonlySet<string> = new Set(["not", "resolves", "rejects"]);
 
-const fixedValueOf = (expression: ESTree.Expression): FixedValue | null => {
+const fixedValueOf = (expression: ESTree.Expression): { readonly held: unknown } | null => {
   const written = withoutParentheses(expression);
 
   if (written.type === "Literal") {

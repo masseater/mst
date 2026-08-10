@@ -1,6 +1,7 @@
 import { uniq } from "es-toolkit";
 import { parseSync, type Comment, type ParseResult } from "oxc-parser";
 
+import { NODE_TYPE_FIELD } from "../ast-node.ts";
 import {
   containsCanonicalValuesAnnotation,
   findRetiredAnnotationTags,
@@ -43,8 +44,6 @@ const KEY_FIELD_BY_NODE_TYPE: ReadonlyMap<string, string> = new Map([
   ["TSMethodSignature", "key"],
   ["TSPropertySignature", "key"],
 ]);
-
-const NODE_TYPE_FIELD = "type";
 
 const lineAt = (text: string, offset: number): number => text.slice(0, offset).split("\n").length;
 
@@ -94,19 +93,17 @@ const spelledOutValuesIn = (node: unknown): readonly CanonicalValue[] => {
 const declarationAfter = (program: ParseResult["program"], comment: Comment): unknown =>
   program.body.find((statement) => statement.start >= comment.end) ?? null;
 
-type AnnotatedComment = {
-  readonly program: ParseResult["program"];
-  readonly comment: Comment;
-  readonly annotation: CanonicalValuesAnnotation;
-  readonly line: number;
-};
-
 const scanAnnotatedComment = ({
   program,
   comment,
   annotation,
   line,
-}: AnnotatedComment): CanonicalValuesTextScan => {
+}: {
+  readonly program: ParseResult["program"];
+  readonly comment: Comment;
+  readonly annotation: CanonicalValuesAnnotation;
+  readonly line: number;
+}): CanonicalValuesTextScan => {
   const vocabulary = uniq(spelledOutValuesIn(declarationAfter(program, comment)));
   if (vocabulary.length === 0) {
     return {

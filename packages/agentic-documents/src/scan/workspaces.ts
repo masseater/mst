@@ -1,9 +1,13 @@
-import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 
 import { parse } from "yaml";
 
-import { nonEmptyStringOrNull, readJsonObjectOrNull, readTextOrNull } from "./read-file.ts";
+import {
+  directoryNamesIn,
+  nonEmptyStringOrNull,
+  readJsonObjectOrNull,
+  readTextOrNull,
+} from "./read-file.ts";
 
 export type WorkspaceEntry = {
   readonly directory: string;
@@ -18,15 +22,6 @@ type IncompleteWorkspace = {
 export type WorkspaceCollection = {
   readonly entries: readonly WorkspaceEntry[];
   readonly incomplete: readonly IncompleteWorkspace[];
-};
-
-const directoryNamesIn = async (absolutePath: string): Promise<readonly string[]> => {
-  try {
-    const entries = await readdir(absolutePath, { withFileTypes: true });
-    return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
-  } catch {
-    return [];
-  }
 };
 
 const expandPattern = async ({

@@ -2,15 +2,17 @@ import { join } from "node:path";
 
 import { sortBy } from "es-toolkit";
 
+import {
+  EXPORTS_CONDITION_DEPTH_LIMIT,
+  MANIFEST_FILE_NAME,
+} from "../canonical-values/package-manifest.ts";
 import { readJsonFile } from "../canonical-values/read-json-file.ts";
-import { isFile, MANIFEST_FILE_NAME } from "../canonical-values/source-files.ts";
+import { isFile } from "../canonical-values/source-files.ts";
 
 export type DependencyTypeEntry = {
   readonly packageName: string;
   readonly declarationsPath: string;
 };
-
-const EXPORTS_CONDITION_DEPTH_LIMIT = 8;
 
 const TYPES_CONDITION = "types";
 

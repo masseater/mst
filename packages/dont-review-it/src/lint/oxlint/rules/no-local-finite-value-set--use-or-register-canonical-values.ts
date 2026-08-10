@@ -42,6 +42,7 @@ import type {
   CanonicalValuesEntry,
 } from "../lib/canonical-values/catalog.ts";
 import type { LibraryVocabularyLoader } from "../lib/library-vocabulary/vocabulary-loader.ts";
+import type { RuleMessage } from "../lib/rule-message.ts";
 
 type FileBindings = {
   readonly arrays: ReadonlyMap<string, ESTree.ArrayExpression>;
@@ -92,16 +93,11 @@ const collectFileBindings = (program: ESTree.Program, sourceText: string): FileB
 const describeOwner = (entry: CanonicalValuesEntry): string =>
   `${entry.conceptId} (${entry.exportPath ?? entry.declarationPath})`;
 
-type OwnerReport = {
-  readonly messageId: string;
-  readonly data: Readonly<Record<string, string>>;
-};
-
 const libraryOwnerReport = (input: {
   readonly libraries: ReturnType<typeof libraryOwnersOf>;
   readonly values: readonly CanonicalValue[];
   readonly ownershipPolicy: string;
-}): OwnerReport => {
+}): RuleMessage => {
   const { libraries, values, ownershipPolicy } = input;
   if (libraries.length === 0) {
     return { messageId: "localFiniteValueSetWithoutOwner", data: { ownershipPolicy } };
@@ -125,7 +121,7 @@ const libraryOwnerReport = (input: {
 const catalogOwnerReport = (input: {
   readonly owners: readonly CanonicalValuesEntry[];
   readonly ownershipPolicy: string;
-}): OwnerReport => {
+}): RuleMessage => {
   const { owners, ownershipPolicy } = input;
   const [onlyOwner] = owners;
   if (owners.length === 1 && onlyOwner !== undefined) {
@@ -148,13 +144,6 @@ const firstNonSpreadArgument = (
   return argument;
 };
 
-type FileSources = {
-  readonly repositoryRootOf: () => string;
-  readonly catalogOf: () => CanonicalValuesCatalog;
-  readonly bindingsOf: () => FileBindings;
-  readonly libraryVocabularyOf: () => LibraryVocabularyIndex;
-};
-
 const fileSourcesFor = (input: {
   readonly context: {
     readonly cwd: string;
@@ -163,7 +152,12 @@ const fileSourcesFor = (input: {
   };
   readonly loadCatalog: CanonicalValuesCatalogLoader;
   readonly loadLibraryVocabulary: LibraryVocabularyLoader;
-}): FileSources => {
+}): {
+  readonly repositoryRootOf: () => string;
+  readonly catalogOf: () => CanonicalValuesCatalog;
+  readonly bindingsOf: () => FileBindings;
+  readonly libraryVocabularyOf: () => LibraryVocabularyIndex;
+} => {
   const { context, loadCatalog, loadLibraryVocabulary } = input;
   const repositoryRootOf = memoize((): string => findWorkspaceRoot(context.cwd));
 
@@ -180,17 +174,6 @@ const fileSourcesFor = (input: {
         loadLibraryVocabulary({ filename: context.filename, repositoryRoot: repositoryRootOf() }),
     ),
   };
-};
-
-type VocabularyReport = {
-  readonly node: ESTree.Span;
-  readonly messageId: string;
-  readonly data: Record<string, string>;
-};
-
-type SpelledOutVocabulary = {
-  readonly node: ESTree.Span;
-  readonly values: readonly CanonicalValue[];
 };
 
 type ValuesPosition =
@@ -249,7 +232,11 @@ export const createNoLocalFiniteValueSet = ({
 
       const reportedSpans = new Set<string>();
 
-      const reportOnce = (report: VocabularyReport): void => {
+      const reportOnce = (report: {
+        readonly node: ESTree.Span;
+        readonly messageId: string;
+        readonly data: Record<string, string>;
+      }): void => {
         if (isInsideAnnotatedDeclaration(bindingsOf().annotatedRanges, report.node)) return;
         const span = `${report.node.start}:${report.node.end}`;
         if (reportedSpans.has(span)) return;
@@ -257,7 +244,10 @@ export const createNoLocalFiniteValueSet = ({
         context.report(report);
       };
 
-      const reportVocabulary = (occurrence: SpelledOutVocabulary, onlyWhenOwned: boolean): void => {
+      const reportVocabulary = (
+        occurrence: { readonly node: ESTree.Span; readonly values: readonly CanonicalValue[] },
+        onlyWhenOwned: boolean,
+      ): void => {
         const { node } = occurrence;
         const vocabulary = occurrence.values;
         const owners = catalogOf().entriesByFingerprint.get(fingerprintValues(vocabulary)) ?? [];

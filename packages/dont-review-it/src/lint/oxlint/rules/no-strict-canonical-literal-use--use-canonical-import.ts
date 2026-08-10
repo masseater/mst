@@ -150,12 +150,6 @@ const registeredDeclarationRanges = (
     declaresConceptAt(catalog, { conceptId: range.conceptId, path: filename }),
   );
 
-type LiteralOccurrence = {
-  readonly node: ESTree.Node;
-  readonly spelling: CanonicalValue;
-  readonly ancestors: readonly ESTree.Node[];
-};
-
 const conceptSummary = (entries: readonly CanonicalValuesEntry[]): string =>
   entries
     .map((entry) =>
@@ -204,7 +198,15 @@ export const createNoStrictCanonicalLiteralUseRule = ({
           registeredDeclarationRanges(lintedSource, loaded),
       );
 
-      const inspect = ({ node, spelling, ancestors }: LiteralOccurrence): void => {
+      const inspect = ({
+        node,
+        spelling,
+        ancestors,
+      }: {
+        readonly node: ESTree.Node;
+        readonly spelling: CanonicalValue;
+        readonly ancestors: readonly ESTree.Node[];
+      }): void => {
         const parent = ancestors.at(-1);
         if (parent !== undefined && isStructuralKeyPosition(parent, node)) return;
         if (parent !== undefined && isModuleSyntaxPosition(parent, node)) return;

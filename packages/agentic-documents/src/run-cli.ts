@@ -1,7 +1,13 @@
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 
-import { toLines } from "@mst/utils";
+import {
+  EXIT_MISUSE,
+  EXIT_PROBLEMS_FOUND,
+  EXIT_SUCCESS,
+  toLines,
+  type CliResult,
+} from "@mst/utils";
 import { attemptAsync } from "es-toolkit";
 
 import { defaultConfig } from "./config.ts";
@@ -17,18 +23,6 @@ Options:
   --repository-root <path>  Root of the repository to scan. Defaults to the current working directory.
   --write                   Rewrite generated regions instead of reporting them as stale.
 `;
-
-export type CliResult = {
-  readonly exitCode: number;
-  readonly out: string;
-  readonly error: string;
-};
-
-const EXIT_SUCCESS = 0;
-
-const EXIT_PROBLEMS_FOUND = 1;
-
-const EXIT_MISUSE = 2;
 
 const CHECK_COMMAND = "check";
 

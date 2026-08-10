@@ -54,25 +54,21 @@ const containsSegmentRun = (
     runSegments.every((segment, offset) => pathSegments[index + offset] === segment),
   );
 
-type DetachedTestFinding = {
-  readonly messageId: "detachedTestFile" | "testOnlyDirectory";
-  readonly data: Readonly<Record<string, string>>;
-};
-
 const isExemptPath = (pathSegments: readonly string[], exemptPaths: readonly string[]): boolean =>
   exemptPaths.some((entry) =>
     containsSegmentRun(pathSegments, segmentsOf({ path: entry, separator: "/" })),
   );
 
-type PlacementRules = {
-  readonly suffixes: readonly string[];
-  readonly exemptPaths: readonly string[];
-};
-
 const findingFor = (
   testPath: string,
-  { suffixes, exemptPaths }: PlacementRules,
-): DetachedTestFinding | null => {
+  {
+    suffixes,
+    exemptPaths,
+  }: { readonly suffixes: readonly string[]; readonly exemptPaths: readonly string[] },
+): {
+  readonly messageId: "detachedTestFile" | "testOnlyDirectory";
+  readonly data: Readonly<Record<string, string>>;
+} | null => {
   const suffix = longestMatchingSuffix(testPath, suffixes);
   const pathSegments = segmentsOf({ path: testPath, separator: sep });
   if (suffix === null || isExemptPath(pathSegments, exemptPaths)) return null;

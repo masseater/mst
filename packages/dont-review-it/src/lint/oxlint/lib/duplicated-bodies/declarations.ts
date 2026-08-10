@@ -1,6 +1,8 @@
 import { lineAtOffset } from "@mst/utils";
 import { parseSync } from "oxc-parser";
 
+import { NODE_TYPE_FIELD } from "../ast-node.ts";
+
 export type BodyDeclaration = {
   readonly name: string;
   readonly line: number;
@@ -9,8 +11,6 @@ export type BodyDeclaration = {
 };
 
 const DEFAULT_SOURCE_NAME = "source.tsx";
-
-const NODE_TYPE_FIELD = "type";
 
 const POSITION_FIELDS: ReadonlySet<string> = new Set(["start", "end", "range", "loc"]);
 
@@ -77,7 +77,24 @@ const functionBodyOf = (statement: Fields): unknown => ({
   generator: statement.generator ?? false,
 });
 
-const functionNameOf = (statement: Fields): string | null => {
+const typeAliasBodyOf = (statement: Fields): unknown => ({
+  typeParameters: statement.typeParameters ?? null,
+  typeAnnotation: statement.typeAnnotation ?? null,
+});
+
+const interfaceBodyOf = (statement: Fields): unknown => ({
+  typeParameters: statement.typeParameters ?? null,
+  extends: statement.extends ?? null,
+  body: statement.body ?? null,
+});
+
+const BODY_BY_STATEMENT_KIND: Readonly<Record<string, (statement: Fields) => unknown>> = {
+  FunctionDeclaration: functionBodyOf,
+  TSInterfaceDeclaration: interfaceBodyOf,
+  TSTypeAliasDeclaration: typeAliasBodyOf,
+};
+
+const declaredNameOf = (statement: Fields): string | null => {
   const { id } = statement;
   if (!isNode(id)) return null;
   return typeof id.name === "string" ? id.name : null;
@@ -85,6 +102,33 @@ const functionNameOf = (statement: Fields): string | null => {
 
 const startOf = (statement: Fields): number =>
   typeof statement.start === "number" ? statement.start : 0;
+
+const bindingDeclarationsIn = (source: string, statement: Fields): readonly BodyDeclaration[] =>
+  bindingsOf(statement).flatMap((binding) => {
+    const name = namedBindingIn(binding);
+    if (name === null) return [];
+    return [
+      declarationFrom({
+        source,
+        described: { name, start: startOf(statement), body: bindingBodyOf(binding) },
+      }),
+    ];
+  });
+
+const namedDeclarationsIn = (source: string, statement: Fields): readonly BodyDeclaration[] => {
+  const kind = statement[NODE_TYPE_FIELD];
+  const bodyOf = typeof kind === "string" ? BODY_BY_STATEMENT_KIND[kind] : undefined;
+  if (bodyOf === undefined) return [];
+
+  const name = declaredNameOf(statement);
+  if (name === null) return [];
+  return [
+    declarationFrom({
+      source,
+      described: { name, start: startOf(statement), body: bodyOf(statement) },
+    }),
+  ];
+};
 
 const declarationsFromStatement = (
   source: string,
@@ -96,30 +140,8 @@ const declarationsFromStatement = (
   if (kind === "ExportNamedDeclaration") {
     return declarationsFromStatement(source, statement.declaration);
   }
-
-  if (kind === "VariableDeclaration") {
-    return bindingsOf(statement).flatMap((binding) => {
-      const name = namedBindingIn(binding);
-      if (name === null) return [];
-      return [
-        declarationFrom({
-          source,
-          described: { name, start: startOf(statement), body: bindingBodyOf(binding) },
-        }),
-      ];
-    });
-  }
-
-  if (kind !== "FunctionDeclaration") return [];
-
-  const name = functionNameOf(statement);
-  if (name === null) return [];
-  return [
-    declarationFrom({
-      source,
-      described: { name, start: startOf(statement), body: functionBodyOf(statement) },
-    }),
-  ];
+  if (kind === "VariableDeclaration") return bindingDeclarationsIn(source, statement);
+  return namedDeclarationsIn(source, statement);
 };
 
 export const declarationsIn = (source: string): readonly BodyDeclaration[] => {

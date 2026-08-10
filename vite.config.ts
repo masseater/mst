@@ -1,14 +1,32 @@
-import * as dontReviewIt from "@mst/dont-review-it";
-import * as lintRuleAuthoring from "@mst/lint-rule-authoring";
+import { oxlint as dontReviewItOxlint, withGitExcludes } from "@mst/dont-review-it";
+import { oxlint as lintRuleAuthoringOxlint } from "@mst/lint-rule-authoring";
 import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   staged: {
     "*": "vp check --fix",
   },
-  fmt: {},
-  lint: {
-    extends: [lintRuleAuthoring.oxlint, dontReviewIt.oxlint],
+  fmt: withGitExcludes({
+    sortImports: {
+      customGroups: [
+        { groupName: "typeBuiltin", selector: "type", elementNamePattern: ["node:*"] },
+        { groupName: "typeRepository", selector: "type", elementNamePattern: ["./**", "../**"] },
+        { groupName: "typeInstalled", selector: "type" },
+      ],
+      groups: [
+        "builtin",
+        "external",
+        ["internal", "subpath", "parent", "sibling", "index"],
+        "typeBuiltin",
+        { newlinesBetween: false },
+        "typeInstalled",
+        { newlinesBetween: false },
+        "typeRepository",
+      ],
+    },
+  }),
+  lint: withGitExcludes({
+    extends: [lintRuleAuthoringOxlint, dontReviewItOxlint],
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
     rules: {
       "vite-plus/prefer-vite-plus-imports": "error",
@@ -41,7 +59,7 @@ export default defineConfig({
       },
     ],
     options: { typeAware: true, typeCheck: true },
-  },
+  }),
   run: {
     cache: true,
   },

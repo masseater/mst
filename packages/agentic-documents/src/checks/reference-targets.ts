@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, normalize, relative } from "node:path";
 
 import { lineAtOffset } from "@mst/utils";
+import { attempt } from "es-toolkit";
 
 import { isInsideGeneratedRegion } from "../markdown/generated-region.ts";
 import { descendants, lineOf, offsetOf } from "../markdown/nodes.ts";
@@ -45,11 +46,9 @@ const anchorOf = (target: string): string | null => {
   if (index === -1 || index === target.length - 1) return null;
 
   const encoded = target.slice(index + 1);
-  try {
-    return decodeURIComponent(encoded);
-  } catch {
-    return encoded;
-  }
+  const [failure, decoded] = attempt(() => decodeURIComponent(encoded));
+
+  return failure === null ? decoded : encoded;
 };
 
 const withoutAnchor = (target: string): string => {

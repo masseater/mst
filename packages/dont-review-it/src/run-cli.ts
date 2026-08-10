@@ -1,7 +1,13 @@
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 
-import { toLines } from "@mst/utils";
+import {
+  EXIT_MISUSE,
+  EXIT_PROBLEMS_FOUND,
+  EXIT_SUCCESS,
+  toLines,
+  type CliResult,
+} from "@mst/utils";
 import { attempt } from "es-toolkit";
 
 import { buildCanonicalValuesCatalog } from "./lint/oxlint/lib/canonical-values/builder.ts";
@@ -25,18 +31,6 @@ Commands:
 Options:
   --repository-root <path>  Root of the repository to scan. Defaults to the current working directory.
 `;
-
-export type CliResult = {
-  readonly exitCode: number;
-  readonly out: string;
-  readonly error: string;
-};
-
-const EXIT_SUCCESS = 0;
-
-const EXIT_PROBLEMS_FOUND = 1;
-
-const EXIT_MISUSE = 2;
 
 const VERIFY_COMMAND = "verify";
 
