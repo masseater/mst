@@ -19,6 +19,7 @@
     "@mst/agentic-documents": "workspace:*",
     "@mst/dont-review-it": "workspace:*",
     "@mst/lint-rule-authoring": "workspace:*",
+    "@mst/stop-ai-slop": "workspace:*",
     "@types/node": "catalog:",
     "knip": "catalog:",
     "vite": "catalog:",

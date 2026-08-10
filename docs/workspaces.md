@@ -8,6 +8,7 @@
 - `packages/agentic-documents` — AI-facing documents that stay true to the repository and keep a shape machines can follow.
 - `packages/dont-review-it` — Machine-enforced answers to the writing questions that would otherwise be raised in review.
 - `packages/lint-rule-authoring` — Materials for authoring lint rules that keep working after they are written.
+- `packages/stop-ai-slop` — Machine-enforced checks for recurring low-value patterns in AI-authored changes.
 - `packages/utils` — Small text helpers shared by the packages in this repository.
 
 <!-- END GENERATED workspaces -->

@@ -19,6 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - uses: voidzero-dev/setup-vp@313600b80b104eadebb9111787d37a2e83e014ca # v1.17.0
@@ -28,12 +29,14 @@ jobs:
           run-install: |
             - args: ['--frozen-lockfile']
 
-      - run: vp check
+      - run: vp run ready
 
-      - run: vp run -r test
-
-      - run: vp run -r build
-
-      - run: vp exec dont-review-it verify
-
-      - run: vp run knip
+      - name: Observe stop-ai-slop findings
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          merge_base="$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
+          vp exec stop-ai-slop check --base "$merge_base" --head "$HEAD_SHA" --repository-root .
