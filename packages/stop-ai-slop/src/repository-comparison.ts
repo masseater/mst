@@ -2,7 +2,9 @@ import { execFile } from "node:child_process";
 import { extname } from "node:path";
 import { promisify } from "node:util";
 
-import parseGitDiff, { type AnyFileChange, type GitDiff } from "parse-git-diff";
+import { type AnyFileChange } from "parse-git-diff";
+
+import { parseRepositoryDiff } from "./repository-diff.ts";
 
 export type CompareRevisionsOptions = Readonly<{
   repositoryRoot: string;
@@ -120,15 +122,6 @@ const addedLinesIn = (file: AnyFileChange): readonly number[] =>
       ? chunk.changes.flatMap((change) => (change.type === "AddedLine" ? [change.lineAfter] : []))
       : [],
   );
-
-export const parseRepositoryDiff = (diff: string): GitDiff => {
-  const parsed = parseGitDiff(diff);
-  if (diff.trim().length > 0 && parsed.files.length === 0) {
-    throw new Error("Unable to parse non-empty Git diff");
-  }
-
-  return parsed;
-};
 
 type ComparisonContext = Readonly<{
   repositoryRoot: string;

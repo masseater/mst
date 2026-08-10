@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { range } from "es-toolkit";
 import { describe, expect, it } from "vite-plus/test";
 
-import { compareRevisions, parseRepositoryDiff } from "./repository-comparison.ts";
+import { compareRevisions } from "./repository-comparison.ts";
 import { withTestRepository } from "./test-repository.ts";
 
 const renameSource = (prefix: string, changed = false): string =>
@@ -277,13 +277,5 @@ describe("compareRevisions", () => {
         }),
       ).rejects.toThrow("Command failed");
     });
-  });
-});
-
-describe("parseRepositoryDiff", () => {
-  it("rejects a non-empty diff that produces no files", () => {
-    expect(() => parseRepositoryDiff("not a git diff\n")).toThrow(
-      "Unable to parse non-empty Git diff",
-    );
   });
 });
