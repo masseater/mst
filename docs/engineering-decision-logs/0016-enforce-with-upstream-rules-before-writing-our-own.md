@@ -23,7 +23,9 @@
 
 **抑制コメントの扱いを設定で固定する。** 使われていない抑制ディレクティブを error にし、他のリンタ向けの抑制コメントを尊重しない。抑制は「今そこに違反がある」ことの表明であって、将来のための予約ではない。違反が消えたら抑制も消える状態を機械で保つ。
 
-**oxlint に実装が無いものは、自前で書けるものだけ書く。** 参照実装が ESLint 側に持っていた検査を oxlint のカタログ 847 本と突き合わせた。品質プラグインとセキュリティプラグインの推奨集合は、含まれるルールのほぼ全てに oxlint 側の同名または同等の実装がある。残ったのは 2 つで、どちらも自前で書いた。
+**閾値を持つテスト側の 2 本は、既定より緩くしない。** `vitest/max-nested-describe` は 2（既定 5、実測の最大 2）。top-level describe が subject を名乗り、その内側で 1 段だけ束ねてよい、という形にした。3 段目が要るなら、そのファイルが 2 つ以上の subject を持っている。`vitest/no-large-snapshots` は既定のまま入れた。mst にはインラインスナップショットも `.snap` ファイルも 1 つも無く、測るものが存在しないためである。最初の 1 つが書かれたときに既定が当たる。
+
+**oxlint に実装が無いものは、自前で書けるものだけ書く。** 参照実装が ESLint 側に持っていた検査を oxlint のカタログ 847 本と突き合わせた。品質プラグインの推奨集合は、名前で数えた範囲では大半に oxlint 側の同名または同等の実装がある（`no-lonely-if` / `no-else-return` / `no-nested-ternary` / `no-unneeded-ternary` / `no-useless-return` / `no-self-compare` / `prefer-object-spread` / `no-implicit-coercion` / `no-param-reassign` などを個別に確認した）。全件を突き合わせたわけではない。残ったのは 2 つで、どちらも自前で書いた。
 
 - `no-unordered-import--group-by-origin-then-sort-by-specifier` — import の並び。整形器は並べ替えないことを実測で確認した（指定子を崩したファイルに `vp fmt --write` をかけても順序は変わらない）
 - `no-multi-binding-declaration--declare-one-binding-per-statement` — 1 つの宣言文が導入する束縛は 1 つ
@@ -52,11 +54,21 @@
 
 **`no-hooks` によりテストの後始末の形が変わった。** 一時ディレクトリを消す `afterAll` を 4 ファイルから外し、モジュールの読み込み時に固定名のディレクトリを消してから作る形にした。後始末が実行の前に来るので、失敗した実行の中身がそのまま残って読める。
 
-**`promise/prefer-await-to-then` は `no-promise-chain--use-async-await` と重なる。** 自前ルールの方が広く、`.then` / `.catch` / `.finally` を添字記法や省略可能連結まで含めて拾う。参照実装はこれをテストにだけ当てていたが、mst では本体にも当てる。現時点で違反は 0 件で、二重報告は観測されていない。自前ルールが将来外れた場合の受け皿として残す。
+**`promise/prefer-await-to-then` は `no-promise-chain--use-async-await` と重なる。** 自前ルールの方が広く、`.then` / `.catch` / `.finally` を添字記法や省略可能連結まで含めて拾う。参照実装はこれをテストにだけ当てていたが、mst では本体にも当てる。
+
+重なりは実測で確認した。`Promise.resolve(1).then(...)` を仕込むと、同じ位置に 2 本とも error を出す。リポジトリの現状では違反が 0 件なので実害は出ていないが、`.then` を書いた人は 2 つの報告を受け取る。「検出の権威をルールごとに 1 つにする」という本文の方針からは外れており、残しているのは人間の指示による。自前ルールが将来外れたときの受け皿になる。
+
+`import/*` と `promise/*` は新しく `plugins` に入れた系統なので、どちらも違反を仕込んで発火を確認した。`import/default`（既定 export を持たないモジュールからの既定 import）と `promise/no-new-statics`（`new Promise.resolve()`）がそれぞれ error を出す。`--print-config` に名前が出ることは、そのルールが実際に走ることを意味しない。
 
 ## 検討して採らなかった案
 
 **`categories` で `pedantic` や `style` をまとめて上げる。** 1 行で済み、oxlint が足したものも自動で入る。採らなかったのは、どのルールを有効にするかがこのリポジトリの判断ではなく上流の分類に従うことになるためである。分類が動いたときに、有効になったルールを誰も選んでいない状態が生まれる。`correctness` だけを一括で上げているのは、あれが「壊れているコード」の分類であって姿勢の選択を含まないからである。
+
+**`import/no-duplicates` を入れる。** 参照実装は入れていたが、mst には [0012](0012-adopt-oxlint-rules-that-are-off-by-default.md) が入れた `no-duplicate-imports` が既にあり、同じモジュールからの重複 import はそちらが権威を持っている。あちらは 30 件を直した実績があり、直し方（値の import に `type` 修飾子を付けて 1 本にまとめる）も確定している。同じ違反を 2 つの検出器が別の直し方で報告する状態を作らない。
+
+**JSON を対象にする検査を入れる。** 参照実装は JSON のリントを ESLint 側に持っていた。oxlint は JS/TS 以外を読まないので、`plugins` に何を足しても JSON には届かない。マニフェストや設定ファイルの検査は、リントではなく独立した検証コマンド（`vp exec dont-review-it verify` と同じ形）で扱う。この作業では触っていない。
+
+**セキュリティ観点のプラグインを自前で書く。** oxlint に相当するプラグインは無い。含まれる検査のうち mst に効きうるものは、正規表現・`eval`・Buffer の生成あたりで、これらは `no-eval` / `no-implied-eval` / `no-new-func` / `no-script-url` / `unicorn/no-new-buffer` が既に見ている。残りは子プロセスの起動やファイルパスの動的生成を対象にするもので、前者は mst に存在せず、後者は有限値カタログの走査が正当に行っている操作なので、入れると大量の偽陽性になる。
 
 **React / Next.js / アクセシビリティのルールを入れる。** 参照実装はこれらを持っていたが、mst にはどちらのスタックも無い。設定に書いても 1 件も発火せず、発火しないルールは正しさを確認できない。スタックが入った時点で足す。
 
