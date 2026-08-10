@@ -9,7 +9,6 @@ export default defineConfig({
   fmt: {},
   lint: {
     extends: [lintRuleAuthoring.oxlint, dontReviewIt.oxlint],
-    plugins: ["unicorn", "typescript", "oxc", "vitest"],
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
     rules: {
       "vite-plus/prefer-vite-plus-imports": "error",

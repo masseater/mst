@@ -3,8 +3,8 @@ import { join } from "node:path";
 import { testLintRule } from "@mst/lint-rule-authoring";
 import { describe } from "vite-plus/test";
 
-import { buildBodyIndex } from "../lib/duplicated-bodies/body-index.ts";
 import { findWorkspaceRoot } from "../lib/canonical-values/workspace-root.ts";
+import { buildBodyIndex } from "../lib/duplicated-bodies/body-index.ts";
 import { createNoDuplicatedBody } from "./no-duplicated-body--import-the-existing-declaration.ts";
 
 const repositoryRoot = findWorkspaceRoot(process.cwd());

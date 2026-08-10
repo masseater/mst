@@ -29,8 +29,7 @@ const isNavigatorSendBeacon = (callee: ESTree.Expression): boolean => {
 const isFetchCallee = (callee: ESTree.Expression): boolean => {
   const written = withoutParentheses(callee);
   if (written.type === "Identifier") return written.name === FETCH_NAME;
-  const member = staticMemberOf(written);
-  return member !== null && member.name === FETCH_NAME;
+  return staticMemberOf(written)?.name === FETCH_NAME;
 };
 
 const isConnectionConstructor = (callee: ESTree.Expression): boolean => {

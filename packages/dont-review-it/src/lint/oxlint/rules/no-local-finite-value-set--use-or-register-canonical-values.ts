@@ -106,10 +106,11 @@ const libraryOwnerReport = (input: {
   if (libraries.length === 0) {
     return { messageId: "localFiniteValueSetWithoutOwner", data: { ownershipPolicy } };
   }
-  if (libraries.length === 1) {
+  const [onlyLibrary] = libraries;
+  if (libraries.length === 1 && onlyLibrary !== undefined) {
     return {
       messageId: "localFiniteValueSetOwnedByLibraryType",
-      data: { owner: describeLibraryOwner(libraries[0], values), ownershipPolicy },
+      data: { owner: describeLibraryOwner(onlyLibrary, values), ownershipPolicy },
     };
   }
   return {
@@ -126,10 +127,11 @@ const catalogOwnerReport = (input: {
   readonly ownershipPolicy: string;
 }): OwnerReport => {
   const { owners, ownershipPolicy } = input;
-  if (owners.length === 1) {
+  const [onlyOwner] = owners;
+  if (owners.length === 1 && onlyOwner !== undefined) {
     return {
       messageId: "localFiniteValueSetWithOwner",
-      data: { owner: describeOwner(owners[0]), ownershipPolicy },
+      data: { owner: describeOwner(onlyOwner), ownershipPolicy },
     };
   }
   return {

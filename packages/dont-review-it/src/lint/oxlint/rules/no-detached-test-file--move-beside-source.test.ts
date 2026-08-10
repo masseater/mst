@@ -1,13 +1,15 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { testLintRule } from "@mst/lint-rule-authoring";
-import { afterAll, describe, expect, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { noDetachedTestFile } from "./no-detached-test-file--move-beside-source.ts";
 
-const fixtureDir = mkdtempSync(join(tmpdir(), "no-detached-test-file-"));
+const fixtureDir = join(tmpdir(), "dont-review-it-no-detached-test-file");
+rmSync(fixtureDir, { recursive: true, force: true });
+mkdirSync(fixtureDir, { recursive: true });
 
 const fixturePath = (name: string): string => join(fixtureDir, name);
 
@@ -34,10 +36,6 @@ writeSourceFixture("spec/nested/buried.ts");
 const rememberedSourcePath = writeSourceFixture("remembered.ts");
 
 describe("dont-review-it/no-detached-test-file--move-beside-source", () => {
-  afterAll(() => {
-    rmSync(fixtureDir, { recursive: true, force: true });
-  });
-
   testLintRule(noDetachedTestFile, {
     valid: [
       {
