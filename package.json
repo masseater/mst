@@ -11,7 +11,7 @@
     "ready": "vp check && vp run -r test && vp run -r build && vp run knip && vp exec dont-review-it verify",
     "dev": "vp run website#dev",
     "knip": "knip",
-    "prepare": "vp config"
+    "prepare": "vp config && git config merge.ff false"
   },
   "devDependencies": {
     "@mst/dont-review-it": "workspace:*",
