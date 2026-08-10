@@ -6,7 +6,6 @@ export {
   createWorkspaceLintRule,
   type WorkspaceLintRule,
   type WorkspaceLintRuleDocs,
-  type WorkspaceLintRuleFactory,
   type WorkspaceLintRuleMeta,
 } from "./create-workspace-lint-rule.ts";
 export {

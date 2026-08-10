@@ -3,9 +3,9 @@ import { isJsdoc } from "../lib/jsdoc-comment.ts";
 
 import type { Comment, ESTree } from "@oxlint/plugins";
 
-type ProseLine = { readonly lineOffset: number; readonly text: string };
-
-const descriptionProse = (comment: Comment): readonly ProseLine[] => {
+const descriptionProse = (
+  comment: Comment,
+): readonly { readonly lineOffset: number; readonly text: string }[] => {
   const stripped = comment.value.split("\n").map((line, lineOffset) => ({
     lineOffset,
     text: line.replace(/^\s*\*?\s?/u, "").trim(),

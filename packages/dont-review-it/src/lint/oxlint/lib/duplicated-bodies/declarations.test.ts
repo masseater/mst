@@ -85,6 +85,45 @@ describe("declarationsIn", () => {
     expect(second.line).toBe(3);
   });
 
+  test("reads a type alias under the name it was declared with", () => {
+    const [declaration] = declarationsIn("type Draft = { readonly title: string };");
+    expect(declaration.name).toBe("Draft");
+  });
+
+  test("reads an interface under the name it was declared with", () => {
+    const [declaration] = declarationsIn("interface Draft {\n  readonly title: string;\n}");
+    expect(declaration.name).toBe("Draft");
+  });
+
+  test("reads an exported type alias", () => {
+    const [declaration] = declarationsIn("export type Draft = { readonly title: string };");
+    expect(declaration.name).toBe("Draft");
+  });
+
+  test("gives two type aliases that differ only in name the same structure", () => {
+    expect(structureOfFirst("type Draft = { readonly title: string };")).toBe(
+      structureOfFirst("type Published = { readonly title: string };"),
+    );
+  });
+
+  test("keeps two type aliases apart when a member differs", () => {
+    expect(structureOfFirst("type Draft = { readonly title: string };")).not.toBe(
+      structureOfFirst("type Draft = { readonly title: number };"),
+    );
+  });
+
+  test("keeps the type parameters of a type alias inside the structure", () => {
+    expect(structureOfFirst("type Boxed<Held> = { readonly held: Held };")).not.toBe(
+      structureOfFirst("type Boxed = { readonly held: Held };"),
+    );
+  });
+
+  test("keeps an interface apart from a type alias that spells the same members", () => {
+    expect(structureOfFirst("interface Draft {\n  readonly title: string;\n}")).not.toBe(
+      structureOfFirst("type Draft = { readonly title: string };"),
+    );
+  });
+
   test("counts more nodes for a longer body", () => {
     const [small] = declarationsIn("const one = 1;");
     const [large] = declarationsIn("const twice = (value: number): number => value * 2;");

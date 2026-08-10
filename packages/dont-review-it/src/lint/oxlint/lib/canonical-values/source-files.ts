@@ -4,6 +4,7 @@ import { basename, dirname, join, relative } from "node:path";
 import { attempt, partition, sortBy } from "es-toolkit";
 
 import { toPosixPath } from "../posix-path.ts";
+import { MANIFEST_FILE_NAME } from "./package-manifest.ts";
 
 export type ScannedFile = {
   readonly absolutePath: string;
@@ -17,8 +18,6 @@ export type RepositoryFiles = {
   readonly commentSources: readonly ScannedFile[];
   readonly manifests: readonly ScannedFile[];
 };
-
-export const MANIFEST_FILE_NAME = "package.json";
 
 const UNSCANNED_DIRECTORY_NAMES: ReadonlySet<string> = new Set([
   ".cache",

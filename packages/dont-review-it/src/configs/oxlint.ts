@@ -15,10 +15,16 @@ import { noIdentityWrapper } from "../lint/oxlint/rules/no-identity-wrapper--cal
 import { noLoggedAndContinuedFailure } from "../lint/oxlint/rules/no-logged-and-continued-failure--stop-or-recover.ts";
 import { noPromiseChain } from "../lint/oxlint/rules/no-promise-chain--use-async-await.ts";
 import { noReassign } from "../lint/oxlint/rules/no-reassign--use-spread-or-iife.ts";
+import { noSingleUseLocalType } from "../lint/oxlint/rules/no-single-use-local-type--inline-at-the-use-site.ts";
 import { noStandaloneTsconfig } from "../lint/oxlint/rules/no-standalone-tsconfig--extend-shared-preset.ts";
 import { noTautologicalAssertion } from "../lint/oxlint/rules/no-tautological-assertion--assert-on-a-computed-value.ts";
 import { requireReExportOnlyFiles } from "../lint/oxlint/rules/require-re-export-only-files--move-declaration-to-owning-module.ts";
-import { noDuplicatedBody, noLocalFiniteValueSet, noStrictCanonicalLiteralUse } from "../plugin.ts";
+import {
+  noDuplicatedBody,
+  noLocalFiniteValueSet,
+  noStrictCanonicalLiteralUse,
+  noTwinDeclaration,
+} from "../plugin.ts";
 
 const PLUGIN_NAME = "dont-review-it";
 
@@ -68,12 +74,14 @@ export const oxlint = defineConfig({
     [`${PLUGIN_NAME}/${noLoggedAndContinuedFailure.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noPromiseChain.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noReassign.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noSingleUseLocalType.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noStandaloneTsconfig.name}`]: [
       LINT_SEVERITY.ERROR,
       [...SHARED_TSCONFIG_PRESETS],
     ],
     [`${PLUGIN_NAME}/${noStrictCanonicalLiteralUse.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noTautologicalAssertion.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noTwinDeclaration.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${requireReExportOnlyFiles.name}`]: LINT_SEVERITY.ERROR,
     complexity: [LINT_SEVERITY.ERROR, { max: 10 }],
     "max-classes-per-file": [LINT_SEVERITY.ERROR, { max: 1 }],

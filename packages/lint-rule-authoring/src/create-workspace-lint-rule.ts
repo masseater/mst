@@ -54,5 +54,3 @@ export const createWorkspaceLintRule = ({ workspaceDir }: { readonly workspaceDi
     };
   };
 };
-
-export type WorkspaceLintRuleFactory = ReturnType<typeof createWorkspaceLintRule>;

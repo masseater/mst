@@ -94,11 +94,6 @@ export const propertyKeyName = (key: ESTree.ObjectProperty["key"]): string | nul
   return null;
 };
 
-export type SchemaUnionLiterals = {
-  readonly values: readonly CanonicalValue[];
-  readonly node: ESTree.ArrayExpression;
-};
-
 const schemaLiteralArgumentValue = (
   element: ESTree.ArrayExpression["elements"][number],
 ): CanonicalValue | null => {
@@ -113,7 +108,9 @@ const schemaLiteralArgumentValue = (
   return scalarLiteralValue(literal);
 };
 
-export const schemaUnionLiterals = (node: ESTree.CallExpression): SchemaUnionLiterals | null => {
+export const schemaUnionLiterals = (
+  node: ESTree.CallExpression,
+): { readonly values: readonly CanonicalValue[]; readonly node: ESTree.ArrayExpression } | null => {
   const [argument] = node.arguments;
   if (argument === undefined || argument.type === "SpreadElement") return null;
   const array = unwrapExpression(argument);

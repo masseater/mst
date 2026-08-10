@@ -7,14 +7,9 @@ const matchesDeclarationPath = (path: string, entry: CanonicalValuesEntry): bool
   return normalized === entry.declarationPath || normalized.endsWith(`/${entry.declarationPath}`);
 };
 
-export type ConceptDeclarationSite = {
-  readonly conceptId: string;
-  readonly path: string;
-};
-
 export const declaresConceptAt = (
   catalog: CanonicalValuesCatalog,
-  { conceptId, path }: ConceptDeclarationSite,
+  { conceptId, path }: { readonly conceptId: string; readonly path: string },
 ): boolean =>
   catalog.entries.some(
     (entry) => entry.conceptId === conceptId && matchesDeclarationPath(path, entry),

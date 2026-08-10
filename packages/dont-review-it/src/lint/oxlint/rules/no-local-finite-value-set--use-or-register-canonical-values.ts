@@ -146,13 +146,6 @@ const firstNonSpreadArgument = (
   return argument;
 };
 
-type FileSources = {
-  readonly repositoryRootOf: () => string;
-  readonly catalogOf: () => CanonicalValuesCatalog;
-  readonly bindingsOf: () => FileBindings;
-  readonly libraryVocabularyOf: () => LibraryVocabularyIndex;
-};
-
 const fileSourcesFor = (input: {
   readonly context: {
     readonly cwd: string;
@@ -161,7 +154,12 @@ const fileSourcesFor = (input: {
   };
   readonly loadCatalog: CanonicalValuesCatalogLoader;
   readonly loadLibraryVocabulary: LibraryVocabularyLoader;
-}): FileSources => {
+}): {
+  readonly repositoryRootOf: () => string;
+  readonly catalogOf: () => CanonicalValuesCatalog;
+  readonly bindingsOf: () => FileBindings;
+  readonly libraryVocabularyOf: () => LibraryVocabularyIndex;
+} => {
   const { context, loadCatalog, loadLibraryVocabulary } = input;
   const repositoryRootOf = memoize((): string => findWorkspaceRoot(context.cwd));
 
@@ -178,17 +176,6 @@ const fileSourcesFor = (input: {
         loadLibraryVocabulary({ filename: context.filename, repositoryRoot: repositoryRootOf() }),
     ),
   };
-};
-
-type VocabularyReport = {
-  readonly node: ESTree.Span;
-  readonly messageId: string;
-  readonly data: Record<string, string>;
-};
-
-type SpelledOutVocabulary = {
-  readonly node: ESTree.Span;
-  readonly values: readonly CanonicalValue[];
 };
 
 type ValuesPosition =
@@ -247,7 +234,11 @@ export const createNoLocalFiniteValueSet = ({
 
       const reportedSpans = new Set<string>();
 
-      const reportOnce = (report: VocabularyReport): void => {
+      const reportOnce = (report: {
+        readonly node: ESTree.Span;
+        readonly messageId: string;
+        readonly data: Record<string, string>;
+      }): void => {
         if (isInsideAnnotatedDeclaration(bindingsOf().annotatedRanges, report.node)) return;
         const span = `${report.node.start}:${report.node.end}`;
         if (reportedSpans.has(span)) return;
@@ -255,7 +246,10 @@ export const createNoLocalFiniteValueSet = ({
         context.report(report);
       };
 
-      const reportVocabulary = (occurrence: SpelledOutVocabulary, onlyWhenOwned: boolean): void => {
+      const reportVocabulary = (
+        occurrence: { readonly node: ESTree.Span; readonly values: readonly CanonicalValue[] },
+        onlyWhenOwned: boolean,
+      ): void => {
         const { node } = occurrence;
         const vocabulary = occurrence.values;
         const owners = catalogOf().entriesByFingerprint.get(fingerprintValues(vocabulary)) ?? [];

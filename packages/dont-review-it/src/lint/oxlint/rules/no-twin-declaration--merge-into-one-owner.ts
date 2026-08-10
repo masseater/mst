@@ -4,44 +4,48 @@ import { memoize } from "es-toolkit";
 
 import { createDontReviewItRule } from "../../../create-rule.ts";
 import { findWorkspaceRoot } from "../lib/canonical-values/workspace-root.ts";
+import {
+  namedFingerprintOf,
+  type BodyIndex,
+  type BodyIndexLoader,
+} from "../lib/duplicated-bodies/body-index.ts";
 import { spellSites, statementCovering } from "../lib/duplicated-bodies/site-report.ts";
 import { isOutOfScopeSource } from "../lib/out-of-scope-source.ts";
 import { toPosixPath } from "../lib/posix-path.ts";
 
 import type { WorkspaceLintRule } from "@mst/lint-rule-authoring";
 import type { ESTree } from "@oxlint/plugins";
-import type { BodyIndex, BodyIndexLoader } from "../lib/duplicated-bodies/body-index.ts";
 
-const duplicatedBodyReports = (input: {
+const twinReports = (input: {
   readonly index: BodyIndex;
   readonly relativePath: string;
 }): readonly { readonly line: number; readonly sites: string }[] => {
   const { index, relativePath } = input;
   return (index.bodiesByPath.get(relativePath) ?? []).flatMap((body) => {
-    const elsewhere = (index.sitesByFingerprint.get(body.fingerprint) ?? []).filter(
+    const elsewhere = (index.sitesByNamedFingerprint.get(namedFingerprintOf(body)) ?? []).filter(
       (site) => site.relativePath !== relativePath || site.line !== body.line,
     );
     return elsewhere.length === 0 ? [] : [{ line: body.line, sites: spellSites(elsewhere) }];
   });
 };
 
-export const createNoDuplicatedBody = ({
+export const createNoTwinDeclaration = ({
   loadIndex,
 }: {
   readonly loadIndex: BodyIndexLoader;
 }): WorkspaceLintRule =>
   createDontReviewItRule({
-    name: "no-duplicated-body--import-the-existing-declaration",
+    name: "no-twin-declaration--merge-into-one-owner",
     meta: {
       type: "problem",
       docs: {
         description:
-          "Disallow a declaration whose body is spelled exactly as another declaration elsewhere in the repository, so one behaviour keeps one owner instead of drifting between copies",
+          "Disallow a declaration that another declaration in the repository spells with the same name and the same body, so one concept keeps one owner however small the body is",
         relatedGuidelines: [],
       },
       messages: {
-        duplicatedBody:
-          "A declaration must not repeat a body that already exists elsewhere in this repository, because a later change reaches only the copy that was edited and nothing fails until the two spellings disagree at run time. The same body is declared at {{sites}}. Decide which place owns the behaviour, export it from there, and import it everywhere else. Do not settle the choice by which copy came first or which name reads better: choose the module whose responsibility the behaviour belongs to.",
+        twinDeclaration:
+          "A declaration must not carry both the name and the body of another declaration in this repository, because two places then answer for one concept and a change made in one of them leaves the other standing under the same name with the old answer, which neither the type checker nor the tests can see. The same declaration stands at {{sites}}. Decide which module owns the concept, export it from there, and import it everywhere else. Choose the owner by whose responsibility the concept is, not by which copy came first or which file is shorter. Renaming one of the two is not a fix: both bodies stay, and one concept ends up with two names.",
       },
       schema: [],
     },
@@ -54,7 +58,7 @@ export const createNoDuplicatedBody = ({
         Program(node: ESTree.Program) {
           const repositoryRoot = repositoryRootOf();
           const relativePath = toPosixPath(relative(repositoryRoot, resolve(context.filename)));
-          const reports = duplicatedBodyReports({
+          const reports = twinReports({
             index: loadIndex({ repositoryRoot }),
             relativePath,
           });
@@ -62,7 +66,7 @@ export const createNoDuplicatedBody = ({
           for (const report of reports) {
             context.report({
               node: statementCovering(node.body, report.line) ?? node,
-              messageId: "duplicatedBody",
+              messageId: "twinDeclaration",
               data: { sites: report.sites },
             });
           }

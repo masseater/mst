@@ -16,9 +16,11 @@ import { createNoLocalFiniteValueSet } from "./lint/oxlint/rules/no-local-finite
 import { noLoggedAndContinuedFailure } from "./lint/oxlint/rules/no-logged-and-continued-failure--stop-or-recover.ts";
 import { noPromiseChain } from "./lint/oxlint/rules/no-promise-chain--use-async-await.ts";
 import { noReassign } from "./lint/oxlint/rules/no-reassign--use-spread-or-iife.ts";
+import { noSingleUseLocalType } from "./lint/oxlint/rules/no-single-use-local-type--inline-at-the-use-site.ts";
 import { noStandaloneTsconfig } from "./lint/oxlint/rules/no-standalone-tsconfig--extend-shared-preset.ts";
 import { createNoStrictCanonicalLiteralUseRule } from "./lint/oxlint/rules/no-strict-canonical-literal-use--use-canonical-import.ts";
 import { noTautologicalAssertion } from "./lint/oxlint/rules/no-tautological-assertion--assert-on-a-computed-value.ts";
+import { createNoTwinDeclaration } from "./lint/oxlint/rules/no-twin-declaration--merge-into-one-owner.ts";
 import { requireReExportOnlyFiles } from "./lint/oxlint/rules/require-re-export-only-files--move-declaration-to-owning-module.ts";
 
 import type { Plugin } from "@oxlint/plugins";
@@ -33,6 +35,8 @@ export const noStrictCanonicalLiteralUse = createNoStrictCanonicalLiteralUseRule
 });
 
 export const noDuplicatedBody = createNoDuplicatedBody({ loadIndex: loadRepositoryBodyIndex });
+
+export const noTwinDeclaration = createNoTwinDeclaration({ loadIndex: loadRepositoryBodyIndex });
 
 const plugin: Plugin = {
   meta: { name: "dont-review-it" },
@@ -52,9 +56,11 @@ const plugin: Plugin = {
     [noLoggedAndContinuedFailure.name]: noLoggedAndContinuedFailure,
     [noPromiseChain.name]: noPromiseChain,
     [noReassign.name]: noReassign,
+    [noSingleUseLocalType.name]: noSingleUseLocalType,
     [noStandaloneTsconfig.name]: noStandaloneTsconfig,
     [noStrictCanonicalLiteralUse.name]: noStrictCanonicalLiteralUse,
     [noTautologicalAssertion.name]: noTautologicalAssertion,
+    [noTwinDeclaration.name]: noTwinDeclaration,
     [requireReExportOnlyFiles.name]: requireReExportOnlyFiles,
   },
 };
