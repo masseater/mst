@@ -94,6 +94,3 @@ const clustersIn = (
 
 export const duplicatedClustersIn = (index: BodyIndex): readonly (readonly BodySite[])[] =>
   clustersIn(index.sitesByFingerprint);
-
-export const twinClustersIn = (index: BodyIndex): readonly (readonly BodySite[])[] =>
-  clustersIn(index.sitesByNamedFingerprint);

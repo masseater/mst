@@ -7,6 +7,7 @@ import { noExplainedLintMessage } from "../lint/oxlint/rules/no-explained-lint-m
 
 const PLUGIN_NAME = "lint-rule-authoring";
 
+/** @public */
 export const oxlint = defineConfig({
   jsPlugins: [{ name: PLUGIN_NAME, specifier: "@mst/lint-rule-authoring/plugin" }],
   rules: {

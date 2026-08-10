@@ -11,10 +11,11 @@ import { brokenReferences } from "./checks/reference-targets.ts";
 import { multipleDecisionKeywords } from "./checks/single-decision-keyword.ts";
 import { versionLiteralsInProse } from "./checks/version-in-prose.ts";
 import { workspaceListProblems } from "./checks/workspace-list.ts";
-import { loadNormativeDocuments, type NormativeDocument } from "./scan/normative-documents.ts";
+import { loadNormativeDocuments } from "./scan/load-normative-documents.ts";
 
 import type { AgenticDocumentsConfig } from "./config.ts";
 import type { DocumentProblem } from "./problem.ts";
+import type { NormativeDocument } from "./scan/normative-documents.ts";
 
 const syntacticProblems = ({
   document,

@@ -50,6 +50,7 @@ const SHARED_TSCONFIG_PRESETS = [
 
 const RE_EXPORT_ONLY_FILES = ["**/index.ts", "**/index.tsx"];
 
+/** @public */
 export const oxlint: OxlintConfig = defineConfig({
   categories: { correctness: LINT_SEVERITY.ERROR },
   plugins: [...UPSTREAM_PLUGINS],

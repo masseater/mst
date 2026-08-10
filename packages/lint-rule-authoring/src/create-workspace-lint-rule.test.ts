@@ -1,9 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import {
-  createWorkspaceLintRule,
-  type WorkspaceLintRuleDocs,
-} from "./create-workspace-lint-rule.ts";
+import { createWorkspaceLintRule, type WorkspaceLintRule } from "./create-workspace-lint-rule.ts";
 
 describe("create-workspace-lint-rule", () => {
   const createRule = createWorkspaceLintRule({ workspaceDir: "packages/example" });
@@ -32,7 +29,7 @@ describe("create-workspace-lint-rule", () => {
   });
 
   test("the transform points the canonical document pointer at the generated rule document", () => {
-    const docs: WorkspaceLintRuleDocs = rule.meta.docs;
+    const docs: WorkspaceLintRule["meta"]["docs"] = rule.meta.docs;
 
     expect(docs.url).toBe(
       "https://github.com/masseater/mst/blob/main/packages/example/docs/lint/no-example--do-something-else.md",

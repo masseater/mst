@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import { buildBodyIndex, duplicatedClustersIn, twinClustersIn } from "./body-index.ts";
+import { buildBodyIndex, duplicatedClustersIn } from "./body-index.ts";
 
 const ENOUGH_NODES = 8;
 
@@ -67,49 +67,5 @@ describe("duplicatedClustersIn", () => {
     const clusters = duplicatedClustersIn(index);
     expect(clusters).toHaveLength(1);
     expect(clusters[0]).toHaveLength(3);
-  });
-});
-
-describe("twinClustersIn", () => {
-  test("gathers two declarations that share both a name and a fingerprint", () => {
-    const index = buildBodyIndex([
-      {
-        relativePath: "a.ts",
-        bodies: [{ name: "LIMIT", line: 1, fingerprint: "two", nodeCount: 1 }],
-      },
-      {
-        relativePath: "b.ts",
-        bodies: [{ name: "LIMIT", line: 2, fingerprint: "two", nodeCount: 1 }],
-      },
-    ]);
-    expect(twinClustersIn(index)).toHaveLength(1);
-  });
-
-  test("leaves two declarations apart when only the fingerprint matches", () => {
-    const index = buildBodyIndex([
-      {
-        relativePath: "a.ts",
-        bodies: [{ name: "LIMIT", line: 1, fingerprint: "two", nodeCount: 1 }],
-      },
-      {
-        relativePath: "b.ts",
-        bodies: [{ name: "DEPTH", line: 2, fingerprint: "two", nodeCount: 1 }],
-      },
-    ]);
-    expect(twinClustersIn(index)).toStrictEqual([]);
-  });
-
-  test("leaves two declarations apart when only the name matches", () => {
-    const index = buildBodyIndex([
-      {
-        relativePath: "a.ts",
-        bodies: [{ name: "LIMIT", line: 1, fingerprint: "two", nodeCount: 1 }],
-      },
-      {
-        relativePath: "b.ts",
-        bodies: [{ name: "LIMIT", line: 2, fingerprint: "three", nodeCount: 1 }],
-      },
-    ]);
-    expect(twinClustersIn(index)).toStrictEqual([]);
   });
 });

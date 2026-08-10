@@ -7,17 +7,15 @@ import {
 
 import type { CreateRule, RuleMeta } from "@oxlint/plugins";
 
-export type WorkspaceLintRuleDocs = {
-  readonly description: string;
-  readonly relatedGuidelines: readonly string[];
-  readonly url?: string;
-};
-
 export type WorkspaceLintRule = {
   readonly name: string;
   readonly meta: {
     readonly type: RuleMeta["type"];
-    readonly docs: WorkspaceLintRuleDocs;
+    readonly docs: {
+      readonly description: string;
+      readonly relatedGuidelines: readonly string[];
+      readonly url?: string;
+    };
     readonly messages: Record<string, string>;
     readonly schema: RuleMeta["schema"];
     readonly fixable?: RuleMeta["fixable"];

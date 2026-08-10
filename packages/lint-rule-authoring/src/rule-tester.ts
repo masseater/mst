@@ -3,6 +3,7 @@ import { describe, it } from "vite-plus/test";
 
 import type { WorkspaceLintRule } from "./create-workspace-lint-rule.ts";
 
+/** @public */
 export const testLintRule = (
   rule: WorkspaceLintRule,
   cases: Parameters<RuleTester["run"]>[2],
