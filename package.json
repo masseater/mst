@@ -11,6 +11,7 @@
     "ready": "vp check && vp run -r test && vp run -r build && vp run knip && vp exec dont-review-it verify && vp exec dont-review-it duplicated-bodies && vp run docs",
     "dev": "vp run website#dev",
     "docs": "vp exec agentic-documents check",
+    "docs:write": "vp exec agentic-documents check --write",
     "knip": "knip",
     "prepare": "vp config && git config merge.ff false"
   },

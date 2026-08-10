@@ -28,6 +28,6 @@
 
 ## 検査
 
-`vp run docs` で検査する。生成される部分は `--write` を付けると更新される。
+`vp run docs` で検査する。生成される部分は `vp run docs:write` で更新される。
 
 検査が見る範囲、判断キーワードの綴り、文末の記号などは `packages/agentic-documents/src/config.ts` の既定値が決めている。

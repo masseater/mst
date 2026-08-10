@@ -1,6 +1,6 @@
 # ワークスペース
 
-このリポジトリが持つワークスペースの一覧。`pnpm-workspace.yaml` の宣言と各ワークスペースのマニフェストから生成される。手で書き換えない。更新は `vp run docs -- --write` で行う。
+このリポジトリが持つワークスペースの一覧。`pnpm-workspace.yaml` の宣言と各ワークスペースのマニフェストから生成される。手で書き換えない。更新は `vp run docs:write` で行う。
 
 <!-- BEGIN GENERATED workspaces -->
 
