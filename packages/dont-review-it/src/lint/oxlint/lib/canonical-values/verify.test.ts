@@ -14,6 +14,8 @@ import {
   verifyCanonicalValues,
 } from "./verify.ts";
 
+import type { CanonicalValue } from "./fingerprint.ts";
+
 const createdRoots: string[] = [];
 
 afterEach(() => {
@@ -31,10 +33,13 @@ const repositoryWith = (files: Readonly<Record<string, string>>): string => {
   return root;
 };
 
-const declaring = (conceptId: string, binding: string): string =>
+const annotatedWith = (conceptId: string, declaration: string): string =>
   `/** ${CANONICAL_VALUES_TAG} ${conceptId} */
-export const ${binding} = ["draft"] as const;
+${declaration}
 `;
+
+const declaring = (conceptId: string, binding: string): string =>
+  annotatedWith(conceptId, `export const ${binding} = ["draft"] as const;`);
 
 const catalogPathsOf = (repositoryRoot: string): readonly string[] =>
   buildCanonicalValuesCatalog({ repositoryRoot }).entries.map((entry) => entry.declarationPath);
@@ -228,5 +233,86 @@ test("a group of equivalent concepts is reported with its shared values", () => 
     ]),
   ).toBe(
     `"draft", "published" is declared by more than one concept: article.status (src/article.ts), order.status (src/order.ts)`,
+  );
+});
+
+const AGREEMENT_CASES: readonly {
+  readonly form: string;
+  readonly conceptId: string;
+  readonly declaration: string;
+  readonly declared: readonly CanonicalValue[] | null;
+}[] = [
+  {
+    form: "an array",
+    conceptId: "array.form",
+    declaration: 'export const ARRAY_FORM = ["draft", "published"] as const;',
+    declared: ["draft", "published"],
+  },
+  {
+    form: "an object",
+    conceptId: "object.form",
+    declaration: 'export const OBJECT_FORM = { Draft: "draft", Published: "published" } as const;',
+    declared: ["draft", "published"],
+  },
+  {
+    form: "a type alias",
+    conceptId: "type.form",
+    declaration: 'export type TypeForm = "draft" | "published";',
+    declared: ["draft", "published"],
+  },
+  {
+    form: "an enum",
+    conceptId: "enum.form",
+    declaration: 'export enum EnumForm {\n  Draft = "draft",\n  Published = "published",\n}',
+    declared: ["draft", "published"],
+  },
+  {
+    form: "a call",
+    conceptId: "call.form",
+    declaration: "export const CALL_FORM = buildStatuses();",
+    declared: null,
+  },
+];
+
+test("the catalog and the verification read the same declarations out of the same source", () => {
+  const observed = AGREEMENT_CASES.map(({ form, conceptId, declaration }) => {
+    const repositoryRoot = repositoryWith({
+      "src/first.ts": annotatedWith(conceptId, declaration),
+      "src/second.ts": annotatedWith(conceptId, declaration),
+    });
+    return {
+      form,
+      catalogued: buildCanonicalValuesCatalog({ repositoryRoot }).entries.map((entry) => [
+        entry.declarationPath,
+        entry.conceptId,
+        entry.values,
+      ]),
+      verified: verifyCanonicalValues({ repositoryRoot }).map((problem) => [
+        problem.kind,
+        problem.filePath,
+      ]),
+    };
+  });
+
+  expect(observed).toStrictEqual(
+    AGREEMENT_CASES.map(({ form, conceptId, declared }) =>
+      declared === null
+        ? {
+            form,
+            catalogued: [],
+            verified: [
+              ["vocabulary-without-values", "src/first.ts"],
+              ["vocabulary-without-values", "src/second.ts"],
+            ],
+          }
+        : {
+            form,
+            catalogued: [
+              ["src/first.ts", conceptId, declared],
+              ["src/second.ts", conceptId, declared],
+            ],
+            verified: [["duplicate-concept", "src/second.ts"]],
+          },
+    ),
   );
 });
