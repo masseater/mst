@@ -8,6 +8,7 @@ import { noArrayMutation } from "./lint/oxlint/rules/no-array-mutation--derive-n
 import { noDefaultExport } from "./lint/oxlint/rules/no-default-export--use-named-export.ts";
 import { noDetachedRationale } from "./lint/oxlint/rules/no-detached-rationale--comment-at-explained-line.ts";
 import { noDetachedTestFile } from "./lint/oxlint/rules/no-detached-test-file--move-beside-source.ts";
+import { noDiscardedFailure } from "./lint/oxlint/rules/no-discarded-failure--receive-and-surface-it.ts";
 import { noDoubleTypeAssertion } from "./lint/oxlint/rules/no-double-type-assertion--declare-the-real-type.ts";
 import { createNoDuplicatedBody } from "./lint/oxlint/rules/no-duplicated-body--import-the-existing-declaration.ts";
 import { noExplanatoryComment } from "./lint/oxlint/rules/no-explanatory-comment--delete-or-move-to-commit-message.ts";
@@ -44,6 +45,7 @@ const plugin: Plugin = {
     [noDefaultExport.name]: noDefaultExport,
     [noDetachedRationale.name]: noDetachedRationale,
     [noDetachedTestFile.name]: noDetachedTestFile,
+    [noDiscardedFailure.name]: noDiscardedFailure,
     [noDoubleTypeAssertion.name]: noDoubleTypeAssertion,
     [noDuplicatedBody.name]: noDuplicatedBody,
     [noExplanatoryComment.name]: noExplanatoryComment,

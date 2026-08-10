@@ -1,7 +1,8 @@
-import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { parse } from "jsonc-parser";
+
+import { readTextFile } from "./canonical-values/source-files.ts";
 
 export type TsconfigExtends = {
   readonly tsconfigPath: string;
@@ -11,14 +12,6 @@ export type TsconfigExtends = {
 const TSCONFIG_FILE_NAME = "tsconfig.json";
 
 const parseJsonc: (text: string) => unknown = parse;
-
-const readTextFile = (path: string): string | null => {
-  try {
-    return readFileSync(path, "utf8");
-  } catch {
-    return null;
-  }
-};
 
 const specifiersOf = (config: unknown): readonly string[] => {
   if (typeof config !== "object" || config === null) return [];

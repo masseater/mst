@@ -2,6 +2,9 @@ import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
+import { attempt } from "es-toolkit";
+
+import { isEnvironmentFailure } from "../path-failure.ts";
 import { readJsonFile } from "./read-json-file.ts";
 
 import type { CanonicalValuesEntry } from "./catalog.ts";
@@ -77,11 +80,16 @@ const isCachedCatalog = (value: unknown): value is CachedCatalog => {
 const cacheFilePath = (repositoryRoot: string): string =>
   join(repositoryRoot, ...CACHE_FILE_SEGMENTS);
 
+const usableCacheAt = (path: string): unknown => {
+  const [unreadableCache, cached] = attempt(() => readJsonFile(path));
+  return unreadableCache === null ? cached : null;
+};
+
 export const readCachedEntries = (
   repositoryRoot: string,
   fingerprint: string,
 ): readonly CanonicalValuesEntry[] | null => {
-  const cached = readJsonFile(cacheFilePath(repositoryRoot));
+  const cached = usableCacheAt(cacheFilePath(repositoryRoot));
   if (!isCachedCatalog(cached)) return null;
   return cached.fingerprint === fingerprint ? cached.entries : null;
 };
@@ -92,10 +100,10 @@ export const writeCachedEntries = (
 ): void => {
   const path = cacheFilePath(repositoryRoot);
   const payload: CachedCatalog = { version: CACHE_FORMAT_VERSION, fingerprint, entries };
-  try {
+  const [unwritableCache] = attempt(() => {
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, JSON.stringify(payload), "utf8");
-  } catch {
-    return;
-  }
+  });
+  if (unwritableCache === null || isEnvironmentFailure(unwritableCache)) return;
+  throw unwritableCache;
 };
