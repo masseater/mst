@@ -11,6 +11,8 @@ import { noDetachedRationale } from "../lint/oxlint/rules/no-detached-rationale-
 import { noDetachedTestFile } from "../lint/oxlint/rules/no-detached-test-file--move-beside-source.ts";
 import { noDoubleTypeAssertion } from "../lint/oxlint/rules/no-double-type-assertion--declare-the-real-type.ts";
 import { noExplanatoryComment } from "../lint/oxlint/rules/no-explanatory-comment--delete-or-move-to-commit-message.ts";
+import { noHardcodedEndpoint } from "../lint/oxlint/rules/no-hardcoded-endpoint--read-from-configuration.ts";
+import { noHardcodedProviderId } from "../lint/oxlint/rules/no-hardcoded-provider-id--read-from-configuration.ts";
 import { noIdentityWrapper } from "../lint/oxlint/rules/no-identity-wrapper--call-the-target-directly.ts";
 import { noLoggedAndContinuedFailure } from "../lint/oxlint/rules/no-logged-and-continued-failure--stop-or-recover.ts";
 import { noMultiBindingDeclaration } from "../lint/oxlint/rules/no-multi-binding-declaration--declare-one-binding-per-statement.ts";
@@ -84,6 +86,8 @@ export const oxlint: OxlintConfig = defineConfig({
     [`${PLUGIN_NAME}/${noDoubleTypeAssertion.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noDuplicatedBody.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noExplanatoryComment.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noHardcodedEndpoint.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noHardcodedProviderId.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noIdentityWrapper.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noLocalFiniteValueSet.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noLoggedAndContinuedFailure.name}`]: LINT_SEVERITY.ERROR,
