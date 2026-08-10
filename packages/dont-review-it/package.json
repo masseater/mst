@@ -9,7 +9,7 @@
     "directory": "packages/dont-review-it"
   },
   "bin": {
-    "dont-review-it": "./dist/cli.mjs"
+    "dont-review-it": "./src/cli.ts"
   },
   "files": [
     "dist",
@@ -34,6 +34,8 @@
   "dependencies": {
     "@mst/lint-rule-authoring": "workspace:*",
     "@oxlint/plugins": "catalog:",
+    "es-toolkit": "catalog:",
+    "oxc-parser": "catalog:",
     "oxlint": "catalog:"
   },
   "devDependencies": {

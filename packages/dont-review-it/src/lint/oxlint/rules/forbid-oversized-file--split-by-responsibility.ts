@@ -1,3 +1,5 @@
+import { range } from "es-toolkit";
+
 import { createDontReviewItRule } from "../../../create-rule.ts";
 
 import type { ESTree, Options } from "@oxlint/plugins";
@@ -13,15 +15,8 @@ const maxLinesFrom = (options: Readonly<Options>): number => {
   return typeof maxLines === "number" ? maxLines : DEFAULT_MAX_LINES;
 };
 
-const codeLineCountOf = (tokens: readonly ESTree.Token[]): number => {
-  const codeLines = new Set<number>();
-  for (const token of tokens) {
-    for (let line = token.loc.start.line; line <= token.loc.end.line; line += 1) {
-      codeLines.add(line);
-    }
-  }
-  return codeLines.size;
-};
+const codeLineCountOf = (tokens: readonly ESTree.Token[]): number =>
+  new Set(tokens.flatMap((token) => range(token.loc.start.line, token.loc.end.line + 1))).size;
 
 export const forbidOversizedFile = createDontReviewItRule({
   name: "forbid-oversized-file--split-by-responsibility",

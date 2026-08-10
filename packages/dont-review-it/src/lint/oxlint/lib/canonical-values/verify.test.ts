@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { afterEach, expect, test } from "vite-plus/test";
+import { expect, onTestFinished, test } from "vite-plus/test";
 
 import { RETIRED_ANNOTATION_TAGS } from "./annotation.ts";
 import { buildCanonicalValuesCatalog } from "./builder.ts";
@@ -18,15 +18,11 @@ import type { CanonicalValue } from "./fingerprint.ts";
 
 const CANONICAL_VALUES_TAG = "@canonical-values";
 
-const createdRoots: string[] = [];
-
-afterEach(() => {
-  for (const root of createdRoots.splice(0)) rmSync(root, { recursive: true, force: true });
-});
-
 const repositoryWith = (files: Readonly<Record<string, string>>): string => {
   const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-  createdRoots.push(root);
+  onTestFinished(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
   for (const [path, text] of Object.entries(files)) {
     const target = join(root, path);
     mkdirSync(dirname(target), { recursive: true });

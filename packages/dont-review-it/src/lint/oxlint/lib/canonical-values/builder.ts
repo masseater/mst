@@ -1,5 +1,7 @@
 import { dirname, join, resolve } from "node:path";
 
+import { memoize, sortBy } from "es-toolkit";
+
 import { readDeclarationSources } from "./annotated-sources.ts";
 import { buildCatalog, EMPTY_CANONICAL_VALUES_CATALOG } from "./catalog.ts";
 import { cacheInputFingerprint, readCachedEntries, writeCachedEntries } from "./catalog-cache.ts";
@@ -11,32 +13,20 @@ import type { AnnotatedSource } from "./annotated-sources.ts";
 import type { CanonicalValuesCatalog, CanonicalValuesEntry } from "./catalog.ts";
 
 const nearestPackageDirectory = (fileDirectory: string, repositoryRoot: string): string | null => {
-  let directory = fileDirectory;
-  for (;;) {
-    if (isFile(join(directory, MANIFEST_FILE_NAME))) return directory;
-    if (directory === repositoryRoot) return null;
-    const parent = dirname(directory);
-    if (parent === directory) return null;
-    directory = parent;
-  }
+  if (isFile(join(fileDirectory, MANIFEST_FILE_NAME))) return fileDirectory;
+  if (fileDirectory === repositoryRoot) return null;
+  const parent = dirname(fileDirectory);
+  return parent === fileDirectory ? null : nearestPackageDirectory(parent, repositoryRoot);
 };
 
 const canonicalValuesEntriesIn = (
   repositoryRoot: string,
   sources: readonly AnnotatedSource[],
 ): readonly CanonicalValuesEntry[] => {
-  const specifierIndexByPackage = new Map<string, ReadonlyMap<string, string>>();
-  const specifierIndexFor = (packageDirectory: string): ReadonlyMap<string, string> => {
-    const known = specifierIndexByPackage.get(packageDirectory);
-    if (known !== undefined) return known;
-    const built = buildExportSpecifierIndex(packageDirectory);
-    specifierIndexByPackage.set(packageDirectory, built);
-    return built;
-  };
+  const specifierIndexFor = memoize(buildExportSpecifierIndex);
 
-  const entries: CanonicalValuesEntry[] = [];
-  for (const source of sources) {
-    if (source.declarations.length === 0) continue;
+  const entries = sources.flatMap((source) => {
+    if (source.declarations.length === 0) return [];
 
     const packageDirectory = nearestPackageDirectory(dirname(source.absolutePath), repositoryRoot);
     const exportPath =
@@ -44,22 +34,16 @@ const canonicalValuesEntriesIn = (
         ? null
         : (specifierIndexFor(packageDirectory).get(source.absolutePath) ?? null);
 
-    for (const declaration of source.declarations) {
-      entries.push({
-        conceptId: declaration.conceptId,
-        declarationPath: source.relativePath,
-        exportPath,
-        values: declaration.values,
-        fingerprint: fingerprintValues(declaration.values),
-      });
-    }
-  }
-
-  return entries.sort((left, right) => {
-    const leftKey = `${left.declarationPath} ${left.conceptId}`;
-    const rightKey = `${right.declarationPath} ${right.conceptId}`;
-    return leftKey === rightKey ? 0 : leftKey < rightKey ? -1 : 1;
+    return source.declarations.map((declaration) => ({
+      conceptId: declaration.conceptId,
+      declarationPath: source.relativePath,
+      exportPath,
+      values: declaration.values,
+      fingerprint: fingerprintValues(declaration.values),
+    }));
   });
+
+  return sortBy(entries, ["declarationPath", "conceptId"]);
 };
 
 export const buildCanonicalValuesCatalog = ({

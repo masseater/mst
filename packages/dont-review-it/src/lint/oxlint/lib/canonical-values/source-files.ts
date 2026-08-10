@@ -1,7 +1,9 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { basename, join, relative, sep } from "node:path";
 
-import type { Stats } from "node:fs";
+import { attempt, partition, sortBy } from "es-toolkit";
+
+import type { Dirent, Stats } from "node:fs";
 
 export type ScannedFile = {
   readonly absolutePath: string;
@@ -33,79 +35,63 @@ const DECLARATION_SOURCE_NAME_PATTERN = /\.[cm]?tsx?$/u;
 
 const TEST_FILE_NAME_PATTERN = /\.(?:test|spec)\.[cm]?[jt]sx?$/u;
 
-const statOf = (path: string): Stats | null => {
-  try {
-    return statSync(path);
-  } catch {
-    return null;
-  }
-};
+const statOf = (path: string): Stats | null => attempt(() => statSync(path))[1];
 
 export const isFile = (path: string): boolean => statOf(path)?.isFile() === true;
 
 export const isDirectory = (path: string): boolean => statOf(path)?.isDirectory() === true;
 
-export const readTextFile = (path: string): string | null => {
-  try {
-    return readFileSync(path, "utf8");
-  } catch {
-    return null;
-  }
-};
+export const readTextFile = (path: string): string | null =>
+  attempt(() => readFileSync(path, "utf8"))[1];
 
 const toPosixPath = (value: string): string => value.split(sep).join("/");
 
-const byRelativePath = (left: ScannedFile, right: ScannedFile): number =>
-  left.relativePath === right.relativePath ? 0 : left.relativePath < right.relativePath ? -1 : 1;
+const directoryEntriesOf = (directory: string): readonly Dirent[] =>
+  attempt(() => readdirSync(directory, { withFileTypes: true }))[1] ?? [];
+
+const scannedFileAt = (repositoryRoot: string, absolutePath: string): ScannedFile | null => {
+  const stats = statOf(absolutePath);
+  if (stats === null) return null;
+  return {
+    absolutePath,
+    relativePath: toPosixPath(relative(repositoryRoot, absolutePath)),
+    size: stats.size,
+    mtimeMs: stats.mtimeMs,
+  };
+};
+
+const isScannedName = (name: string): boolean =>
+  name === MANIFEST_FILE_NAME || SCRIPT_FILE_NAME_PATTERN.test(name);
+
+const scannedFilesUnder = (repositoryRoot: string, directory: string): readonly ScannedFile[] =>
+  directoryEntriesOf(directory).flatMap((directoryEntry) => {
+    const absolutePath = join(directory, directoryEntry.name);
+    if (directoryEntry.isDirectory()) {
+      return UNSCANNED_DIRECTORY_NAMES.has(directoryEntry.name)
+        ? []
+        : scannedFilesUnder(repositoryRoot, absolutePath);
+    }
+    if (!directoryEntry.isFile()) return [];
+    if (!isScannedName(directoryEntry.name)) return [];
+    const scanned = scannedFileAt(repositoryRoot, absolutePath);
+    return scanned === null ? [] : [scanned];
+  });
+
+const isManifest = (file: ScannedFile): boolean =>
+  basename(file.absolutePath) === MANIFEST_FILE_NAME;
+
+const isDeclarationSource = (file: ScannedFile): boolean => {
+  const name = basename(file.absolutePath);
+  return DECLARATION_SOURCE_NAME_PATTERN.test(name) && !TEST_FILE_NAME_PATTERN.test(name);
+};
 
 export const listRepositoryFiles = (repositoryRoot: string): RepositoryFiles => {
-  const declarationSources: ScannedFile[] = [];
-  const commentSources: ScannedFile[] = [];
-  const manifests: ScannedFile[] = [];
-
-  const walk = (directory: string): void => {
-    let directoryEntries;
-    try {
-      directoryEntries = readdirSync(directory, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const directoryEntry of directoryEntries) {
-      const absolutePath = join(directory, directoryEntry.name);
-      if (directoryEntry.isDirectory()) {
-        if (!UNSCANNED_DIRECTORY_NAMES.has(directoryEntry.name)) walk(absolutePath);
-        continue;
-      }
-      if (!directoryEntry.isFile()) continue;
-      const isManifest = directoryEntry.name === MANIFEST_FILE_NAME;
-      if (!isManifest && !SCRIPT_FILE_NAME_PATTERN.test(directoryEntry.name)) continue;
-      const stats = statOf(absolutePath);
-      if (stats === null) continue;
-      const scanned: ScannedFile = {
-        absolutePath,
-        relativePath: toPosixPath(relative(repositoryRoot, absolutePath)),
-        size: stats.size,
-        mtimeMs: stats.mtimeMs,
-      };
-      if (isManifest) {
-        manifests.push(scanned);
-        continue;
-      }
-      commentSources.push(scanned);
-      if (
-        DECLARATION_SOURCE_NAME_PATTERN.test(directoryEntry.name) &&
-        !TEST_FILE_NAME_PATTERN.test(directoryEntry.name)
-      ) {
-        declarationSources.push(scanned);
-      }
-    }
-  };
-
-  walk(repositoryRoot);
+  const scanned = sortBy(scannedFilesUnder(repositoryRoot, repositoryRoot), ["relativePath"]);
+  const [manifests, commentSources] = partition(scanned, isManifest);
 
   return {
-    declarationSources: declarationSources.sort(byRelativePath),
-    commentSources: commentSources.sort(byRelativePath),
-    manifests: manifests.sort(byRelativePath),
+    declarationSources: commentSources.filter(isDeclarationSource),
+    commentSources,
+    manifests,
   };
 };

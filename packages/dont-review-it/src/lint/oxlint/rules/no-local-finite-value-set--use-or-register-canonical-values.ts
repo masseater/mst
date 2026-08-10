@@ -1,5 +1,7 @@
 import { dirname, relative, resolve } from "node:path";
 
+import { memoize } from "es-toolkit";
+
 import { createDontReviewItRule } from "../../../create-rule.ts";
 import {
   annotatedDeclarationRanges,
@@ -68,14 +70,10 @@ const scalarLiteralValue = (node: ESTree.Expression): CanonicalValue | null => {
 };
 
 const staticArrayValues = (node: ESTree.ArrayExpression): readonly CanonicalValue[] | null => {
-  const vocabulary: CanonicalValue[] = [];
-  for (const element of node.elements) {
-    if (element === null || element.type === "SpreadElement") return null;
-    const spelling = scalarLiteralValue(element);
-    if (spelling === null) return null;
-    vocabulary.push(spelling);
-  }
-  return vocabulary;
+  const spellings = node.elements.map((element) =>
+    element === null || element.type === "SpreadElement" ? null : scalarLiteralValue(element),
+  );
+  return spellings.every((spelling) => spelling !== null) ? spellings : null;
 };
 
 const isFiniteVocabulary = (values: readonly CanonicalValue[]): boolean => {
@@ -94,16 +92,12 @@ const literalTypeValue = (node: ESTree.TSType): CanonicalValue | null => {
 const literalUnionValues = (node: ESTree.TSType): readonly CanonicalValue[] | null => {
   const type = unwrapType(node);
   if (type.type !== "TSUnionType") return null;
-  const vocabulary: CanonicalValue[] = [];
-  for (const member of type.types) {
-    const unwrapped = unwrapType(member);
-    if (unwrapped.type === "TSNullKeyword") continue;
-    if (unwrapped.type === "TSUndefinedKeyword") continue;
-    const spelling = literalTypeValue(unwrapped);
-    if (spelling === null) return null;
-    vocabulary.push(spelling);
-  }
-  return vocabulary;
+
+  const spellings = type.types
+    .map((member) => unwrapType(member))
+    .filter((member) => member.type !== "TSNullKeyword" && member.type !== "TSUndefinedKeyword")
+    .map((member) => literalTypeValue(member));
+  return spellings.every((spelling) => spelling !== null) ? spellings : null;
 };
 
 const calleeMemberName = (node: ESTree.Expression): string | null => {
@@ -124,37 +118,35 @@ type SchemaUnionLiterals = {
   readonly node: ESTree.ArrayExpression;
 };
 
+const schemaLiteralArgumentValue = (
+  element: ESTree.ArrayExpression["elements"][number],
+): CanonicalValue | null => {
+  if (element === null || element.type === "SpreadElement") return null;
+
+  const call = unwrapExpression(element);
+  if (call.type !== "CallExpression") return null;
+  if (calleeMemberName(call.callee) !== SCHEMA_LITERAL_MEMBER) return null;
+
+  const [literal] = call.arguments;
+  if (literal === undefined || literal.type === "SpreadElement") return null;
+  return scalarLiteralValue(literal);
+};
+
 const schemaUnionLiterals = (node: ESTree.CallExpression): SchemaUnionLiterals | null => {
   const [argument] = node.arguments;
   if (argument === undefined || argument.type === "SpreadElement") return null;
   const array = unwrapExpression(argument);
   if (array.type !== "ArrayExpression") return null;
 
-  const vocabulary: CanonicalValue[] = [];
-  for (const element of array.elements) {
-    if (element === null || element.type === "SpreadElement") return null;
-    const call = unwrapExpression(element);
-    if (call.type !== "CallExpression") return null;
-    if (calleeMemberName(call.callee) !== SCHEMA_LITERAL_MEMBER) return null;
-    const [literal] = call.arguments;
-    if (literal === undefined || literal.type === "SpreadElement") return null;
-    const spelling = scalarLiteralValue(literal);
-    if (spelling === null) return null;
-    vocabulary.push(spelling);
-  }
-  return { values: vocabulary, node: array };
+  const spellings = array.elements.map((element) => schemaLiteralArgumentValue(element));
+  if (!spellings.every((spelling) => spelling !== null)) return null;
+  return { values: spellings, node: array };
 };
 
 type FileBindings = {
   readonly arrays: ReadonlyMap<string, ESTree.ArrayExpression>;
   readonly namedImports: ReadonlyMap<string, string>;
   readonly annotatedRanges: readonly AnnotatedDeclarationRange[];
-};
-
-const EMPTY_FILE_BINDINGS: FileBindings = {
-  arrays: new Map(),
-  namedImports: new Map(),
-  annotatedRanges: [],
 };
 
 const collectArrays = (
@@ -284,14 +276,16 @@ export const createNoLocalFiniteValueSet = ({
     create(context) {
       if (isOutOfScopeSource(context.filename)) return {};
 
-      let repositoryRoot: string | null = null;
-      const repositoryRootOf = (): string => (repositoryRoot ??= findWorkspaceRoot(context.cwd));
+      const repositoryRootOf = memoize((): string => findWorkspaceRoot(context.cwd));
 
-      let loaded: CanonicalValuesCatalog | null = null;
-      const catalogOf = (): CanonicalValuesCatalog =>
-        (loaded ??= loadCatalog({ repositoryRoot: repositoryRootOf() }));
+      const catalogOf = memoize(
+        (): CanonicalValuesCatalog => loadCatalog({ repositoryRoot: repositoryRootOf() }),
+      );
 
-      let bindings = EMPTY_FILE_BINDINGS;
+      const bindingsOf = memoize(
+        (): FileBindings => collectFileBindings(context.sourceCode.ast, context.sourceCode.text),
+      );
+
       const reportedSpans = new Set<string>();
 
       const reportOnce = (
@@ -299,7 +293,7 @@ export const createNoLocalFiniteValueSet = ({
         messageId: string,
         data: Record<string, string>,
       ): void => {
-        if (isInsideAnnotatedDeclaration(bindings.annotatedRanges, node)) return;
+        if (isInsideAnnotatedDeclaration(bindingsOf().annotatedRanges, node)) return;
         const span = `${node.start}:${node.end}`;
         if (reportedSpans.has(span)) return;
         reportedSpans.add(span);
@@ -333,12 +327,12 @@ export const createNoLocalFiniteValueSet = ({
       };
 
       const resolveName = (name: string, reference: ESTree.Span): ValuesPosition | null => {
-        const array = bindings.arrays.get(name);
+        const array = bindingsOf().arrays.get(name);
         if (array !== undefined) {
           const vocabulary = staticArrayValues(array);
           return vocabulary === null ? null : { kind: "values", values: vocabulary, node: array };
         }
-        const specifier = bindings.namedImports.get(name);
+        const specifier = bindingsOf().namedImports.get(name);
         if (specifier === undefined) return null;
         const route = importRouteStatus(
           specifier,
@@ -383,10 +377,6 @@ export const createNoLocalFiniteValueSet = ({
       };
 
       return {
-        Program(node: ESTree.Program) {
-          bindings = collectFileBindings(node, context.sourceCode.text);
-        },
-
         TSTypeAliasDeclaration(node: ESTree.TSTypeAliasDeclaration) {
           const vocabulary = literalUnionValues(node.typeAnnotation);
           if (vocabulary === null || !isFiniteVocabulary(vocabulary)) return;
