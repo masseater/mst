@@ -19,7 +19,6 @@ import {
   SET_CONSTRUCTOR,
   staticArrayValues,
   unwrapExpression,
-  unwrapType,
 } from "../lib/canonical-values/finite-value-syntax.ts";
 import { importRouteStatus } from "../lib/canonical-values/import-route.ts";
 import {
@@ -347,8 +346,8 @@ export const createNoLocalFiniteValueSet = ({
         },
 
         TSIndexedAccessType(node: ESTree.TSIndexedAccessType) {
-          if (unwrapType(node.indexType).type !== "TSNumberKeyword") return;
-          const objectType = unwrapType(node.objectType);
+          if (node.indexType.type !== "TSNumberKeyword") return;
+          const objectType = node.objectType;
           if (objectType.type !== "TSTypeQuery") return;
           const { exprName } = objectType;
           if (exprName.type !== "Identifier") return;
