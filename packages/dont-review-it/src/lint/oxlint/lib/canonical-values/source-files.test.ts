@@ -1,10 +1,23 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 
-import { expect, onTestFinished, test } from "vite-plus/test";
+import { expect, onTestFinished, test, vi } from "vite-plus/test";
 
-import { nearestPackageDirectory } from "./source-files.ts";
+import { listRepositoryFiles, nearestPackageDirectory } from "./source-files.ts";
+
+const VANISHED_FILE_NAME = "vanished.ts";
+
+vi.mock("node:fs", async (importOriginal) => {
+  const real = await importOriginal<typeof import("node:fs")>();
+  return {
+    ...real,
+    statSync: (path: Parameters<typeof real.statSync>[0]) => {
+      if (String(path).endsWith(VANISHED_FILE_NAME)) throw new Error("the file is gone");
+      return real.statSync(path);
+    },
+  };
+});
 
 const createRepository = (): string => {
   const root = mkdtempSync(join(tmpdir(), "source-files-"));
@@ -63,4 +76,19 @@ test("a repository whose root holds no manifest leaves the file in no package", 
   const nested = createDirectory(root, "scripts");
 
   expect(nearestPackageDirectory(nested, root)).toBe(null);
+});
+
+test("a climb that reaches the top of the filesystem stops there", () => {
+  expect(nearestPackageDirectory(sep, join(sep, "a-root-that-is-never-reached"))).toBe(null);
+});
+
+test("a file that disappears between the listing and the reading is left out", () => {
+  const root = createRepository();
+  const source = createDirectory(root, "src");
+  writeFileSync(join(source, "present.ts"), "export const total = 1;\n", "utf8");
+  writeFileSync(join(source, VANISHED_FILE_NAME), "export const gone = 1;\n", "utf8");
+
+  expect(listRepositoryFiles(root).commentSources.map((file) => file.relativePath)).toStrictEqual([
+    "src/present.ts",
+  ]);
 });
