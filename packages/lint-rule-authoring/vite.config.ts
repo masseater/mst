@@ -7,11 +7,4 @@ export default defineConfig({
       tsgo: true,
     },
   },
-  lint: {
-    options: {
-      typeAware: true,
-      typeCheck: true,
-    },
-  },
-  fmt: {},
 });
