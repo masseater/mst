@@ -1,13 +1,15 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { testLintRule } from "@mst/lint-rule-authoring";
-import { afterAll, describe } from "vite-plus/test";
+import { describe } from "vite-plus/test";
 
 import { forbidNumberedSiblingFile } from "./forbid-numbered-sibling-file--name-what-each-file-owns.ts";
 
-const fixtureDir = mkdtempSync(join(tmpdir(), "forbid-numbered-sibling-file-"));
+const fixtureDir = join(tmpdir(), "dont-review-it-forbid-numbered-sibling-file");
+rmSync(fixtureDir, { recursive: true, force: true });
+mkdirSync(fixtureDir, { recursive: true });
 
 const fixturePath = (name: string): string => join(fixtureDir, name);
 
@@ -46,10 +48,6 @@ writeFixture("different-prefix/alpha-1.ts");
 writeFixture("different-prefix/beta-2.ts");
 
 describe("dont-review-it/forbid-numbered-sibling-file--name-what-each-file-owns", () => {
-  afterAll(() => {
-    rmSync(fixtureDir, { recursive: true, force: true });
-  });
-
   testLintRule(forbidNumberedSiblingFile, {
     valid: [
       {

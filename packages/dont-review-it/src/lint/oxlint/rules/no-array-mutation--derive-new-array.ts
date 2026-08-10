@@ -50,7 +50,7 @@ const staticPropertyName = (node: ESTree.MemberExpression): string | null => {
   if (key.type === "Literal") return typeof key.value === "string" ? key.value : null;
   if (key.type !== "TemplateLiteral") return null;
   if (key.expressions.length !== 0 || key.quasis.length !== 1) return null;
-  return key.quasis[0].value.cooked;
+  return key.quasis[0]?.value.cooked ?? null;
 };
 
 const isArrayGlobalReference = (node: ESTree.Expression): boolean =>
@@ -61,7 +61,7 @@ const declaredTypeParameterConstraint = (node: ESTree.Node, name: string): ESTre
 
   const declared = "typeParameters" in node.parent ? node.parent.typeParameters : null;
   const matched = declared?.params.find((parameter) => parameter.name.name === name);
-  if (matched !== undefined && matched !== null) return matched.constraint;
+  if (matched !== undefined) return matched.constraint;
 
   return declaredTypeParameterConstraint(node.parent, name);
 };

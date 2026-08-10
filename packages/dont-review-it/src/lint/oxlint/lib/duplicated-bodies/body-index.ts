@@ -85,7 +85,12 @@ const clustersIn = (
 ): readonly (readonly BodySite[])[] =>
   [...sitesByKey.values()]
     .filter((sites) => sites.length > 1)
-    .toSorted((left, right) => bySiteOrder(left[0], right[0]));
+    .toSorted((left, right) => {
+      const [leftFirst] = left;
+      const [rightFirst] = right;
+      if (leftFirst === undefined || rightFirst === undefined) return 0;
+      return bySiteOrder(leftFirst, rightFirst);
+    });
 
 export const duplicatedClustersIn = (index: BodyIndex): readonly (readonly BodySite[])[] =>
   clustersIn(index.sitesByFingerprint);

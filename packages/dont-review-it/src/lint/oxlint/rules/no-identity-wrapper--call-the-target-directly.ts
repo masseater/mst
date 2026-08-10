@@ -26,7 +26,7 @@ const forwardedArgument = (argument: ESTree.Argument): ForwardedName | null => {
 const soleReturnedExpression = (body: ESTree.FunctionBody): ESTree.Expression | null => {
   if (body.body.length !== 1) return null;
   const [statement] = body.body;
-  if (statement.type !== "ReturnStatement") return null;
+  if (statement?.type !== "ReturnStatement") return null;
   return statement.argument === null ? null : withoutParentheses(statement.argument);
 };
 
@@ -36,7 +36,7 @@ const forwardedCall = (declared: FunctionLike): ESTree.CallExpression | null => 
 
   const forwarded =
     body.type === "BlockStatement" ? soleReturnedExpression(body) : withoutParentheses(body);
-  if (forwarded === null || forwarded.type !== "CallExpression") return null;
+  if (forwarded?.type !== "CallExpression") return null;
   if (forwarded.optional) return null;
   return (forwarded.typeArguments ?? null) === null ? forwarded : null;
 };

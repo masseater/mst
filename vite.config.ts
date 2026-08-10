@@ -1,15 +1,14 @@
-import * as dontReviewIt from "@mst/dont-review-it";
-import * as lintRuleAuthoring from "@mst/lint-rule-authoring";
+import { oxlint as dontReviewItOxlint, withGitExcludes } from "@mst/dont-review-it";
+import { oxlint as lintRuleAuthoringOxlint } from "@mst/lint-rule-authoring";
 import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   staged: {
     "*": "vp check --fix",
   },
-  fmt: {},
-  lint: {
-    extends: [lintRuleAuthoring.oxlint, dontReviewIt.oxlint],
-    plugins: ["unicorn", "typescript", "oxc", "vitest"],
+  fmt: withGitExcludes({}),
+  lint: withGitExcludes({
+    extends: [lintRuleAuthoringOxlint, dontReviewItOxlint],
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
     rules: {
       "vite-plus/prefer-vite-plus-imports": "error",
@@ -42,7 +41,7 @@ export default defineConfig({
       },
     ],
     options: { typeAware: true, typeCheck: true },
-  },
+  }),
   run: {
     cache: true,
   },

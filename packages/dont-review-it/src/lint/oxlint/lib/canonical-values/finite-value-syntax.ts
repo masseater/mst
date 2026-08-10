@@ -26,7 +26,7 @@ const templateSpelling = (
   quasis: readonly ESTree.TemplateElement[],
   substitutions: readonly unknown[],
 ): CanonicalValue | null =>
-  substitutions.length === 0 && quasis.length === 1 ? quasis[0].value.cooked : null;
+  substitutions.length === 0 && quasis.length === 1 ? (quasis[0]?.value.cooked ?? null) : null;
 
 const literalSpelling = (value: unknown): CanonicalValue | null => {
   if (typeof value === "string") return value;

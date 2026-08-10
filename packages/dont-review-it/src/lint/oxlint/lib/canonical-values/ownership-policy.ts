@@ -16,7 +16,7 @@ export const ownershipPolicyOf = (options: Context["options"]): string => {
   if (typeof configured !== "object" || configured === null || Array.isArray(configured)) {
     return UNCONFIGURED_OWNERSHIP_POLICY;
   }
-  const policy = configured["ownershipPolicy"];
+  const policy = configured.ownershipPolicy;
   if (typeof policy !== "string") return UNCONFIGURED_OWNERSHIP_POLICY;
   return policy.trim() === "" ? UNCONFIGURED_OWNERSHIP_POLICY : policy;
 };

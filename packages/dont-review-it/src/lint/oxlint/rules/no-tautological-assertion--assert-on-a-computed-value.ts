@@ -19,7 +19,7 @@ const fixedValueOf = (expression: ESTree.Expression): { readonly held: unknown }
     return "regex" in written ? null : { held: written.value };
   }
   if (written.type === "TemplateLiteral") {
-    return written.expressions.length === 0 ? { held: written.quasis[0].value.cooked } : null;
+    return written.expressions.length === 0 ? { held: written.quasis[0]?.value.cooked } : null;
   }
   if (written.type !== "UnaryExpression" || written.operator !== "-") return null;
 
@@ -28,16 +28,18 @@ const fixedValueOf = (expression: ESTree.Expression): { readonly held: unknown }
   return { held: -negated.held };
 };
 
+const soleExpectArgumentOf = (call: ESTree.CallExpression): ESTree.Expression | null => {
+  const callee = withoutParentheses(call.callee);
+  if (callee.type !== "Identifier" || callee.name !== EXPECT_NAME) return null;
+  if (call.arguments.length !== 1) return null;
+  const [subject] = call.arguments;
+  if (subject === undefined) return null;
+  return subject.type === "SpreadElement" ? null : subject;
+};
+
 const subjectOfExpect = (expression: ESTree.Expression): ESTree.Expression | null => {
   const asserted = withoutParentheses(expression);
-
-  if (asserted.type === "CallExpression") {
-    const callee = withoutParentheses(asserted.callee);
-    if (callee.type !== "Identifier" || callee.name !== EXPECT_NAME) return null;
-    if (asserted.arguments.length !== 1) return null;
-    const [subject] = asserted.arguments;
-    return subject.type === "SpreadElement" ? null : subject;
-  }
+  if (asserted.type === "CallExpression") return soleExpectArgumentOf(asserted);
 
   const member = staticMemberOf(asserted);
   if (member === null || !MODIFIER_NAMES.has(member.name)) return null;
@@ -52,7 +54,7 @@ const equalityOperandsOf = (
   if (node.arguments.length !== 1) return null;
 
   const [expectedNode] = node.arguments;
-  if (expectedNode.type === "SpreadElement") return null;
+  if (expectedNode === undefined || expectedNode.type === "SpreadElement") return null;
 
   const subjectNode = subjectOfExpect(matcher.object);
   return subjectNode === null ? null : { expectedNode, subjectNode };

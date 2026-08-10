@@ -69,4 +69,4 @@ production の TypeScript ソースで、名前も本体もリポジトリ内の
 - `EXPORTS_CONDITION_DEPTH_LIMIT = 8`（`canonical-values/export-specifier-index.ts` と `library-vocabulary/dependency-types.ts`）
 - `MANIFEST_FILE_NAME = "package.json"`（`canonical-values/source-files.ts` と `canonical-values/workspace-root.ts`）
 
-型宣言のうち、名前も本体も一致するものは 0 件、本体だけが一致するものも 0 件だった。
+型宣言のうち、名前も本体も一致するものは 0 件だった。本体だけが一致するものは 1 組あり、これは索引に型宣言が入ったことで [no-duplicated-body--import-the-existing-declaration](./no-duplicated-body--import-the-existing-declaration.md) が新しく報告した。`{ readonly messageId: string; readonly data: Readonly<Record<string, string>> }` を `Misplacement` と `OwnerReport` の 2 つの名前で宣言していたもので、`lib/rule-message.ts` の `RuleMessage` に寄せた。

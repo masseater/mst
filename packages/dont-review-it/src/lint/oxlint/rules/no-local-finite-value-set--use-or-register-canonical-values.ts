@@ -42,6 +42,7 @@ import type {
   CanonicalValuesEntry,
 } from "../lib/canonical-values/catalog.ts";
 import type { LibraryVocabularyLoader } from "../lib/library-vocabulary/vocabulary-loader.ts";
+import type { RuleMessage } from "../lib/rule-message.ts";
 
 type FileBindings = {
   readonly arrays: ReadonlyMap<string, ESTree.ArrayExpression>;
@@ -92,24 +93,20 @@ const collectFileBindings = (program: ESTree.Program, sourceText: string): FileB
 const describeOwner = (entry: CanonicalValuesEntry): string =>
   `${entry.conceptId} (${entry.exportPath ?? entry.declarationPath})`;
 
-type OwnerReport = {
-  readonly messageId: string;
-  readonly data: Readonly<Record<string, string>>;
-};
-
 const libraryOwnerReport = (input: {
   readonly libraries: ReturnType<typeof libraryOwnersOf>;
   readonly values: readonly CanonicalValue[];
   readonly ownershipPolicy: string;
-}): OwnerReport => {
+}): RuleMessage => {
   const { libraries, values, ownershipPolicy } = input;
   if (libraries.length === 0) {
     return { messageId: "localFiniteValueSetWithoutOwner", data: { ownershipPolicy } };
   }
-  if (libraries.length === 1) {
+  const [onlyLibrary] = libraries;
+  if (libraries.length === 1 && onlyLibrary !== undefined) {
     return {
       messageId: "localFiniteValueSetOwnedByLibraryType",
-      data: { owner: describeLibraryOwner(libraries[0], values), ownershipPolicy },
+      data: { owner: describeLibraryOwner(onlyLibrary, values), ownershipPolicy },
     };
   }
   return {
@@ -124,12 +121,13 @@ const libraryOwnerReport = (input: {
 const catalogOwnerReport = (input: {
   readonly owners: readonly CanonicalValuesEntry[];
   readonly ownershipPolicy: string;
-}): OwnerReport => {
+}): RuleMessage => {
   const { owners, ownershipPolicy } = input;
-  if (owners.length === 1) {
+  const [onlyOwner] = owners;
+  if (owners.length === 1 && onlyOwner !== undefined) {
     return {
       messageId: "localFiniteValueSetWithOwner",
-      data: { owner: describeOwner(owners[0]), ownershipPolicy },
+      data: { owner: describeOwner(onlyOwner), ownershipPolicy },
     };
   }
   return {
