@@ -5,7 +5,7 @@ type ObjectLookup = {
   readonly key: string;
 };
 
-const propertyKeyOf = (property: ESTree.ObjectProperty): string | null => {
+export const propertyKeyOf = (property: ESTree.ObjectProperty): string | null => {
   const { key } = property;
   if (key.type === "Literal") return String(key.value);
   return key.type === "Identifier" && !property.computed ? key.name : null;
