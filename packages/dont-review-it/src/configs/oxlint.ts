@@ -2,6 +2,7 @@ import { LINT_SEVERITY } from "@mst/lint-rule-authoring";
 import { defineConfig } from "oxlint";
 
 import { FORBIDDEN_AMBIGUOUS_NAMES } from "../lint/oxlint/lib/forbidden-ambiguous-names.ts";
+import { forbidNumberedSiblingFile } from "../lint/oxlint/rules/forbid-numbered-sibling-file--name-what-each-file-owns.ts";
 import { forbidOversizedFile } from "../lint/oxlint/rules/forbid-oversized-file--split-by-responsibility.ts";
 import { noAmbiguousVariableName } from "../lint/oxlint/rules/no-ambiguous-variable-name--rename-to-concrete-noun.ts";
 import { noArrayMutation } from "../lint/oxlint/rules/no-array-mutation--derive-new-array.ts";
@@ -31,6 +32,7 @@ const SHARED_TSCONFIG_PRESETS = [
 ];
 
 export const oxlint = defineConfig({
+  categories: { correctness: LINT_SEVERITY.ERROR },
   jsPlugins: [{ name: PLUGIN_NAME, specifier: "@mst/dont-review-it/plugin" }],
   overrides: [
     {
@@ -40,10 +42,12 @@ export const oxlint = defineConfig({
           LINT_SEVERITY.ERROR,
           { max: 320, skipBlankLines: true, skipComments: true },
         ],
+        "max-statements": LINT_SEVERITY.OFF,
       },
     },
   ],
   rules: {
+    [`${PLUGIN_NAME}/${forbidNumberedSiblingFile.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${forbidOversizedFile.name}`]: [
       LINT_SEVERITY.ERROR,
       { maxLines: MAX_LINES_PER_FILE },
@@ -71,12 +75,16 @@ export const oxlint = defineConfig({
     [`${PLUGIN_NAME}/${noStrictCanonicalLiteralUse.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noTautologicalAssertion.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${requireReExportOnlyFiles.name}`]: LINT_SEVERITY.ERROR,
+    complexity: [LINT_SEVERITY.ERROR, { max: 10 }],
+    "max-classes-per-file": [LINT_SEVERITY.ERROR, { max: 1 }],
     "max-depth": [LINT_SEVERITY.ERROR, { max: 4 }],
+    "max-nested-callbacks": [LINT_SEVERITY.ERROR, { max: 2 }],
+    "max-statements": [LINT_SEVERITY.ERROR, { max: 10 }],
     "max-lines-per-function": [
       LINT_SEVERITY.ERROR,
       { max: 200, skipBlankLines: true, skipComments: true },
     ],
-    "max-params": [LINT_SEVERITY.ERROR, { max: 4 }],
+    "max-params": [LINT_SEVERITY.ERROR, { max: 2 }],
     "no-console": LINT_SEVERITY.ERROR,
     "no-duplicate-imports": LINT_SEVERITY.ERROR,
     "no-empty": LINT_SEVERITY.ERROR,

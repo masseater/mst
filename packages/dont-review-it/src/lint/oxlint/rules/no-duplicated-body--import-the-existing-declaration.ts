@@ -26,6 +26,24 @@ const statementCovering = (
   return null;
 };
 
+type DuplicatedBodyReport = {
+  readonly line: number;
+  readonly sites: string;
+};
+
+const duplicatedBodyReports = (input: {
+  readonly index: BodyIndex;
+  readonly relativePath: string;
+}): readonly DuplicatedBodyReport[] => {
+  const { index, relativePath } = input;
+  return (index.bodiesByPath.get(relativePath) ?? []).flatMap((body) => {
+    const elsewhere = (index.sitesByFingerprint.get(body.fingerprint) ?? []).filter(
+      (site) => site.relativePath !== relativePath || site.line !== body.line,
+    );
+    return elsewhere.length === 0 ? [] : [{ line: body.line, sites: spellSites(elsewhere) }];
+  });
+};
+
 export const createNoDuplicatedBody = ({
   loadIndex,
 }: {
@@ -54,24 +72,17 @@ export const createNoDuplicatedBody = ({
       return {
         Program(node: ESTree.Program) {
           const repositoryRoot = repositoryRootOf();
-          const index = loadIndex({ repositoryRoot });
           const relativePath = toPosixPath(relative(repositoryRoot, resolve(context.filename)));
-          const bodies = index.bodiesByPath.get(relativePath);
-          if (bodies === undefined) return;
+          const reports = duplicatedBodyReports({
+            index: loadIndex({ repositoryRoot }),
+            relativePath,
+          });
 
-          for (const body of bodies) {
-            const sites = index.sitesByFingerprint.get(body.fingerprint) ?? [];
-            if (sites.length < 2) continue;
-
-            const elsewhere = sites.filter(
-              (site) => site.relativePath !== relativePath || site.line !== body.line,
-            );
-            if (elsewhere.length === 0) continue;
-
+          for (const report of reports) {
             context.report({
-              node: statementCovering(node.body, body.line) ?? node,
+              node: statementCovering(node.body, report.line) ?? node,
               messageId: "duplicatedBody",
-              data: { sites: spellSites(elsewhere) },
+              data: { sites: report.sites },
             });
           }
         },
