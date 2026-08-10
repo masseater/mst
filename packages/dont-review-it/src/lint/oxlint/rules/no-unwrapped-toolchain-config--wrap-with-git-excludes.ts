@@ -1,3 +1,5 @@
+import { propertyNameOf } from "@mst/lint-rule-authoring";
+
 import { createDontReviewItRule } from "../../../create-rule.ts";
 
 import type { ESTree } from "@oxlint/plugins";
@@ -51,13 +53,6 @@ const isCallOf = (
   );
 };
 
-const propertyNameOf = (property: ESTree.ObjectProperty): string | null => {
-  if (property.computed) return null;
-  if (property.key.type === "Identifier") return property.key.name;
-  if (property.key.type === "Literal") return String(property.key.value);
-  return null;
-};
-
 export const noUnwrappedToolchainConfig = createDontReviewItRule({
   name: "no-unwrapped-toolchain-config--wrap-with-git-excludes",
   meta: {
@@ -68,8 +63,8 @@ export const noUnwrappedToolchainConfig = createDontReviewItRule({
       relatedGuidelines: [],
     },
     messages: {
-      unwrappedLint: `The \`lint\` block handed to Vite+'s \`defineConfig\` must be the result of \`${WRAPPER_NAME}\`, because oxlint keeps only the \`ignorePatterns\` written on the configuration that does the extending and drops the ones carried by every configuration named in \`extends\`. A preset therefore cannot deliver them, and without the wrapper nothing tells the linter about the machine-wide excludes file that \`core.excludesFile\` points at: scratch directories that git has been told to ignore are linted anyway. Wrap the block, keeping the preset where it is: \`lint: ${WRAPPER_NAME}({ extends: [dontReviewIt.oxlint], ... })\`.`,
-      unwrappedFmt: `The \`fmt\` block handed to Vite+'s \`defineConfig\` must be the result of \`${WRAPPER_NAME}\`, because oxfmt reads ignore patterns only from the block itself and, like oxlint, walks past the machine-wide excludes file that \`core.excludesFile\` points at. Without the wrapper the formatter rewrites files inside scratch directories that git has been told to ignore. Wrap the block: \`fmt: ${WRAPPER_NAME}({})\`.`,
+      unwrappedLint: `The \`lint\` block handed to Vite+'s \`defineConfig\` must not skip \`${WRAPPER_NAME}\`. Wrap the block, keeping the preset where it is: \`lint: ${WRAPPER_NAME}({ extends: [dontReviewIt.oxlint], ... })\`.`,
+      unwrappedFmt: `The \`fmt\` block handed to Vite+'s \`defineConfig\` must not skip \`${WRAPPER_NAME}\`. Wrap the block: \`fmt: ${WRAPPER_NAME}({})\`.`,
     },
     schema: [],
   },

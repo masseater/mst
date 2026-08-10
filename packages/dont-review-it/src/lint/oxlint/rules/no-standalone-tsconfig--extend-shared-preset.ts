@@ -17,7 +17,7 @@ export const noStandaloneTsconfig = createDontReviewItRule({
     },
     messages: {
       standaloneTsconfig:
-        "The tsconfig.json that governs this file must extend one of the shared presets, because compiler options written out per workspace start as copies and stop being copies the moment one of them is edited, and nothing reports that they have drifted apart. `{{tsconfigPath}}` extends none of {{allowedSuffixes}}. Replace its compilerOptions with an `extends` naming the preset that matches how the workspace runs, and keep only what is genuinely particular to the workspace, such as `include`. If the workspace needs an option the preset does not give it, that option belongs in the preset, or the workspace needs a preset of its own; deciding it locally puts the next workspace back where this one started.",
+        "The tsconfig.json that governs this file must not decide compiler options on its own. `{{tsconfigPath}}` extends none of {{allowedSuffixes}}. Replace its compilerOptions with an `extends` naming the preset that matches how the workspace runs, and keep only what is particular to the workspace, such as `include`.",
     },
     schema: [
       {

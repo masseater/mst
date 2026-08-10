@@ -93,9 +93,9 @@ export const noDetachedTestFile = createDontReviewItRule({
     },
     messages: {
       detachedTestFile:
-        "A test file must sit in the directory of the source it tests and carry that source's name in front of the test suffix, because the path is the only thing that ties the pair together, and a test placed anywhere else stays behind the moment its source moves or is renamed. Nothing exists at `{{sourcePath}}`. Move this file into the directory of the source it tests and name it after that source. If nothing owns the behaviour it checks any more, fold it into the tests of whatever owns that behaviour now, or delete it.",
+        "A test file must not sit apart from the source it tests. Nothing exists at `{{sourcePath}}`. Move this file into the directory of the source it tests and name it after that source.",
       testOnlyDirectory:
-        "A test file must not sit under a directory that exists only to hold tests, because a tree of tests standing beside the tree of sources holds the pair together by a rule that is written nowhere and breaks without failing. This file sits under `{{directory}}`. Move the source it tests back among the modules that use it, and move this file with it.",
+        "A test file must not sit under a directory that exists only to hold tests. This file sits under `{{directory}}`. Move the source it tests back among the modules that use it, and move this file with it.",
     },
     schema: [
       {

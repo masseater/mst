@@ -59,7 +59,7 @@ export const forbidNumberedSiblingFile = createDontReviewItRule({
     },
     messages: {
       numberedSiblingFile:
-        "Splitting a file into siblings that differ only by a number is forbidden, because the number names nothing, and a reader looking for one behaviour has to open every one of them to find where it went. `{{sibling}}` sits in this directory under the same name with a different number, so the responsibility both files share is still exactly one responsibility spread over two places. List what each file owns and name it after that. If listing produces one entry, the split bought nothing: put the declarations back into one file and reduce what it does instead of dividing it again.",
+        "Splitting a file into siblings that differ only by a number is forbidden. `{{sibling}}` sits in this directory under the same name with a different number. List what each file owns and rename each file after what it owns.",
     },
     schema: [],
   },

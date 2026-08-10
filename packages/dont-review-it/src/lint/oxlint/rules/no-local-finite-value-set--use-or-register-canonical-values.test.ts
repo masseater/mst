@@ -345,7 +345,7 @@ describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-va
         {
           name: "the report carries the name of the type the reader has to derive from",
           code: 'export type SsrTarget = "node" | "webworker";',
-          errors: [{ message: /derive the type from SSRTarget from vite, so/u }],
+          errors: [{ message: /derive the type from SSRTarget from vite\./u }],
         },
         {
           name: "a schema enum reaches the same dependency as the type alias does",

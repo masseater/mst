@@ -41,7 +41,7 @@ export const createNoDuplicatedBody = ({
       },
       messages: {
         duplicatedBody:
-          "A declaration must not repeat a body that already exists elsewhere in this repository, because a later change reaches only the copy that was edited and nothing fails until the two spellings disagree at run time. The same body is declared at {{sites}}. Decide which place owns the behaviour, export it from there, and import it everywhere else. Do not settle the choice by which copy came first or which name reads better: choose the module whose responsibility the behaviour belongs to.",
+          "A declaration must not repeat a body that already exists elsewhere in this repository. The same body is declared at {{sites}}. Decide which module owns the behaviour, export it from there, and import it everywhere else.",
       },
       schema: [],
     },

@@ -32,7 +32,7 @@ export const noPromiseChain = createDontReviewItRule({
     },
     messages: {
       promiseChainCall:
-        "Calling a member named `{{method}}` is forbidden, because the continuation and the failure handling of an asynchronous call then sit inside callback arguments instead of the enclosing function's own control flow, and a reader has to open every callback to learn what happens when the call fails. Await the asynchronous value and let the following statements use it, and move the failure handling into the `catch` clause and the cleanup into the `finally` clause of a `try` statement that encloses that `await`. This rule matches the property name `then`, `catch` or `finally` and never inspects the receiver, so a non-Promise interface that happens to expose one of those names is reported as well; how such an interface should be called instead is still undecided, so report the occurrence instead of working around the check.",
+        "Calling a member named `{{method}}` is forbidden. Await the asynchronous value and let the following statements use it, and move the failure handling into the `catch` clause and the cleanup into the `finally` clause of a `try` statement that encloses that `await`.",
     },
     schema: [],
   },

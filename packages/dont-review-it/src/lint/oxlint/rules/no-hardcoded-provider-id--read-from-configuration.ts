@@ -100,7 +100,7 @@ export const noHardcodedProviderId = createDontReviewItRule({
     },
     messages: {
       hardcodedProviderId:
-        "A client built from a provider package must not take the identity it acts as from text written out in this file, because that identity is the one part of the connection that differs between every deployment: the same source has to act as a sandbox account under test, a staging account during review, and the real account in production, and text baked into the construction can be none of those without an edit. What follows is a build that only works for the account its author happened to have, a test run that touches real data because nothing pointed it elsewhere, and a credential that is now in the history of this repository and stays there after it is deleted from the current file. Read the identity from configuration and pass it in: take it from the environment the process was started with, or accept it as a parameter of the function that builds the client so the caller decides. Whether the text looks like an identifier is not what is being reported. Any written-out text at this argument is, because this argument is who the connection acts as.",
+        "A client built from a provider package must not take the identity it acts as from text written out in this file. Read the identity from configuration and pass it in: take it from the environment the process was started with, or accept it as a parameter of the function that builds the client.",
     },
     schema: [],
   },

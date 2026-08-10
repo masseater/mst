@@ -60,7 +60,7 @@ export const noHardcodedEndpoint = createDontReviewItRule({
     },
     messages: {
       hardcodedEndpoint:
-        "A call that opens a connection must not take its destination from text written out in this file, because the destination is the one part of a request that differs between every deployment: the same source has to reach a local stub under test, a staging host during review, and the real host in production, and text baked into the call can be none of those without an edit. What follows is a build that only runs where its author ran it, a test suite that either talks to a real host or is rewritten per environment, and a wrong destination that no type and no test can catch because the value never leaves this line. Read the destination from configuration and pass it in: take it from the environment the process was started with, or accept it as a parameter of the function that performs the request so the caller decides. Whether the text looks like a URL is not what is being reported. Any written-out text at this argument is, because this argument is where the connection goes.",
+        "A call that opens a connection must not take its destination from text written out in this file. Read the destination from configuration and pass it in: take it from the environment the process was started with, or accept it as a parameter of the function that performs the request.",
     },
     schema: [],
   },

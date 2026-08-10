@@ -176,7 +176,7 @@ export const createNoStrictCanonicalLiteralUseRule = ({
       },
       messages: {
         canonicalValueLiteral:
-          "A value that a declared vocabulary already owns must not be written again as a literal, because the literal and the declaration then change apart and nothing fails when they diverge. Replace {{value}} with the binding its owner publishes: {{concepts}}. Ownership policy: {{ownershipPolicy}}.",
+          "A value that a declared vocabulary already owns must not be written again as a literal. Replace {{value}} with the binding its owner publishes: {{concepts}}. Ownership policy: {{ownershipPolicy}}.",
       },
       schema: OWNERSHIP_POLICY_SCHEMA,
     },
