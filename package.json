@@ -8,7 +8,7 @@
   },
   "type": "module",
   "scripts": {
-    "ready": "vp check && vp run -r test && vp run -r build && vp run knip",
+    "ready": "vp check && vp run -r test && vp run -r build && vp run knip && vp node packages/dont-review-it/dist/cli.mjs verify",
     "dev": "vp run website#dev",
     "knip": "knip",
     "prepare": "vp config"
