@@ -237,6 +237,9 @@ importers:
       '@mst/lint-rule-authoring':
         specifier: workspace:*
         version: link:packages/lint-rule-authoring
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.2.0
       knip:
         specifier: 'catalog:'
         version: 6.32.0
@@ -249,6 +252,9 @@ importers:
 
   apps/website:
     devDependencies:
+      '@mst/dont-review-it':
+        specifier: workspace:*
+        version: link:../../packages/dont-review-it
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -308,6 +314,9 @@ importers:
 
   packages/utils:
     devDependencies:
+      '@mst/dont-review-it':
+        specifier: workspace:*
+        version: link:../dont-review-it
       '@types/node':
         specifier: 'catalog:'
         version: 26.2.0

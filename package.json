@@ -16,6 +16,7 @@
   "devDependencies": {
     "@mst/dont-review-it": "workspace:*",
     "@mst/lint-rule-authoring": "workspace:*",
+    "@types/node": "catalog:",
     "knip": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
@@ -28,11 +29,11 @@
     },
     "runtime": {
       "name": "node",
-      "version": "24.19.0",
+      "version": "26.7.0",
       "onFail": "error"
     }
   },
   "engines": {
-    "node": ">=22.18.0"
+    "node": ">=26.0.0"
   }
 }
