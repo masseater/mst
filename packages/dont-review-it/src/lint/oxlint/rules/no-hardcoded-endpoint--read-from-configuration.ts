@@ -1,5 +1,4 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
-import { withoutParentheses } from "../lib/parenthesized-expression.ts";
 import { staticMemberOf } from "../lib/static-member.ts";
 import { hasWrittenOutText } from "../lib/written-out-text.ts";
 
@@ -22,18 +21,18 @@ const CONNECTION_CONSTRUCTOR_NAMES: ReadonlySet<string> = new Set([
 const isNavigatorSendBeacon = (callee: ESTree.Expression): boolean => {
   const member = staticMemberOf(callee);
   if (member === null || member.name !== SEND_BEACON_NAME) return false;
-  const receiver = withoutParentheses(member.object);
+  const receiver = member.object;
   return receiver.type === "Identifier" && receiver.name === NAVIGATOR_OBJECT_NAME;
 };
 
 const isFetchCallee = (callee: ESTree.Expression): boolean => {
-  const written = withoutParentheses(callee);
+  const written = callee;
   if (written.type === "Identifier") return written.name === FETCH_NAME;
   return staticMemberOf(written)?.name === FETCH_NAME;
 };
 
 const isConnectionConstructor = (callee: ESTree.Expression): boolean => {
-  const written = withoutParentheses(callee);
+  const written = callee;
   return written.type === "Identifier" && CONNECTION_CONSTRUCTOR_NAMES.has(written.name);
 };
 

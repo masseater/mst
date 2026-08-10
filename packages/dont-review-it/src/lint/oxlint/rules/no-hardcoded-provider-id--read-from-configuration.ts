@@ -1,5 +1,4 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
-import { withoutParentheses } from "../lib/parenthesized-expression.ts";
 import { staticMemberOf } from "../lib/static-member.ts";
 import { hasWrittenOutText } from "../lib/written-out-text.ts";
 
@@ -59,12 +58,12 @@ const writtenOutIdentityOf = (property: ESTree.ObjectProperty): ESTree.Expressio
 };
 
 const writtenOutIdentitiesIn = (expression: ESTree.Expression): readonly ESTree.Expression[] => {
-  const written = withoutParentheses(expression);
+  const written = expression;
   if (written.type !== "ObjectExpression") return [];
 
   return written.properties.flatMap((property) => {
     if (property.type !== "Property") return [];
-    if (withoutParentheses(property.value).type === "ObjectExpression") {
+    if (property.value.type === "ObjectExpression") {
       return writtenOutIdentitiesIn(property.value);
     }
     const identity = writtenOutIdentityOf(property);
@@ -76,11 +75,11 @@ const isProviderConstructor = (
   callee: ESTree.Expression,
   providerBindings: ReadonlySet<string>,
 ): boolean => {
-  const written = withoutParentheses(callee);
+  const written = callee;
   if (written.type === "Identifier") return providerBindings.has(written.name);
   const member = staticMemberOf(written);
   if (member === null) return false;
-  const receiver = withoutParentheses(member.object);
+  const receiver = member.object;
   return receiver.type === "Identifier" && providerBindings.has(receiver.name);
 };
 
