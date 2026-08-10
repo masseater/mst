@@ -20,7 +20,7 @@ const answeredWithoutValue = (failure: unknown): boolean =>
   typeof failure.status === "number";
 
 const gitOutput = (args: readonly string[], environment: GitEnvironment): string | null => {
-  const [unaskableGit, answer] = attempt(() =>
+  const [unaskableGit, answer] = attempt<string, Error>(() =>
     execFileSync("git", [...args], {
       cwd: environment.cwd,
       encoding: "utf8",
@@ -28,7 +28,7 @@ const gitOutput = (args: readonly string[], environment: GitEnvironment): string
       stdio: ["ignore", "pipe", "ignore"],
     }),
   );
-  if (unaskableGit === null) return answer?.trim() ?? null;
+  if (unaskableGit === null) return answer.trim();
 
   if (answeredWithoutValue(unaskableGit) || isEnvironmentFailure(unaskableGit)) return null;
   throw new Error(`git ${args.join(" ")} could not be run`, { cause: unaskableGit });

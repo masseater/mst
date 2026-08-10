@@ -44,11 +44,9 @@ const providerBindingNamesIn = (program: ESTree.Program): readonly string[] =>
   );
 
 const identityKeyNameOf = (property: ESTree.ObjectProperty): string | null => {
-  if (property.computed) return null;
   const { key } = property;
-  if (key.type === "Identifier") return key.name;
-  if (key.type !== "Literal") return null;
-  return typeof key.value === "string" ? key.value : null;
+  if (key.type === "Literal") return typeof key.value === "string" ? key.value : null;
+  return key.type === "Identifier" && !property.computed ? key.name : null;
 };
 
 const writtenOutIdentityOf = (property: ESTree.ObjectProperty): ESTree.Expression | null => {
