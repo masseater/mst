@@ -64,7 +64,7 @@ const vocabulariesExportedBy = (
   return harvested;
 };
 
-export const harvestLibraryVocabulary = (packageDirectory: string): LibraryVocabularyIndex => {
+const harvestLibraryVocabulary = (packageDirectory: string): LibraryVocabularyIndex => {
   const typeEntries = dependencyTypeEntries(packageDirectory);
   if (typeEntries.length === 0) return EMPTY_LIBRARY_VOCABULARY_INDEX;
 
