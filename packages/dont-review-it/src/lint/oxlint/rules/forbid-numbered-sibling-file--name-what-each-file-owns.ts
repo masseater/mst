@@ -1,8 +1,6 @@
 import { readdirSync } from "node:fs";
 import { dirname, resolve, sep } from "node:path";
 
-import { attempt } from "es-toolkit";
-
 import { createDontReviewItRule } from "../../../create-rule.ts";
 
 import type { ESTree } from "@oxlint/plugins";
@@ -15,8 +13,7 @@ const directoryEntries = (directory: string): readonly string[] => {
   const remembered = entriesByDirectory.get(directory);
   if (remembered !== undefined) return remembered;
 
-  const [, entries] = attempt((): readonly string[] => readdirSync(directory));
-  const found = entries ?? [];
+  const found: readonly string[] = readdirSync(directory);
   entriesByDirectory.set(directory, found);
   return found;
 };

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { attempt } from "es-toolkit";
 
 import { readTextFile } from "../../lint/oxlint/lib/canonical-values/source-files.ts";
+import { isEnvironmentFailure } from "../../lint/oxlint/lib/path-failure.ts";
 import { ignoreFilePatterns } from "./ignore-file-patterns.ts";
 
 export type GitEnvironment = {
@@ -12,17 +13,25 @@ export type GitEnvironment = {
   readonly env: NodeJS.ProcessEnv;
 };
 
+const answeredWithoutValue = (failure: unknown): boolean =>
+  typeof failure === "object" &&
+  failure !== null &&
+  "status" in failure &&
+  typeof failure.status === "number";
+
 const gitOutput = (args: readonly string[], environment: GitEnvironment): string | null => {
-  const output = attempt(() =>
+  const [unaskableGit, answer] = attempt(() =>
     execFileSync("git", [...args], {
       cwd: environment.cwd,
       encoding: "utf8",
       env: environment.env,
       stdio: ["ignore", "pipe", "ignore"],
     }),
-  )[1];
+  );
+  if (unaskableGit === null) return answer?.trim() ?? null;
 
-  return output === null ? null : output.trim();
+  if (answeredWithoutValue(unaskableGit) || isEnvironmentFailure(unaskableGit)) return null;
+  throw new Error(`git ${args.join(" ")} could not be run`, { cause: unaskableGit });
 };
 
 const configHomeOf = (environment: GitEnvironment): string => {

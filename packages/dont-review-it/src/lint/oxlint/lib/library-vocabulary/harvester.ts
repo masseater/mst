@@ -10,6 +10,7 @@ import {
 } from "typescript/unstable/sync";
 
 import { nearestPackageDirectory } from "../canonical-values/source-files.ts";
+import { isEnvironmentFailure } from "../path-failure.ts";
 import { dependencyTypeEntries, type DependencyTypeEntry } from "./dependency-types.ts";
 import {
   buildLibraryVocabularyIndex,
@@ -83,17 +84,27 @@ const harvestedFrom = (
   );
 };
 
+const harvestedWith = (
+  api: API,
+  typeEntries: readonly DependencyTypeEntry[],
+): LibraryVocabularyIndex => {
+  try {
+    return harvestedFrom(api, typeEntries);
+  } finally {
+    api.close();
+  }
+};
+
 const harvestLibraryVocabulary = memoize((packageDirectory: string): LibraryVocabularyIndex => {
   const typeEntries = dependencyTypeEntries(packageDirectory);
   if (typeEntries.length === 0) return EMPTY_LIBRARY_VOCABULARY_INDEX;
 
-  const [, api] = attempt(() => new API({ cwd: packageDirectory }));
-  if (api === null) return EMPTY_LIBRARY_VOCABULARY_INDEX;
-
-  const [, harvested] = attempt(() => harvestedFrom(api, typeEntries));
-  api.close();
-
-  return harvested ?? EMPTY_LIBRARY_VOCABULARY_INDEX;
+  const [unusableChecker, harvested] = attempt(() =>
+    harvestedWith(new API({ cwd: packageDirectory }), typeEntries),
+  );
+  if (harvested !== null) return harvested;
+  if (isEnvironmentFailure(unusableChecker)) return EMPTY_LIBRARY_VOCABULARY_INDEX;
+  throw unusableChecker;
 });
 
 export const loadLibraryVocabulary: LibraryVocabularyLoader = ({ filename, repositoryRoot }) => {

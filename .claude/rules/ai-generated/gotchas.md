@@ -126,4 +126,4 @@ pack: { exports: { customExports: { './tsconfig/*': './tsconfig/*' } } }
 - 症状: `core.excludesFile` が指すファイルに書いたパターン（`.agents/` など）が lint と format の除外に効かない。リポジトリの `.gitignore` に書いたものは効く
 - 原因: 走査が尊重するのはリポジトリの `.gitignore` だけである。`$GIT_DIR/info/exclude` とマシン全体の ignore は読まない。CLI の `--ignore-path` はあるが、設定から同じ指定をする口は無い
 - 検出方法: グローバルの ignore が拾うパスに違反ファイルを置いて `vp lint` と `vp fmt --list-different` にかける。報告されれば見ていない
-- 対処: 3 経路を読んで `ignorePatterns` に変換する（[EDR 0017](../../../docs/engineering-decision-logs/0017-carry-git-ignore-settings-into-lint-and-fmt.md)）。順序はグローバル → `$GIT_DIR/info/exclude` → リポジトリの `.gitignore`。gitignore は last-match-wins なので、この順でないと `!` による再包含が負ける
+- 対処: 3 経路を読んで `ignorePatterns` に変換する。`@mst/dont-review-it` の `withGitExcludes` がこれを行う。順序はグローバル → `$GIT_DIR/info/exclude` → リポジトリの `.gitignore`。gitignore は last-match-wins なので、この順でないと `!` による再包含が負ける
