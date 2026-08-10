@@ -73,7 +73,7 @@ export const noIdentityWrapper = createDontReviewItRule({
     },
     messages: {
       identityWrapper:
-        'A named function must not consist of nothing but a call that passes its own parameters through unchanged, because the name then adds a second spelling for something that already has one: a reader who looks the name up learns only that another name exists, a search for the callee misses every call routed through here, and the two names drift apart as soon as one of them is renamed. Call the target where this function is being called and delete this one. To publish a name from another module, re-export it (`export { parseUser } from "./parse-user.ts"`) rather than wrapping the call, because a re-export forwards the definition itself and a wrapper only copies its shape. This rule leaves a wrapper alone once it declares a return contract at its own boundary, either as a return type annotation on the function or as a type annotation on the binding it is assigned to, so narrowing the callee\'s type is the way to keep a wrapper that has a reason to exist.',
+        'A named function must not consist of nothing but a call that passes its own parameters through unchanged. Call the target where this function is being called and delete this one. To publish a name from another module, re-export it: `export { parseUser } from "./parse-user.ts"`.',
     },
     schema: [],
   },

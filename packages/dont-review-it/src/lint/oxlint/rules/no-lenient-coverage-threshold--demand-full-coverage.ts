@@ -98,13 +98,13 @@ export const noLenientCoverageThreshold = createDontReviewItRule({
     },
     messages: {
       missingCoverageThresholds:
-        "A test config must demand a coverage number, because a suite that measures coverage without demanding a number lets it fall commit by commit and nothing ever turns red. `{{path}}` is absent from this config. Add it and set {{requirement}} together with `perFile: true`, or write `100: true` alongside `perFile: true` to demand full coverage on every metric at once. If a metric genuinely cannot reach the required number, lower that one metric in this rule's options so the exemption is decided once for every config, instead of leaving the whole config silent.",
+        "A test config must not measure coverage without demanding a number. `{{path}}` is absent from this config. Add it and set {{requirement}} together with `perFile: true`.",
       aggregateCoverageThreshold:
-        "A coverage threshold must be checked file by file, because a threshold checked against the package total lets a file with no tests at all sit behind the files that are well covered, and the total says nothing about which file that is. `perFile` is not set to `true` in `test.coverage.thresholds`. Add it. The number then means the same thing for every file in the package, which is the only reading under which a newly added file cannot arrive uncovered and still pass.",
+        "A coverage threshold must not be checked against the package total. `perFile` is not set to `true` in `test.coverage.thresholds`. Add it.",
       unsetCoverageThreshold:
-        "Every coverage metric must carry a threshold, because a metric left out is a metric nobody is watching, and the ones nobody watches are the ones that erode first. `{{metric}}` carries no number in `test.coverage.thresholds`. Set it to {{required}}, or write `100: true` to demand full coverage on every metric at once. A value that is not a plain number cannot be read here, so a computed or imported threshold counts as absent.",
+        "A coverage metric must not be left without a threshold. `{{metric}}` carries no number in `test.coverage.thresholds`. Set it to {{required}}.",
       lenientCoverageThreshold:
-        "A coverage threshold must not sit below what this repository demands, because a threshold below the demanded number names an amount of untested code that is allowed to stay, and that amount never falls back on its own. `{{metric}}` is declared as {{declared}} against a demanded {{required}}. Raise it to {{required}} and cover the code that made you lower it. If the demand itself is wrong for this repository, change it in this rule's options so it is decided once for every config rather than drifting config by config.",
+        "A coverage threshold must not sit below what this repository demands. `{{metric}}` is declared as {{declared}} against a demanded {{required}}. Raise it to {{required}} and cover the code that made you lower it.",
     },
     schema: [
       {

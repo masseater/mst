@@ -204,7 +204,7 @@ export const noArrayMutation = createDontReviewItRule({
     },
     messages: {
       inPlaceArrayMutation:
-        "`{{method}}` must not be called on an array, because it changes the receiver in place: the call site shows no new value, and every other holder of the same array reference observes the change without a single line of its own being edited. Derive a new array instead and bind it: spread the old one to add elements, `filter` or `map` or `reduce` to narrow or transform, and `toSorted` or `toReversed` or `toSpliced` or `with` to order, reverse, splice or replace, each of which returns a new array and leaves the receiver alone. Casting the receiver so this rule stops seeing an array removes the report and keeps the mutation, so it is not a fix.",
+        "`{{method}}` must not be called on an array. Derive a new array and bind it: spread the old one to add elements, `filter` or `map` or `reduce` to narrow or transform, and `toSorted` or `toReversed` or `toSpliced` or `with` to order, reverse, splice or replace.",
     },
     schema: [],
   },

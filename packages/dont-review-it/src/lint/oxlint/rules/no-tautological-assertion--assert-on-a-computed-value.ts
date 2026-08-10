@@ -79,7 +79,7 @@ export const noTautologicalAssertion = createDontReviewItRule({
     },
     messages: {
       tautologicalAssertion:
-        "An equality assertion must not compare a written-out literal against the same written-out literal, because both sides are decided by this file alone: no function under test runs, no behaviour is observed, and the assertion returns the same verdict whatever the rest of the program does. A green suite full of these reports coverage it does not have, and the case stays green through the change that breaks the thing it was named after. Put the subject the test is about on the left: call the function under test and assert on what it returned, read the state the operation left behind, or assert on the argument a collaborator was called with. If nothing the test could call produces this value, the case has no subject and the value it should assert on has to be found before the case is worth keeping.",
+        "An equality assertion must not compare a written-out literal against the same written-out literal. Put the subject the test is about on the left: call the function under test and assert on what it returned, read the state the operation left behind, or assert on the argument a collaborator was called with.",
     },
     schema: [],
   },

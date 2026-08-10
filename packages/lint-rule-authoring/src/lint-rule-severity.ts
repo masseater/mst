@@ -1,6 +1,6 @@
 import type { AllowWarnDeny } from "oxlint";
 
-export const LINT_RULE_SEVERITIES = ["error", "warn", "off"] as const satisfies readonly Extract<
+const LINT_RULE_SEVERITIES = ["error", "warn", "off"] as const satisfies readonly Extract<
   AllowWarnDeny,
   "error" | "warn" | "off"
 >[];

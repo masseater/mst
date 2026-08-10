@@ -71,9 +71,8 @@ mst は、リポジトリ運用の仕組みを再利用可能な単位として�
 - `vp run -r build` — 全ワークスペースのビルド
 - `vp run knip` — 未使用の依存・export・ファイルの検出
 - `vp run dev` — 開発サーバー（`apps/website`）
-- `vp run docs` — 規範文書の検査
-- `vp run docs:write` — 生成部分の更新
-- `vp run ready` — check → test → build → knip → 規範文書の検査。CI と同じ
+- `vp run guard` — check → test → build → knip → 規範文書の検査。CI とフックが呼ぶ唯一のゲート
+- `vp run guard:fix` — 自動で直せるものを直し、生成部分を更新する
 
 ## 自作 lint ルールの実行時間を見る
 

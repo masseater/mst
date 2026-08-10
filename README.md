@@ -52,7 +52,7 @@ vp install
 | `vp run -r build` | 全ワークスペースのビルド             |
 | `vp run knip`     | 未使用の依存・export・ファイルの検出 |
 | `vp run dev`      | 開発サーバー起動（`apps/website`）   |
-| `vp run ready`    | check → test → build をまとめて実行  |
+| `vp run guard`    | check → test → build をまとめて実行  |
 
 > Development commands last updated: 2026-08-09
 

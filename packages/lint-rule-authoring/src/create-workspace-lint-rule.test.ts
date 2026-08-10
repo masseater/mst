@@ -1,9 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import {
-  createWorkspaceLintRule,
-  type WorkspaceLintRuleDocs,
-} from "./create-workspace-lint-rule.ts";
+import { createWorkspaceLintRule, type WorkspaceLintRule } from "./create-workspace-lint-rule.ts";
 
 describe("create-workspace-lint-rule", () => {
   const createRule = createWorkspaceLintRule({ workspaceDir: "packages/example" });
@@ -17,8 +14,8 @@ describe("create-workspace-lint-rule", () => {
         relatedGuidelines: ["docs/guidelines/example.md"],
       },
       messages: {
-        first: "Stop doing this.",
-        second: "Stop doing that as well.   ",
+        first: "A debugger statement must not stay in the source. Delete it.",
+        second: "A debugger statement must not reach review. Delete it as well.   ",
       },
       schema: [],
     },
@@ -32,7 +29,7 @@ describe("create-workspace-lint-rule", () => {
   });
 
   test("the transform points the canonical document pointer at the generated rule document", () => {
-    const docs: WorkspaceLintRuleDocs = rule.meta.docs;
+    const docs: WorkspaceLintRule["meta"]["docs"] = rule.meta.docs;
 
     expect(docs.url).toBe(
       "https://github.com/masseater/mst/blob/main/packages/example/docs/lint/no-example--do-something-else.md",
@@ -41,15 +38,16 @@ describe("create-workspace-lint-rule", () => {
 
   test("the transform appends a repository relative pointer to every message body", () => {
     expect(rule.meta.messages).toStrictEqual({
-      first: "Stop doing this. See packages/example/docs/lint/no-example--do-something-else.md.",
+      first:
+        "A debugger statement must not stay in the source. Delete it. See packages/example/docs/lint/no-example--do-something-else.md.",
       second:
-        "Stop doing that as well. See packages/example/docs/lint/no-example--do-something-else.md.",
+        "A debugger statement must not reach review. Delete it as well. See packages/example/docs/lint/no-example--do-something-else.md.",
     });
   });
 
   test("the transform keeps every message id the author declared reachable by name", () => {
-    expect(rule.meta.messages.first).toContain("Stop doing this.");
-    expect(rule.meta.messages.second).toContain("Stop doing that as well.");
+    expect(rule.meta.messages.first).toContain("A debugger statement must not stay in the source.");
+    expect(rule.meta.messages.second).toContain("A debugger statement must not reach review.");
   });
 
   test("the transform keeps the description and the related guidelines the author wrote", () => {

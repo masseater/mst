@@ -29,13 +29,13 @@ export const noDefaultExport = createDontReviewItRule({
     },
     messages: {
       defaultExport:
-        "A module must not put a value out under the name `default`, because the name at the module boundary is then left for each importing file to invent, and the same value ends up called something different in every place it is read. Name the value and export the name: `export const parseConfig = ...` or `export function parseConfig() {}`.",
+        "A module must not put a value out under the name `default`. Name the value and export the name: `export const parseConfig = ...` or `export function parseConfig() {}`.",
       defaultAliasReExport:
-        'A re-export must not rename what it forwards to `default`, because the name at the module boundary is then left for each importing file to invent, and the name the owning module chose stops travelling with the value. Forward the name the owning module already gave it: `export { parseConfig } from "./parse-config.ts"`.',
+        'A re-export must not rename what it forwards to `default`. Forward the name the owning module already gave it: `export { parseConfig } from "./parse-config.ts"`.',
       namespaceDefaultReExport:
-        'A namespace re-export must not be bound to the name `default`, because the name at the module boundary is then left for each importing file to invent. A namespace has no name of its own to forward, so give it one here: `export * as parseConfig from "./parse-config.ts"`.',
+        'A namespace re-export must not be bound to the name `default`. Give the namespace a name here: `export * as parseConfig from "./parse-config.ts"`.',
       exportAssignment:
-        "An export assignment must not stand in for a named export, because it hands the whole module out under no name at all and every importing file writes its own, exactly as `default` does. Export the value under the name it was declared with: `export { parseConfig }`.",
+        "An export assignment must not stand in for a named export. Export the value under the name it was declared with: `export { parseConfig }`.",
     },
     schema: [
       {

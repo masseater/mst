@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { describe, expect, onTestFinished, test } from "vite-plus/test";
 
 import { defaultConfig } from "../config.ts";
-import { loadNormativeDocuments } from "./normative-documents.ts";
+import { loadNormativeDocuments } from "./load-normative-documents.ts";
 
 describe("loadNormativeDocuments", () => {
   const repositoryWith = (files: Readonly<Record<string, string>>): string => {

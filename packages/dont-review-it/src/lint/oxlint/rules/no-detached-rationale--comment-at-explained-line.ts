@@ -26,7 +26,7 @@ export const noDetachedRationale = createDontReviewItRule({
     },
     messages: {
       jsdocDescriptionProse:
-        "Free description prose must not sit above a signature instead of on the code it explains, because nothing ties it to the lines it describes once they change. Move contract prose under the JSDoc tag that owns it (`@param`, `@returns`, `@throws`, `@example`, `@see`, `@remarks`), and delete the rest.",
+        "Free description prose must not sit above a signature. Move contract prose under the JSDoc tag that owns it (`@param`, `@returns`, `@throws`, `@example`, `@see`, `@remarks`), and delete the rest.",
     },
     schema: [],
   },

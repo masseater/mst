@@ -22,7 +22,7 @@ export const forbidSymbolPrefixedName = createLintRuleAuthoringRule({
     },
     messages: {
       symbolPrefixedSegment:
-        "A directory or file name must not start with anything other than a letter or a digit, because a glob walk passes over such a name and whatever is placed under it stays unchecked with nothing reporting the gap. The name `{{segment}}`, on the path `{{path}}`, starts with something else. Rename that one name so it starts with a letter or a digit.",
+        "A directory or file name must not start with anything other than a letter or a digit. The name `{{segment}}`, on the path `{{path}}`, starts with something else. Rename that one name to start with a letter or a digit.",
     },
     schema: [
       {
