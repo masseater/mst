@@ -2,12 +2,10 @@ import { resolve } from "node:path";
 
 import { groupBy, mapValues } from "es-toolkit";
 
-import { readAnnotatedSources } from "./annotated-sources.ts";
-import { buildCatalog } from "./catalog.ts";
+import { readAnnotatedSources, type AnnotatedSource } from "./annotated-sources.ts";
+import { buildCatalog, type CanonicalValuesEntry } from "./catalog.ts";
 import { listRepositoryFiles } from "./source-files.ts";
 
-import type { AnnotatedSource } from "./annotated-sources.ts";
-import type { CanonicalValuesEntry } from "./catalog.ts";
 import type { CanonicalValuesTextProblem } from "./declarations.ts";
 import type { CanonicalValue } from "./fingerprint.ts";
 

@@ -1,9 +1,7 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, statSync, type Dirent, type Stats } from "node:fs";
 import { basename, dirname, join, relative, sep } from "node:path";
 
 import { attempt, partition, sortBy } from "es-toolkit";
-
-import type { Dirent, Stats } from "node:fs";
 
 export type ScannedFile = {
   readonly absolutePath: string;

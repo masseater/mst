@@ -5,13 +5,12 @@ import { dirname, join } from "node:path";
 import { sortBy } from "es-toolkit";
 import { expect, onTestFinished, test } from "vite-plus/test";
 
-const CANONICAL_VALUES_TAG = "@canonical-values";
 import { buildCanonicalValuesCatalog, loadCanonicalValuesCatalog } from "./builder.ts";
 import { scanCanonicalValuesText } from "./declarations.ts";
-import { fingerprintValues } from "./fingerprint.ts";
+import { fingerprintValues, type CanonicalValue } from "./fingerprint.ts";
 import { listRepositoryFiles } from "./source-files.ts";
 
-import type { CanonicalValue } from "./fingerprint.ts";
+const CANONICAL_VALUES_TAG = "@canonical-values";
 
 const createRepository = (): string => {
   const root = mkdtempSync(join(tmpdir(), "canonical-values-"));

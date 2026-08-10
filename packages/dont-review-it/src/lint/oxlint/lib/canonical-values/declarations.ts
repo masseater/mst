@@ -1,5 +1,5 @@
 import { uniq } from "es-toolkit";
-import { parseSync } from "oxc-parser";
+import { parseSync, type Comment, type ParseResult } from "oxc-parser";
 
 import {
   containsCanonicalValuesAnnotation,
@@ -9,7 +9,6 @@ import {
 } from "./annotation.ts";
 
 import type { CanonicalValue } from "./fingerprint.ts";
-import type { Comment, ParseResult } from "oxc-parser";
 
 export type CanonicalValuesDeclaration = {
   readonly conceptId: string;

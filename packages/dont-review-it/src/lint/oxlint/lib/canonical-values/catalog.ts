@@ -1,6 +1,4 @@
-import { canonicalValueKey } from "./fingerprint.ts";
-
-import type { CanonicalValue } from "./fingerprint.ts";
+import { canonicalValueKey, type CanonicalValue } from "./fingerprint.ts";
 
 export { canonicalValueKey };
 

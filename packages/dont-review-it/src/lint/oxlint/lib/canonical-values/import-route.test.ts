@@ -1,10 +1,8 @@
 import { expect, test } from "vite-plus/test";
 
-import { buildCatalog } from "./catalog.ts";
+import { buildCatalog, type CanonicalValuesEntry } from "./catalog.ts";
 import { fingerprintValues } from "./fingerprint.ts";
 import { importRouteStatus } from "./import-route.ts";
-
-import type { CanonicalValuesEntry } from "./catalog.ts";
 
 const REPOSITORY_ROOT = "/repository";
 

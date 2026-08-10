@@ -1,8 +1,6 @@
 import { sortBy, uniqBy } from "es-toolkit";
 
-import { canonicalValueKey } from "../canonical-values/fingerprint.ts";
-
-import type { CanonicalValue } from "../canonical-values/fingerprint.ts";
+import { canonicalValueKey, type CanonicalValue } from "../canonical-values/fingerprint.ts";
 
 export type LibraryVocabularyEntry = {
   readonly packageName: string;

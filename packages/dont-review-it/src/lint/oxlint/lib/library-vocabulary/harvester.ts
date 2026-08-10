@@ -1,16 +1,24 @@
 import { dirname, resolve } from "node:path";
 
 import { attempt, memoize } from "es-toolkit";
-import { API, SymbolFlags } from "typescript/unstable/sync";
+import {
+  API,
+  SymbolFlags,
+  type Checker,
+  type Snapshot,
+  type Symbol as TypeSymbol,
+} from "typescript/unstable/sync";
 
 import { nearestPackageDirectory } from "../canonical-values/source-files.ts";
-import { dependencyTypeEntries } from "./dependency-types.ts";
-import { buildLibraryVocabularyIndex, EMPTY_LIBRARY_VOCABULARY_INDEX } from "./vocabulary-index.ts";
+import { dependencyTypeEntries, type DependencyTypeEntry } from "./dependency-types.ts";
+import {
+  buildLibraryVocabularyIndex,
+  EMPTY_LIBRARY_VOCABULARY_INDEX,
+  type LibraryVocabularyEntry,
+  type LibraryVocabularyIndex,
+} from "./vocabulary-index.ts";
 
-import type { Checker, Snapshot, Symbol as TypeSymbol } from "typescript/unstable/sync";
 import type { CanonicalValue } from "../canonical-values/fingerprint.ts";
-import type { DependencyTypeEntry } from "./dependency-types.ts";
-import type { LibraryVocabularyEntry, LibraryVocabularyIndex } from "./vocabulary-index.ts";
 import type { LibraryVocabularyLoader } from "./vocabulary-loader.ts";
 
 const declaredVocabularyOf = (

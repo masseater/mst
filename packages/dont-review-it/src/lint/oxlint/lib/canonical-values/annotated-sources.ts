@@ -1,9 +1,10 @@
 import { containsCanonicalValuesAnnotation } from "./annotation.ts";
-import { scanCanonicalValuesText } from "./declarations.ts";
-import { readTextFile } from "./source-files.ts";
-
-import type { CanonicalValuesDeclaration, CanonicalValuesTextProblem } from "./declarations.ts";
-import type { RepositoryFiles, ScannedFile } from "./source-files.ts";
+import {
+  scanCanonicalValuesText,
+  type CanonicalValuesDeclaration,
+  type CanonicalValuesTextProblem,
+} from "./declarations.ts";
+import { readTextFile, type RepositoryFiles, type ScannedFile } from "./source-files.ts";
 
 export type AnnotatedSource = {
   readonly absolutePath: string;
