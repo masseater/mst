@@ -127,6 +127,13 @@ test("no command at all is answered the same way an unknown command is", () => {
   expect(runDontReviewIt([])).toStrictEqual(runDontReviewIt(["publish"]));
 });
 
+test("a command given no repository root scans the working directory", () => {
+  const run = runDontReviewIt(["equivalent-concepts"]);
+
+  expect(run.exitCode).toBe(0);
+  expect(run.error).toBe("");
+});
+
 test("a repository root that is not a directory exits two instead of scanning nothing", () => {
   const root = repositoryWith({});
 

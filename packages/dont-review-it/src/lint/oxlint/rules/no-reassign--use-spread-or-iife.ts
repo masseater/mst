@@ -79,32 +79,18 @@ const assignmentMessageId = (
   assignOnlyTargets: readonly string[],
 ): string | null => {
   const stripped = unwrapSugar(node);
-  switch (stripped.type) {
-    case "ArrayPattern":
-    case "ObjectPattern":
-      return "patternAssignment";
-    case "Identifier":
-      return "identifierAssignment";
-    case "MemberExpression": {
-      if (isDirectClassStateTarget(stripped)) return null;
-      const path = staticMemberPath(stripped);
-      return path !== null && assignOnlyTargets.includes(path) ? null : "propertyAssignment";
-    }
-    default:
-      return null;
+  if (stripped.type === "MemberExpression") {
+    if (isDirectClassStateTarget(stripped)) return null;
+    const path = staticMemberPath(stripped);
+    return path !== null && assignOnlyTargets.includes(path) ? null : "propertyAssignment";
   }
+  return stripped.type === "Identifier" ? "identifierAssignment" : "patternAssignment";
 };
 
 const updateMessageId = (node: ESTree.Node): string | null => {
   const stripped = unwrapSugar(node);
-  switch (stripped.type) {
-    case "Identifier":
-      return "identifierUpdate";
-    case "MemberExpression":
-      return isDirectClassStateTarget(stripped) ? null : "propertyUpdate";
-    default:
-      return null;
-  }
+  if (stripped.type !== "MemberExpression") return "identifierUpdate";
+  return isDirectClassStateTarget(stripped) ? null : "propertyUpdate";
 };
 
 const isAmbientDeclaration = (node: ESTree.Node): boolean => {

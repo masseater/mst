@@ -35,6 +35,14 @@ test("a value resolves to every concept that owns it", () => {
   expect(catalog.entriesByValue.get(canonicalValueKey("archived"))).toStrictEqual([second]);
 });
 
+test("a concept that spells the same value twice is listed against it once", () => {
+  const repeated = entry("order-status", ["draft", "draft"]);
+
+  const catalog = buildCatalog([repeated]);
+
+  expect(catalog.entriesByValue.get(canonicalValueKey("draft"))).toStrictEqual([repeated]);
+});
+
 test("a value nobody declares resolves to nothing", () => {
   const catalog = buildCatalog([entry("order-status", ["draft"])]);
 

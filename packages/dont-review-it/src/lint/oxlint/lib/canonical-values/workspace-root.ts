@@ -21,7 +21,7 @@ const manifestDeclaresWorkspaces = (directory: string): boolean => {
   const [, manifest] = attempt(() => parseJson(readFileSync(path, "utf8")));
 
   if (manifest === null || typeof manifest !== "object") return false;
-  return WORKSPACES_FIELD in manifest && manifest.workspaces !== undefined;
+  return WORKSPACES_FIELD in manifest;
 };
 
 const isWorkspaceRoot = (directory: string): boolean =>

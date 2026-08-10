@@ -3,6 +3,7 @@ import { parseArgs } from "node:util";
 
 import { attempt } from "es-toolkit";
 
+import { failureMessage } from "./failure-message.ts";
 import { buildCanonicalValuesCatalog } from "./lint/oxlint/lib/canonical-values/builder.ts";
 import { isDirectory } from "./lint/oxlint/lib/canonical-values/source-files.ts";
 import {
@@ -111,6 +112,6 @@ export const runDontReviewIt = (argv: readonly string[]): CliResult => {
   return {
     exitCode: EXIT_MISUSE,
     out: "",
-    error: `${failure instanceof Error ? failure.message : String(failure)}\n`,
+    error: `${failureMessage(failure)}\n`,
   };
 };

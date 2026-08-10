@@ -37,6 +37,25 @@ export const ORDER_STATUSES = ["draft"] as const;
   ]);
 });
 
+test("a literal that is not a word, a number or a flag is not one of the declared values", () => {
+  expect(
+    declaredValuesIn(`/** ${CANONICAL_VALUES_TAG} order.status */
+export const ORDER_STATUSES = ["draft", null, /published/u] as const;
+`),
+  ).toStrictEqual([["draft"]]);
+});
+
+test("an annotation with nothing after it declares no concept", () => {
+  const scanned = scanCanonicalValuesText(`export const total = 1;
+/** ${CANONICAL_VALUES_TAG} order.status */
+`);
+
+  expect(scanned.declarations).toStrictEqual([]);
+  expect(scanned.problems).toStrictEqual([
+    { kind: "vocabulary-without-values", line: 2, conceptId: "order.status" },
+  ]);
+});
+
 test("a template literal without a substitution is one of the declared values", () => {
   expect(
     declaredValuesIn(`/** ${CANONICAL_VALUES_TAG} order.status */

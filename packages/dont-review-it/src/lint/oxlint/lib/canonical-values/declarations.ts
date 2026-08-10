@@ -50,6 +50,11 @@ const lineAt = (text: string, offset: number): number => text.slice(0, offset).s
 const withoutRetiredTags = (commentValue: string): string =>
   RETIRED_ANNOTATION_TAGS.reduce((remaining, tag) => remaining.replaceAll(tag, ""), commentValue);
 
+type TemplateLiteralFields = {
+  readonly expressions: readonly unknown[];
+  readonly quasis: readonly { readonly value: { readonly cooked: string } }[];
+};
+
 const literalValueOf = (node: Readonly<Record<string, unknown>>): CanonicalValue | null => {
   if (node[NODE_TYPE_FIELD] === "Literal") {
     const { value } = node;
@@ -60,13 +65,8 @@ const literalValueOf = (node: Readonly<Record<string, unknown>>): CanonicalValue
   }
   if (node[NODE_TYPE_FIELD] !== "TemplateLiteral") return null;
 
-  const { expressions, quasis } = node;
-  if (!Array.isArray(expressions) || expressions.length !== 0) return null;
-  if (!Array.isArray(quasis) || quasis.length !== 1) return null;
-
-  const cooked: unknown = (quasis[0] as { readonly value?: { readonly cooked?: unknown } }).value
-    ?.cooked;
-  return typeof cooked === "string" ? cooked : null;
+  const { expressions, quasis } = node as TemplateLiteralFields;
+  return expressions.length === 0 ? quasis[0].value.cooked : null;
 };
 
 const spelledOutValuesIn = (node: unknown): readonly CanonicalValue[] => {

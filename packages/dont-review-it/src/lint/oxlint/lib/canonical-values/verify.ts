@@ -34,11 +34,10 @@ const declarationSitesIn = (source: AnnotatedSource): readonly DeclarationSite[]
   }));
 
 const duplicateConceptProblem = (
-  firstSiteByConcept: Readonly<Record<string, DeclarationSite | undefined>>,
+  firstSiteByConcept: Readonly<Record<string, DeclarationSite>>,
   site: DeclarationSite,
 ): CanonicalValuesProblem | null => {
   const first = firstSiteByConcept[site.conceptId];
-  if (first === undefined) return null;
   if (first.filePath === site.filePath && first.line === site.line) return null;
 
   return {
