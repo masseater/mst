@@ -36,6 +36,7 @@
   "dependencies": {
     "@mst/lint-rule-authoring": "workspace:*",
     "@oxlint/plugins": "catalog:",
+    "jsonc-parser": "catalog:",
     "oxlint": "catalog:"
   },
   "devDependencies": {

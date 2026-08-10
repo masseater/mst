@@ -6,6 +6,7 @@ import { noDetachedRationale } from "./lint/oxlint/rules/no-detached-rationale--
 import { noDetachedTestFile } from "./lint/oxlint/rules/no-detached-test-file--move-beside-source.ts";
 import { noExplanatoryComment } from "./lint/oxlint/rules/no-explanatory-comment--delete-or-move-to-commit-message.ts";
 import { createNoLocalFiniteValueSet } from "./lint/oxlint/rules/no-local-finite-value-set--use-or-register-canonical-values.ts";
+import { noStandaloneTsconfig } from "./lint/oxlint/rules/no-standalone-tsconfig--extend-shared-preset.ts";
 import { createNoStrictCanonicalLiteralUseRule } from "./lint/oxlint/rules/no-strict-canonical-literal-use--use-canonical-import.ts";
 import { requireReExportOnlyFiles } from "./lint/oxlint/rules/require-re-export-only-files--move-declaration-to-owning-module.ts";
 
@@ -29,6 +30,7 @@ const plugin: Plugin = {
     [noDetachedTestFile.name]: noDetachedTestFile,
     [noExplanatoryComment.name]: noExplanatoryComment,
     [noLocalFiniteValueSet.name]: noLocalFiniteValueSet,
+    [noStandaloneTsconfig.name]: noStandaloneTsconfig,
     [noStrictCanonicalLiteralUse.name]: noStrictCanonicalLiteralUse,
     [requireReExportOnlyFiles.name]: requireReExportOnlyFiles,
   },
