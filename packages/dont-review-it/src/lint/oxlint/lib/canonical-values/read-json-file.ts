@@ -1,6 +1,6 @@
 import { readTextFile } from "./source-files.ts";
 
-const parseJson: (text: string) => unknown = JSON.parse;
+export const parseJson: (text: string) => unknown = JSON.parse;
 
 export const readJsonFile = (path: string): unknown => {
   const text = readTextFile(path);

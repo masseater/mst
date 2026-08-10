@@ -11,12 +11,15 @@ import {
   formatEquivalentConceptGroup,
   verifyCanonicalValues,
 } from "./lint/oxlint/lib/canonical-values/verify.ts";
+import { duplicatedClustersIn } from "./lint/oxlint/lib/duplicated-bodies/body-index.ts";
+import { buildRepositoryBodyIndex } from "./lint/oxlint/lib/duplicated-bodies/builder.ts";
 
 const USAGE = `Usage: dont-review-it <command> [--repository-root <path>]
 
 Commands:
   verify               Report every broken or retired canonical values annotation, and exit non-zero when any is found.
   equivalent-concepts  Report every value set that more than one concept declares.
+  duplicated-bodies    Report every body that more than one declaration spells the same way.
 
 Options:
   --repository-root <path>  Root of the repository to scan. Defaults to the current working directory.
@@ -37,6 +40,8 @@ const EXIT_MISUSE = 2;
 const VERIFY_COMMAND = "verify";
 
 const EQUIVALENT_CONCEPTS_COMMAND = "equivalent-concepts";
+
+const DUPLICATED_BODIES_COMMAND = "duplicated-bodies";
 
 const asLines = (entries: readonly string[]): string =>
   entries.map((entry) => `${entry}\n`).join("");
@@ -61,6 +66,25 @@ const equivalentConcepts = (repositoryRoot: string): CliResult => {
   };
 };
 
+const duplicatedBodies = (repositoryRoot: string): CliResult => {
+  const clusters = duplicatedClustersIn(buildRepositoryBodyIndex({ repositoryRoot }));
+  return {
+    exitCode: EXIT_SUCCESS,
+    out: asLines(
+      clusters.map((sites) =>
+        sites.map((site) => `${site.relativePath}:${site.line} ${site.name}`).join(" == "),
+      ),
+    ),
+    error: "",
+  };
+};
+
+const RESULT_BY_COMMAND: Readonly<Record<string, (repositoryRoot: string) => CliResult>> = {
+  [VERIFY_COMMAND]: verified,
+  [EQUIVALENT_CONCEPTS_COMMAND]: equivalentConcepts,
+  [DUPLICATED_BODIES_COMMAND]: duplicatedBodies,
+};
+
 const dispatch = (argv: readonly string[]): CliResult => {
   const parsed = parseArgs({
     args: [...argv],
@@ -68,7 +92,8 @@ const dispatch = (argv: readonly string[]): CliResult => {
     options: { "repository-root": { type: "string" } },
   });
   const [command] = parsed.positionals;
-  if (command !== VERIFY_COMMAND && command !== EQUIVALENT_CONCEPTS_COMMAND) {
+  const resultFor = command === undefined ? undefined : RESULT_BY_COMMAND[command];
+  if (resultFor === undefined) {
     return { exitCode: EXIT_MISUSE, out: "", error: USAGE };
   }
 
@@ -81,7 +106,7 @@ const dispatch = (argv: readonly string[]): CliResult => {
     };
   }
 
-  return command === VERIFY_COMMAND ? verified(repositoryRoot) : equivalentConcepts(repositoryRoot);
+  return resultFor(repositoryRoot);
 };
 
 export const runDontReviewIt = (argv: readonly string[]): CliResult => {

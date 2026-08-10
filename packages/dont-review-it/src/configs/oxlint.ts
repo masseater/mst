@@ -9,12 +9,16 @@ import { noArrayMutation } from "../lint/oxlint/rules/no-array-mutation--derive-
 import { noDefaultExport } from "../lint/oxlint/rules/no-default-export--use-named-export.ts";
 import { noDetachedRationale } from "../lint/oxlint/rules/no-detached-rationale--comment-at-explained-line.ts";
 import { noDetachedTestFile } from "../lint/oxlint/rules/no-detached-test-file--move-beside-source.ts";
+import { noDoubleTypeAssertion } from "../lint/oxlint/rules/no-double-type-assertion--declare-the-real-type.ts";
 import { noExplanatoryComment } from "../lint/oxlint/rules/no-explanatory-comment--delete-or-move-to-commit-message.ts";
+import { noIdentityWrapper } from "../lint/oxlint/rules/no-identity-wrapper--call-the-target-directly.ts";
+import { noLoggedAndContinuedFailure } from "../lint/oxlint/rules/no-logged-and-continued-failure--stop-or-recover.ts";
 import { noPromiseChain } from "../lint/oxlint/rules/no-promise-chain--use-async-await.ts";
 import { noReassign } from "../lint/oxlint/rules/no-reassign--use-spread-or-iife.ts";
 import { noStandaloneTsconfig } from "../lint/oxlint/rules/no-standalone-tsconfig--extend-shared-preset.ts";
+import { noTautologicalAssertion } from "../lint/oxlint/rules/no-tautological-assertion--assert-on-a-computed-value.ts";
 import { requireReExportOnlyFiles } from "../lint/oxlint/rules/require-re-export-only-files--move-declaration-to-owning-module.ts";
-import { noLocalFiniteValueSet, noStrictCanonicalLiteralUse } from "../plugin.ts";
+import { noDuplicatedBody, noLocalFiniteValueSet, noStrictCanonicalLiteralUse } from "../plugin.ts";
 
 const PLUGIN_NAME = "dont-review-it";
 
@@ -37,6 +41,7 @@ export const oxlint = defineConfig({
           LINT_SEVERITY.ERROR,
           { max: 320, skipBlankLines: true, skipComments: true },
         ],
+        "max-statements": LINT_SEVERITY.OFF,
       },
     },
   ],
@@ -54,8 +59,12 @@ export const oxlint = defineConfig({
     [`${PLUGIN_NAME}/${noDefaultExport.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noDetachedRationale.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noDetachedTestFile.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noDoubleTypeAssertion.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noDuplicatedBody.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noExplanatoryComment.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noIdentityWrapper.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noLocalFiniteValueSet.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noLoggedAndContinuedFailure.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noPromiseChain.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noReassign.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noStandaloneTsconfig.name}`]: [
@@ -63,6 +72,7 @@ export const oxlint = defineConfig({
       [...SHARED_TSCONFIG_PRESETS],
     ],
     [`${PLUGIN_NAME}/${noStrictCanonicalLiteralUse.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noTautologicalAssertion.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${requireReExportOnlyFiles.name}`]: LINT_SEVERITY.ERROR,
     complexity: [LINT_SEVERITY.ERROR, { max: 10 }],
     "max-classes-per-file": [LINT_SEVERITY.ERROR, { max: 1 }],

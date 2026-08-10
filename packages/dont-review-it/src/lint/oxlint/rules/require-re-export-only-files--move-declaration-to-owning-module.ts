@@ -1,8 +1,10 @@
 import { resolve, sep } from "node:path";
 
+import { matchesGlobSegment } from "@mst/lint-rule-authoring";
 import { range } from "es-toolkit";
 
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { segmentsOf } from "../lib/path-segments.ts";
 
 import type { ESTree, Options } from "@oxlint/plugins";
 
@@ -25,38 +27,6 @@ const patternsFrom = (
   return patterns.filter((entry): entry is string => typeof entry === "string");
 };
 
-const literalsFollowInOrder = (
-  segment: string,
-  literals: readonly string[],
-  cursor: number,
-  lastMatchableEnd: number,
-): boolean => {
-  const [literal, ...remaining] = literals;
-  if (literal === undefined) return true;
-
-  const found = segment.indexOf(literal, cursor);
-  if (found === -1 || found + literal.length > lastMatchableEnd) return false;
-  return literalsFollowInOrder(segment, remaining, found + literal.length, lastMatchableEnd);
-};
-
-const matchesSegmentName = (segment: string, pattern: string): boolean => {
-  const literals = pattern.split("*");
-  if (literals.length === 1) return segment === pattern;
-
-  const head = literals[0];
-  const tail = literals[literals.length - 1];
-  if (!segment.startsWith(head)) return false;
-  if (!segment.endsWith(tail)) return false;
-  if (segment.length < head.length + tail.length) return false;
-
-  return literalsFollowInOrder(
-    segment,
-    literals.slice(1, -1),
-    head.length,
-    segment.length - tail.length,
-  );
-};
-
 const matchesSegments = (
   pathSegments: readonly string[],
   patternSegments: readonly string[],
@@ -71,19 +41,19 @@ const matchesSegments = (
   }
 
   if (pathSegments.length === 0) return false;
-  if (!matchesSegmentName(pathSegments[0], head)) return false;
+  if (!matchesGlobSegment({ segment: pathSegments[0], pattern: head })) return false;
   return matchesSegments(pathSegments.slice(1), remainingPatternSegments);
 };
 
-const segmentsOf = (path: string, separator: string): readonly string[] =>
-  path.split(separator).filter((segment) => segment !== "");
-
 const matchesPattern = (pathSegments: readonly string[], pattern: string, cwd: string): boolean => {
   if (ANCHORED_PATTERN_PREFIXES.some((prefix) => pattern.startsWith(prefix))) {
-    return matchesSegments(pathSegments, segmentsOf(resolve(cwd, pattern), sep));
+    return matchesSegments(
+      pathSegments,
+      segmentsOf({ path: resolve(cwd, pattern), separator: sep }),
+    );
   }
 
-  const patternSegments = segmentsOf(pattern, "/");
+  const patternSegments = segmentsOf({ path: pattern, separator: "/" });
   return pathSegments.some((_, index) =>
     matchesSegments(pathSegments.slice(index), patternSegments),
   );
@@ -124,7 +94,10 @@ export const requireReExportOnlyFiles = createDontReviewItRule({
 
     return {
       Program(node: ESTree.Program) {
-        const pathSegments = segmentsOf(resolve(context.cwd, context.filename), sep);
+        const pathSegments = segmentsOf({
+          path: resolve(context.cwd, context.filename),
+          separator: sep,
+        });
         if (!targets.some((pattern) => matchesPattern(pathSegments, pattern, context.cwd))) return;
         if (exclude.some((pattern) => matchesPattern(pathSegments, pattern, context.cwd))) return;
 

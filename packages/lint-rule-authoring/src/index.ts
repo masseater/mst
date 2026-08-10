@@ -1,5 +1,7 @@
 export { oxlint } from "./configs/oxlint.ts";
 export { createLintRuleAuthoringRule } from "./create-rule.ts";
+export { firstToken } from "./first-token.ts";
+export { matchesGlobSegment } from "./glob-segment.ts";
 export {
   createWorkspaceLintRule,
   type WorkspaceLintRule,
