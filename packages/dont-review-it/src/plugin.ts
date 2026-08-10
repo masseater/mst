@@ -1,4 +1,5 @@
 import { loadCanonicalValuesCatalog } from "./lint/oxlint/lib/canonical-values/builder.ts";
+import { loadLibraryVocabulary } from "./lint/oxlint/lib/library-vocabulary/harvester.ts";
 import { forbidOversizedFile } from "./lint/oxlint/rules/forbid-oversized-file--split-by-responsibility.ts";
 import { noAmbiguousVariableName } from "./lint/oxlint/rules/no-ambiguous-variable-name--rename-to-concrete-noun.ts";
 import { noDefaultExport } from "./lint/oxlint/rules/no-default-export--use-named-export.ts";
@@ -13,6 +14,7 @@ import type { Plugin } from "@oxlint/plugins";
 
 export const noLocalFiniteValueSet = createNoLocalFiniteValueSet({
   loadCatalog: loadCanonicalValuesCatalog,
+  loadLibraryVocabulary,
 });
 
 export const noStrictCanonicalLiteralUse = createNoStrictCanonicalLiteralUseRule({
