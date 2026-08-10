@@ -19,9 +19,9 @@ import {
 import { findWorkspaceRoot } from "../lib/canonical-values/workspace-root.ts";
 import { isOutOfScopeSource } from "../lib/out-of-scope-source.ts";
 
+import type { ESTree, Visitor } from "@oxlint/plugins";
 import type { CanonicalValuesCatalogLoader } from "../lib/canonical-values/catalog-loader.ts";
 import type { CanonicalValue } from "../lib/canonical-values/fingerprint.ts";
-import type { ESTree, Visitor } from "@oxlint/plugins";
 
 const KEY_SELECTION_TYPE_NAMES: ReadonlySet<string> = new Set(["Omit", "Pick"]);
 

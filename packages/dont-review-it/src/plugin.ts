@@ -8,10 +8,12 @@ import { noDetachedRationale } from "./lint/oxlint/rules/no-detached-rationale--
 import { noDetachedTestFile } from "./lint/oxlint/rules/no-detached-test-file--move-beside-source.ts";
 import { noExplanatoryComment } from "./lint/oxlint/rules/no-explanatory-comment--delete-or-move-to-commit-message.ts";
 import { createNoLocalFiniteValueSet } from "./lint/oxlint/rules/no-local-finite-value-set--use-or-register-canonical-values.ts";
+import { noMultiBindingDeclaration } from "./lint/oxlint/rules/no-multi-binding-declaration--declare-one-binding-per-statement.ts";
 import { noPromiseChain } from "./lint/oxlint/rules/no-promise-chain--use-async-await.ts";
 import { noReassign } from "./lint/oxlint/rules/no-reassign--use-spread-or-iife.ts";
 import { noStandaloneTsconfig } from "./lint/oxlint/rules/no-standalone-tsconfig--extend-shared-preset.ts";
 import { createNoStrictCanonicalLiteralUseRule } from "./lint/oxlint/rules/no-strict-canonical-literal-use--use-canonical-import.ts";
+import { noUnorderedImport } from "./lint/oxlint/rules/no-unordered-import--group-by-origin-then-sort-by-specifier.ts";
 import { requireReExportOnlyFiles } from "./lint/oxlint/rules/require-re-export-only-files--move-declaration-to-owning-module.ts";
 
 import type { Plugin } from "@oxlint/plugins";
@@ -36,10 +38,12 @@ const plugin: Plugin = {
     [noDetachedTestFile.name]: noDetachedTestFile,
     [noExplanatoryComment.name]: noExplanatoryComment,
     [noLocalFiniteValueSet.name]: noLocalFiniteValueSet,
+    [noMultiBindingDeclaration.name]: noMultiBindingDeclaration,
     [noPromiseChain.name]: noPromiseChain,
     [noReassign.name]: noReassign,
     [noStandaloneTsconfig.name]: noStandaloneTsconfig,
     [noStrictCanonicalLiteralUse.name]: noStrictCanonicalLiteralUse,
+    [noUnorderedImport.name]: noUnorderedImport,
     [requireReExportOnlyFiles.name]: requireReExportOnlyFiles,
   },
 };
