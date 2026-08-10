@@ -187,5 +187,5 @@ export const UPSTREAM_TEST_RULES: NonNullable<OxlintConfig["rules"]> = {
   "vitest/valid-describe-callback": LINT_SEVERITY.ERROR,
   "vitest/valid-expect": LINT_SEVERITY.ERROR,
   "vitest/valid-title": LINT_SEVERITY.ERROR,
-  "vitest/warn-todo": LINT_SEVERITY.WARN,
+  "vitest/warn-todo": LINT_SEVERITY.ERROR,
 };
