@@ -21,6 +21,7 @@ import { noStandaloneTsconfig } from "./lint/oxlint/rules/no-standalone-tsconfig
 import { createNoStrictCanonicalLiteralUseRule } from "./lint/oxlint/rules/no-strict-canonical-literal-use--use-canonical-import.ts";
 import { noTautologicalAssertion } from "./lint/oxlint/rules/no-tautological-assertion--assert-on-a-computed-value.ts";
 import { noUnorderedImport } from "./lint/oxlint/rules/no-unordered-import--group-by-origin-then-sort-by-specifier.ts";
+import { noUnwrappedToolchainConfig } from "./lint/oxlint/rules/no-unwrapped-toolchain-config--wrap-with-git-excludes.ts";
 import { requireReExportOnlyFiles } from "./lint/oxlint/rules/require-re-export-only-files--move-declaration-to-owning-module.ts";
 
 import type { Plugin } from "@oxlint/plugins";
@@ -59,6 +60,7 @@ const plugin: Plugin = {
     [noStrictCanonicalLiteralUse.name]: noStrictCanonicalLiteralUse,
     [noTautologicalAssertion.name]: noTautologicalAssertion,
     [noUnorderedImport.name]: noUnorderedImport,
+    [noUnwrappedToolchainConfig.name]: noUnwrappedToolchainConfig,
     [requireReExportOnlyFiles.name]: requireReExportOnlyFiles,
   },
 };

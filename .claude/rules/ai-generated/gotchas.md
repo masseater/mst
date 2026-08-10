@@ -111,3 +111,19 @@ pack: { exports: { customExports: { './tsconfig/*': './tsconfig/*' } } }
   - PROHIBIT: `vp lint --print-config` の diff が空であることをもって、ルールが有効になった根拠とする
 - IF: `lint.plugins` を触った; THEN MUST: 引き続き `--print-config` の diff を取る
   - 組み込みプラグインの置換（前項）はこの出力に現れる。`--print-config` が役に立つのはそちらの用途である
+
+## `extends` した設定の `ignorePatterns` は捨てられる
+
+- 症状: preset に `ignorePatterns` を書いても 1 件も効かない。同じ 1 行をルートの `vite.config.ts` の `lint` に移すと効く。エラーも警告も出ない
+- 原因: oxlint の [`Oxlintrc::merge`](https://github.com/oxc-project/oxc/blob/367f730a7b578d24e8106713abaf517304b6b655/crates/oxc_linter/src/config/oxlintrc.rs) が `self`（`extends` を書いた側）の `ignore_patterns` だけを残し、`extends` で名指しした設定のものを読まない。`rules` / `overrides` / `plugins` / `options` は継承されるため、この 1 フィールドだけが例外になっている。`settings` / `env` / `globals` も同じ扱い
+- 対処: `defineConfig` に直接渡すオブジェクト自身に持たせる。このリポジトリでは `@mst/dont-review-it` の `withGitExcludes` が注入し、忘れると `no-unwrapped-toolchain-config--wrap-with-git-excludes` が報告する
+
+- IF: preset から何らかの設定を配れているか確かめる; THEN MUST: そのフィールドが `extends` で継承されるかを実測する
+  - 継承されないフィールドは、書いても何も起きず lint は緑のまま通る
+
+## oxlint と oxfmt はグローバルの gitignore を見ない
+
+- 症状: `core.excludesFile` が指すファイルに書いたパターン（`.agents/` など）が lint と format の除外に効かない。リポジトリの `.gitignore` に書いたものは効く
+- 原因: 走査が尊重するのはリポジトリの `.gitignore` だけである。`$GIT_DIR/info/exclude` とマシン全体の ignore は読まない。CLI の `--ignore-path` はあるが、設定から同じ指定をする口は無い
+- 検出方法: グローバルの ignore が拾うパスに違反ファイルを置いて `vp lint` と `vp fmt --list-different` にかける。報告されれば見ていない
+- 対処: 3 経路を読んで `ignorePatterns` に変換する（[EDR 0017](../../../docs/engineering-decision-logs/0017-carry-git-ignore-settings-into-lint-and-fmt.md)）。順序はグローバル → `$GIT_DIR/info/exclude` → リポジトリの `.gitignore`。gitignore は last-match-wins なので、この順でないと `!` による再包含が負ける
