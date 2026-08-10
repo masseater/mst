@@ -4,24 +4,27 @@ import { checkTestRepository as check } from "../check-test-repository.ts";
 import { withTestRepository } from "../test-repository.ts";
 
 describe("no-removal-verification", () => {
-  it("reports a newly added test file that corresponds to a deleted source file", async () => {
+  it("reports newly added test files that correspond to deleted source files", async () => {
     await withTestRepository(async (repository) => {
       const base = repository.commit({
-        files: { "src/legacy.ts": "export const legacy = true;\n" },
+        files: {
+          "src/zeta.ts": "export const zeta = true;\n",
+          "src/alpha.ts": "export const alpha = true;\n",
+        },
       });
       const head = repository.commit({
         files: {
-          "src/legacy.test.ts":
-            'import { expect, test } from "vite-plus/test";\n\ntest("legacy is gone", () => {\n  expect(true).toBe(true);\n});\n',
+          "src/zeta.test.ts": "",
+          "src/alpha.test.ts": "",
         },
-        removed: ["src/legacy.ts"],
+        removed: ["src/zeta.ts", "src/alpha.ts"],
       });
 
       const fileTestReport = await check({ repository, base, head });
 
       expect(fileTestReport).toStrictEqual({
         exitCode: 1,
-        out: 'src/legacy.test.ts:1 no-removal-verification: Do not add a test for deleted file "src/legacy.ts"; remove the test or restore the file.\n',
+        out: 'src/alpha.test.ts:1 no-removal-verification: Do not add a test for deleted file "src/alpha.ts"; remove the test or restore the file.\nsrc/zeta.test.ts:1 no-removal-verification: Do not add a test for deleted file "src/zeta.ts"; remove the test or restore the file.\n',
         error: "",
       });
     });
@@ -74,14 +77,15 @@ describe("no-removal-verification", () => {
     await withTestRepository(async (repository) => {
       const base = repository.commit({
         files: {
-          "src/legacy.ts": "export const current = true;\nexport const legacyMode = true;\n",
+          "src/legacy.ts":
+            "export const current = true;\nexport const legacyMode = true;\nexport const secondLegacyMode = true;\n",
         },
       });
       const head = repository.commit({
         files: {
           "src/legacy.ts": "export const current = true;\n",
           "src/legacy-api.test.ts":
-            'import * as legacy from "./legacy.ts";\nimport { expect, test } from "vite-plus/test";\n\ntest("legacy mode is gone", () => {\n  expect(legacy).not.toHaveProperty("legacyMode");\n});\n',
+            'import * as legacy from "./legacy.ts";\nimport { expect, test } from "vite-plus/test";\n\ntest("legacy modes are gone", () => {\n  expect(legacy).not.toHaveProperty("secondLegacyMode");\n  expect(legacy).not.toHaveProperty("legacyMode");\n});\n',
         },
       });
 
@@ -89,7 +93,7 @@ describe("no-removal-verification", () => {
 
       expect(exportAssertionReport).toStrictEqual({
         exitCode: 1,
-        out: 'src/legacy-api.test.ts:5 no-removal-verification: Do not assert that removed export "legacyMode" from "src/legacy.ts" remains absent; remove the assertion.\n',
+        out: 'src/legacy-api.test.ts:5 no-removal-verification: Do not assert that removed export "secondLegacyMode" from "src/legacy.ts" remains absent; remove the assertion.\nsrc/legacy-api.test.ts:6 no-removal-verification: Do not assert that removed export "legacyMode" from "src/legacy.ts" remains absent; remove the assertion.\n',
         error: "",
       });
     });
@@ -298,6 +302,30 @@ describe("no-removal-verification", () => {
           "src/removed-from.ts": "export const current = true;\n",
           "src/other-api.test.ts":
             'import * as other from "./other.ts";\nimport { expect, test } from "vite-plus/test";\n\ntest("other module", () => {\n  expect(other).not.toHaveProperty("legacyMode");\n});\n',
+        },
+      });
+
+      expect(await check({ repository, base, head })).toStrictEqual({
+        exitCode: 0,
+        out: "",
+        error: "",
+      });
+    });
+  });
+
+  it("does not collide module paths and export names containing locator separators", async () => {
+    await withTestRepository(async (repository) => {
+      const base = repository.commit({
+        files: {
+          "src/a.ts": 'const value = true;\nexport { value as "x.ts#foo" };\n',
+          "src/a.ts#x.ts": "export const foo = true;\n",
+        },
+      });
+      const head = repository.commit({
+        files: {
+          "src/a.ts": "export const current = true;\n",
+          "src/collision.test.ts":
+            'import * as other from "./a.ts#x.ts";\nimport { expect, test } from "vite-plus/test";\n\ntest("other module", () => {\n  expect(other).not.toHaveProperty("foo");\n});\n',
         },
       });
 

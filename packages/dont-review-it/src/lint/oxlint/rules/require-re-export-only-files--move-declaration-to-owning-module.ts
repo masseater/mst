@@ -29,8 +29,6 @@ const matchesSegments = (
   pathSegments: readonly string[],
   patternSegments: readonly string[],
 ): boolean => {
-  if (patternSegments.length === 0) return pathSegments.length === 0;
-
   const [head, ...remainingPatternSegments] = patternSegments;
   if (head === undefined) return pathSegments.length === 0;
   if (head === "**") {
@@ -73,9 +71,9 @@ export const requireReExportOnlyFiles = createDontReviewItRule({
     },
     messages: {
       extraStatement:
-        'A file the deployment lists as re-export only must carry re-exports and nothing else, and this statement is not one of them. What counts is `export { ... } from "..."`, `export * from "..."` and `export * as Name from "..."`; an import followed by a separate `export { ... }` does not, because the exporting statement names no module. Move what this statement brings in or declares into the module that should own it, and re-export it from here. If this file is meant to own it, the file is not a re-export only file and the listing that named it is what has to change.',
+        'A file the deployment lists as re-export only must not carry a statement that is not a re-export. Move what this statement brings in or declares into the module that should own it, and re-export it from here with `export { ... } from "..."`, `export * from "..."` or `export * as Name from "..."`.',
       missingReExport:
-        'A file the deployment lists as re-export only must carry at least one re-export, and this one carries none, so the file names a surface that exposes nothing. What counts is `export { ... } from "..."`, `export * from "..."` and `export * as Name from "..."`; an import followed by a separate `export { ... }` does not, because the exporting statement names no module. Re-export from here what the modules beside this file own. If this file is not a surface at all, the listing that named it is what has to change.',
+        'A file the deployment lists as re-export only must not carry zero re-exports. Re-export from here what the modules beside this file own, with `export { ... } from "..."`, `export * from "..."` or `export * as Name from "..."`.',
     },
     schema: [
       {

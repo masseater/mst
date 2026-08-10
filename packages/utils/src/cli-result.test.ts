@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { createCliRunner, EXIT_MISUSE, EXIT_SUCCESS } from "./cli-result.ts";
+import { createCliRunner, EXIT_MISUSE, EXIT_SUCCESS, type CliResult } from "./cli-result.ts";
 
 describe("createCliRunner", () => {
   it("forwards arguments and returns a completed CLI run", async () => {
@@ -26,6 +26,18 @@ describe("createCliRunner", () => {
       exitCode: EXIT_MISUSE,
       out: "",
       error: "comparison failed\n",
+    });
+  });
+
+  it("surfaces a non-error rejection as CLI misuse", async () => {
+    const deferredRun = Promise.withResolvers<CliResult>();
+    Reflect.apply(deferredRun.reject, undefined, ["comparison unavailable"]);
+    const run = createCliRunner(() => deferredRun.promise);
+
+    await expect(run()).resolves.toStrictEqual({
+      exitCode: EXIT_MISUSE,
+      out: "",
+      error: "comparison unavailable\n",
     });
   });
 });

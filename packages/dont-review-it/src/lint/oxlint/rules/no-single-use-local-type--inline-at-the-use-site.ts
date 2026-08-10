@@ -16,7 +16,7 @@ export const noSingleUseLocalType = createDontReviewItRule({
     },
     messages: {
       singleUseLocalType:
-        "A type that this file declares without exporting must be referenced from more than one place in the file, and `{{name}}` is referenced from {{count}}. A name that stands for a shape used once buys no agreement between two places and costs the reader a jump: the line that needs the shape shows a name, and the shape is somewhere else. Write the shape where it is used and delete the declaration. If a type argument is declared here, substitute it at the use site. If the file references it from nowhere at all, delete it outright. If the shape really is shared, then the second place that should agree with it is what is missing: make that place use this type instead of spelling the shape again. Exporting the declaration removes the report without moving the shape anywhere, so it is not a fix.",
+        "A type that this file declares without exporting must not be referenced from fewer than two places in the file. `{{name}}` is referenced from {{count}}. Write the shape where it is used and delete the declaration.",
     },
     schema: [],
   },

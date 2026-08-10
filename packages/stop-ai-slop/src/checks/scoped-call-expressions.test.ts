@@ -1,5 +1,3 @@
-import { type AstNodeFields } from "@mst/utils";
-import { isPlainObject } from "es-toolkit";
 import { parseSync } from "oxc-parser";
 import { describe, expect, it } from "vite-plus/test";
 
@@ -10,15 +8,76 @@ import { scopedCallExpressionsIn } from "./scoped-call-expressions.ts";
 const expectBindingStatesIn = (source: string): readonly boolean[] =>
   scopedCallExpressionsIn(parseSync("source.test.ts", source).program).flatMap(
     ({ call, localBindings }) => {
-      if (!isPlainObject(call.callee)) return [];
-      const callee: AstNodeFields = call.callee;
-      return callee.type === "Identifier" && callee.name === "expect"
+      return call.callee.type === "Identifier" && call.callee.name === "expect"
         ? [localBindings.has("expect")]
         : [];
     },
   );
 
+const onlyCallBindingsIn = (value: unknown): readonly string[] => {
+  const [occurrence] = scopedCallExpressionsIn(value);
+  expect(occurrence).toBeDefined();
+  return [...(occurrence?.localBindings ?? [])].toSorted();
+};
+
 describe("scopedCallExpressionsIn", () => {
+  it("collects value declarations and destructured bindings in a program", () => {
+    const source = `
+      export const { property: assigned = true, ...objectRest } = sourceObject;
+      export const [arrayValue, ...arrayRest] = sourceArray;
+      export default function exportedFunction() {}
+      class DeclaredClass {}
+      export { DeclaredClass };
+      enum DeclaredEnum { Value }
+      namespace DeclaredNamespace {}
+      import importedValue = Other.value;
+      target();
+    `;
+    const bindings = onlyCallBindingsIn(parseSync("source.test.ts", source).program);
+
+    expect(bindings).toStrictEqual([
+      "DeclaredClass",
+      "DeclaredEnum",
+      "DeclaredNamespace",
+      "arrayRest",
+      "arrayValue",
+      "assigned",
+      "exportedFunction",
+      "importedValue",
+      "objectRest",
+    ]);
+  });
+
+  it("tracks catch, loop, switch, class, and named function scopes", () => {
+    const source = [
+      "function namedFunction({ value: functionBinding }) { target(); }",
+      "const namedExpression = function innerName() { target(); };",
+      "try {} catch (caught) { target(); }",
+      "for (let initialized = 0; initialized < 1; initialized += 1) { target(); }",
+      "for (const forOfBinding of []) { target(); }",
+      "for (const forInBinding in {}) { target(); }",
+      "switch (true) { case true: const switched = true; target(); }",
+      "const NamedClass = class InnerClass { method() { target(); } };",
+    ].join("\n");
+    const bindings = scopedCallExpressionsIn(parseSync("source.test.ts", source).program)
+      .filter(({ call }) => call.callee.type === "Identifier" && call.callee.name === "target")
+      .flatMap(({ localBindings }) => [...localBindings]);
+
+    expect(bindings).toStrictEqual(
+      expect.arrayContaining([
+        "namedFunction",
+        "functionBinding",
+        "innerName",
+        "caught",
+        "initialized",
+        "forOfBinding",
+        "forInBinding",
+        "switched",
+        "InnerClass",
+      ]),
+    );
+  });
+
   it("hoists var bindings inside a class static block", () => {
     const source =
       "class Probe { static { if (true) { var expect = (value: boolean) => value; } expect(true); } }";

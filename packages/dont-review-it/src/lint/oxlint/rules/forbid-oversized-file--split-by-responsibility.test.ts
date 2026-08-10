@@ -19,6 +19,11 @@ describe("dont-review-it/forbid-oversized-file--split-by-responsibility", () => 
         options: [{ maxLines: 3 }],
       },
       {
+        name: "options that name no budget leave the default budget in place",
+        code: sourceOfLines(399),
+        options: [{}],
+      },
+      {
         name: "a raised budget lets through a file the default would report",
         code: sourceOfLines(450),
         options: [{ maxLines: 500 }],
@@ -101,7 +106,7 @@ describe("dont-review-it/forbid-oversized-file--split-by-responsibility", () => 
     expect(forbidOversizedFile.meta.schema).toStrictEqual([
       {
         type: "object",
-        properties: { maxLines: { type: "integer", minimum: 1, default: 400 } },
+        properties: { maxLines: { type: "integer", minimum: 1 } },
         additionalProperties: false,
       },
     ]);

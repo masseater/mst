@@ -16,7 +16,7 @@ export const noMultiBindingDeclaration = createDontReviewItRule({
     },
     messages: {
       multiBindingDeclaration:
-        "A declaration statement must not introduce {{count}} bindings at once, because the bindings then share a line range: moving one drags the others, deleting one leaves a comma to repair, and a diff that touches one reads as if it touched all of them. Give each binding its own statement, repeating the declaration keyword.",
+        "A declaration statement must not introduce more than one binding, and this one introduces {{count}}. Give each binding its own statement, repeating the declaration keyword.",
     },
     schema: [],
   },

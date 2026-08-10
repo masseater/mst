@@ -34,7 +34,7 @@ export const noExplanatoryComment = createDontReviewItRule({
     },
     messages: {
       explanatoryComment:
-        "A comment that explains the code must not stay in the source, because it drifts as soon as the code changes and nothing fails when it does. Delete it, and put the reasoning in the body of the commit that makes the change. Comment syntax is reserved for declarations a machine reads: lint suppression directives, compiler directives, and JSDoc tag content.",
+        "A comment that explains the code must not stay in the source. Delete it and put the reasoning in the body of the commit that makes the change.",
     },
     schema: [],
   },

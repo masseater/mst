@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 import { runStopAiSlop } from "./run-cli.ts";
 import { withTestRepository } from "./test-repository.ts";
@@ -11,6 +11,10 @@ describe("runStopAiSlop", () => {
     { argv: ["scan"] },
     { argv: ["check", "extra"] },
     { argv: ["check", "--unknown"] },
+    { argv: ["check"] },
+    { argv: ["check", "--base", ""] },
+    { argv: ["check", "--base", "base"] },
+    { argv: ["check", "--base", "base", "--head", ""] },
   ];
 
   it.each(invalidArguments)("rejects invalid arguments $argv", async ({ argv }) => {
@@ -39,6 +43,23 @@ describe("runStopAiSlop", () => {
         "--head",
         head,
       ]);
+
+      expect(passingCheck).toStrictEqual({ exitCode: 0, out: "", error: "" });
+    });
+  });
+
+  it("uses the current working directory when the repository root is omitted", async () => {
+    await withTestRepository(async (repository) => {
+      const base = repository.commit({
+        files: { "src/current.ts": "export const current = true;\n" },
+      });
+      const head = repository.commit({
+        files: { "src/current.ts": "export const current = false;\n" },
+      });
+      const currentDirectory = vi.spyOn(process, "cwd").mockReturnValue(repository.root);
+
+      const passingCheck = await runStopAiSlop(["check", "--base", base, "--head", head]);
+      currentDirectory.mockRestore();
 
       expect(passingCheck).toStrictEqual({ exitCode: 0, out: "", error: "" });
     });

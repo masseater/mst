@@ -1,8 +1,14 @@
 import { posix } from "node:path";
 
-import { lineAtOffset, type AstNodeFields } from "@mst/utils";
-import { isPlainObject } from "es-toolkit";
-import { parseSync, type ParseResult } from "oxc-parser";
+import { lineAtOffset } from "@mst/utils";
+import {
+  parseSync,
+  type Argument,
+  type CallExpression,
+  type Expression,
+  type Node,
+  type ParseResult,
+} from "oxc-parser";
 
 import { scopedCallExpressionsIn } from "./scoped-call-expressions.ts";
 
@@ -26,6 +32,14 @@ type ExportAbsenceVerification = {
 };
 
 export type AbsenceVerification = FileAbsenceVerification | ExportAbsenceVerification;
+
+export const exportVerificationLocator = ({
+  modulePath,
+  exportName,
+}: {
+  readonly modulePath: string;
+  readonly exportName: string;
+}): string => JSON.stringify(["declaration", modulePath, exportName]);
 
 const parsedSource = (file: string, source: string): ParseResult => {
   const parsed = parseSync(file, source, { preserveParens: false });
@@ -64,38 +78,25 @@ const namespaceImports = (parsed: ParseResult): ReadonlyMap<string, string> =>
     ),
   );
 
-const callExpression = (value: unknown): AstNodeFields | null => {
-  if (!isPlainObject(value)) return null;
-  const fields: AstNodeFields = value;
-  return fields.type === "CallExpression" ? fields : null;
-};
+const callExpression = (value: Argument | Expression | null): CallExpression | null =>
+  value?.type === "CallExpression" ? value : null;
 
-const identifierName = (value: unknown): string | null => {
-  if (!isPlainObject(value)) return null;
-  const fields: AstNodeFields = value;
-  return fields.type === "Identifier" && typeof fields.name === "string" ? fields.name : null;
-};
+const identifierName = (value: Node | null): string | null =>
+  value?.type === "Identifier" ? value.name : null;
 
-const literalValue = (value: unknown): unknown => {
-  if (!isPlainObject(value)) return null;
-  const fields: AstNodeFields = value;
-  return fields.type === "Literal" ? fields.value : null;
-};
+const literalValue = (value: Argument | null): unknown =>
+  value?.type === "Literal" ? value.value : null;
 
 const staticMember = (
-  value: unknown,
+  value: Expression,
   propertyName: string,
-): { readonly object: unknown } | null => {
-  if (!isPlainObject(value)) return null;
-  const fields: AstNodeFields = value;
-  if (fields.type !== "MemberExpression" || fields.computed !== false) return null;
-  return identifierName(fields.property) === propertyName ? { object: fields.object } : null;
+): { readonly object: Expression } | null => {
+  if (value.type !== "MemberExpression" || value.computed) return null;
+  return identifierName(value.property) === propertyName ? { object: value.object } : null;
 };
 
-const onlyArgument = (call: AstNodeFields): unknown => {
-  const { arguments: callArguments } = call;
-  return Array.isArray(callArguments) && callArguments.length === 1 ? callArguments[0] : null;
-};
+const onlyArgument = (call: CallExpression): Argument | null =>
+  call.arguments.length === 1 ? (call.arguments[0] as Argument) : null;
 
 const repositoryPath = (value: string): string | null => {
   if (value.startsWith("/") || /^[A-Za-z]:[\\/]/u.test(value)) return null;
@@ -120,10 +121,10 @@ const argumentOfImportedCall = ({
   importedBindings,
   localBindings,
 }: {
-  readonly call: AstNodeFields | null;
+  readonly call: CallExpression | null;
   readonly importedBindings: readonly string[];
   readonly localBindings: ReadonlySet<string>;
-}): unknown => {
+}): Argument | null => {
   if (call === null) return null;
   return importedBindingIsUnshadowed({
     importedBindings,
@@ -136,11 +137,12 @@ const argumentOfImportedCall = ({
 
 const sourceRangeFor = (
   source: string,
-  call: AstNodeFields,
+  call: CallExpression,
 ): { readonly line: number; readonly endLine: number } => {
-  const start = typeof call.start === "number" ? call.start : 0;
-  const end = typeof call.end === "number" ? Math.max(start, call.end - 1) : start;
-  return { line: lineAtOffset(source, start), endLine: lineAtOffset(source, end) };
+  return {
+    line: lineAtOffset(source, call.start),
+    endLine: lineAtOffset(source, Math.max(call.start, call.end - 1)),
+  };
 };
 
 const fileVerificationFrom = ({
@@ -153,7 +155,7 @@ const fileVerificationFrom = ({
 }: {
   readonly file: string;
   readonly source: string;
-  readonly call: AstNodeFields;
+  readonly call: CallExpression;
   readonly expectBindings: readonly string[];
   readonly existsBindings: readonly string[];
   readonly localBindings: ReadonlySet<string>;
@@ -192,7 +194,10 @@ const importedModulePath = (testFile: string, moduleRequest: string): string | n
   return repositoryPath(posix.join(posix.dirname(testFile), moduleRequest));
 };
 
-const negatedExpectationFrom = (call: AstNodeFields, matcherName: string): AstNodeFields | null => {
+const negatedExpectationFrom = (
+  call: CallExpression,
+  matcherName: string,
+): CallExpression | null => {
   const matcher = staticMember(call.callee, matcherName);
   if (matcher === null) return null;
   const not = staticMember(matcher.object, "not");
@@ -209,7 +214,7 @@ const missingPropertyTargetFrom = ({
   expectBindings,
   localBindings,
 }: {
-  readonly call: AstNodeFields;
+  readonly call: CallExpression;
   readonly expectBindings: readonly string[];
   readonly localBindings: ReadonlySet<string>;
 }): ExportVerificationTarget | null => {
@@ -231,12 +236,12 @@ const undefinedPropertyTargetFrom = ({
   expectBindings,
   localBindings,
 }: {
-  readonly call: AstNodeFields;
+  readonly call: CallExpression;
   readonly expectBindings: readonly string[];
   readonly localBindings: ReadonlySet<string>;
 }): ExportVerificationTarget | null => {
   const toBeUndefined = staticMember(call.callee, "toBeUndefined");
-  if (toBeUndefined === null || !Array.isArray(call.arguments) || call.arguments.length !== 0) {
+  if (toBeUndefined === null || call.arguments.length !== 0) {
     return null;
   }
   const expectedValue = argumentOfImportedCall({
@@ -244,11 +249,11 @@ const undefinedPropertyTargetFrom = ({
     importedBindings: expectBindings,
     localBindings,
   });
-  if (!isPlainObject(expectedValue)) return null;
-  const fields: AstNodeFields = expectedValue;
-  if (fields.type !== "MemberExpression" || fields.computed !== false) return null;
-  const namespaceBinding = identifierName(fields.object);
-  const exportName = identifierName(fields.property);
+  if (expectedValue?.type !== "MemberExpression" || expectedValue.computed) {
+    return null;
+  }
+  const namespaceBinding = identifierName(expectedValue.object);
+  const exportName = identifierName(expectedValue.property);
   return namespaceBinding === null || exportName === null ? null : { namespaceBinding, exportName };
 };
 
@@ -262,7 +267,7 @@ const exportVerificationFrom = ({
 }: {
   readonly file: string;
   readonly source: string;
-  readonly call: AstNodeFields;
+  readonly call: CallExpression;
   readonly expectBindings: readonly string[];
   readonly namespaces: ReadonlyMap<string, string>;
   readonly localBindings: ReadonlySet<string>;
@@ -277,7 +282,7 @@ const exportVerificationFrom = ({
   if (modulePath === null) return null;
   return {
     kind: "export",
-    locator: `declaration:${modulePath}#${target.exportName}`,
+    locator: exportVerificationLocator({ modulePath, exportName: target.exportName }),
     modulePath,
     exportName: target.exportName,
     file,

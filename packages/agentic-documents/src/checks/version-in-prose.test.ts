@@ -11,6 +11,19 @@ const versionProblemsIn = (source: string) =>
   });
 
 describe("versionLiteralsInProse", () => {
+  test("除外の綴りに当たる版は報告しない", () => {
+    const problems = versionLiteralsInProse({
+      document: toNormativeDocument({
+        file: "AGENTS.md",
+        source: "v1 を使う\n",
+        config: defaultConfig,
+      }),
+      config: { ...defaultConfig, versionExclusionPatterns: ["^v1$"] },
+    });
+
+    expect(problems).toStrictEqual([]);
+  });
+
   test("接頭辞付きの版を報告する", () => {
     expect(versionProblemsIn("実行環境は v26.7.0 を使う\n").length).toStrictEqual(1);
   });

@@ -36,8 +36,7 @@ const filesReachableByReExport = (entryFile: string): ReadonlySet<string> => {
     if (text === null) return;
     for (const match of text.matchAll(RE_EXPORT_PATTERN)) {
       const [, specifier] = match;
-      if (specifier === undefined) continue;
-      const target = resolveRelativeSpecifier(file, specifier);
+      const target = resolveRelativeSpecifier(file, String(specifier));
       if (target !== null) visit(target, depth + 1);
     }
   };

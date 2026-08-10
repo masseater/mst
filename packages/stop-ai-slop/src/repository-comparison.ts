@@ -1,10 +1,7 @@
-import { execFile } from "node:child_process";
 import { extname } from "node:path";
-import { promisify } from "node:util";
 
-import { type AnyFileChange } from "parse-git-diff";
-
-import { parseRepositoryDiff } from "./repository-diff.ts";
+import { runGitBuffer, runGitText } from "./git-text.ts";
+import { parseRepositoryChanges, type RepositoryChange } from "./repository-diff.ts";
 
 export type CompareRevisionsOptions = Readonly<{
   repositoryRoot: string;
@@ -65,31 +62,12 @@ export type RepositoryComparison = Readonly<{
   files: readonly ComparisonFile[];
 }>;
 
-const executeFile = promisify(execFile);
-
-const runGitText = async (repositoryRoot: string, args: readonly string[]): Promise<string> => {
-  const { stderr, stdout } = await executeFile("git", [...args], {
-    cwd: repositoryRoot,
-    encoding: "buffer",
-    maxBuffer: 100 * 1024 * 1024,
-  });
-  if (stderr.length > 0) {
-    throw new Error(
-      `Git command wrote to stderr: ${new TextDecoder("utf-8", { fatal: true }).decode(stderr)}`,
-    );
-  }
-
-  return new TextDecoder("utf-8", { fatal: true }).decode(stdout);
-};
-
 const resolveCommit = async (repositoryRoot: string, revision: string): Promise<string> =>
   (
-    await runGitText(repositoryRoot, [
-      "rev-parse",
-      "--verify",
-      "--end-of-options",
-      `${revision}^{commit}`,
-    ])
+    await runGitText({
+      repositoryRoot,
+      args: ["rev-parse", "--verify", "--end-of-options", `${revision}^{commit}`],
+    })
   ).trim();
 
 const sourceExtensions = [".cjs", ".cts", ".js", ".jsx", ".mjs", ".mts", ".ts", ".tsx"];
@@ -107,99 +85,58 @@ const readSource = async ({
     return null;
   }
 
-  const { stdout } = await executeFile("git", ["cat-file", "blob", `${revision}:${path}`], {
-    cwd: repositoryRoot,
-    encoding: "buffer",
-    maxBuffer: 100 * 1024 * 1024,
+  const stdout = await runGitBuffer({
+    repositoryRoot,
+    args: ["cat-file", "blob", `${revision}:${path}`],
   });
+  if (stdout.includes(0)) {
+    throw new Error(`Source blob contains NUL bytes: ${path}`);
+  }
 
-  return stdout.includes(0) ? null : stdout.toString("utf8");
+  return new TextDecoder("utf-8").decode(stdout);
 };
 
-const addedLinesIn = (file: AnyFileChange): readonly number[] =>
-  file.chunks.flatMap((chunk) =>
-    "changes" in chunk
-      ? chunk.changes.flatMap((change) => (change.type === "AddedLine" ? [change.lineAfter] : []))
-      : [],
-  );
-
-type ComparisonContext = Readonly<{
-  repositoryRoot: string;
-  baseCommit: string;
-  headCommit: string;
-}>;
-
-type AddedInventoryFile = Readonly<{
-  kind: "added";
-  beforePath: null;
-  afterPath: string;
-}>;
-
-type DeletedInventoryFile = Readonly<{
-  kind: "deleted";
-  beforePath: string;
-  afterPath: null;
-}>;
-
-type ChangedInventoryFile = Readonly<{
-  kind: "changed";
-  beforePath: string;
-  afterPath: string;
-}>;
-
-type RenamedInventoryFile = Readonly<{
-  kind: "renamed";
-  beforePath: string;
-  afterPath: string;
-}>;
-
-type InventoryFile =
-  | AddedInventoryFile
-  | DeletedInventoryFile
-  | ChangedInventoryFile
-  | RenamedInventoryFile;
-
-type FileConversionInput<File extends InventoryFile> = Readonly<{
-  context: ComparisonContext;
+type FileConversionInput<File extends RepositoryChange> = Readonly<{
+  context: Readonly<{
+    repositoryRoot: string;
+    baseCommit: string;
+    headCommit: string;
+  }>;
   file: File;
-  addedLines: readonly number[];
 }>;
 
 const toAddedComparisonFile = async ({
   context,
   file,
-  addedLines,
-}: FileConversionInput<AddedInventoryFile>): Promise<AddedComparisonFile> => {
+}: FileConversionInput<
+  Extract<RepositoryChange, { kind: "added" }>
+>): Promise<AddedComparisonFile> => {
   return {
-    kind: "added",
-    beforePath: null,
-    afterPath: file.afterPath,
+    ...file,
     beforeSource: null,
     afterSource: await readSource({
       repositoryRoot: context.repositoryRoot,
       revision: context.headCommit,
       path: file.afterPath,
     }),
-    addedLines,
-    firstAddedLine: addedLines[0] ?? null,
+    firstAddedLine: file.addedLines[0] ?? null,
   };
 };
 
 const toDeletedComparisonFile = async ({
   context,
   file,
-}: FileConversionInput<DeletedInventoryFile>): Promise<DeletedComparisonFile> => {
+}: FileConversionInput<
+  Extract<RepositoryChange, { kind: "deleted" }>
+>): Promise<DeletedComparisonFile> => {
   return {
-    kind: "deleted",
-    beforePath: file.beforePath,
-    afterPath: null,
+    ...file,
     beforeSource: await readSource({
       repositoryRoot: context.repositoryRoot,
       revision: context.baseCommit,
       path: file.beforePath,
     }),
     afterSource: null,
-    addedLines: [],
     firstAddedLine: null,
   };
 };
@@ -207,8 +144,9 @@ const toDeletedComparisonFile = async ({
 const toChangedComparisonFile = async ({
   context,
   file,
-  addedLines,
-}: FileConversionInput<ChangedInventoryFile>): Promise<ChangedComparisonFile> => {
+}: FileConversionInput<
+  Extract<RepositoryChange, { kind: "changed" }>
+>): Promise<ChangedComparisonFile> => {
   const [beforeSource, afterSource] = await Promise.all([
     readSource({
       repositoryRoot: context.repositoryRoot,
@@ -222,21 +160,19 @@ const toChangedComparisonFile = async ({
     }),
   ]);
   return {
-    kind: "changed",
-    beforePath: file.beforePath,
-    afterPath: file.afterPath,
+    ...file,
     beforeSource,
     afterSource,
-    addedLines,
-    firstAddedLine: addedLines[0] ?? null,
+    firstAddedLine: file.addedLines[0] ?? null,
   };
 };
 
 const toRenamedComparisonFile = async ({
   context,
   file,
-  addedLines,
-}: FileConversionInput<RenamedInventoryFile>): Promise<RenamedComparisonFile> => {
+}: FileConversionInput<
+  Extract<RepositoryChange, { kind: "renamed" }>
+>): Promise<RenamedComparisonFile> => {
   const [beforeSource, afterSource] = await Promise.all([
     readSource({
       repositoryRoot: context.repositoryRoot,
@@ -250,99 +186,27 @@ const toRenamedComparisonFile = async ({
     }),
   ]);
   return {
-    kind: "renamed",
-    beforePath: file.beforePath,
-    afterPath: file.afterPath,
+    ...file,
     beforeSource,
     afterSource,
-    addedLines,
-    firstAddedLine: addedLines[0] ?? null,
+    firstAddedLine: file.addedLines[0] ?? null,
   };
-};
-
-const parsedTypeFor = (kind: InventoryFile["kind"]): AnyFileChange["type"] => {
-  switch (kind) {
-    case "added":
-      return "AddedFile";
-    case "deleted":
-      return "DeletedFile";
-    case "changed":
-      return "ChangedFile";
-    case "renamed":
-      return "RenamedFile";
-  }
 };
 
 const toComparisonFile = ({
   context,
-  inventoryFile,
-  parsedFile,
-}: Readonly<{
-  context: ComparisonContext;
-  inventoryFile: InventoryFile;
-  parsedFile: AnyFileChange;
-}>): Promise<ComparisonFile> => {
-  const expectedType = parsedTypeFor(inventoryFile.kind);
-  if (parsedFile.type !== expectedType) {
-    throw new Error(`Git diff metadata and patch disagree: ${expectedType} != ${parsedFile.type}`);
-  }
-
-  const input = { context, file: inventoryFile, addedLines: addedLinesIn(parsedFile) };
-  switch (inventoryFile.kind) {
+  file,
+}: FileConversionInput<RepositoryChange>): Promise<ComparisonFile> => {
+  switch (file.kind) {
     case "added":
-      return toAddedComparisonFile({ ...input, file: inventoryFile });
+      return toAddedComparisonFile({ context, file });
     case "deleted":
-      return toDeletedComparisonFile({ ...input, file: inventoryFile });
+      return toDeletedComparisonFile({ context, file });
     case "changed":
-      return toChangedComparisonFile({ ...input, file: inventoryFile });
+      return toChangedComparisonFile({ context, file });
     case "renamed":
-      return toRenamedComparisonFile({ ...input, file: inventoryFile });
+      return toRenamedComparisonFile({ context, file });
   }
-};
-
-const captureAt = (match: RegExpMatchArray, index: number): string => {
-  const capture = match[index];
-  if (capture === undefined || capture.length === 0) {
-    throw new Error("Invalid NUL-delimited Git diff metadata");
-  }
-  return capture;
-};
-
-const inventoryFileFor = (match: RegExpMatchArray): InventoryFile => {
-  if (match[3] !== undefined) {
-    return {
-      kind: "renamed",
-      beforePath: captureAt(match, 4),
-      afterPath: captureAt(match, 5),
-    };
-  }
-
-  const path = captureAt(match, 2);
-  switch (captureAt(match, 1)) {
-    case "A":
-      return { kind: "added", beforePath: null, afterPath: path };
-    case "D":
-      return { kind: "deleted", beforePath: path, afterPath: null };
-    case "M":
-    case "T":
-      return { kind: "changed", beforePath: path, afterPath: path };
-  }
-  throw new Error("Unsupported Git diff status");
-};
-
-const nulCharacter = String.fromCodePoint(0);
-const inventoryRecordPattern = new RegExp(
-  `(?:([ADMT])${nulCharacter}([^${nulCharacter}]+)${nulCharacter}|R(100|0\\d{2})${nulCharacter}([^${nulCharacter}]+)${nulCharacter}([^${nulCharacter}]+)${nulCharacter})`,
-  "guy",
-);
-
-const parseDiffInventory = (output: string): readonly InventoryFile[] => {
-  const matches = Array.from(output.matchAll(inventoryRecordPattern));
-  const parsedLength = matches.reduce((length, match) => length + match[0].length, 0);
-  if (parsedLength !== output.length) {
-    throw new Error("Invalid NUL-delimited Git diff metadata");
-  }
-  return matches.map(inventoryFileFor);
 };
 
 const diffArguments = ({
@@ -380,32 +244,20 @@ export const compareRevisions = async ({
     resolveCommit(repositoryRoot, headRevision),
   ]);
   const [inventoryOutput, diff] = await Promise.all([
-    runGitText(
+    runGitText({
       repositoryRoot,
-      diffArguments({ baseCommit, headCommit, presentation: ["--name-status", "-z"] }),
-    ),
-    runGitText(
+      args: diffArguments({ baseCommit, headCommit, presentation: ["--name-status", "-z"] }),
+    }),
+    runGitText({
       repositoryRoot,
-      diffArguments({ baseCommit, headCommit, presentation: ["--unified=0"] }),
-    ),
+      args: diffArguments({ baseCommit, headCommit, presentation: ["--unified=0"] }),
+    }),
   ]);
-  const inventory = parseDiffInventory(inventoryOutput);
-  const parsed = parseRepositoryDiff(diff);
-  if (inventory.length !== parsed.files.length) {
-    throw new Error(
-      `Git diff metadata and patch file counts disagree: ${inventory.length} != ${parsed.files.length}`,
-    );
-  }
-
   const context = { repositoryRoot, baseCommit, headCommit };
   const files = await Promise.all(
-    inventory.map((inventoryFile, index) => {
-      const parsedFile = parsed.files[index];
-      if (parsedFile === undefined) {
-        throw new Error("Git diff patch is missing an inventory file");
-      }
-      return toComparisonFile({ context, inventoryFile, parsedFile });
-    }),
+    parseRepositoryChanges({ inventoryOutput, diff }).map((file) =>
+      toComparisonFile({ context, file }),
+    ),
   );
 
   return {

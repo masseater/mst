@@ -59,13 +59,16 @@ const scalarLiteralValueOf = (node: Readonly<Record<string, unknown>>): Canonica
 };
 
 const templateLiteralValueOf = (node: Readonly<Record<string, unknown>>): CanonicalValue | null => {
-  const { expressions, quasis } = node;
-  if (!Array.isArray(expressions) || expressions.length !== 0) return null;
-  if (!Array.isArray(quasis) || quasis.length !== 1) return null;
-
-  const cooked: unknown = (quasis[0] as { readonly value?: { readonly cooked?: unknown } }).value
-    ?.cooked;
-  return typeof cooked === "string" ? cooked : null;
+  const { expressions, quasis } = node as {
+    readonly expressions: readonly unknown[];
+    readonly quasis: readonly { readonly value: { readonly cooked: string } }[];
+  };
+  return expressions.length === 0
+    ? quasis
+        .slice(0, 1)
+        .map((quasi) => quasi.value.cooked)
+        .join("")
+    : null;
 };
 
 const literalValueOf = (node: Readonly<Record<string, unknown>>): CanonicalValue | null => {

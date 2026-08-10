@@ -33,6 +33,42 @@ describe("dont-review-it/no-unwrapped-toolchain-config--wrap-with-git-excludes",
         code: 'import { defineConfig } from "some-other-tool";\nexport default defineConfig({ lint: {} });',
       },
       {
+        name: "the wrapper named as a string on import is still the wrapper",
+        code: `import { "withGitExcludes" as excluded } from "@mst/dont-review-it";\nimport { defineConfig } from "vite-plus";\nexport default defineConfig({ lint: excluded({ extends: [] }) });`,
+      },
+      {
+        name: "a default import brings in no named binding to match",
+        code: `import dontReviewIt from "@mst/dont-review-it";\nimport { defineConfig } from "vite-plus";\nexport default defineConfig({ pack: {} });`,
+      },
+      {
+        name: "another name imported from the same module is not the wrapper",
+        code: `import { oxlint } from "@mst/dont-review-it";\nimport { defineConfig } from "vite-plus";\nexport default defineConfig({ pack: { entry: [] } });`,
+      },
+      {
+        name: "a factory reached through a computed name is not the toolchain factory",
+        code: `${NAMESPACE_IMPORTS}export default vitePlus["defineConfig"]({ lint: {} });`,
+      },
+      {
+        name: "a factory reached through a longer path is not the toolchain factory",
+        code: `${NAMESPACE_IMPORTS}export default vitePlus.config.defineConfig({ lint: {} });`,
+      },
+      {
+        name: "a configuration handed no object at all declares no block",
+        code: `${NAMED_IMPORTS}export default defineConfig();`,
+      },
+      {
+        name: "a block spread in from elsewhere names no property here",
+        code: `${NAMED_IMPORTS}export default defineConfig({ ...base });`,
+      },
+      {
+        name: "a block reached through a computed name cannot be read as a block",
+        code: `${NAMED_IMPORTS}export default defineConfig({ [block]: {} });`,
+      },
+      {
+        name: "a block named as a string is read as the block it names",
+        code: `${NAMED_IMPORTS}export default defineConfig({ "pack": {} });`,
+      },
+      {
         name: "the wrapper renamed on import is still the wrapper",
         code: 'import { withGitExcludes as excluded } from "@mst/dont-review-it";\nimport { defineConfig } from "vite-plus";\nexport default defineConfig({ lint: excluded({ extends: [] }) });',
       },

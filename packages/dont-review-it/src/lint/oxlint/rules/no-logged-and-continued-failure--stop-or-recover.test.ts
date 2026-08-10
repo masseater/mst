@@ -11,6 +11,14 @@ describe("dont-review-it/no-logged-and-continued-failure--stop-or-recover", () =
         code: "try {\n  run();\n} catch (failure) {\n  console.error(failure);\n  throw failure;\n}",
       },
       {
+        name: "a write to a stream that is not the process output is not an output sink",
+        code: "try {\n  run();\n} catch (failure) {\n  socket.stdout.write(failure);\n}",
+      },
+      {
+        name: "a statement in the clause that is not a call is not a stop",
+        code: "try {\n  run();\n} catch (failure) {\n  console.error(failure);\n  pending;\n  throw failure;\n}",
+      },
+      {
         name: "a catch clause that throws a failure naming this layer also stops",
         code: "try {\n  run();\n} catch (failure) {\n  console.error(failure);\n  throw new Error('reading the catalog failed', { cause: failure });\n}",
       },

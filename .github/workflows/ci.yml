@@ -29,7 +29,7 @@ jobs:
           run-install: |
             - args: ['--frozen-lockfile']
 
-      - run: vp run ready
+      - run: vp run guard
 
       - name: Observe stop-ai-slop findings
         if: github.event_name == 'pull_request'

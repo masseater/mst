@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { chmodSync } from "node:fs";
+import { chmodSync, symlinkSync, unlinkSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { range } from "es-toolkit";
@@ -187,6 +187,57 @@ describe("compareRevisions", () => {
             afterPath: path,
             beforeSource: "export const value = 1;\n",
             afterSource: "export const value = 2;\n",
+            addedLines: [1],
+            firstAddedLine: 1,
+          },
+        ],
+      });
+    });
+  });
+
+  it("rejects a NUL-bearing source-extension blob", async () => {
+    await withTestRepository(async (repository) => {
+      const base = repository.commit({
+        files: { "src/current.ts": "export const current = true;\n" },
+      });
+      const head = repository.commit({
+        files: { "src/binary.ts": "\0binary\0" },
+      });
+
+      await expect(
+        compareRevisions({
+          repositoryRoot: repository.root,
+          baseRevision: base,
+          headRevision: head,
+        }),
+      ).rejects.toThrow("Source blob contains NUL bytes: src/binary.ts");
+    });
+  });
+
+  it("classifies a regular file changed to a symbolic link as changed", async () => {
+    await withTestRepository(async (repository) => {
+      const path = "src/current.ts";
+      const base = repository.commit({
+        files: { [path]: "export const current = true;\n" },
+      });
+      unlinkSync(resolve(repository.root, path));
+      symlinkSync("target.ts", resolve(repository.root, path));
+      const head = repository.commit({});
+
+      await expect(
+        compareRevisions({
+          repositoryRoot: repository.root,
+          baseRevision: base,
+          headRevision: head,
+        }),
+      ).resolves.toMatchObject({
+        files: [
+          {
+            kind: "changed",
+            beforePath: path,
+            afterPath: path,
+            beforeSource: "export const current = true;\n",
+            afterSource: "target.ts",
             addedLines: [1],
             firstAddedLine: 1,
           },

@@ -8,6 +8,12 @@ const conditionProblemsIn = (source: string) =>
   repeatedConditions(toNormativeDocument({ file: "AGENTS.md", source, config: defaultConfig }));
 
 describe("repeatedConditions", () => {
+  test("散文で始まらない項目と条件を持たない項目は数えない", () => {
+    expect(
+      conditionProblemsIn("- - IF: 開始する; THEN MUST: 記録する\n- 条件を持たない項目\n"),
+    ).toStrictEqual([]);
+  });
+
   test("同じ階層で条件が繰り返されると報告する", () => {
     const source = "- IF: 開始する; THEN MUST: 記録する\n- IF: 開始する; THEN MUST: 通知する\n";
 

@@ -2,6 +2,7 @@ import { countBy, difference } from "es-toolkit";
 
 import {
   absenceVerificationsIn,
+  exportVerificationLocator,
   valueExportsIn,
   type AbsenceVerification,
 } from "./verification-source.ts";
@@ -28,10 +29,7 @@ const isTestFile = (path: string): boolean => /\.test\.[cm]?[jt]sx?$/u.test(path
 const isSourceFile = (path: string): boolean =>
   SOURCE_EXTENSION.test(path) && !/\.d\.[cm]?ts$/u.test(path) && !isTestFile(path);
 
-const testPathFor = (sourcePath: string): string | null => {
-  const match = SOURCE_EXTENSION.exec(sourcePath);
-  return match === null ? null : sourcePath.replace(SOURCE_EXTENSION, `.test${match[1]}`);
-};
+const testPathFor = (sourcePath: string): string => sourcePath.replace(SOURCE_EXTENSION, ".test$1");
 
 const byLocation = (left: CheckProblem, right: CheckProblem): number =>
   left.file === right.file ? left.line - right.line : left.file.localeCompare(right.file);
@@ -56,7 +54,7 @@ const removedExportsIn = (files: readonly ComparisonFile[]): readonly RemovedExp
       valueExportsIn({ file: file.beforePath, source: file.beforeSource }),
       valueExportsIn({ file: file.afterPath, source: file.afterSource }),
     ).map((exportName) => ({
-      locator: `declaration:${file.beforePath}#${exportName}`,
+      locator: exportVerificationLocator({ modulePath: file.beforePath, exportName }),
       modulePath: file.beforePath,
       exportName,
     }));
@@ -113,8 +111,8 @@ const addedVerificationsIn = (
   ];
   return prioritizedVerifications.filter((verification) => {
     const selectedCount = selectedCounts.get(verification.locator) ?? 0;
-    const addedCount =
-      (afterCounts[verification.locator] ?? 0) - (beforeCounts[verification.locator] ?? 0);
+    const afterCount = afterCounts[verification.locator] as number;
+    const addedCount = afterCount - (beforeCounts[verification.locator] ?? 0);
     if (selectedCount >= addedCount) return false;
     selectedCounts.set(verification.locator, selectedCount + 1);
     return true;
@@ -125,12 +123,7 @@ const correspondingTestProblems = (
   files: readonly ComparisonFile[],
   removedFiles: readonly RemovedFile[],
 ): readonly CheckProblem[] => {
-  const deletedPathByTestPath = new Map(
-    removedFiles.flatMap(({ path }) => {
-      const testPath = testPathFor(path);
-      return testPath === null ? [] : [[testPath, path]];
-    }),
-  );
+  const deletedPathByTestPath = new Map(removedFiles.map(({ path }) => [testPathFor(path), path]));
   return files
     .flatMap((file): readonly CheckProblem[] => {
       if (file.kind !== "added") return [];

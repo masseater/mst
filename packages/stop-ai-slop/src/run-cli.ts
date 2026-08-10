@@ -39,14 +39,13 @@ const parsedArguments = (argv: readonly string[]) => {
       },
     });
   } catch (failure) {
-    if (failure instanceof TypeError) return null;
-    throw failure;
+    return { failure };
   }
 };
 
 const dispatch = async (argv: readonly string[]): Promise<CliResult> => {
   const parsed = parsedArguments(argv);
-  if (parsed === null) return misuse();
+  if ("failure" in parsed) return misuse();
   if (parsed.positionals.length !== 1 || parsed.positionals[0] !== "check") return misuse();
 
   const { base, head } = parsed.values;

@@ -40,6 +40,15 @@ describe("dont-review-it/no-reassign--use-spread-or-iife", () => {
         code: "const base = load();\nconst first = 1,\n  second = 2;",
       },
       {
+        name: "options that list no assign-only target leave the platform list in place",
+        code: "const base = load();",
+        options: [{}],
+      },
+      {
+        name: "a unary operator other than delete writes nothing",
+        code: "const negated = -total;\nconst missing = !present;\nconst kind = typeof base;",
+      },
+      {
         name: "a pattern used by a new declaration binds each name once",
         code: "const [head, ...tail] = entries;\nconst { count, ...rest } = holder;",
       },

@@ -33,6 +33,29 @@ const problemsFor = ({
   });
 
 describe("frontmatterProblems", () => {
+  test("前置きが対応表でないと前置きが無いものとして報告する", async () => {
+    const problems = await problemsFor({
+      repositoryRoot: rootWithManifest("説明"),
+      source: "---\n- 一覧\n---\n\n# 規約\n",
+    });
+
+    expect(problems.length).toStrictEqual(1);
+  });
+
+  test("必須の前置き項目が 1 つも無い設定では何も要求しない", async () => {
+    const problems = await frontmatterProblems({
+      repositoryRoot: rootWithManifest("説明"),
+      document: toNormativeDocument({
+        file: "AGENTS.md",
+        source: "---\ndescription: 説明\n---\n\n# 規約\n",
+        config: defaultConfig,
+      }),
+      config: { ...defaultConfig, requiredFrontmatterFields: [] },
+    });
+
+    expect(problems).toStrictEqual([]);
+  });
+
   test("前置きが無いと報告する", async () => {
     const problems = await problemsFor({
       repositoryRoot: rootWithManifest(null),
