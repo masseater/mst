@@ -1,3 +1,5 @@
+import { memoize } from "es-toolkit";
+
 import { createDontReviewItRule } from "../../../create-rule.ts";
 import {
   annotatedDeclarationRanges,
@@ -44,12 +46,6 @@ type FileBindings = {
   readonly arrays: ReadonlyMap<string, ESTree.ArrayExpression>;
   readonly namedImports: ReadonlyMap<string, string>;
   readonly annotatedRanges: readonly AnnotatedDeclarationRange[];
-};
-
-const EMPTY_FILE_BINDINGS: FileBindings = {
-  arrays: new Map(),
-  namedImports: new Map(),
-  annotatedRanges: [],
 };
 
 const collectArrays = (
@@ -140,21 +136,24 @@ export const createNoLocalFiniteValueSet = ({
     create(context) {
       if (isOutOfScopeSource(context.filename)) return {};
 
-      let repositoryRoot: string | null = null;
-      const repositoryRootOf = (): string => (repositoryRoot ??= findWorkspaceRoot(context.cwd));
+      const repositoryRootOf = memoize((): string => findWorkspaceRoot(context.cwd));
 
-      let loaded: CanonicalValuesCatalog | null = null;
-      const catalogOf = (): CanonicalValuesCatalog =>
-        (loaded ??= loadCatalog({ repositoryRoot: repositoryRootOf() }));
+      const catalogOf = memoize(
+        (): CanonicalValuesCatalog => loadCatalog({ repositoryRoot: repositoryRootOf() }),
+      );
 
-      let harvested: LibraryVocabularyIndex | null = null;
-      const libraryVocabularyOf = (): LibraryVocabularyIndex =>
-        (harvested ??= loadLibraryVocabulary({
-          filename: context.filename,
-          repositoryRoot: repositoryRootOf(),
-        }));
+      const bindingsOf = memoize(
+        (): FileBindings => collectFileBindings(context.sourceCode.ast, context.sourceCode.text),
+      );
 
-      let bindings = EMPTY_FILE_BINDINGS;
+      const libraryVocabularyOf = memoize(
+        (): LibraryVocabularyIndex =>
+          loadLibraryVocabulary({
+            filename: context.filename,
+            repositoryRoot: repositoryRootOf(),
+          }),
+      );
+
       const reportedSpans = new Set<string>();
 
       const reportOnce = (
@@ -162,7 +161,7 @@ export const createNoLocalFiniteValueSet = ({
         messageId: string,
         data: Record<string, string>,
       ): void => {
-        if (isInsideAnnotatedDeclaration(bindings.annotatedRanges, node)) return;
+        if (isInsideAnnotatedDeclaration(bindingsOf().annotatedRanges, node)) return;
         const span = `${node.start}:${node.end}`;
         if (reportedSpans.has(span)) return;
         reportedSpans.add(span);
@@ -211,12 +210,12 @@ export const createNoLocalFiniteValueSet = ({
       };
 
       const resolveName = (name: string, reference: ESTree.Span): ValuesPosition | null => {
-        const array = bindings.arrays.get(name);
+        const array = bindingsOf().arrays.get(name);
         if (array !== undefined) {
           const vocabulary = staticArrayValues(array);
           return vocabulary === null ? null : { kind: "values", values: vocabulary, node: array };
         }
-        const specifier = bindings.namedImports.get(name);
+        const specifier = bindingsOf().namedImports.get(name);
         if (specifier === undefined) return null;
         const route = importRouteStatus(
           specifier,
@@ -261,10 +260,6 @@ export const createNoLocalFiniteValueSet = ({
       };
 
       return {
-        Program(node: ESTree.Program) {
-          bindings = collectFileBindings(node, context.sourceCode.text);
-        },
-
         TSTypeAliasDeclaration(node: ESTree.TSTypeAliasDeclaration) {
           const vocabulary = literalUnionValues(node.typeAnnotation);
           if (vocabulary === null || !isFiniteVocabulary(vocabulary)) return;

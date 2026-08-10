@@ -1,5 +1,6 @@
 import { dirname, resolve } from "node:path";
 
+import { attempt, memoize } from "es-toolkit";
 import { API, SymbolFlags } from "typescript/unstable/sync";
 
 import { nearestPackageDirectory } from "../canonical-values/source-files.ts";
@@ -22,15 +23,10 @@ const declaredVocabularyOf = (
   const declared = checker.getDeclaredTypeOfSymbol(declaring);
   if (declared.isErrorType() || !declared.isUnionType()) return null;
 
-  const admitted: CanonicalValue[] = [];
-  let admitsUnnamedValues = false;
-  for (const member of declared.getTypes() ?? []) {
-    if (member.isStringLiteralType() || member.isNumberLiteralType()) {
-      admitted.push(member.value);
-      continue;
-    }
-    admitsUnnamedValues = true;
-  }
+  const members = declared.getTypes() ?? [];
+  const admitted: readonly CanonicalValue[] = members.flatMap((member) =>
+    member.isStringLiteralType() || member.isNumberLiteralType() ? [member.value] : [],
+  );
   if (admitted.length === 0) return null;
 
   const [declaration] = declaring.declarations;
@@ -41,7 +37,7 @@ const declaredVocabularyOf = (
     typeName: exported.name,
     declarationId: `${declaration.path}#${declaration.index}`,
     values: admitted,
-    admitsUnnamedValues,
+    admitsUnnamedValues: admitted.length !== members.length,
   };
 };
 
@@ -56,47 +52,38 @@ const vocabulariesExportedBy = (
   const moduleSymbol = project.checker.getSymbolAtLocation(declarations);
   if (moduleSymbol === undefined) return [];
 
-  const harvested: LibraryVocabularyEntry[] = [];
-  for (const exported of project.checker.getExportsOfModule(moduleSymbol)) {
-    const entry = declaredVocabularyOf(project.checker, packageName, exported);
-    if (entry !== null) harvested.push(entry);
-  }
-  return harvested;
+  return project.checker
+    .getExportsOfModule(moduleSymbol)
+    .map((exported) => declaredVocabularyOf(project.checker, packageName, exported))
+    .filter((entry) => entry !== null);
 };
 
-const harvestLibraryVocabulary = (packageDirectory: string): LibraryVocabularyIndex => {
+const harvestLibraryVocabulary = memoize((packageDirectory: string): LibraryVocabularyIndex => {
   const typeEntries = dependencyTypeEntries(packageDirectory);
   if (typeEntries.length === 0) return EMPTY_LIBRARY_VOCABULARY_INDEX;
 
-  let api;
-  try {
-    api = new API({ cwd: packageDirectory });
+  const [, api] = attempt(() => new API({ cwd: packageDirectory }));
+  if (api === null) return EMPTY_LIBRARY_VOCABULARY_INDEX;
+
+  const [, harvested] = attempt(() => {
     const snapshot = api.updateSnapshot({
       openFiles: typeEntries.map((entry) => entry.declarationsPath),
     });
     return buildLibraryVocabularyIndex(
       typeEntries.flatMap((entry) => vocabulariesExportedBy(snapshot, entry)),
     );
-  } catch {
-    return EMPTY_LIBRARY_VOCABULARY_INDEX;
-  } finally {
-    api?.close();
-  }
-};
+  });
+  api.close();
 
-const indexByPackageDirectory = new Map<string, LibraryVocabularyIndex>();
+  return harvested ?? EMPTY_LIBRARY_VOCABULARY_INDEX;
+});
 
 export const loadLibraryVocabulary: LibraryVocabularyLoader = ({ filename, repositoryRoot }) => {
   const packageDirectory = nearestPackageDirectory(
     dirname(resolve(filename)),
     resolve(repositoryRoot),
   );
-  if (packageDirectory === null) return EMPTY_LIBRARY_VOCABULARY_INDEX;
-
-  const memoized = indexByPackageDirectory.get(packageDirectory);
-  if (memoized !== undefined) return memoized;
-
-  const harvested = harvestLibraryVocabulary(packageDirectory);
-  indexByPackageDirectory.set(packageDirectory, harvested);
-  return harvested;
+  return packageDirectory === null
+    ? EMPTY_LIBRARY_VOCABULARY_INDEX
+    : harvestLibraryVocabulary(packageDirectory);
 };

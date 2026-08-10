@@ -8,7 +8,7 @@ import type { CanonicalValuesEntry } from "./catalog.ts";
 import type { CanonicalValue } from "./fingerprint.ts";
 import type { ScannedFile } from "./source-files.ts";
 
-const CACHE_FORMAT_VERSION = 2;
+const CACHE_FORMAT_VERSION = 3;
 
 const CACHE_FILE_SEGMENTS: readonly string[] = [
   "node_modules",

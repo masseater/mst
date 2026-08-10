@@ -51,14 +51,10 @@ const scalarLiteralValue = (node: ESTree.Expression): CanonicalValue | null => {
 export const staticArrayValues = (
   node: ESTree.ArrayExpression,
 ): readonly CanonicalValue[] | null => {
-  const vocabulary: CanonicalValue[] = [];
-  for (const element of node.elements) {
-    if (element === null || element.type === "SpreadElement") return null;
-    const spelling = scalarLiteralValue(element);
-    if (spelling === null) return null;
-    vocabulary.push(spelling);
-  }
-  return vocabulary;
+  const spellings = node.elements.map((element) =>
+    element === null || element.type === "SpreadElement" ? null : scalarLiteralValue(element),
+  );
+  return spellings.every((spelling) => spelling !== null) ? spellings : null;
 };
 
 export const isFiniteVocabulary = (values: readonly CanonicalValue[]): boolean => {
@@ -77,16 +73,12 @@ const literalTypeValue = (node: ESTree.TSType): CanonicalValue | null => {
 export const literalUnionValues = (node: ESTree.TSType): readonly CanonicalValue[] | null => {
   const type = unwrapType(node);
   if (type.type !== "TSUnionType") return null;
-  const vocabulary: CanonicalValue[] = [];
-  for (const member of type.types) {
-    const unwrapped = unwrapType(member);
-    if (unwrapped.type === "TSNullKeyword") continue;
-    if (unwrapped.type === "TSUndefinedKeyword") continue;
-    const spelling = literalTypeValue(unwrapped);
-    if (spelling === null) return null;
-    vocabulary.push(spelling);
-  }
-  return vocabulary;
+
+  const spellings = type.types
+    .map((member) => unwrapType(member))
+    .filter((member) => member.type !== "TSNullKeyword" && member.type !== "TSUndefinedKeyword")
+    .map((member) => literalTypeValue(member));
+  return spellings.every((spelling) => spelling !== null) ? spellings : null;
 };
 
 export const calleeMemberName = (node: ESTree.Expression): string | null => {
@@ -107,23 +99,27 @@ export type SchemaUnionLiterals = {
   readonly node: ESTree.ArrayExpression;
 };
 
+const schemaLiteralArgumentValue = (
+  element: ESTree.ArrayExpression["elements"][number],
+): CanonicalValue | null => {
+  if (element === null || element.type === "SpreadElement") return null;
+
+  const call = unwrapExpression(element);
+  if (call.type !== "CallExpression") return null;
+  if (calleeMemberName(call.callee) !== SCHEMA_LITERAL_MEMBER) return null;
+
+  const [literal] = call.arguments;
+  if (literal === undefined || literal.type === "SpreadElement") return null;
+  return scalarLiteralValue(literal);
+};
+
 export const schemaUnionLiterals = (node: ESTree.CallExpression): SchemaUnionLiterals | null => {
   const [argument] = node.arguments;
   if (argument === undefined || argument.type === "SpreadElement") return null;
   const array = unwrapExpression(argument);
   if (array.type !== "ArrayExpression") return null;
 
-  const vocabulary: CanonicalValue[] = [];
-  for (const element of array.elements) {
-    if (element === null || element.type === "SpreadElement") return null;
-    const call = unwrapExpression(element);
-    if (call.type !== "CallExpression") return null;
-    if (calleeMemberName(call.callee) !== SCHEMA_LITERAL_MEMBER) return null;
-    const [literal] = call.arguments;
-    if (literal === undefined || literal.type === "SpreadElement") return null;
-    const spelling = scalarLiteralValue(literal);
-    if (spelling === null) return null;
-    vocabulary.push(spelling);
-  }
-  return { values: vocabulary, node: array };
+  const spellings = array.elements.map((element) => schemaLiteralArgumentValue(element));
+  if (!spellings.every((spelling) => spelling !== null)) return null;
+  return { values: spellings, node: array };
 };

@@ -1,5 +1,7 @@
 import { join } from "node:path";
 
+import { sortBy } from "es-toolkit";
+
 import { readJsonFile } from "../canonical-values/read-json-file.ts";
 import { isFile, MANIFEST_FILE_NAME } from "../canonical-values/source-files.ts";
 
@@ -110,17 +112,13 @@ export const dependencyTypeEntries = (packageDirectory: string): readonly Depend
     ...recordFieldOf(manifest, "peerDependencies"),
   };
 
-  const entries: DependencyTypeEntry[] = [];
-  for (const [packageName, range] of Object.entries(specifiers)) {
-    if (typeof range === "string" && range.startsWith(WORKSPACE_PROTOCOL)) continue;
+  const entries = Object.entries(specifiers).flatMap(([packageName, range]) => {
+    if (typeof range === "string" && range.startsWith(WORKSPACE_PROTOCOL)) return [];
     const declarationsPath = declarationsOf(
       join(packageDirectory, NODE_MODULES_DIRECTORY_NAME, packageName),
     );
-    if (declarationsPath === null) continue;
-    entries.push({ packageName, declarationsPath });
-  }
+    return declarationsPath === null ? [] : [{ packageName, declarationsPath }];
+  });
 
-  return entries.sort((left, right) =>
-    left.packageName === right.packageName ? 0 : left.packageName < right.packageName ? -1 : 1,
-  );
+  return sortBy(entries, ["packageName"]);
 };

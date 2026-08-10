@@ -12,27 +12,28 @@ export type AnnotatedSource = {
   readonly problems: readonly CanonicalValuesTextProblem[];
 };
 
+const readAnnotatedFile = (
+  file: ScannedFile,
+  declaringPaths: ReadonlySet<string>,
+): AnnotatedSource | null => {
+  const sourceText = readTextFile(file.absolutePath);
+  if (sourceText === null) return null;
+  if (!containsCanonicalValuesAnnotation(sourceText)) return null;
+
+  const scanned = scanCanonicalValuesText(sourceText, file.absolutePath);
+  return {
+    absolutePath: file.absolutePath,
+    relativePath: file.relativePath,
+    declarations: declaringPaths.has(file.absolutePath) ? scanned.declarations : [],
+    problems: scanned.problems,
+  };
+};
+
 const readAnnotatedFiles = (
   files: readonly ScannedFile[],
   declaringPaths: ReadonlySet<string>,
-): readonly AnnotatedSource[] => {
-  const sources: AnnotatedSource[] = [];
-  for (const file of files) {
-    const sourceText = readTextFile(file.absolutePath);
-    if (sourceText === null) continue;
-    if (!containsCanonicalValuesAnnotation(sourceText)) continue;
-
-    const scanned = scanCanonicalValuesText(sourceText);
-    const source: AnnotatedSource = {
-      absolutePath: file.absolutePath,
-      relativePath: file.relativePath,
-      declarations: declaringPaths.has(file.absolutePath) ? scanned.declarations : [],
-      problems: scanned.problems,
-    };
-    sources.push(source);
-  }
-  return sources;
-};
+): readonly AnnotatedSource[] =>
+  files.map((file) => readAnnotatedFile(file, declaringPaths)).filter((source) => source !== null);
 
 const declaringPathsOf = (repositoryFiles: RepositoryFiles): ReadonlySet<string> =>
   new Set(repositoryFiles.declarationSources.map((file) => file.absolutePath));

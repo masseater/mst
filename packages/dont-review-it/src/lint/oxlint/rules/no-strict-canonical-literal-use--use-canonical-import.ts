@@ -1,3 +1,5 @@
+import { memoize } from "es-toolkit";
+
 import { createDontReviewItRule } from "../../../create-rule.ts";
 import {
   annotatedDeclarationRanges,
@@ -31,15 +33,8 @@ type LiteralNode =
   | ESTree.RegExpLiteral
   | ESTree.StringLiteral;
 
-const ancestorsOf = (node: ESTree.Node): readonly ESTree.Node[] => {
-  const chain: ESTree.Node[] = [];
-  let current: ESTree.Node | null = node.parent;
-  while (current !== null) {
-    chain.push(current);
-    current = current.parent;
-  }
-  return chain.reverse();
-};
+const ancestorsOf = (node: ESTree.Node): readonly ESTree.Node[] =>
+  node.parent === null ? [] : [...ancestorsOf(node.parent), node.parent];
 
 const literalValue = (node: LiteralNode): CanonicalValue | null => {
   const spelling = node.value;
@@ -137,7 +132,7 @@ const conceptSummary = (entries: readonly CanonicalValuesEntry[]): string =>
         ? `${entry.conceptId} declared in ${entry.declarationPath}`
         : `${entry.conceptId} exported from ${entry.exportPath}`,
     )
-    .sort()
+    .toSorted()
     .join("; ");
 
 export const createNoStrictCanonicalLiteralUseRule = ({
@@ -164,8 +159,19 @@ export const createNoStrictCanonicalLiteralUseRule = ({
       if (isOutOfScopeSource(context.filename)) return {};
 
       const ownershipPolicy = ownershipPolicyOf(context.options);
-      let catalog: CanonicalValuesCatalog | null = null;
-      let exemptRanges: readonly AnnotatedDeclarationRange[] | null = null;
+      const loadedCatalog = memoize(
+        (): CanonicalValuesCatalog =>
+          loadCatalog({ repositoryRoot: findWorkspaceRoot(context.cwd) }),
+      );
+      const exemptRangesOf = memoize(
+        (loaded: CanonicalValuesCatalog): readonly AnnotatedDeclarationRange[] =>
+          registeredDeclarationRanges(
+            context.sourceCode.ast,
+            context.sourceCode.text,
+            loaded,
+            context.filename,
+          ),
+      );
 
       const inspect = (
         node: ESTree.Node,
@@ -177,19 +183,11 @@ export const createNoStrictCanonicalLiteralUseRule = ({
         if (parent !== undefined && isModuleSyntaxPosition(parent, node)) return;
         if (isKeySelectorArgument(ancestors, node)) return;
 
-        const loaded = (catalog ??= loadCatalog({
-          repositoryRoot: findWorkspaceRoot(context.cwd),
-        }));
+        const loaded = loadedCatalog();
         const entries = loaded.entriesByValue.get(canonicalValueKey(spelling));
         if (entries === undefined || entries.length === 0) return;
 
-        exemptRanges ??= registeredDeclarationRanges(
-          context.sourceCode.ast,
-          context.sourceCode.text,
-          loaded,
-          context.filename,
-        );
-        if (isInsideAnnotatedDeclaration(exemptRanges, node)) return;
+        if (isInsideAnnotatedDeclaration(exemptRangesOf(loaded), node)) return;
 
         context.report({
           node,

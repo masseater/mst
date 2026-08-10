@@ -1,5 +1,7 @@
 import { resolve, sep } from "node:path";
 
+import { range } from "es-toolkit";
+
 import { createDontReviewItRule } from "../../../create-rule.ts";
 
 import type { ESTree, Options } from "@oxlint/plugins";
@@ -23,6 +25,20 @@ const patternsFrom = (
   return patterns.filter((entry): entry is string => typeof entry === "string");
 };
 
+const literalsFollowInOrder = (
+  segment: string,
+  literals: readonly string[],
+  cursor: number,
+  lastMatchableEnd: number,
+): boolean => {
+  const [literal, ...remaining] = literals;
+  if (literal === undefined) return true;
+
+  const found = segment.indexOf(literal, cursor);
+  if (found === -1 || found + literal.length > lastMatchableEnd) return false;
+  return literalsFollowInOrder(segment, remaining, found + literal.length, lastMatchableEnd);
+};
+
 const matchesSegmentName = (segment: string, pattern: string): boolean => {
   const literals = pattern.split("*");
   if (literals.length === 1) return segment === pattern;
@@ -33,14 +49,12 @@ const matchesSegmentName = (segment: string, pattern: string): boolean => {
   if (!segment.endsWith(tail)) return false;
   if (segment.length < head.length + tail.length) return false;
 
-  const lastMatchableEnd = segment.length - tail.length;
-  let cursor = head.length;
-  for (const literal of literals.slice(1, -1)) {
-    const found = segment.indexOf(literal, cursor);
-    if (found === -1 || found + literal.length > lastMatchableEnd) return false;
-    cursor = found + literal.length;
-  }
-  return true;
+  return literalsFollowInOrder(
+    segment,
+    literals.slice(1, -1),
+    head.length,
+    segment.length - tail.length,
+  );
 };
 
 const matchesSegments = (
@@ -51,10 +65,9 @@ const matchesSegments = (
 
   const [head, ...remainingPatternSegments] = patternSegments;
   if (head === "**") {
-    for (let skipped = 0; skipped <= pathSegments.length; skipped += 1) {
-      if (matchesSegments(pathSegments.slice(skipped), remainingPatternSegments)) return true;
-    }
-    return false;
+    return range(0, pathSegments.length + 1).some((skipped) =>
+      matchesSegments(pathSegments.slice(skipped), remainingPatternSegments),
+    );
   }
 
   if (pathSegments.length === 0) return false;

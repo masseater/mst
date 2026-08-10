@@ -1,6 +1,8 @@
 import { readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
+import { attempt } from "es-toolkit";
+
 const WORKSPACE_MANIFEST_FILE_NAMES: readonly string[] = [
   "pnpm-workspace.yaml",
   "pnpm-workspace.yml",
@@ -10,25 +12,14 @@ const MANIFEST_FILE_NAME = "package.json";
 
 const WORKSPACES_FIELD = "workspaces";
 
-const isFile = (path: string): boolean => {
-  try {
-    return statSync(path).isFile();
-  } catch {
-    return false;
-  }
-};
+const isFile = (path: string): boolean => attempt(() => statSync(path).isFile())[1] === true;
 
 const parseJson: (text: string) => unknown = JSON.parse;
 
 const manifestDeclaresWorkspaces = (directory: string): boolean => {
   const path = join(directory, MANIFEST_FILE_NAME);
-  if (!isFile(path)) return false;
-  let manifest: unknown;
-  try {
-    manifest = parseJson(readFileSync(path, "utf8"));
-  } catch {
-    return false;
-  }
+  const [, manifest] = attempt(() => parseJson(readFileSync(path, "utf8")));
+
   if (manifest === null || typeof manifest !== "object") return false;
   return WORKSPACES_FIELD in manifest && manifest.workspaces !== undefined;
 };
@@ -37,13 +28,13 @@ const isWorkspaceRoot = (directory: string): boolean =>
   WORKSPACE_MANIFEST_FILE_NAMES.some((name) => isFile(join(directory, name))) ||
   manifestDeclaresWorkspaces(directory);
 
+const nearestWorkspaceRoot = (directory: string): string | null => {
+  if (isWorkspaceRoot(directory)) return directory;
+  const parent = dirname(directory);
+  return parent === directory ? null : nearestWorkspaceRoot(parent);
+};
+
 export const findWorkspaceRoot = (startDirectory: string): string => {
   const start = resolve(startDirectory);
-  let directory = start;
-  for (;;) {
-    if (isWorkspaceRoot(directory)) return directory;
-    const parent = dirname(directory);
-    if (parent === directory) return start;
-    directory = parent;
-  }
+  return nearestWorkspaceRoot(start) ?? start;
 };

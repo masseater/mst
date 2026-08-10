@@ -2,19 +2,15 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { afterEach, expect, test } from "vite-plus/test";
+import { expect, onTestFinished, test } from "vite-plus/test";
 
 import { dependencyTypeEntries } from "./dependency-types.ts";
 
-const createdRoots: string[] = [];
-
-afterEach(() => {
-  for (const root of createdRoots.splice(0)) rmSync(root, { recursive: true, force: true });
-});
-
 const createPackage = (manifest: Record<string, unknown>): string => {
   const directory = mkdtempSync(join(tmpdir(), "library-vocabulary-"));
-  createdRoots.push(directory);
+  onTestFinished(() => {
+    rmSync(directory, { recursive: true, force: true });
+  });
   writeFileSync(join(directory, "package.json"), JSON.stringify(manifest), "utf8");
   return directory;
 };
