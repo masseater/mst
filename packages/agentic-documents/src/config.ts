@@ -6,8 +6,6 @@ export type GeneratedRegionBoundary = {
 export type WorkspaceListConfig = {
   readonly path: string;
   readonly region: GeneratedRegionBoundary;
-  readonly definitionFile: string;
-  readonly definitionField: string;
 };
 
 export type AgenticDocumentsConfig = {
@@ -29,6 +27,10 @@ export type AgenticDocumentsConfig = {
   readonly duplicateUnitMinimumLength: number;
   readonly pointerUnitPrefixes: readonly string[];
   readonly versionExclusionPatterns: readonly string[];
+  readonly workspaceDefinition: {
+    readonly file: string;
+    readonly field: string;
+  };
   readonly workspaceList: WorkspaceListConfig | null;
 };
 
@@ -61,10 +63,12 @@ export const defaultConfig: AgenticDocumentsConfig = {
   duplicateUnitMinimumLength: 40,
   pointerUnitPrefixes: ["詳細は", "参照:", "See ", "Refer to "],
   versionExclusionPatterns: [],
+  workspaceDefinition: {
+    file: "pnpm-workspace.yaml",
+    field: "packages",
+  },
   workspaceList: {
     path: "docs/workspaces.md",
     region: WORKSPACE_LIST_REGION,
-    definitionFile: "pnpm-workspace.yaml",
-    definitionField: "packages",
   },
 };
