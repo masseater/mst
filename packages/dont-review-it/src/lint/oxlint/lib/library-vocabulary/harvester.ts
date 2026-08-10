@@ -21,9 +21,13 @@ import {
 import type { CanonicalValue } from "../canonical-values/fingerprint.ts";
 import type { LibraryVocabularyLoader } from "./vocabulary-loader.ts";
 
+type CheckedDependency = {
+  readonly checker: Checker;
+  readonly packageName: string;
+};
+
 const declaredVocabularyOf = (
-  checker: Checker,
-  packageName: string,
+  { checker, packageName }: CheckedDependency,
   exported: TypeSymbol,
 ): LibraryVocabularyEntry | null => {
   const declaring =
@@ -60,9 +64,10 @@ const vocabulariesExportedBy = (
   const moduleSymbol = project.checker.getSymbolAtLocation(declarations);
   if (moduleSymbol === undefined) return [];
 
+  const dependency: CheckedDependency = { checker: project.checker, packageName };
   return project.checker
     .getExportsOfModule(moduleSymbol)
-    .map((exported) => declaredVocabularyOf(project.checker, packageName, exported))
+    .map((exported) => declaredVocabularyOf(dependency, exported))
     .filter((entry) => entry !== null);
 };
 

@@ -10,6 +10,17 @@ const INDEX_MODULE_SUFFIX = /\/index$/u;
 
 const SUBPATH_IMPORT_PREFIX = "#";
 
+export type ImportSite = {
+  readonly specifier: string;
+  readonly filename: string;
+  readonly repositoryRoot: string;
+};
+
+type ResolvedImportPath = {
+  readonly resolvedPath: string;
+  readonly repositoryRoot: string;
+};
+
 const isRelativeSpecifier = (specifier: string): boolean =>
   specifier.startsWith("./") || specifier.startsWith("../");
 
@@ -21,8 +32,7 @@ const withoutModuleSuffix = (path: string): string =>
   toPosixPath(path).replace(MODULE_FILE_SUFFIX, "").replace(INDEX_MODULE_SUFFIX, "");
 
 const matchesDeclarationPath = (
-  resolvedPath: string,
-  repositoryRoot: string,
+  { resolvedPath, repositoryRoot }: ResolvedImportPath,
   entry: CanonicalValuesEntry,
 ): boolean => {
   const declaration = withoutModuleSuffix(entry.declarationPath);
@@ -33,15 +43,15 @@ const matchesDeclarationPath = (
 };
 
 export const importRouteStatus = (
-  specifier: string,
-  filename: string,
-  repositoryRoot: string,
+  { specifier, filename, repositoryRoot }: ImportSite,
   catalog: CanonicalValuesCatalog,
 ): "registered" | "unregistered" | "external" => {
   if (catalog.entries.some((entry) => matchesExportPath(specifier, entry))) return "registered";
   if (isRelativeSpecifier(specifier)) {
-    const resolved = resolve(dirname(filename), specifier);
-    return catalog.entries.some((entry) => matchesDeclarationPath(resolved, repositoryRoot, entry))
+    const resolvedPath = resolve(dirname(filename), specifier);
+    return catalog.entries.some((entry) =>
+      matchesDeclarationPath({ resolvedPath, repositoryRoot }, entry),
+    )
       ? "registered"
       : "unregistered";
   }

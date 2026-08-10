@@ -115,15 +115,25 @@ const isKeySelectorArgument = (ancestors: readonly ESTree.Node[], node: ESTree.N
   return false;
 };
 
+type LintedSource = {
+  readonly program: ESTree.Program;
+  readonly sourceText: string;
+  readonly filename: string;
+};
+
 const registeredDeclarationRanges = (
-  program: ESTree.Program,
-  sourceText: string,
+  { program, sourceText, filename }: LintedSource,
   catalog: CanonicalValuesCatalog,
-  filename: string,
 ): readonly AnnotatedDeclarationRange[] =>
   annotatedDeclarationRanges(program, sourceText).filter((range) =>
-    declaresConceptAt(catalog, range.conceptId, filename),
+    declaresConceptAt(catalog, { conceptId: range.conceptId, path: filename }),
   );
+
+type LiteralOccurrence = {
+  readonly node: ESTree.Node;
+  readonly spelling: CanonicalValue;
+  readonly ancestors: readonly ESTree.Node[];
+};
 
 const conceptSummary = (entries: readonly CanonicalValuesEntry[]): string =>
   entries
@@ -163,21 +173,17 @@ export const createNoStrictCanonicalLiteralUseRule = ({
         (): CanonicalValuesCatalog =>
           loadCatalog({ repositoryRoot: findWorkspaceRoot(context.cwd) }),
       );
+      const lintedSource: LintedSource = {
+        program: context.sourceCode.ast,
+        sourceText: context.sourceCode.text,
+        filename: context.filename,
+      };
       const exemptRangesOf = memoize(
         (loaded: CanonicalValuesCatalog): readonly AnnotatedDeclarationRange[] =>
-          registeredDeclarationRanges(
-            context.sourceCode.ast,
-            context.sourceCode.text,
-            loaded,
-            context.filename,
-          ),
+          registeredDeclarationRanges(lintedSource, loaded),
       );
 
-      const inspect = (
-        node: ESTree.Node,
-        spelling: CanonicalValue,
-        ancestors: readonly ESTree.Node[],
-      ): void => {
+      const inspect = ({ node, spelling, ancestors }: LiteralOccurrence): void => {
         const parent = ancestors.at(-1);
         if (parent !== undefined && isStructuralKeyPosition(parent, node)) return;
         if (parent !== undefined && isModuleSyntaxPosition(parent, node)) return;
@@ -212,17 +218,17 @@ export const createNoStrictCanonicalLiteralUseRule = ({
           ) {
             return;
           }
-          inspect(node, spelling, ancestorsOf(node));
+          inspect({ node, spelling, ancestors: ancestorsOf(node) });
         },
         TemplateLiteral(node: ESTree.TemplateLiteral) {
           const spelling = templateLiteralValue(node);
           if (spelling === null) return;
-          inspect(node, spelling, ancestorsOf(node));
+          inspect({ node, spelling, ancestors: ancestorsOf(node) });
         },
         UnaryExpression(node: ESTree.UnaryExpression) {
           const spelling = negatedNumericValue(node);
           if (spelling === null) return;
-          inspect(node, spelling, ancestorsOf(node));
+          inspect({ node, spelling, ancestors: ancestorsOf(node) });
         },
       };
     },
