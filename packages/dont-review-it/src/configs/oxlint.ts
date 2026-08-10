@@ -19,8 +19,6 @@ const PLUGIN_NAME = "dont-review-it";
 
 const MAX_LINES_PER_FILE = 400;
 
-const TOOL_REQUIRED_DEFAULT_EXPORT_FILES = ["**/plugin.ts", "**/vite.config.ts"];
-
 const TEST_FILES = ["**/*.test.ts", "**/*.test.tsx"];
 
 const SHARED_TSCONFIG_PRESETS = [
@@ -31,10 +29,6 @@ const SHARED_TSCONFIG_PRESETS = [
 export const oxlint = defineConfig({
   jsPlugins: [{ name: PLUGIN_NAME, specifier: "@mst/dont-review-it/plugin" }],
   overrides: [
-    {
-      files: TOOL_REQUIRED_DEFAULT_EXPORT_FILES,
-      rules: { [`${PLUGIN_NAME}/${noDefaultExport.name}`]: LINT_SEVERITY.OFF },
-    },
     {
       files: TEST_FILES,
       rules: {
