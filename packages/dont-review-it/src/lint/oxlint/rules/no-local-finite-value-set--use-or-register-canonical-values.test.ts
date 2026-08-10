@@ -3,6 +3,10 @@ import { describe } from "vite-plus/test";
 
 import { buildCatalog, EMPTY_CANONICAL_VALUES_CATALOG } from "../lib/canonical-values/catalog.ts";
 import { fingerprintValues } from "../lib/canonical-values/fingerprint.ts";
+import {
+  buildLibraryVocabularyIndex,
+  EMPTY_LIBRARY_VOCABULARY_INDEX,
+} from "../lib/library-vocabulary/vocabulary-index.ts";
 import { createNoLocalFiniteValueSet } from "./no-local-finite-value-set--use-or-register-canonical-values.ts";
 
 import type { CanonicalValuesEntry } from "../lib/canonical-values/catalog.ts";
@@ -36,12 +40,74 @@ const subpathCatalog = buildCatalog([
   },
 ]);
 
-const withOwner = createNoLocalFiniteValueSet({ loadCatalog: () => ownedCatalog });
+const withoutLibraries = () => EMPTY_LIBRARY_VOCABULARY_INDEX;
+
+const withOwner = createNoLocalFiniteValueSet({
+  loadCatalog: () => ownedCatalog,
+  loadLibraryVocabulary: withoutLibraries,
+});
 const withoutCatalog = createNoLocalFiniteValueSet({
   loadCatalog: () => EMPTY_CANONICAL_VALUES_CATALOG,
+  loadLibraryVocabulary: withoutLibraries,
 });
-const withAmbiguousOwners = createNoLocalFiniteValueSet({ loadCatalog: () => ambiguousCatalog });
-const withSubpathOwner = createNoLocalFiniteValueSet({ loadCatalog: () => subpathCatalog });
+const withAmbiguousOwners = createNoLocalFiniteValueSet({
+  loadCatalog: () => ambiguousCatalog,
+  loadLibraryVocabulary: withoutLibraries,
+});
+const withSubpathOwner = createNoLocalFiniteValueSet({
+  loadCatalog: () => subpathCatalog,
+  loadLibraryVocabulary: withoutLibraries,
+});
+
+const SEVERITY_DECLARATION = "oxlint/dist/index.d.ts#AllowWarnDeny";
+
+const libraryIndex = buildLibraryVocabularyIndex([
+  {
+    packageName: "oxlint",
+    typeName: "AllowWarnDeny",
+    declarationId: SEVERITY_DECLARATION,
+    values: ["allow", "deny", "error", "off", "warn"],
+    admitsUnnamedValues: true,
+  },
+  {
+    packageName: "vite",
+    typeName: "SSRTarget",
+    declarationId: "vite/dist/node/index.d.ts#SSRTarget",
+    values: ["node", "webworker"],
+    admitsUnnamedValues: false,
+  },
+]);
+
+const withLibraryOwner = createNoLocalFiniteValueSet({
+  loadCatalog: () => EMPTY_CANONICAL_VALUES_CATALOG,
+  loadLibraryVocabulary: () => libraryIndex,
+});
+
+const withCatalogAndLibraryOwners = createNoLocalFiniteValueSet({
+  loadCatalog: () => buildCatalog([entry("ssr-target", "ssr-vocabulary", ["node", "webworker"])]),
+  loadLibraryVocabulary: () => libraryIndex,
+});
+
+const withTwoLibraryOwners = createNoLocalFiniteValueSet({
+  loadCatalog: () => EMPTY_CANONICAL_VALUES_CATALOG,
+  loadLibraryVocabulary: () =>
+    buildLibraryVocabularyIndex([
+      {
+        packageName: "oxlint",
+        typeName: "AllowWarnDeny",
+        declarationId: SEVERITY_DECLARATION,
+        values: ["error", "off", "warn"],
+        admitsUnnamedValues: false,
+      },
+      {
+        packageName: "vite",
+        typeName: "LogLevel",
+        declarationId: "vite/dist/node/index.d.ts#LogLevel",
+        values: ["error", "info", "off", "warn"],
+        admitsUnnamedValues: false,
+      },
+    ]),
+});
 
 describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-values", () => {
   describe("against a catalog that owns the value set", () => {
@@ -276,6 +342,11 @@ describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-va
           errors: [{ messageId: "localFiniteValueSetWithoutOwner" }],
         },
         {
+          name: "the message that owns nothing offers the dependencies as a third place to look",
+          code: 'export type OrderStatus = "draft" | "published";',
+          errors: [{ message: /public types of the packages this one depends on/u }],
+        },
+        {
           name: "an unconfigured ownership policy says so instead of inventing one",
           code: 'export const schema = z.enum(["draft", "published"]);',
           errors: [
@@ -310,6 +381,81 @@ describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-va
           code: 'import { STATUSES } from "#internal/order";\nexport const schema = z.enum(STATUSES);',
           filename: "packages/order/src/schema.ts",
           errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
+        },
+      ],
+    });
+  });
+
+  describe("against a dependency whose public type owns the value set", () => {
+    testLintRule(withLibraryOwner, {
+      valid: [
+        {
+          name: "a set stays silent because a set was never reported without a catalog owner",
+          code: 'const SEVERITIES = new Set(["error", "warn", "off"]);\nexport const has = (severity) => SEVERITIES.has(severity);',
+        },
+        {
+          name: "an indexed access array stays silent for the same reason",
+          code: 'const SEVERITIES = ["error", "warn", "off"] as const;\nexport type Severity = (typeof SEVERITIES)[number];',
+        },
+      ],
+      invalid: [
+        {
+          name: "the report names the dependency and the type that own the values",
+          code: 'export type Severity = "error" | "warn" | "off";',
+          errors: [{ messageId: "localFiniteValueSetOwnedByLibraryType" }],
+        },
+        {
+          name: "the report spells out what the dependency admits beyond these values",
+          code: 'export type Severity = "error" | "warn" | "off";',
+          errors: [
+            { message: /derive the type from AllowWarnDeny from oxlint \(which also admits/u },
+          ],
+        },
+        {
+          name: "a dependency that admits only these values is reached the same way",
+          code: 'export type SsrTarget = "node" | "webworker";',
+          errors: [{ message: /derive the type from SSRTarget from vite, so/u }],
+        },
+        {
+          name: "a schema enum reaches the same dependency as the type alias does",
+          code: 'export const schema = z.enum(["error", "warn", "off"]);',
+          errors: [{ message: /AllowWarnDeny from oxlint/u }],
+        },
+        {
+          name: "a vocabulary no dependency owns falls back to the message that owns nothing",
+          code: 'export type OrderStatus = "draft" | "published";',
+          errors: [{ messageId: "localFiniteValueSetWithoutOwner" }],
+        },
+      ],
+    });
+  });
+
+  describe("against a catalog and a dependency that both own the value set", () => {
+    testLintRule(withCatalogAndLibraryOwners, {
+      valid: [],
+      invalid: [
+        {
+          name: "the owner registered in this repository is the one the report names",
+          code: 'export type SsrTarget = "node" | "webworker";',
+          errors: [{ messageId: "localFiniteValueSetWithOwner" }],
+        },
+      ],
+    });
+  });
+
+  describe("against two dependencies that both admit the value set", () => {
+    testLintRule(withTwoLibraryOwners, {
+      valid: [],
+      invalid: [
+        {
+          name: "every dependency is listed instead of one being picked",
+          code: 'export type Severity = "error" | "warn";',
+          errors: [{ messageId: "localFiniteValueSetOwnedByLibraryTypeCandidates" }],
+        },
+        {
+          name: "the candidates keep the order the index settled on",
+          code: 'export type Severity = "error" | "warn";',
+          errors: [{ message: /: AllowWarnDeny from oxlint \(.*\), LogLevel from vite \(/u }],
         },
       ],
     });

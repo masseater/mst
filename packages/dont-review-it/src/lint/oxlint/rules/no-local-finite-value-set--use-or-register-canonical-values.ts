@@ -11,6 +11,8 @@ import {
   ownershipPolicyOf,
 } from "../lib/canonical-values/ownership-policy.ts";
 import { findWorkspaceRoot } from "../lib/canonical-values/workspace-root.ts";
+import { describeLibraryOwner } from "../lib/library-vocabulary/owner-description.ts";
+import { libraryOwnersOf } from "../lib/library-vocabulary/vocabulary-index.ts";
 import { isOutOfScopeSource } from "../lib/out-of-scope-source.ts";
 
 import type { WorkspaceLintRule } from "@mst/lint-rule-authoring";
@@ -22,6 +24,8 @@ import type {
   CanonicalValuesEntry,
 } from "../lib/canonical-values/catalog.ts";
 import type { CanonicalValue } from "../lib/canonical-values/fingerprint.ts";
+import type { LibraryVocabularyIndex } from "../lib/library-vocabulary/vocabulary-index.ts";
+import type { LibraryVocabularyLoader } from "../lib/library-vocabulary/vocabulary-loader.ts";
 
 const MIN_VOCABULARY_SIZE = 2;
 
@@ -257,8 +261,10 @@ type ValuesPosition =
 
 export const createNoLocalFiniteValueSet = ({
   loadCatalog,
+  loadLibraryVocabulary,
 }: {
   readonly loadCatalog: CanonicalValuesCatalogLoader;
+  readonly loadLibraryVocabulary: LibraryVocabularyLoader;
 }): WorkspaceLintRule =>
   createDontReviewItRule({
     name: "no-local-finite-value-set--use-or-register-canonical-values",
@@ -275,7 +281,11 @@ export const createNoLocalFiniteValueSet = ({
         localFiniteValueSetWithOwnerCandidates:
           "Defining a finite value set inside a file that does not own it is forbidden, because the same vocabulary then lives in two places and nothing fails when they disagree. Delete the local values and derive everything from the owner whose concept, reason to change, and boundary match this one, choosing among these candidates yourself rather than by their order: {{owners}}. Ownership policy: {{ownershipPolicy}}.",
         localFiniteValueSetWithoutOwner:
-          "Defining a finite value set inside a file that does not own it is forbidden, because the same vocabulary then lives in two places and nothing fails when they disagree. Read the design records and the sources to find the owner of this concept, or register the runtime values in the place that should own it and derive everything from there. Ownership policy: {{ownershipPolicy}}.",
+          "Defining a finite value set inside a file that does not own it is forbidden, because the same vocabulary then lives in two places and nothing fails when they disagree. Read the design records and the sources to find the owner of this concept. Read the public types of the packages this one depends on as well, because a dependency that already owns this vocabulary is the owner, and the type is derived from it rather than declared again. Register the runtime values in the place that should own it only once you know nothing owns it yet. Ownership policy: {{ownershipPolicy}}.",
+        localFiniteValueSetOwnedByLibraryType:
+          "Defining a finite value set that a dependency already owns is forbidden, because the same vocabulary then lives in two places and nothing fails when they disagree. Delete the local values and derive the type from {{owner}}, so the declaration stops compiling when the dependency changes the vocabulary. Ownership policy: {{ownershipPolicy}}.",
+        localFiniteValueSetOwnedByLibraryTypeCandidates:
+          "Defining a finite value set that a dependency already owns is forbidden, because the same vocabulary then lives in two places and nothing fails when they disagree. Delete the local values and derive the type from the dependency whose concept, reason to change, and boundary match this one, choosing among these candidates yourself rather than by their order: {{owners}}. Ownership policy: {{ownershipPolicy}}.",
         unregisteredCanonicalValuesImportRoute:
           "Feeding a finite value set from a repository import that the catalog does not resolve is forbidden, because the route looks like it goes through an owner while no owner is declared. `{{name}}` from `{{specifier}}` is neither a registered public export path nor an annotated declaration. Register the owner of this concept and import through the route the catalog resolves.",
       },
@@ -290,6 +300,13 @@ export const createNoLocalFiniteValueSet = ({
       let loaded: CanonicalValuesCatalog | null = null;
       const catalogOf = (): CanonicalValuesCatalog =>
         (loaded ??= loadCatalog({ repositoryRoot: repositoryRootOf() }));
+
+      let harvested: LibraryVocabularyIndex | null = null;
+      const libraryVocabularyOf = (): LibraryVocabularyIndex =>
+        (harvested ??= loadLibraryVocabulary({
+          filename: context.filename,
+          repositoryRoot: repositoryRootOf(),
+        }));
 
       let bindings = EMPTY_FILE_BINDINGS;
       const reportedSpans = new Set<string>();
@@ -316,7 +333,22 @@ export const createNoLocalFiniteValueSet = ({
 
         const ownershipPolicy = ownershipPolicyOf(context.options);
         if (owners.length === 0) {
-          reportOnce(node, "localFiniteValueSetWithoutOwner", { ownershipPolicy });
+          const libraries = libraryOwnersOf(libraryVocabularyOf(), values);
+          if (libraries.length === 0) {
+            reportOnce(node, "localFiniteValueSetWithoutOwner", { ownershipPolicy });
+            return;
+          }
+          if (libraries.length === 1) {
+            reportOnce(node, "localFiniteValueSetOwnedByLibraryType", {
+              owner: describeLibraryOwner(libraries[0], values),
+              ownershipPolicy,
+            });
+            return;
+          }
+          reportOnce(node, "localFiniteValueSetOwnedByLibraryTypeCandidates", {
+            owners: libraries.map((library) => describeLibraryOwner(library, values)).join(", "),
+            ownershipPolicy,
+          });
           return;
         }
         if (owners.length === 1) {

@@ -1,4 +1,4 @@
-import { dirname, join, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 
 import { containsCanonicalValuesAnnotation } from "./annotation.ts";
 import { buildCatalog, EMPTY_CANONICAL_VALUES_CATALOG } from "./catalog.ts";
@@ -6,21 +6,10 @@ import { cacheInputFingerprint, readCachedEntries, writeCachedEntries } from "./
 import { scanCanonicalValuesText } from "./declarations.ts";
 import { buildExportSpecifierIndex } from "./export-specifier-index.ts";
 import { fingerprintValues } from "./fingerprint.ts";
-import { isFile, listRepositoryFiles, MANIFEST_FILE_NAME, readTextFile } from "./source-files.ts";
+import { listRepositoryFiles, nearestPackageDirectory, readTextFile } from "./source-files.ts";
 
 import type { CanonicalValuesCatalog, CanonicalValuesEntry } from "./catalog.ts";
 import type { ScannedFile } from "./source-files.ts";
-
-const nearestPackageDirectory = (fileDirectory: string, repositoryRoot: string): string | null => {
-  let directory = fileDirectory;
-  for (;;) {
-    if (isFile(join(directory, MANIFEST_FILE_NAME))) return directory;
-    if (directory === repositoryRoot) return null;
-    const parent = dirname(directory);
-    if (parent === directory) return null;
-    directory = parent;
-  }
-};
 
 const canonicalValuesEntriesIn = (
   repositoryRoot: string,
