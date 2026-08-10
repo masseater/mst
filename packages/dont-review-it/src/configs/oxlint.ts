@@ -2,6 +2,7 @@ import { LINT_SEVERITY } from "@mst/lint-rule-authoring";
 import { defineConfig } from "oxlint";
 
 import { FORBIDDEN_AMBIGUOUS_NAMES } from "../lint/oxlint/lib/forbidden-ambiguous-names.ts";
+import { forbidNumberedSiblingFile } from "../lint/oxlint/rules/forbid-numbered-sibling-file--name-what-each-file-owns.ts";
 import { forbidOversizedFile } from "../lint/oxlint/rules/forbid-oversized-file--split-by-responsibility.ts";
 import { noAmbiguousVariableName } from "../lint/oxlint/rules/no-ambiguous-variable-name--rename-to-concrete-noun.ts";
 import { noArrayMutation } from "../lint/oxlint/rules/no-array-mutation--derive-new-array.ts";
@@ -40,6 +41,7 @@ export const oxlint = defineConfig({
     },
   ],
   rules: {
+    [`${PLUGIN_NAME}/${forbidNumberedSiblingFile.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${forbidOversizedFile.name}`]: [
       LINT_SEVERITY.ERROR,
       { maxLines: MAX_LINES_PER_FILE },

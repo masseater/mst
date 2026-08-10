@@ -1,5 +1,6 @@
 import { loadCanonicalValuesCatalog } from "./lint/oxlint/lib/canonical-values/builder.ts";
 import { loadLibraryVocabulary } from "./lint/oxlint/lib/library-vocabulary/harvester.ts";
+import { forbidNumberedSiblingFile } from "./lint/oxlint/rules/forbid-numbered-sibling-file--name-what-each-file-owns.ts";
 import { forbidOversizedFile } from "./lint/oxlint/rules/forbid-oversized-file--split-by-responsibility.ts";
 import { noAmbiguousVariableName } from "./lint/oxlint/rules/no-ambiguous-variable-name--rename-to-concrete-noun.ts";
 import { noArrayMutation } from "./lint/oxlint/rules/no-array-mutation--derive-new-array.ts";
@@ -28,6 +29,7 @@ export const noStrictCanonicalLiteralUse = createNoStrictCanonicalLiteralUseRule
 const plugin: Plugin = {
   meta: { name: "dont-review-it" },
   rules: {
+    [forbidNumberedSiblingFile.name]: forbidNumberedSiblingFile,
     [forbidOversizedFile.name]: forbidOversizedFile,
     [noAmbiguousVariableName.name]: noAmbiguousVariableName,
     [noArrayMutation.name]: noArrayMutation,
