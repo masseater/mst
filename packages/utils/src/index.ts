@@ -1,1 +1,1 @@
-export { fn } from "./fn.ts";
+export { lineAtOffset, toLines } from "./text.ts";

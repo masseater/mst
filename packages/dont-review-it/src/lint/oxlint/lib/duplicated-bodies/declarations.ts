@@ -1,3 +1,4 @@
+import { lineAtOffset } from "@mst/utils";
 import { parseSync } from "oxc-parser";
 
 export type BodyDeclaration = {
@@ -37,9 +38,6 @@ const nodeCountOf = (value: unknown): number => {
   return namedFieldsOf(value).reduce((total, [, nested]) => total + nodeCountOf(nested), own);
 };
 
-const lineAt = (source: string, offset: number): number =>
-  source.slice(0, offset).split("\n").length;
-
 const declarationFrom = ({
   source,
   described,
@@ -48,7 +46,7 @@ const declarationFrom = ({
   readonly described: { readonly name: string; readonly start: number; readonly body: unknown };
 }): BodyDeclaration => ({
   name: described.name,
-  line: lineAt(source, described.start),
+  line: lineAtOffset(source, described.start),
   structure: structureOf(described.body),
   nodeCount: nodeCountOf(described.body),
 });
