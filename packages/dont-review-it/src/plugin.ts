@@ -69,4 +69,5 @@ const plugin: Plugin = {
   },
 };
 
+/** @public */
 export default plugin;

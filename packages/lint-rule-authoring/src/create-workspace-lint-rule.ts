@@ -12,7 +12,7 @@ export type WorkspaceLintRuleDocs = {
   readonly url?: string;
 };
 
-export type WorkspaceLintRuleMeta = {
+type WorkspaceLintRuleMeta = {
   readonly type: RuleMeta["type"];
   readonly docs: WorkspaceLintRuleDocs;
   readonly messages: Record<string, string>;
@@ -54,5 +54,3 @@ export const createWorkspaceLintRule = ({ workspaceDir }: { readonly workspaceDi
     };
   };
 };
-
-export type WorkspaceLintRuleFactory = ReturnType<typeof createWorkspaceLintRule>;
