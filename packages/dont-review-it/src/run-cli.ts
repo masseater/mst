@@ -11,12 +11,15 @@ import {
   formatEquivalentConceptGroup,
   verifyCanonicalValues,
 } from "./lint/oxlint/lib/canonical-values/verify.ts";
+import { duplicatedClustersIn } from "./lint/oxlint/lib/duplicated-bodies/body-index.ts";
+import { buildRepositoryBodyIndex } from "./lint/oxlint/lib/duplicated-bodies/builder.ts";
 
 const USAGE = `Usage: dont-review-it <command> [--repository-root <path>]
 
 Commands:
   verify               Report every broken or retired canonical values annotation, and exit non-zero when any is found.
   equivalent-concepts  Report every value set that more than one concept declares.
+  duplicated-bodies    Report every body that more than one declaration spells the same way.
 
 Options:
   --repository-root <path>  Root of the repository to scan. Defaults to the current working directory.
@@ -38,6 +41,14 @@ const VERIFY_COMMAND = "verify";
 
 const EQUIVALENT_CONCEPTS_COMMAND = "equivalent-concepts";
 
+const DUPLICATED_BODIES_COMMAND = "duplicated-bodies";
+
+const COMMANDS: ReadonlySet<string> = new Set([
+  VERIFY_COMMAND,
+  EQUIVALENT_CONCEPTS_COMMAND,
+  DUPLICATED_BODIES_COMMAND,
+]);
+
 const asLines = (entries: readonly string[]): string =>
   entries.map((entry) => `${entry}\n`).join("");
 
@@ -48,7 +59,7 @@ const dispatch = (argv: readonly string[]): CliResult => {
     options: { "repository-root": { type: "string" } },
   });
   const [command] = parsed.positionals;
-  if (command !== VERIFY_COMMAND && command !== EQUIVALENT_CONCEPTS_COMMAND) {
+  if (command === undefined || !COMMANDS.has(command)) {
     return { exitCode: EXIT_MISUSE, out: "", error: USAGE };
   }
 
@@ -70,11 +81,24 @@ const dispatch = (argv: readonly string[]): CliResult => {
     };
   }
 
-  const catalog = buildCanonicalValuesCatalog({ repositoryRoot });
+  if (command === EQUIVALENT_CONCEPTS_COMMAND) {
+    const catalog = buildCanonicalValuesCatalog({ repositoryRoot });
+    return {
+      exitCode: EXIT_SUCCESS,
+      out: asLines(
+        findEquivalentConcepts(catalog.entries).map((group) => formatEquivalentConceptGroup(group)),
+      ),
+      error: "",
+    };
+  }
+
+  const clusters = duplicatedClustersIn(buildRepositoryBodyIndex({ repositoryRoot }));
   return {
     exitCode: EXIT_SUCCESS,
     out: asLines(
-      findEquivalentConcepts(catalog.entries).map((group) => formatEquivalentConceptGroup(group)),
+      clusters.map((sites) =>
+        sites.map((site) => `${site.relativePath}:${site.line} ${site.name}`).join(" == "),
+      ),
     ),
     error: "",
   };

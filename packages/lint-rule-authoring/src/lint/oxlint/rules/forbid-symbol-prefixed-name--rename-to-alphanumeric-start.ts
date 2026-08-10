@@ -3,42 +3,11 @@ import { isAbsolute, relative, sep } from "node:path";
 import { uniq } from "es-toolkit";
 
 import { createLintRuleAuthoringRule } from "../../../create-rule.ts";
+import { matchesGlobSegment } from "../../../glob-segment.ts";
 
 import type { ESTree, Options } from "@oxlint/plugins";
 
 const startsWithAlphanumeric = (segment: string): boolean => /^[a-zA-Z0-9]/u.test(segment);
-
-const literalsFollowInOrder = (
-  segment: string,
-  literals: readonly string[],
-  cursor: number,
-  lastMatchableEnd: number,
-): boolean => {
-  const [literal, ...remaining] = literals;
-  if (literal === undefined) return true;
-
-  const found = segment.indexOf(literal, cursor);
-  if (found === -1 || found + literal.length > lastMatchableEnd) return false;
-  return literalsFollowInOrder(segment, remaining, found + literal.length, lastMatchableEnd);
-};
-
-const matchesAllowedName = (segment: string, pattern: string): boolean => {
-  const literals = pattern.split("*");
-  if (literals.length === 1) return segment === pattern;
-
-  const head = literals[0];
-  const tail = literals[literals.length - 1];
-  if (!segment.startsWith(head)) return false;
-  if (!segment.endsWith(tail)) return false;
-  if (segment.length < head.length + tail.length) return false;
-
-  return literalsFollowInOrder(
-    segment,
-    literals.slice(1, -1),
-    head.length,
-    segment.length - tail.length,
-  );
-};
 
 const allowedNamesFrom = (options: Readonly<Options>): readonly string[] => {
   const [first] = options;
@@ -62,7 +31,9 @@ const offendingSegmentsOf = (
     repositoryRelativePath
       .split(sep)
       .filter((segment) => segment !== "" && !startsWithAlphanumeric(segment))
-      .filter((segment) => !allowedNames.some((pattern) => matchesAllowedName(segment, pattern))),
+      .filter(
+        (segment) => !allowedNames.some((pattern) => matchesGlobSegment({ segment, pattern })),
+      ),
   );
 
 export const forbidSymbolPrefixedName = createLintRuleAuthoringRule({
