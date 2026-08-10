@@ -121,9 +121,10 @@ pack: { exports: { customExports: { './tsconfig/*': './tsconfig/*' } } }
 - IF: preset から何らかの設定を配れているか確かめる; THEN MUST: そのフィールドが `extends` で継承されるかを実測する
   - 継承されないフィールドは、書いても何も起きず lint は緑のまま通る
 
-## oxlint と oxfmt はグローバルの gitignore を見ない
+## oxlint と oxfmt が見ない git の ignore は `core.excludesFile` だけ
 
-- 症状: `core.excludesFile` が指すファイルに書いたパターン（`.agents/` など）が lint と format の除外に効かない。リポジトリの `.gitignore` に書いたものは効く
-- 原因: 走査が尊重するのはリポジトリの `.gitignore` だけである。`$GIT_DIR/info/exclude` とマシン全体の ignore は読まない。CLI の `--ignore-path` はあるが、設定から同じ指定をする口は無い
-- 検出方法: グローバルの ignore が拾うパスに違反ファイルを置いて `vp lint` と `vp fmt --list-different` にかける。報告されれば見ていない
-- 対処: 3 経路を読んで `ignorePatterns` に変換する。`@mst/dont-review-it` の `withGitExcludes` がこれを行う。順序はグローバル → `$GIT_DIR/info/exclude` → リポジトリの `.gitignore`。gitignore は last-match-wins なので、この順でないと `!` による再包含が負ける
+- 症状: `core.excludesFile` が指すファイルに書いたパターン（`.agents/` など）が lint と format の除外に効かない
+- 原因: 走査を組み立てる [`configure_walk_builder`](https://github.com/oxc-project/oxc/blob/20f68e74a3fddb4049fe33629be9bf91e14a4baa/crates/oxc_config/src/walk.rs#L16-L35) が `git_global(false)` を立てている。同じ関数が `git_ignore(true)` / `git_exclude(true)` / `parents(true)` を立てているため、リポジトリの `.gitignore`（ネストしたものと親側を含む）と `$GIT_COMMON_DIR/info/exclude` は尊重される。リンクした worktree の中でも `info/exclude` は解決される（上流に同名のテストがあり、こちらでも実測した）
+- 上流: 意図的な非対応である。[公式ドキュメント](https://oxc.rs/docs/guide/usage/linter/ignore-files.html)に `global gitignore files are not respected` と明記があり、[oxc#14926](https://github.com/oxc-project/oxc/issues/14926) は「開発者ごとに検査対象が変わるのは紛らわしい」として NOT_PLANNED で閉じられた。[oxc#22155](https://github.com/oxc-project/oxc/issues/22155) が `$XDG_CONFIG_HOME/git/ignore` の対応を求めて OPEN のまま残っている
+- 検出方法: 片方の経路だけが拾うパスに違反ファイルを置き、`vp lint` と `vp fmt --list-different` にかける。`git check-ignore -v` でどの経路が拾っているかを先に確かめる
+- 対処: `@mst/dont-review-it` の `withGitExcludes` が 3 経路すべてを読んで `ignorePatterns` に変換する。埋めたい穴はグローバルの 1 経路だけだが、残り 2 経路も読む。順序はグローバル → `$GIT_DIR/info/exclude` → リポジトリの `.gitignore` で、gitignore は last-match-wins なので、この順でないと `!` による再包含が負ける。経路をまたぐ再包含は 1 か所で並べないと表現できない
