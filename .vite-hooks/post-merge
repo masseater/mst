@@ -1,0 +1,6 @@
+if git rev-parse -q --verify HEAD^2 > /dev/null; then
+  exit 0
+fi
+echo "fast-forward で merge されたため pre-merge-commit が走っていません。git config merge.ff の値を確認してください。以下は merge 済みの状態に対する事後の検証です。" >&2
+vp run ready
+exit 1

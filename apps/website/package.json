@@ -9,6 +9,7 @@
     "preview": "vp preview"
   },
   "devDependencies": {
+    "@mst/dont-review-it": "workspace:*",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"

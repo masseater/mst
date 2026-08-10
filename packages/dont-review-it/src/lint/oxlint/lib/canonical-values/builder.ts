@@ -1,4 +1,4 @@
-import { dirname, join, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 
 import { memoize, sortBy } from "es-toolkit";
 
@@ -7,17 +7,10 @@ import { buildCatalog, EMPTY_CANONICAL_VALUES_CATALOG } from "./catalog.ts";
 import { cacheInputFingerprint, readCachedEntries, writeCachedEntries } from "./catalog-cache.ts";
 import { buildExportSpecifierIndex } from "./export-specifier-index.ts";
 import { fingerprintValues } from "./fingerprint.ts";
-import { isFile, listRepositoryFiles, MANIFEST_FILE_NAME } from "./source-files.ts";
+import { listRepositoryFiles, nearestPackageDirectory } from "./source-files.ts";
 
 import type { AnnotatedSource } from "./annotated-sources.ts";
 import type { CanonicalValuesCatalog, CanonicalValuesEntry } from "./catalog.ts";
-
-const nearestPackageDirectory = (fileDirectory: string, repositoryRoot: string): string | null => {
-  if (isFile(join(fileDirectory, MANIFEST_FILE_NAME))) return fileDirectory;
-  if (fileDirectory === repositoryRoot) return null;
-  const parent = dirname(fileDirectory);
-  return parent === fileDirectory ? null : nearestPackageDirectory(parent, repositoryRoot);
-};
 
 const canonicalValuesEntriesIn = (
   repositoryRoot: string,

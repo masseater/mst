@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { basename, join, relative, sep } from "node:path";
+import { basename, dirname, join, relative, sep } from "node:path";
 
 import { attempt, partition, sortBy } from "es-toolkit";
 
@@ -40,6 +40,17 @@ const statOf = (path: string): Stats | null => attempt(() => statSync(path))[1];
 export const isFile = (path: string): boolean => statOf(path)?.isFile() === true;
 
 export const isDirectory = (path: string): boolean => statOf(path)?.isDirectory() === true;
+
+export const nearestPackageDirectory = (
+  fileDirectory: string,
+  repositoryRoot: string,
+): string | null => {
+  if (isFile(join(fileDirectory, MANIFEST_FILE_NAME))) return fileDirectory;
+  if (fileDirectory === repositoryRoot) return null;
+
+  const parent = dirname(fileDirectory);
+  return parent === fileDirectory ? null : nearestPackageDirectory(parent, repositoryRoot);
+};
 
 export const readTextFile = (path: string): string | null =>
   attempt(() => readFileSync(path, "utf8"))[1];

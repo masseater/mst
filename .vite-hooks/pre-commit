@@ -1,1 +1,5 @@
 vp staged
+if [ ! -f "$(git rev-parse --git-path MERGE_HEAD)" ]; then
+  exit 0
+fi
+vp run ready

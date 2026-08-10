@@ -214,6 +214,9 @@ catalogs:
     es-toolkit:
       specifier: ^1.50.0
       version: 1.50.0
+    jsonc-parser:
+      specifier: ^3.3.1
+      version: 3.3.1
     knip:
       specifier: ^6.32.0
       version: 6.32.0
@@ -243,6 +246,9 @@ importers:
       '@mst/lint-rule-authoring':
         specifier: workspace:*
         version: link:packages/lint-rule-authoring
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.2.0
       knip:
         specifier: 'catalog:'
         version: 6.32.0
@@ -255,6 +261,9 @@ importers:
 
   apps/website:
     devDependencies:
+      '@mst/dont-review-it':
+        specifier: workspace:*
+        version: link:../../packages/dont-review-it
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -276,19 +285,22 @@ importers:
       es-toolkit:
         specifier: 'catalog:'
         version: 1.50.0
+      jsonc-parser:
+        specifier: 'catalog:'
+        version: 3.3.1
       oxc-parser:
         specifier: 'catalog:'
         version: 0.143.0
       oxlint:
         specifier: 'catalog:'
         version: 1.76.0(oxlint-tsgolint@7.0.2001)(vite-plus@0.2.8(@types/node@26.2.0)(@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
         version: 26.2.0
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2
       vite:
         specifier: npm:@voidzero-dev/vite-plus-core@0.2.8
         version: '@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)'
@@ -323,6 +335,9 @@ importers:
 
   packages/utils:
     devDependencies:
+      '@mst/dont-review-it':
+        specifier: workspace:*
+        version: link:../dont-review-it
       '@types/node':
         specifier: 'catalog:'
         version: 26.2.0
