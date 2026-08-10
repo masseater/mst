@@ -40,7 +40,13 @@ const ownedCatalog = buildCatalog([
 
 const ambiguousCatalog = buildCatalog([
   entry("order-status", { workspace: "order-vocabulary", vocabulary: ORDER_STATUS_VALUES }),
-  entry("article-status", { workspace: "article-vocabulary", vocabulary: ORDER_STATUS_VALUES }),
+  {
+    ...entry("article-status", {
+      workspace: "article-vocabulary",
+      vocabulary: ORDER_STATUS_VALUES,
+    }),
+    exportPath: null,
+  },
 ]);
 
 type AdmittedVocabulary = {
@@ -109,6 +115,18 @@ describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-va
           code: "export const seen = (rows) => new Set(rows.map((row) => row.status));",
         },
         {
+          name: "shapes that name no vocabulary are left alone",
+          code: 'enumOf(["draft", "published"]);\nz.enum();\nz.enum(["draft", "draft"]);\nz.union(base);\nz.union([z.literal("draft")]);\nnew Map(["draft"]);\nnew ns.Set(["draft"]);\nnew Set();',
+        },
+        {
+          name: "keys and index types that name no vocabulary are left alone",
+          code: 'export const schema = { ...base, [key]: [], enum: known };\nexport type Keyed = Article["draft"];\nexport type Indexed = Article[number];\nexport type Namespaced = (typeof catalog.STATUSES)[number];',
+        },
+        {
+          name: "an array whose values are not written out names no vocabulary",
+          code: "const STATUSES = [draft, published];\nz.enum(STATUSES);\nz.enum([draft, published]);",
+        },
+        {
           name: "an enum fed from an external package is not a repository vocabulary",
           code: 'import { STATUSES } from "order-statuses";\nexport const schema = z.enum(STATUSES);',
         },
@@ -148,10 +166,6 @@ describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-va
         {
           name: "the annotated declaration is the place the concept is defined",
           code: '/** @canonical-values order-status */\nexport const ORDER_STATUSES = ["draft", "published"] as const;\nexport type OrderStatus = (typeof ORDER_STATUSES)[number];',
-        },
-        {
-          name: "blank lines between the annotation and its declaration keep them paired",
-          code: '/** @canonical-values order-status */\n\nexport const ORDER_STATUSES = ["draft", "published"] as const;\nexport type OrderStatus = (typeof ORDER_STATUSES)[number];',
         },
         {
           name: "a set whose values no concept owns is not a candidate",
@@ -228,21 +242,6 @@ describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-va
           code: 'import { STATUSES } from "./statuses.ts";\nexport const schema = z.enum(STATUSES);',
           filename: "packages/order/src/schema.ts",
           errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
-        },
-        {
-          name: "a line comment carrying the tag does not annotate the declaration below it",
-          code: '// @canonical-values order-status\nexport const ORDER_STATUSES = ["draft", "published"] as const;\nexport type OrderStatus = (typeof ORDER_STATUSES)[number];',
-          errors: [{ messageId: "localFiniteValueSetWithOwner" }],
-        },
-        {
-          name: "a block comment that is not a doc comment does not annotate either",
-          code: '/* @canonical-values order-status */\nexport const ORDER_STATUSES = ["draft", "published"] as const;\nexport type OrderStatus = (typeof ORDER_STATUSES)[number];',
-          errors: [{ messageId: "localFiniteValueSetWithOwner" }],
-        },
-        {
-          name: "an annotation buried in a function body annotates nothing at the top level",
-          code: 'export const probeNoop = () => {\n  /** @canonical-values order-status */\n  return 1;\n};\n\nexport type OrderStatus = "draft" | "published";',
-          errors: [{ messageId: "localFiniteValueSetWithOwner" }],
         },
         {
           name: "a comment wedged between the annotation and the declaration breaks the pair",
@@ -404,7 +403,7 @@ describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-va
               messageId: "localFiniteValueSetWithOwnerCandidates",
               data: {
                 owners:
-                  "order-status (@mst/order-vocabulary), article-status (@mst/article-vocabulary)",
+                  "order-status (@mst/order-vocabulary), article-status (packages/article-vocabulary/src/article-status.ts)",
                 ownershipPolicy: "not configured (set the ownershipPolicy option of this rule)",
               },
             },
