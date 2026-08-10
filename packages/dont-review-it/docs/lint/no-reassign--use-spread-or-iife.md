@@ -132,15 +132,19 @@
 
 ## オプション
 
-`assignOnlyTargets`（文字列の配列、既定値 `["process.exitCode", "RuleTester.describe", "RuleTester.it", "RuleTester.itOnly"]`）だけを取る。代入でしか設定できない外部 API の書き込み先を名指しする。
+`assignOnlyTargets`（文字列の配列、既定は空）だけを取る。代入でしか設定できない外部 API の書き込み先を、配備先が名指しして足す。
 
 ```jsonc
-["error", { "assignOnlyTargets": ["process.exitCode", "Reporter.output"] }]
+["error", { "assignOnlyTargets": ["RuleTester.describe", "RuleTester.it"] }]
 ```
 
-既定に並ぶ 4 つは、いずれも代替の API が存在しない。`process.exitCode` はプロセスの終了コードを module スコープの入口から返す唯一の手段であり、`RuleTester` の 3 つは oxlint の `RuleTester` が static setter でしか受け取らない。ここに載せる条件は「その API が代入以外の設定手段を持たないこと」であって、「書き換えたい対象であること」ではない。
+ルール自身が持つのは `process.exitCode` の 1 つだけで、これは**常に**通る。オプションが名指しするのはそこに足す分であり、置き換えではない。`process.exitCode` を残すために書き並べる必要はないし、書いても消せない。
 
-照合するのは、計算プロパティを経由しない `受け手.プロパティ` の形の完全一致である。`process['exitCode'] = 1` は照合されず報告される。`process.env = {}` も別のプロパティなので報告される。与えた配列は既定を**置き換える**。
+`process.exitCode` だけをルールに持たせているのは、これが言語処理系の側の事情だからである。プロセスの終了コードを module スコープの入口から返す手段は代入しか無く、`process.exit` は書き込みの完了を待たない。どの配備先で書いても同じ制約がかかる。一方、oxlint の `RuleTester` が `describe` / `it` を static setter でしか受け取らないことは、lint ルールを書く配備先だけの事情である。そちらはオプションで名指しする。
+
+載せる条件は「その API が代入以外の設定手段を持たないこと」であって、「書き換えたい対象であること」ではない。
+
+照合するのは、計算プロパティを経由しない `受け手.プロパティ` の形の完全一致である。`process['exitCode'] = 1` は照合されず報告される。`process.env = {}` も別のプロパティなので報告される。
 
 **検出形状を切り替えるオプションは持たない。** 形状は同一不変条件の別表現なので、形状ごとに切り替えられる設定が存在すると「プロパティ代入は禁止するが、それを関数呼び出しに言い換えた形は許す」という、抜け道が最初から開いた設定を作れてしまう。`assignOnlyTargets` が絞るのは形状ではなく、名指しした書き込み先 1 つずつである。
 
