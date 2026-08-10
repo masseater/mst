@@ -1,4 +1,7 @@
+import { lineAtOffset } from "@mst/utils";
 import { parseSync } from "oxc-parser";
+
+import { NODE_TYPE_FIELD } from "../ast-node.ts";
 
 export type BodyDeclaration = {
   readonly name: string;
@@ -8,8 +11,6 @@ export type BodyDeclaration = {
 };
 
 const DEFAULT_SOURCE_NAME = "source.tsx";
-
-const NODE_TYPE_FIELD = "type";
 
 const POSITION_FIELDS: ReadonlySet<string> = new Set(["start", "end", "range", "loc"]);
 
@@ -21,9 +22,11 @@ const isNode = (value: unknown): value is Fields =>
 const namedFieldsOf = (node: Fields): readonly (readonly [string, unknown])[] =>
   Object.entries(node).filter(([field]) => !POSITION_FIELDS.has(field));
 
+const jsonTextOf: (value: unknown) => string = JSON.stringify;
+
 const structureOf = (value: unknown): string => {
   if (Array.isArray(value)) return `[${value.map(structureOf).join(",")}]`;
-  if (!isNode(value)) return value === undefined ? "undefined" : JSON.stringify(value);
+  if (!isNode(value)) return jsonTextOf(value);
   return `{${namedFieldsOf(value)
     .map(([field, nested]) => `${field}:${structureOf(nested)}`)
     .join(",")}}`;
@@ -37,9 +40,6 @@ const nodeCountOf = (value: unknown): number => {
   return namedFieldsOf(value).reduce((total, [, nested]) => total + nodeCountOf(nested), own);
 };
 
-const lineAt = (source: string, offset: number): number =>
-  source.slice(0, offset).split("\n").length;
-
 const declarationFrom = ({
   source,
   described,
@@ -48,45 +48,78 @@ const declarationFrom = ({
   readonly described: { readonly name: string; readonly start: number; readonly body: unknown };
 }): BodyDeclaration => ({
   name: described.name,
-  line: lineAt(source, described.start),
+  line: lineAtOffset(source, described.start),
   structure: structureOf(described.body),
   nodeCount: nodeCountOf(described.body),
 });
 
-const bindingsOf = (statement: Fields): readonly Fields[] => {
-  const { declarations } = statement;
-  return Array.isArray(declarations) ? declarations.filter(isNode) : [];
-};
+const bindingsOf = (statement: Fields): readonly Fields[] =>
+  (statement.declarations as readonly unknown[]).filter(isNode);
 
 const namedBindingIn = (binding: Fields): string | null => {
-  const { id } = binding;
-  if (!isNode(id) || id[NODE_TYPE_FIELD] !== "Identifier") return null;
-  return typeof id.name === "string" ? id.name : null;
+  const id = binding.id as Fields;
+  return id[NODE_TYPE_FIELD] === "Identifier" ? String(id.name) : null;
 };
 
-const bindingBodyOf = (binding: Fields): unknown => {
-  const { id, init } = binding;
-  const typeAnnotation = isNode(id) ? (id.typeAnnotation ?? null) : null;
-  return { typeAnnotation, init: init ?? null };
-};
-
-const functionBodyOf = (statement: Fields): unknown => ({
-  typeParameters: statement.typeParameters ?? null,
-  params: statement.params ?? null,
-  returnType: statement.returnType ?? null,
-  body: statement.body ?? null,
-  async: statement.async ?? false,
-  generator: statement.generator ?? false,
+const bindingBodyOf = (binding: Fields): unknown => ({
+  typeAnnotation: (binding.id as Fields).typeAnnotation,
+  init: binding.init,
 });
 
-const functionNameOf = (statement: Fields): string | null => {
-  const { id } = statement;
-  if (!isNode(id)) return null;
-  return typeof id.name === "string" ? id.name : null;
+const functionBodyOf = (statement: Fields): unknown => ({
+  typeParameters: statement.typeParameters,
+  params: statement.params,
+  returnType: statement.returnType,
+  body: statement.body,
+  async: statement.async,
+  generator: statement.generator,
+});
+
+const typeAliasBodyOf = (statement: Fields): unknown => ({
+  typeParameters: statement.typeParameters,
+  typeAnnotation: statement.typeAnnotation,
+});
+
+const interfaceBodyOf = (statement: Fields): unknown => ({
+  typeParameters: statement.typeParameters,
+  extends: statement.extends,
+  body: statement.body,
+});
+
+const BODY_BY_STATEMENT_KIND: Readonly<Record<string, (statement: Fields) => unknown>> = {
+  FunctionDeclaration: functionBodyOf,
+  TSInterfaceDeclaration: interfaceBodyOf,
+  TSTypeAliasDeclaration: typeAliasBodyOf,
 };
 
-const startOf = (statement: Fields): number =>
-  typeof statement.start === "number" ? statement.start : 0;
+const declaredNameOf = (statement: Fields): string => String((statement.id as Fields).name);
+
+const startOf = (statement: Fields): number => Number(statement.start);
+
+const bindingDeclarationsIn = (source: string, statement: Fields): readonly BodyDeclaration[] =>
+  bindingsOf(statement).flatMap((binding) => {
+    const name = namedBindingIn(binding);
+    if (name === null) return [];
+    return [
+      declarationFrom({
+        source,
+        described: { name, start: startOf(statement), body: bindingBodyOf(binding) },
+      }),
+    ];
+  });
+
+const namedDeclarationsIn = (source: string, statement: Fields): readonly BodyDeclaration[] => {
+  const bodyOf = BODY_BY_STATEMENT_KIND[String(statement[NODE_TYPE_FIELD])];
+  if (bodyOf === undefined) return [];
+
+  const name = declaredNameOf(statement);
+  return [
+    declarationFrom({
+      source,
+      described: { name, start: startOf(statement), body: bodyOf(statement) },
+    }),
+  ];
+};
 
 const declarationsFromStatement = (
   source: string,
@@ -98,30 +131,8 @@ const declarationsFromStatement = (
   if (kind === "ExportNamedDeclaration") {
     return declarationsFromStatement(source, statement.declaration);
   }
-
-  if (kind === "VariableDeclaration") {
-    return bindingsOf(statement).flatMap((binding) => {
-      const name = namedBindingIn(binding);
-      if (name === null) return [];
-      return [
-        declarationFrom({
-          source,
-          described: { name, start: startOf(statement), body: bindingBodyOf(binding) },
-        }),
-      ];
-    });
-  }
-
-  if (kind !== "FunctionDeclaration") return [];
-
-  const name = functionNameOf(statement);
-  if (name === null) return [];
-  return [
-    declarationFrom({
-      source,
-      described: { name, start: startOf(statement), body: functionBodyOf(statement) },
-    }),
-  ];
+  if (kind === "VariableDeclaration") return bindingDeclarationsIn(source, statement);
+  return namedDeclarationsIn(source, statement);
 };
 
 export const declarationsIn = (source: string): readonly BodyDeclaration[] => {

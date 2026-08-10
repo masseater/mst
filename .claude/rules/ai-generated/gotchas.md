@@ -111,3 +111,32 @@ pack: { exports: { customExports: { './tsconfig/*': './tsconfig/*' } } }
   - PROHIBIT: `vp lint --print-config` の diff が空であることをもって、ルールが有効になった根拠とする
 - IF: `lint.plugins` を触った; THEN MUST: 引き続き `--print-config` の diff を取る
   - 組み込みプラグインの置換（前項）はこの出力に現れる。`--print-config` が役に立つのはそちらの用途である
+
+## `extends` した設定の `ignorePatterns` は捨てられる
+
+- 症状: preset に `ignorePatterns` を書いても 1 件も効かない。同じ 1 行をルートの `vite.config.ts` の `lint` に移すと効く。エラーも警告も出ない
+- 原因: oxlint の [`Oxlintrc::merge`](https://github.com/oxc-project/oxc/blob/367f730a7b578d24e8106713abaf517304b6b655/crates/oxc_linter/src/config/oxlintrc.rs) が `self`（`extends` を書いた側）の `ignore_patterns` だけを残し、`extends` で名指しした設定のものを読まない。`rules` / `overrides` / `plugins` / `options` は継承されるため、この 1 フィールドだけが例外になっている。`settings` / `env` / `globals` も同じ扱い
+- 対処: `defineConfig` に直接渡すオブジェクト自身に持たせる。このリポジトリでは `@mst/dont-review-it` の `withGitExcludes` が注入し、忘れると `no-unwrapped-toolchain-config--wrap-with-git-excludes` が報告する
+
+- IF: preset から何らかの設定を配れているか確かめる; THEN MUST: そのフィールドが `extends` で継承されるかを実測する
+  - 継承されないフィールドは、書いても何も起きず lint は緑のまま通る
+
+## oxlint と oxfmt が見ない git の ignore は `core.excludesFile` だけ
+
+- 症状: `core.excludesFile` が指すファイルに書いたパターン（`.agents/` など）が lint と format の除外に効かない
+- 原因: 走査を組み立てる [`configure_walk_builder`](https://github.com/oxc-project/oxc/blob/20f68e74a3fddb4049fe33629be9bf91e14a4baa/crates/oxc_config/src/walk.rs#L16-L35) が `git_global(false)` を立てている。同じ関数が `git_ignore(true)` / `git_exclude(true)` / `parents(true)` を立てているため、リポジトリの `.gitignore`（ネストしたものと親側を含む）と `$GIT_COMMON_DIR/info/exclude` は尊重される。リンクした worktree の中でも `info/exclude` は解決される（上流に同名のテストがあり、こちらでも実測した）
+- 上流: 意図的な非対応である。[公式ドキュメント](https://oxc.rs/docs/guide/usage/linter/ignore-files.html)に `global gitignore files are not respected` と明記があり、[oxc#14926](https://github.com/oxc-project/oxc/issues/14926) は「開発者ごとに検査対象が変わるのは紛らわしい」として NOT_PLANNED で閉じられた。[oxc#22155](https://github.com/oxc-project/oxc/issues/22155) が `$XDG_CONFIG_HOME/git/ignore` の対応を求めて OPEN のまま残っている
+- 検出方法: 片方の経路だけが拾うパスに違反ファイルを置き、`vp lint` と `vp fmt --list-different` にかける。`git check-ignore -v` でどの経路が拾っているかを先に確かめる
+- 対処: `@mst/dont-review-it` の `withGitExcludes` が 3 経路すべてを読んで `ignorePatterns` に変換する。埋めたい穴はグローバルの 1 経路だけだが、残り 2 経路も読む。順序はグローバル → `$GIT_DIR/info/exclude` → リポジトリの `.gitignore` で、gitignore は last-match-wins なので、この順でないと `!` による再包含が負ける。経路をまたぐ再包含は 1 か所で並べないと表現できない
+
+## oxlint がルールに渡す AST に `ParenthesizedExpression` は現れない
+
+- 症状: 括弧を剥がすヘルパを書いても、その再帰の分岐に一度も入らない。`vp lint` は緑のまま通り、剥がす処理が要らないことに気づけない
+- 原因: `oxc-parser` を直接呼ぶと `export default ({ a: 1 })` は `ParenthesizedExpression` を生成する。oxlint が JS プラグインに渡す AST では括弧が落ちている。同じ AST 定義を共有しているため型には現れ続ける
+- 実測: 括弧付きの設定 (`export default ({...})`)、括弧付きの数値 (`branches: (100)`)、括弧付きの転送呼び出しの 3 通りをテストに置き、いずれもヘルパの再帰に入らないことをカバレッジで確認した。ヘルパと 16 か所の呼び出しを削除しても 983 件のテストは全て通った
+- 対処: ルールの中で括弧を剥がさない
+
+- IF: ルールの中で `ParenthesizedExpression` を扱おうとしている; THEN PROHIBIT: 書く
+  - 型に現れるのは AST 定義の共有によるもので、oxlint 経由では到達しない
+- IF: パーサの出力そのものを扱うコード（`parseSync` を直接呼ぶ側）を書いている; THEN MUST: 括弧を考慮する
+  - こちらには実際に現れる

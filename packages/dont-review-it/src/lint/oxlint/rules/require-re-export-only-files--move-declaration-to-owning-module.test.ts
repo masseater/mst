@@ -74,6 +74,12 @@ describe("dont-review-it/require-re-export-only-files--move-declaration-to-ownin
         options: [{ targets: ["**/index.ts"], exclude: ["generated/index.ts"] }],
       },
       {
+        name: "a listing whose tail matches nothing on the path leaves the file alone",
+        code: "export const total = 1;",
+        filename: "src/index.ts",
+        options: [{ targets: ["**/surface.ts"] }],
+      },
+      {
         name: "a pattern anchored to the working directory names one file and not its namesakes",
         code: "export const total = 1;",
         filename: "packages/other/src/index.ts",

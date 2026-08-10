@@ -1,0 +1,49 @@
+{
+  "name": "@mst/agentic-documents",
+  "version": "0.0.0",
+  "description": "AI-facing documents that stay true to the repository and keep a shape machines can follow.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/masseater/mst.git",
+    "directory": "packages/agentic-documents"
+  },
+  "bin": {
+    "agentic-documents": "./src/cli.ts"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vp pack",
+    "dev": "vp pack --watch",
+    "test": "vp test",
+    "check": "vp check"
+  },
+  "dependencies": {
+    "@mst/utils": "workspace:*",
+    "es-toolkit": "catalog:",
+    "remark-frontmatter": "catalog:",
+    "remark-gfm": "catalog:",
+    "remark-parse": "catalog:",
+    "unified": "catalog:",
+    "yaml": "catalog:"
+  },
+  "devDependencies": {
+    "@types/mdast": "catalog:",
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

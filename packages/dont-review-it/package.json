@@ -35,15 +35,18 @@
   },
   "dependencies": {
     "@mst/lint-rule-authoring": "workspace:*",
+    "@mst/utils": "workspace:*",
     "@oxlint/plugins": "catalog:",
     "es-toolkit": "catalog:",
     "jsonc-parser": "catalog:",
     "oxc-parser": "catalog:",
+    "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "typescript": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
   },

@@ -13,6 +13,16 @@ import {
 } from "../lib/canonical-values/catalog.ts";
 import { declaresConceptAt } from "../lib/canonical-values/declaration-path.ts";
 import {
+  ancestorsOf,
+  isKeySelectorArgument,
+  isModuleSyntaxPosition,
+  isStructuralKeyPosition,
+  literalValue,
+  negatedNumericValue,
+  templateLiteralValue,
+  type LiteralNode,
+} from "../lib/canonical-values/literal-position.ts";
+import {
   OWNERSHIP_POLICY_SCHEMA,
   ownershipPolicyOf,
 } from "../lib/canonical-values/ownership-policy.ts";
@@ -22,119 +32,6 @@ import { isOutOfScopeSource } from "../lib/out-of-scope-source.ts";
 import type { ESTree, Visitor } from "@oxlint/plugins";
 import type { CanonicalValuesCatalogLoader } from "../lib/canonical-values/catalog-loader.ts";
 import type { CanonicalValue } from "../lib/canonical-values/fingerprint.ts";
-
-const KEY_SELECTION_TYPE_NAMES: ReadonlySet<string> = new Set(["Omit", "Pick"]);
-
-type LiteralNode =
-  | ESTree.BigIntLiteral
-  | ESTree.BooleanLiteral
-  | ESTree.NullLiteral
-  | ESTree.NumericLiteral
-  | ESTree.RegExpLiteral
-  | ESTree.StringLiteral;
-
-const ancestorsOf = (node: ESTree.Node): readonly ESTree.Node[] =>
-  node.parent === null ? [] : [...ancestorsOf(node.parent), node.parent];
-
-const literalValue = (node: LiteralNode): CanonicalValue | null => {
-  const spelling = node.value;
-  if (
-    typeof spelling === "string" ||
-    typeof spelling === "number" ||
-    typeof spelling === "boolean"
-  ) {
-    return spelling;
-  }
-  return null;
-};
-
-const negatedNumericValue = (node: ESTree.UnaryExpression): CanonicalValue | null => {
-  if (node.operator !== "-") return null;
-  const { argument } = node;
-  if (argument.type !== "Literal") return null;
-  return typeof argument.value === "number" ? -argument.value : null;
-};
-
-const templateLiteralValue = (node: ESTree.TemplateLiteral): CanonicalValue | null => {
-  if (node.expressions.length !== 0 || node.quasis.length !== 1) return null;
-  return node.quasis[0]?.value.cooked ?? null;
-};
-
-const isValueMemberKeyPosition = (parent: ESTree.Node, node: ESTree.Node): boolean | null => {
-  switch (parent.type) {
-    case "AccessorProperty":
-    case "MethodDefinition":
-    case "Property":
-    case "PropertyDefinition":
-      return !parent.computed && parent.key === node;
-    default:
-      return null;
-  }
-};
-
-const isTypeMemberKeyPosition = (parent: ESTree.Node, node: ESTree.Node): boolean | null => {
-  switch (parent.type) {
-    case "TSAbstractAccessorProperty":
-    case "TSAbstractMethodDefinition":
-    case "TSAbstractPropertyDefinition":
-    case "TSMethodSignature":
-    case "TSPropertySignature":
-      return !parent.computed && parent.key === node;
-    default:
-      return null;
-  }
-};
-
-const isStructuralKeyPosition = (parent: ESTree.Node, node: ESTree.Node): boolean =>
-  isValueMemberKeyPosition(parent, node) ??
-  isTypeMemberKeyPosition(parent, node) ??
-  (parent.type === "TSEnumMember" && parent.id === node);
-
-const isModuleSourcePosition = (parent: ESTree.Node, node: ESTree.Node): boolean | null => {
-  switch (parent.type) {
-    case "ExportNamedDeclaration":
-    case "ImportDeclaration":
-    case "ImportExpression":
-    case "TSImportType":
-      return parent.source === node;
-    case "ExportAllDeclaration":
-      return parent.source === node || parent.exported === node;
-    default:
-      return null;
-  }
-};
-
-const isModuleNamePosition = (parent: ESTree.Node, node: ESTree.Node): boolean | null => {
-  switch (parent.type) {
-    case "ImportAttribute":
-      return parent.key === node || parent.value === node;
-    case "ImportSpecifier":
-      return parent.imported === node;
-    case "ExportSpecifier":
-      return parent.local === node || parent.exported === node;
-    case "TSModuleDeclaration":
-      return parent.id === node;
-    default:
-      return null;
-  }
-};
-
-const isModuleSyntaxPosition = (parent: ESTree.Node, node: ESTree.Node): boolean =>
-  isModuleSourcePosition(parent, node) ?? isModuleNamePosition(parent, node) ?? false;
-
-const isKeySelectorArgument = (ancestors: readonly ESTree.Node[], node: ESTree.Node): boolean => {
-  for (const [index, ancestor] of ancestors.entries()) {
-    if (ancestor.type !== "TSTypeReference") continue;
-    if (ancestor.typeName.type !== "Identifier") continue;
-    if (!KEY_SELECTION_TYPE_NAMES.has(ancestor.typeName.name)) continue;
-    const instantiation = ancestors[index + 1];
-    if (instantiation === undefined) continue;
-    if (instantiation.type !== "TSTypeParameterInstantiation") continue;
-    const selector = ancestors[index + 2] ?? node;
-    if (instantiation.params[1] === selector) return true;
-  }
-  return false;
-};
 
 type LintedSource = {
   readonly program: ESTree.Program;
@@ -149,12 +46,6 @@ const registeredDeclarationRanges = (
   annotatedDeclarationRanges(program, sourceText).filter((range) =>
     declaresConceptAt(catalog, { conceptId: range.conceptId, path: filename }),
   );
-
-type LiteralOccurrence = {
-  readonly node: ESTree.Node;
-  readonly spelling: CanonicalValue;
-  readonly ancestors: readonly ESTree.Node[];
-};
 
 const conceptSummary = (entries: readonly CanonicalValuesEntry[]): string =>
   entries
@@ -204,11 +95,19 @@ export const createNoStrictCanonicalLiteralUseRule = ({
           registeredDeclarationRanges(lintedSource, loaded),
       );
 
-      const inspect = ({ node, spelling, ancestors }: LiteralOccurrence): void => {
+      const inspect = ({
+        node,
+        spelling,
+        ancestors,
+      }: {
+        readonly node: ESTree.Node;
+        readonly spelling: CanonicalValue;
+        readonly ancestors: readonly ESTree.Node[];
+      }): void => {
         const parent = ancestors.at(-1);
         if (parent !== undefined && isStructuralKeyPosition(parent, node)) return;
         if (parent !== undefined && isModuleSyntaxPosition(parent, node)) return;
-        if (isKeySelectorArgument(ancestors, node)) return;
+        if (isKeySelectorArgument(ancestors)) return;
 
         const loaded = loadedCatalog();
         const entries = loaded.entriesByValue.get(canonicalValueKey(spelling));

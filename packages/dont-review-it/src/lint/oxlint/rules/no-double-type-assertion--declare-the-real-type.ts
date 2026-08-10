@@ -1,9 +1,6 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
-import { withoutParentheses } from "../lib/parenthesized-expression.ts";
 
 import type { ESTree } from "@oxlint/plugins";
-
-type AssertionExpression = ESTree.TSAsExpression | ESTree.TSTypeAssertion;
 
 const isAssertion = (expression: ESTree.Expression): boolean =>
   expression.type === "TSAsExpression" || expression.type === "TSTypeAssertion";
@@ -24,8 +21,8 @@ export const noDoubleTypeAssertion = createDontReviewItRule({
     schema: [],
   },
   create(context) {
-    const reportWhenStacked = (node: AssertionExpression): void => {
-      if (!isAssertion(withoutParentheses(node.expression))) return;
+    const reportWhenStacked = (node: ESTree.TSAsExpression | ESTree.TSTypeAssertion): void => {
+      if (!isAssertion(node.expression)) return;
       context.report({ node, messageId: "stackedTypeAssertion" });
     };
 

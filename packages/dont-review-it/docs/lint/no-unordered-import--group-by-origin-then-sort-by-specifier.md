@@ -50,7 +50,9 @@ import { report } from "./report.ts";
 import type { ESTree } from "@oxlint/plugins";
 ```
 
-自動修正は提供しない。import の並べ替えは、副作用を持つモジュールが混ざっていると評価順序を変える。整形器はこの並びに触れないので、書き換えは人が行う。
+ルール自身は自動修正を提供しないが、手で直す必要はない。`vp fmt` がこの並びを出力するよう設定してあるので、`vp check --fix` と pre-commit が直す。設定は `vite.config.ts` の `fmt.sortImports` にあり、由来のブロック順・ブロック内の昇順・ブロック間の空行のすべてをこのルールと同じ形で出す。
+
+並べ替えが評価順序を変える心配は無い。束縛を持たない import は oxfmt の `sortSideEffects` が既定で無効なので動かず、このルールも検査の対象にしていない。
 
 ## 禁じる回避策
 

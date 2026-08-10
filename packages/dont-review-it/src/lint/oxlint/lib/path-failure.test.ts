@@ -19,13 +19,17 @@ const failWithoutCode = (): never => {
 };
 
 class RuntimeRefusal extends Error {
-  constructor(readonly code: string) {
+  constructor(readonly code: string | number) {
     super("the runtime refused");
   }
 }
 
 const failWithCode = (): never => {
   throw new RuntimeRefusal("EACCES");
+};
+
+const failWithNumberedCode = (): never => {
+  throw new RuntimeRefusal(7);
 };
 
 describe("readUnlessMissing", () => {
@@ -59,6 +63,10 @@ describe("readUnlessMissing", () => {
     expect(() => readUnlessMissing(failWithoutCode)).toThrow(
       "the read failed for a reason the runtime did not name",
     );
+  });
+
+  test("a failure whose code is not a word is raised rather than becoming an absence", () => {
+    expect(() => readUnlessMissing(failWithNumberedCode)).toThrow("the runtime refused");
   });
 
   test("a failure carrying a code came from the environment", () => {

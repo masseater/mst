@@ -1,11 +1,10 @@
 import { dirname, join, resolve } from "node:path";
 
+import { EXPORTS_CONDITION_DEPTH_LIMIT, MANIFEST_FILE_NAME } from "./package-manifest.ts";
 import { readJsonFile } from "./read-json-file.ts";
-import { isFile, MANIFEST_FILE_NAME, readTextFile } from "./source-files.ts";
+import { isFile, readTextFile } from "./source-files.ts";
 
 const RE_EXPORT_DEPTH_LIMIT = 4;
-
-const EXPORTS_CONDITION_DEPTH_LIMIT = 8;
 
 const RELATIVE_SPECIFIER_PATTERN = /^\.\.?\//u;
 
@@ -37,18 +36,12 @@ const filesReachableByReExport = (entryFile: string): ReadonlySet<string> => {
     if (text === null) return;
     for (const match of text.matchAll(RE_EXPORT_PATTERN)) {
       const [, specifier] = match;
-      if (specifier === undefined) continue;
-      const target = resolveRelativeSpecifier(file, specifier);
+      const target = resolveRelativeSpecifier(file, String(specifier));
       if (target !== null) visit(target, depth + 1);
     }
   };
   visit(entryFile, 0);
   return reached;
-};
-
-type ExportsFieldPosition = {
-  readonly subpath: string;
-  readonly depth: number;
 };
 
 const exportSubpathTargets = (
@@ -65,7 +58,10 @@ const exportSubpathTargets = (
     else if (!bucket.includes(resolved)) bucket.push(resolved);
   };
 
-  const collect = (value: unknown, { subpath, depth }: ExportsFieldPosition): void => {
+  const collect = (
+    value: unknown,
+    { subpath, depth }: { readonly subpath: string; readonly depth: number },
+  ): void => {
     if (typeof value === "string") {
       record(subpath, value);
       return;
@@ -86,12 +82,9 @@ const exportSubpathTargets = (
 const exportSpecifierOf = (packageName: string, subpath: string): string =>
   subpath === "." ? packageName : `${packageName}${subpath.slice(1)}`;
 
-type ManifestSurface = {
-  readonly packageName: string;
-  readonly exportsField: unknown;
-};
-
-const manifestSurfaceOf = (packageDirectory: string): ManifestSurface | null => {
+const manifestSurfaceOf = (
+  packageDirectory: string,
+): { readonly packageName: string; readonly exportsField: unknown } | null => {
   const manifest = readJsonFile(join(packageDirectory, MANIFEST_FILE_NAME));
   if (manifest === null || typeof manifest !== "object") return null;
   if (!("name" in manifest) || typeof manifest.name !== "string" || manifest.name.length === 0) {

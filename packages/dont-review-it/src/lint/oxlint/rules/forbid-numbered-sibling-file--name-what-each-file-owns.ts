@@ -18,7 +18,7 @@ const directoryEntries = (directory: string): readonly string[] => {
   return found;
 };
 
-const baseNameOf = (fileName: string): string => fileName.split(".")[0] ?? fileName;
+const baseNameOf = (fileName: string): string => fileName.split(".").slice(0, 1).join("");
 
 const ordinalPrefixOf = (fileName: string): string | null =>
   ORDINAL_NAME_PATTERN.exec(baseNameOf(fileName))?.groups?.prefix ?? null;
@@ -36,7 +36,7 @@ const isSplitSibling = (input: {
 };
 
 const splitSiblingOf = (filePath: string): string | null => {
-  const fileName = filePath.split(sep).at(-1) ?? "";
+  const fileName = filePath.split(sep).slice(-1).join("");
   const prefix = ordinalPrefixOf(fileName);
   if (prefix === null) return null;
 

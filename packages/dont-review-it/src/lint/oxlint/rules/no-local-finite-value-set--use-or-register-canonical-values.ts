@@ -1,11 +1,7 @@
 import { memoize } from "es-toolkit";
 
 import { createDontReviewItRule } from "../../../create-rule.ts";
-import {
-  annotatedDeclarationRanges,
-  isInsideAnnotatedDeclaration,
-  type AnnotatedDeclarationRange,
-} from "../lib/canonical-values/annotated-declaration.ts";
+import { isInsideAnnotatedDeclaration } from "../lib/canonical-values/annotated-declaration.ts";
 import { fingerprintValues, type CanonicalValue } from "../lib/canonical-values/fingerprint.ts";
 import {
   calleeMemberName,
@@ -19,9 +15,13 @@ import {
   SET_CONSTRUCTOR,
   staticArrayValues,
   unwrapExpression,
-  unwrapType,
 } from "../lib/canonical-values/finite-value-syntax.ts";
 import { importRouteStatus } from "../lib/canonical-values/import-route.ts";
+import {
+  collectFileBindings,
+  firstNonSpreadArgument,
+  type FileBindings,
+} from "../lib/canonical-values/local-bindings.ts";
 import {
   OWNERSHIP_POLICY_SCHEMA,
   ownershipPolicyOf,
@@ -42,66 +42,16 @@ import type {
   CanonicalValuesEntry,
 } from "../lib/canonical-values/catalog.ts";
 import type { LibraryVocabularyLoader } from "../lib/library-vocabulary/vocabulary-loader.ts";
-
-type FileBindings = {
-  readonly arrays: ReadonlyMap<string, ESTree.ArrayExpression>;
-  readonly namedImports: ReadonlyMap<string, string>;
-  readonly annotatedRanges: readonly AnnotatedDeclarationRange[];
-};
-
-const collectArrays = (
-  declaration: ESTree.VariableDeclaration,
-  arrays: Map<string, ESTree.ArrayExpression>,
-): void => {
-  for (const declarator of declaration.declarations) {
-    if (declarator.id.type !== "Identifier") continue;
-    if (declarator.init === null) continue;
-    const init = unwrapExpression(declarator.init);
-    if (init.type === "ArrayExpression") arrays.set(declarator.id.name, init);
-  }
-};
-
-const collectNamedImports = (
-  statement: ESTree.ImportDeclaration,
-  namedImports: Map<string, string>,
-): void => {
-  for (const specifier of statement.specifiers) {
-    if (specifier.type !== "ImportSpecifier") continue;
-    namedImports.set(specifier.local.name, statement.source.value);
-  }
-};
-
-const collectFileBindings = (program: ESTree.Program, sourceText: string): FileBindings => {
-  const arrays = new Map<string, ESTree.ArrayExpression>();
-  const namedImports = new Map<string, string>();
-
-  for (const statement of program.body) {
-    if (statement.type === "ImportDeclaration") collectNamedImports(statement, namedImports);
-    else if (statement.type === "VariableDeclaration") collectArrays(statement, arrays);
-    else if (
-      statement.type === "ExportNamedDeclaration" &&
-      statement.declaration?.type === "VariableDeclaration"
-    ) {
-      collectArrays(statement.declaration, arrays);
-    }
-  }
-
-  return { arrays, namedImports, annotatedRanges: annotatedDeclarationRanges(program, sourceText) };
-};
+import type { RuleMessage } from "../lib/rule-message.ts";
 
 const describeOwner = (entry: CanonicalValuesEntry): string =>
   `${entry.conceptId} (${entry.exportPath ?? entry.declarationPath})`;
-
-type OwnerReport = {
-  readonly messageId: string;
-  readonly data: Readonly<Record<string, string>>;
-};
 
 const libraryOwnerReport = (input: {
   readonly libraries: ReturnType<typeof libraryOwnersOf>;
   readonly values: readonly CanonicalValue[];
   readonly ownershipPolicy: string;
-}): OwnerReport => {
+}): RuleMessage => {
   const { libraries, values, ownershipPolicy } = input;
   if (libraries.length === 0) {
     return { messageId: "localFiniteValueSetWithoutOwner", data: { ownershipPolicy } };
@@ -125,7 +75,7 @@ const libraryOwnerReport = (input: {
 const catalogOwnerReport = (input: {
   readonly owners: readonly CanonicalValuesEntry[];
   readonly ownershipPolicy: string;
-}): OwnerReport => {
+}): RuleMessage => {
   const { owners, ownershipPolicy } = input;
   const [onlyOwner] = owners;
   if (owners.length === 1 && onlyOwner !== undefined) {
@@ -140,21 +90,6 @@ const catalogOwnerReport = (input: {
   };
 };
 
-const firstNonSpreadArgument = (
-  node: ESTree.CallExpression | ESTree.NewExpression,
-): ESTree.Expression | null => {
-  const [argument] = node.arguments;
-  if (argument === undefined || argument.type === "SpreadElement") return null;
-  return argument;
-};
-
-type FileSources = {
-  readonly repositoryRootOf: () => string;
-  readonly catalogOf: () => CanonicalValuesCatalog;
-  readonly bindingsOf: () => FileBindings;
-  readonly libraryVocabularyOf: () => LibraryVocabularyIndex;
-};
-
 const fileSourcesFor = (input: {
   readonly context: {
     readonly cwd: string;
@@ -163,7 +98,12 @@ const fileSourcesFor = (input: {
   };
   readonly loadCatalog: CanonicalValuesCatalogLoader;
   readonly loadLibraryVocabulary: LibraryVocabularyLoader;
-}): FileSources => {
+}): {
+  readonly repositoryRootOf: () => string;
+  readonly catalogOf: () => CanonicalValuesCatalog;
+  readonly bindingsOf: () => FileBindings;
+  readonly libraryVocabularyOf: () => LibraryVocabularyIndex;
+} => {
   const { context, loadCatalog, loadLibraryVocabulary } = input;
   const repositoryRootOf = memoize((): string => findWorkspaceRoot(context.cwd));
 
@@ -180,17 +120,6 @@ const fileSourcesFor = (input: {
         loadLibraryVocabulary({ filename: context.filename, repositoryRoot: repositoryRootOf() }),
     ),
   };
-};
-
-type VocabularyReport = {
-  readonly node: ESTree.Span;
-  readonly messageId: string;
-  readonly data: Record<string, string>;
-};
-
-type SpelledOutVocabulary = {
-  readonly node: ESTree.Span;
-  readonly values: readonly CanonicalValue[];
 };
 
 type ValuesPosition =
@@ -249,7 +178,11 @@ export const createNoLocalFiniteValueSet = ({
 
       const reportedSpans = new Set<string>();
 
-      const reportOnce = (report: VocabularyReport): void => {
+      const reportOnce = (report: {
+        readonly node: ESTree.Span;
+        readonly messageId: string;
+        readonly data: Record<string, string>;
+      }): void => {
         if (isInsideAnnotatedDeclaration(bindingsOf().annotatedRanges, report.node)) return;
         const span = `${report.node.start}:${report.node.end}`;
         if (reportedSpans.has(span)) return;
@@ -257,7 +190,10 @@ export const createNoLocalFiniteValueSet = ({
         context.report(report);
       };
 
-      const reportVocabulary = (occurrence: SpelledOutVocabulary, onlyWhenOwned: boolean): void => {
+      const reportVocabulary = (
+        occurrence: { readonly node: ESTree.Span; readonly values: readonly CanonicalValue[] },
+        onlyWhenOwned: boolean,
+      ): void => {
         const { node } = occurrence;
         const vocabulary = occurrence.values;
         const owners = catalogOf().entriesByFingerprint.get(fingerprintValues(vocabulary)) ?? [];
@@ -357,8 +293,8 @@ export const createNoLocalFiniteValueSet = ({
         },
 
         TSIndexedAccessType(node: ESTree.TSIndexedAccessType) {
-          if (unwrapType(node.indexType).type !== "TSNumberKeyword") return;
-          const objectType = unwrapType(node.objectType);
+          if (node.indexType.type !== "TSNumberKeyword") return;
+          const objectType = node.objectType;
           if (objectType.type !== "TSTypeQuery") return;
           const { exprName } = objectType;
           if (exprName.type !== "Identifier") return;

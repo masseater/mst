@@ -1,7 +1,5 @@
 import { resolve } from "node:path";
 
-import { groupBy, mapValues } from "es-toolkit";
-
 import { readAnnotatedSources, type AnnotatedSource } from "./annotated-sources.ts";
 import { buildCatalog, type CanonicalValuesEntry } from "./catalog.ts";
 import { listRepositoryFiles } from "./source-files.ts";
@@ -34,37 +32,33 @@ const declarationSitesIn = (source: AnnotatedSource): readonly DeclarationSite[]
   }));
 
 const duplicateConceptProblem = (
-  firstSiteByConcept: Readonly<Record<string, DeclarationSite | undefined>>,
+  first: DeclarationSite,
   site: DeclarationSite,
-): CanonicalValuesProblem | null => {
-  const first = firstSiteByConcept[site.conceptId];
-  if (first === undefined) return null;
-  if (first.filePath === site.filePath && first.line === site.line) return null;
-
-  return {
-    kind: "duplicate-concept",
-    filePath: site.filePath,
-    line: site.line,
-    conceptId: site.conceptId,
-    declaredFilePath: first.filePath,
-    declaredLine: first.line,
-  };
-};
+): CanonicalValuesProblem => ({
+  kind: "duplicate-concept",
+  filePath: site.filePath,
+  line: site.line,
+  conceptId: site.conceptId,
+  declaredFilePath: first.filePath,
+  declaredLine: first.line,
+});
 
 export const verifyCanonicalValues = (options: {
   readonly repositoryRoot: string;
 }): readonly CanonicalValuesProblem[] => {
   const sources = readAnnotatedSources(listRepositoryFiles(resolve(options.repositoryRoot)));
-  const firstSiteByConcept = mapValues(
-    groupBy(sources.flatMap(declarationSitesIn), (site) => site.conceptId),
-    (sites) => sites[0],
-  );
+  const firstSiteByConcept = new Map<string, DeclarationSite>();
 
   return sources.flatMap((source) => [
     ...source.problems.map((problem) => ({ ...problem, filePath: source.relativePath })),
-    ...declarationSitesIn(source)
-      .map((site) => duplicateConceptProblem(firstSiteByConcept, site))
-      .filter((problem) => problem !== null),
+    ...declarationSitesIn(source).flatMap((site) => {
+      const first = firstSiteByConcept.get(site.conceptId);
+      if (first === undefined) {
+        firstSiteByConcept.set(site.conceptId, site);
+        return [];
+      }
+      return [duplicateConceptProblem(first, site)];
+    }),
   ]);
 };
 

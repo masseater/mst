@@ -1,7 +1,8 @@
 import { dirname, join, resolve } from "node:path";
 
+import { MANIFEST_FILE_NAME } from "./package-manifest.ts";
 import { readJsonFile } from "./read-json-file.ts";
-import { isFile, MANIFEST_FILE_NAME } from "./source-files.ts";
+import { isFile } from "./source-files.ts";
 
 const WORKSPACE_MANIFEST_FILE_NAMES: readonly string[] = [
   "pnpm-workspace.yaml",
@@ -13,7 +14,7 @@ const WORKSPACES_FIELD = "workspaces";
 const manifestDeclaresWorkspaces = (directory: string): boolean => {
   const manifest = readJsonFile(join(directory, MANIFEST_FILE_NAME));
   if (manifest === null || typeof manifest !== "object") return false;
-  return WORKSPACES_FIELD in manifest && manifest.workspaces !== undefined;
+  return WORKSPACES_FIELD in manifest;
 };
 
 const isWorkspaceRoot = (directory: string): boolean =>

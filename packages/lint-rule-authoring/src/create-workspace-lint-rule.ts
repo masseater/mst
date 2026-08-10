@@ -1,3 +1,4 @@
+import { measureVisitor } from "./measure-rule-duration.ts";
 import {
   workspaceLintRuleDocsRelativePath,
   workspaceLintRuleDocsUrl,
@@ -12,18 +13,16 @@ export type WorkspaceLintRuleDocs = {
   readonly url?: string;
 };
 
-export type WorkspaceLintRuleMeta = {
-  readonly type: RuleMeta["type"];
-  readonly docs: WorkspaceLintRuleDocs;
-  readonly messages: Record<string, string>;
-  readonly schema: RuleMeta["schema"];
-  readonly fixable?: RuleMeta["fixable"];
-  readonly hasSuggestions?: RuleMeta["hasSuggestions"];
-};
-
 export type WorkspaceLintRule = {
   readonly name: string;
-  readonly meta: WorkspaceLintRuleMeta;
+  readonly meta: {
+    readonly type: RuleMeta["type"];
+    readonly docs: WorkspaceLintRuleDocs;
+    readonly messages: Record<string, string>;
+    readonly schema: RuleMeta["schema"];
+    readonly fixable?: RuleMeta["fixable"];
+    readonly hasSuggestions?: RuleMeta["hasSuggestions"];
+  };
   readonly create: CreateRule["create"];
 };
 
@@ -51,8 +50,7 @@ export const createWorkspaceLintRule = ({ workspaceDir }: { readonly workspaceDi
         docs: { ...rule.meta.docs, url: workspaceLintRuleDocsUrl(identity) },
         messages: withDocPointers(rule.meta.messages, identity),
       },
+      create: (context) => measureVisitor({ ruleName: rule.name, visitor: rule.create(context) }),
     };
   };
 };
-
-export type WorkspaceLintRuleFactory = ReturnType<typeof createWorkspaceLintRule>;

@@ -8,11 +8,9 @@ import { segmentsOf } from "../lib/path-segments.ts";
 
 import type { ESTree, Options } from "@oxlint/plugins";
 
-type TopLevelNode = ESTree.Program["body"][number];
-
 const ANCHORED_PATTERN_PREFIXES = ["/", "./", "../"];
 
-const isDirectReExport = (node: TopLevelNode): boolean =>
+const isDirectReExport = (node: ESTree.Program["body"][number]): boolean =>
   node.type === "ExportAllDeclaration" ||
   (node.type === "ExportNamedDeclaration" && node.source !== null);
 
@@ -31,8 +29,6 @@ const matchesSegments = (
   pathSegments: readonly string[],
   patternSegments: readonly string[],
 ): boolean => {
-  if (patternSegments.length === 0) return pathSegments.length === 0;
-
   const [head, ...remainingPatternSegments] = patternSegments;
   if (head === undefined) return pathSegments.length === 0;
   if (head === "**") {
@@ -47,14 +43,9 @@ const matchesSegments = (
   return matchesSegments(remainingPathSegments, remainingPatternSegments);
 };
 
-type AnchoredPattern = {
-  readonly pattern: string;
-  readonly cwd: string;
-};
-
 const matchesPattern = (
   pathSegments: readonly string[],
-  { pattern, cwd }: AnchoredPattern,
+  { pattern, cwd }: { readonly pattern: string; readonly cwd: string },
 ): boolean => {
   if (ANCHORED_PATTERN_PREFIXES.some((prefix) => pattern.startsWith(prefix))) {
     return matchesSegments(
