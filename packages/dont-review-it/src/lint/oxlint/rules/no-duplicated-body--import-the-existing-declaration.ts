@@ -4,26 +4,25 @@ import { memoize } from "es-toolkit";
 
 import { createDontReviewItRule } from "../../../create-rule.ts";
 import { findWorkspaceRoot } from "../lib/canonical-values/workspace-root.ts";
+import { spellSites, statementCovering } from "../lib/duplicated-bodies/site-report.ts";
 import { isOutOfScopeSource } from "../lib/out-of-scope-source.ts";
 import { toPosixPath } from "../lib/posix-path.ts";
 
 import type { WorkspaceLintRule } from "@mst/lint-rule-authoring";
 import type { ESTree } from "@oxlint/plugins";
-import type { BodyIndex, BodySite } from "../lib/duplicated-bodies/body-index.ts";
+import type { BodyIndex, BodyIndexLoader } from "../lib/duplicated-bodies/body-index.ts";
 
-export type BodyIndexLoader = (options: { readonly repositoryRoot: string }) => BodyIndex;
-
-const spellSites = (sites: readonly BodySite[]): string =>
-  sites.map((site) => `${site.relativePath}:${site.line} (${site.name})`).join(", ");
-
-const statementCovering = (
-  statements: ESTree.Program["body"],
-  line: number,
-): ESTree.Node | null => {
-  for (const statement of statements) {
-    if (statement.loc.start.line <= line && line <= statement.loc.end.line) return statement;
-  }
-  return null;
+const duplicatedBodyReports = (input: {
+  readonly index: BodyIndex;
+  readonly relativePath: string;
+}): readonly { readonly line: number; readonly sites: string }[] => {
+  const { index, relativePath } = input;
+  return (index.bodiesByPath.get(relativePath) ?? []).flatMap((body) => {
+    const elsewhere = (index.sitesByFingerprint.get(body.fingerprint) ?? []).filter(
+      (site) => site.relativePath !== relativePath || site.line !== body.line,
+    );
+    return elsewhere.length === 0 ? [] : [{ line: body.line, sites: spellSites(elsewhere) }];
+  });
 };
 
 export const createNoDuplicatedBody = ({
@@ -54,24 +53,17 @@ export const createNoDuplicatedBody = ({
       return {
         Program(node: ESTree.Program) {
           const repositoryRoot = repositoryRootOf();
-          const index = loadIndex({ repositoryRoot });
           const relativePath = toPosixPath(relative(repositoryRoot, resolve(context.filename)));
-          const bodies = index.bodiesByPath.get(relativePath);
-          if (bodies === undefined) return;
+          const reports = duplicatedBodyReports({
+            index: loadIndex({ repositoryRoot }),
+            relativePath,
+          });
 
-          for (const body of bodies) {
-            const sites = index.sitesByFingerprint.get(body.fingerprint) ?? [];
-            if (sites.length < 2) continue;
-
-            const elsewhere = sites.filter(
-              (site) => site.relativePath !== relativePath || site.line !== body.line,
-            );
-            if (elsewhere.length === 0) continue;
-
+          for (const report of reports) {
             context.report({
-              node: statementCovering(node.body, body.line) ?? node,
+              node: statementCovering(node.body, report.line) ?? node,
               messageId: "duplicatedBody",
-              data: { sites: spellSites(elsewhere) },
+              data: { sites: report.sites },
             });
           }
         },

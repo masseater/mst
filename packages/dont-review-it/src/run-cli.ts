@@ -44,14 +44,47 @@ const EQUIVALENT_CONCEPTS_COMMAND = "equivalent-concepts";
 
 const DUPLICATED_BODIES_COMMAND = "duplicated-bodies";
 
-const COMMANDS: ReadonlySet<string> = new Set([
-  VERIFY_COMMAND,
-  EQUIVALENT_CONCEPTS_COMMAND,
-  DUPLICATED_BODIES_COMMAND,
-]);
-
 const asLines = (entries: readonly string[]): string =>
   entries.map((entry) => `${entry}\n`).join("");
+
+const verified = (repositoryRoot: string): CliResult => {
+  const problems = verifyCanonicalValues({ repositoryRoot });
+  return {
+    exitCode: problems.length === 0 ? EXIT_SUCCESS : EXIT_PROBLEMS_FOUND,
+    out: asLines(problems.map((problem) => formatCanonicalValuesProblem(problem))),
+    error: "",
+  };
+};
+
+const equivalentConcepts = (repositoryRoot: string): CliResult => {
+  const catalog = buildCanonicalValuesCatalog({ repositoryRoot });
+  return {
+    exitCode: EXIT_SUCCESS,
+    out: asLines(
+      findEquivalentConcepts(catalog.entries).map((group) => formatEquivalentConceptGroup(group)),
+    ),
+    error: "",
+  };
+};
+
+const duplicatedBodies = (repositoryRoot: string): CliResult => {
+  const clusters = duplicatedClustersIn(buildRepositoryBodyIndex({ repositoryRoot }));
+  return {
+    exitCode: EXIT_SUCCESS,
+    out: asLines(
+      clusters.map((sites) =>
+        sites.map((site) => `${site.relativePath}:${site.line} ${site.name}`).join(" == "),
+      ),
+    ),
+    error: "",
+  };
+};
+
+const RESULT_BY_COMMAND: Readonly<Record<string, (repositoryRoot: string) => CliResult>> = {
+  [VERIFY_COMMAND]: verified,
+  [EQUIVALENT_CONCEPTS_COMMAND]: equivalentConcepts,
+  [DUPLICATED_BODIES_COMMAND]: duplicatedBodies,
+};
 
 const dispatch = (argv: readonly string[]): CliResult => {
   const parsed = parseArgs({
@@ -60,7 +93,8 @@ const dispatch = (argv: readonly string[]): CliResult => {
     options: { "repository-root": { type: "string" } },
   });
   const [command] = parsed.positionals;
-  if (command === undefined || !COMMANDS.has(command)) {
+  const resultFor = command === undefined ? undefined : RESULT_BY_COMMAND[command];
+  if (resultFor === undefined) {
     return { exitCode: EXIT_MISUSE, out: "", error: USAGE };
   }
 
@@ -73,36 +107,7 @@ const dispatch = (argv: readonly string[]): CliResult => {
     };
   }
 
-  if (command === VERIFY_COMMAND) {
-    const problems = verifyCanonicalValues({ repositoryRoot });
-    return {
-      exitCode: problems.length === 0 ? EXIT_SUCCESS : EXIT_PROBLEMS_FOUND,
-      out: asLines(problems.map((problem) => formatCanonicalValuesProblem(problem))),
-      error: "",
-    };
-  }
-
-  if (command === EQUIVALENT_CONCEPTS_COMMAND) {
-    const catalog = buildCanonicalValuesCatalog({ repositoryRoot });
-    return {
-      exitCode: EXIT_SUCCESS,
-      out: asLines(
-        findEquivalentConcepts(catalog.entries).map((group) => formatEquivalentConceptGroup(group)),
-      ),
-      error: "",
-    };
-  }
-
-  const clusters = duplicatedClustersIn(buildRepositoryBodyIndex({ repositoryRoot }));
-  return {
-    exitCode: EXIT_SUCCESS,
-    out: asLines(
-      clusters.map((sites) =>
-        sites.map((site) => `${site.relativePath}:${site.line} ${site.name}`).join(" == "),
-      ),
-    ),
-    error: "",
-  };
+  return resultFor(repositoryRoot);
 };
 
 export const runDontReviewIt = (argv: readonly string[]): CliResult => {

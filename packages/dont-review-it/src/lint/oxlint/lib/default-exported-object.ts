@@ -1,8 +1,8 @@
 import type { ESTree } from "@oxlint/plugins";
 
-type DefaultExportedValue = ESTree.ExportDefaultDeclaration["declaration"];
-
-const objectExpressionOf = (value: DefaultExportedValue): ESTree.ObjectExpression | null => {
+const objectExpressionOf = (
+  value: ESTree.ExportDefaultDeclaration["declaration"],
+): ESTree.ObjectExpression | null => {
   if (value.type === "ObjectExpression") return value;
   if (value.type !== "CallExpression") return null;
   const [firstArgument] = value.arguments;

@@ -2,12 +2,24 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { declarationsIn } from "./declarations.ts";
 
-const structureOfFirst = (source: string): string => declarationsIn(source)[0].structure;
+type Declaration = ReturnType<typeof declarationsIn>[number];
+
+const soleDeclarationOf = (source: string): Declaration => {
+  const [declaration] = declarationsIn(source);
+  if (declaration === undefined) throw new Error(`nothing was declared in: ${source}`);
+  return declaration;
+};
+
+const structureOfFirst = (source: string): string => soleDeclarationOf(source).structure;
+
+const namesOf = (declarations: readonly { readonly name: string }[]): readonly string[] =>
+  declarations.map((declaration) => declaration.name);
 
 describe("declarationsIn", () => {
   test("reads an arrow binding under the name it was declared with", () => {
-    const [declaration] = declarationsIn("const twice = (value: number): number => value * 2;");
-    expect(declaration.name).toBe("twice");
+    expect(soleDeclarationOf("const twice = (value: number): number => value * 2;").name).toBe(
+      "twice",
+    );
   });
 
   test("gives two bindings that differ only in name the same structure", () => {
@@ -53,20 +65,22 @@ describe("declarationsIn", () => {
   });
 
   test("reads a function declaration under the name it was declared with", () => {
-    const [declaration] = declarationsIn("function twice(value: number) {\n  return value * 2;\n}");
-    expect(declaration.name).toBe("twice");
+    expect(soleDeclarationOf("function twice(value: number) {\n  return value * 2;\n}").name).toBe(
+      "twice",
+    );
   });
 
   test("reads an exported binding", () => {
-    const [declaration] = declarationsIn("export const twice = (value: number) => value * 2;");
-    expect(declaration.name).toBe("twice");
+    expect(soleDeclarationOf("export const twice = (value: number) => value * 2;").name).toBe(
+      "twice",
+    );
   });
 
   test("leaves a declaration nested inside another declaration out", () => {
     const declarations = declarationsIn(
       "const outer = () => {\n  const inner = 1;\n  return inner;\n};",
     );
-    expect(declarations.map((declaration) => declaration.name)).toStrictEqual(["outer"]);
+    expect(namesOf(declarations)).toStrictEqual(["outer"]);
   });
 
   test("leaves an anonymous function written at a call site out", () => {
@@ -78,13 +92,52 @@ describe("declarationsIn", () => {
   });
 
   test("records the line the declaration starts on", () => {
-    const [, second] = declarationsIn("const first = 1;\n\nconst second = 2;");
-    expect(second.line).toBe(3);
+    expect(
+      declarationsIn("const first = 1;\n\nconst second = 2;").map(
+        (declaration) => declaration.line,
+      ),
+    ).toStrictEqual([1, 3]);
+  });
+
+  test("reads a type alias under the name it was declared with", () => {
+    expect(soleDeclarationOf("type Draft = { readonly title: string };").name).toBe("Draft");
+  });
+
+  test("reads an interface under the name it was declared with", () => {
+    expect(soleDeclarationOf("interface Draft {\n  readonly title: string;\n}").name).toBe("Draft");
+  });
+
+  test("reads an exported type alias", () => {
+    expect(soleDeclarationOf("export type Draft = { readonly title: string };").name).toBe("Draft");
+  });
+
+  test("gives two type aliases that differ only in name the same structure", () => {
+    expect(structureOfFirst("type Draft = { readonly title: string };")).toBe(
+      structureOfFirst("type Published = { readonly title: string };"),
+    );
+  });
+
+  test("keeps two type aliases apart when a member differs", () => {
+    expect(structureOfFirst("type Draft = { readonly title: string };")).not.toBe(
+      structureOfFirst("type Draft = { readonly title: number };"),
+    );
+  });
+
+  test("keeps the type parameters of a type alias inside the structure", () => {
+    expect(structureOfFirst("type Boxed<Held> = { readonly held: Held };")).not.toBe(
+      structureOfFirst("type Boxed = { readonly held: Held };"),
+    );
+  });
+
+  test("keeps an interface apart from a type alias that spells the same members", () => {
+    expect(structureOfFirst("interface Draft {\n  readonly title: string;\n}")).not.toBe(
+      structureOfFirst("type Draft = { readonly title: string };"),
+    );
   });
 
   test("counts more nodes for a longer body", () => {
-    const [small] = declarationsIn("const one = 1;");
-    const [large] = declarationsIn("const twice = (value: number): number => value * 2;");
+    const small = soleDeclarationOf("const one = 1;");
+    const large = soleDeclarationOf("const twice = (value: number): number => value * 2;");
     expect(large.nodeCount).toBeGreaterThan(small.nodeCount);
   });
 });

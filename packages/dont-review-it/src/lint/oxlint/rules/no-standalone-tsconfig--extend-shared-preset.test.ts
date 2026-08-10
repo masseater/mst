@@ -1,15 +1,17 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { testLintRule } from "@mst/lint-rule-authoring";
-import { afterAll, describe } from "vite-plus/test";
+import { describe } from "vite-plus/test";
 
 import { noStandaloneTsconfig } from "./no-standalone-tsconfig--extend-shared-preset.ts";
 
 const sharedPresets = ["dont-review-it/tsconfig/library.json", "dont-review-it/tsconfig/app.json"];
 
-const fixtureDir = mkdtempSync(join(tmpdir(), "no-standalone-tsconfig-"));
+const fixtureDir = join(tmpdir(), "dont-review-it-no-standalone-tsconfig");
+rmSync(fixtureDir, { recursive: true, force: true });
+mkdirSync(fixtureDir, { recursive: true });
 
 const writeWorkspaceFixture = (name: string, tsconfig: string): string => {
   const directory = join(fixtureDir, name);
@@ -76,10 +78,6 @@ const buriedUnderStandalone = join(fixtureDir, "standalone", "src", "deep", "ind
 const withoutAnyTsconfig = join(fixtureDir, "no-tsconfig-anywhere.ts");
 
 describe("dont-review-it/no-standalone-tsconfig--extend-shared-preset", () => {
-  afterAll(() => {
-    rmSync(fixtureDir, { recursive: true, force: true });
-  });
-
   testLintRule(noStandaloneTsconfig, {
     valid: [
       {

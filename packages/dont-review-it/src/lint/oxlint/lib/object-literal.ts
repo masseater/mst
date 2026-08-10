@@ -32,5 +32,5 @@ export const nestedObjectAt = ({
   path.reduce<ESTree.ObjectExpression | null>((current, key) => {
     if (current === null) return null;
     const nested = objectValueOf({ object: current, key });
-    return nested !== null && nested.type === "ObjectExpression" ? nested : null;
+    return nested?.type === "ObjectExpression" ? nested : null;
   }, object);

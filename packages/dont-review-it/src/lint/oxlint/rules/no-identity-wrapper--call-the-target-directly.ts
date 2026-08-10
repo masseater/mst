@@ -1,6 +1,7 @@
 import { isEqual } from "es-toolkit";
 
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { withoutParentheses } from "../lib/parenthesized-expression.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
@@ -25,23 +26,28 @@ const forwardedArgument = (argument: ESTree.Argument): ForwardedName | null => {
 const soleReturnedExpression = (body: ESTree.FunctionBody): ESTree.Expression | null => {
   if (body.body.length !== 1) return null;
   const [statement] = body.body;
-  if (statement.type !== "ReturnStatement") return null;
-  return statement.argument;
+  if (statement?.type !== "ReturnStatement") return null;
+  return statement.argument === null ? null : withoutParentheses(statement.argument);
 };
 
 const forwardedCall = (declared: FunctionLike): ESTree.CallExpression | null => {
-  const body = declared.body as ESTree.FunctionBody | ESTree.Expression;
+  const { body } = declared;
+  if (body === null) return null;
 
-  const forwarded = body.type === "BlockStatement" ? soleReturnedExpression(body) : body;
-  if (forwarded === null || forwarded.type !== "CallExpression") return null;
+  const forwarded =
+    body.type === "BlockStatement" ? soleReturnedExpression(body) : withoutParentheses(body);
+  if (forwarded?.type !== "CallExpression") return null;
+  if (forwarded.optional) return null;
   return (forwarded.typeArguments ?? null) === null ? forwarded : null;
 };
 
 const calleeIsOwnParameter = (
-  target: ESTree.Expression,
+  callee: ESTree.Expression,
   parameters: readonly (ForwardedName | null)[],
-): boolean =>
-  target.type === "Identifier" && parameters.some((entry) => entry?.name === target.name);
+): boolean => {
+  const target = withoutParentheses(callee);
+  return target.type === "Identifier" && parameters.some((entry) => entry?.name === target.name);
+};
 
 const declaresOwnTypeContract = (declared: FunctionLike): boolean =>
   (declared.returnType ?? null) !== null || (declared.typeParameters ?? null) !== null;
@@ -87,10 +93,13 @@ export const noIdentityWrapper = createDontReviewItRule({
         if ((id.typeAnnotation ?? null) !== null) return;
         if (init === null) return;
 
-        if (init.type !== "ArrowFunctionExpression" && init.type !== "FunctionExpression") return;
-        if (!isIdentityForwarding(init)) return;
+        const declared = withoutParentheses(init);
+        if (declared.type !== "ArrowFunctionExpression" && declared.type !== "FunctionExpression") {
+          return;
+        }
+        if (!isIdentityForwarding(declared)) return;
 
-        context.report({ node: init, messageId: "identityWrapper" });
+        context.report({ node: declared, messageId: "identityWrapper" });
       },
     };
   },

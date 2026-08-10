@@ -26,17 +26,18 @@ const templateSpelling = (
   quasis: readonly ESTree.TemplateElement[],
   substitutions: readonly unknown[],
 ): CanonicalValue | null =>
-  substitutions.length === 0 && quasis.length === 1 ? quasis[0].value.cooked : null;
+  substitutions.length === 0 && quasis.length === 1 ? (quasis[0]?.value.cooked ?? null) : null;
+
+const literalSpelling = (value: unknown): CanonicalValue | null => {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return value;
+  if (typeof value === "boolean") return value;
+  return null;
+};
 
 const scalarLiteralValue = (node: ESTree.Expression): CanonicalValue | null => {
   const expression = unwrapExpression(node);
-  if (expression.type === "Literal") {
-    const { value } = expression;
-    if (typeof value === "string") return value;
-    if (typeof value === "number") return value;
-    if (typeof value === "boolean") return value;
-    return null;
-  }
+  if (expression.type === "Literal") return literalSpelling(expression.value);
   if (expression.type === "TemplateLiteral") {
     return templateSpelling(expression.quasis, expression.expressions);
   }
@@ -93,11 +94,6 @@ export const propertyKeyName = (key: ESTree.ObjectProperty["key"]): string | nul
   return null;
 };
 
-export type SchemaUnionLiterals = {
-  readonly values: readonly CanonicalValue[];
-  readonly node: ESTree.ArrayExpression;
-};
-
 const schemaLiteralArgumentValue = (
   element: ESTree.ArrayExpression["elements"][number],
 ): CanonicalValue | null => {
@@ -112,7 +108,9 @@ const schemaLiteralArgumentValue = (
   return scalarLiteralValue(literal);
 };
 
-export const schemaUnionLiterals = (node: ESTree.CallExpression): SchemaUnionLiterals | null => {
+export const schemaUnionLiterals = (
+  node: ESTree.CallExpression,
+): { readonly values: readonly CanonicalValue[]; readonly node: ESTree.ArrayExpression } | null => {
   const [argument] = node.arguments;
   if (argument === undefined || argument.type === "SpreadElement") return null;
   const array = unwrapExpression(argument);

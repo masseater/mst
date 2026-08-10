@@ -1,11 +1,13 @@
 import { uniq } from "es-toolkit";
 import { parseSync, type Comment, type ParseResult } from "oxc-parser";
 
+import { NODE_TYPE_FIELD } from "../ast-node.ts";
 import {
   containsCanonicalValuesAnnotation,
   findRetiredAnnotationTags,
   parseCanonicalValuesAnnotation,
   RETIRED_ANNOTATION_TAGS,
+  type CanonicalValuesAnnotation,
 } from "./annotation.ts";
 
 import type { CanonicalValue } from "./fingerprint.ts";
@@ -43,30 +45,33 @@ const KEY_FIELD_BY_NODE_TYPE: ReadonlyMap<string, string> = new Map([
   ["TSPropertySignature", "key"],
 ]);
 
-const NODE_TYPE_FIELD = "type";
-
 const lineAt = (text: string, offset: number): number => text.slice(0, offset).split("\n").length;
 
 const withoutRetiredTags = (commentValue: string): string =>
   RETIRED_ANNOTATION_TAGS.reduce((remaining, tag) => remaining.replaceAll(tag, ""), commentValue);
 
-type TemplateLiteralFields = {
-  readonly expressions: readonly unknown[];
-  readonly quasis: readonly { readonly value: { readonly cooked: string } }[];
+const scalarLiteralValueOf = (node: Readonly<Record<string, unknown>>): CanonicalValue | null => {
+  const { value } = node;
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+  return null;
+};
+
+const templateLiteralValueOf = (node: Readonly<Record<string, unknown>>): CanonicalValue | null => {
+  const { expressions, quasis } = node;
+  if (!Array.isArray(expressions) || expressions.length !== 0) return null;
+  if (!Array.isArray(quasis) || quasis.length !== 1) return null;
+
+  const cooked: unknown = (quasis[0] as { readonly value?: { readonly cooked?: unknown } }).value
+    ?.cooked;
+  return typeof cooked === "string" ? cooked : null;
 };
 
 const literalValueOf = (node: Readonly<Record<string, unknown>>): CanonicalValue | null => {
-  if (node[NODE_TYPE_FIELD] === "Literal") {
-    const { value } = node;
-    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-      return value;
-    }
-    return null;
-  }
+  if (node[NODE_TYPE_FIELD] === "Literal") return scalarLiteralValueOf(node);
   if (node[NODE_TYPE_FIELD] !== "TemplateLiteral") return null;
-
-  const { expressions, quasis } = node as TemplateLiteralFields;
-  return expressions.length === 0 ? quasis[0].value.cooked : null;
+  return templateLiteralValueOf(node);
 };
 
 const spelledOutValuesIn = (node: unknown): readonly CanonicalValue[] => {
@@ -87,6 +92,31 @@ const spelledOutValuesIn = (node: unknown): readonly CanonicalValue[] => {
 
 const declarationAfter = (program: ParseResult["program"], comment: Comment): unknown =>
   program.body.find((statement) => statement.start >= comment.end) ?? null;
+
+const scanAnnotatedComment = ({
+  program,
+  comment,
+  annotation,
+  line,
+}: {
+  readonly program: ParseResult["program"];
+  readonly comment: Comment;
+  readonly annotation: CanonicalValuesAnnotation;
+  readonly line: number;
+}): CanonicalValuesTextScan => {
+  const vocabulary = uniq(spelledOutValuesIn(declarationAfter(program, comment)));
+  if (vocabulary.length === 0) {
+    return {
+      declarations: [],
+      problems: [{ kind: "vocabulary-without-values", line, conceptId: annotation.conceptId }],
+    };
+  }
+
+  return {
+    declarations: [{ conceptId: annotation.conceptId, values: vocabulary, line }],
+    problems: [],
+  };
+};
 
 type ParsedSource = {
   readonly sourceText: string;
@@ -116,21 +146,8 @@ const scanComment = (
     return { declarations: [], problems: [...problems, { kind: "unparsable-annotation", line }] };
   }
 
-  const vocabulary = uniq(spelledOutValuesIn(declarationAfter(program, comment)));
-  if (vocabulary.length === 0) {
-    return {
-      declarations: [],
-      problems: [
-        ...problems,
-        { kind: "vocabulary-without-values", line, conceptId: annotation.conceptId },
-      ],
-    };
-  }
-
-  return {
-    declarations: [{ conceptId: annotation.conceptId, values: vocabulary, line }],
-    problems,
-  };
+  const scan = scanAnnotatedComment({ program, comment, annotation, line });
+  return { declarations: scan.declarations, problems: [...problems, ...scan.problems] };
 };
 
 export const scanCanonicalValuesText = (

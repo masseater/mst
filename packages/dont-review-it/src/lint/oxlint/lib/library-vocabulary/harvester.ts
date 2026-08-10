@@ -10,6 +10,7 @@ import {
 } from "typescript/unstable/sync";
 
 import { nearestPackageDirectory } from "../canonical-values/source-files.ts";
+import { isEnvironmentFailure } from "../path-failure.ts";
 import { dependencyTypeEntries, type DependencyTypeEntry } from "./dependency-types.ts";
 import {
   buildLibraryVocabularyIndex,
@@ -35,7 +36,7 @@ const declaredVocabularyOf = (
   const declared = checker.getDeclaredTypeOfSymbol(declaring);
   if (declared.isErrorType() || !declared.isUnionType()) return null;
 
-  const members = declared.getTypes() ?? [];
+  const members = declared.getTypes();
   const admitted: readonly CanonicalValue[] = members.flatMap((member) =>
     member.isStringLiteralType() || member.isNumberLiteralType() ? [member.value] : [],
   );
@@ -71,24 +72,39 @@ const vocabulariesExportedBy = (
     .filter((entry) => entry !== null);
 };
 
+const harvestedFrom = (
+  api: API,
+  typeEntries: readonly DependencyTypeEntry[],
+): LibraryVocabularyIndex => {
+  const snapshot = api.updateSnapshot({
+    openFiles: typeEntries.map((entry) => entry.declarationsPath),
+  });
+  return buildLibraryVocabularyIndex(
+    typeEntries.flatMap((entry) => vocabulariesExportedBy(snapshot, entry)),
+  );
+};
+
+const harvestedWith = (
+  api: API,
+  typeEntries: readonly DependencyTypeEntry[],
+): LibraryVocabularyIndex => {
+  try {
+    return harvestedFrom(api, typeEntries);
+  } finally {
+    api.close();
+  }
+};
+
 const harvestLibraryVocabulary = memoize((packageDirectory: string): LibraryVocabularyIndex => {
   const typeEntries = dependencyTypeEntries(packageDirectory);
   if (typeEntries.length === 0) return EMPTY_LIBRARY_VOCABULARY_INDEX;
 
-  const [, api] = attempt(() => new API({ cwd: packageDirectory }));
-  if (api === null) return EMPTY_LIBRARY_VOCABULARY_INDEX;
-
-  const [, harvested] = attempt(() => {
-    const snapshot = api.updateSnapshot({
-      openFiles: typeEntries.map((entry) => entry.declarationsPath),
-    });
-    return buildLibraryVocabularyIndex(
-      typeEntries.flatMap((entry) => vocabulariesExportedBy(snapshot, entry)),
-    );
-  });
-  api.close();
-
-  return harvested ?? EMPTY_LIBRARY_VOCABULARY_INDEX;
+  const [unusableChecker, harvested] = attempt(() =>
+    harvestedWith(new API({ cwd: packageDirectory }), typeEntries),
+  );
+  if (harvested !== null) return harvested;
+  if (isEnvironmentFailure(unusableChecker)) return EMPTY_LIBRARY_VOCABULARY_INDEX;
+  throw unusableChecker;
 });
 
 export const loadLibraryVocabulary: LibraryVocabularyLoader = ({ filename, repositoryRoot }) => {

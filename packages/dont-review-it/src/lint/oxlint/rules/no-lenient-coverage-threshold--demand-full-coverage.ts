@@ -54,7 +54,7 @@ const declaresTrueAt = ({
   readonly key: string;
 }): boolean => {
   const declared = objectValueOf({ object: thresholds, key });
-  return declared !== null && declared.type === "Literal" && declared.value === true;
+  return declared?.type === "Literal" && declared.value === true;
 };
 
 const violationsIn = ({

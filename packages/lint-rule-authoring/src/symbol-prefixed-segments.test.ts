@@ -15,18 +15,18 @@ const segmentsOf = ({
 
 describe("symbolPrefixedSegmentsOf", () => {
   test("finds nothing on a path whose every name starts with a letter or a digit", () => {
-    expect(segmentsOf({ filename: "/repo/packages/2024-report/src/index.ts" })).toEqual([]);
+    expect(segmentsOf({ filename: "/repo/packages/2024-report/src/index.ts" })).toStrictEqual([]);
   });
 
   test("names the directory and the file that start with something else", () => {
-    expect(segmentsOf({ filename: "/repo/packages/_draft/src/~scratch.ts" })).toEqual([
+    expect(segmentsOf({ filename: "/repo/packages/_draft/src/~scratch.ts" })).toStrictEqual([
       "_draft",
       "~scratch.ts",
     ]);
   });
 
   test("names a repeated offending segment once", () => {
-    expect(segmentsOf({ filename: "/repo/packages/_shared/_shared/index.ts" })).toEqual([
+    expect(segmentsOf({ filename: "/repo/packages/_shared/_shared/index.ts" })).toStrictEqual([
       "_shared",
     ]);
   });
@@ -37,26 +37,26 @@ describe("symbolPrefixedSegmentsOf", () => {
         location: { cwd: "/repo", filename: "/repo/packages/_draft/index.ts" },
         allowedNames: [],
       }),
-    ).toEqual([{ segment: "_draft", path: "packages/_draft/index.ts" }]);
+    ).toStrictEqual([{ segment: "_draft", path: "packages/_draft/index.ts" }]);
   });
 
   test("leaves out the names the caller allows", () => {
     expect(
       segmentsOf({ filename: "/repo/.config/tooling/setup.ts", allowedNames: [".config"] }),
-    ).toEqual([]);
+    ).toStrictEqual([]);
   });
 
   test("matches an allowed name given as a pattern", () => {
     expect(
       segmentsOf({ filename: "/repo/packages/.storybook/preview.ts", allowedNames: [".*book"] }),
-    ).toEqual([]);
+    ).toStrictEqual([]);
   });
 
   test("finds nothing outside the working directory", () => {
-    expect(segmentsOf({ filename: "/elsewhere/_draft/index.ts" })).toEqual([]);
+    expect(segmentsOf({ filename: "/elsewhere/_draft/index.ts" })).toStrictEqual([]);
   });
 
   test("finds nothing for the working directory itself", () => {
-    expect(segmentsOf({ filename: "/repo" })).toEqual([]);
+    expect(segmentsOf({ filename: "/repo" })).toStrictEqual([]);
   });
 });

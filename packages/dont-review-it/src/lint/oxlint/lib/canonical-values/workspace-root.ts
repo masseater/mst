@@ -1,25 +1,18 @@
-import { readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
-import { attempt } from "es-toolkit";
-
-import { parseJson } from "./read-json-file.ts";
+import { MANIFEST_FILE_NAME } from "./package-manifest.ts";
+import { readJsonFile } from "./read-json-file.ts";
+import { isFile } from "./source-files.ts";
 
 const WORKSPACE_MANIFEST_FILE_NAMES: readonly string[] = [
   "pnpm-workspace.yaml",
   "pnpm-workspace.yml",
 ];
 
-const MANIFEST_FILE_NAME = "package.json";
-
 const WORKSPACES_FIELD = "workspaces";
 
-const isFile = (path: string): boolean => attempt(() => statSync(path).isFile())[1] === true;
-
 const manifestDeclaresWorkspaces = (directory: string): boolean => {
-  const path = join(directory, MANIFEST_FILE_NAME);
-  const [, manifest] = attempt(() => parseJson(readFileSync(path, "utf8")));
-
+  const manifest = readJsonFile(join(directory, MANIFEST_FILE_NAME));
   if (manifest === null || typeof manifest !== "object") return false;
   return WORKSPACES_FIELD in manifest;
 };
