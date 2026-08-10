@@ -4,6 +4,9 @@ import { declarationsIn } from "./declarations.ts";
 
 const structureOfFirst = (source: string): string => declarationsIn(source)[0].structure;
 
+const namesOf = (declarations: readonly { readonly name: string }[]): readonly string[] =>
+  declarations.map((declaration) => declaration.name);
+
 describe("declarationsIn", () => {
   test("reads an arrow binding under the name it was declared with", () => {
     const [declaration] = declarationsIn("const twice = (value: number): number => value * 2;");
@@ -66,7 +69,7 @@ describe("declarationsIn", () => {
     const declarations = declarationsIn(
       "const outer = () => {\n  const inner = 1;\n  return inner;\n};",
     );
-    expect(declarations.map((declaration) => declaration.name)).toStrictEqual(["outer"]);
+    expect(namesOf(declarations)).toStrictEqual(["outer"]);
   });
 
   test("leaves an anonymous function written at a call site out", () => {

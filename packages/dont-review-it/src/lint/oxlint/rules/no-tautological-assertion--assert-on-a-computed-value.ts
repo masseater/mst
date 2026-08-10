@@ -46,6 +46,30 @@ const subjectOfExpect = (expression: ESTree.Expression): ESTree.Expression | nul
   return subjectOfExpect(member.object);
 };
 
+const equalityOperandsOf = (
+  node: ESTree.CallExpression,
+): { readonly expectedNode: ESTree.Expression; readonly subjectNode: ESTree.Expression } | null => {
+  const matcher = staticMemberOf(node.callee);
+  if (matcher === null || !EQUALITY_MATCHER_NAMES.has(matcher.name)) return null;
+  if (node.arguments.length !== 1) return null;
+
+  const [expectedNode] = node.arguments;
+  if (expectedNode.type === "SpreadElement") return null;
+
+  const subjectNode = subjectOfExpect(matcher.object);
+  return subjectNode === null ? null : { expectedNode, subjectNode };
+};
+
+const isTautologicalAssertion = (node: ESTree.CallExpression): boolean => {
+  const operands = equalityOperandsOf(node);
+  if (operands === null) return false;
+
+  const expected = fixedValueOf(operands.expectedNode);
+  const subject = fixedValueOf(operands.subjectNode);
+  if (expected === null || subject === null) return false;
+  return isEqual(expected.held, subject.held);
+};
+
 export const noTautologicalAssertion = createDontReviewItRule({
   name: "no-tautological-assertion--assert-on-a-computed-value",
   meta: {
@@ -64,21 +88,7 @@ export const noTautologicalAssertion = createDontReviewItRule({
   create(context) {
     return {
       CallExpression(node: ESTree.CallExpression) {
-        const matcher = staticMemberOf(node.callee);
-        if (matcher === null || !EQUALITY_MATCHER_NAMES.has(matcher.name)) return;
-        if (node.arguments.length !== 1) return;
-
-        const [expectedNode] = node.arguments;
-        if (expectedNode.type === "SpreadElement") return;
-
-        const subjectNode = subjectOfExpect(matcher.object);
-        if (subjectNode === null) return;
-
-        const expected = fixedValueOf(expectedNode);
-        const subject = fixedValueOf(subjectNode);
-        if (expected === null || subject === null) return;
-        if (!isEqual(expected.held, subject.held)) return;
-
+        if (!isTautologicalAssertion(node)) return;
         context.report({ node, messageId: "tautologicalAssertion" });
       },
     };

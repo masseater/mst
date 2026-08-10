@@ -28,15 +28,16 @@ const templateSpelling = (
 ): CanonicalValue | null =>
   substitutions.length === 0 && quasis.length === 1 ? quasis[0].value.cooked : null;
 
+const literalSpelling = (value: unknown): CanonicalValue | null => {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return value;
+  if (typeof value === "boolean") return value;
+  return null;
+};
+
 const scalarLiteralValue = (node: ESTree.Expression): CanonicalValue | null => {
   const expression = unwrapExpression(node);
-  if (expression.type === "Literal") {
-    const { value } = expression;
-    if (typeof value === "string") return value;
-    if (typeof value === "number") return value;
-    if (typeof value === "boolean") return value;
-    return null;
-  }
+  if (expression.type === "Literal") return literalSpelling(expression.value);
   if (expression.type === "TemplateLiteral") {
     return templateSpelling(expression.quasis, expression.expressions);
   }

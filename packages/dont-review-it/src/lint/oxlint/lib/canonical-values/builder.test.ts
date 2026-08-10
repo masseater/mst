@@ -37,6 +37,12 @@ const annotate = (conceptId: string, declaration: string): string =>
 const cachePathOf = (root: string): string =>
   join(root, "node_modules", ".cache", "mst-dont-review-it", "canonical-values.json");
 
+const declaredRowsIn = (sourceText: string): readonly unknown[] =>
+  scanCanonicalValuesText(sourceText).declarations.map((declaration) => [
+    declaration.conceptId,
+    declaration.values,
+  ]);
+
 const conceptIdsOf = (root: string): readonly string[] =>
   buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map((entry) => entry.conceptId);
 
@@ -426,12 +432,7 @@ test("the catalog carries exactly what the shared scan reads out of the same sou
   const catalog = buildCanonicalValuesCatalog({ repositoryRoot: root });
 
   expect(catalog.entries.map((entry) => [entry.conceptId, entry.values])).toStrictEqual(
-    sources.flatMap((source) =>
-      scanCanonicalValuesText(source.text).declarations.map((declaration) => [
-        declaration.conceptId,
-        declaration.values,
-      ]),
-    ),
+    sources.flatMap((source) => declaredRowsIn(source.text)),
   );
   expect(catalog.entries.map((entry) => entry.conceptId)).toStrictEqual([
     "array.form",

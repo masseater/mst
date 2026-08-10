@@ -154,10 +154,11 @@ const isArrayProducingCall = (
   );
 };
 
-const isArrayLikeExpression = (node: ESTree.Expression, resolution: BindingResolution): boolean => {
+const isArrayLikeThroughWrapper = (
+  node: ESTree.Expression,
+  resolution: BindingResolution,
+): boolean | null => {
   switch (node.type) {
-    case "ArrayExpression":
-      return true;
     case "ChainExpression":
     case "ParenthesizedExpression":
     case "TSNonNullExpression":
@@ -169,6 +170,18 @@ const isArrayLikeExpression = (node: ESTree.Expression, resolution: BindingResol
         isArrayLikeType(node.typeAnnotation, new Set()) ||
         isArrayLikeExpression(node.expression, resolution)
       );
+    default:
+      return null;
+  }
+};
+
+const isArrayLikeExpression = (node: ESTree.Expression, resolution: BindingResolution): boolean => {
+  const throughWrapper = isArrayLikeThroughWrapper(node, resolution);
+  if (throughWrapper !== null) return throughWrapper;
+
+  switch (node.type) {
+    case "ArrayExpression":
+      return true;
     case "NewExpression":
       return isArrayGlobalReference(node.callee);
     case "CallExpression":
