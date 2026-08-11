@@ -13,7 +13,7 @@ bin を公開するパッケージが守る規範。機械で止められるも�
 ## コマンドの骨格
 
 - IF: リポジトリの CLI を書く; THEN
-  - MUST: citty をコマンドフレームワークにする（判断は [EDR 0029](../../../docs/engineering-decision-logs/0029-build-repository-clis-on-citty.md)）
+  - MUST: citty をコマンドフレームワークにする（判断は [EDR 0031](../../../docs/engineering-decision-logs/0031-build-repository-clis-on-citty.md)）
   - MUST: 実行ファイルを所有パッケージの `bin` フィールドで宣言する
   - MUST: ルートの `package.json` には、パッケージの bin を呼ぶだけの薄いスクリプトを置く
 - IF: CLI のエントリを増やしたくなった; THEN PROHIBIT: 既存の正規エントリへ委譲するだけの別名を作る
