@@ -28,12 +28,12 @@ const findingsFor = (files: Readonly<Record<string, string>>) =>
 describe("runDependencyCatalogChecks", () => {
   it("stays silent where no workspace definition marks pnpm usage", () => {
     expect(findingsFor({ "package.json": `{"dependencies": {"react": "^19.0.0"}}` })).toStrictEqual(
-      { problems: [], warnings: [] },
+      { problems: [], warnings: [], definitionUnreadable: false },
     );
   });
 
   it("reports a workspace definition that does not parse", () => {
-    const { problems, warnings } = findingsFor({
+    const { problems, warnings, definitionUnreadable } = findingsFor({
       "pnpm-workspace.yaml": "packages: [\n",
     });
 
@@ -41,6 +41,7 @@ describe("runDependencyCatalogChecks", () => {
     expect(problems.length).toBe(1);
     expect(problems[0]?.file).toBe("pnpm-workspace.yaml");
     expect(problems[0]?.message).toContain("does not parse");
+    expect(definitionUnreadable).toBe(true);
   });
 
   it("reports the catalog entry that only one manifest uses", () => {
@@ -61,7 +62,7 @@ describe("runDependencyCatalogChecks", () => {
         "pnpm-workspace.yaml": `packages:\n  - packages/*\ncatalog:\n  vite: ^6.0.0\noverrides:\n  vite: "catalog:"\n`,
         "packages/web/package.json": `{"dependencies": {"vite": "catalog:"}}`,
       }),
-    ).toStrictEqual({ problems: [], warnings: [] });
+    ).toStrictEqual({ problems: [], warnings: [], definitionUnreadable: false });
   });
 
   it("keeps quiet about an entry that a root manifest override references", () => {
@@ -71,7 +72,7 @@ describe("runDependencyCatalogChecks", () => {
         "package.json": `{"pnpm": {"overrides": {"vite": "catalog:"}}}`,
         "packages/web/package.json": `{"dependencies": {"vite": "catalog:"}}`,
       }),
-    ).toStrictEqual({ problems: [], warnings: [] });
+    ).toStrictEqual({ problems: [], warnings: [], definitionUnreadable: false });
   });
 
   it("tells a single manifest to inline the entry rather than to reference it", () => {

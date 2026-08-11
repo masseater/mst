@@ -27,6 +27,9 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
     repositoryRoot,
     config: defaultDependencyCatalogChecksConfig,
   });
+  const ruleIndexProblems = dependencyCatalog.definitionUnreadable
+    ? []
+    : lintRuleIndexProblems({ repositoryRoot, write: false }).map(formatLintRuleIndexProblem);
 
   return {
     problems: [
@@ -40,7 +43,7 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
       ...runWorkflowChecks({ repositoryRoot, config: defaultWorkflowChecksConfig }).map(
         formatWorkflowProblem,
       ),
-      ...lintRuleIndexProblems({ repositoryRoot, write: false }).map(formatLintRuleIndexProblem),
+      ...ruleIndexProblems,
       ...dependencyCatalog.problems.map(formatDependencyCatalogProblem),
     ].toSorted(),
     warnings: dependencyCatalog.warnings.map(formatDependencyCatalogProblem).toSorted(),

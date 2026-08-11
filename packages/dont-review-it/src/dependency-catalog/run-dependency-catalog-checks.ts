@@ -13,6 +13,7 @@ import {
   NO_DEPENDENCY_CATALOG_FINDINGS,
   type DependencyCatalogFindings,
   type DependencyCatalogProblem,
+  type DependencyCatalogReport,
 } from "./problem.ts";
 import { recordOf } from "./record-fields.ts";
 import {
@@ -125,10 +126,10 @@ export const runDependencyCatalogChecks = ({
 }: {
   readonly repositoryRoot: string;
   readonly config: DependencyCatalogChecksConfig;
-}): DependencyCatalogFindings => {
+}): DependencyCatalogReport => {
   const definitionPath = config.workspaceDefinitionFileName;
   const source = readTextFile(join(repositoryRoot, definitionPath));
-  if (source === null) return NO_DEPENDENCY_CATALOG_FINDINGS;
+  if (source === null) return { ...NO_DEPENDENCY_CATALOG_FINDINGS, definitionUnreadable: false };
 
   const definition = parsedDefinitionOrNull({ source, config });
   if (definition === null) {
@@ -141,8 +142,12 @@ export const runDependencyCatalogChecks = ({
         },
       ],
       warnings: [],
+      definitionUnreadable: true,
     };
   }
 
-  return findingsIn({ repositoryRoot, definition, definitionPath, config });
+  return {
+    ...findingsIn({ repositoryRoot, definition, definitionPath, config }),
+    definitionUnreadable: false,
+  };
 };
