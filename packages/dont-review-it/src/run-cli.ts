@@ -18,9 +18,10 @@ const USAGE = `Usage: dont-review-it check [--repository-root <path>]
 
 Reports every canonical values annotation that is broken or retired, every value set
 that more than one concept declares, every body that more than one declaration spells
-the same way, and every workflow definition that narrows its own start, hides a
-failure, holds logic, or leaves its permissions unstated. Exits non-zero when any of
-them is found.
+the same way, every workflow definition that narrows its own start, hides a failure,
+holds logic, or leaves its permissions unstated, and every package whose TanStack
+Intent skills disagree with its manifest: a publishable package shipping none, or a
+workspace-internal package carrying them. Exits non-zero when any of them is found.
 
 Options:
   --repository-root <path>  Root of the repository to scan. Defaults to the current working directory.

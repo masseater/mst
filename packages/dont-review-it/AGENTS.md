@@ -61,3 +61,18 @@ CLI が持つコマンドは `check` の 1 つで、そこが全部の検査を�
   - PROHIBIT: 同じ違反を 2 つの経路から報告する
 - IF: 構文・式の注入・ランナー名・アクションの入力名を検査したくなった; THEN MUST: この検査に足さず、その層を持つ既製の検査を導入する判断から始める
   - この検査が持たない範囲であることは [EDR 0025](../../docs/engineering-decision-logs/0025-check-workflow-definitions-with-our-own-policy-layer.md) が決めている
+
+## 公開パッケージの skill の検査
+
+`check` が、TanStack Intent の skill と package.json の宣言が食い違っていないことも読む。見るのは同梱と配布の配線だけで、両方向を検知する。
+
+npm へ公開できるパッケージには、あることを要求する。
+
+- `skills/**/SKILL.md` が 1 つ以上ある
+- `files` の許可リストがあるなら `skills` を載せている
+- `keywords` が `tanstack-intent` を含んでいる
+
+`private: true` のパッケージには、同じ 3 点が書かれていないことを要求する。出荷されない skill と、出荷されない前提の配線は、読む側に嘘を教える。
+
+- IF: SKILL.md の中身の構造を検査したくなった; THEN MUST: この検査に足さず、上流の `intent validate`（各パッケージの `check:skills`）に任せる
+  - 不変条件の分担は [EDR 0030](../../docs/engineering-decision-logs/0030-ship-agent-skills-with-published-packages-and-gate-the-shipping-ourselves.md) が決めている
