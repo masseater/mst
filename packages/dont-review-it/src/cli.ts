@@ -1,9 +1,6 @@
 #!/usr/bin/env node
-import { runDontReviewIt } from "./run-cli.ts";
+import { runMain } from "citty";
 
-const { exitCode, out, error } = runDontReviewIt(process.argv.slice(2));
+import { dontReviewItCommand } from "./dont-review-it-command.ts";
 
-if (out !== "") process.stdout.write(out);
-if (error !== "") process.stderr.write(error);
-
-process.exitCode = exitCode;
+await runMain(dontReviewItCommand);
