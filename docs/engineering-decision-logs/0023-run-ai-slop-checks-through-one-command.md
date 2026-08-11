@@ -25,7 +25,7 @@ package の公開面は bin と `./package.json` に限定する。試行中に�
 
 Git、revision、diff、source parse の失敗は終了コード 2 にする。読み取れなかった変更を問題なしへ変換しない。問題の抑制、severity、allowlist は設けない。誤検知する形は検出対象から外す。
 
-pull request では base branch tip と head の merge-base を base revision とし、head SHA までを非ブロッキングで検査する。base branch が先に進んだ場合も pull request の変更だけを比較する。試行期間は finding の実例を観測し、通常の品質検査とは分けて表示する。
+pull request では base branch tip と head の merge-base を base revision とし、head SHA までを非ブロッキングで検査する。base branch が先に進んだ場合も pull request の変更だけを比較する。CI は GitHub Compare API から merge-base SHA を取得し、merge-base と head の二つだけを depth 1 で取得する。merge-base のために repository の全履歴を取得しない。試行期間は finding の実例を観測し、通常の品質検査とは分けて表示する。
 
 ## 帰結
 
