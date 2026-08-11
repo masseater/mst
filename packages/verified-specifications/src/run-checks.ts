@@ -3,8 +3,12 @@ import { join, relative } from "node:path";
 
 import { sortBy } from "es-toolkit";
 
-import { renderSpecificationsDocument, SPECIFICATIONS_FILE_NAME } from "./document/render.ts";
-import { extractClaims, type SpecificationSubject } from "./extract/claims.ts";
+import {
+  renderSpecificationsDocument,
+  SPECIFICATIONS_FILE_NAME,
+  type ListedSubject,
+} from "./document/render.ts";
+import { extractClaims } from "./extract/claims.ts";
 import { fileTextOrNull } from "./file-text.ts";
 import { tsconfigScopeProblemsOf } from "./scan/tsconfig-scope.ts";
 import { listWorkspaces, type Workspace } from "./scan/workspaces.ts";
@@ -27,14 +31,21 @@ const claimsOf = async (input: {
   readonly workspace: Workspace;
   readonly specFiles: readonly string[];
 }): Promise<{
-  readonly subjects: readonly SpecificationSubject[];
+  readonly subjects: readonly ListedSubject[];
   readonly problems: readonly RepositoryProblem[];
 }> => {
   const read = await Promise.all(
     input.specFiles.map(async (file) => {
       const absolutePath = join(input.workspace.directory, file);
       const source = await readFile(absolutePath, "utf-8");
-      return extractClaims({ file: relative(input.repositoryRoot, absolutePath), source });
+      const extracted = extractClaims({
+        file: relative(input.repositoryRoot, absolutePath),
+        source,
+      });
+      return {
+        subjects: extracted.subjects.map((subject) => ({ ...subject, sourceFile: file })),
+        problems: extracted.problems,
+      };
     }),
   );
   return {
@@ -58,7 +69,7 @@ const orphanProblemsOf = async (input: {
 const documentProblemsOf = async (input: {
   readonly repositoryRoot: string;
   readonly workspace: Workspace;
-  readonly subjects: readonly SpecificationSubject[];
+  readonly subjects: readonly ListedSubject[];
   readonly hasSpecFiles: boolean;
   readonly write: boolean;
 }): Promise<readonly RepositoryProblem[]> => {
