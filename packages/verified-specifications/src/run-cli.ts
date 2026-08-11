@@ -10,21 +10,18 @@ import {
 } from "@mst/utils";
 import { attemptAsync } from "es-toolkit";
 
-import { defaultConfig } from "./config.ts";
-import { formatProblem } from "./problem.ts";
+import { formatSpecificationProblem } from "./problem.ts";
 import { runChecks } from "./run-checks.ts";
 
-const USAGE = `Usage: agentic-documents <command> [options]
+const USAGE = `Usage: verified-specifications <command> [options]
 
 Commands:
-  check   Report every place where a document disagrees with the repository or breaks the normative notation.
+  check   Extract the claims of every specification test and report each place where the structure cannot be read or a SPECIFICATIONS.md disagrees with them.
 
 Options:
   --repository-root <path>  Root of the repository to scan. Defaults to the current working directory.
-  --write                   Rewrite generated regions instead of reporting them as stale.
+  --write                   Rewrite each SPECIFICATIONS.md instead of reporting it as stale.
 `;
-
-const CHECK_COMMAND = "check";
 
 const dispatch = async (argv: readonly string[]): Promise<CliResult> => {
   const parsed = parseArgs({
@@ -37,26 +34,25 @@ const dispatch = async (argv: readonly string[]): Promise<CliResult> => {
   });
 
   const [command] = parsed.positionals;
-  if (command !== CHECK_COMMAND) {
+  if (command !== "check") {
     return { exitCode: EXIT_MISUSE, out: "", error: USAGE };
   }
 
   const problems = await runChecks({
     repositoryRoot: resolve(parsed.values["repository-root"] ?? process.cwd()),
-    config: defaultConfig,
     write: parsed.values.write,
   });
 
   return {
     exitCode: problems.length === 0 ? EXIT_SUCCESS : EXIT_PROBLEMS_FOUND,
-    out: toLines(problems.map(formatProblem)),
+    out: toLines(problems.map(formatSpecificationProblem)),
     error: "",
   };
 };
 
-export const runAgenticDocuments = async (argv: readonly string[]): Promise<CliResult> => {
-  const [failure, checked] = await attemptAsync<CliResult, Error>(async () => dispatch(argv));
-  return failure === null
-    ? checked
-    : { exitCode: EXIT_MISUSE, out: "", error: `${failure.message}\n` };
+export const runVerifiedSpecifications = async (argv: readonly string[]): Promise<CliResult> => {
+  const [failure, dispatched] = await attemptAsync<CliResult, Error>(async () => dispatch(argv));
+  if (failure === null) return dispatched;
+
+  return { exitCode: EXIT_MISUSE, out: "", error: `${failure.message}\n` };
 };
