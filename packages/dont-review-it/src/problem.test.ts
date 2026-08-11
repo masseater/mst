@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { formatWorkflowProblem } from "./problem.ts";
+import { formatRepositoryProblem } from "./problem.ts";
 
-describe("formatWorkflowProblem", () => {
+describe("formatRepositoryProblem", () => {
   it("puts the message after the file and the line it was found on", () => {
     expect(
-      formatWorkflowProblem({
+      formatRepositoryProblem({
         file: ".github/workflows/ci.yml",
         line: 12,
         message: "Declare permissions.",
