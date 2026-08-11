@@ -2,6 +2,9 @@
   "name": "@mst/dont-review-it",
   "version": "0.0.0",
   "description": "Machine-enforced answers to the writing questions that would otherwise be raised in review.",
+  "keywords": [
+    "tanstack-intent"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -13,6 +16,7 @@
   },
   "files": [
     "dist",
+    "skills",
     "src",
     "tsconfig"
   ],
@@ -21,6 +25,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./plugin": "./src/plugin.ts",
+    "./vitest": "./src/vitest/standard-io-test.ts",
     "./tsconfig/*": "./tsconfig/*",
     "./package.json": "./package.json"
   },
@@ -31,21 +36,24 @@
     "build": "vp pack",
     "dev": "vp pack --watch",
     "test": "vp test",
-    "check": "vp check"
+    "check": "vp check",
+    "check:skills": "intent validate"
   },
   "dependencies": {
     "@mst/lint-rule-authoring": "workspace:*",
     "@mst/utils": "workspace:*",
     "@oxlint/plugins": "catalog:",
+    "citty": "0.2.2",
     "es-toolkit": "catalog:",
     "jsonc-parser": "catalog:",
     "oxc-parser": "catalog:",
-    "oxfmt": "catalog:",
+    "oxfmt": "0.61.0",
     "oxlint": "catalog:",
     "typescript": "catalog:",
     "yaml": "catalog:"
   },
   "devDependencies": {
+    "@tanstack/intent": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "vite": "catalog:",

@@ -16,6 +16,10 @@ describe("dont-review-it/no-explanatory-comment--delete-or-move-to-commit-messag
         code: "// @ts-nocheck\nconst total = 1;",
       },
       {
+        name: "a mock factory exemption is a declaration a machine reads",
+        code: '// mock-factory-exemption no-vi-mock-factory-behavior--use-spy-true-and-fixture -- this unit test replaces the child module boundary on purpose\nvi.mock("./child.ts", () => ({ read: vi.fn() }));',
+      },
+      {
         name: "a JSDoc block is judged by no-detached-rationale instead",
         code: "/**\n * @returns the total\n */\nexport const total = 1;",
       },

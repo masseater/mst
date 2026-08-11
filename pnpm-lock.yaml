@@ -205,27 +205,12 @@ settings:
 
 catalogs:
   default:
-    '@opentelemetry/api':
-      specifier: ^1.9.1
-      version: 1.9.1
-    '@opentelemetry/core':
-      specifier: ^2.10.0
-      version: 2.10.0
-    '@opentelemetry/exporter-metrics-otlp-http':
-      specifier: ^0.221.0
-      version: 0.221.0
-    '@opentelemetry/resources':
-      specifier: ^2.10.0
-      version: 2.10.0
-    '@opentelemetry/sdk-metrics':
-      specifier: ^2.10.0
-      version: 2.10.0
     '@oxlint/plugins':
       specifier: 1.73.0
       version: 1.73.0
-    '@types/mdast':
-      specifier: ^4.0.4
-      version: 4.0.4
+    '@tanstack/intent':
+      specifier: ^0.3.6
+      version: 0.3.6
     '@types/node':
       specifier: ^26
       version: 26.2.0
@@ -238,33 +223,15 @@ catalogs:
     jsonc-parser:
       specifier: ^3.3.1
       version: 3.3.1
-    knip:
-      specifier: ^6.32.0
-      version: 6.32.0
     oxc-parser:
       specifier: ^0.143.0
       version: 0.143.0
-    oxfmt:
-      specifier: 0.61.0
-      version: 0.61.0
     oxlint:
       specifier: 1.76.0
       version: 1.76.0
-    remark-frontmatter:
-      specifier: ^5.0.0
-      version: 5.0.0
-    remark-gfm:
-      specifier: ^4.0.1
-      version: 4.0.1
-    remark-parse:
-      specifier: ^11.0.0
-      version: 11.0.0
     typescript:
       specifier: ^7.0.2
       version: 7.0.2
-    unified:
-      specifier: ^11.0.5
-      version: 11.0.5
     vite-plus:
       specifier: 0.2.8
       version: 0.2.8
@@ -288,6 +255,9 @@ importers:
       '@mst/lint-rule-authoring':
         specifier: workspace:*
         version: link:packages/lint-rule-authoring
+      '@mst/verified-specifications':
+        specifier: workspace:*
+        version: link:packages/verified-specifications
       '@types/node':
         specifier: 'catalog:'
         version: 26.2.0
@@ -295,7 +265,7 @@ importers:
         specifier: 'catalog:'
         version: 4.1.10(@vitest/browser@4.1.10)(vitest@4.1.10)
       knip:
-        specifier: 'catalog:'
+        specifier: ^6.32.0
         version: 6.32.0
       vite:
         specifier: npm:@voidzero-dev/vite-plus-core@0.2.8
@@ -328,23 +298,26 @@ importers:
         specifier: 'catalog:'
         version: 1.50.0
       remark-frontmatter:
-        specifier: 'catalog:'
+        specifier: ^5.0.0
         version: 5.0.0(supports-color@7.2.0)
       remark-gfm:
-        specifier: 'catalog:'
+        specifier: ^4.0.1
         version: 4.0.1(supports-color@7.2.0)
       remark-parse:
-        specifier: 'catalog:'
+        specifier: ^11.0.0
         version: 11.0.0(supports-color@7.2.0)
       unified:
-        specifier: 'catalog:'
+        specifier: ^11.0.5
         version: 11.0.5
       yaml:
         specifier: 'catalog:'
         version: 2.9.0
     devDependencies:
-      '@types/mdast':
+      '@tanstack/intent':
         specifier: 'catalog:'
+        version: 0.3.6
+      '@types/mdast':
+        specifier: ^4.0.4
         version: 4.0.4
       '@types/node':
         specifier: 'catalog:'
@@ -398,6 +371,9 @@ importers:
       '@oxlint/plugins':
         specifier: 'catalog:'
         version: 1.73.0
+      citty:
+        specifier: 0.2.2
+        version: 0.2.2
       es-toolkit:
         specifier: 'catalog:'
         version: 1.50.0
@@ -408,7 +384,7 @@ importers:
         specifier: 'catalog:'
         version: 0.143.0
       oxfmt:
-        specifier: 'catalog:'
+        specifier: 0.61.0
         version: 0.61.0(vite-plus@0.2.8(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/coverage-v8@4.1.10)(@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))
       oxlint:
         specifier: 'catalog:'
@@ -420,6 +396,9 @@ importers:
         specifier: 'catalog:'
         version: 2.9.0
     devDependencies:
+      '@tanstack/intent':
+        specifier: 'catalog:'
+        version: 0.3.6
       '@types/node':
         specifier: 'catalog:'
         version: 26.2.0
@@ -435,20 +414,23 @@ importers:
 
   packages/lint-rule-authoring:
     dependencies:
+      '@mst/utils':
+        specifier: workspace:*
+        version: link:../utils
       '@opentelemetry/api':
-        specifier: 'catalog:'
+        specifier: ^1.9.1
         version: 1.9.1
       '@opentelemetry/core':
-        specifier: 'catalog:'
+        specifier: ^2.10.0
         version: 2.10.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/exporter-metrics-otlp-http':
-        specifier: 'catalog:'
+        specifier: ^0.221.0
         version: 0.221.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/resources':
-        specifier: 'catalog:'
+        specifier: ^2.10.0
         version: 2.10.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/sdk-metrics':
-        specifier: 'catalog:'
+        specifier: ^2.10.0
         version: 2.10.0(@opentelemetry/api@1.9.1)
       '@oxlint/plugins':
         specifier: 'catalog:'
@@ -456,10 +438,19 @@ importers:
       es-toolkit:
         specifier: 'catalog:'
         version: 1.50.0
+      oxc-parser:
+        specifier: 'catalog:'
+        version: 0.143.0
       oxlint:
         specifier: 'catalog:'
         version: 1.76.0(oxlint-tsgolint@7.0.2001)(vite-plus@0.2.8(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/coverage-v8@4.1.10)(@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))
+      yaml:
+        specifier: 'catalog:'
+        version: 2.9.0
     devDependencies:
+      '@tanstack/intent':
+        specifier: 'catalog:'
+        version: 0.3.6
       '@types/node':
         specifier: 'catalog:'
         version: 26.2.0
@@ -477,7 +468,54 @@ importers:
         version: 0.2.8(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/coverage-v8@4.1.10)(@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)
 
   packages/utils:
+    dependencies:
+      es-toolkit:
+        specifier: 'catalog:'
+        version: 1.50.0
     devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.2.0
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.1.10(@vitest/browser@4.1.10)(vitest@4.1.10)
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vite:
+        specifier: npm:@voidzero-dev/vite-plus-core@0.2.8
+        version: '@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)'
+      vite-plus:
+        specifier: 'catalog:'
+        version: 0.2.8(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/coverage-v8@4.1.10)(@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)
+
+  packages/verified-specifications:
+    dependencies:
+      '@mst/lint-rule-authoring':
+        specifier: workspace:*
+        version: link:../lint-rule-authoring
+      '@mst/utils':
+        specifier: workspace:*
+        version: link:../utils
+      es-toolkit:
+        specifier: 'catalog:'
+        version: 1.50.0
+      jsonc-parser:
+        specifier: 'catalog:'
+        version: 3.3.1
+      oxc-parser:
+        specifier: 'catalog:'
+        version: 0.143.0
+      oxlint:
+        specifier: 'catalog:'
+        version: 1.76.0(oxlint-tsgolint@7.0.2001)(vite-plus@0.2.8(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/coverage-v8@4.1.10)(@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))
+      yaml:
+        specifier: 'catalog:'
+        version: 2.9.0
+    devDependencies:
+      '@tanstack/intent':
+        specifier: 'catalog:'
+        version: 0.3.6
       '@types/node':
         specifier: 'catalog:'
         version: 26.2.0
@@ -1260,6 +1298,10 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
+  '@tanstack/intent@0.3.6':
+    resolution: {integrity: sha512-ylew/4T3layUXSfE/SDGUSAi1B3U/wuoNUE0adC3j/s6wzX7omV6e6hAv0WyMC52Inren8kqvwpHj+G/ZBbQHQ==}
+    hasBin: true
+
   '@testing-library/dom@10.4.1':
     resolution: {integrity: sha512-o4PXJQidqJl82ckFaXUeoAW+XysPLauYI43Abki5hABd853iMhitooc6znOnczgbTYmEP6U6/y1ZyKAIsvMKGg==}
     engines: {node: '>=18'}
@@ -1729,6 +1771,10 @@ packages:
   bail@2.0.2:
     resolution: {integrity: sha512-0xO6mYd7JB2YesxDKplafRpsiOzPt9V02ddPCLbY1xYGPOX24NTyN50qnUxgCPcSoYMhKpAuBTjQoRZCAkUDRw==}
 
+  cac@6.7.14:
+    resolution: {integrity: sha512-b6Ilus+c3RrdDk+JhLKUAQfzzgLEPy6wcXqS7f/xe1EETvsDP6GORG7SFuOs6cID5YkqchW/LXZbX5bc8j7ZcQ==}
+    engines: {node: '>=8'}
+
   ccount@2.0.1:
     resolution: {integrity: sha512-eyrF0jiFpY+3drT6383f1qhkbGsLSifNAjA61IUjZjmLCWjItY6LB9ft9YhoDgwfmclB2zhu51Lc7+95b8NRAg==}
 
@@ -1738,6 +1784,9 @@ packages:
 
   character-entities@2.0.2:
     resolution: {integrity: sha512-shx7oQ0Awen/BRIdkjkvz54PnEEI/EjwXDSIZp86/KKdbafHh1Df/RYGBhn4hbe2+uKC9FnT5UCEdyPz3ai9hQ==}
+
+  citty@0.2.2:
+    resolution: {integrity: sha512-+6vJA3L98yv+IdfKGZHBNiGW5KHn22e/JwID0Strsz8h4S/csAu/OuICwxrg44k5MRiZHWIo8XXuJgQTriRP4w==}
 
   convert-source-map@2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
@@ -2826,6 +2875,14 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
+  '@tanstack/intent@0.3.6':
+    dependencies:
+      cac: 6.7.14
+      jsonc-parser: 3.3.1
+      semver: 7.8.5
+      std-env: 4.2.0
+      yaml: 2.9.0
+
   '@testing-library/dom@10.4.1':
     dependencies:
       '@babel/code-frame': 7.29.7
@@ -3158,11 +3215,15 @@ snapshots:
 
   bail@2.0.2: {}
 
+  cac@6.7.14: {}
+
   ccount@2.0.1: {}
 
   chai@6.2.2: {}
 
   character-entities@2.0.2: {}
+
+  citty@0.2.2: {}
 
   convert-source-map@2.0.0: {}
 

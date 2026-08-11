@@ -7,10 +7,10 @@ import { multiCommandRuns } from "./checks/single-command-run.ts";
 import { lineAtOffset, type WorkflowDocument } from "./workflow-document.ts";
 import { readWorkflowDocuments } from "./workflow-files.ts";
 
+import type { RepositoryProblem } from "../problem.ts";
 import type { WorkflowChecksConfig } from "./config.ts";
-import type { WorkflowProblem } from "./problem.ts";
 
-const unreadableDefinition = (document: WorkflowDocument): readonly WorkflowProblem[] =>
+const unreadableDefinition = (document: WorkflowDocument): readonly RepositoryProblem[] =>
   document.parseFailureOffsets.map((offset) => ({
     file: document.relativePath,
     line: lineAtOffset(document, offset),
@@ -23,7 +23,7 @@ const problemsIn = ({
 }: {
   readonly document: WorkflowDocument;
   readonly config: WorkflowChecksConfig;
-}): readonly WorkflowProblem[] => {
+}): readonly RepositoryProblem[] => {
   const unreadable = unreadableDefinition(document);
   if (unreadable.length > 0) return unreadable;
 
@@ -37,7 +37,7 @@ const problemsIn = ({
   ];
 };
 
-const byLocation = (left: WorkflowProblem, right: WorkflowProblem): number =>
+const byLocation = (left: RepositoryProblem, right: RepositoryProblem): number =>
   left.file === right.file ? left.line - right.line : left.file.localeCompare(right.file);
 
 export const runWorkflowChecks = ({
@@ -46,7 +46,7 @@ export const runWorkflowChecks = ({
 }: {
   readonly repositoryRoot: string;
   readonly config: WorkflowChecksConfig;
-}): readonly WorkflowProblem[] =>
+}): readonly RepositoryProblem[] =>
   readWorkflowDocuments({ repositoryRoot, config })
     .flatMap((document) => problemsIn({ document, config }))
     .toSorted(byLocation);
