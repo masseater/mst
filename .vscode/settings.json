@@ -18,5 +18,32 @@
   "editor.formatOnSaveMode": "file",
   "editor.codeActionsOnSave": {
     "source.fixAll.oxc": "explicit"
-  }
+  },
+  "workbench.colorCustomizations": {
+    "activityBar.activeBackground": "#77c788",
+    "activityBar.background": "#77c788",
+    "activityBar.foreground": "#15202b",
+    "activityBar.inactiveForeground": "#15202b99",
+    "activityBarBadge.background": "#7561be",
+    "activityBarBadge.foreground": "#e7e7e7",
+    "activityBarTop.activeBackground": "#77c788",
+    "activityBarTop.background": "#77c788",
+    "activityBarTop.foreground": "#15202b",
+    "activityBarTop.inactiveForeground": "#15202b99",
+    "commandCenter.border": "#15202b99",
+    "commandCenter.foreground": "#15202b",
+    "sash.hoverBorder": "#77c788",
+    "statusBar.background": "#53b868",
+    "statusBar.debuggingBackground": "#53b868",
+    "statusBar.debuggingForeground": "#15202b",
+    "statusBar.foreground": "#15202b",
+    "statusBarItem.hoverBackground": "#3f9952",
+    "statusBarItem.remoteBackground": "#7461be",
+    "statusBarItem.remoteForeground": "#15202b",
+    "titleBar.activeBackground": "#53b868",
+    "titleBar.activeForeground": "#15202b",
+    "titleBar.inactiveBackground": "#53b86899",
+    "titleBar.inactiveForeground": "#15202b99"
+  },
+  "peacock.color": "#53b868"
 }

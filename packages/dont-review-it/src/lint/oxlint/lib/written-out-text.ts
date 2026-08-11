@@ -1,6 +1,6 @@
 import type { ESTree } from "@oxlint/plugins";
 
-const CONCATENATION_OPERATOR = "+";
+export const CONCATENATION_OPERATOR = "+";
 
 export const hasWrittenOutText = (expression: ESTree.Expression): boolean => {
   const written = expression;

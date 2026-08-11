@@ -1,0 +1,278 @@
+import { range } from "es-toolkit";
+
+import { createDontReviewItRule } from "../../../create-rule.ts";
+import { resolveBinding } from "../lib/resolved-bindings.ts";
+import { isAssertionCall } from "../lib/spec-syntax/assertion-entries.ts";
+import {
+  fixtureDeclarationsOf,
+  fixtureDependenciesOf,
+} from "../lib/spec-syntax/fixture-declarations.ts";
+import { isSpecFile, specFileSuffixesFrom } from "../lib/spec-syntax/spec-files.ts";
+import {
+  asSpecFunction,
+  unwrapSubject,
+  type SpecFunction,
+} from "../lib/spec-syntax/subject-expressions.ts";
+import {
+  declaresTestBlock,
+  testBlockBindings,
+  testCallbacksOf,
+} from "../lib/spec-syntax/test-block-declarations.ts";
+
+import type { Definition, ESTree, Node, Options, SourceCode } from "@oxlint/plugins";
+
+const DEFAULT_MAX_ASSERTIONS = 1;
+
+const MAX_ASSERTIONS_OPTION = "maxAssertions";
+
+type Callee = {
+  readonly kind: "fixture" | "helper";
+  readonly label: string;
+  readonly body: SpecFunction;
+};
+
+type Owner =
+  | { readonly kind: "block"; readonly block: ESTree.CallExpression }
+  | { readonly kind: "callee"; readonly callee: Callee };
+
+type Placed = {
+  readonly at: ESTree.Node;
+  readonly count: number;
+};
+
+type Reached = Placed & { readonly through: Callee };
+
+type Reading = {
+  readonly assertions: ReadonlySet<ESTree.CallExpression>;
+  readonly blocks: ReadonlyMap<ESTree.CallExpression, SpecFunction>;
+  readonly calleeByCall: ReadonlyMap<ESTree.CallExpression, Callee>;
+  readonly fixtures: ReadonlyMap<string, Callee>;
+  readonly ownerByCall: ReadonlyMap<ESTree.CallExpression, Owner | null>;
+};
+
+type Report = {
+  readonly node: ESTree.Node;
+  readonly messageId: string;
+  readonly data: Readonly<Record<string, number | string>>;
+};
+
+const maxAssertionsFrom = (options: Readonly<Options>): number => {
+  const [first] = options;
+  if (typeof first !== "object" || first === null || Array.isArray(first)) {
+    return DEFAULT_MAX_ASSERTIONS;
+  }
+  const configured = first[MAX_ASSERTIONS_OPTION];
+  return typeof configured === "number" ? configured : DEFAULT_MAX_ASSERTIONS;
+};
+
+const declaredFunctionOf = (definition: Definition): SpecFunction | null => {
+  const declared = definition.node;
+  if (declared.type === "FunctionDeclaration") return declared;
+  if (declared.type !== "VariableDeclarator" || declared.init === null) return null;
+  return asSpecFunction(declared.init);
+};
+
+const helperCalledBy = (sourceCode: SourceCode, call: ESTree.CallExpression): Callee | null => {
+  const callee = unwrapSubject(call.callee);
+  if (callee.type !== "Identifier") return null;
+
+  const binding = resolveBinding(sourceCode.getScope(call), callee.name);
+  if (binding === null) return null;
+
+  const body = binding.defs
+    .flatMap((definition) => {
+      const declared = declaredFunctionOf(definition);
+      return declared === null ? [] : [declared];
+    })
+    .at(-1);
+  return body === undefined ? null : { kind: "helper", label: callee.name, body };
+};
+
+const isUnder = (owner: Owner | null, target: ESTree.Node): boolean => {
+  if (owner === null) return false;
+  return owner.kind === "block" ? owner.block === target : owner.callee.body === target;
+};
+
+const inSourceOrder = <Held extends Placed>(placed: readonly Held[]): readonly Held[] =>
+  placed.toSorted((earlier, later) => earlier.at.start - later.at.start);
+
+const beyondBudget = (placed: readonly Placed[], budget: number): readonly Placed[] =>
+  inSourceOrder(placed)
+    .flatMap((entry) => range(0, entry.count).map(() => entry))
+    .slice(budget);
+
+const throughText = (reached: readonly Reached[]): string =>
+  reached
+    .filter((contribution) => contribution.count !== 0)
+    .map(
+      (contribution) =>
+        `${contribution.count} through the ${contribution.through.kind} \`${contribution.through.label}\``,
+    )
+    .join(", ");
+
+const readingOf = (collected: {
+  readonly assertions: ReadonlySet<ESTree.CallExpression>;
+  readonly calls: ReadonlySet<ESTree.CallExpression>;
+  readonly fixtures: ReadonlyMap<string, Callee>;
+  readonly rootNames: ReadonlySet<string>;
+  readonly sourceCode: SourceCode;
+}): Reading => {
+  const { assertions, calls, fixtures, rootNames, sourceCode } = collected;
+  const blocks = new Map<ESTree.CallExpression, SpecFunction>(
+    [...calls].flatMap((call): readonly (readonly [ESTree.CallExpression, SpecFunction])[] => {
+      if (!declaresTestBlock(call, rootNames)) return [];
+      const body = testCallbacksOf(call).at(-1);
+      return body === undefined ? [] : [[call, body]];
+    }),
+  );
+  const calleeByCall = new Map<ESTree.CallExpression, Callee>(
+    [...calls].flatMap((call): readonly (readonly [ESTree.CallExpression, Callee])[] => {
+      if (blocks.has(call)) return [];
+      const reached = helperCalledBy(sourceCode, call);
+      return reached === null ? [] : [[call, reached]];
+    }),
+  );
+  const owners = new Map<Node, Owner>([
+    ...[...blocks.keys()].map((block): readonly [Node, Owner] => [block, { kind: "block", block }]),
+    ...[...fixtures.values(), ...calleeByCall.values()].map((callee): readonly [Node, Owner] => [
+      callee.body,
+      { kind: "callee", callee },
+    ]),
+  ]);
+  const ownerByCall = new Map<ESTree.CallExpression, Owner | null>(
+    [...assertions, ...calleeByCall.keys()].map((call) => [
+      call,
+      sourceCode
+        .getAncestors(call)
+        .flatMap((ancestor) => {
+          const owner = owners.get(ancestor);
+          return owner === undefined ? [] : [owner];
+        })
+        .at(-1) ?? null,
+    ]),
+  );
+  return { assertions, blocks, calleeByCall, fixtures, ownerByCall };
+};
+
+const overflowingIn = (reading: Reading, budget: number): readonly Report[] => {
+  const carriedBy = (target: ESTree.Node): readonly ESTree.CallExpression[] =>
+    [...reading.assertions].filter((assertion) =>
+      isUnder(reading.ownerByCall.get(assertion) ?? null, target),
+    );
+  const rootsUnder = (target: ESTree.Node): readonly Reached[] =>
+    [...reading.calleeByCall].flatMap(([call, through]) =>
+      isUnder(reading.ownerByCall.get(call) ?? null, target)
+        ? [{ at: call, through, count: 0 }]
+        : [],
+    );
+  const fixtureRootsOf = (body: SpecFunction): readonly Reached[] =>
+    (fixtureDependenciesOf(body) ?? []).flatMap((dependency) => {
+      const through = reading.fixtures.get(dependency.name);
+      return through === undefined ? [] : [{ at: dependency.property, through, count: 0 }];
+    });
+  const reachedFrom = (source: Callee): readonly Callee[] =>
+    source.kind === "fixture"
+      ? [
+          ...rootsUnder(source.body).map((root) => root.through),
+          ...fixtureRootsOf(source.body).map((root) => root.through),
+        ]
+      : rootsUnder(source.body).map((root) => root.through);
+  const assertionsThrough = (source: Callee, seen: Set<SpecFunction>): number => {
+    if (seen.has(source.body)) return 0;
+    seen.add(source.body);
+    return reachedFrom(source).reduce(
+      (total, next) => total + assertionsThrough(next, seen),
+      carriedBy(source.body).length,
+    );
+  };
+
+  return [...reading.blocks].flatMap(([block, body]) => {
+    const seen = new Set<SpecFunction>();
+    const reached = inSourceOrder([...fixtureRootsOf(body), ...rootsUnder(block)]).map((root) => ({
+      ...root,
+      count: assertionsThrough(root.through, seen),
+    }));
+    const direct = carriedBy(block);
+    const placed: readonly Placed[] = [
+      ...direct.map((assertion) => ({ at: assertion, count: 1 })),
+      ...reached,
+    ];
+    const attributed = placed.reduce((total, entry) => total + entry.count, 0);
+    const elsewhere = throughText(reached);
+    return beyondBudget(placed, budget).map(
+      (overflowing): Report => ({
+        node: overflowing.at,
+        messageId: elsewhere === "" ? "multiExpectIt" : "multiExpectItThroughCallees",
+        data: { attributed, direct: direct.length, elsewhere, limit: budget },
+      }),
+    );
+  });
+};
+
+export const forbidMultiExpectIt = createDontReviewItRule({
+  name: "forbid-multi-expect-it--split-into-separate-it",
+  meta: {
+    type: "problem",
+    docs: {
+      description:
+        "Disallow a test block reaching more assertions than the budget set for it, counting the ones its callees carry as well, so a failing block names one behaviour and one cause",
+      relatedGuidelines: [],
+    },
+    messages: {
+      multiExpectIt:
+        "A test block must not reach more than {{limit}} assertion. This block reaches {{attributed}}. Split it into one block per behaviour and name each block after the behaviour it pins. Merge the claims that all speak about a single returned value: have the fixture hand that value back and pin it whole with one exact comparison.",
+      multiExpectItThroughCallees:
+        "A test block must not reach more than {{limit}} assertion, counting the assertions carried by every helper and fixture it reaches. This block reaches {{attributed}}: {{direct}} written in its body and {{elsewhere}}. Split it into one block per behaviour and name each block after the behaviour it pins. Keep every assertion in the block that claims it; assertions parked in a helper or a fixture still run under this block's name.",
+    },
+    schema: [
+      {
+        type: "object",
+        properties: {
+          maxAssertions: { type: "integer", minimum: 1 },
+          specFileSuffixes: { type: "array", items: { type: "string" } },
+        },
+        additionalProperties: false,
+      },
+    ],
+  },
+  create(context) {
+    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+
+    const budget = maxAssertionsFrom(context.options);
+    const blockBindings = testBlockBindings();
+    const calls = new Set<ESTree.CallExpression>();
+    const assertions = new Set<ESTree.CallExpression>();
+    const fixtures = new Map<string, Callee>();
+
+    return {
+      ImportDeclaration(node: ESTree.ImportDeclaration) {
+        blockBindings.takeImport(node);
+      },
+      VariableDeclarator(node: ESTree.VariableDeclarator) {
+        blockBindings.takeLocalBinding(node);
+      },
+      CallExpression(node: ESTree.CallExpression) {
+        for (const declaration of fixtureDeclarationsOf(node)) {
+          const { factory, name } = declaration;
+          if (factory !== null) fixtures.set(name, { kind: "fixture", label: name, body: factory });
+        }
+
+        if (isAssertionCall(node)) {
+          assertions.add(node);
+          return;
+        }
+        calls.add(node);
+      },
+      "Program:exit"() {
+        const reading = readingOf({
+          assertions,
+          calls,
+          fixtures,
+          rootNames: blockBindings.rootNames(),
+          sourceCode: context.sourceCode,
+        });
+        for (const report of overflowingIn(reading, budget)) context.report(report);
+      },
+    };
+  },
+});
