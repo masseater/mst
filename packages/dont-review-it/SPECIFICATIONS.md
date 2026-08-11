@@ -4,5 +4,7 @@
 
 ## リポジトリ検査の入口
 
+[`specs/check-entry.spec.ts`](specs/check-entry.spec.ts)
+
 - check 以外の命令を名指しで拒否する
 - 存在しない場所を検査対象に取らない

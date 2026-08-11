@@ -43,18 +43,27 @@ describe("仕様一覧の生成", () => {
 
   it("describe の名前を見出しに、it の名前を箇条書きにする", async () => {
     const written = await writtenListOf({ "specs/login.spec.ts": SPEC_SOURCE });
+    expect(written).toContain("## ログイン\n");
     expect(written).toContain(
-      "## ログイン\n\n- 正しい資格情報でセッションを発行する\n- 誤ったパスワードを繰り返すと施錠する\n",
+      "- 正しい資格情報でセッションを発行する\n- 誤ったパスワードを繰り返すと施錠する\n",
     );
   });
 
-  it("同じ主題を宣言した複数のファイルを 1 つの見出しに畳む", async () => {
+  it("主題の下に、その主張を検証している spec ファイルへのリンクを挿す", async () => {
+    const written = await writtenListOf({ "specs/login.spec.ts": SPEC_SOURCE });
+    expect(written).toContain("## ログイン\n\n[`specs/login.spec.ts`](specs/login.spec.ts)\n");
+  });
+
+  it("同じ主題を宣言した複数のファイルを 1 つの見出しに畳み、全ファイルへリンクする", async () => {
     const written = await writtenListOf({
       "specs/issuing.spec.ts": 'describe("ログイン", () => {\n  it("発行する", () => {});\n});\n',
       "specs/locking.spec.ts": 'describe("ログイン", () => {\n  it("施錠する", () => {});\n});\n',
     });
     expect(written.match(/## ログイン/gu)).toHaveLength(1);
     expect(written).toContain("- 発行する\n- 施錠する\n");
+    expect(written).toContain(
+      "[`specs/issuing.spec.ts`](specs/issuing.spec.ts), [`specs/locking.spec.ts`](specs/locking.spec.ts)",
+    );
   });
 
   it("主題をファイル名の順に並べる", async () => {
