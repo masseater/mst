@@ -5,10 +5,8 @@ import {
   EXIT_MISUSE,
   EXIT_PROBLEMS_FOUND,
   EXIT_SUCCESS,
-  failureMessage,
-  toLines,
   type CliResult,
-} from "@mst/utils";
+} from "@mst/repository-checks";
 import { attempt } from "es-toolkit";
 
 import { isDirectory } from "./lint/oxlint/lib/canonical-values/source-files.ts";
@@ -51,18 +49,20 @@ const dispatch = (argv: readonly string[]): CliResult => {
   const { problems, warnings } = runChecks(repositoryRoot);
   return {
     exitCode: problems.length === 0 ? EXIT_SUCCESS : EXIT_PROBLEMS_FOUND,
-    out: toLines([...problems, ...warnings.map((warning) => `warning: ${warning}`)]),
+    out: [...problems, ...warnings.map((warning) => `warning: ${warning}`)]
+      .map((line) => `${line}\n`)
+      .join(""),
     error: "",
   };
 };
 
 export const runDontReviewIt = (argv: readonly string[]): CliResult => {
-  const [failure, result] = attempt(() => dispatch(argv));
-  if (result !== null) return result;
+  const [failure, result] = attempt<CliResult, Error>(() => dispatch(argv));
+  if (failure === null) return result;
 
   return {
     exitCode: EXIT_MISUSE,
     out: "",
-    error: `${failureMessage(failure)}\n`,
+    error: `${failure.message}\n`,
   };
 };

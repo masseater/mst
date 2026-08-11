@@ -32,7 +32,7 @@
   },
   "dependencies": {
     "@mst/lint-rule-authoring": "workspace:*",
-    "@mst/utils": "workspace:*",
+    "@mst/repository-checks": "workspace:*",
     "es-toolkit": "catalog:",
     "jsonc-parser": "catalog:",
     "oxc-parser": "catalog:",

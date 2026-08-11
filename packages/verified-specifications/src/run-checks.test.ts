@@ -30,7 +30,7 @@ const repositoryWith = async (files: Readonly<Record<string, string>>): Promise<
 const utilsRepository = async (extraFiles: Readonly<Record<string, string>>): Promise<string> =>
   repositoryWith({
     "pnpm-workspace.yaml": WORKSPACE_MANIFEST,
-    "packages/utils/package.json": '{ "name": "@mst/utils" }',
+    "packages/utils/package.json": '{ "name": "@mst/repository-checks" }',
     ...extraFiles,
   });
 

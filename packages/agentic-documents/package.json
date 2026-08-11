@@ -30,7 +30,7 @@
     "check": "vp check"
   },
   "dependencies": {
-    "@mst/utils": "workspace:*",
+    "@mst/repository-checks": "workspace:*",
     "es-toolkit": "catalog:",
     "remark-frontmatter": "^5.0.0",
     "remark-gfm": "^4.0.1",

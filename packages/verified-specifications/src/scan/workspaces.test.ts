@@ -26,24 +26,26 @@ describe("listWorkspaces", () => {
   test("names each workspace after its package.json", async () => {
     const repositoryRoot = await repositoryWith({
       "pnpm-workspace.yaml": WORKSPACE_MANIFEST,
-      "packages/utils/package.json": '{ "name": "@mst/utils" }',
+      "packages/utils/package.json": '{ "name": "@mst/repository-checks" }',
       "packages/other/package.json": '{ "name": "@mst/other" }',
     });
     const listed = await listWorkspaces({ repositoryRoot });
     expect(listed.workspaces.map((entry) => entry.packageName)).toStrictEqual([
       "@mst/other",
-      "@mst/utils",
+      "@mst/repository-checks",
     ]);
   });
 
   test("skips a workspace directory that has no package.json", async () => {
     const repositoryRoot = await repositoryWith({
       "pnpm-workspace.yaml": WORKSPACE_MANIFEST,
-      "packages/utils/package.json": '{ "name": "@mst/utils" }',
+      "packages/utils/package.json": '{ "name": "@mst/repository-checks" }',
       "packages/empty/notes.txt": "not a workspace",
     });
     const listed = await listWorkspaces({ repositoryRoot });
-    expect(listed.workspaces.map((entry) => entry.packageName)).toStrictEqual(["@mst/utils"]);
+    expect(listed.workspaces.map((entry) => entry.packageName)).toStrictEqual([
+      "@mst/repository-checks",
+    ]);
   });
 
   test("reports a workspace whose package.json has no name", async () => {
@@ -95,7 +97,7 @@ describe("listWorkspaces", () => {
   test("lists nothing for a manifest that holds no packages list", async () => {
     const repositoryRoot = await repositoryWith({
       "pnpm-workspace.yaml": "catalogMode: strict\n",
-      "packages/utils/package.json": '{ "name": "@mst/utils" }',
+      "packages/utils/package.json": '{ "name": "@mst/repository-checks" }',
     });
     const listed = await listWorkspaces({ repositoryRoot });
     expect(listed.workspaces).toStrictEqual([]);
@@ -112,9 +114,11 @@ describe("listWorkspaces", () => {
   test("keeps only the string entries of the packages list", async () => {
     const repositoryRoot = await repositoryWith({
       "pnpm-workspace.yaml": "packages:\n  - packages/*\n  - 5\n",
-      "packages/utils/package.json": '{ "name": "@mst/utils" }',
+      "packages/utils/package.json": '{ "name": "@mst/repository-checks" }',
     });
     const listed = await listWorkspaces({ repositoryRoot });
-    expect(listed.workspaces.map((entry) => entry.packageName)).toStrictEqual(["@mst/utils"]);
+    expect(listed.workspaces.map((entry) => entry.packageName)).toStrictEqual([
+      "@mst/repository-checks",
+    ]);
   });
 });

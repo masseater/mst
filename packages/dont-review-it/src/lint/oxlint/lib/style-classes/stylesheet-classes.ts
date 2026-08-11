@@ -1,4 +1,3 @@
-import { lineAtOffset } from "@mst/utils";
 import { uniqBy } from "es-toolkit";
 
 export type StyleClassSite = {
@@ -45,7 +44,7 @@ const classSitesInPrelude = (input: {
 }): readonly StyleClassSite[] =>
   [...input.prelude.text.matchAll(CLASS_SELECTOR)].map((match) => ({
     name: match[0].slice(1),
-    line: lineAtOffset(input.source, input.prelude.start + match.index),
+    line: input.source.slice(0, input.prelude.start + match.index).split("\n").length,
   }));
 
 export const classSitesIn = (source: string): readonly StyleClassSite[] =>

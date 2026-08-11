@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync, type Stats } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 
-import { readUnlessMissing } from "@mst/utils";
+import { readUnlessMissing } from "@mst/repository-checks";
 import { sortBy } from "es-toolkit";
 
 import { toPosixPath } from "../posix-path.ts";

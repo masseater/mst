@@ -1,4 +1,4 @@
-import { EXIT_MISUSE } from "@mst/utils";
+import { EXIT_MISUSE } from "@mst/repository-checks";
 import { describe, expect, it } from "vite-plus/test";
 
 import { runDontReviewIt } from "../src/run-cli.ts";

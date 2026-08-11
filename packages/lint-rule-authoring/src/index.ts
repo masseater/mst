@@ -10,3 +10,4 @@ export {
 } from "./rule-index/reconcile-rule-index.ts";
 /** @public */
 export { testLintRule } from "./rule-tester.ts";
+export type { UnknownFields } from "./unknown-fields.ts";
