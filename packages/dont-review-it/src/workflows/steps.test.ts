@@ -1,8 +1,22 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import { defaultWorkflowChecksConfig } from "./config.ts";
-import { entriesNamedInSteps, jobEntriesOf, stepsOf, triggersOf } from "./steps.ts";
-import { keyOf, keysOf, parseWorkflowDocument, scalarText, valueOf } from "./workflow-document.ts";
+import {
+  entriesNamedInSteps,
+  jobEntriesOf,
+  stepsOf,
+  triggerKeyNodeOf,
+  triggerNamesOf,
+  triggersOf,
+} from "./steps.ts";
+import {
+  keyOf,
+  keysOf,
+  lineOf,
+  parseWorkflowDocument,
+  scalarText,
+  valueOf,
+} from "./workflow-document.ts";
 
 const config = defaultWorkflowChecksConfig;
 
@@ -71,5 +85,47 @@ describe("triggersOf", () => {
     expect(
       valueOf(triggersOf({ document: documentOf("on:\n  push:\n"), config }), "jobs"),
     ).toBeNull();
+  });
+});
+
+describe("triggerNamesOf", () => {
+  it("names the triggers written as a mapping", () => {
+    expect(
+      triggerNamesOf({ document: documentOf("on:\n  push:\n  pull_request:\n"), config }),
+    ).toStrictEqual(["push", "pull_request"]);
+  });
+
+  it("names the triggers written as a list", () => {
+    expect(
+      triggerNamesOf({ document: documentOf("on: [push, workflow_call]\n"), config }),
+    ).toStrictEqual(["push", "workflow_call"]);
+  });
+
+  it("names the single trigger written on its own", () => {
+    expect(triggerNamesOf({ document: documentOf("on: push\n"), config })).toStrictEqual(["push"]);
+  });
+
+  it("drops the items of a list that are not plain values", () => {
+    expect(
+      triggerNamesOf({ document: documentOf("on: [push, [nested]]\n"), config }),
+    ).toStrictEqual(["push"]);
+  });
+
+  it("names nothing when the workflow declares no triggers", () => {
+    expect(triggerNamesOf({ document: documentOf("name: CI\n"), config })).toStrictEqual([]);
+  });
+});
+
+describe("triggerKeyNodeOf", () => {
+  it("points at the trigger itself when it was written as a mapping", () => {
+    const document = documentOf("name: CI\non:\n  push:\n  workflow_call:\n");
+
+    expect(lineOf(document, triggerKeyNodeOf({ document, config, name: "workflow_call" }))).toBe(4);
+  });
+
+  it("points at the declaration of the triggers when they were written as a list", () => {
+    const document = documentOf("name: CI\non: [push, workflow_call]\n");
+
+    expect(lineOf(document, triggerKeyNodeOf({ document, config, name: "workflow_call" }))).toBe(2);
   });
 });
