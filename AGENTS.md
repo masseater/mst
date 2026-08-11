@@ -49,10 +49,12 @@ mst は、リポジトリ運用の仕組みを再利用可能な単位として�
 - IF: `vite` の依存を整理する; THEN
   - PROHIBIT: ルートと `packages/utils` の `vite` 直接依存を削除する
   - PROHIBIT: `knip.json` の `ignoreDependencies` から `vite` を外す
-- IF: テストを置く; THEN
+- IF: カバレッジ担保のテストを置く; THEN
   - MUST: 対象ソースと同じディレクトリに `<ソース名>.test.ts` として置く
   - PROHIBIT: `tests/` `test/` `__tests__/` `spec/` を作る
-  - PROHIBIT: `.spec.ts` を使う
+- IF: 仕様担保のテストを置く; THEN
+  - MUST: パッケージ直下の `specs/` に `<機能名>.spec.ts` として置く
+  - MUST: 書き方を `packages/verified-specifications/AGENTS.md` に従わせる
 - IF: テストの実行経路を決める; THEN MUST: main に入るすべての経路が通るまとまりに含める
 - IF: `package.json` の依存や `devEngines` を変更した; THEN MUST: コミット前に `vp install --frozen-lockfile` が通ることを確認する
 - IF: `.github/workflows/ci.yml` の `voidzero-dev/setup-vp` を書く; THEN

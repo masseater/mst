@@ -1,0 +1,3 @@
+{
+  "extends": "@mst/dont-review-it/tsconfig/library.json"
+}

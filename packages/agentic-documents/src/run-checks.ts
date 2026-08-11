@@ -1,3 +1,5 @@
+import { sortBy } from "es-toolkit";
+
 import { rationaleOnActionLine } from "./checks/action-is-one-sentence.ts";
 import { companionFileProblems } from "./checks/companion-files.ts";
 import { contrastiveCodePairs } from "./checks/contrastive-code-pair.ts";
@@ -18,6 +20,11 @@ import type { AgenticDocumentsConfig } from "./config.ts";
 import type { DocumentProblem } from "./problem.ts";
 import type { NormativeDocument } from "./scan/normative-documents.ts";
 
+const LINE_DIGITS = 9;
+
+const locationKeyOf = (problem: DocumentProblem): string =>
+  `${problem.file}:${String(problem.line ?? 0).padStart(LINE_DIGITS, "0")}`;
+
 const syntacticProblems = ({
   document,
   config,
@@ -34,11 +41,6 @@ const syntacticProblems = ({
   ...versionLiteralsInProse({ document, config }),
   ...contrastiveCodePairs({ document, config }),
 ];
-
-const byLocation = (left: DocumentProblem, right: DocumentProblem): number =>
-  left.file === right.file
-    ? (left.line ?? 0) - (right.line ?? 0)
-    : left.file.localeCompare(right.file);
 
 export const runChecks = async ({
   repositoryRoot,
@@ -68,5 +70,5 @@ export const runChecks = async ({
     ...(await workspaceListProblems({ repositoryRoot, config, write })),
   ];
 
-  return [...perDocument.flat(), ...acrossDocuments].toSorted(byLocation);
+  return sortBy([...perDocument.flat(), ...acrossDocuments], [locationKeyOf]);
 };
