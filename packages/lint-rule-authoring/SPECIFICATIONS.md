@@ -4,4 +4,6 @@
 
 ## lint ルールの重大度の語彙
 
+[`specs/severity-vocabulary.spec.ts`](specs/severity-vocabulary.spec.ts)
+
 - error と warn と off の 3 値だけを公開する
