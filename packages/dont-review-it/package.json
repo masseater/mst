@@ -38,9 +38,9 @@
     "@mst/utils": "workspace:*",
     "@oxlint/plugins": "catalog:",
     "es-toolkit": "catalog:",
-    "jsonc-parser": "catalog:",
-    "oxc-parser": "catalog:",
-    "oxfmt": "catalog:",
+    "jsonc-parser": "^3.3.1",
+    "oxc-parser": "^0.143.0",
+    "oxfmt": "0.61.0",
     "oxlint": "catalog:",
     "typescript": "catalog:",
     "yaml": "catalog:"

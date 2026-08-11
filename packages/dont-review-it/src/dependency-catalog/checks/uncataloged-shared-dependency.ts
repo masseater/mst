@@ -1,0 +1,68 @@
+import { uniq } from "es-toolkit";
+
+import { NO_DEPENDENCY_CATALOG_FINDINGS, type DependencyCatalogFindings } from "../problem.ts";
+
+import type { DependencyCatalogChecksConfig } from "../config.ts";
+import type { DependencyUsage } from "../dependency-usage.ts";
+
+const findingsForUsage = ({
+  usage,
+  definitionPath,
+  config,
+}: {
+  readonly usage: DependencyUsage;
+  readonly definitionPath: string;
+  readonly config: DependencyCatalogChecksConfig;
+}): DependencyCatalogFindings => {
+  const manifestPaths = uniq(usage.directReferences.map((reference) => reference.manifestPath));
+  if (manifestPaths.length < 2) return NO_DEPENDENCY_CATALOG_FINDINGS;
+
+  const specifiers = uniq(usage.directReferences.map((reference) => reference.specifier));
+
+  if (specifiers.length === 1) {
+    return {
+      problems: [
+        {
+          file: definitionPath,
+          message: `${usage.dependencyName} must not be pinned to ${specifiers.join(", ")} separately by ${manifestPaths.join(" and ")}, because pins that repeat drift apart silently. Add ${usage.dependencyName} to the catalog and reference it with ${config.catalogProtocol} from each manifest.`,
+        },
+      ],
+      warnings: [],
+    };
+  }
+
+  const pins = usage.directReferences
+    .map((reference) => `${reference.manifestPath} pins ${reference.specifier}`)
+    .join(", ");
+
+  return {
+    problems: [],
+    warnings: [
+      {
+        file: definitionPath,
+        message: `${usage.dependencyName} is pinned to different specifiers: ${pins}. Decide one version, then move it to the catalog once the manifests agree.`,
+      },
+    ],
+  };
+};
+
+export const sharedDependencyFindings = ({
+  usages,
+  catalogedNames,
+  definitionPath,
+  config,
+}: {
+  readonly usages: readonly DependencyUsage[];
+  readonly catalogedNames: readonly string[];
+  readonly definitionPath: string;
+  readonly config: DependencyCatalogChecksConfig;
+}): DependencyCatalogFindings => {
+  const findings = usages
+    .filter((usage) => !catalogedNames.includes(usage.dependencyName))
+    .map((usage) => findingsForUsage({ usage, definitionPath, config }));
+
+  return {
+    problems: findings.flatMap((finding) => finding.problems),
+    warnings: findings.flatMap((finding) => finding.warnings),
+  };
+};
