@@ -56,6 +56,12 @@ mst は、リポジトリ運用の仕組みを再利用可能な単位として�
   - MUST: パッケージ直下の `specs/` に `<機能名>.spec.ts` として置く
   - MUST: 書き方を `packages/verified-specifications/AGENTS.md` に従わせる
 - IF: テストの実行経路を決める; THEN MUST: main に入るすべての経路が通るまとまりに含める
+- IF: main への merge を判断する; THEN
+  - MUST: 各パッケージの `SPECIFICATIONS.md` の diff を何よりも先に読み、主張の変化をすべて承認してから merge する
+    - この diff がリポジトリの約束の変化そのものであり、ここを読み飛ばした merge は仕様の変更を無審査で通す
+  - PROHIBIT: `SPECIFICATIONS.md` に diff が出ているのに読まずに merge する
+  - MAY: それ以外のテストの diff は読まない
+    - カバレッジ担保テストの中身は guard が守るもので、merge の判断材料ではない
 - IF: `package.json` の依存や `devEngines` を変更した; THEN MUST: コミット前に `vp install --frozen-lockfile` が通ることを確認する
 - IF: `.github/workflows/ci.yml` の `voidzero-dev/setup-vp` を書く; THEN
   - MUST: commit SHA で固定する
