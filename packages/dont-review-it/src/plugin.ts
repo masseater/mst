@@ -21,6 +21,7 @@ import { forbidWeakMatcher } from "./lint/oxlint/rules/forbid-weak-matcher--use-
 import { noAmbiguousVariableName } from "./lint/oxlint/rules/no-ambiguous-variable-name--rename-to-concrete-noun.ts";
 import { noArrayMutation } from "./lint/oxlint/rules/no-array-mutation--derive-new-array.ts";
 import { noBlanketSuppression } from "./lint/oxlint/rules/no-blanket-suppression--name-and-record.ts";
+import { noCittyParentRun } from "./lint/oxlint/rules/no-citty-parent-run--move-run-into-a-subcommand.ts";
 import { createNoClassAsMutableCell } from "./lint/oxlint/rules/no-class-as-mutable-cell--decide-in-an-iife.ts";
 import { noComputedTestApiMember } from "./lint/oxlint/rules/no-computed-test-api-member--use-static-member.ts";
 import { noCrossSpecAssetsImport } from "./lint/oxlint/rules/no-cross-spec-assets-import--use-own-assets.ts";
@@ -47,6 +48,7 @@ import { noFixtureFactoryFunction } from "./lint/oxlint/rules/no-fixture-factory
 import { noFixtureForwardSubject } from "./lint/oxlint/rules/no-fixture-forward-subject--yield-sut-output.ts";
 import { noFixtureOrderingAlias } from "./lint/oxlint/rules/no-fixture-ordering-alias--use-auto-action-fixture.ts";
 import { noFloatingPromise } from "./lint/oxlint/rules/no-floating-promise--await-the-result.ts";
+import { noHandmadeStandardIoDouble } from "./lint/oxlint/rules/no-handmade-standard-io-double--use-standard-io-test.ts";
 import { noHardcodedEndpoint } from "./lint/oxlint/rules/no-hardcoded-endpoint--read-from-configuration.ts";
 import { noHardcodedProviderId } from "./lint/oxlint/rules/no-hardcoded-provider-id--read-from-configuration.ts";
 import { noIdentityWrapper } from "./lint/oxlint/rules/no-identity-wrapper--call-the-target-directly.ts";
@@ -95,6 +97,7 @@ import { requireRegisteredFile } from "./lint/oxlint/rules/require-registered-fi
 import { requireSpecFileForAssets } from "./lint/oxlint/rules/require-spec-file-for-assets--create-matching-spec.ts";
 import { requireSpecLintCoverage } from "./lint/oxlint/rules/require-spec-lint-coverage--lint-every-spec-file.ts";
 import { requireSpecOrAssetsOnlyInSpecDirectory } from "./lint/oxlint/rules/require-spec-or-assets-only-in-spec-directory--move-out-or-inline.ts";
+import { requireStandardIoSnapshot } from "./lint/oxlint/rules/require-standard-io-snapshot--pin-both-streams.ts";
 import { requireTestAssetsConstants } from "./lint/oxlint/rules/require-test-assets-constants--move-setup-to-spec.ts";
 import { requireTestBlockForSpecFile } from "./lint/oxlint/rules/require-test-block-for-spec-file--add-test-or-delete-file.ts";
 import { requireTestBlockSpelling } from "./lint/oxlint/rules/require-test-block-spelling--use-configured-fn.ts";
@@ -151,6 +154,7 @@ const plugin: Plugin = {
     [noAmbiguousVariableName.name]: noAmbiguousVariableName,
     [noArrayMutation.name]: noArrayMutation,
     [noBlanketSuppression.name]: noBlanketSuppression,
+    [noCittyParentRun.name]: noCittyParentRun,
     [noClassAsMutableCell.name]: noClassAsMutableCell,
     [noComputedTestApiMember.name]: noComputedTestApiMember,
     [noCrossSpecAssetsImport.name]: noCrossSpecAssetsImport,
@@ -177,6 +181,7 @@ const plugin: Plugin = {
     [noFixtureForwardSubject.name]: noFixtureForwardSubject,
     [noFixtureOrderingAlias.name]: noFixtureOrderingAlias,
     [noFloatingPromise.name]: noFloatingPromise,
+    [noHandmadeStandardIoDouble.name]: noHandmadeStandardIoDouble,
     [noHardcodedEndpoint.name]: noHardcodedEndpoint,
     [noHardcodedProviderId.name]: noHardcodedProviderId,
     [noIdentityWrapper.name]: noIdentityWrapper,
@@ -225,6 +230,7 @@ const plugin: Plugin = {
     [requireSpecFileForAssets.name]: requireSpecFileForAssets,
     [requireSpecLintCoverage.name]: requireSpecLintCoverage,
     [requireSpecOrAssetsOnlyInSpecDirectory.name]: requireSpecOrAssetsOnlyInSpecDirectory,
+    [requireStandardIoSnapshot.name]: requireStandardIoSnapshot,
     [requireTestAssetsConstants.name]: requireTestAssetsConstants,
     [requireTestBlockForSpecFile.name]: requireTestBlockForSpecFile,
     [requireTestBlockSpelling.name]: requireTestBlockSpelling,

@@ -25,6 +25,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./plugin": "./src/plugin.ts",
+    "./vitest": "./src/vitest/standard-io-test.ts",
     "./tsconfig/*": "./tsconfig/*",
     "./package.json": "./package.json"
   },
@@ -42,6 +43,7 @@
     "@mst/lint-rule-authoring": "workspace:*",
     "@mst/utils": "workspace:*",
     "@oxlint/plugins": "catalog:",
+    "citty": "0.2.2",
     "es-toolkit": "catalog:",
     "jsonc-parser": "catalog:",
     "oxc-parser": "catalog:",
