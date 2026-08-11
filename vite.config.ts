@@ -4,6 +4,7 @@ import {
   withGitExcludes,
 } from "@mst/dont-review-it";
 import { oxlint as lintRuleAuthoringOxlint } from "@mst/lint-rule-authoring";
+import { oxlint as verifiedSpecificationsOxlint } from "@mst/verified-specifications";
 import { defineConfig } from "vite-plus";
 
 const dontReviewItBaseRuleIds = new Set(Object.keys(dontReviewItOxlint.rules ?? {}));
@@ -38,7 +39,7 @@ export default defineConfig({
     },
   }),
   lint: withGitExcludes({
-    extends: [lintRuleAuthoringOxlint, dontReviewItOxlint],
+    extends: [lintRuleAuthoringOxlint, dontReviewItOxlint, verifiedSpecificationsOxlint],
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
     rules: {
       "vite-plus/prefer-vite-plus-imports": "error",
@@ -58,7 +59,7 @@ export default defineConfig({
         rules: dontReviewItCliOnlyRules,
       },
       {
-        files: ["**/{test,tests,__tests__,spec,specs,__specs__}/**"],
+        files: ["**/{test,tests,__tests__,spec,__specs__}/**"],
         rules: {
           "vitest/consistent-test-filename": [
             "error",

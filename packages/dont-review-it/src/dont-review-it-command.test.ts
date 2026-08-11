@@ -68,6 +68,21 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
     expect(stderr.text).toBe("");
   });
 
+  standardIoTest(
+    "check prints a version disagreement as a warning and still exits zero",
+    async ({ stdout, stderr }) => {
+      const root = repositoryWith({
+        "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
+        "packages/web/package.json": `{"devDependencies": {"typescript": "^5.0.0"}}`,
+        "packages/site/package.json": `{"devDependencies": {"typescript": "^5.5.0"}}`,
+      });
+
+      expect(await cliExitCode(["check", "--repository-root", root])).toBe(0);
+      expect(stdout.text).toContain("warning: ");
+      expect(stderr.text).toBe("");
+    },
+  );
+
   standardIoTest("check reports a broken annotation and exits one", async ({ stdout, stderr }) => {
     const root = repositoryWith({
       "src/order.ts": `/** ${CANONICAL_VALUES_TAG} */

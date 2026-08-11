@@ -43,7 +43,7 @@ const MAX_LINES_PER_FUNCTION = 200;
 
 const SOURCE_FILES = ["**/*.ts", "**/*.tsx"];
 
-const TEST_FILES = ["**/*.test.ts", "**/*.test.tsx"];
+const TEST_FILES = ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx"];
 
 const SHARED_TSCONFIG_PRESETS = [
   "dont-review-it/tsconfig/library.json",

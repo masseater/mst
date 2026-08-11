@@ -9,7 +9,7 @@ const CAPTURED_STREAM_NAMES = new Set(["stdout", "stderr"]);
 
 const STREAM_CLASS_NAMES = new Set(["Writable", "Duplex", "Transform", "PassThrough"]);
 
-const TEST_FILE_SUFFIXES = [".test.ts", ".test.tsx"];
+const TEST_FILE_SUFFIXES = [".test.ts", ".test.tsx", ".spec.ts", ".spec.tsx"];
 
 const isExtendCall = (callee: ESTree.Expression): boolean =>
   staticMemberOf(callee)?.name === "extend";

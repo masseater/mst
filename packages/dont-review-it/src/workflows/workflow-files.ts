@@ -1,7 +1,8 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { readUnlessMissing } from "../lint/oxlint/lib/path-failure.ts";
+import { readUnlessMissing } from "@mst/utils";
+
 import { parseWorkflowDocument, type WorkflowDocument } from "./workflow-document.ts";
 
 import type { WorkflowChecksConfig } from "./config.ts";

@@ -17,10 +17,10 @@ const refuseMisuse = (message: string): void => {
 };
 
 const reportProblems = (repositoryRoot: string): void => {
-  const problems = runChecks(repositoryRoot);
-  if (problems.length === 0) return;
-  process.stdout.write(toLines(problems));
-  process.exitCode = EXIT_PROBLEMS_FOUND;
+  const { problems, warnings } = runChecks(repositoryRoot);
+  const lines = [...problems, ...warnings.map((warning) => `warning: ${warning}`)];
+  if (lines.length > 0) process.stdout.write(toLines(lines));
+  if (problems.length > 0) process.exitCode = EXIT_PROBLEMS_FOUND;
 };
 
 export const checkCommand = defineCommand({
