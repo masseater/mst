@@ -23,8 +23,9 @@ lint による強制が、書かれた時点でも、時間が経った後でも
 
 ## 提供するもの
 
-- `@mst/lint-rule-authoring` — factory・severity 語彙・テスト基盤・このパッケージの oxlint config
+- `@mst/lint-rule-authoring` — factory・severity 語彙・テスト基盤・ルール索引の照合関数・このパッケージの oxlint config
 - `@mst/lint-rule-authoring/plugin` — oxlint が `jsPlugins` の指定子で読むエントリ
+- `lint-rule-authoring check [--write]` — マニフェストの `lintRules` が宣言する置き場からルールを発見し、各ワークスペースの `packages/<workspace>/docs/lint/index.md` の生成領域を照合・再生成する CLI
 
 ## 規約
 

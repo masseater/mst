@@ -25,6 +25,9 @@ domains:
   - name: "keeping documents true"
     slug: "keeping-documents-true"
     description: "Writing AI-facing documents that match the repository and keep a machine-followable shape."
+  - name: "surfacing verified specifications"
+    slug: "surfacing-verified-specifications"
+    description: "Declaring behavior claims as specification tests and generating the human-readable list from them."
 
 skills:
   - name: "adopt the dont-review-it preset"
@@ -318,6 +321,61 @@ skills:
         correct_pattern: |
           pnpm exec agentic-documents check --write
         source: "masseater/mst:packages/agentic-documents/src/run-cli.ts"
+        priority: "MEDIUM"
+        status: "active"
+
+  - name: "write specification tests"
+    slug: "verified-specifications-core"
+    domain: "surfacing-verified-specifications"
+    description: "Declare behavior claims in specs/<feature>.spec.ts and regenerate SPECIFICATIONS.md with verified-specifications check --write."
+    type: "core"
+    packages:
+      - "@mst/verified-specifications"
+    covers:
+      - "verified-specifications check"
+      - "--write"
+      - "specs/<feature>.spec.ts"
+      - "SPECIFICATIONS.md"
+      - "claim naming rules"
+    tasks:
+      - "write a behavior claim"
+      - "regenerate the specification list"
+      - "decide spec test versus coverage test"
+    failure_modes:
+      - mistake: "SPECIFICATIONS.md edited by hand"
+        mechanism: "the list is generated from the tests, so a hand edit is reported as stale and the next --write erases it."
+        wrong_pattern: |
+          - 手で追記した主張
+        correct_pattern: |
+          pnpm exec verified-specifications check --write
+        source: "masseater/mst:packages/verified-specifications/AGENTS.md"
+        priority: "HIGH"
+        status: "active"
+      - mistake: "claim written with a computed name"
+        mechanism: "the extractor reads string literals, so a computed describe or it name cannot be read and the structure check reports it."
+        wrong_pattern: |
+          it(`${subject}は表を報告する`, () => {})
+        correct_pattern: |
+          it("規範が表の行として書かれていれば報告する", () => {})
+        source: "masseater/mst:packages/verified-specifications/src/run-cli.ts"
+        priority: "MEDIUM"
+        status: "active"
+      - mistake: "coverage exercise placed in specs/"
+        mechanism: "an execution that is not a claim dilutes the generated list a human reads."
+        wrong_pattern: |
+          specs/read-json-file.spec.ts
+        correct_pattern: |
+          src/read-json-file.test.ts
+        source: "masseater/mst:packages/verified-specifications/AGENTS.md"
+        priority: "MEDIUM"
+        status: "active"
+      - mistake: "spec workspace tsconfig narrowed by include"
+        mechanism: "narrowing include drops specs/ from type checking silently, so the check stays green while the claims rot."
+        wrong_pattern: |
+          { "include": ["src"] }
+        correct_pattern: |
+          { "extends": "@mst/dont-review-it/tsconfig/library.json" }
+        source: "masseater/mst:packages/verified-specifications/AGENTS.md"
         priority: "MEDIUM"
         status: "active"
 

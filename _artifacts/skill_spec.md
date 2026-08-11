@@ -9,21 +9,23 @@ skills.
 
 ## Domains
 
-| Domain                      | Description                                             | Skills                           |
-| --------------------------- | ------------------------------------------------------- | -------------------------------- |
-| enforcing-writing-standards | Wiring machine-enforced answers into a repository       | dont-review-it-core              |
-| gating-the-repository       | Running the checks lint cannot express as a single gate | dont-review-it-repository-checks |
-| authoring-lint-rules        | Writing rules whose enforcement keeps working           | lint-rule-authoring-core         |
-| keeping-documents-true      | Keeping AI-facing documents true and machine-followable | agentic-documents-core           |
+| Domain                            | Description                                             | Skills                           |
+| --------------------------------- | ------------------------------------------------------- | -------------------------------- |
+| enforcing-writing-standards       | Wiring machine-enforced answers into a repository       | dont-review-it-core              |
+| gating-the-repository             | Running the checks lint cannot express as a single gate | dont-review-it-repository-checks |
+| authoring-lint-rules              | Writing rules whose enforcement keeps working           | lint-rule-authoring-core         |
+| keeping-documents-true            | Keeping AI-facing documents true and machine-followable | agentic-documents-core           |
+| surfacing-verified-specifications | Declaring claims as spec tests, generating the list     | verified-specifications-core     |
 
 ## Skill Inventory
 
-| Skill                            | Type | Domain                      | What it covers                                                  | Failure modes |
-| -------------------------------- | ---- | --------------------------- | --------------------------------------------------------------- | ------------- |
-| dont-review-it-core              | core | enforcing-writing-standards | preset, withGitExcludes, plugin, tsconfig presets, wiring probe | 4             |
-| dont-review-it-repository-checks | core | gating-the-repository       | check CLI, workflow checks, shipped-skills check, guard wiring  | 6             |
-| lint-rule-authoring-core         | core | authoring-lint-rules        | factory, tester, severity, message discipline, docs pathing     | 5             |
-| agentic-documents-core           | core | keeping-documents-true      | check CLI, --write, normative notation, generated regions       | 4             |
+| Skill                            | Type | Domain                            | What it covers                                                  | Failure modes |
+| -------------------------------- | ---- | --------------------------------- | --------------------------------------------------------------- | ------------- |
+| dont-review-it-core              | core | enforcing-writing-standards       | preset, withGitExcludes, plugin, tsconfig presets, wiring probe | 4             |
+| dont-review-it-repository-checks | core | gating-the-repository             | check CLI, workflow checks, shipped-skills check, guard wiring  | 6             |
+| lint-rule-authoring-core         | core | authoring-lint-rules              | factory, tester, severity, message discipline, docs pathing     | 5             |
+| agentic-documents-core           | core | keeping-documents-true            | check CLI, --write, normative notation, generated regions       | 4             |
+| verified-specifications-core     | core | surfacing-verified-specifications | spec tests, claim naming, SPECIFICATIONS.md regeneration        | 4             |
 
 ## Failure Mode Inventory
 
@@ -66,6 +68,15 @@ skills.
 | 3   | good and bad examples placed as a pair | MEDIUM   | contrastive-code-pair.ts   | —            |
 | 4   | generated region edited by hand        | MEDIUM   | run-cli.ts                 | —            |
 
+### verified-specifications-core (4 failure modes)
+
+| #   | Mistake                                     | Priority | Source     | Cross-skill? |
+| --- | ------------------------------------------- | -------- | ---------- | ------------ |
+| 1   | SPECIFICATIONS.md edited by hand            | HIGH     | AGENTS.md  | —            |
+| 2   | claim written with a computed name          | MEDIUM   | run-cli.ts | —            |
+| 3   | coverage exercise placed in specs/          | MEDIUM   | AGENTS.md  | —            |
+| 4   | spec workspace tsconfig narrowed by include | MEDIUM   | AGENTS.md  | —            |
+
 ## Tensions
 
 | Tension                             | Skills                                                    | Agent implication                                          |
@@ -103,7 +114,8 @@ skills.
 ## Recommended Skill File Structure
 
 - **Core skills:** dont-review-it-core, dont-review-it-repository-checks,
-  lint-rule-authoring-core, agentic-documents-core
+  lint-rule-authoring-core, agentic-documents-core,
+  verified-specifications-core
 - **Framework skills:** none — every package is framework-agnostic
 - **Lifecycle skills:** none — no quickstart or go-live material in docs
 - **Composition skills:** none — the only assumed companion is the Vite+

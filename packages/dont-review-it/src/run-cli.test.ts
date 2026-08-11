@@ -119,6 +119,31 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
     expect(run.out).toContain("order.status");
   });
 
+  test("check fails on a catalog entry that only one manifest uses", () => {
+    const root = repositoryWith({
+      "pnpm-workspace.yaml": "packages:\n  - packages/*\ncatalog:\n  react: ^19.0.0\n",
+      "packages/web/package.json": `{"dependencies": {"react": "catalog:"}}`,
+    });
+
+    const run = runDontReviewIt(["check", "--repository-root", root]);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.out).toContain("pnpm-workspace.yaml The catalog must not hold react");
+  });
+
+  test("check prints a version disagreement as a warning and still exits zero", () => {
+    const root = repositoryWith({
+      "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
+      "packages/web/package.json": `{"devDependencies": {"typescript": "^5.0.0"}}`,
+      "packages/site/package.json": `{"devDependencies": {"typescript": "^5.5.0"}}`,
+    });
+
+    const run = runDontReviewIt(["check", "--repository-root", root]);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.out).toContain("warning: pnpm-workspace.yaml typescript is pinned to different");
+  });
+
   test("an unknown command returns the usage as an error and exits two", () => {
     const run = runDontReviewIt(["publish"]);
 
@@ -207,6 +232,24 @@ jobs:
 
     expect(run.exitCode).toBe(1);
     expect(run.out).toContain(".github/workflows/ci.yml:3");
+  });
+
+  test("check fails when a workspace that declares lint rules has no index for them", () => {
+    const root = repositoryWith({
+      "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
+      "packages/example/package.json": JSON.stringify({ lintRules: ["src/rules"] }),
+      "packages/example/src/rules/no-thing--allow-it.ts": `export const rule = {
+  name: "no-thing--allow-it",
+  meta: { docs: { description: "Disallow the thing" }, messages: { report: "No." } },
+  create: () => ({}),
+};
+`,
+    });
+
+    const run = runDontReviewIt(["check", "--repository-root", root]);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.out).toContain("packages/example/docs/lint/index.md");
   });
 
   test("check stays silent on a workflow definition that keeps every discipline", () => {

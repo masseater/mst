@@ -49,6 +49,17 @@ skills:
       - "masseater/mst:packages/lint-rule-authoring/src/rule-tester.ts"
       - "masseater/mst:packages/lint-rule-authoring/AGENTS.md"
 
+  - name: "write specification tests"
+    slug: "verified-specifications-core"
+    type: "core"
+    domain: "surfacing-verified-specifications"
+    path: "packages/verified-specifications/skills/core/SKILL.md"
+    package: "packages/verified-specifications"
+    description: "Declare behavior claims in specs/<feature>.spec.ts and regenerate SPECIFICATIONS.md from them."
+    sources:
+      - "masseater/mst:packages/verified-specifications/src/run-cli.ts"
+      - "masseater/mst:packages/verified-specifications/AGENTS.md"
+
   - name: "write and check agent-facing documents"
     slug: "agentic-documents-core"
     type: "core"

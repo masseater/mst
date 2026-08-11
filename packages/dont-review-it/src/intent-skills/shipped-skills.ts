@@ -1,14 +1,13 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { lineAtOffset } from "@mst/utils";
+import { lineAtOffset, readUnlessMissing } from "@mst/utils";
 import { findNodeAtLocation, getNodeValue, parseTree, type Node } from "jsonc-parser";
 
 import {
   listRepositoryFiles,
   type ScannedFile,
 } from "../lint/oxlint/lib/canonical-values/source-files.ts";
-import { readUnlessMissing } from "../lint/oxlint/lib/path-failure.ts";
 
 import type { RepositoryProblem } from "../problem.ts";
 import type { IntentSkillsConfig } from "./config.ts";

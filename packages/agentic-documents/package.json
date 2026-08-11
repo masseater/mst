@@ -37,15 +37,15 @@
   "dependencies": {
     "@mst/utils": "workspace:*",
     "es-toolkit": "catalog:",
-    "remark-frontmatter": "catalog:",
-    "remark-gfm": "catalog:",
-    "remark-parse": "catalog:",
-    "unified": "catalog:",
+    "remark-frontmatter": "^5.0.0",
+    "remark-gfm": "^4.0.1",
+    "remark-parse": "^11.0.0",
+    "unified": "^11.0.5",
     "yaml": "catalog:"
   },
   "devDependencies": {
     "@tanstack/intent": "catalog:",
-    "@types/mdast": "catalog:",
+    "@types/mdast": "^4.0.4",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "typescript": "catalog:",

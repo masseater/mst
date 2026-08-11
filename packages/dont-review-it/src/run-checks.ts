@@ -1,3 +1,8 @@
+import { formatLintRuleIndexProblem, lintRuleIndexProblems } from "@mst/lint-rule-authoring";
+
+import { defaultDependencyCatalogChecksConfig } from "./dependency-catalog/config.ts";
+import { formatDependencyCatalogProblem } from "./dependency-catalog/problem.ts";
+import { runDependencyCatalogChecks } from "./dependency-catalog/run-dependency-catalog-checks.ts";
 import { defaultIntentSkillsConfig } from "./intent-skills/config.ts";
 import { shippedSkillsProblems } from "./intent-skills/shipped-skills.ts";
 import { buildCanonicalValuesCatalog } from "./lint/oxlint/lib/canonical-values/builder.ts";
@@ -14,19 +19,35 @@ import { formatRepositoryProblem } from "./problem.ts";
 import { defaultWorkflowChecksConfig } from "./workflows/config.ts";
 import { runWorkflowChecks } from "./workflows/run-workflow-checks.ts";
 
-export const runChecks = (repositoryRoot: string): readonly string[] =>
-  [
-    ...verifyCanonicalValues({ repositoryRoot }).map(formatCanonicalValuesProblem),
-    ...findEquivalentConcepts(buildCanonicalValuesCatalog({ repositoryRoot }).entries).map(
-      formatEquivalentConceptGroup,
-    ),
-    ...duplicatedClustersIn(buildRepositoryBodyIndex({ repositoryRoot })).map(
-      formatDuplicatedCluster,
-    ),
-    ...runWorkflowChecks({ repositoryRoot, config: defaultWorkflowChecksConfig }).map(
-      formatRepositoryProblem,
-    ),
-    ...shippedSkillsProblems({ repositoryRoot, config: defaultIntentSkillsConfig }).map(
-      formatRepositoryProblem,
-    ),
-  ].toSorted();
+export type CheckReport = {
+  readonly problems: readonly string[];
+  readonly warnings: readonly string[];
+};
+
+export const runChecks = (repositoryRoot: string): CheckReport => {
+  const dependencyCatalog = runDependencyCatalogChecks({
+    repositoryRoot,
+    config: defaultDependencyCatalogChecksConfig,
+  });
+
+  return {
+    problems: [
+      ...verifyCanonicalValues({ repositoryRoot }).map(formatCanonicalValuesProblem),
+      ...findEquivalentConcepts(buildCanonicalValuesCatalog({ repositoryRoot }).entries).map(
+        formatEquivalentConceptGroup,
+      ),
+      ...duplicatedClustersIn(buildRepositoryBodyIndex({ repositoryRoot })).map(
+        formatDuplicatedCluster,
+      ),
+      ...runWorkflowChecks({ repositoryRoot, config: defaultWorkflowChecksConfig }).map(
+        formatRepositoryProblem,
+      ),
+      ...lintRuleIndexProblems({ repositoryRoot, write: false }).map(formatLintRuleIndexProblem),
+      ...dependencyCatalog.problems.map(formatDependencyCatalogProblem),
+      ...shippedSkillsProblems({ repositoryRoot, config: defaultIntentSkillsConfig }).map(
+        formatRepositoryProblem,
+      ),
+    ].toSorted(),
+    warnings: dependencyCatalog.warnings.map(formatDependencyCatalogProblem).toSorted(),
+  };
+};

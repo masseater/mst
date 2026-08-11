@@ -55,12 +55,8 @@ const dispatch = async (argv: readonly string[]): Promise<CliResult> => {
 };
 
 export const runAgenticDocuments = async (argv: readonly string[]): Promise<CliResult> => {
-  const [failure, result] = await attemptAsync(() => dispatch(argv));
-  if (result !== null) return result;
-
-  return {
-    exitCode: EXIT_MISUSE,
-    out: "",
-    error: `${failure instanceof Error ? failure.message : String(failure)}\n`,
-  };
+  const [failure, checked] = await attemptAsync<CliResult, Error>(async () => dispatch(argv));
+  return failure === null
+    ? checked
+    : { exitCode: EXIT_MISUSE, out: "", error: `${failure.message}\n` };
 };
