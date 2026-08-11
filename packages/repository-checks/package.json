@@ -1,6 +1,7 @@
 {
   "name": "@mst/repository-checks",
   "version": "0.0.0",
+  "private": true,
   "description": "The shared contract of this repository's checks: how they read files, shape problems, and exit.",
   "license": "MIT",
   "repository": {
@@ -17,9 +18,6 @@
   "exports": {
     ".": "./src/index.ts",
     "./package.json": "./package.json"
-  },
-  "publishConfig": {
-    "access": "public"
   },
   "scripts": {
     "build": "vp pack",

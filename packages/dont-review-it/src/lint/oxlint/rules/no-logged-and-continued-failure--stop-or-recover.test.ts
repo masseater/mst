@@ -116,7 +116,7 @@ describe("dont-review-it/no-logged-and-continued-failure--stop-or-recover", () =
       {
         name: "a write in a catch clause inside a test file carries no exemption",
         code: "try {\n  run();\n} catch (failure) {\n  console.error(failure);\n}",
-        filename: "/repo/packages/utils/src/total.test.ts",
+        filename: "/repo/packages/repository-checks/src/total.test.ts",
         errors: [{ messageId: "loggedAndContinuedFailure" }],
       },
     ],

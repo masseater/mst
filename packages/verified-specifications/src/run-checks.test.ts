@@ -30,14 +30,14 @@ const repositoryWith = async (files: Readonly<Record<string, string>>): Promise<
 const utilsRepository = async (extraFiles: Readonly<Record<string, string>>): Promise<string> =>
   repositoryWith({
     "pnpm-workspace.yaml": WORKSPACE_MANIFEST,
-    "packages/utils/package.json": '{ "name": "@mst/repository-checks" }',
+    "packages/repository-checks/package.json": '{ "name": "@mst/repository-checks" }',
     ...extraFiles,
   });
 
 describe("runChecks", () => {
   test("reports a missing specification list", async () => {
     const repositoryRoot = await utilsRepository({
-      "packages/utils/specs/text-joining.spec.ts": SPEC_SOURCE,
+      "packages/repository-checks/specs/text-joining.spec.ts": SPEC_SOURCE,
     });
     const problems = await runChecks({ repositoryRoot, write: false });
     expect(problems.map((problem) => problem.message)).toStrictEqual([
@@ -47,11 +47,11 @@ describe("runChecks", () => {
 
   test("writes the specification list when asked to", async () => {
     const repositoryRoot = await utilsRepository({
-      "packages/utils/specs/text-joining.spec.ts": SPEC_SOURCE,
+      "packages/repository-checks/specs/text-joining.spec.ts": SPEC_SOURCE,
     });
     await expect(runChecks({ repositoryRoot, write: true })).resolves.toStrictEqual([]);
     const written = await readFile(
-      join(repositoryRoot, "packages/utils/SPECIFICATIONS.md"),
+      join(repositoryRoot, "packages/repository-checks/SPECIFICATIONS.md"),
       "utf-8",
     );
     expect(written).toContain("## 行の結合");
@@ -59,7 +59,7 @@ describe("runChecks", () => {
 
   test("accepts a list that matches the tests", async () => {
     const repositoryRoot = await utilsRepository({
-      "packages/utils/specs/text-joining.spec.ts": SPEC_SOURCE,
+      "packages/repository-checks/specs/text-joining.spec.ts": SPEC_SOURCE,
     });
     await runChecks({ repositoryRoot, write: true });
     await expect(runChecks({ repositoryRoot, write: false })).resolves.toStrictEqual([]);
@@ -67,15 +67,15 @@ describe("runChecks", () => {
 
   test("reports a stale list without touching it", async () => {
     const repositoryRoot = await utilsRepository({
-      "packages/utils/specs/text-joining.spec.ts": SPEC_SOURCE,
-      "packages/utils/SPECIFICATIONS.md": "# stale\n",
+      "packages/repository-checks/specs/text-joining.spec.ts": SPEC_SOURCE,
+      "packages/repository-checks/SPECIFICATIONS.md": "# stale\n",
     });
     const problems = await runChecks({ repositoryRoot, write: false });
     expect(problems.map((problem) => problem.message)).toStrictEqual([
       expect.stringContaining("must not fall behind"),
     ]);
     const untouched = await readFile(
-      join(repositoryRoot, "packages/utils/SPECIFICATIONS.md"),
+      join(repositoryRoot, "packages/repository-checks/SPECIFICATIONS.md"),
       "utf-8",
     );
     expect(untouched).toBe("# stale\n");
@@ -83,7 +83,7 @@ describe("runChecks", () => {
 
   test("reports a list that outlived its tests", async () => {
     const repositoryRoot = await utilsRepository({
-      "packages/utils/SPECIFICATIONS.md": "# orphan\n",
+      "packages/repository-checks/SPECIFICATIONS.md": "# orphan\n",
     });
     const problems = await runChecks({ repositoryRoot, write: false });
     expect(problems.map((problem) => problem.message)).toStrictEqual([
@@ -93,12 +93,12 @@ describe("runChecks", () => {
 
   test("deletes an outlived list when asked to write", async () => {
     const repositoryRoot = await utilsRepository({
-      "packages/utils/SPECIFICATIONS.md": "# orphan\n",
+      "packages/repository-checks/SPECIFICATIONS.md": "# orphan\n",
     });
     await expect(runChecks({ repositoryRoot, write: true })).resolves.toStrictEqual([]);
-    await expect(stat(join(repositoryRoot, "packages/utils/SPECIFICATIONS.md"))).rejects.toThrow(
-      "ENOENT",
-    );
+    await expect(
+      stat(join(repositoryRoot, "packages/repository-checks/SPECIFICATIONS.md")),
+    ).rejects.toThrow("ENOENT");
   });
 
   test("stays silent for a workspace with neither tests nor list", async () => {
@@ -108,7 +108,7 @@ describe("runChecks", () => {
 
   test("reports the structure of a spec file before the state of the list", async () => {
     const repositoryRoot = await utilsRepository({
-      "packages/utils/specs/text-joining.spec.ts": "describe('s', () => {});\n",
+      "packages/repository-checks/specs/text-joining.spec.ts": "describe('s', () => {});\n",
     });
     const problems = await runChecks({ repositoryRoot, write: false });
     expect(problems.map((problem) => problem.message)).toStrictEqual([
@@ -118,8 +118,8 @@ describe("runChecks", () => {
 
   test("reports a tsconfig that narrows the program alongside spec problems", async () => {
     const repositoryRoot = await utilsRepository({
-      "packages/utils/specs/text-joining.spec.ts": SPEC_SOURCE,
-      "packages/utils/tsconfig.json": '{ "include": ["src"] }',
+      "packages/repository-checks/specs/text-joining.spec.ts": SPEC_SOURCE,
+      "packages/repository-checks/tsconfig.json": '{ "include": ["src"] }',
     });
     await runChecks({ repositoryRoot, write: true });
     const problems = await runChecks({ repositoryRoot, write: false });
@@ -145,8 +145,9 @@ describe("runChecks", () => {
 
   test("keeps problems without a line ahead of nothing in their file", async () => {
     const repositoryRoot = await utilsRepository({
-      "packages/utils/specs/text-joining.spec.ts": SPEC_SOURCE,
-      "packages/utils/tsconfig.json": '{ "include": ["src"], "files": ["src/index.ts"] }',
+      "packages/repository-checks/specs/text-joining.spec.ts": SPEC_SOURCE,
+      "packages/repository-checks/tsconfig.json":
+        '{ "include": ["src"], "files": ["src/index.ts"] }',
     });
     await runChecks({ repositoryRoot, write: true });
     const problems = await runChecks({ repositoryRoot, write: false });
@@ -155,7 +156,7 @@ describe("runChecks", () => {
 
   test("orders problems in one file by line", async () => {
     const repositoryRoot = await utilsRepository({
-      "packages/utils/specs/text-joining.spec.ts":
+      "packages/repository-checks/specs/text-joining.spec.ts":
         "describe('s', () => {\n  test('a', () => {});\n  test('b', () => {});\n});\n",
     });
     const problems = await runChecks({ repositoryRoot, write: false });

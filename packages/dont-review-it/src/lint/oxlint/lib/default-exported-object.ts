@@ -1,6 +1,6 @@
 import type { ESTree } from "@oxlint/plugins";
 
-const objectExpressionOf = (
+export const objectExpressionOf = (
   value: ESTree.ExportDefaultDeclaration["declaration"],
 ): ESTree.ObjectExpression | null => {
   if (value.type === "ObjectExpression") return value;
@@ -10,7 +10,13 @@ const objectExpressionOf = (
   return objectExpressionOf(firstArgument);
 };
 
-export const defaultExportedObject = (program: ESTree.Program): ESTree.ObjectExpression | null => {
+export type ProgramStatements = {
+  readonly body: readonly ESTree.Program["body"][number][];
+};
+
+export const defaultExportedObject = (
+  program: ProgramStatements,
+): ESTree.ObjectExpression | null => {
   const exported = program.body.findLast(
     (node): node is ESTree.ExportDefaultDeclaration => node.type === "ExportDefaultDeclaration",
   );

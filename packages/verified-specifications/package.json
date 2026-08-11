@@ -2,6 +2,9 @@
   "name": "@mst/verified-specifications",
   "version": "0.0.0",
   "description": "Specifications extracted from the tests that verify them, so a human can read what the AI believes the code promises.",
+  "keywords": [
+    "tanstack-intent"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -13,6 +16,7 @@
   },
   "files": [
     "dist",
+    "skills",
     "src"
   ],
   "type": "module",
@@ -28,7 +32,8 @@
     "build": "vp pack",
     "dev": "vp pack --watch",
     "test": "vp test",
-    "check": "vp check"
+    "check": "vp check",
+    "check:skills": "intent validate"
   },
   "dependencies": {
     "@mst/lint-rule-authoring": "workspace:*",
@@ -40,6 +45,7 @@
     "yaml": "catalog:"
   },
   "devDependencies": {
+    "@tanstack/intent": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "typescript": "catalog:",

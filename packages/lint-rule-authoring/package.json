@@ -2,6 +2,9 @@
   "name": "@mst/lint-rule-authoring",
   "version": "0.0.0",
   "description": "Materials for authoring lint rules that keep working after they are written.",
+  "keywords": [
+    "tanstack-intent"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -13,6 +16,7 @@
   },
   "files": [
     "dist",
+    "skills",
     "src"
   ],
   "type": "module",
@@ -29,7 +33,8 @@
     "build": "vp pack",
     "dev": "vp pack --watch",
     "test": "vp test",
-    "check": "vp check"
+    "check": "vp check",
+    "check:skills": "intent validate"
   },
   "dependencies": {
     "@mst/repository-checks": "workspace:*",
@@ -45,6 +50,7 @@
     "yaml": "catalog:"
   },
   "devDependencies": {
+    "@tanstack/intent": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "typescript": "catalog:",
