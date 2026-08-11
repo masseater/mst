@@ -1,6 +1,7 @@
 {
   "name": "@mst/utils",
   "version": "0.0.0",
+  "private": true,
   "description": "The neutral home for declarations that more than one package needs and none of them owns.",
   "license": "MIT",
   "repository": {
@@ -17,9 +18,6 @@
   "exports": {
     ".": "./src/index.ts",
     "./package.json": "./package.json"
-  },
-  "publishConfig": {
-    "access": "public"
   },
   "scripts": {
     "build": "vp pack",

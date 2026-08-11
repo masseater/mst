@@ -8,8 +8,8 @@ import {
 } from "../workflow-document.ts";
 
 import type { Pair } from "yaml";
+import type { RepositoryProblem } from "../../problem.ts";
 import type { WorkflowChecksConfig } from "../config.ts";
-import type { WorkflowProblem } from "../problem.ts";
 
 const WHITESPACE_RUN_PATTERN = /\s+/gu;
 
@@ -43,7 +43,7 @@ export const maskedFailures = ({
 }: {
   readonly document: WorkflowDocument;
   readonly config: WorkflowChecksConfig;
-}): readonly WorkflowProblem[] => [
+}): readonly RepositoryProblem[] => [
   ...continuedOnErrorEntries({ document, config }).map((entry) => ({
     file: document.relativePath,
     line: lineOf(document, entry.key),
