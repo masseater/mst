@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
-import { readUnlessMissing } from "@mst/utils";
+import { readUnlessMissing } from "@mst/repository-checks";
 import { parseSync } from "oxc-parser";
 
 import type { ESTree } from "@oxlint/plugins";

@@ -26,7 +26,7 @@ describe("sharedDependencyFindings", () => {
           catalogReferences: [],
           directReferences: [
             { manifestPath: "apps/web/package.json", specifier: "^5.0.0" },
-            { manifestPath: "packages/utils/package.json", specifier: "^5.0.0" },
+            { manifestPath: "packages/repository-checks/package.json", specifier: "^5.0.0" },
           ],
         },
       ],
@@ -36,7 +36,7 @@ describe("sharedDependencyFindings", () => {
     expect(problems.length).toBe(1);
     expect(problems[0]?.file).toBe(DEFINITION_PATH);
     expect(problems[0]?.message).toContain("apps/web/package.json");
-    expect(problems[0]?.message).toContain("packages/utils/package.json");
+    expect(problems[0]?.message).toContain("packages/repository-checks/package.json");
     expect(problems[0]?.message).toContain("^5.0.0");
   });
 
@@ -48,7 +48,7 @@ describe("sharedDependencyFindings", () => {
           catalogReferences: [],
           directReferences: [
             { manifestPath: "apps/web/package.json", specifier: "^5.0.0" },
-            { manifestPath: "packages/utils/package.json", specifier: "^5.5.0" },
+            { manifestPath: "packages/repository-checks/package.json", specifier: "^5.5.0" },
           ],
         },
       ],
@@ -57,7 +57,7 @@ describe("sharedDependencyFindings", () => {
     expect(problems).toStrictEqual([]);
     expect(warnings.length).toBe(1);
     expect(warnings[0]?.message).toContain("apps/web/package.json pins ^5.0.0");
-    expect(warnings[0]?.message).toContain("packages/utils/package.json pins ^5.5.0");
+    expect(warnings[0]?.message).toContain("packages/repository-checks/package.json pins ^5.5.0");
   });
 
   it("leaves a version that only one manifest pins alone", () => {
@@ -83,7 +83,7 @@ describe("sharedDependencyFindings", () => {
           catalogReferences: [],
           directReferences: [
             { manifestPath: "apps/web/package.json", specifier: "^5.0.0" },
-            { manifestPath: "packages/utils/package.json", specifier: "^5.0.0" },
+            { manifestPath: "packages/repository-checks/package.json", specifier: "^5.0.0" },
           ],
         },
       ],

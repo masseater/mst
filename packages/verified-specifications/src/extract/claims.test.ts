@@ -3,7 +3,7 @@ import { describe, expect, test } from "vite-plus/test";
 import { extractClaims } from "./claims.ts";
 
 const extract = (source: string): ReturnType<typeof extractClaims> =>
-  extractClaims({ file: "packages/utils/specs/text-joining.spec.ts", source });
+  extractClaims({ file: "packages/repository-checks/specs/text-joining.spec.ts", source });
 
 const messagesOf = (source: string): readonly string[] =>
   extract(source).problems.map((problem) => problem.message);
@@ -143,7 +143,7 @@ describe("subject", () => {
 
   test("names the file it was given in every problem", () => {
     expect(extract("const nothing = 1;\n").problems.map((problem) => problem.file)).toStrictEqual([
-      "packages/utils/specs/text-joining.spec.ts",
+      "packages/repository-checks/specs/text-joining.spec.ts",
     ]);
   });
 

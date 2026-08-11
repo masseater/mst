@@ -4,7 +4,7 @@ import { parse } from "jsonc-parser";
 
 import { fileTextOrNull } from "../file-text.ts";
 
-import type { RepositoryProblem } from "@mst/utils";
+import type { RepositoryProblem } from "@mst/repository-checks";
 
 const NARROWING_KEYS = ["exclude", "files", "include"];
 

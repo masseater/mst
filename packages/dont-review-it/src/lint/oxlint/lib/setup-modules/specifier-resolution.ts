@@ -1,7 +1,7 @@
 import { realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
-import { readUnlessMissing } from "@mst/utils";
+import { readUnlessMissing } from "@mst/repository-checks";
 
 import { buildExportSpecifierIndex } from "../canonical-values/export-specifier-index.ts";
 import { isDirectory, isFile } from "../canonical-values/source-files.ts";

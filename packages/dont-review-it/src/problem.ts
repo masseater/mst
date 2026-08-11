@@ -1,8 +1,6 @@
-export type RepositoryProblem = {
-  readonly file: string;
-  readonly line: number;
-  readonly message: string;
-};
+import type { RepositoryProblem } from "@mst/repository-checks";
+
+export type { RepositoryProblem } from "@mst/repository-checks";
 
 export const formatRepositoryProblem = ({ file, line, message }: RepositoryProblem): string =>
-  `${file}:${line} ${message}`;
+  line === null ? `${file} ${message}` : `${file}:${line} ${message}`;

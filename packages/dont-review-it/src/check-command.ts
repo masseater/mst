@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 
-import { EXIT_MISUSE, EXIT_PROBLEMS_FOUND, toLines } from "@mst/utils";
+import { EXIT_MISUSE, EXIT_PROBLEMS_FOUND } from "@mst/repository-checks";
 import { defineCommand } from "citty";
 
 import { isDirectory } from "./lint/oxlint/lib/canonical-values/source-files.ts";
@@ -19,7 +19,7 @@ const refuseMisuse = (message: string): void => {
 const reportProblems = (repositoryRoot: string): void => {
   const { problems, warnings } = runChecks(repositoryRoot);
   const lines = [...problems, ...warnings.map((warning) => `warning: ${warning}`)];
-  if (lines.length > 0) process.stdout.write(toLines(lines));
+  if (lines.length > 0) process.stdout.write(lines.map((line) => `${line}\n`).join(""));
   if (problems.length > 0) process.exitCode = EXIT_PROBLEMS_FOUND;
 };
 

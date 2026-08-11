@@ -12,4 +12,14 @@ describe("formatRepositoryProblem", () => {
       }),
     ).toBe(".github/workflows/ci.yml:12 Declare permissions.");
   });
+
+  it("omits the line separator when the problem has no line", () => {
+    expect(
+      formatRepositoryProblem({
+        file: "package.json",
+        line: null,
+        message: "Declare a name.",
+      }),
+    ).toBe("package.json Declare a name.");
+  });
 });

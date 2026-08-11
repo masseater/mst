@@ -9,7 +9,7 @@ import {
 } from "./spawn-forms.ts";
 
 const OWN_FORM = {
-  specifier: "@mst/utils",
+  specifier: "@mst/repository-checks",
   exported: "run",
   position: 1,
   carries: SPAWN_TARGET_NAME,
@@ -33,13 +33,20 @@ describe("declared-replacements/spawn-forms", () => {
       spawnFormsIn({
         options: [
           {
-            spawnForms: [{ specifier: "@mst/utils", exported: "run", carries: SPAWN_TARGET_LINE }],
+            spawnForms: [
+              { specifier: "@mst/repository-checks", exported: "run", carries: SPAWN_TARGET_LINE },
+            ],
           },
         ],
         standing: [],
       }),
     ).toStrictEqual([
-      { specifier: "@mst/utils", exported: "run", position: 0, carries: SPAWN_TARGET_LINE },
+      {
+        specifier: "@mst/repository-checks",
+        exported: "run",
+        position: 0,
+        carries: SPAWN_TARGET_LINE,
+      },
     ]);
   });
 
@@ -55,7 +62,9 @@ describe("declared-replacements/spawn-forms", () => {
   test("an entry written without an exported name is left out", () => {
     expect(
       spawnFormsIn({
-        options: [{ spawnForms: [{ specifier: "@mst/utils", carries: SPAWN_TARGET_NAME }] }],
+        options: [
+          { spawnForms: [{ specifier: "@mst/repository-checks", carries: SPAWN_TARGET_NAME }] },
+        ],
         standing: DEFAULT_SPAWN_FORMS,
       }),
     ).toStrictEqual(DEFAULT_SPAWN_FORMS);
@@ -64,7 +73,13 @@ describe("declared-replacements/spawn-forms", () => {
   test("an entry saying nothing about what its argument carries is left out", () => {
     expect(
       spawnFormsIn({
-        options: [{ spawnForms: [{ specifier: "@mst/utils", exported: "run", carries: "shell" }] }],
+        options: [
+          {
+            spawnForms: [
+              { specifier: "@mst/repository-checks", exported: "run", carries: "shell" },
+            ],
+          },
+        ],
         standing: DEFAULT_SPAWN_FORMS,
       }),
     ).toStrictEqual(DEFAULT_SPAWN_FORMS);

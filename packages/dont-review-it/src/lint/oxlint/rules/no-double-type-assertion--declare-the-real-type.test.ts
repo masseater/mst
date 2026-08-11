@@ -97,7 +97,7 @@ describe("dont-review-it/no-double-type-assertion--declare-the-real-type", () =>
       {
         name: "a stacked assertion in a test file carries no exemption",
         code: "const total = input as Source as number;",
-        filename: "/repo/packages/utils/src/total.test.ts",
+        filename: "/repo/packages/repository-checks/src/total.test.ts",
         errors: [{ messageId: "stackedTypeAssertion" }],
       },
     ],

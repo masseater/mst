@@ -5,9 +5,8 @@ import {
   EXIT_MISUSE,
   EXIT_PROBLEMS_FOUND,
   EXIT_SUCCESS,
-  toLines,
   type CliResult,
-} from "@mst/utils";
+} from "@mst/repository-checks";
 import { attemptAsync } from "es-toolkit";
 
 import { formatSpecificationProblem } from "./problem.ts";
@@ -45,7 +44,7 @@ const dispatch = async (argv: readonly string[]): Promise<CliResult> => {
 
   return {
     exitCode: problems.length === 0 ? EXIT_SUCCESS : EXIT_PROBLEMS_FOUND,
-    out: toLines(problems.map(formatSpecificationProblem)),
+    out: problems.map((problem) => `${formatSpecificationProblem(problem)}\n`).join(""),
     error: "",
   };
 };
