@@ -209,6 +209,24 @@ jobs:
     expect(run.out).toContain(".github/workflows/ci.yml:3");
   });
 
+  test("check fails when a workspace that declares lint rules has no index for them", () => {
+    const root = repositoryWith({
+      "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
+      "packages/example/package.json": JSON.stringify({ lintRules: ["src/rules"] }),
+      "packages/example/src/rules/no-thing--allow-it.ts": `export const rule = {
+  name: "no-thing--allow-it",
+  meta: { docs: { description: "Disallow the thing" }, messages: { report: "No." } },
+  create: () => ({}),
+};
+`,
+    });
+
+    const run = runDontReviewIt(["check", "--repository-root", root]);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.out).toContain("packages/example/docs/lint/index.md");
+  });
+
   test("check stays silent on a workflow definition that keeps every discipline", () => {
     const root = repositoryWith({
       ".github/workflows/ci.yml": `name: CI
