@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -7,9 +7,7 @@ import { describe } from "vite-plus/test";
 
 import { requireRegisteredFile } from "./require-registered-file--restore-it-at-the-registered-path.ts";
 
-const fixtureDir = join(tmpdir(), "dont-review-it-require-registered-file");
-rmSync(fixtureDir, { recursive: true, force: true });
-mkdirSync(fixtureDir, { recursive: true });
+const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-require-registered-file-"));
 
 const MODULE_SOURCE = "export const shipped = true;\n";
 

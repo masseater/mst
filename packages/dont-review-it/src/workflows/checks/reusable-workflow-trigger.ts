@@ -1,8 +1,8 @@
 import { triggerKeyNodeOf, triggerNamesOf } from "../steps.ts";
 import { lineOf, type WorkflowDocument } from "../workflow-document.ts";
 
+import type { RepositoryProblem } from "../../problem.ts";
 import type { WorkflowChecksConfig } from "../config.ts";
-import type { WorkflowProblem } from "../problem.ts";
 
 export const reusableWorkflowTriggers = ({
   document,
@@ -10,7 +10,7 @@ export const reusableWorkflowTriggers = ({
 }: {
   readonly document: WorkflowDocument;
   readonly config: WorkflowChecksConfig;
-}): readonly WorkflowProblem[] => {
+}): readonly RepositoryProblem[] => {
   const declared = triggerNamesOf({ document, config });
   if (!declared.includes(config.reusableTrigger)) return [];
 

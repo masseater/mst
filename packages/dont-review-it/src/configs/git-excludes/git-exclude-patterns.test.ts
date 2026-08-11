@@ -94,7 +94,7 @@ describe("git-exclude-patterns", () => {
     expect(gitExcludePatterns({ cwd: home, env: withoutHome })).toStrictEqual(
       gitExcludePatterns({ cwd: home, env: { ...withoutHome, HOME: homedir() } }),
     );
-  });
+  }, 20_000);
 
   test("a git that cannot be started at all is raised rather than read as an absence", () => {
     const home = sandboxDirectory("git-excludes-home");

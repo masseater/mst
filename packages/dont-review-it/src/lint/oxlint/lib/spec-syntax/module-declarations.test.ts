@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -13,9 +13,7 @@ import {
 
 import type { SpecStatement } from "./subject-expressions.ts";
 
-const fixtureDir = join(tmpdir(), "dont-review-it-module-declarations");
-rmSync(fixtureDir, { recursive: true, force: true });
-mkdirSync(fixtureDir, { recursive: true });
+const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-module-declarations-"));
 
 const writeModule = (name: string, source: string): string => {
   const path = join(fixtureDir, name);

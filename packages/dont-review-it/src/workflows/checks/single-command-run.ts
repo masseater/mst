@@ -1,8 +1,8 @@
 import { entriesNamedInSteps } from "../steps.ts";
 import { lineOf, scalarText, type WorkflowDocument } from "../workflow-document.ts";
 
+import type { RepositoryProblem } from "../../problem.ts";
 import type { WorkflowChecksConfig } from "../config.ts";
-import type { WorkflowProblem } from "../problem.ts";
 
 const CONTINUATION_PATTERN = /\\\n/gu;
 
@@ -33,7 +33,7 @@ export const multiCommandRuns = ({
 }: {
   readonly document: WorkflowDocument;
   readonly config: WorkflowChecksConfig;
-}): readonly WorkflowProblem[] =>
+}): readonly RepositoryProblem[] =>
   entriesNamedInSteps({ document, config, key: config.runKey }).flatMap((entry) => {
     const script = scalarText(entry.value);
     if (script === null || isSingleCommand(script, config)) return [];

@@ -1,8 +1,8 @@
 import { triggersOf } from "../steps.ts";
 import { entriesOf, keyOf, lineOf, valueOf, type WorkflowDocument } from "../workflow-document.ts";
 
+import type { RepositoryProblem } from "../../problem.ts";
 import type { WorkflowChecksConfig } from "../config.ts";
-import type { WorkflowProblem } from "../problem.ts";
 
 export const gatingTriggerFilters = ({
   document,
@@ -10,7 +10,7 @@ export const gatingTriggerFilters = ({
 }: {
   readonly document: WorkflowDocument;
   readonly config: WorkflowChecksConfig;
-}): readonly WorkflowProblem[] => {
+}): readonly RepositoryProblem[] => {
   const triggers = triggersOf({ document, config });
 
   return config.gatingTriggers.flatMap((trigger) =>
