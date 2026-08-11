@@ -31,7 +31,6 @@
     "check": "vp check"
   },
   "dependencies": {
-    "@mst/utils": "workspace:*",
     "proper-lockfile": "4.1.2"
   },
   "devDependencies": {
