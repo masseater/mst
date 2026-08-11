@@ -1,6 +1,7 @@
 import { firstToken } from "@mst/lint-rule-authoring";
 
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { MOCK_FACTORY_EXEMPTION_DIRECTIVE } from "../lib/directive-comments.ts";
 import { isJsdoc } from "../lib/jsdoc-comment.ts";
 
 import type { Comment, ESTree } from "@oxlint/plugins";
@@ -14,6 +15,7 @@ const LINT_DIRECTIVES = new Set([
   "oxlint-disable-line",
   "oxlint-disable-next-line",
   "oxlint-enable",
+  MOCK_FACTORY_EXEMPTION_DIRECTIVE,
 ]);
 
 const COMPILER_DIRECTIVE_PREFIX = "@ts-";

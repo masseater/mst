@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -9,8 +9,7 @@ import { readWorkflowDocuments } from "./workflow-files.ts";
 
 const config = defaultWorkflowChecksConfig;
 
-const fixtureDir = join(tmpdir(), "dont-review-it-workflow-files");
-rmSync(fixtureDir, { recursive: true, force: true });
+const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-workflow-files-"));
 
 const repositoryWith = (name: string, files: Readonly<Record<string, string>>): string => {
   const repositoryRoot = join(fixtureDir, name);
