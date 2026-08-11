@@ -22,9 +22,9 @@ import {
 
 import type { Socket } from "node:net";
 
-export const HEALTH_PATH = "/health";
+const HEALTH_PATH = "/health";
 
-export const WEBHOOK_PATH = "/webhook";
+const WEBHOOK_PATH = "/webhook";
 
 const DRAIN_BUDGET_MS = 1000;
 

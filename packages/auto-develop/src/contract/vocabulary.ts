@@ -1,18 +1,18 @@
-export const MODES = ["author", "reviewer"] as const;
+const MODES = ["author", "reviewer"] as const;
 
 export type Mode = (typeof MODES)[number];
 
 export const isMode = (candidate: unknown): candidate is Mode =>
   (MODES as readonly unknown[]).includes(candidate);
 
-export const REVIEW_STATES = ["changes_requested", "commented", "approved"] as const;
+const REVIEW_STATES = ["changes_requested", "commented", "approved"] as const;
 
 export type ReviewState = (typeof REVIEW_STATES)[number];
 
 export const isReviewState = (candidate: string): candidate is ReviewState =>
   (REVIEW_STATES as readonly string[]).includes(candidate);
 
-export const AUTHOR_WORK_REVIEW_STATES = ["changes_requested"] as const;
+const AUTHOR_WORK_REVIEW_STATES = ["changes_requested"] as const;
 
 export type AuthorWorkReviewState = (typeof AUTHOR_WORK_REVIEW_STATES)[number];
 
@@ -21,7 +21,7 @@ export const isAuthorWorkReviewState = (
 ): candidate is AuthorWorkReviewState =>
   (AUTHOR_WORK_REVIEW_STATES as readonly ReviewState[]).includes(candidate);
 
-export const CHECK_SUITE_CONCLUSIONS = [
+const CHECK_SUITE_CONCLUSIONS = [
   "success",
   "failure",
   "neutral",
@@ -38,7 +38,7 @@ export type CheckSuiteConclusion = (typeof CHECK_SUITE_CONCLUSIONS)[number];
 export const isCheckSuiteConclusion = (candidate: unknown): candidate is CheckSuiteConclusion =>
   (CHECK_SUITE_CONCLUSIONS as readonly unknown[]).includes(candidate);
 
-export const AUTHOR_WORK_CONCLUSIONS = ["failure", "timed_out", "startup_failure"] as const;
+const AUTHOR_WORK_CONCLUSIONS = ["failure", "timed_out", "startup_failure"] as const;
 
 export type AuthorWorkConclusion = (typeof AUTHOR_WORK_CONCLUSIONS)[number];
 

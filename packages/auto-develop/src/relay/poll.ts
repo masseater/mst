@@ -16,7 +16,7 @@ export const readResumableEvents = async (resumption: {
   return resumption.events.readSince(resumption.nowMs - REPLAY_WINDOW_MS);
 };
 
-export const ownedEventsOf = async (selection: {
+const ownedEventsOf = async (selection: {
   readonly scanned: readonly StoredEvent[];
   readonly ownerFilter: OwnerFilter;
   readonly subscriberLogin: string;

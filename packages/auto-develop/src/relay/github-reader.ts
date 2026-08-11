@@ -1,4 +1,4 @@
-export const CHECK_BUCKETS = ["pass", "fail", "pending", "cancel", "skipping"] as const;
+const CHECK_BUCKETS = ["pass", "fail", "pending", "cancel", "skipping"] as const;
 
 export type CheckBucket = (typeof CHECK_BUCKETS)[number];
 

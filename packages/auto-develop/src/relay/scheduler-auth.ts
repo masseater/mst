@@ -3,7 +3,7 @@ import { IdTokenUnavailableError } from "./id-token-unavailable-error.ts";
 import { UnauthenticatedError } from "./unauthenticated-error.ts";
 import { VerifierUnavailableError } from "./verifier-unavailable-error.ts";
 
-export type VerifiedIdToken = {
+type VerifiedIdToken = {
   readonly email: string | undefined;
   readonly emailVerified: boolean;
 };

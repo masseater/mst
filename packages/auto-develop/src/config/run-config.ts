@@ -13,7 +13,3 @@ export const runConfigSchema = z.object({
   ghUser: z.string().min(1).optional(),
   dangerouslySkipPermissions: z.boolean().default(false),
 });
-
-export type RunConfigInput = z.input<typeof runConfigSchema>;
-
-export type RunConfig = z.output<typeof runConfigSchema>;

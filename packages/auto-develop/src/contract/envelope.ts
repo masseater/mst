@@ -1,6 +1,6 @@
 import { asRecord } from "./unknown-record.ts";
 
-export const ENVELOPE_SCHEMA_VERSION = 1;
+const ENVELOPE_SCHEMA_VERSION = 1;
 
 export type EventEnvelope = {
   readonly schema_version: typeof ENVELOPE_SCHEMA_VERSION;
