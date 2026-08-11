@@ -259,14 +259,7 @@ description: 外から入る値・型の主張・定義の所有者・失敗と�
 
 ## 機械が判定できる形
 
-この領域で機械が判定できるのは、書き方の違いが構文の違いとして現れる性質である。`packages/dont-review-it` のルールがこれらを見ており、個々のルールの文書は `packages/dont-review-it/docs/lint/` にある。以下は例であって、この領域を見ているルールの全部ではない。
-
-- [no-twin-declaration--merge-into-one-owner](../../packages/dont-review-it/docs/lint/no-twin-declaration--merge-into-one-owner.md)
-- [no-double-type-assertion--declare-the-real-type](../../packages/dont-review-it/docs/lint/no-double-type-assertion--declare-the-real-type.md)
-- [no-discarded-failure--receive-and-surface-it](../../packages/dont-review-it/docs/lint/no-discarded-failure--receive-and-surface-it.md)
-- [no-logged-and-continued-failure--stop-or-recover](../../packages/dont-review-it/docs/lint/no-logged-and-continued-failure--stop-or-recover.md)
-- [no-local-finite-value-set--use-or-register-canonical-values](../../packages/dont-review-it/docs/lint/no-local-finite-value-set--use-or-register-canonical-values.md)
-- [require-re-export-only-files--move-declaration-to-owning-module](../../packages/dont-review-it/docs/lint/require-re-export-only-files--move-declaration-to-owning-module.md)
+この領域で機械が判定できるのは、書き方の違いが構文の違いとして現れる性質である。同じ本体を持つ宣言、根拠を伴わない型の主張、受け取られずに捨てられた失敗、書き出してから続く失敗、その場に閉じた有限値の語彙、再エクスポート以外を持つ入口が、いずれもその形をしている。どのルールがどれを見ているかは `packages/dont-review-it/docs/lint/` の各文書が持ち、ファイル名がそのままルール名である。
 
 落とせるのは形であって判断ではない。どの型がその場で最も精密かも、名前がその値の綴りを決めた側を含んでいるかも、どの語彙をカタログへ最初に登録するかも、構文を見るルールでは決まらない。
 
