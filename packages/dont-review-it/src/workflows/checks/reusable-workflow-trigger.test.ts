@@ -24,4 +24,20 @@ describe("reusableWorkflowTriggers", () => {
   it("leaves a workflow that is not callable alone", () => {
     expect(problemsFor("on:\n  push:\n")).toStrictEqual([]);
   });
+
+  it("reads the triggers written as a list", () => {
+    expect(problemsFor("on: [workflow_call, push]\n")[0]?.message).toContain("push");
+  });
+
+  it("names the line the triggers were written on when they are a list", () => {
+    expect(problemsFor("name: Part\non: [workflow_call, push]\n")[0]?.line).toBe(2);
+  });
+
+  it("leaves a list that only makes the workflow callable alone", () => {
+    expect(problemsFor("on: [workflow_call]\n")).toStrictEqual([]);
+  });
+
+  it("leaves a single trigger written on its own alone", () => {
+    expect(problemsFor("on: push\n")).toStrictEqual([]);
+  });
 });

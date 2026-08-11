@@ -20,4 +20,16 @@ describe("crossWorkflowChains", () => {
   it("leaves a workflow that starts from a change alone", () => {
     expect(problemsFor("on:\n  push:\n")).toStrictEqual([]);
   });
+
+  it("reads the trigger written in a list", () => {
+    expect(problemsFor("on: [workflow_run]\n").length).toBe(1);
+  });
+
+  it("reads the trigger written on its own", () => {
+    expect(problemsFor("on: workflow_run\n").length).toBe(1);
+  });
+
+  it("leaves a list that names other triggers alone", () => {
+    expect(problemsFor("on: [push, pull_request]\n")).toStrictEqual([]);
+  });
 });
