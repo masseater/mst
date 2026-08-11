@@ -21,6 +21,9 @@ import {
 } from "./lint/oxlint/lib/canonical-values/verify.ts";
 import { duplicatedClustersIn } from "./lint/oxlint/lib/duplicated-bodies/body-index.ts";
 import { buildRepositoryBodyIndex } from "./lint/oxlint/lib/duplicated-bodies/builder.ts";
+import { defaultWorkflowChecksConfig } from "./workflows/config.ts";
+import { formatWorkflowProblem } from "./workflows/problem.ts";
+import { runWorkflowChecks } from "./workflows/run-workflow-checks.ts";
 
 const USAGE = `Usage: dont-review-it <command> [--repository-root <path>]
 
@@ -28,6 +31,7 @@ Commands:
   verify               Report every broken or retired canonical values annotation, and exit non-zero when any is found.
   equivalent-concepts  Report every value set that more than one concept declares.
   duplicated-bodies    Report every body that more than one declaration spells the same way.
+  workflows            Report every workflow definition that narrows its own start, hides a failure, holds logic, or leaves its permissions unstated.
 
 Options:
   --repository-root <path>  Root of the repository to scan. Defaults to the current working directory.
@@ -38,6 +42,8 @@ const VERIFY_COMMAND = "verify";
 const EQUIVALENT_CONCEPTS_COMMAND = "equivalent-concepts";
 
 const DUPLICATED_BODIES_COMMAND = "duplicated-bodies";
+
+const WORKFLOWS_COMMAND = "workflows";
 
 const verified = (repositoryRoot: string): CliResult => {
   const problems = verifyCanonicalValues({ repositoryRoot });
@@ -72,10 +78,20 @@ const duplicatedBodies = (repositoryRoot: string): CliResult => {
   };
 };
 
+const workflows = (repositoryRoot: string): CliResult => {
+  const problems = runWorkflowChecks({ repositoryRoot, config: defaultWorkflowChecksConfig });
+  return {
+    exitCode: problems.length === 0 ? EXIT_SUCCESS : EXIT_PROBLEMS_FOUND,
+    out: toLines(problems.map(formatWorkflowProblem)),
+    error: "",
+  };
+};
+
 const RESULT_BY_COMMAND: Readonly<Record<string, (repositoryRoot: string) => CliResult>> = {
   [VERIFY_COMMAND]: verified,
   [EQUIVALENT_CONCEPTS_COMMAND]: equivalentConcepts,
   [DUPLICATED_BODIES_COMMAND]: duplicatedBodies,
+  [WORKFLOWS_COMMAND]: workflows,
 };
 
 const dispatch = (argv: readonly string[]): CliResult => {

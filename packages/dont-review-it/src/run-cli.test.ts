@@ -179,6 +179,46 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
     });
   });
 
+  test("workflows stays silent and exits zero when every definition keeps the discipline", () => {
+    const root = repositoryWith({
+      ".github/workflows/ci.yml": `name: CI
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  ready:
+    steps:
+      - run: vp run guard
+`,
+    });
+
+    expect(runDontReviewIt(["workflows", "--repository-root", root])).toStrictEqual({
+      exitCode: 0,
+      out: "",
+      error: "",
+    });
+  });
+
+  test("workflows returns the problem as output and exits one", () => {
+    const root = repositoryWith({
+      ".github/workflows/ci.yml": `on:
+  pull_request:
+    paths: [src/**]
+jobs:
+  ready:
+    steps:
+      - run: vp run guard
+`,
+    });
+
+    const run = runDontReviewIt(["workflows", "--repository-root", root]);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.out).toContain(".github/workflows/ci.yml:3");
+    expect(run.error).toBe("");
+  });
+
   test("duplicated-bodies leaves test files out of the scan", () => {
     const root = repositoryWith({
       "src/twice.ts": "export const twice = (value: number): number => value * 2;\n",

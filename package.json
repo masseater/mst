@@ -8,7 +8,7 @@
   },
   "type": "module",
   "scripts": {
-    "guard": "vp check && vp run -r test --coverage && vp run -r build && vp run knip && vp run knip --production && vp exec dont-review-it verify && vp exec dont-review-it duplicated-bodies && vp exec agentic-documents check",
+    "guard": "vp check && vp run -r test --coverage && vp run -r build && vp run knip && vp run knip --production && vp exec dont-review-it verify && vp exec dont-review-it duplicated-bodies && vp exec dont-review-it workflows && vp exec agentic-documents check",
     "guard:fix": "vp check --fix && vp exec agentic-documents check --write",
     "dev": "vp run website#dev",
     "knip": "knip",
