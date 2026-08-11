@@ -33,4 +33,4 @@ description: Machine-enforced answers to the writing questions that would otherw
 lint ルールとして書けない検査は CLI として持つ。マニフェストや複数ファイルをまたぐ突き合わせが該当する。
 
 - IF: 検査が 1 ファイルの構文で完結しない; THEN MUST: lint ルールではなく CLI のサブコマンドとして持つ
-- IF: CLI のサブコマンドを足す; THEN MUST: `vp run ready` の経路に載せる
+- IF: CLI のサブコマンドを足す; THEN MUST: まとめて走らせる入口の経路に載せる
