@@ -16,8 +16,9 @@ import {
 } from "./problem.ts";
 import { recordOf } from "./record-fields.ts";
 import {
-  catalogReferencingNamesIn,
+  catalogReferencingOverridesIn,
   parseWorkspaceDefinition,
+  type OverrideCatalogReference,
   type WorkspaceDefinition,
 } from "./workspace-definition.ts";
 
@@ -44,18 +45,18 @@ const parsedDefinitionOrNull = ({
   return unparsableSource === null ? definition : null;
 };
 
-const rootOverrideNames = ({
+const rootOverrideReferences = ({
   manifests,
   config,
 }: {
   readonly manifests: readonly WorkspaceManifest[];
   readonly config: DependencyCatalogChecksConfig;
-}): readonly string[] => {
+}): readonly OverrideCatalogReference[] => {
   const rootManifest = manifests.find(
     (candidate) => candidate.relativePath === config.manifestFileName,
   );
   const settings = recordOf(recordOf(rootManifest?.manifest)[config.rootManifestSettingsKey]);
-  return catalogReferencingNamesIn({ overrides: settings[config.overridesKey], config });
+  return catalogReferencingOverridesIn({ overrides: settings[config.overridesKey], config });
 };
 
 const findingsIn = ({
@@ -84,16 +85,16 @@ const findingsIn = ({
     ),
     config,
   });
-  const overriddenNames = [
-    ...definition.catalogReferencingOverrideNames,
-    ...rootOverrideNames({ manifests, config }),
+  const overrideReferences = [
+    ...definition.catalogReferencingOverrides,
+    ...rootOverrideReferences({ manifests, config }),
   ];
 
   const singleUse = singleUseCatalogEntryFindings({
     catalogEntries: definition.catalogEntries,
     definitionPath,
     usages,
-    overriddenNames,
+    overrideReferences,
   });
   const singleUseEntries = singleUse.map((finding) => finding.entry);
   const bypassed = bypassedCatalogFindings({

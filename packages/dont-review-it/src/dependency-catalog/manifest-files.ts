@@ -1,5 +1,6 @@
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
+import { normalize } from "node:path/posix";
 
 import { uniq } from "es-toolkit";
 
@@ -47,12 +48,14 @@ export const readWorkspaceManifests = ({
   readonly packagePatterns: readonly string[];
   readonly config: DependencyCatalogChecksConfig;
 }): readonly WorkspaceManifest[] => {
-  const manifestPaths = [
-    config.manifestFileName,
-    ...uniq(packagePatterns.flatMap((pattern) => directoriesMatching({ repositoryRoot, pattern })))
-      .toSorted()
-      .map((directory) => `${directory}/${config.manifestFileName}`),
-  ];
+  const workspaceManifestPaths = uniq(
+    packagePatterns
+      .flatMap((pattern) => directoriesMatching({ repositoryRoot, pattern }))
+      .map((directory) => normalize(`${directory}/${config.manifestFileName}`)),
+  )
+    .toSorted()
+    .filter((relativePath) => relativePath !== config.manifestFileName);
+  const manifestPaths = [config.manifestFileName, ...workspaceManifestPaths];
 
   return manifestPaths.flatMap((relativePath) => {
     const manifest = readJsonFile(join(repositoryRoot, relativePath));

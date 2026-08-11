@@ -10,33 +10,45 @@ export type CatalogEntry = {
   readonly version: string;
 };
 
+export type OverrideCatalogReference = {
+  readonly catalogName: string;
+  readonly dependencyName: string;
+};
+
 export type WorkspaceDefinition = {
   readonly packagePatterns: readonly string[];
   readonly catalogEntries: readonly CatalogEntry[];
-  readonly catalogReferencingOverrideNames: readonly string[];
+  readonly catalogReferencingOverrides: readonly OverrideCatalogReference[];
 };
 
 export const DEFAULT_CATALOG_NAME = "";
 
+const OVERRIDE_SELECTOR_DELIMITER_PATTERN = /[^ |@]>/u;
+
 const overrideTargetName = (overrideKey: string): string => {
-  const selectorStart = overrideKey.lastIndexOf(">") + 1;
-  const trimmedSelector = overrideKey.slice(selectorStart).trim();
+  const delimiterIndex = overrideKey.search(OVERRIDE_SELECTOR_DELIMITER_PATTERN);
+  const targetSelector =
+    delimiterIndex === -1 ? overrideKey : overrideKey.slice(delimiterIndex + 2);
+  const trimmedSelector = targetSelector.trim();
   const versionSeparatorIndex = trimmedSelector.indexOf("@", 1);
   return versionSeparatorIndex === -1
     ? trimmedSelector
     : trimmedSelector.slice(0, versionSeparatorIndex);
 };
 
-export const catalogReferencingNamesIn = ({
+export const catalogReferencingOverridesIn = ({
   overrides,
   config,
 }: {
   readonly overrides: unknown;
   readonly config: DependencyCatalogChecksConfig;
-}): readonly string[] =>
+}): readonly OverrideCatalogReference[] =>
   stringEntriesOf(overrides)
     .filter(([, specifier]) => specifier.startsWith(config.catalogProtocol))
-    .map(([overrideKey]) => overrideTargetName(overrideKey));
+    .map(([overrideKey, specifier]) => ({
+      catalogName: specifier.slice(config.catalogProtocol.length),
+      dependencyName: overrideTargetName(overrideKey),
+    }));
 
 export const parseWorkspaceDefinition = ({
   source,
@@ -67,7 +79,7 @@ export const parseWorkspaceDefinition = ({
           })),
       ),
     ],
-    catalogReferencingOverrideNames: catalogReferencingNamesIn({
+    catalogReferencingOverrides: catalogReferencingOverridesIn({
       overrides: definition[config.overridesKey],
       config,
     }),

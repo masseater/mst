@@ -3,7 +3,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { singleUseCatalogEntryFindings } from "./single-use-catalog-entry.ts";
 
 import type { DependencyUsage } from "../dependency-usage.ts";
-import type { CatalogEntry } from "../workspace-definition.ts";
+import type { CatalogEntry, OverrideCatalogReference } from "../workspace-definition.ts";
 
 const DEFINITION_PATH = "pnpm-workspace.yaml";
 
@@ -15,16 +15,16 @@ const REACT_ENTRY: CatalogEntry = {
 
 const findingsFor = ({
   usages,
-  overriddenNames = [],
+  overrideReferences = [],
 }: {
   readonly usages: readonly DependencyUsage[];
-  readonly overriddenNames?: readonly string[];
+  readonly overrideReferences?: readonly OverrideCatalogReference[];
 }) =>
   singleUseCatalogEntryFindings({
     catalogEntries: [REACT_ENTRY],
     definitionPath: DEFINITION_PATH,
     usages,
-    overriddenNames,
+    overrideReferences,
   });
 
 describe("singleUseCatalogEntryFindings", () => {
@@ -87,10 +87,25 @@ describe("singleUseCatalogEntryFindings", () => {
           directReferences: [],
         },
       ],
-      overriddenNames: ["react"],
+      overrideReferences: [{ catalogName: "", dependencyName: "react" }],
     });
 
     expect(findings).toStrictEqual([]);
+  });
+
+  it("reports an entry whose name an override references from another catalog", () => {
+    const findings = findingsFor({
+      usages: [
+        {
+          dependencyName: "react",
+          catalogReferences: [{ manifestPath: "apps/web/package.json", catalogName: "" }],
+          directReferences: [],
+        },
+      ],
+      overrideReferences: [{ catalogName: "legacy", dependencyName: "react" }],
+    });
+
+    expect(findings.length).toBe(1);
   });
 
   it("leaves an entry alone when a second manifest also references it", () => {

@@ -2,7 +2,7 @@ import { uniq } from "es-toolkit";
 
 import type { DependencyUsage } from "../dependency-usage.ts";
 import type { DependencyCatalogProblem } from "../problem.ts";
-import type { CatalogEntry } from "../workspace-definition.ts";
+import type { CatalogEntry, OverrideCatalogReference } from "../workspace-definition.ts";
 
 const manifestsUsingEntry = ({
   entry,
@@ -29,15 +29,20 @@ export const singleUseCatalogEntryFindings = ({
   catalogEntries,
   definitionPath,
   usages,
-  overriddenNames,
+  overrideReferences,
 }: {
   readonly catalogEntries: readonly CatalogEntry[];
   readonly definitionPath: string;
   readonly usages: readonly DependencyUsage[];
-  readonly overriddenNames: readonly string[];
+  readonly overrideReferences: readonly OverrideCatalogReference[];
 }): readonly SingleUseCatalogEntryFinding[] =>
   catalogEntries.flatMap((entry) => {
-    if (overriddenNames.includes(entry.dependencyName)) return [];
+    const overridden = overrideReferences.some(
+      (reference) =>
+        reference.dependencyName === entry.dependencyName &&
+        reference.catalogName === entry.catalogName,
+    );
+    if (overridden) return [];
 
     const usage = usages.find((candidate) => candidate.dependencyName === entry.dependencyName);
     if (usage === undefined) return [];

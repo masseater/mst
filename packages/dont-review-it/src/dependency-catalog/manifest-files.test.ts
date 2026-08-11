@@ -111,6 +111,24 @@ describe("readWorkspaceManifests", () => {
     ]);
   });
 
+  it("counts the root manifest once when a pattern names the root itself", () => {
+    const repositoryRoot = repositoryWith({
+      "package.json": `{"name": "root"}`,
+      "packages/left/package.json": `{"name": "left"}`,
+    });
+
+    const manifests = readWorkspaceManifests({
+      repositoryRoot,
+      packagePatterns: [".", "packages/*"],
+      config,
+    });
+
+    expect(manifests.map((workspaceManifest) => workspaceManifest.relativePath)).toStrictEqual([
+      "package.json",
+      "packages/left/package.json",
+    ]);
+  });
+
   it("skips a package directory that carries no manifest", () => {
     const repositoryRoot = repositoryWith({
       "packages/empty/.gitkeep": "",

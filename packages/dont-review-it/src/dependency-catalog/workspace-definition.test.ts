@@ -24,7 +24,7 @@ describe("parseWorkspaceDefinition", () => {
     expect(definitionFor("42\n")).toStrictEqual({
       packagePatterns: [],
       catalogEntries: [],
-      catalogReferencingOverrideNames: [],
+      catalogReferencingOverrides: [],
     });
   });
 
@@ -47,13 +47,25 @@ describe("parseWorkspaceDefinition", () => {
   it("collects the override targets that point back into the catalog", () => {
     const definition = definitionFor('overrides:\n  vite: "catalog:"\n  esbuild: ^0.25.0\n');
 
-    expect(definition.catalogReferencingOverrideNames).toStrictEqual(["vite"]);
+    expect(definition.catalogReferencingOverrides).toStrictEqual([
+      { catalogName: "", dependencyName: "vite" },
+    ]);
+  });
+
+  it("keeps the name of the catalog an override references", () => {
+    const definition = definitionFor('overrides:\n  vite: "catalog:legacy"\n');
+
+    expect(definition.catalogReferencingOverrides).toStrictEqual([
+      { catalogName: "legacy", dependencyName: "vite" },
+    ]);
   });
 });
 
 describe("parseWorkspaceDefinition override targets", () => {
   const overrideNamesFor = (overrideKey: string) =>
-    definitionFor(`overrides:\n  "${overrideKey}": "catalog:"\n`).catalogReferencingOverrideNames;
+    definitionFor(`overrides:\n  "${overrideKey}": "catalog:"\n`).catalogReferencingOverrides.map(
+      (reference) => reference.dependencyName,
+    );
 
   it("keeps a scoped name whole", () => {
     expect(overrideNamesFor("@scope/vite")).toStrictEqual(["@scope/vite"]);
@@ -67,7 +79,15 @@ describe("parseWorkspaceDefinition override targets", () => {
     expect(overrideNamesFor("@scope/vite@^6.0.0")).toStrictEqual(["@scope/vite"]);
   });
 
-  it("reads only the last selector of a nested override", () => {
-    expect(overrideNamesFor("plugin@1 > vite@^6.0.0")).toStrictEqual(["vite"]);
+  it("reads the child of a parent-child selector as the target", () => {
+    expect(overrideNamesFor("plugin@1>vite@^6.0.0")).toStrictEqual(["vite"]);
+  });
+
+  it("keeps a range whose operator spells > inside the version qualifier", () => {
+    expect(overrideNamesFor("vite@>=6.0.0")).toStrictEqual(["vite"]);
+  });
+
+  it("reads a spaced > as part of the version range the way pnpm does", () => {
+    expect(overrideNamesFor("plugin@1 > vite@^6.0.0")).toStrictEqual(["plugin"]);
   });
 });
