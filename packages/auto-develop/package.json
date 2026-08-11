@@ -30,7 +30,8 @@
     "check": "vp check"
   },
   "dependencies": {
-    "@mst/utils": "workspace:*"
+    "@mst/utils": "workspace:*",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "catalog:",
