@@ -6,6 +6,7 @@ import { forbidNumberedSiblingFile } from "./lint/oxlint/rules/forbid-numbered-s
 import { forbidOversizedFile } from "./lint/oxlint/rules/forbid-oversized-file--split-by-responsibility.ts";
 import { noAmbiguousVariableName } from "./lint/oxlint/rules/no-ambiguous-variable-name--rename-to-concrete-noun.ts";
 import { noArrayMutation } from "./lint/oxlint/rules/no-array-mutation--derive-new-array.ts";
+import { noCittyParentRun } from "./lint/oxlint/rules/no-citty-parent-run--move-run-into-a-subcommand.ts";
 import { noDefaultExport } from "./lint/oxlint/rules/no-default-export--use-named-export.ts";
 import { noDetachedRationale } from "./lint/oxlint/rules/no-detached-rationale--comment-at-explained-line.ts";
 import { noDetachedTestFile } from "./lint/oxlint/rules/no-detached-test-file--move-beside-source.ts";
@@ -13,6 +14,7 @@ import { noDiscardedFailure } from "./lint/oxlint/rules/no-discarded-failure--re
 import { noDoubleTypeAssertion } from "./lint/oxlint/rules/no-double-type-assertion--declare-the-real-type.ts";
 import { createNoDuplicatedBody } from "./lint/oxlint/rules/no-duplicated-body--import-the-existing-declaration.ts";
 import { noExplanatoryComment } from "./lint/oxlint/rules/no-explanatory-comment--delete-or-move-to-commit-message.ts";
+import { noHandmadeStandardIoDouble } from "./lint/oxlint/rules/no-handmade-standard-io-double--use-standard-io-test.ts";
 import { noHardcodedEndpoint } from "./lint/oxlint/rules/no-hardcoded-endpoint--read-from-configuration.ts";
 import { noHardcodedProviderId } from "./lint/oxlint/rules/no-hardcoded-provider-id--read-from-configuration.ts";
 import { noIdentityWrapper } from "./lint/oxlint/rules/no-identity-wrapper--call-the-target-directly.ts";
@@ -31,6 +33,7 @@ import { noUnorderedImport } from "./lint/oxlint/rules/no-unordered-import--grou
 import { createNoUnusedStyleClass } from "./lint/oxlint/rules/no-unused-style-class--delete-or-reference-it.ts";
 import { noUnwrappedToolchainConfig } from "./lint/oxlint/rules/no-unwrapped-toolchain-config--wrap-with-git-excludes.ts";
 import { requireReExportOnlyFiles } from "./lint/oxlint/rules/require-re-export-only-files--move-declaration-to-owning-module.ts";
+import { requireStandardIoSnapshot } from "./lint/oxlint/rules/require-standard-io-snapshot--pin-both-streams.ts";
 
 import type { Plugin } from "@oxlint/plugins";
 
@@ -56,6 +59,7 @@ const plugin: Plugin = {
     [forbidOversizedFile.name]: forbidOversizedFile,
     [noAmbiguousVariableName.name]: noAmbiguousVariableName,
     [noArrayMutation.name]: noArrayMutation,
+    [noCittyParentRun.name]: noCittyParentRun,
     [noDefaultExport.name]: noDefaultExport,
     [noDetachedRationale.name]: noDetachedRationale,
     [noDetachedTestFile.name]: noDetachedTestFile,
@@ -63,6 +67,7 @@ const plugin: Plugin = {
     [noDoubleTypeAssertion.name]: noDoubleTypeAssertion,
     [noDuplicatedBody.name]: noDuplicatedBody,
     [noExplanatoryComment.name]: noExplanatoryComment,
+    [noHandmadeStandardIoDouble.name]: noHandmadeStandardIoDouble,
     [noHardcodedEndpoint.name]: noHardcodedEndpoint,
     [noHardcodedProviderId.name]: noHardcodedProviderId,
     [noIdentityWrapper.name]: noIdentityWrapper,
@@ -81,6 +86,7 @@ const plugin: Plugin = {
     [noUnusedStyleClass.name]: noUnusedStyleClass,
     [noUnwrappedToolchainConfig.name]: noUnwrappedToolchainConfig,
     [requireReExportOnlyFiles.name]: requireReExportOnlyFiles,
+    [requireStandardIoSnapshot.name]: requireStandardIoSnapshot,
   },
 };
 

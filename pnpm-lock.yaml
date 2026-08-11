@@ -373,6 +373,9 @@ importers:
       '@oxlint/plugins':
         specifier: 'catalog:'
         version: 1.73.0
+      citty:
+        specifier: 0.2.2
+        version: 0.2.2
       es-toolkit:
         specifier: 'catalog:'
         version: 1.50.0
@@ -1707,6 +1710,9 @@ packages:
 
   character-entities@2.0.2:
     resolution: {integrity: sha512-shx7oQ0Awen/BRIdkjkvz54PnEEI/EjwXDSIZp86/KKdbafHh1Df/RYGBhn4hbe2+uKC9FnT5UCEdyPz3ai9hQ==}
+
+  citty@0.2.2:
+    resolution: {integrity: sha512-+6vJA3L98yv+IdfKGZHBNiGW5KHn22e/JwID0Strsz8h4S/csAu/OuICwxrg44k5MRiZHWIo8XXuJgQTriRP4w==}
 
   convert-source-map@2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
@@ -3113,6 +3119,8 @@ snapshots:
   chai@6.2.2: {}
 
   character-entities@2.0.2: {}
+
+  citty@0.2.2: {}
 
   convert-source-map@2.0.0: {}
 
