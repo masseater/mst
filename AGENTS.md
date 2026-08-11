@@ -30,6 +30,7 @@ mst は、リポジトリ運用の仕組みを再利用可能な単位として�
     - warn にするかは人間が決める
 - IF: 守りたい不変条件に対してルールを用意する; THEN
   - MUST: 同じ不変条件を守る公式ルール（oxlint の組み込みと同梱プラグイン）を先に探す
+  - MUST: 組み込みのルール、同梱プラグインのルール、自前のルールの順に検討する
   - PROHIBIT: 公式ルールで守れる不変条件を自前ルールとして書く
 - IF: 公式ルールの報告文を読んでも、何を直せばよいかが決まらない; THEN
   - MAY: その不変条件だけ自前ルールとして書く
@@ -52,9 +53,7 @@ mst は、リポジトリ運用の仕組みを再利用可能な単位として�
   - MUST: 対象ソースと同じディレクトリに `<ソース名>.test.ts` として置く
   - PROHIBIT: `tests/` `test/` `__tests__/` `spec/` を作る
   - PROHIBIT: `.spec.ts` を使う
-- IF: テストの実行経路を決める; THEN
-  - MUST: CI で実行する
-  - PROHIBIT: pre-push に含める
+- IF: テストの実行経路を決める; THEN MUST: main に入るすべての経路が通るまとまりに含める
 - IF: `package.json` の依存や `devEngines` を変更した; THEN MUST: コミット前に `vp install --frozen-lockfile` が通ることを確認する
 - IF: `.github/workflows/ci.yml` の `voidzero-dev/setup-vp` を書く; THEN
   - MUST: commit SHA で固定する

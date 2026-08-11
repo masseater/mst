@@ -144,6 +144,4 @@ description: 指摘を 2 つの問いに掛けて扱いを 1 つに決め、修�
 
 書かれた時点の綴りで判別が付くものは lint が拾い、[no-explanatory-comment--delete-or-move-to-commit-message](../../packages/dont-review-it/docs/lint/no-explanatory-comment--delete-or-move-to-commit-message.md) と [no-detached-rationale--comment-at-explained-line](../../packages/dont-review-it/docs/lint/no-detached-rationale--comment-at-explained-line.md) がその形をしている。残りは人が見る側にあり、統合後の木で効果を失った変更も、テストの不在も、探索が完了したかどうかも、有効に見えて 1 件も見ていない検査（[0018. 公開面を実際に使われている分だけにし、機械に見張らせる](../engineering-decision-logs/0018-narrow-the-export-surface-to-what-is-used.md)）もそこに入る。
 
-- PROHIBIT: 報告が出ていないことを根拠に、その扱いに当たらないと判定する
-
-検査が動いているときに人が重ねて見るかどうかの扱いは [中核原則](principles.md) が持つ。
+検査が動いているときに人が重ねて見るかどうかの扱いと、報告が出ていないことをその扱いに当たらない根拠にしない扱いは [中核原則](principles.md) が持つ。

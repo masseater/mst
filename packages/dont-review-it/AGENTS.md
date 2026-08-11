@@ -18,9 +18,8 @@ description: Machine-enforced answers to the writing questions that would otherw
     - 報告を受けた側がどれを選ぶかで迷い、迷いをレビューに戻すことになる
 - IF: 検出できない回避策がある; THEN MUST: 文書の禁止事項として名指しする
   - 検出できないことは許していることを意味しない。この差を文書で埋める
-- IF: 既存の公開ルールが同じことを見ている; THEN
-  - MUST: そちらを設定で有効にする
-  - PROHIBIT: 同じ検出を自前で書く
+
+同じ不変条件を守る公式のルールを先に探すこと、どの順に検討するか、自前で書いてよい条件と書いたあとの後始末は [AGENTS.md](../../AGENTS.md) が持つ。
 
 ## 文書
 
