@@ -1,0 +1,29 @@
+import { dirname, resolve } from "node:path";
+
+import { readJsonFile } from "../canonical-values/read-json-file.ts";
+import { listRepositoryFiles } from "../canonical-values/source-files.ts";
+import { declaredDependenciesIn } from "./declared-dependencies.ts";
+import { workspaceDirectoryOf, type WorkspaceDependencies } from "./shared-dependency-index.ts";
+
+const scannedWorkspaces = (repositoryRoot: string): readonly WorkspaceDependencies[] =>
+  listRepositoryFiles(repositoryRoot).manifests.map((manifest) => ({
+    relativeDir: workspaceDirectoryOf({
+      repositoryRoot,
+      packageDirectory: dirname(manifest.absolutePath),
+    }),
+    dependencies: declaredDependenciesIn(readJsonFile(manifest.absolutePath)),
+  }));
+
+const workspacesByRepositoryRoot = new Map<string, readonly WorkspaceDependencies[]>();
+
+export const loadWorkspaceDependencies = (options: {
+  readonly repositoryRoot: string;
+}): readonly WorkspaceDependencies[] => {
+  const root = resolve(options.repositoryRoot);
+  const memoized = workspacesByRepositoryRoot.get(root);
+  if (memoized !== undefined) return memoized;
+
+  const scanned = scannedWorkspaces(root);
+  workspacesByRepositoryRoot.set(root, scanned);
+  return scanned;
+};

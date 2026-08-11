@@ -1,7 +1,7 @@
 import { lineAtOffset } from "@mst/utils";
 import { parseSync } from "oxc-parser";
 
-import { NODE_TYPE_FIELD } from "../ast-node.ts";
+import { isAstFields, NODE_TYPE_FIELD, type AstFields } from "../ast-node.ts";
 
 export type BodyDeclaration = {
   readonly name: string;
@@ -14,19 +14,14 @@ const DEFAULT_SOURCE_NAME = "source.tsx";
 
 const POSITION_FIELDS: ReadonlySet<string> = new Set(["start", "end", "range", "loc"]);
 
-type Fields = Readonly<Record<string, unknown>>;
-
-const isNode = (value: unknown): value is Fields =>
-  value !== null && typeof value === "object" && !Array.isArray(value);
-
-const namedFieldsOf = (node: Fields): readonly (readonly [string, unknown])[] =>
+const namedFieldsOf = (node: AstFields): readonly (readonly [string, unknown])[] =>
   Object.entries(node).filter(([field]) => !POSITION_FIELDS.has(field));
 
 const jsonTextOf: (value: unknown) => string = JSON.stringify;
 
 const structureOf = (value: unknown): string => {
   if (Array.isArray(value)) return `[${value.map(structureOf).join(",")}]`;
-  if (!isNode(value)) return jsonTextOf(value);
+  if (!isAstFields(value)) return jsonTextOf(value);
   return `{${namedFieldsOf(value)
     .map(([field, nested]) => `${field}:${structureOf(nested)}`)
     .join(",")}}`;
@@ -35,7 +30,7 @@ const structureOf = (value: unknown): string => {
 const nodeCountOf = (value: unknown): number => {
   if (Array.isArray(value))
     return value.reduce<number>((total, item) => total + nodeCountOf(item), 0);
-  if (!isNode(value)) return 0;
+  if (!isAstFields(value)) return 0;
   const own = typeof value[NODE_TYPE_FIELD] === "string" ? 1 : 0;
   return namedFieldsOf(value).reduce((total, [, nested]) => total + nodeCountOf(nested), own);
 };
@@ -53,20 +48,20 @@ const declarationFrom = ({
   nodeCount: nodeCountOf(described.body),
 });
 
-const bindingsOf = (statement: Fields): readonly Fields[] =>
-  (statement.declarations as readonly unknown[]).filter(isNode);
+const bindingsOf = (statement: AstFields): readonly AstFields[] =>
+  (statement.declarations as readonly unknown[]).filter(isAstFields);
 
-const namedBindingIn = (binding: Fields): string | null => {
-  const id = binding.id as Fields;
+const namedBindingIn = (binding: AstFields): string | null => {
+  const id = binding.id as AstFields;
   return id[NODE_TYPE_FIELD] === "Identifier" ? String(id.name) : null;
 };
 
-const bindingBodyOf = (binding: Fields): unknown => ({
-  typeAnnotation: (binding.id as Fields).typeAnnotation,
+const bindingBodyOf = (binding: AstFields): unknown => ({
+  typeAnnotation: (binding.id as AstFields).typeAnnotation,
   init: binding.init,
 });
 
-const functionBodyOf = (statement: Fields): unknown => ({
+const functionBodyOf = (statement: AstFields): unknown => ({
   typeParameters: statement.typeParameters,
   params: statement.params,
   returnType: statement.returnType,
@@ -75,28 +70,28 @@ const functionBodyOf = (statement: Fields): unknown => ({
   generator: statement.generator,
 });
 
-const typeAliasBodyOf = (statement: Fields): unknown => ({
+const typeAliasBodyOf = (statement: AstFields): unknown => ({
   typeParameters: statement.typeParameters,
   typeAnnotation: statement.typeAnnotation,
 });
 
-const interfaceBodyOf = (statement: Fields): unknown => ({
+const interfaceBodyOf = (statement: AstFields): unknown => ({
   typeParameters: statement.typeParameters,
   extends: statement.extends,
   body: statement.body,
 });
 
-const BODY_BY_STATEMENT_KIND: Readonly<Record<string, (statement: Fields) => unknown>> = {
+const BODY_BY_STATEMENT_KIND: Readonly<Record<string, (statement: AstFields) => unknown>> = {
   FunctionDeclaration: functionBodyOf,
   TSInterfaceDeclaration: interfaceBodyOf,
   TSTypeAliasDeclaration: typeAliasBodyOf,
 };
 
-const declaredNameOf = (statement: Fields): string => String((statement.id as Fields).name);
+const declaredNameOf = (statement: AstFields): string => String((statement.id as AstFields).name);
 
-const startOf = (statement: Fields): number => Number(statement.start);
+const startOf = (statement: AstFields): number => Number(statement.start);
 
-const bindingDeclarationsIn = (source: string, statement: Fields): readonly BodyDeclaration[] =>
+const bindingDeclarationsIn = (source: string, statement: AstFields): readonly BodyDeclaration[] =>
   bindingsOf(statement).flatMap((binding) => {
     const name = namedBindingIn(binding);
     if (name === null) return [];
@@ -108,7 +103,7 @@ const bindingDeclarationsIn = (source: string, statement: Fields): readonly Body
     ];
   });
 
-const namedDeclarationsIn = (source: string, statement: Fields): readonly BodyDeclaration[] => {
+const namedDeclarationsIn = (source: string, statement: AstFields): readonly BodyDeclaration[] => {
   const bodyOf = BODY_BY_STATEMENT_KIND[String(statement[NODE_TYPE_FIELD])];
   if (bodyOf === undefined) return [];
 
@@ -125,7 +120,7 @@ const declarationsFromStatement = (
   source: string,
   statement: unknown,
 ): readonly BodyDeclaration[] => {
-  if (!isNode(statement)) return [];
+  if (!isAstFields(statement)) return [];
 
   const kind = statement[NODE_TYPE_FIELD];
   if (kind === "ExportNamedDeclaration") {

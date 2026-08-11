@@ -9,9 +9,9 @@ export type TsconfigExtends = {
   readonly specifiers: readonly string[];
 };
 
-const TSCONFIG_FILE_NAME = "tsconfig.json";
+export const TSCONFIG_FILE_NAME = "tsconfig.json";
 
-const parseJsonc: (text: string) => unknown = parse;
+export const parseJsonc: (text: string) => unknown = parse;
 
 const specifiersOf = (config: unknown): readonly string[] => {
   if (typeof config !== "object" || config === null) return [];
