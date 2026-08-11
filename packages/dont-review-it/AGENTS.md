@@ -30,7 +30,26 @@ description: Machine-enforced answers to the writing questions that would otherw
 
 ## 検証コマンド
 
-lint ルールとして書けない検査は CLI として持つ。マニフェストや複数ファイルをまたぐ突き合わせが該当する。
+lint ルールとして書けない検査は CLI として持つ。マニフェストや複数ファイルをまたぐ突き合わせと、lint のツールチェーンが解釈できない形式が該当する。
 
 - IF: 検査が 1 ファイルの構文で完結しない; THEN MUST: lint ルールではなく CLI のサブコマンドとして持つ
+- IF: 検査対象の形式を lint のツールチェーンが解釈できない; THEN MUST: 同じく CLI のサブコマンドとして持つ
 - IF: CLI のサブコマンドを足す; THEN MUST: まとめて走らせる入口の経路に載せる
+
+## ワークフロー定義の検査
+
+`workflows` サブコマンドが `.github/workflows/` の定義を読む。守っているのは [強制の機構](../../docs/guidelines/enforcement.md) と [秘密と権限](../../docs/guidelines/secrets-and-permissions.md) に既に書かれている規範で、この検査はその強制側にあたる。
+
+- 読めない定義が残っていない
+- ゲートとして要求されうる実行単位が、起動の条件で自分を絞り込んでいない
+- 呼び出される部品が、自分を起動するトリガを持っていない
+- 実行単位が、別の実行単位の結果を受け取って起動していない
+- ジョブが、宣言されていない既定の権限で走っていない
+- 実行ブロックが、1 つのコマンド呼び出しを超えていない
+- 失敗を成功に読み替える記述が置かれていない
+
+- IF: 上流に同じ形式を対象にする既製の検査を入れる; THEN
+  - MUST: 既製の側が覆う不変条件をこの検査から外す
+  - PROHIBIT: 同じ違反を 2 つの経路から報告する
+- IF: 構文・式の注入・ランナー名・アクションの入力名を検査したくなった; THEN MUST: この検査に足さず、その層を持つ既製の検査を導入する判断から始める
+  - この検査が持たない範囲であることは [EDR 0025](../../docs/engineering-decision-logs/0025-check-workflow-definitions-with-our-own-policy-layer.md) が決めている
