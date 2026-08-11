@@ -2,6 +2,7 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { readUnlessMissing } from "@mst/repository-checks";
+import { attempt } from "es-toolkit";
 import { parse } from "yaml";
 
 import { textOrNull } from "./read-text.ts";
@@ -41,7 +42,12 @@ const declaredWorkspaceDirs = (repositoryRoot: string): readonly string[] => {
   const definitionText = textOrNull(join(repositoryRoot, WORKSPACE_DEFINITION_FILE));
   if (definitionText === null) return [];
 
-  const definition: unknown = parse(definitionText);
+  const [unparsableDefinition, definition] = attempt((): unknown => parse(definitionText));
+  if (unparsableDefinition !== null) {
+    throw new Error(`${WORKSPACE_DEFINITION_FILE} exists but does not parse as YAML`, {
+      cause: unparsableDefinition,
+    });
+  }
   if (typeof definition !== "object" || definition === null) return [];
 
   const patterns = (definition as Record<string, unknown>)[WORKSPACE_PATTERNS_FIELD];

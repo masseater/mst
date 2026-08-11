@@ -7,6 +7,10 @@ export type DependencyCatalogFindings = {
   readonly warnings: readonly DependencyCatalogProblem[];
 };
 
+export type DependencyCatalogReport = DependencyCatalogFindings & {
+  readonly definitionUnreadable: boolean;
+};
+
 export const NO_DEPENDENCY_CATALOG_FINDINGS: DependencyCatalogFindings = {
   problems: [],
   warnings: [],

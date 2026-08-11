@@ -36,6 +36,14 @@ describe("lintRuleWorkspacesIn", () => {
     expect(lintRuleWorkspacesIn(repositoryWith({ "pnpm-workspace.yaml": "" }))).toStrictEqual([]);
   });
 
+  test("a workspace definition that does not parse is raised instead of being skipped", () => {
+    const root = repositoryWith({ "pnpm-workspace.yaml": "packages: [packages/*\n" });
+
+    expect(() => lintRuleWorkspacesIn(root)).toThrow(
+      "pnpm-workspace.yaml exists but does not parse as YAML",
+    );
+  });
+
   test("a definition whose packages field is not a list declares nothing", () => {
     expect(
       lintRuleWorkspacesIn(repositoryWith({ "pnpm-workspace.yaml": "packages: 7\n" })),
