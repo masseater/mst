@@ -2,10 +2,9 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { EXIT_PROBLEMS_FOUND } from "@mst/utils";
 import { describe, expect, it, onTestFinished } from "vite-plus/test";
 
-import { runDontReviewIt } from "../src/run-cli.ts";
+import { runChecks } from "../src/run-checks.ts";
 
 const WORKFLOW_PATH = ".github/workflows/ci.yml";
 
@@ -25,9 +24,9 @@ const repositoryWith = async (files: Readonly<Record<string, string>>): Promise<
 
 const reportedForWorkflow = async (workflowSource: string): Promise<string> => {
   const repositoryRoot = await repositoryWith({ [WORKFLOW_PATH]: workflowSource });
-  const finished = runDontReviewIt(["check", "--repository-root", repositoryRoot]);
-  expect(finished.exitCode).toBe(EXIT_PROBLEMS_FOUND);
-  return finished.out;
+  const { problems } = runChecks(repositoryRoot);
+  expect(problems.length).toBeGreaterThan(0);
+  return problems.join("\n");
 };
 
 describe("ワークフロー定義の検査", () => {
@@ -144,7 +143,6 @@ jobs:
       - run: vp run guard
 `,
     });
-    const finished = runDontReviewIt(["check", "--repository-root", repositoryRoot]);
-    expect(finished).toStrictEqual({ exitCode: 0, out: "", error: "" });
+    expect(runChecks(repositoryRoot)).toStrictEqual({ problems: [], warnings: [] });
   });
 });

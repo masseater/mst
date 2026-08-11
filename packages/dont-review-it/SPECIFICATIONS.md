@@ -16,7 +16,7 @@
 
 [`specs/check-entry.spec.ts`](specs/check-entry.spec.ts)
 
-- check 以外の命令に使い方を返して失敗する
+- check 以外の命令を名指しで拒否する
 - 存在しない場所を検査対象に取らない
 
 ## 依存宣言の検査

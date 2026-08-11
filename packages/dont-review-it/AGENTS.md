@@ -27,6 +27,10 @@ description: Machine-enforced answers to the writing questions that would otherw
 
 説明に載せる例をどこから作るかは [文書](../../docs/guidelines/documents.md) が持つ。良い例と悪い例を対で置かないことは [規範の書き方](../../docs/normative-notation.md) が持つ。
 
+## CLI 向け config
+
+bin を公開するパッケージ向けに、全部入り config の厳密な上位集合 `oxlintCli` を公開する。何を足しているか、lint で検出できない CLI の規範は [CLI の作り方](docs/cli.md) が持つ。上位集合の形にした判断は [EDR 0032](../../docs/engineering-decision-logs/0032-ship-the-cli-config-as-a-strict-superset.md) にある。
+
 ## 検証コマンド
 
 lint ルールとして書けない検査は CLI として持つ。マニフェストや複数ファイルをまたぐ突き合わせと、lint のツールチェーンが解釈できない形式が該当する。

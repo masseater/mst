@@ -1,7 +1,19 @@
-import { oxlint as dontReviewItOxlint, withGitExcludes } from "@mst/dont-review-it";
+import {
+  oxlint as dontReviewItOxlint,
+  oxlintCli as dontReviewItOxlintCli,
+  withGitExcludes,
+} from "@mst/dont-review-it";
 import { oxlint as lintRuleAuthoringOxlint } from "@mst/lint-rule-authoring";
 import { oxlint as verifiedSpecificationsOxlint } from "@mst/verified-specifications";
 import { defineConfig } from "vite-plus";
+
+const dontReviewItBaseRuleIds = new Set(Object.keys(dontReviewItOxlint.rules ?? {}));
+
+const dontReviewItCliOnlyRules = Object.fromEntries(
+  Object.entries(dontReviewItOxlintCli.rules ?? {}).filter(
+    ([ruleId]) => !dontReviewItBaseRuleIds.has(ruleId),
+  ),
+);
 
 export default defineConfig({
   staged: {
@@ -42,6 +54,10 @@ export default defineConfig({
       ],
     },
     overrides: [
+      {
+        files: ["packages/dont-review-it/**"],
+        rules: dontReviewItCliOnlyRules,
+      },
       {
         files: ["**/{test,tests,__tests__,spec,__specs__}/**"],
         rules: {

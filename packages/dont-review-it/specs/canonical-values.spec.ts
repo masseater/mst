@@ -2,10 +2,9 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { EXIT_PROBLEMS_FOUND, EXIT_SUCCESS } from "@mst/utils";
 import { describe, expect, it, onTestFinished } from "vite-plus/test";
 
-import { runDontReviewIt } from "../src/run-cli.ts";
+import { runChecks } from "../src/run-checks.ts";
 
 const repositoryWith = async (files: Readonly<Record<string, string>>): Promise<string> => {
   const repositoryRoot = await mkdtemp(join(tmpdir(), "dont-review-it-canonical-"));
@@ -31,10 +30,9 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
 export const STATUSES = ["draft", "published"] as const;
 `,
     });
-    const finished = runDontReviewIt(["check", "--repository-root", repositoryRoot]);
-    expect(finished.exitCode).toBe(EXIT_PROBLEMS_FOUND);
-    expect(finished.out).toContain("A concept must be declared in one place");
-    expect(finished.out).toContain("src/order.ts");
+    const reported = runChecks(repositoryRoot).problems.join("\n");
+    expect(reported).toContain("A concept must be declared in one place");
+    expect(reported).toContain("src/order.ts");
   });
 
   it("同じ値の集合を別々の概念が宣言していたら、両方の概念を挙げて報告する", async () => {
@@ -46,10 +44,9 @@ export const ARTICLE_STATUSES = ["published", "draft"] as const;
 export const ORDER_STATUSES = ["draft", "published"] as const;
 `,
     });
-    const finished = runDontReviewIt(["check", "--repository-root", repositoryRoot]);
-    expect(finished.exitCode).toBe(EXIT_PROBLEMS_FOUND);
-    expect(finished.out).toContain("article.status");
-    expect(finished.out).toContain("order.status");
+    const reported = runChecks(repositoryRoot).problems.join("\n");
+    expect(reported).toContain("article.status");
+    expect(reported).toContain("order.status");
   });
 
   it("概念を名指ししない注釈を報告する", async () => {
@@ -58,9 +55,8 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
 export const ORDER_STATUSES = ["draft"] as const;
 `,
     });
-    const finished = runDontReviewIt(["check", "--repository-root", repositoryRoot]);
-    expect(finished.exitCode).toBe(EXIT_PROBLEMS_FOUND);
-    expect(finished.out).toContain("must name the concept it declares");
+    const reported = runChecks(repositoryRoot).problems.join("\n");
+    expect(reported).toContain("must name the concept it declares");
   });
 
   it("退役した注釈タグが残っていたら報告する", async () => {
@@ -69,9 +65,8 @@ export const ORDER_STATUSES = ["draft"] as const;
 export const ORDER_STATUSES = ["draft"] as const;
 `,
     });
-    const finished = runDontReviewIt(["check", "--repository-root", repositoryRoot]);
-    expect(finished.exitCode).toBe(EXIT_PROBLEMS_FOUND);
-    expect(finished.out).toContain("@canonical-values-exempt");
+    const reported = runChecks(repositoryRoot).problems.join("\n");
+    expect(reported).toContain("@canonical-values-exempt");
   });
 
   it("テストファイルが繰り返す値の集合を二重宣言と数えない", async () => {
@@ -83,7 +78,6 @@ export const ORDER_STATUSES = ["draft"] as const;
 const FIXTURE_STATUSES = ["draft"] as const;
 `,
     });
-    const finished = runDontReviewIt(["check", "--repository-root", repositoryRoot]);
-    expect(finished).toStrictEqual({ exitCode: EXIT_SUCCESS, out: "", error: "" });
+    expect(runChecks(repositoryRoot)).toStrictEqual({ problems: [], warnings: [] });
   });
 });
