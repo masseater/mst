@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -7,9 +7,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { governingSurfacesOf } from "./declared-surfaces.ts";
 
-const fixtureDir = join(tmpdir(), "dont-review-it-declared-surfaces");
-rmSync(fixtureDir, { recursive: true, force: true });
-mkdirSync(fixtureDir, { recursive: true });
+const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-declared-surfaces-"));
 
 const MODULE_SOURCE = "export const shipped = true;\n";
 

@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -21,9 +21,7 @@ const DECLARATION = "export const total = 1;";
 
 const configFor = (lint: string): string => `export default { lint: ${lint} };`;
 
-const fixtureDir = join(tmpdir(), "dont-review-it-require-spec-lint-coverage");
-rmSync(fixtureDir, { recursive: true, force: true });
-mkdirSync(fixtureDir, { recursive: true });
+const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-require-spec-lint-coverage-"));
 
 const writeFixture = (name: string, source: string): string => {
   const path = join(fixtureDir, name);

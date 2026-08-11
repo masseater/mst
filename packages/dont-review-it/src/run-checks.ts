@@ -3,6 +3,8 @@ import { formatLintRuleIndexProblem, lintRuleIndexProblems } from "@mst/lint-rul
 import { defaultDependencyCatalogChecksConfig } from "./dependency-catalog/config.ts";
 import { formatDependencyCatalogProblem } from "./dependency-catalog/problem.ts";
 import { runDependencyCatalogChecks } from "./dependency-catalog/run-dependency-catalog-checks.ts";
+import { defaultIntentSkillsConfig } from "./intent-skills/config.ts";
+import { shippedSkillsProblems } from "./intent-skills/shipped-skills.ts";
 import { buildCanonicalValuesCatalog } from "./lint/oxlint/lib/canonical-values/builder.ts";
 import {
   findEquivalentConcepts,
@@ -13,8 +15,8 @@ import {
 import { duplicatedClustersIn } from "./lint/oxlint/lib/duplicated-bodies/body-index.ts";
 import { buildRepositoryBodyIndex } from "./lint/oxlint/lib/duplicated-bodies/builder.ts";
 import { formatDuplicatedCluster } from "./lint/oxlint/lib/duplicated-bodies/site-report.ts";
+import { formatRepositoryProblem } from "./problem.ts";
 import { defaultWorkflowChecksConfig } from "./workflows/config.ts";
-import { formatWorkflowProblem } from "./workflows/problem.ts";
 import { runWorkflowChecks } from "./workflows/run-workflow-checks.ts";
 
 export type CheckReport = {
@@ -41,10 +43,13 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
         formatDuplicatedCluster,
       ),
       ...runWorkflowChecks({ repositoryRoot, config: defaultWorkflowChecksConfig }).map(
-        formatWorkflowProblem,
+        formatRepositoryProblem,
       ),
       ...ruleIndexProblems,
       ...dependencyCatalog.problems.map(formatDependencyCatalogProblem),
+      ...shippedSkillsProblems({ repositoryRoot, config: defaultIntentSkillsConfig }).map(
+        formatRepositoryProblem,
+      ),
     ].toSorted(),
     warnings: dependencyCatalog.warnings.map(formatDependencyCatalogProblem).toSorted(),
   };

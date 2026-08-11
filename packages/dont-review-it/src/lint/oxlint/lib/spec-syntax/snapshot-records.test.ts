@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -11,8 +11,7 @@ import {
   recordLineCountOf,
 } from "./snapshot-records.ts";
 
-const fixtureDir = join(tmpdir(), "dont-review-it-snapshot-records");
-rmSync(fixtureDir, { recursive: true, force: true });
+const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-snapshot-records-"));
 
 const writeRecordFixture = (name: string, records: string): string => {
   const directory = join(fixtureDir, name);

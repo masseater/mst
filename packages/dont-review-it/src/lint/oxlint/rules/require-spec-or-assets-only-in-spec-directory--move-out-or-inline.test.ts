@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -7,9 +7,9 @@ import { describe } from "vite-plus/test";
 
 import { requireSpecOrAssetsOnlyInSpecDirectory } from "./require-spec-or-assets-only-in-spec-directory--move-out-or-inline.ts";
 
-const fixtureDir = join(tmpdir(), "dont-review-it-require-spec-or-assets-only-in-spec-directory");
-rmSync(fixtureDir, { recursive: true, force: true });
-mkdirSync(fixtureDir, { recursive: true });
+const fixtureDir = mkdtempSync(
+  join(tmpdir(), "dont-review-it-require-spec-or-assets-only-in-spec-directory-"),
+);
 
 const MODULE_SOURCE = "export const held = true;\n";
 
