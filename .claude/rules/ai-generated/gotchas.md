@@ -100,6 +100,11 @@ pack: { exports: { customExports: { './tsconfig/*': './tsconfig/*' } } }
 - IF: `vitest/consistent-test-filename` の `pattern` を変更する; THEN MUST: 変更後に違反ファイルを実際に置いて error になることを確認する
   - このルールは条件に合わなければ黙って何も言わない。設定ミスは「lint が緑」として現れるため、正のケースだけでは検出できない
 
+さらに、このルールが見るのは oxlint が `*.test.*` / `*.spec.*` という名前からテストファイルと見なしたものだけである。`text.checks.ts` のような任意の名前に置かれたテストは、`test` を呼んでいても一切報告されない。このルールで守れるのは「テストらしい名前どうしの選別」であって、「テストを別の名前のファイルへ置く」ことは防げない。
+
+- IF: `vitest/consistent-test-filename` に「テストはこの名前だけ」を守らせたい; THEN PROHIBIT: テストらしくない名前のファイルの検出を期待する
+  - 検証に使うと無反応が「合格」に見える。実測するときは `*.test.*` / `*.spec.*` の名前の中で違反させる
+
 ## `vp lint --print-config` は jsPlugin のルールを解決しない
 
 - 症状: 自前ルールを base preset に追加した前後で `vp lint --print-config` を取って diff したところ、差分が 1 行も出なかった。ルールは実際に有効になっていて、違反ファイルを置けば error が出る

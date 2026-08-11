@@ -1,27 +1,24 @@
 {
-  "name": "@mst/dont-review-it",
+  "name": "@mst/verified-specifications",
   "version": "0.0.0",
-  "description": "Machine-enforced answers to the writing questions that would otherwise be raised in review.",
+  "description": "Specifications extracted from the tests that verify them, so a human can read what the AI believes the code promises.",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/masseater/mst.git",
-    "directory": "packages/dont-review-it"
+    "directory": "packages/verified-specifications"
   },
   "bin": {
-    "dont-review-it": "./src/cli.ts"
+    "verified-specifications": "./src/cli.ts"
   },
   "files": [
     "dist",
-    "src",
-    "tsconfig"
+    "src"
   ],
   "type": "module",
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
-    "./plugin": "./src/plugin.ts",
-    "./tsconfig/*": "./tsconfig/*",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -36,22 +33,17 @@
   "dependencies": {
     "@mst/lint-rule-authoring": "workspace:*",
     "@mst/utils": "workspace:*",
-    "@oxlint/plugins": "catalog:",
     "es-toolkit": "catalog:",
     "jsonc-parser": "catalog:",
     "oxc-parser": "catalog:",
-    "oxfmt": "0.61.0",
     "oxlint": "catalog:",
-    "typescript": "catalog:",
     "yaml": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
-  },
-  "lintRules": [
-    "src/lint/oxlint/rules"
-  ]
+  }
 }

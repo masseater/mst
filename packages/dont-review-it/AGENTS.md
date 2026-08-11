@@ -67,7 +67,7 @@ CLI が持つコマンドは `check` の 1 つで、そこが全部の検査を�
 
 ## 依存宣言の検査
 
-`check` が `pnpm-workspace.yaml` と、そこに宣言されたワークスペースの `package.json` も読む。ワークスペース定義が無いリポジトリでは何も検査しない。守っているのは「catalog は複数のワークスペースが共有するバージョンだけを持つ」という規範で、判断は [EDR 0027](../../docs/engineering-decision-logs/0027-keep-the-catalog-for-shared-versions-only.md) にある。
+`check` が `pnpm-workspace.yaml` と、そこに宣言されたワークスペースの `package.json` も読む。ワークスペース定義が無いリポジトリでは何も検査しない。守っているのは「catalog は複数のワークスペースが共有するバージョンだけを持つ」という規範で、判断は [EDR 0028](../../docs/engineering-decision-logs/0028-keep-the-catalog-for-shared-versions-only.md) にある。
 
 - 読めないワークスペース定義が残っていない
 - 1 つのマニフェストしか使わない catalog エントリが残っていない。overrides が `catalog:` で参照するエントリは除く
