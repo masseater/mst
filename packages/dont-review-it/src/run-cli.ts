@@ -5,12 +5,12 @@ import {
   EXIT_MISUSE,
   EXIT_PROBLEMS_FOUND,
   EXIT_SUCCESS,
+  failureMessage,
   toLines,
   type CliResult,
 } from "@mst/utils";
 import { attempt } from "es-toolkit";
 
-import { failureMessage } from "./failure-message.ts";
 import { isDirectory } from "./lint/oxlint/lib/canonical-values/source-files.ts";
 import { runChecks } from "./run-checks.ts";
 

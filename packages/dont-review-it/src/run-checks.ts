@@ -1,3 +1,5 @@
+import { formatLintRuleIndexProblem, lintRuleIndexProblems } from "@mst/lint-rule-authoring";
+
 import { buildCanonicalValuesCatalog } from "./lint/oxlint/lib/canonical-values/builder.ts";
 import {
   findEquivalentConcepts,
@@ -24,4 +26,5 @@ export const runChecks = (repositoryRoot: string): readonly string[] =>
     ...runWorkflowChecks({ repositoryRoot, config: defaultWorkflowChecksConfig }).map(
       formatWorkflowProblem,
     ),
+    ...lintRuleIndexProblems({ repositoryRoot, write: false }).map(formatLintRuleIndexProblem),
   ].toSorted();

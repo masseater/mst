@@ -8,6 +8,9 @@
     "url": "git+https://github.com/masseater/mst.git",
     "directory": "packages/lint-rule-authoring"
   },
+  "bin": {
+    "lint-rule-authoring": "./src/cli.ts"
+  },
   "files": [
     "dist",
     "src"
@@ -29,6 +32,7 @@
     "check": "vp check"
   },
   "dependencies": {
+    "@mst/utils": "workspace:*",
     "@opentelemetry/api": "catalog:",
     "@opentelemetry/core": "catalog:",
     "@opentelemetry/exporter-metrics-otlp-http": "catalog:",
@@ -36,7 +40,9 @@
     "@opentelemetry/sdk-metrics": "catalog:",
     "@oxlint/plugins": "catalog:",
     "es-toolkit": "catalog:",
-    "oxlint": "catalog:"
+    "oxc-parser": "catalog:",
+    "oxlint": "catalog:",
+    "yaml": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

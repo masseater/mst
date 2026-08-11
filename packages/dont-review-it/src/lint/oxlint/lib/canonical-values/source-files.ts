@@ -1,9 +1,9 @@
 import { readdirSync, readFileSync, statSync, type Stats } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 
+import { readUnlessMissing } from "@mst/utils";
 import { sortBy } from "es-toolkit";
 
-import { readUnlessMissing } from "../path-failure.ts";
 import { toPosixPath } from "../posix-path.ts";
 import { MANIFEST_FILE_NAME } from "./package-manifest.ts";
 
