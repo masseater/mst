@@ -23,7 +23,7 @@ vi.mock(import("node:child_process"), async (importOriginal) => {
   return { ...real, execFileSync };
 });
 
-describe("git-exclude-patterns", () => {
+describe("git-exclude-patterns", { timeout: 30_000 }, () => {
   const sandboxDirectory = (name: string): string => mkdtempSync(join(tmpdir(), `mst-${name}-`));
 
   const isolatedEnvironment = (home: string): NodeJS.ProcessEnv => ({
