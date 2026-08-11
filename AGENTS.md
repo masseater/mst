@@ -37,9 +37,13 @@ mst は、リポジトリ運用の仕組みを再利用可能な単位として�
     - 判定の精度ではなく報告文で決める。精度は上流が上げるが、報告文は上流が上げない
   - MUST: 書いたら、同じ不変条件を見ている公式ルールを off にする
     - 権威が 2 つあると同じ違反が 2 回報告され、どちらを黙らせるかを書き手が選べてしまう
-- IF: 依存のバージョンを宣言する; THEN
-  - MUST: `pnpm-workspace.yaml` の catalog に集約する
-  - MUST: 各ワークスペースから `catalog:` で参照する
+- IF: 複数のワークスペースが同じ依存を使う; THEN
+  - MUST: バージョンを `pnpm-workspace.yaml` の catalog に集約し、各ワークスペースから `catalog:` で参照する
+- IF: 依存を使うワークスペースが 1 つだけ; THEN
+  - MUST: そのワークスペースの `package.json` にバージョンを直接書く
+  - PROHIBIT: catalog に載せる
+    - 共有していないバージョンが catalog に混ざると、どの依存を揃えるべきかが catalog から読めなくなる
+  - 例外は overrides が `catalog:` で参照する依存（`vite` など）で、使用箇所の数に関わらず catalog に置く
 - IF: Node のバージョンを固定する; THEN
   - MUST: `package.json` の `devEngines.runtime` に置き、`onFail` を `error` にする
   - PROHIBIT: `.node-version` や `.tool-versions` を置く
