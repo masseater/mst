@@ -31,13 +31,22 @@ description: Machine-enforced answers to the writing questions that would otherw
 
 lint ルールとして書けない検査は CLI として持つ。マニフェストや複数ファイルをまたぐ突き合わせと、lint のツールチェーンが解釈できない形式が該当する。
 
-- IF: 検査が 1 ファイルの構文で完結しない; THEN MUST: lint ルールではなく CLI のサブコマンドとして持つ
-- IF: 検査対象の形式を lint のツールチェーンが解釈できない; THEN MUST: 同じく CLI のサブコマンドとして持つ
-- IF: CLI のサブコマンドを足す; THEN MUST: まとめて走らせる入口の経路に載せる
+CLI が持つコマンドは `check` の 1 つで、そこが全部の検査を走らせる。1 件でも見つかれば非ゼロで終わる。
+
+- IF: 検査が 1 ファイルの構文で完結しない; THEN MUST: lint ルールではなく CLI の検査として持つ
+- IF: 検査対象の形式を lint のツールチェーンが解釈できない; THEN MUST: 同じく CLI の検査として持つ
+- IF: 検査を足す; THEN
+  - MUST: `check` が走らせる一覧に載せる
+  - PROHIBIT: 2 つ目のサブコマンドを作る
+    - 呼ぶ側が入口を選べると、載せ忘れた検査が「あるのに走らない」状態で残る
+- IF: 検査が違反を見つけた; THEN
+  - MUST: 非ゼロで終わらせる
+  - PROHIBIT: 報告だけ出してゼロで終わる
+    - 報告が出るのに通る検査は、ゲートに名前があるだけの状態になる
 
 ## ワークフロー定義の検査
 
-`workflows` サブコマンドが `.github/workflows/` の定義を読む。守っているのは [強制の機構](../../docs/guidelines/enforcement.md) と [秘密と権限](../../docs/guidelines/secrets-and-permissions.md) に既に書かれている規範で、この検査はその強制側にあたる。
+`check` が `.github/workflows/` の定義も読む。守っているのは [強制の機構](../../docs/guidelines/enforcement.md) と [秘密と権限](../../docs/guidelines/secrets-and-permissions.md) に既に書かれている規範で、この検査はその強制側にあたる。
 
 - 読めない定義が残っていない
 - ゲートとして要求されうる実行単位が、起動の条件で自分を絞り込んでいない

@@ -11,88 +11,20 @@ import {
 import { attempt } from "es-toolkit";
 
 import { failureMessage } from "./failure-message.ts";
-import { buildCanonicalValuesCatalog } from "./lint/oxlint/lib/canonical-values/builder.ts";
 import { isDirectory } from "./lint/oxlint/lib/canonical-values/source-files.ts";
-import {
-  findEquivalentConcepts,
-  formatCanonicalValuesProblem,
-  formatEquivalentConceptGroup,
-  verifyCanonicalValues,
-} from "./lint/oxlint/lib/canonical-values/verify.ts";
-import { duplicatedClustersIn } from "./lint/oxlint/lib/duplicated-bodies/body-index.ts";
-import { buildRepositoryBodyIndex } from "./lint/oxlint/lib/duplicated-bodies/builder.ts";
-import { defaultWorkflowChecksConfig } from "./workflows/config.ts";
-import { formatWorkflowProblem } from "./workflows/problem.ts";
-import { runWorkflowChecks } from "./workflows/run-workflow-checks.ts";
+import { runChecks } from "./run-checks.ts";
 
-const USAGE = `Usage: dont-review-it <command> [--repository-root <path>]
+const USAGE = `Usage: dont-review-it check [--repository-root <path>]
 
-Commands:
-  verify               Report every broken or retired canonical values annotation, and exit non-zero when any is found.
-  equivalent-concepts  Report every value set that more than one concept declares.
-  duplicated-bodies    Report every body that more than one declaration spells the same way.
-  workflows            Report every workflow definition that narrows its own start, hides a failure, holds logic, or leaves its permissions unstated.
+Reports every canonical values annotation that is broken or retired, every value set
+that more than one concept declares, every body that more than one declaration spells
+the same way, and every workflow definition that narrows its own start, hides a
+failure, holds logic, or leaves its permissions unstated. Exits non-zero when any of
+them is found.
 
 Options:
   --repository-root <path>  Root of the repository to scan. Defaults to the current working directory.
 `;
-
-const VERIFY_COMMAND = "verify";
-
-const EQUIVALENT_CONCEPTS_COMMAND = "equivalent-concepts";
-
-const DUPLICATED_BODIES_COMMAND = "duplicated-bodies";
-
-const WORKFLOWS_COMMAND = "workflows";
-
-const verified = (repositoryRoot: string): CliResult => {
-  const problems = verifyCanonicalValues({ repositoryRoot });
-  return {
-    exitCode: problems.length === 0 ? EXIT_SUCCESS : EXIT_PROBLEMS_FOUND,
-    out: toLines(problems.map((problem) => formatCanonicalValuesProblem(problem))),
-    error: "",
-  };
-};
-
-const equivalentConcepts = (repositoryRoot: string): CliResult => {
-  const catalog = buildCanonicalValuesCatalog({ repositoryRoot });
-  return {
-    exitCode: EXIT_SUCCESS,
-    out: toLines(
-      findEquivalentConcepts(catalog.entries).map((group) => formatEquivalentConceptGroup(group)),
-    ),
-    error: "",
-  };
-};
-
-const duplicatedBodies = (repositoryRoot: string): CliResult => {
-  const clusters = duplicatedClustersIn(buildRepositoryBodyIndex({ repositoryRoot }));
-  return {
-    exitCode: EXIT_SUCCESS,
-    out: toLines(
-      clusters.map((sites) =>
-        sites.map((site) => `${site.relativePath}:${site.line} ${site.name}`).join(" == "),
-      ),
-    ),
-    error: "",
-  };
-};
-
-const workflows = (repositoryRoot: string): CliResult => {
-  const problems = runWorkflowChecks({ repositoryRoot, config: defaultWorkflowChecksConfig });
-  return {
-    exitCode: problems.length === 0 ? EXIT_SUCCESS : EXIT_PROBLEMS_FOUND,
-    out: toLines(problems.map(formatWorkflowProblem)),
-    error: "",
-  };
-};
-
-const RESULT_BY_COMMAND: Readonly<Record<string, (repositoryRoot: string) => CliResult>> = {
-  [VERIFY_COMMAND]: verified,
-  [EQUIVALENT_CONCEPTS_COMMAND]: equivalentConcepts,
-  [DUPLICATED_BODIES_COMMAND]: duplicatedBodies,
-  [WORKFLOWS_COMMAND]: workflows,
-};
 
 const dispatch = (argv: readonly string[]): CliResult => {
   const parsed = parseArgs({
@@ -101,8 +33,7 @@ const dispatch = (argv: readonly string[]): CliResult => {
     options: { "repository-root": { type: "string" } },
   });
   const [command] = parsed.positionals;
-  const resultFor = command === undefined ? undefined : RESULT_BY_COMMAND[command];
-  if (resultFor === undefined) {
+  if (command !== "check") {
     return { exitCode: EXIT_MISUSE, out: "", error: USAGE };
   }
 
@@ -115,7 +46,12 @@ const dispatch = (argv: readonly string[]): CliResult => {
     };
   }
 
-  return resultFor(repositoryRoot);
+  const problems = runChecks(repositoryRoot);
+  return {
+    exitCode: problems.length === 0 ? EXIT_SUCCESS : EXIT_PROBLEMS_FOUND,
+    out: toLines(problems),
+    error: "",
+  };
 };
 
 export const runDontReviewIt = (argv: readonly string[]): CliResult => {
