@@ -27,6 +27,8 @@ type ResolvedTarget = {
   readonly sourceFiles: readonly string[];
 };
 
+type PackageManifest = Readonly<Record<string, unknown>> & { readonly name: string };
+
 const MODULE_VALUE_EXPORT_NAME = "<module>";
 
 const realPathIsInside = (parent: string, candidate: string): boolean => {
@@ -228,14 +230,25 @@ const packageSurfaces = ({
 const packageSpecifier = (packageName: string, subpath: string): string =>
   subpath === "." ? packageName : `${packageName}/${subpath.replace(/^\.\//u, "")}`;
 
+const packageManifest = (packageDirectory: string): PackageManifest | null => {
+  const manifest = readJsonFile(join(packageDirectory, MANIFEST_FILE_NAME));
+  if (
+    manifest === null ||
+    typeof manifest !== "object" ||
+    !("name" in manifest) ||
+    typeof manifest.name !== "string" ||
+    manifest.name.length === 0
+  ) {
+    return null;
+  }
+  return manifest as PackageManifest;
+};
+
 export const publicPackageEntries = (
   packageDirectory: string,
 ): readonly { readonly sourceFile: string; readonly specifier: string }[] => {
-  const manifest = readJsonFile(join(packageDirectory, MANIFEST_FILE_NAME));
-  if (manifest === null || typeof manifest !== "object") return [];
-  if (!("name" in manifest) || typeof manifest.name !== "string" || manifest.name.length === 0) {
-    return [];
-  }
+  const manifest = packageManifest(packageDirectory);
+  if (manifest === null) return [];
   const packageName = manifest.name;
 
   const exportsField = "exports" in manifest ? manifest.exports : undefined;
@@ -245,12 +258,7 @@ export const publicPackageEntries = (
 };
 
 export const publicPackageName = (packageDirectory: string): string | null => {
-  const manifest = readJsonFile(join(packageDirectory, MANIFEST_FILE_NAME));
-  if (manifest === null || typeof manifest !== "object") return null;
-  if (!("name" in manifest) || typeof manifest.name !== "string" || manifest.name.length === 0) {
-    return null;
-  }
-  return manifest.name;
+  return packageManifest(packageDirectory)?.name ?? null;
 };
 
 const declarationIdentity = (declaration: ts.Declaration): string =>
@@ -258,8 +266,10 @@ const declarationIdentity = (declaration: ts.Declaration): string =>
 
 const declaresSameBinding = (left: ts.Symbol, right: ts.Symbol): boolean => {
   if (left === right) return true;
-  const leftDeclarations = new Set((left.declarations ?? []).map(declarationIdentity));
-  return (right.declarations ?? []).some((declaration) =>
+  const leftDeclarations = new Set(
+    (left.declarations as readonly ts.Declaration[]).map(declarationIdentity),
+  );
+  return (right.declarations as readonly ts.Declaration[]).some((declaration) =>
     leftDeclarations.has(declarationIdentity(declaration)),
   );
 };
@@ -275,8 +285,7 @@ const ownerExportNames = ({
   readonly owner: ts.Symbol;
   readonly program: ts.Program;
 }): readonly string[] => {
-  const sourceFile = program.getSourceFile(fileName);
-  if (sourceFile === undefined) return [];
+  const sourceFile = program.getSourceFile(fileName) as ts.SourceFile;
   const module = checker.getSymbolAtLocation(sourceFile);
   if (module === undefined) return [];
   const namedExports = checker
@@ -290,11 +299,10 @@ const ownerExportNames = ({
     : namedExports;
 };
 
-const sharedExportNames = (
-  exportNamesBySource: readonly (readonly string[])[],
-): readonly string[] => {
-  const [firstExportNames, ...remaining] = exportNamesBySource;
-  if (firstExportNames === undefined) return [];
+const sharedExportNames = ([firstExportNames, ...remaining]: readonly [
+  readonly string[],
+  ...(readonly string[])[],
+]): readonly string[] => {
   return firstExportNames.filter((exportName) =>
     remaining.every((names) => names.includes(exportName)),
   );
@@ -313,11 +321,10 @@ export const publicImportRoutes = ({
   readonly program: ts.Program;
   readonly repositoryRoot: string;
 }): readonly CanonicalValuesImportRoute[] => {
-  const packageName = publicPackageName(packageDirectory);
-  if (packageName === null) return [];
-  const manifest = readJsonFile(join(packageDirectory, MANIFEST_FILE_NAME));
-  if (manifest === null || typeof manifest !== "object") return [];
-  const exportsField = "exports" in manifest ? manifest.exports : undefined;
+  const manifest = packageManifest(packageDirectory);
+  if (manifest === null) return [];
+  const packageName = manifest.name;
+  const exportsField = manifest.exports;
 
   const routes = packageSurfaces({ exportsField, packageDirectory, packageName }).flatMap(
     (surface) => {
@@ -327,7 +334,11 @@ export const publicImportRoutes = ({
       const resolvedSourcePaths = surface.sourceFiles
         .map((fileName) => toPosixPath(relative(repositoryRoot, fileName)))
         .toSorted();
-      return sharedExportNames(exportNamesBySource).map((exportName) => ({
+      const [firstExportNames, ...remainingExportNames] = exportNamesBySource;
+      return sharedExportNames([
+        firstExportNames as readonly string[],
+        ...remainingExportNames,
+      ]).map((exportName) => ({
         exportName,
         resolvedSourcePaths,
         specifier: surface.specifier,

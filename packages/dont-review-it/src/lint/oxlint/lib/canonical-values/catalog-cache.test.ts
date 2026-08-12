@@ -1,18 +1,12 @@
 import { createHash } from "node:crypto";
-import { readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 import { describe, expect, test } from "vite-plus/test";
 
-import { buildCanonicalValuesCatalog } from "./builder.ts";
-import {
-  annotateCanonicalValues,
-  createCanonicalValuesTestRepository,
-  writeCanonicalValuesTestFile,
-} from "./canonical-values-test-fixture.ts";
-import { cacheInputFingerprint } from "./catalog-cache.ts";
+import { createCanonicalValuesTestRepository } from "./canonical-values.test-fixture.ts";
+import { cacheInputFingerprint, readCachedEntries, writeCachedEntries } from "./catalog-cache.ts";
 import { fingerprintValues } from "./fingerprint.ts";
-import { listRepositoryFiles } from "./source-files.ts";
 
 describe("catalog cache", () => {
   const cachePathOf = (repositoryRoot: string): string =>
@@ -23,403 +17,175 @@ describe("catalog cache", () => {
       .update(JSON.stringify({ version: 5, fingerprint, entries }))
       .digest("hex");
 
-  test("a version 4 cache cannot inject an owner into the current catalog", () => {
-    const repositoryRoot = createCanonicalValuesTestRepository();
-    writeCanonicalValuesTestFile({
-      repositoryRoot,
-      relativePath: "src/order-status.ts",
-      contents: annotateCanonicalValues(
-        "order.status",
-        'export const ORDER_STATUSES = ["draft"] as const;',
-      ),
-    });
-    buildCanonicalValuesCatalog({ repositoryRoot });
+  const validEntry = {
+    annotationStart: 0,
+    binding: "VALUES",
+    bindingStart: 2,
+    conceptId: "order.status",
+    declarationEnd: 3,
+    declarationPath: "src/status.ts",
+    declarationStart: 1,
+    fingerprint: fingerprintValues(["draft"]),
+    importRoutes: [
+      {
+        exportName: "VALUES",
+        resolvedSourcePaths: ["src/index.ts"],
+        specifier: "@fixture/vocabulary",
+      },
+    ],
+    packageName: null,
+    values: ["draft"],
+  };
 
-    const cachePath = cachePathOf(repositoryRoot);
-    const current = JSON.parse(readFileSync(cachePath, "utf8")) as {
-      readonly fingerprint: string;
-    };
-    writeFileSync(
-      cachePath,
-      JSON.stringify({
-        version: 4,
-        fingerprint: current.fingerprint,
-        entries: [
-          {
-            annotationStart: 0,
-            binding: "POISON",
-            bindingStart: 1,
-            conceptId: "poison.cache",
-            declarationEnd: 2,
-            declarationPath: "src/poison.ts",
-            declarationStart: 1,
-            importRoutes: [],
-            packageName: null,
-            values: ["poison"],
-            fingerprint: fingerprintValues(["poison"]),
-          },
-        ],
-      }),
-      "utf8",
-    );
+  const writeCachePayload = (repositoryRoot: string, payload: unknown): void => {
+    const path = cachePathOf(repositoryRoot);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, JSON.stringify(payload), "utf8");
+  };
 
-    expect(
-      buildCanonicalValuesCatalog({ repositoryRoot }).entries.map((entry) => entry.conceptId),
-    ).toStrictEqual(["order.status"]);
-    expect(JSON.parse(readFileSync(cachePath, "utf8"))).toMatchObject({ version: 5 });
+  const currentPayload = (
+    entries: readonly unknown[] = [validEntry],
+    fingerprint = "repository-fingerprint",
+  ) => ({
+    entries,
+    fingerprint,
+    integrity: cacheIntegrity(fingerprint, entries),
+    version: 5,
   });
 
-  test("a version 5 cache cannot drop every real owner without invalidating its integrity", () => {
+  const readPayload = (payload: unknown, fingerprint = "repository-fingerprint") => {
     const repositoryRoot = createCanonicalValuesTestRepository();
-    writeCanonicalValuesTestFile({
-      repositoryRoot,
-      relativePath: "src/order-status.ts",
-      contents: annotateCanonicalValues(
-        "order.status",
-        'export const ORDER_STATUSES = ["draft"] as const;',
-      ),
-    });
-    buildCanonicalValuesCatalog({ repositoryRoot });
+    writeCachePayload(repositoryRoot, payload);
+    return readCachedEntries(repositoryRoot, fingerprint);
+  };
 
-    const cachePath = cachePathOf(repositoryRoot);
-    const current = JSON.parse(readFileSync(cachePath, "utf8")) as Record<string, unknown>;
-    writeFileSync(cachePath, JSON.stringify({ ...current, entries: [] }), "utf8");
+  test("a valid current payload is read only for its own repository fingerprint", () => {
+    const payload = currentPayload();
 
-    expect(
-      buildCanonicalValuesCatalog({ repositoryRoot }).entries.map((entry) => entry.conceptId),
-    ).toStrictEqual(["order.status"]);
+    expect(readPayload(payload)).toStrictEqual([validEntry]);
+    expect(readPayload(payload, "other-fingerprint")).toBe(null);
   });
 
-  test("source contents invalidate the cache even when size and timestamps are preserved", () => {
+  test("an unreadable cache is treated as a cache miss", () => {
     const repositoryRoot = createCanonicalValuesTestRepository();
-    const sourcePath = join(repositoryRoot, "src/order-status.ts");
-    writeCanonicalValuesTestFile({
-      repositoryRoot,
-      relativePath: "src/order-status.ts",
-      contents: annotateCanonicalValues(
-        "order.status",
-        'export const ORDER_STATUSES = ["draft"] as const;',
-      ),
-    });
-    buildCanonicalValuesCatalog({ repositoryRoot });
-    const originalStats = statSync(sourcePath);
-    writeCanonicalValuesTestFile({
-      repositoryRoot,
-      relativePath: "src/order-status.ts",
-      contents: annotateCanonicalValues(
-        "order.status",
-        'export const ORDER_STATUSES = ["final"] as const;',
-      ),
-    });
-    utimesSync(sourcePath, originalStats.atime, originalStats.mtime);
+    const path = cachePathOf(repositoryRoot);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, "{not json", "utf8");
 
-    expect(buildCanonicalValuesCatalog({ repositoryRoot }).entries[0]?.values).toStrictEqual([
-      "final",
-    ]);
-  });
-
-  test("a retargeted source symlink invalidates identical cache contents", () => {
-    const repositoryRoot = createCanonicalValuesTestRepository();
-    const firstTarget = join(repositoryRoot, "src/first.ts");
-    const secondTarget = join(repositoryRoot, "src/second.ts");
-    const link = join(repositoryRoot, "src/public.ts");
-    const contents = 'export const value = "draft";\n';
-    writeCanonicalValuesTestFile({
-      repositoryRoot,
-      relativePath: "src/first.ts",
-      contents,
-    });
-    writeCanonicalValuesTestFile({
-      repositoryRoot,
-      relativePath: "src/second.ts",
-      contents,
-    });
-    symlinkSync(firstTarget, link);
-    const first = cacheInputFingerprint(listRepositoryFiles(repositoryRoot).cacheInputs);
-    rmSync(link);
-    symlinkSync(secondTarget, link);
-
-    expect(cacheInputFingerprint(listRepositoryFiles(repositoryRoot).cacheInputs)).not.toBe(first);
-  });
-
-  test("an imported static value invalidates the cache when its literal domain changes", () => {
-    const repositoryRoot = createCanonicalValuesTestRepository();
-    const declarationPath = join(repositoryRoot, "src/base.ts");
-    writeCanonicalValuesTestFile({
-      repositoryRoot,
-      relativePath: "src/base.ts",
-      contents: annotateCanonicalValues("base.status", 'export const BASE = ["draft"] as const;'),
-    });
-    writeCanonicalValuesTestFile({
-      repositoryRoot,
-      relativePath: "src/order-status.ts",
-      contents: `import { BASE } from "./base.js";
-${annotateCanonicalValues(
-  "order.status",
-  'export const ORDER_STATUSES = [...BASE, "published"] as const;',
-)}`,
-    });
-    expect(
-      buildCanonicalValuesCatalog({ repositoryRoot }).entries.find(
-        (entry) => entry.conceptId === "order.status",
-      )?.values,
-    ).toStrictEqual(["draft", "published"]);
-    const originalStats = statSync(declarationPath);
-    writeCanonicalValuesTestFile({
-      repositoryRoot,
-      relativePath: "src/base.ts",
-      contents: annotateCanonicalValues("base.status", 'export const BASE = ["final"] as const;'),
-    });
-    utimesSync(declarationPath, originalStats.atime, originalStats.mtime);
-
-    expect(
-      buildCanonicalValuesCatalog({ repositoryRoot }).entries.find(
-        (entry) => entry.conceptId === "order.status",
-      )?.values,
-    ).toStrictEqual(["final", "published"]);
-  });
-
-  test("an imported JSON object invalidates the cache when its property domain changes", () => {
-    const repositoryRoot = createCanonicalValuesTestRepository();
-    const jsonPath = join(repositoryRoot, "src/statuses.json");
-    writeCanonicalValuesTestFile({
-      repositoryRoot,
-      relativePath: "src/statuses.json",
-      contents: '{"draft":null,"published":null}\n',
-    });
-    writeCanonicalValuesTestFile({
-      repositoryRoot,
-      relativePath: "src/order-status.ts",
-      contents: `import STATUSES from "./statuses.json";
-${annotateCanonicalValues("order.status", "export const ORDER_STATUS = Object.freeze(STATUSES);")}`,
-    });
-    expect(buildCanonicalValuesCatalog({ repositoryRoot }).entries[0]?.values).toStrictEqual([
-      "draft",
-      "published",
-    ]);
-    const originalStats = statSync(jsonPath);
-    writeCanonicalValuesTestFile({
-      repositoryRoot,
-      relativePath: "src/statuses.json",
-      contents: '{"final":null,"published":null}\n',
-    });
-    utimesSync(jsonPath, originalStats.atime, originalStats.mtime);
-
-    expect(buildCanonicalValuesCatalog({ repositoryRoot }).entries[0]?.values).toStrictEqual([
-      "final",
-      "published",
-    ]);
+    expect(readCachedEntries(repositoryRoot, "repository-fingerprint")).toBe(null);
   });
 
   test.each([
+    null,
+    "cache",
+    {},
+    { ...currentPayload(), version: 4 },
+    { ...currentPayload(), fingerprint: 1 },
+    { ...currentPayload(), integrity: 1 },
+    { ...currentPayload(), entries: "entries" },
+    { ...currentPayload(), integrity: "forged" },
+  ])("an invalid cache envelope is rejected", (payload) => {
+    expect(readPayload(payload)).toBe(null);
+  });
+
+  test.each([
+    null,
+    "entry",
+    {},
+    { ...validEntry, annotationStart: 0.5 },
+    { ...validEntry, bindingStart: 0.5 },
+    { ...validEntry, declarationEnd: 0.5 },
+    { ...validEntry, declarationStart: 0.5 },
+    { ...validEntry, annotationStart: -1 },
+    { ...validEntry, declarationStart: -1 },
+    { ...validEntry, annotationStart: 1 },
+    { ...validEntry, bindingStart: 0 },
+    { ...validEntry, bindingStart: 3 },
+    { ...validEntry, declarationEnd: 1 },
+    { ...validEntry, binding: 1 },
+    { ...validEntry, binding: "" },
+    { ...validEntry, conceptId: 1 },
+    { ...validEntry, conceptId: "Order Status" },
+    { ...validEntry, declarationPath: 1 },
+    { ...validEntry, declarationPath: "" },
+    { ...validEntry, fingerprint: 1 },
+    { ...validEntry, fingerprint: "not-a-fingerprint" },
+    { ...validEntry, packageName: 1 },
+    { ...validEntry, packageName: "" },
+  ])("an entry with invalid identity or offsets is rejected", (entry) => {
+    expect(readPayload(currentPayload([entry]))).toBe(null);
+  });
+
+  test.each([
+    { ...validEntry, importRoutes: null },
+    { ...validEntry, importRoutes: [null] },
+    { ...validEntry, importRoutes: [{}] },
+    { ...validEntry, importRoutes: [{ ...validEntry.importRoutes[0], exportName: "" }] },
+    { ...validEntry, importRoutes: [{ ...validEntry.importRoutes[0], specifier: "" }] },
     {
-      relativePath: "pnpm-lock.yaml",
-      before: "lockfileVersion: 9.0\n",
-      after: "lockfileVersion: 9.1\n",
+      ...validEntry,
+      importRoutes: [{ exportName: "VALUES", specifier: "@fixture/vocabulary" }],
     },
     {
-      relativePath: "pnpm-workspace.yaml",
-      before: "packages: [packages/*]\n",
-      after: "packages: [projects/*]\n",
+      ...validEntry,
+      importRoutes: [{ ...validEntry.importRoutes[0], resolvedSourcePaths: "src/index.ts" }],
     },
     {
-      relativePath: "tsconfig.json",
-      before: '{"compilerOptions":{"strict":true}}\n',
-      after: '{"compilerOptions":{"strict":false}}\n',
+      ...validEntry,
+      importRoutes: [{ ...validEntry.importRoutes[0], resolvedSourcePaths: [] }],
     },
-  ])(
-    "a changed dependency input $relativePath invalidates the cache",
-    ({ relativePath, before, after }) => {
-      const repositoryRoot = createCanonicalValuesTestRepository();
-      writeCanonicalValuesTestFile({ repositoryRoot, relativePath, contents: before });
-      writeCanonicalValuesTestFile({
-        repositoryRoot,
-        relativePath: "src/order-status.ts",
-        contents: annotateCanonicalValues(
-          "order.status",
-          'export const ORDER_STATUSES = ["draft"] as const;',
-        ),
+    ...[
+      "",
+      ".",
+      "src\0index.ts",
+      "src\\index.ts",
+      "src/../index.ts",
+      "../index.ts",
+      "/src/index.ts",
+      "C:/src/index.ts",
+    ].map((path) => ({
+      ...validEntry,
+      importRoutes: [{ ...validEntry.importRoutes[0], resolvedSourcePaths: [path] }],
+    })),
+    {
+      ...validEntry,
+      importRoutes: [
+        { ...validEntry.importRoutes[0], resolvedSourcePaths: ["src/index.ts", "src/index.ts"] },
+      ],
+    },
+  ])("an entry with an invalid import route is rejected", (entry) => {
+    expect(readPayload(currentPayload([entry]))).toBe(null);
+  });
+
+  test.each([
+    { ...validEntry, values: null },
+    { ...validEntry, values: [] },
+    { ...validEntry, values: [{}] },
+    { ...validEntry, values: ["draft", "draft"] },
+    { ...validEntry, values: ["draft"], fingerprint: fingerprintValues(["other"]) },
+  ])("an entry with an invalid canonical domain is rejected", (entry) => {
+    expect(readPayload(currentPayload([entry]))).toBe(null);
+  });
+
+  test("cache input problems participate in the fingerprint", () => {
+    expect(
+      cacheInputFingerprint(
+        [],
+        [{ filePath: "src/link.ts", kind: "unsafe-symbolic-link", line: 1 }],
+      ),
+    ).not.toBe(cacheInputFingerprint([]));
+  });
+
+  test("a cache write failure caused by the file system is non-fatal", () => {
+    const repositoryRoot = createCanonicalValuesTestRepository();
+    const fileRoot = join(repositoryRoot, "not-a-directory");
+    writeFileSync(fileRoot, "occupied");
+
+    expect(() => {
+      writeCachedEntries(fileRoot, {
+        entries: [],
+        fingerprint: "repository-fingerprint",
       });
-      buildCanonicalValuesCatalog({ repositoryRoot });
-      const cachePath = cachePathOf(repositoryRoot);
-      const beforeCache = JSON.parse(readFileSync(cachePath, "utf8")) as {
-        readonly fingerprint: string;
-      };
-      writeCanonicalValuesTestFile({ repositoryRoot, relativePath, contents: after });
-
-      buildCanonicalValuesCatalog({ repositoryRoot });
-      const afterCache = JSON.parse(readFileSync(cachePath, "utf8")) as {
-        readonly fingerprint: string;
-      };
-      expect(afterCache.fingerprint).not.toBe(beforeCache.fingerprint);
-    },
-  );
-
-  test("a version 5 cache with an impossible declaration range is rebuilt", () => {
-    const repositoryRoot = createCanonicalValuesTestRepository();
-    writeCanonicalValuesTestFile({
-      repositoryRoot,
-      relativePath: "src/order-status.ts",
-      contents: annotateCanonicalValues(
-        "order.status",
-        'export const ORDER_STATUSES = ["draft"] as const;',
-      ),
-    });
-    buildCanonicalValuesCatalog({ repositoryRoot });
-    const cachePath = cachePathOf(repositoryRoot);
-    const current = JSON.parse(readFileSync(cachePath, "utf8")) as {
-      readonly fingerprint: string;
-    };
-    const entries = [
-      {
-        annotationStart: 4,
-        binding: "POISON",
-        bindingStart: 2,
-        conceptId: "poison.cache",
-        declarationEnd: 2,
-        declarationPath: "src/poison.ts",
-        declarationStart: 3,
-        importRoutes: [],
-        packageName: null,
-        values: ["poison"],
-        fingerprint: fingerprintValues(["poison"]),
-      },
-    ];
-    writeFileSync(
-      cachePath,
-      JSON.stringify({
-        version: 5,
-        fingerprint: current.fingerprint,
-        entries,
-        integrity: cacheIntegrity(current.fingerprint, entries),
-      }),
-      "utf8",
-    );
-
-    expect(
-      buildCanonicalValuesCatalog({ repositoryRoot }).entries.map((entry) => entry.conceptId),
-    ).toStrictEqual(["order.status"]);
-  });
-
-  test("a version 5 cache route without resolved source identity is rebuilt", () => {
-    const repositoryRoot = createCanonicalValuesTestRepository();
-    writeCanonicalValuesTestFile({
-      repositoryRoot,
-      relativePath: "package.json",
-      contents: JSON.stringify({ name: "@fixture/repository", exports: "./src/index.ts" }),
-    });
-    writeCanonicalValuesTestFile({
-      repositoryRoot,
-      relativePath: "src/order-status.ts",
-      contents: annotateCanonicalValues(
-        "order.status",
-        'export const ORDER_STATUSES = ["draft"] as const;',
-      ),
-    });
-    writeCanonicalValuesTestFile({
-      repositoryRoot,
-      relativePath: "src/index.ts",
-      contents: 'export { ORDER_STATUSES } from "./order-status.ts";\n',
-    });
-    buildCanonicalValuesCatalog({ repositoryRoot });
-    const cachePath = cachePathOf(repositoryRoot);
-    const current = JSON.parse(readFileSync(cachePath, "utf8")) as {
-      readonly fingerprint: string;
-      readonly entries: readonly Record<string, unknown>[];
-    };
-    const entries = current.entries.map((entry) => ({
-      ...entry,
-      importRoutes: [{ exportName: "ORDER_STATUSES", specifier: "@fixture/repository" }],
-    }));
-    writeFileSync(
-      cachePath,
-      JSON.stringify({
-        version: 5,
-        fingerprint: current.fingerprint,
-        entries,
-        integrity: cacheIntegrity(current.fingerprint, entries),
-      }),
-      "utf8",
-    );
-
-    expect(buildCanonicalValuesCatalog({ repositoryRoot }).entries[0]?.importRoutes).toStrictEqual([
-      {
-        exportName: "ORDER_STATUSES",
-        resolvedSourcePaths: ["src/index.ts"],
-        specifier: "@fixture/repository",
-      },
-    ]);
-  });
-
-  test("a version 5 cache whose value fingerprint is forged is rebuilt", () => {
-    const repositoryRoot = createCanonicalValuesTestRepository();
-    writeCanonicalValuesTestFile({
-      repositoryRoot,
-      relativePath: "src/order-status.ts",
-      contents: annotateCanonicalValues(
-        "order.status",
-        'export const ORDER_STATUSES = ["draft"] as const;',
-      ),
-    });
-    buildCanonicalValuesCatalog({ repositoryRoot });
-    const cachePath = cachePathOf(repositoryRoot);
-    const current = JSON.parse(readFileSync(cachePath, "utf8")) as {
-      readonly fingerprint: string;
-    };
-    const entries = [
-      {
-        annotationStart: 0,
-        binding: "POISON",
-        bindingStart: 2,
-        conceptId: "poison.cache",
-        declarationEnd: 3,
-        declarationPath: "src/poison.ts",
-        declarationStart: 1,
-        importRoutes: [],
-        packageName: null,
-        values: ["poison"],
-        fingerprint: fingerprintValues(["other"]),
-      },
-    ];
-    writeFileSync(
-      cachePath,
-      JSON.stringify({
-        version: 5,
-        fingerprint: current.fingerprint,
-        entries,
-        integrity: cacheIntegrity(current.fingerprint, entries),
-      }),
-      "utf8",
-    );
-
-    expect(
-      buildCanonicalValuesCatalog({ repositoryRoot }).entries.map((entry) => entry.conceptId),
-    ).toStrictEqual(["order.status"]);
-  });
-
-  test("a changed input rebuilds the catalog", () => {
-    const repositoryRoot = createCanonicalValuesTestRepository();
-    writeCanonicalValuesTestFile({
-      repositoryRoot,
-      relativePath: "src/order-status.ts",
-      contents: annotateCanonicalValues(
-        "order.status",
-        'export const ORDER_STATUSES = ["draft"] as const;',
-      ),
-    });
-    buildCanonicalValuesCatalog({ repositoryRoot });
-    writeCanonicalValuesTestFile({
-      repositoryRoot,
-      relativePath: "src/order-status.ts",
-      contents: annotateCanonicalValues(
-        "order.status",
-        'export const ORDER_STATUSES = ["draft", "published"] as const;',
-      ),
-    });
-
-    expect(buildCanonicalValuesCatalog({ repositoryRoot }).entries[0]?.values).toStrictEqual([
-      "draft",
-      "published",
-    ]);
+    }).not.toThrow();
   });
 });

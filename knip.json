@@ -1,5 +1,13 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "includeEntryExports": true,
-  "ignoreDependencies": ["vite", "@mst/agentic-documents"]
+  "ignoreDependencies": ["vite", "@mst/agentic-documents"],
+  "workspaces": {
+    "packages/dont-review-it": {
+      "project": [
+        "**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}!",
+        "!src/lint/oxlint/lib/canonical-values/canonical-values.test-fixture.ts!"
+      ]
+    }
+  }
 }

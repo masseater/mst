@@ -1,7 +1,11 @@
-import { lineAtOffset } from "@mst/utils";
-
 import { isInsideGeneratedRegion } from "../markdown/generated-region.ts";
-import { descendants, flattenTextKeepingCode, lineOf, offsetOf } from "../markdown/nodes.ts";
+import {
+  descendants,
+  endOffsetOf,
+  flattenTextKeepingCode,
+  lineOf,
+  offsetOf,
+} from "../markdown/nodes.ts";
 
 import type { AgenticDocumentsConfig } from "../config.ts";
 import type { DocumentProblem } from "../problem.ts";
@@ -55,7 +59,7 @@ const decimalMarkerLines = ({
     .slice(startOffset, endOffset)
     .split("\n")
     .flatMap((line, index) => (index > 0 && DECIMAL_MARKER_PATTERN.test(line) ? [index] : []))
-    .map((lineIndex) => lineAtOffset(source, startOffset) + lineIndex);
+    .map((lineIndex) => source.slice(0, startOffset).split("\n").length + lineIndex);
 
 const orderedListProblems = ({
   document,
@@ -67,9 +71,8 @@ const orderedListProblems = ({
     .filter((node) => node.ordered === true)
     .filter((node) => !isInsideGeneratedRegion(offsetOf(node), document.generated))
     .flatMap((list): readonly DocumentProblem[] => {
-      const startOffset = list.position?.start.offset;
-      const endOffset = list.position?.end.offset;
-      if (startOffset === undefined || endOffset === undefined) return [];
+      const startOffset = offsetOf(list);
+      const endOffset = endOffsetOf(list);
 
       const numbers = markerNumbersIn({ source: document.source, startOffset, endOffset });
       const sequenceProblems = isContiguousFromOne(numbers)

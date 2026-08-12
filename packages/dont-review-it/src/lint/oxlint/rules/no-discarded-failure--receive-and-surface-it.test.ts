@@ -11,6 +11,18 @@ describe("dont-review-it/no-discarded-failure--receive-and-surface-it", () => {
         code: "const [failure, parsed] = attempt(() => parse(text));",
       },
       {
+        name: "gathering the rest of the pair keeps the failure within reach",
+        code: "const { ...both } = attempt(() => parse(text));",
+      },
+      {
+        name: "a binding reached through a computed name cannot be read as the result alone",
+        code: "const { [half]: taken } = attempt(() => parse(text));",
+      },
+      {
+        name: "an operator other than void keeps the pair as a value",
+        code: "const negated = -attempt(() => parse(text));",
+      },
+      {
         name: "binding the failure alone receives it",
         code: "const [failure] = attempt(() => parse(text));",
       },
@@ -131,7 +143,7 @@ describe("dont-review-it/no-discarded-failure--receive-and-surface-it", () => {
       {
         name: "a dropped pair in a test file carries no exemption",
         code: "const [, parsed] = attempt(() => parse(text));",
-        filename: "/repo/packages/utils/src/parse.test.ts",
+        filename: "/repo/packages/repository-checks/src/parse.test.ts",
         errors: [{ messageId: "discardedFailurePair" }],
       },
       {
@@ -157,7 +169,7 @@ describe("dont-review-it/no-discarded-failure--receive-and-surface-it", () => {
       {
         name: "a catch clause that binds nothing in a test file carries no exemption",
         code: "try {\n  run();\n} catch {\n  recover();\n}",
-        filename: "/repo/packages/utils/src/parse.test.ts",
+        filename: "/repo/packages/repository-checks/src/parse.test.ts",
         errors: [{ messageId: "unnamedCatchFailure" }],
       },
     ],

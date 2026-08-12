@@ -1,17 +1,18 @@
-import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, test } from "vite-plus/test";
+import { describe, expect, test, vi } from "vite-plus/test";
 
-import { isGitIgnoredSource } from "./git-ignored-source.ts";
-import { isOutOfScopeBoundarySource } from "./out-of-scope-boundary-source.ts";
+import { readGitSourceScope } from "./git-ignored-source.ts";
+import { gitOutput } from "./git-output.ts";
 
 describe("git-ignored-source", () => {
+  const isGitIgnoredSource = (sourcePath: string, repositoryRoot: string): boolean =>
+    readGitSourceScope(repositoryRoot).isIgnored(sourcePath);
   const inRepository = (evaluate: (root: string) => void): void => {
     const root = mkdtempSync(join(tmpdir(), "git-ignored-source-"));
-    execFileSync("git", ["init", "--quiet"], { cwd: root });
+    gitOutput(["init", "--quiet"], { cwd: root, env: process.env });
     try {
       evaluate(root);
     } finally {
@@ -33,8 +34,6 @@ describe("git-ignored-source", () => {
       expect(isGitIgnoredSource(join(root, "dist/status.ts"), root)).toBe(true);
       expect(isGitIgnoredSource(join(root, "src/status.generated.ts"), root)).toBe(true);
       expect(isGitIgnoredSource(join(root, "src/status.ts"), root)).toBe(false);
-      expect(isOutOfScopeBoundarySource(join(root, "dist/status.ts"), root)).toBe(false);
-      expect(isOutOfScopeBoundarySource(join(root, "fixtures/status.ts"), root)).toBe(true);
     });
   });
 
@@ -42,11 +41,10 @@ describe("git-ignored-source", () => {
     inRepository((root) => {
       mkdirSync(join(root, "dist"));
       writeFileSync(join(root, "dist/status.ts"), "export {};");
-      execFileSync("git", ["add", "dist/status.ts"], { cwd: root });
+      gitOutput(["add", "dist/status.ts"], { cwd: root, env: process.env });
       writeFileSync(join(root, ".gitignore"), "dist\n");
 
       expect(isGitIgnoredSource(join(root, "dist/status.ts"), root)).toBe(false);
-      expect(isOutOfScopeBoundarySource(join(root, "dist/status.ts"), root)).toBe(true);
     });
   });
 
@@ -65,6 +63,21 @@ describe("git-ignored-source", () => {
     });
   });
 
+  test("a parent repository index cannot change a child repository ignore result", () => {
+    inRepository((root) => {
+      writeFileSync(join(root, ".gitignore"), "dist\n");
+      mkdirSync(join(root, "dist"));
+      writeFileSync(join(root, "dist/status.ts"), "export {};");
+      vi.stubEnv("GIT_INDEX_FILE", join(root, "foreign-index"));
+
+      try {
+        expect(isGitIgnoredSource(join(root, "dist/status.ts"), root)).toBe(true);
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+  });
+
   test("paths outside the repository do not inherit repository ignores", () => {
     inRepository((root) => {
       const outside = mkdtempSync(join(tmpdir(), "git-ignored-outside-"));
@@ -75,6 +88,48 @@ describe("git-ignored-source", () => {
         expect(isGitIgnoredSource(join(outside, "status.ts"), root)).toBe(false);
       } finally {
         rmSync(outside, { force: true, recursive: true });
+      }
+    });
+  });
+
+  test("a source scope filters several paths with one Git snapshot", () => {
+    inRepository((root) => {
+      mkdirSync(join(root, "dist"));
+      mkdirSync(join(root, "src"));
+      writeFileSync(join(root, ".gitignore"), "dist\n");
+      writeFileSync(join(root, "dist/status.ts"), "export {};");
+      writeFileSync(join(root, "src/status.ts"), "export {};");
+
+      const scope = readGitSourceScope(root);
+      expect(
+        new Set(
+          ["dist/status.ts", "src/status.ts"]
+            .map((sourcePath) => join(root, sourcePath))
+            .filter(scope.isIgnored),
+        ),
+      ).toStrictEqual(new Set([join(root, "dist/status.ts")]));
+    });
+  });
+
+  test("a missing repository root has no ignored sources", () => {
+    const root = join(tmpdir(), "missing-git-source-scope");
+
+    expect(isGitIgnoredSource(join(root, "dist/status.ts"), root)).toBe(false);
+  });
+
+  test("a repository reached through a symbolic root uses its physical source paths", () => {
+    inRepository((root) => {
+      const parent = mkdtempSync(join(tmpdir(), "git-source-root-link-"));
+      const linkedRoot = join(parent, "repository");
+      try {
+        writeFileSync(join(root, ".gitignore"), "dist\n");
+        mkdirSync(join(root, "dist"));
+        writeFileSync(join(root, "dist/status.ts"), "export {};");
+        symlinkSync(root, linkedRoot);
+
+        expect(isGitIgnoredSource(join(root, "dist/status.ts"), linkedRoot)).toBe(true);
+      } finally {
+        rmSync(parent, { force: true, recursive: true });
       }
     });
   });

@@ -3,6 +3,7 @@ import { isAbsolute } from "node:path";
 
 import { pathIsInside } from "../path-is-inside.ts";
 import {
+  isIgnoredRepositoryModule,
   matchesConfiguredPathAlias,
   repositoryModulePath,
   resolvedDirectImportEntries,
@@ -16,14 +17,14 @@ import type { CanonicalValuesCatalog, CanonicalValuesEntry } from "./catalog.ts"
 const SUBPATH_IMPORT_PREFIX = "#";
 
 const packageNameOf = (specifier: string): string => {
-  if (!specifier.startsWith("@")) return specifier.split("/")[0] ?? specifier;
+  if (!specifier.startsWith("@")) return specifier.split("/")[0] as string;
   return specifier.split("/").slice(0, 2).join("/");
 };
 
 const belongsToRegisteredPackage = (specifier: string, catalog: CanonicalValuesCatalog): boolean =>
   catalog.packageNames.has(packageNameOf(specifier));
 
-export const registeredEntriesForImportRoute = (
+const registeredEntriesForImportRoute = (
   query: ImportRouteQuery,
   catalog: CanonicalValuesCatalog,
 ): readonly CanonicalValuesEntry[] => {
@@ -52,6 +53,7 @@ export const importRouteStatus = (
   query: ImportRouteQuery,
   catalog: CanonicalValuesCatalog,
 ): "registered" | "unregistered" | "external" => {
+  if (isIgnoredRepositoryModule(query, catalog)) return "external";
   if (registeredEntriesForImportRoute(query, catalog).length !== 0) return "registered";
   if (isRelativeImportSpecifier(query.specifier)) return "unregistered";
   if (isAbsolute(query.specifier)) {

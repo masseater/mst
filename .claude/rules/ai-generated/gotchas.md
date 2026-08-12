@@ -24,7 +24,7 @@ paths:
 
 ## テンプレートが入れる `vite` 直接依存を「未使用」と判断して消してはいけない
 
-- 症状: knip がルートと `packages/utils` の `vite` を未使用 devDependency として報告する。実際にソースからは参照されていない
+- 症状: knip がルートと `packages/repository-checks` の `vite` を未使用 devDependency として報告する。実際にソースからは参照されていない
 - 消すとどうなるか: pnpm では `overrides` が実際の `vite` 依存エッジを持つワークスペースにしか効かない。直接依存のないワークスペースでは autoInstallPeers が上流の素の vite を別途インストールし、vite/vitest が二重インスタンス化する。これは前項と同じ構造の障害（`vp test` のキャッシュミス、dual instance）を招く
 - 上流: [voidzero-dev/vite-plus#1932](https://github.com/voidzero-dev/vite-plus/issues/1932)。テンプレートが root と `packages/utils` に直接 `vite` 依存を入れているのは、まさにこの対策として入れられたもの
 - 併せて必須の設定: `catalog` の `vite: npm:@voidzero-dev/vite-plus-core@<version>` エイリアスと `overrides.vite: "catalog:"`（[voidzero-dev/vite-plus#2034](https://github.com/voidzero-dev/vite-plus/issues/2034) でコラボレータが「想定どおり」と回答）。`peerDependencyRules` は機能上は任意で、外すと unmet peer の警告が出るだけ（[voidzero-dev/vite-plus#1021](https://github.com/voidzero-dev/vite-plus/issues/1021)）
@@ -56,12 +56,12 @@ pack: { exports: { customExports: { './tsconfig/*': './tsconfig/*' } } }
 
 したがって pnpm 固有の依存解決の挙動（前項の autoInstallPeers など）はこのリポジトリにそのまま該当する。
 
-## `packages/utils/package.json` にプレースホルダのメタデータが残っている
+## テンプレートが置くパッケージのメタデータはプレースホルダである
 
 - 該当箇所: `"author": "Author Name <author.name@mail.com>"`、`"repository.url": "git+https://github.com/author/library.git"`、`"homepage": "https://github.com/author/library#readme"`、`"bugs.url": "https://github.com/author/library/issues"`、`"description": "A starter for creating a TypeScript package."`
 - 出自: Vite+ のテンプレートが [sxzz/tsdown-templates](https://github.com/sxzz/tsdown-templates) の default テンプレートを取り込んだもの。vite-plus の CLI スナップショットテストで期待値として固定されているため、テンプレートの未整備ではなく既知の出力
 - 上流に issue はなく、公開リポジトリでもそのまま残している例が複数ある
-- IF: `packages/utils` を publish する; THEN MUST: これらを実際の値に書き換える
+- IF: テンプレートが生成したパッケージを publish する; THEN MUST: これらを実際の値に書き換える
 
 ## catalog に寄せるときは catalog 側の値が実態と合っているか確認する
 
@@ -100,6 +100,11 @@ pack: { exports: { customExports: { './tsconfig/*': './tsconfig/*' } } }
 - IF: `vitest/consistent-test-filename` の `pattern` を変更する; THEN MUST: 変更後に違反ファイルを実際に置いて error になることを確認する
   - このルールは条件に合わなければ黙って何も言わない。設定ミスは「lint が緑」として現れるため、正のケースだけでは検出できない
 
+さらに、このルールが見るのは oxlint が `*.test.*` / `*.spec.*` という名前からテストファイルと見なしたものだけである。`text.checks.ts` のような任意の名前に置かれたテストは、`test` を呼んでいても一切報告されない。このルールで守れるのは「テストらしい名前どうしの選別」であって、「テストを別の名前のファイルへ置く」ことは防げない。
+
+- IF: `vitest/consistent-test-filename` に「テストはこの名前だけ」を守らせたい; THEN PROHIBIT: テストらしくない名前のファイルの検出を期待する
+  - 検証に使うと無反応が「合格」に見える。実測するときは `*.test.*` / `*.spec.*` の名前の中で違反させる
+
 ## `vp lint --print-config` は jsPlugin のルールを解決しない
 
 - 症状: 自前ルールを base preset に追加した前後で `vp lint --print-config` を取って diff したところ、差分が 1 行も出なかった。ルールは実際に有効になっていて、違反ファイルを置けば error が出る
@@ -128,3 +133,15 @@ pack: { exports: { customExports: { './tsconfig/*': './tsconfig/*' } } }
 - 上流: 意図的な非対応である。[公式ドキュメント](https://oxc.rs/docs/guide/usage/linter/ignore-files.html)に `global gitignore files are not respected` と明記があり、[oxc#14926](https://github.com/oxc-project/oxc/issues/14926) は「開発者ごとに検査対象が変わるのは紛らわしい」として NOT_PLANNED で閉じられた。[oxc#22155](https://github.com/oxc-project/oxc/issues/22155) が `$XDG_CONFIG_HOME/git/ignore` の対応を求めて OPEN のまま残っている
 - 検出方法: 片方の経路だけが拾うパスに違反ファイルを置き、`vp lint` と `vp fmt --list-different` にかける。`git check-ignore -v` でどの経路が拾っているかを先に確かめる
 - 対処: `@mst/dont-review-it` の `withGitExcludes` が 3 経路すべてを読んで `ignorePatterns` に変換する。埋めたい穴はグローバルの 1 経路だけだが、残り 2 経路も読む。順序はグローバル → `$GIT_DIR/info/exclude` → リポジトリの `.gitignore` で、gitignore は last-match-wins なので、この順でないと `!` による再包含が負ける。経路をまたぐ再包含は 1 か所で並べないと表現できない
+
+## oxlint がルールに渡す AST に `ParenthesizedExpression` は現れない
+
+- 症状: 括弧を剥がすヘルパを書いても、その再帰の分岐に一度も入らない。`vp lint` は緑のまま通り、剥がす処理が要らないことに気づけない
+- 原因: `oxc-parser` を直接呼ぶと `export default ({ a: 1 })` は `ParenthesizedExpression` を生成する。oxlint が JS プラグインに渡す AST では括弧が落ちている。同じ AST 定義を共有しているため型には現れ続ける
+- 実測: 括弧付きの設定 (`export default ({...})`)、括弧付きの数値 (`branches: (100)`)、括弧付きの転送呼び出しの 3 通りをテストに置き、いずれもヘルパの再帰に入らないことをカバレッジで確認した。ヘルパと 16 か所の呼び出しを削除しても 983 件のテストは全て通った
+- 対処: ルールの中で括弧を剥がさない
+
+- IF: ルールの中で `ParenthesizedExpression` を扱おうとしている; THEN PROHIBIT: 書く
+  - 型に現れるのは AST 定義の共有によるもので、oxlint 経由では到達しない
+- IF: パーサの出力そのものを扱うコード（`parseSync` を直接呼ぶ側）を書いている; THEN MUST: 括弧を考慮する
+  - こちらには実際に現れる

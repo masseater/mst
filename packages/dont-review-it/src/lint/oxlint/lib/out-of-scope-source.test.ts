@@ -1,6 +1,10 @@
-import { describe, expect, test } from "vite-plus/test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-import { isOutOfScopeSource } from "./out-of-scope-source.ts";
+import { describe, expect, onTestFinished, test } from "vite-plus/test";
+
+import { isOutOfScopeLintSource, isOutOfScopeSource } from "./out-of-scope-source.ts";
 
 describe("out-of-scope-source", () => {
   test("a test source is out of scope whichever extension it carries", () => {
@@ -70,5 +74,18 @@ describe("out-of-scope-source", () => {
         repositoryRoot,
       ),
     ).toBe(true);
+  });
+
+  test("lint scope uses the repository root only for a source that exists", () => {
+    const repositoryRoot = mkdtempSync(join(tmpdir(), "out-of-scope-source-"));
+    onTestFinished(() => {
+      rmSync(repositoryRoot, { recursive: true, force: true });
+    });
+    const source = join(repositoryRoot, "src/status.ts");
+    mkdirSync(join(repositoryRoot, "src"));
+    writeFileSync(source, "export {};\n");
+
+    expect(isOutOfScopeLintSource(source, repositoryRoot)).toBe(false);
+    expect(isOutOfScopeLintSource("tests/missing.ts", repositoryRoot)).toBe(true);
   });
 });

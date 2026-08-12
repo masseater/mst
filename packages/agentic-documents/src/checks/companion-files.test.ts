@@ -37,6 +37,22 @@ const problemsUnder = (repositoryRoot: string) =>
   });
 
 describe("companionFileProblems", () => {
+  test("入れ子の文書の対応ファイルはその階層で探す", async () => {
+    const problems = await companionFileProblems({
+      repositoryRoot: rootWithCompanion({ kind: "none" }),
+      documents: [
+        toNormativeDocument({
+          file: "packages/example/AGENTS.md",
+          source: NORMATIVE_SOURCE,
+          config: defaultConfig,
+        }),
+      ],
+      config: defaultConfig,
+    });
+
+    expect(problems[0]?.file).toStrictEqual("packages/example/CLAUDE.md");
+  });
+
   test("対応ファイルが無いと報告する", async () => {
     expect((await problemsUnder(rootWithCompanion({ kind: "none" }))).length).toStrictEqual(1);
   });

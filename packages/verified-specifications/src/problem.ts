@@ -1,0 +1,9 @@
+import type { RepositoryProblem } from "@mst/repository-checks";
+
+export const formatSpecificationProblem = (problem: RepositoryProblem): string =>
+  [
+    problem.file,
+    problem.line === null ? "" : `:${String(problem.line)}`,
+    " ",
+    problem.message,
+  ].join("");

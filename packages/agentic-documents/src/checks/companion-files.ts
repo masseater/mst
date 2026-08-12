@@ -74,7 +74,7 @@ const regularFileProblem = async ({
   readonly companionFileName: string;
   readonly config: AgenticDocumentsConfig;
 }): Promise<readonly DocumentProblem[]> => {
-  const content = (await readTextOrNull(join(repositoryRoot, companionFile))) ?? "";
+  const content = String(await readTextOrNull(join(repositoryRoot, companionFile)));
   const message = isPointerOnly({
     content,
     normativeFileName: config.normativeDocumentFileName,

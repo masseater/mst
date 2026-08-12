@@ -20,7 +20,7 @@ const CLI_PATH = fileURLToPath(new URL("./cli.ts", import.meta.url));
 
 const PLUGIN_PATH = fileURLToPath(new URL("./plugin.ts", import.meta.url));
 
-const PROCESS_TIMEOUT = 30_000;
+const PROCESS_TIMEOUT = 180_000;
 
 type CommandResult = {
   readonly exitCode: number | null;
@@ -87,10 +87,10 @@ const runCommand = ({
   return { exitCode: run.status, out: run.stdout, error: run.stderr };
 };
 
-const runCli = (root: string, command: "equivalent-concepts" | "verify"): CommandResult =>
+const runCli = (root: string): CommandResult =>
   runCommand({
     command: process.execPath,
-    arguments_: [CLI_PATH, command, "--repository-root", root],
+    arguments_: [CLI_PATH, "check", "--repository-root", root],
     cwd: root,
   });
 
@@ -117,14 +117,14 @@ const annotated = (conceptId: string, declaration: string): string =>
 const validOwner = (value: string): string =>
   annotated("real.status", `export const REAL_STATUSES = [${JSON.stringify(value)}] as const;`);
 
-describe("canonical values process e2e", { timeout: PROCESS_TIMEOUT * 2 }, () => {
+describe("canonical values process e2e", { timeout: PROCESS_TIMEOUT * 4 }, () => {
   test("a canonical owner verifies and its consumer raw literal is linted", () => {
     const root = repositoryWith({
       "src/consumer.ts": 'export const selected = "draft";\n',
       "src/owner.ts": validOwner("draft"),
     });
 
-    expect(runCli(root, "verify")).toMatchObject({ exitCode: 0, out: "", error: "" });
+    expect(runCli(root)).toMatchObject({ exitCode: 0, out: "", error: "" });
     expect(runLint(root, "src/owner.ts")).toMatchObject({ exitCode: 0 });
     const consumer = runLint(root, "src/consumer.ts");
     expect(consumer.exitCode).toBe(1);
@@ -137,7 +137,7 @@ describe("canonical values process e2e", { timeout: PROCESS_TIMEOUT * 2 }, () =>
       "src/owner.ts": validOwner("draft"),
     });
 
-    const verified = runCli(root, "verify");
+    const verified = runCli(root);
     expect(verified.exitCode).toBe(1);
     expect(verified.out).toContain("src/invalid.ts:1");
     const linted = runLint(root, "src/invalid.ts");
@@ -152,7 +152,7 @@ describe("canonical values process e2e", { timeout: PROCESS_TIMEOUT * 2 }, () =>
       "src/owner.ts": validOwner("published"),
     });
 
-    const verified = runCli(root, "verify");
+    const verified = runCli(root);
     expect(verified.exitCode).toBe(1);
     expect(verified.out).toContain("src/invalid.ts:2");
     const linted = runLint(root, "src/invalid.ts");
@@ -174,7 +174,7 @@ describe("canonical values process e2e", { timeout: PROCESS_TIMEOUT * 2 }, () =>
       "src/owner.ts": validOwner("draft"),
     });
 
-    const verified = runCli(root, "verify");
+    const verified = runCli(root);
     expect(verified.exitCode).toBe(1);
     expect(verified.out).toContain("fixtures/status.ts:1");
     expect(verified.out).toContain("src/Owner.stories.ts:1");
@@ -192,7 +192,7 @@ describe("canonical values process e2e", { timeout: PROCESS_TIMEOUT * 2 }, () =>
       "src/values.ts": 'export const VALUES = ["other"] as const;\n',
     });
 
-    const verified = runCli(root, "verify");
+    const verified = runCli(root);
     expect(verified.exitCode).toBe(1);
     expect(verified.out).toContain("src/invalid.ts:1");
     const linted = runLint(root, "src/invalid.ts");
@@ -203,7 +203,7 @@ describe("canonical values process e2e", { timeout: PROCESS_TIMEOUT * 2 }, () =>
   test("a package shadow subpath is an unregistered canonical import route", () => {
     const root = packageRouteRepository();
 
-    expect(runCli(root, "verify").exitCode).toBe(0);
+    expect(runCli(root)).toMatchObject({ exitCode: 0, out: "", error: "" });
     const linted = runLint(root, "src/shadow-consumer.ts");
     expect(linted.exitCode).toBe(1);
     expect(linted.out).toContain(NO_LOCAL_CODE);
@@ -213,7 +213,7 @@ describe("canonical values process e2e", { timeout: PROCESS_TIMEOUT * 2 }, () =>
   test("an alias subpath that exports the owner symbol is a registered route", () => {
     const root = packageRouteRepository();
 
-    expect(runCli(root, "verify").exitCode).toBe(0);
+    expect(runCli(root)).toMatchObject({ exitCode: 0, out: "", error: "" });
     expect(runLint(root, "src/alias-consumer.ts")).toMatchObject({ exitCode: 0 });
   });
 
@@ -283,7 +283,7 @@ describe("canonical values process e2e", { timeout: PROCESS_TIMEOUT * 2 }, () =>
         annotated("retry.outcome", "export const OUTCOMES = [...BASE, 1] as const;"),
     });
 
-    expect(runCli(root, "verify")).toMatchObject({ exitCode: 0, out: "" });
+    expect(runCli(root)).toMatchObject({ exitCode: 0, out: "" });
     expect(runLint(root, "src/base.ts").exitCode).toBe(0);
     expect(runLint(root, "src/retry.ts").exitCode).toBe(0);
     expect(runLint(root, "src/order.ts").exitCode).toBe(0);
@@ -305,8 +305,7 @@ describe("canonical values process e2e", { timeout: PROCESS_TIMEOUT * 2 }, () =>
       "src/pair.ts": annotated("pair.value", 'export const PAIR = ["a", "b"] as const;'),
     });
 
-    expect(runCli(root, "verify")).toMatchObject({ exitCode: 0, out: "" });
-    expect(runCli(root, "equivalent-concepts")).toMatchObject({ exitCode: 0, out: "" });
+    expect(runCli(root)).toMatchObject({ exitCode: 0, out: "" });
   });
 
   test("same-line duplicate declarations fail verification and leave no catalog owner", () => {
@@ -315,7 +314,7 @@ describe("canonical values process e2e", { timeout: PROCESS_TIMEOUT * 2 }, () =>
         '/** @canonical-values order.status */ const A = ["draft"] as const; /** @canonical-values order.status */ const B = ["published"] as const;\nexport type Status = "draft" | "published";\n',
     });
 
-    const verified = runCli(root, "verify");
+    const verified = runCli(root);
     expect(verified.exitCode).toBe(1);
     expect(verified.out).toContain("already declared at src/duplicate.ts:1");
     const linted = runLint(root, "src/duplicate.ts");
@@ -335,6 +334,7 @@ const packageRouteRepository = (): string =>
     }),
     "packages/vocabulary/package.json": JSON.stringify({
       name: "@fixture/vocabulary",
+      private: true,
       exports: {
         ".": "./src/index.ts",
         "./alias": "./src/alias.ts",

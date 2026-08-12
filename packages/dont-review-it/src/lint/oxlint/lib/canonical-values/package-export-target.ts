@@ -51,11 +51,7 @@ const packageExportPatternKeyCompare = (left: string, right: string): number => 
   const leftBaseLength = packageExportPatternBaseLength(left);
   const rightBaseLength = packageExportPatternBaseLength(right);
   if (leftBaseLength !== rightBaseLength) return leftBaseLength > rightBaseLength ? -1 : 1;
-  const leftWildcard = left.indexOf("*");
-  const rightWildcard = right.indexOf("*");
-  if (leftWildcard === -1 || rightWildcard === -1) return leftWildcard === -1 ? 1 : -1;
-  if (left.length !== right.length) return left.length > right.length ? -1 : 1;
-  return 0;
+  return left.length === right.length ? 0 : left.length > right.length ? -1 : 1;
 };
 
 const packageExportPatternMatches = (pattern: string, subpath: string): boolean => {
@@ -102,7 +98,7 @@ export const packageExportTargetPatterns = ({
     );
     return nested.some((patterns) => patterns === null)
       ? null
-      : nested.flatMap((patterns) => patterns ?? []);
+      : nested.flatMap((patterns) => patterns as readonly string[]);
   }
   const nested = Object.entries(value).flatMap(([condition, target]) => {
     if ((!includeTypes && /^types(?:@|$)/u.test(condition)) || target === null) return [];
@@ -110,7 +106,7 @@ export const packageExportTargetPatterns = ({
   });
   return nested.some((patterns) => patterns === null)
     ? null
-    : nested.flatMap((patterns) => patterns ?? []);
+    : nested.flatMap((patterns) => patterns as readonly string[]);
 };
 
 export const validPackageExportTargetPattern = (

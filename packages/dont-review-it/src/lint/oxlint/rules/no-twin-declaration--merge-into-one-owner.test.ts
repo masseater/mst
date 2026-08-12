@@ -4,14 +4,14 @@ import { testLintRule } from "@mst/lint-rule-authoring";
 import { describe } from "vite-plus/test";
 
 import { findWorkspaceRoot } from "../lib/canonical-values/workspace-root.ts";
-import { buildBodyIndex } from "../lib/duplicated-bodies/body-index.ts";
+import { buildBodyIndex, namedFingerprintOf } from "../lib/duplicated-bodies/body-index.ts";
 import { createNoTwinDeclaration } from "./no-twin-declaration--merge-into-one-owner.ts";
 
 const repositoryRoot = findWorkspaceRoot(process.cwd());
 
 const SUBJECT_PATH = "packages/dont-review-it/src/subject.ts";
 
-const OTHER_PATH = "packages/utils/src/other.ts";
+const OTHER_PATH = "packages/repository-checks/src/other.ts";
 
 const subjectFilename = join(repositoryRoot, SUBJECT_PATH);
 
@@ -41,6 +41,54 @@ const ruleWith = (subject: { readonly name: string; readonly fingerprint: string
 
 const twinRule = ruleWith({ name: "MANIFEST_FILE_NAME", fingerprint: "manifest" });
 
+const offPageTwinRule = createNoTwinDeclaration({
+  loadIndex: () => ({
+    bodiesByPath: new Map([
+      [
+        SUBJECT_PATH,
+        [
+          {
+            name: "MANIFEST_FILE_NAME",
+            line: 99,
+            fingerprint: "manifest",
+            nodeCount: NODES_IN_A_SHORT_BODY,
+          },
+        ],
+      ],
+    ]),
+    sitesByFingerprint: new Map(),
+    sitesByNamedFingerprint: new Map([
+      [
+        namedFingerprintOf({ name: "MANIFEST_FILE_NAME", fingerprint: "manifest" }),
+        [
+          { relativePath: SUBJECT_PATH, name: "MANIFEST_FILE_NAME", line: 99 },
+          { relativePath: OTHER_PATH, name: "MANIFEST_FILE_NAME", line: 7 },
+        ],
+      ],
+    ]),
+  }),
+});
+
+const unlistedTwinRule = createNoTwinDeclaration({
+  loadIndex: () => ({
+    bodiesByPath: new Map([
+      [
+        SUBJECT_PATH,
+        [
+          {
+            name: "MANIFEST_FILE_NAME",
+            line: 1,
+            fingerprint: "manifest",
+            nodeCount: NODES_IN_A_SHORT_BODY,
+          },
+        ],
+      ],
+    ]),
+    sitesByFingerprint: new Map(),
+    sitesByNamedFingerprint: new Map(),
+  }),
+});
+
 const sameBodyRule = ruleWith({ name: "PACKAGE_FILE_NAME", fingerprint: "manifest" });
 
 const sameNameRule = ruleWith({ name: "MANIFEST_FILE_NAME", fingerprint: "workspace" });
@@ -66,6 +114,29 @@ describe("dont-review-it/no-twin-declaration--merge-into-one-owner", () => {
       },
     ],
     invalid: [],
+  });
+
+  testLintRule(unlistedTwinRule, {
+    valid: [
+      {
+        name: "a declaration whose name and body the index lists no site for is left alone",
+        code: `const MANIFEST_FILE_NAME = "package.json";`,
+        filename: subjectFilename,
+      },
+    ],
+    invalid: [],
+  });
+
+  testLintRule(offPageTwinRule, {
+    valid: [],
+    invalid: [
+      {
+        name: "a declaration the index places past the end of the file is reported on the file",
+        code: `const MANIFEST_FILE_NAME = "package.json";`,
+        filename: subjectFilename,
+        errors: [{ messageId: "twinDeclaration" }],
+      },
+    ],
   });
 
   testLintRule(twinRule, {

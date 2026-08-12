@@ -70,15 +70,10 @@ export const duplicatedNormativeUnits = ({
     const files = [...new Set(sites.map((site) => site.file))].toSorted();
     if (files.length < 2) return [];
 
-    const [first] = sites;
-    if (first === undefined) return [];
-
-    return [
-      {
-        file: first.file,
-        line: first.line,
-        message: message({ files, unit: truncate(text, 120) }),
-      },
-    ];
+    return sites.slice(0, 1).map((first) => ({
+      file: first.file,
+      line: first.line,
+      message: message({ files, unit: truncate(text, 120) }),
+    }));
   });
 };

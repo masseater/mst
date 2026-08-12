@@ -18,7 +18,7 @@ const directoryEntries = (directory: string): readonly string[] => {
   return found;
 };
 
-const baseNameOf = (fileName: string): string => fileName.split(".")[0] ?? fileName;
+const baseNameOf = (fileName: string): string => fileName.split(".").slice(0, 1).join("");
 
 const ordinalPrefixOf = (fileName: string): string | null =>
   ORDINAL_NAME_PATTERN.exec(baseNameOf(fileName))?.groups?.prefix ?? null;
@@ -36,7 +36,7 @@ const isSplitSibling = (input: {
 };
 
 const splitSiblingOf = (filePath: string): string | null => {
-  const fileName = filePath.split(sep).at(-1) ?? "";
+  const fileName = filePath.split(sep).slice(-1).join("");
   const prefix = ordinalPrefixOf(fileName);
   if (prefix === null) return null;
 
@@ -59,7 +59,7 @@ export const forbidNumberedSiblingFile = createDontReviewItRule({
     },
     messages: {
       numberedSiblingFile:
-        "Splitting a file into siblings that differ only by a number is forbidden, because the number names nothing, and a reader looking for one behaviour has to open every one of them to find where it went. `{{sibling}}` sits in this directory under the same name with a different number, so the responsibility both files share is still exactly one responsibility spread over two places. List what each file owns and name it after that. If listing produces one entry, the split bought nothing: put the declarations back into one file and reduce what it does instead of dividing it again.",
+        "Splitting a file into siblings that differ only by a number is forbidden. `{{sibling}}` sits in this directory under the same name with a different number. List what each file owns and rename each file after what it owns.",
     },
     schema: [],
   },

@@ -4,8 +4,12 @@ import { dirname, join } from "node:path";
 
 import { describe, expect, onTestFinished, test } from "vite-plus/test";
 
-import { buildCanonicalValuesCatalog } from "./builder.ts";
+import { analyzeCanonicalValuesRepository } from "./builder.ts";
+import { publicPackageEntries, publicPackageName } from "./export-specifier-index.ts";
 import { importRouteStatus } from "./import-route.ts";
+
+const buildCanonicalValuesCatalog = (options: { readonly repositoryRoot: string }) =>
+  analyzeCanonicalValuesRepository(options).catalog;
 
 const writeRepositoryFile = ({
   contents,
@@ -86,7 +90,113 @@ const importRoutesFor = (
     repositoryRoot: createPackageRepository(exportsField, extraFiles),
   }).entries[0]?.importRoutes ?? [];
 
+const publicEntriesFor = (
+  exportsField: unknown,
+  extraFiles?: Readonly<Record<string, string>>,
+): readonly unknown[] => {
+  const root = createPackageRepository(exportsField, extraFiles);
+  return publicPackageEntries(join(root, "packages/vocabulary"));
+};
+
 describe("export specifier index", () => {
+  test.each([null, [], {}])(
+    "a package manifest without a public name publishes no entries",
+    (manifest) => {
+      const root = createPackageRepository("./src/index.ts");
+      writeRepositoryFile({
+        contents: JSON.stringify(manifest),
+        relativePath: "packages/vocabulary/package.json",
+        root,
+      });
+
+      expect(publicPackageEntries(join(root, "packages/vocabulary"))).toStrictEqual([]);
+      expect(publicPackageName(join(root, "packages/vocabulary"))).toBe(null);
+    },
+  );
+
+  test("package.json and invalid subpaths never become public source entries", () => {
+    const entries = publicEntriesFor({
+      ".": "./src/index.ts",
+      invalid: "./src/index.ts",
+      "./package.json": "./package.json",
+      "./blocked": null,
+    });
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ specifier: "@fixture/vocabulary" });
+    expect(String((entries[0] as { readonly sourceFile: unknown }).sourceFile)).toMatch(
+      /packages\/vocabulary\/src\/index\.ts$/u,
+    );
+  });
+
+  test("a non-module JSON export does not invalidate a script owner route", () => {
+    expect(
+      importRoutesFor(
+        { ".": "./src/index.ts", "./config": "./config.json" },
+        { "packages/vocabulary/config.json": "{}\n" },
+      ),
+    ).toHaveLength(1);
+  });
+
+  test("non-runtime and exhausted fallback targets publish no source entry", () => {
+    expect(publicEntriesFor(["types-only", null, "../outside.ts"])).toStrictEqual([]);
+  });
+
+  test("an empty fallback and an empty runtime condition publish no source entry", () => {
+    expect(publicEntriesFor([])).toStrictEqual([]);
+    expect(publicEntriesFor({ types: "./src/index.d.ts" })).toStrictEqual([]);
+  });
+
+  test("a malformed wildcard key and a package escape publish no source entry", () => {
+    expect(
+      publicEntriesFor({
+        "invalid/*": "./src/public/*.ts",
+        "./escape/*": "../public/*.ts",
+      }),
+    ).toStrictEqual([]);
+  });
+
+  test("a missing package directory publishes no name or entries", () => {
+    const root = createPackageRepository("./src/index.ts");
+    const missing = join(root, "packages/missing");
+
+    expect(publicPackageEntries(missing)).toStrictEqual([]);
+    expect(publicPackageName(missing)).toBe(null);
+  });
+
+  test("package name reading rejects malformed manifests independently", () => {
+    for (const manifest of [null, [], {}, { name: "" }, { name: 1 }]) {
+      const root = createPackageRepository("./src/index.ts");
+      writeRepositoryFile({
+        contents: JSON.stringify(manifest),
+        relativePath: "packages/vocabulary/package.json",
+        root,
+      });
+
+      expect(publicPackageName(join(root, "packages/vocabulary"))).toBe(null);
+    }
+  });
+
+  test("an invalid package manifest grants no owner import route", () => {
+    const root = createPackageRepository("./src/index.ts");
+    writeRepositoryFile({
+      contents: "null",
+      relativePath: "packages/vocabulary/package.json",
+      root,
+    });
+
+    expect(buildCanonicalValuesCatalog({ repositoryRoot: root }).entries[0]).toMatchObject({
+      importRoutes: [],
+      packageName: null,
+    });
+  });
+
+  test("a package without exports exposes no public source entry", () => {
+    const root = createPackageRepository(undefined);
+
+    expect(publicPackageEntries(join(root, "packages/vocabulary"))).toStrictEqual([]);
+  });
+
   test("an export-equals owner publishes the package module value", () => {
     expect(
       importRoutesFor({
@@ -168,6 +278,17 @@ describe("export specifier index", () => {
 
   test("a pattern whose target has no repository file publishes no route", () => {
     expect(importRoutesFor({ "./*": "./src/missing/*.ts" })).toStrictEqual([]);
+  });
+
+  test("a pattern with an unresolved runtime condition publishes no route", () => {
+    expect(
+      importRoutesFor({
+        "./*": {
+          browser: "./src/missing/*.ts",
+          default: "./src/public/*.ts",
+        },
+      }),
+    ).toStrictEqual([]);
   });
 
   test("a JavaScript target pattern resolves its corresponding TypeScript source", () => {

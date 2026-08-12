@@ -21,7 +21,7 @@ export const noBroadLintDisable = createLintRuleAuthoringRule({
     },
     messages: {
       broadLintDisable:
-        "A `{{ directive }}` comment must not stay in the source, because it opens the suppression over a span instead of pinning it to the one violation it was written for, and whatever lands inside that span later is exempted without anyone deciding so. Replace it with `{{ nextLineDirective }}` on its own line directly above the single line that violates, name there the rule it suppresses, and state after `--` why the suppression holds.",
+        "A `{{ directive }}` comment must not stay in the source. Replace it with `{{ nextLineDirective }}` on its own line directly above the single line that violates, name there the rule it suppresses, and state the grounds for the suppression after `--`.",
     },
     schema: [],
   },

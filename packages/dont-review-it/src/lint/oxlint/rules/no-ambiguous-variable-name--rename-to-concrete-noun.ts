@@ -20,7 +20,7 @@ export const noAmbiguousVariableName = createDontReviewItRule({
     },
     messages: {
       ambiguousVariableName:
-        "The name `{{name}}` must not be used as a variable binding name, because it names a container rather than the subject the binding holds, and a reader has to trace the assignment upstream to learn what that subject is. Rename it to a noun that names the value itself: the parsed config, the rendered fragment, the fetched record, the caught error. If one block offers several such nouns and none of them covers the binding, that block is doing several jobs; split it.",
+        "The name `{{name}}` must not be used as a variable binding name. Rename it to a noun that names the value itself: the parsed config, the rendered fragment, the fetched record, the caught error.",
     },
     schema: [
       {

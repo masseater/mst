@@ -1,7 +1,8 @@
 import { dirname, resolve } from "node:path";
 
-import { attempt, sortBy, uniqBy } from "es-toolkit";
+import { attempt, memoize, sortBy, uniqBy } from "es-toolkit";
 
+import { readGitSourceScope, type GitSourceScope } from "../git-ignored-source.ts";
 import { readAnnotatedSources, type AnnotatedSource } from "./annotated-sources.ts";
 import { cacheInputFingerprint, readCachedEntries, writeCachedEntries } from "./catalog-cache.ts";
 import { buildCatalog, type CanonicalValuesCatalog } from "./catalog.ts";
@@ -55,6 +56,14 @@ const sourceProblemsIn = (
     source.problems.map((problem) => ({ ...problem, filePath: source.relativePath })),
   );
 
+const hasDuplicateDeclarations = (
+  declarations: CanonicalValuesDeclarationSite[],
+): declarations is [
+  CanonicalValuesDeclarationSite,
+  CanonicalValuesDeclarationSite,
+  ...CanonicalValuesDeclarationSite[],
+] => declarations.length > 1;
+
 const duplicateConceptsIn = (
   declarations: readonly CanonicalValuesDeclarationSite[],
 ): {
@@ -62,23 +71,21 @@ const duplicateConceptsIn = (
   readonly problems: readonly CanonicalValuesDuplicateProblem[];
 } => {
   const groups = [...Map.groupBy(declarations, (declaration) => declaration.conceptId).values()];
-  const duplicates = groups.filter((group) => group.length > 1);
+  const duplicates = groups.filter(hasDuplicateDeclarations);
   return {
-    conceptIds: new Set(duplicates.flatMap((group) => group[0]?.conceptId ?? [])),
-    problems: duplicates.flatMap(([first, ...rest]) =>
-      first === undefined
-        ? []
-        : rest.map(
-            (declaration): CanonicalValuesDuplicateProblem => ({
-              kind: "duplicate-concept",
-              filePath: declaration.relativePath,
-              line: declaration.line,
-              conceptId: declaration.conceptId,
-              declaredFilePath: first.relativePath,
-              declaredLine: first.line,
-            }),
-          ),
-    ),
+    conceptIds: new Set(duplicates.map(([first]) => first.conceptId)),
+    problems: duplicates.flatMap(([first, ...rest]) => {
+      return rest.map(
+        (declaration): CanonicalValuesDuplicateProblem => ({
+          kind: "duplicate-concept",
+          filePath: declaration.relativePath,
+          line: declaration.line,
+          conceptId: declaration.conceptId,
+          declaredFilePath: first.relativePath,
+          declaredLine: first.line,
+        }),
+      );
+    }),
   };
 };
 
@@ -96,9 +103,11 @@ const packageNamesIn = (manifests: RepositoryFiles["manifests"]): readonly strin
 const analyzeRepositoryFiles = ({
   repositoryFiles,
   repositoryRoot,
+  sourceScope,
 }: {
   readonly repositoryFiles: RepositoryFiles;
   readonly repositoryRoot: string;
+  readonly sourceScope: GitSourceScope;
 }): CanonicalValuesRepositoryAnalysis => {
   const sources = readAnnotatedSources(repositoryFiles);
   const declarations = declarationSitesIn(sources);
@@ -114,10 +123,10 @@ const analyzeRepositoryFiles = ({
   const entries = repositoryFiles.problems.length === 0 ? resolved.entries : [];
 
   return {
-    catalog: buildCatalog(
-      sortBy(entries, ["declarationPath", "declarationStart"]),
-      packageNamesIn(repositoryFiles.manifests),
-    ),
+    catalog: buildCatalog(sortBy(entries, ["declarationPath", "declarationStart"]), {
+      packageNames: packageNamesIn(repositoryFiles.manifests),
+      sourceScope,
+    }),
     declarations,
     problems: [
       ...repositoryFiles.problems,
@@ -134,13 +143,15 @@ export const analyzeCanonicalValuesRepository = ({
   readonly repositoryRoot: string;
 }): CanonicalValuesRepositoryAnalysis => {
   const root = resolve(repositoryRoot);
+  const sourceScope = readGitSourceScope(root);
   return analyzeRepositoryFiles({
-    repositoryFiles: listRepositoryFiles(root),
+    repositoryFiles: listRepositoryFiles(root, sourceScope),
     repositoryRoot: root,
+    sourceScope,
   });
 };
 
-export const buildCanonicalValuesCatalog = ({
+const buildCanonicalValuesCatalog = ({
   repositoryRoot,
 }: {
   readonly repositoryRoot: string;
@@ -150,33 +161,37 @@ type CanonicalValuesRepositoryInput = {
   readonly fingerprint: string;
   readonly repositoryFiles: RepositoryFiles;
   readonly repositoryRoot: string;
+  readonly sourceScope: GitSourceScope;
 };
 
 const repositoryInput = (repositoryRoot: string): CanonicalValuesRepositoryInput => {
-  const repositoryFiles = listRepositoryFiles(repositoryRoot);
+  const sourceScope = readGitSourceScope(repositoryRoot);
+  const repositoryFiles = listRepositoryFiles(repositoryRoot, sourceScope);
   return {
     fingerprint: cacheInputFingerprint(repositoryFiles.cacheInputs, repositoryFiles.problems),
     repositoryFiles,
     repositoryRoot,
+    sourceScope,
   };
 };
 
 const buildCatalogFor = (input: CanonicalValuesRepositoryInput): CanonicalValuesCatalog => {
-  const { fingerprint, repositoryFiles, repositoryRoot } = input;
+  const { fingerprint, repositoryFiles, repositoryRoot, sourceScope } = input;
   const packageNames = packageNamesIn(repositoryFiles.manifests);
   if (repositoryFiles.problems.length > 0 || repositoryFiles.declarationSources.length === 0) {
-    return buildCatalog([], packageNames);
+    return buildCatalog([], { packageNames, sourceScope });
   }
 
   const cached = readCachedEntries(repositoryRoot, fingerprint);
-  if (cached !== null) return buildCatalog(cached, packageNames);
-  return buildAndCacheCatalog({ fingerprint, repositoryFiles, repositoryRoot });
+  if (cached !== null) return buildCatalog(cached, { packageNames, sourceScope });
+  return buildAndCacheCatalog({ fingerprint, repositoryFiles, repositoryRoot, sourceScope });
 };
 
 const buildAndCacheCatalog = (input: {
   readonly fingerprint: string;
   readonly repositoryFiles: RepositoryFiles;
   readonly repositoryRoot: string;
+  readonly sourceScope: GitSourceScope;
 }): CanonicalValuesCatalog => {
   const analyzed = analyzeRepositoryFiles(input);
   writeCachedEntries(input.repositoryRoot, {
@@ -186,20 +201,6 @@ const buildAndCacheCatalog = (input: {
   return analyzed.catalog;
 };
 
-const catalogByRepositoryRoot = new Map<
-  string,
-  { readonly catalog: CanonicalValuesCatalog; readonly fingerprint: string }
->();
-
-export const loadCanonicalValuesCatalog = (options: {
-  readonly repositoryRoot: string;
-}): CanonicalValuesCatalog => {
-  const root = resolve(options.repositoryRoot);
-  const input = repositoryInput(root);
-  const memoized = catalogByRepositoryRoot.get(root);
-  if (memoized?.fingerprint === input.fingerprint) return memoized.catalog;
-
-  const built = buildCatalogFor(input);
-  catalogByRepositoryRoot.set(root, { catalog: built, fingerprint: input.fingerprint });
-  return built;
-};
+export const loadCanonicalValuesCatalogSnapshot = memoize(buildCanonicalValuesCatalog, {
+  getCacheKey: (options) => resolve(options.repositoryRoot),
+});

@@ -5,8 +5,7 @@ import { dirname, join } from "node:path";
 import { describe, expect, onTestFinished, test } from "vite-plus/test";
 
 import { RETIRED_ANNOTATION_TAGS } from "./annotation.ts";
-import { buildCanonicalValuesCatalog } from "./builder.ts";
-import { findEquivalentConcepts, verifyCanonicalValues } from "./verify.ts";
+import { findEquivalentConcepts, inspectCanonicalValues } from "./verify.ts";
 
 import type { CanonicalValue } from "./fingerprint.ts";
 
@@ -36,6 +35,12 @@ ${declaration}
 
   const conceptIdsOf = (group: readonly { readonly conceptId: string }[]): readonly string[] =>
     group.map((entry) => entry.conceptId);
+
+  const verifyCanonicalValues = (options: { readonly repositoryRoot: string }) =>
+    inspectCanonicalValues(options).problems;
+
+  const buildCanonicalValuesCatalog = (options: { readonly repositoryRoot: string }) =>
+    inspectCanonicalValues(options).catalog;
 
   const catalogPathsOf = (repositoryRoot: string): readonly string[] =>
     buildCanonicalValuesCatalog({ repositoryRoot }).entries.map((entry) => entry.declarationPath);
@@ -269,25 +274,20 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
     },
   ];
 
-  const cataloguedRows = (repositoryRoot: string): readonly unknown[] =>
-    buildCanonicalValuesCatalog({ repositoryRoot }).entries.map((entry) => [
-      entry.declarationPath,
-      entry.conceptId,
-      entry.values,
-    ]);
-
-  const verifiedRows = (repositoryRoot: string): readonly unknown[] =>
-    verifyCanonicalValues({ repositoryRoot }).map((problem) => [problem.kind, problem.filePath]);
-
   test("the catalog and the verification read the same declarations out of the same source", () => {
     const observed = AGREEMENT_CASES.map(({ form, conceptId, declaration }) => {
       const repositoryRoot = repositoryWith({
         "src/owner.ts": annotatedWith(conceptId, declaration),
       });
+      const inspection = inspectCanonicalValues({ repositoryRoot });
       return {
         form,
-        catalogued: cataloguedRows(repositoryRoot),
-        verified: verifiedRows(repositoryRoot),
+        catalogued: inspection.catalog.entries.map((entry) => [
+          entry.declarationPath,
+          entry.conceptId,
+          entry.values,
+        ]),
+        verified: inspection.problems.map((problem) => [problem.kind, problem.filePath]),
       };
     });
 

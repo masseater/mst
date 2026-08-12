@@ -1,19 +1,8 @@
 import { dirname } from "node:path";
 
-import { attempt, uniqBy } from "es-toolkit";
+import { attempt, groupBy, uniqBy } from "es-toolkit";
 import * as ts from "typescript-6";
 
-import { canonicalOwnerReachableNodes } from "./canonical-owner-execution.ts";
-import { validateCanonicalOwnerRuntimeDomain } from "./canonical-owner-runtime-domain.ts";
-import {
-  canonicalOwnerRuntimeDeclarationKey,
-  validateCanonicalOwnerRuntimeSource,
-} from "./canonical-owner-runtime-source.ts";
-import { validateCanonicalOwnerStability } from "./canonical-owner-stability.ts";
-import {
-  canonicalValueFromLiteralType,
-  validateDirectCanonicalValueDuplicates,
-} from "./direct-duplicate-values.ts";
 import {
   publicImportRoutes,
   publicPackageEntries,
@@ -21,7 +10,10 @@ import {
 } from "./export-specifier-index.ts";
 import { canonicalValueKey, fingerprintValues, type CanonicalValue } from "./fingerprint.ts";
 import { nearestPackageDirectory } from "./source-files.ts";
-import { createCanonicalValuesTypeScriptProgram } from "./typescript-program.ts";
+import {
+  canonicalValuesTypeScriptConfigPath,
+  createCanonicalValuesTypeScriptProgram,
+} from "./typescript-program.ts";
 
 import type { CanonicalValuesEntry } from "./catalog.ts";
 import type { CanonicalValuesDeclaration, CanonicalValuesTextProblem } from "./declarations.ts";
@@ -31,9 +23,11 @@ export type CanonicalValuesDeclarationSite = CanonicalValuesDeclaration & {
   readonly relativePath: string;
 };
 
-export type CanonicalValuesSourceProblem = CanonicalValuesTextProblem & {
-  readonly filePath: string;
-};
+export type CanonicalValuesSourceProblem = CanonicalValuesTextProblem extends infer Problem
+  ? Problem extends CanonicalValuesTextProblem
+    ? Problem & { readonly filePath: string }
+    : never
+  : never;
 
 const variableDeclarationAt = (
   sourceFile: ts.SourceFile,
@@ -41,20 +35,8 @@ const variableDeclarationAt = (
 ): ts.VariableDeclaration => {
   const statement = sourceFile.statements.find(
     (candidate) => candidate.getStart(sourceFile) === declaration.declarationStart,
-  );
-  if (statement === undefined || !ts.isVariableStatement(statement)) {
-    throw new Error(`${declaration.relativePath}: canonical variable statement was not found`);
-  }
-  const [variable] = statement.declarationList.declarations;
-  if (
-    statement.declarationList.declarations.length !== 1 ||
-    variable === undefined ||
-    !ts.isIdentifier(variable.name) ||
-    variable.name.text !== declaration.binding
-  ) {
-    throw new Error(`${declaration.relativePath}: canonical binding was not found`);
-  }
-  return variable;
+  ) as ts.VariableStatement;
+  return statement.declarationList.declarations[0] as ts.VariableDeclaration;
 };
 
 const normalizedItems = (canonicalItems: readonly CanonicalValue[]): readonly CanonicalValue[] =>
@@ -62,28 +44,15 @@ const normalizedItems = (canonicalItems: readonly CanonicalValue[]): readonly Ca
     canonicalValueKey(left).localeCompare(canonicalValueKey(right)),
   );
 
-const closedObjectProperties = (input: {
-  readonly bindingType: ts.Type;
-  readonly checker: ts.TypeChecker;
-  readonly declaration: ts.VariableDeclaration;
-}): readonly ts.Symbol[] => {
-  if ((input.bindingType.flags & ts.TypeFlags.Object) === 0) {
-    throw new Error(
-      `${input.declaration.name.getText()}: canonical binding must expose finite values`,
-    );
-  }
-  if (input.checker.getIndexInfosOfType(input.bindingType).length > 0) {
-    throw new Error(
-      `${input.declaration.name.getText()}: canonical object keys must form a closed domain`,
-    );
-  }
-  const properties = input.checker.getPropertiesOfType(input.bindingType);
-  if (properties.some((property) => (property.flags & ts.SymbolFlags.Optional) !== 0)) {
-    throw new Error(
-      `${input.declaration.name.getText()}: canonical object keys must always be present`,
-    );
-  }
-  return properties;
+const literalValueFromType = (
+  checker: ts.TypeChecker,
+  type: ts.Type,
+): CanonicalValue | undefined => {
+  if ((type.flags & ts.TypeFlags.StringLiteral) !== 0) return (type as ts.StringLiteralType).value;
+  if ((type.flags & ts.TypeFlags.NumberLiteral) !== 0) return (type as ts.NumberLiteralType).value;
+  if ((type.flags & ts.TypeFlags.BooleanLiteral) !== 0)
+    return checker.typeToString(type) === "true";
+  return (type.flags & ts.TypeFlags.Null) !== 0 ? null : undefined;
 };
 
 const objectDomain = (input: {
@@ -91,14 +60,25 @@ const objectDomain = (input: {
   readonly checker: ts.TypeChecker;
   readonly declaration: ts.VariableDeclaration;
 }): readonly CanonicalValue[] => {
-  const properties = closedObjectProperties(input);
-  const propertyNames = properties.map((property) => property.name);
-  if (propertyNames.length === 0 || propertyNames.some((name) => name.startsWith("__@"))) {
+  if ((input.bindingType.flags & ts.TypeFlags.Object) === 0) {
     throw new Error(
-      `${input.declaration.name.getText()}: canonical object must expose named properties`,
+      `${input.declaration.name.getText()}: canonical binding must expose finite values`,
     );
   }
-  return normalizedItems(propertyNames);
+  if (input.checker.getIndexInfosOfType(input.bindingType).length > 0) {
+    throw new Error(`${input.declaration.name.getText()}: canonical object keys must be closed`);
+  }
+  const properties = input.checker.getPropertiesOfType(input.bindingType);
+  if (
+    properties.length === 0 ||
+    properties.some(
+      (property) =>
+        (property.flags & ts.SymbolFlags.Optional) !== 0 || property.name.startsWith("__@"),
+    )
+  ) {
+    throw new Error(`${input.declaration.name.getText()}: canonical object keys must be finite`);
+  }
+  return normalizedItems(properties.map((property) => property.name));
 };
 
 const arrayDomain = (input: {
@@ -106,22 +86,75 @@ const arrayDomain = (input: {
   readonly declaration: ts.VariableDeclaration;
   readonly elementType: ts.Type;
 }): readonly CanonicalValue[] => {
+  if ((input.elementType.flags & ts.TypeFlags.Never) !== 0) {
+    throw new Error(`${input.declaration.name.getText()}: canonical array must not be empty`);
+  }
   const memberTypes = input.elementType.isUnion() ? input.elementType.types : [input.elementType];
-  const canonicalItems = memberTypes.map((member) =>
-    canonicalValueFromLiteralType(input.checker, member),
-  );
+  const canonicalItems = memberTypes.map((member) => literalValueFromType(input.checker, member));
   if (canonicalItems.length === 0 || canonicalItems.some((item) => item === undefined)) {
-    throw new Error(
-      `${input.declaration.name.getText()}: canonical array must expose literal values`,
-    );
+    throw new Error(`${input.declaration.name.getText()}: canonical array must contain literals`);
   }
   return normalizedItems(canonicalItems as CanonicalValue[]);
+};
+
+const unwrapInitializer = (expression: ts.Expression): ts.Expression => {
+  if (
+    ts.isAsExpression(expression) ||
+    ts.isSatisfiesExpression(expression) ||
+    ts.isParenthesizedExpression(expression) ||
+    ts.isNonNullExpression(expression)
+  ) {
+    return unwrapInitializer(expression.expression);
+  }
+  return expression;
+};
+
+const directScalarInitializerValue = (unwrapped: ts.Expression): CanonicalValue | undefined => {
+  if (ts.isStringLiteral(unwrapped) || ts.isNoSubstitutionTemplateLiteral(unwrapped)) {
+    return unwrapped.text;
+  }
+  if (ts.isNumericLiteral(unwrapped)) return Number(unwrapped.text);
+  if (unwrapped.kind === ts.SyntaxKind.TrueKeyword) return true;
+  if (unwrapped.kind === ts.SyntaxKind.FalseKeyword) return false;
+  if (unwrapped.kind === ts.SyntaxKind.NullKeyword) return null;
+  return undefined;
+};
+
+const directInitializerValue = (expression: ts.Expression): CanonicalValue | undefined => {
+  const unwrapped = unwrapInitializer(expression);
+  const scalar = directScalarInitializerValue(unwrapped);
+  if (scalar !== undefined) return scalar;
+  if (!ts.isPrefixUnaryExpression(unwrapped)) return undefined;
+  if (
+    unwrapped.operator !== ts.SyntaxKind.PlusToken &&
+    unwrapped.operator !== ts.SyntaxKind.MinusToken
+  ) {
+    return undefined;
+  }
+  const operand = directInitializerValue(unwrapped.operand);
+  if (typeof operand !== "number") return undefined;
+  return unwrapped.operator === ts.SyntaxKind.MinusToken ? -operand : operand;
+};
+
+const validateDirectDuplicates = (declaration: ts.VariableDeclaration): void => {
+  const unwrapped = unwrapInitializer(declaration.initializer as ts.Expression);
+  if (!ts.isArrayLiteralExpression(unwrapped)) return;
+  const directItems = unwrapped.elements.flatMap((element) => {
+    if (ts.isSpreadElement(element) || ts.isOmittedExpression(element)) return [];
+    const canonicalItem = directInitializerValue(element);
+    return canonicalItem === undefined ? [] : [canonicalItem];
+  });
+  const keys = directItems.map(canonicalValueKey);
+  if (new Set(keys).size !== keys.length) {
+    throw new Error(`${declaration.name.getText()}: canonical array contains duplicate values`);
+  }
 };
 
 const canonicalItemsFromType = (
   checker: ts.TypeChecker,
   declaration: ts.VariableDeclaration,
 ): readonly CanonicalValue[] => {
+  validateDirectDuplicates(declaration);
   const bindingType = checker.getTypeAtLocation(declaration.name);
   const elementType = checker.getIndexTypeOfType(bindingType, ts.IndexKind.Number);
   return elementType === undefined
@@ -153,94 +186,48 @@ const packageSurface = (input: {
   };
 };
 
-const ownerBindingFor = (input: {
-  readonly checker: ts.TypeChecker;
-  readonly declaration: CanonicalValuesDeclarationSite;
-  readonly program: ts.Program;
-}): { readonly owner: ts.Symbol; readonly variable: ts.VariableDeclaration } => {
-  const sourceFile = input.program.getSourceFile(input.declaration.absolutePath);
-  if (sourceFile === undefined) {
-    throw new Error(`${input.declaration.relativePath}: TypeScript program did not load the owner`);
-  }
-  const variable = variableDeclarationAt(sourceFile, input.declaration);
-  const owner = input.checker.getSymbolAtLocation(variable.name);
-  if (owner === undefined) {
-    throw new Error(
-      `${input.declaration.relativePath}: TypeScript did not resolve the owner binding`,
-    );
-  }
-  return { owner, variable };
-};
-
 const entryFor = (input: {
   readonly checker: ts.TypeChecker;
   readonly declaration: CanonicalValuesDeclarationSite;
-  readonly declarations: readonly CanonicalValuesDeclarationSite[];
   readonly program: ts.Program;
   readonly repositoryRoot: string;
-}): { readonly dependencies: readonly string[]; readonly entry: CanonicalValuesEntry } => {
-  const { owner, variable } = ownerBindingFor(input);
-  const nodes = canonicalOwnerReachableNodes(input.program, input.checker);
-  validateCanonicalOwnerStability({
-    checker: input.checker,
-    declaration: variable,
-    nodes,
-    owner,
-    program: input.program,
-  });
-  validateDirectCanonicalValueDuplicates(input.checker, variable);
+}): CanonicalValuesEntry => {
+  const sourceFile = input.program.getSourceFile(input.declaration.absolutePath) as ts.SourceFile;
+  const variable = variableDeclarationAt(sourceFile, input.declaration);
+  const owner = input.checker.getSymbolAtLocation(variable.name) as ts.Symbol;
   const canonicalItems = canonicalItemsFromType(input.checker, variable);
-  validateCanonicalOwnerRuntimeDomain({
-    checker: input.checker,
-    declaration: variable,
-    expectedValues: canonicalItems,
-    nodes,
-    program: input.program,
-  });
-  const dependencies = validateCanonicalOwnerRuntimeSource({
-    checker: input.checker,
-    declaration: variable,
-    declarations: input.declarations,
-    nodes,
-    program: input.program,
-    repositoryRoot: input.repositoryRoot,
-  });
   const surface = packageSurface({ ...input, owner });
   return {
-    dependencies,
-    entry: {
-      annotationStart: input.declaration.annotationStart,
-      binding: input.declaration.binding,
-      bindingStart: input.declaration.bindingStart,
-      conceptId: input.declaration.conceptId,
-      declarationEnd: input.declaration.declarationEnd,
-      declarationPath: input.declaration.relativePath,
-      declarationStart: input.declaration.declarationStart,
-      importRoutes: surface.importRoutes,
-      packageName: surface.packageName,
-      values: canonicalItems,
-      fingerprint: fingerprintValues(canonicalItems),
-    },
+    annotationStart: input.declaration.annotationStart,
+    binding: input.declaration.binding,
+    bindingStart: input.declaration.bindingStart,
+    conceptId: input.declaration.conceptId,
+    declarationEnd: input.declaration.declarationEnd,
+    declarationPath: input.declaration.relativePath,
+    declarationStart: input.declaration.declarationStart,
+    importRoutes: surface.importRoutes,
+    packageName: surface.packageName,
+    values: canonicalItems,
+    fingerprint: fingerprintValues(canonicalItems),
   };
 };
 
 const publicSourceFilesFor = (
   declarations: readonly CanonicalValuesDeclarationSite[],
   repositoryRoot: string,
-): readonly string[] => {
-  const packageDirectories = uniqBy(
+): readonly string[] =>
+  uniqBy(
     declarations.flatMap((declaration) => {
-      const directory = nearestPackageDirectory(dirname(declaration.absolutePath), repositoryRoot);
-      return directory === null ? [] : [directory];
+      const packageDirectory = nearestPackageDirectory(
+        dirname(declaration.absolutePath),
+        repositoryRoot,
+      );
+      if (packageDirectory === null) return [];
+      const [failure, entries] = attempt(() => publicPackageEntries(packageDirectory));
+      return failure === null && entries !== null ? entries.map((entry) => entry.sourceFile) : [];
     }),
-    (directory) => directory,
+    (sourceFile) => sourceFile,
   );
-  return packageDirectories.flatMap((packageDirectory) => {
-    const [failure, entries] = attempt(() => publicPackageEntries(packageDirectory));
-    if (failure !== null || entries === null) return [];
-    return entries.map((entry) => entry.sourceFile);
-  });
-};
 
 const problemFor = (declaration: CanonicalValuesDeclarationSite): CanonicalValuesSourceProblem => ({
   kind: "vocabulary-without-values",
@@ -249,64 +236,51 @@ const problemFor = (declaration: CanonicalValuesDeclarationSite): CanonicalValue
   conceptId: declaration.conceptId,
 });
 
-const resolveDeclaration = (input: {
-  readonly declaration: CanonicalValuesDeclarationSite;
+const configurationKey = (
+  declaration: CanonicalValuesDeclarationSite,
+  repositoryRoot: string,
+): string =>
+  canonicalValuesTypeScriptConfigPath({
+    repositoryRoot,
+    searchDirectory: dirname(declaration.absolutePath),
+  }) ?? "<default>";
+
+const resolveGroup = (input: {
   readonly declarations: readonly CanonicalValuesDeclarationSite[];
   readonly publicSourceFiles: readonly string[];
   readonly repositoryRoot: string;
   readonly sourceFiles: readonly string[];
 }): {
-  readonly declaration: CanonicalValuesDeclarationSite;
-  readonly dependencies: readonly string[];
-  readonly entry: CanonicalValuesEntry | null;
-  readonly problem: CanonicalValuesSourceProblem | null;
+  readonly entries: readonly CanonicalValuesEntry[];
+  readonly problems: readonly CanonicalValuesSourceProblem[];
 } => {
-  const [failure, resolved] = attempt(() => {
-    const program = createCanonicalValuesTypeScriptProgram({
-      repositoryRoot: input.repositoryRoot,
-      rootNames: [input.declaration.absolutePath, ...input.publicSourceFiles, ...input.sourceFiles],
-      searchDirectory: dirname(input.declaration.absolutePath),
-    });
-    return entryFor({
-      checker: program.getTypeChecker(),
-      declaration: input.declaration,
-      declarations: input.declarations,
-      program,
-      repositoryRoot: input.repositoryRoot,
-    });
+  const first = input.declarations[0] as CanonicalValuesDeclarationSite;
+  const program = createCanonicalValuesTypeScriptProgram({
+    repositoryRoot: input.repositoryRoot,
+    rootNames: [
+      ...input.declarations.map((declaration) => declaration.absolutePath),
+      ...input.publicSourceFiles,
+      ...input.sourceFiles,
+    ],
+    searchDirectory: dirname(first.absolutePath),
   });
-  return failure === null && resolved !== null
-    ? {
-        declaration: input.declaration,
-        dependencies: resolved.dependencies,
-        entry: resolved.entry,
-        problem: null,
-      }
-    : {
-        declaration: input.declaration,
-        dependencies: [],
-        entry: null,
-        problem: problemFor(input.declaration),
-      };
-};
-
-type ResolvedDeclaration = ReturnType<typeof resolveDeclaration>;
-
-const declarationKey = (declaration: CanonicalValuesDeclarationSite): string =>
-  canonicalOwnerRuntimeDeclarationKey(declaration);
-
-const entriesWithResolvedDependencies = (
-  results: readonly ResolvedDeclaration[],
-): readonly ResolvedDeclaration[] => {
-  const successful = results.filter((result) => result.entry !== null);
-  const complete = (remaining: readonly ResolvedDeclaration[]): readonly ResolvedDeclaration[] => {
-    const keys = new Set(remaining.map((result) => declarationKey(result.declaration)));
-    const next = remaining.filter((result) =>
-      result.dependencies.every((dependency) => keys.has(dependency)),
+  const checker = program.getTypeChecker();
+  const resolutions = input.declarations.map((declaration) => {
+    const [failure, entry] = attempt(() =>
+      entryFor({ checker, declaration, program, repositoryRoot: input.repositoryRoot }),
     );
-    return next.length === remaining.length ? next : complete(next);
+    return failure === null && entry !== null
+      ? { entry, problem: null }
+      : { entry: null, problem: problemFor(declaration) };
+  });
+  return {
+    entries: resolutions.flatMap((resolution) =>
+      resolution.entry === null ? [] : [resolution.entry],
+    ),
+    problems: resolutions.flatMap((resolution) =>
+      resolution.problem === null ? [] : [resolution.problem],
+    ),
   };
-  return complete(successful);
 };
 
 export const resolveCanonicalValuesEntries = (input: {
@@ -318,24 +292,16 @@ export const resolveCanonicalValuesEntries = (input: {
   readonly problems: readonly CanonicalValuesSourceProblem[];
 } => {
   const publicSourceFiles = publicSourceFilesFor(input.declarations, input.repositoryRoot);
-  const results = input.declarations.map((declaration) =>
-    resolveDeclaration({
-      declaration,
-      declarations: input.declarations,
-      publicSourceFiles,
-      repositoryRoot: input.repositoryRoot,
-      sourceFiles: input.sourceFiles,
-    }),
+  const groups = Object.values(
+    groupBy(input.declarations, (declaration) =>
+      configurationKey(declaration, input.repositoryRoot),
+    ),
   );
-  const resolved = entriesWithResolvedDependencies(results);
-  const resolvedKeys = new Set(resolved.map((result) => declarationKey(result.declaration)));
+  const resolved = groups.map((declarations) =>
+    resolveGroup({ ...input, declarations, publicSourceFiles }),
+  );
   return {
-    entries: resolved.flatMap((result) => (result.entry === null ? [] : [result.entry])),
-    problems: results.flatMap((result) => {
-      if (result.problem !== null) return [result.problem];
-      return resolvedKeys.has(declarationKey(result.declaration))
-        ? []
-        : [problemFor(result.declaration)];
-    }),
+    entries: resolved.flatMap((result) => result.entries),
+    problems: resolved.flatMap((result) => result.problems),
   };
 };

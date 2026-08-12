@@ -29,46 +29,32 @@ const invalidReason = (reason: InvalidCanonicalDeclarationReason): string => {
   return descriptions[reason];
 };
 
-const sourceProblemMessage = (problem: CanonicalValuesProblem): string | null => {
-  if (problem.kind === "unsafe-symbolic-link") {
-    return "A symbolic link in the repository source walk must resolve to a readable target inside the repository. Replace the broken or external link with a repository-owned source path.";
+const problemMessage = (problem: CanonicalValuesProblem): string => {
+  switch (problem.kind) {
+    case "unsafe-symbolic-link":
+      return "A symbolic link in the repository source walk must resolve to a readable target inside the repository. Replace the broken or external link with a repository-owned source path.";
+    case "retired-annotation-tag":
+      return `The retired annotation tag ${problem.tag} must not stay in the source, because opting a value set out of the canonical vocabulary is no longer possible. Delete the tag, and declare the concept it belonged to so every use derives from that declaration.`;
+    case "canonical-rule-suppression":
+      return "Canonical vocabulary rules must not be suppressed with a lint-disable directive. Delete the directive, then derive the use site from its registered runtime owner or register the missing owner.";
+    case "unparsable-annotation":
+      return 'A canonical values annotation must name the concept it declares. Write the tag followed by a concept id built from lowercase words joined by "-" or ".".';
+    case "unparsable-source":
+      return "A source containing a canonical values annotation must parse successfully before it can declare an owner. Fix the source syntax or delete the annotation.";
+    case "invalid-declaration":
+      return `A canonical values annotation does not declare an owner here: ${invalidReason(problem.reason)}. Move it onto one module-scope variable statement with one identifier binding, or delete it.`;
+    case "out-of-scope-declaration":
+      return `${problem.conceptId} is annotated in a non-production source. Move the canonical owner into production source, or delete the annotation.`;
+    case "vocabulary-without-values":
+      return `A canonical values annotation must sit on a variable whose resolved type exposes only finite string, number, boolean, or null values for ${problem.conceptId}. Make the binding expose that literal domain, or delete the annotation.`;
+    case "duplicate-concept":
+      return `A concept must be declared in one place. ${problem.conceptId} is already declared at ${problem.declaredFilePath}:${problem.declaredLine}. Delete one of the two declarations, and derive from the one that stays.`;
   }
-  if (problem.kind === "retired-annotation-tag") {
-    return `The retired annotation tag ${problem.tag} must not stay in the source, because opting a value set out of the canonical vocabulary is no longer possible. Delete the tag, and declare the concept it belonged to so every use derives from that declaration.`;
-  }
-  if (problem.kind === "canonical-rule-suppression") {
-    return "Canonical vocabulary rules must not be suppressed with a lint-disable directive. Delete the directive, then derive the use site from its registered runtime owner or register the missing owner.";
-  }
-  if (problem.kind === "unparsable-annotation") {
-    return 'A canonical values annotation must name the concept it declares. Write the tag followed by a concept id built from lowercase words joined by "-" or ".".';
-  }
-  return problem.kind === "unparsable-source"
-    ? "A source containing a canonical values annotation must parse successfully before it can declare an owner. Fix the source syntax or delete the annotation."
-    : null;
-};
-
-const declarationProblemMessage = (problem: CanonicalValuesProblem): string | null => {
-  if (problem.kind === "invalid-declaration") {
-    return `A canonical values annotation does not declare an owner here: ${invalidReason(problem.reason)}. Move it onto one module-scope variable statement with one identifier binding, or delete it.`;
-  }
-  if (problem.kind === "out-of-scope-declaration") {
-    return `${problem.conceptId} is annotated in a non-production source. Move the canonical owner into production source, or delete the annotation.`;
-  }
-  if (problem.kind === "vocabulary-without-values") {
-    return `A canonical values annotation must sit on a variable whose resolved type exposes only finite string, number, boolean, or null values for ${problem.conceptId}. Make the binding expose that literal domain, or delete the annotation.`;
-  }
-  return problem.kind === "duplicate-concept"
-    ? `A concept must be declared in one place. ${problem.conceptId} is already declared at ${problem.declaredFilePath}:${problem.declaredLine}. Delete one of the two declarations, and derive from the one that stays.`
-    : null;
 };
 
 export const formatCanonicalValuesProblem = (problem: CanonicalValuesProblem): string => {
   const location = `${problem.filePath}:${problem.line}`;
-  const sourceMessage = sourceProblemMessage(problem);
-  if (sourceMessage !== null) return `${location} ${sourceMessage}`;
-  const declarationMessage = declarationProblemMessage(problem);
-  if (declarationMessage !== null) return `${location} ${declarationMessage}`;
-  throw new Error(`Unsupported canonical values problem: ${problem.kind}`);
+  return `${location} ${problemMessage(problem)}`;
 };
 
 const formatValues = (values: readonly CanonicalValue[]): string =>

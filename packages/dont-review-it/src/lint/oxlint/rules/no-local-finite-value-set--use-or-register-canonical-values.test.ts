@@ -1,364 +1,265 @@
 import { testLintRule } from "@mst/lint-rule-authoring";
 import { describe } from "vite-plus/test";
 
-import {
-  ORDER_BLANK_OWNER_CODE,
-  ORDER_OBJECT_OWNER_CODE,
-  ORDER_OWNER_CODE,
-  withAmbiguousOwners,
-  withBlankOwner,
-  withCatalogAndLibraryOwners,
-  withLibraryOwner,
-  withNullableOwner,
-  withNumericOwner,
-  withObjectOwner,
-  withOwner,
-  withTwoLibraryOwners,
-  withoutCatalog,
-  withoutEntriesInRepositoryPackage,
-} from "./canonical-value-rule-test-fixture.ts";
+import { buildCatalog } from "../lib/canonical-values/catalog.ts";
+import { fingerprintValues } from "../lib/canonical-values/fingerprint.ts";
+import { createNoLocalFiniteValueSet } from "./no-local-finite-value-set--use-or-register-canonical-values.ts";
 
-describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-values: owner and report contracts", () => {
-  testLintRule(withNullableOwner, {
+const canonicalItems = ["draft", "published"] as const;
+const entry = {
+  annotationStart: 0,
+  binding: "ORDER_STATUSES",
+  bindingStart: 40,
+  conceptId: "order.status",
+  declarationEnd: 92,
+  declarationPath: "packages/vocabulary/src/status.ts",
+  declarationStart: 38,
+  fingerprint: fingerprintValues(canonicalItems),
+  importRoutes: [],
+  packageName: null,
+  values: canonicalItems,
+} as const;
+const catalog = buildCatalog([
+  entry,
+  {
+    ...entry,
+    binding: "ORDER_STATUS_NAMES",
+    conceptId: "order.status.name",
+    declarationPath: "packages/vocabulary/src/status-name.ts",
+  },
+  {
+    ...entry,
+    binding: "STATE_CODES",
+    conceptId: "state.code",
+    declarationPath: "packages/vocabulary/src/state-code.ts",
+    importRoutes: [
+      {
+        exportName: "ORDER_STATUSES",
+        resolvedSourcePaths: ["packages/vocabulary/src/state-code.ts"],
+        specifier: "@vocabulary/state-code",
+      },
+    ],
+  },
+]);
+
+const singleOwnerRule = createNoLocalFiniteValueSet({
+  loadCatalog: () => buildCatalog([entry]),
+  loadLibraryVocabulary: () => [],
+});
+
+const rule = createNoLocalFiniteValueSet({
+  loadCatalog: () => catalog,
+  loadLibraryVocabulary: () => [],
+});
+
+const libraryRule = createNoLocalFiniteValueSet({
+  loadCatalog: () => buildCatalog([]),
+  loadLibraryVocabulary: () => [
+    {
+      admitsUnnamedValues: false,
+      declarationId: "types-one#Status",
+      packageName: "types-one",
+      typeName: "Status",
+      values: canonicalItems,
+    },
+    {
+      admitsUnnamedValues: false,
+      declarationId: "types-two#Status",
+      packageName: "types-two",
+      typeName: "Status",
+      values: canonicalItems,
+    },
+  ],
+});
+
+const singleLibraryRule = createNoLocalFiniteValueSet({
+  loadCatalog: () => buildCatalog([]),
+  loadLibraryVocabulary: () => [
+    {
+      admitsUnnamedValues: false,
+      declarationId: "types-one#Status",
+      packageName: "types-one",
+      typeName: "Status",
+      values: canonicalItems,
+    },
+  ],
+});
+
+describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-values", () => {
+  testLintRule(rule, {
+    valid: [
+      { code: 'const DISPLAY_ORDER = ["draft", "published"]; consume(DISPLAY_ORDER);' },
+      { code: 'const hints = new Set(["alpha", "beta"]); consume(hints);' },
+      { code: "const flag = { enum: [true, false] }; consume(flag);" },
+      { code: 'z.enum(); z.union(); new Map(["draft", "published"]);' },
+      { code: 'const statuses = new Set(); const loose = { ["enum"]: values };' },
+      { code: "z.enum(values()); new Set(values()); const loose = { enum: values() };" },
+      { code: "type Loose = string; type AlsoLoose = keyof string;" },
+      { code: 'type Loose = (typeof STATUSES)["length"];' },
+      { code: 'type Loose = keyof import("./shape.ts");' },
+      { code: "const shape = { [name]: null }; z.enum(Object.keys(shape));" },
+      { code: "z.enum(Object.values({ draft: null, published: null }));" },
+      { code: "z.enum(Object.keys(makeShape()));" },
+      { code: "z.enum(Object.keys());" },
+      { code: "z.enum(Other.keys({ draft: null, published: null }));" },
+      { code: 'z.enum(["draft", value]);' },
+      { code: "z.enum(UNKNOWN_VALUES);" },
+      { code: "z.enum(Object.keys(UNKNOWN_SHAPE));" },
+      { code: "z.enum(Object.keys({ [name]: null, published: null }));" },
+      { code: "type Loose = LocalValues[number];" },
+      { code: "type Loose = keyof LocalShape;" },
+      {
+        code: 'import DefaultShape, * as Shapes from "./shape.ts"; void DefaultShape; void Shapes;',
+      },
+      { code: 'import { "shape" as Shape } from "./shape.ts"; void Shape;' },
+      {
+        code: 'import { ORDER_STATUSES } from "node:fs";\nexport const schema = z.enum(ORDER_STATUSES);',
+      },
+      {
+        code: 'import { INTERNAL_SPELLINGS } from "./internal.ts";\nexport const spellings = new Set(INTERNAL_SPELLINGS);',
+      },
+      {
+        code: 'import { INTERNAL_SPELLINGS } from "./internal.ts";\nexport type Spelling = (typeof INTERNAL_SPELLINGS)[number];',
+      },
+      { code: 'export type Loose = string | "draft";' },
+      {
+        code: 'export type Status = "draft" | "published";',
+        filename: "/repo/src/status.test.ts",
+        cwd: "/repo",
+      },
+    ],
+    invalid: [
+      {
+        code: 'export const schema = z.enum(["draft", "published"]);',
+        errors: [{ messageId: "localFiniteValueSetWithOwnerCandidates" }],
+      },
+      {
+        code: 'const STATUSES = ["draft", "published"] as const;\nexport const schema = z.picklist(STATUSES);',
+        errors: [{ messageId: "localFiniteValueSetWithOwnerCandidates" }],
+      },
+      {
+        code: 'export type Status = "draft" | "published";',
+        errors: [{ messageId: "localFiniteValueSetWithOwnerCandidates" }],
+      },
+      {
+        code: 'export const schema = z.union([z.literal("draft"), z.literal("published")]);',
+        errors: [{ messageId: "localFiniteValueSetWithOwnerCandidates" }],
+      },
+      {
+        code: 'export const option = { enum: ["draft", "published"] };',
+        errors: [{ messageId: "localFiniteValueSetWithOwnerCandidates" }],
+      },
+      {
+        code: 'const STATUSES = ["draft", "published"] as const;\nexport type Status = (typeof STATUSES)[number];',
+        errors: [{ messageId: "localFiniteValueSetWithOwnerCandidates" }],
+      },
+      {
+        code: 'export const statuses = new Set(["draft", "published"]);',
+        errors: [{ messageId: "localFiniteValueSetWithOwnerCandidates" }],
+      },
+      {
+        code: 'import { ORDER_STATUSES } from "./shadow.ts";\nexport const statuses = new Set(ORDER_STATUSES);',
+        errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
+      },
+      {
+        code: 'import { ORDER_STATUSES } from "./shadow.ts";\nexport type Status = (typeof ORDER_STATUSES)[number];',
+        errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
+      },
+      {
+        code: 'declare const ORDER_STATUSES: readonly ["shadow", "values"];\nexport const schema = z.enum(ORDER_STATUSES);',
+        errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
+      },
+      {
+        code: "const SHAPE = { queued: null, running: null } as const;\nexport const schema = z.enum(Object.keys(SHAPE));",
+        errors: [{ messageId: "localFiniteValueSetWithoutOwner" }],
+      },
+      {
+        code: 'import { SHAPE } from "./shape.ts";\nexport const schema = z.enum(Object.keys(SHAPE));',
+        errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
+      },
+      {
+        code: "export const schema = z.enum(Object.keys({ draft: null, published: null }));",
+        errors: [{ messageId: "localFiniteValueSetWithOwnerCandidates" }],
+      },
+      {
+        code: 'import type { Shape } from "./shape.ts";\nexport type Status = keyof Shape;',
+        errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
+      },
+      {
+        code: 'import { type Shape } from "./shape.ts";\nexport type Status = keyof Shape;',
+        errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
+      },
+      {
+        code: 'export type Status = keyof import("./shape.ts").Shape;',
+        errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
+      },
+      {
+        code: 'export type Status = keyof import("./shape.ts").nested.Shape;',
+        errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
+      },
+    ],
+  });
+
+  testLintRule(libraryRule, {
     valid: [],
     invalid: [
       {
-        name: "null remains a value in a literal union",
-        code: 'export type MaybeStatus = "draft" | null;',
-        errors: [{ messageId: "localFiniteValueSetWithOwner" }],
+        code: 'export type Status = "queued" | "running";',
+        errors: [{ messageId: "localFiniteValueSetWithoutOwner" }],
       },
       {
-        name: "null remains a value in a static array",
-        code: 'export const schema = z.enum(["draft", null]);',
-        errors: [{ messageId: "localFiniteValueSetWithOwner" }],
+        code: 'export type Status = "draft" | "published";',
+        errors: [{ messageId: "localFiniteValueSetOwnedByLibraryTypeCandidates" }],
       },
+    ],
+  });
+
+  testLintRule(singleOwnerRule, {
+    valid: [],
+    invalid: [
       {
-        name: "null remains a value in a schema literal union",
-        code: 'export const schema = z.union([z.literal("draft"), z.literal(null)]);',
+        code: 'export const schema = z.enum(["draft", "published"]);',
         errors: [{ messageId: "localFiniteValueSetWithOwner" }],
       },
     ],
   });
 
-  testLintRule(withNumericOwner, {
-    valid: [],
-    invalid: [
-      {
-        name: "negative numbers keep their sign in a literal union",
-        code: "export type RetryBudget = -1 | 1;",
-        errors: [{ messageId: "localFiniteValueSetWithOwner" }],
-      },
-      {
-        name: "nested unary signs keep their numeric value in a schema array",
-        code: "export const schema = z.enum([-+1, +1]);",
-        errors: [{ messageId: "localFiniteValueSetWithOwner" }],
-      },
-      {
-        name: "static arithmetic keeps its numeric vocabulary",
-        code: "export const schema = z.enum([2 - 3, 3 - 2]);",
-        errors: [{ messageId: "localFiniteValueSetWithOwner" }],
-      },
-      {
-        name: "static numeric calls keep their numeric vocabulary",
-        code: 'export const schema = z.enum([Number("-1"), Math.ceil(0.1)]);',
-        errors: [{ messageId: "localFiniteValueSetWithOwner" }],
-      },
-    ],
+  const declarationSource =
+    '/** @canonical-values order.status */\nexport const VALUES = z.enum(["draft", "published"]);';
+  const declarationStart = declarationSource.indexOf("export const");
+  const declarationRule = createNoLocalFiniteValueSet({
+    loadCatalog: () =>
+      buildCatalog([
+        {
+          ...entry,
+          annotationStart: 0,
+          binding: "VALUES",
+          bindingStart: declarationSource.indexOf("VALUES"),
+          declarationPath: "src/owner.ts",
+          declarationStart,
+          declarationEnd: declarationSource.length,
+        },
+      ]),
+    loadLibraryVocabulary: () => [],
   });
 
-  testLintRule(withBlankOwner, {
+  testLintRule(declarationRule, {
     valid: [
       {
-        name: "blank lines between the annotation and its declaration keep them paired",
-        code: ORDER_BLANK_OWNER_CODE,
-        filename: "/repo/packages/order-vocabulary/src/order-status.ts",
+        code: declarationSource,
         cwd: "/repo",
+        filename: "/repo/src/owner.ts",
       },
     ],
     invalid: [],
   });
 
-  testLintRule(withObjectOwner, {
+  testLintRule(singleLibraryRule, {
     valid: [],
     invalid: [
       {
-        name: "an annotated object owner does not exempt a nested schema enum with another fingerprint",
-        code: ORDER_OBJECT_OWNER_CODE,
-        filename: "/repo/packages/order-vocabulary/src/order-status.ts",
-        cwd: "/repo",
-        errors: [{ messageId: "localFiniteValueSetWithoutOwner" }],
-      },
-    ],
-  });
-
-  testLintRule(withOwner, {
-    valid: [
-      {
-        name: "an array that only fixes display order defines no type",
-        code: 'const DISPLAY_ORDER = ["draft", "published"];\nexport const first = DISPLAY_ORDER[0];',
-      },
-      {
-        name: "a set assembled at run time is not a static vocabulary",
-        code: "export const seen = (rows) => new Set(rows.map((row) => row.status));",
-      },
-      {
-        name: "a union widened by a keyword is not finite",
-        code: 'export type Loose = string | "draft";',
-      },
-      {
-        name: "a discriminated union carries structure rather than values",
-        code: 'export type Event = { kind: "draft" } | { kind: "published" };',
-      },
-      {
-        name: "a union written in a parameter position is outside the grammar",
-        code: 'export const label = (status: "draft" | "published") => status;',
-      },
-      {
-        name: "a union written in a return position is outside the grammar",
-        code: 'export const initial = (): "draft" | "published" => "draft";',
-      },
-      {
-        name: "the annotated declaration is the place the concept is defined",
-        code: ORDER_OWNER_CODE,
-        filename: "/repo/packages/order-vocabulary/src/order-status.ts",
-        cwd: "/repo",
-      },
-      {
-        name: "a set whose values no concept owns is not a candidate",
-        code: 'const CACHE_KEYS = new Set(["alpha", "beta"]);\nexport const has = (key) => CACHE_KEYS.has(key);',
-      },
-      {
-        name: "a test file is not production source",
-        code: 'export type OrderStatus = "draft" | "published";',
-        filename: "/repo/packages/order/src/order-status.test.ts",
-      },
-    ],
-    invalid: [
-      {
-        name: "a conditional local object receiver cannot hide its member vocabulary",
-        code: 'const holder = { statuses: ["draft", "published"] as const };\nexport const schema = z.enum((enabled ? holder : holder).statuses);',
-        errors: [{ messageId: "localFiniteValueSetWithOwner" }],
-      },
-      {
-        name: "a sequence local object receiver cannot hide its member vocabulary",
-        code: 'const holder = { statuses: ["draft", "published"] as const };\nexport const schema = z.enum((0, holder).statuses);',
-        errors: [{ messageId: "localFiniteValueSetWithOwner" }],
-      },
-      {
-        name: "a spread supplying argument index zero keeps its local array value",
-        code: 'const args = [...[["draft", "published"] as const]] as const;\nexport const schema = z.enum(...args);',
-        errors: [{ messageId: "localFiniteValueSetWithOwner" }],
-      },
-      {
-        name: "one array feeding two constructs is reported once",
-        code: 'const STATUSES = ["draft", "published"] as const;\nexport type OrderStatus = (typeof STATUSES)[number];\nexport const schema = z.enum(STATUSES);',
-        errors: [{ messageId: "localFiniteValueSetWithOwner" }],
-      },
-      {
-        name: "a line comment carrying the tag does not annotate the declaration below it",
-        code: '// @canonical-values order-status\nexport const ORDER_STATUSES = ["draft", "published"] as const;\nexport type OrderStatus = (typeof ORDER_STATUSES)[number];',
-        errors: [{ messageId: "localFiniteValueSetWithOwner" }],
-      },
-      {
-        name: "a block comment that is not a doc comment does not annotate either",
-        code: '/* @canonical-values order-status */\nexport const ORDER_STATUSES = ["draft", "published"] as const;\nexport type OrderStatus = (typeof ORDER_STATUSES)[number];',
-        errors: [{ messageId: "localFiniteValueSetWithOwner" }],
-      },
-      {
-        name: "an annotation buried in a function body annotates nothing at the top level",
-        code: 'export const probeNoop = () => {\n  /** @canonical-values order-status */\n  return 1;\n};\n\nexport type OrderStatus = "draft" | "published";',
-        errors: [{ messageId: "localFiniteValueSetWithOwner" }],
-      },
-      {
-        name: "a comment wedged between the annotation and the declaration breaks the pair",
-        code: '/** @canonical-values order-status */\n// sorted by the order the api returns\nexport const ORDER_STATUSES = ["draft", "published"] as const;\nexport type OrderStatus = (typeof ORDER_STATUSES)[number];',
-        errors: [{ messageId: "localFiniteValueSetWithOwner" }],
-      },
-      {
-        name: "the registered declaration range exempts no other path",
-        code: ORDER_OWNER_CODE,
-        filename: "/repo/packages/shadow/src/order-status.ts",
-        cwd: "/repo",
-        errors: [{ messageId: "localFiniteValueSetWithOwner" }],
-      },
-      {
-        name: "the report names the owner it found",
-        code: 'export type OrderStatus = "draft" | "published";',
-        errors: [{ message: /order-status \(@mst\/order-vocabulary\)/u }],
-      },
-      {
-        name: "the configured ownership policy reaches the report",
-        code: 'export type OrderStatus = "draft" | "published";',
-        options: [
-          { ownershipPolicy: "service wide operational vocabulary lives in @mst/vocabulary" },
-        ],
-        errors: [
-          {
-            message:
-              /Ownership policy: service wide operational vocabulary lives in @mst\/vocabulary\./u,
-          },
-        ],
-      },
-    ],
-  });
-
-  testLintRule(withoutCatalog, {
-    valid: [
-      {
-        name: "a set stays silent because it is only a candidate when a concept owns it",
-        code: 'const STATUSES = new Set(["draft", "published"]);\nexport const has = (status) => STATUSES.has(status);',
-      },
-      {
-        name: "an indexed access array stays silent for the same reason",
-        code: 'const STATUSES = ["draft", "published"] as const;\nexport type OrderStatus = (typeof STATUSES)[number];',
-      },
-      {
-        name: "a set filled from an external import stays silent for the same reason",
-        code: 'import { HTTP_METHOD_HINTS } from "http-method-hints";\nconst known = new Set(HTTP_METHOD_HINTS);\nexport const has = (hint) => known.has(hint);',
-        filename: "packages/order/src/known.ts",
-      },
-      {
-        name: "an indexed access over an external import stays silent for the same reason",
-        code: 'import { HTTP_METHOD_HINTS } from "http-method-hints";\nexport type Hint = (typeof HTTP_METHOD_HINTS)[number];',
-        filename: "packages/order/src/hint.ts",
-      },
-    ],
-    invalid: [
-      {
-        name: "a vocabulary with no owner still has to be registered somewhere",
-        code: 'export type OrderStatus = "draft" | "published";',
-        errors: [{ messageId: "localFiniteValueSetWithoutOwner" }],
-      },
-      {
-        name: "the message that owns nothing offers the dependencies as a third place to look",
-        code: 'export type OrderStatus = "draft" | "published";',
-        errors: [{ message: /public types of the packages this one depends on/u }],
-      },
-      {
-        name: "an unconfigured ownership policy says so instead of inventing one",
-        code: 'export const schema = z.enum(["draft", "published"]);',
-        errors: [
-          {
-            message:
-              /Ownership policy: not configured \(set the ownershipPolicy option of this rule\)\./u,
-          },
-        ],
-      },
-      {
-        name: "a relative route is unregistered while nothing is registered",
-        code: 'import { STATUSES } from "./statuses.ts";\nexport const schema = z.enum(STATUSES);',
-        filename: "packages/order/src/schema.ts",
-        errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
-      },
-      {
-        name: "a relative Set route is unregistered while nothing is registered",
-        code: 'import { STATUSES } from "./statuses.ts";\nexport const statuses = new Set(STATUSES);',
-        filename: "packages/order/src/schema.ts",
-        errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
-      },
-      {
-        name: "a relative indexed access route is unregistered while nothing is registered",
-        code: 'import { STATUSES } from "./statuses.ts";\nexport type Status = (typeof STATUSES)[number];',
-        filename: "packages/order/src/schema.ts",
-        errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
-      },
-    ],
-  });
-
-  testLintRule(withoutEntriesInRepositoryPackage, {
-    valid: [],
-    invalid: [
-      {
-        name: "the package root remains an unregistered repository route",
-        code: 'import { ORDER_STATUSES } from "@mst/order-vocabulary";\nexport const schema = z.enum(ORDER_STATUSES);',
-        errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
-      },
-      {
-        name: "a package namespace remains an unregistered repository route",
-        code: 'import * as vocabulary from "@mst/order-vocabulary";\nexport const schema = z.enum(vocabulary.ORDER_STATUSES);',
-        errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
-      },
-    ],
-  });
-
-  testLintRule(withLibraryOwner, {
-    valid: [
-      {
-        name: "a set stays silent because a set was never reported without a catalog owner",
-        code: 'const SEVERITIES = new Set(["error", "warn", "off"]);\nexport const has = (severity) => SEVERITIES.has(severity);',
-      },
-      {
-        name: "an indexed access array stays silent for the same reason",
-        code: 'const SEVERITIES = ["error", "warn", "off"] as const;\nexport type Severity = (typeof SEVERITIES)[number];',
-      },
-    ],
-    invalid: [
-      {
-        name: "the report names the dependency and the type that own the values",
-        code: 'export type Severity = "error" | "warn" | "off";',
+        code: 'export type Status = "draft" | "published";',
         errors: [{ messageId: "localFiniteValueSetOwnedByLibraryType" }],
-      },
-      {
-        name: "the report carries the name of the type the reader has to derive from",
-        code: 'export type SsrTarget = "node" | "webworker";',
-        errors: [{ message: /derive the type from SSRTarget from vite, so/u }],
-      },
-      {
-        name: "a schema enum reaches the same dependency as the type alias does",
-        code: 'export const schema = z.enum(["error", "warn", "off"]);',
-        errors: [{ message: /AllowWarnDeny from oxlint/u }],
-      },
-      {
-        name: "a vocabulary no dependency owns falls back to the message that owns nothing",
-        code: 'export type OrderStatus = "draft" | "published";',
-        errors: [{ messageId: "localFiniteValueSetWithoutOwner" }],
-      },
-    ],
-  });
-
-  testLintRule(withCatalogAndLibraryOwners, {
-    valid: [],
-    invalid: [
-      {
-        name: "the owner registered in this repository is the one the report names",
-        code: 'export type SsrTarget = "node" | "webworker";',
-        errors: [{ messageId: "localFiniteValueSetWithOwner" }],
-      },
-    ],
-  });
-
-  testLintRule(withTwoLibraryOwners, {
-    valid: [],
-    invalid: [
-      {
-        name: "every dependency is listed instead of one being picked",
-        code: 'export type Severity = "error" | "warn";',
-        errors: [{ message: /: AllowWarnDeny from oxlint \(.*\), LogLevel from vite \(/u }],
-      },
-    ],
-  });
-
-  testLintRule(withAmbiguousOwners, {
-    valid: [
-      {
-        name: "an array that only fixes display order defines no type",
-        code: 'const DISPLAY_ORDER = ["draft", "published"];\nexport const first = DISPLAY_ORDER[0];',
-      },
-    ],
-    invalid: [
-      {
-        name: "every candidate is listed instead of one being picked",
-        code: 'export type OrderStatus = "draft" | "published";',
-        errors: [
-          {
-            messageId: "localFiniteValueSetWithOwnerCandidates",
-            data: {
-              owners:
-                "order-status (@mst/order-vocabulary), article-status (@mst/article-vocabulary)",
-              ownershipPolicy: "not configured (set the ownershipPolicy option of this rule)",
-            },
-          },
-        ],
       },
     ],
   });

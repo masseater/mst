@@ -30,7 +30,8 @@ export const isOutOfScopeSource = (filename: string, repositoryRoot?: string): b
       : filename;
   const segments = sourcePath.split(/[/\\]/u);
   if (segments.includes("node_modules")) return false;
-  if (OUT_OF_SCOPE_FILE_NAME.test(segments.at(-1) ?? "")) return true;
+  const fileName = segments.at(-1) as string;
+  if (OUT_OF_SCOPE_FILE_NAME.test(fileName)) return true;
   return segments.slice(0, -1).some((segment) => OUT_OF_SCOPE_DIRECTORIES.has(segment));
 };
 

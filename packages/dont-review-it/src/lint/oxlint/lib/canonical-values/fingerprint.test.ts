@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import { canonicalValueKey, fingerprintValues } from "./fingerprint.ts";
+import { canonicalValueKey, fingerprintValues, isCanonicalValue } from "./fingerprint.ts";
 
 describe("fingerprint", () => {
   test("the fingerprint does not depend on the order the values were written in", () => {
@@ -37,5 +37,10 @@ describe("fingerprint", () => {
     expect(canonicalValueKey("draft")).toBe("string:draft");
     expect(canonicalValueKey(1)).toBe("number:1");
     expect(canonicalValueKey(true)).toBe("boolean:true");
+  });
+
+  test("only runtime scalar vocabulary values are canonical", () => {
+    expect([null, "draft", 1, true].every(isCanonicalValue)).toBe(true);
+    expect([undefined, 1n, Symbol("draft"), {}, []].some(isCanonicalValue)).toBe(false);
   });
 });

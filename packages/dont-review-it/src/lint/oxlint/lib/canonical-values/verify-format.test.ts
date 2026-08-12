@@ -1,10 +1,71 @@
 import { describe, expect, test } from "vite-plus/test";
 
 import { RETIRED_ANNOTATION_TAGS } from "./annotation.ts";
+import { INVALID_CANONICAL_DECLARATION_REASONS } from "./declarations.ts";
 import { fingerprintValues } from "./fingerprint.ts";
 import { formatCanonicalValuesProblem, formatEquivalentConceptGroup } from "./verify-format.ts";
 
+import type { CanonicalValuesRepositoryProblem } from "./builder.ts";
+
 describe("verify format", () => {
+  test.each([
+    {
+      problem: { kind: "unsafe-symbolic-link", filePath: "src/order.ts", line: 1 },
+      expected: "A symbolic link in the repository source walk must resolve",
+    },
+    {
+      problem: { kind: "canonical-rule-suppression", filePath: "src/order.ts", line: 4 },
+      expected: "Canonical vocabulary rules must not be suppressed",
+    },
+    {
+      problem: { kind: "unparsable-annotation", filePath: "src/order.ts", line: 4 },
+      expected: "A canonical values annotation must name the concept",
+    },
+    {
+      problem: { kind: "unparsable-source", filePath: "src/order.ts", line: 4 },
+      expected: "A source containing a canonical values annotation must parse",
+    },
+  ] satisfies readonly {
+    readonly problem: CanonicalValuesRepositoryProblem;
+    readonly expected: string;
+  }[])("formats the $problem.kind source problem", ({ problem, expected }) => {
+    expect(formatCanonicalValuesProblem(problem)).toContain(expected);
+  });
+
+  test.each(Object.values(INVALID_CANONICAL_DECLARATION_REASONS))(
+    "formats the invalid declaration reason %s",
+    (reason) => {
+      expect(
+        formatCanonicalValuesProblem({
+          kind: "invalid-declaration",
+          filePath: "src/order.ts",
+          line: 4,
+          conceptId: null,
+          reason,
+        }),
+      ).toContain("A canonical values annotation does not declare an owner here:");
+    },
+  );
+
+  test("formats out-of-scope and valueless declarations", () => {
+    expect(
+      formatCanonicalValuesProblem({
+        kind: "out-of-scope-declaration",
+        filePath: "src/order.test.ts",
+        line: 4,
+        conceptId: "order.status",
+      }),
+    ).toContain("is annotated in a non-production source");
+    expect(
+      formatCanonicalValuesProblem({
+        kind: "vocabulary-without-values",
+        filePath: "src/order.ts",
+        line: 4,
+        conceptId: "order.status",
+      }),
+    ).toContain("must sit on a variable whose resolved type exposes only finite");
+  });
+
   test("a retired tag is reported with the location and the tag it found", () => {
     const [retired] = RETIRED_ANNOTATION_TAGS;
     if (retired === undefined) throw new Error("the retired tag vocabulary must not be empty");

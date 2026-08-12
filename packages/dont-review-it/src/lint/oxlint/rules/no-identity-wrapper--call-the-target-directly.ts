@@ -1,7 +1,6 @@
 import { isEqual } from "es-toolkit";
 
 import { createDontReviewItRule } from "../../../create-rule.ts";
-import { withoutParentheses } from "../lib/parenthesized-expression.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
@@ -27,17 +26,14 @@ const soleReturnedExpression = (body: ESTree.FunctionBody): ESTree.Expression | 
   if (body.body.length !== 1) return null;
   const [statement] = body.body;
   if (statement?.type !== "ReturnStatement") return null;
-  return statement.argument === null ? null : withoutParentheses(statement.argument);
+  return statement.argument;
 };
 
 const forwardedCall = (declared: FunctionLike): ESTree.CallExpression | null => {
-  const { body } = declared;
-  if (body === null) return null;
+  const body = declared.body as ESTree.FunctionBody | ESTree.Expression;
 
-  const forwarded =
-    body.type === "BlockStatement" ? soleReturnedExpression(body) : withoutParentheses(body);
+  const forwarded = body.type === "BlockStatement" ? soleReturnedExpression(body) : body;
   if (forwarded?.type !== "CallExpression") return null;
-  if (forwarded.optional) return null;
   return (forwarded.typeArguments ?? null) === null ? forwarded : null;
 };
 
@@ -45,7 +41,7 @@ const calleeIsOwnParameter = (
   callee: ESTree.Expression,
   parameters: readonly (ForwardedName | null)[],
 ): boolean => {
-  const target = withoutParentheses(callee);
+  const target = callee;
   return target.type === "Identifier" && parameters.some((entry) => entry?.name === target.name);
 };
 
@@ -77,7 +73,7 @@ export const noIdentityWrapper = createDontReviewItRule({
     },
     messages: {
       identityWrapper:
-        'A named function must not consist of nothing but a call that passes its own parameters through unchanged, because the name then adds a second spelling for something that already has one: a reader who looks the name up learns only that another name exists, a search for the callee misses every call routed through here, and the two names drift apart as soon as one of them is renamed. Call the target where this function is being called and delete this one. To publish a name from another module, re-export it (`export { parseUser } from "./parse-user.ts"`) rather than wrapping the call, because a re-export forwards the definition itself and a wrapper only copies its shape. This rule leaves a wrapper alone once it declares a return contract at its own boundary, either as a return type annotation on the function or as a type annotation on the binding it is assigned to, so narrowing the callee\'s type is the way to keep a wrapper that has a reason to exist.',
+        'A named function must not consist of nothing but a call that passes its own parameters through unchanged. Call the target where this function is being called and delete this one. To publish a name from another module, re-export it: `export { parseUser } from "./parse-user.ts"`.',
     },
     schema: [],
   },
@@ -93,7 +89,7 @@ export const noIdentityWrapper = createDontReviewItRule({
         if ((id.typeAnnotation ?? null) !== null) return;
         if (init === null) return;
 
-        const declared = withoutParentheses(init);
+        const declared = init;
         if (declared.type !== "ArrowFunctionExpression" && declared.type !== "FunctionExpression") {
           return;
         }

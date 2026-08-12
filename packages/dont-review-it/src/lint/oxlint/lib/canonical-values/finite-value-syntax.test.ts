@@ -2,11 +2,14 @@ import { parseSync } from "oxc-parser";
 import { describe, expect, test } from "vite-plus/test";
 
 import {
+  calleeMemberName,
   isFiniteVocabulary,
   literalUnionValues,
   propertyKeyName,
-  scalarLiteralValue,
+  schemaUnionLiterals,
+  staticArrayValues,
   unwrapExpression,
+  unwrapType,
 } from "./finite-value-syntax.ts";
 
 import type { ESTree } from "@oxlint/plugins";
@@ -37,6 +40,18 @@ const propertyFrom = (source: string): ESTree.ObjectProperty => {
   return property;
 };
 
+const callFrom = (source: string): ESTree.CallExpression => {
+  const expression = unwrapExpression(expressionFrom(source));
+  if (expression.type !== "CallExpression") throw new Error(`Expected a call: ${source}`);
+  return expression;
+};
+
+const arrayFrom = (source: string): ESTree.ArrayExpression => {
+  const expression = unwrapExpression(expressionFrom(source));
+  if (expression.type !== "ArrayExpression") throw new Error(`Expected an array: ${source}`);
+  return expression;
+};
+
 describe("finite-value-syntax", () => {
   test("two distinct spellings are a vocabulary", () => {
     expect(isFiniteVocabulary(["draft", "published"])).toBe(true);
@@ -62,13 +77,21 @@ describe("finite-value-syntax", () => {
     expect(isFiniteVocabulary([1, "1"])).toBe(true);
   });
 
-  test("null is a scalar value while undefined remains the extraction sentinel", () => {
-    expect(scalarLiteralValue(expressionFrom("null;"))).toBeNull();
-    expect(scalarLiteralValue(expressionFrom("undefined;"))).toBeUndefined();
-  });
-
-  test("nested signs and transparent wrappers preserve the final numeric value", () => {
-    expect(scalarLiteralValue(expressionFrom("(-+1! as const);"))).toBe(-1);
+  test("static arrays reject holes, spreads, and non-scalar expressions", () => {
+    expect(staticArrayValues(arrayFrom('["draft", "published"]'))).toStrictEqual([
+      "draft",
+      "published",
+    ]);
+    expect(staticArrayValues(arrayFrom("[-1, +2, `draft`]"))).toStrictEqual([-1, 2, "draft"]);
+    expect(staticArrayValues(arrayFrom('[null, true, "draft"]'))).toStrictEqual([
+      null,
+      true,
+      "draft",
+    ]);
+    expect(staticArrayValues(arrayFrom('[-"draft", "published"]'))).toBeNull();
+    expect(staticArrayValues(arrayFrom('[/draft/u, "published"]'))).toBeNull();
+    expect(staticArrayValues(arrayFrom('["draft", , "published"]'))).toBeNull();
+    expect(staticArrayValues(arrayFrom('["draft", ...values]'))).toBeNull();
   });
 
   test("literal unions retain null and reject undefined members", () => {
@@ -86,8 +109,45 @@ describe("finite-value-syntax", () => {
     ).toBeNull();
   });
 
+  test("literal union extraction rejects non-unions and unwraps parenthesized types", () => {
+    expect(literalUnionValues(unionFrom('type Status = "draft";'))).toBeNull();
+    expect(unwrapType(unionFrom('type Status = ("draft" | "published");')).type).toBe(
+      "TSUnionType",
+    );
+  });
+
   test("static string and template property keys have the same name", () => {
+    expect(propertyKeyName(propertyFrom("({ enum: [] });").key)).toBe("enum");
     expect(propertyKeyName(propertyFrom('({ ["enum"]: [] });').key)).toBe("enum");
+    expect(propertyKeyName(propertyFrom("({ [1]: [] });").key)).toBe("1");
     expect(propertyKeyName(propertyFrom("({ [`enum`]: [] });").key)).toBe("enum");
+    expect(propertyKeyName(propertyFrom("({ [`${name}`]: [] });").key)).toBeNull();
+    expect(propertyKeyName(propertyFrom("({ [/enum/u]: [] });").key)).toBeNull();
+    expect(propertyKeyName(propertyFrom("({ [true]: [] });").key)).toBeNull();
+    expect(propertyKeyName(propertyFrom("({ [names.enum]: [] });").key)).toBeNull();
+  });
+
+  test("schema member and union syntax is accepted only in the explicit forms", () => {
+    expect(calleeMemberName(callFrom("schema.enum([])").callee)).toBe("enum");
+    expect(calleeMemberName(callFrom("schema.enum?.([])").callee)).toBe("enum");
+    expect(calleeMemberName(callFrom('schema["enum"]([])').callee)).toBeNull();
+    expect(calleeMemberName(expressionFrom("schema"))).toBeNull();
+    expect(
+      schemaUnionLiterals(callFrom('z.union([z.literal("draft"), z.literal("published")])')),
+    ).toMatchObject({ values: ["draft", "published"] });
+    expect(schemaUnionLiterals(callFrom("z.union()"))).toBeNull();
+    expect(schemaUnionLiterals(callFrom("z.union(...members)"))).toBeNull();
+    expect(schemaUnionLiterals(callFrom("z.union(members)"))).toBeNull();
+    expect(schemaUnionLiterals(callFrom('z.union(["draft", z.literal("published")])'))).toBeNull();
+    expect(schemaUnionLiterals(callFrom('z.union([, z.literal("published")])'))).toBeNull();
+    expect(
+      schemaUnionLiterals(callFrom('z.union([z["literal"]("draft"), z.literal("published")])')),
+    ).toBeNull();
+    expect(
+      schemaUnionLiterals(callFrom('z.union([z.literal(), z.literal("published")])')),
+    ).toBeNull();
+    expect(
+      schemaUnionLiterals(callFrom('z.union([z.literal(...values), z.literal("published")])')),
+    ).toBeNull();
   });
 });

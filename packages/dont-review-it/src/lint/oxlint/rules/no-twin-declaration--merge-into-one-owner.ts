@@ -45,7 +45,7 @@ export const createNoTwinDeclaration = ({
       },
       messages: {
         twinDeclaration:
-          "A declaration must not carry both the name and the body of another declaration in this repository, because two places then answer for one concept and a change made in one of them leaves the other standing under the same name with the old answer, which neither the type checker nor the tests can see. The same declaration stands at {{sites}}. Decide which module owns the concept, export it from there, and import it everywhere else. Choose the owner by whose responsibility the concept is, not by which copy came first or which file is shorter. Renaming one of the two is not a fix: both bodies stay, and one concept ends up with two names.",
+          "A declaration must not carry both the name and the body of another declaration in this repository. The same declaration stands at {{sites}}. Decide which module owns the concept, export it from there, and import it everywhere else.",
       },
       schema: [],
     },

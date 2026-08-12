@@ -15,6 +15,42 @@ describe("dont-review-it/no-tautological-assertion--assert-on-a-computed-value",
         code: "expect(parsed).toBe(3);",
       },
       {
+        name: "a matcher reached through a computed name is not read as a matcher",
+        code: "expect(1)['toBe'](1);",
+      },
+      {
+        name: "a matcher handed more than one argument is not an equality assertion",
+        code: "expect(1).toBe(1, 1);",
+      },
+      {
+        name: "a matcher handed a spread has no written out expected value",
+        code: "expect(1).toBe(...expected);",
+      },
+      {
+        name: "a call to expect handed a spread has no written out subject",
+        code: "expect(...given).toBe(1);",
+      },
+      {
+        name: "a matcher called on a plain binding has no call to expect behind it",
+        code: "assertion.toBe(1);",
+      },
+      {
+        name: "a matcher reached through something other than a modifier is left alone",
+        code: "suite.assertion.toBe(1);",
+      },
+      {
+        name: "negating something that is not a written out number leaves no fixed value",
+        code: "expect(-computed).toBe(-computed);",
+      },
+      {
+        name: "negating a written out string is not a written out number",
+        code: "expect(-'1').toBe(-'1');",
+      },
+      {
+        name: "a private method call is not read as a matcher",
+        code: "class Suite { #toBe(expected) { return expected; } run() { this.#toBe(1); } }",
+      },
+      {
         name: "two different literals compare something even if the code never runs",
         code: "expect(1).toBe(2);",
       },
@@ -120,7 +156,7 @@ describe("dont-review-it/no-tautological-assertion--assert-on-a-computed-value",
       {
         name: "a file outside the test suffix carries no exemption",
         code: "expect(1).toBe(1);",
-        filename: "/repo/packages/utils/src/total.ts",
+        filename: "/repo/packages/repository-checks/src/total.ts",
         errors: [{ messageId: "tautologicalAssertion" }],
       },
     ],

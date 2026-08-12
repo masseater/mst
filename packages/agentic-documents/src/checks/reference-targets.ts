@@ -2,7 +2,6 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, normalize, relative } from "node:path";
 
-import { lineAtOffset } from "@mst/utils";
 import { attempt } from "es-toolkit";
 
 import { isInsideGeneratedRegion } from "../markdown/generated-region.ts";
@@ -110,21 +109,11 @@ const referencesIn = ({
       if (node.type !== "text") return [];
 
       const baseOffset = offsetOf(node);
-      return [...node.value.matchAll(pointerPattern)].flatMap((match): readonly Reference[] => {
-        const target = match[1];
-        if (target === undefined) return [];
-
-        return [
-          {
-            target,
-            fromRepositoryRoot: true,
-            line:
-              baseOffset === undefined
-                ? lineOf(node)
-                : lineAtOffset(document.source, baseOffset + match.index),
-          },
-        ];
-      });
+      return [...node.value.matchAll(pointerPattern)].map((match) => ({
+        target: String(match[1]),
+        fromRepositoryRoot: true,
+        line: document.source.slice(0, baseOffset + match.index).split("\n").length,
+      }));
     });
 };
 

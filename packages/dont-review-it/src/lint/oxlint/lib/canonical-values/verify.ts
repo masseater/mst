@@ -1,14 +1,9 @@
-import {
-  analyzeCanonicalValuesRepository,
-  type CanonicalValuesRepositoryProblem,
-} from "./builder.ts";
+import { analyzeCanonicalValuesRepository } from "./builder.ts";
 import { buildCatalog, type CanonicalValuesCatalog, type CanonicalValuesEntry } from "./catalog.ts";
-
-export type CanonicalValuesProblem = CanonicalValuesRepositoryProblem;
 
 export type CanonicalValuesInspection = {
   readonly catalog: CanonicalValuesCatalog;
-  readonly problems: readonly CanonicalValuesProblem[];
+  readonly problems: ReturnType<typeof analyzeCanonicalValuesRepository>["problems"];
 };
 
 export const inspectCanonicalValues = (options: {
@@ -17,10 +12,6 @@ export const inspectCanonicalValues = (options: {
   const analyzed = analyzeCanonicalValuesRepository(options);
   return { catalog: analyzed.catalog, problems: analyzed.problems };
 };
-
-export const verifyCanonicalValues = (options: {
-  readonly repositoryRoot: string;
-}): readonly CanonicalValuesProblem[] => inspectCanonicalValues(options).problems;
 
 export const findEquivalentConcepts = (
   entries: readonly CanonicalValuesEntry[],

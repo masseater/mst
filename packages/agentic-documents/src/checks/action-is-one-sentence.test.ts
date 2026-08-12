@@ -11,6 +11,12 @@ const rationaleProblemsIn = (source: string) =>
   });
 
 describe("rationaleOnActionLine", () => {
+  test("散文で始まらない項目そのものは行動を持たず、入れ子の項目だけが報告される", () => {
+    expect(
+      rationaleProblemsIn("- - MUST: 記録する。記録が無いと辿れない。\n").length,
+    ).toStrictEqual(1);
+  });
+
   test("行動の行に 2 文目があると報告する", () => {
     expect(
       rationaleProblemsIn("- MUST: 記録する。記録が無いと後から辿れないためである。\n").length,

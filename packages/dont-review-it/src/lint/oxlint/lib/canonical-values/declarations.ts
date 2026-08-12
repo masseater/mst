@@ -56,16 +56,12 @@ export type CanonicalValuesTextScan = {
   readonly problems: readonly CanonicalValuesTextProblem[];
 };
 
-type NodeFields = Readonly<Record<string, unknown>> & {
-  readonly end: number;
-  readonly start: number;
-  readonly type: string;
-};
+type ProgramStatement = ParseResult["program"]["body"][number];
 
-type VariableDeclarationFields = NodeFields & {
-  readonly declare?: boolean;
-  readonly declarations: readonly unknown[];
-};
+type VariableDeclarationFields = Extract<
+  ProgramStatement,
+  { readonly type: "VariableDeclaration" }
+>;
 
 type ValidationResult<Value> =
   | { readonly value: Value }
@@ -96,7 +92,9 @@ const canonicalAnnotationLines = (commentValue: string): readonly string[] =>
 const withoutRetiredTags = (commentValue: string): string =>
   RETIRED_ANNOTATION_TAGS.reduce((remaining, tag) => remaining.replaceAll(tag, ""), commentValue);
 
-const isNodeFields = (value: unknown): value is NodeFields =>
+const isNodeFields = (
+  value: unknown,
+): value is { readonly end: number; readonly start: number; readonly type: string } =>
   value !== null &&
   typeof value === "object" &&
   "type" in value &&
@@ -106,16 +104,11 @@ const isNodeFields = (value: unknown): value is NodeFields =>
   "end" in value &&
   typeof value.end === "number";
 
-const variableDeclarationIn = (statement: unknown): VariableDeclarationFields | null => {
-  if (!isNodeFields(statement)) return null;
-  if (statement.type === "VariableDeclaration" && "declarations" in statement) {
-    return statement as VariableDeclarationFields;
-  }
-  if (statement.type !== "ExportNamedDeclaration" || !("declaration" in statement)) return null;
+const variableDeclarationIn = (statement: ProgramStatement): VariableDeclarationFields | null => {
+  if (statement.type === "VariableDeclaration") return statement;
+  if (statement.type !== "ExportNamedDeclaration") return null;
   const { declaration } = statement;
-  if (!isNodeFields(declaration) || declaration.type !== "VariableDeclaration") return null;
-  if (!("declarations" in declaration)) return null;
-  return declaration as VariableDeclarationFields;
+  return declaration?.type === "VariableDeclaration" ? declaration : null;
 };
 
 const invalidDeclaration = (input: {
@@ -247,16 +240,9 @@ const identifierBinding = (input: {
   readonly line: number;
   readonly variable: VariableDeclarationFields;
 }): ValidationResult<{ readonly binding: string; readonly bindingStart: number }> => {
-  const [declarator] = input.variable.declarations;
-  if (!isNodeFields(declarator) || !("id" in declarator)) {
-    return {
-      problem: invalidDeclaration({
-        ...input,
-        reason: INVALID_CANONICAL_DECLARATION_REASONS.identifierBindingRequired,
-      }),
-    };
-  }
-  if (!("init" in declarator) || declarator.init === null) {
+  const declarator = input.variable
+    .declarations[0] as VariableDeclarationFields["declarations"][number];
+  if (declarator.init === null) {
     return {
       problem: invalidDeclaration({
         ...input,
@@ -343,7 +329,8 @@ const canonicalRuleSuppressionProblemsIn = (
       .filter((target) => target !== "");
     const targetsCanonicalRule = targets.some((target) => {
       const diagnosticRule = /^[^()]+\(([^()]+)\)$/u.exec(target)?.[1] ?? target;
-      return CANONICAL_RULE_BASENAMES.has(diagnosticRule.split("/").at(-1) ?? diagnosticRule);
+      const segments = diagnosticRule.split("/");
+      return CANONICAL_RULE_BASENAMES.has(segments[segments.length - 1] as string);
     });
     if (targets.length !== 0 && !targets.includes("all") && !targetsCanonicalRule) {
       return [];

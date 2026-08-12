@@ -8,10 +8,9 @@
   },
   "type": "module",
   "scripts": {
-    "ready": "vp check && vp run -r test && vp run -r build && vp run knip && vp exec dont-review-it verify && vp exec dont-review-it duplicated-bodies && vp run docs",
+    "guard": "vp check && vp run -r test --coverage && vp run -r build && vp run knip && vp run knip --production && vp exec dont-review-it check && vp exec agentic-documents check && vp exec verified-specifications check && vp run -r check:skills",
+    "guard:fix": "vp exec lint-rule-authoring check --write && vp check --fix && vp exec agentic-documents check --write && vp exec verified-specifications check --write",
     "dev": "vp run website#dev",
-    "docs": "vp exec agentic-documents check",
-    "docs:write": "vp exec agentic-documents check --write",
     "knip": "knip",
     "prepare": "vp config && git config merge.ff false"
   },
@@ -19,8 +18,10 @@
     "@mst/agentic-documents": "workspace:*",
     "@mst/dont-review-it": "workspace:*",
     "@mst/lint-rule-authoring": "workspace:*",
+    "@mst/verified-specifications": "workspace:*",
     "@types/node": "catalog:",
-    "knip": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "knip": "^6.32.0",
     "vite": "catalog:",
     "vite-plus": "catalog:"
   },

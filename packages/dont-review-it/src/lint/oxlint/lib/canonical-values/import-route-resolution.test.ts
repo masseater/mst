@@ -1,65 +1,49 @@
+import { execFileSync } from "node:child_process";
 import { mkdirSync, realpathSync, symlinkSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
+import * as ts from "typescript-6";
 import { describe, expect, test } from "vite-plus/test";
 
-import { buildCanonicalValuesCatalog } from "./builder.ts";
 import {
   createCanonicalValuesTestRepository,
   writeCanonicalValuesTestFiles,
-} from "./canonical-values-test-fixture.ts";
+} from "./canonical-values.test-fixture.ts";
+import { buildCatalog, type CanonicalValuesEntry } from "./catalog.ts";
 import {
-  IMPORT_MODULE_RESOLUTION_MODE,
+  matchesConfiguredPathAlias,
   repositoryModulePath,
-  REQUIRE_MODULE_RESOLUTION_MODE,
+  resolvedDirectImportEntries,
+  resolvedPublicImportEntries,
 } from "./import-route-resolution.ts";
 import { importRouteStatus } from "./import-route.ts";
 
-type PublicRouteQuery = {
-  readonly consumer: "missing-consumer" | "public-consumer" | "shadow-consumer" | "types-consumer";
-  readonly importedName?: string;
-  readonly specifier?: string;
-};
-
 describe("import route source resolution", () => {
-  test("Vite query and asset imports resolve only existing repository sources", () => {
+  test("relative extensions and TypeScript paths resolve exact repository sources", () => {
     const repositoryRoot = createCanonicalValuesTestRepository();
     writeCanonicalValuesTestFiles({
       repositoryRoot,
       files: {
-        "fixtures/status.module.css": ".draft {}\n",
-        "fixtures/status.txt": "draft\n",
+        "tsconfig.json": JSON.stringify({
+          compilerOptions: { baseUrl: ".", paths: { "@internal/status": ["src/status.ts"] } },
+        }),
         "src/consumer.ts": "export {};\n",
-        "vite.config.ts": `export default { resolve: { alias: { "@fixture": ${JSON.stringify(
-          join(repositoryRoot, "fixtures"),
-        )} } } };\n`,
+        "src/status.ts": "export const status = 1;\n",
       },
     });
     const filename = join(repositoryRoot, "src/consumer.ts");
+    const resolved = realpathSync.native(join(repositoryRoot, "src/status.ts"));
     const sourcePath = (specifier: string): string | null =>
-      repositoryModulePath({
-        filename,
-        importedName: "<namespace>",
-        repositoryRoot,
-        specifier,
-      });
+      repositoryModulePath({ filename, importedName: "status", repositoryRoot, specifier });
 
-    expect(sourcePath("../fixtures/status.txt?raw")).toBe(
-      realpathSync.native(join(repositoryRoot, "fixtures/status.txt")),
-    );
-    expect(sourcePath("../fixtures/status.module.css")).toBe(
-      realpathSync.native(join(repositoryRoot, "fixtures/status.module.css")),
-    );
-    expect(sourcePath("/fixtures/status.txt?url")).toBe(
-      realpathSync.native(join(repositoryRoot, "fixtures/status.txt")),
-    );
-    expect(sourcePath("@fixture/status.txt?raw")).toBe(
-      realpathSync.native(join(repositoryRoot, "fixtures/status.txt")),
-    );
-    expect(sourcePath("../fixtures/missing.txt?raw")).toBeNull();
+    expect(sourcePath("./status.ts")).toBe(resolved);
+    expect(sourcePath("./status")).toBe(resolved);
+    expect(sourcePath("./status.js")).toBe(resolved);
+    expect(sourcePath("@internal/status")).toBe(resolved);
+    expect(sourcePath("./missing")).toBeNull();
   });
 
-  test("conditional exports resolve with the syntax-specific module mode", () => {
+  test("conditional exports use the syntax-specific module mode", () => {
     const repositoryRoot = createCanonicalValuesTestRepository();
     writeCanonicalValuesTestFiles({
       repositoryRoot,
@@ -88,213 +72,299 @@ describe("import route source resolution", () => {
     );
     const query = {
       filename: join(repositoryRoot, "src/main.cjs"),
-      importedName: "<namespace>",
+      importedName: "status",
       repositoryRoot,
       specifier: "@fixture/vocabulary/status",
     } as const;
-    expect(repositoryModulePath({ ...query, resolutionMode: IMPORT_MODULE_RESOLUTION_MODE })).toBe(
+
+    expect(repositoryModulePath({ ...query, resolutionMode: ts.ModuleKind.ESNext })).toBe(
       realpathSync.native(join(repositoryRoot, "packages/vocabulary/fixtures/status.mjs")),
     );
-    expect(repositoryModulePath({ ...query, resolutionMode: REQUIRE_MODULE_RESOLUTION_MODE })).toBe(
+    expect(repositoryModulePath({ ...query, resolutionMode: ts.ModuleKind.CommonJS })).toBe(
       realpathSync.native(join(repositoryRoot, "packages/vocabulary/src/status.cjs")),
     );
   });
 
-  test("module values and export patterns keep their exact public source identity", () => {
+  test("an ignored untracked source is external while the same tracked source is repository code", () => {
     const repositoryRoot = createCanonicalValuesTestRepository();
+    execFileSync("git", ["init", "--quiet"], { cwd: repositoryRoot });
     writeCanonicalValuesTestFiles({
       repositoryRoot,
       files: {
-        "packages/vocabulary/package.json": JSON.stringify({
-          name: "@fixture/vocabulary",
-          exports: {
-            ".": "./src/module.ts",
-            "./shadow": "./src/module-shadow.ts",
-            "./pattern/*": "./src/pattern/*.ts",
-          },
-        }),
-        "packages/vocabulary/src/order-status.ts":
-          '/** @canonical-values order.status */\nexport const ORDER_STATUSES = ["draft", "published"] as const;\n',
-        "packages/vocabulary/src/module.ts":
-          'import { ORDER_STATUSES } from "./order-status.ts";\nexport = ORDER_STATUSES;\n',
-        "packages/vocabulary/src/module-shadow.ts":
-          'const ORDER_STATUSES = ["draft", "published"] as const;\nexport = ORDER_STATUSES;\n',
-        "packages/vocabulary/src/pattern/owner.ts":
-          'export { ORDER_STATUSES } from "../order-status.ts";\n',
-        "packages/vocabulary/src/pattern/shadow.ts":
-          'export const ORDER_STATUSES = ["draft", "published"] as const;\n',
-        "packages/consumer/tsconfig.json": JSON.stringify({
-          compilerOptions: {
-            baseUrl: ".",
-            paths: {
-              "@fixture/vocabulary": ["../vocabulary/src/module.ts"],
-              "@fixture/vocabulary/shadow": ["../vocabulary/src/module-shadow.ts"],
-              "@fixture/vocabulary/pattern/*": ["../vocabulary/src/pattern/*.ts"],
-            },
-          },
-        }),
-        "packages/consumer/src/schema.ts": "export {};\n",
+        ".gitignore": "ignored\n",
+        "ignored/status.ts": "export const status = 1;\n",
+        "src/consumer.ts": "export {};\n",
       },
     });
-    const catalog = buildCanonicalValuesCatalog({ repositoryRoot });
-    const status = (specifier: string, importedName: string): string =>
-      importRouteStatus(
-        {
-          filename: join(repositoryRoot, "packages/consumer/src/schema.ts"),
-          importedName,
-          repositoryRoot,
-          specifier,
-        },
-        catalog,
-      );
-
-    expect(status("@fixture/vocabulary", "<module>")).toBe("registered");
-    expect(status("@fixture/vocabulary", "<namespace>")).toBe("unregistered");
-    expect(status("@fixture/vocabulary", "ORDER_STATUSES")).toBe("unregistered");
-    expect(status("@fixture/vocabulary/shadow", "<module>")).toBe("unregistered");
-    expect(status("@fixture/vocabulary/pattern/owner", "ORDER_STATUSES")).toBe("registered");
-    expect(status("@fixture/vocabulary/pattern/owner", "<module>")).toBe("unregistered");
-    expect(status("@fixture/vocabulary/pattern/shadow", "ORDER_STATUSES")).toBe("unregistered");
-  });
-
-  test("an exact public specifier resolves only to its catalogued source identity", () => {
-    const repositoryRoot = createCanonicalValuesTestRepository();
-    writeCanonicalValuesTestFiles({
-      repositoryRoot,
-      files: {
-        "packages/vocabulary/package.json": JSON.stringify({
-          name: "@fixture/vocabulary",
-          exports: { ".": "./src/index.ts", "./alias": "./src/alias.ts" },
-        }),
-        "packages/vocabulary/src/order-status.ts":
-          '/** @canonical-values order.status */\nexport const ORDER_STATUSES = ["draft", "published"] as const;\n',
-        "packages/vocabulary/src/index.ts": 'export { ORDER_STATUSES } from "./order-status.ts";\n',
-        "packages/vocabulary/src/alias.ts":
-          'export { ORDER_STATUSES as PUBLIC_STATUSES } from "./order-status.ts";\n',
-        "packages/vocabulary/src/shadow.ts":
-          'export const ORDER_STATUSES = ["draft", "published"] as const;\n',
-        "packages/vocabulary/src/index.d.ts":
-          'export declare const ORDER_STATUSES: readonly ["draft", "published"];\n',
-        "packages/shadow-consumer/tsconfig.json": JSON.stringify({
-          compilerOptions: {
-            baseUrl: ".",
-            paths: { "@fixture/vocabulary": ["../vocabulary/src/shadow.ts"] },
-          },
-        }),
-        "packages/shadow-consumer/src/schema.ts": "export {};\n",
-        "packages/public-consumer/tsconfig.json": JSON.stringify({
-          compilerOptions: {
-            baseUrl: ".",
-            paths: {
-              "@fixture/vocabulary": ["../vocabulary/src/index.ts"],
-              "@fixture/vocabulary/alias": ["../vocabulary/src/alias.ts"],
-            },
-          },
-        }),
-        "packages/public-consumer/src/schema.ts": "export {};\n",
-        "packages/missing-consumer/tsconfig.json": JSON.stringify({
-          compilerOptions: {
-            baseUrl: ".",
-            paths: { "@fixture/vocabulary": ["../vocabulary/src/missing.ts"] },
-          },
-        }),
-        "packages/missing-consumer/src/schema.ts": "export {};\n",
-        "packages/types-consumer/tsconfig.json": JSON.stringify({
-          compilerOptions: {
-            baseUrl: ".",
-            paths: { "@fixture/vocabulary": ["../vocabulary/src/index.d.ts"] },
-          },
-        }),
-        "packages/types-consumer/src/schema.ts": "export {};\n",
-      },
-    });
-    const catalog = buildCanonicalValuesCatalog({ repositoryRoot });
-    const status = ({
-      consumer,
-      importedName = "ORDER_STATUSES",
-      specifier = "@fixture/vocabulary",
-    }: PublicRouteQuery): string =>
-      importRouteStatus(
-        {
-          filename: join(repositoryRoot, "packages", consumer, "src/schema.ts"),
-          importedName,
-          repositoryRoot,
-          specifier,
-        },
-        catalog,
-      );
-
-    expect(status({ consumer: "public-consumer" })).toBe("registered");
-    expect(
-      status({
-        consumer: "public-consumer",
-        importedName: "PUBLIC_STATUSES",
-        specifier: "@fixture/vocabulary/alias",
-      }),
-    ).toBe("registered");
-    expect(status({ consumer: "public-consumer", specifier: "@fixture/vocabulary/alias" })).toBe(
-      "unregistered",
-    );
-    expect(status({ consumer: "shadow-consumer" })).toBe("unregistered");
-    expect(status({ consumer: "missing-consumer" })).toBe("unregistered");
-    expect(status({ consumer: "types-consumer" })).toBe("unregistered");
-    expect(
-      importRouteStatus(
-        {
-          filename: join(repositoryRoot, "virtual-consumer.ts"),
-          importedName: "ORDER_STATUSES",
-          repositoryRoot,
-          specifier: "@fixture/vocabulary",
-        },
-        catalog,
-      ),
-    ).toBe("unregistered");
-  });
-
-  test("a changed path mapping cannot reuse a previous module resolution", () => {
-    const repositoryRoot = createCanonicalValuesTestRepository();
-    const configPath = "packages/consumer/tsconfig.json";
-    writeCanonicalValuesTestFiles({
-      repositoryRoot,
-      files: {
-        "packages/vocabulary/package.json": JSON.stringify({
-          name: "@fixture/vocabulary",
-          exports: { ".": "./src/index.ts" },
-        }),
-        "packages/vocabulary/src/order-status.ts":
-          '/** @canonical-values order.status */\nexport const ORDER_STATUSES = ["draft", "published"] as const;\n',
-        "packages/vocabulary/src/index.ts": 'export { ORDER_STATUSES } from "./order-status.ts";\n',
-        "packages/vocabulary/src/shadow.ts":
-          'export const ORDER_STATUSES = ["draft", "published"] as const;\n',
-        [configPath]: JSON.stringify({
-          compilerOptions: {
-            baseUrl: ".",
-            paths: { "@fixture/vocabulary": ["../vocabulary/src/index.ts"] },
-          },
-        }),
-        "packages/consumer/src/schema.ts": "export {};\n",
-      },
-    });
-    const catalog = buildCanonicalValuesCatalog({ repositoryRoot });
     const query = {
-      filename: join(repositoryRoot, "packages/consumer/src/schema.ts"),
+      filename: join(repositoryRoot, "src/consumer.ts"),
+      importedName: "status",
+      repositoryRoot,
+      specifier: "../ignored/status.ts",
+    } as const;
+
+    expect(
+      importRouteStatus(
+        query,
+        buildCatalog([], {
+          sourceScope: { isIgnored: (sourcePath) => sourcePath.includes("/ignored/") },
+        }),
+      ),
+    ).toBe("external");
+
+    execFileSync("git", ["add", "-f", "ignored/status.ts"], { cwd: repositoryRoot });
+
+    expect(importRouteStatus(query, buildCatalog([]))).toBe("unregistered");
+  });
+
+  test("an ignored repository module cannot resolve a registered owner entry", () => {
+    const repositoryRoot = createCanonicalValuesTestRepository();
+    writeCanonicalValuesTestFiles({
+      repositoryRoot,
+      files: {
+        "src/order-status.ts": "export const ORDER_STATUSES = [] as const;\n",
+        "src/schema.ts": "export {};\n",
+      },
+    });
+    const entry: CanonicalValuesEntry = {
+      annotationStart: 0,
+      binding: "ORDER_STATUSES",
+      bindingStart: 40,
+      conceptId: "order.status",
+      declarationEnd: 80,
+      declarationPath: "src/order-status.ts",
+      declarationStart: 20,
+      fingerprint: "fixture",
+      importRoutes: [],
+      packageName: null,
+      values: ["draft", "published"],
+    };
+    const query = {
+      filename: join(repositoryRoot, "src/schema.ts"),
       importedName: "ORDER_STATUSES",
       repositoryRoot,
-      specifier: "@fixture/vocabulary",
+      specifier: "./order-status.ts",
     } as const;
-    expect(importRouteStatus(query, catalog)).toBe("registered");
 
+    expect(
+      importRouteStatus(query, buildCatalog([entry], { sourceScope: { isIgnored: () => true } })),
+    ).toBe("external");
+  });
+
+  test("file URLs and external paths preserve repository identity boundaries", () => {
+    const repositoryRoot = createCanonicalValuesTestRepository();
+    writeCanonicalValuesTestFiles({
+      repositoryRoot,
+      files: { "src/consumer.ts": "export {};\n", "src/status.ts": "export const status = 1;\n" },
+    });
+    const query = {
+      filename: join(repositoryRoot, "src/consumer.ts"),
+      importedName: "status",
+      repositoryRoot,
+    } as const;
+    const repositoryUrl = new URL(`file://${join(repositoryRoot, "src/status.ts")}`).href;
+
+    expect(repositoryModulePath({ ...query, specifier: repositoryUrl })).toBe(
+      realpathSync.native(join(repositoryRoot, "src/status.ts")),
+    );
+    expect(repositoryModulePath({ ...query, specifier: "file:%" })).toBeNull();
+    expect(repositoryModulePath({ ...query, specifier: "file:///vendor/status.ts" })).toBeNull();
+    expect(repositoryModulePath({ ...query, specifier: "node:fs" })).toBeNull();
+  });
+
+  test("configured path patterns require one wildcard and a readable config", () => {
+    const repositoryRoot = createCanonicalValuesTestRepository();
     writeCanonicalValuesTestFiles({
       repositoryRoot,
       files: {
-        [configPath]: JSON.stringify({
+        "tsconfig.json": JSON.stringify({
           compilerOptions: {
-            baseUrl: ".",
-            paths: { "@fixture/vocabulary": ["../vocabulary/src/shadow.ts"] },
+            paths: { "@exact": ["src/exact.ts"], "@one/*": ["src/*"], "@two/*/*": ["src/*"] },
           },
         }),
+        "src/consumer.ts": "export {};\n",
       },
     });
-    expect(importRouteStatus(query, catalog)).toBe("unregistered");
+    const query = {
+      filename: join(repositoryRoot, "src/consumer.ts"),
+      importedName: "status",
+      repositoryRoot,
+    } as const;
+
+    expect(matchesConfiguredPathAlias({ ...query, specifier: "@exact" })).toBe(true);
+    expect(matchesConfiguredPathAlias({ ...query, specifier: "@one/status" })).toBe(true);
+    expect(matchesConfiguredPathAlias({ ...query, specifier: "@one/status/extra" })).toBe(true);
+    expect(matchesConfiguredPathAlias({ ...query, specifier: "@two/a/b" })).toBe(false);
+    expect(matchesConfiguredPathAlias({ ...query, specifier: "@other/status" })).toBe(false);
+  });
+
+  test("invalid compiler configuration leaves repository resolution closed", () => {
+    const repositoryRoot = createCanonicalValuesTestRepository();
+    writeCanonicalValuesTestFiles({
+      repositoryRoot,
+      files: {
+        "tsconfig.json": "{ invalid",
+        "src/consumer.ts": "export {};\n",
+        "src/status.ts": "export const status = 1;\n",
+      },
+    });
+    const query = {
+      filename: "src/consumer.ts",
+      importedName: "status",
+      repositoryRoot,
+      specifier: "./status.ts",
+    } as const;
+
+    expect(repositoryModulePath(query)).toBe(
+      realpathSync.native(join(repositoryRoot, "src/status.ts")),
+    );
+    expect(matchesConfiguredPathAlias(query)).toBe(false);
+  });
+
+  test("resolution classifies repository dependencies as external", () => {
+    const repositoryRoot = createCanonicalValuesTestRepository();
+    writeCanonicalValuesTestFiles({
+      repositoryRoot,
+      files: {
+        "node_modules/dependency/index.d.ts": "export const status: string;\n",
+        "node_modules/dependency/package.json": JSON.stringify({
+          name: "dependency",
+          types: "index.d.ts",
+        }),
+        "src/consumer.ts": "export {};\n",
+      },
+    });
+
+    expect(
+      repositoryModulePath({
+        filename: "src/consumer.ts",
+        importedName: "status",
+        repositoryRoot,
+        specifier: "dependency",
+      }),
+    ).toBeNull();
+  });
+
+  test("public declaration routes require a readable exported runtime name", () => {
+    const repositoryRoot = createCanonicalValuesTestRepository();
+    writeCanonicalValuesTestFiles({
+      repositoryRoot,
+      files: {
+        "src/consumer.ts": "export {};\n",
+        "src/public.d.ts":
+          "interface Local {}\ndeclare const LOCAL: string;\nexport const STATUS: string;\n",
+      },
+    });
+    const entry = {
+      annotationStart: 0,
+      binding: "STATUS",
+      bindingStart: 0,
+      conceptId: "order.status",
+      declarationEnd: 1,
+      declarationPath: "src/owner.ts",
+      declarationStart: 0,
+      fingerprint: "fingerprint",
+      importRoutes: [
+        {
+          exportName: "STATUS",
+          resolvedSourcePaths: ["src/runtime.ts"],
+          specifier: "./public.d.ts",
+        },
+      ],
+      packageName: null,
+      values: ["draft", "published"],
+    } as const;
+    const query = {
+      filename: "src/consumer.ts",
+      importedName: "STATUS",
+      repositoryRoot,
+      specifier: "./public.d.ts",
+    } as const;
+
+    expect(resolvedPublicImportEntries(query, [entry])).toStrictEqual([entry]);
+    expect(
+      resolvedPublicImportEntries({ ...query, importedName: "MISSING" }, [entry]),
+    ).toStrictEqual([]);
+    expect(resolvedPublicImportEntries({ ...query, specifier: "node:fs" }, [entry])).toStrictEqual(
+      [],
+    );
+  });
+
+  test("direct and public entry matching requires source and exported binding identity", () => {
+    const repositoryRoot = createCanonicalValuesTestRepository();
+    writeCanonicalValuesTestFiles({
+      repositoryRoot,
+      files: {
+        "src/consumer.ts": "export {};\n",
+        "src/owner.ts": "export const ORDER_STATUSES = [];\n",
+        "src/public.ts": 'export { ORDER_STATUSES } from "./owner.ts";\n',
+      },
+    });
+    const entry = {
+      annotationStart: 0,
+      binding: "ORDER_STATUSES",
+      bindingStart: 0,
+      conceptId: "order.status",
+      declarationEnd: 1,
+      declarationPath: "src/owner.ts",
+      declarationStart: 0,
+      fingerprint: "fingerprint",
+      importRoutes: [
+        {
+          exportName: "ORDER_STATUSES",
+          resolvedSourcePaths: ["src/public.ts"],
+          specifier: "./public.ts",
+        },
+      ],
+      packageName: null,
+      values: ["draft", "published"],
+    } as const;
+    const query = {
+      filename: join(repositoryRoot, "src/consumer.ts"),
+      importedName: "ORDER_STATUSES",
+      repositoryRoot,
+    } as const;
+
+    expect(
+      resolvedDirectImportEntries({ ...query, specifier: "./owner.ts" }, [entry]),
+    ).toStrictEqual([entry]);
+    expect(
+      resolvedDirectImportEntries({ ...query, specifier: "./missing.ts" }, [entry]),
+    ).toStrictEqual([]);
+    expect(
+      resolvedPublicImportEntries({ ...query, specifier: "./public.ts" }, [entry]),
+    ).toStrictEqual([entry]);
+    expect(
+      resolvedPublicImportEntries({ ...query, importedName: "SHADOW", specifier: "./public.ts" }, [
+        entry,
+      ]),
+    ).toStrictEqual([]);
+    expect(
+      resolvedPublicImportEntries({ ...query, specifier: "./public.ts" }, [
+        {
+          ...entry,
+          importRoutes: [
+            {
+              exportName: "ORDER_STATUSES",
+              resolvedSourcePaths: ["src/runtime.ts"],
+              specifier: "./public.ts",
+            },
+          ],
+        },
+      ]),
+    ).toStrictEqual([]);
+  });
+
+  test("a consumer outside the repository cannot inherit repository compiler configuration", () => {
+    const repositoryRoot = createCanonicalValuesTestRepository();
+
+    expect(
+      repositoryModulePath({
+        filename: join(dirname(repositoryRoot), "consumer.ts"),
+        importedName: "status",
+        repositoryRoot,
+        specifier: "./status.ts",
+      }),
+    ).toBeNull();
   });
 });

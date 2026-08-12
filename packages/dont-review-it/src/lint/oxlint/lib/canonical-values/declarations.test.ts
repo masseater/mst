@@ -178,6 +178,24 @@ export const ORDER_STATUSES = ["draft"] as const;
     });
   });
 
+  test("a valid annotation without a following statement is rejected", () => {
+    expect(scanCanonicalValuesText(`/** ${CANONICAL_VALUES_TAG} order.status */`)).toMatchObject({
+      declarations: [],
+      problems: [{ kind: "invalid-declaration", line: 1, reason: "variable-statement-required" }],
+    });
+  });
+
+  test("a variable without a runtime initializer is rejected", () => {
+    expect(
+      scanCanonicalValuesText(`/** ${CANONICAL_VALUES_TAG} order.status */
+let ORDER_STATUSES;
+`),
+    ).toMatchObject({
+      declarations: [],
+      problems: [{ kind: "invalid-declaration", line: 1, reason: "runtime-initializer-required" }],
+    });
+  });
+
   test("an unterminated annotated comment is a strict parse problem", () => {
     expect(scanCanonicalValuesText(`/** ${CANONICAL_VALUES_TAG} order.status`)).toStrictEqual({
       declarations: [],
@@ -226,6 +244,12 @@ export const ORDER_STATUSES = ["draft"] as const;
     expect(scanCanonicalValuesText("/* oxlint-disable */\n").problems).toStrictEqual([
       { kind: "canonical-rule-suppression", line: 1 },
     ]);
+  });
+
+  test("a line directive without a rule list cannot suppress canonical checks", () => {
+    expect(
+      scanCanonicalValuesText("// oxlint-disable-next-line\nconst status = 'draft';\n").problems,
+    ).toStrictEqual([{ kind: "canonical-rule-suppression", line: 1 }]);
   });
 
   test("an eslint-compatible directive cannot suppress a canonical rule", () => {

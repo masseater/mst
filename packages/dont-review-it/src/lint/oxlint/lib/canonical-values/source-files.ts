@@ -10,10 +10,11 @@ import {
 } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 
+import { readUnlessMissing } from "@mst/repository-checks";
 import { attempt, partition, sortBy, uniqBy } from "es-toolkit";
 
+import { readGitSourceScope, type GitSourceScope } from "../git-ignored-source.ts";
 import { isOutOfScopeSource } from "../out-of-scope-source.ts";
-import { readUnlessMissing } from "../path-failure.ts";
 import { pathIsInside } from "../path-is-inside.ts";
 import { toPosixPath } from "../posix-path.ts";
 import { MANIFEST_FILE_NAME } from "./package-manifest.ts";
@@ -31,6 +32,8 @@ export type RepositoryFiles = {
   readonly cacheInputs: readonly ScannedFile[];
   readonly declarationSources: readonly ScannedFile[];
   readonly commentSources: readonly ScannedFile[];
+  readonly styleSheets: readonly ScannedFile[];
+  readonly markupSources: readonly ScannedFile[];
   readonly manifests: readonly ScannedFile[];
   readonly problems: readonly RepositoryFileProblem[];
 };
@@ -64,12 +67,6 @@ const UNCACHED_DIRECTORY_NAMES: ReadonlySet<string> = new Set([
   "node_modules",
 ]);
 
-const UNRESOLVED_MODULE_DIRECTORY_NAMES: ReadonlySet<string> = new Set([
-  ".git",
-  ".local-agents",
-  "node_modules",
-]);
-
 const SCRIPT_FILE_NAME_PATTERN = /\.[cm]?[jt]sx?$/u;
 
 const DEPENDENCY_INPUT_FILE_NAMES: ReadonlySet<string> = new Set([
@@ -87,6 +84,10 @@ const DEPENDENCY_INPUT_FILE_NAMES: ReadonlySet<string> = new Set([
 const DECLARATION_SOURCE_NAME_PATTERN = /\.[cm]?tsx?$/u;
 
 const TYPE_DECLARATION_FILE_NAME_PATTERN = /\.d\.[cm]?ts$/u;
+
+const STYLE_SHEET_EXTENSION = ".css";
+
+const MARKUP_SOURCE_NAME_PATTERN = /\.(?:html|svg)$/u;
 
 const statOf = (path: string): Stats | null => readUnlessMissing(() => statSync(path));
 
@@ -112,12 +113,10 @@ const scannedFileAt = (input: {
   readonly absolutePath: string;
   readonly realRepositoryRoot: string;
   readonly repositoryRoot: string;
-}): ScannedFile | null => {
+}): ScannedFile => {
   const { absolutePath, realRepositoryRoot, repositoryRoot } = input;
-  const stats = statOf(absolutePath);
-  if (stats === null) return null;
-  const realPath = readUnlessMissing(() => realpathSync.native(absolutePath));
-  if (realPath === null) return null;
+  const stats = statSync(absolutePath);
+  const realPath = realpathSync.native(absolutePath);
   const symbolicLinkTarget = readUnlessMissing(() =>
     lstatSync(absolutePath).isSymbolicLink() ? readlinkSync(absolutePath) : null,
   );
@@ -133,6 +132,8 @@ const scannedFileAt = (input: {
 
 const isScannedName = (name: string): boolean =>
   SCRIPT_FILE_NAME_PATTERN.test(name) ||
+  name.endsWith(STYLE_SHEET_EXTENSION) ||
+  MARKUP_SOURCE_NAME_PATTERN.test(name) ||
   name.endsWith(".json") ||
   DEPENDENCY_INPUT_FILE_NAMES.has(name);
 
@@ -161,12 +162,14 @@ type ScanDirectoryInput = {
   readonly directory: string;
   readonly includesFileName: (name: string) => boolean;
   readonly ignoredDirectoryNames: ReadonlySet<string>;
+  readonly sourceScope: GitSourceScope;
   readonly realRepositoryRoot: string;
   readonly repositoryRoot: string;
 };
 
 const scannedSymbolicLink = (input: ScanDirectoryInput, directoryEntry: Dirent): ScannedFiles => {
   const absolutePath = join(input.directory, directoryEntry.name);
+  if (input.sourceScope.isIgnored(absolutePath)) return EMPTY_SCANNED_FILES;
   const realTarget = resolvedSymbolicTarget(input, absolutePath);
   if (realTarget === null) return unsafeLinkAt(input.repositoryRoot, absolutePath);
   const target = statOf(absolutePath);
@@ -177,17 +180,30 @@ const scannedSymbolicLink = (input: ScanDirectoryInput, directoryEntry: Dirent):
       directory: absolutePath,
     });
   }
-  if (target?.isFile() !== true || !input.includesFileName(directoryEntry.name)) {
+  return scannedSymbolicFile(input, {
+    absolutePath,
+    directoryEntry,
+    isFile: target?.isFile() === true,
+  });
+};
+
+const scannedSymbolicFile = (
+  input: ScanDirectoryInput,
+  candidate: {
+    readonly absolutePath: string;
+    readonly directoryEntry: Dirent;
+    readonly isFile: boolean;
+  },
+): ScannedFiles => {
+  if (!candidate.isFile || !input.includesFileName(candidate.directoryEntry.name)) {
     return EMPTY_SCANNED_FILES;
   }
   const scanned = scannedFileAt({
-    absolutePath,
+    absolutePath: candidate.absolutePath,
     realRepositoryRoot: input.realRepositoryRoot,
     repositoryRoot: input.repositoryRoot,
   });
-  return scanned === null
-    ? unsafeLinkAt(input.repositoryRoot, absolutePath)
-    : { files: [scanned], problems: [] };
+  return { files: [scanned], problems: [] };
 };
 
 const scannedDirectoryEntry = (input: ScanDirectoryInput, directoryEntry: Dirent): ScannedFiles => {
@@ -200,19 +216,21 @@ const scannedDirectoryEntry = (input: ScanDirectoryInput, directoryEntry: Dirent
   }
   if (directoryEntry.isSymbolicLink()) return scannedSymbolicLink(input, directoryEntry);
   if (directoryEntry.isDirectory()) {
-    return input.ignoredDirectoryNames.has(directoryEntry.name)
-      ? EMPTY_SCANNED_FILES
-      : scannedFilesUnder({ ...input, directory: absolutePath });
+    return scannedFilesUnder({ ...input, directory: absolutePath });
   }
   if (!directoryEntry.isFile() || !input.includesFileName(directoryEntry.name)) {
     return EMPTY_SCANNED_FILES;
   }
+  return scannedRegularFile(input, absolutePath);
+};
+
+const scannedRegularFile = (input: ScanDirectoryInput, absolutePath: string): ScannedFiles => {
   const scanned = scannedFileAt({
     absolutePath,
     realRepositoryRoot: input.realRepositoryRoot,
     repositoryRoot: input.repositoryRoot,
   });
-  return scanned === null ? EMPTY_SCANNED_FILES : { files: [scanned], problems: [] };
+  return { files: [scanned], problems: [] };
 };
 
 const scannedFilesUnder = ({
@@ -222,6 +240,7 @@ const scannedFilesUnder = ({
   ignoredDirectoryNames,
   ancestry,
   realRepositoryRoot,
+  sourceScope,
 }: ScanDirectoryInput): ScannedFiles => {
   const scanned = readdirSync(directory, { withFileTypes: true }).map((directoryEntry) =>
     scannedDirectoryEntry(
@@ -232,6 +251,7 @@ const scannedFilesUnder = ({
         ignoredDirectoryNames,
         realRepositoryRoot,
         repositoryRoot,
+        sourceScope,
       },
       directoryEntry,
     ),
@@ -247,6 +267,12 @@ const isManifest = (file: ScannedFile): boolean =>
 
 const isCommentSource = (file: ScannedFile): boolean =>
   SCRIPT_FILE_NAME_PATTERN.test(basename(file.absolutePath));
+
+const isStyleSheet = (file: ScannedFile): boolean =>
+  basename(file.absolutePath).endsWith(STYLE_SHEET_EXTENSION);
+
+const isMarkupSource = (file: ScannedFile): boolean =>
+  MARKUP_SOURCE_NAME_PATTERN.test(basename(file.absolutePath));
 
 const isScannedSourcePath = (file: ScannedFile): boolean =>
   !file.relativePath
@@ -274,11 +300,16 @@ const NO_REPOSITORY_FILES: RepositoryFiles = {
   cacheInputs: [],
   declarationSources: [],
   commentSources: [],
+  styleSheets: [],
+  markupSources: [],
   manifests: [],
   problems: [],
 };
 
-export const listRepositoryFiles = (repositoryRoot: string): RepositoryFiles => {
+export const listRepositoryFiles = (
+  repositoryRoot: string,
+  sourceScope: GitSourceScope = readGitSourceScope(repositoryRoot),
+): RepositoryFiles => {
   if (!isDirectory(repositoryRoot)) return NO_REPOSITORY_FILES;
 
   const realRoot = realpathSync.native(repositoryRoot);
@@ -288,9 +319,13 @@ export const listRepositoryFiles = (repositoryRoot: string): RepositoryFiles => 
     directory: repositoryRoot,
     includesFileName: isScannedName,
     ignoredDirectoryNames: UNCACHED_DIRECTORY_NAMES,
+    sourceScope,
     ancestry: new Set([realRoot]),
   });
-  const cacheInputs = sortBy(scannedRepository.files, ["relativePath"]);
+  const cacheInputs = sortBy(
+    scannedRepository.files.filter((file) => !sourceScope.isIgnored(file.absolutePath)),
+    ["relativePath"],
+  );
   const scanned = cacheInputs.filter(isScannedSourcePath);
   const [manifests, otherScannedFiles] = partition(scanned, isManifest);
   const commentSources = uniquePhysicalFiles(otherScannedFiles.filter(isCommentSource));
@@ -299,20 +334,9 @@ export const listRepositoryFiles = (repositoryRoot: string): RepositoryFiles => 
     cacheInputs,
     declarationSources: commentSources.filter(isDeclarationSource),
     commentSources,
+    styleSheets: scanned.filter(isStyleSheet),
+    markupSources: scanned.filter(isMarkupSource),
     manifests,
     problems: sortBy(scannedRepository.problems, ["filePath"]),
   };
-};
-
-export const listRepositoryModuleFiles = (repositoryRoot: string): readonly ScannedFile[] => {
-  if (!isDirectory(repositoryRoot)) return [];
-  const realRoot = realpathSync.native(repositoryRoot);
-  return scannedFilesUnder({
-    repositoryRoot,
-    realRepositoryRoot: realRoot,
-    directory: repositoryRoot,
-    includesFileName: () => true,
-    ignoredDirectoryNames: UNRESOLVED_MODULE_DIRECTORY_NAMES,
-    ancestry: new Set([realRoot]),
-  }).files;
 };

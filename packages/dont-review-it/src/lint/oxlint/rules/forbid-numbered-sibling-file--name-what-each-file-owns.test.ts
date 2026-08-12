@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -7,9 +7,7 @@ import { describe } from "vite-plus/test";
 
 import { forbidNumberedSiblingFile } from "./forbid-numbered-sibling-file--name-what-each-file-owns.ts";
 
-const fixtureDir = join(tmpdir(), "dont-review-it-forbid-numbered-sibling-file");
-rmSync(fixtureDir, { recursive: true, force: true });
-mkdirSync(fixtureDir, { recursive: true });
+const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-forbid-numbered-sibling-file-"));
 
 const fixturePath = (name: string): string => join(fixtureDir, name);
 
@@ -87,6 +85,12 @@ describe("dont-review-it/forbid-numbered-sibling-file--name-what-each-file-owns"
         code: "export const total = 1;",
         filename: fixturePath("ordinal/order-1.ts"),
         errors: [{ messageId: "numberedSiblingFile", data: { sibling: "order-2.ts" } }],
+      },
+      {
+        name: "the other half of the same split is reported on its own, from the remembered listing",
+        code: "export const total = 1;",
+        filename: fixturePath("ordinal/order-2.ts"),
+        errors: [{ messageId: "numberedSiblingFile", data: { sibling: "order-1.ts" } }],
       },
       {
         name: "the ordinal is found before the suffix chain, so numbered test files are caught",

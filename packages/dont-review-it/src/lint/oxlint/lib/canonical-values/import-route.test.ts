@@ -2,11 +2,11 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "vite-plus/test";
 
-import { buildCanonicalValuesCatalog } from "./builder.ts";
+import { analyzeCanonicalValuesRepository } from "./builder.ts";
 import {
   createCanonicalValuesTestRepository,
   writeCanonicalValuesTestFiles,
-} from "./canonical-values-test-fixture.ts";
+} from "./canonical-values.test-fixture.ts";
 import { buildCatalog, type CanonicalValuesEntry } from "./catalog.ts";
 import { fingerprintValues } from "./fingerprint.ts";
 import { importRouteStatus } from "./import-route.ts";
@@ -116,7 +116,7 @@ describe("import-route", () => {
   });
 
   test("a repository package with no valid owner entry remains unregistered", () => {
-    const invalidOwnerCatalog = buildCatalog([], ["@mst/order-vocabulary"]);
+    const invalidOwnerCatalog = buildCatalog([], { packageNames: ["@mst/order-vocabulary"] });
 
     expect(
       importRouteStatus(
@@ -134,6 +134,36 @@ describe("import-route", () => {
   test("a specifier that only starts with the same letters as the export path is not registered", () => {
     expect(
       statusOf("@mst/order-vocabulary-legacy", "/repository/packages/order/src/schema.ts"),
+    ).toBe("external");
+  });
+
+  test("an external protocol is external", () => {
+    expect(statusOf("node:fs", "/repository/packages/order/src/schema.ts")).toBe("external");
+  });
+
+  test("an ignored repository module has no registered entry", () => {
+    const repositoryRoot = createCanonicalValuesTestRepository();
+    writeCanonicalValuesTestFiles({
+      repositoryRoot,
+      files: {
+        "src/order-status.ts": "export const ORDER_STATUSES = [] as const;\n",
+        "src/schema.ts": "export {};\n",
+      },
+    });
+    const ignoredCatalog = buildCatalog(
+      [entry({ declarationPath: "src/order-status.ts", importRoutes: [] })],
+      { sourceScope: { isIgnored: () => true } },
+    );
+    expect(
+      importRouteStatus(
+        {
+          filename: join(repositoryRoot, "src/schema.ts"),
+          importedName: "ORDER_STATUSES",
+          repositoryRoot,
+          specifier: "./order-status.ts",
+        },
+        ignoredCatalog,
+      ),
     ).toBe("external");
   });
 
@@ -256,7 +286,7 @@ describe("import-route", () => {
           '/** @canonical-values order.status */\nexport const ORDER_STATUSES = ["draft", "published"] as const;\n',
       },
     });
-    const nestedCatalog = buildCanonicalValuesCatalog({ repositoryRoot: root });
+    const nestedCatalog = analyzeCanonicalValuesRepository({ repositoryRoot: root }).catalog;
 
     expect(
       importRouteStatus(
@@ -285,7 +315,7 @@ describe("import-route", () => {
         "src/consumer.ts": "export {};\n",
       },
     });
-    const directCatalog = buildCanonicalValuesCatalog({ repositoryRoot: root });
+    const directCatalog = analyzeCanonicalValuesRepository({ repositoryRoot: root }).catalog;
     const status = (specifier: string): string =>
       importRouteStatus(
         {

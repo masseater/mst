@@ -80,20 +80,20 @@ export const buildBodyIndex = (files: readonly IndexedFile[]): BodyIndex => {
   };
 };
 
+const LINE_ORDER_WIDTH = 12;
+
+const firstSiteKey = (sites: readonly BodySite[]): string =>
+  sites
+    .slice(0, 1)
+    .map((site) => `${site.relativePath}\0${String(site.line).padStart(LINE_ORDER_WIDTH, "0")}`)
+    .join("");
+
 const clustersIn = (
   sitesByKey: ReadonlyMap<string, readonly BodySite[]>,
 ): readonly (readonly BodySite[])[] =>
   [...sitesByKey.values()]
     .filter((sites) => sites.length > 1)
-    .toSorted((left, right) => {
-      const [leftFirst] = left;
-      const [rightFirst] = right;
-      if (leftFirst === undefined || rightFirst === undefined) return 0;
-      return bySiteOrder(leftFirst, rightFirst);
-    });
+    .toSorted((left, right) => (firstSiteKey(left) < firstSiteKey(right) ? -1 : 1));
 
 export const duplicatedClustersIn = (index: BodyIndex): readonly (readonly BodySite[])[] =>
   clustersIn(index.sitesByFingerprint);
-
-export const twinClustersIn = (index: BodyIndex): readonly (readonly BodySite[])[] =>
-  clustersIn(index.sitesByNamedFingerprint);

@@ -11,6 +11,18 @@ describe("dont-review-it/no-single-use-local-type--inline-at-the-use-site", () =
         code: "type Draft = { readonly title: string };\nconst read = (draft: Draft): Draft => draft;",
       },
       {
+        name: "a type reached through a namespace names no local declaration",
+        code: "type Draft = catalog.Draft;\nconst read = (draft: Draft): Draft => draft;",
+      },
+      {
+        name: "a heritage clause reached through a namespace names no local declaration",
+        code: "interface Draft extends catalog.Entry {}\nconst read = (draft: Draft): Draft => draft;",
+      },
+      {
+        name: "an implements clause reached through a namespace names no local declaration",
+        code: "class Draft implements catalog.Entry {}\nclass Copy implements Draft {}",
+      },
+      {
         name: "an exported type is left to the module that imports it",
         code: "export type Draft = { readonly title: string };\nexport const read = (draft: Draft) => draft.title;",
       },

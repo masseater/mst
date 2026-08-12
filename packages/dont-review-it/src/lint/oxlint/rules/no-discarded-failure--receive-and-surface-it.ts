@@ -1,4 +1,5 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { VOID_OPERATOR } from "../lib/void-operator.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
@@ -16,8 +17,6 @@ const CARRIED_THROUGH_TYPES: ReadonlySet<string> = new Set([
 const FAILURE_ELEMENT_INDEX = 0;
 
 const RESULT_ELEMENT_INDEX = 1;
-
-const VOID_OPERATOR = "void";
 
 const PLACEHOLDER_NAME_PATTERN = /^_+$/u;
 
@@ -44,15 +43,13 @@ const readsResultElement = (member: ESTree.MemberExpression): boolean =>
   member.property.type === "Literal" &&
   member.property.value === RESULT_ELEMENT_INDEX;
 
-const receiverOf = (node: ESTree.Node): ESTree.Node | null => {
-  const { parent } = node;
-  if (parent === null) return null;
+const receiverOf = (node: ESTree.Node): ESTree.Node => {
+  const parent = node.parent as ESTree.Node;
   return CARRIED_THROUGH_TYPES.has(parent.type) ? receiverOf(parent) : parent;
 };
 
 const discardsFailure = (node: ESTree.CallExpression): boolean => {
   const receiver = receiverOf(node);
-  if (receiver === null) return true;
   if (receiver.type === "ExpressionStatement") return true;
   if (receiver.type === "UnaryExpression") return receiver.operator === VOID_OPERATOR;
   if (receiver.type === "VariableDeclarator") return !bindsFailure(receiver.id);
@@ -71,9 +68,9 @@ export const noDiscardedFailure = createDontReviewItRule({
     },
     messages: {
       discardedFailurePair:
-        "The failure half of this pair must be bound, because dropping it turns a failure into the value that stands for its own absence: `null` for a file that exists but cannot be read, an empty array for a directory that cannot be listed, an empty index for a scan that never ran. Nothing downstream can tell that apart from a genuine absence, so the run finishes green with less inspected than it claims, and nothing reports the difference. Bind the failure and decide, at this call, what it means. If the absence of the target is a normal input here, keep that case as a value and let the failure's `code` decide which failures produce it, so absence and unreadability stop sharing one value. Every other failure belongs above this call: throw one that names what could not be read, with the original passed as `cause`. This rule reads the spelling `attempt` and `attemptAsync` at the call site and never resolves where the name came from, so a local binding that borrows one of those names is reported as well.",
+        "The failure half of this pair must not be dropped. Bind the failure and decide at this call what it means: keep a normal absence as a value selected by the failure's `code`, and throw for every other failure with the original passed as `cause`.",
       unnamedCatchFailure:
-        "A catch clause must name what it caught, because a clause that binds nothing cannot report, classify or rethrow the failure, and the statements after the `try` then run on state that the failed operation never finished producing. Bind the failure and pick an ending the caller can act on: rethrow it, throw one that names this layer's part in it with the original as `cause`, or return a value that shows the operation did not complete. A binding spelled with underscores alone is reported the same way, because it declares in advance that the failure will not be read.",
+        "A catch clause must not leave what it caught unbound. Bind the failure and pick an ending the caller can act on: rethrow it, throw one that names this layer's part in it with the original as `cause`, or return a value that shows the operation did not complete.",
     },
     schema: [],
   },

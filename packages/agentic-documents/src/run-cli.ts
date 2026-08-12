@@ -5,9 +5,8 @@ import {
   EXIT_MISUSE,
   EXIT_PROBLEMS_FOUND,
   EXIT_SUCCESS,
-  toLines,
   type CliResult,
-} from "@mst/utils";
+} from "@mst/repository-checks";
 import { attemptAsync } from "es-toolkit";
 
 import { defaultConfig } from "./config.ts";
@@ -49,18 +48,14 @@ const dispatch = async (argv: readonly string[]): Promise<CliResult> => {
 
   return {
     exitCode: problems.length === 0 ? EXIT_SUCCESS : EXIT_PROBLEMS_FOUND,
-    out: toLines(problems.map(formatProblem)),
+    out: problems.map((problem) => `${formatProblem(problem)}\n`).join(""),
     error: "",
   };
 };
 
 export const runAgenticDocuments = async (argv: readonly string[]): Promise<CliResult> => {
-  const [failure, result] = await attemptAsync(() => dispatch(argv));
-  if (result !== null) return result;
-
-  return {
-    exitCode: EXIT_MISUSE,
-    out: "",
-    error: `${failure instanceof Error ? failure.message : String(failure)}\n`,
-  };
+  const [failure, checked] = await attemptAsync<CliResult, Error>(async () => dispatch(argv));
+  return failure === null
+    ? checked
+    : { exitCode: EXIT_MISUSE, out: "", error: `${failure.message}\n` };
 };

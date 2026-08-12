@@ -174,4 +174,51 @@ describe("createCanonicalValuesTypeScriptProgram", () => {
     ).toThrow("TypeScript dependency is outside the repository");
     rmSync(outer, { force: true, recursive: true });
   });
+
+  test("reports the first malformed TypeScript configuration diagnostic", () => {
+    const root = repository();
+    write({ root, path: "tsconfig.json", contents: '{ "compilerOptions": { "module": 1 }' });
+    const ownerPath = write({
+      root,
+      path: "src/owner.ts",
+      contents: 'export const OWNER = ["draft", "published"] as const;\n',
+    });
+
+    expect(() =>
+      createCanonicalValuesTypeScriptProgram({
+        repositoryRoot: root,
+        rootNames: [ownerPath],
+        searchDirectory: join(root, "src"),
+      }),
+    ).toThrow("Compiler option 'module' requires a value of type string.");
+    rmSync(root, { force: true, recursive: true });
+  });
+
+  test.each([
+    {
+      extension: "tsx",
+      languageVariant: ts.LanguageVariant.JSX,
+      source: "export const view = <main />;\n",
+    },
+    {
+      extension: "ts",
+      languageVariant: ts.LanguageVariant.Standard,
+      source: "export const value = 1;\n",
+    },
+  ] as const)(
+    "parses a $extension source override with its script kind",
+    ({ extension, languageVariant, source }) => {
+      const root = repository();
+      const sourcePath = join(root, `src/owner.${extension}`);
+      const program = createCanonicalValuesTypeScriptProgram({
+        repositoryRoot: root,
+        rootNames: [sourcePath],
+        searchDirectory: join(root, "src"),
+        sourceOverrides: new Map([[sourcePath, source]]),
+      });
+
+      expect(program.getSourceFile(sourcePath)?.languageVariant).toBe(languageVariant);
+      rmSync(root, { force: true, recursive: true });
+    },
+  );
 });

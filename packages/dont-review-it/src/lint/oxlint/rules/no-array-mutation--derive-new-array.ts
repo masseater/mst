@@ -1,8 +1,12 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
 import { IN_PLACE_ARRAY_METHODS } from "../lib/array-mutation-methods.ts";
-import { bindingInScope, type ScopeLookup } from "./scope-resolution.ts";
+import {
+  resolveBinding,
+  type BindingResolution,
+  type ScopeLookup,
+} from "../lib/resolved-bindings.ts";
 
-import type { Definition, ESTree, Variable } from "@oxlint/plugins";
+import type { Definition, ESTree } from "@oxlint/plugins";
 
 const ARRAY_RETURNING_ARRAY_METHODS: ReadonlySet<string> = new Set([
   "concat",
@@ -26,19 +30,17 @@ const ARRAY_GLOBAL_FACTORY_METHODS: ReadonlySet<string> = new Set(["from", "of"]
 
 const ARRAY_TYPE_NAMES: ReadonlySet<string> = new Set(["Array", "ReadonlyArray"]);
 
-type BindingResolution = {
-  readonly scopeAt: ScopeLookup;
-  readonly seenBindings: ReadonlySet<Variable>;
-};
-
 const staticPropertyName = (node: ESTree.MemberExpression): string | null => {
   if (!node.computed) return node.property.type === "Identifier" ? node.property.name : null;
 
   const key = node.property;
   if (key.type === "Literal") return typeof key.value === "string" ? key.value : null;
   if (key.type !== "TemplateLiteral") return null;
-  if (key.expressions.length !== 0 || key.quasis.length !== 1) return null;
-  return key.quasis[0]?.value.cooked ?? null;
+  if (key.expressions.length !== 0) return null;
+  return key.quasis
+    .slice(0, 1)
+    .map((quasi) => quasi.value.cooked)
+    .join("");
 };
 
 const isArrayGlobalReference = (node: ESTree.Expression): boolean =>
@@ -78,8 +80,6 @@ const isArrayLikeType = (
     case "TSArrayType":
     case "TSTupleType":
       return true;
-    case "TSParenthesizedType":
-      return isArrayLikeType(node.typeAnnotation, seenTypeParameterNames);
     case "TSTypeOperator":
       return (
         node.operator === "readonly" && isArrayLikeType(node.typeAnnotation, seenTypeParameterNames)
@@ -110,7 +110,7 @@ const isArrayLikeBinding = (
   node: ESTree.IdentifierReference,
   { scopeAt, seenBindings }: BindingResolution,
 ): boolean => {
-  const binding = bindingInScope(scopeAt(node), node.name);
+  const binding = resolveBinding(scopeAt(node), node.name);
   if (binding === null || seenBindings.has(binding)) return false;
 
   const seen = new Set([...seenBindings, binding]);
@@ -143,7 +143,6 @@ const isArrayLikeThroughWrapper = (
 ): boolean | null => {
   switch (node.type) {
     case "ChainExpression":
-    case "ParenthesizedExpression":
     case "TSNonNullExpression":
       return isArrayLikeExpression(node.expression, resolution);
     case "TSAsExpression":
@@ -187,7 +186,7 @@ export const noArrayMutation = createDontReviewItRule({
     },
     messages: {
       inPlaceArrayMutation:
-        "`{{method}}` must not be called on an array, because it changes the receiver in place: the call site shows no new value, and every other holder of the same array reference observes the change without a single line of its own being edited. Derive a new array instead and bind it: spread the old one to add elements, `filter` or `map` or `reduce` to narrow or transform, and `toSorted` or `toReversed` or `toSpliced` or `with` to order, reverse, splice or replace, each of which returns a new array and leaves the receiver alone. Casting the receiver so this rule stops seeing an array removes the report and keeps the mutation, so it is not a fix.",
+        "`{{method}}` must not be called on an array. Derive a new array and bind it: spread the old one to add elements, `filter` or `map` or `reduce` to narrow or transform, and `toSorted` or `toReversed` or `toSpliced` or `with` to order, reverse, splice or replace.",
     },
     schema: [],
   },

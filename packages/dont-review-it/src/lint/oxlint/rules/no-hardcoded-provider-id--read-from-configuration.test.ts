@@ -15,6 +15,26 @@ describe("dont-review-it/no-hardcoded-provider-id--read-from-configuration", () 
         code: "import Provider from 'provider-sdk';\nnew Provider({ apiKey: process.env.PROVIDER_API_KEY });",
       },
       {
+        name: "an identity behind a computed name cannot be read as an identity key",
+        code: "import Provider from 'provider-sdk';\nnew Provider({ [field]: 'written-out' });",
+      },
+      {
+        name: "a key that is a number names no identity",
+        code: "import Provider from 'provider-sdk';\nnew Provider({ 1: 'written-out' });",
+      },
+      {
+        name: "settings spread in from elsewhere are not written out here",
+        code: "import Provider from 'provider-sdk';\nnew Provider({ ...base });",
+      },
+      {
+        name: "an argument spread in from elsewhere is not written out here",
+        code: "import Provider from 'provider-sdk';\nnew Provider(...settings);",
+      },
+      {
+        name: "a constructor reached through a computed name is not a provider constructor",
+        code: "import Provider from 'provider-sdk';\nnew providers[0]({ apiKey: 'written-out' });",
+      },
+      {
         name: "a setting that is not an identity may be written out",
         code: "import { RuleTester } from '@oxlint/plugins';\nnew RuleTester({ languageOptions: { parserOptions: { lang: 'ts' } } });",
       },
@@ -105,7 +125,7 @@ describe("dont-review-it/no-hardcoded-provider-id--read-from-configuration", () 
       {
         name: "a test file carries no exemption",
         code: "import Provider from 'provider-sdk';\nnew Provider({ projectId: 'acme-production' });",
-        filename: "/repo/packages/utils/src/provider.test.ts",
+        filename: "/repo/packages/repository-checks/src/provider.test.ts",
         errors: [{ messageId: "hardcodedProviderId" }],
       },
     ],

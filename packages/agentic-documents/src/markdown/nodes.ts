@@ -5,9 +5,20 @@ const isParent = (node: Nodes): node is Nodes & Parent => "children" in node;
 export const descendants = (node: Nodes): readonly Nodes[] =>
   isParent(node) ? node.children.flatMap((child) => [child, ...descendants(child)]) : [];
 
-export const lineOf = (node: Nodes): number | null => node.position?.start.line ?? null;
+const startOf = (node: Nodes): { readonly line: number; readonly offset: number } =>
+  (
+    node as Nodes & {
+      readonly position: { readonly start: { readonly line: number; readonly offset: number } };
+    }
+  ).position.start;
 
-export const offsetOf = (node: Nodes): number | undefined => node.position?.start.offset;
+export const lineOf = (node: Nodes): number => startOf(node).line;
+
+export const offsetOf = (node: Nodes): number => startOf(node).offset;
+
+export const endOffsetOf = (node: Nodes): number =>
+  (node as Nodes & { readonly position: { readonly end: { readonly offset: number } } }).position
+    .end.offset;
 
 export const flattenTextDroppingCode = (node: Nodes): string => {
   if (node.type === "text") return node.value;

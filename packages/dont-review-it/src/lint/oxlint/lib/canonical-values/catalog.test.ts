@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import { buildCatalog, canonicalValueKey, EMPTY_CANONICAL_VALUES_CATALOG } from "./catalog.ts";
+import { buildCatalog, canonicalValueKey } from "./catalog.ts";
 import { fingerprintValues } from "./fingerprint.ts";
 
 describe("catalog", () => {
@@ -24,14 +24,16 @@ describe("catalog", () => {
     fingerprint: fingerprintValues(values),
   });
 
-  test("an empty catalog resolves nothing", () => {
-    expect(EMPTY_CANONICAL_VALUES_CATALOG.entries).toStrictEqual([]);
-    expect(EMPTY_CANONICAL_VALUES_CATALOG.entriesByValue.size).toBe(0);
-    expect(EMPTY_CANONICAL_VALUES_CATALOG.packageNames.size).toBe(0);
+  test("a concept that spells the same value twice is listed against it once", () => {
+    const repeated = entry("order-status", ["draft", "draft"]);
+
+    expect(buildCatalog([repeated]).entriesByValue.get(canonicalValueKey("draft"))).toStrictEqual([
+      repeated,
+    ]);
   });
 
   test("repository package identity does not depend on a valid owner entry", () => {
-    expect(buildCatalog([], ["@mst/example"]).packageNames).toStrictEqual(
+    expect(buildCatalog([], { packageNames: ["@mst/example"] }).packageNames).toStrictEqual(
       new Set(["@mst/example"]),
     );
   });

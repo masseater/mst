@@ -38,7 +38,7 @@ repository package 名は valid entry の有無から推測せず、現在の pa
 
 cache file は `node_modules/.cache/mst-dont-review-it/canonical-values.json` に置く。書き込みは process 固有の temporary file を完成させてから rename し、reader が partial JSON を見ないようにする。環境要因で書き込めなくても、今回構築した memory 上の catalog を返し、次の process が再構築できる状態を保つ。
 
-この cache を使うのは lint だけである。`dont-review-it verify` と `equivalent-concepts` は cache を読まず、同じ repository analysis を毎回 strict に実行する。out-of-scope annotation や不正 annotation は lint catalog の entry にならず、strict analysis では problem になる。
+この cache を使うのは lint だけである。`dont-review-it check` は cache を読まず、repository analysis を毎回 1 回 strict に実行する。out-of-scope annotation や不正 annotation は lint catalog の entry にならず、strict analysis では problem になる。equivalent concept はその strict inspection に problem がない場合だけ同じ catalog から照合する。
 
 ## 影響
 

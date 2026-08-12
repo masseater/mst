@@ -38,7 +38,7 @@ mst の綴りはルート `vite.config.ts` の `rules` に置いた。配布す�
 
 **canonical owner の構文上の位置は `oxc-parser`、解決済みの意味は `typescript-6` で読む。** `declarations.ts` は source ごとに `parseSync` を 1 回呼び、comment と top-level statement の範囲だけを扱う。module-scope の JSDoc と、その末尾から空白だけを挟んで続く単一 variable statement・単一 Identifier binding・runtime initializer を owner 候補にする。line comment、通常の block comment、nested annotation、intervening comment、ambient declaration、type alias、enum、function、class、import、re-export、制御文は owner にしない。
 
-Oxc AST は owner の構文上の位置と initializer range を確定し、catalog builder は `typescript-6` の checker で同じ binding の期待値域を解決する。さらに initializer の runtime 候補を CandidateSet として評価し、literal、静的 spread、identifier・import alias、sequence、conditional、証明済み call result の全候補が checker の値域と一致する場合だけ entry を作る。型 assertion、明示型、ambient・opaque call、unknown branch だけで成立する値域へは退避しない。empty・非 literal domain・直接記述された重複値も problem にして entry を作らない。
+Oxc AST は owner の構文上の位置と declaration range を確定する。owner 候補は最寄りの TypeScript configuration ごとに先にまとめ、catalog builder は configuration ごとの `typescript-6` Program と checker で同じ binding の値域を解決する。array の numeric index type にある literal union、または index signature を持たない object の property name を値域にする。checker が解決する import と spread は同じ型へ畳まれ、empty・widened・scalar・非 literal domain・直接記述された重複値は problem にして entry を作らない。
 
 public import route も同じ checker で package entry の export symbol を解決する。specifier、export name、exports field が解決した repository-relative runtime source path 群を、owner symbol と同じ declaration identity を指す場合だけ登録する。consumer で解決した実体 path が別 source なら、specifier と export name が同じでも未登録 route にする。package exports の `types` condition が同じ workspace package の declaration file を返した場合は、登録済み runtime source と同じ package root に属することを確認して登録 route とみなす。`paths` で specifier を別 runtime source または declaration file へ向けた解決は未登録のままにする。相対・絶対 import は実在する consumer に対する TypeScript の解決結果を優先し、競合する `.ts` と `.tsx` を拡張子除去で同一視しない。renamed alias は公開名で登録し、shadow export は名前が同じでも登録しない。parser AST を再帰して import・spread・re-export の評価器を自作する経路は持たない。
 
@@ -46,19 +46,19 @@ public import route も同じ checker で package entry の export symbol を解
 
 **library vocabulary と canonical catalog で TypeScript の用途を分ける。** `typescript` package の `typescript/unstable/sync` は、直接依存の公開型から lint message に載せる候補を収穫するためだけに使う。遅延起動し、環境要因で起動できなければ空の候補へ退避しても lint の報告箇所は変えない。
 
-`typescript-6` は canonical owner の値域と public symbol identity を決める correctness-critical な checker として使う。ここで解決できない owner は catalog entry を持たず、strict analysis の problem になる。起動不能や型解決失敗を parser-only の値評価へ退避しない。2 package は別 API・別失敗条件・別責務を持つため、どちらも `@mst/dont-review-it` の runtime dependency とし、`pnpm-workspace.yaml` の別 catalog entry で固定する。
+`typescript-6` は canonical owner の値域と public symbol identity を決める correctness-critical な checker として使う。ここで解決できない owner は catalog entry を持たず、strict analysis の problem になる。起動不能や型解決失敗を parser-only の値評価へ退避しない。2 package は別 API・別失敗条件・別責務を持つため、どちらも `@mst/dont-review-it` の runtime dependency とする。`typescript-6` はこの workspace だけが使うため package manifest で固定し、複数 workspace が共有する `typescript` だけを dependency catalog に置く。
 
-**consumer の静的な値追跡は、Oxc の scope identity を使う二相の abstract interpretation にする。** no-local rule は visitor が到着した順に名前の `Map` を更新して、その時点の値を決めない。最初に `Variable` identity、definition、binding write、member write、guard、execution context、call site、type alias を source 全体から索引化し、`Program:exit` で schema・型・collection mutation の sink を評価する。同名の import、parameter、内側 binding、destructuring alias は綴りではなく scope が解決した identity で区別する。
+**consumer は明示した構文だけを visitor より前に索引化する。** 二本の canonical rule は `create` 時に Oxc AST 全体を一度走査し、module-scope の静的 array・object binding、named import、schema・type・Set・indexed access・JSON Schema の sink、canonical literal を不変な診断配列へ変換してから visitor を返す。visitor は `Program` で完成済み診断を報告するだけで、走査順に名前や候補値を更新しない。
 
-評価結果は「既知候補」と「候補を閉じられたか」を別に持つ。条件分岐、unknown spread、computed property、呼び出し得る関数を通ったとき、分からない値を空集合や最後に見た 1 値へ置き換えない。未登録 import route は open な候補集合に含まれていても報告する。schema invocation のように語彙を定義する sink は既知の局所有限値候補を報告し、後勝ちの unknown property で値域自体を閉じられない object は有限集合として断定しない。
+consumer 側に JavaScript の abstract interpreter を置かない。callback の実行、標準 API の返値、collection mutation、`call` / `apply` / `bind` の正規化を一般化すると、lint rule が JavaScript 実行系を再実装することになる。対象を増やす場合は、語彙を定義する明示的な syntax contract と耐久テストを追加する。owner の import・spread・public export は TypeScript checker に任せ、consumer の値域評価へ同じ解決処理を重複実装しない。
 
-property path は JavaScript の property key と同じ文字列へ正規化し、unknown computed key は wildcard invalidation として扱う。binding と property の write は query 先と同じ execution context、親 context、実際に到達する call site に分け、未呼び出し関数の write を混ぜない。direct / `bind` / `call` / `apply` / `Reflect.apply` は target、bound arguments、`this` を持つ同じ invocation fact へ正規化する。配列の追加・削除・並べ替え・上書き、`length` / index の直接・更新・複合・論理・分割代入、`Set` の追加・削除・全削除、`Object` / `Reflect` の property mutation API は、alias ごとの個別報告にせず、同じ collection identity の状態遷移として最終値域を評価する。
+named import は TypeScript module resolution で実体 source を解決し、catalog の specifier・export name・source identity と照合する。catalog owner と同名の ambient・local bindingを綴りだけで登録済みとみなさない。repository scan と route 判定は `git ls-files --others --ignored --exclude-standard --directory` から作った不変の source scope で未追跡 source を一括で取り除き、tracked source は ignore pattern に一致しても repository source として維持する。
 
-この処理に `eslint` や `@eslint-community/eslint-utils` を中核依存として持ち込まない。Oxlint plugin が公開する scope manager は `Variable` / `Reference` / write expression を供給する一方、ESLint 実体を peer dependency に持つ utility は Oxlint の JS plugin load 境界と一致しない。`getStaticValue` も単一の値か失敗しか返さず、候補集合の completeness、route provenance、property invalidation、partial bind を表せない。primitive・property key・truthiness の評価はこの abstract interpreter の限定された static resolver に置き、checker を consumer file ごとに起動しない。
+source scope、repository file 一覧、cache fingerprint、catalog は lint process の最初の rule 作成より前に一度だけ確定し、全 file と両 canonical rule が同じ instance を共有する。CLI の strict verification と明示的な catalog reload は現在の fingerprint を再計算するが、visitor と import route lookup は Git command や repository scan を実行しない。
 
 **汎用の処理は `es-toolkit` を使う。** 単一代入への書き換えで、同じ形が何度も出た。try/catch で失敗を握って既定値に落とす形、比較関数を手書きして並べ替える形、2 回 filter して集合を分ける形、遅延初期化。これらを `attempt` / `sortBy` / `partition` / `memoize` / `uniq` / `range` に置き換えた。両パッケージの実行時依存に入れている。
 
-**CLI は出力を書き込まず、戻り値として返す。** `runDontReviewIt` は `writeOut` / `writeError` のコールバックを受け取る形だった。この形はテスト側に「文字列に足し込む」再代入を強制する。`{ exitCode, out, error }` を返す形にして、プロセスのストリームに書くのは `cli.ts` だけにした。
+**CLI の検査結果は `check` の report として一度だけ組み立てる。** canonical owner の問題と equivalent concept は同じ inspection を共有し、owner problem があるときは不完全な catalog から equivalent concept を報告しない。Citty の `check` subcommand がほかの repository check と同じ report にまとめ、プロセスのストリームと exit code を扱う。
 
 ## 影響
 
@@ -74,9 +74,11 @@ property path は JavaScript の property key と同じ文字列へ正規化し�
 
 TypeScript checker は 2 系統になる。library vocabulary checker の障害は message の候補だけを薄くし、canonical checker の失敗は owner 登録を失敗させる。この差を崩すと、環境によって lint 合否が変わるか、不正 owner を syntax fallback で登録することになる。
 
-consumer の解析は Oxc scope から作った索引を 1 file につき 1 つ共有する。schema、JSON Schema、type indexed access、`Set`、collection mutation がそれぞれ別の名前追跡器を持たないため、新しい alias・write・call form を追加したときに一方だけが未登録 route を落とす状態を避けられる。cycle memo の key は binding identity、property path、cutoff、execution context を含み、自己代入と循環 alias は unknown 候補へ閉じて lint process を停止させない。
+consumer の解析は 1 file につき 1 回だけ行う。schema、JSON Schema、type indexed access、`Set` は同じ module-scope binding と import route の索引を共有し、visitor の走査順には依存しない。
 
-`bin` が `dist/cli.mjs` を指していると、素のチェックアウトでは対象が存在せず pnpm が bin リンクを張らない。`vp install` を 2 回打つまで `vp exec dont-review-it verify` が動かない状態になっていた。`bin` を `src/cli.ts` に向けて解消している。[0004](0004-shape-the-lint-rule-foundation-around-tooling-limits.md) が plugin の指定子について書いているのと同じ理由で、src は常に存在する。
+declaration source index も source の visitor 実行前に完成している。consumer identifier の range から checker symbol の declaration source を引く lookup と、AMD dependency specifier の一覧だけを visitor に渡す。visitor 中に repository scan、tsconfig 探索、program 作成を始める経路は持たない。
+
+`bin` が `dist/cli.mjs` を指していると、素のチェックアウトでは対象が存在せず pnpm が bin リンクを張らない。`vp install` を 2 回打つまで `vp exec dont-review-it check` が動かない状態になっていた。`bin` を `src/cli.ts` に向けて解消している。[0004](0004-shape-the-lint-rule-foundation-around-tooling-limits.md) が plugin の指定子について書いているのと同じ理由で、src は常に存在する。
 
 ## 検討して採らなかった案
 

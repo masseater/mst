@@ -11,6 +11,14 @@ describe("dont-review-it/no-hardcoded-endpoint--read-from-configuration", () => 
         code: "fetch(config.catalogEndpoint);",
       },
       {
+        name: "a call handed no destination at all writes none out",
+        code: "fetch();",
+      },
+      {
+        name: "a destination spread in from elsewhere is not written out here",
+        code: "fetch(...destinations);",
+      },
+      {
         name: "a destination taken from the environment passes",
         code: "fetch(process.env.CATALOG_ENDPOINT);",
       },
@@ -123,7 +131,7 @@ describe("dont-review-it/no-hardcoded-endpoint--read-from-configuration", () => 
       {
         name: "a test file carries no exemption",
         code: "fetch('https://example.test/catalog');",
-        filename: "/repo/packages/utils/src/catalog.test.ts",
+        filename: "/repo/packages/repository-checks/src/catalog.test.ts",
         errors: [{ messageId: "hardcodedEndpoint" }],
       },
     ],

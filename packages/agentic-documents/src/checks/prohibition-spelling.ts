@@ -1,5 +1,3 @@
-import { lineAtOffset } from "@mst/utils";
-
 import { isInsideGeneratedRegion } from "../markdown/generated-region.ts";
 import { descendants, offsetOf } from "../markdown/nodes.ts";
 import { negatedKeywordPattern } from "./normative-notation.ts";
@@ -22,14 +20,13 @@ export const negatedKeywordSpellings = ({
     .filter((node) => node.type === "text")
     .flatMap((node): readonly DocumentProblem[] => {
       const baseOffset = offsetOf(node);
-      if (baseOffset === undefined) return [];
 
       return [...node.value.matchAll(negatedKeywordPattern(config))]
         .map((match) => ({ offset: baseOffset + match.index, found: match[0] }))
         .filter(({ offset }) => !isInsideGeneratedRegion(offset, document.generated))
         .map(({ offset, found }) => ({
           file: document.file,
-          line: lineAtOffset(document.source, offset),
+          line: document.source.slice(0, offset).split("\n").length,
           message: message(found, config.prohibitionKeyword),
         }));
     });

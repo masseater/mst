@@ -3,16 +3,12 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "vite-plus/test";
 
-import {
-  analyzeCanonicalValuesRepository,
-  buildCanonicalValuesCatalog,
-  loadCanonicalValuesCatalog,
-} from "./builder.ts";
+import { analyzeCanonicalValuesRepository, loadCanonicalValuesCatalogSnapshot } from "./builder.ts";
 import {
   annotateCanonicalValues,
   createCanonicalValuesTestRepository,
   writeCanonicalValuesTestFile,
-} from "./canonical-values-test-fixture.ts";
+} from "./canonical-values.test-fixture.ts";
 
 describe("builder", () => {
   test("public routes preserve the exact exported symbol and alias", () => {
@@ -53,7 +49,9 @@ describe("builder", () => {
       contents: 'export const SHADOW_STATUSES = ["draft", "published"] as const;\n',
     });
 
-    expect(buildCanonicalValuesCatalog({ repositoryRoot }).entries[0]?.importRoutes).toStrictEqual([
+    expect(
+      analyzeCanonicalValuesRepository({ repositoryRoot }).catalog.entries[0]?.importRoutes,
+    ).toStrictEqual([
       {
         exportName: "ORDER_STATUSES",
         resolvedSourcePaths: ["packages/vocabulary/src/index.ts"],
@@ -91,7 +89,7 @@ describe("builder", () => {
       ),
     });
 
-    expect(buildCanonicalValuesCatalog({ repositoryRoot }).entries[0]).toMatchObject({
+    expect(analyzeCanonicalValuesRepository({ repositoryRoot }).catalog.entries[0]).toMatchObject({
       importRoutes: [],
       packageName: "@fixture/vocabulary",
     });
@@ -126,7 +124,9 @@ describe("builder", () => {
       ),
     });
 
-    expect(buildCanonicalValuesCatalog({ repositoryRoot }).entries[0]?.importRoutes).toStrictEqual([
+    expect(
+      analyzeCanonicalValuesRepository({ repositoryRoot }).catalog.entries[0]?.importRoutes,
+    ).toStrictEqual([
       {
         exportName: "ORDER_STATUSES",
         resolvedSourcePaths: ["packages/vocabulary/src/index.ts"],
@@ -151,7 +151,7 @@ describe("builder", () => {
       ),
     });
 
-    expect(buildCanonicalValuesCatalog({ repositoryRoot }).entries).toStrictEqual([]);
+    expect(analyzeCanonicalValuesRepository({ repositoryRoot }).catalog.entries).toStrictEqual([]);
     expect(analyzeCanonicalValuesRepository({ repositoryRoot }).problems).toContainEqual({
       kind: "vocabulary-without-values",
       filePath: "packages/vocabulary/src/order-status.ts",
@@ -256,7 +256,7 @@ describe("builder", () => {
     expect(catalog.packageNames).toStrictEqual(new Set(["@fixture/repository"]));
   });
 
-  test("the in-process loader reuses only the current input fingerprint", () => {
+  test("the lint snapshot remains immutable for the lifetime of the process", () => {
     const repositoryRoot = createCanonicalValuesTestRepository();
     writeCanonicalValuesTestFile({
       repositoryRoot,
@@ -266,9 +266,7 @@ describe("builder", () => {
         'export const ORDER_STATUSES = ["draft"] as const;',
       ),
     });
-    const first = loadCanonicalValuesCatalog({ repositoryRoot });
-    expect(first.entries[0]?.values).toStrictEqual(["draft"]);
-    expect(loadCanonicalValuesCatalog({ repositoryRoot })).toBe(first);
+    const first = loadCanonicalValuesCatalogSnapshot({ repositoryRoot });
 
     writeCanonicalValuesTestFile({
       repositoryRoot,
@@ -278,14 +276,34 @@ describe("builder", () => {
         'export const ORDER_STATUSES = ["final"] as const;',
       ),
     });
-    const changed = loadCanonicalValuesCatalog({ repositoryRoot });
 
-    expect(changed).not.toBe(first);
-    expect(changed.entries[0]?.values).toStrictEqual(["final"]);
-    expect(loadCanonicalValuesCatalog({ repositoryRoot })).toBe(changed);
+    const snapshot = loadCanonicalValuesCatalogSnapshot({ repositoryRoot });
+
+    expect(snapshot).toBe(first);
+    expect(snapshot.entries[0]?.values).toStrictEqual(["draft"]);
   });
 
-  test("an unsafe symbolic link invalidates an in-process catalog instance", () => {
+  test("a second lexical root for one repository reuses its disk cache", () => {
+    const repositoryRoot = createCanonicalValuesTestRepository();
+    const linkedRoot = join(createCanonicalValuesTestRepository(), "repository");
+    writeCanonicalValuesTestFile({
+      repositoryRoot,
+      relativePath: "src/order-status.ts",
+      contents: annotateCanonicalValues(
+        "order.status",
+        'export const ORDER_STATUSES = ["draft"] as const;',
+      ),
+    });
+    const first = loadCanonicalValuesCatalogSnapshot({ repositoryRoot });
+    symlinkSync(repositoryRoot, linkedRoot, "dir");
+
+    const cached = loadCanonicalValuesCatalogSnapshot({ repositoryRoot: linkedRoot });
+
+    expect(cached).not.toBe(first);
+    expect(cached.entries).toStrictEqual(first.entries);
+  });
+
+  test("an unsafe symbolic link prevents a catalog entry", () => {
     const repositoryRoot = createCanonicalValuesTestRepository();
     const externalRoot = createCanonicalValuesTestRepository();
     writeCanonicalValuesTestFile({
@@ -296,7 +314,6 @@ describe("builder", () => {
         'export const ORDER_STATUSES = ["draft", "published"] as const;',
       ),
     });
-    const first = loadCanonicalValuesCatalog({ repositoryRoot });
     writeCanonicalValuesTestFile({
       repositoryRoot: externalRoot,
       relativePath: "external.ts",
@@ -305,22 +322,19 @@ describe("builder", () => {
     symlinkSync(join(externalRoot, "external.ts"), join(repositoryRoot, "src/external.ts"));
 
     const analyzed = analyzeCanonicalValuesRepository({ repositoryRoot });
-    const invalidated = loadCanonicalValuesCatalog({ repositoryRoot });
 
     expect(analyzed.problems).toContainEqual({
       kind: "unsafe-symbolic-link",
       filePath: "src/external.ts",
       line: 1,
     });
-    expect(invalidated).not.toBe(first);
-    expect(invalidated.entries).toStrictEqual([]);
-    expect(loadCanonicalValuesCatalog({ repositoryRoot })).toBe(invalidated);
+    expect(analyzed.catalog.entries).toStrictEqual([]);
   });
 
   test("a missing repository root yields an empty catalog and creates nothing", () => {
     const repositoryRoot = join(createCanonicalValuesTestRepository(), "missing");
 
-    expect(loadCanonicalValuesCatalog({ repositoryRoot }).entries).toStrictEqual([]);
+    expect(loadCanonicalValuesCatalogSnapshot({ repositoryRoot }).entries).toStrictEqual([]);
     expect(existsSync(repositoryRoot)).toBe(false);
   });
 });

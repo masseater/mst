@@ -1,26 +1,22 @@
 import { firstToken } from "@mst/lint-rule-authoring";
 
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { MOCK_FACTORY_EXEMPTION_DIRECTIVE } from "../lib/directive-comments.ts";
 import { isJsdoc } from "../lib/jsdoc-comment.ts";
 
 import type { Comment, ESTree } from "@oxlint/plugins";
 
-const LINT_DIRECTIVES = new Set([
-  "eslint-disable",
-  "eslint-disable-line",
-  "eslint-disable-next-line",
-  "eslint-enable",
-  "oxlint-disable",
-  "oxlint-disable-line",
-  "oxlint-disable-next-line",
-  "oxlint-enable",
-]);
+const LINT_DIRECTIVE = /^(?:eslint|oxlint)-(?:disable(?:-line|-next-line)?|enable)$/u;
 
 const COMPILER_DIRECTIVE_PREFIX = "@ts-";
 
 const isMachineReadDirective = (comment: Comment): boolean => {
   const token = firstToken(comment.value);
-  return LINT_DIRECTIVES.has(token) || token.startsWith(COMPILER_DIRECTIVE_PREFIX);
+  return (
+    LINT_DIRECTIVE.test(token) ||
+    token === MOCK_FACTORY_EXEMPTION_DIRECTIVE ||
+    token.startsWith(COMPILER_DIRECTIVE_PREFIX)
+  );
 };
 
 export const noExplanatoryComment = createDontReviewItRule({
@@ -34,7 +30,7 @@ export const noExplanatoryComment = createDontReviewItRule({
     },
     messages: {
       explanatoryComment:
-        "A comment that explains the code must not stay in the source, because it drifts as soon as the code changes and nothing fails when it does. Delete it, and put the reasoning in the body of the commit that makes the change. Comment syntax is reserved for declarations a machine reads: lint suppression directives, compiler directives, and JSDoc tag content.",
+        "A comment that explains the code must not stay in the source. Delete it and put the reasoning in the body of the commit that makes the change.",
     },
     schema: [],
   },

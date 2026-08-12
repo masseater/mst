@@ -1,40 +1,73 @@
-import { execFileSync } from "node:child_process";
-import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { lstatSync, realpathSync } from "node:fs";
+import { join, relative, resolve, sep } from "node:path";
 
 import { attempt } from "es-toolkit";
 
+import { gitOutput } from "./git-output.ts";
 import { pathIsInside } from "./path-is-inside.ts";
 
-const gitCheckIgnoreStatus = (
-  repositoryRoot: string,
-  repositoryPath: string,
-): "ignored" | "not-ignored" | "unknown" => {
-  const [failure] = attempt(() =>
-    execFileSync("git", ["check-ignore", "--quiet", "--", repositoryPath], {
-      cwd: repositoryRoot,
-      stdio: "ignore",
-    }),
-  );
-  if (failure === null) return "ignored";
-  if (typeof failure === "object" && "status" in failure) {
-    return failure.status === 1 ? "not-ignored" : "unknown";
+const realPathOf = (path: string): string => {
+  const [failure, realPath] = attempt(() => realpathSync.native(path));
+  return failure === null && realPath !== null ? realPath : path;
+};
+
+const repositoryPathOf = (input: {
+  readonly repositoryRoot: string;
+  readonly realRepositoryRoot: string;
+  readonly source: string;
+}): string | null => {
+  if (pathIsInside(input.repositoryRoot, input.source)) {
+    return relative(input.repositoryRoot, input.source);
   }
-  return "unknown";
+  const realSource = realPathOf(input.source);
+  return pathIsInside(input.realRepositoryRoot, realSource)
+    ? relative(input.realRepositoryRoot, realSource)
+    : null;
 };
 
-const nearestCheckablePath = (repositoryRoot: string, repositoryPath: string): boolean => {
-  const status = gitCheckIgnoreStatus(repositoryRoot, repositoryPath);
-  if (status !== "unknown") return status === "ignored";
-  const parent = dirname(repositoryPath);
-  return parent !== "." && parent !== repositoryPath
-    ? nearestCheckablePath(repositoryRoot, parent)
-    : false;
+const firstSymbolicPath = (repositoryRoot: string, repositoryPath: string): string | null => {
+  const segments = repositoryPath.split(sep);
+  for (const index of segments.keys()) {
+    const candidate = join(repositoryRoot, ...segments.slice(0, index + 1));
+    const [failure, stats] = attempt(() => lstatSync(candidate));
+    if (failure === null && stats?.isSymbolicLink() === true)
+      return relative(repositoryRoot, candidate);
+  }
+  return null;
 };
 
-export const isGitIgnoredSource = (sourcePath: string, repositoryRoot: string): boolean => {
+const ignoredRepositoryPaths = (repositoryRoot: string): ReadonlySet<string> => {
+  const output = gitOutput(
+    ["ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z"],
+    { cwd: repositoryRoot, env: process.env },
+  );
+  return output !== null ? new Set(output.split("\0").filter((path) => path !== "")) : new Set();
+};
+
+const pathIsIgnored = (repositoryPath: string, ignoredPaths: ReadonlySet<string>): boolean =>
+  ignoredPaths.has(repositoryPath) ||
+  [...ignoredPaths].some(
+    (ignoredPath) => ignoredPath.endsWith("/") && repositoryPath.startsWith(ignoredPath),
+  );
+
+export type GitSourceScope = {
+  readonly isIgnored: (sourcePath: string) => boolean;
+};
+
+export const readGitSourceScope = (repositoryRoot: string): GitSourceScope => {
   const root = resolve(repositoryRoot);
-  const source = resolve(root, isAbsolute(sourcePath) ? relative(root, sourcePath) : sourcePath);
-  if (!pathIsInside(root, source)) return false;
-  const repositoryPath = relative(root, source);
-  return repositoryPath !== "" && nearestCheckablePath(root, repositoryPath);
+  const realRoot = realPathOf(root);
+  const ignoredPaths = ignoredRepositoryPaths(root);
+  return {
+    isIgnored(sourcePath) {
+      const source = resolve(root, sourcePath);
+      const repositoryPath = repositoryPathOf({
+        repositoryRoot: root,
+        realRepositoryRoot: realRoot,
+        source,
+      });
+      if (repositoryPath === null || repositoryPath === "") return false;
+      return pathIsIgnored(firstSymbolicPath(root, repositoryPath) ?? repositoryPath, ignoredPaths);
+    },
+  };
 };

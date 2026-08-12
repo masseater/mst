@@ -1,5 +1,7 @@
 import { canonicalValueKey, type CanonicalValue } from "./fingerprint.ts";
 
+import type { GitSourceScope } from "../git-ignored-source.ts";
+
 export { canonicalValueKey };
 
 export type CanonicalValuesImportRoute = {
@@ -27,7 +29,10 @@ export type CanonicalValuesCatalog = {
   readonly entriesByFingerprint: ReadonlyMap<string, readonly CanonicalValuesEntry[]>;
   readonly entriesByValue: ReadonlyMap<string, readonly CanonicalValuesEntry[]>;
   readonly packageNames: ReadonlySet<string>;
+  readonly sourceScope: GitSourceScope;
 };
+
+const ALL_SOURCES: GitSourceScope = { isIgnored: () => false };
 
 const groupBy = (
   entries: readonly CanonicalValuesEntry[],
@@ -49,14 +54,17 @@ const groupBy = (
 
 export const buildCatalog = (
   entries: readonly CanonicalValuesEntry[],
-  packageNames: readonly string[] = entries.flatMap((entry) =>
-    entry.packageName === null ? [] : [entry.packageName],
-  ),
+  options: {
+    readonly packageNames?: readonly string[];
+    readonly sourceScope?: GitSourceScope;
+  } = {},
 ): CanonicalValuesCatalog => ({
   entries,
   entriesByFingerprint: groupBy(entries, (entry) => [entry.fingerprint]),
   entriesByValue: groupBy(entries, (entry) => entry.values.map(canonicalValueKey)),
-  packageNames: new Set(packageNames),
+  packageNames: new Set(
+    options.packageNames ??
+      entries.flatMap((entry) => (entry.packageName === null ? [] : [entry.packageName])),
+  ),
+  sourceScope: options.sourceScope ?? ALL_SOURCES,
 });
-
-export const EMPTY_CANONICAL_VALUES_CATALOG: CanonicalValuesCatalog = buildCatalog([]);

@@ -11,6 +11,10 @@ const problemsIn = (source: string) =>
   });
 
 describe("multipleDecisionKeywords", () => {
+  test("散文で始まらない項目そのものは判断を持たず、入れ子の項目だけが報告される", () => {
+    expect(problemsIn("- - MUST: 記録する PROHIBIT: 省略する\n").length).toStrictEqual(1);
+  });
+
   test("1 つの項目に判断キーワードが 2 つあると報告する", () => {
     expect(problemsIn("- MUST: 記録する PROHIBIT: 省略する\n").length).toStrictEqual(1);
   });

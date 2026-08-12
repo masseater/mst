@@ -90,13 +90,7 @@ export const createCanonicalValuesTypeScriptProgram = (input: ProgramInput): ts.
       const [fileName, languageVersion] = args;
       const sourceText = input.sourceOverrides?.get(resolve(fileName));
       if (sourceText === undefined) return baseHost.getSourceFile(...args);
-      const scriptKind = fileName.endsWith(".tsx")
-        ? ts.ScriptKind.TSX
-        : fileName.endsWith(".jsx")
-          ? ts.ScriptKind.JSX
-          : /\.[cm]?js$/u.test(fileName)
-            ? ts.ScriptKind.JS
-            : ts.ScriptKind.TS;
+      const scriptKind = fileName.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
       return ts.createSourceFile(fileName, sourceText, languageVersion, true, scriptKind);
     },
   };

@@ -11,6 +11,18 @@ const sequenceProblemsIn = (source: string) =>
   });
 
 describe("brokenOrderedSequences", () => {
+  test("順序を表す語を持たない見出しは報告しない", () => {
+    expect(sequenceProblemsIn("## 書き方\n\n**注意**を読む\n")).toStrictEqual([]);
+  });
+
+  test("番号の続きの行は番号として数えない", () => {
+    expect(sequenceProblemsIn("1. 始める\n   続きの行\n2. 終える\n")).toStrictEqual([]);
+  });
+
+  test("強調に置かれた 0 のラベルも報告する", () => {
+    expect(sequenceProblemsIn("**Phase 0** を参照する\n").length).toStrictEqual(1);
+  });
+
   test("0 から始まる番号を報告する", () => {
     expect(sequenceProblemsIn("0. 準備する\n1. 実行する\n").length).toStrictEqual(1);
   });

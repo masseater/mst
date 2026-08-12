@@ -74,10 +74,16 @@ describe("dont-review-it/require-re-export-only-files--move-declaration-to-ownin
         options: [{ targets: ["**/index.ts"], exclude: ["generated/index.ts"] }],
       },
       {
+        name: "a listing whose tail matches nothing on the path leaves the file alone",
+        code: "export const total = 1;",
+        filename: "src/index.ts",
+        options: [{ targets: ["**/surface.ts"] }],
+      },
+      {
         name: "a pattern anchored to the working directory names one file and not its namesakes",
         code: "export const total = 1;",
         filename: "packages/other/src/index.ts",
-        options: [{ targets: ["./packages/utils/src/index.ts"] }],
+        options: [{ targets: ["./packages/repository-checks/src/index.ts"] }],
       },
     ],
     invalid: [
@@ -179,14 +185,14 @@ describe("dont-review-it/require-re-export-only-files--move-declaration-to-ownin
       {
         name: "a listed pattern reaches through a working directory sitting in the middle of the path",
         code: "export const total = 1;",
-        filename: "/tmp/build-cache/.staging/packages/utils/src/index.ts",
-        options: [{ targets: ["utils/src/index.ts"] }],
+        filename: "/tmp/build-cache/.staging/packages/repository-checks/src/index.ts",
+        options: [{ targets: ["repository-checks/src/index.ts"] }],
         errors: [{ messageId: "missingReExport" }, { messageId: "extraStatement" }],
       },
       {
         name: "a double star in a listed pattern spans any number of directories",
         code: "export const total = 1;",
-        filename: "packages/utils/src/lint/oxlint/index.ts",
+        filename: "packages/repository-checks/src/lint/oxlint/index.ts",
         options: [{ targets: ["packages/**/index.ts"] }],
         errors: [{ messageId: "missingReExport" }, { messageId: "extraStatement" }],
       },
@@ -200,8 +206,8 @@ describe("dont-review-it/require-re-export-only-files--move-declaration-to-ownin
       {
         name: "a pattern anchored to the working directory names the file it resolves to",
         code: "export const total = 1;",
-        filename: "packages/utils/src/index.ts",
-        options: [{ targets: ["./packages/utils/src/index.ts"] }],
+        filename: "packages/repository-checks/src/index.ts",
+        options: [{ targets: ["./packages/repository-checks/src/index.ts"] }],
         errors: [{ messageId: "missingReExport" }, { messageId: "extraStatement" }],
       },
     ],

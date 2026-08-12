@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 
 import { describe, expect, onTestFinished, test } from "vite-plus/test";
 
+import { gitOutput } from "../git-output.ts";
 import { listRepositoryFiles, nearestPackageDirectory } from "./source-files.ts";
 
 describe("source-files", () => {
@@ -19,6 +20,10 @@ describe("source-files", () => {
     const absolutePath = join(root, relativePath);
     mkdirSync(absolutePath, { recursive: true });
     return absolutePath;
+  };
+
+  const initializeGit = (root: string): void => {
+    gitOutput(["init", "--quiet"], { cwd: root, env: process.env });
   };
 
   const createManifest = (directory: string): void => {
@@ -64,6 +69,12 @@ describe("source-files", () => {
     const nested = createDirectory(root, "scripts");
 
     expect(nearestPackageDirectory(nested, root)).toBe(null);
+  });
+
+  test("a directory outside the repository cannot acquire a package", () => {
+    const root = createRepository();
+
+    expect(nearestPackageDirectory(dirname(root), root)).toBe(null);
   });
 
   test("only production TypeScript sources can declare canonical values", () => {
@@ -133,6 +144,30 @@ describe("source-files", () => {
     expect(listed.manifests.map((file) => file.relativePath)).toStrictEqual(["package.json"]);
   });
 
+  test("style sheets and markup sources are listed apart from script sources", () => {
+    const root = createRepository();
+    const files = {
+      "index.html": "<main></main>\n",
+      "src/icon.svg": "<svg></svg>\n",
+      "src/status.css": ".draft { color: red; }\n",
+      "src/status.ts": "export const status = 'draft';\n",
+    };
+    for (const [relativePath, source] of Object.entries(files)) {
+      const absolutePath = join(root, relativePath);
+      mkdirSync(dirname(absolutePath), { recursive: true });
+      writeFileSync(absolutePath, source);
+    }
+
+    const listed = listRepositoryFiles(root);
+
+    expect(listed.commentSources.map((file) => file.relativePath)).toStrictEqual(["src/status.ts"]);
+    expect(listed.styleSheets.map((file) => file.relativePath)).toStrictEqual(["src/status.css"]);
+    expect(listed.markupSources.map((file) => file.relativePath)).toStrictEqual([
+      "index.html",
+      "src/icon.svg",
+    ]);
+  });
+
   test("an internal source symlink keeps cache identity but cannot promote generated source", () => {
     const root = createRepository();
     const target = join(root, "dist/generated/consumer.ts");
@@ -171,6 +206,32 @@ describe("source-files", () => {
     ]);
   });
 
+  test("an internal directory symlink is scanned through its repository alias", () => {
+    const root = createRepository();
+    createDirectory(root, "shared");
+    writeFileSync(join(root, "shared/status.ts"), "export const status = 'draft';\n");
+    createDirectory(root, "src");
+    symlinkSync("../shared", join(root, "src/shared"));
+
+    const listed = listRepositoryFiles(root);
+
+    expect(listed.cacheInputs.map((file) => file.relativePath)).toStrictEqual([
+      "shared/status.ts",
+      "src/shared/status.ts",
+    ]);
+    expect(listed.commentSources.map((file) => file.relativePath)).toStrictEqual([
+      "shared/status.ts",
+    ]);
+  });
+
+  test("a symbolic file with an unscanned name stays outside source collections", () => {
+    const root = createRepository();
+    writeFileSync(join(root, "README.md"), "status\n");
+    symlinkSync("README.md", join(root, "README-link.md"));
+
+    expect(listRepositoryFiles(root).cacheInputs).toStrictEqual([]);
+  });
+
   test("external and broken source symlinks become strict repository problems", () => {
     const outer = createRepository();
     const root = createDirectory(outer, "repository");
@@ -182,6 +243,16 @@ describe("source-files", () => {
     expect(listRepositoryFiles(root).problems).toStrictEqual([
       { kind: "unsafe-symbolic-link", line: 1, filePath: "src/external.ts" },
       { kind: "unsafe-symbolic-link", line: 1, filePath: "src/missing.ts" },
+    ]);
+  });
+
+  test("a symbolic-link cycle becomes a strict repository problem", () => {
+    const root = createRepository();
+    const sourceDirectory = createDirectory(root, "src");
+    symlinkSync(sourceDirectory, join(sourceDirectory, "cycle"));
+
+    expect(listRepositoryFiles(root).problems).toStrictEqual([
+      { kind: "unsafe-symbolic-link", line: 1, filePath: "src/cycle/cycle" },
     ]);
   });
 
@@ -197,7 +268,73 @@ describe("source-files", () => {
       commentSources: [],
       declarationSources: [],
       manifests: [],
+      markupSources: [],
       problems: [],
+      styleSheets: [],
     });
+  });
+
+  test("an untracked ignored source does not enter any repository source collection", () => {
+    const root = createRepository();
+    initializeGit(root);
+    createDirectory(root, "ignored");
+    writeFileSync(join(root, ".gitignore"), "ignored\n");
+    writeFileSync(join(root, "ignored/status.ts"), 'export const status = "draft";\n');
+
+    expect(listRepositoryFiles(root)).toStrictEqual({
+      cacheInputs: [],
+      commentSources: [],
+      declarationSources: [],
+      manifests: [],
+      markupSources: [],
+      problems: [],
+      styleSheets: [],
+    });
+  });
+
+  test("a tracked source stays in repository collections after an ignore rule is added", () => {
+    const root = createRepository();
+    initializeGit(root);
+    createDirectory(root, "ignored");
+    writeFileSync(join(root, "ignored/status.ts"), 'export const status = "draft";\n');
+    gitOutput(["add", "ignored/status.ts"], { cwd: root, env: process.env });
+    writeFileSync(join(root, ".gitignore"), "ignored\n");
+
+    const listed = listRepositoryFiles(root);
+
+    expect(listed.cacheInputs.map((file) => file.relativePath)).toStrictEqual([
+      "ignored/status.ts",
+    ]);
+    expect(listed.commentSources.map((file) => file.relativePath)).toStrictEqual([
+      "ignored/status.ts",
+    ]);
+    expect(listed.declarationSources.map((file) => file.relativePath)).toStrictEqual([
+      "ignored/status.ts",
+    ]);
+  });
+
+  test("an ignored external symlink is omitted before unsafe-link validation", () => {
+    const outer = createRepository();
+    const root = createDirectory(outer, "repository");
+    initializeGit(root);
+    writeFileSync(join(root, ".gitignore"), "ignored.ts\n");
+    writeFileSync(join(outer, "external.ts"), 'export const status = "draft";\n');
+    symlinkSync(join(outer, "external.ts"), join(root, "ignored.ts"));
+
+    expect(listRepositoryFiles(root).problems).toStrictEqual([]);
+  });
+
+  test("a tracked ignored external symlink remains an unsafe repository source", () => {
+    const outer = createRepository();
+    const root = createDirectory(outer, "repository");
+    initializeGit(root);
+    writeFileSync(join(outer, "external.ts"), 'export const status = "draft";\n');
+    symlinkSync(join(outer, "external.ts"), join(root, "ignored.ts"));
+    gitOutput(["add", "ignored.ts"], { cwd: root, env: process.env });
+    writeFileSync(join(root, ".gitignore"), "ignored.ts\n");
+
+    expect(listRepositoryFiles(root).problems).toStrictEqual([
+      { kind: "unsafe-symbolic-link", line: 1, filePath: "ignored.ts" },
+    ]);
   });
 });
