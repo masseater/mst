@@ -1,11 +1,11 @@
 import type { EngineKind } from "../config/engine.ts";
 import type { Mode } from "../contract/vocabulary.ts";
 
-export const IDENTITY_SOURCES = ["override", "auto"] as const;
+const IDENTITY_SOURCES = ["override", "auto"] as const;
 
 export type IdentitySource = (typeof IDENTITY_SOURCES)[number];
 
-export const TOKEN_SOURCES = ["github-cli", "environment-variable"] as const;
+const TOKEN_SOURCES = ["github-cli", "environment-variable"] as const;
 
 export type TokenSource = (typeof TOKEN_SOURCES)[number];
 

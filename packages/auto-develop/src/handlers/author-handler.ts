@@ -3,24 +3,17 @@ import { createStatusWriter, type StatusWriter } from "./status-writer.ts";
 
 import type { Logger } from "../logging/logger.ts";
 
-export const AUTHOR_REASONS = [
-  "request_changes",
-  "ci_failure",
-  "merge_conflict",
-  "base_update",
-] as const;
+const AUTHOR_REASONS = ["request_changes", "ci_failure", "merge_conflict", "base_update"] as const;
 
 export type AuthorReason = (typeof AUTHOR_REASONS)[number];
 
-export type AuthorSessionRunner = (session: {
-  readonly prNumber: number;
-  readonly headBranch: string;
-  readonly reason: AuthorReason;
-}) => Promise<void>;
-
 export type AuthorHandlerConfig = {
   readonly github: HandlerGithubClient;
-  readonly runSession: AuthorSessionRunner;
+  readonly runSession: (session: {
+    readonly prNumber: number;
+    readonly headBranch: string;
+    readonly reason: AuthorReason;
+  }) => Promise<void>;
   readonly reviewerLogin: string;
   readonly dryRun: boolean;
   readonly log: Logger;

@@ -5,7 +5,7 @@ import { createJobLedger } from "./job-ledger.ts";
 import { laneAdmitted, type PrFilter } from "./pr-lane.ts";
 import { createSnapshotWriter, resolveSnapshotPath } from "./snapshot.ts";
 
-export type JobHandlers = Readonly<Record<string, (payload: unknown) => Promise<void>>>;
+type JobHandlers = Readonly<Record<string, (payload: unknown) => Promise<void>>>;
 
 export type JobQueueConfig = {
   readonly concurrency: number;

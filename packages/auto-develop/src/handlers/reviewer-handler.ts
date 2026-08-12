@@ -11,16 +11,14 @@ import { createStatusWriter, type StatusWriter } from "./status-writer.ts";
 import type { LifecycleGate } from "../lifecycle/lifecycle-gate.ts";
 import type { Logger } from "../logging/logger.ts";
 
-export type ReviewSessionRunner = (session: {
-  readonly prNumber: number;
-  readonly headBranch: string;
-  readonly baseBranch: string;
-}) => Promise<void>;
-
 export type ReviewerHandlerConfig = {
   readonly github: HandlerGithubClient;
   readonly gate: LifecycleGate;
-  readonly runSession: ReviewSessionRunner;
+  readonly runSession: (session: {
+    readonly prNumber: number;
+    readonly headBranch: string;
+    readonly baseBranch: string;
+  }) => Promise<void>;
   readonly requestFollowUpReview: (request: {
     readonly prNumber: number;
     readonly endpoint: DiffEndpoint;

@@ -1,6 +1,6 @@
-export const RESTART_REASONS = ["code-updated", "idle"] as const;
+const RESTART_REASONS = ["code-updated", "idle"] as const;
 
-export type RestartReason = (typeof RESTART_REASONS)[number];
+type RestartReason = (typeof RESTART_REASONS)[number];
 
 export type RestartRequest = {
   readonly request: (reason: RestartReason) => void;

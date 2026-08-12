@@ -1,14 +1,9 @@
-export type GitCommandResult = {
-  readonly stdout: string;
-  readonly stderr: string;
-};
-
 export type GitRunner = {
   readonly run: (invocation: {
     readonly args: readonly string[];
     readonly cwd: string;
     readonly configOverrides?: Readonly<Record<string, string>>;
-  }) => Promise<GitCommandResult>;
+  }) => Promise<{ readonly stdout: string; readonly stderr: string }>;
 };
 
 const DETACHED_HEAD_MARKER = "is not a symbolic ref";

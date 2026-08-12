@@ -10,11 +10,6 @@ import type { TmuxRunRequest } from "./tmux-runner.ts";
 
 const IDLE_TIMEOUT_MS = 30 * 60_000;
 
-export type GitPathResolver = (cwd: string) => Promise<{
-  readonly repoRoot: string | null;
-  readonly sharedGitDir: string | null;
-}>;
-
 export type EngineRunner = (request: TmuxRunRequest) => AsyncGenerator<string, void, undefined>;
 
 export type Engine = {
@@ -29,7 +24,10 @@ export type Engine = {
 
 export type EngineConfig = {
   readonly kind: EngineKind;
-  readonly resolveGitPaths: GitPathResolver;
+  readonly resolveGitPaths: (cwd: string) => Promise<{
+    readonly repoRoot: string | null;
+    readonly sharedGitDir: string | null;
+  }>;
   readonly launchOverride?: string;
   readonly timeoutMs: number;
   readonly bypassPermissions: boolean;

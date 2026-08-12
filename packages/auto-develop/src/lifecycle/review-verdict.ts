@@ -1,4 +1,4 @@
-export const GITHUB_REVIEW_STATES = [
+const GITHUB_REVIEW_STATES = [
   "APPROVED",
   "CHANGES_REQUESTED",
   "COMMENTED",
@@ -6,7 +6,7 @@ export const GITHUB_REVIEW_STATES = [
   "PENDING",
 ] as const;
 
-export type GithubReviewState = (typeof GITHUB_REVIEW_STATES)[number];
+type GithubReviewState = (typeof GITHUB_REVIEW_STATES)[number];
 
 export type Review = {
   readonly state: GithubReviewState;
@@ -28,7 +28,7 @@ export const effectiveReviewOf = (derive: {
   return effective.at(-1) ?? null;
 };
 
-export const COMMIT_STATUS_STATES = ["pending", "success", "failure", "error"] as const;
+const COMMIT_STATUS_STATES = ["pending", "success", "failure", "error"] as const;
 
 export type CommitStatusState = (typeof COMMIT_STATUS_STATES)[number];
 

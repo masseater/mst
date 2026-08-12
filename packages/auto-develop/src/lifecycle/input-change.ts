@@ -1,4 +1,4 @@
-export const DIFF_ENDPOINTS = ["base", "head"] as const;
+const DIFF_ENDPOINTS = ["base", "head"] as const;
 
 export type DiffEndpoint = (typeof DIFF_ENDPOINTS)[number];
 

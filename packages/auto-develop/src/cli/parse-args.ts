@@ -1,4 +1,4 @@
-export const COMMANDS = [
+const COMMANDS = [
   "reviewer",
   "author",
   "prepare-review",

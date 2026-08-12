@@ -6,18 +6,7 @@ import { resolveRepositoryRoot } from "../config/repository-root.ts";
 
 import type { Logger } from "../logging/logger.ts";
 
-export const QUEUE_SNAPSHOT_ENV_VAR = "AUTO_DEVELOP_QUEUE_PATH";
-
-export type SnapshotJobRecord = {
-  readonly id: string;
-  readonly type: string;
-  readonly payload: unknown;
-  readonly key: string;
-  readonly lane: string;
-  readonly label: string;
-  readonly state: string;
-  readonly acceptedAt: string;
-};
+const QUEUE_SNAPSHOT_ENV_VAR = "AUTO_DEVELOP_QUEUE_PATH";
 
 export const resolveSnapshotPath = (resolution: {
   readonly explicitPath: string | undefined;
@@ -38,7 +27,18 @@ const writeAtomically = (snapshotPath: string, serialized: string): void => {
 };
 
 export type SnapshotWriter = {
-  readonly write: (jobs: readonly SnapshotJobRecord[]) => void;
+  readonly write: (
+    jobs: readonly {
+      readonly id: string;
+      readonly type: string;
+      readonly payload: unknown;
+      readonly key: string;
+      readonly lane: string;
+      readonly label: string;
+      readonly state: string;
+      readonly acceptedAt: string;
+    }[],
+  ) => void;
 };
 
 export const createSnapshotWriter = (writer: {

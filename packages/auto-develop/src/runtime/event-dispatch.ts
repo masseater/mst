@@ -4,7 +4,7 @@ import type { FilteredEvent } from "../contract/filtered-event.ts";
 import type { Logger } from "../logging/logger.ts";
 import type { JobQueue } from "../queue/job-queue.ts";
 
-export const PR_EVENT_JOB_TYPE = "pr-event";
+const PR_EVENT_JOB_TYPE = "pr-event";
 
 export type EventDispatcher = {
   readonly dispatch: (event: FilteredEvent) => boolean;

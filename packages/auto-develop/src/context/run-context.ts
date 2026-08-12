@@ -4,13 +4,11 @@ import { isMode, type Mode } from "../contract/vocabulary.ts";
 
 export const RUN_CONTEXT_SCHEMA_VERSION = 1;
 
-export const LAUNCH_PATHS = ["auto", "manual"] as const;
+const LAUNCH_PATHS = ["auto", "manual"] as const;
 
 export type LaunchPath = (typeof LAUNCH_PATHS)[number];
 
 export const LAUNCH_AUTO: LaunchPath = "auto";
-
-export const LAUNCH_MANUAL: LaunchPath = "manual";
 
 const isLaunchPath = (candidate: unknown): candidate is LaunchPath =>
   (LAUNCH_PATHS as readonly unknown[]).includes(candidate);

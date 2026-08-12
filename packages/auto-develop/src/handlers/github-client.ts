@@ -12,16 +12,14 @@ export type PrSnapshot = {
   readonly requestedReviewerLogins: readonly string[];
 };
 
-export type CommitStatusRequest = {
-  readonly sha: string;
-  readonly state: CommitStatusState;
-  readonly context: string;
-  readonly description: string;
-};
-
 export type HandlerGithubClient = {
   readonly prSnapshot: (prNumber: number) => Promise<PrSnapshot>;
-  readonly createCommitStatus: (request: CommitStatusRequest) => Promise<void>;
+  readonly createCommitStatus: (request: {
+    readonly sha: string;
+    readonly state: CommitStatusState;
+    readonly context: string;
+    readonly description: string;
+  }) => Promise<void>;
   readonly listReviews: (prNumber: number) => Promise<readonly Review[]>;
   readonly requestReviewers: (request: {
     readonly prNumber: number;

@@ -2,7 +2,7 @@ import { realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 
-export const WORKTREE_ROOT_NAME = "auto-develop-worktree";
+const WORKTREE_ROOT_NAME = "auto-develop-worktree";
 
 export const LAST_USED_MARKER_NAME = ".auto-develop-last-used";
 

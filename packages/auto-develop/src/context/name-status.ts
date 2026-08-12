@@ -1,13 +1,11 @@
-export const CONTENT_OMISSIONS = ["deleted", "binary", "too-large", "submodule"] as const;
-
-export type ContentOmission = (typeof CONTENT_OMISSIONS)[number];
+const CONTENT_OMISSIONS = ["deleted", "binary", "too-large", "submodule"] as const;
 
 export type ChangedFile = {
   readonly statusCode: string;
   readonly path: string;
   readonly previousPath: string | null;
   readonly content: string | null;
-  readonly omissionReason: ContentOmission | null;
+  readonly omissionReason: (typeof CONTENT_OMISSIONS)[number] | null;
 };
 
 const isRename = (statusCode: string): boolean => /^R\d+$/.test(statusCode);
