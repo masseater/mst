@@ -58,7 +58,7 @@ mst の綴りはルート `vite.config.ts` の `rules` に置いた。配布す�
 
 `declarations.ts` は自前の字句解析をやめたので、対象ファイルが構文として壊れている場合の挙動が変わった。以前は壊れていても注釈だけは拾えた。いまはパーサの誤り回復に従う。
 
-`bin` が `dist/cli.mjs` を指していると、素のチェックアウトでは対象が存在せず pnpm が bin リンクを張らない。`vp install` を 2 回打つまで `vp exec dont-review-it verify` が動かない状態になっていた。`bin` を `src/cli.ts` に向けて解消している。[0004](0004-shape-the-lint-rule-foundation-around-tooling-limits.md) が plugin の指定子について書いているのと同じ理由で、src は常に存在する。
+`bin` が `dist/cli.mjs` を指していると、素のチェックアウトでは対象が存在せず pnpm が bin リンクを張らない。`vp install` を 2 回打つまで `vp exec dont-review-it verify` が動かない状態になっていた。ワークスペースの `bin` は常に存在する `src/cli.ts` を指し、tsdown の `exports.devExports` が pack 用の `publishConfig.bin` だけを `dist/cli.mjs` へ差し替える。[0004](0004-shape-the-lint-rule-foundation-around-tooling-limits.md) が plugin の指定子について書いているのと同じ境界である。
 
 ## 検討して採らなかった案
 

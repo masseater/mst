@@ -26,6 +26,13 @@
     "./package.json": "./package.json"
   },
   "publishConfig": {
+    "bin": {
+      "verified-specifications": "./dist/cli.mjs"
+    },
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./package.json": "./package.json"
+    },
     "access": "public"
   },
   "scripts": {
@@ -37,7 +44,6 @@
   },
   "dependencies": {
     "@mst/lint-rule-authoring": "workspace:*",
-    "@mst/repository-checks": "workspace:*",
     "es-toolkit": "catalog:",
     "jsonc-parser": "catalog:",
     "oxc-parser": "catalog:",
@@ -46,6 +52,7 @@
   },
   "devDependencies": {
     "@mst/ai-native": "workspace:*",
+    "@mst/repository-checks": "workspace:*",
     "@tanstack/intent": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",

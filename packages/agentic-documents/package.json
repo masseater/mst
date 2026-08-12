@@ -25,6 +25,12 @@
     "./package.json": "./package.json"
   },
   "publishConfig": {
+    "bin": {
+      "agentic-documents": "./dist/cli.mjs"
+    },
+    "exports": {
+      "./package.json": "./package.json"
+    },
     "access": "public"
   },
   "scripts": {
@@ -35,7 +41,6 @@
     "check:skills": "intent validate"
   },
   "dependencies": {
-    "@mst/repository-checks": "workspace:*",
     "es-toolkit": "catalog:",
     "remark-frontmatter": "^5.0.0",
     "remark-gfm": "^4.0.1",
@@ -45,6 +50,7 @@
   },
   "devDependencies": {
     "@mst/ai-native": "workspace:*",
+    "@mst/repository-checks": "workspace:*",
     "@tanstack/intent": "catalog:",
     "@types/mdast": "^4.0.4",
     "@types/node": "catalog:",

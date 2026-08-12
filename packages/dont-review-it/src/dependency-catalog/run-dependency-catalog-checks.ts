@@ -70,7 +70,7 @@ const findingsIn = ({
   readonly definition: WorkspaceDefinition;
   readonly definitionPath: string;
   readonly config: DependencyCatalogChecksConfig;
-}): DependencyCatalogFindings => {
+}): DependencyCatalogFindings & { readonly scanned: number } => {
   const manifests = readWorkspaceManifests({
     repositoryRoot,
     packagePatterns: definition.packagePatterns,
@@ -116,6 +116,7 @@ const findingsIn = ({
       ...bypassed.problems,
       ...shared.problems,
     ].toSorted(byFileThenMessage),
+    scanned: manifests.length,
   };
 };
 
@@ -128,7 +129,14 @@ export const runDependencyCatalogChecks = ({
 }): DependencyCatalogReport => {
   const definitionPath = config.workspaceDefinitionFileName;
   const source = readTextFile(join(repositoryRoot, definitionPath));
-  if (source === null) return { ...NO_DEPENDENCY_CATALOG_FINDINGS, definitionUnreadable: false };
+  if (source === null) {
+    return {
+      ...NO_DEPENDENCY_CATALOG_FINDINGS,
+      definitionUnreadable: false,
+      definitionMissing: true,
+      scanned: 0,
+    };
+  }
 
   const definition = parsedDefinitionOrNull({ source, config });
   if (definition === null) {
@@ -141,11 +149,14 @@ export const runDependencyCatalogChecks = ({
         },
       ],
       definitionUnreadable: true,
+      definitionMissing: false,
+      scanned: 0,
     };
   }
 
   return {
     ...findingsIn({ repositoryRoot, definition, definitionPath, config }),
     definitionUnreadable: false,
+    definitionMissing: false,
   };
 };

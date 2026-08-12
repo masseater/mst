@@ -36,10 +36,10 @@ describe("entryCompositionProblems", () => {
       "packages/web/package.json": `{ "scripts": { "test": "${WORKSPACE_PREFIX}vp test", "build": "${WORKSPACE_PREFIX}vp pack" } }`,
     });
 
-    expect(entryCompositionProblems({ repositoryRoot, config })).toStrictEqual({
-      problems: [],
-      failures: [],
-    });
+    const { problems, failures } = entryCompositionProblems({ repositoryRoot, config });
+
+    expect(problems).toStrictEqual([]);
+    expect(failures).toStrictEqual([]);
   });
 
   test("reports the required entry that is missing from an existing scripts section", () => {
@@ -179,21 +179,21 @@ describe("entryCompositionProblems", () => {
     });
     mkdirSync(join(repositoryRoot, "packages", "empty"), { recursive: true });
 
-    expect(entryCompositionProblems({ repositoryRoot, config })).toStrictEqual({
-      problems: [],
-      failures: [],
-    });
+    const { problems, failures } = entryCompositionProblems({ repositoryRoot, config });
+
+    expect(problems).toStrictEqual([]);
+    expect(failures).toStrictEqual([]);
   });
 
   test("treats a root manifest that does not parse as a failure of the check itself", () => {
     const repositoryRoot = repositoryWith({ "package.json": "{ oops" });
 
-    expect(entryCompositionProblems({ repositoryRoot, config })).toStrictEqual({
-      problems: [],
-      failures: [
-        "package.json exists but does not parse as a JSON object, so the entry composition check did not run.",
-      ],
-    });
+    const { problems, failures } = entryCompositionProblems({ repositoryRoot, config });
+
+    expect(problems).toStrictEqual([]);
+    expect(failures).toStrictEqual([
+      "package.json exists but does not parse as a JSON object, so the entry composition check did not run.",
+    ]);
   });
 
   test("treats an empty manifest and a non-object manifest as failures of the check itself", () => {
@@ -261,9 +261,9 @@ describe("entryCompositionProblems", () => {
       "pnpm-workspace.yaml": "catalog: {}\n",
     });
 
-    expect(entryCompositionProblems({ repositoryRoot, config })).toStrictEqual({
-      problems: [],
-      failures: [],
-    });
+    const { problems, failures } = entryCompositionProblems({ repositoryRoot, config });
+
+    expect(problems).toStrictEqual([]);
+    expect(failures).toStrictEqual([]);
   });
 });

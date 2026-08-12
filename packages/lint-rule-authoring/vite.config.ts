@@ -9,8 +9,24 @@ export default defineConfig({
   },
   pack: {
     entry: ["src/cli.ts", "src/index.ts", "src/plugin.ts"],
+    deps: {
+      alwaysBundle: ["@mst/repository-checks"],
+      dts: {
+        alwaysBundle: ["@mst/repository-checks"],
+      },
+    },
     dts: {
       tsgo: true,
+    },
+    exports: {
+      devExports: true,
+      exclude: ["cli"],
+      bin: {
+        "lint-rule-authoring": "src/cli.ts",
+      },
+      customExports: {
+        "./package.json": "./package.json",
+      },
     },
   },
 });

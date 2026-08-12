@@ -26,10 +26,20 @@
     ".": "./src/index.ts",
     "./plugin": "./src/plugin.ts",
     "./vitest": "./src/vitest/standard-io-test.ts",
-    "./tsconfig/*": "./tsconfig/*",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./tsconfig/*": "./tsconfig/*"
   },
   "publishConfig": {
+    "bin": {
+      "dont-review-it": "./dist/cli.mjs"
+    },
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./plugin": "./dist/plugin.mjs",
+      "./vitest": "./dist/vitest.mjs",
+      "./package.json": "./package.json",
+      "./tsconfig/*": "./tsconfig/*"
+    },
     "access": "public"
   },
   "scripts": {
@@ -41,7 +51,6 @@
   },
   "dependencies": {
     "@mst/lint-rule-authoring": "workspace:*",
-    "@mst/repository-checks": "workspace:*",
     "@oxlint/plugins": "catalog:",
     "citty": "0.2.2",
     "es-toolkit": "catalog:",
@@ -49,15 +58,20 @@
     "oxc-parser": "catalog:",
     "oxfmt": "0.61.0",
     "oxlint": "catalog:",
+    "std-env": "^4.2.0",
     "typescript": "catalog:",
     "yaml": "catalog:"
   },
   "devDependencies": {
     "@mst/ai-native": "workspace:*",
+    "@mst/repository-checks": "workspace:*",
     "@tanstack/intent": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "peerDependencies": {
     "vite-plus": "catalog:"
   },
   "lintRules": [

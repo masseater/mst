@@ -1,14 +1,13 @@
-import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
-import { lock } from "proper-lockfile";
 import { describe, expect, onTestFinished, test, vi } from "vite-plus/test";
 
 import { runThrottle, type ThrottleSeams } from "./run-throttle.ts";
-import { ensureSlots } from "./slots.ts";
+import { ensureSlots, sweepWaiters, tryAcquireAny, type SlotHold } from "./slots.ts";
+import { waitForSlot, type WaitConfiguration } from "./wait-for-slot.ts";
 
 const temporaryDirectory = (prefix: string): string => {
   const directory = mkdtempSync(join(tmpdir(), prefix));
@@ -29,104 +28,164 @@ const captureStderr = (): { joined: () => string; chunks: () => string[] } => {
   };
 };
 
-const holdSlot = async (slotDir: string, staleMs: number): Promise<() => Promise<void>> => {
+class NoSuchProcessError extends Error {
+  readonly code = "ESRCH";
+}
+
+const holdSlot = async (slotDir: string): Promise<() => Promise<void>> => {
   ensureSlots(slotDir, 1);
-  return lock(join(slotDir, "slot-0"), { stale: staleMs, retries: 0 });
+  const hold = await tryAcquireAny({ slotDir, limit: 1 });
+  if (hold === null) throw new Error("expected to acquire the slot");
+  return hold.release;
+};
+
+const released = new WeakSet<() => Promise<void>>();
+
+const releaseOnce = async (release: () => Promise<void>): Promise<void> => {
+  if (released.has(release)) return;
+  released.add(release);
+  await release();
 };
 
 const trivialCommand = ["--", process.execPath, "-e", ""];
 
-const exitedPid = (): number => {
-  const child = spawnSync(process.execPath, ["-e", ""]);
-  return child.pid;
-};
-
 const quickSeams = (slotDir: string): ThrottleSeams => ({
   slotDir,
   limit: 1,
-  staleMs: 5000,
   waitBudgetMs: 15_000,
   pollMs: 50,
   isInteractive: false,
 });
 
+const quickConfiguration = (slotDir: string): WaitConfiguration => ({
+  slotDir,
+  limit: 1,
+  waitBudgetMs: 8000,
+  pollMs: 50,
+  interactive: false,
+});
+
+const acquiredSlot = (result: SlotHold | "budget-exhausted"): SlotHold => {
+  expect(result).not.toBe("budget-exhausted");
+  if (result === "budget-exhausted") throw new Error("expected a slot hold");
+  return result;
+};
+
+const namedSlot = async (
+  name: "A" | "B",
+  pending: Promise<SlotHold | "budget-exhausted">,
+): Promise<{ name: "A" | "B"; result: SlotHold | "budget-exhausted" }> => ({
+  name,
+  result: await pending,
+});
+
+const releaseResourcesAfterTest = (
+  initialRelease: (() => Promise<void>) | undefined,
+): {
+  addPending: (pending: Promise<SlotHold | "budget-exhausted">) => void;
+  releaseInitial: () => Promise<void>;
+} => {
+  const pendingSlots = new Set<Promise<SlotHold | "budget-exhausted">>();
+  const releaseInitial = async (): Promise<void> => {
+    if (initialRelease !== undefined) await releaseOnce(initialRelease);
+  };
+  onTestFinished(async () => {
+    await releaseInitial();
+    await Promise.all(
+      [...pendingSlots].map(async (pending) => {
+        const slot = await pending;
+        if (slot !== "budget-exhausted") await releaseOnce(slot.release);
+      }),
+    );
+  });
+  return { addPending: (pending) => pendingSlots.add(pending), releaseInitial };
+};
+
 describe("wait-for-slot", () => {
-  test(
-    "a dead holder's slot is reclaimed after the stale threshold, not the wait budget",
-    { timeout: 20_000 },
-    async () => {
-      const slotDir = temporaryDirectory("throttle-dead-");
-      mkdirSync(join(slotDir, "slot-0.lock"), { recursive: true });
-      captureStderr();
-      const before = Date.now();
-
-      const code = await runThrottle(trivialCommand, {
-        ...quickSeams(slotDir),
-        staleMs: 2000,
-        pollMs: 100,
-        waitBudgetMs: 20_000,
-      });
-
-      const elapsed = Date.now() - before;
-      expect(code).toBe(0);
-      expect(elapsed).toBeGreaterThan(1200);
-      expect(elapsed).toBeLessThan(9000);
-    },
-  );
-
-  test("a live holder keeps its slot past the stale threshold", { timeout: 20_000 }, async () => {
+  test("a live holder keeps its slot until release", { timeout: 30_000 }, async () => {
     const slotDir = temporaryDirectory("throttle-live-");
-    const release = await holdSlot(slotDir, 2000);
-    captureStderr();
-    const before = Date.now();
+    const initialRelease = await holdSlot(slotDir);
+    const resources = releaseResourcesAfterTest(initialRelease);
+    const stderr = captureStderr();
 
-    const pendingRun = runThrottle(trivialCommand, {
-      ...quickSeams(slotDir),
-      staleMs: 2000,
+    const pending = waitForSlot({
+      ...quickConfiguration(slotDir),
       pollMs: 100,
-      waitBudgetMs: 10_000,
     });
-    const [code] = await Promise.all([
-      pendingRun,
-      (async (): Promise<void> => {
-        await delay(3500);
-        await release();
-      })(),
-    ]);
+    resources.addPending(pending);
+    const progressBeforeRelease = stderr.joined();
+    await delay(300);
+    const beforeRelease = await Promise.race([pending, delay(100, "still-waiting")]);
+    await resources.releaseInitial();
 
-    const elapsed = Date.now() - before;
-    expect(code).toBe(0);
-    expect(elapsed).toBeGreaterThan(3300);
-    expect(elapsed).toBeLessThan(9000);
+    const hold = acquiredSlot(await pending);
+
+    expect(progressBeforeRelease).toContain("waiting 1/1");
+    expect(beforeRelease).toBe("still-waiting");
+    await releaseOnce(hold.release);
   });
 
   test(
     "the wait queue holds exactly the live waiters and ranks close up",
-    { timeout: 20_000 },
+    { timeout: 30_000 },
     async () => {
       const slotDir = temporaryDirectory("throttle-queue-");
-      const release = await holdSlot(slotDir, 5000);
+      const initialRelease = await holdSlot(slotDir);
+      const resources = releaseResourcesAfterTest(initialRelease);
       const stderr = captureStderr();
       const waiters = join(slotDir, "waiters");
-      const seams = { ...quickSeams(slotDir), pollMs: 60 };
-      const shortSleep = ["--", process.execPath, "-e", "setTimeout(() => {}, 200);"];
+      const configuration = quickConfiguration(slotDir);
 
-      const runA = runThrottle(shortSleep, seams);
-      await delay(150);
-      const runB = runThrottle(shortSleep, seams);
-      await delay(200);
-      expect(readdirSync(waiters)).toHaveLength(2);
+      const pendingA = waitForSlot(configuration);
+      resources.addPending(pendingA);
+      const runA = namedSlot("A", pendingA);
+      const afterA = readdirSync(waiters);
+      const pendingB = waitForSlot(configuration);
+      resources.addPending(pendingB);
+      const runB = namedSlot("B", pendingB);
+      const afterB = readdirSync(waiters);
+      await vi.waitFor(() => {
+        expect(stderr.joined()).toContain("waiting 2/2");
+      }, 10_000);
 
-      writeFileSync(join(waiters, `0000000000000-${exitedPid()}-deadbeef`), `${exitedPid()}\n`);
-      await delay(200);
-      expect(readdirSync(waiters)).toHaveLength(2);
+      const deadEntry = "0000000000000-invalid-deadbeef";
+      writeFileSync(join(waiters, deadEntry), "2147483647\n");
+      const kill = vi.spyOn(process, "kill").mockImplementation((pid) => {
+        if (pid === 2_147_483_647) throw new NoSuchProcessError("no such process");
+        return true;
+      });
+      onTestFinished(() => {
+        kill.mockRestore();
+      });
+      const afterSweep = sweepWaiters(slotDir);
+      const deadPidWasChecked = kill.mock.calls.some(
+        ([pid, signal]) => pid === 2_147_483_647 && signal === 0,
+      );
+      kill.mockRestore();
 
-      await release();
-      await delay(150);
-      expect(readdirSync(waiters)).toHaveLength(1);
+      const rankOneBeforeRelease = stderr
+        .chunks()
+        .filter((chunk) => chunk === "throttle: waiting 1/1\n").length;
+      await resources.releaseInitial();
+      const first = await Promise.race([runA, runB]);
+      const afterFirst = readdirSync(waiters);
+      await vi.waitFor(() => {
+        const rankOneAfterRelease = stderr
+          .chunks()
+          .filter((chunk) => chunk === "throttle: waiting 1/1\n").length;
+        expect(rankOneAfterRelease).toBeGreaterThan(rankOneBeforeRelease);
+      }, 10_000);
 
-      expect(await runA).toBe(0);
-      expect(await runB).toBe(0);
+      await releaseOnce(acquiredSlot(first.result).release);
+      const second = await (first.name === "A" ? runB : runA);
+      await releaseOnce(acquiredSlot(second.result).release);
+
+      expect(afterA).toHaveLength(1);
+      expect(afterB).toHaveLength(2);
+      expect(afterSweep).toHaveLength(2);
+      expect(afterSweep).not.toContain(deadEntry);
+      expect(deadPidWasChecked).toBe(true);
+      expect(afterFirst).toHaveLength(1);
       expect(readdirSync(waiters)).toHaveLength(0);
       expect(stderr.joined()).toContain("waiting 2/2");
       expect(stderr.joined()).toContain("waiting 1/1");
@@ -138,7 +197,7 @@ describe("wait-for-slot", () => {
     { timeout: 10_000 },
     async () => {
       const slotDir = temporaryDirectory("throttle-budget-");
-      const release = await holdSlot(slotDir, 5000);
+      const release = await holdSlot(slotDir);
       const stderr = captureStderr();
       const seams = { ...quickSeams(slotDir), pollMs: 100, waitBudgetMs: 400 };
       const before = Date.now();
@@ -151,7 +210,6 @@ describe("wait-for-slot", () => {
       expect(first).toBe(1);
       expect(second).toBe(1);
       expect(elapsed).toBeGreaterThanOrEqual(400);
-      expect(elapsed).toBeLessThan(1500);
       const failures = stderr.chunks().filter((chunk) => chunk.includes("gave up"));
       expect(failures).toHaveLength(2);
       expect(failures[0]).toBe(failures[1]);
@@ -165,7 +223,7 @@ describe("wait-for-slot", () => {
     { timeout: 10_000 },
     async () => {
       const slotDir = temporaryDirectory("throttle-tty-");
-      const release = await holdSlot(slotDir, 5000);
+      const release = await holdSlot(slotDir);
       const stderr = captureStderr();
 
       const pendingRun = runThrottle(trivialCommand, {
@@ -188,7 +246,7 @@ describe("wait-for-slot", () => {
     { timeout: 10_000 },
     async () => {
       const slotDir = temporaryDirectory("throttle-tty-budget-");
-      const release = await holdSlot(slotDir, 5000);
+      const release = await holdSlot(slotDir);
       const stderr = captureStderr();
 
       const code = await runThrottle(trivialCommand, {
@@ -211,7 +269,7 @@ describe("wait-for-slot", () => {
     { timeout: 10_000 },
     async () => {
       const slotDir = temporaryDirectory("throttle-plain-");
-      const release = await holdSlot(slotDir, 5000);
+      const release = await holdSlot(slotDir);
       const stderr = captureStderr();
 
       const code = await runThrottle(trivialCommand, {

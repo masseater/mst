@@ -26,6 +26,13 @@
     "./package.json": "./package.json"
   },
   "publishConfig": {
+    "bin": {
+      "spool": "./dist/spool/cli.mjs",
+      "throttle": "./dist/throttle/cli.mjs"
+    },
+    "exports": {
+      "./package.json": "./package.json"
+    },
     "access": "public"
   },
   "scripts": {
@@ -36,16 +43,19 @@
     "check:skills": "intent validate"
   },
   "dependencies": {
-    "proper-lockfile": "4.1.2"
+    "es-toolkit": "catalog:",
+    "fs-native-extensions": "1.5.0"
   },
   "devDependencies": {
     "@mst/ai-native": "workspace:*",
     "@tanstack/intent": "catalog:",
     "@types/node": "catalog:",
-    "@types/proper-lockfile": "4.1.4",
     "@vitest/coverage-v8": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
+  },
+  "engines": {
+    "node": ">=26.0.0"
   }
 }

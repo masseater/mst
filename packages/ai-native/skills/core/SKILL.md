@@ -34,8 +34,8 @@ throttle [--timeout <seconds>] -- <command> [args...]
 
 - Holds one slot per run. When every slot is held it joins a wait queue,
   reports its position on stderr, and retries each slot on every poll.
-- A holder that died without releasing is reclaimed once its liveness mark
-  goes stale; nobody has to clean up by hand.
+- The operating system releases a holder's slot when that process exits. A
+  live holder keeps the slot until its command ends or its timeout stops it.
 - `--timeout` kills the command's whole process group (SIGTERM, then
   SIGKILL after a grace period). `0` means never.
 - `MST_THROTTLE_LIMIT` sets the slot count for the host and namespace.
@@ -79,3 +79,7 @@ independent competitor and consumes a second slot.
   failures.
 - `.spool/` is never cleaned automatically: it grows by one file per run and
   disappears with the work tree.
+- Keep throttle's temporary slot area on a local filesystem. Its exclusion
+  contract does not extend to NFS, SMB, or another network filesystem.
+- Do not delete, rename, replace, or clean up `slot-*.lock` while throttle
+  processes are active. The operating-system lock belongs to that exact file.

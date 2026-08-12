@@ -29,7 +29,9 @@ factory もちょうど 1 つで、ワークスペースのパスを受けてル
 
 土台の型は oxlint の `Rule` の形の変化に自動では追随しない。追随するのは、上で挙げた借りているフィールドの中身だけである。
 
-指定子が src を指すので、この 2 パッケージは TypeScript ソースを解決できる利用者を前提にしている。publish する段では `publishConfig` で dist を指す必要がある。現物の `publishConfig` は `access: "public"` だけで、この差し替えはまだ入っていない。
+ワークスペース内では指定子と `bin` が src を指すので、check と test は build 前でも動く。`vp pack` は tsdown の `exports.devExports` から `publishConfig.exports` と `publishConfig.bin` を生成し、pnpm が pack する manifest だけを dist へ差し替える。公開パッケージをインストールした利用者は node_modules 内の TypeScript ではなく、生成済みの JavaScript を解決する。
+
+実行基盤の singleton へ結合する公開入口は、その基盤を bundle しない。`@mst/dont-review-it/vitest` は利用者が起動した Vitest と同じ `vite-plus` を peer dependency から解決する。別の Vitest を成果物へ含めると、テストブロックが runner の current suite に到達しないためである。
 
 文書の在り処はワークスペースの位置とルール名から機械的に決まるので、ルールの作者がパスを書くことはない。URL の基点は manifest の `repository` フィールドから導出している。
 

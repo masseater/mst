@@ -2,11 +2,14 @@ import { resolve } from "node:path";
 
 import { EXIT_MISUSE, EXIT_PROBLEMS_FOUND } from "@mst/repository-checks";
 import { defineCommand } from "citty";
+import { isAgent, isColorSupported } from "std-env";
 
+import { checkReportLines } from "./check-report-lines.ts";
 import { defaultEntryCompositionConfig } from "./entry-composition/config.ts";
 import { writeEntryComposition } from "./entry-composition/write-entry-composition.ts";
 import { isDirectory } from "./lint/oxlint/lib/canonical-values/source-files.ts";
 import { runChecks } from "./run-checks.ts";
+import { scanTraceFor } from "./scan-trace/scan-trace-report.ts";
 
 const REPOSITORY_ROOT_FLAG = "--repository-root";
 
@@ -30,10 +33,10 @@ const repairComposition = (repositoryRoot: string): boolean => {
 };
 
 const reportProblems = (repositoryRoot: string): void => {
-  const { problems, failures } = runChecks(repositoryRoot);
-  if (problems.length > 0) {
-    process.stdout.write(problems.map((problem) => `${problem}\n`).join(""));
-  }
+  const { outcomes, problems, warnings, failures } = runChecks(repositoryRoot);
+  const lines = checkReportLines({ problems, warnings });
+  if (lines.length > 0) process.stdout.write(lines.map((line) => `${line}\n`).join(""));
+  process.stderr.write(scanTraceFor({ outcomes, readByAgent: isAgent, colored: isColorSupported }));
   if (failures.length > 0) {
     refuseMisuse(failures.map((failure) => `${failure}\n`).join(""));
     return;

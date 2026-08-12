@@ -23,9 +23,12 @@ utils を 1 対 1 で改名するのではなく、export ごとに次の順で�
 
 契約に属さない宣言の持ち込みは、パッケージの AGENTS.md が禁じる。
 
+`@mst/repository-checks` はリポジトリ内部の契約として `private: true` を維持する。これを実行時に使う公開パッケージは、package の build で `pack.deps.alwaysBundle` により実装を成果物へ含め、manifest では開発時だけ必要な `devDependencies` として参照する。公開される型と JavaScript は private workspace package の取得を consumer に要求しない。
+
 ## 帰結
 
 - 「誰も所有しない置き場」は消えた。次に迷った宣言が現れたとき、既定の行き先は無く、所有者を決めるか式として書くかを選ぶことになる
 - 展開した式の写しが呼び出し箇所に散った。duplicated-bodies の検出は宣言だけを見るため、式の写しの食い違いは機械では止まらない
 - CLI を citty へ寄せる決定（未 merge のブランチが 0031 として持つ）が main に入れば、終了契約の宣言はさらに縮みうる
+- 公開 package の build は `@mst/repository-checks` を外部 import として残してはならない。ローカルでは workspace source を直接読み、pack では同じ実装を bundle する
 - 旧名 `@mst/utils` / 旧パス `packages/utils` を参照する並行ブランチは、main を取り込むときに modify/delete の衝突か、消えたパスへのファイル復活を踏む。取り込み時に新しい置き場所へ寄せ直す必要がある

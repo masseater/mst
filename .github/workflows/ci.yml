@@ -13,10 +13,38 @@ permissions:
   contents: read
 
 jobs:
+  native-lock:
+    name: Native lock (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: voidzero-dev/setup-vp@313600b80b104eadebb9111787d37a2e83e014ca # v1.17.0
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: |
+            - args: ['--frozen-lockfile']
+
+      - run: vp test run src/throttle/slots.test.ts --root packages/ai-native --testNamePattern "native lock"
+
   ready:
+    if: ${{ always() }}
+    needs: native-lock
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - name: Require native lock checks
+        if: ${{ needs.native-lock.result != 'success' }}
+        run: exit 1
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false

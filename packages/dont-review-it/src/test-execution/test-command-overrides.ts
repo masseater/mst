@@ -10,7 +10,7 @@ import { parseWorkspaceDefinition } from "../dependency-catalog/workspace-defini
 import { isFile, readTextFile } from "../lint/oxlint/lib/canonical-values/source-files.ts";
 import { type CommandResolution, testCommandResolutionsIn } from "./test-command-resolution.ts";
 
-import type { RepositoryProblem } from "@mst/repository-checks";
+import type { RepositoryProblem, ScannedProblems } from "@mst/repository-checks";
 
 const CONFIG_OPTIONS: ReadonlySet<string> = new Set(["--config", "-c"]);
 
@@ -144,22 +144,23 @@ const problemsForManifest = ({
   return [...lifecycleProblems, problemFor(relativePath, entryMessage)];
 };
 
-export const testCommandOverrideProblems = (
-  repositoryRoot: string,
-): readonly RepositoryProblem[] => {
+export const testCommandOverrideProblems = (repositoryRoot: string): ScannedProblems => {
   const config = defaultDependencyCatalogChecksConfig;
   const source = readTextFile(join(repositoryRoot, config.workspaceDefinitionFileName));
   const packagePatterns = source === null ? [] : (packagePatternsIn(source) ?? []);
+  const manifests = readWorkspaceManifests({ repositoryRoot, packagePatterns, config });
 
-  return readWorkspaceManifests({ repositoryRoot, packagePatterns, config }).flatMap(
-    ({ relativePath, manifest }) =>
+  return {
+    problems: manifests.flatMap(({ relativePath, manifest }) =>
       problemsForManifest({
         repositoryRoot,
         relativePath,
         manifest,
         rootManifestFileName: config.manifestFileName,
       }),
-  );
+    ),
+    scanned: manifests.length,
+  };
 };
 
 export const formatTestCommandOverrideProblem = ({ file, message }: RepositoryProblem): string =>

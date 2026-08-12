@@ -48,7 +48,7 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
 
       expect(await cliExitCode(["check", "--repository-root", root])).toBe(0);
       expect(stdout.text).toBe("");
-      expect(stderr.text).toBe("");
+      expect(stderr.text).toContain("entry-composition");
     },
   );
 
@@ -69,7 +69,7 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
 
     expect(invocation.status).toBe(0);
     expect(invocation.stdout).toBe("");
-    expect(invocation.stderr).toBe("");
+    expect(invocation.stderr).toContain("entry-composition");
   }, 30_000);
 
   test("an omitted repository root is resolved from the current directory", async () => {
@@ -97,7 +97,7 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
 
     expect(await cliExitCode(["check", `--repository-root=${root}`])).toBe(0);
     expect(stdout.text).toBe("");
-    expect(stderr.text).toBe("");
+    expect(stderr.text).toContain("entry-composition");
   });
 
   standardIoTest(
@@ -111,7 +111,7 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
 
       expect(await cliExitCode(["check", "--repository-root", root])).toBe(1);
       expect(stdout.text).toContain("pinned to different specifiers");
-      expect(stderr.text).toBe("");
+      expect(stderr.text).toContain("dependency-declarations");
     },
   );
 
@@ -124,7 +124,7 @@ export const ORDER_STATUSES = ["draft"] as const;
 
     expect(await cliExitCode(["check", "--repository-root", root])).toBe(1);
     expect(stdout.text).toContain("src/order.ts:1");
-    expect(stderr.text).toBe("");
+    expect(stderr.text).toContain("entry-composition");
   });
 
   standardIoTest("the broken-annotation report matches the stdout snapshot", async ({ stdout }) => {
@@ -187,7 +187,7 @@ export const ORDER_STATUSES = ["draft"] as const;
 
       expect(await cliExitCode(["check", "--repository-root", root])).toBe(0);
       expect(stdout.text).toBe("");
-      expect(stderr.text).toBe("");
+      expect(stderr.text).toContain("entry-composition");
     },
   );
 
@@ -257,7 +257,7 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
 
     expect(await cliExitCode(["check", "--repository-root", root])).toBe(0);
     expect(stdout.text).toBe("");
-    expect(stderr.text).toBe("");
+    expect(stderr.text).toContain("entry-composition");
   });
 
   standardIoTest(
@@ -295,7 +295,7 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
 
       expect(await cliExitCode(["check", "--write", "--repository-root", root])).toBe(0);
       expect(stdout.text).toBe("");
-      expect(stderr.text).toBe("");
+      expect(stderr.text).toContain("entry-composition");
       expect(readFileSync(join(root, "package.json"), "utf8")).toContain(
         "throttle --timeout 1800 -- spool -- vp check",
       );
@@ -313,7 +313,7 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
 
       expect(await cliExitCode(["check", "--write", "--repository-root", root])).toBe(1);
       expect(stdout.text).toContain("packages/web/package.json");
-      expect(stderr.text).toBe("");
+      expect(stderr.text).toContain("entry-composition");
     },
   );
 
@@ -377,7 +377,7 @@ jobs:
 
       expect(await cliExitCode(["check", "--repository-root", root])).toBe(0);
       expect(stdout.text).toBe("");
-      expect(stderr.text).toBe("");
+      expect(stderr.text).toContain("entry-composition");
     },
   );
 });

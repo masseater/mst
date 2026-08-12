@@ -6,6 +6,7 @@ import { describe, expect, onTestFinished, test, vi } from "vite-plus/test";
 
 import { runThrottle, type ThrottleSeams } from "./run-throttle.ts";
 import { safeKill } from "./signals.ts";
+import { tryAcquireAny } from "./slots.ts";
 
 const temporaryDirectory = (prefix: string): string => {
   const directory = mkdtempSync(join(tmpdir(), prefix));
@@ -84,7 +85,6 @@ const barrierArgs = (barrier: {
 const quickSeams = (slotDir: string): ThrottleSeams => ({
   slotDir,
   limit: 1,
-  staleMs: 5000,
   waitBudgetMs: 15_000,
   pollMs: 50,
   isInteractive: false,
@@ -242,7 +242,6 @@ describe("run-throttle", () => {
       captureStderr();
       const seams = {
         slotDir,
-        staleMs: 5000,
         waitBudgetMs: 15_000,
         pollMs: 50,
         isInteractive: false,
@@ -272,28 +271,27 @@ describe("run-throttle", () => {
     },
   );
 
-  test(
-    "an invalid environment limit falls back to the default instead of failing",
-    { timeout: 15_000 },
-    async () => {
-      captureStderr();
-      for (const raw of ["abc", "0", "-3"]) {
-        stubLimit(raw);
-        const slotDir = temporaryDirectory("throttle-env-bad-");
+  test.each(["abc", "0", "-3"])(
+    "an invalid environment limit falls back to the default instead of failing: %s",
+    async (raw) => {
+      stubLimit(raw);
+      const root = temporaryDirectory("throttle-env-bad-");
+      const slotDir = join(root, "slots");
+      const missingExecutable = join(root, "missing-executable");
+      const stderrText = captureStderr();
 
-        expect(
-          await runThrottle(trivialCommand, {
-            slotDir,
-            staleMs: 5000,
-            waitBudgetMs: 5000,
-            pollMs: 1000,
-            isInteractive: false,
-          }),
-        ).toBe(0);
+      expect(await runThrottle(["--", missingExecutable], { slotDir, isInteractive: false })).toBe(
+        1,
+      );
 
-        const markers = readdirSync(slotDir).filter((name) => /^slot-\d+$/.test(name));
-        expect(markers).toStrictEqual(["slot-0"]);
-      }
+      const markers = readdirSync(slotDir).filter((name) => /^slot-\d+$/.test(name));
+      expect(markers).toStrictEqual(["slot-0"]);
+      const released = await tryAcquireAny({ slotDir, limit: 1 });
+      expect(released).not.toBeNull();
+      await released?.release();
+      expect(readdirSync(join(slotDir, "waiters"))).toStrictEqual([]);
+      expect(stderrText()).toContain("throttle: acquiring a slot (limit 1)");
+      expect(stderrText()).toContain(`throttle: could not start ${missingExecutable}`);
     },
   );
 

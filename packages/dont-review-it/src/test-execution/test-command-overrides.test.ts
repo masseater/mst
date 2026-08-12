@@ -22,17 +22,23 @@ const repositoryWith = (files: Readonly<Record<string, string>>): string => {
   return root;
 };
 
+const problemsFor = (repositoryRoot: string) =>
+  testCommandOverrideProblems(repositoryRoot).problems;
+
 describe("testCommandOverrideProblems", () => {
   test("a single-package repository scans its root test script without a workspace definition", () => {
     const root = repositoryWith({
       "package.json": JSON.stringify({ scripts: { test: "vp test -c arbitrary.ts" } }),
     });
-    expect(testCommandOverrideProblems(root)).toHaveLength(1);
+    const report = testCommandOverrideProblems(root);
+
+    expect(report.problems).toHaveLength(1);
+    expect(report.scanned).toBe(1);
   });
 
   test("an invalid workspace definition is left to the workspace parser problem", () => {
     const root = repositoryWith({ "pnpm-workspace.yaml": "packages: [" });
-    expect(testCommandOverrideProblems(root)).toStrictEqual([]);
+    expect(problemsFor(root)).toStrictEqual([]);
   });
 
   test("auto-discovered test configs and unrelated config flags pass", () => {
@@ -48,7 +54,7 @@ describe("testCommandOverrideProblems", () => {
       }),
       "packages/app/package.json": JSON.stringify({ scripts: { test: "vp test --coverage" } }),
     });
-    expect(testCommandOverrideProblems(root)).toStrictEqual([]);
+    expect(problemsFor(root)).toStrictEqual([]);
   });
 
   test("pretest and posttest cannot add lifecycle commands around the inspected test entry", () => {
@@ -62,7 +68,7 @@ describe("testCommandOverrideProblems", () => {
       }),
     });
 
-    expect(testCommandOverrideProblems(root).map(formatTestCommandOverrideProblem)).toStrictEqual([
+    expect(problemsFor(root).map(formatTestCommandOverrideProblem)).toStrictEqual([
       expect.stringContaining("`scripts.pretest` lifecycle entry must not run"),
       expect.stringContaining("`scripts.posttest` lifecycle entry must not run"),
     ]);
@@ -80,7 +86,7 @@ describe("testCommandOverrideProblems", () => {
       "packages/no-config/package.json": JSON.stringify({ scripts: {} }),
     });
 
-    expect(testCommandOverrideProblems(root).map(formatTestCommandOverrideProblem)).toStrictEqual([
+    expect(problemsFor(root).map(formatTestCommandOverrideProblem)).toStrictEqual([
       expect.stringMatching(/^packages\/missing\/package\.json .*must not omit `scripts\.test`/u),
       expect.stringMatching(
         /^packages\/non-string\/package\.json .*must not declare `scripts\.test` as a non-string value/u,
@@ -102,7 +108,7 @@ describe("testCommandOverrideProblems", () => {
       [`packages/app/${configName}`]: "export default {};\n",
     });
 
-    expect(testCommandOverrideProblems(root).map(formatTestCommandOverrideProblem)).toStrictEqual([
+    expect(problemsFor(root).map(formatTestCommandOverrideProblem)).toStrictEqual([
       expect.stringContaining("must not omit `scripts.test`"),
     ]);
   });
@@ -115,7 +121,7 @@ describe("testCommandOverrideProblems", () => {
       "packages/app/vite.config.tsx": "export default {};\n",
     });
 
-    expect(testCommandOverrideProblems(root)).toStrictEqual([]);
+    expect(problemsFor(root)).toStrictEqual([]);
   });
 
   test("root and workspace test commands cannot inject a different config", () => {
@@ -126,7 +132,7 @@ describe("testCommandOverrideProblems", () => {
         scripts: { test: "vitest run --coverage --config custom.ts", metadata: 1 },
       }),
     });
-    const problems = testCommandOverrideProblems(root);
+    const { problems } = testCommandOverrideProblems(root);
     expect(problems).toHaveLength(2);
     expect(problems.map(formatTestCommandOverrideProblem)).toStrictEqual([
       "package.json The test script must not select a test config with `--config` or `-c`. Remove that argument and merge the test settings into the auto-discovered `vite.config` or `vitest.config`, so lint and the coverage gate inspect the same source universe.",
@@ -141,7 +147,7 @@ describe("testCommandOverrideProblems", () => {
         scripts: { test: "vp test '--config' arbitrary.ts" },
       }),
     });
-    expect(testCommandOverrideProblems(root)).toHaveLength(1);
+    expect(problemsFor(root)).toHaveLength(1);
   });
 
   test.each([`'vp' test -c=arbitrary.ts`, "./node_modules/.bin/vitest -c arbitrary.ts"])(
@@ -150,7 +156,7 @@ describe("testCommandOverrideProblems", () => {
       const root = repositoryWith({
         "package.json": JSON.stringify({ scripts: { test: command } }),
       });
-      expect(testCommandOverrideProblems(root)).toHaveLength(1);
+      expect(problemsFor(root)).toHaveLength(1);
     },
   );
 
@@ -160,7 +166,7 @@ describe("testCommandOverrideProblems", () => {
         scripts: { test: "CI=1 NODE_ENV=test vp test --coverage.exclude=src" },
       }),
     });
-    expect(testCommandOverrideProblems(root).map(formatTestCommandOverrideProblem)).toStrictEqual([
+    expect(problemsFor(root).map(formatTestCommandOverrideProblem)).toStrictEqual([
       expect.stringContaining("exactly one normal test run"),
     ]);
   });
@@ -169,7 +175,7 @@ describe("testCommandOverrideProblems", () => {
     const root = repositoryWith({
       "package.json": JSON.stringify({ scripts: { test: "spool -- vp test" } }),
     });
-    expect(testCommandOverrideProblems(root)).toStrictEqual([]);
+    expect(problemsFor(root)).toStrictEqual([]);
   });
 
   test.each(["vitest", "./node_modules/.bin/vitest"])(
@@ -178,9 +184,9 @@ describe("testCommandOverrideProblems", () => {
       const root = repositoryWith({
         "package.json": JSON.stringify({ scripts: { test: command } }),
       });
-      expect(testCommandOverrideProblems(root).map(formatTestCommandOverrideProblem)).toStrictEqual(
-        [expect.stringContaining("exactly one normal test run")],
-      );
+      expect(problemsFor(root).map(formatTestCommandOverrideProblem)).toStrictEqual([
+        expect.stringContaining("exactly one normal test run"),
+      ]);
     },
   );
 
@@ -190,7 +196,7 @@ describe("testCommandOverrideProblems", () => {
       const root = repositoryWith({
         "package.json": JSON.stringify({ scripts: { test: command } }),
       });
-      expect(testCommandOverrideProblems(root)).toStrictEqual([]);
+      expect(problemsFor(root)).toStrictEqual([]);
     },
   );
 
@@ -198,7 +204,7 @@ describe("testCommandOverrideProblems", () => {
     const root = repositoryWith({
       "package.json": JSON.stringify({ scripts: { test: "env -- vp test --changed HEAD" } }),
     });
-    expect(testCommandOverrideProblems(root)).toHaveLength(1);
+    expect(problemsFor(root)).toHaveLength(1);
   });
 
   test.each([
@@ -217,7 +223,7 @@ describe("testCommandOverrideProblems", () => {
     const root = repositoryWith({
       "package.json": JSON.stringify({ scripts: { test: command } }),
     });
-    expect(testCommandOverrideProblems(root).map(formatTestCommandOverrideProblem)).toStrictEqual([
+    expect(problemsFor(root).map(formatTestCommandOverrideProblem)).toStrictEqual([
       expect.stringContaining("exactly one normal test run"),
     ]);
   });
@@ -233,7 +239,7 @@ describe("testCommandOverrideProblems", () => {
     const root = repositoryWith({
       "package.json": JSON.stringify({ scripts: { test: command } }),
     });
-    expect(testCommandOverrideProblems(root).map(formatTestCommandOverrideProblem)).toStrictEqual([
+    expect(problemsFor(root).map(formatTestCommandOverrideProblem)).toStrictEqual([
       expect.stringContaining("must not select a test subset"),
     ]);
   });
@@ -248,7 +254,7 @@ describe("testCommandOverrideProblems", () => {
       }),
     });
 
-    expect(testCommandOverrideProblems(root)).toStrictEqual([]);
+    expect(problemsFor(root)).toStrictEqual([]);
   });
 
   test("non-test script names are outside the test entry contract", () => {
@@ -261,7 +267,7 @@ describe("testCommandOverrideProblems", () => {
         },
       }),
     });
-    expect(testCommandOverrideProblems(root)).toStrictEqual([]);
+    expect(problemsFor(root)).toStrictEqual([]);
   });
 
   test.each(["true || vp test", "vp run override"])(
@@ -270,9 +276,9 @@ describe("testCommandOverrideProblems", () => {
       const root = repositoryWith({
         "package.json": JSON.stringify({ scripts: { test: command } }),
       });
-      expect(
-        testCommandOverrideProblems(root).map(formatTestCommandOverrideProblem),
-      ).toContainEqual(expect.stringContaining("statically inspectable command"));
+      expect(problemsFor(root).map(formatTestCommandOverrideProblem)).toContainEqual(
+        expect.stringContaining("statically inspectable command"),
+      );
     },
   );
 
@@ -287,7 +293,7 @@ describe("testCommandOverrideProblems", () => {
     const root = repositoryWith({
       "package.json": JSON.stringify({ scripts: { test: command } }),
     });
-    expect(testCommandOverrideProblems(root).map(formatTestCommandOverrideProblem)).toStrictEqual([
+    expect(problemsFor(root).map(formatTestCommandOverrideProblem)).toStrictEqual([
       expect.stringContaining("only bare `--coverage` may enable"),
     ]);
   });
@@ -296,7 +302,7 @@ describe("testCommandOverrideProblems", () => {
     const root = repositoryWith({
       "package.json": JSON.stringify({ scripts: { test: "vp test --coverage" } }),
     });
-    expect(testCommandOverrideProblems(root)).toStrictEqual([]);
+    expect(problemsFor(root)).toStrictEqual([]);
   });
 
   test("a double dash cannot hide options that the workspace guard appends to the test script", () => {
@@ -305,7 +311,7 @@ describe("testCommandOverrideProblems", () => {
         scripts: { test: "vp test -- --coverage.exclude=fixture --config fixture" },
       }),
     });
-    expect(testCommandOverrideProblems(root)).toHaveLength(2);
+    expect(problemsFor(root)).toHaveLength(2);
   });
 
   test("recursive workspace patterns include nested packages and apply negations", () => {
@@ -319,8 +325,9 @@ describe("testCommandOverrideProblems", () => {
         scripts: { test: "vp test --config ignored.ts" },
       }),
     });
-    const problems = testCommandOverrideProblems(root);
+    const { problems, scanned } = testCommandOverrideProblems(root);
     expect(problems).toHaveLength(1);
     expect(problems[0]?.file).toBe("packages/features/app/package.json");
+    expect(scanned).toBe(2);
   });
 });

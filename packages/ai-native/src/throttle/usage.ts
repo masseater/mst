@@ -8,9 +8,13 @@ Runs the command while keeping the number of simultaneous executions that
 share this host and namespace at or below the limit. When every slot is held
 the wrapper joins a wait queue, reports its position on stderr, and retries
 every slot on each poll, for at most the wait budget. A slot whose holder
-died without releasing is reclaimed once the holder's liveness mark goes
-stale. Do not nest throttle inside a command it wraps: the inner call counts
-as one more competitor and consumes a second slot.
+exits is released by the operating system. A live holder keeps its slot until
+its command ends or its timeout stops the command. Do not nest throttle inside
+a command it wraps: the inner call counts as one more competitor and consumes
+a second slot. The operating system's temporary directory that stores the
+slots must be on a local filesystem, not NFS, SMB, or another network filesystem.
+Do not delete, rename, replace, or clean up slot lock files while throttle
+processes are active.
 
 Options:
   --timeout <seconds>  Send SIGTERM to the command's process group after this

@@ -8,6 +8,8 @@ export type DependencyCatalogFindings = {
 
 export type DependencyCatalogReport = DependencyCatalogFindings & {
   readonly definitionUnreadable: boolean;
+  readonly definitionMissing: boolean;
+  readonly scanned: number;
 };
 
 export const NO_DEPENDENCY_CATALOG_FINDINGS: DependencyCatalogFindings = {

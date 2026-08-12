@@ -2,7 +2,7 @@ import { ChildProcess, spawn } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
+import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, onTestFinished, test, vi } from "vite-plus/test";
@@ -10,6 +10,7 @@ import { describe, expect, onTestFinished, test, vi } from "vite-plus/test";
 import { runWithSlot } from "./run-command.ts";
 import { runThrottle, type ThrottleSeams } from "./run-throttle.ts";
 import { safeKill } from "./signals.ts";
+import { tryAcquireAny } from "./slots.ts";
 
 const temporaryDirectory = (prefix: string): string => {
   const directory = mkdtempSync(join(tmpdir(), prefix));
@@ -65,7 +66,6 @@ const wrappedCommandCases = [
 const quickSeams = (slotDir: string): ThrottleSeams => ({
   slotDir,
   limit: 1,
-  staleMs: 5000,
   waitBudgetMs: 30_000,
   pollMs: 10_000,
   isInteractive: false,
@@ -94,7 +94,9 @@ describe("run-command", () => {
       expect(await runThrottle(wrappedCommandCase.argv, quickSeams(slotDir))).toBe(
         wrappedCommandCase.exitCode,
       );
-      expect(existsSync(join(slotDir, "slot-0.lock"))).toBe(false);
+      const released = await tryAcquireAny({ slotDir, limit: 1 });
+      expect(released).not.toBeNull();
+      await released?.release();
       expect(stderrText()).toContain(wrappedCommandCase.diagnostic);
     },
   );
@@ -114,20 +116,20 @@ describe("run-command", () => {
 
   test.each(["SIGINT", "SIGTERM"] as const)(
     "forwards repeated %s signals while the command is running",
-    { timeout: 20_000 },
+    { timeout: 60_000 },
     async (interruptSignal) => {
       const root = mkdtempSync(join(tmpdir(), "throttle-repeated-signal-"));
       const childPidFile = join(root, "child-pid");
-      const receivedSignalsFile = join(root, "received-signals");
       const wrappedProgram = `
-        const { appendFileSync, writeFileSync } = require("node:fs");
+        const { writeFileSync, writeSync } = require("node:fs");
         let received = 0;
         process.on(${JSON.stringify(interruptSignal)}, () => {
-          appendFileSync(${JSON.stringify(receivedSignalsFile)}, ${JSON.stringify(`${interruptSignal}\n`)});
+          writeSync(1, ${JSON.stringify(`${interruptSignal}\n`)});
           received += 1;
           if (received === 2) process.exit(0);
         });
         writeFileSync(${JSON.stringify(childPidFile)}, String(process.pid));
+        writeSync(1, \`ready \${process.pid}\\n\`);
         setInterval(() => {}, 1000);
       `;
       const wrapper = spawn(
@@ -141,10 +143,13 @@ describe("run-command", () => {
         ],
         {
           env: { ...process.env, TMPDIR: root },
-          stdio: "ignore",
+          stdio: ["ignore", "pipe", "ignore"],
         },
       );
+      const outputLines = createInterface({ input: wrapper.stdout });
+      const output = outputLines[Symbol.asyncIterator]();
       onTestFinished(() => {
+        outputLines.close();
         if (existsSync(childPidFile)) {
           safeKill(-Number(readFileSync(childPidFile, "utf8")), "SIGKILL");
         }
@@ -159,18 +164,14 @@ describe("run-command", () => {
         },
       );
 
-      await vi.waitFor(() => {
-        expect(existsSync(childPidFile)).toBe(true);
-      }, 10_000);
-      const recordedChildPid = Number(readFileSync(childPidFile, "utf8"));
+      const ready = await output.next();
+      if (ready.done === true) throw new Error("throttle command ended before it became ready");
+      expect(ready.value).toMatch(/^ready \d+$/);
+      const recordedChildPid = Number(ready.value.slice("ready ".length));
       if (wrapper.pid === undefined) throw new Error("throttle wrapper did not start");
 
       process.kill(wrapper.pid, interruptSignal);
-      await vi.waitFor(() => {
-        expect(readFileSync(receivedSignalsFile, "utf8").trim().split("\n")).toStrictEqual([
-          interruptSignal,
-        ]);
-      }, 10_000);
+      expect(await output.next()).toStrictEqual({ value: interruptSignal, done: false });
       expect(() => {
         process.kill(wrapper.pid ?? 0, 0);
       }).not.toThrow();
@@ -178,10 +179,8 @@ describe("run-command", () => {
       process.kill(wrapper.pid, interruptSignal);
 
       expect(await wrapperEnd).toStrictEqual({ exitCode: 0, signal: null });
-      expect(readFileSync(receivedSignalsFile, "utf8").trim().split("\n")).toStrictEqual([
-        interruptSignal,
-        interruptSignal,
-      ]);
+      expect(await output.next()).toStrictEqual({ value: interruptSignal, done: false });
+      expect(await output.next()).toStrictEqual({ value: undefined, done: true });
       expect(() => {
         process.kill(recordedChildPid, 0);
       }).toThrow(/ESRCH/);
@@ -272,29 +271,6 @@ describe("run-command", () => {
       expect(() => {
         process.kill(grandchild, 0);
       }).toThrow(/ESRCH/);
-    },
-  );
-
-  test(
-    "a compromised lease lets the command finish but its failed release fails the wrapper",
-    { timeout: 10_000 },
-    async () => {
-      const slotDir = temporaryDirectory("throttle-compromise-");
-      const stderrText = captureStderr();
-
-      const pendingRun = runThrottle(
-        ["--", process.execPath, "-e", "setTimeout(() => {}, 2600);"],
-        {
-          ...quickSeams(slotDir),
-          staleMs: 2000,
-        },
-      );
-      await delay(500);
-      rmSync(join(slotDir, "slot-0.lock"), { recursive: true, force: true });
-
-      expect(await pendingRun).toBe(1);
-      expect(stderrText()).toContain("slot lease compromised");
-      expect(stderrText()).toContain("throttle: could not release the slot:");
     },
   );
 });

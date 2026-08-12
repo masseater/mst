@@ -32,7 +32,7 @@
 
 ## 影響
 
-**導入時点で 3 つの公開パッケージすべてが skill を持つ。** 検査を足した commit で `@mst/dont-review-it` / `@mst/lint-rule-authoring` / `@mst/agentic-documents` に SKILL.md を書いたので、厳しい側へ移るときに既存の違反を抱えていない。`@mst/utils` は外部公開しないので `private: true` を宣言し、検査の対象から外れた。公開側のパッケージが `@mst/utils` に依存しているため、実際に npm へ publish する時は utils も公開へ戻し、その時点で skill の同梱が要る。
+**導入時点で 3 つの公開パッケージすべてが skill を持つ。** 検査を足した commit で `@mst/dont-review-it` / `@mst/lint-rule-authoring` / `@mst/agentic-documents` に SKILL.md を書いたので、厳しい側へ移るときに既存の違反を抱えていない。後継の `@mst/repository-checks` は外部公開しないので `private: true` を維持し、検査の対象から外れる。公開側はこの内部契約を pack 時に成果物へ bundle し、private package 自体を consumer へ要求しない。
 
 **`guard` に 1 行増えた。** `vp run -r check:skills`。検査の入口が増えたのではなく、上流ツールの構造検証を既存のゲートに載せただけである。同梱の有無は従来どおり `vp exec dont-review-it check` の 1 入口が落とす。
 

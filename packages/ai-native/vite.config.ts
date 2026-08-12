@@ -12,5 +12,16 @@ export default defineConfig({
     dts: {
       tsgo: true,
     },
+    exports: {
+      devExports: true,
+      exclude: ["spool/cli", "throttle/cli"],
+      bin: {
+        spool: "src/spool/cli.ts",
+        throttle: "src/throttle/cli.ts",
+      },
+      customExports: {
+        "./package.json": "./package.json",
+      },
+    },
   },
 });

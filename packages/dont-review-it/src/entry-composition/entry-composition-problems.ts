@@ -8,6 +8,7 @@ import type { RepositoryProblem } from "../problem.ts";
 export type EntryCompositionReport = {
   readonly problems: readonly RepositoryProblem[];
   readonly failures: readonly string[];
+  readonly scanned: number;
 };
 
 export type EntryFinding =
@@ -119,5 +120,6 @@ export const entryCompositionProblems = ({
       ),
     ),
     failures: listing.failures,
+    scanned: listing.manifests.length,
   };
 };

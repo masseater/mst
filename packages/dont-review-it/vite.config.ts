@@ -8,9 +8,33 @@ export default defineConfig({
     },
   },
   pack: {
-    entry: ["src/cli.ts", "src/index.ts", "src/plugin.ts"],
+    entry: {
+      cli: "src/cli.ts",
+      index: "src/index.ts",
+      plugin: "src/plugin.ts",
+      vitest: "src/vitest/standard-io-test.ts",
+    },
+    deps: {
+      alwaysBundle: ["@mst/repository-checks"],
+      neverBundle: ["vite-plus"],
+      dts: {
+        alwaysBundle: ["@mst/repository-checks"],
+        neverBundle: ["vite-plus"],
+      },
+    },
     dts: {
       tsgo: true,
+    },
+    exports: {
+      devExports: true,
+      exclude: ["cli"],
+      bin: {
+        "dont-review-it": "src/cli.ts",
+      },
+      customExports: {
+        "./package.json": "./package.json",
+        "./tsconfig/*": "./tsconfig/*",
+      },
     },
   },
 });
