@@ -34,7 +34,10 @@ const repositoryWith = async (files: Readonly<Record<string, string>>): Promise<
 
 describe("検査の走査証跡", () => {
   it("観点ごとに、開いた対象の数を残す", async () => {
-    const repositoryRoot = await repositoryWith({ ".github/workflows/ci.yml": GATED_WORKFLOW });
+    const repositoryRoot = await repositoryWith({
+      "renovate.json": `{}\n`,
+      ".github/workflows/ci.yml": GATED_WORKFLOW,
+    });
 
     const scanned = runChecks(repositoryRoot).outcomes.map((outcome) => [
       outcome.check,
@@ -47,6 +50,7 @@ describe("検査の走査証跡", () => {
       ["equivalent-concepts", 0],
       ["duplicated-bodies", 0],
       ["workflow-definitions", 1],
+      ["action-updates", 1],
       ["lint-rule-index", 0],
       ["dependency-declarations", 0],
       ["preset-adoption", 0],
@@ -62,13 +66,17 @@ describe("検査の走査証跡", () => {
       .map((outcome) => [outcome.check, outcome.skippedReason]);
 
     expect(skipped).toStrictEqual([
+      ["action-updates", "no workflow definition"],
       ["dependency-declarations", "no workspace definition"],
       ["preset-adoption", "no toolchain configuration"],
     ]);
   });
 
   it("人間が読む形では、状態の記号と対象の規模を観点ごとに桁で揃えて並べる", async () => {
-    const repositoryRoot = await repositoryWith({ ".github/workflows/ci.yml": GATED_WORKFLOW });
+    const repositoryRoot = await repositoryWith({
+      "renovate.json": `{}\n`,
+      ".github/workflows/ci.yml": GATED_WORKFLOW,
+    });
     const { outcomes } = runChecks(repositoryRoot);
 
     expect(scanTraceFor({ outcomes, readByAgent: false, colored: false })).toMatchInlineSnapshot(`
@@ -77,18 +85,22 @@ describe("検査の走査証跡", () => {
         ✓ equivalent-concepts      0 concepts
         ✓ duplicated-bodies        0 declaration sources
         ✓ workflow-definitions     1 definition
+        ✓ action-updates           1 update configuration
         ✓ lint-rule-index          0 workspaces
         ⊘ dependency-declarations  skipped — no workspace definition
         ⊘ preset-adoption          skipped — no toolchain configuration
         ✓ intent-skills            0 manifests
 
-        9 checks ran, nothing to report
+        10 checks ran, nothing to report
       "
     `);
   });
 
   it("AI が読む形では、記号も桁揃えも持たせずに 1 行 1 観点で並べる", async () => {
-    const repositoryRoot = await repositoryWith({ ".github/workflows/ci.yml": GATED_WORKFLOW });
+    const repositoryRoot = await repositoryWith({
+      "renovate.json": `{}\n`,
+      ".github/workflows/ci.yml": GATED_WORKFLOW,
+    });
     const { outcomes } = runChecks(repositoryRoot);
 
     expect(scanTraceFor({ outcomes, readByAgent: true, colored: false })).toMatchInlineSnapshot(`
@@ -97,6 +109,7 @@ describe("検査の走査証跡", () => {
       checked equivalent-concepts 0 concepts 0 problems 0 warnings
       checked duplicated-bodies 0 declaration sources 0 problems 0 warnings
       checked workflow-definitions 1 definition 0 problems 0 warnings
+      checked action-updates 1 update configuration 0 problems 0 warnings
       checked lint-rule-index 0 workspaces 0 problems 0 warnings
       skipped dependency-declarations no workspace definition
       skipped preset-adoption no toolchain configuration
@@ -107,6 +120,7 @@ describe("検査の走査証跡", () => {
 
   it("違反を見つけた観点を、その件数とともに残す", async () => {
     const repositoryRoot = await repositoryWith({
+      "renovate.json": `{}\n`,
       ".github/workflows/ci.yml": "jobs:\n  build:\n    steps: []\n",
     });
 
