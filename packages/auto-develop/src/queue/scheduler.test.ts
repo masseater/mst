@@ -3,7 +3,9 @@ import { describe, expect, test, vi } from "vite-plus/test";
 import { silentLogger } from "../logging/logger.ts";
 import { createPeriodicScheduler } from "./scheduler.ts";
 
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+const elapse = async (ms: number): Promise<void> => {
+  await vi.advanceTimersByTimeAsync(ms);
+};
 
 const it = test
   .extend("runningStates", () => {
@@ -19,6 +21,7 @@ const it = test
     return { beforeStart, whileRunning, afterStop: scheduler.isRunning() };
   })
   .extend("restartCheckCounts", async () => {
+    vi.useFakeTimers();
     const checkRestart = vi.fn<() => void>();
     const scheduler = createPeriodicScheduler({
       checkRestart,
@@ -27,11 +30,13 @@ const it = test
     });
     scheduler.start();
     scheduler.start();
-    await sleep(35);
+    await elapse(35);
     scheduler.stop();
     const whileRunning = checkRestart.mock.calls.length;
-    await sleep(25);
-    return { whileRunning, afterStop: checkRestart.mock.calls.length };
+    await elapse(25);
+    const afterStop = checkRestart.mock.calls.length;
+    vi.useRealTimers();
+    return { whileRunning, afterStop };
   })
   .extend("cleanupStartCalls", async () => {
     const cleanupStarts = vi.fn<() => void>();
@@ -50,11 +55,13 @@ const it = test
       },
       log: silentLogger,
     });
+    vi.useFakeTimers();
     scheduler.start();
-    await sleep(30);
+    await elapse(30);
     scheduler.stop();
     gate.get("finish")?.();
-    await sleep(5);
+    await elapse(5);
+    vi.useRealTimers();
     return cleanupStarts.mock.calls;
   })
   .extend("cleanupFailureWarnCalls", async () => {
@@ -65,9 +72,11 @@ const it = test
       cleanup: { run: () => Promise.reject(new Error("cleanup broke")), intervalMs: 10 },
       log: { info: () => undefined, warn: warnLog, error: () => undefined },
     });
+    vi.useFakeTimers();
     scheduler.start();
-    await sleep(25);
+    await elapse(25);
     scheduler.stop();
+    vi.useRealTimers();
     return warnLog.mock.calls;
   })
   .extend("stopBeforeStartRunning", () => {
