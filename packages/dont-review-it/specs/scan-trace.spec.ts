@@ -53,6 +53,7 @@ describe("検査の走査証跡", () => {
       ["action-updates", 1],
       ["lint-rule-index", 0],
       ["dependency-declarations", 0],
+      ["preset-adoption", 0],
       ["intent-skills", 0],
     ]);
   });
@@ -67,6 +68,7 @@ describe("検査の走査証跡", () => {
     expect(skipped).toStrictEqual([
       ["action-updates", "no workflow definition"],
       ["dependency-declarations", "no workspace definition"],
+      ["preset-adoption", "no toolchain configuration"],
     ]);
   });
 
@@ -86,9 +88,10 @@ describe("検査の走査証跡", () => {
         ✓ action-updates           1 update configuration
         ✓ lint-rule-index          0 workspaces
         ⊘ dependency-declarations  skipped — no workspace definition
+        ⊘ preset-adoption          skipped — no toolchain configuration
         ✓ intent-skills            0 manifests
 
-        9 checks ran, nothing to report
+        10 checks ran, nothing to report
       "
     `);
   });
@@ -109,6 +112,7 @@ describe("検査の走査証跡", () => {
       checked action-updates 1 update configuration 0 problems 0 warnings
       checked lint-rule-index 0 workspaces 0 problems 0 warnings
       skipped dependency-declarations no workspace definition
+      skipped preset-adoption no toolchain configuration
       checked intent-skills 0 manifests 0 problems 0 warnings
       "
     `);

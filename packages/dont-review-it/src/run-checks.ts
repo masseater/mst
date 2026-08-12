@@ -20,10 +20,11 @@ import {
 import { duplicatedClustersIn } from "./lint/oxlint/lib/duplicated-bodies/body-index.ts";
 import { buildRepositoryBodyIndex } from "./lint/oxlint/lib/duplicated-bodies/builder.ts";
 import { formatDuplicatedCluster } from "./lint/oxlint/lib/duplicated-bodies/site-report.ts";
+import { defaultPresetAdoptionConfig } from "./preset-adoption/config.ts";
+import { runPresetAdoptionChecks } from "./preset-adoption/run-preset-adoption-checks.ts";
 import { formatRepositoryProblem } from "./problem.ts";
-import { actionUpdateProblems } from "./workflows/action-updates.ts";
 import { defaultWorkflowChecksConfig } from "./workflows/config.ts";
-import { runWorkflowChecks } from "./workflows/run-workflow-checks.ts";
+import { workflowOutcomesOf } from "./workflows/workflow-outcomes.ts";
 
 import type { CheckOutcome } from "@mst/repository-checks";
 
@@ -38,6 +39,8 @@ const NO_WORKSPACE_DEFINITION = "no workspace definition";
 
 const NO_WORKFLOW_DEFINITION = "no workflow definition";
 
+const NO_TOOLCHAIN_CONFIG = "no toolchain configuration";
+
 const UNREADABLE_WORKSPACE_DEFINITION = "workspace definition does not parse";
 
 export const runChecks = (repositoryRoot: string): CheckReport => {
@@ -51,12 +54,15 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
   });
   const repositoryFiles = listRepositoryFiles(resolve(repositoryRoot));
   const catalog = buildCanonicalValuesCatalog({ repositoryRoot });
-  const workflows = runWorkflowChecks({ repositoryRoot, config: defaultWorkflowChecksConfig });
-  const actionUpdates =
-    workflows.scanned === 0
-      ? { problems: [], scanned: 0 }
-      : actionUpdateProblems({ repositoryRoot, config: defaultWorkflowChecksConfig });
+  const workflows = workflowOutcomesOf({
+    repositoryRoot,
+    config: defaultWorkflowChecksConfig,
+  });
   const skills = shippedSkillsProblems({ repositoryRoot, config: defaultIntentSkillsConfig });
+  const presetAdoption = runPresetAdoptionChecks({
+    repositoryRoot,
+    config: defaultPresetAdoptionConfig,
+  });
   const ruleIndex = dependencyCatalog.definitionUnreadable
     ? { problems: [], scanned: 0 }
     : lintRuleIndexProblems({ repositoryRoot, write: false });
@@ -103,17 +109,17 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
     {
       check: "workflow-definitions",
       unit: "definition",
-      count: workflows.scanned,
+      count: workflows.definitions.scanned,
       skippedReason: null,
-      problems: workflows.problems.map(formatRepositoryProblem).toSorted(),
+      problems: workflows.definitions.problems.map(formatRepositoryProblem).toSorted(),
       warnings: [],
     },
     {
       check: "action-updates",
       unit: "update configuration",
-      count: actionUpdates.scanned,
-      skippedReason: workflows.scanned === 0 ? NO_WORKFLOW_DEFINITION : null,
-      problems: actionUpdates.problems.map(formatRepositoryProblem).toSorted(),
+      count: workflows.updates.scanned,
+      skippedReason: workflows.definitions.scanned === 0 ? NO_WORKFLOW_DEFINITION : null,
+      problems: workflows.updates.problems.map(formatRepositoryProblem).toSorted(),
       warnings: [],
     },
     {
@@ -133,6 +139,14 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
       skippedReason: dependencyCatalog.definitionMissing ? NO_WORKSPACE_DEFINITION : null,
       problems: dependencyCatalog.problems.map(formatDependencyCatalogProblem).toSorted(),
       warnings: dependencyCatalog.warnings.map(formatDependencyCatalogProblem).toSorted(),
+    },
+    {
+      check: "preset-adoption",
+      unit: "workspace",
+      count: presetAdoption.scanned,
+      skippedReason: presetAdoption.configMissing ? NO_TOOLCHAIN_CONFIG : null,
+      problems: [],
+      warnings: presetAdoption.warnings.map(formatRepositoryProblem).toSorted(),
     },
     {
       check: "intent-skills",

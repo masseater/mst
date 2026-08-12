@@ -1,3 +1,5 @@
+export const ARRAY_EXPRESSION = "ArrayExpression";
+
 export const FUNCTION_NODE_TYPES: ReadonlySet<string> = new Set([
   "ArrowFunctionExpression",
   "FunctionDeclaration",
