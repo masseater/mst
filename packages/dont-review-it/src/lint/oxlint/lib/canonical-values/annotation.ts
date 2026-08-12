@@ -11,7 +11,7 @@ export type CanonicalValuesAnnotation = {
 };
 
 const ANNOTATED_CONCEPT_PATTERN = new RegExp(
-  String.raw`(?:^|\n)[^\S\n]*\*?[^\S\n]*${CANONICAL_VALUES_TAG}[^\S\n]+([a-z0-9]+(?:[-.][a-z0-9]+)*)[^\S\n]*(?:\n|$)`,
+  String.raw`(?<=(?:^|\n)[^\S\n]*\*?[^\S\n]*${CANONICAL_VALUES_TAG}[^\S\n]+)[a-z0-9]+(?:[-.][a-z0-9]+)*(?=[^\S\n]*(?:\n|$))`,
   "u",
 );
 
@@ -19,10 +19,7 @@ export const parseCanonicalValuesAnnotation = (
   commentValue: string,
 ): CanonicalValuesAnnotation | null => {
   const annotated = ANNOTATED_CONCEPT_PATTERN.exec(commentValue);
-  if (annotated === null) return null;
-
-  const conceptId = annotated.at(1);
-  return conceptId === undefined ? null : { conceptId };
+  return annotated === null ? null : { conceptId: annotated[0] };
 };
 
 export const containsCanonicalValuesAnnotation = (sourceText: string): boolean =>

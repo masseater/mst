@@ -122,6 +122,10 @@ describe("dont-review-it/no-vi-mock-factory-behavior--use-spy-true-and-fixture",
         name: "setting behaviour outside a factory belongs to the rule on placement",
         code: "vi.fn().mockReturnValue(1);",
       },
+      {
+        name: "a declaration leaves behaviour settled outside its factory alone",
+        code: 'vi.mock("./module.ts", () => ({}));\nvi.fn().mockReturnValue(1);',
+      },
     ],
     invalid: [
       {

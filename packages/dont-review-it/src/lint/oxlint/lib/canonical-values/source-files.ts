@@ -49,7 +49,7 @@ export const readTextFile = (path: string): string | null =>
 
 const scannedFileAt = (repositoryRoot: string, absolutePath: string): ScannedFile | null => {
   const stats = statOf(absolutePath);
-  if (stats === null) return null;
+  if (stats?.isFile() !== true) return null;
   return {
     absolutePath,
     relativePath: toPosixPath(relative(repositoryRoot, absolutePath)),
@@ -69,7 +69,6 @@ const scannedFilesUnder = (repositoryRoot: string, directory: string): readonly 
         ? []
         : scannedFilesUnder(repositoryRoot, absolutePath);
     }
-    if (!directoryEntry.isFile()) return [];
     if (!isScannedName(directoryEntry.name)) return [];
     const scanned = scannedFileAt(repositoryRoot, absolutePath);
     return scanned === null ? [] : [scanned];

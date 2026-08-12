@@ -368,6 +368,19 @@ describe("dont-review-it/no-normalize-sut-output--assert-natural-shape", () => {
           { messageId: "mutatedSubject", data: { operation: "`sort`", subject: "produced" } },
         ],
       },
+      {
+        name: "rewrites of three different kinds are each reported where they stand in the fixture",
+        filename: SPEC_FILE,
+        code: 'const test = baseTest.extend("report", () => {\n  const produced = summarise(input);\n  produced.rows.sort();\n  produced.id = "a";\n  delete produced.slug;\n  return produced;\n});',
+        errors: [
+          { messageId: "mutatedSubject", data: { operation: "`sort`", subject: "produced" } },
+          {
+            messageId: "mutatedSubject",
+            data: { operation: "An assignment", subject: "produced" },
+          },
+          { messageId: "mutatedSubject", data: { operation: "A `delete`", subject: "produced" } },
+        ],
+      },
     ],
   });
 });
