@@ -9,7 +9,6 @@ describe("runStopAiSlop", () => {
     { argv: ["scan"] },
     { argv: ["check", "extra"] },
     { argv: ["check", "--unknown"] },
-    { argv: ["check"] },
     { argv: ["check", "--base", ""] },
     { argv: ["check", "--base", "base"] },
     { argv: ["check", "--base", "base", "--head", ""] },
@@ -108,6 +107,36 @@ describe("runStopAiSlop", () => {
       expect(commonRevision).toBe(mergeBase);
       expect(directTipComparison).toStrictEqual({ exitCode: 0, out: "", error: "" });
       expect(mergeBaseComparison).toStrictEqual({
+        exitCode: 1,
+        out: 'src/legacy-api.test.ts:4 no-removal-verification: Do not assert that removed export "legacyMode" from "src/legacy.ts" remains absent; remove the assertion.\n',
+        error: "",
+      });
+    });
+  });
+
+  it("compares the history since the integration branch when no revision is named", async () => {
+    await withTestRepository(async (repository) => {
+      const common = repository.commit({
+        files: {
+          "src/legacy.ts": "export const current = true;\nexport const legacyMode = true;\n",
+        },
+      });
+      repository.git(["update-ref", "refs/remotes/origin/main", common]);
+      repository.commit({
+        files: {
+          "src/legacy.ts": "export const current = true;\n",
+          "src/legacy-api.test.ts":
+            'import * as legacy from "./legacy.ts";\nimport { expect } from "vite-plus/test";\n\nexpect(legacy).not.toHaveProperty("legacyMode");\n',
+        },
+      });
+
+      const resolvedComparison = await runStopAiSlop([
+        "check",
+        "--repository-root",
+        repository.root,
+      ]);
+
+      expect(resolvedComparison).toStrictEqual({
         exitCode: 1,
         out: 'src/legacy-api.test.ts:4 no-removal-verification: Do not assert that removed export "legacyMode" from "src/legacy.ts" remains absent; remove the assertion.\n',
         error: "",
