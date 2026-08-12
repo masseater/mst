@@ -37,7 +37,7 @@
     "check:skills": "intent validate"
   },
   "dependencies": {
-    "@mst/utils": "workspace:*",
+    "@mst/repository-checks": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/core": "^2.10.0",
     "@opentelemetry/exporter-metrics-otlp-http": "^0.221.0",

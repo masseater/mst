@@ -1,7 +1,7 @@
 import { readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import { readUnlessMissing } from "@mst/utils";
+import { readUnlessMissing } from "@mst/repository-checks";
 
 import type { LintRuleWorkspace } from "./lint-rule-workspaces.ts";
 

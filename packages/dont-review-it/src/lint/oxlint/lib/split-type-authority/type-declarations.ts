@@ -1,4 +1,3 @@
-import { lineAtOffset } from "@mst/utils";
 import { uniq } from "es-toolkit";
 import { parseSync } from "oxc-parser";
 
@@ -92,7 +91,7 @@ const declarationFrom = (
 
   return {
     name: String((statement.id as AstFields).name),
-    line: lineAtOffset(source, Number(statement.start)),
+    line: source.slice(0, Number(statement.start)).split("\n").length,
     kind: String(statement[NODE_TYPE_FIELD]),
     structure: structureOf(shape, placeholders),
     referencesNamedType: referencedTypeNamesIn(shape.memberNodes).some(isUnbound),

@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { lineAtOffset, readUnlessMissing } from "@mst/utils";
+import { readUnlessMissing } from "@mst/repository-checks";
 import { findNodeAtLocation, getNodeValue, parseTree, type Node } from "jsonc-parser";
 
 import {
@@ -31,7 +31,7 @@ const lineOfProperty = ({
   key: string;
 }): number => {
   const node = findNodeAtLocation(manifest.root, [key]);
-  return lineAtOffset(manifest.source, node?.offset ?? manifest.root.offset);
+  return manifest.source.slice(0, node?.offset ?? manifest.root.offset).split("\n").length;
 };
 
 const stringEntriesOf = (declared: unknown): readonly string[] | null =>

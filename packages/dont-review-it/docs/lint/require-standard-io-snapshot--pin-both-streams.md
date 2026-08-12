@@ -4,7 +4,7 @@
 
 `standardIoTest` からテストを導出しているファイルが、捕捉された 2 ストリームのスナップショットを欠いている状態を検出する。要求は「stdout と stderr のそれぞれに、`expect(stdout.text)` / `expect(stderr.text)` を主語とするスナップショット assertion が最低 1 つある」ことで、`toMatchInlineSnapshot` と `toMatchSnapshot` のどちらでも満たせる。
 
-導出の判定は import した `standardIoTest`（改名 import を含む）の呼び出しで行い、`standardIoTest.skip` のような修飾呼び出しも導出に数える。欠けているストリームごとに 1 件、最初の導出呼び出しの位置に報告する。
+導出の判定は import した `standardIoTest`（改名 import を含む）の呼び出しで行い、`standardIoTest.skip` のような修飾呼び出しも導出に数える。`const it = standardIoTest.extend(...)` のように束縛へ導出した形も、その束縛からの呼び出しを含めて追跡する。導出の連鎖（導出した束縛からさらに `extend` した束縛）も同様に数える。欠けているストリームごとに 1 件、最初の導出呼び出しの位置に報告する。
 
 フィクスチャを使っていないファイルには何も要求しない。
 

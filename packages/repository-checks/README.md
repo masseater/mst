@@ -1,6 +1,6 @@
-# vite-plus-starter
+# @mst/repository-checks
 
-A starter for creating a Vite Plus project.
+The shared contract of this repository's checks: how they read files, shape problems, and exit.
 
 ## Development
 

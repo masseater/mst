@@ -1,13 +1,13 @@
 {
-  "name": "@mst/utils",
+  "name": "@mst/repository-checks",
   "version": "0.0.0",
   "private": true,
-  "description": "The neutral home for declarations that more than one package needs and none of them owns.",
+  "description": "The shared contract of this repository's checks: how they read files, shape problems, and exit.",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/masseater/mst.git",
-    "directory": "packages/utils"
+    "directory": "packages/repository-checks"
   },
   "files": [
     "dist",

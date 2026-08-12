@@ -2,7 +2,7 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { normalize } from "node:path/posix";
 
-import { readUnlessMissing } from "@mst/utils";
+import { readUnlessMissing } from "@mst/repository-checks";
 import { uniq } from "es-toolkit";
 
 import { readJsonFile } from "../lint/oxlint/lib/canonical-values/read-json-file.ts";

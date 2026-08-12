@@ -103,14 +103,14 @@ describe("run-command", () => {
       const before = Date.now();
 
       const code = await runThrottle(
-        ["--timeout", "2", "--", "sh", "-c", stubborn],
+        ["--timeout", "5", "--", "sh", "-c", stubborn],
         quickSeams(slotDir),
       );
 
       const elapsed = Date.now() - before;
       expect(code).toBe(1);
-      expect(stderrText()).toContain("ran past the 2s timeout");
-      expect(elapsed).toBeGreaterThan(6500);
+      expect(stderrText()).toContain("ran past the 5s timeout");
+      expect(elapsed).toBeGreaterThan(9500);
       await delay(200);
       const grandchild = Number(readFileSync(pidFile, "utf8").trim());
       expect(() => {

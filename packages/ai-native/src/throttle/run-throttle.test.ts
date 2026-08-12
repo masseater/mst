@@ -188,7 +188,7 @@ describe("run-throttle", () => {
       const recorders = ["a", "b", "c"].map((name) => recordedRun(stamps, name));
 
       const codes = await Promise.all(
-        recorders.map((recorder) => runThrottle(["--", ...recorder.argsFor(300)], seams)),
+        recorders.map((recorder) => runThrottle(["--", ...recorder.argsFor(1500)], seams)),
       );
 
       expect(codes).toStrictEqual([0, 0, 0]);

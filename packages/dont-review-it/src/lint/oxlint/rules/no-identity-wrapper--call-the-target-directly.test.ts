@@ -174,7 +174,7 @@ describe("dont-review-it/no-identity-wrapper--call-the-target-directly", () => {
       {
         name: "a wrapper in a file that only forwards names is reported like any other",
         code: "export const parseUser = (input) => parse(input);",
-        filename: "/repo/packages/utils/src/index.ts",
+        filename: "/repo/packages/repository-checks/src/index.ts",
         errors: [{ messageId: "identityWrapper" }],
       },
       {

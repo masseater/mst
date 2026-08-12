@@ -1,7 +1,7 @@
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 
-import { readUnlessMissing } from "@mst/utils";
+import { readUnlessMissing } from "@mst/repository-checks";
 import { attempt } from "es-toolkit";
 import { parse } from "yaml";
 

@@ -1,4 +1,4 @@
-import { EXIT_MISUSE } from "@mst/utils";
+import { EXIT_MISUSE } from "@mst/repository-checks";
 import { runCommand } from "citty";
 import { describe, expect, it } from "vite-plus/test";
 

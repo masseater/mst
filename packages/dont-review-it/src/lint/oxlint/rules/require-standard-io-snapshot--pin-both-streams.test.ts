@@ -37,6 +37,20 @@ standardIoTest("pins both", ({ stdout, stderr }) => {
 });`,
       },
       {
+        name: "declarations unrelated to the fixture never join the derivation set",
+        code: `${FIXTURE_IMPORT}
+const LABEL = "check";
+let pending;
+const { helper } = toolbox;
+const wrapped = wrap(LABEL);
+standardIoTest("pins stdout", ({ stdout }) => {
+  expect(stdout.text).toMatchInlineSnapshot();
+});
+standardIoTest("pins stderr", ({ stderr }) => {
+  expect(stderr.text).toMatchInlineSnapshot();
+});`,
+      },
+      {
         name: "an unrelated import carries no snapshot obligation",
         code: `import { helper } from "./helper.ts";
 test("plain", () => {
@@ -49,6 +63,17 @@ test("plain", () => {
 standardIoTest("checks content", ({ stdout, stderr }) => {
   expect(stdout.text).toContain("result");
   expect(stdout.text).toMatchInlineSnapshot();
+  expect(stderr.text).toMatchInlineSnapshot();
+});`,
+      },
+      {
+        name: "a binding derived through extend keeps the snapshot duty satisfied",
+        code: `${FIXTURE_IMPORT}
+const it = standardIoTest.extend("finished", () => runCli(["check"]));
+it("pins stdout", ({ stdout }) => {
+  expect(stdout.text).toMatchInlineSnapshot();
+});
+it("pins stderr", ({ stderr }) => {
   expect(stderr.text).toMatchInlineSnapshot();
 });`,
       },
@@ -83,6 +108,34 @@ ${STDOUT_SNAPSHOT}`,
         code: `${FIXTURE_IMPORT}
 ${STDERR_SNAPSHOT}`,
         errors: [{ messageId: "missingSnapshot" }],
+      },
+      {
+        name: "a binding derived through extend still owes both snapshots",
+        code: `${FIXTURE_IMPORT}
+const it = standardIoTest.extend("finished", () => runCli(["check"]));
+it("asserts content only", ({ stdout }) => {
+  expect(stdout.text).toContain("result");
+});`,
+        errors: [{ messageId: "missingSnapshot" }, { messageId: "missingSnapshot" }],
+      },
+      {
+        name: "a chain of derivations does not shed the duty",
+        code: `${FIXTURE_IMPORT}
+const scenario = standardIoTest.extend("finished", () => runCli(["check"]));
+const it = scenario.extend("report", () => parse());
+it("asserts content only", ({ report }) => {
+  expect(report).toContain("result");
+});`,
+        errors: [{ messageId: "missingSnapshot" }, { messageId: "missingSnapshot" }],
+      },
+      {
+        name: "a plain alias of the fixture is followed to its call sites",
+        code: `${FIXTURE_IMPORT}
+const it = standardIoTest;
+it("asserts content only", ({ stdout }) => {
+  expect(stdout.text).toContain("result");
+});`,
+        errors: [{ messageId: "missingSnapshot" }, { messageId: "missingSnapshot" }],
       },
       {
         name: "a modifier call still derives the test from the fixture",

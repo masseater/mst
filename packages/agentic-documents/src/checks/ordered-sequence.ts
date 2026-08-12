@@ -1,5 +1,3 @@
-import { lineAtOffset } from "@mst/utils";
-
 import { isInsideGeneratedRegion } from "../markdown/generated-region.ts";
 import {
   descendants,
@@ -61,7 +59,7 @@ const decimalMarkerLines = ({
     .slice(startOffset, endOffset)
     .split("\n")
     .flatMap((line, index) => (index > 0 && DECIMAL_MARKER_PATTERN.test(line) ? [index] : []))
-    .map((lineIndex) => lineAtOffset(source, startOffset) + lineIndex);
+    .map((lineIndex) => source.slice(0, startOffset).split("\n").length + lineIndex);
 
 const orderedListProblems = ({
   document,

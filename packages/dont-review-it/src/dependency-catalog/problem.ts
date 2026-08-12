@@ -1,4 +1,4 @@
-import type { RepositoryProblem } from "@mst/utils";
+import type { RepositoryProblem } from "@mst/repository-checks";
 
 export type DependencyCatalogProblem = RepositoryProblem;
 

@@ -5,15 +5,15 @@ import { renderSpecificationsDocument } from "./render.ts";
 describe("renderSpecificationsDocument", () => {
   test("titles the document with the package name", () => {
     const rendered = renderSpecificationsDocument({
-      packageName: "@mst/utils",
+      packageName: "@mst/repository-checks",
       subjects: [{ subject: "行の結合", claims: ["各要素を畳む"], sourceFile: "specs/a.spec.ts" }],
     });
-    expect(rendered).toContain("# @mst/utils\n");
+    expect(rendered).toContain("# @mst/repository-checks\n");
   });
 
   test("renders each subject as a heading and each claim as a bullet", () => {
     const rendered = renderSpecificationsDocument({
-      packageName: "@mst/utils",
+      packageName: "@mst/repository-checks",
       subjects: [
         {
           subject: "行の結合",
@@ -28,7 +28,7 @@ describe("renderSpecificationsDocument", () => {
 
   test("links each subject to the spec file its claims came from", () => {
     const rendered = renderSpecificationsDocument({
-      packageName: "@mst/utils",
+      packageName: "@mst/repository-checks",
       subjects: [{ subject: "行の結合", claims: ["各要素を畳む"], sourceFile: "specs/a.spec.ts" }],
     });
     expect(rendered).toContain("## 行の結合\n\n[`specs/a.spec.ts`](specs/a.spec.ts)\n");
@@ -36,7 +36,7 @@ describe("renderSpecificationsDocument", () => {
 
   test("merges subjects that share a name and links every source file once", () => {
     const rendered = renderSpecificationsDocument({
-      packageName: "@mst/utils",
+      packageName: "@mst/repository-checks",
       subjects: [
         { subject: "行の結合", claims: ["first"], sourceFile: "specs/a.spec.ts" },
         { subject: "別の主題", claims: ["second"], sourceFile: "specs/a.spec.ts" },
@@ -52,7 +52,10 @@ describe("renderSpecificationsDocument", () => {
   });
 
   test("states that the file is generated", () => {
-    const rendered = renderSpecificationsDocument({ packageName: "@mst/utils", subjects: [] });
+    const rendered = renderSpecificationsDocument({
+      packageName: "@mst/repository-checks",
+      subjects: [],
+    });
     expect(rendered).toContain("生成物");
   });
 });

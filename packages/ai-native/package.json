@@ -2,6 +2,9 @@
   "name": "@mst/ai-native",
   "version": "0.0.0",
   "description": "Command wrappers that keep parallel heavy commands within the host's capacity and their output out of the caller's context window.",
+  "keywords": [
+    "tanstack-intent"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -14,6 +17,7 @@
   },
   "files": [
     "dist",
+    "skills",
     "src"
   ],
   "type": "module",
@@ -28,12 +32,14 @@
     "build": "vp pack",
     "dev": "vp pack --watch",
     "test": "vp test",
-    "check": "vp check"
+    "check": "vp check",
+    "check:skills": "intent validate"
   },
   "dependencies": {
     "proper-lockfile": "4.1.2"
   },
   "devDependencies": {
+    "@tanstack/intent": "catalog:",
     "@types/node": "catalog:",
     "@types/proper-lockfile": "4.1.4",
     "@vitest/coverage-v8": "catalog:",

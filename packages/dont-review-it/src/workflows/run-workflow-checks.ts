@@ -38,7 +38,9 @@ const problemsIn = ({
 };
 
 const byLocation = (left: RepositoryProblem, right: RepositoryProblem): number =>
-  left.file === right.file ? left.line - right.line : left.file.localeCompare(right.file);
+  left.file === right.file
+    ? Number(left.line) - Number(right.line)
+    : left.file.localeCompare(right.file);
 
 export const runWorkflowChecks = ({
   repositoryRoot,
