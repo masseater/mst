@@ -11,19 +11,19 @@ const config = defaultWorkflowChecksConfig;
 
 const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-dependency-updates-"));
 
-const reportFor = (name: string, files: Readonly<Record<string, string>>) => {
-  const repositoryRoot = join(fixtureDir, name);
+const reportFor = (scenario: string, files: Readonly<Record<string, string>>) => {
+  const repositoryRoot = join(fixtureDir, scenario);
   mkdirSync(repositoryRoot, { recursive: true });
   Object.entries(files).forEach(([relativePath, source]) => {
-    const target = join(repositoryRoot, relativePath);
-    mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, source);
+    const absolutePath = join(repositoryRoot, relativePath);
+    mkdirSync(dirname(absolutePath), { recursive: true });
+    writeFileSync(absolutePath, source);
   });
   return actionUpdateProblems({ repositoryRoot, config });
 };
 
-const problemsFor = (name: string, files: Readonly<Record<string, string>>) =>
-  reportFor(name, files).problems;
+const problemsFor = (scenario: string, files: Readonly<Record<string, string>>) =>
+  reportFor(scenario, files).problems;
 
 const DEPENDABOT_PATH = ".github/dependabot.yml";
 

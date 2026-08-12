@@ -11,13 +11,13 @@ const config = defaultWorkflowChecksConfig;
 
 const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-workflow-outcomes-"));
 
-const outcomesFor = (name: string, files: Readonly<Record<string, string>>) => {
-  const repositoryRoot = join(fixtureDir, name);
+const outcomesFor = (scenario: string, files: Readonly<Record<string, string>>) => {
+  const repositoryRoot = join(fixtureDir, scenario);
   mkdirSync(repositoryRoot, { recursive: true });
   Object.entries(files).forEach(([relativePath, source]) => {
-    const target = join(repositoryRoot, relativePath);
-    mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, source);
+    const absolutePath = join(repositoryRoot, relativePath);
+    mkdirSync(dirname(absolutePath), { recursive: true });
+    writeFileSync(absolutePath, source);
   });
   return workflowOutcomesOf({ repositoryRoot, config });
 };
@@ -50,7 +50,7 @@ describe("workflowOutcomesOf", () => {
 
   it("leaves the update mechanism unasked for when no definition exists", () => {
     expect(
-      outcomesFor("no-definition", { "package.json": `{"name": "solo"}` }).updates,
+      outcomesFor("no-definition", { "package.json": `{"scenario": "solo"}` }).updates,
     ).toStrictEqual({
       problems: [],
       scanned: 0,

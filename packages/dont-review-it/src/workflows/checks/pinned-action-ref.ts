@@ -31,8 +31,8 @@ const referenceEntries = ({
   ];
 
   return holders.flatMap((holder) => {
-    const entry = entryOf(holder, config.usesKey);
-    return entry === null ? [] : [entry];
+    const pair = entryOf(holder, config.usesKey);
+    return pair === null ? [] : [pair];
   });
 };
 
@@ -48,12 +48,12 @@ export const unpinnedActionRefs = ({
   readonly document: WorkflowDocument;
   readonly config: WorkflowChecksConfig;
 }): readonly RepositoryProblem[] =>
-  referenceEntries({ document, config }).flatMap((entry) => {
-    const reference = scalarText(entry.value);
+  referenceEntries({ document, config }).flatMap((pair) => {
+    const reference = scalarText(pair.value);
     if (reference === null) return [];
     if (CARRIES_ITS_OWN_COMMIT.some((prefix) => reference.startsWith(prefix))) return [];
 
-    const line = lineOf(document, entry.key);
+    const line = lineOf(document, pair.key);
     if (!COMMIT_SHA_PATTERN.test(refOf(reference))) {
       return [
         {
@@ -64,7 +64,7 @@ export const unpinnedActionRefs = ({
       ];
     }
 
-    if (trailingComment(entry.value) !== null) return [];
+    if (trailingComment(pair.value) !== null) return [];
 
     return [
       {
