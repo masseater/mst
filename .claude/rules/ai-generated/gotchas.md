@@ -145,3 +145,14 @@ pack: { exports: { customExports: { './tsconfig/*': './tsconfig/*' } } }
   - 型に現れるのは AST 定義の共有によるもので、oxlint 経由では到達しない
 - IF: パーサの出力そのものを扱うコード（`parseSync` を直接呼ぶ側）を書いている; THEN MUST: 括弧を考慮する
   - こちらには実際に現れる
+
+## 生成される lint ルール索引の「設定可能」印は、schema がその場に書かれていないと付かない
+
+- 症状: オプションを受け取るルールを書いたのに、`docs/lint/index.md` の設定可能を示す列が空のまま生成される。ルールは実際にオプションを読んでいて、テストも通る
+- 原因: 索引の事実を抽出する `packages/lint-rule-authoring/src/rule-index/rule-facts.ts` は、`meta.schema` がその場に書かれた配列リテラルで、要素が 1 つ以上あるときだけ設定可能と判定する。定数へ括り出して参照すると識別子として読まれ、要素数が数えられない。抽出はルールのファイル 1 つを `oxc-parser` で読むだけなので、別モジュールから import した定数は解決しようがない
+- 波及: `name` と `docs.description` は同じファイル内の `const` なら解決される。`schema` だけがこの解決を通らない
+- 実測: `require-catalog-entry--register-shared-dependency` は `CATALOG_ENTRY_SCHEMA` を別モジュールから import していて、オプションを 2 つ持つのに索引の印が付いていない
+- 対処: schema はルールのファイルに配列リテラルとして直接書く
+
+- IF: ルールの `meta.schema` を別モジュールの定数から渡そうとしている; THEN PROHIBIT: 渡す
+  - 索引が「設定を持たないルール」として生成され、lint も検査も緑のまま通る

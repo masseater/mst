@@ -1,4 +1,5 @@
-import { describe, expect, test, vi } from "vite-plus/test";
+import { standardIoTest } from "@mst/dont-review-it/vitest";
+import { describe, expect, test } from "vite-plus/test";
 
 import { withJobBanner } from "./job-banner.ts";
 
@@ -81,14 +82,33 @@ const it = test
         return { caught: bannerFailure, failureLine: lines()[1] ?? "" };
       }
     },
-  )
-  .extend("defaultStdoutLines", async () => {
-    const stdoutSpy = vi.spyOn(process.stdout, "write").mockReturnValue(true);
-    await withJobBanner({ mode: "reviewer", prNumber: 7, run: () => Promise.resolve() });
-    const writtenLines = stdoutSpy.mock.calls;
-    stdoutSpy.mockRestore();
-    return writtenLines;
+  );
+
+standardIoTest("出力先を指定しなければ標準出力へ書かれる", async ({ stdout }) => {
+  await withJobBanner({
+    mode: "reviewer",
+    prNumber: 7,
+    now: () => 0,
+    run: () => Promise.resolve(),
   });
+
+  expect(stdout.text).toMatchInlineSnapshot(`
+    "[reviewer] 🪟 PR #7 picked up — attach: tmux attach -t auto-develop-pr-7
+    [reviewer] ✅ PR #7 done in 0s — attach: tmux attach -t auto-develop-pr-7
+    "
+  `);
+});
+
+standardIoTest("既定の経路は標準エラーへ何も書かない", async ({ stderr }) => {
+  await withJobBanner({
+    mode: "reviewer",
+    prNumber: 7,
+    now: () => 0,
+    run: () => Promise.resolve(),
+  });
+
+  expect(stderr.text).toMatchInlineSnapshot(`""`);
+});
 
 describe("withJobBanner の経過時間表記", () => {
   it("1 秒に満たない経過は 0 秒と書く", ({ quarterSecondBannerRun }) => {
@@ -134,9 +154,5 @@ describe("withJobBanner", () => {
 
   it("エラーでない値が投げられたら文字列化してメッセージに使う", ({ nonErrorBannerRun }) => {
     expect(nonErrorBannerRun.failureLine).toContain("failed: broken");
-  });
-
-  it("出力先を指定しなければ標準出力へ書かれる", ({ defaultStdoutLines }) => {
-    expect(defaultStdoutLines.length).toStrictEqual(2);
   });
 });

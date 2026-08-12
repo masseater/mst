@@ -25,7 +25,7 @@ describe("shippedSkillsProblems", () => {
     shippedSkillsProblems({
       repositoryRoot: repositoryWith(files),
       config: defaultIntentSkillsConfig,
-    });
+    }).problems;
 
   const SHIPPED_MANIFEST = `{
   "name": "@example/shipped",

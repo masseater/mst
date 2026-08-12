@@ -1,3 +1,4 @@
+import { standardIoTest } from "@mst/dont-review-it/vitest";
 import { describe, expect, test, vi } from "vite-plus/test";
 
 import { createConsoleLogger } from "./console-logger.ts";
@@ -33,13 +34,6 @@ const it = test
     createConsoleLogger("relay", { out: recording.out }).error({}, "broken");
     return parsedLine(recording.lines()[0] ?? "{}").level;
   })
-  .extend("defaultStdoutLines", () => {
-    const written = vi.spyOn(process.stdout, "write").mockReturnValue(true);
-    createConsoleLogger("relay").info({}, "listening");
-    const lines = written.mock.calls.map(([chunk]) => chunk);
-    written.mockRestore();
-    return lines.length;
-  })
   .extend("mirroredLines", () => {
     const recording = recordingOut();
     const append = vi.fn<(line: string) => void>();
@@ -49,6 +43,23 @@ const it = test
     );
     return { stdout: recording.lines(), file: append.mock.calls.map(([line]) => line) };
   });
+
+standardIoTest("出力先を渡さなければ標準出力へ書く", ({ stdout }) => {
+  vi.setSystemTime(new Date("2026-08-11T00:00:00.000Z"));
+  createConsoleLogger("relay").info({}, "listening");
+  vi.useRealTimers();
+
+  expect(stdout.text).toMatchInlineSnapshot(`
+    "{"level":"info","name":"relay","time":"2026-08-11T00:00:00.000Z","msg":"listening"}
+    "
+  `);
+});
+
+standardIoTest("標準エラーへは書かない", ({ stderr }) => {
+  createConsoleLogger("relay").info({}, "listening");
+
+  expect(stderr.text).toMatchInlineSnapshot(`""`);
+});
 
 describe("createConsoleLogger", () => {
   it("1 行 JSON にロガー名を載せる", ({ infoLine }) => {
@@ -69,10 +80,6 @@ describe("createConsoleLogger", () => {
 
   it("エラーは error の水準になる", ({ errorLevel }) => {
     expect(errorLevel).toStrictEqual("error");
-  });
-
-  it("出力先を渡さなければ標準出力へ書く", ({ defaultStdoutLines }) => {
-    expect(defaultStdoutLines).toStrictEqual(1);
   });
 
   it("ファイル出力先があれば同じ行を書き分ける", ({ mirroredLines }) => {

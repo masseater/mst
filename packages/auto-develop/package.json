@@ -43,6 +43,7 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@mst/dont-review-it": "workspace:*",
     "@tanstack/intent": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",

@@ -49,6 +49,7 @@
     "oxc-parser": "catalog:",
     "oxfmt": "0.61.0",
     "oxlint": "catalog:",
+    "std-env": "4.2.0",
     "typescript": "catalog:",
     "yaml": "catalog:"
   },

@@ -205,13 +205,23 @@ const reconcileWorkspace = ({
   ];
 };
 
+export type LintRuleIndexReport = {
+  readonly problems: readonly LintRuleIndexProblem[];
+  readonly scanned: number;
+};
+
 export const lintRuleIndexProblems = ({
   repositoryRoot,
   write,
 }: {
   readonly repositoryRoot: string;
   readonly write: boolean;
-}): readonly LintRuleIndexProblem[] =>
-  lintRuleWorkspacesIn(repositoryRoot).flatMap((workspace) =>
-    reconcileWorkspace({ repositoryRoot, workspace, write }),
-  );
+}): LintRuleIndexReport => {
+  const workspaces = lintRuleWorkspacesIn(repositoryRoot);
+  return {
+    problems: workspaces.flatMap((workspace) =>
+      reconcileWorkspace({ repositoryRoot, workspace, write }),
+    ),
+    scanned: workspaces.length,
+  };
+};
