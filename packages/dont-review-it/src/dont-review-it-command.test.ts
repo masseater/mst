@@ -351,6 +351,7 @@ jobs:
     "check stays silent on a workflow definition that keeps every discipline",
     async ({ stdout, stderr }) => {
       const root = repositoryWith({
+        "renovate.json": `{}\n`,
         ".github/workflows/ci.yml": `name: CI
 on:
   pull_request:

@@ -10,6 +10,8 @@ import {
   lineOf,
   parseWorkflowDocument,
   scalarText,
+  scalarValueText,
+  trailingComment,
   valueOf,
 } from "./workflow-document.ts";
 
@@ -113,6 +115,50 @@ describe("scalarText", () => {
 
   it("reads nothing from a value that is not a plain value at all", () => {
     expect(scalarText(valueOf(documentOf("run:\n  shell: bash\n").root, "run"))).toBeNull();
+  });
+});
+
+describe("scalarValueText", () => {
+  it("spells out a value written as a number", () => {
+    expect(scalarValueText(valueOf(documentOf("fetch-depth: 0\n").root, "fetch-depth"))).toBe("0");
+  });
+
+  it("spells out a value written as a string", () => {
+    expect(scalarValueText(valueOf(documentOf(`fetch-depth: "0"\n`).root, "fetch-depth"))).toBe(
+      "0",
+    );
+  });
+
+  it("spells out a value written as a boolean", () => {
+    expect(scalarValueText(valueOf(documentOf("cache: true\n").root, "cache"))).toBe("true");
+  });
+
+  it("spells out nothing for a value written as nothing", () => {
+    expect(scalarValueText(valueOf(documentOf("fetch-depth:\n").root, "fetch-depth"))).toBeNull();
+  });
+
+  it("spells out nothing for a value that is not a plain value", () => {
+    expect(
+      scalarValueText(valueOf(documentOf("fetch-depth: [0]\n").root, "fetch-depth")),
+    ).toBeNull();
+  });
+});
+
+describe("trailingComment", () => {
+  it("reads the comment written after a value", () => {
+    expect(trailingComment(valueOf(documentOf("uses: actions/checkout # v5\n").root, "uses"))).toBe(
+      " v5",
+    );
+  });
+
+  it("reads nothing from a value written without a comment", () => {
+    expect(
+      trailingComment(valueOf(documentOf("uses: actions/checkout\n").root, "uses")),
+    ).toBeNull();
+  });
+
+  it("reads nothing from a value that is not a plain value", () => {
+    expect(trailingComment(valueOf(documentOf("uses:\n  - one\n").root, "uses"))).toBeNull();
   });
 });
 

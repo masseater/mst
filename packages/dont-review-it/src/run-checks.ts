@@ -23,7 +23,7 @@ import { defaultPresetAdoptionConfig } from "./preset-adoption/config.ts";
 import { runPresetAdoptionChecks } from "./preset-adoption/run-preset-adoption-checks.ts";
 import { formatRepositoryProblem } from "./problem.ts";
 import { defaultWorkflowChecksConfig } from "./workflows/config.ts";
-import { runWorkflowChecks } from "./workflows/run-workflow-checks.ts";
+import { workflowOutcomesOf } from "./workflows/workflow-outcomes.ts";
 
 import type { CheckOutcome } from "@mst/repository-checks";
 
@@ -35,6 +35,8 @@ export type CheckReport = {
 };
 
 const NO_WORKSPACE_DEFINITION = "no workspace definition";
+
+const NO_WORKFLOW_DEFINITION = "no workflow definition";
 
 const NO_TOOLCHAIN_CONFIG = "no toolchain configuration";
 
@@ -51,7 +53,10 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
     config: defaultEntryCompositionConfig,
   });
   const repositoryFiles = listRepositoryFiles(resolve(repositoryRoot));
-  const workflows = runWorkflowChecks({ repositoryRoot, config: defaultWorkflowChecksConfig });
+  const workflows = workflowOutcomesOf({
+    repositoryRoot,
+    config: defaultWorkflowChecksConfig,
+  });
   const skills = shippedSkillsProblems({ repositoryRoot, config: defaultIntentSkillsConfig });
   const presetAdoption = runPresetAdoptionChecks({
     repositoryRoot,
@@ -104,9 +109,17 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
     {
       check: "workflow-definitions",
       unit: "definition",
-      count: workflows.scanned,
+      count: workflows.definitions.scanned,
       skippedReason: null,
-      problems: workflows.problems.map(formatRepositoryProblem).toSorted(),
+      problems: workflows.definitions.problems.map(formatRepositoryProblem).toSorted(),
+      warnings: [],
+    },
+    {
+      check: "action-updates",
+      unit: "update configuration",
+      count: workflows.updates.scanned,
+      skippedReason: workflows.definitions.scanned === 0 ? NO_WORKFLOW_DEFINITION : null,
+      problems: workflows.updates.problems.map(formatRepositoryProblem).toSorted(),
       warnings: [],
     },
     {
