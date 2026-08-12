@@ -10,6 +10,7 @@ catalog:
   "@tanstack/intent": 0.3.6
   "@types/node": 26.2.0
   es-toolkit: 1.50.0
+  citty: 0.2.2
   jsonc-parser: 3.3.1
   oxc-parser: 0.143.0
   oxlint: 1.76.0

@@ -43,7 +43,7 @@
     "@mst/lint-rule-authoring": "workspace:*",
     "@mst/repository-checks": "workspace:*",
     "@oxlint/plugins": "catalog:",
-    "citty": "0.2.2",
+    "citty": "catalog:",
     "es-toolkit": "catalog:",
     "jsonc-parser": "catalog:",
     "oxc-parser": "catalog:",
