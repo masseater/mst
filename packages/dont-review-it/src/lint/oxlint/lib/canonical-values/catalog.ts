@@ -2,10 +2,22 @@ import { canonicalValueKey, type CanonicalValue } from "./fingerprint.ts";
 
 export { canonicalValueKey };
 
+export type CanonicalValuesImportRoute = {
+  readonly exportName: string;
+  readonly resolvedSourcePaths: readonly string[];
+  readonly specifier: string;
+};
+
 export type CanonicalValuesEntry = {
+  readonly annotationStart: number;
+  readonly binding: string;
+  readonly bindingStart: number;
   readonly conceptId: string;
+  readonly declarationEnd: number;
   readonly declarationPath: string;
-  readonly exportPath: string | null;
+  readonly declarationStart: number;
+  readonly importRoutes: readonly CanonicalValuesImportRoute[];
+  readonly packageName: string | null;
   readonly values: readonly CanonicalValue[];
   readonly fingerprint: string;
 };
@@ -14,6 +26,7 @@ export type CanonicalValuesCatalog = {
   readonly entries: readonly CanonicalValuesEntry[];
   readonly entriesByFingerprint: ReadonlyMap<string, readonly CanonicalValuesEntry[]>;
   readonly entriesByValue: ReadonlyMap<string, readonly CanonicalValuesEntry[]>;
+  readonly packageNames: ReadonlySet<string>;
 };
 
 const groupBy = (
@@ -34,10 +47,16 @@ const groupBy = (
   return grouped;
 };
 
-export const buildCatalog = (entries: readonly CanonicalValuesEntry[]): CanonicalValuesCatalog => ({
+export const buildCatalog = (
+  entries: readonly CanonicalValuesEntry[],
+  packageNames: readonly string[] = entries.flatMap((entry) =>
+    entry.packageName === null ? [] : [entry.packageName],
+  ),
+): CanonicalValuesCatalog => ({
   entries,
   entriesByFingerprint: groupBy(entries, (entry) => [entry.fingerprint]),
   entriesByValue: groupBy(entries, (entry) => entry.values.map(canonicalValueKey)),
+  packageNames: new Set(packageNames),
 });
 
 export const EMPTY_CANONICAL_VALUES_CATALOG: CanonicalValuesCatalog = buildCatalog([]);

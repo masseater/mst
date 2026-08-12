@@ -24,6 +24,15 @@ describe("fingerprint", () => {
     expect(fingerprintValues(["draft"])).not.toBe(fingerprintValues(["draft", "published"]));
   });
 
+  test("a separator inside a value cannot collide with the boundary between two values", () => {
+    expect(fingerprintValues(["a", "b"])).not.toBe(fingerprintValues(["a\0string:b"]));
+  });
+
+  test("null has its own runtime key and fingerprint", () => {
+    expect(canonicalValueKey(null)).toBe("null:null");
+    expect(fingerprintValues([null])).not.toBe(fingerprintValues(["null"]));
+  });
+
   test("a value is keyed by its runtime type as well as its spelling", () => {
     expect(canonicalValueKey("draft")).toBe("string:draft");
     expect(canonicalValueKey(1)).toBe("number:1");

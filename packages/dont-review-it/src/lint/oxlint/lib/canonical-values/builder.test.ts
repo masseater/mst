@@ -1,457 +1,326 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { existsSync, symlinkSync } from "node:fs";
+import { join } from "node:path";
 
-import { sortBy } from "es-toolkit";
-import { describe, expect, onTestFinished, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
-import { buildCanonicalValuesCatalog, loadCanonicalValuesCatalog } from "./builder.ts";
-import { scanCanonicalValuesText } from "./declarations.ts";
-import { fingerprintValues, type CanonicalValue } from "./fingerprint.ts";
-import { listRepositoryFiles } from "./source-files.ts";
+import {
+  analyzeCanonicalValuesRepository,
+  buildCanonicalValuesCatalog,
+  loadCanonicalValuesCatalog,
+} from "./builder.ts";
+import {
+  annotateCanonicalValues,
+  createCanonicalValuesTestRepository,
+  writeCanonicalValuesTestFile,
+} from "./canonical-values-test-fixture.ts";
 
 describe("builder", () => {
-  const CANONICAL_VALUES_TAG = "@canonical-values";
-
-  const createRepository = (): string => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onTestFinished(() => {
-      rmSync(root, { recursive: true, force: true });
+  test("public routes preserve the exact exported symbol and alias", () => {
+    const repositoryRoot = createCanonicalValuesTestRepository();
+    writeCanonicalValuesTestFile({
+      repositoryRoot,
+      relativePath: "packages/vocabulary/package.json",
+      contents: JSON.stringify({
+        name: "@fixture/vocabulary",
+        exports: {
+          ".": "./src/index.ts",
+          "./alias": "./src/alias.ts",
+          "./shadow": "./src/shadow.ts",
+        },
+      }),
     });
-    return root;
-  };
-
-  type RepositoryFile = {
-    readonly relativePath: string;
-    readonly contents: string;
-  };
-
-  const writeRepositoryFile = (root: string, { relativePath, contents }: RepositoryFile): void => {
-    const absolutePath = join(root, relativePath);
-    mkdirSync(dirname(absolutePath), { recursive: true });
-    writeFileSync(absolutePath, contents, "utf8");
-  };
-
-  const annotate = (conceptId: string, declaration: string): string =>
-    ["/**", ` * ${CANONICAL_VALUES_TAG} ${conceptId}`, " */", declaration, ""].join("\n");
-
-  const cachePathOf = (root: string): string =>
-    join(root, "node_modules", ".cache", "mst-dont-review-it", "canonical-values.json");
-
-  const declaredRowsIn = (sourceText: string): readonly unknown[] =>
-    scanCanonicalValuesText(sourceText).declarations.map((declaration) => [
-      declaration.conceptId,
-      declaration.values,
-    ]);
-
-  const conceptIdsOf = (root: string): readonly string[] =>
-    buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map((entry) => entry.conceptId);
-
-  test("an annotated array declaration becomes the catalog entry for its concept", () => {
-    const root = createRepository();
-    writeRepositoryFile(root, {
-      relativePath: "src/order-status.ts",
-      contents: annotate(
+    writeCanonicalValuesTestFile({
+      repositoryRoot,
+      relativePath: "packages/vocabulary/src/order-status.ts",
+      contents: annotateCanonicalValues(
         "order.status",
         'export const ORDER_STATUSES = ["draft", "published"] as const;',
       ),
     });
-
-    const catalog = buildCanonicalValuesCatalog({ repositoryRoot: root });
-
-    expect(catalog.entries).toStrictEqual([
-      {
-        conceptId: "order.status",
-        declarationPath: "src/order-status.ts",
-        exportPath: null,
-        values: ["draft", "published"],
-        fingerprint: fingerprintValues(["draft", "published"]),
-      },
-    ]);
-  });
-
-  test("an annotated object declaration takes the values its keys point at", () => {
-    const root = createRepository();
-    writeRepositoryFile(root, {
-      relativePath: "src/order-status.ts",
-      contents: annotate(
-        "order.status",
-        'export const ORDER_STATUS = { Draft: "draft", Published: "published" } as const;',
-      ),
-    });
-
-    const catalog = buildCanonicalValuesCatalog({ repositoryRoot: root });
-
-    expect(catalog.entries.map((entry) => entry.values)).toStrictEqual([["draft", "published"]]);
-  });
-
-  test("an annotated type alias takes the members of its union", () => {
-    const root = createRepository();
-    writeRepositoryFile(root, {
-      relativePath: "src/order-status.ts",
-      contents: annotate("order.status", 'export type OrderStatus = "draft" | "published";'),
-    });
-
-    const catalog = buildCanonicalValuesCatalog({ repositoryRoot: root });
-
-    expect(catalog.entries.map((entry) => entry.values)).toStrictEqual([["draft", "published"]]);
-  });
-
-  test("a declaration the package export map reaches carries the specifier that reaches it", () => {
-    const root = createRepository();
-    writeRepositoryFile(root, {
-      relativePath: "packages/vocabulary/package.json",
-      contents: JSON.stringify({ name: "@fixture/vocabulary", exports: { ".": "./src/index.ts" } }),
-    });
-    writeRepositoryFile(root, {
+    writeCanonicalValuesTestFile({
+      repositoryRoot,
       relativePath: "packages/vocabulary/src/index.ts",
       contents: 'export { ORDER_STATUSES } from "./order-status.ts";\n',
     });
-    writeRepositoryFile(root, {
-      relativePath: "packages/vocabulary/src/order-status.ts",
-      contents: annotate("order.status", 'export const ORDER_STATUSES = ["draft"] as const;'),
+    writeCanonicalValuesTestFile({
+      repositoryRoot,
+      relativePath: "packages/vocabulary/src/alias.ts",
+      contents: 'export { ORDER_STATUSES as PUBLIC_STATUSES } from "./order-status.ts";\n',
+    });
+    writeCanonicalValuesTestFile({
+      repositoryRoot,
+      relativePath: "packages/vocabulary/src/shadow.ts",
+      contents: 'export const SHADOW_STATUSES = ["draft", "published"] as const;\n',
     });
 
-    const catalog = buildCanonicalValuesCatalog({ repositoryRoot: root });
-
-    expect(catalog.entries.map((entry) => entry.exportPath)).toStrictEqual(["@fixture/vocabulary"]);
+    expect(buildCanonicalValuesCatalog({ repositoryRoot }).entries[0]?.importRoutes).toStrictEqual([
+      {
+        exportName: "ORDER_STATUSES",
+        resolvedSourcePaths: ["packages/vocabulary/src/index.ts"],
+        specifier: "@fixture/vocabulary",
+      },
+      {
+        exportName: "PUBLIC_STATUSES",
+        resolvedSourcePaths: ["packages/vocabulary/src/alias.ts"],
+        specifier: "@fixture/vocabulary/alias",
+      },
+    ]);
   });
 
-  test("a declaration no export map reaches carries no specifier", () => {
-    const root = createRepository();
-    writeRepositoryFile(root, {
+  test("a package owner keeps its package identity when no public route reaches it", () => {
+    const repositoryRoot = createCanonicalValuesTestRepository();
+    writeCanonicalValuesTestFile({
+      repositoryRoot,
       relativePath: "packages/vocabulary/package.json",
-      contents: JSON.stringify({ name: "@fixture/vocabulary", exports: { ".": "./src/index.ts" } }),
-    });
-    writeRepositoryFile(root, {
-      relativePath: "packages/vocabulary/src/index.ts",
-      contents: "export const marker = 1;\n",
-    });
-    writeRepositoryFile(root, {
-      relativePath: "packages/vocabulary/src/order-status.ts",
-      contents: annotate("order.status", 'export const ORDER_STATUSES = ["draft"] as const;'),
-    });
-
-    const catalog = buildCanonicalValuesCatalog({ repositoryRoot: root });
-
-    expect(catalog.entries.map((entry) => entry.exportPath)).toStrictEqual([null]);
-  });
-
-  test("a concept written outside the vocabulary drops the hint instead of failing the build", () => {
-    const root = createRepository();
-    writeRepositoryFile(root, {
-      relativePath: "src/order-status.ts",
-      contents: annotate("Order Status", 'export const ORDER_STATUSES = ["draft"] as const;'),
-    });
-
-    expect(conceptIdsOf(root)).toStrictEqual([]);
-  });
-
-  test("an annotation on a declaration that holds no literals drops the hint", () => {
-    const root = createRepository();
-    writeRepositoryFile(root, {
-      relativePath: "src/order-status.ts",
-      contents: annotate("order.status", "export const ORDER_STATUSES = buildStatuses();"),
-    });
-
-    expect(conceptIdsOf(root)).toStrictEqual([]);
-  });
-
-  test("the tag written outside a documentation block declares nothing", () => {
-    const root = createRepository();
-    writeRepositoryFile(root, {
-      relativePath: "src/order-status.ts",
-      contents: [
-        `export const documentation = "${CANONICAL_VALUES_TAG} order.status";`,
-        'export const ORDER_STATUSES = ["draft"] as const;',
-        "",
-      ].join("\n"),
-    });
-
-    expect(conceptIdsOf(root)).toStrictEqual([]);
-  });
-
-  test("the catalog is built once per repository root within a process", () => {
-    const root = createRepository();
-    writeRepositoryFile(root, {
-      relativePath: "src/order-status.ts",
-      contents: annotate("order.status", 'export const ORDER_STATUSES = ["draft"] as const;'),
-    });
-
-    const first = loadCanonicalValuesCatalog({ repositoryRoot: root });
-    writeRepositoryFile(root, {
-      relativePath: "src/order-status.ts",
-      contents: annotate(
-        "article.status",
-        'export const ARTICLE_STATUSES = ["published"] as const;',
-      ),
-    });
-    const second = loadCanonicalValuesCatalog({ repositoryRoot: root });
-
-    expect(second).toBe(first);
-    expect(second.entries.map((entry) => entry.conceptId)).toStrictEqual(["order.status"]);
-  });
-
-  test("a catalog left behind by an earlier process is reused while the inputs are unchanged", () => {
-    const root = createRepository();
-    writeRepositoryFile(root, {
-      relativePath: "src/order-status.ts",
-      contents: annotate("order.status", 'export const ORDER_STATUSES = ["draft"] as const;'),
-    });
-    buildCanonicalValuesCatalog({ repositoryRoot: root });
-
-    const cachePath = cachePathOf(root);
-    const written = JSON.parse(readFileSync(cachePath, "utf8")) as {
-      readonly version: number;
-      readonly fingerprint: string;
-    };
-    writeFileSync(
-      cachePath,
-      JSON.stringify({
-        version: written.version,
-        fingerprint: written.fingerprint,
-        entries: [
-          {
-            conceptId: "left.behind.by.the.cache",
-            declarationPath: "src/order-status.ts",
-            exportPath: null,
-            values: ["cached"],
-            fingerprint: fingerprintValues(["cached"]),
-          },
-        ],
+      contents: JSON.stringify({
+        name: "@fixture/vocabulary",
+        exports: { ".": "./src/index.ts" },
       }),
-      "utf8",
-    );
-
-    expect(conceptIdsOf(root)).toStrictEqual(["left.behind.by.the.cache"]);
-  });
-
-  test("a changed input rebuilds the catalog without anyone clearing the cache", () => {
-    const root = createRepository();
-    writeRepositoryFile(root, {
-      relativePath: "src/order-status.ts",
-      contents: annotate("order.status", 'export const ORDER_STATUSES = ["draft"] as const;'),
     });
-    buildCanonicalValuesCatalog({ repositoryRoot: root });
-
-    writeRepositoryFile(root, {
-      relativePath: "src/order-status.ts",
-      contents: annotate(
-        "order.status",
-        'export const ORDER_STATUSES = ["draft", "archived"] as const;',
-      ),
+    writeCanonicalValuesTestFile({
+      repositoryRoot,
+      relativePath: "packages/vocabulary/src/index.ts",
+      contents: 'export const SHADOW_STATUSES = ["draft", "published"] as const;\n',
     });
-    const catalog = buildCanonicalValuesCatalog({ repositoryRoot: root });
-
-    expect(catalog.entries.map((entry) => entry.values)).toStrictEqual([["draft", "archived"]]);
-  });
-
-  test("a repository root that is not on disk yields an empty catalog and creates nothing", () => {
-    const root = createRepository();
-    const pruned = join(root, "pruned-checkout");
-
-    const catalog = loadCanonicalValuesCatalog({ repositoryRoot: pruned });
-
-    expect(catalog.entries).toStrictEqual([]);
-    expect(existsSync(pruned)).toBe(false);
-  });
-
-  test("a workspace missing from the checkout costs only the hints that workspace owned", () => {
-    const root = createRepository();
-    writeRepositoryFile(root, {
-      relativePath: "packages/kept/src/order-status.ts",
-      contents: annotate("order.status", 'export const ORDER_STATUSES = ["draft"] as const;'),
-    });
-    writeRepositoryFile(root, {
-      relativePath: "packages/pruned/src/article-status.ts",
-      contents: annotate(
-        "article.status",
-        'export const ARTICLE_STATUSES = ["published"] as const;',
-      ),
-    });
-
-    expect(conceptIdsOf(root)).toStrictEqual(["order.status", "article.status"]);
-
-    rmSync(join(root, "packages", "pruned"), { recursive: true, force: true });
-
-    expect(conceptIdsOf(root)).toStrictEqual(["order.status"]);
-  });
-
-  const annotateAsLineComment = (conceptId: string, declaration: string): string =>
-    [`// ${CANONICAL_VALUES_TAG} ${conceptId}`, declaration, ""].join("\n");
-
-  const ANNOTATION_FORMS: readonly {
-    readonly form: string;
-    readonly write: (conceptId: string, declaration: string) => string;
-  }[] = [
-    { form: "a documentation block", write: annotate },
-    { form: "a line comment", write: annotateAsLineComment },
-  ];
-
-  const valuesOf = (root: string): readonly (readonly CanonicalValue[])[] =>
-    buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map((entry) => entry.values);
-
-  test.each([...ANNOTATION_FORMS])(
-    "an annotation written as $form declares its concept",
-    ({ write }) => {
-      const root = createRepository();
-      writeRepositoryFile(root, {
-        relativePath: "src/order-status.ts",
-        contents: write(
-          "order.status",
-          'export const ORDER_STATUSES = ["draft", "published"] as const;',
-        ),
-      });
-
-      expect(conceptIdsOf(root)).toStrictEqual(["order.status"]);
-      expect(valuesOf(root)).toStrictEqual([["draft", "published"]]);
-    },
-  );
-
-  test.each([...ANNOTATION_FORMS])(
-    "an enum annotated with $form declares the values of its members",
-    ({ write }) => {
-      const root = createRepository();
-      writeRepositoryFile(root, {
-        relativePath: "src/order-status.ts",
-        contents: write(
-          "order.status",
-          'export enum OrderStatus {\n  Draft = "draft",\n  Published = "published",\n}',
-        ),
-      });
-
-      expect(conceptIdsOf(root)).toStrictEqual(["order.status"]);
-      expect(valuesOf(root)).toStrictEqual([["draft", "published"]]);
-    },
-  );
-
-  test("a declaration that spells its type before its values keeps both", () => {
-    const root = createRepository();
-    writeRepositoryFile(root, {
-      relativePath: "src/order-status.ts",
-      contents: annotate(
-        "order.status",
-        'export const ORDER_STATUSES: readonly OrderStatus[] = ["draft", "published"];',
-      ),
-    });
-
-    expect(valuesOf(root)).toStrictEqual([["draft", "published"]]);
-  });
-
-  test("the quoted keys of an annotated object stay out of its vocabulary", () => {
-    const root = createRepository();
-    writeRepositoryFile(root, {
-      relativePath: "src/order-status.ts",
-      contents: annotate(
-        "order.status",
-        'export const ORDER_STATUS = { "DRAFT": "draft", "PUBLISHED": "published" } as const;',
-      ),
-    });
-
-    expect(valuesOf(root)).toStrictEqual([["draft", "published"]]);
-  });
-
-  test("a declaration that holds a single value is declared like any other", () => {
-    const root = createRepository();
-    writeRepositoryFile(root, {
-      relativePath: "src/payment-method.ts",
-      contents: annotate("payment.method", 'export const PAYMENT_METHOD = "card";'),
-    });
-
-    expect(conceptIdsOf(root)).toStrictEqual(["payment.method"]);
-    expect(valuesOf(root)).toStrictEqual([["card"]]);
-  });
-
-  test("a second documentation block between the annotation and the declaration keeps it", () => {
-    const root = createRepository();
-    writeRepositoryFile(root, {
-      relativePath: "src/order-status.ts",
-      contents: annotate(
-        "order.status",
-        '/** @see the order lifecycle */\nexport const ORDER_STATUSES = ["draft", "published"] as const;',
-      ),
-    });
-
-    expect(conceptIdsOf(root)).toStrictEqual(["order.status"]);
-  });
-
-  test("an annotation written inside a template literal declares nothing", () => {
-    const root = createRepository();
-    writeRepositoryFile(root, {
-      relativePath: "src/documentation.ts",
-      contents: [
-        "export const EXAMPLE = `",
-        `/** ${CANONICAL_VALUES_TAG} doc.example */`,
-        'export const STATUSES = ["alpha", "beta"];',
-        "`;",
-        "",
-      ].join("\n"),
-    });
-
-    expect(conceptIdsOf(root)).toStrictEqual([]);
-  });
-
-  test("an annotation inside a test file declares nothing, and the scan agrees it is no declaration source", () => {
-    const root = createRepository();
-    writeRepositoryFile(root, {
-      relativePath: "src/order-status.test.ts",
-      contents: annotate(
+    writeCanonicalValuesTestFile({
+      repositoryRoot,
+      relativePath: "packages/vocabulary/src/order-status.ts",
+      contents: annotateCanonicalValues(
         "order.status",
         'export const ORDER_STATUSES = ["draft", "published"] as const;',
       ),
     });
 
-    const { commentSources, declarationSources } = listRepositoryFiles(root);
-
-    expect(commentSources.map((file) => file.relativePath)).toStrictEqual([
-      "src/order-status.test.ts",
-    ]);
-    expect(declarationSources).toStrictEqual([]);
-    expect(conceptIdsOf(root)).toStrictEqual([]);
+    expect(buildCanonicalValuesCatalog({ repositoryRoot }).entries[0]).toMatchObject({
+      importRoutes: [],
+      packageName: "@fixture/vocabulary",
+    });
   });
 
-  const DECLARATION_FORMS: readonly { readonly conceptId: string; readonly declaration: string }[] =
-    [
-      {
-        conceptId: "array.form",
-        declaration: 'export const ARRAY_FORM: readonly string[] = ["draft", "published"];',
-      },
-      {
-        conceptId: "object.form",
-        declaration:
-          'export const OBJECT_FORM = { "DRAFT": "draft", Published: "published" } as const;',
-      },
-      { conceptId: "type.form", declaration: 'export type TypeForm = "draft" | "published";' },
-      {
-        conceptId: "enum.form",
-        declaration: 'export enum EnumForm {\n  Draft = "draft",\n  Published = "published",\n}',
-      },
-      { conceptId: "empty.form", declaration: "export const EMPTY_FORM = buildStatuses();" },
-    ];
+  test("a JavaScript export target resolves to its TypeScript source before generated output", () => {
+    const repositoryRoot = createCanonicalValuesTestRepository();
+    writeCanonicalValuesTestFile({
+      repositoryRoot,
+      relativePath: "packages/vocabulary/package.json",
+      contents: JSON.stringify({
+        name: "@fixture/vocabulary",
+        exports: { ".": "./src/index.js" },
+      }),
+    });
+    writeCanonicalValuesTestFile({
+      repositoryRoot,
+      relativePath: "packages/vocabulary/src/index.js",
+      contents: 'export const ORDER_STATUSES = ["shadow"] as const;\n',
+    });
+    writeCanonicalValuesTestFile({
+      repositoryRoot,
+      relativePath: "packages/vocabulary/src/index.ts",
+      contents: 'export { ORDER_STATUSES } from "./order-status.ts";\n',
+    });
+    writeCanonicalValuesTestFile({
+      repositoryRoot,
+      relativePath: "packages/vocabulary/src/order-status.ts",
+      contents: annotateCanonicalValues(
+        "order.status",
+        'export const ORDER_STATUSES = ["draft", "published"] as const;',
+      ),
+    });
 
-  test("the catalog carries exactly what the shared scan reads out of the same source", () => {
-    const root = createRepository();
-    const sources = sortBy(DECLARATION_FORMS, ["conceptId"]).map(({ conceptId, declaration }) => ({
-      conceptId,
-      text: annotate(conceptId, declaration),
-    }));
-    for (const source of sources) {
-      writeRepositoryFile(root, {
-        relativePath: `src/${source.conceptId}.ts`,
-        contents: source.text,
-      });
-    }
-
-    const catalog = buildCanonicalValuesCatalog({ repositoryRoot: root });
-
-    expect(catalog.entries.map((entry) => [entry.conceptId, entry.values])).toStrictEqual(
-      sources.flatMap((source) => declaredRowsIn(source.text)),
-    );
-    expect(catalog.entries.map((entry) => entry.conceptId)).toStrictEqual([
-      "array.form",
-      "enum.form",
-      "object.form",
-      "type.form",
+    expect(buildCanonicalValuesCatalog({ repositoryRoot }).entries[0]?.importRoutes).toStrictEqual([
+      {
+        exportName: "ORDER_STATUSES",
+        resolvedSourcePaths: ["packages/vocabulary/src/index.ts"],
+        specifier: "@fixture/vocabulary",
+      },
     ]);
+  });
+
+  test("a malformed package surface becomes a strict problem instead of crashing lenient build", () => {
+    const repositoryRoot = createCanonicalValuesTestRepository();
+    writeCanonicalValuesTestFile({
+      repositoryRoot,
+      relativePath: "packages/vocabulary/package.json",
+      contents: "{not json\n",
+    });
+    writeCanonicalValuesTestFile({
+      repositoryRoot,
+      relativePath: "packages/vocabulary/src/order-status.ts",
+      contents: annotateCanonicalValues(
+        "order.status",
+        'export const ORDER_STATUSES = ["draft", "published"] as const;',
+      ),
+    });
+
+    expect(buildCanonicalValuesCatalog({ repositoryRoot }).entries).toStrictEqual([]);
+    expect(analyzeCanonicalValuesRepository({ repositoryRoot }).problems).toContainEqual({
+      kind: "vocabulary-without-values",
+      filePath: "packages/vocabulary/src/order-status.ts",
+      line: 1,
+      conceptId: "order.status",
+    });
+  });
+
+  test("out-of-scope annotations become problems without becoming owners", () => {
+    const repositoryRoot = createCanonicalValuesTestRepository();
+    writeCanonicalValuesTestFile({
+      repositoryRoot,
+      relativePath: "src/Owner.stories.fixture.ts",
+      contents: annotateCanonicalValues(
+        "story.status",
+        'export const STATUSES = ["draft"] as const;',
+      ),
+    });
+    writeCanonicalValuesTestFile({
+      repositoryRoot,
+      relativePath: "src/order.test.helper.ts",
+      contents: annotateCanonicalValues(
+        "test.status",
+        'export const TEST_STATUSES = ["tested"] as const;',
+      ),
+    });
+    writeCanonicalValuesTestFile({
+      repositoryRoot,
+      relativePath: "src/order.test-d.ts",
+      contents: annotateCanonicalValues(
+        "type-test.status",
+        'export const TYPE_TEST_STATUSES = ["typed"] as const;',
+      ),
+    });
+    writeCanonicalValuesTestFile({
+      repositoryRoot,
+      relativePath: "fixtures/order.ts",
+      contents: annotateCanonicalValues(
+        "fixture.status",
+        'export const STATUSES = ["published"] as const;',
+      ),
+    });
+
+    const analyzed = analyzeCanonicalValuesRepository({ repositoryRoot });
+
+    expect(analyzed.catalog.entries).toStrictEqual([]);
+    expect(analyzed.problems.map((problem) => [problem.kind, problem.filePath])).toStrictEqual([
+      ["out-of-scope-declaration", "fixtures/order.ts"],
+      ["out-of-scope-declaration", "src/Owner.stories.fixture.ts"],
+      ["out-of-scope-declaration", "src/order.test-d.ts"],
+      ["out-of-scope-declaration", "src/order.test.helper.ts"],
+    ]);
+  });
+
+  test("ambient and declaration-file annotations cannot become runtime owners", () => {
+    const repositoryRoot = createCanonicalValuesTestRepository();
+    const ambient = annotateCanonicalValues(
+      "order.status",
+      'export declare const ORDER_STATUSES: readonly ["draft", "published"];',
+    );
+    writeCanonicalValuesTestFile({
+      repositoryRoot,
+      relativePath: "src/order-status.d.ts",
+      contents: ambient,
+    });
+    writeCanonicalValuesTestFile({
+      repositoryRoot,
+      relativePath: "src/order-status.ts",
+      contents: ambient,
+    });
+
+    const analyzed = analyzeCanonicalValuesRepository({ repositoryRoot });
+
+    expect(analyzed.catalog.entries).toStrictEqual([]);
+    expect(analyzed.problems.map((problem) => [problem.kind, problem.filePath])).toStrictEqual([
+      ["invalid-declaration", "src/order-status.d.ts"],
+      ["invalid-declaration", "src/order-status.ts"],
+    ]);
+  });
+
+  test("every declaration in a duplicate concept collision is excluded", () => {
+    const repositoryRoot = createCanonicalValuesTestRepository();
+    writeCanonicalValuesTestFile({
+      repositoryRoot,
+      relativePath: "package.json",
+      contents: JSON.stringify({ name: "@fixture/repository" }),
+    });
+    writeCanonicalValuesTestFile({
+      repositoryRoot,
+      relativePath: "src/a.ts",
+      contents: annotateCanonicalValues("order.status", 'export const A = ["draft"] as const;'),
+    });
+    writeCanonicalValuesTestFile({
+      repositoryRoot,
+      relativePath: "src/b.ts",
+      contents: annotateCanonicalValues("order.status", 'export const B = ["published"] as const;'),
+    });
+
+    const catalog = analyzeCanonicalValuesRepository({ repositoryRoot }).catalog;
+
+    expect(catalog.entries).toStrictEqual([]);
+    expect(catalog.packageNames).toStrictEqual(new Set(["@fixture/repository"]));
+  });
+
+  test("the in-process loader reuses only the current input fingerprint", () => {
+    const repositoryRoot = createCanonicalValuesTestRepository();
+    writeCanonicalValuesTestFile({
+      repositoryRoot,
+      relativePath: "src/order-status.ts",
+      contents: annotateCanonicalValues(
+        "order.status",
+        'export const ORDER_STATUSES = ["draft"] as const;',
+      ),
+    });
+    const first = loadCanonicalValuesCatalog({ repositoryRoot });
+    expect(first.entries[0]?.values).toStrictEqual(["draft"]);
+    expect(loadCanonicalValuesCatalog({ repositoryRoot })).toBe(first);
+
+    writeCanonicalValuesTestFile({
+      repositoryRoot,
+      relativePath: "src/order-status.ts",
+      contents: annotateCanonicalValues(
+        "order.status",
+        'export const ORDER_STATUSES = ["final"] as const;',
+      ),
+    });
+    const changed = loadCanonicalValuesCatalog({ repositoryRoot });
+
+    expect(changed).not.toBe(first);
+    expect(changed.entries[0]?.values).toStrictEqual(["final"]);
+    expect(loadCanonicalValuesCatalog({ repositoryRoot })).toBe(changed);
+  });
+
+  test("an unsafe symbolic link invalidates an in-process catalog instance", () => {
+    const repositoryRoot = createCanonicalValuesTestRepository();
+    const externalRoot = createCanonicalValuesTestRepository();
+    writeCanonicalValuesTestFile({
+      repositoryRoot,
+      relativePath: "src/order-status.ts",
+      contents: annotateCanonicalValues(
+        "order.status",
+        'export const ORDER_STATUSES = ["draft", "published"] as const;',
+      ),
+    });
+    const first = loadCanonicalValuesCatalog({ repositoryRoot });
+    writeCanonicalValuesTestFile({
+      repositoryRoot: externalRoot,
+      relativePath: "external.ts",
+      contents: 'export const EXTERNAL = "draft";\n',
+    });
+    symlinkSync(join(externalRoot, "external.ts"), join(repositoryRoot, "src/external.ts"));
+
+    const analyzed = analyzeCanonicalValuesRepository({ repositoryRoot });
+    const invalidated = loadCanonicalValuesCatalog({ repositoryRoot });
+
+    expect(analyzed.problems).toContainEqual({
+      kind: "unsafe-symbolic-link",
+      filePath: "src/external.ts",
+      line: 1,
+    });
+    expect(invalidated).not.toBe(first);
+    expect(invalidated.entries).toStrictEqual([]);
+    expect(loadCanonicalValuesCatalog({ repositoryRoot })).toBe(invalidated);
+  });
+
+  test("a missing repository root yields an empty catalog and creates nothing", () => {
+    const repositoryRoot = join(createCanonicalValuesTestRepository(), "missing");
+
+    expect(loadCanonicalValuesCatalog({ repositoryRoot }).entries).toStrictEqual([]);
+    expect(existsSync(repositoryRoot)).toBe(false);
   });
 });

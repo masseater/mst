@@ -5,9 +5,21 @@ import { fingerprintValues } from "./fingerprint.ts";
 
 describe("catalog", () => {
   const entry = (conceptId: string, values: readonly string[]) => ({
+    annotationStart: 0,
+    binding: "VALUES",
+    bindingStart: 20,
     conceptId,
+    declarationEnd: 40,
     declarationPath: `packages/example/src/${conceptId}.ts`,
-    exportPath: "@mst/example",
+    declarationStart: 10,
+    importRoutes: [
+      {
+        exportName: "VALUES",
+        resolvedSourcePaths: ["packages/example/src/index.ts"],
+        specifier: "@mst/example",
+      },
+    ],
+    packageName: "@mst/example",
     values,
     fingerprint: fingerprintValues(values),
   });
@@ -15,6 +27,13 @@ describe("catalog", () => {
   test("an empty catalog resolves nothing", () => {
     expect(EMPTY_CANONICAL_VALUES_CATALOG.entries).toStrictEqual([]);
     expect(EMPTY_CANONICAL_VALUES_CATALOG.entriesByValue.size).toBe(0);
+    expect(EMPTY_CANONICAL_VALUES_CATALOG.packageNames.size).toBe(0);
+  });
+
+  test("repository package identity does not depend on a valid owner entry", () => {
+    expect(buildCatalog([], ["@mst/example"]).packageNames).toStrictEqual(
+      new Set(["@mst/example"]),
+    );
   });
 
   test("concepts that share a value set are reachable through one fingerprint", () => {

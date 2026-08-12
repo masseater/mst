@@ -79,7 +79,7 @@ export const LEGACY_STATUSES = ["draft"];
     expect(run.out).toContain(retired);
   });
 
-  test("a concept a test file repeats is never reported against the declaration that owns it", () => {
+  test("verify rejects a test annotation without treating it as a duplicate owner", () => {
     const root = repositoryWith({
       "src/order.test.ts": `/** ${CANONICAL_VALUES_TAG} order.status */
 const FIXTURE_STATUSES = ["draft"] as const;
@@ -89,11 +89,29 @@ export const ORDER_STATUSES = ["draft"] as const;
 `,
     });
 
-    expect(runDontReviewIt(["verify", "--repository-root", root])).toStrictEqual({
-      exitCode: 0,
-      out: "",
-      error: "",
+    const run = runDontReviewIt(["verify", "--repository-root", root]);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.out).toContain(
+      "src/order.test.ts:1 order.status is annotated in a non-production source",
+    );
+    expect(run.out).not.toContain("already declared");
+    expect(run.error).toBe("");
+  });
+
+  test("verify rejects a lint directive that suppresses a canonical rule", () => {
+    const root = repositoryWith({
+      "src/consumer.ts":
+        '// eslint-disable-next-line dont-review-it/no-strict-canonical-literal-use--use-canonical-import -- forbidden escape\nexport const status = "draft";\n',
     });
+
+    const run = runDontReviewIt(["verify", "--repository-root", root]);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.out).toContain(
+      "src/consumer.ts:1 Canonical vocabulary rules must not be suppressed with a lint-disable directive",
+    );
+    expect(run.error).toBe("");
   });
 
   test("equivalent-concepts returns the group it found and still exits zero", () => {
@@ -113,6 +131,27 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
     expect(run.out).toContain("order.status");
   });
 
+  test("equivalent-concepts fails closed when strict analysis finds a problem", () => {
+    const root = repositoryWith({
+      "src/article.ts": `/** ${CANONICAL_VALUES_TAG} article.status */
+export const ARTICLE_STATUSES = ["published", "draft"] as const;
+`,
+      "src/broken.ts": `/** ${CANONICAL_VALUES_TAG} fake.owner */
+if (true) consume("draft");
+`,
+      "src/order.ts": `/** ${CANONICAL_VALUES_TAG} order.status */
+export const ORDER_STATUSES = ["draft", "published"] as const;
+`,
+    });
+
+    const run = runDontReviewIt(["equivalent-concepts", "--repository-root", root]);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.out).toContain("src/broken.ts:1");
+    expect(run.out).not.toContain("is declared by more than one concept");
+    expect(run.error).toBe("");
+  });
+
   test("an unknown command returns the usage as an error and exits two", () => {
     const run = runDontReviewIt(["publish"]);
 
@@ -126,6 +165,16 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
 
   test("no command at all is answered the same way an unknown command is", () => {
     expect(runDontReviewIt([])).toStrictEqual(runDontReviewIt(["publish"]));
+  });
+
+  test("an extra positional argument is misuse instead of a successful verification", () => {
+    const root = repositoryWith({});
+
+    const run = runDontReviewIt(["verify", "unexpected", "--repository-root", root]);
+
+    expect(run.exitCode).toBe(2);
+    expect(run.out).toBe("");
+    expect(run.error).toContain("Usage: dont-review-it");
   });
 
   test("a repository root that is not a directory exits two instead of scanning nothing", () => {

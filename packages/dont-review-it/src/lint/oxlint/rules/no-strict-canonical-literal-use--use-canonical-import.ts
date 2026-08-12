@@ -1,164 +1,160 @@
-import { memoize } from "es-toolkit";
-
 import { createDontReviewItRule } from "../../../create-rule.ts";
-import {
-  annotatedDeclarationRanges,
-  isInsideAnnotatedDeclaration,
-  type AnnotatedDeclarationRange,
-} from "../lib/canonical-values/annotated-declaration.ts";
 import {
   canonicalValueKey,
   type CanonicalValuesCatalog,
   type CanonicalValuesEntry,
 } from "../lib/canonical-values/catalog.ts";
-import { declaresConceptAt } from "../lib/canonical-values/declaration-path.ts";
 import {
   OWNERSHIP_POLICY_SCHEMA,
   ownershipPolicyOf,
 } from "../lib/canonical-values/ownership-policy.ts";
-import { findWorkspaceRoot } from "../lib/canonical-values/workspace-root.ts";
-import { isOutOfScopeSource } from "../lib/out-of-scope-source.ts";
+import { isOutOfScopeLintSource } from "../lib/out-of-scope-source.ts";
+import {
+  createCanonicalLiteralVisitor,
+  inspectCanonicalLiteralBinaryExpression,
+  inspectCanonicalLiteralTemplateLiteral,
+  inspectCanonicalLiteralUnaryExpression,
+  type CanonicalLiteralCandidate,
+} from "./canonical-literal-candidate.ts";
+import { createCanonicalLiteralCatalogAccess } from "./canonical-literal-catalog-access.ts";
+import { canonicalLiteralLookupSpellings } from "./canonical-literal-key-spellings.ts";
+import { createCanonicalLiteralOwnerExemption } from "./canonical-literal-owner-exemption.ts";
+import { isExemptCanonicalLiteralPosition } from "./canonical-literal-position.ts";
+import { createCanonicalLiteralStaticExpressionSink } from "./canonical-literal-static-expression.ts";
+import { createCanonicalValueBindingIndex } from "./canonical-value-binding-index.ts";
+import { createCanonicalValueBindingVisitor } from "./canonical-value-binding-visitor.ts";
+import { createCanonicalValueRuntimeState } from "./canonical-value-invocation.ts";
+import { createCanonicalValueOutOfScopeImportSink } from "./canonical-value-out-of-scope-import.ts";
+import { withCanonicalValueStaticCallResolver } from "./canonical-value-property-state.ts";
+import { createCanonicalValueStaticCallResolver } from "./canonical-value-static-invocation.ts";
 
-import type { ESTree, Visitor } from "@oxlint/plugins";
+import type { Context, Visitor } from "@oxlint/plugins";
 import type { CanonicalValuesCatalogLoader } from "../lib/canonical-values/catalog-loader.ts";
-import type { CanonicalValue } from "../lib/canonical-values/fingerprint.ts";
-
-const KEY_SELECTION_TYPE_NAMES: ReadonlySet<string> = new Set(["Omit", "Pick"]);
-
-type LiteralNode =
-  | ESTree.BigIntLiteral
-  | ESTree.BooleanLiteral
-  | ESTree.NullLiteral
-  | ESTree.NumericLiteral
-  | ESTree.RegExpLiteral
-  | ESTree.StringLiteral;
-
-const ancestorsOf = (node: ESTree.Node): readonly ESTree.Node[] =>
-  node.parent === null ? [] : [...ancestorsOf(node.parent), node.parent];
-
-const literalValue = (node: LiteralNode): CanonicalValue | null => {
-  const spelling = node.value;
-  if (
-    typeof spelling === "string" ||
-    typeof spelling === "number" ||
-    typeof spelling === "boolean"
-  ) {
-    return spelling;
-  }
-  return null;
-};
-
-const negatedNumericValue = (node: ESTree.UnaryExpression): CanonicalValue | null => {
-  if (node.operator !== "-") return null;
-  const { argument } = node;
-  if (argument.type !== "Literal") return null;
-  return typeof argument.value === "number" ? -argument.value : null;
-};
-
-const templateLiteralValue = (node: ESTree.TemplateLiteral): CanonicalValue | null => {
-  if (node.expressions.length !== 0 || node.quasis.length !== 1) return null;
-  return node.quasis[0]?.value.cooked ?? null;
-};
-
-const isValueMemberKeyPosition = (parent: ESTree.Node, node: ESTree.Node): boolean | null => {
-  switch (parent.type) {
-    case "AccessorProperty":
-    case "MethodDefinition":
-    case "Property":
-    case "PropertyDefinition":
-      return !parent.computed && parent.key === node;
-    default:
-      return null;
-  }
-};
-
-const isTypeMemberKeyPosition = (parent: ESTree.Node, node: ESTree.Node): boolean | null => {
-  switch (parent.type) {
-    case "TSAbstractAccessorProperty":
-    case "TSAbstractMethodDefinition":
-    case "TSAbstractPropertyDefinition":
-    case "TSMethodSignature":
-    case "TSPropertySignature":
-      return !parent.computed && parent.key === node;
-    default:
-      return null;
-  }
-};
-
-const isStructuralKeyPosition = (parent: ESTree.Node, node: ESTree.Node): boolean =>
-  isValueMemberKeyPosition(parent, node) ??
-  isTypeMemberKeyPosition(parent, node) ??
-  (parent.type === "TSEnumMember" && parent.id === node);
-
-const isModuleSourcePosition = (parent: ESTree.Node, node: ESTree.Node): boolean | null => {
-  switch (parent.type) {
-    case "ExportNamedDeclaration":
-    case "ImportDeclaration":
-    case "ImportExpression":
-    case "TSImportType":
-      return parent.source === node;
-    case "ExportAllDeclaration":
-      return parent.source === node || parent.exported === node;
-    default:
-      return null;
-  }
-};
-
-const isModuleNamePosition = (parent: ESTree.Node, node: ESTree.Node): boolean | null => {
-  switch (parent.type) {
-    case "ImportAttribute":
-      return parent.key === node || parent.value === node;
-    case "ImportSpecifier":
-      return parent.imported === node;
-    case "ExportSpecifier":
-      return parent.local === node || parent.exported === node;
-    case "TSModuleDeclaration":
-      return parent.id === node;
-    default:
-      return null;
-  }
-};
-
-const isModuleSyntaxPosition = (parent: ESTree.Node, node: ESTree.Node): boolean =>
-  isModuleSourcePosition(parent, node) ?? isModuleNamePosition(parent, node) ?? false;
-
-const isKeySelectorArgument = (ancestors: readonly ESTree.Node[], node: ESTree.Node): boolean => {
-  for (const [index, ancestor] of ancestors.entries()) {
-    if (ancestor.type !== "TSTypeReference") continue;
-    if (ancestor.typeName.type !== "Identifier") continue;
-    if (!KEY_SELECTION_TYPE_NAMES.has(ancestor.typeName.name)) continue;
-    const instantiation = ancestors[index + 1];
-    if (instantiation === undefined) continue;
-    if (instantiation.type !== "TSTypeParameterInstantiation") continue;
-    const selector = ancestors[index + 2] ?? node;
-    if (instantiation.params[1] === selector) return true;
-  }
-  return false;
-};
-
-type LintedSource = {
-  readonly program: ESTree.Program;
-  readonly sourceText: string;
-  readonly filename: string;
-};
-
-const registeredDeclarationRanges = (
-  { program, sourceText, filename }: LintedSource,
-  catalog: CanonicalValuesCatalog,
-): readonly AnnotatedDeclarationRange[] =>
-  annotatedDeclarationRanges(program, sourceText).filter((range) =>
-    declaresConceptAt(catalog, { conceptId: range.conceptId, path: filename }),
-  );
+import type { ScopeLookup } from "./scope-resolution.ts";
 
 const conceptSummary = (entries: readonly CanonicalValuesEntry[]): string =>
   entries
-    .map((entry) =>
-      entry.exportPath === null
+    .map((entry) => {
+      const routes = entry.importRoutes.map((route) => route.specifier).join(", ");
+      return routes === ""
         ? `${entry.conceptId} declared in ${entry.declarationPath}`
-        : `${entry.conceptId} exported from ${entry.exportPath}`,
-    )
+        : `${entry.conceptId} exported from ${routes}`;
+    })
     .toSorted()
     .join("; ");
+
+const createCanonicalPropertyAnalysis = (context: Context) => {
+  const bindingIndex = createCanonicalValueBindingIndex(context.sourceCode);
+  const { invocationState, propertyState: basePropertyState } =
+    createCanonicalValueRuntimeState(bindingIndex);
+  const propertyState = withCanonicalValueStaticCallResolver(
+    basePropertyState,
+    createCanonicalValueStaticCallResolver({
+      bindingIndex,
+      invocationState,
+      propertyState: basePropertyState,
+    }),
+  );
+  return { bindingIndex, invocationState, propertyState };
+};
+
+const createCanonicalLiteralInspection = (input: {
+  readonly catalog: () => CanonicalValuesCatalog;
+  readonly context: Context;
+  readonly ownershipPolicy: string;
+  readonly repositoryRootOf: () => string;
+}) => {
+  const scopeAt: ScopeLookup = (node) => input.context.sourceCode.getScope(node);
+  const isOwnerDeclaration = createCanonicalLiteralOwnerExemption({
+    filename: input.context.filename,
+    program: input.context.sourceCode.ast,
+    repositoryRootOf: input.repositoryRootOf,
+    sourceText: input.context.sourceCode.text,
+  });
+  const pendingReports = new Set<{
+    readonly candidate: CanonicalLiteralCandidate;
+    readonly concepts: string;
+  }>();
+  const reportedCandidates = new Set<CanonicalLiteralCandidate>();
+  const sameCandidate = (
+    left: CanonicalLiteralCandidate,
+    right: CanonicalLiteralCandidate,
+  ): boolean =>
+    left.node.start === right.node.start &&
+    left.node.end === right.node.end &&
+    canonicalValueKey(left.spelling) === canonicalValueKey(right.spelling);
+  const strictlyContains = (
+    container: CanonicalLiteralCandidate,
+    contained: CanonicalLiteralCandidate,
+  ): boolean =>
+    container.node.start <= contained.node.start &&
+    container.node.end >= contained.node.end &&
+    (container.node.start < contained.node.start || container.node.end > contained.node.end);
+  const covered = (candidate: CanonicalLiteralCandidate): boolean =>
+    [...pendingReports].some(
+      (pending) =>
+        sameCandidate(pending.candidate, candidate) ||
+        strictlyContains(pending.candidate, candidate),
+    );
+  const inspect = ({ ancestors, node, spelling }: CanonicalLiteralCandidate): void => {
+    if (isExemptCanonicalLiteralPosition({ ancestors, node, scopeAt })) return;
+
+    const loaded = input.catalog();
+    const matchingSpellings = canonicalLiteralLookupSpellings({
+      ancestors,
+      node,
+      spelling,
+    }).filter(
+      (candidate) => (loaded.entriesByValue.get(canonicalValueKey(candidate))?.length ?? 0) !== 0,
+    );
+    const entries = matchingSpellings.flatMap(
+      (candidate) => loaded.entriesByValue.get(canonicalValueKey(candidate)) ?? [],
+    );
+    if (entries.length === 0) return;
+    if (
+      matchingSpellings.some((candidate) =>
+        isOwnerDeclaration({ catalog: loaded, node, spelling: candidate }),
+      )
+    ) {
+      return;
+    }
+    const candidate = { ancestors, node, spelling };
+    if (!covered(candidate)) {
+      pendingReports.add({ candidate, concepts: conceptSummary(entries) });
+    }
+  };
+  return {
+    covered,
+    evaluate: () => {
+      [...pendingReports]
+        .toSorted(
+          (left, right) =>
+            right.candidate.node.end -
+              right.candidate.node.start -
+              (left.candidate.node.end - left.candidate.node.start) ||
+            left.candidate.ancestors.length - right.candidate.ancestors.length,
+        )
+        .forEach(({ candidate, concepts }) => {
+          if (
+            Array.from(reportedCandidates).some((reported) => strictlyContains(reported, candidate))
+          ) {
+            return;
+          }
+          input.context.report({
+            node: candidate.node,
+            messageId: "canonicalValueLiteral",
+            data: {
+              value: input.context.sourceCode.getText(candidate.node),
+              concepts,
+              ownershipPolicy: input.ownershipPolicy,
+            },
+          });
+          reportedCandidates.add(candidate);
+        });
+    },
+    inspect,
+  };
+};
 
 export const createNoStrictCanonicalLiteralUseRule = ({
   loadCatalog,
@@ -177,82 +173,72 @@ export const createNoStrictCanonicalLiteralUseRule = ({
       messages: {
         canonicalValueLiteral:
           "A value that a declared vocabulary already owns must not be written again as a literal, because the literal and the declaration then change apart and nothing fails when they diverge. Replace {{value}} with the binding its owner publishes: {{concepts}}. Ownership policy: {{ownershipPolicy}}.",
+        productionImportsOutOfScopeSource:
+          "Production source must not import {{sourcePath}}, because test, Story, fixture, and mock sources are outside the production checks and can otherwise supply canonical values without either canonical rule inspecting their declaration. Move the supplied value into a production owner and import its registered public binding.",
       },
       schema: OWNERSHIP_POLICY_SCHEMA,
     },
     create(context): Visitor {
-      if (isOutOfScopeSource(context.filename)) return {};
-
-      const ownershipPolicy = ownershipPolicyOf(context.options);
-      const loadedCatalog = memoize(
-        (): CanonicalValuesCatalog =>
-          loadCatalog({ repositoryRoot: findWorkspaceRoot(context.cwd) }),
-      );
-      const lintedSource: LintedSource = {
-        program: context.sourceCode.ast,
-        sourceText: context.sourceCode.text,
-        filename: context.filename,
-      };
-      const exemptRangesOf = memoize(
-        (loaded: CanonicalValuesCatalog): readonly AnnotatedDeclarationRange[] =>
-          registeredDeclarationRanges(lintedSource, loaded),
-      );
-
-      const inspect = ({
-        node,
-        spelling,
-        ancestors,
-      }: {
-        readonly node: ESTree.Node;
-        readonly spelling: CanonicalValue;
-        readonly ancestors: readonly ESTree.Node[];
-      }): void => {
-        const parent = ancestors.at(-1);
-        if (parent !== undefined && isStructuralKeyPosition(parent, node)) return;
-        if (parent !== undefined && isModuleSyntaxPosition(parent, node)) return;
-        if (isKeySelectorArgument(ancestors, node)) return;
-
-        const loaded = loadedCatalog();
-        const entries = loaded.entriesByValue.get(canonicalValueKey(spelling));
-        if (entries === undefined || entries.length === 0) return;
-
-        if (isInsideAnnotatedDeclaration(exemptRangesOf(loaded), node)) return;
-
-        context.report({
-          node,
-          messageId: "canonicalValueLiteral",
-          data: {
-            value: context.sourceCode.getText(node),
-            concepts: conceptSummary(entries),
-            ownershipPolicy,
-          },
-        });
-      };
-
-      return {
-        Literal(node: LiteralNode) {
-          const spelling = literalValue(node);
-          if (spelling === null) return;
-          const { parent } = node;
-          if (
-            typeof spelling === "number" &&
-            parent.type === "UnaryExpression" &&
-            parent.operator === "-"
-          ) {
-            return;
-          }
-          inspect({ node, spelling, ancestors: ancestorsOf(node) });
+      const { loadedCatalog, repositoryRootOf } = createCanonicalLiteralCatalogAccess({
+        cwd: context.cwd,
+        loadCatalog,
+      });
+      if (isOutOfScopeLintSource(context.filename, repositoryRootOf())) return {};
+      const { bindingIndex, invocationState, propertyState } =
+        createCanonicalPropertyAnalysis(context);
+      const inspection = createCanonicalLiteralInspection({
+        catalog: loadedCatalog,
+        context,
+        ownershipPolicy: ownershipPolicyOf(context.options),
+        repositoryRootOf,
+      });
+      const staticExpressionSink = createCanonicalLiteralStaticExpressionSink({
+        covered: inspection.covered,
+        inspect: inspection.inspect,
+        propertyState,
+      });
+      const literalVisitor = createCanonicalLiteralVisitor(inspection.inspect, {
+        recordStaticExpression: staticExpressionSink.recordExpression,
+      });
+      const outOfScopeImportSink = createCanonicalValueOutOfScopeImportSink({
+        bindingIndex,
+        context,
+        invocationState,
+        propertyState,
+        repositoryRootOf,
+        report({ node, sourcePath }) {
+          context.report({
+            node,
+            messageId: "productionImportsOutOfScopeSource",
+            data: { sourcePath },
+          });
         },
-        TemplateLiteral(node: ESTree.TemplateLiteral) {
-          const spelling = templateLiteralValue(node);
-          if (spelling === null) return;
-          inspect({ node, spelling, ancestors: ancestorsOf(node) });
+      });
+      const bindingVisitor = createCanonicalValueBindingVisitor(bindingIndex, {
+        afterBinary: (node) => {
+          inspectCanonicalLiteralBinaryExpression(node, inspection.inspect);
+          staticExpressionSink.recordExpression(node);
         },
-        UnaryExpression(node: ESTree.UnaryExpression) {
-          const spelling = negatedNumericValue(node);
-          if (spelling === null) return;
-          inspect({ node, spelling, ancestors: ancestorsOf(node) });
+        afterCall: (node) => {
+          outOfScopeImportSink.recordCall(node);
+          staticExpressionSink.recordCall(node);
         },
-      };
+        afterMember: staticExpressionSink.recordExpression,
+        afterNew: outOfScopeImportSink.recordNew,
+        afterTemplate: (node) => {
+          inspectCanonicalLiteralTemplateLiteral(node, inspection.inspect);
+          staticExpressionSink.recordExpression(node);
+        },
+        afterUnary: (node) => {
+          inspectCanonicalLiteralUnaryExpression(node, inspection.inspect);
+          staticExpressionSink.recordExpression(node);
+        },
+        programExit: () => {
+          staticExpressionSink.evaluate();
+          inspection.evaluate();
+          outOfScopeImportSink.evaluate();
+        },
+      });
+      return { ...literalVisitor, ...bindingVisitor, ...outOfScopeImportSink.visitor };
     },
   });

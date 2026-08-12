@@ -43,13 +43,15 @@ oxlint は JS プラグインを worker で回していないため、同期 RPC
 
 **型チェッカを起動できないときは語彙索引を空として扱う。** 同期 API はプラットフォーム固有のバイナリを子プロセスとして起動する。起動に失敗する環境、依存が刈り込まれた環境、API の形が変わったバージョンでは、これまでどおりのメッセージを出す。lint はここで落ちてはならない。プラットフォームのバイナリを実際に外して、lint が落ちず従来のメッセージが出ることを確認している。
 
-**`typescript` を `packages/dont-review-it` の実行時依存に移す。** ルールが lint 実行時に読むようになったため、開発時依存では位置が実態と合わない。
+**library message 用と canonical catalog 用の checker dependency を分ける。** `typescript` は `typescript/unstable/sync` を通じて lint 実行時に library vocabulary を読むため、`packages/dont-review-it` の runtime dependency に置く。この checker が決めるのは message の候補だけで、起動不能時は空の索引へ退避する。
+
+canonical catalog は別の runtime dependency `typescript-6` を使う。こちらは owner binding の literal domain、import・spread、public export の symbol identity を repository source から解決し、lint と strict verification の正当性を決める。解決失敗を空の候補へ退避せず、その owner の entry を除外して strict problem にする。API、失敗時の扱い、合否への影響が異なるため、2 つを同じ checker instance や package 名で兼用しない。
 
 ## 影響
 
 このパッケージの lint は、`node_modules` に型宣言が揃っていることを前提にした「良い報告」と、揃っていないときの「これまでどおりの報告」の 2 つの状態を持つようになった。合否は両方の状態で同じである。報告文が環境によって変わることは受け入れる。
 
-`typescript` が実行時依存になったので、`@mst/dont-review-it` を使う側はプラットフォーム固有のバイナリを含む依存を引き込む。`vp install --frozen-lockfile` が通ることと、`vp why typescript` が単一バージョンを保つことを確認している。
+`typescript` と `typescript-6` が実行時依存になった。`@mst/dont-review-it` を使う側は library message 用の同期 API と、canonical catalog 用の TypeScript 6 checker の両方を引き込む。`pnpm-workspace.yaml` はそれぞれを別の catalog entry に固定し、各 workspace は `catalog:` で参照する。依存変更時は `vp install --frozen-lockfile` に加え、`vp why typescript` と `vp why typescript-6` で意図しない複数 instance が無いことを確認する。
 
 候補の絞り込みをしないため、ノイズが混じる。実測では `error` / `warn` / `off` に対して `AllowWarnDeny` と `DummyRule` の 2 つが候補に並ぶ。後者は前者を内側に含む型で、語彙の所有者としては筋が悪い。順序で優劣を示さないと決めた以上、この選別は人が行う。
 

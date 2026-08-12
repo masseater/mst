@@ -10,12 +10,12 @@ import {
 } from "@mst/utils";
 import { attempt } from "es-toolkit";
 
-import { buildCanonicalValuesCatalog } from "./lint/oxlint/lib/canonical-values/builder.ts";
 import { isDirectory } from "./lint/oxlint/lib/canonical-values/source-files.ts";
 import {
   findEquivalentConcepts,
   formatCanonicalValuesProblem,
   formatEquivalentConceptGroup,
+  inspectCanonicalValues,
   verifyCanonicalValues,
 } from "./lint/oxlint/lib/canonical-values/verify.ts";
 import { duplicatedClustersIn } from "./lint/oxlint/lib/duplicated-bodies/body-index.ts";
@@ -48,11 +48,20 @@ const verified = (repositoryRoot: string): CliResult => {
 };
 
 const equivalentConcepts = (repositoryRoot: string): CliResult => {
-  const catalog = buildCanonicalValuesCatalog({ repositoryRoot });
+  const inspected = inspectCanonicalValues({ repositoryRoot });
+  if (inspected.problems.length > 0) {
+    return {
+      exitCode: EXIT_PROBLEMS_FOUND,
+      out: toLines(inspected.problems.map((problem) => formatCanonicalValuesProblem(problem))),
+      error: "",
+    };
+  }
   return {
     exitCode: EXIT_SUCCESS,
     out: toLines(
-      findEquivalentConcepts(catalog.entries).map((group) => formatEquivalentConceptGroup(group)),
+      findEquivalentConcepts(inspected.catalog.entries).map((group) =>
+        formatEquivalentConceptGroup(group),
+      ),
     ),
     error: "",
   };
@@ -85,7 +94,7 @@ const dispatch = (argv: readonly string[]): CliResult => {
   });
   const [command] = parsed.positionals;
   const resultFor = command === undefined ? undefined : RESULT_BY_COMMAND[command];
-  if (resultFor === undefined) {
+  if (parsed.positionals.length !== 1 || resultFor === undefined) {
     return { exitCode: EXIT_MISUSE, out: "", error: USAGE };
   }
 

@@ -24,7 +24,10 @@ const namedFieldsOf = (node: Fields): readonly (readonly [string, unknown])[] =>
 
 const structureOf = (value: unknown): string => {
   if (Array.isArray(value)) return `[${value.map(structureOf).join(",")}]`;
-  if (!isNode(value)) return value === undefined ? "undefined" : JSON.stringify(value);
+  if (!isNode(value)) {
+    if (value === undefined) return "undefined";
+    return typeof value === "bigint" ? `bigint:${String(value)}` : JSON.stringify(value);
+  }
   return `{${namedFieldsOf(value)
     .map(([field, nested]) => `${field}:${structureOf(nested)}`)
     .join(",")}}`;

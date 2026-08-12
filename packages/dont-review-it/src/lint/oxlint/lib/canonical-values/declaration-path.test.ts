@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vite-plus/test";
 
 import { buildCatalog } from "./catalog.ts";
-import { declaresConceptAt } from "./declaration-path.ts";
+import { declarationEntriesAt } from "./declaration-path.ts";
 import { fingerprintValues, type CanonicalValue } from "./fingerprint.ts";
 
 describe("declaration-path", () => {
@@ -9,65 +9,58 @@ describe("declaration-path", () => {
 
   const CATALOG = buildCatalog([
     {
+      annotationStart: 0,
+      binding: "ORDER_STATUSES",
+      bindingStart: 40,
       conceptId: "order.status",
+      declarationEnd: 80,
       declarationPath: "packages/order/src/status.ts",
-      exportPath: "@mst/order",
+      declarationStart: 20,
+      importRoutes: [
+        {
+          exportName: "ORDER_STATUSES",
+          resolvedSourcePaths: ["packages/order/src/order-status.ts"],
+          specifier: "@mst/order",
+        },
+      ],
+      packageName: "@mst/order",
       values: ORDER_STATUS,
       fingerprint: fingerprintValues(ORDER_STATUS),
     },
   ]);
 
+  const conceptIdsAt = (path: string, repositoryRoot: string): readonly string[] =>
+    declarationEntriesAt(CATALOG, { path, repositoryRoot }).map((entry) => entry.conceptId);
+
   test("the declaring file declares the concept the annotation names", () => {
-    expect(
-      declaresConceptAt(CATALOG, {
-        conceptId: "order.status",
-        path: "/repo/packages/order/src/status.ts",
-      }),
-    ).toBe(true);
+    expect(conceptIdsAt("/repo/packages/order/src/status.ts", "/repo")).toContain("order.status");
   });
 
   test("the declaring file is recognized through a repository relative path", () => {
-    expect(
-      declaresConceptAt(CATALOG, {
-        conceptId: "order.status",
-        path: "packages/order/src/status.ts",
-      }),
-    ).toBe(true);
+    expect(conceptIdsAt("packages/order/src/status.ts", "/repo")).toContain("order.status");
   });
 
   test("the declaring file is recognized through a windows path", () => {
     expect(
-      declaresConceptAt(CATALOG, {
-        conceptId: "order.status",
-        path: String.raw`C:\repo\packages\order\src\status.ts`,
-      }),
-    ).toBe(true);
+      conceptIdsAt(String.raw`C:\repo\packages\order\src\status.ts`, String.raw`C:\repo`),
+    ).toContain("order.status");
   });
 
   test("a path whose suffix starts inside a segment declares nothing", () => {
-    expect(
-      declaresConceptAt(CATALOG, {
-        conceptId: "order.status",
-        path: "/repo/vendored-packages/order/src/status.ts",
-      }),
-    ).toBe(false);
+    expect(conceptIdsAt("/repo/vendored-packages/order/src/status.ts", "/repo")).toStrictEqual([]);
+  });
+
+  test("the same relative suffix under another repository declares nothing", () => {
+    expect(conceptIdsAt("/vendor/repo/packages/order/src/status.ts", "/repo")).toStrictEqual([]);
   });
 
   test("another file in the same package does not declare the concept", () => {
-    expect(
-      declaresConceptAt(CATALOG, {
-        conceptId: "order.status",
-        path: "/repo/packages/order/src/order.ts",
-      }),
-    ).toBe(false);
+    expect(conceptIdsAt("/repo/packages/order/src/order.ts", "/repo")).toStrictEqual([]);
   });
 
   test("a concept the catalog does not know is declared nowhere", () => {
-    expect(
-      declaresConceptAt(CATALOG, {
-        conceptId: "totally.unrelated",
-        path: "/repo/packages/order/src/status.ts",
-      }),
-    ).toBe(false);
+    expect(conceptIdsAt("/repo/packages/order/src/status.ts", "/repo")).not.toContain(
+      "totally.unrelated",
+    );
   });
 });

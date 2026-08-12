@@ -5,31 +5,55 @@
 
 ## 文脈
 
-有限値の語彙のカタログは生成物を持たない。lint のたびに注釈の付いた宣言から遅延で構築し、fingerprint で無効化する。コミットされた生成物にすると「注釈を編集したらこのコマンドを実行」という手順が生まれ、その手順が 1 つでもある限り、古いメタデータのまま lint が走る状態に戻るためである。
+有限値の語彙の catalog は生成物を commit せず、lint process が repository source から導出する。注釈を編集した後に人が更新 command を実行する手順を作ると、更新忘れによって古い catalog が正規情報として残るためである。
 
-生成物を持たない代わりに、構築結果はキャッシュに載る。ここで fingerprint が対象ファイルの状態だけを見ていると足りない。注釈の読み取り方を変えたとき、対象ファイルは 1 バイトも変わっていないのに導出結果が変わるからである。更新時刻とサイズだけを見ていると、古い解釈で作られた結果が黙って返り、実装を直したのに lint の結果が変わらない状態になる。人が気づく契機が無いのが最も悪い。
-
-対象ファイルの内容をハッシュしても同じである。抽出の解釈を変える変更は、対象ファイルの内容を変えない。
+lint のたびに Oxc parser と TypeScript checker で全 owner を解決すると、同じ repository を読む各 rule process が同じ費用を繰り返す。そこで lint は導出結果を disk cache に置く。ただし source の内容だけでは、抽出ロジックや entry shape が変わったことを表せない。実装変更前の entry が新しい owner 契約を満たすものとして読まれると、不正な値・path・range・route が lint の判定と免除へ入る。
 
 ## 決定
 
-キャッシュの形式に版を持たせ、抽出の解釈を変えたら上げる。
+lint 用 catalog cache は形式の version を持ち、抽出の解釈または entry shape を変えた変更で version を上げる。現在の `CACHE_FORMAT_VERSION` は 5 である。
 
-`packages/dont-review-it/src/lint/oxlint/lib/canonical-values/catalog-cache.ts` の `CACHE_FORMAT_VERSION` が、2 つの経路で効く。
+version は 2 箇所で照合する。
 
-- `cacheInputFingerprint` は、走査対象ファイルの相対パス・サイズ・更新時刻を混ぜる前に、まず版を混ぜる。版を上げると既存の fingerprint はすべて一致しなくなる
-- 書き出す payload は `version` フィールドを持ち、読み出し時に現在の版と一致しないキャッシュは形式ごと捨てられる
+- input fingerprint を作る hash に version を最初に加える
+- cache payload の `version` が現在値と完全一致することを読み出し条件にする
 
-現物の版は 2。キャッシュの置き場は `node_modules/.cache/mst-dont-review-it/canonical-values.json` で、書き出しに失敗しても黙って構築結果を返す。
+fingerprint の file input は、`commentSources` と `declarationSources` から独立した `cacheInputs` である。repository 内の JavaScript・TypeScript source と declaration、JSON、package manifest、TypeScript config、dependency graph を決める workspace config と lockfile を含める。test・Story・fixture、`.d.ts`、`dist` の生成 source は owner 候補にならなくても checker が production owner の import や package entry から参照できるため、cache input からは外さない。`.git`・`.cache`・`coverage`・`node_modules` は走査せず、repository 外 dependency の内容は manifest・config・lockfile の変更で invalidation する。
+
+走査で検出した problem の kind・path・line も input fingerprint に含める。repository 外へ出る symbolic link の追加や除去は、走査対象 file の本文が変わらなくても disk cache と process 内 catalog instance を invalidation する。同じ file input と problem identity の間だけ同じ catalog instance を共有する。
+
+各 input の repository-relative path と本文を、長さで境界を付けて順序どおり hash に入れる。size と mtime が同じまま本文が変わっても cache hit にはならない。owner source、import・spread・JSON・declaration が供給する型、公開 route、dependency 解決条件のいずれが変わっても cache miss になる。`commentSources` は strict annotation scan、`declarationSources` は production runtime owner 候補という従来の意味を維持し、cache の完全性のために範囲を広げない。
+
+version 5 entry は次を持つ。
+
+- concept id、binding、package name
+- declaration path
+- annotation、binding、declaration の各 offset
+- specifier、export name、exports field から解決した repository-relative source path 群からなる public import route
+- `null` を含む canonical values と、その型付き fingerprint
+
+cache payload は version、input fingerprint、entries から再計算できる integrity hash も持つ。cache read は integrity に加え、concept id、nonempty binding・path、route がある場合の nonempty specifier・export name・重複のない repository-relative source path、offset の順序、値の型・有限性・一意性、値から再計算した fingerprint を検証する。entries の削除・置換を含め、1 つでも不整合があれば cache 全体を miss として再構築する。version 4 以前の payload は、fingerprint が一致していても必ず破棄するため、旧 shape の poison concept・value・range を version 5 catalog へ注入できない。version 4 を導入する途中で書かれた source identity を持たない route shape も、同じ検証で cache miss にする。
+
+repository package 名は valid entry の有無から推測せず、現在の package manifest から catalog に保持する。invalid・duplicate・out-of-scope owner によって entry が 0 件になった package も repository package であり続けるため、正規 route に一致しない root・subpath・binding を外部依存へ誤分類しない。この集合は cache hit 時も現在の manifest から導出する。
+
+cache file は `node_modules/.cache/mst-dont-review-it/canonical-values.json` に置く。書き込みは process 固有の temporary file を完成させてから rename し、reader が partial JSON を見ないようにする。環境要因で書き込めなくても、今回構築した memory 上の catalog を返し、次の process が再構築できる状態を保つ。
+
+この cache を使うのは lint だけである。`dont-review-it verify` と `equivalent-concepts` は cache を読まず、同じ repository analysis を毎回 strict に実行する。out-of-scope annotation や不正 annotation は lint catalog の entry にならず、strict analysis では problem になる。
 
 ## 影響
 
-抽出の解釈を変える変更は、`CACHE_FORMAT_VERSION` を上げるところまでで 1 つの変更になる。注釈の読み取り、値の導出、カタログエントリの形のいずれを変えても対象になる。
+注釈 scanner、TypeScript checker による値域導出、public symbol 解決、declaration identity、entry shape のいずれかを変える変更は、cache version を確認する責務を持つ。上げ忘れると source fingerprint が同じ環境で旧解釈が残るため、実装変更と version 更新を分けない。
 
-上げ忘れたときに何が起きるかは、この仕組みの意味そのものなので書いておく。対象ファイルは変わっていないので fingerprint は一致し、キャッシュがある環境では古い解釈で作られたカタログがそのまま使われる。lint の結果は変わらず、失敗もしない。キャッシュを消すか版を上げるまで、直したはずの実装は効かない。
+cache hit でも、両 lint rule は現在の source を再走査し、entry の path・binding・concept id・全 offset が一致した declaration range だけを免除する。version 5 の正規 entry であっても、現在の source と identity が違えば免除に使わない。input fingerprint は本文を読むため、同じ size・mtime に戻した source 変更も stale entry を残さない。
+
+strict verification が cache に依存しないため、cache の欠損・破損・書き込み不能は repository の正当性判定を弱めない。lint は cache miss の費用を払い、同じ analysis から有効 entry だけを使う。
 
 ## 検討して採らなかった案
 
-**カタログを生成物としてコミットし、コマンドで更新する。** 更新手順が人の手に残るため、注釈を編集して更新を忘れた状態で lint が走る。この仕組みが避けたかった状態そのものである。
+**catalog を生成物として commit する。** 注釈を編集した人に更新手順を課し、古い生成物を正規情報として残す。
 
-**fingerprint の入力を対象ファイルの状態だけにする。** 抽出の解釈を変えても fingerprint が変わらず、古い結果が黙って返る。更新時刻とサイズを内容のハッシュに置き換えても解決しない。
+**source fingerprint だけで互換性を判断する。** source が同じまま抽出ロジックや entry shape が変わる場合を検出できない。
+
+**CLI の strict verification も cache を使う。** invalid・duplicate・out-of-scope の problem を持たない lint 用 entry cache だけでは、repository 全体の fail-closed な判定にならない。
+
+**最終 path へ直接書き込む。** 並行 lint process が partial または混在した payload を読めるため、temporary file からの rename を使う。

@@ -1,18 +1,8 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { IN_PLACE_ARRAY_METHODS } from "../lib/array-mutation-methods.ts";
+import { bindingInScope, type ScopeLookup } from "./scope-resolution.ts";
 
-import type { Definition, ESTree, Scope, Variable } from "@oxlint/plugins";
-
-const IN_PLACE_ARRAY_METHODS: ReadonlySet<string> = new Set([
-  "copyWithin",
-  "fill",
-  "pop",
-  "push",
-  "reverse",
-  "shift",
-  "sort",
-  "splice",
-  "unshift",
-]);
+import type { Definition, ESTree, Variable } from "@oxlint/plugins";
 
 const ARRAY_RETURNING_ARRAY_METHODS: ReadonlySet<string> = new Set([
   "concat",
@@ -35,8 +25,6 @@ const ARRAY_RETURNING_ARRAY_METHODS: ReadonlySet<string> = new Set([
 const ARRAY_GLOBAL_FACTORY_METHODS: ReadonlySet<string> = new Set(["from", "of"]);
 
 const ARRAY_TYPE_NAMES: ReadonlySet<string> = new Set(["Array", "ReadonlyArray"]);
-
-type ScopeLookup = (node: ESTree.Node) => Scope;
 
 type BindingResolution = {
   readonly scopeAt: ScopeLookup;
@@ -106,11 +94,6 @@ const isArrayLikeType = (
   }
 };
 
-const resolveBinding = (scope: Scope | null, name: string): Variable | null => {
-  if (scope === null) return null;
-  return scope.set.get(name) ?? resolveBinding(scope.upper, name);
-};
-
 const isArrayLikeDefinition = (definition: Definition, resolution: BindingResolution): boolean => {
   const annotation = definition.name.typeAnnotation;
   if (annotation !== null && annotation !== undefined) {
@@ -127,7 +110,7 @@ const isArrayLikeBinding = (
   node: ESTree.IdentifierReference,
   { scopeAt, seenBindings }: BindingResolution,
 ): boolean => {
-  const binding = resolveBinding(scopeAt(node), node.name);
+  const binding = bindingInScope(scopeAt(node), node.name);
   if (binding === null || seenBindings.has(binding)) return false;
 
   const seen = new Set([...seenBindings, binding]);

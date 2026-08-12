@@ -1,55 +1,48 @@
-import { parseCanonicalValuesAnnotation } from "./annotation.ts";
+import { declarationEntriesAt } from "./declaration-path.ts";
+import { scanCanonicalValuesText } from "./declarations.ts";
 
-import type { Comment, ESTree } from "@oxlint/plugins";
+import type { CanonicalValuesCatalog } from "./catalog.ts";
+import type { CanonicalValue } from "./fingerprint.ts";
 
 export type AnnotatedDeclarationRange = {
+  readonly binding: string;
   readonly conceptId: string;
+  readonly fingerprint: string;
   readonly start: number;
   readonly end: number;
+  readonly values: readonly CanonicalValue[];
 };
 
-const JSDOC_COMMENT_VALUE_PREFIX = "*";
-
-const isJsDocComment = (comment: Comment): boolean =>
-  comment.type === "Block" && comment.value.startsWith(JSDOC_COMMENT_VALUE_PREFIX);
-
-type ParsedSource = {
-  readonly program: ESTree.Program;
+export const registeredDeclarationRanges = (input: {
+  readonly catalog: CanonicalValuesCatalog;
+  readonly filename: string;
+  readonly repositoryRoot: string;
   readonly sourceText: string;
+}): readonly AnnotatedDeclarationRange[] => {
+  const declarations = scanCanonicalValuesText(input.sourceText, input.filename).declarations;
+  return declarationEntriesAt(input.catalog, {
+    path: input.filename,
+    repositoryRoot: input.repositoryRoot,
+  }).flatMap((entry) => {
+    const matchesCurrentSource = declarations.some(
+      (declaration) =>
+        declaration.annotationStart === entry.annotationStart &&
+        declaration.binding === entry.binding &&
+        declaration.bindingStart === entry.bindingStart &&
+        declaration.conceptId === entry.conceptId &&
+        declaration.declarationStart === entry.declarationStart &&
+        declaration.declarationEnd === entry.declarationEnd,
+    );
+    if (!matchesCurrentSource) return [];
+    return [
+      {
+        binding: entry.binding,
+        conceptId: entry.conceptId,
+        fingerprint: entry.fingerprint,
+        start: entry.declarationStart,
+        end: entry.declarationEnd,
+        values: entry.values,
+      },
+    ];
+  });
 };
-
-const annotatedDeclarationRange = (
-  { program, sourceText }: ParsedSource,
-  comment: Comment,
-): AnnotatedDeclarationRange | null => {
-  if (!isJsDocComment(comment)) return null;
-
-  const annotation = parseCanonicalValuesAnnotation(comment.value);
-  if (annotation === null) return null;
-
-  const nested = program.body.some(
-    (statement) => statement.start <= comment.start && comment.end <= statement.end,
-  );
-  if (nested) return null;
-
-  const owner = program.body.find((statement) => statement.start >= comment.end);
-  if (owner === undefined) return null;
-  if (sourceText.slice(comment.end, owner.start).trim() !== "") return null;
-
-  return { conceptId: annotation.conceptId, start: owner.start, end: owner.end };
-};
-
-export const annotatedDeclarationRanges = (
-  program: ESTree.Program,
-  sourceText: string,
-): readonly AnnotatedDeclarationRange[] => {
-  const source: ParsedSource = { program, sourceText };
-  return program.comments
-    .map((comment) => annotatedDeclarationRange(source, comment))
-    .filter((range) => range !== null);
-};
-
-export const isInsideAnnotatedDeclaration = (
-  ranges: readonly AnnotatedDeclarationRange[],
-  node: ESTree.Span,
-): boolean => ranges.some((range) => node.start >= range.start && node.end <= range.end);
