@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -44,12 +44,29 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
 
       expect(await cliExitCode(["check", "--repository-root", root])).toBe(0);
       expect(stdout.text).toBe("");
-      expect(stderr.text).toBe("");
+      expect(stderr.text).toContain("entry-composition");
     },
   );
 
   standardIoTest(
     "check given no repository root scans the working directory",
+    async ({ stdout, stderr }) => {
+      const root = repositoryWith({ "package.json": "{}" });
+      const cwd = vi.spyOn(process, "cwd").mockReturnValue(root);
+
+      try {
+        expect(await cliExitCode(["check"])).toBe(1);
+      } finally {
+        cwd.mockRestore();
+      }
+
+      expect(stdout.text).toContain('required "guard" entry must not be missing');
+      expect(stderr.text).toContain("entry-composition");
+    },
+  );
+
+  standardIoTest(
+    "check given no repository root reads canonical values from the working directory",
     async ({ stdout, stderr }) => {
       const root = repositoryWith({
         "src/order.ts": `/** ${CANONICAL_VALUES_TAG} */
@@ -65,7 +82,7 @@ export const ORDER_STATUSES = ["draft"] as const;
       }
 
       expect(stdout.text).toContain("src/order.ts:1");
-      expect(stderr.text).toBe("");
+      expect(stderr.text).toContain("entry-composition");
     },
   );
 
@@ -78,7 +95,7 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
 
     expect(await cliExitCode(["check", `--repository-root=${root}`])).toBe(0);
     expect(stdout.text).toBe("");
-    expect(stderr.text).toBe("");
+    expect(stderr.text).toContain("entry-composition");
   });
 
   standardIoTest(
@@ -92,7 +109,7 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
 
       expect(await cliExitCode(["check", "--repository-root", root])).toBe(0);
       expect(stdout.text).toContain("warning: ");
-      expect(stderr.text).toBe("");
+      expect(stderr.text).toContain("entry-composition");
     },
   );
 
@@ -105,7 +122,7 @@ export const ORDER_STATUSES = ["draft"] as const;
 
     expect(await cliExitCode(["check", "--repository-root", root])).toBe(1);
     expect(stdout.text).toContain("src/order.ts:1");
-    expect(stderr.text).toBe("");
+    expect(stderr.text).toContain("entry-composition");
   });
 
   standardIoTest("the broken-annotation report matches the stdout snapshot", async ({ stdout }) => {
@@ -167,7 +184,7 @@ export const ORDER_STATUSES = ["draft"] as const;
 
       expect(await cliExitCode(["check", "--repository-root", root])).toBe(0);
       expect(stdout.text).toBe("");
-      expect(stderr.text).toBe("");
+      expect(stderr.text).toContain("entry-composition");
     },
   );
 
@@ -228,7 +245,7 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
 
     expect(await cliExitCode(["check", "--repository-root", root])).toBe(0);
     expect(stdout.text).toBe("");
-    expect(stderr.text).toBe("");
+    expect(stderr.text).toContain("entry-composition");
   });
 
   standardIoTest(
@@ -254,6 +271,60 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
     expect(await cliExitCode(["check", "--repository-root", root])).toBe(0);
     expect(stdout.text).toBe("");
   });
+
+  standardIoTest(
+    "check --write repairs the entry composition and exits zero",
+    async ({ stdout, stderr }) => {
+      const root = repositoryWith({
+        "package.json": `{ "scripts": { "guard": "vp check" } }`,
+        "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
+        "packages/web/package.json": `{ "scripts": { "test": "vp test" } }`,
+      });
+
+      expect(await cliExitCode(["check", "--write", "--repository-root", root])).toBe(0);
+      expect(stdout.text).toBe("");
+      expect(stderr.text).toContain("entry-composition");
+      expect(readFileSync(join(root, "package.json"), "utf8")).toContain(
+        "throttle --timeout 1800 -- spool -- vp check",
+      );
+    },
+  );
+
+  standardIoTest(
+    "check --write reports what it must not repair and exits one",
+    async ({ stdout, stderr }) => {
+      const root = repositoryWith({
+        "package.json": `{ "scripts": { "guard": "throttle --timeout 1800 -- spool -- vp check" } }`,
+        "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
+        "packages/web/package.json": `{ "scripts": { "test": "throttle -- spool -- vp test" } }`,
+      });
+
+      expect(await cliExitCode(["check", "--write", "--repository-root", root])).toBe(1);
+      expect(stdout.text).toContain("packages/web/package.json");
+      expect(stderr.text).toContain("entry-composition");
+    },
+  );
+
+  standardIoTest(
+    "check exits two when a manifest exists but does not parse",
+    async ({ stdout, stderr }) => {
+      const root = repositoryWith({ "package.json": "{ oops" });
+
+      expect(await cliExitCode(["check", "--repository-root", root])).toBe(2);
+      expect(stdout.text).toBe("");
+      expect(stderr.text).toContain("package.json exists but does not parse as a JSON object");
+    },
+  );
+
+  standardIoTest(
+    "check --write exits two when a manifest exists but does not parse",
+    async ({ stderr }) => {
+      const root = repositoryWith({ "package.json": "{ oops" });
+
+      expect(await cliExitCode(["check", "--write", "--repository-root", root])).toBe(2);
+      expect(stderr.text).toContain("package.json exists but does not parse as a JSON object");
+    },
+  );
 
   standardIoTest(
     "check fails on a workflow definition that narrows its own start",
@@ -294,7 +365,7 @@ jobs:
 
       expect(await cliExitCode(["check", "--repository-root", root])).toBe(0);
       expect(stdout.text).toBe("");
-      expect(stderr.text).toBe("");
+      expect(stderr.text).toContain("entry-composition");
     },
   );
 });

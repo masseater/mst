@@ -27,9 +27,13 @@ const findingsFor = (files: Readonly<Record<string, string>>) =>
 
 describe("runDependencyCatalogChecks", () => {
   it("stays silent where no workspace definition marks pnpm usage", () => {
-    expect(findingsFor({ "package.json": `{"dependencies": {"react": "^19.0.0"}}` })).toStrictEqual(
-      { problems: [], warnings: [], definitionUnreadable: false },
-    );
+    const { problems, warnings, definitionMissing } = findingsFor({
+      "package.json": `{"dependencies": {"react": "^19.0.0"}}`,
+    });
+
+    expect(problems).toStrictEqual([]);
+    expect(warnings).toStrictEqual([]);
+    expect(definitionMissing).toBe(true);
   });
 
   it("reports a workspace definition that does not parse", () => {
@@ -57,22 +61,24 @@ describe("runDependencyCatalogChecks", () => {
   });
 
   it("keeps quiet about an entry that a workspace override references", () => {
-    expect(
-      findingsFor({
-        "pnpm-workspace.yaml": `packages:\n  - packages/*\ncatalog:\n  vite: ^6.0.0\noverrides:\n  vite: "catalog:"\n`,
-        "packages/web/package.json": `{"dependencies": {"vite": "catalog:"}}`,
-      }),
-    ).toStrictEqual({ problems: [], warnings: [], definitionUnreadable: false });
+    const { problems, warnings } = findingsFor({
+      "pnpm-workspace.yaml": `packages:\n  - packages/*\ncatalog:\n  vite: ^6.0.0\noverrides:\n  vite: "catalog:"\n`,
+      "packages/web/package.json": `{"dependencies": {"vite": "catalog:"}}`,
+    });
+
+    expect(problems).toStrictEqual([]);
+    expect(warnings).toStrictEqual([]);
   });
 
   it("keeps quiet about an entry that a root manifest override references", () => {
-    expect(
-      findingsFor({
-        "pnpm-workspace.yaml": "packages:\n  - packages/*\ncatalog:\n  vite: ^6.0.0\n",
-        "package.json": `{"pnpm": {"overrides": {"vite": "catalog:"}}}`,
-        "packages/web/package.json": `{"dependencies": {"vite": "catalog:"}}`,
-      }),
-    ).toStrictEqual({ problems: [], warnings: [], definitionUnreadable: false });
+    const { problems, warnings } = findingsFor({
+      "pnpm-workspace.yaml": "packages:\n  - packages/*\ncatalog:\n  vite: ^6.0.0\n",
+      "package.json": `{"pnpm": {"overrides": {"vite": "catalog:"}}}`,
+      "packages/web/package.json": `{"dependencies": {"vite": "catalog:"}}`,
+    });
+
+    expect(problems).toStrictEqual([]);
+    expect(warnings).toStrictEqual([]);
   });
 
   it("tells a single manifest to inline the entry rather than to reference it", () => {

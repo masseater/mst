@@ -6,12 +6,14 @@ import { forbidNumberedSiblingFile } from "../lint/oxlint/rules/forbid-numbered-
 import { forbidOversizedFile } from "../lint/oxlint/rules/forbid-oversized-file--split-by-responsibility.ts";
 import { noAmbiguousVariableName } from "../lint/oxlint/rules/no-ambiguous-variable-name--rename-to-concrete-noun.ts";
 import { noArrayMutation } from "../lint/oxlint/rules/no-array-mutation--derive-new-array.ts";
+import { noCittyParentRun } from "../lint/oxlint/rules/no-citty-parent-run--move-run-into-a-subcommand.ts";
 import { noDefaultExport } from "../lint/oxlint/rules/no-default-export--use-named-export.ts";
 import { noDetachedRationale } from "../lint/oxlint/rules/no-detached-rationale--comment-at-explained-line.ts";
 import { noDetachedTestFile } from "../lint/oxlint/rules/no-detached-test-file--move-beside-source.ts";
 import { noDiscardedFailure } from "../lint/oxlint/rules/no-discarded-failure--receive-and-surface-it.ts";
 import { noDoubleTypeAssertion } from "../lint/oxlint/rules/no-double-type-assertion--declare-the-real-type.ts";
 import { noExplanatoryComment } from "../lint/oxlint/rules/no-explanatory-comment--delete-or-move-to-commit-message.ts";
+import { noHandmadeStandardIoDouble } from "../lint/oxlint/rules/no-handmade-standard-io-double--use-standard-io-test.ts";
 import { noHardcodedEndpoint } from "../lint/oxlint/rules/no-hardcoded-endpoint--read-from-configuration.ts";
 import { noHardcodedProviderId } from "../lint/oxlint/rules/no-hardcoded-provider-id--read-from-configuration.ts";
 import { noIdentityWrapper } from "../lint/oxlint/rules/no-identity-wrapper--call-the-target-directly.ts";
@@ -26,6 +28,7 @@ import { noTautologicalAssertion } from "../lint/oxlint/rules/no-tautological-as
 import { noUnorderedImport } from "../lint/oxlint/rules/no-unordered-import--group-by-origin-then-sort-by-specifier.ts";
 import { noUnwrappedToolchainConfig } from "../lint/oxlint/rules/no-unwrapped-toolchain-config--wrap-with-git-excludes.ts";
 import { requireReExportOnlyFiles } from "../lint/oxlint/rules/require-re-export-only-files--move-declaration-to-owning-module.ts";
+import { requireStandardIoSnapshot } from "../lint/oxlint/rules/require-standard-io-snapshot--pin-both-streams.ts";
 import {
   noDuplicatedBody,
   noLocalFiniteValueSet,
@@ -35,7 +38,7 @@ import {
 } from "../plugin.ts";
 import { UPSTREAM_PLUGINS, UPSTREAM_RULES, UPSTREAM_TEST_RULES } from "./upstream-rules.ts";
 
-export const PLUGIN_NAME = "dont-review-it";
+const PLUGIN_NAME = "dont-review-it";
 
 const MAX_LINES_PER_FILE = 400;
 
@@ -93,6 +96,7 @@ export const oxlint: OxlintConfig = defineConfig({
       [...FORBIDDEN_AMBIGUOUS_NAMES],
     ],
     [`${PLUGIN_NAME}/${noArrayMutation.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noCittyParentRun.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noDefaultExport.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noDetachedRationale.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noDetachedTestFile.name}`]: LINT_SEVERITY.ERROR,
@@ -100,6 +104,7 @@ export const oxlint: OxlintConfig = defineConfig({
     [`${PLUGIN_NAME}/${noDoubleTypeAssertion.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noDuplicatedBody.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noExplanatoryComment.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noHandmadeStandardIoDouble.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noHardcodedEndpoint.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noHardcodedProviderId.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noIdentityWrapper.name}`]: LINT_SEVERITY.ERROR,
@@ -124,6 +129,7 @@ export const oxlint: OxlintConfig = defineConfig({
       LINT_SEVERITY.ERROR,
       { targets: [...RE_EXPORT_ONLY_FILES] },
     ],
+    [`${PLUGIN_NAME}/${requireStandardIoSnapshot.name}`]: LINT_SEVERITY.ERROR,
     complexity: [LINT_SEVERITY.ERROR, { max: 10 }],
     "max-classes-per-file": [LINT_SEVERITY.ERROR, { max: 1 }],
     "max-depth": [LINT_SEVERITY.ERROR, { max: 4 }],

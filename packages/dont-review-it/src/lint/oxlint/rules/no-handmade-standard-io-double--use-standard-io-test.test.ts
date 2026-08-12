@@ -34,6 +34,11 @@ standardIoTest("captures", ({ stdout }) => {
         filename: "/repo/src/cli.test.ts",
       },
       {
+        name: "a builder-form extend under an unrelated name is not a stream double",
+        code: `const scenarioTest = test.extend("repository", () => "root");`,
+        filename: "/repo/src/cli.test.ts",
+      },
+      {
         name: "a stream-named property holding plain data is not a double",
         code: `const result = { stdout: "captured text", stderr: "" };`,
         filename: "/repo/src/cli.test.ts",
@@ -92,6 +97,12 @@ const home = process.env.HOME;`,
       {
         name: "an extend fixture named stderr is reported the same way",
         code: `const ioTest = it.extend({ stderr: async ({}, use) => { await use([]); } });`,
+        filename: "/repo/src/cli.test.ts",
+        errors: [{ messageId: "ownFixture" }],
+      },
+      {
+        name: "a builder-form extend naming a stream is the same redeclaration",
+        code: `const ioTest = test.extend("stdout", () => captureSomehow());`,
         filename: "/repo/src/cli.test.ts",
         errors: [{ messageId: "ownFixture" }],
       },

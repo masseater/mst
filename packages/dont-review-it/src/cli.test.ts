@@ -57,6 +57,7 @@ const repositoryWith = (files: Readonly<Record<string, string>>): string => {
     contents: JSON.stringify({
       name: "canonical-values-e2e",
       private: true,
+      scripts: { guard: "throttle --timeout 1800 -- spool -- vp check" },
       type: "module",
       workspaces: [],
     }),
@@ -124,7 +125,9 @@ describe("canonical values process e2e", { timeout: PROCESS_TIMEOUT * 4 }, () =>
       "src/owner.ts": validOwner("draft"),
     });
 
-    expect(runCli(root)).toMatchObject({ exitCode: 0, out: "", error: "" });
+    const verified = runCli(root);
+    expect(verified).toMatchObject({ exitCode: 0, out: "" });
+    expect(verified.error).toContain("checked canonical-values");
     expect(runLint(root, "src/owner.ts")).toMatchObject({ exitCode: 0 });
     const consumer = runLint(root, "src/consumer.ts");
     expect(consumer.exitCode).toBe(1);
@@ -203,7 +206,9 @@ describe("canonical values process e2e", { timeout: PROCESS_TIMEOUT * 4 }, () =>
   test("a package shadow subpath is an unregistered canonical import route", () => {
     const root = packageRouteRepository();
 
-    expect(runCli(root)).toMatchObject({ exitCode: 0, out: "", error: "" });
+    const verified = runCli(root);
+    expect(verified).toMatchObject({ exitCode: 0, out: "" });
+    expect(verified.error).toContain("checked canonical-values");
     const linted = runLint(root, "src/shadow-consumer.ts");
     expect(linted.exitCode).toBe(1);
     expect(linted.out).toContain(NO_LOCAL_CODE);
@@ -213,7 +218,9 @@ describe("canonical values process e2e", { timeout: PROCESS_TIMEOUT * 4 }, () =>
   test("an alias subpath that exports the owner symbol is a registered route", () => {
     const root = packageRouteRepository();
 
-    expect(runCli(root)).toMatchObject({ exitCode: 0, out: "", error: "" });
+    const verified = runCli(root);
+    expect(verified).toMatchObject({ exitCode: 0, out: "" });
+    expect(verified.error).toContain("checked canonical-values");
     expect(runLint(root, "src/alias-consumer.ts")).toMatchObject({ exitCode: 0 });
   });
 
@@ -329,6 +336,7 @@ const packageRouteRepository = (): string =>
     "package.json": JSON.stringify({
       name: "canonical-values-e2e",
       private: true,
+      scripts: { guard: "throttle --timeout 1800 -- spool -- vp check" },
       type: "module",
       workspaces: ["packages/*"],
     }),

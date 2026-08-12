@@ -1,3 +1,4 @@
+import { attempt } from "es-toolkit";
 import { parse } from "yaml";
 
 import { recordOf, stringEntriesOf } from "./record-fields.ts";
@@ -50,7 +51,15 @@ export const catalogReferencingOverridesIn = ({
       dependencyName: overrideTargetName(overrideKey),
     }));
 
-export const parseWorkspaceDefinition = ({
+export const parsedWorkspaceDefinitionOrNull = (definitionSource: {
+  readonly source: string;
+  readonly config: DependencyCatalogChecksConfig;
+}): WorkspaceDefinition | null => {
+  const [unparsableSource, definition] = attempt(() => parseWorkspaceDefinition(definitionSource));
+  return unparsableSource === null ? definition : null;
+};
+
+const parseWorkspaceDefinition = ({
   source,
   config,
 }: {

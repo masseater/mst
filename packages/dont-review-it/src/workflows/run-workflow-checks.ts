@@ -7,6 +7,7 @@ import { multiCommandRuns } from "./checks/single-command-run.ts";
 import { lineAtOffset, type WorkflowDocument } from "./workflow-document.ts";
 import { readWorkflowDocuments } from "./workflow-files.ts";
 
+import type { ScannedProblems } from "@mst/repository-checks";
 import type { RepositoryProblem } from "../problem.ts";
 import type { WorkflowChecksConfig } from "./config.ts";
 
@@ -48,7 +49,12 @@ export const runWorkflowChecks = ({
 }: {
   readonly repositoryRoot: string;
   readonly config: WorkflowChecksConfig;
-}): readonly RepositoryProblem[] =>
-  readWorkflowDocuments({ repositoryRoot, config })
-    .flatMap((document) => problemsIn({ document, config }))
-    .toSorted(byLocation);
+}): ScannedProblems => {
+  const documents = readWorkflowDocuments({ repositoryRoot, config });
+  return {
+    problems: documents
+      .flatMap((document) => problemsIn({ document, config }))
+      .toSorted(byLocation),
+    scanned: documents.length,
+  };
+};

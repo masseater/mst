@@ -1,13 +1,17 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "includeEntryExports": true,
-  "ignoreDependencies": ["vite", "@mst/agentic-documents"],
+  "ignoreBinaries": ["mkfifo"],
+  "ignoreDependencies": ["vite", "@mst/agentic-documents", "@mst/stop-ai-slop"],
   "workspaces": {
     "packages/dont-review-it": {
       "project": [
         "**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}!",
         "!src/lint/oxlint/lib/canonical-values/canonical-values.test-fixture.ts!"
       ]
+    },
+    "packages/stop-ai-slop": {
+      "project": ["src/**/*.ts!", "!src/check-test-repository.ts!", "!src/test-repository.ts!"]
     }
   }
 }

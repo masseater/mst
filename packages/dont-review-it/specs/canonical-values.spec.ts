@@ -77,6 +77,10 @@ export const ORDER_STATUSES = ["draft"] as const;
       "src/order.test.ts": `const FIXTURE_STATUSES = ["draft"] as const;
 `,
     });
-    expect(runChecks(repositoryRoot)).toStrictEqual({ problems: [], warnings: [] });
+    const { problems, warnings, failures } = runChecks(repositoryRoot);
+
+    expect(problems).toStrictEqual([]);
+    expect(warnings).toStrictEqual([]);
+    expect(failures).toStrictEqual([]);
   });
 });

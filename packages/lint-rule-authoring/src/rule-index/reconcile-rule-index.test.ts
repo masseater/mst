@@ -43,12 +43,15 @@ const declaringRepository = (extraFiles: Readonly<Record<string, string>> = {}):
 describe("lintRuleIndexProblems", () => {
   test("a repository without declaring workspaces has nothing to reconcile", () => {
     expect(
-      lintRuleIndexProblems({ repositoryRoot: repositoryWith({}), write: false }),
+      lintRuleIndexProblems({ repositoryRoot: repositoryWith({}), write: false }).problems,
     ).toStrictEqual([]);
   });
 
   test("a missing index is reported and its report spells the path first", () => {
-    const problems = lintRuleIndexProblems({ repositoryRoot: declaringRepository(), write: false });
+    const { problems } = lintRuleIndexProblems({
+      repositoryRoot: declaringRepository(),
+      write: false,
+    });
 
     expect(problems.length).toBe(1);
     expect(formatLintRuleIndexProblem(problems[0] ?? { file: "", message: "" })).toContain(
@@ -59,23 +62,25 @@ describe("lintRuleIndexProblems", () => {
   test("writing a missing index scaffolds it and the next check stays silent", () => {
     const root = declaringRepository();
 
-    expect(lintRuleIndexProblems({ repositoryRoot: root, write: true })).toStrictEqual([]);
+    expect(lintRuleIndexProblems({ repositoryRoot: root, write: true }).problems).toStrictEqual([]);
 
     const written = readFileSync(join(root, INDEX_PATH), "utf8");
     expect(written).toContain("# lint ルール索引");
     expect(written).toContain("<!-- BEGIN GENERATED lint-rules -->");
     expect(written).toContain("[no-thing--allow-it](./no-thing--allow-it.md)");
     expect(written).toContain("<!-- END GENERATED lint-rules -->");
-    expect(lintRuleIndexProblems({ repositoryRoot: root, write: false })).toStrictEqual([]);
+    expect(lintRuleIndexProblems({ repositoryRoot: root, write: false }).problems).toStrictEqual(
+      [],
+    );
   });
 
   test("an index without the generated region is reported until writing inserts one", () => {
     const root = declaringRepository({ [INDEX_PATH]: "# 手書きの索引\n\n散文だけがある。\n" });
 
-    const problems = lintRuleIndexProblems({ repositoryRoot: root, write: false });
+    const { problems } = lintRuleIndexProblems({ repositoryRoot: root, write: false });
     expect(problems[0]?.message).toContain("must not lose its generated region");
 
-    expect(lintRuleIndexProblems({ repositoryRoot: root, write: true })).toStrictEqual([]);
+    expect(lintRuleIndexProblems({ repositoryRoot: root, write: true }).problems).toStrictEqual([]);
     const written = readFileSync(join(root, INDEX_PATH), "utf8");
     expect(written.indexOf("<!-- BEGIN GENERATED lint-rules -->")).toBeLessThan(
       written.indexOf("# 手書きの索引"),
@@ -120,10 +125,10 @@ describe("lintRuleIndexProblems", () => {
 `,
     });
 
-    const problems = lintRuleIndexProblems({ repositoryRoot: root, write: false });
+    const { problems } = lintRuleIndexProblems({ repositoryRoot: root, write: false });
     expect(problems[0]?.message).toContain("must not fall behind the rule implementations");
 
-    expect(lintRuleIndexProblems({ repositoryRoot: root, write: true })).toStrictEqual([]);
+    expect(lintRuleIndexProblems({ repositoryRoot: root, write: true }).problems).toStrictEqual([]);
     const written = readFileSync(join(root, INDEX_PATH), "utf8");
     expect(written).toContain("前書き。");
     expect(written).toContain("後書き。");
@@ -145,7 +150,9 @@ describe("lintRuleIndexProblems", () => {
 `,
     });
 
-    expect(lintRuleIndexProblems({ repositoryRoot: root, write: false })).toStrictEqual([]);
+    expect(lintRuleIndexProblems({ repositoryRoot: root, write: false }).problems).toStrictEqual(
+      [],
+    );
   });
 
   test("two rules sharing a name are reported in either mode", () => {
@@ -154,14 +161,14 @@ describe("lintRuleIndexProblems", () => {
     });
 
     const checking = lintRuleIndexProblems({ repositoryRoot: root, write: false });
-    expect(checking.some((problem) => problem.message.includes("must not share the name"))).toBe(
-      true,
-    );
+    expect(
+      checking.problems.some((problem) => problem.message.includes("must not share the name")),
+    ).toBe(true);
 
     const writing = lintRuleIndexProblems({ repositoryRoot: root, write: true });
-    expect(writing.some((problem) => problem.message.includes("must not share the name"))).toBe(
-      true,
-    );
+    expect(
+      writing.problems.some((problem) => problem.message.includes("must not share the name")),
+    ).toBe(true);
   });
 
   test("a workspace with no rules yet still gets an index with an empty table", () => {
@@ -170,7 +177,7 @@ describe("lintRuleIndexProblems", () => {
       "packages/example/package.json": DECLARING_MANIFEST,
     });
 
-    expect(lintRuleIndexProblems({ repositoryRoot: root, write: true })).toStrictEqual([]);
+    expect(lintRuleIndexProblems({ repositoryRoot: root, write: true }).problems).toStrictEqual([]);
     expect(readFileSync(join(root, INDEX_PATH), "utf8")).toContain(
       "| ルール | 説明 | ツール | 補足 |",
     );
