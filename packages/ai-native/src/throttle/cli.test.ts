@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { readdirSync } from "node:fs";
+import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { text } from "node:stream/consumers";
@@ -12,7 +12,16 @@ import { describe, expect, onTestFinished, test, vi } from "vite-plus/test";
 import { ensureSlots } from "./slots.ts";
 
 const CLI_PATH = fileURLToPath(new URL("./cli.ts", import.meta.url));
-const DEFAULT_SLOT_DIR = join(tmpdir(), "mst-throttle", "mst");
+
+const isolatedTmp = (): string => {
+  const dir = mkdtempSync(join(tmpdir(), "throttle-cli-tmp-"));
+  onTestFinished(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+  return dir;
+};
+
+const slotDirUnder = (tmpRoot: string): string => join(tmpRoot, "mst-throttle", "mst");
 
 type ProcessReport = {
   code: number | null;
@@ -21,8 +30,15 @@ type ProcessReport = {
   stderr: string;
 };
 
-const collect = async (executable: string, args: readonly string[]): Promise<ProcessReport> => {
-  const child = spawn(executable, [...args], { stdio: ["ignore", "pipe", "pipe"] });
+const collect = async (invocation: {
+  executable: string;
+  args: readonly string[];
+  tmpRoot: string;
+}): Promise<ProcessReport> => {
+  const child = spawn(invocation.executable, [...invocation.args], {
+    stdio: ["ignore", "pipe", "pipe"],
+    env: { ...process.env, TMPDIR: invocation.tmpRoot },
+  });
   const childEnd = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(
     (resolve) => {
       child.once("exit", (code, signal) => {
@@ -44,13 +60,13 @@ const waitUntil = async (isDone: () => boolean): Promise<void> => {
   return waitUntil(isDone);
 };
 
-const acquireDefaultSlot = async (): Promise<() => Promise<void>> => {
-  ensureSlots(DEFAULT_SLOT_DIR, 1);
+const acquireSlotIn = async (slotDir: string): Promise<() => Promise<void>> => {
+  ensureSlots(slotDir, 1);
   try {
-    return await lock(join(DEFAULT_SLOT_DIR, "slot-0"), { stale: 60_000, retries: 0 });
+    return await lock(join(slotDir, "slot-0"), { stale: 60_000, retries: 0 });
   } catch (heldElsewhere) {
     await delay(200);
-    return acquireDefaultSlot();
+    return acquireSlotIn(slotDir);
   }
 };
 
@@ -59,7 +75,11 @@ describe("cli", () => {
     "a call without a command prints the usage on stderr and exits 2",
     { timeout: 20_000 },
     async () => {
-      const report = await collect(process.execPath, [CLI_PATH]);
+      const report = await collect({
+        executable: process.execPath,
+        args: [CLI_PATH],
+        tmpRoot: isolatedTmp(),
+      });
 
       expect(report.code).toBe(2);
       expect(report.stdout).toBe("");
@@ -71,17 +91,16 @@ describe("cli", () => {
     "the child's streams pass through byte for byte, plus only throttle's own stderr lines",
     { timeout: 30_000 },
     async () => {
+      const tmpRoot = isolatedTmp();
       const script =
         "process.stdout.write('alpha\\nbeta\\n'); process.stderr.write('gamma\\ndelta\\n');";
 
-      const direct = await collect(process.execPath, ["-e", script]);
-      const wrapped = await collect(process.execPath, [
-        CLI_PATH,
-        "--",
-        process.execPath,
-        "-e",
-        script,
-      ]);
+      const direct = await collect({ executable: process.execPath, args: ["-e", script], tmpRoot });
+      const wrapped = await collect({
+        executable: process.execPath,
+        args: [CLI_PATH, "--", process.execPath, "-e", script],
+        tmpRoot,
+      });
 
       expect(direct.code).toBe(0);
       expect(wrapped.code).toBe(0);
@@ -102,13 +121,16 @@ describe("cli", () => {
       onTestFinished(() => {
         vi.unstubAllEnvs();
       });
-      const release = await acquireDefaultSlot();
+      const tmpRoot = isolatedTmp();
+      const slotDir = slotDirUnder(tmpRoot);
+      const release = await acquireSlotIn(slotDir);
       onTestFinished(async () => {
         await release();
       });
-      const waitersDir = join(DEFAULT_SLOT_DIR, "waiters");
+      const waitersDir = join(slotDir, "waiters");
       const child = spawn(process.execPath, [CLI_PATH, "--", process.execPath, "-e", ""], {
         stdio: ["ignore", "pipe", "pipe"],
+        env: { ...process.env, TMPDIR: tmpRoot, MST_THROTTLE_LIMIT: "" },
       });
       const childDeath = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(
         (resolve) => {

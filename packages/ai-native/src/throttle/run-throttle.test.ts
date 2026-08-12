@@ -74,6 +74,7 @@ describe("run-throttle", () => {
     { timeout: 30_000 },
     async () => {
       stubLimit(undefined);
+      vi.stubEnv("TMPDIR", temporaryDirectory("throttle-default-tmp-"));
       const stderrText = captureStderr();
 
       expect(await runThrottle(trivialCommand)).toBe(0);
