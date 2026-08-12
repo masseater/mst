@@ -1,4 +1,4 @@
-export const MATCHER_FAMILIES = [
+const MATCHER_FAMILIES = [
   "containment",
   "loose-structure",
   "magnitude",
@@ -35,22 +35,6 @@ export const CALL_CONTRACT_MATCHERS: ReadonlySet<string> = new Set([
   "toHaveBeenNthCalledWith",
 ]);
 
-export const RETURN_RECORD_MATCHERS: ReadonlySet<string> = new Set([
-  "toHaveLastResolvedWith",
-  "toHaveLastReturnedWith",
-  "toHaveNthResolvedWith",
-  "toHaveNthReturnedWith",
-  "toHaveResolved",
-  "toHaveResolvedTimes",
-  "toHaveResolvedWith",
-  "toHaveReturned",
-  "toHaveReturnedTimes",
-  "toHaveReturnedWith",
-  "toReturn",
-  "toReturnTimes",
-  "toReturnWith",
-]);
-
 export const SNAPSHOT_MATCHERS: ReadonlySet<string> = new Set([
   "matchSnapshot",
   "toMatchFileSnapshot",
@@ -77,16 +61,9 @@ export const THROW_EXPECTING_MODIFIERS: ReadonlySet<string> = new Set(["rejects"
 
 export const DERIVED_ASSERTION_RECEIVERS: ReadonlySet<string> = new Set(["poll", "soft"]);
 
-export const EXPECT_UTILITY_MEMBERS: ReadonlySet<string> = new Set([
-  "addEqualityTesters",
-  "addSnapshotSerializer",
-  "assert",
+export const ASSERTION_COUNT_DECLARATIONS: ReadonlySet<string> = new Set([
   "assertions",
-  "extend",
-  "getState",
   "hasAssertions",
-  "setState",
-  "unreachable",
 ]);
 
 export const WEAK_MATCHERS: readonly WeakMatcher[] = [
@@ -270,10 +247,3 @@ export const REDUNDANT_MATCHERS: readonly RedundantMatcher[] = [
   { name: "toBeCalledWith", writeInstead: "toHaveBeenCalledWith()" },
   { name: "matchSnapshot", writeInstead: "toMatchSnapshot()" },
 ];
-
-export const unverifiedRegionOf = (name: string): string | null =>
-  [...WEAK_MATCHERS, ...WEAK_ASYMMETRIC_MATCHERS].find((matcher) => matcher.name === name)
-    ?.unverified ?? null;
-
-export const writeInsteadOf = (name: string): string | null =>
-  REDUNDANT_MATCHERS.find((matcher) => matcher.name === name)?.writeInstead ?? null;

@@ -198,7 +198,7 @@ export const UPSTREAM_TEST_RULES: NonNullable<OxlintConfig["rules"]> = {
   "vitest/no-import-node-test": LINT_SEVERITY.ERROR,
   "vitest/no-interpolation-in-snapshots": LINT_SEVERITY.ERROR,
   "vitest/no-mocks-import": LINT_SEVERITY.ERROR,
-  "vitest/no-standalone-expect": LINT_SEVERITY.ERROR,
+  "vitest/no-standalone-expect": LINT_SEVERITY.OFF,
   "vitest/no-test-return-statement": LINT_SEVERITY.ERROR,
   "vitest/no-unneeded-async-expect-function": LINT_SEVERITY.ERROR,
   "vitest/prefer-called-exactly-once-with": LINT_SEVERITY.ERROR,
@@ -219,5 +219,5 @@ export const UPSTREAM_TEST_RULES: NonNullable<OxlintConfig["rules"]> = {
   "vitest/valid-describe-callback": LINT_SEVERITY.ERROR,
   "vitest/valid-expect": LINT_SEVERITY.ERROR,
   "vitest/valid-title": LINT_SEVERITY.ERROR,
-  "vitest/warn-todo": LINT_SEVERITY.WARN,
+  "vitest/warn-todo": LINT_SEVERITY.ERROR,
 };

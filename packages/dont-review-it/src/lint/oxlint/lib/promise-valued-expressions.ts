@@ -49,7 +49,7 @@ export const carriedThroughExpression = (node: ESTree.Expression): ESTree.Expres
   return node;
 };
 
-export const isPromiseType = (node: ESTree.TSType): boolean => {
+const isPromiseType = (node: ESTree.TSType): boolean => {
   if (node.type === "TSTypeReference") {
     return node.typeName.type === "Identifier" && PROMISE_TYPE_NAMES.has(node.typeName.name);
   }

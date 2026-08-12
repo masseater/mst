@@ -1,9 +1,11 @@
 import { testLintRule } from "@mst/lint-rule-authoring";
-import { describe, expect, test } from "vite-plus/test";
+import { describe, expect, it } from "vite-plus/test";
 
 import { requireReExportOnlyFiles } from "./require-re-export-only-files--move-declaration-to-owning-module.ts";
 
 const listedAsSurface = [{ targets: ["index.ts"] }];
+
+const optionsSchema = requireReExportOnlyFiles.meta.schema;
 
 describe("dont-review-it/require-re-export-only-files--move-declaration-to-owning-module", () => {
   testLintRule(requireReExportOnlyFiles, {
@@ -213,8 +215,8 @@ describe("dont-review-it/require-re-export-only-files--move-declaration-to-ownin
     ],
   });
 
-  test("the options schema demands a listing and refuses any other key", () => {
-    expect(requireReExportOnlyFiles.meta.schema).toStrictEqual([
+  it("the options schema demands a listing and refuses any other key", () => {
+    expect(optionsSchema).toStrictEqual([
       {
         type: "object",
         properties: {

@@ -3,7 +3,7 @@ import { unwrapSubject } from "./subject-expressions.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
-export const TEST_BLOCK_MODIFIERS: ReadonlySet<string> = new Set([
+const TEST_BLOCK_MODIFIERS: ReadonlySet<string> = new Set([
   "concurrent",
   "each",
   "fails",
@@ -17,7 +17,7 @@ export const TEST_BLOCK_MODIFIERS: ReadonlySet<string> = new Set([
   "todo",
 ]);
 
-export const isTestBlockModifier = (name: string): boolean => TEST_BLOCK_MODIFIERS.has(name);
+const isTestBlockModifier = (name: string): boolean => TEST_BLOCK_MODIFIERS.has(name);
 
 export const testBlockRootIdentifier = (
   callee: ESTree.Expression,

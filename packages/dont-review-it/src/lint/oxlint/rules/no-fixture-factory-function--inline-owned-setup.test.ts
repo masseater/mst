@@ -84,6 +84,31 @@ describe("dont-review-it/no-fixture-factory-function--inline-owned-setup", () =>
         code: `const test = baseTest.extend("failing", () => () => summarise(-1));`,
       },
       {
+        name: "a thunk a test block names without reading is read by nothing asking for another shape",
+        filename: SPEC_FILE,
+        code: `const test = baseTest.extend("failing", () => () => summarise(-1));\ntest("refuses a negative port", ({ failing }) => {\n  expect(summarise(-1)).toBeUndefined();\n});`,
+      },
+      {
+        name: "a runner taken in through an import roots the same reading",
+        filename: SPEC_FILE,
+        code: `import { test as baseTest } from "vite-plus/test";\n\nconst test = baseTest.extend("report", () => summarise(3000));`,
+      },
+      {
+        name: "a test block taking the whole context names no fixture this reading can follow",
+        filename: SPEC_FILE,
+        code: `const test = baseTest.extend("build", () => () => summarise(3000));\ntest("summarises the port", (fixtureContext) => {\n  expect(fixtureContext.build()).toStrictEqual({ port: 3000 });\n});`,
+      },
+      {
+        name: "a name the fixture never bound carries no function this reading can reach",
+        filename: SPEC_FILE,
+        code: `const test = baseTest.extend("build", () => {\n  return sharedBuilder;\n});`,
+      },
+      {
+        name: "a name bound to itself leaves this reading with no function to reach",
+        filename: SPEC_FILE,
+        code: `const test = baseTest.extend("build", () => {\n  const build = build;\n  return build;\n});`,
+      },
+      {
         name: "a file that is not a spec is left alone",
         filename: "report.ts",
         code: `const test = baseTest.extend("report", () => (port) => summarise(port));`,
@@ -142,6 +167,18 @@ describe("dont-review-it/no-fixture-factory-function--inline-owned-setup", () =>
         name: "a function handed back and called for its result leaves the subject to the test block",
         filename: SPEC_FILE,
         code: `const test = baseTest.extend("build", () => () => summarise(3000));\ntest("summarises the port", ({ build }) => {\n  expect(build()).toStrictEqual({ port: 3000 });\n});`,
+        errors: [{ messageId: "handedBackFunction" }],
+      },
+      {
+        name: "a callback spelled as a named function expression is followed to the thunk it reads",
+        filename: SPEC_FILE,
+        code: `const test = baseTest.extend("build", () => () => summarise(3000));\ntest("summarises the port", function run({ build }) {\n  expect(build()).toStrictEqual({ port: 3000 });\n});`,
+        errors: [{ messageId: "handedBackFunction" }],
+      },
+      {
+        name: "a thunk written over before the assertion is not the thunk that assertion demands fail",
+        filename: SPEC_FILE,
+        code: `const test = baseTest.extend("failing", () => () => summarise(-1));\ntest("refuses a negative port", ({ failing }) => {\n  failing = () => summarise(-2);\n  expect(failing).toThrow(new RangeError("port is negative"));\n});`,
         errors: [{ messageId: "handedBackFunction" }],
       },
       {
@@ -214,6 +251,36 @@ describe("dont-review-it/no-fixture-factory-function--inline-owned-setup", () =>
         name: "a thunk taken apart into a pattern this reading cannot follow is not shown to be one",
         filename: SPEC_FILE,
         code: `const test = baseTest.extend("failing", () => () => summarise(-1));\ntest("refuses a negative port", ({ failing = fallbackThunk }) => {\n  expect(failing).toThrow(new RangeError("port is negative"));\n});`,
+        errors: [{ messageId: "handedBackFunction" }],
+      },
+      {
+        name: "a matcher reached through a name decided at run time states no demand for a failure",
+        filename: SPEC_FILE,
+        code: `const test = baseTest.extend("failing", () => () => summarise(-1));\ntest("refuses a negative port", ({ failing }) => {\n  expect(failing)[chosenMatcher]();\n});`,
+        errors: [{ messageId: "handedBackFunction" }],
+      },
+      {
+        name: "a modifier reached through a name decided at run time breaks the chain this reading walks",
+        filename: SPEC_FILE,
+        code: `const test = baseTest.extend("failing", () => () => summarise(-1));\ntest("refuses a negative port", ({ failing }) => {\n  expect(failing)[chosenModifier].toThrow(new RangeError("port is negative"));\n});`,
+        errors: [{ messageId: "handedBackFunction" }],
+      },
+      {
+        name: "a thunk spread into the assertion entry is not the subject that entry states",
+        filename: SPEC_FILE,
+        code: `const test = baseTest.extend("failing", () => () => summarise(-1));\ntest("refuses a negative port", ({ failing }) => {\n  expect(...[failing]).toThrow(new RangeError("port is negative"));\n});`,
+        errors: [{ messageId: "handedBackFunction" }],
+      },
+      {
+        name: "an assertion entry standing on no subject demands no failure of the thunk it names",
+        filename: SPEC_FILE,
+        code: `const test = baseTest.extend("failing", () => () => summarise(-1));\ntest("refuses a negative port", ({ failing }) => {\n  expect().toThrow(failing);\n});`,
+        errors: [{ messageId: "handedBackFunction" }],
+      },
+      {
+        name: "a thunk called inside another function leaves the demanded failure to that function",
+        filename: SPEC_FILE,
+        code: `const test = baseTest.extend("failing", () => () => summarise(-1));\ntest("refuses a negative port", ({ failing }) => {\n  expect(() => failing()).toThrow(new RangeError("port is negative"));\n});`,
         errors: [{ messageId: "handedBackFunction" }],
       },
       {

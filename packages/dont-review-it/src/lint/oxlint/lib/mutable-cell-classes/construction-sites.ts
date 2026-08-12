@@ -78,7 +78,7 @@ const declaredClassesIn = (visits: readonly NodeVisit[]): readonly DeclaredClass
       return [
         {
           name,
-          fields: stateFieldsWrittenAfterConstruction(visit.node),
+          fields: [...stateFieldsWrittenAfterConstruction(visit.node)],
           shared: visit.ancestors
             .slice(-1)
             .some((parent) => SHARED_PARENT_KINDS.has(nodeTypeOf(parent))),

@@ -1,13 +1,11 @@
 import { join } from "node:path";
 
-import { isPlainObject } from "es-toolkit";
+import { isPlainObject, memoize } from "es-toolkit";
 
 import { readJsonFile } from "../canonical-values/read-json-file.ts";
 import { bareRuleNameOf, namesRule, suppressionDirectiveOf } from "./suppression-directives.ts";
 
 export const APPROVAL_LEDGER_FILE_NAME = "approved-lint-suppressions.json";
-
-const COMMENT_BODIES = /\/\/(?<lineBody>[^\n]*)|\/\*(?<blockBody>[\s\S]*?)\*\//gu;
 
 export type SuppressionApproval = {
   readonly path: string;
@@ -37,16 +35,9 @@ const approvalOf = (declared: unknown): readonly SuppressionApproval[] => {
 const approvalsIn = (held: unknown): readonly SuppressionApproval[] =>
   Array.isArray(held) ? held.flatMap(approvalOf) : [];
 
-const approvalsByRepository = new Map<string, readonly SuppressionApproval[]>();
-
-export const approvalLedgerIn = (repositoryRoot: string): readonly SuppressionApproval[] => {
-  const memoized = approvalsByRepository.get(repositoryRoot);
-  if (memoized !== undefined) return memoized;
-
-  const read = approvalsIn(readJsonFile(join(repositoryRoot, APPROVAL_LEDGER_FILE_NAME)));
-  approvalsByRepository.set(repositoryRoot, read);
-  return read;
-};
+export const approvalLedgerIn = memoize((repositoryRoot: string): readonly SuppressionApproval[] =>
+  approvalsIn(readJsonFile(join(repositoryRoot, APPROVAL_LEDGER_FILE_NAME))),
+);
 
 export const approvalFor = ({
   ledger,
@@ -67,6 +58,11 @@ export const gapIn = (approval: SuppressionApproval): string | null => {
   return approval.approver === "" ? "approver" : null;
 };
 
+const COMMENTS = /\/\/[^\n]*|\/\*[\s\S]*?\*\//gu;
+
+const bodyOf = (comment: string): string =>
+  comment.startsWith("//") ? comment.slice(2) : comment.slice(2, -2);
+
 export const holdsDirectiveNaming = ({
   text,
   ruleName,
@@ -74,9 +70,7 @@ export const holdsDirectiveNaming = ({
   readonly text: string;
   readonly ruleName: string;
 }): boolean =>
-  [...text.matchAll(COMMENT_BODIES)].some((match) => {
-    const directive = suppressionDirectiveOf({
-      value: match.groups?.lineBody ?? match.groups?.blockBody ?? "",
-    });
+  [...text.matchAll(COMMENTS)].some((match) => {
+    const directive = suppressionDirectiveOf({ value: bodyOf(match[0]) });
     return directive !== null && namesRule({ directive, ruleName });
   });

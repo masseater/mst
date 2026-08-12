@@ -10,67 +10,230 @@ import {
 } from "./nodes.ts";
 import { parseMarkdown } from "./parse.ts";
 
-import type { Nodes, Parent } from "mdast";
-
-const nodesIn = (source: string): readonly Nodes[] => descendants(parseMarkdown(source));
-
-const firstOfType = (source: string, type: string): Nodes => {
-  const found = nodesIn(source).find((node) => node.type === type);
-  if (found === undefined) throw new Error(`no ${type} in: ${source}`);
-  return found;
-};
+const it = test
+  .extend("nodesBelowAListDocument", () => descendants(parseMarkdown("- one\n")))
+  .extend("lineTheProseParagraphStartsAt", () => {
+    const paragraph = descendants(parseMarkdown("# title\n\nprose\n")).find(
+      (node) => node.type === "paragraph",
+    );
+    if (paragraph === undefined) throw new Error("the document holds no paragraph");
+    return lineOf(paragraph);
+  })
+  .extend("offsetTheProseParagraphStartsAt", () => {
+    const paragraph = descendants(parseMarkdown("# title\n\nprose\n")).find(
+      (node) => node.type === "paragraph",
+    );
+    if (paragraph === undefined) throw new Error("the document holds no paragraph");
+    return offsetOf(paragraph);
+  })
+  .extend("proseOfAParagraphWithTheCodeDropped", () => {
+    const paragraph = descendants(parseMarkdown("prose `code` more\n")).find(
+      (node) => node.type === "paragraph",
+    );
+    if (paragraph === undefined) throw new Error("the document holds no paragraph");
+    return flattenTextDroppingCode(paragraph);
+  })
+  .extend("proseOfAParagraphWithTheCodeKept", () => {
+    const paragraph = descendants(parseMarkdown("prose `code` more\n")).find(
+      (node) => node.type === "paragraph",
+    );
+    if (paragraph === undefined) throw new Error("the document holds no paragraph");
+    return flattenTextKeepingCode(paragraph);
+  })
+  .extend("proseOfAnImageWithTheCodeDropped", () => {
+    const image = descendants(parseMarkdown("![alt](a.png)\n")).find(
+      (node) => node.type === "image",
+    );
+    if (image === undefined) throw new Error("the document holds no image");
+    return flattenTextDroppingCode(image);
+  })
+  .extend("proseOfAnImageWithTheCodeKept", () => {
+    const image = descendants(parseMarkdown("![alt](a.png)\n")).find(
+      (node) => node.type === "image",
+    );
+    if (image === undefined) throw new Error("the document holds no image");
+    return flattenTextKeepingCode(image);
+  })
+  .extend("leadingParagraphOfAnItemOpeningWithProse", () => {
+    const item = descendants(parseMarkdown("- one\n")).find((node) => node.type === "listItem");
+    if (item === undefined) throw new Error("the document holds no list item");
+    return leadingParagraphOf(item);
+  })
+  .extend("leadingParagraphOfAnItemOpeningWithANestedList", () => {
+    const item = descendants(parseMarkdown("- - nested\n")).find(
+      (node) => node.type === "listItem",
+    );
+    if (item === undefined) throw new Error("the document holds no list item");
+    return leadingParagraphOf(item);
+  })
+  .extend("leadingParagraphOfAnItemHoldingNothing", () => {
+    const item = descendants(parseMarkdown("-\n")).find((node) => node.type === "listItem");
+    if (item === undefined) throw new Error("the document holds no list item");
+    return leadingParagraphOf(item);
+  });
 
 describe("markdown nodes", () => {
-  test("a tree hands back every node below it", () => {
-    expect(nodesIn("- one\n").map((node) => node.type)).toStrictEqual([
-      "list",
-      "listItem",
-      "paragraph",
-      "text",
+  it("a tree hands back every node below it", ({ nodesBelowAListDocument }) => {
+    expect(nodesBelowAListDocument).toStrictEqual([
+      {
+        type: "list",
+        ordered: false,
+        start: null,
+        spread: false,
+        children: [
+          {
+            type: "listItem",
+            checked: null,
+            spread: false,
+            children: [
+              {
+                type: "paragraph",
+                children: [
+                  {
+                    type: "text",
+                    value: "one",
+                    position: {
+                      start: { line: 1, column: 3, offset: 2 },
+                      end: { line: 1, column: 6, offset: 5 },
+                    },
+                  },
+                ],
+                position: {
+                  start: { line: 1, column: 3, offset: 2 },
+                  end: { line: 1, column: 6, offset: 5 },
+                },
+              },
+            ],
+            position: {
+              start: { line: 1, column: 1, offset: 0 },
+              end: { line: 1, column: 6, offset: 5 },
+            },
+          },
+        ],
+        position: {
+          start: { line: 1, column: 1, offset: 0 },
+          end: { line: 1, column: 6, offset: 5 },
+        },
+      },
+      {
+        type: "listItem",
+        checked: null,
+        spread: false,
+        children: [
+          {
+            type: "paragraph",
+            children: [
+              {
+                type: "text",
+                value: "one",
+                position: {
+                  start: { line: 1, column: 3, offset: 2 },
+                  end: { line: 1, column: 6, offset: 5 },
+                },
+              },
+            ],
+            position: {
+              start: { line: 1, column: 3, offset: 2 },
+              end: { line: 1, column: 6, offset: 5 },
+            },
+          },
+        ],
+        position: {
+          start: { line: 1, column: 1, offset: 0 },
+          end: { line: 1, column: 6, offset: 5 },
+        },
+      },
+      {
+        type: "paragraph",
+        children: [
+          {
+            type: "text",
+            value: "one",
+            position: {
+              start: { line: 1, column: 3, offset: 2 },
+              end: { line: 1, column: 6, offset: 5 },
+            },
+          },
+        ],
+        position: {
+          start: { line: 1, column: 3, offset: 2 },
+          end: { line: 1, column: 6, offset: 5 },
+        },
+      },
+      {
+        type: "text",
+        value: "one",
+        position: {
+          start: { line: 1, column: 3, offset: 2 },
+          end: { line: 1, column: 6, offset: 5 },
+        },
+      },
     ]);
   });
 
-  test("a node knows the line and the offset it starts at", () => {
-    const paragraph = firstOfType("# title\n\nprose\n", "paragraph");
-
-    expect(lineOf(paragraph)).toBe(3);
-    expect(offsetOf(paragraph)).toBe(9);
+  it("a node knows the line it starts at", ({ lineTheProseParagraphStartsAt }) => {
+    expect(lineTheProseParagraphStartsAt).toBe(3);
   });
 
-  test("flattening drops the code it passes and keeps the prose", () => {
-    const paragraph = firstOfType("prose `code` more\n", "paragraph");
-
-    expect(flattenTextDroppingCode(paragraph)).toBe("prose   more");
+  it("a node knows the offset it starts at", ({ offsetTheProseParagraphStartsAt }) => {
+    expect(offsetTheProseParagraphStartsAt).toBe(9);
   });
 
-  test("flattening the other way keeps the code as it was written", () => {
-    const paragraph = firstOfType("prose `code` more\n", "paragraph");
-
-    expect(flattenTextKeepingCode(paragraph)).toBe("prose `code` more");
+  it("flattening drops the code it passes and keeps the prose", ({
+    proseOfAParagraphWithTheCodeDropped,
+  }) => {
+    expect(proseOfAParagraphWithTheCodeDropped).toBe("prose   more");
   });
 
-  test("a node that carries neither text nor children flattens to nothing", () => {
-    const image = firstOfType("![alt](a.png)\n", "image");
-
-    expect(flattenTextDroppingCode(image)).toBe("");
-    expect(flattenTextKeepingCode(image)).toBe("");
+  it("flattening the other way keeps the code as it was written", ({
+    proseOfAParagraphWithTheCodeKept,
+  }) => {
+    expect(proseOfAParagraphWithTheCodeKept).toBe("prose `code` more");
   });
 
-  test("a list item that opens with prose hands back that paragraph", () => {
-    const item = firstOfType("- one\n", "listItem") as Nodes & Parent;
-
-    expect(leadingParagraphOf(item)?.type).toBe("paragraph");
+  it("a node that carries neither text nor children drops to nothing", ({
+    proseOfAnImageWithTheCodeDropped,
+  }) => {
+    expect(proseOfAnImageWithTheCodeDropped).toBe("");
   });
 
-  test("a list item that opens with something else hands back nothing", () => {
-    const item = firstOfType("- - nested\n", "listItem") as Nodes & Parent;
-
-    expect(leadingParagraphOf(item)).toBe(null);
+  it("a node that carries neither text nor children keeps nothing either", ({
+    proseOfAnImageWithTheCodeKept,
+  }) => {
+    expect(proseOfAnImageWithTheCodeKept).toBe("");
   });
 
-  test("a list item that holds nothing at all hands back nothing", () => {
-    const item = firstOfType("-\n", "listItem") as Nodes & Parent;
+  it("a list item that opens with prose hands back that paragraph", ({
+    leadingParagraphOfAnItemOpeningWithProse,
+  }) => {
+    expect(leadingParagraphOfAnItemOpeningWithProse).toStrictEqual({
+      type: "paragraph",
+      children: [
+        {
+          type: "text",
+          value: "one",
+          position: {
+            start: { line: 1, column: 3, offset: 2 },
+            end: { line: 1, column: 6, offset: 5 },
+          },
+        },
+      ],
+      position: {
+        start: { line: 1, column: 3, offset: 2 },
+        end: { line: 1, column: 6, offset: 5 },
+      },
+    });
+  });
 
-    expect(leadingParagraphOf(item)).toBe(null);
+  it("a list item that opens with something else hands back nothing", ({
+    leadingParagraphOfAnItemOpeningWithANestedList,
+  }) => {
+    expect(leadingParagraphOfAnItemOpeningWithANestedList).toBe(null);
+  });
+
+  it("a list item that holds nothing at all hands back nothing", ({
+    leadingParagraphOfAnItemHoldingNothing,
+  }) => {
+    expect(leadingParagraphOfAnItemHoldingNothing).toBe(null);
   });
 });

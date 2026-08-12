@@ -1,5 +1,6 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
 import { ancestorsOf } from "../lib/ast-node.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { resolveBinding, type ScopeLookup } from "../lib/resolved-bindings.ts";
 import {
   isAssertionEntryCall,
@@ -370,7 +371,6 @@ export const noVacuousHostObjectEquality = createDontReviewItRule({
       modules: runtimeModulesFrom(context.options),
     });
     const reader = specReaderOf({ lookup: lookupOf({ imports, hostTypes, scopeAt }), scopeAt });
-    const recordings = new Set<SnapshotRecording>();
     const matcher = parsedValueMatcherFrom(context.options);
 
     const reportComparison = (site: ComparisonSite): void => {
@@ -402,16 +402,15 @@ export const noVacuousHostObjectEquality = createDontReviewItRule({
 
     return {
       CallExpression(node: ESTree.CallExpression) {
-        const recorded = snapshotRecordingOf(node);
-        if (recorded !== null) {
-          recordings.add(recorded);
-          return;
-        }
+        if (snapshotRecordingOf(node) !== null) return;
+
         const site = comparisonSiteOf(node);
         if (site !== null) reportComparison(site);
       },
-      "Program:exit"() {
-        const taken = [...recordings];
+      "Program:exit"(program: ESTree.Program) {
+        const taken = nodesOfType(program, "CallExpression").flatMap(
+          (node) => snapshotRecordingOf(node) ?? [],
+        );
         const resolved = entryKeysOf(taken.map((recording) => recording.site));
         for (const [index, recording] of taken.entries()) {
           const records = recordsAt({

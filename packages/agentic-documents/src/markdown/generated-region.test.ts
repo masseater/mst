@@ -4,37 +4,58 @@ import { generatedRanges, isInsideGeneratedRegion } from "./generated-region.ts"
 
 const BOUNDARIES = [{ begin: "<!--BEGIN-->", end: "<!--END-->" }];
 
-const rangesIn = (source: string) => generatedRanges(source, BOUNDARIES);
+const it = test
+  .extend("rangesOfADocumentThatOpensAndClosesARegion", () =>
+    generatedRanges("prose\n<!--BEGIN-->\ngenerated\n<!--END-->\nmore\n", BOUNDARIES))
+  .extend("rangesOfADocumentThatNeverOpensARegion", () =>
+    generatedRanges("prose only\n", BOUNDARIES),
+  )
+  .extend("rangesOfADocumentThatOpensWithoutClosing", () =>
+    generatedRanges("prose\n<!--BEGIN-->\ngenerated\n", BOUNDARIES),
+  )
+  .extend("verdictOnAnOffsetInsideTheRegion", () =>
+    isInsideGeneratedRegion(
+      19,
+      generatedRanges("prose\n<!--BEGIN-->\ngenerated\n<!--END-->\nmore\n", BOUNDARIES),
+    ),
+  )
+  .extend("verdictOnAnOffsetOutsideEveryRegion", () =>
+    isInsideGeneratedRegion(
+      0,
+      generatedRanges("prose\n<!--BEGIN-->\ngenerated\n<!--END-->\nmore\n", BOUNDARIES),
+    ),
+  );
 
 describe("generatedRanges", () => {
-  test("a region that opens and closes is one range", () => {
-    const source = "prose\n<!--BEGIN-->\ngenerated\n<!--END-->\nmore\n";
-
-    expect(rangesIn(source)).toStrictEqual([
-      {
-        startOffset: source.indexOf("<!--BEGIN-->"),
-        endOffset: source.indexOf("<!--END-->") + "<!--END-->".length,
-      },
+  it("a region that opens and closes is one range", ({
+    rangesOfADocumentThatOpensAndClosesARegion,
+  }) => {
+    expect(rangesOfADocumentThatOpensAndClosesARegion).toStrictEqual([
+      { startOffset: 6, endOffset: 39 },
     ]);
   });
 
-  test("a document that never opens a region has none", () => {
-    expect(rangesIn("prose only\n")).toStrictEqual([]);
+  it("a document that never opens a region has none", ({
+    rangesOfADocumentThatNeverOpensARegion,
+  }) => {
+    expect(rangesOfADocumentThatNeverOpensARegion).toStrictEqual([]);
   });
 
-  test("a region that opens and never closes is not a range", () => {
-    expect(rangesIn("prose\n<!--BEGIN-->\ngenerated\n")).toStrictEqual([]);
+  it("a region that opens and never closes is not a range", ({
+    rangesOfADocumentThatOpensWithoutClosing,
+  }) => {
+    expect(rangesOfADocumentThatOpensWithoutClosing).toStrictEqual([]);
   });
 });
 
 describe("isInsideGeneratedRegion", () => {
-  const source = "prose\n<!--BEGIN-->\ngenerated\n<!--END-->\nmore\n";
-
-  test("an offset inside the region is inside it", () => {
-    expect(isInsideGeneratedRegion(source.indexOf("generated"), rangesIn(source))).toBe(true);
+  it("an offset inside the region is inside it", ({ verdictOnAnOffsetInsideTheRegion }) => {
+    expect(verdictOnAnOffsetInsideTheRegion).toBe(true);
   });
 
-  test("an offset outside every region is outside them", () => {
-    expect(isInsideGeneratedRegion(0, rangesIn(source))).toBe(false);
+  it("an offset outside every region is outside them", ({
+    verdictOnAnOffsetOutsideEveryRegion,
+  }) => {
+    expect(verdictOnAnOffsetOutsideEveryRegion).toBe(false);
   });
 });

@@ -1,93 +1,293 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { describe, expect, onTestFinished, test, vi } from "vite-plus/test";
+import { describe, expect, test, vi } from "vite-plus/test";
 
-import {
-  buildRepositoryValueDeclarationIndex,
-  loadRepositoryValueDeclarationIndex,
-} from "./builder.ts";
+import { readTextFile } from "../canonical-values/source-files.ts";
+import { loadRepositoryValueDeclarationIndex } from "./builder.ts";
 
-const REMOVED_FILE_NAME = "removed.ts";
-
-class GonePathError extends Error {
-  readonly code = "ENOENT";
-
-  constructor() {
-    super("the file is no longer there");
-  }
-}
-
-vi.mock(import("node:fs"), async (importOriginal) => {
-  const real = await importOriginal();
-  const readFileSync = ((...call: Parameters<typeof real.readFileSync>) => {
-    const [path] = call;
-    if (String(path).endsWith(REMOVED_FILE_NAME)) throw new GonePathError();
-    return real.readFileSync(...call);
-  }) as typeof real.readFileSync;
-  return { ...real, readFileSync };
-});
+vi.mock(import("../canonical-values/source-files.ts"), { spy: true });
 
 const SEED = `export const seed = 1;\n`;
 
-describe("buildRepositoryValueDeclarationIndex", () => {
-  const repositoryWith = (files: Readonly<Record<string, string>>): string => {
-    const root = mkdtempSync(join(tmpdir(), "value-declarations-builder-"));
-    onTestFinished(() => {
-      rmSync(root, { recursive: true, force: true });
+const REMOVED_FILE_NAME = "removed.ts";
+
+const SEED_FINGERPRINT = '{annotation:null,init:{type:"Literal",value:1,raw:"1"}}';
+
+const it = test
+  .extend("indexOfTwoSourcesDeclaringValues", ({}, { onCleanup }) => {
+    const repositoryRoot = mkdtempSync(join(tmpdir(), "value-declarations-builder-"));
+    onCleanup(() => {
+      rmSync(repositoryRoot, { recursive: true, force: true });
     });
-    for (const [path, text] of Object.entries(files)) {
-      const target = join(root, path);
-      mkdirSync(dirname(target), { recursive: true });
-      writeFileSync(target, text, "utf8");
-    }
-    return root;
-  };
-
-  const pathsIn = (repositoryRoot: string): readonly string[] => [
-    ...buildRepositoryValueDeclarationIndex({ repositoryRoot }).sitesByPath.keys(),
-  ];
-
-  test("takes in every source that declares a value", () => {
-    const repositoryRoot = repositoryWith({ "src/a.ts": SEED, "src/b.ts": SEED });
-
-    expect(pathsIn(repositoryRoot)).toStrictEqual(["src/a.ts", "src/b.ts"]);
-  });
-
-  test("leaves a test file out of the index", () => {
-    const repositoryRoot = repositoryWith({ "src/a.ts": SEED, "src/a.test.ts": SEED });
-
-    expect(pathsIn(repositoryRoot)).toStrictEqual(["src/a.ts"]);
-  });
-
-  test("leaves a source that declares no value of its own out of the index", () => {
-    const repositoryRoot = repositoryWith({ "src/a.ts": SEED, "src/b.ts": "export {};\n" });
-
-    expect(pathsIn(repositoryRoot)).toStrictEqual(["src/a.ts"]);
-  });
-
-  test("leaves a source that went away after the listing out of the index", () => {
-    const repositoryRoot = repositoryWith({ "src/a.ts": SEED, [`src/${REMOVED_FILE_NAME}`]: SEED });
-
-    expect(pathsIn(repositoryRoot)).toStrictEqual(["src/a.ts"]);
-  });
-
-  test("names the two places a copied value stands", () => {
-    const repositoryRoot = repositoryWith({ "src/a.ts": SEED, "src/b.ts": SEED });
-    const index = buildRepositoryValueDeclarationIndex({ repositoryRoot });
-
-    expect(index.sitesByName.get("seed")?.map((site) => site.relativePath)).toStrictEqual([
-      "src/a.ts",
-      "src/b.ts",
-    ]);
-  });
-
-  test("builds the index of a repository once and hands the same one back later", () => {
-    const repositoryRoot = repositoryWith({ "src/a.ts": SEED });
-
-    expect(loadRepositoryValueDeclarationIndex({ repositoryRoot })).toBe(
-      loadRepositoryValueDeclarationIndex({ repositoryRoot }),
+    mkdirSync(join(repositoryRoot, "src"), { recursive: true });
+    writeFileSync(join(repositoryRoot, "src", "a.ts"), SEED, "utf8");
+    writeFileSync(join(repositoryRoot, "src", "b.ts"), SEED, "utf8");
+    return loadRepositoryValueDeclarationIndex({ repositoryRoot });
+  })
+  .extend("indexOfASourceBesideATestFile", ({}, { onCleanup }) => {
+    const repositoryRoot = mkdtempSync(join(tmpdir(), "value-declarations-builder-"));
+    onCleanup(() => {
+      rmSync(repositoryRoot, { recursive: true, force: true });
+    });
+    mkdirSync(join(repositoryRoot, "src"), { recursive: true });
+    writeFileSync(join(repositoryRoot, "src", "a.ts"), SEED, "utf8");
+    writeFileSync(join(repositoryRoot, "src", "a.test.ts"), SEED, "utf8");
+    return loadRepositoryValueDeclarationIndex({ repositoryRoot });
+  })
+  .extend("indexOfASourceBesideAValuelessSource", ({}, { onCleanup }) => {
+    const repositoryRoot = mkdtempSync(join(tmpdir(), "value-declarations-builder-"));
+    onCleanup(() => {
+      rmSync(repositoryRoot, { recursive: true, force: true });
+    });
+    mkdirSync(join(repositoryRoot, "src"), { recursive: true });
+    writeFileSync(join(repositoryRoot, "src", "a.ts"), SEED, "utf8");
+    writeFileSync(join(repositoryRoot, "src", "b.ts"), "export {};\n", "utf8");
+    return loadRepositoryValueDeclarationIndex({ repositoryRoot });
+  })
+  .extend("indexOfASourceBesideAVanishedSource", ({}, { onCleanup }) => {
+    const repositoryRoot = mkdtempSync(join(tmpdir(), "value-declarations-builder-"));
+    onCleanup(() => {
+      rmSync(repositoryRoot, { recursive: true, force: true });
+    });
+    mkdirSync(join(repositoryRoot, "src"), { recursive: true });
+    writeFileSync(join(repositoryRoot, "src", "a.ts"), SEED, "utf8");
+    writeFileSync(join(repositoryRoot, "src", REMOVED_FILE_NAME), SEED, "utf8");
+    vi.mocked(readTextFile).mockImplementation((path) =>
+      path.endsWith(REMOVED_FILE_NAME) ? null : readFileSync(path, "utf8"),
     );
+    return loadRepositoryValueDeclarationIndex({ repositoryRoot });
+  })
+  .extend("repositoryRootHoldingOneSource", ({}, { onCleanup }) => {
+    const repositoryRoot = mkdtempSync(join(tmpdir(), "value-declarations-builder-"));
+    onCleanup(() => {
+      rmSync(repositoryRoot, { recursive: true, force: true });
+    });
+    const target = join(repositoryRoot, "src", "a.ts");
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, SEED, "utf8");
+    return repositoryRoot;
+  })
+  .extend("indexBuiltFirst", ({ repositoryRootHoldingOneSource }) =>
+    loadRepositoryValueDeclarationIndex({ repositoryRoot: repositoryRootHoldingOneSource }),
+  )
+  .extend("indexBuiltAgain", ({ repositoryRootHoldingOneSource }) =>
+    loadRepositoryValueDeclarationIndex({ repositoryRoot: repositoryRootHoldingOneSource }),
+  );
+
+describe("loadRepositoryValueDeclarationIndex", () => {
+  it("takes in every source that declares a value", ({ indexOfTwoSourcesDeclaringValues }) => {
+    expect(indexOfTwoSourcesDeclaringValues).toStrictEqual({
+      sitesByName: new Map([
+        [
+          "seed",
+          [
+            {
+              name: "seed",
+              line: 1,
+              exported: true,
+              fingerprint: SEED_FINGERPRINT,
+              relativePath: "src/a.ts",
+            },
+            {
+              name: "seed",
+              line: 1,
+              exported: true,
+              fingerprint: SEED_FINGERPRINT,
+              relativePath: "src/b.ts",
+            },
+          ],
+        ],
+      ]),
+      sitesByPath: new Map([
+        [
+          "src/a.ts",
+          [
+            {
+              name: "seed",
+              line: 1,
+              exported: true,
+              fingerprint: SEED_FINGERPRINT,
+              relativePath: "src/a.ts",
+            },
+          ],
+        ],
+        [
+          "src/b.ts",
+          [
+            {
+              name: "seed",
+              line: 1,
+              exported: true,
+              fingerprint: SEED_FINGERPRINT,
+              relativePath: "src/b.ts",
+            },
+          ],
+        ],
+      ]),
+    });
+  });
+
+  it("leaves a test file out of the index", ({ indexOfASourceBesideATestFile }) => {
+    expect(indexOfASourceBesideATestFile).toStrictEqual({
+      sitesByName: new Map([
+        [
+          "seed",
+          [
+            {
+              name: "seed",
+              line: 1,
+              exported: true,
+              fingerprint: SEED_FINGERPRINT,
+              relativePath: "src/a.ts",
+            },
+          ],
+        ],
+      ]),
+      sitesByPath: new Map([
+        [
+          "src/a.ts",
+          [
+            {
+              name: "seed",
+              line: 1,
+              exported: true,
+              fingerprint: SEED_FINGERPRINT,
+              relativePath: "src/a.ts",
+            },
+          ],
+        ],
+      ]),
+    });
+  });
+
+  it("leaves a source that declares no value of its own out of the index", ({
+    indexOfASourceBesideAValuelessSource,
+  }) => {
+    expect(indexOfASourceBesideAValuelessSource).toStrictEqual({
+      sitesByName: new Map([
+        [
+          "seed",
+          [
+            {
+              name: "seed",
+              line: 1,
+              exported: true,
+              fingerprint: SEED_FINGERPRINT,
+              relativePath: "src/a.ts",
+            },
+          ],
+        ],
+      ]),
+      sitesByPath: new Map([
+        [
+          "src/a.ts",
+          [
+            {
+              name: "seed",
+              line: 1,
+              exported: true,
+              fingerprint: SEED_FINGERPRINT,
+              relativePath: "src/a.ts",
+            },
+          ],
+        ],
+      ]),
+    });
+  });
+
+  it("leaves a source that went away after the listing out of the index", ({
+    indexOfASourceBesideAVanishedSource,
+  }) => {
+    expect(indexOfASourceBesideAVanishedSource).toStrictEqual({
+      sitesByName: new Map([
+        [
+          "seed",
+          [
+            {
+              name: "seed",
+              line: 1,
+              exported: true,
+              fingerprint: SEED_FINGERPRINT,
+              relativePath: "src/a.ts",
+            },
+          ],
+        ],
+      ]),
+      sitesByPath: new Map([
+        [
+          "src/a.ts",
+          [
+            {
+              name: "seed",
+              line: 1,
+              exported: true,
+              fingerprint: SEED_FINGERPRINT,
+              relativePath: "src/a.ts",
+            },
+          ],
+        ],
+      ]),
+    });
+  });
+
+  it("names the two places a copied value stands", ({ indexOfTwoSourcesDeclaringValues }) => {
+    expect(indexOfTwoSourcesDeclaringValues).toStrictEqual({
+      sitesByName: new Map([
+        [
+          "seed",
+          [
+            {
+              name: "seed",
+              line: 1,
+              exported: true,
+              fingerprint: SEED_FINGERPRINT,
+              relativePath: "src/a.ts",
+            },
+            {
+              name: "seed",
+              line: 1,
+              exported: true,
+              fingerprint: SEED_FINGERPRINT,
+              relativePath: "src/b.ts",
+            },
+          ],
+        ],
+      ]),
+      sitesByPath: new Map([
+        [
+          "src/a.ts",
+          [
+            {
+              name: "seed",
+              line: 1,
+              exported: true,
+              fingerprint: SEED_FINGERPRINT,
+              relativePath: "src/a.ts",
+            },
+          ],
+        ],
+        [
+          "src/b.ts",
+          [
+            {
+              name: "seed",
+              line: 1,
+              exported: true,
+              fingerprint: SEED_FINGERPRINT,
+              relativePath: "src/b.ts",
+            },
+          ],
+        ],
+      ]),
+    });
+  });
+
+  it("builds the index of a repository once and hands the same one back later", ({
+    indexBuiltAgain,
+    indexBuiltFirst,
+  }) => {
+    expect(indexBuiltAgain).toBe(indexBuiltFirst);
   });
 });

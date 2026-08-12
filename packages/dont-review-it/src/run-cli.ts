@@ -12,11 +12,13 @@ import { attempt } from "es-toolkit";
 
 import { failureMessage } from "./failure-message.ts";
 import { buildCanonicalValuesCatalog } from "./lint/oxlint/lib/canonical-values/builder.ts";
+import {
+  formatCanonicalValuesProblem,
+  formatEquivalentConceptGroup,
+} from "./lint/oxlint/lib/canonical-values/problem-message.ts";
 import { isDirectory } from "./lint/oxlint/lib/canonical-values/source-files.ts";
 import {
   findEquivalentConcepts,
-  formatCanonicalValuesProblem,
-  formatEquivalentConceptGroup,
   verifyCanonicalValues,
 } from "./lint/oxlint/lib/canonical-values/verify.ts";
 import { duplicatedClustersIn } from "./lint/oxlint/lib/duplicated-bodies/body-index.ts";

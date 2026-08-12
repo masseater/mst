@@ -11,116 +11,324 @@ import {
   statementsOf,
 } from "./coupling-edges.ts";
 
-import type { AstFields } from "../ast-node.ts";
-
-const programIn = (sourceText: string): AstFields => {
-  const program = astFieldsOf(parseSync("spec.ts", sourceText).program);
-  if (program === null) throw new Error(`nothing was parsed from: ${sourceText}`);
-  return program;
-};
-
-const callIn = (sourceText: string): AstFields => {
-  const [statement] = statementsOf(programIn(sourceText));
-  const called = statement === undefined ? null : astFieldsOf(statement.expression);
-  if (called === null) throw new Error(`nothing is called by: ${sourceText}`);
-  return called;
-};
-
-const specifiersIn = (sourceText: string): readonly string[] => {
-  const program = programIn(sourceText);
-  return couplingEdgesUnder(program, constantSpecifiersIn(program.body)).map(
-    (edge) => edge.specifier,
-  );
-};
-
-const templateSourceOf = (quasi: unknown): AstFields => ({
-  type: "ImportExpression",
-  source: { type: "TemplateLiteral", quasis: [quasi], expressions: [] },
-});
+const it = test
+  .extend("typeOfAValueCarryingNoNodeType", () => nodeTypeOf({}))
+  .extend("edgeOfAValueThatIsNotANode", () => couplingEdgeOf(null, new Map()))
+  .extend("edgeOfATemplatePartCarryingNoValue", () =>
+    couplingEdgeOf(
+      {
+        type: "ImportExpression",
+        source: { type: "TemplateLiteral", quasis: [{}], expressions: [] },
+      },
+      new Map(),
+    ),
+  )
+  .extend("edgeOfATemplatePartWhoseTextWasNeverCooked", () =>
+    couplingEdgeOf(
+      {
+        type: "ImportExpression",
+        source: { type: "TemplateLiteral", quasis: [{ value: {} }], expressions: [] },
+      },
+      new Map(),
+    ),
+  )
+  .extend("statementsOfAProgramDeclaringAConstant", () => {
+    const program = astFieldsOf(parseSync("spec.ts", "const total = 1;").program);
+    if (program === null) throw new Error("nothing was parsed");
+    return statementsOf(program);
+  })
+  .extend("specifiersOfAConstantBindingAPattern", () => {
+    const program = astFieldsOf(parseSync("spec.ts", "const { picked } = held;").program);
+    if (program === null) throw new Error("nothing was parsed");
+    const [specifiers] = [program.body].map((body) => constantSpecifiersIn(body));
+    if (specifiers === undefined) throw new Error("no specifier was read");
+    return specifiers;
+  })
+  .extend("specifiersOfAConstantExportedWithItsDeclaration", () => {
+    const program = astFieldsOf(parseSync("spec.ts", 'export const SETUP = "./held.ts";').program);
+    if (program === null) throw new Error("nothing was parsed");
+    const [specifiers] = [program.body].map((body) => constantSpecifiersIn(body));
+    if (specifiers === undefined) throw new Error("no specifier was read");
+    return specifiers;
+  })
+  .extend("edgesOfATemplateAssembledFromAConstantOfThisFile", () => {
+    const program = astFieldsOf(
+      parseSync("spec.ts", 'const STEM = "held";\nconst loaded = import(`./${STEM}.ts`);').program,
+    );
+    if (program === null) throw new Error("nothing was parsed");
+    const [constants] = [program.body].map((body) => constantSpecifiersIn(body));
+    if (constants === undefined) throw new Error("no constant was read");
+    return couplingEdgesUnder(program, constants);
+  })
+  .extend("edgesOfTwoWrittenOutStringsJoinedTogether", () => {
+    const program = astFieldsOf(
+      parseSync("spec.ts", 'const loaded = import("./held" + ".ts");').program,
+    );
+    if (program === null) throw new Error("nothing was parsed");
+    const [constants] = [program.body].map((body) => constantSpecifiersIn(body));
+    if (constants === undefined) throw new Error("no constant was read");
+    return couplingEdgesUnder(program, constants);
+  })
+  .extend("edgesOfAJoinWhoseSideIsDecidedWhileTheProgramRuns", () => {
+    const program = astFieldsOf(
+      parseSync("spec.ts", 'const loaded = import("./" + chosen);').program,
+    );
+    if (program === null) throw new Error("nothing was parsed");
+    const [constants] = [program.body].map((body) => constantSpecifiersIn(body));
+    if (constants === undefined) throw new Error("no constant was read");
+    return couplingEdgesUnder(program, constants);
+  })
+  .extend("edgesOfAJoinUnderAnOperatorOtherThanConcatenation", () => {
+    const program = astFieldsOf(
+      parseSync("spec.ts", 'const loaded = import("./held.ts" ?? "./other.ts");').program,
+    );
+    if (program === null) throw new Error("nothing was parsed");
+    const [constants] = [program.body].map((body) => constantSpecifiersIn(body));
+    if (constants === undefined) throw new Error("no constant was read");
+    return couplingEdgesUnder(program, constants);
+  })
+  .extend("edgesOfAConstantJoinedFromAConstantDeclaredAboveIt", () => {
+    const program = astFieldsOf(
+      parseSync(
+        "spec.ts",
+        'const BASE = "./held";\nconst ENTRY = BASE + ".ts";\nconst held = import(ENTRY);',
+      ).program,
+    );
+    if (program === null) throw new Error("nothing was parsed");
+    const [constants] = [program.body].map((body) => constantSpecifiersIn(body));
+    if (constants === undefined) throw new Error("no constant was read");
+    return couplingEdgesUnder(program, constants);
+  })
+  .extend("edgesOfAConstantReadingANameDeclaredBelowIt", () => {
+    const program = astFieldsOf(
+      parseSync(
+        "spec.ts",
+        'const ENTRY = BASE + ".ts";\nconst BASE = "./held";\nconst held = import(ENTRY);',
+      ).program,
+    );
+    if (program === null) throw new Error("nothing was parsed");
+    const [constants] = [program.body].map((body) => constantSpecifiersIn(body));
+    if (constants === undefined) throw new Error("no constant was read");
+    return couplingEdgesUnder(program, constants);
+  })
+  .extend("specifierRequestedByACallNamedSomethingElse", () => {
+    const program = astFieldsOf(parseSync("spec.ts", 'load("./held.ts");').program);
+    if (program === null) throw new Error("nothing was parsed");
+    const [statement] = statementsOf(program);
+    const called = statement === undefined ? null : astFieldsOf(statement.expression);
+    if (called === null) throw new Error("nothing is called");
+    return requestedSpecifierOf(called);
+  })
+  .extend("specifierRequestedByARequireCall", () => {
+    const program = astFieldsOf(parseSync("spec.ts", 'require("./held.ts");').program);
+    if (program === null) throw new Error("nothing was parsed");
+    const [statement] = statementsOf(program);
+    const called = statement === undefined ? null : astFieldsOf(statement.expression);
+    if (called === null) throw new Error("nothing is called");
+    return requestedSpecifierOf(called);
+  })
+  .extend("specifierRequestedByARequireCallHandedNothing", () => {
+    const program = astFieldsOf(parseSync("spec.ts", "require();").program);
+    if (program === null) throw new Error("nothing was parsed");
+    const [statement] = statementsOf(program);
+    const called = statement === undefined ? null : astFieldsOf(statement.expression);
+    if (called === null) throw new Error("nothing is called");
+    return requestedSpecifierOf(called);
+  })
+  .extend("specifierRequestedThroughAMemberOfAnObject", () => {
+    const program = astFieldsOf(parseSync("spec.ts", 'loader.require("./held.ts");').program);
+    if (program === null) throw new Error("nothing was parsed");
+    const [statement] = statementsOf(program);
+    const called = statement === undefined ? null : astFieldsOf(statement.expression);
+    if (called === null) throw new Error("nothing is called");
+    return requestedSpecifierOf(called);
+  })
+  .extend("edgeOfAJoinUnderAnOperatorThatDoesNotConcatenate", () =>
+    couplingEdgeOf(
+      {
+        type: "ImportExpression",
+        source: {
+          type: "BinaryExpression",
+          operator: "-",
+          left: { type: "Literal", value: "./held" },
+          right: { type: "Literal", value: ".ts" },
+        },
+      },
+      new Map(),
+    ),
+  )
+  .extend("edgeOfAJoinWhoseSideIsNotANode", () =>
+    couplingEdgeOf(
+      {
+        type: "ImportExpression",
+        source: {
+          type: "BinaryExpression",
+          operator: "+",
+          left: "./held",
+          right: { type: "Literal", value: ".ts" },
+        },
+      },
+      new Map(),
+    ),
+  )
+  .extend("specifierRequestedByAValueThatIsNotANode", () => requestedSpecifierOf(null));
 
 describe("setup-modules/coupling-edges", () => {
-  test("a value that carries no node type spells no type at all", () => {
-    expect(nodeTypeOf({})).toBe("");
+  it("a value that carries no node type spells no type at all", ({
+    typeOfAValueCarryingNoNodeType,
+  }) => {
+    expect(typeOfAValueCarryingNoNodeType).toBe("");
   });
 
-  test("a value that is not a node at all is no coupling", () => {
-    expect(couplingEdgeOf(null, new Map())).toBe(null);
+  it("a value that is not a node at all is no coupling", ({ edgeOfAValueThatIsNotANode }) => {
+    expect(edgeOfAValueThatIsNotANode).toBe(null);
   });
 
-  test("a template part carrying no value spells no specifier", () => {
-    expect(couplingEdgeOf(templateSourceOf({}), new Map())).toBe(null);
+  it("a template part carrying no value spells no specifier", ({
+    edgeOfATemplatePartCarryingNoValue,
+  }) => {
+    expect(edgeOfATemplatePartCarryingNoValue).toBe(null);
   });
 
-  test("a template part whose text was never cooked spells no specifier", () => {
-    expect(couplingEdgeOf(templateSourceOf({ value: {} }), new Map())).toBe(null);
+  it("a template part whose text was never cooked spells no specifier", ({
+    edgeOfATemplatePartWhoseTextWasNeverCooked,
+  }) => {
+    expect(edgeOfATemplatePartWhoseTextWasNeverCooked).toBe(null);
   });
 
-  test("the statements of a program are read as nodes", () => {
-    expect(statementsOf(programIn("const total = 1;")).map(nodeTypeOf)).toStrictEqual([
-      "VariableDeclaration",
+  it("the statements of a program are read as nodes", ({
+    statementsOfAProgramDeclaringAConstant,
+  }) => {
+    expect(statementsOfAProgramDeclaringAConstant).toStrictEqual([
+      {
+        type: "VariableDeclaration",
+        kind: "const",
+        declarations: [
+          {
+            type: "VariableDeclarator",
+            id: {
+              type: "Identifier",
+              decorators: [],
+              name: "total",
+              optional: false,
+              typeAnnotation: null,
+              start: 6,
+              end: 11,
+            },
+            init: { type: "Literal", value: 1, raw: "1", start: 14, end: 15 },
+            definite: false,
+            start: 6,
+            end: 15,
+          },
+        ],
+        declare: false,
+        start: 0,
+        end: 16,
+      },
     ]);
   });
 
-  test("a constant that binds a pattern rather than a name specifies nothing", () => {
-    expect(constantSpecifiersIn(programIn("const { picked } = held;").body)).toStrictEqual(
-      new Map(),
-    );
+  it("a constant that binds a pattern rather than a name specifies nothing", ({
+    specifiersOfAConstantBindingAPattern,
+  }) => {
+    expect(specifiersOfAConstantBindingAPattern).toStrictEqual(new Map());
   });
 
-  test("a constant exported with its declaration still spells its specifier", () => {
-    expect(constantSpecifiersIn(programIn('export const SETUP = "./held.ts";').body)).toStrictEqual(
+  it("a constant exported with its declaration still spells its specifier", ({
+    specifiersOfAConstantExportedWithItsDeclaration,
+  }) => {
+    expect(specifiersOfAConstantExportedWithItsDeclaration).toStrictEqual(
       new Map([["SETUP", "./held.ts"]]),
     );
   });
 
-  test("a template assembled from a constant of this file resolves to one specifier", () => {
-    expect(
-      specifiersIn('const STEM = "held";\nconst loaded = import(`./${STEM}.ts`);'),
-    ).toStrictEqual(["./held.ts"]);
+  it("a template assembled from a constant of this file resolves to one specifier", ({
+    edgesOfATemplateAssembledFromAConstantOfThisFile,
+  }) => {
+    expect(edgesOfATemplateAssembledFromAConstantOfThisFile).toStrictEqual([
+      { specifier: "./held.ts", carriesValues: true },
+    ]);
   });
 
-  test("two written-out strings joined together resolve to one specifier", () => {
-    expect(specifiersIn('const loaded = import("./held" + ".ts");')).toStrictEqual(["./held.ts"]);
+  it("two written-out strings joined together resolve to one specifier", ({
+    edgesOfTwoWrittenOutStringsJoinedTogether,
+  }) => {
+    expect(edgesOfTwoWrittenOutStringsJoinedTogether).toStrictEqual([
+      { specifier: "./held.ts", carriesValues: true },
+    ]);
   });
 
-  test("a join whose side is decided while the program runs resolves to no specifier", () => {
-    expect(specifiersIn('const loaded = import("./" + chosen);')).toStrictEqual([]);
+  it("a join whose side is decided while the program runs resolves to no specifier", ({
+    edgesOfAJoinWhoseSideIsDecidedWhileTheProgramRuns,
+  }) => {
+    expect(edgesOfAJoinWhoseSideIsDecidedWhileTheProgramRuns).toStrictEqual([]);
   });
 
-  test("a join under an operator other than concatenation resolves to no specifier", () => {
-    expect(specifiersIn('const loaded = import("./held.ts" ?? "./other.ts");')).toStrictEqual([]);
+  it("a join under an operator other than concatenation resolves to no specifier", ({
+    edgesOfAJoinUnderAnOperatorOtherThanConcatenation,
+  }) => {
+    expect(edgesOfAJoinUnderAnOperatorOtherThanConcatenation).toStrictEqual([]);
   });
 
-  test("a constant joined from a constant declared above it resolves to one specifier", () => {
-    expect(
-      specifiersIn(
-        'const BASE = "./held";\nconst ENTRY = BASE + ".ts";\nconst held = import(ENTRY);',
-      ),
-    ).toStrictEqual(["./held.ts"]);
+  it("a constant joined from a constant declared above it resolves to one specifier", ({
+    edgesOfAConstantJoinedFromAConstantDeclaredAboveIt,
+  }) => {
+    expect(edgesOfAConstantJoinedFromAConstantDeclaredAboveIt).toStrictEqual([
+      { specifier: "./held.ts", carriesValues: true },
+    ]);
   });
 
-  test("a constant that reads a name declared below it resolves to no specifier", () => {
-    expect(
-      specifiersIn(
-        'const ENTRY = BASE + ".ts";\nconst BASE = "./held";\nconst held = import(ENTRY);',
-      ),
-    ).toStrictEqual([]);
+  it("a constant that reads a name declared below it resolves to no specifier", ({
+    edgesOfAConstantReadingANameDeclaredBelowIt,
+  }) => {
+    expect(edgesOfAConstantReadingANameDeclaredBelowIt).toStrictEqual([]);
   });
 
-  test("the specifier a call requests is read only from a call named require", () => {
-    expect(requestedSpecifierOf(callIn('load("./held.ts");'))).toBe(null);
+  it("the specifier a call requests is read only from a call named require", ({
+    specifierRequestedByACallNamedSomethingElse,
+  }) => {
+    expect(specifierRequestedByACallNamedSomethingElse).toBe(null);
   });
 
-  test("the specifier a require call requests is the argument it is handed", () => {
-    const requested = requestedSpecifierOf(callIn('require("./held.ts");'));
-    expect(requested === null ? null : requested.value).toBe("./held.ts");
+  it("the specifier a require call requests is the argument it is handed", ({
+    specifierRequestedByARequireCall,
+  }) => {
+    expect(specifierRequestedByARequireCall).toStrictEqual({
+      type: "Literal",
+      value: "./held.ts",
+      raw: '"./held.ts"',
+      start: 8,
+      end: 19,
+    });
   });
 
-  test("a require call handed nothing requests no specifier", () => {
-    expect(requestedSpecifierOf(callIn("require();"))).toBe(null);
+  it("a require call handed nothing requests no specifier", ({
+    specifierRequestedByARequireCallHandedNothing,
+  }) => {
+    expect(specifierRequestedByARequireCallHandedNothing).toBe(null);
   });
 
-  test("a call through a member of an object requests no specifier", () => {
-    expect(requestedSpecifierOf(callIn('loader.require("./held.ts");'))).toBe(null);
+  it("a call through a member of an object requests no specifier", ({
+    specifierRequestedThroughAMemberOfAnObject,
+  }) => {
+    expect(specifierRequestedThroughAMemberOfAnObject).toBe(null);
+  });
+
+  it("a join written under an operator that never concatenates spells no specifier", ({
+    edgeOfAJoinUnderAnOperatorThatDoesNotConcatenate,
+  }) => {
+    expect(edgeOfAJoinUnderAnOperatorThatDoesNotConcatenate).toBe(null);
+  });
+
+  it("a join whose side is not a node at all spells no specifier", ({
+    edgeOfAJoinWhoseSideIsNotANode,
+  }) => {
+    expect(edgeOfAJoinWhoseSideIsNotANode).toBe(null);
+  });
+
+  it("a value that is not a node requests no specifier", ({
+    specifierRequestedByAValueThatIsNotANode,
+  }) => {
+    expect(specifierRequestedByAValueThatIsNotANode).toBe(null);
   });
 });

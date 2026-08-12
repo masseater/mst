@@ -1,5 +1,7 @@
 import { resolve } from "node:path";
 
+import { memoize } from "es-toolkit";
+
 import {
   listRepositoryFiles,
   readTextFile,
@@ -40,16 +42,9 @@ export const buildRepositoryBodyIndex = ({
   return buildBodyIndex(scanned.map(indexedFileAt).filter((file) => file !== null));
 };
 
-const indexByRepositoryRoot = new Map<string, BodyIndex>();
+const bodyIndexUnder = memoize(
+  (repositoryRoot: string): BodyIndex => buildRepositoryBodyIndex({ repositoryRoot }),
+);
 
-export const loadRepositoryBodyIndex = (options: {
-  readonly repositoryRoot: string;
-}): BodyIndex => {
-  const root = resolve(options.repositoryRoot);
-  const memoized = indexByRepositoryRoot.get(root);
-  if (memoized !== undefined) return memoized;
-
-  const built = buildRepositoryBodyIndex({ repositoryRoot: root });
-  indexByRepositoryRoot.set(root, built);
-  return built;
-};
+export const loadRepositoryBodyIndex = (options: { readonly repositoryRoot: string }): BodyIndex =>
+  bodyIndexUnder(resolve(options.repositoryRoot));

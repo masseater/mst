@@ -2,39 +2,38 @@ import { testLintRule } from "@mst/lint-rule-authoring";
 import { describe } from "vite-plus/test";
 
 import { buildCatalog, EMPTY_CANONICAL_VALUES_CATALOG } from "../lib/canonical-values/catalog.ts";
-import { fingerprintValues, type CanonicalValue } from "../lib/canonical-values/fingerprint.ts";
+import { fingerprintValues } from "../lib/canonical-values/fingerprint.ts";
 import { createNoStrictCanonicalLiteralUseRule } from "./no-strict-canonical-literal-use--use-canonical-import.ts";
 
-const entry = (
-  conceptId: string,
-  declaration: {
-    readonly declarationPath: string;
-    readonly exportPath: string | null;
-    readonly values: readonly CanonicalValue[];
-  },
-) => ({ conceptId, ...declaration, fingerprint: fingerprintValues(declaration.values) });
-
 const CATALOG = buildCatalog([
-  entry("order.status", {
+  {
+    conceptId: "order.status",
     declarationPath: "packages/order/src/status.ts",
     exportPath: "@mst/order",
     values: ["draft", "published"],
-  }),
-  entry("article.status", {
+    fingerprint: fingerprintValues(["draft", "published"]),
+  },
+  {
+    conceptId: "article.status",
     declarationPath: "packages/article/src/status.ts",
     exportPath: null,
     values: ["draft", "archived"],
-  }),
-  entry("retry.budget", {
+    fingerprint: fingerprintValues(["draft", "archived"]),
+  },
+  {
+    conceptId: "retry.budget",
     declarationPath: "packages/retry/src/budget.ts",
     exportPath: "@mst/retry",
     values: [3, -1],
-  }),
-  entry("sync.mode", {
+    fingerprint: fingerprintValues([3, -1]),
+  },
+  {
+    conceptId: "sync.mode",
     declarationPath: "packages/sync/src/mode.ts",
     exportPath: "@mst/sync",
     values: ["auto", true],
-  }),
+    fingerprint: fingerprintValues(["auto", true]),
+  },
 ]);
 
 const UNCONFIGURED_OWNERSHIP_POLICY =

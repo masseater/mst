@@ -98,6 +98,12 @@ describe("dont-review-it/no-sut-independent-assertion--assert-fixture-subject", 
         errors: [{ messageId: "sutIndependentAssertion" }],
       },
       {
+        name: "a name written to more than once is compared as the name it stands for",
+        filename: SPEC_FILE,
+        code: 'test("carries the id", ({ report }) => {\n  let held = report;\n  held = summarise(report);\n  expect(held).toBe(held);\n});',
+        errors: [{ messageId: "selfComparedSubject" }],
+      },
+      {
         name: "an expression built only from written-out values lands the same way whatever the code does",
         filename: SPEC_FILE,
         code: 'test("adds up", () => {\n  expect(1 + 1).toBe(2);\n});',

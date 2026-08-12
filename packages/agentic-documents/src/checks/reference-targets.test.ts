@@ -1,129 +1,242 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
-import { describe, expect, onTestFinished, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { defaultConfig } from "../config.ts";
 import { toNormativeDocument } from "../scan/normative-documents.ts";
 import { brokenReferences } from "./reference-targets.ts";
 
-const rootWith = (files: Readonly<Record<string, string>>): string => {
-  const root = mkdtempSync(join(tmpdir(), "agentic-documents-references-"));
-  onTestFinished(() => {
-    rmSync(root, { recursive: true, force: true });
-  });
+const MISSING_FILE_MESSAGE =
+  "参照 `docs/rules.md` の指し先 `docs/rules.md` が実在しない。参照を更新するか、参照ごと消す。";
 
-  for (const [path, text] of Object.entries(files)) {
-    const target = join(root, path);
-    mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, text, "utf8");
-  }
+const UNREADABLE_ANCHOR_MESSAGE =
+  "参照 `docs/rules.md#%E0%A4%A` が指す位置が `docs/rules.md` に無い。現在の見出しを指すか、位置の指定を消す。指していた節の内容が今どこにあるかを確かめる。";
 
-  return root;
-};
+const MISSING_ANCHOR_MESSAGE =
+  "参照 `docs/rules.md#存在しない見出し` が指す位置が `docs/rules.md` に無い。現在の見出しを指すか、位置の指定を消す。指していた節の内容が今どこにあるかを確かめる。";
 
-const referenceProblemsIn = ({
-  repositoryRoot,
-  source,
-}: {
-  readonly repositoryRoot: string;
-  readonly source: string;
-}) =>
-  brokenReferences({
-    repositoryRoot,
-    document: toNormativeDocument({ file: "AGENTS.md", source, config: defaultConfig }),
-    config: defaultConfig,
+const it = test
+  .extend("referenceProblemsOfAnExistingCodeSpanPath", async ({}, { onCleanup }) => {
+    const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-references-"));
+    onCleanup(() => {
+      rmSync(repositoryRoot, { recursive: true, force: true });
+    });
+    mkdirSync(join(repositoryRoot, "docs"), { recursive: true });
+    writeFileSync(join(repositoryRoot, "docs", "rules.md"), "# 規約\n", "utf8");
+    return brokenReferences({
+      repositoryRoot,
+      document: toNormativeDocument({
+        file: "AGENTS.md",
+        source: "`docs/rules.md` と `rules.md` を読む\n",
+        config: defaultConfig,
+      }),
+      config: defaultConfig,
+    });
+  })
+  .extend("referenceProblemsOfAMissingCodeSpanPath", async ({}, { onCleanup }) => {
+    const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-references-"));
+    onCleanup(() => {
+      rmSync(repositoryRoot, { recursive: true, force: true });
+    });
+    return brokenReferences({
+      repositoryRoot,
+      document: toNormativeDocument({
+        file: "AGENTS.md",
+        source: "`docs/rules.md` を読む\n",
+        config: defaultConfig,
+      }),
+      config: defaultConfig,
+    });
+  })
+  .extend("referenceProblemsOfAMarkedPointer", async ({}, { onCleanup }) => {
+    const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-references-"));
+    onCleanup(() => {
+      rmSync(repositoryRoot, { recursive: true, force: true });
+    });
+    return brokenReferences({
+      repositoryRoot,
+      document: toNormativeDocument({
+        file: "AGENTS.md",
+        source: "詳細は @docs/rules.md を読む\n",
+        config: defaultConfig,
+      }),
+      config: defaultConfig,
+    });
+  })
+  .extend("referenceProblemsOfAnUnreadableAnchorSpelling", async ({}, { onCleanup }) => {
+    const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-references-"));
+    onCleanup(() => {
+      rmSync(repositoryRoot, { recursive: true, force: true });
+    });
+    mkdirSync(join(repositoryRoot, "docs"), { recursive: true });
+    writeFileSync(join(repositoryRoot, "docs", "rules.md"), "# 規約\n", "utf8");
+    return brokenReferences({
+      repositoryRoot,
+      document: toNormativeDocument({
+        file: "AGENTS.md",
+        source: "詳しくは [規約](docs/rules.md#%E0%A4%A) を読む\n",
+        config: defaultConfig,
+      }),
+      config: defaultConfig,
+    });
+  })
+  .extend("referenceProblemsOfATrailingHashOnly", async ({}, { onCleanup }) => {
+    const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-references-"));
+    onCleanup(() => {
+      rmSync(repositoryRoot, { recursive: true, force: true });
+    });
+    mkdirSync(join(repositoryRoot, "docs"), { recursive: true });
+    writeFileSync(join(repositoryRoot, "docs", "rules.md"), "# 規約\n", "utf8");
+    return brokenReferences({
+      repositoryRoot,
+      document: toNormativeDocument({
+        file: "AGENTS.md",
+        source: "詳しくは [規約](docs/rules.md#) を読む\n",
+        config: defaultConfig,
+      }),
+      config: defaultConfig,
+    });
+  })
+  .extend("referenceProblemsOfAMissingDocument", async ({}, { onCleanup }) => {
+    const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-references-"));
+    onCleanup(() => {
+      rmSync(repositoryRoot, { recursive: true, force: true });
+    });
+    return brokenReferences({
+      repositoryRoot,
+      document: toNormativeDocument({
+        file: "AGENTS.md",
+        source: "詳しくは [規約](docs/rules.md) を読む\n",
+        config: defaultConfig,
+      }),
+      config: defaultConfig,
+    });
+  })
+  .extend("referenceProblemsOfAnExistingDocument", async ({}, { onCleanup }) => {
+    const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-references-"));
+    onCleanup(() => {
+      rmSync(repositoryRoot, { recursive: true, force: true });
+    });
+    mkdirSync(join(repositoryRoot, "docs"), { recursive: true });
+    writeFileSync(join(repositoryRoot, "docs", "rules.md"), "# 規約\n", "utf8");
+    return brokenReferences({
+      repositoryRoot,
+      document: toNormativeDocument({
+        file: "AGENTS.md",
+        source: "詳しくは [規約](docs/rules.md) を読む\n",
+        config: defaultConfig,
+      }),
+      config: defaultConfig,
+    });
+  })
+  .extend("referenceProblemsOfAMissingHeading", async ({}, { onCleanup }) => {
+    const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-references-"));
+    onCleanup(() => {
+      rmSync(repositoryRoot, { recursive: true, force: true });
+    });
+    mkdirSync(join(repositoryRoot, "docs"), { recursive: true });
+    writeFileSync(join(repositoryRoot, "docs", "rules.md"), "# 規約\n\n## 書き方\n", "utf8");
+    return brokenReferences({
+      repositoryRoot,
+      document: toNormativeDocument({
+        file: "AGENTS.md",
+        source: "詳しくは [規約](docs/rules.md#存在しない見出し) を読む\n",
+        config: defaultConfig,
+      }),
+      config: defaultConfig,
+    });
+  })
+  .extend("referenceProblemsOfAnExistingHeading", async ({}, { onCleanup }) => {
+    const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-references-"));
+    onCleanup(() => {
+      rmSync(repositoryRoot, { recursive: true, force: true });
+    });
+    mkdirSync(join(repositoryRoot, "docs"), { recursive: true });
+    writeFileSync(join(repositoryRoot, "docs", "rules.md"), "# 規約\n\n## 書き方\n", "utf8");
+    return brokenReferences({
+      repositoryRoot,
+      document: toNormativeDocument({
+        file: "AGENTS.md",
+        source: "詳しくは [規約](docs/rules.md#書き方) を読む\n",
+        config: defaultConfig,
+      }),
+      config: defaultConfig,
+    });
+  })
+  .extend("referenceProblemsOfATargetOutsideTheRepository", async ({}, { onCleanup }) => {
+    const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-references-"));
+    onCleanup(() => {
+      rmSync(repositoryRoot, { recursive: true, force: true });
+    });
+    return brokenReferences({
+      repositoryRoot,
+      document: toNormativeDocument({
+        file: "AGENTS.md",
+        source: "詳しくは [外部](https://example.com/rules.md) を読む\n",
+        config: defaultConfig,
+      }),
+      config: defaultConfig,
+    });
   });
 
 describe("brokenReferences", () => {
-  test("コード表記のリポジトリ相対パスは参照として辿る", async () => {
-    const problems = await referenceProblemsIn({
-      repositoryRoot: rootWith({ "docs/rules.md": "# 規約\n" }),
-      source: "`docs/rules.md` と `rules.md` を読む\n",
-    });
-
-    expect(problems).toStrictEqual([]);
+  it("コード表記のリポジトリ相対パスは参照として辿る", ({
+    referenceProblemsOfAnExistingCodeSpanPath,
+  }) => {
+    expect(referenceProblemsOfAnExistingCodeSpanPath).toStrictEqual([]);
   });
 
-  test("コード表記のリポジトリ相対パスが実在しないと報告する", async () => {
-    const problems = await referenceProblemsIn({
-      repositoryRoot: rootWith({}),
-      source: "`docs/rules.md` を読む\n",
-    });
-
-    expect(problems.length).toStrictEqual(1);
+  it("コード表記のリポジトリ相対パスが実在しないと報告する", ({
+    referenceProblemsOfAMissingCodeSpanPath,
+  }) => {
+    expect(referenceProblemsOfAMissingCodeSpanPath).toStrictEqual([
+      { file: "AGENTS.md", line: 1, message: MISSING_FILE_MESSAGE },
+    ]);
   });
 
-  test("印を伴う指し先も参照として辿る", async () => {
-    const problems = await referenceProblemsIn({
-      repositoryRoot: rootWith({}),
-      source: "詳細は @docs/rules.md を読む\n",
-    });
-
-    expect(problems.length).toStrictEqual(1);
+  it("印を伴う指し先も参照として辿る", ({ referenceProblemsOfAMarkedPointer }) => {
+    expect(referenceProblemsOfAMarkedPointer).toStrictEqual([
+      { file: "AGENTS.md", line: 1, message: MISSING_FILE_MESSAGE },
+    ]);
   });
 
-  test("読み解けない綴りの見出し指定はそのまま見出し名として扱う", async () => {
-    const problems = await referenceProblemsIn({
-      repositoryRoot: rootWith({ "docs/rules.md": "# 規約\n" }),
-      source: "詳しくは [規約](docs/rules.md#%E0%A4%A) を読む\n",
-    });
-
-    expect(problems.length).toStrictEqual(1);
+  it("読み解けない綴りの見出し指定はそのまま見出し名として扱う", ({
+    referenceProblemsOfAnUnreadableAnchorSpelling,
+  }) => {
+    expect(referenceProblemsOfAnUnreadableAnchorSpelling).toStrictEqual([
+      { file: "AGENTS.md", line: 1, message: UNREADABLE_ANCHOR_MESSAGE },
+    ]);
   });
 
-  test("末尾の井桁だけの参照は見出しを指していない", async () => {
-    const problems = await referenceProblemsIn({
-      repositoryRoot: rootWith({ "docs/rules.md": "# 規約\n" }),
-      source: "詳しくは [規約](docs/rules.md#) を読む\n",
-    });
-
-    expect(problems).toStrictEqual([]);
+  it("末尾の井桁だけの参照は見出しを指していない", ({ referenceProblemsOfATrailingHashOnly }) => {
+    expect(referenceProblemsOfATrailingHashOnly).toStrictEqual([]);
   });
 
-  test("実在しない文書への参照を報告する", async () => {
-    const problems = await referenceProblemsIn({
-      repositoryRoot: rootWith({}),
-      source: "詳しくは [規約](docs/rules.md) を読む\n",
-    });
-
-    expect(problems.length).toStrictEqual(1);
+  it("実在しない文書への参照を報告する", ({ referenceProblemsOfAMissingDocument }) => {
+    expect(referenceProblemsOfAMissingDocument).toStrictEqual([
+      { file: "AGENTS.md", line: 1, message: MISSING_FILE_MESSAGE },
+    ]);
   });
 
-  test("実在する文書への参照は報告しない", async () => {
-    const problems = await referenceProblemsIn({
-      repositoryRoot: rootWith({ "docs/rules.md": "# 規約\n" }),
-      source: "詳しくは [規約](docs/rules.md) を読む\n",
-    });
-
-    expect(problems).toStrictEqual([]);
+  it("実在する文書への参照は報告しない", ({ referenceProblemsOfAnExistingDocument }) => {
+    expect(referenceProblemsOfAnExistingDocument).toStrictEqual([]);
   });
 
-  test("実在しない見出しを指す参照を報告する", async () => {
-    const problems = await referenceProblemsIn({
-      repositoryRoot: rootWith({ "docs/rules.md": "# 規約\n\n## 書き方\n" }),
-      source: "詳しくは [規約](docs/rules.md#存在しない見出し) を読む\n",
-    });
-
-    expect(problems.length).toStrictEqual(1);
+  it("実在しない見出しを指す参照を報告する", ({ referenceProblemsOfAMissingHeading }) => {
+    expect(referenceProblemsOfAMissingHeading).toStrictEqual([
+      { file: "AGENTS.md", line: 1, message: MISSING_ANCHOR_MESSAGE },
+    ]);
   });
 
-  test("実在する見出しを指す参照は報告しない", async () => {
-    const problems = await referenceProblemsIn({
-      repositoryRoot: rootWith({ "docs/rules.md": "# 規約\n\n## 書き方\n" }),
-      source: "詳しくは [規約](docs/rules.md#書き方) を読む\n",
-    });
-
-    expect(problems).toStrictEqual([]);
+  it("実在する見出しを指す参照は報告しない", ({ referenceProblemsOfAnExistingHeading }) => {
+    expect(referenceProblemsOfAnExistingHeading).toStrictEqual([]);
   });
 
-  test("リポジトリの外を指す参照は報告しない", async () => {
-    const problems = await referenceProblemsIn({
-      repositoryRoot: rootWith({}),
-      source: "詳しくは [外部](https://example.com/rules.md) を読む\n",
-    });
-
-    expect(problems).toStrictEqual([]);
+  it("リポジトリの外を指す参照は報告しない", ({
+    referenceProblemsOfATargetOutsideTheRepository,
+  }) => {
+    expect(referenceProblemsOfATargetOutsideTheRepository).toStrictEqual([]);
   });
 });

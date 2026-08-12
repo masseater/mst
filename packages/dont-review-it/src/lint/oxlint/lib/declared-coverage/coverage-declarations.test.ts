@@ -8,28 +8,16 @@ const NAMED_CHECK = {
   excludedPaths: ["**/*.d.ts"],
 };
 
-describe("coverage-declarations", () => {
-  test("options that carry nothing declare nothing", () => {
-    expect(coverageDeclarationsFrom([])).toStrictEqual({
-      checks: [],
-      tables: [],
-      uncheckedDeclarations: [],
-      scopes: [],
-    });
-  });
-
-  test("a field that is not a list declares nothing", () => {
-    expect(coverageDeclarationsFrom([{ declaredChecks: "the analyser" }]).checks).toStrictEqual([]);
-  });
-
-  test("a check keeps the paths it opens and the paths it leaves out", () => {
-    expect(coverageDeclarationsFrom([{ declaredChecks: [NAMED_CHECK] }]).checks).toStrictEqual([
-      NAMED_CHECK,
-    ]);
-  });
-
-  test("a check without a name, and a path that is not written out, are dropped", () => {
-    const declared = coverageDeclarationsFrom([
+const it = test
+  .extend("declarationsReadFromNoOptions", () => coverageDeclarationsFrom([]))
+  .extend("checksReadFromAnUnlistedField", () =>
+    coverageDeclarationsFrom([{ declaredChecks: "the analyser" }]),
+  )
+  .extend("checksReadFromANamedCheck", () =>
+    coverageDeclarationsFrom([{ declaredChecks: [NAMED_CHECK] }]),
+  )
+  .extend("checksReadFromUnspelledRows", () =>
+    coverageDeclarationsFrom([
       {
         declaredChecks: [
           { coveredPaths: ["**/*.ts"] },
@@ -37,14 +25,10 @@ describe("coverage-declarations", () => {
           { name: "the type check", coveredPaths: [17, "**/*.ts"] },
         ],
       },
-    ]);
-    expect(declared.checks).toStrictEqual([
-      { name: "the type check", coveredPaths: ["**/*.ts"], excludedPaths: [] },
-    ]);
-  });
-
-  test("a registry keeps its rows, its allowances, and the receivers they record", () => {
-    const declared = coverageDeclarationsFrom([
+    ]),
+  )
+  .extend("tablesReadFromACompleteRegistry", () =>
+    coverageDeclarationsFrom([
       {
         registries: [
           {
@@ -61,31 +45,10 @@ describe("coverage-declarations", () => {
           },
         ],
       },
-    ]);
-    expect(declared.tables).toStrictEqual([
-      {
-        name: "the forbidden files",
-        consumedBy: "the analyser",
-        rows: [
-          {
-            pattern: "**/*.js",
-            reason: "sources are authored in TypeScript",
-            receivers: [],
-          },
-        ],
-        allowances: [
-          {
-            pattern: "tools/shim.js",
-            reason: "the shim ships as JavaScript",
-            receivers: ["the type check"],
-          },
-        ],
-      },
-    ]);
-  });
-
-  test("a registry without a consumer, and a row without a reason, are dropped", () => {
-    const declared = coverageDeclarationsFrom([
+    ]),
+  )
+  .extend("tablesReadFromIncompleteRegistries", () =>
+    coverageDeclarationsFrom([
       {
         registries: [
           { name: "the tracked paths", rows: [{ pattern: "**/*.env" }] },
@@ -96,28 +59,20 @@ describe("coverage-declarations", () => {
           },
         ],
       },
-    ]);
-    expect(declared.tables).toStrictEqual([
-      { name: "the required files", consumedBy: "the file scan", rows: [], allowances: [] },
-    ]);
-  });
-
-  test("a declaration of paths no check reads keeps its pattern and its reason", () => {
-    const declared = coverageDeclarationsFrom([
+    ]),
+  )
+  .extend("uncheckedDeclarationsReadFromMixedRows", () =>
+    coverageDeclarationsFrom([
       {
         uncheckedDeclarations: [
           { pattern: "**/*.md", reason: "the guide is read by people" },
           { pattern: "**/*.txt" },
         ],
       },
-    ]);
-    expect(declared.uncheckedDeclarations).toStrictEqual([
-      { pattern: "**/*.md", reason: "the guide is read by people", receivers: [] },
-    ]);
-  });
-
-  test("a scope registration without a name is dropped, and one without paths registers none", () => {
-    const declared = coverageDeclarationsFrom([
+    ]),
+  )
+  .extend("scopesReadFromMixedRegistrations", () =>
+    coverageDeclarationsFrom([
       {
         scopeRegistrations: [
           { registeredPaths: ["tools/**"] },
@@ -125,16 +80,118 @@ describe("coverage-declarations", () => {
           { name: "the release zone", registeredPaths: ["tools/release/**"] },
         ],
       },
-    ]);
-    expect(declared.scopes).toStrictEqual([
-      { name: "the bootstrap zone", registeredPaths: [] },
-      { name: "the release zone", registeredPaths: ["tools/release/**"] },
-    ]);
+    ]),
+  )
+  .extend("spellingOfTwoNames", () => spelledNames(["the analyser", "the type check"]));
+
+describe("coverage-declarations", () => {
+  it("options that carry nothing declare nothing", ({ declarationsReadFromNoOptions }) => {
+    expect(declarationsReadFromNoOptions).toStrictEqual({
+      checks: [],
+      tables: [],
+      uncheckedDeclarations: [],
+      scopes: [],
+    });
   });
 
-  test("names are spelled as a list the message can carry", () => {
-    expect(spelledNames(["the analyser", "the type check"])).toBe(
-      "`the analyser`, `the type check`",
-    );
+  it("a field that is not a list declares nothing", ({ checksReadFromAnUnlistedField }) => {
+    expect(checksReadFromAnUnlistedField).toStrictEqual({
+      checks: [],
+      tables: [],
+      uncheckedDeclarations: [],
+      scopes: [],
+    });
+  });
+
+  it("a check keeps the paths it opens and the paths it leaves out", ({
+    checksReadFromANamedCheck,
+  }) => {
+    expect(checksReadFromANamedCheck).toStrictEqual({
+      checks: [NAMED_CHECK],
+      tables: [],
+      uncheckedDeclarations: [],
+      scopes: [],
+    });
+  });
+
+  it("a check without a name, and a path that is not written out, are dropped", ({
+    checksReadFromUnspelledRows,
+  }) => {
+    expect(checksReadFromUnspelledRows).toStrictEqual({
+      checks: [{ name: "the type check", coveredPaths: ["**/*.ts"], excludedPaths: [] }],
+      tables: [],
+      uncheckedDeclarations: [],
+      scopes: [],
+    });
+  });
+
+  it("a registry keeps its rows, its allowances, and the receivers they record", ({
+    tablesReadFromACompleteRegistry,
+  }) => {
+    expect(tablesReadFromACompleteRegistry).toStrictEqual({
+      checks: [],
+      tables: [
+        {
+          name: "the forbidden files",
+          consumedBy: "the analyser",
+          rows: [
+            { pattern: "**/*.js", reason: "sources are authored in TypeScript", receivers: [] },
+          ],
+          allowances: [
+            {
+              pattern: "tools/shim.js",
+              reason: "the shim ships as JavaScript",
+              receivers: ["the type check"],
+            },
+          ],
+        },
+      ],
+      uncheckedDeclarations: [],
+      scopes: [],
+    });
+  });
+
+  it("a registry without a consumer, and a row without a reason, are dropped", ({
+    tablesReadFromIncompleteRegistries,
+  }) => {
+    expect(tablesReadFromIncompleteRegistries).toStrictEqual({
+      checks: [],
+      tables: [
+        { name: "the required files", consumedBy: "the file scan", rows: [], allowances: [] },
+      ],
+      uncheckedDeclarations: [],
+      scopes: [],
+    });
+  });
+
+  it("a declaration of paths no check reads keeps its pattern and its reason", ({
+    uncheckedDeclarationsReadFromMixedRows,
+  }) => {
+    expect(uncheckedDeclarationsReadFromMixedRows).toStrictEqual({
+      checks: [],
+      tables: [],
+      uncheckedDeclarations: [
+        { pattern: "**/*.md", reason: "the guide is read by people", receivers: [] },
+      ],
+      scopes: [],
+    });
+  });
+
+  it("a scope registration without a name is dropped, and one without paths registers none", ({
+    scopesReadFromMixedRegistrations,
+  }) => {
+    expect(scopesReadFromMixedRegistrations).toStrictEqual({
+      checks: [],
+      tables: [],
+      uncheckedDeclarations: [],
+      scopes: [
+        { name: "the bootstrap zone", registeredPaths: [] },
+        { name: "the release zone", registeredPaths: ["tools/release/**"] },
+      ],
+    });
+  });
+
+  it("names are spelled as a list the message can carry", ({ spellingOfTwoNames }) => {
+    expect(spellingOfTwoNames).toBe("`the analyser`, `the type check`");
   });
 });

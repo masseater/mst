@@ -25,6 +25,7 @@ import { noDetachedTestFile } from "../lint/oxlint/rules/no-detached-test-file--
 import { noDiscardedFailure } from "../lint/oxlint/rules/no-discarded-failure--receive-and-surface-it.ts";
 import { noDoubleTypeAssertion } from "../lint/oxlint/rules/no-double-type-assertion--declare-the-real-type.ts";
 import { noDryTestSetup } from "../lint/oxlint/rules/no-dry-test-setup--inline-owned-setup.ts";
+import { noEmptyCatch } from "../lint/oxlint/rules/no-empty-catch--throw-or-handle.ts";
 import { noExpectCallExpression } from "../lint/oxlint/rules/no-expect-call-expression--yield-from-fixture.ts";
 import { noExpectForbiddenSubjectName } from "../lint/oxlint/rules/no-expect-forbidden-subject-name--rename-to-concrete-subject.ts";
 import { noExpectMemberSubject } from "../lint/oxlint/rules/no-expect-member-subject--yield-subject-from-fixture.ts";
@@ -58,6 +59,7 @@ import { noReassign } from "../lint/oxlint/rules/no-reassign--use-spread-or-iife
 import { noReceiverMutation } from "../lint/oxlint/rules/no-receiver-mutation--derive-new-value.ts";
 import { noRedundantMockReset } from "../lint/oxlint/rules/no-redundant-mock-reset--lift-mocks-into-fixture.ts";
 import { noRuleSuppression } from "../lint/oxlint/rules/no-rule-suppression--fix-the-violation.ts";
+import { noSilentCatch } from "../lint/oxlint/rules/no-silent-catch--rethrow-or-handle.ts";
 import { noSilentSuppression } from "../lint/oxlint/rules/no-silent-suppression--fix-or-justify-inline.ts";
 import { noSingleUseLocalType } from "../lint/oxlint/rules/no-single-use-local-type--inline-at-the-use-site.ts";
 import { noSpecFileHelperFunction } from "../lint/oxlint/rules/no-spec-file-helper-function--inline-or-use-fixture.ts";
@@ -171,6 +173,7 @@ export const oxlint: OxlintConfig = defineConfig({
     [`${PLUGIN_NAME}/${noDryTestSetup.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noDuplicateValueDeclaration.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noDuplicatedBody.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noEmptyCatch.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noExpectCallExpression.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noExpectForbiddenSubjectName.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noExpectMemberSubject.name}`]: LINT_SEVERITY.ERROR,
@@ -205,6 +208,7 @@ export const oxlint: OxlintConfig = defineConfig({
     [`${PLUGIN_NAME}/${noReceiverMutation.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noRedundantMockReset.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noRuleSuppression.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noSilentCatch.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noSilentSuppression.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noSingleUseLocalType.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noSpecFileHelperFunction.name}`]: LINT_SEVERITY.ERROR,

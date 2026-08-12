@@ -78,7 +78,7 @@ export const noReceiverMutation = createDontReviewItRule({
 
     const mutatingNamesOf = memoize((type: string): ReadonlySet<string> | null => {
       const imported = importedNames().get(type) ?? null;
-      const className = imported === null ? type : imported.name;
+      const className = imported === null ? type : imported.exported;
       const found = classModulesFor({
         file,
         source: context.sourceCode.text,

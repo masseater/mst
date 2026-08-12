@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 import { testLintRule } from "@mst/lint-rule-authoring";
 import { describe } from "vite-plus/test";
@@ -19,23 +19,15 @@ const SPELLED_SUFFIXES = "`.test.ts`, `.test.tsx`";
 
 const DECLARATION = "export const total = 1;";
 
-const configFor = (lint: string): string => `export default { lint: ${lint} };`;
-
 const fixtureDir = join(tmpdir(), "dont-review-it-require-spec-lint-coverage");
 rmSync(fixtureDir, { recursive: true, force: true });
-mkdirSync(fixtureDir, { recursive: true });
+mkdirSync(join(fixtureDir, "src/legacy"), { recursive: true });
 
-const writeFixture = (name: string, source: string): string => {
-  const path = join(fixtureDir, name);
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, source);
-  return path;
-};
-
-writeFixture("pnpm-workspace.yaml", "packages:\n  - packages/*\n");
-writeFixture("package.json", '{ "name": "@fixture/root" }\n');
-writeFixture("src/legacy/basket.test.ts", 'it("counts", () => {});\n');
-const ignoringConfig = writeFixture(CONFIG_FILE, DECLARATION);
+writeFileSync(join(fixtureDir, "pnpm-workspace.yaml"), "packages:\n  - packages/*\n");
+writeFileSync(join(fixtureDir, "package.json"), '{ "name": "@fixture/root" }\n');
+writeFileSync(join(fixtureDir, "src/legacy/basket.test.ts"), 'it("counts", () => {});\n');
+const ignoringConfig = join(fixtureDir, CONFIG_FILE);
+writeFileSync(ignoringConfig, DECLARATION);
 
 describe("dont-review-it/require-spec-lint-coverage--lint-every-spec-file", () => {
   testLintRule(requireSpecLintCoverage, {
@@ -77,46 +69,42 @@ describe("dont-review-it/require-spec-lint-coverage--lint-every-spec-file", () =
       },
       {
         name: "a bundle rule held at the level that fails a run passes",
-        code: configFor(`{ rules: { "${BUNDLE_RULE}": "error" } }`),
+        code: `export default { lint: { rules: { "${BUNDLE_RULE}": "error" } } };`,
         filename: CONFIG_FILE,
       },
       {
         name: "a rule outside this bundle may sit at any level",
-        code: configFor(
-          `{ rules: { "dont-review-it/no-array-mutation--derive-new-array": "off" } }`,
-        ),
+        code: `export default { lint: { rules: { "dont-review-it/no-array-mutation--derive-new-array": "off" } } };`,
         filename: CONFIG_FILE,
       },
       {
         name: "a setting only one rule reads stays with that rule",
-        code: configFor(
-          `{ rules: { "dont-review-it/forbid-oversized-file--split-by-responsibility": ["error", { maxLines: 400 }] } }`,
-        ),
+        code: `export default { lint: { rules: { "dont-review-it/forbid-oversized-file--split-by-responsibility": ["error", { maxLines: 400 }] } } };`,
         filename: CONFIG_FILE,
       },
       {
         name: "a file that is not the lint configuration is read for its declarations alone",
-        code: configFor(`{ rules: { "${BUNDLE_RULE}": "off" } }`),
+        code: `export default { lint: { rules: { "${BUNDLE_RULE}": "off" } } };`,
         filename: "rules-snapshot.ts",
       },
       {
         name: "a rules entry whose key is computed names no rule this repository holds",
-        code: `const held = "x";\n${configFor(`{ rules: { [held]: "off" } }`)}`,
+        code: `const held = "x";\nexport default { lint: { rules: { [held]: "off" } } };`,
         filename: CONFIG_FILE,
       },
       {
         name: "a rules block assembled by spread carries no entry to read",
-        code: `const shared = {};\n${configFor(`{ rules: { ...shared } }`)}`,
+        code: `const shared = {};\nexport default { lint: { rules: { ...shared } } };`,
         filename: CONFIG_FILE,
       },
       {
         name: "a severity written as a single-element array carries no options",
-        code: configFor(`{ rules: { "${BUNDLE_RULE}": ["error"] } }`),
+        code: `export default { lint: { rules: { "${BUNDLE_RULE}": ["error"] } } };`,
         filename: CONFIG_FILE,
       },
       {
         name: "options assembled by spread carry no setting to read",
-        code: `const shared = {};\n${configFor(`{ rules: { "${BUNDLE_RULE}": ["error", { ...shared }] } }`)}`,
+        code: `const shared = {};\nexport default { lint: { rules: { "${BUNDLE_RULE}": ["error", { ...shared }] } } };`,
         filename: CONFIG_FILE,
       },
       {
@@ -204,7 +192,7 @@ describe("dont-review-it/require-spec-lint-coverage--lint-every-spec-file", () =
       },
       {
         name: "a bundle rule taken down to a level that passes a run is reported",
-        code: configFor(`{ rules: { "${BUNDLE_RULE}": "off" } }`),
+        code: `export default { lint: { rules: { "${BUNDLE_RULE}": "off" } } };`,
         filename: CONFIG_FILE,
         errors: [
           {
@@ -215,9 +203,7 @@ describe("dont-review-it/require-spec-lint-coverage--lint-every-spec-file", () =
       },
       {
         name: "an override that takes a bundle rule down over part of the tree is reported",
-        code: `const carried = "apps/**";\n${configFor(
-          `{ overrides: [{ files: [carried, "apps/site/**"], rules: { "${BUNDLE_RULE}": "warn" } }] }`,
-        )}`,
+        code: `const carried = "apps/**";\nexport default { lint: { overrides: [{ files: [carried, "apps/site/**"], rules: { "${BUNDLE_RULE}": "warn" } }] } };`,
         filename: CONFIG_FILE,
         errors: [
           {
@@ -228,9 +214,7 @@ describe("dont-review-it/require-spec-lint-coverage--lint-every-spec-file", () =
       },
       {
         name: "an override whose paths are written outside the entry names no scope",
-        code: `const paths = ["apps/site/**"];\n${configFor(
-          `{ overrides: [{ files: paths, rules: { "${BUNDLE_RULE}": "off" } }] }`,
-        )}`,
+        code: `const paths = ["apps/site/**"];\nexport default { lint: { overrides: [{ files: paths, rules: { "${BUNDLE_RULE}": "off" } }] } };`,
         filename: CONFIG_FILE,
         errors: [
           {
@@ -241,9 +225,7 @@ describe("dont-review-it/require-spec-lint-coverage--lint-every-spec-file", () =
       },
       {
         name: "a setting more than one rule reads must not sit in a single rule entry",
-        code: configFor(
-          `{ rules: { "${BUNDLE_RULE}": ["error", { specFileSuffixes: [".spec.ts"] }] } }`,
-        ),
+        code: `export default { lint: { rules: { "${BUNDLE_RULE}": ["error", { specFileSuffixes: [".spec.ts"] }] } } };`,
         filename: CONFIG_FILE,
         errors: [
           {
@@ -254,7 +236,7 @@ describe("dont-review-it/require-spec-lint-coverage--lint-every-spec-file", () =
       },
       {
         name: "an ignore entry that covers an authored spec file is reported",
-        code: configFor(`{ ignorePatterns: ["**/legacy/**", "docs/**"] }`),
+        code: `export default { lint: { ignorePatterns: ["**/legacy/**", "docs/**"] } };`,
         filename: ignoringConfig,
         errors: [
           {

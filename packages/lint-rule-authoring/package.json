@@ -2,6 +2,7 @@
   "name": "@mst/lint-rule-authoring",
   "version": "0.0.0",
   "description": "Materials for authoring lint rules that keep working after they are written.",
+  "homepage": "https://github.com/masseater/mst",
   "license": "MIT",
   "repository": {
     "type": "git",

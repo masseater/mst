@@ -1,7 +1,7 @@
 import { uniq } from "es-toolkit";
 import { parseSync, type Comment, type ParseResult } from "oxc-parser";
 
-import { NODE_TYPE_FIELD } from "../ast-node.ts";
+import { isAstFields, NODE_TYPE_FIELD } from "../ast-node.ts";
 import {
   containsCanonicalValuesAnnotation,
   findRetiredAnnotationTags,
@@ -79,16 +79,14 @@ const literalValueOf = (node: Readonly<Record<string, unknown>>): CanonicalValue
 
 const spelledOutValuesIn = (node: unknown): readonly CanonicalValue[] => {
   if (Array.isArray(node)) return node.flatMap(spelledOutValuesIn);
-  if (node === null || typeof node !== "object") return [];
+  if (!isAstFields(node)) return [];
+  if (typeof node[NODE_TYPE_FIELD] !== "string") return [];
 
-  const fields = node as Readonly<Record<string, unknown>>;
-  if (typeof fields[NODE_TYPE_FIELD] !== "string") return [];
-
-  const literal = literalValueOf(fields);
+  const literal = literalValueOf(node);
   if (literal !== null) return [literal];
 
-  const keyField = KEY_FIELD_BY_NODE_TYPE.get(fields[NODE_TYPE_FIELD]);
-  return Object.entries(fields)
+  const keyField = KEY_FIELD_BY_NODE_TYPE.get(node[NODE_TYPE_FIELD]);
+  return Object.entries(node)
     .filter(([field]) => field !== NODE_TYPE_FIELD && field !== keyField)
     .flatMap(([, value]) => spelledOutValuesIn(value));
 };

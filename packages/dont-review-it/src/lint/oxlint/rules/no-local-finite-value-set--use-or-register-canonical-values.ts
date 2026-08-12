@@ -1,4 +1,4 @@
-import { memoize } from "es-toolkit";
+import { memoize, uniqBy } from "es-toolkit";
 
 import { createDontReviewItRule } from "../../../create-rule.ts";
 import { isInsideAnnotatedDeclaration } from "../lib/canonical-values/annotated-declaration.ts";
@@ -32,10 +32,11 @@ import {
   libraryOwnersOf,
   type LibraryVocabularyIndex,
 } from "../lib/library-vocabulary/vocabulary-index.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { isOutOfScopeSource } from "../lib/out-of-scope-source.ts";
 
 import type { WorkspaceLintRule } from "@mst/lint-rule-authoring";
-import type { ESTree } from "@oxlint/plugins";
+import type { Context, ESTree } from "@oxlint/plugins";
 import type { CanonicalValuesCatalogLoader } from "../lib/canonical-values/catalog-loader.ts";
 import type {
   CanonicalValuesCatalog,
@@ -90,20 +91,25 @@ const catalogOwnerReport = (input: {
   };
 };
 
-const fileSourcesFor = (input: {
-  readonly context: {
-    readonly cwd: string;
-    readonly filename: string;
-    readonly sourceCode: { readonly ast: ESTree.Program; readonly text: string };
-  };
-  readonly loadCatalog: CanonicalValuesCatalogLoader;
-  readonly loadLibraryVocabulary: LibraryVocabularyLoader;
-}): {
+type ValuesSources = {
   readonly repositoryRootOf: () => string;
   readonly catalogOf: () => CanonicalValuesCatalog;
   readonly bindingsOf: () => FileBindings;
   readonly libraryVocabularyOf: () => LibraryVocabularyIndex;
-} => {
+  readonly filename: string;
+  readonly ownershipPolicy: string;
+};
+
+const fileSourcesFor = (input: {
+  readonly context: {
+    readonly cwd: string;
+    readonly filename: string;
+    readonly options: Context["options"];
+    readonly sourceCode: { readonly ast: ESTree.Program; readonly text: string };
+  };
+  readonly loadCatalog: CanonicalValuesCatalogLoader;
+  readonly loadLibraryVocabulary: LibraryVocabularyLoader;
+}): ValuesSources => {
   const { context, loadCatalog, loadLibraryVocabulary } = input;
   const repositoryRootOf = memoize((): string => findWorkspaceRoot(context.cwd));
 
@@ -119,6 +125,8 @@ const fileSourcesFor = (input: {
       (): LibraryVocabularyIndex =>
         loadLibraryVocabulary({ filename: context.filename, repositoryRoot: repositoryRootOf() }),
     ),
+    filename: context.filename,
+    ownershipPolicy: ownershipPolicyOf(context.options),
   };
 };
 
@@ -134,6 +142,211 @@ type ValuesPosition =
       readonly specifier: string;
       readonly node: ESTree.Span;
     };
+
+type Finding = {
+  readonly node: ESTree.Span;
+  readonly messageId: string;
+  readonly data: Record<string, string>;
+};
+
+type VisitedNode =
+  | ESTree.TSTypeAliasDeclaration
+  | ESTree.CallExpression
+  | ESTree.NewExpression
+  | ESTree.ObjectExpression
+  | ESTree.TSIndexedAccessType;
+
+const positionForName = (
+  asked: { readonly name: string; readonly at: ESTree.Span },
+  sources: ValuesSources,
+): ValuesPosition | null => {
+  const array = sources.bindingsOf().arrays.get(asked.name);
+  if (array !== undefined) {
+    const vocabulary = staticArrayValues(array);
+    return vocabulary === null ? null : { kind: "values", values: vocabulary, node: array };
+  }
+
+  const specifier = sources.bindingsOf().namedImports.get(asked.name);
+  if (specifier === undefined) return null;
+
+  const route = importRouteStatus(
+    { specifier, filename: sources.filename, repositoryRoot: sources.repositoryRootOf() },
+    sources.catalogOf(),
+  );
+  if (route !== "unregistered") return null;
+  return { kind: "unregisteredRoute", name: asked.name, specifier, node: asked.at };
+};
+
+const positionForExpression = (
+  node: ESTree.Expression,
+  sources: ValuesSources,
+): ValuesPosition | null => {
+  const expression = unwrapExpression(node);
+  if (expression.type === "ArrayExpression") {
+    const vocabulary = staticArrayValues(expression);
+    return vocabulary === null ? null : { kind: "values", values: vocabulary, node: expression };
+  }
+  if (expression.type === "Identifier") {
+    return positionForName({ name: expression.name, at: expression }, sources);
+  }
+  return null;
+};
+
+const vocabularyFindings = (input: {
+  readonly position: { readonly node: ESTree.Span; readonly values: readonly CanonicalValue[] };
+  readonly onlyWhenOwned: boolean;
+  readonly sources: ValuesSources;
+}): readonly Finding[] => {
+  const { position, onlyWhenOwned, sources } = input;
+  const { ownershipPolicy } = sources;
+  const owners =
+    sources.catalogOf().entriesByFingerprint.get(fingerprintValues(position.values)) ?? [];
+  if (onlyWhenOwned && owners.length === 0) return [];
+
+  const report =
+    owners.length === 0
+      ? libraryOwnerReport({
+          libraries: libraryOwnersOf(sources.libraryVocabularyOf(), position.values),
+          values: position.values,
+          ownershipPolicy,
+        })
+      : catalogOwnerReport({ owners, ownershipPolicy });
+  return [{ node: position.node, messageId: report.messageId, data: { ...report.data } }];
+};
+
+const findingsAt = (input: {
+  readonly position: ValuesPosition | null;
+  readonly onlyWhenOwned: boolean;
+  readonly sources: ValuesSources;
+}): readonly Finding[] => {
+  const { position, onlyWhenOwned, sources } = input;
+  if (position === null) return [];
+  if (position.kind === "unregisteredRoute") {
+    return onlyWhenOwned
+      ? []
+      : [
+          {
+            node: position.node,
+            messageId: "unregisteredCanonicalValuesImportRoute",
+            data: { name: position.name, specifier: position.specifier },
+          },
+        ];
+  }
+  return isFiniteVocabulary(position.values)
+    ? vocabularyFindings({ position, onlyWhenOwned, sources })
+    : [];
+};
+
+const typeAliasFindings = (
+  node: ESTree.TSTypeAliasDeclaration,
+  sources: ValuesSources,
+): readonly Finding[] => {
+  const vocabulary = literalUnionValues(node.typeAnnotation);
+  return vocabulary === null
+    ? []
+    : findingsAt({
+        position: { kind: "values", values: vocabulary, node: node.typeAnnotation },
+        onlyWhenOwned: false,
+        sources,
+      });
+};
+
+const schemaCallFindings = (
+  node: ESTree.CallExpression,
+  sources: ValuesSources,
+): readonly Finding[] => {
+  const member = calleeMemberName(node.callee);
+  if (member === null) return [];
+
+  if (SCHEMA_ENUM_MEMBERS.has(member)) {
+    const argument = firstNonSpreadArgument(node);
+    return argument === null
+      ? []
+      : findingsAt({
+          position: positionForExpression(argument, sources),
+          onlyWhenOwned: false,
+          sources,
+        });
+  }
+  if (member !== SCHEMA_UNION_MEMBER) return [];
+
+  const literals = schemaUnionLiterals(node);
+  return literals === null
+    ? []
+    : findingsAt({
+        position: { kind: "values", values: literals.values, node: literals.node },
+        onlyWhenOwned: false,
+        sources,
+      });
+};
+
+const setConstructorFindings = (
+  node: ESTree.NewExpression,
+  sources: ValuesSources,
+): readonly Finding[] => {
+  const callee = unwrapExpression(node.callee);
+  if (callee.type !== "Identifier" || callee.name !== SET_CONSTRUCTOR) return [];
+
+  const argument = firstNonSpreadArgument(node);
+  return argument === null
+    ? []
+    : findingsAt({
+        position: positionForExpression(argument, sources),
+        onlyWhenOwned: true,
+        sources,
+      });
+};
+
+const schemaObjectFindings = (
+  node: ESTree.ObjectExpression,
+  sources: ValuesSources,
+): readonly Finding[] =>
+  node.properties.flatMap((property) => {
+    if (property.type !== "Property" || property.computed) return [];
+    if (propertyKeyName(property.key) !== JSON_SCHEMA_ENUM_KEY) return [];
+    return findingsAt({
+      position: positionForExpression(property.value, sources),
+      onlyWhenOwned: false,
+      sources,
+    });
+  });
+
+const indexedAccessFindings = (
+  node: ESTree.TSIndexedAccessType,
+  sources: ValuesSources,
+): readonly Finding[] => {
+  if (node.indexType.type !== "TSNumberKeyword") return [];
+
+  const objectType = node.objectType;
+  if (objectType.type !== "TSTypeQuery") return [];
+
+  const { exprName } = objectType;
+  if (exprName.type !== "Identifier") return [];
+  return findingsAt({
+    position: positionForName({ name: exprName.name, at: exprName }, sources),
+    onlyWhenOwned: true,
+    sources,
+  });
+};
+
+const findingsFor = (node: VisitedNode, sources: ValuesSources): readonly Finding[] => {
+  if (node.type === "TSTypeAliasDeclaration") return typeAliasFindings(node, sources);
+  if (node.type === "CallExpression") return schemaCallFindings(node, sources);
+  if (node.type === "NewExpression") return setConstructorFindings(node, sources);
+  if (node.type === "ObjectExpression") return schemaObjectFindings(node, sources);
+  return indexedAccessFindings(node, sources);
+};
+
+const visitedNodesIn = (program: ESTree.Program): readonly VisitedNode[] =>
+  [
+    ...nodesOfType(program, "TSTypeAliasDeclaration"),
+    ...nodesOfType(program, "CallExpression"),
+    ...nodesOfType(program, "NewExpression"),
+    ...nodesOfType(program, "ObjectExpression"),
+    ...nodesOfType(program, "TSIndexedAccessType"),
+  ].toSorted((left, right) => left.start - right.start);
+
+const spanOf = (finding: Finding): string => `${finding.node.start}:${finding.node.end}`;
 
 export const createNoLocalFiniteValueSet = ({
   loadCatalog,
@@ -170,135 +383,17 @@ export const createNoLocalFiniteValueSet = ({
     create(context) {
       if (isOutOfScopeSource(context.filename)) return {};
 
-      const { repositoryRootOf, catalogOf, bindingsOf, libraryVocabularyOf } = fileSourcesFor({
-        context,
-        loadCatalog,
-        loadLibraryVocabulary,
-      });
-
-      const reportedSpans = new Set<string>();
-
-      const reportOnce = (report: {
-        readonly node: ESTree.Span;
-        readonly messageId: string;
-        readonly data: Record<string, string>;
-      }): void => {
-        if (isInsideAnnotatedDeclaration(bindingsOf().annotatedRanges, report.node)) return;
-        const span = `${report.node.start}:${report.node.end}`;
-        if (reportedSpans.has(span)) return;
-        reportedSpans.add(span);
-        context.report(report);
-      };
-
-      const reportVocabulary = (
-        occurrence: { readonly node: ESTree.Span; readonly values: readonly CanonicalValue[] },
-        onlyWhenOwned: boolean,
-      ): void => {
-        const { node } = occurrence;
-        const vocabulary = occurrence.values;
-        const owners = catalogOf().entriesByFingerprint.get(fingerprintValues(vocabulary)) ?? [];
-        if (onlyWhenOwned && owners.length === 0) return;
-
-        const ownershipPolicy = ownershipPolicyOf(context.options);
-        const report =
-          owners.length === 0
-            ? libraryOwnerReport({
-                libraries: libraryOwnersOf(libraryVocabularyOf(), vocabulary),
-                values: vocabulary,
-                ownershipPolicy,
-              })
-            : catalogOwnerReport({ owners, ownershipPolicy });
-        reportOnce({ node, messageId: report.messageId, data: { ...report.data } });
-      };
-
-      const resolveName = (name: string, reference: ESTree.Span): ValuesPosition | null => {
-        const array = bindingsOf().arrays.get(name);
-        if (array !== undefined) {
-          const vocabulary = staticArrayValues(array);
-          return vocabulary === null ? null : { kind: "values", values: vocabulary, node: array };
-        }
-        const specifier = bindingsOf().namedImports.get(name);
-        if (specifier === undefined) return null;
-        const route = importRouteStatus(
-          { specifier, filename: context.filename, repositoryRoot: repositoryRootOf() },
-          catalogOf(),
-        );
-        if (route !== "unregistered") return null;
-        return { kind: "unregisteredRoute", name, specifier, node: reference };
-      };
-
-      const resolveExpression = (node: ESTree.Expression): ValuesPosition | null => {
-        const expression = unwrapExpression(node);
-        if (expression.type === "ArrayExpression") {
-          const vocabulary = staticArrayValues(expression);
-          return vocabulary === null
-            ? null
-            : { kind: "values", values: vocabulary, node: expression };
-        }
-        if (expression.type === "Identifier") return resolveName(expression.name, expression);
-        return null;
-      };
-
-      const handle = (position: ValuesPosition | null, onlyWhenOwned: boolean): void => {
-        if (position === null) return;
-        if (position.kind === "unregisteredRoute") {
-          if (onlyWhenOwned) return;
-          reportOnce({
-            node: position.node,
-            messageId: "unregisteredCanonicalValuesImportRoute",
-            data: { name: position.name, specifier: position.specifier },
-          });
-          return;
-        }
-        if (!isFiniteVocabulary(position.values)) return;
-        reportVocabulary(position, onlyWhenOwned);
-      };
+      const sources = fileSourcesFor({ context, loadCatalog, loadLibraryVocabulary });
 
       return {
-        TSTypeAliasDeclaration(node: ESTree.TSTypeAliasDeclaration) {
-          const vocabulary = literalUnionValues(node.typeAnnotation);
-          if (vocabulary === null || !isFiniteVocabulary(vocabulary)) return;
-          reportVocabulary({ node: node.typeAnnotation, values: vocabulary }, false);
-        },
+        "Program:exit"(program: ESTree.Program) {
+          const found = visitedNodesIn(program).flatMap((node) => findingsFor(node, sources));
+          const outside = found.filter(
+            (finding) =>
+              !isInsideAnnotatedDeclaration(sources.bindingsOf().annotatedRanges, finding.node),
+          );
 
-        CallExpression(node: ESTree.CallExpression) {
-          const member = calleeMemberName(node.callee);
-          if (member === null) return;
-
-          if (SCHEMA_ENUM_MEMBERS.has(member)) {
-            const argument = firstNonSpreadArgument(node);
-            if (argument !== null) handle(resolveExpression(argument), false);
-            return;
-          }
-          if (member !== SCHEMA_UNION_MEMBER) return;
-
-          const literals = schemaUnionLiterals(node);
-          if (literals === null || !isFiniteVocabulary(literals.values)) return;
-          reportVocabulary(literals, false);
-        },
-
-        NewExpression(node: ESTree.NewExpression) {
-          const callee = unwrapExpression(node.callee);
-          if (callee.type !== "Identifier" || callee.name !== SET_CONSTRUCTOR) return;
-          const argument = firstNonSpreadArgument(node);
-          if (argument !== null) handle(resolveExpression(argument), true);
-        },
-
-        ObjectExpression(node: ESTree.ObjectExpression) {
-          for (const property of node.properties) {
-            if (property.type !== "Property" || property.computed) continue;
-            if (propertyKeyName(property.key) !== JSON_SCHEMA_ENUM_KEY) continue;
-            handle(resolveExpression(property.value), false);
-          }
-        },
-
-        TSIndexedAccessType(node: ESTree.TSIndexedAccessType) {
-          if (node.indexType.type !== "TSNumberKeyword") return;
-          const objectType = node.objectType;
-          if (objectType.type !== "TSTypeQuery") return;
-          const { exprName } = objectType;
-          if (exprName.type !== "Identifier") return;
-          handle(resolveName(exprName.name, exprName), true);
+          for (const finding of uniqBy(outside, spanOf)) context.report(finding);
         },
       };
     },

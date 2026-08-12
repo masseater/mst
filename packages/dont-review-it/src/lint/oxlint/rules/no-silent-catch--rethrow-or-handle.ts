@@ -1,4 +1,5 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { bodyCarriesNoWork } from "../lib/catch-clause-bodies.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
@@ -43,7 +44,7 @@ export const noSilentCatch = createDontReviewItRule({
     return {
       CatchClause(node: ESTree.CatchClause) {
         if (node.param === null) return;
-        if (node.body.body.length === 0) return;
+        if (bodyCarriesNoWork(node)) return;
 
         const caught = context.sourceCode.getScope(node);
         const carried = caught.variables.some((variable) =>

@@ -3,89 +3,55 @@ import { describe, expect, test } from "vite-plus/test";
 import { RETIRED_ANNOTATION_TAGS } from "./annotation.ts";
 import { scanCanonicalValuesText } from "./declarations.ts";
 
-describe("declarations", () => {
-  const CANONICAL_VALUES_TAG = "@canonical-values";
+const CANONICAL_VALUES_TAG = "@canonical-values";
 
-  const declaredValuesIn = (sourceText: string): readonly (readonly unknown[])[] =>
-    scanCanonicalValuesText(sourceText).declarations.map((declaration) => declaration.values);
-
-  test("a value list under the annotation becomes the declaration of that concept", () => {
-    const scanned = scanCanonicalValuesText(`/** ${CANONICAL_VALUES_TAG} order.status */
+const it = test
+  .extend("scanOfAValueListUnderTheAnnotation", () =>
+    scanCanonicalValuesText(`/** ${CANONICAL_VALUES_TAG} order.status */
 export const ORDER_STATUSES = ["draft", "published"] as const;
-`);
-
-    expect(scanned).toStrictEqual({
-      problems: [],
-      declarations: [{ conceptId: "order.status", values: ["draft", "published"], line: 1 }],
-    });
-  });
-
-  test("a union of literal types under the annotation declares the same values", () => {
-    expect(
-      declaredValuesIn(`/** ${CANONICAL_VALUES_TAG} order.status */
+`))
+  .extend("scanOfAUnionOfLiteralTypes", () =>
+    scanCanonicalValuesText(`/** ${CANONICAL_VALUES_TAG} order.status */
 export type OrderStatus = "draft" | "published";
 `),
-    ).toStrictEqual([["draft", "published"]]);
-  });
-
-  test("an annotation written as a line comment declares its concept", () => {
-    const scanned = scanCanonicalValuesText(`// ${CANONICAL_VALUES_TAG} order.status
+  )
+  .extend("scanOfAnAnnotationWrittenAsALineComment", () =>
+    scanCanonicalValuesText(`// ${CANONICAL_VALUES_TAG} order.status
 export const ORDER_STATUSES = ["draft"] as const;
-`);
-
-    expect(scanned.declarations.map((declaration) => declaration.conceptId)).toStrictEqual([
-      "order.status",
-    ]);
-  });
-
-  test("a literal that is not a word, a number or a flag is not one of the declared values", () => {
-    expect(
-      declaredValuesIn(`/** ${CANONICAL_VALUES_TAG} order.status */
+`),
+  )
+  .extend("scanOfAListHoldingALiteralOutsideTheVocabulary", () =>
+    scanCanonicalValuesText(`/** ${CANONICAL_VALUES_TAG} order.status */
 export const ORDER_STATUSES = ["draft", null, /published/u] as const;
 `),
-    ).toStrictEqual([["draft"]]);
-  });
-
-  test("a template literal carrying a substitution is not one of the declared values", () => {
-    expect(
-      declaredValuesIn(`/** ${CANONICAL_VALUES_TAG} order.status */
+  )
+  .extend("scanOfAListHoldingATemplateWithASubstitution", () =>
+    scanCanonicalValuesText(`/** ${CANONICAL_VALUES_TAG} order.status */
 export const ORDER_STATUSES = ["draft", \`published-\${suffix}\`] as const;
 `),
-    ).toStrictEqual([["draft"]]);
-  });
-
-  test("an annotation with nothing after it declares no concept", () => {
-    const scanned = scanCanonicalValuesText(`export const total = 1;
+  )
+  .extend("scanOfAnAnnotationWithNothingAfterIt", () =>
+    scanCanonicalValuesText(`export const total = 1;
 /** ${CANONICAL_VALUES_TAG} order.status */
-`);
-
-    expect(scanned.declarations).toStrictEqual([]);
-  });
-
-  test("a template literal without a substitution is one of the declared values", () => {
-    expect(
-      declaredValuesIn(`/** ${CANONICAL_VALUES_TAG} order.status */
+`),
+  )
+  .extend("scanOfAListHoldingATemplateWithoutASubstitution", () =>
+    scanCanonicalValuesText(`/** ${CANONICAL_VALUES_TAG} order.status */
 export const ORDER_STATUSES = [\`draft\`, "published"] as const;
 `),
-    ).toStrictEqual([["draft", "published"]]);
-  });
-
-  test("numbers and booleans under the annotation are declared values", () => {
-    expect(
-      declaredValuesIn(`/** ${CANONICAL_VALUES_TAG} retry.attempt */
+  )
+  .extend("scanOfNumbersUnderTheAnnotation", () =>
+    scanCanonicalValuesText(`/** ${CANONICAL_VALUES_TAG} retry.attempt */
 export const RETRY_ATTEMPTS = [1, 2, 3] as const;
 `),
-    ).toStrictEqual([[1, 2, 3]]);
-    expect(
-      declaredValuesIn(`/** ${CANONICAL_VALUES_TAG} toggle.state */
+  )
+  .extend("scanOfBooleansUnderTheAnnotation", () =>
+    scanCanonicalValuesText(`/** ${CANONICAL_VALUES_TAG} toggle.state */
 export const TOGGLE_STATES = [true, false] as const;
 `),
-    ).toStrictEqual([[true, false]]);
-  });
-
-  test("an enum body under the annotation declares its member values", () => {
-    expect(
-      declaredValuesIn(`/** ${CANONICAL_VALUES_TAG} order.status */
+  )
+  .extend("scanOfAnEnumBodyUnderTheAnnotation", () =>
+    scanCanonicalValuesText(`/** ${CANONICAL_VALUES_TAG} order.status */
 export enum OrderStatus {
   Draft = "draft",
   Published = "published",
@@ -93,75 +59,189 @@ export enum OrderStatus {
 
 export const UNRELATED = ["not-a-status"] as const;
 `),
-    ).toStrictEqual([["draft", "published"]]);
-  });
-
-  test("a quoted property key is not one of the declared values", () => {
-    expect(
-      declaredValuesIn(`/** ${CANONICAL_VALUES_TAG} order.status */
+  )
+  .extend("scanOfQuotedPropertyKeysUnderTheAnnotation", () =>
+    scanCanonicalValuesText(`/** ${CANONICAL_VALUES_TAG} order.status */
 export const ORDER_STATUS = { "Draft": "draft", "Published": "published" } as const;
 `),
-    ).toStrictEqual([["draft", "published"]]);
-  });
-
-  test("a type annotation on the declaration does not cut the value list short", () => {
-    expect(
-      declaredValuesIn(`/** ${CANONICAL_VALUES_TAG} order.status */
+  )
+  .extend("scanOfATypeAnnotatedDeclaration", () =>
+    scanCanonicalValuesText(`/** ${CANONICAL_VALUES_TAG} order.status */
 export const ORDER_STATUSES: readonly string[] = ["draft", "published"];
 `),
-    ).toStrictEqual([["draft", "published"]]);
-  });
-
-  test("a tag without a concept is reported as a broken annotation", () => {
-    expect(
-      scanCanonicalValuesText(`/** ${CANONICAL_VALUES_TAG} */
+  )
+  .extend("scanOfATagWithoutAConcept", () =>
+    scanCanonicalValuesText(`/** ${CANONICAL_VALUES_TAG} */
 export const ORDER_STATUSES = ["draft"] as const;
 `),
-    ).toStrictEqual({
+  )
+  .extend("scanOfARetiredTagLeftInAComment", () =>
+    scanCanonicalValuesText(`export const A = 1;
+/** ${RETIRED_ANNOTATION_TAGS[0]} */
+export const ORDER_STATUSES = ["draft"] as const;
+`),
+  )
+  .extend("scanOfTagsWrittenAsStringLiterals", () =>
+    scanCanonicalValuesText(`export const TAG = "${CANONICAL_VALUES_TAG}";
+export const RETIRED = ${JSON.stringify(RETIRED_ANNOTATION_TAGS)};
+`),
+  )
+  .extend("scanOfARegularExpressionHoldingAQuote", () =>
+    scanCanonicalValuesText(`const QUOTES = /['"]/u;
+/** ${CANONICAL_VALUES_TAG} order.status */
+export const ORDER_STATUSES = ["draft"] as const;
+`),
+  )
+  .extend("scanOfADeclarationThatSpellsOutNoValue", () =>
+    scanCanonicalValuesText(`/** ${CANONICAL_VALUES_TAG} order.status */
+export type OrderStatus = string;
+`),
+  );
+
+describe("declarations", () => {
+  it("a value list under the annotation becomes the declaration of that concept", ({
+    scanOfAValueListUnderTheAnnotation,
+  }) => {
+    expect(scanOfAValueListUnderTheAnnotation).toStrictEqual({
+      declarations: [{ conceptId: "order.status", values: ["draft", "published"], line: 1 }],
+      problems: [],
+    });
+  });
+
+  it("a union of literal types under the annotation declares the same values", ({
+    scanOfAUnionOfLiteralTypes,
+  }) => {
+    expect(scanOfAUnionOfLiteralTypes).toStrictEqual({
+      declarations: [{ conceptId: "order.status", values: ["draft", "published"], line: 1 }],
+      problems: [],
+    });
+  });
+
+  it("an annotation written as a line comment declares its concept", ({
+    scanOfAnAnnotationWrittenAsALineComment,
+  }) => {
+    expect(scanOfAnAnnotationWrittenAsALineComment).toStrictEqual({
+      declarations: [{ conceptId: "order.status", values: ["draft"], line: 1 }],
+      problems: [],
+    });
+  });
+
+  it("a literal that is not a word, a number or a flag is not one of the declared values", ({
+    scanOfAListHoldingALiteralOutsideTheVocabulary,
+  }) => {
+    expect(scanOfAListHoldingALiteralOutsideTheVocabulary).toStrictEqual({
+      declarations: [{ conceptId: "order.status", values: ["draft"], line: 1 }],
+      problems: [],
+    });
+  });
+
+  it("a template literal carrying a substitution is not one of the declared values", ({
+    scanOfAListHoldingATemplateWithASubstitution,
+  }) => {
+    expect(scanOfAListHoldingATemplateWithASubstitution).toStrictEqual({
+      declarations: [{ conceptId: "order.status", values: ["draft"], line: 1 }],
+      problems: [],
+    });
+  });
+
+  it("an annotation with nothing after it declares no concept", ({
+    scanOfAnAnnotationWithNothingAfterIt,
+  }) => {
+    expect(scanOfAnAnnotationWithNothingAfterIt).toStrictEqual({
+      declarations: [],
+      problems: [{ kind: "vocabulary-without-values", line: 2, conceptId: "order.status" }],
+    });
+  });
+
+  it("a template literal without a substitution is one of the declared values", ({
+    scanOfAListHoldingATemplateWithoutASubstitution,
+  }) => {
+    expect(scanOfAListHoldingATemplateWithoutASubstitution).toStrictEqual({
+      declarations: [{ conceptId: "order.status", values: ["draft", "published"], line: 1 }],
+      problems: [],
+    });
+  });
+
+  it("numbers under the annotation are declared values", ({ scanOfNumbersUnderTheAnnotation }) => {
+    expect(scanOfNumbersUnderTheAnnotation).toStrictEqual({
+      declarations: [{ conceptId: "retry.attempt", values: [1, 2, 3], line: 1 }],
+      problems: [],
+    });
+  });
+
+  it("booleans under the annotation are declared values", ({
+    scanOfBooleansUnderTheAnnotation,
+  }) => {
+    expect(scanOfBooleansUnderTheAnnotation).toStrictEqual({
+      declarations: [{ conceptId: "toggle.state", values: [true, false], line: 1 }],
+      problems: [],
+    });
+  });
+
+  it("an enum body under the annotation declares its member values", ({
+    scanOfAnEnumBodyUnderTheAnnotation,
+  }) => {
+    expect(scanOfAnEnumBodyUnderTheAnnotation).toStrictEqual({
+      declarations: [{ conceptId: "order.status", values: ["draft", "published"], line: 1 }],
+      problems: [],
+    });
+  });
+
+  it("a quoted property key is not one of the declared values", ({
+    scanOfQuotedPropertyKeysUnderTheAnnotation,
+  }) => {
+    expect(scanOfQuotedPropertyKeysUnderTheAnnotation).toStrictEqual({
+      declarations: [{ conceptId: "order.status", values: ["draft", "published"], line: 1 }],
+      problems: [],
+    });
+  });
+
+  it("a type annotation on the declaration does not cut the value list short", ({
+    scanOfATypeAnnotatedDeclaration,
+  }) => {
+    expect(scanOfATypeAnnotatedDeclaration).toStrictEqual({
+      declarations: [{ conceptId: "order.status", values: ["draft", "published"], line: 1 }],
+      problems: [],
+    });
+  });
+
+  it("a tag without a concept is reported as a broken annotation", ({
+    scanOfATagWithoutAConcept,
+  }) => {
+    expect(scanOfATagWithoutAConcept).toStrictEqual({
       declarations: [],
       problems: [{ kind: "unparsable-annotation", line: 1 }],
     });
   });
 
-  test("a retired annotation tag left in a comment is rejected by name", () => {
-    const retired = RETIRED_ANNOTATION_TAGS[0];
-
-    expect(
-      scanCanonicalValuesText(`export const A = 1;
-/** ${retired} */
-export const ORDER_STATUSES = ["draft"] as const;
-`),
-    ).toStrictEqual({
+  it("a retired annotation tag left in a comment is rejected by name", ({
+    scanOfARetiredTagLeftInAComment,
+  }) => {
+    expect(scanOfARetiredTagLeftInAComment).toStrictEqual({
       declarations: [],
-      problems: [{ kind: "retired-annotation-tag", line: 2, tag: retired }],
+      problems: [{ kind: "retired-annotation-tag", line: 2, tag: RETIRED_ANNOTATION_TAGS[0] }],
     });
   });
 
-  test("annotation tags written as string literals declare nothing and break nothing", () => {
-    expect(
-      scanCanonicalValuesText(`export const TAG = "${CANONICAL_VALUES_TAG}";
-export const RETIRED = ${JSON.stringify(RETIRED_ANNOTATION_TAGS)};
-`),
-    ).toStrictEqual({ declarations: [], problems: [] });
+  it("annotation tags written as string literals declare nothing and break nothing", ({
+    scanOfTagsWrittenAsStringLiterals,
+  }) => {
+    expect(scanOfTagsWrittenAsStringLiterals).toStrictEqual({ declarations: [], problems: [] });
   });
 
-  test("a regular expression holding a quote does not hide the annotation behind it", () => {
-    const scanned = scanCanonicalValuesText(`const QUOTES = /['"]/u;
-/** ${CANONICAL_VALUES_TAG} order.status */
-export const ORDER_STATUSES = ["draft"] as const;
-`);
-
-    expect(scanned.declarations.map((declaration) => declaration.conceptId)).toStrictEqual([
-      "order.status",
-    ]);
+  it("a regular expression holding a quote does not hide the annotation behind it", ({
+    scanOfARegularExpressionHoldingAQuote,
+  }) => {
+    expect(scanOfARegularExpressionHoldingAQuote).toStrictEqual({
+      declarations: [{ conceptId: "order.status", values: ["draft"], line: 2 }],
+      problems: [],
+    });
   });
 
-  test("an annotation on a declaration that spells out no value is rejected", () => {
-    expect(
-      scanCanonicalValuesText(`/** ${CANONICAL_VALUES_TAG} order.status */
-export type OrderStatus = string;
-`),
-    ).toStrictEqual({
+  it("an annotation on a declaration that spells out no value is rejected", ({
+    scanOfADeclarationThatSpellsOutNoValue,
+  }) => {
+    expect(scanOfADeclarationThatSpellsOutNoValue).toStrictEqual({
       declarations: [],
       problems: [{ kind: "vocabulary-without-values", line: 1, conceptId: "order.status" }],
     });

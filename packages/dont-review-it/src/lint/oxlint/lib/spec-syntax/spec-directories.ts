@@ -3,7 +3,7 @@ import { segmentsOf } from "../path-segments.ts";
 
 import type { Options } from "@oxlint/plugins";
 
-export const DEFAULT_SPEC_DIRECTORY_NAMES: readonly string[] = [
+const DEFAULT_SPEC_DIRECTORY_NAMES: readonly string[] = [
   "__specs__",
   "__tests__",
   "spec",

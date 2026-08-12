@@ -1,10 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import {
-  buildValueDeclarationIndex,
-  duplicateValueReportsIn,
-  type IndexedValueFile,
-} from "./declaration-index.ts";
+import { buildValueDeclarationIndex, duplicateValueReportsIn } from "./declaration-index.ts";
 
 import type { ValueDeclaration } from "./declarations.ts";
 
@@ -19,128 +15,157 @@ const EXPORTED_SEED: ValueDeclaration = {
   fingerprint: "one",
 };
 
-const fileWith = (
-  relativePath: string,
-  declarations: readonly ValueDeclaration[],
-): IndexedValueFile => ({ relativePath, declarations });
-
-const reportedNamesIn = (input: {
-  readonly files: readonly IndexedValueFile[];
-  readonly relativePath: string;
-}): readonly string[] =>
-  duplicateValueReportsIn({
-    index: buildValueDeclarationIndex(input.files),
-    relativePath: input.relativePath,
-  }).map((report) => `${report.site.name}:${report.site.line}`);
-
-const matchedSitesIn = (files: readonly IndexedValueFile[]): readonly string[] =>
-  duplicateValueReportsIn({
-    index: buildValueDeclarationIndex(files),
-    relativePath: AUTHORITY_PATH,
-  }).flatMap((report) => report.matches.map((match) => `${match.relativePath}:${match.line}`));
+const it = test
+  .extend("sitesReportedForACopyInAnotherFile", () =>
+    duplicateValueReportsIn({
+      index: buildValueDeclarationIndex([
+        { relativePath: AUTHORITY_PATH, declarations: [EXPORTED_SEED] },
+        { relativePath: COPY_PATH, declarations: [{ ...EXPORTED_SEED, line: 8 }] },
+      ]),
+      relativePath: COPY_PATH,
+    }).map((report) => `${report.site.name}:${report.site.line}`))
+  .extend("sitesReportedForACopyInOneFile", () =>
+    duplicateValueReportsIn({
+      index: buildValueDeclarationIndex([
+        {
+          relativePath: AUTHORITY_PATH,
+          declarations: [EXPORTED_SEED, { ...EXPORTED_SEED, line: 9 }],
+        },
+      ]),
+      relativePath: AUTHORITY_PATH,
+    }).map((report) => `${report.site.name}:${report.site.line}`),
+  )
+  .extend("sitesReportedForTwoLocalDeclarations", () =>
+    duplicateValueReportsIn({
+      index: buildValueDeclarationIndex([
+        {
+          relativePath: AUTHORITY_PATH,
+          declarations: [{ ...EXPORTED_SEED, exported: false }],
+        },
+        {
+          relativePath: COPY_PATH,
+          declarations: [{ ...EXPORTED_SEED, exported: false, line: 8 }],
+        },
+      ]),
+      relativePath: COPY_PATH,
+    }).map((report) => `${report.site.name}:${report.site.line}`),
+  )
+  .extend("sitesReportedForALocalAgainstAnExportedOne", () =>
+    duplicateValueReportsIn({
+      index: buildValueDeclarationIndex([
+        { relativePath: AUTHORITY_PATH, declarations: [EXPORTED_SEED] },
+        {
+          relativePath: COPY_PATH,
+          declarations: [{ ...EXPORTED_SEED, exported: false, line: 8 }],
+        },
+      ]),
+      relativePath: COPY_PATH,
+    }).map((report) => `${report.site.name}:${report.site.line}`),
+  )
+  .extend("sitesReportedForBodiesSpelledDifferently", () =>
+    duplicateValueReportsIn({
+      index: buildValueDeclarationIndex([
+        { relativePath: AUTHORITY_PATH, declarations: [EXPORTED_SEED] },
+        {
+          relativePath: COPY_PATH,
+          declarations: [{ ...EXPORTED_SEED, fingerprint: "two", line: 8 }],
+        },
+      ]),
+      relativePath: COPY_PATH,
+    }).map((report) => `${report.site.name}:${report.site.line}`),
+  )
+  .extend("sitesReportedForNamesSpelledDifferently", () =>
+    duplicateValueReportsIn({
+      index: buildValueDeclarationIndex([
+        { relativePath: AUTHORITY_PATH, declarations: [EXPORTED_SEED] },
+        { relativePath: COPY_PATH, declarations: [{ ...EXPORTED_SEED, name: "kept", line: 8 }] },
+      ]),
+      relativePath: COPY_PATH,
+    }).map((report) => `${report.site.name}:${report.site.line}`),
+  )
+  .extend("reportsForAnIndexListingNoNamesake", () =>
+    duplicateValueReportsIn({
+      index: {
+        sitesByName: new Map(),
+        sitesByPath: new Map([
+          [AUTHORITY_PATH, [{ ...EXPORTED_SEED, relativePath: AUTHORITY_PATH }]],
+        ]),
+      },
+      relativePath: AUTHORITY_PATH,
+    }),
+  )
+  .extend("sitesReportedForAFileTheIndexNeverSaw", () =>
+    duplicateValueReportsIn({
+      index: buildValueDeclarationIndex([
+        { relativePath: AUTHORITY_PATH, declarations: [EXPORTED_SEED] },
+      ]),
+      relativePath: "packages/three/src/read.ts",
+    }).map((report) => `${report.site.name}:${report.site.line}`),
+  )
+  .extend("matchedSitesInReadingOrder", () =>
+    duplicateValueReportsIn({
+      index: buildValueDeclarationIndex([
+        { relativePath: AUTHORITY_PATH, declarations: [EXPORTED_SEED] },
+        {
+          relativePath: COPY_PATH,
+          declarations: [
+            { ...EXPORTED_SEED, line: 12 },
+            { ...EXPORTED_SEED, line: 8 },
+          ],
+        },
+      ]),
+      relativePath: AUTHORITY_PATH,
+    }).flatMap((report) => report.matches.map((match) => `${match.relativePath}:${match.line}`)),
+  );
 
 describe("duplicateValueReportsIn", () => {
-  test("reports a declaration another file spells with the same name and body", () => {
-    expect(
-      reportedNamesIn({
-        files: [
-          fileWith(AUTHORITY_PATH, [EXPORTED_SEED]),
-          fileWith(COPY_PATH, [{ ...EXPORTED_SEED, line: 8 }]),
-        ],
-        relativePath: COPY_PATH,
-      }),
-    ).toStrictEqual(["seed:8"]);
+  it("reports a declaration another file spells with the same name and body", ({
+    sitesReportedForACopyInAnotherFile,
+  }) => {
+    expect(sitesReportedForACopyInAnotherFile).toStrictEqual(["seed:8"]);
   });
 
-  test("reports a declaration standing twice in one file", () => {
-    expect(
-      reportedNamesIn({
-        files: [fileWith(AUTHORITY_PATH, [EXPORTED_SEED, { ...EXPORTED_SEED, line: 9 }])],
-        relativePath: AUTHORITY_PATH,
-      }),
-    ).toStrictEqual(["seed:3", "seed:9"]);
+  it("reports a declaration standing twice in one file", ({ sitesReportedForACopyInOneFile }) => {
+    expect(sitesReportedForACopyInOneFile).toStrictEqual(["seed:3", "seed:9"]);
   });
 
-  test("leaves a pair alone when neither of the two is exported", () => {
-    expect(
-      reportedNamesIn({
-        files: [
-          fileWith(AUTHORITY_PATH, [{ ...EXPORTED_SEED, exported: false }]),
-          fileWith(COPY_PATH, [{ ...EXPORTED_SEED, exported: false, line: 8 }]),
-        ],
-        relativePath: COPY_PATH,
-      }),
-    ).toStrictEqual([]);
+  it("leaves a pair alone when neither of the two is exported", ({
+    sitesReportedForTwoLocalDeclarations,
+  }) => {
+    expect(sitesReportedForTwoLocalDeclarations).toStrictEqual([]);
   });
 
-  test("reports a local declaration that stands against an exported one", () => {
-    expect(
-      reportedNamesIn({
-        files: [
-          fileWith(AUTHORITY_PATH, [EXPORTED_SEED]),
-          fileWith(COPY_PATH, [{ ...EXPORTED_SEED, exported: false, line: 8 }]),
-        ],
-        relativePath: COPY_PATH,
-      }),
-    ).toStrictEqual(["seed:8"]);
+  it("reports a local declaration that stands against an exported one", ({
+    sitesReportedForALocalAgainstAnExportedOne,
+  }) => {
+    expect(sitesReportedForALocalAgainstAnExportedOne).toStrictEqual(["seed:8"]);
   });
 
-  test("leaves a pair alone when the two bodies are spelled differently", () => {
-    expect(
-      reportedNamesIn({
-        files: [
-          fileWith(AUTHORITY_PATH, [EXPORTED_SEED]),
-          fileWith(COPY_PATH, [{ ...EXPORTED_SEED, fingerprint: "two", line: 8 }]),
-        ],
-        relativePath: COPY_PATH,
-      }),
-    ).toStrictEqual([]);
+  it("leaves a pair alone when the two bodies are spelled differently", ({
+    sitesReportedForBodiesSpelledDifferently,
+  }) => {
+    expect(sitesReportedForBodiesSpelledDifferently).toStrictEqual([]);
   });
 
-  test("leaves a pair alone when the two names are spelled differently", () => {
-    expect(
-      reportedNamesIn({
-        files: [
-          fileWith(AUTHORITY_PATH, [EXPORTED_SEED]),
-          fileWith(COPY_PATH, [{ ...EXPORTED_SEED, name: "kept", line: 8 }]),
-        ],
-        relativePath: COPY_PATH,
-      }),
-    ).toStrictEqual([]);
+  it("leaves a pair alone when the two names are spelled differently", ({
+    sitesReportedForNamesSpelledDifferently,
+  }) => {
+    expect(sitesReportedForNamesSpelledDifferently).toStrictEqual([]);
   });
 
-  test("leaves a declaration the index lists no namesake for alone", () => {
-    expect(
-      duplicateValueReportsIn({
-        index: {
-          sitesByName: new Map(),
-          sitesByPath: new Map([
-            [AUTHORITY_PATH, [{ ...EXPORTED_SEED, relativePath: AUTHORITY_PATH }]],
-          ]),
-        },
-        relativePath: AUTHORITY_PATH,
-      }),
-    ).toStrictEqual([]);
+  it("leaves a declaration the index lists no namesake for alone", ({
+    reportsForAnIndexListingNoNamesake,
+  }) => {
+    expect(reportsForAnIndexListingNoNamesake).toStrictEqual([]);
   });
 
-  test("leaves a file the index never saw alone", () => {
-    expect(
-      reportedNamesIn({
-        files: [fileWith(AUTHORITY_PATH, [EXPORTED_SEED])],
-        relativePath: "packages/three/src/read.ts",
-      }),
-    ).toStrictEqual([]);
+  it("leaves a file the index never saw alone", ({ sitesReportedForAFileTheIndexNeverSaw }) => {
+    expect(sitesReportedForAFileTheIndexNeverSaw).toStrictEqual([]);
   });
 
-  test("hands back the other places the name stands, in reading order", () => {
-    expect(
-      matchedSitesIn([
-        fileWith(AUTHORITY_PATH, [EXPORTED_SEED]),
-        fileWith(COPY_PATH, [
-          { ...EXPORTED_SEED, line: 12 },
-          { ...EXPORTED_SEED, line: 8 },
-        ]),
-      ]),
-    ).toStrictEqual([`${COPY_PATH}:8`, `${COPY_PATH}:12`]);
+  it("hands back the other places the name stands, in reading order", ({
+    matchedSitesInReadingOrder,
+  }) => {
+    expect(matchedSitesInReadingOrder).toStrictEqual([`${COPY_PATH}:8`, `${COPY_PATH}:12`]);
   });
 });

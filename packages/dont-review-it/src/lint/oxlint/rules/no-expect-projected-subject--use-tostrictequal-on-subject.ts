@@ -1,4 +1,5 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { isAssertionEntryCall } from "../lib/spec-syntax/assertion-entries.ts";
 import { fixtureDependenciesOf } from "../lib/spec-syntax/fixture-declarations.ts";
 import {
@@ -10,7 +11,7 @@ import { staticMemberName } from "../lib/spec-syntax/static-names.ts";
 import { memberRootOf, unwrapSubject } from "../lib/spec-syntax/subject-expressions.ts";
 import {
   declaresTestBlock,
-  testBlockBindings,
+  testBlockRootNames,
   testCallbacksOf,
 } from "../lib/spec-syntax/test-block-declarations.ts";
 
@@ -177,8 +178,6 @@ export const noExpectProjectedSubject = createDontReviewItRule({
     if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
 
     const snapshotMatchers = snapshotMatchersFrom(context.options);
-    const bindings = testBlockBindings();
-    const entries = new Set<ESTree.CallExpression>();
 
     const pinOf = (
       entry: ESTree.CallExpression,
@@ -201,18 +200,12 @@ export const noExpectProjectedSubject = createDontReviewItRule({
     };
 
     return {
-      ImportDeclaration(node: ESTree.ImportDeclaration) {
-        bindings.takeImport(node);
-      },
-      VariableDeclarator(node: ESTree.VariableDeclarator) {
-        bindings.takeLocalBinding(node);
-      },
-      CallExpression(node: ESTree.CallExpression) {
-        if (isAssertionEntryCall(node)) entries.add(node);
-      },
-      "Program:exit"() {
-        const rootNames = bindings.rootNames();
-        const pins = [...entries].flatMap((entry) => {
+      "Program:exit"(program: ESTree.Program) {
+        const rootNames = testBlockRootNames(program);
+        const entries = nodesOfType(program, "CallExpression").filter((call) =>
+          isAssertionEntryCall(call),
+        );
+        const pins = entries.flatMap((entry) => {
           const pin = pinOf(entry, rootNames);
           return pin === null ? [] : [pin];
         });

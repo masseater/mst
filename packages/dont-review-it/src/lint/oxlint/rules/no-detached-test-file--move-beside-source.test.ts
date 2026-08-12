@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { testLintRule } from "@mst/lint-rule-authoring";
-import { describe, expect, test } from "vite-plus/test";
+import { describe, expect, it } from "vite-plus/test";
 
 import { noDetachedTestFile } from "./no-detached-test-file--move-beside-source.ts";
 
@@ -11,32 +11,29 @@ const fixtureDir = join(tmpdir(), "dont-review-it-no-detached-test-file");
 rmSync(fixtureDir, { recursive: true, force: true });
 mkdirSync(fixtureDir, { recursive: true });
 
-const fixturePath = (name: string): string => join(fixtureDir, name);
+const SOURCE_CONTENT = "export const total = 1;\n";
 
-const writeSourceFixture = (name: string): string => {
-  const path = fixturePath(name);
-  writeFileSync(path, "export const total = 1;\n");
-  return path;
-};
+const optionsSchema = noDetachedTestFile.meta.schema;
 
-mkdirSync(fixturePath("isolated-tests"));
-mkdirSync(fixturePath("e2e"));
-mkdirSync(fixturePath("tests"));
-mkdirSync(fixturePath("spec"));
-mkdirSync(fixturePath("spec/nested"), { recursive: true });
+mkdirSync(join(fixtureDir, "isolated-tests"));
+mkdirSync(join(fixtureDir, "e2e"));
+mkdirSync(join(fixtureDir, "tests"));
+mkdirSync(join(fixtureDir, "spec"));
+mkdirSync(join(fixtureDir, "spec/nested"), { recursive: true });
 
-writeSourceFixture("beside-source.ts");
-writeSourceFixture("component.tsx");
-writeSourceFixture("widget.ts");
-writeSourceFixture("scenario.ts");
-writeSourceFixture("renamed.ts");
-writeSourceFixture("tests/co-located.ts");
-writeSourceFixture("spec/nested/buried.ts");
+writeFileSync(join(fixtureDir, "beside-source.ts"), SOURCE_CONTENT);
+writeFileSync(join(fixtureDir, "component.tsx"), SOURCE_CONTENT);
+writeFileSync(join(fixtureDir, "widget.ts"), SOURCE_CONTENT);
+writeFileSync(join(fixtureDir, "scenario.ts"), SOURCE_CONTENT);
+writeFileSync(join(fixtureDir, "renamed.ts"), SOURCE_CONTENT);
+writeFileSync(join(fixtureDir, "tests/co-located.ts"), SOURCE_CONTENT);
+writeFileSync(join(fixtureDir, "spec/nested/buried.ts"), SOURCE_CONTENT);
 
-writeSourceFixture("a.ts");
-writeSourceFixture("alpha");
+writeFileSync(join(fixtureDir, "a.ts"), SOURCE_CONTENT);
+writeFileSync(join(fixtureDir, "alpha"), SOURCE_CONTENT);
 
-const rememberedSourcePath = writeSourceFixture("remembered.ts");
+const rememberedSourcePath = join(fixtureDir, "remembered.ts");
+writeFileSync(rememberedSourcePath, SOURCE_CONTENT);
 
 describe("dont-review-it/no-detached-test-file--move-beside-source", () => {
   testLintRule(noDetachedTestFile, {
@@ -44,49 +41,49 @@ describe("dont-review-it/no-detached-test-file--move-beside-source", () => {
       {
         name: "a test file whose source sits beside it under the same name passes",
         code: "export const total = 1;",
-        filename: fixturePath("beside-source.test.ts"),
+        filename: join(fixtureDir, "beside-source.test.ts"),
       },
       {
         name: "a tsx test file whose tsx source sits beside it passes",
         code: "export const total = 1;",
-        filename: fixturePath("component.test.tsx"),
+        filename: join(fixtureDir, "component.test.tsx"),
       },
       {
         name: "the spec suffix is part of the vocabulary the runner already picks up",
         code: "export const total = 1;",
-        filename: fixturePath("scenario.spec.ts"),
+        filename: join(fixtureDir, "scenario.spec.ts"),
       },
       {
         name: "a file that is not a test file is never looked up",
         code: "export const total = 1;",
-        filename: fixturePath("plain.ts"),
+        filename: join(fixtureDir, "plain.ts"),
       },
       {
         name: "a name ending in test.ts without the separating dot is not a test file",
         code: "export const total = 1;",
-        filename: fixturePath("contest.ts"),
+        filename: join(fixtureDir, "contest.ts"),
       },
       {
         name: "a test file outside the vocabulary is not recognised as a test",
         code: "const total = 1;",
-        filename: fixturePath("legacy.test.js"),
+        filename: join(fixtureDir, "legacy.test.js"),
       },
       {
         name: "the longest matching suffix decides which source is looked for",
         code: "export const total = 1;",
-        filename: fixturePath("ax.test.ts"),
+        filename: join(fixtureDir, "ax.test.ts"),
         options: [{ testFileSuffixes: ["st.ts", "x.test.ts"] }],
       },
       {
         name: "a suffix carrying no extension looks for a source without one",
         code: "export const total = 1;",
-        filename: fixturePath("alpha_test"),
+        filename: join(fixtureDir, "alpha_test"),
         options: [{ testFileSuffixes: ["_test"] }],
       },
       {
         name: "a suffix from the deployment is added to the vocabulary rather than replacing it",
         code: "export const total = 1;",
-        filename: fixturePath("beside-source.test.ts"),
+        filename: join(fixtureDir, "beside-source.test.ts"),
         options: [{ testFileSuffixes: ["-test.ts"] }],
       },
       {
@@ -98,12 +95,12 @@ describe("dont-review-it/no-detached-test-file--move-beside-source", () => {
       {
         name: "the source beside a test file is looked up on disk",
         code: "export const total = 1;",
-        filename: fixturePath("remembered.test.ts"),
+        filename: join(fixtureDir, "remembered.test.ts"),
       },
       {
         name: "the lookup is remembered, so removing the source afterwards does not change the answer",
         code: "export const total = 2;",
-        filename: fixturePath("remembered.test.ts"),
+        filename: join(fixtureDir, "remembered.test.ts"),
         before: () => {
           rmSync(rememberedSourcePath);
         },
@@ -113,11 +110,11 @@ describe("dont-review-it/no-detached-test-file--move-beside-source", () => {
       {
         name: "a test file whose source is not beside it is reported",
         code: "export const total = 1;",
-        filename: fixturePath("vanished.test.ts"),
+        filename: join(fixtureDir, "vanished.test.ts"),
         errors: [
           {
             messageId: "detachedTestFile",
-            data: { sourcePath: fixturePath("vanished.ts") },
+            data: { sourcePath: join(fixtureDir, "vanished.ts") },
           },
         ],
       },
@@ -135,34 +132,34 @@ describe("dont-review-it/no-detached-test-file--move-beside-source", () => {
       {
         name: "a tsx test file is not answered by a ts source of the same name",
         code: "export const total = 1;",
-        filename: fixturePath("widget.test.tsx"),
+        filename: join(fixtureDir, "widget.test.tsx"),
         errors: [
           {
             messageId: "detachedTestFile",
-            data: { sourcePath: fixturePath("widget.tsx") },
+            data: { sourcePath: join(fixtureDir, "widget.tsx") },
           },
         ],
       },
       {
         name: "a spec file whose source is not beside it is reported",
         code: "export const total = 1;",
-        filename: fixturePath("absent.spec.tsx"),
+        filename: join(fixtureDir, "absent.spec.tsx"),
         errors: [
           {
             messageId: "detachedTestFile",
-            data: { sourcePath: fixturePath("absent.tsx") },
+            data: { sourcePath: join(fixtureDir, "absent.tsx") },
           },
         ],
       },
       {
         name: "a suffix the deployment added is recognised, and the extension it carries names the source",
         code: "export const total = 1;",
-        filename: fixturePath("gone-test.ts"),
+        filename: join(fixtureDir, "gone-test.ts"),
         options: [{ testFileSuffixes: ["-test.ts"] }],
         errors: [
           {
             messageId: "detachedTestFile",
-            data: { sourcePath: fixturePath("gone.ts") },
+            data: { sourcePath: join(fixtureDir, "gone.ts") },
           },
         ],
       },
@@ -204,8 +201,8 @@ describe("dont-review-it/no-detached-test-file--move-beside-source", () => {
     ],
   });
 
-  test("the options schema declares the vocabulary and the exemptions, and refuses any other key", () => {
-    expect(noDetachedTestFile.meta.schema).toStrictEqual([
+  it("the options schema declares the vocabulary and the exemptions, and refuses any other key", () => {
+    expect(optionsSchema).toStrictEqual([
       {
         type: "object",
         properties: {

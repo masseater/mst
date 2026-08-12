@@ -4,33 +4,59 @@ import { requiredFilesFrom } from "./required-file-entries.ts";
 
 const REASON = "the release job reads it";
 
+const it = test
+  .extend("filesOfEmptyOptions", () => requiredFilesFrom([]))
+  .extend("filesOfOptionsWithoutRegistration", () => requiredFilesFrom([{}]))
+  .extend("filesOfOwnerlessRow", () =>
+    requiredFilesFrom([{ requiredFiles: [{ pattern: "CHANGELOG.md", reason: REASON }] }]),
+  )
+  .extend("filesOfFullyDescribedRow", () =>
+    requiredFilesFrom([
+      {
+        requiredFiles: [
+          {
+            pattern: "README.md",
+            owner: "packages/*",
+            reason: REASON,
+            contentChecks: ["require-readme-sections", 7],
+          },
+        ],
+      },
+    ]),
+  )
+  .extend("filesOfPathlessRow", () =>
+    requiredFilesFrom([{ requiredFiles: [{ pattern: "", reason: REASON }] }]),
+  )
+  .extend("filesOfReasonlessRow", () =>
+    requiredFilesFrom([{ requiredFiles: [{ pattern: "CHANGELOG.md", reason: "" }] }]),
+  )
+  .extend("filesOfUnspelledOwnerRow", () =>
+    requiredFilesFrom([{ requiredFiles: [{ pattern: "CHANGELOG.md", owner: 5, reason: REASON }] }]),
+  );
+
 describe("required-file-entries", () => {
-  test("options that register nothing hold no rows", () => {
-    expect(requiredFilesFrom([])).toStrictEqual([]);
-    expect(requiredFilesFrom([{}])).toStrictEqual([]);
+  it("options that carry nothing at all hold no rows", ({ filesOfEmptyOptions }) => {
+    expect(filesOfEmptyOptions).toStrictEqual([]);
   });
 
-  test("a row without an owner is registered against the repository itself", () => {
-    expect(
-      requiredFilesFrom([{ requiredFiles: [{ pattern: "CHANGELOG.md", reason: REASON }] }]),
-    ).toStrictEqual([{ pattern: "CHANGELOG.md", owner: null, reason: REASON, contentChecks: [] }]);
+  it("an options object that registers nothing holds no rows", ({
+    filesOfOptionsWithoutRegistration,
+  }) => {
+    expect(filesOfOptionsWithoutRegistration).toStrictEqual([]);
   });
 
-  test("a row carries the owner, the reason and the checks that read the file", () => {
-    expect(
-      requiredFilesFrom([
-        {
-          requiredFiles: [
-            {
-              pattern: "README.md",
-              owner: "packages/*",
-              reason: REASON,
-              contentChecks: ["require-readme-sections", 7],
-            },
-          ],
-        },
-      ]),
-    ).toStrictEqual([
+  it("a row without an owner is registered against the repository itself", ({
+    filesOfOwnerlessRow,
+  }) => {
+    expect(filesOfOwnerlessRow).toStrictEqual([
+      { pattern: "CHANGELOG.md", owner: null, reason: REASON, contentChecks: [] },
+    ]);
+  });
+
+  it("a row carries the owner, the reason and the checks that read the file", ({
+    filesOfFullyDescribedRow,
+  }) => {
+    expect(filesOfFullyDescribedRow).toStrictEqual([
       {
         pattern: "README.md",
         owner: "packages/*",
@@ -40,23 +66,21 @@ describe("required-file-entries", () => {
     ]);
   });
 
-  test("a row that names no path asks for nothing and is dropped", () => {
-    expect(requiredFilesFrom([{ requiredFiles: [{ pattern: "", reason: REASON }] }])).toStrictEqual(
-      [],
-    );
+  it("a row that names no path asks for nothing and is dropped", ({ filesOfPathlessRow }) => {
+    expect(filesOfPathlessRow).toStrictEqual([]);
   });
 
-  test("a row that carries no reason is not a registration and is dropped", () => {
-    expect(
-      requiredFilesFrom([{ requiredFiles: [{ pattern: "CHANGELOG.md", reason: "" }] }]),
-    ).toStrictEqual([]);
+  it("a row that carries no reason is not a registration and is dropped", ({
+    filesOfReasonlessRow,
+  }) => {
+    expect(filesOfReasonlessRow).toStrictEqual([]);
   });
 
-  test("an owner that is not spelled out leaves the row against the repository itself", () => {
-    expect(
-      requiredFilesFrom([
-        { requiredFiles: [{ pattern: "CHANGELOG.md", owner: 5, reason: REASON }] },
-      ]),
-    ).toStrictEqual([{ pattern: "CHANGELOG.md", owner: null, reason: REASON, contentChecks: [] }]);
+  it("an owner that is not spelled out leaves the row against the repository itself", ({
+    filesOfUnspelledOwnerRow,
+  }) => {
+    expect(filesOfUnspelledOwnerRow).toStrictEqual([
+      { pattern: "CHANGELOG.md", owner: null, reason: REASON, contentChecks: [] },
+    ]);
   });
 });

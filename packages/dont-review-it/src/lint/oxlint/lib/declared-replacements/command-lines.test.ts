@@ -2,77 +2,150 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { carriesUndecidedTarget, invokedNamesIn, namesRunner } from "./command-lines.ts";
 
+const it = test
+  .extend("namesOfALineWhoseFirstWordIsTheCommand", () => invokedNamesIn("lerna run build"))
+  .extend("namesOfALineHoldingNothing", () => invokedNamesIn(""))
+  .extend("namesOfALineNamingTheToolAsAnArgument", () =>
+    invokedNamesIn("node ./node_modules/lerna/cli.js"),
+  )
+  .extend("namesOfACommandChain", () => invokedNamesIn("tsc && lerna run build"))
+  .extend("namesOfCommandsSeparatedByASemicolon", () => invokedNamesIn("tsc; lerna"))
+  .extend("namesOfCommandsJoinedByAPipe", () => invokedNamesIn("cat list | lerna"))
+  .extend("namesOfCommandsJoinedByAnAlternative", () => invokedNamesIn("tsc || lerna"))
+  .extend("namesOfACommandInsideBrackets", () => invokedNamesIn("(lerna run build)"))
+  .extend("namesOfALineLedByEnvironmentBindings", () =>
+    invokedNamesIn("NODE_ENV=test CI=1 lerna run build"),
+  )
+  .extend("namesOfALineLedByARunner", () => invokedNamesIn("npx lerna run build"))
+  .extend("namesOfALineLedByATwoWordRunner", () => invokedNamesIn("pnpm dlx lerna"))
+  .extend("namesOfALineCarryingFlagsBehindTheRunner", () => invokedNamesIn("npx --yes -- lerna"))
+  .extend("namesOfARunnerArgumentCarryingAVersion", () =>
+    invokedNamesIn("npx lerna@8.0.0 run build"),
+  )
+  .extend("namesOfAScopedRunnerArgumentCarryingAVersion", () =>
+    invokedNamesIn("npx @scope/lerna@8.0.0"),
+  )
+  .extend("namesOfAScopedRunnerArgumentWithoutAVersion", () => invokedNamesIn("npx @scope/lerna"))
+  .extend("namesOfAShellHandedAnInlineScript", () => invokedNamesIn('bash -c "lerna run build"'))
+  .extend("namesOfAShellHandedAScriptFile", () => invokedNamesIn("bash scripts/release.sh"))
+  .extend("namesOfAFetchedAddress", () =>
+    invokedNamesIn("curl https://example.com/lerna/install.sh"),
+  )
+  .extend("namesOfACommandSettledByASubstitution", () => invokedNamesIn("$TOOL run build"))
+  .extend("undecidedTargetOfALineSpellingOutItsCommand", () =>
+    carriesUndecidedTarget("lerna run build"),
+  )
+  .extend("undecidedTargetOfALineHoldingNothing", () => carriesUndecidedTarget(""))
+  .extend("undecidedTargetOfACommandSettledByASubstitution", () =>
+    carriesUndecidedTarget("$TOOL run build"),
+  )
+  .extend("undecidedTargetOfFetchedTextHandedToAShell", () =>
+    carriesUndecidedTarget("curl https://example.com/install.sh | bash"),
+  )
+  .extend("undecidedTargetOfAShellStartedOnItsOwnFile", () =>
+    carriesUndecidedTarget("bash scripts/release.sh"),
+  )
+  .extend("undecidedTargetOfTextHandedToAnEvaluator", () => carriesUndecidedTarget("eval $SETUP"))
+  .extend("runnerReadingOfAWordARunnerIsSpelledWith", () => namesRunner("npx"))
+  .extend("runnerReadingOfAWordNoRunnerIsSpelledWith", () => namesRunner("lerna"));
+
 describe("declared-replacements/command-lines", () => {
-  test("the first word of a line is the command it starts", () => {
-    expect(invokedNamesIn("lerna run build")).toStrictEqual(["lerna"]);
+  it("the first word of a line is the command it starts", ({
+    namesOfALineWhoseFirstWordIsTheCommand,
+  }) => {
+    expect(namesOfALineWhoseFirstWordIsTheCommand).toStrictEqual(["lerna"]);
   });
 
-  test("a line holding nothing starts no command", () => {
-    expect(invokedNamesIn("")).toStrictEqual([]);
+  it("a line holding nothing starts no command", ({ namesOfALineHoldingNothing }) => {
+    expect(namesOfALineHoldingNothing).toStrictEqual([]);
   });
 
-  test("a name written as an argument is not the command", () => {
-    expect(invokedNamesIn("node ./node_modules/lerna/cli.js")).toStrictEqual(["node"]);
+  it("a name written as an argument is not the command", ({
+    namesOfALineNamingTheToolAsAnArgument,
+  }) => {
+    expect(namesOfALineNamingTheToolAsAnArgument).toStrictEqual(["node"]);
   });
 
-  test("each side of a chain is read as its own command", () => {
-    expect(invokedNamesIn("tsc && lerna run build")).toStrictEqual(["tsc", "lerna"]);
+  it("each side of a chain is read as its own command", ({ namesOfACommandChain }) => {
+    expect(namesOfACommandChain).toStrictEqual(["tsc", "lerna"]);
   });
 
-  test("commands separated by a semicolon are read one by one", () => {
-    expect(invokedNamesIn("tsc; lerna")).toStrictEqual(["tsc", "lerna"]);
+  it("commands separated by a semicolon are read one by one", ({
+    namesOfCommandsSeparatedByASemicolon,
+  }) => {
+    expect(namesOfCommandsSeparatedByASemicolon).toStrictEqual(["tsc", "lerna"]);
   });
 
-  test("commands joined by a pipe are read one by one", () => {
-    expect(invokedNamesIn("cat list | lerna")).toStrictEqual(["cat", "lerna"]);
+  it("commands joined by a pipe are read one by one", ({ namesOfCommandsJoinedByAPipe }) => {
+    expect(namesOfCommandsJoinedByAPipe).toStrictEqual(["cat", "lerna"]);
   });
 
-  test("commands joined by an alternative are read one by one", () => {
-    expect(invokedNamesIn("tsc || lerna")).toStrictEqual(["tsc", "lerna"]);
+  it("commands joined by an alternative are read one by one", ({
+    namesOfCommandsJoinedByAnAlternative,
+  }) => {
+    expect(namesOfCommandsJoinedByAnAlternative).toStrictEqual(["tsc", "lerna"]);
   });
 
-  test("a command written inside brackets is read on its own", () => {
-    expect(invokedNamesIn("(lerna run build)")).toStrictEqual(["lerna"]);
+  it("a command written inside brackets is read on its own", ({
+    namesOfACommandInsideBrackets,
+  }) => {
+    expect(namesOfACommandInsideBrackets).toStrictEqual(["lerna"]);
   });
 
-  test("environment bindings written in front of a command are stepped over", () => {
-    expect(invokedNamesIn("NODE_ENV=test CI=1 lerna run build")).toStrictEqual(["lerna"]);
+  it("environment bindings written in front of a command are stepped over", ({
+    namesOfALineLedByEnvironmentBindings,
+  }) => {
+    expect(namesOfALineLedByEnvironmentBindings).toStrictEqual(["lerna"]);
   });
 
-  test("a runner written in front of a command hands the position to what it runs", () => {
-    expect(invokedNamesIn("npx lerna run build")).toStrictEqual(["lerna"]);
+  it("a runner written in front of a command hands the position to what it runs", ({
+    namesOfALineLedByARunner,
+  }) => {
+    expect(namesOfALineLedByARunner).toStrictEqual(["lerna"]);
   });
 
-  test("a runner written as two words hands the position to what it runs", () => {
-    expect(invokedNamesIn("pnpm dlx lerna")).toStrictEqual(["lerna"]);
+  it("a runner written as two words hands the position to what it runs", ({
+    namesOfALineLedByATwoWordRunner,
+  }) => {
+    expect(namesOfALineLedByATwoWordRunner).toStrictEqual(["lerna"]);
   });
 
-  test("flags written behind a runner are stepped over", () => {
-    expect(invokedNamesIn("npx --yes -- lerna")).toStrictEqual(["lerna"]);
+  it("flags written behind a runner are stepped over", ({
+    namesOfALineCarryingFlagsBehindTheRunner,
+  }) => {
+    expect(namesOfALineCarryingFlagsBehindTheRunner).toStrictEqual(["lerna"]);
   });
 
-  test("a version written on a runner argument is dropped", () => {
-    expect(invokedNamesIn("npx lerna@8.0.0 run build")).toStrictEqual(["lerna"]);
+  it("a version written on a runner argument is dropped", ({
+    namesOfARunnerArgumentCarryingAVersion,
+  }) => {
+    expect(namesOfARunnerArgumentCarryingAVersion).toStrictEqual(["lerna"]);
   });
 
-  test("a scoped name keeps its scope when its version is dropped", () => {
-    expect(invokedNamesIn("npx @scope/lerna@8.0.0")).toStrictEqual(["@scope/lerna"]);
+  it("a scoped name keeps its scope when its version is dropped", ({
+    namesOfAScopedRunnerArgumentCarryingAVersion,
+  }) => {
+    expect(namesOfAScopedRunnerArgumentCarryingAVersion).toStrictEqual(["@scope/lerna"]);
   });
 
-  test("a scoped name written without a version stands as it is", () => {
-    expect(invokedNamesIn("npx @scope/lerna")).toStrictEqual(["@scope/lerna"]);
+  it("a scoped name written without a version stands as it is", ({
+    namesOfAScopedRunnerArgumentWithoutAVersion,
+  }) => {
+    expect(namesOfAScopedRunnerArgumentWithoutAVersion).toStrictEqual(["@scope/lerna"]);
   });
 
-  test("a shell handed an inline script hands the position to what the script starts", () => {
-    expect(invokedNamesIn('bash -c "lerna run build"')).toStrictEqual(["lerna"]);
+  it("a shell handed an inline script hands the position to what the script starts", ({
+    namesOfAShellHandedAnInlineScript,
+  }) => {
+    expect(namesOfAShellHandedAnInlineScript).toStrictEqual(["lerna"]);
   });
 
-  test("a shell handed a script file starts the shell", () => {
-    expect(invokedNamesIn("bash scripts/release.sh")).toStrictEqual(["bash"]);
+  it("a shell handed a script file starts the shell", ({ namesOfAShellHandedAScriptFile }) => {
+    expect(namesOfAShellHandedAScriptFile).toStrictEqual(["bash"]);
   });
 
-  test("the elements of a fetched address are read one by one", () => {
-    expect(invokedNamesIn("curl https://example.com/lerna/install.sh")).toStrictEqual([
+  it("the elements of a fetched address are read one by one", ({ namesOfAFetchedAddress }) => {
+    expect(namesOfAFetchedAddress).toStrictEqual([
       "curl",
       "https:",
       "example.com",
@@ -81,39 +154,57 @@ describe("declared-replacements/command-lines", () => {
     ]);
   });
 
-  test("a command settled by a substitution names nothing", () => {
-    expect(invokedNamesIn("$TOOL run build")).toStrictEqual([]);
+  it("a command settled by a substitution names nothing", ({
+    namesOfACommandSettledByASubstitution,
+  }) => {
+    expect(namesOfACommandSettledByASubstitution).toStrictEqual([]);
   });
 
-  test("a line spelling out its command settles what it starts", () => {
-    expect(carriesUndecidedTarget("lerna run build")).toBe(false);
+  it("a line spelling out its command settles what it starts", ({
+    undecidedTargetOfALineSpellingOutItsCommand,
+  }) => {
+    expect(undecidedTargetOfALineSpellingOutItsCommand).toBe(false);
   });
 
-  test("a line holding nothing settles what it starts", () => {
-    expect(carriesUndecidedTarget("")).toBe(false);
+  it("a line holding nothing settles what it starts", ({
+    undecidedTargetOfALineHoldingNothing,
+  }) => {
+    expect(undecidedTargetOfALineHoldingNothing).toBe(false);
   });
 
-  test("a command settled by a substitution leaves the target undecided", () => {
-    expect(carriesUndecidedTarget("$TOOL run build")).toBe(true);
+  it("a command settled by a substitution leaves the target undecided", ({
+    undecidedTargetOfACommandSettledByASubstitution,
+  }) => {
+    expect(undecidedTargetOfACommandSettledByASubstitution).toBe(true);
   });
 
-  test("fetched text handed to a shell leaves the target undecided", () => {
-    expect(carriesUndecidedTarget("curl https://example.com/install.sh | bash")).toBe(true);
+  it("fetched text handed to a shell leaves the target undecided", ({
+    undecidedTargetOfFetchedTextHandedToAShell,
+  }) => {
+    expect(undecidedTargetOfFetchedTextHandedToAShell).toBe(true);
   });
 
-  test("a shell started on its own file settles what it starts", () => {
-    expect(carriesUndecidedTarget("bash scripts/release.sh")).toBe(false);
+  it("a shell started on its own file settles what it starts", ({
+    undecidedTargetOfAShellStartedOnItsOwnFile,
+  }) => {
+    expect(undecidedTargetOfAShellStartedOnItsOwnFile).toBe(false);
   });
 
-  test("text handed to an evaluator leaves the target undecided", () => {
-    expect(carriesUndecidedTarget("eval $SETUP")).toBe(true);
+  it("text handed to an evaluator leaves the target undecided", ({
+    undecidedTargetOfTextHandedToAnEvaluator,
+  }) => {
+    expect(undecidedTargetOfTextHandedToAnEvaluator).toBe(true);
   });
 
-  test("a word a runner is spelled with is a runner", () => {
-    expect(namesRunner("npx")).toBe(true);
+  it("a word a runner is spelled with is a runner", ({
+    runnerReadingOfAWordARunnerIsSpelledWith,
+  }) => {
+    expect(runnerReadingOfAWordARunnerIsSpelledWith).toBe(true);
   });
 
-  test("a word no runner is spelled with is no runner", () => {
-    expect(namesRunner("lerna")).toBe(false);
+  it("a word no runner is spelled with is no runner", ({
+    runnerReadingOfAWordNoRunnerIsSpelledWith,
+  }) => {
+    expect(runnerReadingOfAWordNoRunnerIsSpelledWith).toBe(false);
   });
 });

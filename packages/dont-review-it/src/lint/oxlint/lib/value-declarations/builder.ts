@@ -1,5 +1,7 @@
 import { resolve } from "node:path";
 
+import { memoize } from "es-toolkit";
+
 import {
   listRepositoryFiles,
   readTextFile,
@@ -21,7 +23,7 @@ const readValueFileAt = (file: ScannedFile): IndexedValueFile | null => {
   return declarations.length === 0 ? null : { relativePath: file.relativePath, declarations };
 };
 
-export const buildRepositoryValueDeclarationIndex = ({
+const buildRepositoryValueDeclarationIndex = ({
   repositoryRoot,
 }: {
   readonly repositoryRoot: string;
@@ -36,16 +38,11 @@ export const buildRepositoryValueDeclarationIndex = ({
   );
 };
 
-const indexByRoot = new Map<string, ValueDeclarationIndex>();
+const valueDeclarationIndexAt = memoize(
+  (repositoryRoot: string): ValueDeclarationIndex =>
+    buildRepositoryValueDeclarationIndex({ repositoryRoot }),
+);
 
 export const loadRepositoryValueDeclarationIndex = (options: {
   readonly repositoryRoot: string;
-}): ValueDeclarationIndex => {
-  const root = resolve(options.repositoryRoot);
-  const held = indexByRoot.get(root);
-  if (held !== undefined) return held;
-
-  const built = buildRepositoryValueDeclarationIndex({ repositoryRoot: root });
-  indexByRoot.set(root, built);
-  return built;
-};
+}): ValueDeclarationIndex => valueDeclarationIndexAt(resolve(options.repositoryRoot));

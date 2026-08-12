@@ -1,6 +1,7 @@
 import { uniq } from "es-toolkit";
 
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { fixtureDeclarationsOf } from "../lib/spec-syntax/fixture-declarations.ts";
 import {
   moduleDeclarationsOf,
@@ -118,14 +119,13 @@ export const noFixtureCopySubject = createDontReviewItRule({
   create(context) {
     if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
 
-    const fixtures = new Set<ESTree.CallExpression>();
-
     return {
-      CallExpression(node: ESTree.CallExpression) {
-        if (fixtureDeclarationsOf(node).length > 0) fixtures.add(node);
-      },
-      "Program:exit"(node: ESTree.Program) {
-        const module = moduleDeclarationsOf(context.filename, node.body);
+      "Program:exit"(program: ESTree.Program) {
+        const module = moduleDeclarationsOf(context.filename, program.body);
+        const fixtures = nodesOfType(program, "CallExpression").filter(
+          (call) => fixtureDeclarationsOf(call).length > 0,
+        );
+
         for (const call of fixtures) {
           for (const report of reportsFor({ module, call })) context.report(report);
         }

@@ -1,5 +1,7 @@
 import { readdir, readFile, lstat } from "node:fs/promises";
 
+import { isPlainObject } from "es-toolkit";
+
 import type { Stats } from "node:fs";
 
 const NOT_FOUND_CODE = "ENOENT";
@@ -49,9 +51,7 @@ export const readJsonObjectOrNull = async (
   if (raw === null) return null;
 
   const parsed: unknown = JSON.parse(raw);
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return null;
-
-  return parsed as Record<string, unknown>;
+  return isPlainObject(parsed) ? parsed : null;
 };
 
 export const nonEmptyStringOrNull = (value: unknown): string | null => {

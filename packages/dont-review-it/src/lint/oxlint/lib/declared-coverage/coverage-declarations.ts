@@ -1,3 +1,5 @@
+import { isNamedFields } from "../named-fields.ts";
+
 import type { Context, RuleMeta } from "@oxlint/plugins";
 import type { RuleMessage } from "../rule-message.ts";
 
@@ -99,7 +101,7 @@ export const DECLARED_COVERAGE_SCHEMA: RuleMeta["schema"] = [
 ];
 
 const fieldsOf = (held: unknown): Readonly<Record<string, unknown>> =>
-  typeof held === "object" && held !== null ? (held as Readonly<Record<string, unknown>>) : {};
+  isNamedFields(held) ? held : {};
 
 const writtenTextOf = (held: unknown): string | null => {
   if (typeof held !== "string") return null;

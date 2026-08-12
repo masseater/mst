@@ -1,4 +1,5 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { listedUnder } from "../lib/declared-replacements/option-lists.ts";
 import { bareRuleNameOf } from "../lib/lint-suppression/suppression-directives.ts";
 import { propertyKeyOf } from "../lib/object-literal.ts";
 import { spelledSeverityOf } from "../lib/spelled-lint-severity.ts";
@@ -58,34 +59,19 @@ const holdsEnabledRule = (value: ESTree.Expression): boolean => {
   return ENABLED_SEVERITIES.has(spelled);
 };
 
-const declaredEntriesIn = ({
-  options,
-  key,
-}: {
-  readonly options: Readonly<Options>;
-  readonly key: string;
-}): Readonly<Options> => {
-  const [declared] = options;
-  if (typeof declared !== "object" || declared === null || Array.isArray(declared)) return [];
-  const listed = declared[key];
-  if (!Array.isArray(listed)) return [];
-  return listed;
-};
-
 const textAt = ({
   held,
   key,
 }: {
-  readonly held: Readonly<Options>[number];
+  readonly held: Readonly<Record<string, unknown>>;
   readonly key: string;
 }): string => {
-  if (typeof held !== "object" || held === null || Array.isArray(held)) return "";
   const written = held[key];
   return typeof written === "string" ? written : "";
 };
 
 const restrictionRulesIn = (options: Readonly<Options>): ReadonlyMap<string, string> => {
-  const declared = declaredEntriesIn({ options, key: RESTRICTION_RULES_OPTION }).map((held) => ({
+  const declared = listedUnder(options, RESTRICTION_RULES_OPTION).map((held) => ({
     rule: textAt({ held, key: "rule" }),
     substitute: textAt({ held, key: "substitute" }),
   }));
@@ -98,7 +84,7 @@ const restrictionRulesIn = (options: Readonly<Options>): ReadonlyMap<string, str
 
 const exceptionGroundsIn = (options: Readonly<Options>): ReadonlyMap<string, string> =>
   new Map(
-    declaredEntriesIn({ options, key: EXCEPTIONS_OPTION })
+    listedUnder(options, EXCEPTIONS_OPTION)
       .map((held): readonly [string, string] => [
         bareRuleNameOf(textAt({ held, key: "rule" })),
         textAt({ held, key: "reason" }).trim(),

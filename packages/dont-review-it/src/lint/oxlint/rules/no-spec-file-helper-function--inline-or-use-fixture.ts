@@ -1,4 +1,5 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { resolveBinding, type ScopeLookup } from "../lib/resolved-bindings.ts";
 import { fixtureDeclarationsOf } from "../lib/spec-syntax/fixture-declarations.ts";
 import { isSpecFile, specFileSuffixesFrom } from "../lib/spec-syntax/spec-files.ts";
@@ -10,7 +11,7 @@ import {
 } from "../lib/spec-syntax/subject-expressions.ts";
 import {
   declaresTestBlock,
-  groupingBlockBindings,
+  groupingBlockRootNames,
   testCallbacksOf,
 } from "../lib/spec-syntax/test-block-declarations.ts";
 
@@ -157,6 +158,38 @@ const fixtureReportsOf = (call: ESTree.CallExpression): readonly HelperReport[] 
     }),
   );
 
+const scopeReadingIn = (program: ESTree.Program, rootNames: ReadonlySet<string>): ScopeReading => ({
+  functions: [
+    ...nodesOfType(program, "FunctionDeclaration"),
+    ...nodesOfType(program, "FunctionExpression"),
+    ...nodesOfType(program, "ArrowFunctionExpression"),
+  ],
+  groupingBodies: nodesOfType(program, "CallExpression")
+    .filter((call) => declaresTestBlock(call, rootNames))
+    .flatMap((call) => testCallbacksOf(call)),
+});
+
+const declarationReportsIn = (
+  program: ESTree.Program,
+  reading: ScopeReading,
+): readonly HelperReport[] =>
+  nodesOfType(program, "FunctionDeclaration")
+    .filter((declared) => standsInHelperScope(declared, reading))
+    .map((declared) => ({
+      node: declared,
+      messageId: "scopedHelperDeclaration",
+      data: { name: declared.id?.name ?? ANONYMOUS_DECLARATION_NAME },
+    }));
+
+const bindingReportsIn = (read: {
+  readonly program: ESTree.Program;
+  readonly reading: ScopeReading;
+  readonly binding: BindingReading;
+}): readonly HelperReport[] =>
+  nodesOfType(read.program, "VariableDeclarator")
+    .filter((declarator) => standsInHelperScope(declarator, read.reading))
+    .flatMap((declarator) => bindingReportOf(declarator, read.binding) ?? []);
+
 export const noSpecFileHelperFunction = createDontReviewItRule({
   name: "no-spec-file-helper-function--inline-or-use-fixture",
   meta: {
@@ -195,60 +228,17 @@ export const noSpecFileHelperFunction = createDontReviewItRule({
       lookup: (node) => context.sourceCode.getScope(node),
       source: context.sourceCode.text,
     };
-    const bindings = groupingBlockBindings();
-    const functions = new Set<ESTree.Node>();
-    const calls = new Set<ESTree.CallExpression>();
-    const declarations = new Set<ESTree.Function>();
-    const declarators = new Set<ESTree.VariableDeclarator>();
-
-    const takeFunction = (node: ESTree.Function | ESTree.ArrowFunctionExpression): void => {
-      functions.add(node);
-    };
-
-    const scopeReadingOf = (): ScopeReading => {
-      const rootNames = bindings.rootNames();
-      return {
-        functions: [...functions],
-        groupingBodies: [...calls]
-          .filter((call) => declaresTestBlock(call, rootNames))
-          .flatMap((call) => testCallbacksOf(call)),
-      };
-    };
 
     return {
-      ImportDeclaration: bindings.takeImport,
-      FunctionDeclaration(node: ESTree.Function) {
-        takeFunction(node);
-        declarations.add(node);
-      },
-      FunctionExpression: takeFunction,
-      ArrowFunctionExpression: takeFunction,
-      VariableDeclarator(node: ESTree.VariableDeclarator) {
-        bindings.takeLocalBinding(node);
-        declarators.add(node);
-      },
-      CallExpression(node: ESTree.CallExpression) {
-        calls.add(node);
-      },
-      "Program:exit"() {
-        const reading = scopeReadingOf();
+      "Program:exit"(program: ESTree.Program) {
+        const reading = scopeReadingIn(program, groupingBlockRootNames(program));
+        const reports = [
+          ...declarationReportsIn(program, reading),
+          ...bindingReportsIn({ program, reading, binding }),
+          ...nodesOfType(program, "CallExpression").flatMap((call) => fixtureReportsOf(call)),
+        ];
 
-        for (const declared of declarations) {
-          if (!standsInHelperScope(declared, reading)) continue;
-          context.report({
-            node: declared,
-            messageId: "scopedHelperDeclaration",
-            data: { name: declared.id?.name ?? ANONYMOUS_DECLARATION_NAME },
-          });
-        }
-        for (const declarator of declarators) {
-          if (!standsInHelperScope(declarator, reading)) continue;
-          const report = bindingReportOf(declarator, binding);
-          if (report !== null) context.report(report);
-        }
-        for (const call of calls) {
-          for (const report of fixtureReportsOf(call)) context.report(report);
-        }
+        for (const report of reports) context.report(report);
       },
     };
   },

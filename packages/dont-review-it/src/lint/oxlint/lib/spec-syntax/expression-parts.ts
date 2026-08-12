@@ -10,7 +10,7 @@ export const handedValues = (
     return value.type === "SpreadElement" ? [value.argument] : [value];
   });
 
-export const receiverOf = (call: ESTree.CallExpression): readonly ESTree.Expression[] => {
+const receiverOf = (call: ESTree.CallExpression): readonly ESTree.Expression[] => {
   const callee = unwrapSubject(call.callee);
   return callee.type === "MemberExpression" ? [callee.object] : [];
 };

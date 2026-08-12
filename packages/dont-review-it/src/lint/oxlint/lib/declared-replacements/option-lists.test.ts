@@ -2,40 +2,50 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { listedUnder } from "./option-lists.ts";
 
+const it = test
+  .extend("entriesOfEmptyOptions", () => listedUnder([], "declared"))
+  .extend("entriesOfTextOption", () => listedUnder(["declared"], "declared"))
+  .extend("entriesOfMissingOption", () => listedUnder([null], "declared"))
+  .extend("entriesOfListedOption", () => listedUnder([[]], "declared"))
+  .extend("entriesOfTextKey", () => listedUnder([{ declared: "lerna" }], "declared"))
+  .extend("entriesOfUnwrittenKey", () => listedUnder([{ withdrawn: [] }], "declared"))
+  .extend("entriesOfObjectRows", () => listedUnder([{ declared: [{ name: "lerna" }] }], "declared"))
+  .extend("entriesOfMixedRows", () =>
+    listedUnder([{ declared: ["lerna", null, [], { name: "gulp" }] }], "declared"),
+  );
+
 describe("declared-replacements/option-lists", () => {
-  test("options nobody wrote carry no entries", () => {
-    expect(listedUnder([], "declared")).toStrictEqual([]);
+  it("options nobody wrote carry no entries", ({ entriesOfEmptyOptions }) => {
+    expect(entriesOfEmptyOptions).toStrictEqual([]);
   });
 
-  test("an option written as something other than an object carries no entries", () => {
-    expect(listedUnder(["declared"], "declared")).toStrictEqual([]);
+  it("an option written as something other than an object carries no entries", ({
+    entriesOfTextOption,
+  }) => {
+    expect(entriesOfTextOption).toStrictEqual([]);
   });
 
-  test("an option written as nothing carries no entries", () => {
-    expect(listedUnder([null], "declared")).toStrictEqual([]);
+  it("an option written as nothing carries no entries", ({ entriesOfMissingOption }) => {
+    expect(entriesOfMissingOption).toStrictEqual([]);
   });
 
-  test("an option written as a list carries no entries under a key", () => {
-    expect(listedUnder([[]], "declared")).toStrictEqual([]);
+  it("an option written as a list carries no entries under a key", ({ entriesOfListedOption }) => {
+    expect(entriesOfListedOption).toStrictEqual([]);
   });
 
-  test("a key written as something other than a list carries no entries", () => {
-    expect(listedUnder([{ declared: "lerna" }], "declared")).toStrictEqual([]);
+  it("a key written as something other than a list carries no entries", ({ entriesOfTextKey }) => {
+    expect(entriesOfTextKey).toStrictEqual([]);
   });
 
-  test("a key nobody wrote carries no entries", () => {
-    expect(listedUnder([{ withdrawn: [] }], "declared")).toStrictEqual([]);
+  it("a key nobody wrote carries no entries", ({ entriesOfUnwrittenKey }) => {
+    expect(entriesOfUnwrittenKey).toStrictEqual([]);
   });
 
-  test("entries written as objects come back as they stand", () => {
-    expect(listedUnder([{ declared: [{ name: "lerna" }] }], "declared")).toStrictEqual([
-      { name: "lerna" },
-    ]);
+  it("entries written as objects come back as they stand", ({ entriesOfObjectRows }) => {
+    expect(entriesOfObjectRows).toStrictEqual([{ name: "lerna" }]);
   });
 
-  test("entries written as anything but an object are left out", () => {
-    expect(
-      listedUnder([{ declared: ["lerna", null, [], { name: "gulp" }] }], "declared"),
-    ).toStrictEqual([{ name: "gulp" }]);
+  it("entries written as anything but an object are left out", ({ entriesOfMixedRows }) => {
+    expect(entriesOfMixedRows).toStrictEqual([{ name: "gulp" }]);
   });
 });

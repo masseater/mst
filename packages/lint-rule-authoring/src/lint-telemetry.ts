@@ -47,7 +47,6 @@ const failWhateverCannotBeExported = (): void => {
 const stopOnExit = (provider: MeterProvider): void => {
   const shutdownOnce = once(async (): Promise<void> => {
     runDuration().record(process.uptime() * MILLISECONDS_PER_SECOND);
-    await provider.forceFlush();
     await provider.shutdown();
   });
   process.on("beforeExit", () => {

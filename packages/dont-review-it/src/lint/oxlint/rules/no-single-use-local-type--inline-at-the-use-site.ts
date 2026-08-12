@@ -1,4 +1,5 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { isOutOfScopeSource } from "../lib/out-of-scope-source.ts";
 
 import type { ESTree } from "@oxlint/plugins";
@@ -23,33 +24,32 @@ export const noSingleUseLocalType = createDontReviewItRule({
   create(context) {
     if (isOutOfScopeSource(context.filename)) return {};
 
-    const declaredNodeByName = new Map<string, ESTree.Node>();
-    const referenceCountByName = new Map<string, number>();
-
-    const countReference = (name: string): void => {
-      referenceCountByName.set(name, (referenceCountByName.get(name) ?? 0) + 1);
-    };
-
-    const declare = (node: ESTree.TSTypeAliasDeclaration | ESTree.TSInterfaceDeclaration): void => {
-      if (node.parent.type !== "Program") return;
-      declaredNodeByName.set(node.id.name, node);
-    };
-
     return {
-      TSTypeAliasDeclaration: declare,
-      TSInterfaceDeclaration: declare,
-      TSTypeReference(node: ESTree.TSTypeReference) {
-        if (node.typeName.type === "Identifier") countReference(node.typeName.name);
-      },
-      TSInterfaceHeritage(node: ESTree.TSInterfaceHeritage) {
-        if (node.expression.type === "Identifier") countReference(node.expression.name);
-      },
-      TSClassImplements(node: ESTree.TSClassImplements) {
-        if (node.expression.type === "Identifier") countReference(node.expression.name);
-      },
-      "Program:exit"() {
+      "Program:exit"(program: ESTree.Program) {
+        const referencedNames = [
+          ...nodesOfType(program, "TSTypeReference").flatMap((node) =>
+            node.typeName.type === "Identifier" ? [node.typeName.name] : [],
+          ),
+          ...nodesOfType(program, "TSInterfaceHeritage").flatMap((node) =>
+            node.expression.type === "Identifier" ? [node.expression.name] : [],
+          ),
+          ...nodesOfType(program, "TSClassImplements").flatMap((node) =>
+            node.expression.type === "Identifier" ? [node.expression.name] : [],
+          ),
+        ];
+        const declaredNodeByName = new Map(
+          program.body
+            .flatMap((statement) =>
+              statement.type === "TSTypeAliasDeclaration" ||
+              statement.type === "TSInterfaceDeclaration"
+                ? [statement]
+                : [],
+            )
+            .map((declared) => [declared.id.name, declared] as const),
+        );
+
         for (const [name, node] of declaredNodeByName) {
-          const count = referenceCountByName.get(name) ?? 0;
+          const count = referencedNames.filter((referenced) => referenced === name).length;
           if (count >= REFERENCES_A_SHARED_TYPE) continue;
           context.report({
             node,

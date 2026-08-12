@@ -2,24 +2,32 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, onTestFinished, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { couplingEdgesOf, parsedProgramAt } from "./entry-reachability.ts";
 
-const pathNothingWasWrittenTo = (): string => {
-  const root = mkdtempSync(join(tmpdir(), "setup-modules-entry-reachability-"));
-  onTestFinished(() => {
-    rmSync(root, { recursive: true, force: true });
+const it = test
+  .extend("parsedProgram", ({}, { onCleanup }) => {
+    const root = mkdtempSync(join(tmpdir(), "setup-modules-entry-reachability-"));
+    onCleanup(() => {
+      rmSync(root, { recursive: true, force: true });
+    });
+    return parsedProgramAt(join(root, "never-written.ts"));
+  })
+  .extend("couplingEdges", ({}, { onCleanup }) => {
+    const root = mkdtempSync(join(tmpdir(), "setup-modules-entry-reachability-"));
+    onCleanup(() => {
+      rmSync(root, { recursive: true, force: true });
+    });
+    return couplingEdgesOf(join(root, "never-written.ts"));
   });
-  return join(root, "never-written.ts");
-};
 
 describe("setup-modules/entry-reachability", () => {
-  test("a path holding no file parses into no program", () => {
-    expect(parsedProgramAt(pathNothingWasWrittenTo())).toBe(null);
+  it("a path holding no file parses into no program", ({ parsedProgram }) => {
+    expect(parsedProgram).toBe(null);
   });
 
-  test("a path holding no file couples to nothing", () => {
-    expect(couplingEdgesOf(pathNothingWasWrittenTo())).toStrictEqual([]);
+  it("a path holding no file couples to nothing", ({ couplingEdges }) => {
+    expect(couplingEdges).toStrictEqual([]);
   });
 });

@@ -13,38 +13,32 @@ const CONFIG_FILE = "vite.config.ts";
 
 const PRESET_FILE = "src/configs/upstream-rules.ts";
 
-const configFor = (rules: string): string => `export default { lint: { rules: ${rules} } };`;
-
 describe("dont-review-it/forbid-generic-restriction-rule--use-the-declared-rule", () => {
   testLintRule(forbidGenericRestrictionRule, {
     valid: [
       {
         name: "a rule outside the table may sit at any level",
-        code: configFor(`{ "no-console": "error", "no-shadow-restricted-names": "error" }`),
+        code: `export default { lint: { rules: { "no-console": "error", "no-shadow-restricted-names": "error" } } };`,
         filename: CONFIG_FILE,
       },
       {
         name: "this package's own rules carry their bans in their own options",
-        code: configFor(
-          `{ "dont-review-it/${MODULE_IMPORT_RULE}": ["error", { restricted: [{ module: "lodash" }] }] }`,
-        ),
+        code: `export default { lint: { rules: { "dont-review-it/${MODULE_IMPORT_RULE}": ["error", { restricted: [{ module: "lodash" }] }] } } };`,
         filename: CONFIG_FILE,
       },
       {
         name: "a listed rule written as disabled is left alone",
-        code: configFor(
-          `{ "no-restricted-imports": "off", "no-restricted-syntax": "allow", "no-restricted-globals": 0 }`,
-        ),
+        code: `export default { lint: { rules: { "no-restricted-imports": "off", "no-restricted-syntax": "allow", "no-restricted-globals": 0 } } };`,
         filename: CONFIG_FILE,
       },
       {
         name: "a listed rule disabled through a named constant is left alone",
-        code: configFor(`{ "no-restricted-imports": LINT_SEVERITY.OFF }`),
+        code: `export default { lint: { rules: { "no-restricted-imports": LINT_SEVERITY.OFF } } };`,
         filename: CONFIG_FILE,
       },
       {
         name: "a listed rule disabled in the head of a list is left alone",
-        code: configFor(`{ "no-restricted-imports": ["off", { paths: ["lodash"] }] }`),
+        code: `export default { lint: { rules: { "no-restricted-imports": ["off", { paths: ["lodash"] }] } } };`,
         filename: CONFIG_FILE,
       },
       {
@@ -53,12 +47,12 @@ describe("dont-review-it/forbid-generic-restriction-rule--use-the-declared-rule"
       },
       {
         name: "a computed key names no rule",
-        code: configFor(`{ [chosen]: "error" }`),
+        code: `export default { lint: { rules: { [chosen]: "error" } } };`,
         filename: CONFIG_FILE,
       },
       {
         name: "a block assembled by spreading another block carries no key of its own",
-        code: configFor(`{ ...carried, "no-console": "error" }`),
+        code: `export default { lint: { rules: { ...carried, "no-console": "error" } } };`,
         filename: CONFIG_FILE,
       },
       {
@@ -67,7 +61,7 @@ describe("dont-review-it/forbid-generic-restriction-rule--use-the-declared-rule"
       },
       {
         name: "a registered exception carrying grounds is the path this rule leaves open",
-        code: configFor(`{ "no-restricted-syntax": "error" }`),
+        code: `export default { lint: { rules: { "no-restricted-syntax": "error" } } };`,
         filename: CONFIG_FILE,
         options: [
           {
@@ -84,7 +78,7 @@ describe("dont-review-it/forbid-generic-restriction-rule--use-the-declared-rule"
     invalid: [
       {
         name: "a listed rule enabled in the lint configuration names where its bans belong",
-        code: configFor(`{ "no-restricted-imports": ["error", { paths: ["lodash"] }] }`),
+        code: `export default { lint: { rules: { "no-restricted-imports": ["error", { paths: ["lodash"] }] } } };`,
         filename: CONFIG_FILE,
         errors: [
           {
@@ -95,7 +89,7 @@ describe("dont-review-it/forbid-generic-restriction-rule--use-the-declared-rule"
       },
       {
         name: "a plugin-prefixed spelling names the same rule",
-        code: configFor(`{ "typescript/no-restricted-imports": "error" }`),
+        code: `export default { lint: { rules: { "typescript/no-restricted-imports": "error" } } };`,
         filename: CONFIG_FILE,
         errors: [
           {
@@ -106,7 +100,7 @@ describe("dont-review-it/forbid-generic-restriction-rule--use-the-declared-rule"
       },
       {
         name: "a rule left at a level that only warns still holds the ban",
-        code: configFor(`{ "no-restricted-globals": "warn" }`),
+        code: `export default { lint: { rules: { "no-restricted-globals": "warn" } } };`,
         filename: CONFIG_FILE,
         errors: [
           {
@@ -117,7 +111,7 @@ describe("dont-review-it/forbid-generic-restriction-rule--use-the-declared-rule"
       },
       {
         name: "a severity written as a number that runs the rule is reported",
-        code: configFor(`{ "no-restricted-properties": 2 }`),
+        code: `export default { lint: { rules: { "no-restricted-properties": 2 } } };`,
         filename: CONFIG_FILE,
         errors: [
           {
@@ -128,7 +122,7 @@ describe("dont-review-it/forbid-generic-restriction-rule--use-the-declared-rule"
       },
       {
         name: "a severity held in a binding outside this file is not a disabled spelling",
-        code: configFor(`{ "no-restricted-paths": chosenSeverity }`),
+        code: `export default { lint: { rules: { "no-restricted-paths": chosenSeverity } } };`,
         filename: CONFIG_FILE,
         errors: [
           {
@@ -139,7 +133,7 @@ describe("dont-review-it/forbid-generic-restriction-rule--use-the-declared-rule"
       },
       {
         name: "a listed rule this package has no receiver for asks for a rule of its own",
-        code: configFor(`{ "no-restricted-syntax": "error", "no-restricted-exports": "error" }`),
+        code: `export default { lint: { rules: { "no-restricted-syntax": "error", "no-restricted-exports": "error" } } };`,
         filename: CONFIG_FILE,
         errors: [
           {
@@ -166,7 +160,7 @@ describe("dont-review-it/forbid-generic-restriction-rule--use-the-declared-rule"
       },
       {
         name: "an exception without grounds leaves the entry standing",
-        code: configFor(`{ "no-restricted-syntax": "error" }`),
+        code: `export default { lint: { rules: { "no-restricted-syntax": "error" } } };`,
         filename: CONFIG_FILE,
         options: [{ exceptions: [{ rule: "no-restricted-syntax", reason: "   " }] }],
         errors: [
@@ -178,16 +172,14 @@ describe("dont-review-it/forbid-generic-restriction-rule--use-the-declared-rule"
       },
       {
         name: "an exception named with a plugin prefix covers the same rule",
-        code: configFor(`{ "eslint/no-restricted-imports": "error" }`),
+        code: `export default { lint: { rules: { "eslint/no-restricted-imports": "error" } } };`,
         filename: CONFIG_FILE,
         options: [{ exceptions: [{ rule: "no-restricted-imports" }] }],
         errors: [{ messageId: "groundlessRestrictionException" }],
       },
       {
         name: "a rule added by the configuration joins the ones this rule already carries",
-        code: configFor(
-          `{ "no-restricted-html-elements": "error", "no-restricted-imports": "error" }`,
-        ),
+        code: `export default { lint: { rules: { "no-restricted-html-elements": "error", "no-restricted-imports": "error" } } };`,
         filename: CONFIG_FILE,
         options: [
           {
@@ -215,7 +207,7 @@ describe("dont-review-it/forbid-generic-restriction-rule--use-the-declared-rule"
       },
       {
         name: "a rule added without a receiver asks for a rule of its own",
-        code: configFor(`{ "no-restricted-html-elements": "error" }`),
+        code: `export default { lint: { rules: { "no-restricted-html-elements": "error" } } };`,
         filename: CONFIG_FILE,
         options: [{ restrictionRules: [{ rule: "no-restricted-html-elements" }] }],
         errors: [{ messageId: "undelegatedRestrictionRule" }],

@@ -9,127 +9,242 @@ import {
   matchingRestrictedTarget,
   RESTRICTED_TARGET_SCHEMA,
   restrictedTargetsFrom,
-  type RestrictedTargetEntry,
 } from "./restricted-entries.ts";
 
 const substitute = "Take the same values from the shared reader.";
 
-const entryFor = (
-  held: Partial<RestrictedTargetEntry> & { readonly module: string },
-): RestrictedTargetEntry => ({
-  exports: [],
-  allowedPositions: [],
-  substitute,
-  ...held,
-});
-
-const matchedName = (
-  entries: readonly RestrictedTargetEntry[],
-  forwarded: { readonly specifier: string; readonly exported: string | null },
-): string | null => matchingRestrictedTarget({ entries, forwarded })?.module ?? null;
-
-const retiredLib = [entryFor({ module: "retired-lib" })];
-
-const readFileOnly = [entryFor({ module: "node:fs", exports: ["readFileSync"] })];
+const it = test
+  .extend("entryMatchedByASpecifierSpelledTheSameWay", () =>
+    matchingRestrictedTarget({
+      entries: [{ module: "retired-lib", exports: [], allowedPositions: [], substitute }],
+      forwarded: { specifier: "retired-lib", exported: null },
+    }))
+  .extend("entryMatchedByAPathInsideTheDistributedPackage", () =>
+    matchingRestrictedTarget({
+      entries: [{ module: "retired-lib", exports: [], allowedPositions: [], substitute }],
+      forwarded: { specifier: "retired-lib/deep/inner.js", exported: null },
+    }),
+  )
+  .extend("entryMatchedByANameThatMerelyBeginsTheSameWay", () =>
+    matchingRestrictedTarget({
+      entries: [{ module: "retired-lib", exports: [], allowedPositions: [], substitute }],
+      forwarded: { specifier: "retired-lib-extra", exported: null },
+    }),
+  )
+  .extend("entryMatchedByAnExportOutsideTheNamedList", () =>
+    matchingRestrictedTarget({
+      entries: [{ module: "node:fs", exports: ["readFileSync"], allowedPositions: [], substitute }],
+      forwarded: { specifier: "node:fs", exported: "writeFileSync" },
+    }),
+  )
+  .extend("entryMatchedByTheExportItNames", () =>
+    matchingRestrictedTarget({
+      entries: [{ module: "node:fs", exports: ["readFileSync"], allowedPositions: [], substitute }],
+      forwarded: { specifier: "node:fs", exported: "readFileSync" },
+    }),
+  )
+  .extend("entryMatchedByAForwardThatNamesNoExport", () =>
+    matchingRestrictedTarget({
+      entries: [{ module: "node:fs", exports: ["readFileSync"], allowedPositions: [], substitute }],
+      forwarded: { specifier: "node:fs", exported: null },
+    }),
+  )
+  .extend("entriesInForceAtAPositionTheEntryDoesNotAllow", () =>
+    entriesInForceAt({
+      entries: [{ module: "retired-lib", exports: [], allowedPositions: ["owner/**"], substitute }],
+      file: resolve("/repo", "reader", "reader.ts").split("/").join(sep),
+      cwd: "/repo",
+    }),
+  )
+  .extend("entriesInForceAtAPositionTheEntryAllows", () =>
+    entriesInForceAt({
+      entries: [{ module: "retired-lib", exports: [], allowedPositions: ["owner/**"], substitute }],
+      file: resolve("/repo", "owner", "reader.ts").split("/").join(sep),
+      cwd: "/repo",
+    }),
+  )
+  .extend("entriesReadFromARowMissingTheModuleItRestricts", () =>
+    restrictedTargetsFrom([{ restricted: [{ substitute }] }]),
+  )
+  .extend("entriesReadFromARowMissingTheSubstituteItNames", () =>
+    restrictedTargetsFrom([{ restricted: [{ module: "retired-lib" }] }]),
+  )
+  .extend("entriesReadFromARowNamingAModuleAndItsSubstitute", () =>
+    restrictedTargetsFrom([
+      { restricted: [{ module: "retired-lib", exports: ["readFile"], substitute }] },
+    ]),
+  )
+  .extend("entriesReadFromOptionsCarryingNoneAtAll", () => restrictedTargetsFrom([]))
+  .extend("entriesDeclaredAsBareText", () =>
+    restrictedTargetsFrom([{ restricted: ["retired-lib"] }]),
+  )
+  .extend("aliasesReadFromAPrefixWithTheDirectoryItStandsFor", () =>
+    internalAliasesFrom([{ internalAliases: [{ prefix: "~/", directory: "src" }] }]),
+  )
+  .extend("aliasesReadFromAPrefixWithoutTheDirectoryItStandsFor", () =>
+    internalAliasesFrom([{ internalAliases: [{ prefix: "~/" }] }]),
+  )
+  .extend("aliasesDeclaredAsBareText", () => internalAliasesFrom([{ internalAliases: ["~/"] }]))
+  .extend("aliasesDeclaredWithAnEmptyPrefix", () =>
+    internalAliasesFrom([{ internalAliases: [{ prefix: "", directory: "src" }] }]),
+  )
+  .extend("pathStoodForByADeclaredPrefix", () =>
+    aliasedSpecifierIn({
+      specifier: "~/forward.ts",
+      aliases: [{ prefix: "~/", directory: "shared" }],
+      workspaceRoot: resolve("/repo"),
+    }),
+  )
+  .extend("pathStoodForByASpecifierMatchingNoDeclaredPrefix", () =>
+    aliasedSpecifierIn({
+      specifier: "@other/forward.ts",
+      aliases: [{ prefix: "~/", directory: "shared" }],
+      workspaceRoot: resolve("/repo"),
+    }),
+  );
 
 describe("restricted-targets/restricted-entries", () => {
-  test("an entry naming the module matches a specifier spelled the same way", () => {
-    expect(matchedName(retiredLib, { specifier: "retired-lib", exported: null })).toBe(
-      "retired-lib",
-    );
+  it("an entry naming the module matches a specifier spelled the same way", ({
+    entryMatchedByASpecifierSpelledTheSameWay,
+  }) => {
+    expect(entryMatchedByASpecifierSpelledTheSameWay).toStrictEqual({
+      module: "retired-lib",
+      exports: [],
+      allowedPositions: [],
+      substitute,
+    });
   });
 
-  test("a path inside the distributed package reaches the same entry", () => {
-    expect(
-      matchedName(retiredLib, { specifier: "retired-lib/deep/inner.js", exported: null }),
-    ).toBe("retired-lib");
+  it("a path inside the distributed package reaches the same entry", ({
+    entryMatchedByAPathInsideTheDistributedPackage,
+  }) => {
+    expect(entryMatchedByAPathInsideTheDistributedPackage).toStrictEqual({
+      module: "retired-lib",
+      exports: [],
+      allowedPositions: [],
+      substitute,
+    });
   });
 
-  test("a package whose name merely begins with the restricted name is a separate name", () => {
-    expect(matchedName(retiredLib, { specifier: "retired-lib-extra", exported: null })).toBe(null);
+  it("a package whose name merely begins with the restricted name is a separate name", ({
+    entryMatchedByANameThatMerelyBeginsTheSameWay,
+  }) => {
+    expect(entryMatchedByANameThatMerelyBeginsTheSameWay).toBe(null);
   });
 
-  test("an entry naming exports leaves an export outside that list alone", () => {
-    expect(matchedName(readFileOnly, { specifier: "node:fs", exported: "writeFileSync" })).toBe(
-      null,
-    );
+  it("an entry naming exports leaves an export outside that list alone", ({
+    entryMatchedByAnExportOutsideTheNamedList,
+  }) => {
+    expect(entryMatchedByAnExportOutsideTheNamedList).toBe(null);
   });
 
-  test("an entry naming exports matches the export it names", () => {
-    expect(matchedName(readFileOnly, { specifier: "node:fs", exported: "readFileSync" })).toBe(
-      "node:fs",
-    );
+  it("an entry naming exports matches the export it names", ({
+    entryMatchedByTheExportItNames,
+  }) => {
+    expect(entryMatchedByTheExportItNames).toStrictEqual({
+      module: "node:fs",
+      exports: ["readFileSync"],
+      allowedPositions: [],
+      substitute,
+    });
   });
 
-  test("a forward that names no export carries every named export with it", () => {
-    expect(matchedName(readFileOnly, { specifier: "node:fs", exported: null })).toBe("node:fs");
+  it("a forward that names no export carries every named export with it", ({
+    entryMatchedByAForwardThatNamesNoExport,
+  }) => {
+    expect(entryMatchedByAForwardThatNamesNoExport).toStrictEqual({
+      module: "node:fs",
+      exports: ["readFileSync"],
+      allowedPositions: [],
+      substitute,
+    });
   });
 
-  test("an entry stays in force at a position it does not allow", () => {
-    const entries = [entryFor({ module: "retired-lib", allowedPositions: ["owner/**"] })];
-    const file = resolve("/repo", "reader", "reader.ts").split("/").join(sep);
-    expect(entriesInForceAt({ entries, file, cwd: "/repo" })).toStrictEqual(entries);
+  it("an entry stays in force at a position it does not allow", ({
+    entriesInForceAtAPositionTheEntryDoesNotAllow,
+  }) => {
+    expect(entriesInForceAtAPositionTheEntryDoesNotAllow).toStrictEqual([
+      { module: "retired-lib", exports: [], allowedPositions: ["owner/**"], substitute },
+    ]);
   });
 
-  test("an entry falls out of force at a position it allows", () => {
-    const entries = [entryFor({ module: "retired-lib", allowedPositions: ["owner/**"] })];
-    const file = resolve("/repo", "owner", "reader.ts").split("/").join(sep);
-    expect(entriesInForceAt({ entries, file, cwd: "/repo" })).toStrictEqual([]);
+  it("an entry falls out of force at a position it allows", ({
+    entriesInForceAtAPositionTheEntryAllows,
+  }) => {
+    expect(entriesInForceAtAPositionTheEntryAllows).toStrictEqual([]);
   });
 
-  test("an entry missing the name of what it restricts is no entry", () => {
-    expect(restrictedTargetsFrom([{ restricted: [{ substitute }] }])).toStrictEqual([]);
+  it("an entry missing the name of what it restricts is no entry", ({
+    entriesReadFromARowMissingTheModuleItRestricts,
+  }) => {
+    expect(entriesReadFromARowMissingTheModuleItRestricts).toStrictEqual([]);
   });
 
-  test("an entry missing the instruction that replaces it is no entry", () => {
-    expect(restrictedTargetsFrom([{ restricted: [{ module: "retired-lib" }] }])).toStrictEqual([]);
+  it("an entry missing the instruction that replaces it is no entry", ({
+    entriesReadFromARowMissingTheSubstituteItNames,
+  }) => {
+    expect(entriesReadFromARowMissingTheSubstituteItNames).toStrictEqual([]);
   });
 
-  test("an entry naming a module and its replacement is read whole", () => {
-    expect(
-      restrictedTargetsFrom([
-        { restricted: [{ module: "retired-lib", exports: ["readFile"], substitute }] },
-      ]),
-    ).toStrictEqual([
+  it("an entry naming a module and its replacement is read whole", ({
+    entriesReadFromARowNamingAModuleAndItsSubstitute,
+  }) => {
+    expect(entriesReadFromARowNamingAModuleAndItsSubstitute).toStrictEqual([
       { module: "retired-lib", exports: ["readFile"], allowedPositions: [], substitute },
     ]);
   });
 
-  test("options carrying no entries at all yield no entries", () => {
-    expect(restrictedTargetsFrom([])).toStrictEqual([]);
+  it("options carrying no entries at all yield no entries", ({
+    entriesReadFromOptionsCarryingNoneAtAll,
+  }) => {
+    expect(entriesReadFromOptionsCarryingNoneAtAll).toStrictEqual([]);
   });
 
-  test("a prefix declared with the directory it stands for is read whole", () => {
-    expect(
-      internalAliasesFrom([{ internalAliases: [{ prefix: "~/", directory: "src" }] }]),
-    ).toStrictEqual([{ prefix: "~/", directory: "src" }]);
+  it("an entry written as bare text instead of a declaration is no entry", ({
+    entriesDeclaredAsBareText,
+  }) => {
+    expect(entriesDeclaredAsBareText).toStrictEqual([]);
   });
 
-  test("a prefix declared without the directory it stands for is no alias", () => {
-    expect(internalAliasesFrom([{ internalAliases: [{ prefix: "~/" }] }])).toStrictEqual([]);
+  it("a prefix declared with the directory it stands for is read whole", ({
+    aliasesReadFromAPrefixWithTheDirectoryItStandsFor,
+  }) => {
+    expect(aliasesReadFromAPrefixWithTheDirectoryItStandsFor).toStrictEqual([
+      { prefix: "~/", directory: "src" },
+    ]);
   });
 
-  test("a declared prefix resolves to the directory it stands for", () => {
-    expect(
-      aliasedSpecifierIn({
-        specifier: "~/forward.ts",
-        aliases: [{ prefix: "~/", directory: "shared" }],
-        workspaceRoot: resolve("/repo"),
-      }),
-    ).toBe(resolve("/repo", "shared", "forward.ts"));
+  it("a prefix declared without the directory it stands for is no alias", ({
+    aliasesReadFromAPrefixWithoutTheDirectoryItStandsFor,
+  }) => {
+    expect(aliasesReadFromAPrefixWithoutTheDirectoryItStandsFor).toStrictEqual([]);
   });
 
-  test("a specifier matching no declared prefix stands for nothing", () => {
-    expect(
-      aliasedSpecifierIn({
-        specifier: "@other/forward.ts",
-        aliases: [{ prefix: "~/", directory: "shared" }],
-        workspaceRoot: resolve("/repo"),
-      }),
-    ).toBe(null);
+  it("a prefix written as bare text instead of a declaration is no alias", ({
+    aliasesDeclaredAsBareText,
+  }) => {
+    expect(aliasesDeclaredAsBareText).toStrictEqual([]);
   });
 
-  test("the options schema declares the entry shape and refuses any other key", () => {
+  it("a prefix spelled as an empty string stands for nothing and is no alias", ({
+    aliasesDeclaredWithAnEmptyPrefix,
+  }) => {
+    expect(aliasesDeclaredWithAnEmptyPrefix).toStrictEqual([]);
+  });
+
+  it("a declared prefix resolves to the directory it stands for", ({
+    pathStoodForByADeclaredPrefix,
+  }) => {
+    expect(pathStoodForByADeclaredPrefix).toBe(resolve("/repo", "shared", "forward.ts"));
+  });
+
+  it("a specifier matching no declared prefix stands for nothing", ({
+    pathStoodForByASpecifierMatchingNoDeclaredPrefix,
+  }) => {
+    expect(pathStoodForByASpecifierMatchingNoDeclaredPrefix).toBe(null);
+  });
+
+  it("the options schema declares the entry shape and refuses any other key", () => {
     expect(RESTRICTED_TARGET_SCHEMA).toStrictEqual([
       {
         type: "object",

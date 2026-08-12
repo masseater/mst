@@ -56,6 +56,16 @@ describe("dont-review-it/no-fixture-forward-subject--yield-sut-output", () => {
         code: "const test = baseTest.extend({\n  report: async ({ store }, use) => {\n    const summarised = await summarise(entries);\n    await use(summarised);\n  },\n});",
       },
       {
+        name: "a binding this fixture was never given is not one it can be handing back",
+        filename: SPEC_FILE,
+        code: 'const test = baseTest.extend("report", async () => sharedReport);',
+      },
+      {
+        name: "a dependency taken apart in the parameter list hands no whole value to the factory",
+        filename: SPEC_FILE,
+        code: 'const test = baseTest.extend("path", async ({ lockOptions: { lockPath } }) => lockPath);',
+      },
+      {
         name: "a fixture written as a shared binding declares no factory to read",
         filename: SPEC_FILE,
         code: "const test = baseTest.extend({ report: fixtures.report });",
@@ -80,6 +90,24 @@ describe("dont-review-it/no-fixture-forward-subject--yield-sut-output", () => {
         filename: SPEC_FILE,
         options: SCOPING_WRAPPERS,
         code: 'const test = baseTest.extend("report", async () => scopeHandlers(handlers, async () => {\n  const summarised = await summarise(entries);\n  return summarised;\n}));',
+      },
+      {
+        name: "a named wrapper called with nothing to scope hands back no body to read",
+        filename: SPEC_FILE,
+        options: SCOPING_WRAPPERS,
+        code: 'const test = baseTest.extend("report", async () => scopeHandlers());',
+      },
+      {
+        name: "a named wrapper whose last argument is spread hands back no body to read",
+        filename: SPEC_FILE,
+        options: SCOPING_WRAPPERS,
+        code: 'const test = baseTest.extend("report", async () => scopeHandlers(...handlers));',
+      },
+      {
+        name: "a configuration that only respells spec files names no scoping wrapper",
+        filename: SPEC_FILE,
+        options: [{ specFileSuffixes: [".test.ts"] }],
+        code: 'const test = baseTest.extend("report", async () => scopeHandlers(handlers, async () => summarise(entries)));',
       },
       {
         name: "a file that is not a spec file is outside this reading",

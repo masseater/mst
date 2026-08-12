@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,24 +7,44 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { findWorkspaceRoot } from "./workspace-root.ts";
 
+const REPOSITORY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../../..");
+
+const DETACHED_DIRECTORY = join(tmpdir(), "mst-workspace-root-detached");
+
+const it = test
+  .extend("rootOfManifestDirectory", () => findWorkspaceRoot(REPOSITORY_ROOT))
+  .extend("rootOfPackageDirectory", () =>
+    findWorkspaceRoot(join(REPOSITORY_ROOT, "packages/dont-review-it")),
+  )
+  .extend("rootOfNestedSourceDirectory", () =>
+    findWorkspaceRoot(join(REPOSITORY_ROOT, "packages/dont-review-it/src/lint")),
+  )
+  .extend("rootOfDetachedDirectory", ({}, { onCleanup }) => {
+    mkdirSync(DETACHED_DIRECTORY, { recursive: true });
+    onCleanup(() => {
+      rmSync(DETACHED_DIRECTORY, { recursive: true, force: true });
+    });
+    return findWorkspaceRoot(DETACHED_DIRECTORY);
+  });
+
 describe("workspace-root", () => {
-  const thisDirectory = dirname(fileURLToPath(import.meta.url));
-
-  const repositoryRoot = resolve(thisDirectory, "../../../../../../..");
-
-  test("the directory holding the workspace manifest is the root", () => {
-    expect(findWorkspaceRoot(repositoryRoot)).toBe(repositoryRoot);
+  it("the directory holding the workspace manifest is the root", ({ rootOfManifestDirectory }) => {
+    expect(rootOfManifestDirectory).toBe(REPOSITORY_ROOT);
   });
 
-  test("a package directory reports the workspace above it rather than itself", () => {
-    expect(findWorkspaceRoot(join(repositoryRoot, "packages/dont-review-it"))).toBe(repositoryRoot);
-    expect(findWorkspaceRoot(join(repositoryRoot, "packages/dont-review-it/src/lint"))).toBe(
-      repositoryRoot,
-    );
+  it("a package directory reports the workspace above it rather than itself", ({
+    rootOfPackageDirectory,
+  }) => {
+    expect(rootOfPackageDirectory).toBe(REPOSITORY_ROOT);
   });
 
-  test("a directory under no workspace keeps itself as the root", () => {
-    const detached = mkdtempSync(join(tmpdir(), "mst-workspace-root-"));
-    expect(findWorkspaceRoot(detached)).toBe(resolve(detached));
+  it("a directory deeper inside a package reports the same workspace above it", ({
+    rootOfNestedSourceDirectory,
+  }) => {
+    expect(rootOfNestedSourceDirectory).toBe(REPOSITORY_ROOT);
+  });
+
+  it("a directory under no workspace keeps itself as the root", ({ rootOfDetachedDirectory }) => {
+    expect(rootOfDetachedDirectory).toBe(resolve(DETACHED_DIRECTORY));
   });
 });

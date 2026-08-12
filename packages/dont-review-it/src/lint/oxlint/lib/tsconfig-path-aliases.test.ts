@@ -1,185 +1,368 @@
-import { mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 import { describe, expect, test } from "vite-plus/test";
 
 import { aliasedPathsFor } from "./tsconfig-path-aliases.ts";
 
-const fixtureDir = join(realpathSync(tmpdir()), "dont-review-it-tsconfig-path-aliases");
-rmSync(fixtureDir, { recursive: true, force: true });
-
-const fixturePath = (name: string): string => join(fixtureDir, name);
-
-const writeFixture = (name: string, content: string): string => {
-  const path = fixturePath(name);
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, content);
-  return path;
-};
-
-const writeConfig = (name: string, config: unknown): string =>
-  writeFixture(name, JSON.stringify(config));
-
-writeConfig("wildcard/tsconfig.json", {
-  compilerOptions: { baseUrl: ".", paths: { "@data/*": ["./values/*"] } },
-});
-
-writeConfig("exact/tsconfig.json", {
-  compilerOptions: { paths: { "@data/table": ["./values/table.assets.ts"] } },
-});
-
-writeConfig("layered/tsconfig.json", {
-  compilerOptions: {
-    paths: { "@data/*": ["./shallow/*"], "@data/deep/*": ["./deep/*"] },
-  },
-});
-
-writeConfig("reversed/tsconfig.json", {
-  compilerOptions: {
-    paths: { "@data/deep/*": ["./deep/*"], "@data/*": ["./shallow/*"] },
-  },
-});
-
-writeConfig("wild/tsconfig.json", {
-  compilerOptions: { paths: { "@data/*/*": ["./values/*"], "@data/held": "./values/held.ts" } },
-});
-
-writeConfig("based/tsconfig.json", {
-  compilerOptions: { baseUrl: "./src", paths: { "@data/*": ["./values/*"] } },
-});
-
-writeConfig("inherited/tsconfig.json", { extends: ["./tsconfig.base.json"] });
-writeConfig("inherited/tsconfig.base.json", {
-  compilerOptions: { paths: { "@data/*": ["./values/*"] } },
-});
-
-writeConfig("packaged/tsconfig.json", { extends: "@fixture/preset/tsconfig.json" });
-
-writeConfig("circular/tsconfig.json", { extends: "./tsconfig.other.json" });
-writeConfig("circular/tsconfig.other.json", { extends: "./tsconfig.json" });
-
-writeFixture("listed/tsconfig.json", "[]");
-
-writeConfig("plain/tsconfig.json", { compilerOptions: { strict: true } });
-
-mkdirSync(fixturePath("bare"), { recursive: true });
+const it = test
+  .extend("workspaceRoot", ({}, { onCleanup }) => {
+    const root = mkdtempSync(join(tmpdir(), "tsconfig-path-aliases-"));
+    onCleanup(() => {
+      rmSync(root, { recursive: true, force: true });
+    });
+    return root;
+  })
+  .extend("pathsOfASpecifierStandingForAPath", ({ workspaceRoot }) => {
+    const directory = join(workspaceRoot, "wildcard");
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, "tsconfig.json"),
+      '{ "compilerOptions": { "baseUrl": ".", "paths": { "@data/*": ["./values/*"] } } }\n',
+    );
+    return aliasedPathsFor({
+      specifier: "@data/order.assets.ts",
+      fromFile: join(directory, "reader.ts"),
+    });
+  })
+  .extend("pathsOfASpecifierShorterThanTheDeclaration", ({ workspaceRoot }) => {
+    const directory = join(workspaceRoot, "wildcard");
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, "tsconfig.json"),
+      '{ "compilerOptions": { "baseUrl": ".", "paths": { "@data/*": ["./values/*"] } } }\n',
+    );
+    return aliasedPathsFor({ specifier: "@data", fromFile: join(directory, "reader.ts") });
+  })
+  .extend("pathsOfASpecifierOpeningDifferently", ({ workspaceRoot }) => {
+    const directory = join(workspaceRoot, "wildcard");
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, "tsconfig.json"),
+      '{ "compilerOptions": { "baseUrl": ".", "paths": { "@data/*": ["./values/*"] } } }\n',
+    );
+    return aliasedPathsFor({
+      specifier: "@other/order.assets.ts",
+      fromFile: join(directory, "reader.ts"),
+    });
+  })
+  .extend("pathsOfTheSpecifierAnExactDeclarationSpells", ({ workspaceRoot }) => {
+    const directory = join(workspaceRoot, "exact");
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, "tsconfig.json"),
+      '{ "compilerOptions": { "paths": { "@data/table": ["./values/table.assets.ts"] } } }\n',
+    );
+    return aliasedPathsFor({ specifier: "@data/table", fromFile: join(directory, "reader.ts") });
+  })
+  .extend("pathsOfASpecifierAnExactDeclarationDoesNotSpell", ({ workspaceRoot }) => {
+    const directory = join(workspaceRoot, "exact");
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, "tsconfig.json"),
+      '{ "compilerOptions": { "paths": { "@data/table": ["./values/table.assets.ts"] } } }\n',
+    );
+    return aliasedPathsFor({ specifier: "@data/other", fromFile: join(directory, "reader.ts") });
+  })
+  .extend("pathsOfASpecifierUnderTheLongestOpening", ({ workspaceRoot }) => {
+    const directory = join(workspaceRoot, "layered");
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, "tsconfig.json"),
+      '{ "compilerOptions": { "paths": { "@data/*": ["./shallow/*"], "@data/deep/*": ["./deep/*"] } } }\n',
+    );
+    return aliasedPathsFor({
+      specifier: "@data/deep/order.assets.ts",
+      fromFile: join(directory, "reader.ts"),
+    });
+  })
+  .extend("pathsOfASpecifierUnderTheLongestOpeningWrittenFirst", ({ workspaceRoot }) => {
+    const directory = join(workspaceRoot, "reversed");
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, "tsconfig.json"),
+      '{ "compilerOptions": { "paths": { "@data/deep/*": ["./deep/*"], "@data/*": ["./shallow/*"] } } }\n',
+    );
+    return aliasedPathsFor({
+      specifier: "@data/deep/order.assets.ts",
+      fromFile: join(directory, "reader.ts"),
+    });
+  })
+  .extend("pathsOfASpecifierMeetingTwoWildcards", ({ workspaceRoot }) => {
+    const directory = join(workspaceRoot, "wild");
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, "tsconfig.json"),
+      '{ "compilerOptions": { "paths": { "@data/*/*": ["./values/*"], "@data/held": "./values/held.ts" } } }\n',
+    );
+    return aliasedPathsFor({
+      specifier: "@data/left/right",
+      fromFile: join(directory, "reader.ts"),
+    });
+  })
+  .extend("pathsOfASpecifierMeetingASinglePathTarget", ({ workspaceRoot }) => {
+    const directory = join(workspaceRoot, "wild");
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, "tsconfig.json"),
+      '{ "compilerOptions": { "paths": { "@data/*/*": ["./values/*"], "@data/held": "./values/held.ts" } } }\n',
+    );
+    return aliasedPathsFor({ specifier: "@data/held", fromFile: join(directory, "reader.ts") });
+  })
+  .extend("pathsOfASpecifierReadFromTheDeclaredBaseDirectory", ({ workspaceRoot }) => {
+    const directory = join(workspaceRoot, "based");
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, "tsconfig.json"),
+      '{ "compilerOptions": { "baseUrl": "./src", "paths": { "@data/*": ["./values/*"] } } }\n',
+    );
+    return aliasedPathsFor({
+      specifier: "@data/order.assets.ts",
+      fromFile: join(directory, "reader.ts"),
+    });
+  })
+  .extend("pathsOfASpecifierDeclaredByAnInheritedConfiguration", ({ workspaceRoot }) => {
+    const directory = join(workspaceRoot, "inherited");
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(join(directory, "tsconfig.json"), '{ "extends": ["./tsconfig.base.json"] }\n');
+    writeFileSync(
+      join(directory, "tsconfig.base.json"),
+      '{ "compilerOptions": { "paths": { "@data/*": ["./values/*"] } } }\n',
+    );
+    return aliasedPathsFor({
+      specifier: "@data/order.assets.ts",
+      fromFile: join(directory, "reader.ts"),
+    });
+  })
+  .extend("pathsOfASpecifierUnderAConfigurationInheritedFromAPackage", ({ workspaceRoot }) => {
+    const directory = join(workspaceRoot, "packaged");
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, "tsconfig.json"),
+      '{ "extends": "@fixture/preset/tsconfig.json" }\n',
+    );
+    return aliasedPathsFor({
+      specifier: "@data/order.assets.ts",
+      fromFile: join(directory, "reader.ts"),
+    });
+  })
+  .extend("pathsOfASpecifierUnderConfigurationsExtendingInACircle", ({ workspaceRoot }) => {
+    const directory = join(workspaceRoot, "circular");
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(join(directory, "tsconfig.json"), '{ "extends": "./tsconfig.other.json" }\n');
+    writeFileSync(join(directory, "tsconfig.other.json"), '{ "extends": "./tsconfig.json" }\n');
+    return aliasedPathsFor({
+      specifier: "@data/order.assets.ts",
+      fromFile: join(directory, "reader.ts"),
+    });
+  })
+  .extend("pathsOfASpecifierUnderAConfigurationThatIsNotAnObject", ({ workspaceRoot }) => {
+    const directory = join(workspaceRoot, "listed");
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(join(directory, "tsconfig.json"), "[]");
+    return aliasedPathsFor({
+      specifier: "@data/order.assets.ts",
+      fromFile: join(directory, "reader.ts"),
+    });
+  })
+  .extend("pathsOfASpecifierUnderAProjectDeclaringNoPaths", ({ workspaceRoot }) => {
+    const directory = join(workspaceRoot, "plain");
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(join(directory, "tsconfig.json"), '{ "compilerOptions": { "strict": true } }\n');
+    return aliasedPathsFor({
+      specifier: "@data/order.assets.ts",
+      fromFile: join(directory, "reader.ts"),
+    });
+  })
+  .extend("pathsOfASpecifierUnderADirectoryHoldingNoConfiguration", ({ workspaceRoot }) => {
+    const directory = join(workspaceRoot, "bare");
+    mkdirSync(directory, { recursive: true });
+    return aliasedPathsFor({
+      specifier: "@data/order.assets.ts",
+      fromFile: join(directory, "reader.ts"),
+    });
+  })
+  .extend("pathsOfASpecifierNamingThisDirectory", ({ workspaceRoot }) => {
+    const directory = join(workspaceRoot, "wildcard");
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, "tsconfig.json"),
+      '{ "compilerOptions": { "baseUrl": ".", "paths": { "@data/*": ["./values/*"] } } }\n',
+    );
+    return aliasedPathsFor({
+      specifier: "./order.assets.ts",
+      fromFile: join(directory, "reader.ts"),
+    });
+  })
+  .extend("pathsOfASpecifierNamingTheDirectoryAbove", ({ workspaceRoot }) => {
+    const directory = join(workspaceRoot, "wildcard");
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, "tsconfig.json"),
+      '{ "compilerOptions": { "baseUrl": ".", "paths": { "@data/*": ["./values/*"] } } }\n',
+    );
+    return aliasedPathsFor({
+      specifier: "../order.assets.ts",
+      fromFile: join(directory, "reader.ts"),
+    });
+  })
+  .extend("pathsOfASpecifierNamingAnAbsolutePlace", ({ workspaceRoot }) => {
+    const directory = join(workspaceRoot, "wildcard");
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, "tsconfig.json"),
+      '{ "compilerOptions": { "baseUrl": ".", "paths": { "@data/*": ["./values/*"] } } }\n',
+    );
+    return aliasedPathsFor({
+      specifier: join(directory, "order.assets.ts"),
+      fromFile: join(directory, "reader.ts"),
+    });
+  })
+  .extend("pathsOfASubpathSpecifier", ({ workspaceRoot }) => {
+    const directory = join(workspaceRoot, "wildcard");
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, "tsconfig.json"),
+      '{ "compilerOptions": { "baseUrl": ".", "paths": { "@data/*": ["./values/*"] } } }\n',
+    );
+    return aliasedPathsFor({ specifier: "#data", fromFile: join(directory, "reader.ts") });
+  });
 
 describe("tsconfig-path-aliases", () => {
-  test("a specifier standing for a path is read as the path the project declares for it", () => {
-    expect(
-      aliasedPathsFor({
-        specifier: "@data/order.assets.ts",
-        fromFile: fixturePath("wildcard/reader.ts"),
-      }),
-    ).toStrictEqual([fixturePath("wildcard/values/order.assets.ts")]);
-  });
-
-  test("a specifier shorter than the declaration, or opening differently, stands for nothing", () => {
-    const fromFile = fixturePath("wildcard/reader.ts");
-    expect(aliasedPathsFor({ specifier: "@data", fromFile })).toStrictEqual([]);
-    expect(aliasedPathsFor({ specifier: "@other/order.assets.ts", fromFile })).toStrictEqual([]);
-  });
-
-  test("a declaration carrying no wildcard stands for exactly the specifier it spells", () => {
-    const fromFile = fixturePath("exact/reader.ts");
-    expect(aliasedPathsFor({ specifier: "@data/table", fromFile })).toStrictEqual([
-      fixturePath("exact/values/table.assets.ts"),
+  it("a specifier standing for a path is read as the path the project declares for it", ({
+    pathsOfASpecifierStandingForAPath,
+    workspaceRoot,
+  }) => {
+    expect(pathsOfASpecifierStandingForAPath).toStrictEqual([
+      join(workspaceRoot, "wildcard", "values", "order.assets.ts"),
     ]);
-    expect(aliasedPathsFor({ specifier: "@data/other", fromFile })).toStrictEqual([]);
   });
 
-  test("the declaration spelling the longest opening is the one that stands for the specifier", () => {
-    expect(
-      aliasedPathsFor({
-        specifier: "@data/deep/order.assets.ts",
-        fromFile: fixturePath("layered/reader.ts"),
-      }),
-    ).toStrictEqual([fixturePath("layered/deep/order.assets.ts")]);
+  it("a specifier shorter than the declaration stands for nothing", ({
+    pathsOfASpecifierShorterThanTheDeclaration,
+  }) => {
+    expect(pathsOfASpecifierShorterThanTheDeclaration).toStrictEqual([]);
   });
 
-  test("the order the declarations are written in does not decide which one stands", () => {
-    expect(
-      aliasedPathsFor({
-        specifier: "@data/deep/order.assets.ts",
-        fromFile: fixturePath("reversed/reader.ts"),
-      }),
-    ).toStrictEqual([fixturePath("reversed/deep/order.assets.ts")]);
+  it("a specifier opening differently from the declaration stands for nothing", ({
+    pathsOfASpecifierOpeningDifferently,
+  }) => {
+    expect(pathsOfASpecifierOpeningDifferently).toStrictEqual([]);
   });
 
-  test("a declaration spelling two wildcards, and one holding a single path, stand for nothing", () => {
-    const fromFile = fixturePath("wild/reader.ts");
-    expect(aliasedPathsFor({ specifier: "@data/left/right", fromFile })).toStrictEqual([]);
-    expect(aliasedPathsFor({ specifier: "@data/held", fromFile })).toStrictEqual([]);
+  it("a declaration carrying no wildcard stands for exactly the specifier it spells", ({
+    pathsOfTheSpecifierAnExactDeclarationSpells,
+    workspaceRoot,
+  }) => {
+    expect(pathsOfTheSpecifierAnExactDeclarationSpells).toStrictEqual([
+      join(workspaceRoot, "exact", "values", "table.assets.ts"),
+    ]);
   });
 
-  test("the paths a project declares are read from the base directory it names", () => {
-    expect(
-      aliasedPathsFor({
-        specifier: "@data/order.assets.ts",
-        fromFile: fixturePath("based/reader.ts"),
-      }),
-    ).toStrictEqual([fixturePath("based/src/values/order.assets.ts")]);
+  it("a declaration carrying no wildcard stands for no other specifier", ({
+    pathsOfASpecifierAnExactDeclarationDoesNotSpell,
+  }) => {
+    expect(pathsOfASpecifierAnExactDeclarationDoesNotSpell).toStrictEqual([]);
   });
 
-  test("a project that inherits its paths reads them from the configuration it extends", () => {
-    expect(
-      aliasedPathsFor({
-        specifier: "@data/order.assets.ts",
-        fromFile: fixturePath("inherited/reader.ts"),
-      }),
-    ).toStrictEqual([fixturePath("inherited/values/order.assets.ts")]);
+  it("the declaration spelling the longest opening is the one that stands for the specifier", ({
+    pathsOfASpecifierUnderTheLongestOpening,
+    workspaceRoot,
+  }) => {
+    expect(pathsOfASpecifierUnderTheLongestOpening).toStrictEqual([
+      join(workspaceRoot, "layered", "deep", "order.assets.ts"),
+    ]);
   });
 
-  test("a configuration inherited from an installed package carries no paths of its own", () => {
-    expect(
-      aliasedPathsFor({
-        specifier: "@data/order.assets.ts",
-        fromFile: fixturePath("packaged/reader.ts"),
-      }),
-    ).toStrictEqual([]);
+  it("the order the declarations are written in does not decide which one stands", ({
+    pathsOfASpecifierUnderTheLongestOpeningWrittenFirst,
+    workspaceRoot,
+  }) => {
+    expect(pathsOfASpecifierUnderTheLongestOpeningWrittenFirst).toStrictEqual([
+      join(workspaceRoot, "reversed", "deep", "order.assets.ts"),
+    ]);
   });
 
-  test("configurations that extend each other in a circle come to an end", () => {
-    expect(
-      aliasedPathsFor({
-        specifier: "@data/order.assets.ts",
-        fromFile: fixturePath("circular/reader.ts"),
-      }),
-    ).toStrictEqual([]);
+  it("a declaration spelling two wildcards stands for nothing", ({
+    pathsOfASpecifierMeetingTwoWildcards,
+  }) => {
+    expect(pathsOfASpecifierMeetingTwoWildcards).toStrictEqual([]);
   });
 
-  test("a configuration that is not an object of settings declares no paths", () => {
-    expect(
-      aliasedPathsFor({
-        specifier: "@data/order.assets.ts",
-        fromFile: fixturePath("listed/reader.ts"),
-      }),
-    ).toStrictEqual([]);
+  it("a declaration holding a single path instead of a list stands for nothing", ({
+    pathsOfASpecifierMeetingASinglePathTarget,
+  }) => {
+    expect(pathsOfASpecifierMeetingASinglePathTarget).toStrictEqual([]);
   });
 
-  test("a project that declares no paths at all stands for nothing", () => {
-    expect(
-      aliasedPathsFor({
-        specifier: "@data/order.assets.ts",
-        fromFile: fixturePath("plain/reader.ts"),
-      }),
-    ).toStrictEqual([]);
-    expect(
-      aliasedPathsFor({
-        specifier: "@data/order.assets.ts",
-        fromFile: fixturePath("bare/reader.ts"),
-      }),
-    ).toStrictEqual([]);
+  it("the paths a project declares are read from the base directory it names", ({
+    pathsOfASpecifierReadFromTheDeclaredBaseDirectory,
+    workspaceRoot,
+  }) => {
+    expect(pathsOfASpecifierReadFromTheDeclaredBaseDirectory).toStrictEqual([
+      join(workspaceRoot, "based", "src", "values", "order.assets.ts"),
+    ]);
   });
 
-  test("a specifier that already names a place is never read as a path alias", () => {
-    const fromFile = fixturePath("wildcard/reader.ts");
-    expect(aliasedPathsFor({ specifier: "./order.assets.ts", fromFile })).toStrictEqual([]);
-    expect(aliasedPathsFor({ specifier: "../order.assets.ts", fromFile })).toStrictEqual([]);
-    expect(
-      aliasedPathsFor({ specifier: fixturePath("wildcard/order.assets.ts"), fromFile }),
-    ).toStrictEqual([]);
-    expect(aliasedPathsFor({ specifier: "#data", fromFile })).toStrictEqual([]);
+  it("a project that inherits its paths reads them from the configuration it extends", ({
+    pathsOfASpecifierDeclaredByAnInheritedConfiguration,
+    workspaceRoot,
+  }) => {
+    expect(pathsOfASpecifierDeclaredByAnInheritedConfiguration).toStrictEqual([
+      join(workspaceRoot, "inherited", "values", "order.assets.ts"),
+    ]);
+  });
+
+  it("a configuration inherited from an installed package carries no paths of its own", ({
+    pathsOfASpecifierUnderAConfigurationInheritedFromAPackage,
+  }) => {
+    expect(pathsOfASpecifierUnderAConfigurationInheritedFromAPackage).toStrictEqual([]);
+  });
+
+  it("configurations that extend each other in a circle come to an end", ({
+    pathsOfASpecifierUnderConfigurationsExtendingInACircle,
+  }) => {
+    expect(pathsOfASpecifierUnderConfigurationsExtendingInACircle).toStrictEqual([]);
+  });
+
+  it("a configuration that is not an object of settings declares no paths", ({
+    pathsOfASpecifierUnderAConfigurationThatIsNotAnObject,
+  }) => {
+    expect(pathsOfASpecifierUnderAConfigurationThatIsNotAnObject).toStrictEqual([]);
+  });
+
+  it("a project that declares no paths at all stands for nothing", ({
+    pathsOfASpecifierUnderAProjectDeclaringNoPaths,
+  }) => {
+    expect(pathsOfASpecifierUnderAProjectDeclaringNoPaths).toStrictEqual([]);
+  });
+
+  it("a directory holding no configuration at all stands for nothing", ({
+    pathsOfASpecifierUnderADirectoryHoldingNoConfiguration,
+  }) => {
+    expect(pathsOfASpecifierUnderADirectoryHoldingNoConfiguration).toStrictEqual([]);
+  });
+
+  it("a specifier naming this directory is never read as a path alias", ({
+    pathsOfASpecifierNamingThisDirectory,
+  }) => {
+    expect(pathsOfASpecifierNamingThisDirectory).toStrictEqual([]);
+  });
+
+  it("a specifier naming the directory above is never read as a path alias", ({
+    pathsOfASpecifierNamingTheDirectoryAbove,
+  }) => {
+    expect(pathsOfASpecifierNamingTheDirectoryAbove).toStrictEqual([]);
+  });
+
+  it("a specifier naming an absolute place is never read as a path alias", ({
+    pathsOfASpecifierNamingAnAbsolutePlace,
+  }) => {
+    expect(pathsOfASpecifierNamingAnAbsolutePlace).toStrictEqual([]);
+  });
+
+  it("a subpath specifier is never read as a path alias", ({ pathsOfASubpathSpecifier }) => {
+    expect(pathsOfASubpathSpecifier).toStrictEqual([]);
   });
 });

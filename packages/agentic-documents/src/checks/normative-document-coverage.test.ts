@@ -1,8 +1,8 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
-import { describe, expect, onTestFinished, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { defaultConfig } from "../config.ts";
 import { missingNormativeDocuments } from "./normative-document-coverage.ts";
@@ -11,77 +11,133 @@ const DESCRIBED_MANIFEST = JSON.stringify({ name: "example", description: "説�
 
 const WORKSPACE_DEFINITION = "packages:\n  - packages/*\n";
 
-const repositoryOf = (files: Readonly<Record<string, string>>): string => {
-  const root = mkdtempSync(join(tmpdir(), "agentic-documents-coverage-"));
-  onTestFinished(() => {
-    rmSync(root, { recursive: true, force: true });
+const NORMATIVE_DOCUMENT = "# 規約\n";
+
+const MISSING_DOCUMENT_MESSAGE =
+  "この場所に `AGENTS.md` が無い。ここで作業する読み手は、固有の規約が無いのか書かれていないだけなのかを区別できない。この場所が守るものを書く。見出しだけの空の文書で通すと、無いことすら読み取れなくなる。";
+
+const it = test
+  .extend("problemsOfAWorkspaceWithoutItsOwnDocument", async ({}, { onCleanup }) => {
+    const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-coverage-"));
+    onCleanup(() => {
+      rmSync(repositoryRoot, { recursive: true, force: true });
+    });
+    mkdirSync(join(repositoryRoot, "packages", "example"), { recursive: true });
+    writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+    writeFileSync(join(repositoryRoot, "AGENTS.md"), NORMATIVE_DOCUMENT, "utf8");
+    writeFileSync(
+      join(repositoryRoot, "packages", "example", "package.json"),
+      DESCRIBED_MANIFEST,
+      "utf8",
+    );
+    return missingNormativeDocuments({ repositoryRoot, config: defaultConfig });
+  })
+  .extend("problemsOfARepositoryRootWithoutADocument", async ({}, { onCleanup }) => {
+    const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-coverage-"));
+    onCleanup(() => {
+      rmSync(repositoryRoot, { recursive: true, force: true });
+    });
+    mkdirSync(join(repositoryRoot, "packages", "example"), { recursive: true });
+    writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+    writeFileSync(
+      join(repositoryRoot, "packages", "example", "package.json"),
+      DESCRIBED_MANIFEST,
+      "utf8",
+    );
+    writeFileSync(
+      join(repositoryRoot, "packages", "example", "AGENTS.md"),
+      NORMATIVE_DOCUMENT,
+      "utf8",
+    );
+    return missingNormativeDocuments({ repositoryRoot, config: defaultConfig });
+  })
+  .extend("problemsOfARepositoryWhereEveryLocationIsCovered", async ({}, { onCleanup }) => {
+    const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-coverage-"));
+    onCleanup(() => {
+      rmSync(repositoryRoot, { recursive: true, force: true });
+    });
+    mkdirSync(join(repositoryRoot, "packages", "example"), { recursive: true });
+    writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+    writeFileSync(join(repositoryRoot, "AGENTS.md"), NORMATIVE_DOCUMENT, "utf8");
+    writeFileSync(
+      join(repositoryRoot, "packages", "example", "package.json"),
+      DESCRIBED_MANIFEST,
+      "utf8",
+    );
+    writeFileSync(
+      join(repositoryRoot, "packages", "example", "AGENTS.md"),
+      NORMATIVE_DOCUMENT,
+      "utf8",
+    );
+    return missingNormativeDocuments({ repositoryRoot, config: defaultConfig });
+  })
+  .extend("problemsOfADirectoryWithoutAManifest", async ({}, { onCleanup }) => {
+    const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-coverage-"));
+    onCleanup(() => {
+      rmSync(repositoryRoot, { recursive: true, force: true });
+    });
+    mkdirSync(join(repositoryRoot, "packages", "not-a-workspace"), { recursive: true });
+    writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+    writeFileSync(join(repositoryRoot, "AGENTS.md"), NORMATIVE_DOCUMENT, "utf8");
+    writeFileSync(
+      join(repositoryRoot, "packages", "not-a-workspace", "readme.txt"),
+      "マニフェストが無い\n",
+      "utf8",
+    );
+    return missingNormativeDocuments({ repositoryRoot, config: defaultConfig });
+  })
+  .extend("problemsOfADirectoryOutsideTheWorkspaceDefinition", async ({}, { onCleanup }) => {
+    const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-coverage-"));
+    onCleanup(() => {
+      rmSync(repositoryRoot, { recursive: true, force: true });
+    });
+    mkdirSync(join(repositoryRoot, "tools", "helper"), { recursive: true });
+    writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+    writeFileSync(join(repositoryRoot, "AGENTS.md"), NORMATIVE_DOCUMENT, "utf8");
+    writeFileSync(
+      join(repositoryRoot, "tools", "helper", "package.json"),
+      DESCRIBED_MANIFEST,
+      "utf8",
+    );
+    return missingNormativeDocuments({ repositoryRoot, config: defaultConfig });
   });
-
-  for (const [path, text] of Object.entries(files)) {
-    const target = join(root, path);
-    mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, text, "utf8");
-  }
-
-  return root;
-};
-
-const coverageProblemsIn = (repositoryRoot: string) =>
-  missingNormativeDocuments({ repositoryRoot, config: defaultConfig });
 
 describe("missingNormativeDocuments", () => {
-  test("規範文書を持たないワークスペースを報告する", async () => {
-    const root = repositoryOf({
-      "pnpm-workspace.yaml": WORKSPACE_DEFINITION,
-      "AGENTS.md": "# 規約\n",
-      "packages/example/package.json": DESCRIBED_MANIFEST,
-    });
-
-    const problems = await coverageProblemsIn(root);
-
-    expect(problems.map((problem) => problem.file)).toStrictEqual(["packages/example/AGENTS.md"]);
+  it("規範文書を持たないワークスペースを報告する", ({
+    problemsOfAWorkspaceWithoutItsOwnDocument,
+  }) => {
+    expect(problemsOfAWorkspaceWithoutItsOwnDocument).toStrictEqual([
+      {
+        file: "packages/example/AGENTS.md",
+        line: null,
+        message: MISSING_DOCUMENT_MESSAGE,
+      },
+    ]);
   });
 
-  test("リポジトリのルートに規範文書が無いことを報告する", async () => {
-    const root = repositoryOf({
-      "pnpm-workspace.yaml": WORKSPACE_DEFINITION,
-      "packages/example/package.json": DESCRIBED_MANIFEST,
-      "packages/example/AGENTS.md": "# 規約\n",
-    });
-
-    const problems = await coverageProblemsIn(root);
-
-    expect(problems.map((problem) => problem.file)).toStrictEqual(["AGENTS.md"]);
+  it("リポジトリのルートに規範文書が無いことを報告する", ({
+    problemsOfARepositoryRootWithoutADocument,
+  }) => {
+    expect(problemsOfARepositoryRootWithoutADocument).toStrictEqual([
+      { file: "AGENTS.md", line: null, message: MISSING_DOCUMENT_MESSAGE },
+    ]);
   });
 
-  test("すべての場所が規範文書を持てば報告しない", async () => {
-    const root = repositoryOf({
-      "pnpm-workspace.yaml": WORKSPACE_DEFINITION,
-      "AGENTS.md": "# 規約\n",
-      "packages/example/package.json": DESCRIBED_MANIFEST,
-      "packages/example/AGENTS.md": "# 規約\n",
-    });
-
-    expect(await coverageProblemsIn(root)).toStrictEqual([]);
+  it("すべての場所が規範文書を持てば報告しない", ({
+    problemsOfARepositoryWhereEveryLocationIsCovered,
+  }) => {
+    expect(problemsOfARepositoryWhereEveryLocationIsCovered).toStrictEqual([]);
   });
 
-  test("マニフェストを持たない位置は作業の単位ではないので報告しない", async () => {
-    const root = repositoryOf({
-      "pnpm-workspace.yaml": WORKSPACE_DEFINITION,
-      "AGENTS.md": "# 規約\n",
-      "packages/not-a-workspace/readme.txt": "マニフェストが無い\n",
-    });
-
-    expect(await coverageProblemsIn(root)).toStrictEqual([]);
+  it("マニフェストを持たない位置は作業の単位ではないので報告しない", ({
+    problemsOfADirectoryWithoutAManifest,
+  }) => {
+    expect(problemsOfADirectoryWithoutAManifest).toStrictEqual([]);
   });
 
-  test("ワークスペースとして宣言されていないディレクトリは報告しない", async () => {
-    const root = repositoryOf({
-      "pnpm-workspace.yaml": WORKSPACE_DEFINITION,
-      "AGENTS.md": "# 規約\n",
-      "tools/helper/package.json": DESCRIBED_MANIFEST,
-    });
-
-    expect(await coverageProblemsIn(root)).toStrictEqual([]);
+  it("ワークスペースとして宣言されていないディレクトリは報告しない", ({
+    problemsOfADirectoryOutsideTheWorkspaceDefinition,
+  }) => {
+    expect(problemsOfADirectoryOutsideTheWorkspaceDefinition).toStrictEqual([]);
   });
 });

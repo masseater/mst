@@ -1,12 +1,20 @@
+import { uniqBy } from "es-toolkit";
+
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { resolveBinding } from "../lib/resolved-bindings.ts";
-import { isAssertionEntryCall } from "../lib/spec-syntax/assertion-entries.ts";
 import { isFixtureBuilderCall } from "../lib/spec-syntax/fixture-declarations.ts";
+import {
+  ASSERTION_COUNT_DECLARATIONS,
+  DERIVED_ASSERTION_RECEIVERS,
+} from "../lib/spec-syntax/matcher-vocabulary.ts";
+import { staticMemberName } from "../lib/spec-syntax/static-names.ts";
 import { unwrapSubject } from "../lib/spec-syntax/subject-expressions.ts";
 import {
+  assertionEntryRootNames,
   carriesSpelledTitle,
   INJECTED_TEST_BLOCK_SPELLINGS,
-  testBlockBindings,
+  runnerRootedTestBlockRootNames,
   testCallbacksOf,
 } from "../lib/spec-syntax/test-block-declarations.ts";
 import { testBlockRootIdentifier } from "../lib/spec-syntax/test-block-modifiers.ts";
@@ -47,6 +55,44 @@ const innermostBodyAround = (
     .toSorted((held, other) => other.start - held.start)
     .at(0) ?? null;
 
+const receiverRootName = (
+  call: ESTree.CallExpression,
+  members: ReadonlySet<string>,
+): string | null => {
+  const callee = unwrapSubject(call.callee);
+  if (callee.type !== "MemberExpression") return null;
+
+  const member = staticMemberName(callee);
+  if (member === null || !members.has(member)) return null;
+
+  const receiver = unwrapSubject(callee.object);
+  return receiver.type === "Identifier" ? receiver.name : null;
+};
+
+const entryRootName = (call: ESTree.CallExpression): string | null => {
+  const callee = unwrapSubject(call.callee);
+  if (callee.type === "Identifier") return callee.name;
+  return receiverRootName(call, DERIVED_ASSERTION_RECEIVERS);
+};
+
+const assertionKindOf = (
+  call: ESTree.CallExpression,
+  entryNames: ReadonlySet<string>,
+): "assertion" | "count" | null => {
+  if (entryNames.has(entryRootName(call) ?? "")) return "assertion";
+  return entryNames.has(receiverRootName(call, ASSERTION_COUNT_DECLARATIONS) ?? "")
+    ? "count"
+    : null;
+};
+
+const placementMessageId = (
+  canonical: boolean,
+  rooted: boolean,
+): "foreignTestBlockAssertion" | "shadowedTestBlockAssertion" | "groupingBlockAssertion" | null => {
+  if (!rooted) return canonical ? "shadowedTestBlockAssertion" : "groupingBlockAssertion";
+  return canonical ? null : "foreignTestBlockAssertion";
+};
+
 const derivedFactoryBase = (initializer: ESTree.Expression): ESTree.Expression | null => {
   const written = unwrapSubject(initializer);
   if (written.type !== "CallExpression") return null;
@@ -57,14 +103,13 @@ const derivedFactoryBase = (initializer: ESTree.Expression): ESTree.Expression |
 };
 
 const namesRootedAt = (
-  reached: Set<string>,
+  reached: ReadonlySet<string>,
   bases: ReadonlyMap<string, string>,
 ): ReadonlySet<string> => {
   const gained = [...bases].filter(([name, base]) => !reached.has(name) && reached.has(base));
   if (gained.length === 0) return reached;
 
-  for (const [name] of gained) reached.add(name);
-  return namesRootedAt(reached, bases);
+  return namesRootedAt(new Set([...reached, ...gained.map(([name]) => name)]), bases);
 };
 
 const exportedNamesOf = (declaration: ESTree.ExportNamedDeclaration): readonly string[] => {
@@ -81,14 +126,11 @@ const exportedNamesOf = (declaration: ESTree.ExportNamedDeclaration): readonly s
   return [...bound, ...forwarded];
 };
 
-const renamedSpots = (variable: Variable): readonly ESTree.Node[] => {
-  const spots = new Map<number, ESTree.Node>();
-  for (const identifier of variable.identifiers) spots.set(identifier.start, identifier);
-  for (const reference of variable.references) {
-    spots.set(reference.identifier.start, reference.identifier);
-  }
-  return [...spots.values()];
-};
+const renamedSpots = (variable: Variable): readonly ESTree.Node[] =>
+  uniqBy(
+    [...variable.identifiers, ...variable.references.map((reference) => reference.identifier)],
+    (spot) => spot.start,
+  );
 
 export const noExpectOutsideIt = createDontReviewItRule({
   name: "no-expect-outside-it--move-into-it-block",
@@ -96,16 +138,20 @@ export const noExpectOutsideIt = createDontReviewItRule({
     type: "problem",
     docs: {
       description:
-        "Disallow an assertion standing anywhere other than inside a test block declared through the configured spelling, so every assertion a suite runs answers for the behaviour one named block describes",
+        "Disallow an assertion standing anywhere other than inside a test block the runner handed over under the configured spelling, so every assertion a suite runs answers for the behaviour one named block describes",
       relatedGuidelines: [],
     },
     messages: {
       foreignTestBlockAssertion:
         "An assertion must not stand in a test block declared through `{{written}}`. Rename the root of that declaration to `{{required}}`.",
+      shadowedTestBlockAssertion:
+        "An assertion must not stand in a block declared through a binding of `{{required}}` that the test runner never handed over. Declare the block through the `{{required}}` the runner injects, or through a fixture derived from it.",
       groupingBlockAssertion:
         "An assertion must not stand in the block declared through `{{written}}`. Move this assertion into an `{{required}}` block that names the behaviour it checks.",
       detachedAssertion:
         "An assertion must not stand outside a test block. Move this assertion into the `{{required}}` block that names the behaviour it checks.",
+      strayAssertionCount:
+        "An assertion count must not be declared outside a test block. Move this declaration into the `{{required}}` block whose assertions it counts, or delete it.",
     },
     schema: [
       {
@@ -120,17 +166,14 @@ export const noExpectOutsideIt = createDontReviewItRule({
   },
   create(context) {
     const required = blockSpellingFrom(context.options);
-    const bindings = testBlockBindings();
-    const calls = new Set<ESTree.CallExpression>();
     const harvested = {
       chainBases: new Map<string, string>(),
       factoryNames: new Set<string>(),
       exportedNames: new Set<string>(),
+      fixedRoots: new Set<number>(),
     };
-    const fixedRoots = new Set<number>();
 
     const takeDerivation = (declarator: ESTree.VariableDeclarator): void => {
-      bindings.takeLocalBinding(declarator);
       if (declarator.id.type !== "Identifier" || declarator.init === null) return;
 
       const factoryBase = derivedFactoryBase(declarator.init);
@@ -139,6 +182,15 @@ export const noExpectOutsideIt = createDontReviewItRule({
 
       harvested.chainBases.set(declarator.id.name, written.name);
       if (factoryBase !== null) harvested.factoryNames.add(declarator.id.name);
+    };
+
+    const runnerRooted = (
+      root: ESTree.IdentifierReference,
+      blockRootNames: ReadonlySet<string>,
+    ): boolean => {
+      const bound = resolveBinding(context.sourceCode.getScope(root), root.name);
+      if (bound !== null) return blockRootNames.has(root.name);
+      return INJECTED_TEST_BLOCK_SPELLINGS.has(root.name) || root.name === required;
     };
 
     const renameFixOf = (root: ESTree.IdentifierReference): FixFn | null => {
@@ -157,47 +209,71 @@ export const noExpectOutsideIt = createDontReviewItRule({
       return (fixer) => renamedSpots(bound).map((spot) => fixer.replaceText(spot, required));
     };
 
-    const reportPlacement = (assertion: ESTree.CallExpression, body: BlockBody): void => {
-      const written = body.root.name;
-      if (written === required) return;
+    const reportPlacement = (asked: {
+      readonly assertion: ESTree.CallExpression;
+      readonly body: BlockBody;
+      readonly blockRootNames: ReadonlySet<string>;
+    }): void => {
+      const root = asked.body.root;
+      const written = root.name;
+      const messageId = placementMessageId(
+        written === required,
+        runnerRooted(root, asked.blockRootNames),
+      );
+      if (messageId === null) return;
 
-      const spelling = { written, required };
-      if (!bindings.rootNames().has(written)) {
-        context.report({ node: assertion, messageId: "groupingBlockAssertion", data: spelling });
-        return;
-      }
-
-      const fix = fixedRoots.has(body.root.start) ? null : renameFixOf(body.root);
-      if (fix !== null) fixedRoots.add(body.root.start);
+      const rewritable =
+        messageId === "foreignTestBlockAssertion" && !harvested.fixedRoots.has(root.start);
+      const fix = rewritable ? renameFixOf(root) : null;
+      if (fix !== null) harvested.fixedRoots.add(root.start);
       context.report({
-        node: assertion,
-        messageId: "foreignTestBlockAssertion",
-        data: spelling,
+        node: asked.assertion,
+        messageId,
+        data: { written, required },
         ...(fix === null ? {} : { fix }),
       });
     };
 
+    const reportCall = (asked: {
+      readonly call: ESTree.CallExpression;
+      readonly body: BlockBody | null;
+      readonly blockRootNames: ReadonlySet<string>;
+      readonly entryRootNames: ReadonlySet<string>;
+    }): void => {
+      const kind = assertionKindOf(asked.call, asked.entryRootNames);
+      if (kind === null) return;
+      if (asked.body !== null && kind === "assertion") {
+        reportPlacement({
+          assertion: asked.call,
+          body: asked.body,
+          blockRootNames: asked.blockRootNames,
+        });
+        return;
+      }
+      if (asked.body !== null && runnerRooted(asked.body.root, asked.blockRootNames)) return;
+
+      const messageId = kind === "assertion" ? "detachedAssertion" : "strayAssertionCount";
+      context.report({ node: asked.call, messageId, data: { required } });
+    };
+
     return {
-      ImportDeclaration: bindings.takeImport,
       VariableDeclarator: takeDerivation,
       ExportNamedDeclaration(node: ESTree.ExportNamedDeclaration) {
         for (const name of exportedNamesOf(node)) harvested.exportedNames.add(name);
       },
-      CallExpression(node: ESTree.CallExpression) {
-        calls.add(node);
-      },
-      "Program:exit"() {
-        const bodies = [...calls].flatMap((call) => blockBodiesOf(call));
+      "Program:exit"(program: ESTree.Program) {
+        const blockRootNames = runnerRootedTestBlockRootNames(program);
+        const entryRootNames = assertionEntryRootNames(program);
+        const calls = nodesOfType(program, "CallExpression");
+        const bodies = calls.flatMap((call) => blockBodiesOf(call));
 
         for (const call of calls) {
-          if (!isAssertionEntryCall(call)) continue;
-
-          const body = innermostBodyAround(call, bodies);
-          if (body === null) {
-            context.report({ node: call, messageId: "detachedAssertion", data: { required } });
-            continue;
-          }
-          reportPlacement(call, body);
+          reportCall({
+            call,
+            body: innermostBodyAround(call, bodies),
+            blockRootNames,
+            entryRootNames,
+          });
         }
       },
     };

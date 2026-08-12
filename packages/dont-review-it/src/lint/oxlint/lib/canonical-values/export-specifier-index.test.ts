@@ -1,61 +1,299 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
-import { describe, expect, onTestFinished, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { buildExportSpecifierIndex } from "./export-specifier-index.ts";
 
-describe("buildExportSpecifierIndex", () => {
-  const packageWith = (files: Readonly<Record<string, string>>): string => {
+const it = test
+  .extend("specifiersOfAPackageNamingItsRootExport", ({}, { onCleanup }) => {
     const root = mkdtempSync(join(tmpdir(), "export-specifier-index-"));
-    onTestFinished(() => {
+    onCleanup(() => {
       rmSync(root, { recursive: true, force: true });
     });
-    for (const [path, text] of Object.entries(files)) {
-      const target = join(root, path);
-      mkdirSync(dirname(target), { recursive: true });
-      writeFileSync(target, text, "utf8");
-    }
-    return root;
-  };
-
-  const manifest = (fields: Readonly<Record<string, unknown>>): string => JSON.stringify(fields);
-
-  const specifiersIn = (root: string): readonly (readonly [string, string])[] =>
-    [...buildExportSpecifierIndex(root)].map(([file, specifier]) => [
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(
+      join(root, "package.json"),
+      '{ "name": "@mst/user", "exports": { ".": "./src/index.ts" } }',
+    );
+    writeFileSync(join(root, "src", "index.ts"), "export const total = 1;\n");
+    return [...buildExportSpecifierIndex(root)].map(([file, specifier]) => [
       file.slice(root.length + 1),
       specifier,
     ]);
-
-  test("a package that names its root export reaches the file behind it", () => {
-    const root = packageWith({
-      "package.json": manifest({ name: "@mst/user", exports: { ".": "./src/index.ts" } }),
-      "src/index.ts": "export const total = 1;\n",
+  })
+  .extend("specifiersOfASubpathExport", ({}, { onCleanup }) => {
+    const root = mkdtempSync(join(tmpdir(), "export-specifier-index-"));
+    onCleanup(() => {
+      rmSync(root, { recursive: true, force: true });
     });
-
-    expect(specifiersIn(root)).toStrictEqual([["src/index.ts", "@mst/user"]]);
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(
+      join(root, "package.json"),
+      '{ "name": "@mst/user", "exports": { "./plugin": "./src/plugin.ts" } }',
+    );
+    writeFileSync(join(root, "src", "plugin.ts"), "export const total = 1;\n");
+    return [...buildExportSpecifierIndex(root)].map(([file, specifier]) => [
+      file.slice(root.length + 1),
+      specifier,
+    ]);
+  })
+  .extend("filesReachedThroughAReExportChain", ({}, { onCleanup }) => {
+    const root = mkdtempSync(join(tmpdir(), "export-specifier-index-"));
+    onCleanup(() => {
+      rmSync(root, { recursive: true, force: true });
+    });
+    mkdirSync(join(root, "src", "vocabulary"), { recursive: true });
+    writeFileSync(
+      join(root, "package.json"),
+      '{ "name": "@mst/user", "exports": "./src/index.ts" }',
+    );
+    writeFileSync(
+      join(root, "src", "index.ts"),
+      'export * from "./status.ts";\nexport type { Draft } from "./draft.js";\n',
+    );
+    writeFileSync(
+      join(root, "src", "status.ts"),
+      'export { STATUSES } from "./vocabulary/index.ts";\n',
+    );
+    writeFileSync(join(root, "src", "draft.ts"), "export type Draft = { readonly id: string };\n");
+    writeFileSync(
+      join(root, "src", "vocabulary", "index.ts"),
+      'export const STATUSES = ["draft"];\n',
+    );
+    return [...buildExportSpecifierIndex(root)].map(([file]) => file.slice(root.length + 1));
+  })
+  .extend("specifiersBehindAReExportOfAnAbsentFile", ({}, { onCleanup }) => {
+    const root = mkdtempSync(join(tmpdir(), "export-specifier-index-"));
+    onCleanup(() => {
+      rmSync(root, { recursive: true, force: true });
+    });
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(
+      join(root, "package.json"),
+      '{ "name": "@mst/user", "exports": "./src/index.ts" }',
+    );
+    writeFileSync(
+      join(root, "src", "index.ts"),
+      'export * from "./missing.ts";\nexport * from "node:path";\n',
+    );
+    return [...buildExportSpecifierIndex(root)].map(([file, specifier]) => [
+      file.slice(root.length + 1),
+      specifier,
+    ]);
+  })
+  .extend("specifiersOfAFileReExportedFromTwoPlaces", ({}, { onCleanup }) => {
+    const root = mkdtempSync(join(tmpdir(), "export-specifier-index-"));
+    onCleanup(() => {
+      rmSync(root, { recursive: true, force: true });
+    });
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(
+      join(root, "package.json"),
+      '{ "name": "@mst/user", "exports": { ".": "./src/index.ts", "./plugin": "./src/plugin.ts" } }',
+    );
+    writeFileSync(join(root, "src", "index.ts"), 'export * from "./shared.ts";\n');
+    writeFileSync(join(root, "src", "plugin.ts"), 'export * from "./shared.ts";\n');
+    writeFileSync(join(root, "src", "shared.ts"), "export const total = 1;\n");
+    return [...buildExportSpecifierIndex(root)].map(([file, specifier]) => [
+      file.slice(root.length + 1),
+      specifier,
+    ]);
+  })
+  .extend("specifiersOfAnExportMapNamingConditions", ({}, { onCleanup }) => {
+    const root = mkdtempSync(join(tmpdir(), "export-specifier-index-"));
+    onCleanup(() => {
+      rmSync(root, { recursive: true, force: true });
+    });
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(
+      join(root, "package.json"),
+      '{ "name": "@mst/user", "exports": { ".": { "types": "./src/index.d.ts", "import": "./src/index.ts", "require": "./src/index.ts" }, "./package.json": "./package.json" } }',
+    );
+    writeFileSync(join(root, "src", "index.ts"), "export const total = 1;\n");
+    return [...buildExportSpecifierIndex(root)].map(([file, specifier]) => [
+      file.slice(root.length + 1),
+      specifier,
+    ]);
+  })
+  .extend("filesReachedThroughAReExportCycle", ({}, { onCleanup }) => {
+    const root = mkdtempSync(join(tmpdir(), "export-specifier-index-"));
+    onCleanup(() => {
+      rmSync(root, { recursive: true, force: true });
+    });
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(
+      join(root, "package.json"),
+      '{ "name": "@mst/user", "exports": "./src/index.ts" }',
+    );
+    writeFileSync(join(root, "src", "index.ts"), 'export * from "./status.ts";\n');
+    writeFileSync(join(root, "src", "status.ts"), 'export * from "./index.ts";\n');
+    return [...buildExportSpecifierIndex(root)].map(([file]) => file.slice(root.length + 1));
+  })
+  .extend("filesReachedThroughAReExportChainPastTheLimit", ({}, { onCleanup }) => {
+    const root = mkdtempSync(join(tmpdir(), "export-specifier-index-"));
+    onCleanup(() => {
+      rmSync(root, { recursive: true, force: true });
+    });
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(join(root, "package.json"), '{ "name": "@mst/user", "exports": "./src/a.ts" }');
+    writeFileSync(join(root, "src", "a.ts"), 'export * from "./b.ts";\n');
+    writeFileSync(join(root, "src", "b.ts"), 'export * from "./c.ts";\n');
+    writeFileSync(join(root, "src", "c.ts"), 'export * from "./d.ts";\n');
+    writeFileSync(join(root, "src", "d.ts"), 'export * from "./e.ts";\n');
+    writeFileSync(join(root, "src", "e.ts"), 'export * from "./f.ts";\n');
+    writeFileSync(join(root, "src", "f.ts"), "export const total = 1;\n");
+    return [...buildExportSpecifierIndex(root)].map(([file]) => file.slice(root.length + 1));
+  })
+  .extend("specifiersOfAnEntryFileThePackageDoesNotHold", ({}, { onCleanup }) => {
+    const root = mkdtempSync(join(tmpdir(), "export-specifier-index-"));
+    onCleanup(() => {
+      rmSync(root, { recursive: true, force: true });
+    });
+    writeFileSync(
+      join(root, "package.json"),
+      '{ "name": "@mst/user", "exports": "./src/missing.ts" }',
+    );
+    return [...buildExportSpecifierIndex(root)].map(([file, specifier]) => [
+      file.slice(root.length + 1),
+      specifier,
+    ]);
+  })
+  .extend("filesReachedThroughTwoConditionsNamingDifferentFiles", ({}, { onCleanup }) => {
+    const root = mkdtempSync(join(tmpdir(), "export-specifier-index-"));
+    onCleanup(() => {
+      rmSync(root, { recursive: true, force: true });
+    });
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(
+      join(root, "package.json"),
+      '{ "name": "@mst/user", "exports": { ".": { "import": "./src/modern.ts", "require": "./src/legacy.ts" } } }',
+    );
+    writeFileSync(join(root, "src", "modern.ts"), "export const total = 1;\n");
+    writeFileSync(join(root, "src", "legacy.ts"), "export const total = 1;\n");
+    return [...buildExportSpecifierIndex(root)].map(([file]) => file.slice(root.length + 1));
+  })
+  .extend("specifiersOfAnExportTargetWithoutARelativeMarker", ({}, { onCleanup }) => {
+    const root = mkdtempSync(join(tmpdir(), "export-specifier-index-"));
+    onCleanup(() => {
+      rmSync(root, { recursive: true, force: true });
+    });
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(
+      join(root, "package.json"),
+      '{ "name": "@mst/user", "exports": { ".": "src/index.ts" } }',
+    );
+    writeFileSync(join(root, "src", "index.ts"), "export const total = 1;\n");
+    return [...buildExportSpecifierIndex(root)].map(([file, specifier]) => [
+      file.slice(root.length + 1),
+      specifier,
+    ]);
+  })
+  .extend("specifiersOfAnExportMapNestedPastTheLimit", ({}, { onCleanup }) => {
+    const root = mkdtempSync(join(tmpdir(), "export-specifier-index-"));
+    onCleanup(() => {
+      rmSync(root, { recursive: true, force: true });
+    });
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(
+      join(root, "package.json"),
+      '{ "name": "@mst/user", "exports": { ".": { "a": { "b": { "c": { "d": { "e": { "f": { "g": { "h": { "i": "./src/index.ts" } } } } } } } } } } }',
+    );
+    writeFileSync(join(root, "src", "index.ts"), "export const total = 1;\n");
+    return [...buildExportSpecifierIndex(root)].map(([file, specifier]) => [
+      file.slice(root.length + 1),
+      specifier,
+    ]);
+  })
+  .extend("specifiersOfAnExportMapHoldingAList", ({}, { onCleanup }) => {
+    const root = mkdtempSync(join(tmpdir(), "export-specifier-index-"));
+    onCleanup(() => {
+      rmSync(root, { recursive: true, force: true });
+    });
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(
+      join(root, "package.json"),
+      '{ "name": "@mst/user", "exports": { ".": ["./src/index.ts"] } }',
+    );
+    writeFileSync(join(root, "src", "index.ts"), "export const total = 1;\n");
+    return [...buildExportSpecifierIndex(root)].map(([file, specifier]) => [
+      file.slice(root.length + 1),
+      specifier,
+    ]);
+  })
+  .extend("specifiersOfAPackageNamingNoExportSurface", ({}, { onCleanup }) => {
+    const root = mkdtempSync(join(tmpdir(), "export-specifier-index-"));
+    onCleanup(() => {
+      rmSync(root, { recursive: true, force: true });
+    });
+    writeFileSync(join(root, "package.json"), '{ "name": "@mst/user" }');
+    return [...buildExportSpecifierIndex(root)].map(([file, specifier]) => [
+      file.slice(root.length + 1),
+      specifier,
+    ]);
+  })
+  .extend("specifiersOfADirectoryHoldingNoManifest", ({}, { onCleanup }) => {
+    const root = mkdtempSync(join(tmpdir(), "export-specifier-index-"));
+    onCleanup(() => {
+      rmSync(root, { recursive: true, force: true });
+    });
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(join(root, "src", "index.ts"), "export const total = 1;\n");
+    return [...buildExportSpecifierIndex(root)].map(([file, specifier]) => [
+      file.slice(root.length + 1),
+      specifier,
+    ]);
+  })
+  .extend("specifiersOfAManifestNamingNoPackage", ({}, { onCleanup }) => {
+    const root = mkdtempSync(join(tmpdir(), "export-specifier-index-"));
+    onCleanup(() => {
+      rmSync(root, { recursive: true, force: true });
+    });
+    writeFileSync(join(root, "package.json"), '{ "exports": "./src/index.ts" }');
+    return [...buildExportSpecifierIndex(root)].map(([file, specifier]) => [
+      file.slice(root.length + 1),
+      specifier,
+    ]);
+  })
+  .extend("specifiersOfAManifestWhoseNameIsEmpty", ({}, { onCleanup }) => {
+    const root = mkdtempSync(join(tmpdir(), "export-specifier-index-"));
+    onCleanup(() => {
+      rmSync(root, { recursive: true, force: true });
+    });
+    writeFileSync(join(root, "package.json"), '{ "name": "", "exports": "./src/index.ts" }');
+    return [...buildExportSpecifierIndex(root)].map(([file, specifier]) => [
+      file.slice(root.length + 1),
+      specifier,
+    ]);
+  })
+  .extend("specifiersOfAManifestThatIsNotAnObject", ({}, { onCleanup }) => {
+    const root = mkdtempSync(join(tmpdir(), "export-specifier-index-"));
+    onCleanup(() => {
+      rmSync(root, { recursive: true, force: true });
+    });
+    writeFileSync(join(root, "package.json"), '"@mst/user"');
+    return [...buildExportSpecifierIndex(root)].map(([file, specifier]) => [
+      file.slice(root.length + 1),
+      specifier,
+    ]);
   });
 
-  test("a subpath export carries the specifier that names it", () => {
-    const root = packageWith({
-      "package.json": manifest({ name: "@mst/user", exports: { "./plugin": "./src/plugin.ts" } }),
-      "src/plugin.ts": "export const total = 1;\n",
-    });
-
-    expect(specifiersIn(root)).toStrictEqual([["src/plugin.ts", "@mst/user/plugin"]]);
+describe("buildExportSpecifierIndex", () => {
+  it("a package that names its root export reaches the file behind it", ({
+    specifiersOfAPackageNamingItsRootExport,
+  }) => {
+    expect(specifiersOfAPackageNamingItsRootExport).toStrictEqual([["src/index.ts", "@mst/user"]]);
   });
 
-  test("a re-export chain carries the specifier to every file it reaches", () => {
-    const root = packageWith({
-      "package.json": manifest({ name: "@mst/user", exports: "./src/index.ts" }),
-      "src/index.ts": 'export * from "./status.ts";\nexport type { Draft } from "./draft.js";\n',
-      "src/status.ts": 'export { STATUSES } from "./vocabulary/index.ts";\n',
-      "src/draft.ts": "export type Draft = { readonly id: string };\n",
-      "src/vocabulary/index.ts": 'export const STATUSES = ["draft"];\n',
-    });
+  it("a subpath export carries the specifier that names it", ({ specifiersOfASubpathExport }) => {
+    expect(specifiersOfASubpathExport).toStrictEqual([["src/plugin.ts", "@mst/user/plugin"]]);
+  });
 
-    expect(specifiersIn(root).map(([file]) => file)).toStrictEqual([
+  it("a re-export chain carries the specifier to every file it reaches", ({
+    filesReachedThroughAReExportChain,
+  }) => {
+    expect(filesReachedThroughAReExportChain).toStrictEqual([
       "src/index.ts",
       "src/status.ts",
       "src/vocabulary/index.ts",
@@ -63,74 +301,36 @@ describe("buildExportSpecifierIndex", () => {
     ]);
   });
 
-  test("a re-export that names a file which is not there reaches nothing further", () => {
-    const root = packageWith({
-      "package.json": manifest({ name: "@mst/user", exports: "./src/index.ts" }),
-      "src/index.ts": 'export * from "./missing.ts";\nexport * from "node:path";\n',
-    });
-
-    expect(specifiersIn(root)).toStrictEqual([["src/index.ts", "@mst/user"]]);
+  it("a re-export that names a file which is not there reaches nothing further", ({
+    specifiersBehindAReExportOfAnAbsentFile,
+  }) => {
+    expect(specifiersBehindAReExportOfAnAbsentFile).toStrictEqual([["src/index.ts", "@mst/user"]]);
   });
 
-  test("a file re-exported from two places keeps the specifier that reached it first", () => {
-    const root = packageWith({
-      "package.json": manifest({
-        name: "@mst/user",
-        exports: { ".": "./src/index.ts", "./plugin": "./src/plugin.ts" },
-      }),
-      "src/index.ts": 'export * from "./shared.ts";\n',
-      "src/plugin.ts": 'export * from "./shared.ts";\n',
-      "src/shared.ts": "export const total = 1;\n",
-    });
-
-    expect(specifiersIn(root)).toStrictEqual([
+  it("a file re-exported from two places keeps the specifier that reached it first", ({
+    specifiersOfAFileReExportedFromTwoPlaces,
+  }) => {
+    expect(specifiersOfAFileReExportedFromTwoPlaces).toStrictEqual([
       ["src/index.ts", "@mst/user"],
       ["src/shared.ts", "@mst/user"],
       ["src/plugin.ts", "@mst/user/plugin"],
     ]);
   });
 
-  test("an export map that names conditions reaches the file each of them names", () => {
-    const root = packageWith({
-      "package.json": manifest({
-        name: "@mst/user",
-        exports: {
-          ".": { types: "./src/index.d.ts", import: "./src/index.ts", require: "./src/index.ts" },
-          "./package.json": "./package.json",
-        },
-      }),
-      "src/index.ts": "export const total = 1;\n",
-    });
-
-    expect(specifiersIn(root)).toStrictEqual([["src/index.ts", "@mst/user"]]);
+  it("an export map that names conditions reaches the file each of them names", ({
+    specifiersOfAnExportMapNamingConditions,
+  }) => {
+    expect(specifiersOfAnExportMapNamingConditions).toStrictEqual([["src/index.ts", "@mst/user"]]);
   });
 
-  test("a re-export cycle is walked once", () => {
-    const root = packageWith({
-      "package.json": manifest({ name: "@mst/user", exports: "./src/index.ts" }),
-      "src/index.ts": 'export * from "./status.ts";\n',
-      "src/status.ts": 'export * from "./index.ts";\n',
-    });
-
-    expect(specifiersIn(root).map(([file]) => file)).toStrictEqual([
-      "src/index.ts",
-      "src/status.ts",
-    ]);
+  it("a re-export cycle is walked once", ({ filesReachedThroughAReExportCycle }) => {
+    expect(filesReachedThroughAReExportCycle).toStrictEqual(["src/index.ts", "src/status.ts"]);
   });
 
-  test("a re-export chain deeper than the limit stops there", () => {
-    const step = (next: string): string => `export * from "./${next}.ts";\n`;
-    const root = packageWith({
-      "package.json": manifest({ name: "@mst/user", exports: "./src/a.ts" }),
-      "src/a.ts": step("b"),
-      "src/b.ts": step("c"),
-      "src/c.ts": step("d"),
-      "src/d.ts": step("e"),
-      "src/e.ts": step("f"),
-      "src/f.ts": "export const total = 1;\n",
-    });
-
-    expect(specifiersIn(root).map(([file]) => file)).toStrictEqual([
+  it("a re-export chain deeper than the limit stops there", ({
+    filesReachedThroughAReExportChainPastTheLimit,
+  }) => {
+    expect(filesReachedThroughAReExportChainPastTheLimit).toStrictEqual([
       "src/a.ts",
       "src/b.ts",
       "src/c.ts",
@@ -139,89 +339,68 @@ describe("buildExportSpecifierIndex", () => {
     ]);
   });
 
-  test("an entry file the manifest names but the package does not hold reaches only itself", () => {
-    const root = packageWith({
-      "package.json": manifest({ name: "@mst/user", exports: "./src/missing.ts" }),
-    });
-
-    expect(specifiersIn(root)).toStrictEqual([["src/missing.ts", "@mst/user"]]);
+  it("an entry file the manifest names but the package does not hold reaches only itself", ({
+    specifiersOfAnEntryFileThePackageDoesNotHold,
+  }) => {
+    expect(specifiersOfAnEntryFileThePackageDoesNotHold).toStrictEqual([
+      ["src/missing.ts", "@mst/user"],
+    ]);
   });
 
-  test("two conditions that name different files both stand behind the subpath", () => {
-    const root = packageWith({
-      "package.json": manifest({
-        name: "@mst/user",
-        exports: { ".": { import: "./src/modern.ts", require: "./src/legacy.ts" } },
-      }),
-      "src/modern.ts": "export const total = 1;\n",
-      "src/legacy.ts": "export const total = 1;\n",
-    });
-
-    expect(specifiersIn(root).map(([file]) => file)).toStrictEqual([
+  it("two conditions that name different files both stand behind the subpath", ({
+    filesReachedThroughTwoConditionsNamingDifferentFiles,
+  }) => {
+    expect(filesReachedThroughTwoConditionsNamingDifferentFiles).toStrictEqual([
       "src/modern.ts",
       "src/legacy.ts",
     ]);
   });
 
-  test("an export target that does not start with a relative marker is left out", () => {
-    const root = packageWith({
-      "package.json": manifest({ name: "@mst/user", exports: { ".": "src/index.ts" } }),
-      "src/index.ts": "export const total = 1;\n",
-    });
-
-    expect(specifiersIn(root)).toStrictEqual([]);
+  it("an export target that does not start with a relative marker is left out", ({
+    specifiersOfAnExportTargetWithoutARelativeMarker,
+  }) => {
+    expect(specifiersOfAnExportTargetWithoutARelativeMarker).toStrictEqual([]);
   });
 
-  test("an export map nested deeper than the limit is not followed", () => {
-    const root = packageWith({
-      "package.json": manifest({
-        name: "@mst/user",
-        exports: {
-          ".": { a: { b: { c: { d: { e: { f: { g: { h: { i: "./src/index.ts" } } } } } } } } },
-        },
-      }),
-      "src/index.ts": "export const total = 1;\n",
-    });
-
-    expect(specifiersIn(root)).toStrictEqual([]);
+  it("an export map nested deeper than the limit is not followed", ({
+    specifiersOfAnExportMapNestedPastTheLimit,
+  }) => {
+    expect(specifiersOfAnExportMapNestedPastTheLimit).toStrictEqual([]);
   });
 
-  test("an export map holding a list is not read as conditions", () => {
-    const root = packageWith({
-      "package.json": manifest({ name: "@mst/user", exports: { ".": ["./src/index.ts"] } }),
-      "src/index.ts": "export const total = 1;\n",
-    });
-
-    expect(specifiersIn(root)).toStrictEqual([]);
+  it("an export map holding a list is not read as conditions", ({
+    specifiersOfAnExportMapHoldingAList,
+  }) => {
+    expect(specifiersOfAnExportMapHoldingAList).toStrictEqual([]);
   });
 
-  test("a package that names no export surface reaches nothing", () => {
-    const root = packageWith({ "package.json": manifest({ name: "@mst/user" }) });
-
-    expect(specifiersIn(root)).toStrictEqual([]);
+  it("a package that names no export surface reaches nothing", ({
+    specifiersOfAPackageNamingNoExportSurface,
+  }) => {
+    expect(specifiersOfAPackageNamingNoExportSurface).toStrictEqual([]);
   });
 
-  test("a directory that holds no manifest reaches nothing", () => {
-    expect(
-      specifiersIn(packageWith({ "src/index.ts": "export const total = 1;\n" })),
-    ).toStrictEqual([]);
+  it("a directory that holds no manifest reaches nothing", ({
+    specifiersOfADirectoryHoldingNoManifest,
+  }) => {
+    expect(specifiersOfADirectoryHoldingNoManifest).toStrictEqual([]);
   });
 
-  test("a manifest that names no package reaches nothing", () => {
-    const root = packageWith({ "package.json": manifest({ exports: "./src/index.ts" }) });
-
-    expect(specifiersIn(root)).toStrictEqual([]);
+  it("a manifest that names no package reaches nothing", ({
+    specifiersOfAManifestNamingNoPackage,
+  }) => {
+    expect(specifiersOfAManifestNamingNoPackage).toStrictEqual([]);
   });
 
-  test("a manifest whose name is empty reaches nothing", () => {
-    const root = packageWith({ "package.json": manifest({ name: "", exports: "./src/index.ts" }) });
-
-    expect(specifiersIn(root)).toStrictEqual([]);
+  it("a manifest whose name is empty reaches nothing", ({
+    specifiersOfAManifestWhoseNameIsEmpty,
+  }) => {
+    expect(specifiersOfAManifestWhoseNameIsEmpty).toStrictEqual([]);
   });
 
-  test("a manifest that is not an object reaches nothing", () => {
-    const root = packageWith({ "package.json": '"@mst/user"' });
-
-    expect(specifiersIn(root)).toStrictEqual([]);
+  it("a manifest that is not an object reaches nothing", ({
+    specifiersOfAManifestThatIsNotAnObject,
+  }) => {
+    expect(specifiersOfAManifestThatIsNotAnObject).toStrictEqual([]);
   });
 });

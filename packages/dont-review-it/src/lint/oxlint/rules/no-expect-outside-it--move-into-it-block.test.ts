@@ -39,12 +39,49 @@ describe("dont-review-it/no-expect-outside-it--move-into-it-block", () => {
         code: "expect.extend({ toBeReport });",
       },
       {
-        name: "an assertion count declared through the namespace is not an assertion",
-        code: "expect.hasAssertions();",
+        name: "an assertion count declared inside the canonical block counts what that block runs",
+        code: "it('adds', () => { expect.hasAssertions(); expect(sum).toBe(3); });",
+      },
+      {
+        name: "an assertion count declared inside another runner spelling still stands in a test block",
+        code: "test('adds', () => { expect.assertions(1); });",
+      },
+      {
+        name: "a member of the assertion entry that counts nothing is not a count declaration",
+        code: "expect.setState({ assertionCalls: 0 });",
+      },
+      {
+        name: "a receiver reached through a subscript is not read as an assertion entry",
+        code: "expect[chosen](sum).toBe(3);",
+      },
+      {
+        name: "a derived receiver standing on a call is not read as an assertion entry",
+        code: "buildExpect().soft(sum).toBe(3);",
+      },
+      {
+        name: "a call that reaches neither the assertion entry nor a count declaration is left alone",
+        code: "seedDatabase();",
       },
       {
         name: "a fixture factory bound to the canonical spelling declares canonical test blocks",
         code: "const it = test.extend({ subject: 1 });\nit('adds', ({ subject }) => { expect(subject).toBe(1); });",
+      },
+      {
+        name: "a factory built up through repeated derivation still declares canonical test blocks",
+        code: "const it = test.extend({ port: 1 }).extend({ subject: 2 });\nit('adds', ({ subject }) => { expect(subject).toBe(2); });",
+      },
+      {
+        name: "the canonical spelling taken from the test runner declares canonical test blocks",
+        code: "import { it } from 'vite-plus/test';\nit('adds', () => { expect(sum).toBe(3); });",
+      },
+      {
+        name: "a configured spelling the runner injects under that name declares canonical test blocks",
+        code: "spec('adds', () => { expect(sum).toBe(3); });",
+        options: [{ blockSpelling: "spec" }],
+      },
+      {
+        name: "a function declared without a name leaves the canonical spelling alone",
+        code: "export default function () {}\nit('adds', () => { expect(sum).toBe(3); });",
       },
       {
         name: "a test block nested in a grouping block is still the block the assertion stands in",
@@ -194,6 +231,61 @@ describe("dont-review-it/no-expect-outside-it--move-into-it-block", () => {
         name: "a block reached through a receiver is not a test block declaration",
         code: "suite.test('adds', () => { expect(sum).toBe(3); });",
         errors: [{ messageId: "detachedAssertion" }],
+      },
+      {
+        name: "an assertion entry taken from the runner under another name is still the entry",
+        code: "import { expect as check } from 'vite-plus/test';\ndescribe('sums', () => { check(sum).toBe(3); });",
+        errors: [{ messageId: "groupingBlockAssertion" }],
+      },
+      {
+        name: "an assertion entry bound to another name in the file is still the entry",
+        code: "const check = expect;\ncheck(sum).toBe(3);",
+        errors: [{ messageId: "detachedAssertion" }],
+      },
+      {
+        name: "a derived receiver on a renamed assertion entry is still the entry",
+        code: "import { expect as check } from 'vite-plus/test';\ncheck.soft(sum).toBe(3);",
+        errors: [{ messageId: "detachedAssertion" }],
+      },
+      {
+        name: "an assertion count declared at module scope counts assertions no block runs",
+        code: "expect.hasAssertions();",
+        errors: [{ messageId: "strayAssertionCount" }],
+      },
+      {
+        name: "an assertion count declared in a grouping block counts assertions that block never runs",
+        code: "describe('sums', () => { expect.assertions(2); });",
+        errors: [{ messageId: "strayAssertionCount" }],
+      },
+      {
+        name: "a block declared through a locally written function of the canonical spelling runs no test",
+        code: "const it = (title, body) => body();\nit('adds', () => { expect(sum).toBe(3); });",
+        errors: [{ messageId: "shadowedTestBlockAssertion" }],
+      },
+      {
+        name: "a function declaration taking the canonical spelling declares no test block",
+        code: "function it(title, body) { body(); }\nit('adds', () => { expect(sum).toBe(3); });",
+        errors: [{ messageId: "shadowedTestBlockAssertion" }],
+      },
+      {
+        name: "the canonical spelling filled by a plain call reaches no runner block",
+        code: "const it = buildRunner();\nit('adds', () => { expect(sum).toBe(3); });",
+        errors: [{ messageId: "shadowedTestBlockAssertion" }],
+      },
+      {
+        name: "the canonical spelling bound to a grouping block declares no test block",
+        code: "const it = describe;\nit('adds', () => { expect(sum).toBe(3); });",
+        errors: [{ messageId: "shadowedTestBlockAssertion" }],
+      },
+      {
+        name: "the canonical spelling taken from a module that is no test runner declares no test block",
+        code: "import { it } from './runner.ts';\nit('adds', () => { expect(sum).toBe(3); });",
+        errors: [{ messageId: "shadowedTestBlockAssertion" }],
+      },
+      {
+        name: "another runner spelling bound to a locally written function declares no test block",
+        code: "const test = (title, body) => body();\ntest('adds', () => { expect(sum).toBe(3); });",
+        errors: [{ messageId: "groupingBlockAssertion" }],
       },
     ],
   });

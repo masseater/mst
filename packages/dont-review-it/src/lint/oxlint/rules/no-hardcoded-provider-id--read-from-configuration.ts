@@ -1,4 +1,5 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { staticMemberOf } from "../lib/static-member.ts";
 import { hasWrittenOutText } from "../lib/written-out-text.ts";
 
@@ -102,16 +103,15 @@ export const noHardcodedProviderId = createDontReviewItRule({
     schema: [],
   },
   create(context) {
-    const providerBindings = new Set<string>();
-
     return {
-      Program(node: ESTree.Program) {
-        for (const name of providerBindingNamesIn(node)) providerBindings.add(name);
-      },
-      NewExpression(node: ESTree.NewExpression) {
-        if (!isProviderConstructor(node.callee, providerBindings)) return;
-        for (const identity of writtenOutIdentitiesOf(node)) {
-          context.report({ node: identity, messageId: "hardcodedProviderId" });
+      "Program:exit"(program: ESTree.Program) {
+        const providerBindings: ReadonlySet<string> = new Set(providerBindingNamesIn(program));
+
+        for (const node of nodesOfType(program, "NewExpression")) {
+          if (!isProviderConstructor(node.callee, providerBindings)) continue;
+          for (const identity of writtenOutIdentitiesOf(node)) {
+            context.report({ node: identity, messageId: "hardcodedProviderId" });
+          }
         }
       },
     };

@@ -19,7 +19,7 @@ export const NORMALIZING_METHODS: ReadonlySet<string> = new Set([
   "trimStart",
 ]);
 
-export const DEFAULT_NORMALIZING_FUNCTIONS: readonly string[] = [
+const DEFAULT_NORMALIZING_FUNCTIONS: readonly string[] = [
   "orderBy",
   "reduceAsync",
   "sortBy",

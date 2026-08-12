@@ -18,14 +18,6 @@ writeFileSync(join(importingDir, "held.ts"), "export const held = summarise(inpu
 
 const IMPORTING_SPEC_FILE = join(importingDir, "report.test.ts");
 
-const reshapedBehind = (name: string) => [
-  { messageId: "normalizedBehindName", data: { name, operation: "sort" } },
-];
-
-const rewrittenBy = (operation: string) => [
-  { messageId: "mutatedSubject", data: { operation, subject: "produced" } },
-];
-
 describe("dont-review-it/no-normalize-sut-output--assert-natural-shape", () => {
   testLintRule(noNormalizeSutOutput, {
     valid: [
@@ -166,6 +158,16 @@ describe("dont-review-it/no-normalize-sut-output--assert-natural-shape", () => {
         options: [{ specFileSuffixes: ["-test.ts"] }],
         code: 'const test = baseTest.extend("rows", () => summarise(input).sort());',
       },
+      {
+        name: "an operation another module writes inside its own body is that module's own shape",
+        filename: IMPORTING_SPEC_FILE,
+        code: 'import { ordered } from "./shape.ts";\nconst test = baseTest.extend("rows", () => ordered(summarise(input)));',
+      },
+      {
+        name: "a value another module already shaped arrives under a name this spec only hands back",
+        filename: IMPORTING_SPEC_FILE,
+        code: 'import { held } from "./held.ts";\nconst test = baseTest.extend("rows", () => held);',
+      },
     ],
     invalid: [
       {
@@ -256,25 +258,31 @@ describe("dont-review-it/no-normalize-sut-output--assert-natural-shape", () => {
         name: "an operation pushed behind a name in this file is reached through the name",
         filename: SPEC_FILE,
         code: 'const ordered = (rows) => rows.sort();\nconst test = baseTest.extend("rows", () => ordered(summarise(input)));',
-        errors: reshapedBehind("ordered"),
+        errors: [
+          { messageId: "normalizedBehindName", data: { name: "ordered", operation: "sort" } },
+        ],
       },
       {
         name: "an operation pushed two names deep is reached through the first name",
         filename: SPEC_FILE,
         code: 'const ordered = (rows) => rows.sort();\nconst prepared = (rows) => ordered(rows);\nconst test = baseTest.extend("rows", () => prepared(summarise(input)));',
-        errors: reshapedBehind("prepared"),
+        errors: [
+          { messageId: "normalizedBehindName", data: { name: "prepared", operation: "sort" } },
+        ],
       },
       {
         name: "an operation behind a function declaration is reached the same way",
         filename: SPEC_FILE,
         code: 'function ordered(rows) {\n  return rows.sort();\n}\nconst test = baseTest.extend("rows", () => ordered(summarise(input)));',
-        errors: reshapedBehind("ordered"),
+        errors: [
+          { messageId: "normalizedBehindName", data: { name: "ordered", operation: "sort" } },
+        ],
       },
       {
         name: "an operation behind a function declared in the fixture is reached the same way",
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("rows", () => {\n  function tidy(handed) {\n    return handed.sort();\n  }\n  return tidy(summarise(input));\n});',
-        errors: reshapedBehind("tidy"),
+        errors: [{ messageId: "normalizedBehindName", data: { name: "tidy", operation: "sort" } }],
       },
       {
         name: "copying properties over the produced value reshapes it on the way out",
@@ -286,67 +294,79 @@ describe("dont-review-it/no-normalize-sut-output--assert-natural-shape", () => {
         name: "an operation behind a function expression is reached the same way",
         filename: SPEC_FILE,
         code: 'const ordered = function (rows) {\n  return rows.sort();\n};\nconst test = baseTest.extend("rows", () => ordered(summarise(input)));',
-        errors: reshapedBehind("ordered"),
-      },
-      {
-        name: "an operation pushed into another module is reached by reading that module",
-        filename: IMPORTING_SPEC_FILE,
-        code: 'import { ordered } from "./shape.ts";\nconst test = baseTest.extend("rows", () => ordered(summarise(input)));',
-        errors: reshapedBehind("ordered"),
-      },
-      {
-        name: "a value another module already reshaped is reached through the name it arrives under",
-        filename: IMPORTING_SPEC_FILE,
-        code: 'import { held } from "./held.ts";\nconst test = baseTest.extend("rows", () => held);',
-        errors: [{ messageId: "normalizedBehindName", data: { name: "held", operation: "sort" } }],
+        errors: [
+          { messageId: "normalizedBehindName", data: { name: "ordered", operation: "sort" } },
+        ],
       },
       {
         name: "ordering the binding in place rewrites the value before it is handed back",
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("rows", () => {\n  const produced = summarise(input);\n  produced.sort();\n  return produced;\n});',
-        errors: rewrittenBy("`sort`"),
+        errors: [
+          { messageId: "mutatedSubject", data: { operation: "`sort`", subject: "produced" } },
+        ],
       },
       {
         name: "adding an element rewrites the value before it is handed back",
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("rows", () => {\n  const produced = summarise(input);\n  produced.push(extra);\n  return produced;\n});',
-        errors: rewrittenBy("`push`"),
+        errors: [
+          { messageId: "mutatedSubject", data: { operation: "`push`", subject: "produced" } },
+        ],
       },
       {
         name: "writing a property rewrites the value before it is handed back",
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("report", () => {\n  const produced = summarise(input);\n  produced.id = "a";\n  return produced;\n});',
-        errors: rewrittenBy("An assignment"),
+        errors: [
+          {
+            messageId: "mutatedSubject",
+            data: { operation: "An assignment", subject: "produced" },
+          },
+        ],
       },
       {
         name: "removing a property rewrites the value before it is handed back",
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("report", () => {\n  const produced = summarise(input);\n  delete produced.id;\n  return produced;\n});',
-        errors: rewrittenBy("A `delete`"),
+        errors: [
+          { messageId: "mutatedSubject", data: { operation: "A `delete`", subject: "produced" } },
+        ],
       },
       {
         name: "copying properties over the binding rewrites the value before it is handed back",
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("report", () => {\n  const produced = summarise(input);\n  Object.assign(produced, { id: "a" });\n  return produced;\n});',
-        errors: rewrittenBy("`Object.assign`"),
+        errors: [
+          {
+            messageId: "mutatedSubject",
+            data: { operation: "`Object.assign`", subject: "produced" },
+          },
+        ],
       },
       {
         name: "a rewrite under a branch still runs before the value is handed back",
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("rows", () => {\n  const produced = summarise(input);\n  if (produced.length > 0) {\n    produced.sort();\n  }\n  return produced;\n});',
-        errors: rewrittenBy("`sort`"),
+        errors: [
+          { messageId: "mutatedSubject", data: { operation: "`sort`", subject: "produced" } },
+        ],
       },
       {
         name: "a rewrite reached through a second binding is still a rewrite of the same value",
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("rows", () => {\n  const produced = summarise(input);\n  const handed = produced;\n  produced.sort();\n  return handed;\n});',
-        errors: rewrittenBy("`sort`"),
+        errors: [
+          { messageId: "mutatedSubject", data: { operation: "`sort`", subject: "produced" } },
+        ],
       },
       {
         name: "the handoff form reads a rewrite that runs before the handoff",
         filename: SPEC_FILE,
         code: "const test = baseTest.extend({\n  rows: async ({ input }, use) => {\n    const produced = summarise(input);\n    produced.sort();\n    await use(produced);\n  },\n});",
-        errors: rewrittenBy("`sort`"),
+        errors: [
+          { messageId: "mutatedSubject", data: { operation: "`sort`", subject: "produced" } },
+        ],
       },
     ],
   });

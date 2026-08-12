@@ -1,7 +1,10 @@
 import { dirname, isAbsolute, join, resolve } from "node:path";
 
+import { maxBy, memoize } from "es-toolkit";
+
 import { readTextFile } from "./canonical-values/source-files.ts";
 import { listedTexts } from "./listed-texts.ts";
+import { namedFieldsOf } from "./named-fields.ts";
 import { parseJsonc, TSCONFIG_FILE_NAME } from "./nearest-tsconfig.ts";
 
 const WILDCARD = "*";
@@ -13,19 +16,14 @@ type PathAliases = {
   readonly patternTargets: ReadonlyMap<string, readonly string[]>;
 };
 
-const recordOf = (held: unknown): Readonly<Record<string, unknown>> | null =>
-  typeof held === "object" && held !== null && !Array.isArray(held)
-    ? (held as Readonly<Record<string, unknown>>)
-    : null;
-
 const textOf = (held: unknown): string | null => (typeof held === "string" ? held : null);
 
 const aliasesIn = (
   configPath: string,
   config: Readonly<Record<string, unknown>>,
 ): PathAliases | null => {
-  const compilerOptions = recordOf(config.compilerOptions);
-  const declared = compilerOptions === null ? null : recordOf(compilerOptions.paths);
+  const compilerOptions = namedFieldsOf(config.compilerOptions);
+  const declared = compilerOptions === null ? null : namedFieldsOf(compilerOptions.paths);
   if (compilerOptions === null || declared === null) return null;
 
   const baseUrl = textOf(compilerOptions.baseUrl) ?? ".";
@@ -44,7 +42,7 @@ const inheritedSpecifiersOf = (config: Readonly<Record<string, unknown>>): reado
 const aliasesAt = (configPath: string, visited: ReadonlySet<string>): PathAliases | null => {
   if (visited.has(configPath)) return null;
   const text = readTextFile(configPath);
-  const config = text === null ? null : recordOf(parseJsonc(text));
+  const config = text === null ? null : namedFieldsOf(parseJsonc(text));
   if (config === null) return null;
 
   const own = aliasesIn(configPath, config);
@@ -59,19 +57,15 @@ const aliasesAt = (configPath: string, visited: ReadonlySet<string>): PathAliase
   );
 };
 
-const aliasesByDirectory = new Map<string, PathAliases | null>();
-
-const nearestAliasesFrom = (directory: string): PathAliases | null => {
-  const remembered = aliasesByDirectory.get(directory);
-  if (remembered !== undefined) return remembered;
-
-  const parent = dirname(directory);
-  const found =
-    aliasesAt(join(directory, TSCONFIG_FILE_NAME), new Set()) ??
-    (parent === directory ? null : nearestAliasesFrom(parent));
-  aliasesByDirectory.set(directory, found);
-  return found;
-};
+const nearestAliasesFrom: (directory: string) => PathAliases | null = memoize(
+  (directory: string): PathAliases | null => {
+    const parent = dirname(directory);
+    return (
+      aliasesAt(join(directory, TSCONFIG_FILE_NAME), new Set()) ??
+      (parent === directory ? null : nearestAliasesFrom(parent))
+    );
+  },
+);
 
 const filledTarget = (target: string, captured: string): string =>
   target.replace(WILDCARD, captured);
@@ -87,29 +81,23 @@ const capturedBy = (pattern: string, specifier: string): string | null => {
   return specifier.slice(prefix.length, specifier.length - suffix.length);
 };
 
-type MatchedAlias = {
-  readonly prefixLength: number;
-  readonly captured: string;
-  readonly targets: readonly string[];
-};
-
 const prefixLengthOf = (pattern: string): number => {
   const wildcardAt = pattern.indexOf(WILDCARD);
   return wildcardAt === -1 ? pattern.length : wildcardAt;
 };
 
-const matchedAliasesIn = (aliases: PathAliases, specifier: string): readonly MatchedAlias[] =>
+const matchedAliasesIn = (
+  aliases: PathAliases,
+  specifier: string,
+): readonly {
+  readonly prefixLength: number;
+  readonly captured: string;
+  readonly targets: readonly string[];
+}[] =>
   [...aliases.patternTargets].flatMap(([pattern, targets]) => {
     const captured = capturedBy(pattern, specifier);
     return captured === null ? [] : [{ prefixLength: prefixLengthOf(pattern), captured, targets }];
   });
-
-const longestMatchOf = (matched: readonly MatchedAlias[]): MatchedAlias | null =>
-  matched.reduce<MatchedAlias | null>(
-    (longest, entry) =>
-      longest === null || entry.prefixLength > longest.prefixLength ? entry : longest,
-    null,
-  );
 
 export const aliasedPathsFor = ({
   specifier,
@@ -123,8 +111,8 @@ export const aliasedPathsFor = ({
   const aliases = nearestAliasesFrom(dirname(fromFile));
   if (aliases === null) return [];
 
-  const matched = longestMatchOf(matchedAliasesIn(aliases, specifier));
-  if (matched === null) return [];
+  const matched = maxBy(matchedAliasesIn(aliases, specifier), (entry) => entry.prefixLength);
+  if (matched === undefined) return [];
 
   return matched.targets.map((target) =>
     resolve(aliases.baseDirectory, filledTarget(target, matched.captured)),

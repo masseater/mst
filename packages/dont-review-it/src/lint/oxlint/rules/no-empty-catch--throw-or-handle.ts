@@ -1,11 +1,7 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { bodyCarriesNoWork } from "../lib/catch-clause-bodies.ts";
 
 import type { ESTree } from "@oxlint/plugins";
-
-const carriesNoWork = (statement: ESTree.Statement): boolean => {
-  if (statement.type === "EmptyStatement") return true;
-  return statement.type === "BlockStatement" && statement.body.every(carriesNoWork);
-};
 
 export const noEmptyCatch = createDontReviewItRule({
   name: "no-empty-catch--throw-or-handle",
@@ -25,7 +21,7 @@ export const noEmptyCatch = createDontReviewItRule({
   create(context) {
     return {
       CatchClause(node: ESTree.CatchClause) {
-        if (!node.body.body.every(carriesNoWork)) return;
+        if (!bodyCarriesNoWork(node)) return;
 
         context.report({ node, messageId: "emptyCatch" });
       },

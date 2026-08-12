@@ -1,3 +1,4 @@
+import { memoize } from "es-toolkit";
 import { parseSync } from "oxc-parser";
 
 import { readTextFile } from "../canonical-values/source-files.ts";
@@ -18,18 +19,10 @@ export const parsedProgramAt = (path: string): AstFields | null => {
   return astFieldsOf(parseSync(path, source).program);
 };
 
-const edgesByFile = new Map<string, readonly CouplingEdge[]>();
-
-export const couplingEdgesOf = (file: string): readonly CouplingEdge[] => {
-  const remembered = edgesByFile.get(file);
-  if (remembered !== undefined) return remembered;
-
+export const couplingEdgesOf = memoize((file: string): readonly CouplingEdge[] => {
   const program = parsedProgramAt(file);
-  const edges =
-    program === null ? [] : couplingEdgesUnder(program, constantSpecifiersIn(program.body));
-  edgesByFile.set(file, edges);
-  return edges;
-};
+  return program === null ? [] : couplingEdgesUnder(program, constantSpecifiersIn(program.body));
+});
 
 export const couplingTargetsOf = ({
   file,
@@ -67,23 +60,18 @@ const reachedFrom = ({
   });
 };
 
-const reachableByPackage = new Map<string, ReadonlySet<string> | null>();
-
-export const entryReachableFilesOf = ({
-  packageDirectory,
-  workspaceRoot,
-}: {
-  readonly packageDirectory: string;
-  readonly workspaceRoot: string;
-}): ReadonlySet<string> | null => {
-  const remembered = reachableByPackage.get(packageDirectory);
-  if (remembered !== undefined) return remembered;
-
-  const entries = publicEntryFilesOf(packageDirectory);
-  const reachable =
-    entries === null
+export const entryReachableFilesOf = memoize(
+  ({
+    packageDirectory,
+    workspaceRoot,
+  }: {
+    readonly packageDirectory: string;
+    readonly workspaceRoot: string;
+  }): ReadonlySet<string> | null => {
+    const entries = publicEntryFilesOf(packageDirectory);
+    return entries === null
       ? null
       : reachedFrom({ frontier: entries, reached: new Set(), packageDirectory, workspaceRoot });
-  reachableByPackage.set(packageDirectory, reachable);
-  return reachable;
-};
+  },
+  { getCacheKey: ({ packageDirectory }) => packageDirectory },
+);

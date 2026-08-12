@@ -12,45 +12,46 @@ export type FileBindings = {
   readonly annotatedRanges: readonly AnnotatedDeclarationRange[];
 };
 
-const collectArrays = (
+const arraysDeclaredIn = (
   declaration: ESTree.VariableDeclaration,
-  arrays: Map<string, ESTree.ArrayExpression>,
-): void => {
-  for (const declarator of declaration.declarations) {
-    if (declarator.id.type !== "Identifier") continue;
-    if (declarator.init === null) continue;
+): readonly (readonly [string, ESTree.ArrayExpression])[] =>
+  declaration.declarations.flatMap((declarator) => {
+    if (declarator.id.type !== "Identifier") return [];
+    if (declarator.init === null) return [];
     const init = unwrapExpression(declarator.init);
-    if (init.type === "ArrayExpression") arrays.set(declarator.id.name, init);
+    return init.type === "ArrayExpression" ? [[declarator.id.name, init] as const] : [];
+  });
+
+const arraysBoundBy = (
+  statement: ESTree.Program["body"][number],
+): readonly (readonly [string, ESTree.ArrayExpression])[] => {
+  if (statement.type === "VariableDeclaration") return arraysDeclaredIn(statement);
+  if (
+    statement.type === "ExportNamedDeclaration" &&
+    statement.declaration?.type === "VariableDeclaration"
+  ) {
+    return arraysDeclaredIn(statement.declaration);
   }
+  return [];
 };
 
-const collectNamedImports = (
-  statement: ESTree.ImportDeclaration,
-  namedImports: Map<string, string>,
-): void => {
-  for (const specifier of statement.specifiers) {
-    if (specifier.type !== "ImportSpecifier") continue;
-    namedImports.set(specifier.local.name, statement.source.value);
-  }
+const namedImportsBoundBy = (
+  statement: ESTree.Program["body"][number],
+): readonly (readonly [string, string])[] => {
+  if (statement.type !== "ImportDeclaration") return [];
+
+  return statement.specifiers.flatMap((specifier) =>
+    specifier.type === "ImportSpecifier"
+      ? [[specifier.local.name, statement.source.value] as const]
+      : [],
+  );
 };
 
-export const collectFileBindings = (program: ESTree.Program, sourceText: string): FileBindings => {
-  const arrays = new Map<string, ESTree.ArrayExpression>();
-  const namedImports = new Map<string, string>();
-
-  for (const statement of program.body) {
-    if (statement.type === "ImportDeclaration") collectNamedImports(statement, namedImports);
-    else if (statement.type === "VariableDeclaration") collectArrays(statement, arrays);
-    else if (
-      statement.type === "ExportNamedDeclaration" &&
-      statement.declaration?.type === "VariableDeclaration"
-    ) {
-      collectArrays(statement.declaration, arrays);
-    }
-  }
-
-  return { arrays, namedImports, annotatedRanges: annotatedDeclarationRanges(program, sourceText) };
-};
+export const collectFileBindings = (program: ESTree.Program, sourceText: string): FileBindings => ({
+  arrays: new Map(program.body.flatMap(arraysBoundBy)),
+  namedImports: new Map(program.body.flatMap(namedImportsBoundBy)),
+  annotatedRanges: annotatedDeclarationRanges(program, sourceText),
+});
 
 export const firstNonSpreadArgument = (
   node: ESTree.CallExpression | ESTree.NewExpression,

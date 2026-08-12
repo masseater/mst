@@ -11,106 +11,225 @@ import {
 
 import type { ESTree } from "@oxlint/plugins";
 
-const firstStatementIn = (sourceText: string): ESTree.Statement =>
-  parseSync("claim.ts", sourceText).program.body[0] as ESTree.Statement;
-
-const declaredType = (sourceText: string): ESTree.TSType =>
-  (firstStatementIn(`type Held = ${sourceText};`) as ESTree.TSTypeAliasDeclaration).typeAnnotation;
-
-const boundValue = (sourceText: string): ESTree.Expression => {
-  const declared = firstStatementIn(`const held = ${sourceText};`);
-  const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
-  return declarator?.init as ESTree.Expression;
-};
+const it = test
+  .extend("keywordNamedByAny", () => {
+    const declared = parseSync("claim.ts", "type Held = any;").program
+      .body[0] as ESTree.TSTypeAliasDeclaration;
+    const loose = looseTypeNodeOf(declared.typeAnnotation);
+    return loose === null ? null : loose.type;
+  })
+  .extend("keywordNamedByUnknown", () => {
+    const declared = parseSync("claim.ts", "type Held = unknown;").program
+      .body[0] as ESTree.TSTypeAliasDeclaration;
+    const loose = looseTypeNodeOf(declared.typeAnnotation);
+    return loose === null ? null : loose.type;
+  })
+  .extend("looseNodeOfNamedType", () => {
+    const declared = parseSync("claim.ts", "type Held = Row;").program
+      .body[0] as ESTree.TSTypeAliasDeclaration;
+    return looseTypeNodeOf(declared.typeAnnotation);
+  })
+  .extend("keywordNamedByParenthesisedAny", () => {
+    const declared = parseSync("claim.ts", "type Held = (any);").program
+      .body[0] as ESTree.TSTypeAliasDeclaration;
+    const loose = looseTypeNodeOf(declared.typeAnnotation);
+    return loose === null ? null : loose.type;
+  })
+  .extend("keywordNamedByUnionHoldingAny", () => {
+    const declared = parseSync("claim.ts", "type Held = string | any;").program
+      .body[0] as ESTree.TSTypeAliasDeclaration;
+    const loose = looseTypeNodeOf(declared.typeAnnotation);
+    return loose === null ? null : loose.type;
+  })
+  .extend("keywordNamedByUnionHoldingUnknown", () => {
+    const declared = parseSync("claim.ts", "type Held = string | unknown;").program
+      .body[0] as ESTree.TSTypeAliasDeclaration;
+    const loose = looseTypeNodeOf(declared.typeAnnotation);
+    return loose === null ? null : loose.type;
+  })
+  .extend("keywordNamedByUnionHoldingBoth", () => {
+    const declared = parseSync("claim.ts", "type Held = unknown | any;").program
+      .body[0] as ESTree.TSTypeAliasDeclaration;
+    const loose = looseTypeNodeOf(declared.typeAnnotation);
+    return loose === null ? null : loose.type;
+  })
+  .extend("looseNodeOfUnionOfNamedTypes", () => {
+    const declared = parseSync("claim.ts", "type Held = string | number;").program
+      .body[0] as ESTree.TSTypeAliasDeclaration;
+    return looseTypeNodeOf(declared.typeAnnotation);
+  })
+  .extend("concretenessOfNamedType", () => {
+    const declared = parseSync("claim.ts", "type Held = Row;").program
+      .body[0] as ESTree.TSTypeAliasDeclaration;
+    return isConcreteTypeClaim(declared.typeAnnotation);
+  })
+  .extend("concretenessOfQualifiedName", () => {
+    const declared = parseSync("claim.ts", "type Held = schema.Row;").program
+      .body[0] as ESTree.TSTypeAliasDeclaration;
+    return isConcreteTypeClaim(declared.typeAnnotation);
+  })
+  .extend("concretenessOfUnknownKeyword", () => {
+    const declared = parseSync("claim.ts", "type Held = unknown;").program
+      .body[0] as ESTree.TSTypeAliasDeclaration;
+    return isConcreteTypeClaim(declared.typeAnnotation);
+  })
+  .extend("concretenessOfConstAssertionTarget", () => {
+    const declared = parseSync("claim.ts", "const held = [1, 2] as const;").program
+      .body[0] as ESTree.VariableDeclaration;
+    const assertion = declared.declarations[0]?.init as ESTree.TSAsExpression;
+    return isConcreteTypeClaim(assertion.typeAnnotation);
+  })
+  .extend("assertionInAsExpression", () => {
+    const declared = parseSync("claim.ts", "const held = input as Row;").program
+      .body[0] as ESTree.VariableDeclaration;
+    return isTypeAssertion(declared.declarations[0]?.init as ESTree.Expression);
+  })
+  .extend("assertionInAngleBracketExpression", () => {
+    const declared = parseSync("claim.ts", "const held = <Row>input;").program
+      .body[0] as ESTree.VariableDeclaration;
+    return isTypeAssertion(declared.declarations[0]?.init as ESTree.Expression);
+  })
+  .extend("assertionInSatisfiesExpression", () => {
+    const declared = parseSync("claim.ts", "const held = input satisfies Row;").program
+      .body[0] as ESTree.VariableDeclaration;
+    return isTypeAssertion(declared.declarations[0]?.init as ESTree.Expression);
+  })
+  .extend("shapeUnderParentheses", () => {
+    const declared = parseSync("claim.ts", "const held = (input);").program
+      .body[0] as ESTree.VariableDeclaration;
+    const written = declared.declarations[0]?.init;
+    return written === null || written === undefined ? null : unwrappedValueOf(written).type;
+  })
+  .extend("shapeUnderNonNullSuffix", () => {
+    const declared = parseSync("claim.ts", "const held = input!;").program
+      .body[0] as ESTree.VariableDeclaration;
+    const written = declared.declarations[0]?.init;
+    return written === null || written === undefined ? null : unwrappedValueOf(written).type;
+  })
+  .extend("shapeUnderOptionalChain", () => {
+    const declared = parseSync("claim.ts", "const held = input?.row;").program
+      .body[0] as ESTree.VariableDeclaration;
+    const written = declared.declarations[0]?.init;
+    return written === null || written === undefined ? null : unwrappedValueOf(written).type;
+  })
+  .extend("shapeOfCall", () => {
+    const declared = parseSync("claim.ts", "const held = parse(input);").program
+      .body[0] as ESTree.VariableDeclaration;
+    const written = declared.declarations[0]?.init;
+    return written === null || written === undefined ? null : unwrappedValueOf(written).type;
+  })
+  .extend("shapeOfDeclaredReturnType", () => {
+    const declared = parseSync("claim.ts", "function read(): Row { return row; }").program
+      .body[0] as ESTree.Statement;
+    const annotated = declaredReturnTypeOf(declared);
+    return annotated === null ? null : annotated.typeAnnotation.type;
+  })
+  .extend("returnTypeOfUnannotatedFunction", () => {
+    const declared = parseSync("claim.ts", "function read() { return row; }").program
+      .body[0] as ESTree.Statement;
+    return declaredReturnTypeOf(declared);
+  })
+  .extend("returnTypeOfStatementReturningNothing", () => {
+    const declared = parseSync("claim.ts", "const held = 1;").program.body[0] as ESTree.Statement;
+    return declaredReturnTypeOf(declared);
+  });
 
 describe("loose type claims", () => {
-  test("the any keyword names the type that takes every value", () => {
-    expect(looseTypeNodeOf(declaredType("any"))?.type).toBe("TSAnyKeyword");
+  it("the any keyword names the type that takes every value", ({ keywordNamedByAny }) => {
+    expect(keywordNamedByAny).toBe("TSAnyKeyword");
   });
 
-  test("the unknown keyword names the type that carries no shape", () => {
-    expect(looseTypeNodeOf(declaredType("unknown"))?.type).toBe("TSUnknownKeyword");
+  it("the unknown keyword names the type that carries no shape", ({ keywordNamedByUnknown }) => {
+    expect(keywordNamedByUnknown).toBe("TSUnknownKeyword");
   });
 
-  test("a named type carries a shape of its own", () => {
-    expect(looseTypeNodeOf(declaredType("Row"))).toBe(null);
+  it("a named type carries a shape of its own", ({ looseNodeOfNamedType }) => {
+    expect(looseNodeOfNamedType).toBe(null);
   });
 
-  test("a parenthesised any keyword is the type the parentheses hold", () => {
-    expect(looseTypeNodeOf(declaredType("(any)"))?.type).toBe("TSAnyKeyword");
+  it("a parenthesised any keyword is the type the parentheses hold", ({
+    keywordNamedByParenthesisedAny,
+  }) => {
+    expect(keywordNamedByParenthesisedAny).toBe("TSAnyKeyword");
   });
 
-  test("a union holding any collapses onto any", () => {
-    expect(looseTypeNodeOf(declaredType("string | any"))?.type).toBe("TSAnyKeyword");
+  it("a union holding any collapses onto any", ({ keywordNamedByUnionHoldingAny }) => {
+    expect(keywordNamedByUnionHoldingAny).toBe("TSAnyKeyword");
   });
 
-  test("a union holding unknown collapses onto unknown", () => {
-    expect(looseTypeNodeOf(declaredType("string | unknown"))?.type).toBe("TSUnknownKeyword");
+  it("a union holding unknown collapses onto unknown", ({ keywordNamedByUnionHoldingUnknown }) => {
+    expect(keywordNamedByUnionHoldingUnknown).toBe("TSUnknownKeyword");
   });
 
-  test("a union holding both collapses onto any", () => {
-    expect(looseTypeNodeOf(declaredType("unknown | any"))?.type).toBe("TSAnyKeyword");
+  it("a union holding both collapses onto any", ({ keywordNamedByUnionHoldingBoth }) => {
+    expect(keywordNamedByUnionHoldingBoth).toBe("TSAnyKeyword");
   });
 
-  test("a union of named types collapses onto neither", () => {
-    expect(looseTypeNodeOf(declaredType("string | number"))).toBe(null);
+  it("a union of named types collapses onto neither", ({ looseNodeOfUnionOfNamedTypes }) => {
+    expect(looseNodeOfUnionOfNamedTypes).toBe(null);
   });
 
-  test("a named type is a concrete claim", () => {
-    expect(isConcreteTypeClaim(declaredType("Row"))).toBe(true);
+  it("a named type is a concrete claim", ({ concretenessOfNamedType }) => {
+    expect(concretenessOfNamedType).toBe(true);
   });
 
-  test("a qualified type name is a concrete claim", () => {
-    expect(isConcreteTypeClaim(declaredType("schema.Row"))).toBe(true);
+  it("a qualified type name is a concrete claim", ({ concretenessOfQualifiedName }) => {
+    expect(concretenessOfQualifiedName).toBe(true);
   });
 
-  test("the unknown keyword claims nothing concrete", () => {
-    expect(isConcreteTypeClaim(declaredType("unknown"))).toBe(false);
+  it("the unknown keyword claims nothing concrete", ({ concretenessOfUnknownKeyword }) => {
+    expect(concretenessOfUnknownKeyword).toBe(false);
   });
 
-  test("the const target of a literal assertion claims nothing concrete", () => {
-    const assertion = boundValue("[1, 2] as const") as ESTree.TSAsExpression;
-    expect(isConcreteTypeClaim(assertion.typeAnnotation)).toBe(false);
+  it("the const target of a literal assertion claims nothing concrete", ({
+    concretenessOfConstAssertionTarget,
+  }) => {
+    expect(concretenessOfConstAssertionTarget).toBe(false);
   });
 
-  test("an as expression is a type assertion", () => {
-    expect(isTypeAssertion(boundValue("input as Row"))).toBe(true);
+  it("an as expression is a type assertion", ({ assertionInAsExpression }) => {
+    expect(assertionInAsExpression).toBe(true);
   });
 
-  test("an angle bracket expression is a type assertion", () => {
-    expect(isTypeAssertion(boundValue("<Row>input"))).toBe(true);
+  it("an angle bracket expression is a type assertion", ({ assertionInAngleBracketExpression }) => {
+    expect(assertionInAngleBracketExpression).toBe(true);
   });
 
-  test("a satisfies expression asserts nothing", () => {
-    expect(isTypeAssertion(boundValue("input satisfies Row"))).toBe(false);
+  it("a satisfies expression asserts nothing", ({ assertionInSatisfiesExpression }) => {
+    expect(assertionInSatisfiesExpression).toBe(false);
   });
 
-  test("parentheses around a name leave the name standing", () => {
-    expect(unwrappedValueOf(boundValue("(input)")).type).toBe("Identifier");
+  it("parentheses around a name leave the name standing", ({ shapeUnderParentheses }) => {
+    expect(shapeUnderParentheses).toBe("Identifier");
   });
 
-  test("a non null suffix leaves the name standing", () => {
-    expect(unwrappedValueOf(boundValue("input!")).type).toBe("Identifier");
+  it("a non null suffix leaves the name standing", ({ shapeUnderNonNullSuffix }) => {
+    expect(shapeUnderNonNullSuffix).toBe("Identifier");
   });
 
-  test("an optional chain leaves the member read standing", () => {
-    expect(unwrappedValueOf(boundValue("input?.row")).type).toBe("MemberExpression");
+  it("an optional chain leaves the member read standing", ({ shapeUnderOptionalChain }) => {
+    expect(shapeUnderOptionalChain).toBe("MemberExpression");
   });
 
-  test("a call keeps the shape it has", () => {
-    expect(unwrappedValueOf(boundValue("parse(input)")).type).toBe("CallExpression");
+  it("a call keeps the shape it has", ({ shapeOfCall }) => {
+    expect(shapeOfCall).toBe("CallExpression");
   });
 
-  test("a function with a return annotation hands back the type it declares", () => {
-    const declared = firstStatementIn("function read(): Row { return row; }");
-    expect(declaredReturnTypeOf(declared)?.typeAnnotation.type).toBe("TSTypeReference");
+  it("a function with a return annotation hands back the type it declares", ({
+    shapeOfDeclaredReturnType,
+  }) => {
+    expect(shapeOfDeclaredReturnType).toBe("TSTypeReference");
   });
 
-  test("a function without a return annotation declares no return type", () => {
-    expect(declaredReturnTypeOf(firstStatementIn("function read() { return row; }"))).toBe(null);
+  it("a function without a return annotation declares no return type", ({
+    returnTypeOfUnannotatedFunction,
+  }) => {
+    expect(returnTypeOfUnannotatedFunction).toBe(null);
   });
 
-  test("a statement that returns nothing declares no return type", () => {
-    expect(declaredReturnTypeOf(firstStatementIn("const held = 1;"))).toBe(null);
+  it("a statement that returns nothing declares no return type", ({
+    returnTypeOfStatementReturningNothing,
+  }) => {
+    expect(returnTypeOfStatementReturningNothing).toBe(null);
   });
 });

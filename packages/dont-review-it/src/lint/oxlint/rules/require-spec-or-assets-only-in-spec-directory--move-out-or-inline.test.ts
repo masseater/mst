@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 import { testLintRule } from "@mst/lint-rule-authoring";
 import { describe } from "vite-plus/test";
@@ -17,49 +17,79 @@ const SPEC_NAMES = "`*.test.ts`, `*.test.tsx`";
 
 const ASSETS_NAMES = "`*.assets.*`";
 
-const writeFixture = (name: string, source: string): string => {
-  const path = join(fixtureDir, name);
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, source, "utf8");
-  return path;
-};
+const WORKSPACE_MANIFEST = "packages:\n  - packages/*\n";
 
-const writeRepository = (name: string): void => {
-  writeFixture(`${name}/pnpm-workspace.yaml`, "packages:\n  - packages/*\n");
-  writeFixture(`${name}/package.json`, '{ "name": "fixture" }\n');
-};
+const ROOT_PACKAGE_MANIFEST = '{ "name": "fixture" }\n';
 
-writeRepository("held");
-writeFixture("held/packages/alpha/package.json", '{ "name": "alpha" }\n');
-writeFixture("held/packages/alpha/test/order.test.ts", MODULE_SOURCE);
-writeFixture("held/packages/alpha/test/order.assets.ts", MODULE_SOURCE);
-const heldSource = writeFixture("held/packages/alpha/src/order.ts", MODULE_SOURCE);
+mkdirSync(join(fixtureDir, "held/packages/alpha/test"), { recursive: true });
+mkdirSync(join(fixtureDir, "held/packages/alpha/src"), { recursive: true });
+writeFileSync(join(fixtureDir, "held/pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf8");
+writeFileSync(join(fixtureDir, "held/package.json"), ROOT_PACKAGE_MANIFEST, "utf8");
+writeFileSync(
+  join(fixtureDir, "held/packages/alpha/package.json"),
+  '{ "name": "alpha" }\n',
+  "utf8",
+);
+writeFileSync(join(fixtureDir, "held/packages/alpha/test/order.test.ts"), MODULE_SOURCE, "utf8");
+writeFileSync(join(fixtureDir, "held/packages/alpha/test/order.assets.ts"), MODULE_SOURCE, "utf8");
+const heldSource = join(fixtureDir, "held/packages/alpha/src/order.ts");
+writeFileSync(heldSource, MODULE_SOURCE, "utf8");
 
-writeRepository("carved");
-writeFixture("carved/packages/alpha/package.json", '{ "name": "alpha" }\n');
-writeFixture("carved/packages/alpha/test/order.test.ts", MODULE_SOURCE);
-writeFixture("carved/packages/alpha/test/helpers.ts", MODULE_SOURCE);
-const carvedSource = writeFixture("carved/packages/alpha/src/order.ts", MODULE_SOURCE);
-writeFixture("carved/packages/beta/package.json", '{ "name": "beta" }\n');
-const untouchedSource = writeFixture("carved/packages/beta/src/price.ts", MODULE_SOURCE);
+mkdirSync(join(fixtureDir, "carved/packages/alpha/test"), { recursive: true });
+mkdirSync(join(fixtureDir, "carved/packages/alpha/src"), { recursive: true });
+mkdirSync(join(fixtureDir, "carved/packages/beta/src"), { recursive: true });
+writeFileSync(join(fixtureDir, "carved/pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf8");
+writeFileSync(join(fixtureDir, "carved/package.json"), ROOT_PACKAGE_MANIFEST, "utf8");
+writeFileSync(
+  join(fixtureDir, "carved/packages/alpha/package.json"),
+  '{ "name": "alpha" }\n',
+  "utf8",
+);
+writeFileSync(join(fixtureDir, "carved/packages/alpha/test/order.test.ts"), MODULE_SOURCE, "utf8");
+writeFileSync(join(fixtureDir, "carved/packages/alpha/test/helpers.ts"), MODULE_SOURCE, "utf8");
+const carvedSource = join(fixtureDir, "carved/packages/alpha/src/order.ts");
+writeFileSync(carvedSource, MODULE_SOURCE, "utf8");
+writeFileSync(
+  join(fixtureDir, "carved/packages/beta/package.json"),
+  '{ "name": "beta" }\n',
+  "utf8",
+);
+const untouchedSource = join(fixtureDir, "carved/packages/beta/src/price.ts");
+writeFileSync(untouchedSource, MODULE_SOURCE, "utf8");
 
-writeRepository("nested");
-writeFixture("nested/test/orders/held.ts", MODULE_SOURCE);
-const nestedSource = writeFixture("nested/src/entry.ts", MODULE_SOURCE);
+mkdirSync(join(fixtureDir, "nested/test/orders"), { recursive: true });
+mkdirSync(join(fixtureDir, "nested/src"), { recursive: true });
+writeFileSync(join(fixtureDir, "nested/pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf8");
+writeFileSync(join(fixtureDir, "nested/package.json"), ROOT_PACKAGE_MANIFEST, "utf8");
+writeFileSync(join(fixtureDir, "nested/test/orders/held.ts"), MODULE_SOURCE, "utf8");
+const nestedSource = join(fixtureDir, "nested/src/entry.ts");
+writeFileSync(nestedSource, MODULE_SOURCE, "utf8");
 
-writeRepository("stemless");
-writeFixture("stemless/test/assets.ts", MODULE_SOURCE);
-const stemlessSource = writeFixture("stemless/src/entry.ts", MODULE_SOURCE);
+mkdirSync(join(fixtureDir, "stemless/test"), { recursive: true });
+mkdirSync(join(fixtureDir, "stemless/src"), { recursive: true });
+writeFileSync(join(fixtureDir, "stemless/pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf8");
+writeFileSync(join(fixtureDir, "stemless/package.json"), ROOT_PACKAGE_MANIFEST, "utf8");
+writeFileSync(join(fixtureDir, "stemless/test/assets.ts"), MODULE_SOURCE, "utf8");
+const stemlessSource = join(fixtureDir, "stemless/src/entry.ts");
+writeFileSync(stemlessSource, MODULE_SOURCE, "utf8");
 
-writeRepository("renamed");
-writeFixture("renamed/cases/order.spec.ts", MODULE_SOURCE);
-writeFixture("renamed/cases/order.data.ts", MODULE_SOURCE);
-writeFixture("renamed/cases/helpers.ts", MODULE_SOURCE);
-const renamedSource = writeFixture("renamed/src/entry.ts", MODULE_SOURCE);
+mkdirSync(join(fixtureDir, "renamed/cases"), { recursive: true });
+mkdirSync(join(fixtureDir, "renamed/src"), { recursive: true });
+writeFileSync(join(fixtureDir, "renamed/pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf8");
+writeFileSync(join(fixtureDir, "renamed/package.json"), ROOT_PACKAGE_MANIFEST, "utf8");
+writeFileSync(join(fixtureDir, "renamed/cases/order.spec.ts"), MODULE_SOURCE, "utf8");
+writeFileSync(join(fixtureDir, "renamed/cases/order.data.ts"), MODULE_SOURCE, "utf8");
+writeFileSync(join(fixtureDir, "renamed/cases/helpers.ts"), MODULE_SOURCE, "utf8");
+const renamedSource = join(fixtureDir, "renamed/src/entry.ts");
+writeFileSync(renamedSource, MODULE_SOURCE, "utf8");
 
-writeRepository("generated");
-writeFixture("generated/build/test/helpers.ts", MODULE_SOURCE);
-const generatedSource = writeFixture("generated/src/entry.ts", MODULE_SOURCE);
+mkdirSync(join(fixtureDir, "generated/build/test"), { recursive: true });
+mkdirSync(join(fixtureDir, "generated/src"), { recursive: true });
+writeFileSync(join(fixtureDir, "generated/pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf8");
+writeFileSync(join(fixtureDir, "generated/package.json"), ROOT_PACKAGE_MANIFEST, "utf8");
+writeFileSync(join(fixtureDir, "generated/build/test/helpers.ts"), MODULE_SOURCE, "utf8");
+const generatedSource = join(fixtureDir, "generated/src/entry.ts");
+writeFileSync(generatedSource, MODULE_SOURCE, "utf8");
 
 const RENAMED_CONVENTION = [
   {

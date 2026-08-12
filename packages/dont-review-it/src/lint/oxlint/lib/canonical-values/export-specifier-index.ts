@@ -1,5 +1,7 @@
 import { dirname, join, resolve } from "node:path";
 
+import { groupBy, uniq, uniqBy } from "es-toolkit";
+
 import { EXPORTS_CONDITION_DEPTH_LIMIT, MANIFEST_FILE_NAME } from "./package-manifest.ts";
 import { readJsonFile } from "./read-json-file.ts";
 import { isFile, readTextFile } from "./source-files.ts";
@@ -26,57 +28,67 @@ const resolveRelativeSpecifier = (fromFile: string, specifier: string): string |
   return candidates.find(isFile) ?? null;
 };
 
-const filesReachableByReExport = (entryFile: string): ReadonlySet<string> => {
-  const reached = new Set<string>();
-  const visit = (file: string, depth: number): void => {
-    if (reached.has(file)) return;
-    reached.add(file);
-    if (depth >= RE_EXPORT_DEPTH_LIMIT) return;
-    const text = readTextFile(file);
-    if (text === null) return;
-    for (const match of text.matchAll(RE_EXPORT_PATTERN)) {
-      const [, specifier] = match;
-      const target = resolveRelativeSpecifier(file, String(specifier));
-      if (target !== null) visit(target, depth + 1);
-    }
-  };
-  visit(entryFile, 0);
-  return reached;
+const filesReachedFrom = (
+  file: string,
+  { depth, walked }: { readonly depth: number; readonly walked: readonly string[] },
+): readonly string[] => {
+  if (walked.includes(file)) return walked;
+  const opened = [...walked, file];
+  if (depth >= RE_EXPORT_DEPTH_LIMIT) return opened;
+  const text = readTextFile(file);
+  if (text === null) return opened;
+
+  return [...text.matchAll(RE_EXPORT_PATTERN)].reduce<readonly string[]>((reached, match) => {
+    const [, specifier] = match;
+    const target = resolveRelativeSpecifier(file, String(specifier));
+    return target === null
+      ? reached
+      : filesReachedFrom(target, { depth: depth + 1, walked: reached });
+  }, opened);
+};
+
+const filesReachableByReExport = (entryFile: string): readonly string[] =>
+  filesReachedFrom(entryFile, { depth: 0, walked: [] });
+
+const exportSubpathReaches = (
+  declared: unknown,
+  {
+    packageDirectory,
+    subpath,
+    depth,
+  }: { readonly packageDirectory: string; readonly subpath: string; readonly depth: number },
+): readonly { readonly subpath: string; readonly target: string }[] => {
+  if (typeof declared === "string") {
+    if (!declared.startsWith("./") || declared.endsWith(".d.ts")) return [];
+    return [{ subpath, target: resolve(packageDirectory, declared) }];
+  }
+  if (depth > EXPORTS_CONDITION_DEPTH_LIMIT) return [];
+  if (declared === null || typeof declared !== "object" || Array.isArray(declared)) return [];
+
+  const conditions: readonly (readonly [string, unknown])[] = Object.entries(declared);
+  return conditions
+    .filter(([key]) => key !== `./${MANIFEST_FILE_NAME}`)
+    .flatMap(([key, nested]) =>
+      exportSubpathReaches(nested, {
+        packageDirectory,
+        subpath: key.startsWith(".") ? key : subpath,
+        depth: depth + 1,
+      }),
+    );
 };
 
 const exportSubpathTargets = (
   packageDirectory: string,
   exportsField: unknown,
 ): ReadonlyMap<string, readonly string[]> => {
-  const targets = new Map<string, string[]>();
+  const reaches = exportSubpathReaches(exportsField, { packageDirectory, subpath: ".", depth: 0 });
 
-  const record = (subpath: string, value: string): void => {
-    if (!value.startsWith("./") || value.endsWith(".d.ts")) return;
-    const resolved = resolve(packageDirectory, value);
-    const bucket = targets.get(subpath);
-    if (bucket === undefined) targets.set(subpath, [resolved]);
-    else if (!bucket.includes(resolved)) bucket.push(resolved);
-  };
-
-  const collect = (
-    value: unknown,
-    { subpath, depth }: { readonly subpath: string; readonly depth: number },
-  ): void => {
-    if (typeof value === "string") {
-      record(subpath, value);
-      return;
-    }
-    if (depth > EXPORTS_CONDITION_DEPTH_LIMIT) return;
-    if (value === null || typeof value !== "object" || Array.isArray(value)) return;
-    const conditions: readonly (readonly [string, unknown])[] = Object.entries(value);
-    for (const [key, nested] of conditions) {
-      if (key === `./${MANIFEST_FILE_NAME}`) continue;
-      collect(nested, { subpath: key.startsWith(".") ? key : subpath, depth: depth + 1 });
-    }
-  };
-
-  collect(exportsField, { subpath: ".", depth: 0 });
-  return targets;
+  return new Map(
+    Object.entries(groupBy(reaches, (reach) => reach.subpath)).map(([subpath, grouped]) => [
+      subpath,
+      uniq(grouped.map((reach) => reach.target)),
+    ]),
+  );
 };
 
 const exportSpecifierOf = (packageName: string, subpath: string): string =>
@@ -99,20 +111,19 @@ const manifestSurfaceOf = (
 export const buildExportSpecifierIndex = (
   packageDirectory: string,
 ): ReadonlyMap<string, string> => {
-  const index = new Map<string, string>();
   const surface = manifestSurfaceOf(packageDirectory);
-  if (surface === null) return index;
+  if (surface === null) return new Map();
 
-  for (const [subpath, entryFiles] of exportSubpathTargets(
-    packageDirectory,
-    surface.exportsField,
-  )) {
-    const specifier = exportSpecifierOf(surface.packageName, subpath);
-    for (const entryFile of entryFiles) {
-      for (const reached of filesReachableByReExport(entryFile)) {
-        if (!index.has(reached)) index.set(reached, specifier);
-      }
-    }
-  }
-  return index;
+  const entryReaches = [...exportSubpathTargets(packageDirectory, surface.exportsField)].flatMap(
+    ([subpath, entryFiles]) => entryFiles.map((entryFile) => ({ subpath, entryFile })),
+  );
+
+  const reached = entryReaches.flatMap((reach) =>
+    filesReachableByReExport(reach.entryFile).map((file): readonly [string, string] => [
+      file,
+      exportSpecifierOf(surface.packageName, reach.subpath),
+    ]),
+  );
+
+  return new Map(uniqBy(reached, ([file]) => file));
 };

@@ -1,3 +1,5 @@
+import { groupBy, uniq } from "es-toolkit";
+
 import { canonicalValueKey, type CanonicalValue } from "./fingerprint.ts";
 
 export { canonicalValueKey };
@@ -16,28 +18,24 @@ export type CanonicalValuesCatalog = {
   readonly entriesByValue: ReadonlyMap<string, readonly CanonicalValuesEntry[]>;
 };
 
-const groupBy = (
+const entriesByKey = (
   entries: readonly CanonicalValuesEntry[],
   keysOf: (entry: CanonicalValuesEntry) => readonly string[],
 ): ReadonlyMap<string, readonly CanonicalValuesEntry[]> => {
-  const grouped = new Map<string, CanonicalValuesEntry[]>();
-  for (const entry of entries) {
-    for (const key of keysOf(entry)) {
-      const bucket = grouped.get(key);
-      if (bucket === undefined) {
-        grouped.set(key, [entry]);
-        continue;
-      }
-      if (!bucket.includes(entry)) bucket.push(entry);
-    }
-  }
-  return grouped;
+  const keyed = entries.flatMap((entry) => keysOf(entry).map((key) => ({ key, entry })));
+
+  return new Map(
+    Object.entries(groupBy(keyed, (held) => held.key)).map(([key, grouped]) => [
+      key,
+      uniq(grouped.map((held) => held.entry)),
+    ]),
+  );
 };
 
 export const buildCatalog = (entries: readonly CanonicalValuesEntry[]): CanonicalValuesCatalog => ({
   entries,
-  entriesByFingerprint: groupBy(entries, (entry) => [entry.fingerprint]),
-  entriesByValue: groupBy(entries, (entry) => entry.values.map(canonicalValueKey)),
+  entriesByFingerprint: entriesByKey(entries, (entry) => [entry.fingerprint]),
+  entriesByValue: entriesByKey(entries, (entry) => entry.values.map(canonicalValueKey)),
 });
 
 export const EMPTY_CANONICAL_VALUES_CATALOG: CanonicalValuesCatalog = buildCatalog([]);

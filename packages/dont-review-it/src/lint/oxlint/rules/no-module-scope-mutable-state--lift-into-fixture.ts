@@ -1,6 +1,7 @@
-import { take } from "es-toolkit";
+import { sortBy, take } from "es-toolkit";
 
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { resolveBinding, type ScopeLookup } from "../lib/resolved-bindings.ts";
 import { fixtureDeclarationsOf } from "../lib/spec-syntax/fixture-declarations.ts";
 import {
@@ -15,7 +16,7 @@ import { staticMemberName } from "../lib/spec-syntax/static-names.ts";
 import { memberRootOf, unwrapSubject } from "../lib/spec-syntax/subject-expressions.ts";
 import {
   declaresTestBlock,
-  testBlockBindings,
+  testBlockRootNames,
   testCallbacksOf,
 } from "../lib/spec-syntax/test-block-declarations.ts";
 import { INJECTED_TEST_HOOK_SPELLINGS } from "../lib/spec-syntax/test-hook-declarations.ts";
@@ -131,6 +132,42 @@ const namesSetupHook = (node: ESTree.CallExpression, hookNames: ReadonlySet<stri
   return callee.type === "Identifier" && hookNames.has(callee.name);
 };
 
+const testRegionsIn = (
+  program: ESTree.Program,
+  rootNames: ReadonlySet<string>,
+): readonly ESTree.Node[] => {
+  const hookNames: ReadonlySet<string> = new Set([
+    ...TEST_HOOK_SPELLINGS,
+    ...nodesOfType(program, "ImportDeclaration").flatMap(hookLocalNamesIn),
+  ]);
+
+  return nodesOfType(program, "CallExpression").flatMap((call) => [
+    ...fixtureDeclarationsOf(call).flatMap(({ factory }) => factory ?? []),
+    ...(declaresTestBlock(call, rootNames) || namesSetupHook(call, hookNames)
+      ? testCallbacksOf(call)
+      : []),
+  ]);
+};
+
+const stateWritesIn = (
+  program: ESTree.Program,
+  namespaces: NamespaceLookup,
+): readonly StateWrite[] => {
+  const found = [
+    ...nodesOfType(program, "AssignmentExpression").flatMap((node) =>
+      assignmentWrites(node, namespaces),
+    ),
+    ...nodesOfType(program, "UpdateExpression").flatMap(updateWrites),
+    ...nodesOfType(program, "UnaryExpression").flatMap(deletionWrites),
+    ...nodesOfType(program, "CallExpression").flatMap(operationWrites),
+  ];
+
+  return sortBy(
+    found.map((write) => ({ write, at: write.node.start })),
+    ["at"],
+  ).map((placed) => placed.write);
+};
+
 export const noModuleScopeMutableState = createDontReviewItRule({
   name: "no-module-scope-mutable-state--lift-into-fixture",
   meta: {
@@ -160,21 +197,6 @@ export const noModuleScopeMutableState = createDontReviewItRule({
       seenBindings: new Set(),
     };
 
-    const blocks = testBlockBindings();
-    const hookNames = new Set<string>(TEST_HOOK_SPELLINGS);
-    const calls = new Set<ESTree.CallExpression>();
-    const writes = new Set<StateWrite>();
-
-    const testRegions = (): readonly ESTree.Node[] => {
-      const rootNames = blocks.rootNames();
-      return [...calls].flatMap((call) => [
-        ...fixtureDeclarationsOf(call).flatMap(({ factory }) => factory ?? []),
-        ...(declaresTestBlock(call, rootNames) || namesSetupHook(call, hookNames)
-          ? testCallbacksOf(call)
-          : []),
-      ]);
-    };
-
     const declarationsOutsideTests = (
       write: StateWrite,
       regions: readonly ESTree.Node[],
@@ -187,30 +209,10 @@ export const noModuleScopeMutableState = createDontReviewItRule({
     };
 
     return {
-      ImportDeclaration(node: ESTree.ImportDeclaration) {
-        blocks.takeImport(node);
-        for (const name of hookLocalNamesIn(node)) hookNames.add(name);
-      },
-      VariableDeclarator(node: ESTree.VariableDeclarator) {
-        blocks.takeLocalBinding(node);
-      },
-      AssignmentExpression(node: ESTree.AssignmentExpression) {
-        for (const write of assignmentWrites(node, namespaces)) writes.add(write);
-      },
-      UpdateExpression(node: ESTree.UpdateExpression) {
-        for (const write of updateWrites(node)) writes.add(write);
-      },
-      UnaryExpression(node: ESTree.UnaryExpression) {
-        for (const write of deletionWrites(node)) writes.add(write);
-      },
-      CallExpression(node: ESTree.CallExpression) {
-        calls.add(node);
-        for (const write of operationWrites(node)) writes.add(write);
-      },
-      "Program:exit"() {
-        const regions = testRegions();
+      "Program:exit"(program: ESTree.Program) {
+        const regions = testRegionsIn(program, testBlockRootNames(program));
 
-        for (const write of writes) {
+        for (const write of stateWritesIn(program, namespaces)) {
           if (!standsInsideTest(write.node, regions)) continue;
 
           for (const definition of take(declarationsOutsideTests(write, regions), 1)) {

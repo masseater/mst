@@ -1,106 +1,102 @@
-import { testLintRule, type WorkspaceLintRule } from "@mst/lint-rule-authoring";
+import { testLintRule } from "@mst/lint-rule-authoring";
 import { describe } from "vite-plus/test";
 
-import {
-  buildCatalog,
-  EMPTY_CANONICAL_VALUES_CATALOG,
-  type CanonicalValuesCatalog,
-  type CanonicalValuesEntry,
-} from "../lib/canonical-values/catalog.ts";
+import { buildCatalog, EMPTY_CANONICAL_VALUES_CATALOG } from "../lib/canonical-values/catalog.ts";
 import { fingerprintValues, type CanonicalValue } from "../lib/canonical-values/fingerprint.ts";
 import {
   buildLibraryVocabularyIndex,
   EMPTY_LIBRARY_VOCABULARY_INDEX,
-  type LibraryVocabularyEntry,
-  type LibraryVocabularyIndex,
 } from "../lib/library-vocabulary/vocabulary-index.ts";
 import { createNoLocalFiniteValueSet } from "./no-local-finite-value-set--use-or-register-canonical-values.ts";
 
 const ORDER_STATUS_VALUES: readonly CanonicalValue[] = ["draft", "published"];
 
-type WorkspaceVocabulary = {
-  readonly workspace: string;
-  readonly vocabulary: readonly CanonicalValue[];
+const ORDER_STATUS_ENTRY = {
+  conceptId: "order-status",
+  declarationPath: "packages/order-vocabulary/src/order-status.ts",
+  exportPath: "@mst/order-vocabulary",
+  values: ORDER_STATUS_VALUES,
+  fingerprint: fingerprintValues(ORDER_STATUS_VALUES),
 };
 
-const entry = (
-  conceptId: string,
-  { workspace, vocabulary }: WorkspaceVocabulary,
-): CanonicalValuesEntry => ({
-  conceptId,
-  declarationPath: `packages/${workspace}/src/${conceptId}.ts`,
-  exportPath: `@mst/${workspace}`,
-  values: vocabulary,
-  fingerprint: fingerprintValues(vocabulary),
-});
-
-const ownedCatalog = buildCatalog([
-  entry("order-status", { workspace: "order-vocabulary", vocabulary: ORDER_STATUS_VALUES }),
-]);
+const ownedCatalog = buildCatalog([ORDER_STATUS_ENTRY]);
 
 const ambiguousCatalog = buildCatalog([
-  entry("order-status", { workspace: "order-vocabulary", vocabulary: ORDER_STATUS_VALUES }),
+  ORDER_STATUS_ENTRY,
   {
-    ...entry("article-status", {
-      workspace: "article-vocabulary",
-      vocabulary: ORDER_STATUS_VALUES,
-    }),
+    ...ORDER_STATUS_ENTRY,
+    conceptId: "article-status",
+    declarationPath: "packages/article-vocabulary/src/article-status.ts",
     exportPath: null,
   },
 ]);
 
-type AdmittedVocabulary = {
-  readonly typeName: string;
-  readonly admits: readonly CanonicalValue[];
-  readonly admitsUnnamedValues?: boolean;
-};
-
-const libraryType = (
-  packageName: string,
-  { typeName, admits, admitsUnnamedValues = false }: AdmittedVocabulary,
-): LibraryVocabularyEntry => ({
-  packageName,
-  typeName,
-  declarationId: `${packageName}#${typeName}`,
-  values: admits,
-  admitsUnnamedValues,
-});
-
-const ruleReading = (
-  catalog: CanonicalValuesCatalog,
-  libraries: LibraryVocabularyIndex = EMPTY_LIBRARY_VOCABULARY_INDEX,
-): WorkspaceLintRule =>
-  createNoLocalFiniteValueSet({
-    loadCatalog: () => catalog,
-    loadLibraryVocabulary: () => libraries,
-  });
-
 const severityAndTarget = buildLibraryVocabularyIndex([
-  libraryType("oxlint", {
+  {
+    packageName: "oxlint",
     typeName: "AllowWarnDeny",
-    admits: ["allow", "deny", "error", "off", "warn"],
+    declarationId: "oxlint#AllowWarnDeny",
+    values: ["allow", "deny", "error", "off", "warn"],
     admitsUnnamedValues: true,
-  }),
-  libraryType("vite", { typeName: "SSRTarget", admits: ["node", "webworker"] }),
+  },
+  {
+    packageName: "vite",
+    typeName: "SSRTarget",
+    declarationId: "vite#SSRTarget",
+    values: ["node", "webworker"],
+    admitsUnnamedValues: false,
+  },
 ]);
 
-const withOwner = ruleReading(ownedCatalog);
-const withoutCatalog = ruleReading(EMPTY_CANONICAL_VALUES_CATALOG);
-const withAmbiguousOwners = ruleReading(ambiguousCatalog);
-const withLibraryOwner = ruleReading(EMPTY_CANONICAL_VALUES_CATALOG, severityAndTarget);
-const withCatalogAndLibraryOwners = ruleReading(
-  buildCatalog([
-    entry("ssr-target", { workspace: "ssr-vocabulary", vocabulary: ["node", "webworker"] }),
-  ]),
-  severityAndTarget,
-);
-const withTwoLibraryOwners = ruleReading(
-  EMPTY_CANONICAL_VALUES_CATALOG,
-  buildLibraryVocabularyIndex([
-    libraryType("oxlint", { typeName: "AllowWarnDeny", admits: ["error", "off", "warn"] }),
-    libraryType("vite", { typeName: "LogLevel", admits: ["error", "info", "off", "warn"] }),
-  ]),
-);
+const withOwner = createNoLocalFiniteValueSet({
+  loadCatalog: () => ownedCatalog,
+  loadLibraryVocabulary: () => EMPTY_LIBRARY_VOCABULARY_INDEX,
+});
+const withoutCatalog = createNoLocalFiniteValueSet({
+  loadCatalog: () => EMPTY_CANONICAL_VALUES_CATALOG,
+  loadLibraryVocabulary: () => EMPTY_LIBRARY_VOCABULARY_INDEX,
+});
+const withAmbiguousOwners = createNoLocalFiniteValueSet({
+  loadCatalog: () => ambiguousCatalog,
+  loadLibraryVocabulary: () => EMPTY_LIBRARY_VOCABULARY_INDEX,
+});
+const withLibraryOwner = createNoLocalFiniteValueSet({
+  loadCatalog: () => EMPTY_CANONICAL_VALUES_CATALOG,
+  loadLibraryVocabulary: () => severityAndTarget,
+});
+const withCatalogAndLibraryOwners = createNoLocalFiniteValueSet({
+  loadCatalog: () =>
+    buildCatalog([
+      {
+        conceptId: "ssr-target",
+        declarationPath: "packages/ssr-vocabulary/src/ssr-target.ts",
+        exportPath: "@mst/ssr-vocabulary",
+        values: ["node", "webworker"],
+        fingerprint: fingerprintValues(["node", "webworker"]),
+      },
+    ]),
+  loadLibraryVocabulary: () => severityAndTarget,
+});
+const withTwoLibraryOwners = createNoLocalFiniteValueSet({
+  loadCatalog: () => EMPTY_CANONICAL_VALUES_CATALOG,
+  loadLibraryVocabulary: () =>
+    buildLibraryVocabularyIndex([
+      {
+        packageName: "oxlint",
+        typeName: "AllowWarnDeny",
+        declarationId: "oxlint#AllowWarnDeny",
+        values: ["error", "off", "warn"],
+        admitsUnnamedValues: false,
+      },
+      {
+        packageName: "vite",
+        typeName: "LogLevel",
+        declarationId: "vite#LogLevel",
+        values: ["error", "info", "off", "warn"],
+        admitsUnnamedValues: false,
+      },
+    ]),
+});
 
 describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-values", () => {
   describe("against a catalog that owns the value set", () => {

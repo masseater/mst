@@ -1,5 +1,7 @@
 import { dirname, resolve } from "node:path";
 
+import { memoize } from "es-toolkit";
+
 import { readJsonFile } from "../canonical-values/read-json-file.ts";
 import { listRepositoryFiles } from "../canonical-values/source-files.ts";
 import { declaredDependenciesIn } from "./declared-dependencies.ts";
@@ -14,16 +16,8 @@ const scannedWorkspaces = (repositoryRoot: string): readonly WorkspaceDependenci
     dependencies: declaredDependenciesIn(readJsonFile(manifest.absolutePath)),
   }));
 
-const workspacesByRepositoryRoot = new Map<string, readonly WorkspaceDependencies[]>();
+const scannedWorkspacesUnder = memoize(scannedWorkspaces);
 
 export const loadWorkspaceDependencies = (options: {
   readonly repositoryRoot: string;
-}): readonly WorkspaceDependencies[] => {
-  const root = resolve(options.repositoryRoot);
-  const memoized = workspacesByRepositoryRoot.get(root);
-  if (memoized !== undefined) return memoized;
-
-  const scanned = scannedWorkspaces(root);
-  workspacesByRepositoryRoot.set(root, scanned);
-  return scanned;
-};
+}): readonly WorkspaceDependencies[] => scannedWorkspacesUnder(resolve(options.repositoryRoot));

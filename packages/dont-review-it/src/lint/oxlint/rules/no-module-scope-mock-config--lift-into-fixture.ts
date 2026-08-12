@@ -1,4 +1,5 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { resolveBinding } from "../lib/resolved-bindings.ts";
 import {
   FIXTURE_BUILDER_MEMBER,
@@ -7,7 +8,7 @@ import {
 import { isSpecFile, specFileSuffixesFrom } from "../lib/spec-syntax/spec-files.ts";
 import { staticMemberName } from "../lib/spec-syntax/static-names.ts";
 import { asSpecFunction, unwrapSubject } from "../lib/spec-syntax/subject-expressions.ts";
-import { testBlockBindings } from "../lib/spec-syntax/test-block-declarations.ts";
+import { testBlockRootNames } from "../lib/spec-syntax/test-block-declarations.ts";
 
 import type { Definition, ESTree, Options, Scope, Variable } from "@oxlint/plugins";
 
@@ -33,12 +34,6 @@ type ReachLookup = {
   readonly scopeAt: (node: ESTree.Node) => Scope;
   readonly vocabulary: MockVocabulary;
   readonly tracedBindings: ReadonlySet<Variable>;
-};
-
-type MockWriting = {
-  readonly call: ESTree.CallExpression;
-  readonly messageId: string;
-  readonly member: string;
 };
 
 const listedNames = (options: Readonly<Options>, named: string): readonly string[] | null => {
@@ -155,7 +150,14 @@ const namesMockThroughSubscript = (
   return reached.mock || reached.namespace;
 };
 
-const mockWritingOf = (call: ESTree.CallExpression, lookup: ReachLookup): MockWriting | null => {
+const mockWritingOf = (
+  call: ESTree.CallExpression,
+  lookup: ReachLookup,
+): {
+  readonly call: ESTree.CallExpression;
+  readonly messageId: string;
+  readonly member: string;
+} | null => {
   const callee = unwrapSubject(call.callee);
   if (callee.type !== "MemberExpression") return null;
 
@@ -188,6 +190,11 @@ const replacementFactoryOf = (
   const [, handed] = call.arguments;
   if (handed === undefined || handed.type === "SpreadElement") return null;
   return asSpecFunction(handed);
+};
+
+const namesFixtureBuilder = (call: ESTree.CallExpression): boolean => {
+  const callee = unwrapSubject(call.callee);
+  return callee.type === "MemberExpression" && staticMemberName(callee) === FIXTURE_BUILDER_MEMBER;
 };
 
 const builderRootName = (node: ESTree.Expression): string | null => {
@@ -260,46 +267,23 @@ export const noModuleScopeMockConfig = createDontReviewItRule({
       tracedBindings: new Set(),
     };
 
-    const bindings = testBlockBindings();
-    const writings = new Set<MockWriting>();
-    const builderCalls = new Set<ESTree.CallExpression>();
-    const factoryRegions = new Set<ESTree.Node>();
-
-    const allowedRegions = (): readonly ESTree.Node[] => {
-      const rootNames = bindings.rootNames();
-      return [
-        ...factoryRegions,
-        ...[...builderCalls]
-          .filter((call) => rootNames.has(builderRootName(call.callee) ?? ""))
-          .flatMap((call) => fixtureBodiesOf(call)),
-      ];
-    };
-
     return {
-      ImportDeclaration(node: ESTree.ImportDeclaration) {
-        bindings.takeImport(node);
-      },
-      VariableDeclarator(node: ESTree.VariableDeclarator) {
-        bindings.takeLocalBinding(node);
-      },
-      CallExpression(node: ESTree.CallExpression) {
-        const factory = replacementFactoryOf(node, lookup);
-        if (factory !== null) factoryRegions.add(factory);
+      "Program:exit"(program: ESTree.Program) {
+        const rootNames = testBlockRootNames(program);
+        const calls = nodesOfType(program, "CallExpression");
+        const regions = [
+          ...calls.flatMap((call) => replacementFactoryOf(call, lookup) ?? []),
+          ...calls
+            .filter(
+              (call) =>
+                namesFixtureBuilder(call) && rootNames.has(builderRootName(call.callee) ?? ""),
+            )
+            .flatMap((call) => fixtureBodiesOf(call)),
+        ];
 
-        const callee = unwrapSubject(node.callee);
-        if (
-          callee.type === "MemberExpression" &&
-          staticMemberName(callee) === FIXTURE_BUILDER_MEMBER
-        ) {
-          builderCalls.add(node);
-        }
-
-        const writing = mockWritingOf(node, lookup);
-        if (writing !== null) writings.add(writing);
-      },
-      "Program:exit"() {
-        const regions = allowedRegions();
-        const outstanding = [...writings].filter((writing) => !standsWithin(writing.call, regions));
+        const outstanding = calls
+          .flatMap((call) => mockWritingOf(call, lookup) ?? [])
+          .filter((writing) => !standsWithin(writing.call, regions));
         const chained = new Set(outstanding.flatMap((writing) => receiverCallsOf(writing.call)));
 
         for (const writing of outstanding) {

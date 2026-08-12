@@ -10,7 +10,7 @@ import { staticMemberName, staticPropertyName } from "../lib/spec-syntax/static-
 import { unwrapSubject, type SpecFunction } from "../lib/spec-syntax/subject-expressions.ts";
 import {
   declaresTestBlock,
-  testBlockBindings,
+  testBlockRootNames,
   testCallbacksOf,
 } from "../lib/spec-syntax/test-block-declarations.ts";
 
@@ -70,8 +70,6 @@ export const noVitestContextExpect = createDontReviewItRule({
     schema: [],
   },
   create(context) {
-    const bindings = testBlockBindings();
-
     const reportTakenEntry = (callback: SpecFunction): void => {
       const pattern = contextPatternOf(callback);
       if (pattern === null) return;
@@ -82,10 +80,8 @@ export const noVitestContextExpect = createDontReviewItRule({
     };
 
     return {
-      ImportDeclaration: bindings.takeImport,
-      VariableDeclarator: bindings.takeLocalBinding,
       "Program:exit"(program: ESTree.Program) {
-        const rootNames = bindings.rootNames();
+        const rootNames = testBlockRootNames(program);
         const callbacks = nodesOfType(program, "CallExpression")
           .filter((call) => declaresTestBlock(call, rootNames))
           .flatMap((call) => testCallbacksOf(call));

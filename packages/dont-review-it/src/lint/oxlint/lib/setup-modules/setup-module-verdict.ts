@@ -1,6 +1,7 @@
 import { relative } from "node:path";
 
 import { matchesGlobSegment } from "@mst/lint-rule-authoring";
+import { memoize } from "es-toolkit";
 
 import { segmentsOf } from "../path-segments.ts";
 import { toPosixPath } from "../posix-path.ts";
@@ -49,17 +50,10 @@ const isTypeStatement = (statement: AstFields): boolean => {
   return declared !== null && isTypeStatement(declared);
 };
 
-const typedOnlyByFile = new Map<string, boolean>();
-
-const carriesOnlyTypes = (file: string): boolean => {
-  const remembered = typedOnlyByFile.get(file);
-  if (remembered !== undefined) return remembered;
-
+const carriesOnlyTypes = memoize((file: string): boolean => {
   const program = parsedProgramAt(file);
-  const typedOnly = program !== null && statementsOf(program).every(isTypeStatement);
-  typedOnlyByFile.set(file, typedOnly);
-  return typedOnly;
-};
+  return program !== null && statementsOf(program).every(isTypeStatement);
+});
 
 export const spelledPathOf = ({
   file,

@@ -13,89 +13,112 @@ rmSync(fixtureDir, { recursive: true, force: true });
 
 const SPEC_FILE_NAME = "subject.test.ts";
 
-const recordOf = (lines: number): string =>
-  lines === 1
-    ? '"alpha"'
-    : `\n${range(lines)
-        .map((at) => `line ${String(at)}`)
-        .join("\n")}\n`;
+const RECORD_HEADER = "// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html\n\n";
 
-const writeSpecFixture = (name: string, records: Readonly<Record<string, string>>): string => {
-  const directory = join(fixtureDir, name);
-  mkdirSync(join(directory, "__snapshots__"), { recursive: true });
-  const written = Object.entries(records)
-    .map(([key, record]) => `exports[\`${key}\`] = \`${record}\`;\n`)
-    .join("\n");
-  writeFileSync(
-    join(directory, "__snapshots__", `${SPEC_FILE_NAME}.snap`),
-    `// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html\n\n${written}`,
-  );
-  return join(directory, SPEC_FILE_NAME);
-};
+const SCALAR_RECORD = '"alpha"';
 
-const plainSpec = (body: string): string =>
-  `describe("outer", () => {\n  it("names a behaviour", () => {\n${body}\n  });\n});`;
+const RECORD_OF_THREE_LINES = `\n${range(3)
+  .map((at) => `line ${String(at)}`)
+  .join("\n")}\n`;
 
-const smallRecord = writeSpecFixture("small-record", {
-  "outer > names a behaviour 1": recordOf(3),
-});
+const RECORD_AT_THE_BUDGET = `\n${range(12)
+  .map((at) => `line ${String(at)}`)
+  .join("\n")}\n`;
 
-const atTheBudget = writeSpecFixture("at-the-budget", {
-  "outer > names a behaviour 1": recordOf(12),
-});
+const RECORD_PAST_THE_BUDGET = `\n${range(13)
+  .map((at) => `line ${String(at)}`)
+  .join("\n")}\n`;
 
-const overTheBudget = writeSpecFixture("over-the-budget", {
-  "outer > names a behaviour 1": recordOf(13),
-});
+const smallRecord = join(fixtureDir, "small-record", SPEC_FILE_NAME);
+mkdirSync(join(fixtureDir, "small-record", "__snapshots__"), { recursive: true });
+writeFileSync(
+  join(fixtureDir, "small-record", "__snapshots__", `${SPEC_FILE_NAME}.snap`),
+  `${RECORD_HEADER}exports[\`outer > names a behaviour 1\`] = \`${RECORD_OF_THREE_LINES}\`;\n`,
+);
 
-const shiftedByInline = writeSpecFixture("shifted-by-inline", {
-  "outer > names a behaviour 1": recordOf(13),
-  "outer > names a behaviour 2": recordOf(1),
-});
+const atTheBudget = join(fixtureDir, "at-the-budget", SPEC_FILE_NAME);
+mkdirSync(join(fixtureDir, "at-the-budget", "__snapshots__"), { recursive: true });
+writeFileSync(
+  join(fixtureDir, "at-the-budget", "__snapshots__", `${SPEC_FILE_NAME}.snap`),
+  `${RECORD_HEADER}exports[\`outer > names a behaviour 1\`] = \`${RECORD_AT_THE_BUDGET}\`;\n`,
+);
 
-const shiftedByFileRecord = writeSpecFixture("shifted-by-file-record", {
-  "outer > names a behaviour 1": recordOf(13),
-  "outer > names a behaviour 2": recordOf(1),
-});
+const overTheBudget = join(fixtureDir, "over-the-budget", SPEC_FILE_NAME);
+mkdirSync(join(fixtureDir, "over-the-budget", "__snapshots__"), { recursive: true });
+writeFileSync(
+  join(fixtureDir, "over-the-budget", "__snapshots__", `${SPEC_FILE_NAME}.snap`),
+  `${RECORD_HEADER}exports[\`outer > names a behaviour 1\`] = \`${RECORD_PAST_THE_BUDGET}\`;\n`,
+);
 
-const hintedRecord = writeSpecFixture("hinted-record", {
-  "outer > names a behaviour 1": recordOf(13),
-  "outer > names a behaviour > the hint 1": recordOf(1),
-});
+const shiftedByInline = join(fixtureDir, "shifted-by-inline", SPEC_FILE_NAME);
+mkdirSync(join(fixtureDir, "shifted-by-inline", "__snapshots__"), { recursive: true });
+writeFileSync(
+  join(fixtureDir, "shifted-by-inline", "__snapshots__", `${SPEC_FILE_NAME}.snap`),
+  `${RECORD_HEADER}exports[\`outer > names a behaviour 1\`] = \`${RECORD_PAST_THE_BUDGET}\`;\n\nexports[\`outer > names a behaviour 2\`] = \`${SCALAR_RECORD}\`;\n`,
+);
 
-const thrownRecord = writeSpecFixture("thrown-record", {
-  "outer > names a behaviour 1": recordOf(1),
-});
+const shiftedByFileRecord = join(fixtureDir, "shifted-by-file-record", SPEC_FILE_NAME);
+mkdirSync(join(fixtureDir, "shifted-by-file-record", "__snapshots__"), { recursive: true });
+writeFileSync(
+  join(fixtureDir, "shifted-by-file-record", "__snapshots__", `${SPEC_FILE_NAME}.snap`),
+  `${RECORD_HEADER}exports[\`outer > names a behaviour 1\`] = \`${RECORD_PAST_THE_BUDGET}\`;\n\nexports[\`outer > names a behaviour 2\`] = \`${SCALAR_RECORD}\`;\n`,
+);
 
-const tableRecords = writeSpecFixture("table-records", {
-  "outer > scalar 1 1": recordOf(1),
-  "outer > scalar 2 1": recordOf(1),
-});
+const hintedRecord = join(fixtureDir, "hinted-record", SPEC_FILE_NAME);
+mkdirSync(join(fixtureDir, "hinted-record", "__snapshots__"), { recursive: true });
+writeFileSync(
+  join(fixtureDir, "hinted-record", "__snapshots__", `${SPEC_FILE_NAME}.snap`),
+  `${RECORD_HEADER}exports[\`outer > names a behaviour 1\`] = \`${RECORD_PAST_THE_BUDGET}\`;\n\nexports[\`outer > names a behaviour > the hint 1\`] = \`${SCALAR_RECORD}\`;\n`,
+);
 
-const partialTableRecords = writeSpecFixture("partial-table-records", {
-  "outer > scalar 1 1": recordOf(1),
-});
+const thrownRecord = join(fixtureDir, "thrown-record", SPEC_FILE_NAME);
+mkdirSync(join(fixtureDir, "thrown-record", "__snapshots__"), { recursive: true });
+writeFileSync(
+  join(fixtureDir, "thrown-record", "__snapshots__", `${SPEC_FILE_NAME}.snap`),
+  `${RECORD_HEADER}exports[\`outer > names a behaviour 1\`] = \`${SCALAR_RECORD}\`;\n`,
+);
 
-const unrecordedKey = writeSpecFixture("unrecorded-key", {
-  "outer > some other behaviour 1": recordOf(1),
-});
+const tableRecords = join(fixtureDir, "table-records", SPEC_FILE_NAME);
+mkdirSync(join(fixtureDir, "table-records", "__snapshots__"), { recursive: true });
+writeFileSync(
+  join(fixtureDir, "table-records", "__snapshots__", `${SPEC_FILE_NAME}.snap`),
+  `${RECORD_HEADER}exports[\`outer > scalar 1 1\`] = \`${SCALAR_RECORD}\`;\n\nexports[\`outer > scalar 2 1\`] = \`${SCALAR_RECORD}\`;\n`,
+);
 
-const splitTitles = writeSpecFixture("split-titles", {
-  "outer > names a behaviour 1": recordOf(1),
-  "outer names > a behaviour 1": recordOf(1),
-});
+const partialTableRecords = join(fixtureDir, "partial-table-records", SPEC_FILE_NAME);
+mkdirSync(join(fixtureDir, "partial-table-records", "__snapshots__"), { recursive: true });
+writeFileSync(
+  join(fixtureDir, "partial-table-records", "__snapshots__", `${SPEC_FILE_NAME}.snap`),
+  `${RECORD_HEADER}exports[\`outer > scalar 1 1\`] = \`${SCALAR_RECORD}\`;\n`,
+);
 
-const hintAgainstPlainTitle = writeSpecFixture("hint-against-plain-title", {
-  "outer > names a behaviour > the hint 1": recordOf(1),
-  "outer > names a behaviour the hint 1": recordOf(1),
-});
+const unrecordedKey = join(fixtureDir, "unrecorded-key", SPEC_FILE_NAME);
+mkdirSync(join(fixtureDir, "unrecorded-key", "__snapshots__"), { recursive: true });
+writeFileSync(
+  join(fixtureDir, "unrecorded-key", "__snapshots__", `${SPEC_FILE_NAME}.snap`),
+  `${RECORD_HEADER}exports[\`outer > some other behaviour 1\`] = \`${SCALAR_RECORD}\`;\n`,
+);
 
-const manyCases = writeSpecFixture("many-cases", {
-  "outer > scalar 1 1": recordOf(1),
-  "outer > scalar 2 1": recordOf(1),
-  "outer > scalar 3 1": recordOf(1),
-  "outer > scalar 4 1": recordOf(1),
-});
+const splitTitles = join(fixtureDir, "split-titles", SPEC_FILE_NAME);
+mkdirSync(join(fixtureDir, "split-titles", "__snapshots__"), { recursive: true });
+writeFileSync(
+  join(fixtureDir, "split-titles", "__snapshots__", `${SPEC_FILE_NAME}.snap`),
+  `${RECORD_HEADER}exports[\`outer > names a behaviour 1\`] = \`${SCALAR_RECORD}\`;\n\nexports[\`outer names > a behaviour 1\`] = \`${SCALAR_RECORD}\`;\n`,
+);
+
+const hintAgainstPlainTitle = join(fixtureDir, "hint-against-plain-title", SPEC_FILE_NAME);
+mkdirSync(join(fixtureDir, "hint-against-plain-title", "__snapshots__"), { recursive: true });
+writeFileSync(
+  join(fixtureDir, "hint-against-plain-title", "__snapshots__", `${SPEC_FILE_NAME}.snap`),
+  `${RECORD_HEADER}exports[\`outer > names a behaviour > the hint 1\`] = \`${SCALAR_RECORD}\`;\n\nexports[\`outer > names a behaviour the hint 1\`] = \`${SCALAR_RECORD}\`;\n`,
+);
+
+const manyCases = join(fixtureDir, "many-cases", SPEC_FILE_NAME);
+mkdirSync(join(fixtureDir, "many-cases", "__snapshots__"), { recursive: true });
+writeFileSync(
+  join(fixtureDir, "many-cases", "__snapshots__", `${SPEC_FILE_NAME}.snap`),
+  `${RECORD_HEADER}exports[\`outer > scalar 1 1\`] = \`${SCALAR_RECORD}\`;\n\nexports[\`outer > scalar 2 1\`] = \`${SCALAR_RECORD}\`;\n\nexports[\`outer > scalar 3 1\`] = \`${SCALAR_RECORD}\`;\n\nexports[\`outer > scalar 4 1\`] = \`${SCALAR_RECORD}\`;\n`,
+);
 
 const withoutRecordFile = join(fixtureDir, "no-record-file", SPEC_FILE_NAME);
 mkdirSync(join(fixtureDir, "no-record-file"), { recursive: true });
@@ -105,32 +128,32 @@ describe("dont-review-it/no-undersized-external-snapshot--use-inline-snapshot", 
     valid: [
       {
         name: "a file that is not a spec is left alone",
-        code: plainSpec("expect(subject).toMatchSnapshot();"),
+        code: 'describe("outer", () => {\n  it("names a behaviour", () => {\nexpect(subject).toMatchSnapshot();\n  });\n});',
         filename: join(fixtureDir, "small-record", "subject.ts"),
       },
       {
         name: "a spec with no record file has nothing to measure",
-        code: plainSpec("expect(subject).toMatchSnapshot();"),
+        code: 'describe("outer", () => {\n  it("names a behaviour", () => {\nexpect(subject).toMatchSnapshot();\n  });\n});',
         filename: withoutRecordFile,
       },
       {
         name: "a key the record file does not carry has nothing to measure",
-        code: plainSpec("expect(subject).toMatchSnapshot();"),
+        code: 'describe("outer", () => {\n  it("names a behaviour", () => {\nexpect(subject).toMatchSnapshot();\n  });\n});',
         filename: unrecordedKey,
       },
       {
         name: "a record past the budget is already in the right place",
-        code: plainSpec("expect(subject).toMatchSnapshot();"),
+        code: 'describe("outer", () => {\n  it("names a behaviour", () => {\nexpect(subject).toMatchSnapshot();\n  });\n});',
         filename: overTheBudget,
       },
       {
         name: "an inline record is the other rule's subject",
-        code: plainSpec('expect(subject).toMatchInlineSnapshot(`"alpha"`);'),
+        code: 'describe("outer", () => {\n  it("names a behaviour", () => {\nexpect(subject).toMatchInlineSnapshot(`"alpha"`);\n  });\n});',
         filename: smallRecord,
       },
       {
         name: "a file record is the counter's business and not this rule's",
-        code: plainSpec('expect(subject).toMatchFileSnapshot("./subject.txt");'),
+        code: 'describe("outer", () => {\n  it("names a behaviour", () => {\nexpect(subject).toMatchFileSnapshot("./subject.txt");\n  });\n});',
         filename: smallRecord,
       },
       {
@@ -150,61 +173,125 @@ describe("dont-review-it/no-undersized-external-snapshot--use-inline-snapshot", 
       },
       {
         name: "raising the budget past the record leaves it in place",
-        code: plainSpec("expect(subject).toMatchSnapshot();"),
+        code: 'describe("outer", () => {\n  it("names a behaviour", () => {\nexpect(subject).toMatchSnapshot();\n  });\n});',
         filename: smallRecord,
         options: [{ maxLines: 2 }],
+      },
+      {
+        name: "a snapshot matcher reached on a receiver that is no assertion is another API",
+        code: "held.toMatchSnapshot();",
+        filename: smallRecord,
+      },
+      {
+        name: "a table declaration built by a bare call keeps the title it was written with",
+        code: 'each([1])("scalar %s", (value) => {\n  expect(value).toMatchSnapshot();\n});',
+        filename: smallRecord,
+      },
+      {
+        name: "a member other than a table member keeps the title it was written with",
+        code: 'it.notEach([1])("scalar %s", (value) => {\n  expect(value).toMatchSnapshot();\n});',
+        filename: smallRecord,
+      },
+      {
+        name: "a table member handed no table keeps the title it was written with",
+        code: 'it.each()("scalar %s", (value) => {\n  expect(value).toMatchSnapshot();\n});',
+        filename: smallRecord,
+      },
+      {
+        name: "a tagged table whose tag is a bare name is read as a plain title",
+        code: 'each`a`("scalar", () => {\n  expect(subject).toMatchSnapshot();\n});',
+        filename: smallRecord,
+      },
+      {
+        name: "a block whose first argument is spread declares no title of its own",
+        code: 'describe(...rest, () => {\n  it("names a behaviour", () => {\n    expect(subject).toMatchSnapshot();\n  });\n});',
+        filename: smallRecord,
+      },
+      {
+        name: "a block whose last argument is no function declares no title of its own",
+        code: 'describe("outer", it("names a behaviour", () => {\n  expect(subject).toMatchSnapshot();\n}));',
+        filename: smallRecord,
+      },
+      {
+        name: "a call standing where the title of a block goes keeps its place among the entries",
+        code: 'describe("outer", () => {\n  it("names a behaviour", expect(subject).toMatchSnapshot(), () => {});\n});',
+        filename: withoutRecordFile,
+      },
+      {
+        name: "a table declaring no case records nothing to measure",
+        code: 'describe("outer", () => {\n  it.each([])("scalar %s", (value) => {\n    expect(value).toMatchSnapshot();\n  });\n});',
+        filename: smallRecord,
       },
     ],
     invalid: [
       {
-        name: "a record inside the budget is reported and moved to an inline record",
-        code: plainSpec("    expect(subject).toMatchSnapshot();"),
+        name: "property matchers are no hint, and the repair leaves the call for a human to finish",
+        code: 'describe("outer", () => {\n  it("names a behaviour", () => {\n    expect(subject).toMatchSnapshot({ id: expect.any(String) });\n  });\n});',
         filename: smallRecord,
         errors: [{ messageId: "undersizedExternalSnapshot" }],
-        output: plainSpec("    expect(subject).toMatchInlineSnapshot();"),
+      },
+      {
+        name: "a spread hint cannot be measured and is reported as such",
+        code: 'describe("outer", () => {\n  it("names a behaviour", () => {\n    expect(subject).toMatchSnapshot(...hints);\n  });\n});',
+        filename: smallRecord,
+        errors: [{ messageId: "unresolvableExternalSnapshot" }],
+      },
+      {
+        name: "options that spell out no budget leave the shared budget in force",
+        code: 'describe("outer", () => {\n  it("names a behaviour", () => {\n    expect(subject).toMatchSnapshot();\n  });\n});',
+        filename: smallRecord,
+        options: [{}],
+        errors: [{ messageId: "undersizedExternalSnapshot" }],
+        output:
+          'describe("outer", () => {\n  it("names a behaviour", () => {\n    expect(subject).toMatchInlineSnapshot();\n  });\n});',
+      },
+      {
+        name: "a record inside the budget is reported and moved to an inline record",
+        code: 'describe("outer", () => {\n  it("names a behaviour", () => {\n    expect(subject).toMatchSnapshot();\n  });\n});',
+        filename: smallRecord,
+        errors: [{ messageId: "undersizedExternalSnapshot" }],
+        output:
+          'describe("outer", () => {\n  it("names a behaviour", () => {\n    expect(subject).toMatchInlineSnapshot();\n  });\n});',
       },
       {
         name: "a record at the budget stays on the inline side of the boundary",
-        code: plainSpec("    expect(subject).toMatchSnapshot();"),
+        code: 'describe("outer", () => {\n  it("names a behaviour", () => {\n    expect(subject).toMatchSnapshot();\n  });\n});',
         filename: atTheBudget,
         errors: [{ messageId: "undersizedExternalSnapshot" }],
-        output: plainSpec("    expect(subject).toMatchInlineSnapshot();"),
+        output:
+          'describe("outer", () => {\n  it("names a behaviour", () => {\n    expect(subject).toMatchInlineSnapshot();\n  });\n});',
       },
       {
         name: "an inline record ahead of it shifts which entry the call is measured against",
-        code: plainSpec(
-          '    expect(first).toMatchInlineSnapshot(`"first"`);\n    expect(subject).toMatchSnapshot();',
-        ),
+        code: 'describe("outer", () => {\n  it("names a behaviour", () => {\n    expect(first).toMatchInlineSnapshot(`"first"`);\n    expect(subject).toMatchSnapshot();\n  });\n});',
         filename: shiftedByInline,
         errors: [{ messageId: "undersizedExternalSnapshot" }],
-        output: plainSpec(
-          '    expect(first).toMatchInlineSnapshot(`"first"`);\n    expect(subject).toMatchInlineSnapshot();',
-        ),
+        output:
+          'describe("outer", () => {\n  it("names a behaviour", () => {\n    expect(first).toMatchInlineSnapshot(`"first"`);\n    expect(subject).toMatchInlineSnapshot();\n  });\n});',
       },
       {
         name: "a file record ahead of it shifts which entry the call is measured against",
-        code: plainSpec(
-          '    expect(first).toMatchFileSnapshot("./first.txt");\n    expect(subject).toMatchSnapshot();',
-        ),
+        code: 'describe("outer", () => {\n  it("names a behaviour", () => {\n    expect(first).toMatchFileSnapshot("./first.txt");\n    expect(subject).toMatchSnapshot();\n  });\n});',
         filename: shiftedByFileRecord,
         errors: [{ messageId: "undersizedExternalSnapshot" }],
-        output: plainSpec(
-          '    expect(first).toMatchFileSnapshot("./first.txt");\n    expect(subject).toMatchInlineSnapshot();',
-        ),
+        output:
+          'describe("outer", () => {\n  it("names a behaviour", () => {\n    expect(first).toMatchFileSnapshot("./first.txt");\n    expect(subject).toMatchInlineSnapshot();\n  });\n});',
       },
       {
         name: "a hint puts the call in its own run of entries and the repair drops it",
-        code: plainSpec('    expect(subject).toMatchSnapshot("the hint");'),
+        code: 'describe("outer", () => {\n  it("names a behaviour", () => {\n    expect(subject).toMatchSnapshot("the hint");\n  });\n});',
         filename: hintedRecord,
         errors: [{ messageId: "undersizedExternalSnapshot" }],
-        output: plainSpec("    expect(subject).toMatchInlineSnapshot();"),
+        output:
+          'describe("outer", () => {\n  it("names a behaviour", () => {\n    expect(subject).toMatchInlineSnapshot();\n  });\n});',
       },
       {
         name: "a thrown error record moves to the inline spelling of the same matcher",
-        code: plainSpec("    expect(run).toThrowErrorMatchingSnapshot();"),
+        code: 'describe("outer", () => {\n  it("names a behaviour", () => {\n    expect(run).toThrowErrorMatchingSnapshot();\n  });\n});',
         filename: thrownRecord,
         errors: [{ messageId: "undersizedExternalSnapshot" }],
-        output: plainSpec("    expect(run).toThrowErrorMatchingInlineSnapshot();"),
+        output:
+          'describe("outer", () => {\n  it("names a behaviour", () => {\n    expect(run).toThrowErrorMatchingInlineSnapshot();\n  });\n});',
       },
       {
         name: "a written out table is measured case by case and asks for a split",
@@ -226,37 +313,31 @@ describe("dont-review-it/no-undersized-external-snapshot--use-inline-snapshot", 
       },
       {
         name: "a hint built at run time cannot be measured and is reported as such",
-        code: plainSpec("    expect(subject).toMatchSnapshot(chosenHint);"),
+        code: 'describe("outer", () => {\n  it("names a behaviour", () => {\n    expect(subject).toMatchSnapshot(chosenHint);\n  });\n});',
         filename: smallRecord,
         errors: [{ messageId: "unresolvableExternalSnapshot" }],
       },
       {
         name: "a call inside a loop has no settled position among the entries",
-        code: plainSpec(
-          "    for (const value of rows) {\n      expect(value).toMatchSnapshot();\n    }",
-        ),
+        code: 'describe("outer", () => {\n  it("names a behaviour", () => {\n    for (const value of rows) {\n      expect(value).toMatchSnapshot();\n    }\n  });\n});',
         filename: smallRecord,
         errors: [{ messageId: "unresolvableExternalSnapshot" }],
       },
       {
         name: "a call inside a branch has no settled position among the entries",
-        code: plainSpec("    if (ready) {\n      expect(subject).toMatchSnapshot();\n    }"),
+        code: 'describe("outer", () => {\n  it("names a behaviour", () => {\n    if (ready) {\n      expect(subject).toMatchSnapshot();\n    }\n  });\n});',
         filename: smallRecord,
         errors: [{ messageId: "unresolvableExternalSnapshot" }],
       },
       {
         name: "a call inside a nested callback has no settled position among the entries",
-        code: plainSpec(
-          "    rows.forEach((value) => {\n      expect(value).toMatchSnapshot();\n    });",
-        ),
+        code: 'describe("outer", () => {\n  it("names a behaviour", () => {\n    rows.forEach((value) => {\n      expect(value).toMatchSnapshot();\n    });\n  });\n});',
         filename: smallRecord,
         errors: [{ messageId: "unresolvableExternalSnapshot" }],
       },
       {
         name: "a call after one that lost its position loses its own position too",
-        code: plainSpec(
-          "    for (const value of rows) {\n      expect(value).toMatchSnapshot();\n    }\n    expect(subject).toMatchSnapshot();",
-        ),
+        code: 'describe("outer", () => {\n  it("names a behaviour", () => {\n    for (const value of rows) {\n      expect(value).toMatchSnapshot();\n    }\n    expect(subject).toMatchSnapshot();\n  });\n});',
         filename: smallRecord,
         errors: [
           { messageId: "unresolvableExternalSnapshot" },
@@ -293,11 +374,12 @@ describe("dont-review-it/no-undersized-external-snapshot--use-inline-snapshot", 
       },
       {
         name: "lowering the budget is not a way to leave a record outside",
-        code: plainSpec("    expect(subject).toMatchSnapshot();"),
+        code: 'describe("outer", () => {\n  it("names a behaviour", () => {\n    expect(subject).toMatchSnapshot();\n  });\n});',
         filename: overTheBudget,
         options: [{ maxLines: 13 }],
         errors: [{ messageId: "undersizedExternalSnapshot" }],
-        output: plainSpec("    expect(subject).toMatchInlineSnapshot();"),
+        output:
+          'describe("outer", () => {\n  it("names a behaviour", () => {\n    expect(subject).toMatchInlineSnapshot();\n  });\n});',
       },
     ],
   });

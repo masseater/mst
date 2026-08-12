@@ -2,7 +2,7 @@ import { baseNameOf, configuredSuffixesFrom } from "../file-name-suffixes.ts";
 
 import type { Options } from "@oxlint/plugins";
 
-export const DEFAULT_ASSETS_NAME_MARKERS: readonly string[] = ["assets"];
+const DEFAULT_ASSETS_NAME_MARKERS: readonly string[] = ["assets"];
 
 const ASSETS_NAME_MARKERS_OPTION = "assetsNameMarkers";
 

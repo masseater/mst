@@ -58,6 +58,14 @@ describe("dont-review-it/no-silent-catch--rethrow-or-handle", () => {
         name: "a failure named outside a catch clause is not this rule's subject",
         code: "const failure = new Error('reading the catalog failed');\nreport(failure);",
       },
+      {
+        name: "a body holding only a semicolon belongs to no-empty-catch--throw-or-handle",
+        code: "try {\n  run();\n} catch (failure) {\n  ;\n}",
+      },
+      {
+        name: "a body holding only an empty block belongs to no-empty-catch--throw-or-handle",
+        code: "try {\n  run();\n} catch (failure) {\n  {\n  }\n}",
+      },
     ],
     invalid: [
       {

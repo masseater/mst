@@ -6,24 +6,84 @@ import { chainFrom, fieldOf, innermostOf, kindAt, nodeVisitsIn, visitAt } from "
 
 import type { AstFields } from "../ast-node.ts";
 
-const visitsOf = (sourceText: string) => nodeVisitsIn(parseSync("held.ts", sourceText).program);
-
-const kindsOf = (sourceText: string): readonly string[] =>
-  visitsOf(sourceText).map((visit) => nodeTypeOf(visit.node));
-
-const namedVisit = (sourceText: string, name: string) => {
-  const found = visitsOf(sourceText).find(
-    (visit) => nodeTypeOf(visit.node) === "Identifier" && visit.node.name === name,
-  );
-  if (found === undefined) throw new Error(`no ${name} is written in: ${sourceText}`);
-  return found;
-};
-
 const ELSEWHERE: AstFields = { type: "Program" };
 
+const it = test
+  .extend("kindsWalkedInASourceHoldingAType", () =>
+    nodeVisitsIn(parseSync("held.ts", "const held: Cell = read();").program).map((visit) =>
+      nodeTypeOf(visit.node),
+    ))
+  .extend("kindsWalkedInASourceHoldingAValue", () =>
+    nodeVisitsIn(parseSync("held.ts", "held;").program).map((visit) => nodeTypeOf(visit.node)),
+  )
+  .extend("ancestorKindsCarriedByAWalkedName", () => {
+    const found = nodeVisitsIn(parseSync("held.ts", "held;").program).find(
+      (visit) => nodeTypeOf(visit.node) === "Identifier" && visit.node.name === "held",
+    );
+    if (found === undefined) throw new Error("no held is written on its own");
+    return found.ancestors.map(nodeTypeOf);
+  })
+  .extend("fieldReadOffAWalkedNode", () => {
+    const found = nodeVisitsIn(parseSync("held.ts", "held;").program).find(
+      (visit) => nodeTypeOf(visit.node) === "Identifier" && visit.node.name === "held",
+    );
+    if (found === undefined) throw new Error("no held is written on its own");
+    return fieldOf(found.node, "name");
+  })
+  .extend("fieldReadOffSomethingThatIsNoNode", () => fieldOf("held", "name"))
+  .extend("kindOfAWalkedNode", () => {
+    const found = nodeVisitsIn(parseSync("held.ts", "held;").program).find(
+      (visit) => nodeTypeOf(visit.node) === "Identifier" && visit.node.name === "held",
+    );
+    if (found === undefined) throw new Error("no held is written on its own");
+    return kindAt(found.node);
+  })
+  .extend("kindOfSomethingThatIsNoNode", () => kindAt(null))
+  .extend("chainKindsCutAtANodeItSitsUnder", () => {
+    const found = nodeVisitsIn(parseSync("held.ts", "held;").program).find(
+      (visit) => nodeTypeOf(visit.node) === "Identifier" && visit.node.name === "held",
+    );
+    if (found === undefined) throw new Error("no held is written on its own");
+    const [boundary] = found.ancestors.slice(-1);
+    if (boundary === undefined) throw new Error("held sits under nothing");
+    return chainFrom(found, boundary).map(nodeTypeOf);
+  })
+  .extend("chainKindsCutAtANodeItDoesNotSitUnder", () => {
+    const found = nodeVisitsIn(parseSync("held.ts", "held;").program).find(
+      (visit) => nodeTypeOf(visit.node) === "Identifier" && visit.node.name === "held",
+    );
+    if (found === undefined) throw new Error("no held is written on its own");
+    return chainFrom(found, ELSEWHERE).map(nodeTypeOf);
+  })
+  .extend("ancestorKindsOfTheVisitAtANodeItSitsUnder", () => {
+    const found = nodeVisitsIn(parseSync("held.ts", "held;").program).find(
+      (visit) => nodeTypeOf(visit.node) === "Identifier" && visit.node.name === "held",
+    );
+    if (found === undefined) throw new Error("no held is written on its own");
+    const [boundary] = found.ancestors.slice(-1);
+    if (boundary === undefined) throw new Error("held sits under nothing");
+    return visitAt(found, boundary).ancestors.map(nodeTypeOf);
+  })
+  .extend("kindOfTheNearestWantedAncestor", () => {
+    const found = nodeVisitsIn(parseSync("held.ts", "const walk = () => held;").program).find(
+      (visit) => nodeTypeOf(visit.node) === "Identifier" && visit.node.name === "held",
+    );
+    if (found === undefined) throw new Error("no held stands as the body of a function");
+    return nodeTypeOf(
+      innermostOf(found.ancestors, new Set(["ArrowFunctionExpression"])) ?? ELSEWHERE,
+    );
+  })
+  .extend("nearestWantedAncestorOfAChainHoldingNone", () => {
+    const found = nodeVisitsIn(parseSync("held.ts", "held;").program).find(
+      (visit) => nodeTypeOf(visit.node) === "Identifier" && visit.node.name === "held",
+    );
+    if (found === undefined) throw new Error("no held is written on its own");
+    return innermostOf(found.ancestors, new Set(["ClassBody"]));
+  });
+
 describe("nodeVisitsIn", () => {
-  test("a name written in a type is left out of the walk", () => {
-    expect(kindsOf("const held: Cell = read();")).toStrictEqual([
+  it("a name written in a type is left out of the walk", ({ kindsWalkedInASourceHoldingAType }) => {
+    expect(kindsWalkedInASourceHoldingAType).toStrictEqual([
       "Program",
       "VariableDeclaration",
       "VariableDeclarator",
@@ -33,77 +93,71 @@ describe("nodeVisitsIn", () => {
     ]);
   });
 
-  test("a name written in a value is walked", () => {
-    expect(kindsOf("held;")).toStrictEqual(["Program", "ExpressionStatement", "Identifier"]);
-  });
-
-  test("a walked node carries the nodes it sits under", () => {
-    expect(namedVisit("held;", "held").ancestors.map(nodeTypeOf)).toStrictEqual([
+  it("a name written in a value is walked", ({ kindsWalkedInASourceHoldingAValue }) => {
+    expect(kindsWalkedInASourceHoldingAValue).toStrictEqual([
       "Program",
       "ExpressionStatement",
+      "Identifier",
     ]);
+  });
+
+  it("a walked node carries the nodes it sits under", ({ ancestorKindsCarriedByAWalkedName }) => {
+    expect(ancestorKindsCarriedByAWalkedName).toStrictEqual(["Program", "ExpressionStatement"]);
   });
 });
 
 describe("fieldOf", () => {
-  test("a field of a node is read", () => {
-    expect(fieldOf(namedVisit("held;", "held").node, "name")).toBe("held");
+  it("a field of a node is read", ({ fieldReadOffAWalkedNode }) => {
+    expect(fieldReadOffAWalkedNode).toBe("held");
   });
 
-  test("a field of something that is no node reads as nothing", () => {
-    expect(fieldOf("held", "name")).toBe(undefined);
+  it("a field of something that is no node reads as nothing", ({
+    fieldReadOffSomethingThatIsNoNode,
+  }) => {
+    expect(fieldReadOffSomethingThatIsNoNode).toBe(undefined);
   });
 });
 
 describe("kindAt", () => {
-  test("a node reads as its own kind", () => {
-    expect(kindAt(namedVisit("held;", "held").node)).toBe("Identifier");
+  it("a node reads as its own kind", ({ kindOfAWalkedNode }) => {
+    expect(kindOfAWalkedNode).toBe("Identifier");
   });
 
-  test("something that is no node reads as no kind", () => {
-    expect(kindAt(null)).toBe("");
+  it("something that is no node reads as no kind", ({ kindOfSomethingThatIsNoNode }) => {
+    expect(kindOfSomethingThatIsNoNode).toBe("");
   });
 });
 
 describe("chainFrom", () => {
-  test("a chain cut at a node it sits under starts at that node", () => {
-    const visit = namedVisit("held;", "held");
-    const [boundary] = visit.ancestors.slice(-1);
-
-    expect(chainFrom(visit, boundary ?? ELSEWHERE).map(nodeTypeOf)).toStrictEqual([
-      "ExpressionStatement",
-    ]);
+  it("a chain cut at a node it sits under starts at that node", ({
+    chainKindsCutAtANodeItSitsUnder,
+  }) => {
+    expect(chainKindsCutAtANodeItSitsUnder).toStrictEqual(["ExpressionStatement"]);
   });
 
-  test("a chain cut at a node it does not sit under keeps every node", () => {
-    expect(chainFrom(namedVisit("held;", "held"), ELSEWHERE).map(nodeTypeOf)).toStrictEqual([
-      "Program",
-      "ExpressionStatement",
-    ]);
+  it("a chain cut at a node it does not sit under keeps every node", ({
+    chainKindsCutAtANodeItDoesNotSitUnder,
+  }) => {
+    expect(chainKindsCutAtANodeItDoesNotSitUnder).toStrictEqual(["Program", "ExpressionStatement"]);
   });
 });
 
 describe("visitAt", () => {
-  test("a node this one sits under is carried with the nodes above it", () => {
-    const visit = namedVisit("held;", "held");
-    const [boundary] = visit.ancestors.slice(-1);
-
-    expect(visitAt(visit, boundary ?? ELSEWHERE).ancestors.map(nodeTypeOf)).toStrictEqual([
-      "Program",
-    ]);
+  it("a node this one sits under is carried with the nodes above it", ({
+    ancestorKindsOfTheVisitAtANodeItSitsUnder,
+  }) => {
+    expect(ancestorKindsOfTheVisitAtANodeItSitsUnder).toStrictEqual(["Program"]);
   });
 });
 
 describe("innermostOf", () => {
-  test("the nearest node of a wanted kind is picked", () => {
-    const visit = namedVisit("const walk = () => held;", "held");
-
-    expect(
-      nodeTypeOf(innermostOf(visit.ancestors, new Set(["ArrowFunctionExpression"])) ?? ELSEWHERE),
-    ).toBe("ArrowFunctionExpression");
+  it("the nearest node of a wanted kind is picked", ({ kindOfTheNearestWantedAncestor }) => {
+    expect(kindOfTheNearestWantedAncestor).toBe("ArrowFunctionExpression");
   });
 
-  test("a chain holding no wanted kind picks nothing", () => {
-    expect(innermostOf(namedVisit("held;", "held").ancestors, new Set(["ClassBody"]))).toBe(null);
+  it("a chain holding no wanted kind picks nothing", ({
+    nearestWantedAncestorOfAChainHoldingNone,
+  }) => {
+    expect(nearestWantedAncestorOfAChainHoldingNone).toBe(null);
   });
 });

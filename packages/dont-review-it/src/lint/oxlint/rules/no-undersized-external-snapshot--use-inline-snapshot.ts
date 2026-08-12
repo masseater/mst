@@ -1,5 +1,8 @@
+import { zip } from "es-toolkit";
+
 import { createDontReviewItRule } from "../../../create-rule.ts";
 import { ancestorsOf } from "../lib/ast-node.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import {
   entryKeysOf,
   INLINE_SPELLING_BY_EXTERNAL,
@@ -86,10 +89,15 @@ export const noUndersizedExternalSnapshot = createDontReviewItRule({
       return { range: [site.matcherNode.start, site.node.end], written: `${inlineSpelling}()` };
     };
 
-    const reportUndersized = (site: SnapshotMatcherSite, keys: readonly string[]): void => {
-      const inlineSpelling = INLINE_SPELLING_BY_EXTERNAL.get(site.matcher);
-      if (inlineSpelling === undefined) return;
-
+    const reportUndersized = ({
+      site,
+      inlineSpelling,
+      keys,
+    }: {
+      readonly site: SnapshotMatcherSite;
+      readonly inlineSpelling: string;
+      readonly keys: readonly string[];
+    }): void => {
       const recordedLines = recordedLinesOf(keys);
       if (recordedLines === null || recordedLines > maxLines) return;
 
@@ -122,29 +130,24 @@ export const noUndersizedExternalSnapshot = createDontReviewItRule({
     };
 
     const reportSite = (site: SnapshotMatcherSite, entries: SnapshotEntryKeys): void => {
-      if (!INLINE_SPELLING_BY_EXTERNAL.has(site.matcher)) return;
+      const inlineSpelling = INLINE_SPELLING_BY_EXTERNAL.get(site.matcher);
+      if (inlineSpelling === undefined) return;
       if (entries.kind === "unreadable") return;
       if (entries.kind === "unresolvable") {
         context.report({ node: site.matcherNode, messageId: "unresolvableExternalSnapshot" });
         return;
       }
       if (entries.keys.length === 0) return;
-      reportUndersized(site, entries.keys);
+      reportUndersized({ site, inlineSpelling, keys: entries.keys });
     };
 
-    const collected = new Set<SnapshotMatcherSite>();
-
     return {
-      CallExpression(node: ESTree.CallExpression) {
-        const site = snapshotMatcherSiteOf(node, ancestorsOf(node));
-        if (site !== null) collected.add(site);
-      },
-      "Program:exit"() {
-        const sites = [...collected];
-        const resolutions = entryKeysOf(sites);
-        for (const [index, site] of sites.entries()) {
-          const entries = resolutions[index];
-          if (entries !== undefined) reportSite(site, entries);
+      "Program:exit"(program: ESTree.Program) {
+        const sites = nodesOfType(program, "CallExpression").flatMap(
+          (node) => snapshotMatcherSiteOf(node, ancestorsOf(node)) ?? [],
+        );
+        for (const [site, entries] of zip(sites, entryKeysOf(sites))) {
+          reportSite(site, entries);
         }
       },
     };

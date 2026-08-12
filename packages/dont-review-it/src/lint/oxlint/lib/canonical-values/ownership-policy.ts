@@ -18,5 +18,6 @@ export const ownershipPolicyOf = (options: Context["options"]): string => {
   }
   const policy = configured.ownershipPolicy;
   if (typeof policy !== "string") return UNCONFIGURED_OWNERSHIP_POLICY;
-  return policy.trim() === "" ? UNCONFIGURED_OWNERSHIP_POLICY : policy;
+  if (policy.trim() === "") return UNCONFIGURED_OWNERSHIP_POLICY;
+  return policy;
 };

@@ -1,3 +1,5 @@
+import { memoize } from "es-toolkit";
+
 import { isAstFields, NODE_TYPE_FIELD, type AstFields } from "../ast-node.ts";
 import { boundNamesIn } from "./bound-names.ts";
 
@@ -47,17 +49,14 @@ export const normalizedBodyOf = (input: {
 }): string => {
   const bound = boundNamesIn(input.body);
   const placeholderByName = new Map<string, string>();
+  const placeholderFor = memoize(
+    (name: string): string =>
+      `${PLACEHOLDER_PREFIX}${[...placeholderByName.keys(), name].indexOf(name)}`,
+    { cache: placeholderByName },
+  );
 
-  const spell: Spelling = (name) => {
-    if (!bound.has(name)) return input.routes.get(name) ?? name;
-
-    const held = placeholderByName.get(name);
-    if (held !== undefined) return held;
-
-    const minted = `${PLACEHOLDER_PREFIX}${placeholderByName.size}`;
-    placeholderByName.set(name, minted);
-    return minted;
-  };
+  const spell: Spelling = (name) =>
+    bound.has(name) ? placeholderFor(name) : (input.routes.get(name) ?? name);
 
   return structureOf(input.body, spell);
 };

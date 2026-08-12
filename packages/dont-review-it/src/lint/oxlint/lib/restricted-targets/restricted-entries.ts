@@ -2,6 +2,7 @@ import { resolve, sep } from "node:path";
 
 import { matchesGlobPath } from "../glob-path-match.ts";
 import { listedTexts } from "../listed-texts.ts";
+import { isNamedFields } from "../named-fields.ts";
 import { segmentsOf } from "../path-segments.ts";
 
 import type { Context, RuleMeta } from "@oxlint/plugins";
@@ -58,18 +59,15 @@ export const RESTRICTED_TARGET_SCHEMA: RuleMeta["schema"] = [
   },
 ];
 
-const isJsonObject = (held: unknown): held is Readonly<Record<string, unknown>> =>
-  typeof held === "object" && held !== null && !Array.isArray(held);
-
 const declaredListOf = (options: Context["options"], key: string): readonly unknown[] => {
   const [first] = options;
-  if (!isJsonObject(first)) return [];
+  if (!isNamedFields(first)) return [];
   const declared = first[key];
   return Array.isArray(declared) ? declared : [];
 };
 
 const entryOf = (held: unknown): RestrictedTargetEntry | null => {
-  if (!isJsonObject(held)) return null;
+  if (!isNamedFields(held)) return null;
   const { module, substitute } = held;
   if (typeof module !== "string" || module === "") return null;
   if (typeof substitute !== "string") return null;
@@ -83,7 +81,7 @@ const entryOf = (held: unknown): RestrictedTargetEntry | null => {
 };
 
 const aliasOf = (held: unknown): InternalAlias | null => {
-  if (!isJsonObject(held)) return null;
+  if (!isNamedFields(held)) return null;
   const { prefix, directory } = held;
   if (typeof prefix !== "string" || prefix === "") return null;
   return typeof directory === "string" ? { prefix, directory } : null;

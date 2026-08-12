@@ -1,5 +1,6 @@
 import { join } from "node:path";
 
+import { isPlainObject } from "es-toolkit";
 import { parse } from "yaml";
 
 import {
@@ -52,9 +53,9 @@ const declaredWorkspaceDirectories = async ({
   if (raw === null) return [];
 
   const parsed: unknown = parse(raw);
-  if (typeof parsed !== "object" || parsed === null) return [];
+  if (!isPlainObject(parsed)) return [];
 
-  const patterns = (parsed as Record<string, unknown>)[definitionField];
+  const patterns: unknown = parsed[definitionField];
   if (!Array.isArray(patterns)) return [];
 
   const expanded = await Promise.all(

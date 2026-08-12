@@ -1,7 +1,8 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { isAssertionCall } from "../lib/spec-syntax/assertion-entries.ts";
 import { isSpecFile, specFileSuffixesFrom } from "../lib/spec-syntax/spec-files.ts";
-import { testBlockBindings, testBlockBodyOf } from "../lib/spec-syntax/test-block-declarations.ts";
+import { testBlockBodyOf, testBlockRootNames } from "../lib/spec-syntax/test-block-declarations.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
@@ -59,22 +60,15 @@ export const forbidExpectlessIt = createDontReviewItRule({
   create(context) {
     if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
 
-    const bindings = testBlockBindings();
-    const calls = new Set<ESTree.CallExpression>();
-
     return {
-      ImportDeclaration: bindings.takeImport,
-      VariableDeclarator: bindings.takeLocalBinding,
-      CallExpression(node: ESTree.CallExpression) {
-        calls.add(node);
-      },
-      "Program:exit"() {
-        const rootNames = bindings.rootNames();
-        const blocks = [...calls].flatMap((call): readonly Block[] => {
+      "Program:exit"(program: ESTree.Program) {
+        const rootNames = testBlockRootNames(program);
+        const calls = nodesOfType(program, "CallExpression");
+        const blocks = calls.flatMap((call): readonly Block[] => {
           const body = testBlockBodyOf(call, rootNames);
           return body === null ? [] : [{ call, start: body.start, end: body.end }];
         });
-        const assertions = [...calls].filter((call) => isAssertionCall(call));
+        const assertions = calls.filter((call) => isAssertionCall(call));
 
         for (const claimless of claimlessAmong(blocks, assertions)) {
           context.report({ node: claimless, messageId: "expectlessIt" });

@@ -1,3 +1,5 @@
+import { groupBy, zip } from "es-toolkit";
+
 import { FUNCTION_NODE_TYPES } from "../node-kinds.ts";
 import { isAssertionChain } from "./assertion-entries.ts";
 import { SNAPSHOT_MATCHERS } from "./matcher-vocabulary.ts";
@@ -73,16 +75,14 @@ const isTaggedTable = (callee: ESTree.Expression): boolean => {
 };
 
 const titledCallShape = (call: ESTree.CallExpression): ESTree.Expression | null => {
-  if (call.arguments.length < 2) return null;
-
-  const [first] = call.arguments;
-  const last = call.arguments.at(-1);
+  const [first, ...trailing] = call.arguments;
+  const last = trailing.at(-1);
   if (first === undefined || last === undefined) return null;
   if (first.type === "SpreadElement" || last.type === "SpreadElement") return null;
   return asSpecFunction(last) === null ? null : first;
 };
 
-export const titleScopeOf = (call: ESTree.CallExpression): TableDrivenTitles | null => {
+const titleScopeOf = (call: ESTree.CallExpression): TableDrivenTitles | null => {
   const titled = titledCallShape(call);
   if (titled === null) return null;
   if (isTaggedTable(call.callee)) return { kind: "unreadable" };
@@ -157,6 +157,7 @@ export const snapshotMatcherSiteOf = (
 };
 
 type Placement = {
+  readonly site: SnapshotMatcherSite;
   readonly siteIndex: number;
   readonly titles: readonly string[];
   readonly order: readonly number[];
@@ -167,48 +168,54 @@ type Combination = {
   readonly order: readonly number[];
 };
 
-const extendedBy = (prefix: Combination, scope: TableDrivenTitles): readonly Combination[] =>
-  scope.kind === "spelled"
-    ? scope.titles.map((title, index) => ({
-        titles: [...prefix.titles, title],
-        order: [...prefix.order, index],
-      }))
-    : [];
+type SpelledScope = Extract<TableDrivenTitles, { kind: "spelled" }>;
 
-const combinationsOf = (scopes: readonly TableDrivenTitles[]): readonly Combination[] =>
+const spelledScopesOf = (scopes: readonly TableDrivenTitles[]): readonly SpelledScope[] | null => {
+  const spelled = scopes.flatMap((scope) => (scope.kind === "spelled" ? [scope] : []));
+  return spelled.length === scopes.length ? spelled : null;
+};
+
+const extendedBy = (prefix: Combination, scope: SpelledScope): readonly Combination[] =>
+  scope.titles.map((title, index) => ({
+    titles: [...prefix.titles, title],
+    order: [...prefix.order, index],
+  }));
+
+const combinationsOf = (scopes: readonly SpelledScope[]): readonly Combination[] =>
   scopes.reduce<readonly Combination[]>(
     (carried, scope) => carried.flatMap((prefix) => extendedBy(prefix, scope)),
     [{ titles: [], order: [] }],
   );
 
 const placementsOf = (site: SnapshotMatcherSite, siteIndex: number): readonly Placement[] => {
-  if (!site.scopes.every((scope) => scope.kind === "spelled")) return [];
+  const spelled = spelledScopesOf(site.scopes);
+  if (spelled === null) return [];
 
-  return combinationsOf(site.scopes).map((combination) => ({
+  return combinationsOf(spelled).map((combination) => ({
+    site,
     siteIndex,
     titles: combination.titles,
     order: [...combination.order, site.node.start],
   }));
 };
 
-const byExecutionOrder = (left: Placement, right: Placement): number => {
-  const at = left.order.findIndex((value, index) => value !== (right.order[index] ?? -1));
-  if (at < 0) return left.order.length - right.order.length;
-  return (left.order[at] ?? -1) - (right.order[at] ?? -1);
-};
+const byExecutionOrder = (left: Placement, right: Placement): number =>
+  zip(left.order, right.order).reduce(
+    (carried, [leftReached, rightReached]) =>
+      carried === 0 ? leftReached - rightReached : carried,
+    0,
+  );
 
 const bucketKeyOf = (titles: readonly string[]): string => JSON.stringify(titles);
 
 const bucketedPlacements = (
   sites: readonly SnapshotMatcherSite[],
-): ReadonlyMap<string, readonly Placement[]> => {
-  const bucketed = new Map<string, readonly Placement[]>();
-  for (const placement of sites.flatMap(placementsOf)) {
-    const bucket = bucketKeyOf(placement.titles);
-    bucketed.set(bucket, [...(bucketed.get(bucket) ?? []), placement]);
-  }
-  return bucketed;
-};
+): ReadonlyMap<string, readonly Placement[]> =>
+  new Map(
+    Object.entries(
+      groupBy(sites.flatMap(placementsOf), (placement) => bucketKeyOf(placement.titles)),
+    ),
+  );
 
 type Ordinals = Map<string, number>;
 
@@ -218,30 +225,23 @@ const takeOrdinal = (ordinals: Ordinals, bucket: string): number => {
   return ordinal;
 };
 
-const keyedTitlesOf = (site: SnapshotMatcherSite, placement: Placement): readonly string[] =>
-  site.hintText === null ? placement.titles : [...placement.titles, site.hintText];
+const keyedTitlesOf = ({ site, titles }: Placement): readonly string[] =>
+  site.hintText === null ? titles : [...titles, site.hintText];
 
 const bucketKeysIn = ({
-  sites,
   placements,
   ordinals,
   spelled,
 }: {
-  readonly sites: readonly SnapshotMatcherSite[];
   readonly placements: readonly Placement[];
   readonly ordinals: Ordinals;
   readonly spelled: Map<number, readonly string[]>;
 }): void => {
   const ordered = placements.toSorted(byExecutionOrder);
-  const brokenAt = ordered.findIndex(
-    (placement) => sites[placement.siteIndex]?.orderBroken === true,
-  );
+  const brokenAt = ordered.findIndex((placement) => placement.site.orderBroken);
 
   for (const [position, placement] of ordered.entries()) {
-    const site = sites[placement.siteIndex];
-    if (site === undefined) continue;
-
-    const titles = keyedTitlesOf(site, placement);
+    const titles = keyedTitlesOf(placement);
     const ordinal = takeOrdinal(ordinals, bucketKeyOf(titles));
     if (brokenAt >= 0 && position >= brokenAt) continue;
 
@@ -259,7 +259,7 @@ const spelledKeysBySite = (
   const spelled = new Map<number, readonly string[]>();
 
   for (const placements of bucketedPlacements(sites).values()) {
-    bucketKeysIn({ sites, placements, ordinals, spelled });
+    bucketKeysIn({ placements, ordinals, spelled });
   }
   return spelled;
 };

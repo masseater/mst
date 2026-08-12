@@ -2,54 +2,111 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { matchesGlobSegment } from "./glob-segment.ts";
 
-const matches = (segment: string, pattern: string): boolean =>
-  matchesGlobSegment({ segment, pattern });
+const it = test
+  .extend("starlessEqualMatch", () =>
+    matchesGlobSegment({ segment: "packages", pattern: "packages" }))
+  .extend("starlessUnequalMatch", () =>
+    matchesGlobSegment({ segment: "package", pattern: "packages" }),
+  )
+  .extend("wrappedSegmentMatch", () =>
+    matchesGlobSegment({ segment: "__fixtures__", pattern: "__*__" }),
+  )
+  .extend("missingHeadMatch", () => matchesGlobSegment({ segment: "fixtures__", pattern: "__*__" }))
+  .extend("missingTailMatch", () => matchesGlobSegment({ segment: "__fixtures", pattern: "__*__" }))
+  .extend("tooShortForBothEndsMatch", () => matchesGlobSegment({ segment: "__", pattern: "__*__" }))
+  .extend("bothEndsAndNothingBetweenMatch", () =>
+    matchesGlobSegment({ segment: "____", pattern: "__*__" }),
+  )
+  .extend("orderedInnerLiteralsMatch", () =>
+    matchesGlobSegment({ segment: "a-one-two-z", pattern: "a*one*two*z" }),
+  )
+  .extend("swappedInnerLiteralsMatch", () =>
+    matchesGlobSegment({ segment: "a-two-one-z", pattern: "a*one*two*z" }),
+  )
+  .extend("skippedInnerLiteralMatch", () =>
+    matchesGlobSegment({ segment: "a-two-three-z", pattern: "a*one*two*three*z" }),
+  )
+  .extend("innerLiteralInsideTailMatch", () =>
+    matchesGlobSegment({ segment: "a-z-one", pattern: "a*one*z-one" }),
+  )
+  .extend("loneStarMatch", () => matchesGlobSegment({ segment: "anything", pattern: "*" }))
+  .extend("trailingStarPrefixMatch", () =>
+    matchesGlobSegment({ segment: "index.test.ts", pattern: "index*" }),
+  )
+  .extend("trailingStarOtherPrefixMatch", () =>
+    matchesGlobSegment({ segment: "other.test.ts", pattern: "index*" }),
+  );
 
 describe("matchesGlobSegment", () => {
-  test("compares a pattern without a star for equality", () => {
-    expect(matches("packages", "packages")).toBe(true);
-    expect(matches("package", "packages")).toBe(false);
+  it("compares a pattern without a star for equality", ({ starlessEqualMatch }) => {
+    expect(starlessEqualMatch).toBe(true);
   });
 
-  test("accepts anything between a head and a tail", () => {
-    expect(matches("__fixtures__", "__*__")).toBe(true);
+  it("refuses a segment that only shares a prefix with a pattern without a star", ({
+    starlessUnequalMatch,
+  }) => {
+    expect(starlessUnequalMatch).toBe(false);
   });
 
-  test("refuses a segment that does not start with the head", () => {
-    expect(matches("fixtures__", "__*__")).toBe(false);
+  it("accepts anything between a head and a tail", ({ wrappedSegmentMatch }) => {
+    expect(wrappedSegmentMatch).toBe(true);
   });
 
-  test("refuses a segment that does not end with the tail", () => {
-    expect(matches("__fixtures", "__*__")).toBe(false);
+  it("refuses a segment that does not start with the head", ({ missingHeadMatch }) => {
+    expect(missingHeadMatch).toBe(false);
   });
 
-  test("refuses a segment shorter than the head and tail together", () => {
-    expect(matches("__", "__*__")).toBe(false);
+  it("refuses a segment that does not end with the tail", ({ missingTailMatch }) => {
+    expect(missingTailMatch).toBe(false);
   });
 
-  test("accepts a segment that is exactly the head and tail with nothing between", () => {
-    expect(matches("____", "__*__")).toBe(true);
+  it("refuses a segment shorter than the head and tail together", ({
+    tooShortForBothEndsMatch,
+  }) => {
+    expect(tooShortForBothEndsMatch).toBe(false);
   });
 
-  test("requires the inner literals to appear in the order the pattern gives", () => {
-    expect(matches("a-one-two-z", "a*one*two*z")).toBe(true);
-    expect(matches("a-two-one-z", "a*one*two*z")).toBe(false);
+  it("accepts a segment that is exactly the head and tail with nothing between", ({
+    bothEndsAndNothingBetweenMatch,
+  }) => {
+    expect(bothEndsAndNothingBetweenMatch).toBe(true);
   });
 
-  test("stops looking once an inner literal is missing rather than resuming at a later one", () => {
-    expect(matches("a-two-three-z", "a*one*two*three*z")).toBe(false);
+  it("requires the inner literals to appear in the order the pattern gives", ({
+    orderedInnerLiteralsMatch,
+  }) => {
+    expect(orderedInnerLiteralsMatch).toBe(true);
   });
 
-  test("refuses an inner literal that only appears inside the tail", () => {
-    expect(matches("a-z-one", "a*one*z-one")).toBe(false);
+  it("refuses inner literals that appear in the reverse of the pattern order", ({
+    swappedInnerLiteralsMatch,
+  }) => {
+    expect(swappedInnerLiteralsMatch).toBe(false);
   });
 
-  test("accepts a lone star", () => {
-    expect(matches("anything", "*")).toBe(true);
+  it("stops looking once an inner literal is missing rather than resuming at a later one", ({
+    skippedInnerLiteralMatch,
+  }) => {
+    expect(skippedInnerLiteralMatch).toBe(false);
   });
 
-  test("accepts a trailing star as a prefix match", () => {
-    expect(matches("index.test.ts", "index*")).toBe(true);
-    expect(matches("other.test.ts", "index*")).toBe(false);
+  it("refuses an inner literal that only appears inside the tail", ({
+    innerLiteralInsideTailMatch,
+  }) => {
+    expect(innerLiteralInsideTailMatch).toBe(false);
+  });
+
+  it("accepts a lone star", ({ loneStarMatch }) => {
+    expect(loneStarMatch).toBe(true);
+  });
+
+  it("accepts a trailing star as a prefix match", ({ trailingStarPrefixMatch }) => {
+    expect(trailingStarPrefixMatch).toBe(true);
+  });
+
+  it("refuses a segment that does not carry the prefix before a trailing star", ({
+    trailingStarOtherPrefixMatch,
+  }) => {
+    expect(trailingStarOtherPrefixMatch).toBe(false);
   });
 });

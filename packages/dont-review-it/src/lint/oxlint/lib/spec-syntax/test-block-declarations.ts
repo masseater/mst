@@ -1,3 +1,4 @@
+import { nodesOfType } from "../nodes-of-type.ts";
 import { ASSERTION_ENTRY_NAME } from "./assertion-entries.ts";
 import { staticMemberName } from "./static-names.ts";
 import { unwrapSubject, type SpecFunction } from "./subject-expressions.ts";
@@ -7,17 +8,13 @@ import type { ESTree } from "@oxlint/plugins";
 
 export const INJECTED_TEST_BLOCK_SPELLINGS: ReadonlySet<string> = new Set(["it", "test"]);
 
-export const INJECTED_GROUPING_BLOCK_SPELLINGS: ReadonlySet<string> = new Set(["describe"]);
+const INJECTED_GROUPING_BLOCK_SPELLINGS: ReadonlySet<string> = new Set(["describe"]);
 
 const INJECTED_ASSERTION_ENTRY_SPELLINGS: ReadonlySet<string> = new Set([ASSERTION_ENTRY_NAME]);
 
 const DERIVED_BUILDER_MEMBER = "extend";
 
-export type TestBlockBindings = {
-  readonly takeImport: (declaration: ESTree.ImportDeclaration) => void;
-  readonly takeLocalBinding: (declarator: ESTree.VariableDeclarator) => void;
-  readonly rootNames: () => ReadonlySet<string>;
-};
+export const RUNNER_MODULES: readonly string[] = ["vitest", "vite-plus/test"];
 
 const importedBlockNames = (
   declaration: ESTree.ImportDeclaration,
@@ -42,7 +39,7 @@ const boundRootName = (initializer: ESTree.Expression): string | null => {
 };
 
 const settledNames = (
-  reached: Set<string>,
+  reached: ReadonlySet<string>,
   initializers: ReadonlyMap<string, ESTree.Expression>,
 ): ReadonlySet<string> => {
   const gained = [...initializers].filter(
@@ -50,35 +47,59 @@ const settledNames = (
   );
   if (gained.length === 0) return reached;
 
-  for (const [name] of gained) reached.add(name);
-  return settledNames(reached, initializers);
+  return settledNames(new Set([...reached, ...gained.map(([name]) => name)]), initializers);
 };
 
-const blockBindingsOf = (spellings: ReadonlySet<string>): TestBlockBindings => {
-  const imported = new Set<string>();
-  const initializers = new Map<string, ESTree.Expression>();
+const initializersIn = (program: ESTree.Program): ReadonlyMap<string, ESTree.Expression> =>
+  new Map(
+    nodesOfType(program, "VariableDeclarator").flatMap((declarator) =>
+      declarator.id.type === "Identifier" && declarator.init !== null
+        ? [[declarator.id.name, declarator.init] as const]
+        : [],
+    ),
+  );
 
-  return {
-    takeImport: (declaration) => {
-      for (const name of importedBlockNames(declaration, spellings)) imported.add(name);
-    },
-    takeLocalBinding: (declarator) => {
-      if (declarator.id.type !== "Identifier") return;
-      if (declarator.init === null) return;
-      initializers.set(declarator.id.name, declarator.init);
-    },
-    rootNames: () => settledNames(new Set([...spellings, ...imported]), initializers),
-  };
+const rootNamesIn = (
+  program: ESTree.Program,
+  spellings: ReadonlySet<string>,
+): ReadonlySet<string> => {
+  const imported = nodesOfType(program, "ImportDeclaration").flatMap((declaration) =>
+    importedBlockNames(declaration, spellings),
+  );
+  return settledNames(new Set([...spellings, ...imported]), initializersIn(program));
 };
 
-export const testBlockBindings = (): TestBlockBindings =>
-  blockBindingsOf(INJECTED_TEST_BLOCK_SPELLINGS);
+export const testBlockRootNames = (program: ESTree.Program): ReadonlySet<string> =>
+  rootNamesIn(program, INJECTED_TEST_BLOCK_SPELLINGS);
 
-export const groupingBlockBindings = (): TestBlockBindings =>
-  blockBindingsOf(INJECTED_GROUPING_BLOCK_SPELLINGS);
+export const groupingBlockRootNames = (program: ESTree.Program): ReadonlySet<string> =>
+  rootNamesIn(program, INJECTED_GROUPING_BLOCK_SPELLINGS);
 
-export const assertionEntryBindings = (): TestBlockBindings =>
-  blockBindingsOf(INJECTED_ASSERTION_ENTRY_SPELLINGS);
+export const assertionEntryRootNames = (program: ESTree.Program): ReadonlySet<string> =>
+  rootNamesIn(program, INJECTED_ASSERTION_ENTRY_SPELLINGS);
+
+const shadowedNamesIn = (program: ESTree.Program): ReadonlySet<string> =>
+  new Set([
+    ...nodesOfType(program, "ImportDeclaration").flatMap((declaration) =>
+      declaration.specifiers.map((specifier) => specifier.local.name),
+    ),
+    ...nodesOfType(program, "VariableDeclarator").flatMap((declarator) =>
+      declarator.id.type === "Identifier" ? [declarator.id.name] : [],
+    ),
+    ...nodesOfType(program, "FunctionDeclaration").flatMap((declaration) =>
+      declaration.id === null ? [] : [declaration.id.name],
+    ),
+  ]);
+
+export const runnerRootedTestBlockRootNames = (program: ESTree.Program): ReadonlySet<string> => {
+  const shadowed = shadowedNamesIn(program);
+  const imported = nodesOfType(program, "ImportDeclaration")
+    .filter((declaration) => RUNNER_MODULES.includes(declaration.source.value))
+    .flatMap((declaration) => importedBlockNames(declaration, INJECTED_TEST_BLOCK_SPELLINGS));
+  const injected = [...INJECTED_TEST_BLOCK_SPELLINGS].filter((name) => !shadowed.has(name));
+
+  return settledNames(new Set([...injected, ...imported]), initializersIn(program));
+};
 
 export const declaresTestBlock = (
   call: ESTree.CallExpression,

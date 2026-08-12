@@ -49,7 +49,7 @@ const regionOf = ({
 
   return {
     before: source.slice(0, beginIndex + begin.length),
-    content: source.slice(beginIndex + begin.length, endIndex).trim(),
+    content: source.slice(beginIndex + begin.length, endIndex),
     after: source.slice(endIndex),
   };
 };
@@ -96,7 +96,7 @@ const reconcileRegion = async ({
   if ("problem" in loaded) return [loaded.problem];
 
   const { region } = loaded;
-  if (region.content === expected) return [];
+  if (region.content.trim() === expected) return [];
   if (!write) {
     return [{ file: listConfig.path, line: null, message: staleRegion(listConfig.path) }];
   }

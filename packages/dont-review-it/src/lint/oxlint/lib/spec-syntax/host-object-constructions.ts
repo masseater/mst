@@ -3,11 +3,11 @@ import { unwrapSubject } from "./subject-expressions.ts";
 
 import type { ESTree, Options } from "@oxlint/plugins";
 
-export const DEFAULT_HOST_OBJECT_TYPES: readonly string[] = ["Request", "Response"];
+const DEFAULT_HOST_OBJECT_TYPES: readonly string[] = ["Request", "Response"];
 
-export const DEFAULT_RUNTIME_MODULES: readonly string[] = ["undici"];
+const DEFAULT_RUNTIME_MODULES: readonly string[] = ["undici"];
 
-export const HOST_OBJECT_FACTORY_MEMBERS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
+const HOST_OBJECT_FACTORY_MEMBERS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
   ["Response", new Set(["error", "json", "redirect"])],
 ]);
 

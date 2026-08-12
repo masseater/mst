@@ -101,10 +101,9 @@ const declarationFrom = (
 };
 
 const exportedTypeDeclarationOf = (statement: unknown): ExportedTypeDeclaration | null => {
-  const exported = statement as AstFields;
-  if (exported[NODE_TYPE_FIELD] !== EXPORT_KIND) return null;
+  if (!isAstFields(statement) || statement[NODE_TYPE_FIELD] !== EXPORT_KIND) return null;
 
-  const { declaration } = exported;
+  const { declaration } = statement;
   if (!isAstFields(declaration)) return null;
 
   const shapeOf = SHAPE_BY_KIND.get(String(declaration[NODE_TYPE_FIELD]));

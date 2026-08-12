@@ -47,7 +47,7 @@ export const forbidSymbolPrefixedName = createLintRuleAuthoringRule({
           allowedNames,
         });
 
-        for (const { segment, path } of offending) {
+        for (const [segment, path] of offending) {
           context.report({
             node,
             messageId: "symbolPrefixedSegment",

@@ -12,9 +12,9 @@ const RECORD_ESCAPE = /\\([\S\s])/gu;
 
 const EMPTY_BODY_RECORD = /^([$_\p{ID_Start}][$\p{ID_Continue}]*) \{\}$/u;
 
-const RECORD_LINE_BREAK = "\n";
+const RECORD_LINE_BREAK = /\r?\n/u;
 
-export const RECORD_TITLE_SEPARATOR = " > ";
+const RECORD_TITLE_SEPARATOR = " > ";
 
 export const MAX_INLINE_RECORD_LINES = 12;
 
@@ -22,12 +22,9 @@ export const externalRecordKeyOf = (titles: readonly string[], ordinal: number):
   `${titles.join(RECORD_TITLE_SEPARATOR)} ${ordinal}`;
 
 export const recordLineCountOf = (record: string): number => {
-  const written = record.replaceAll("\r\n", RECORD_LINE_BREAK);
-  const padded =
-    written.length >= 2 &&
-    written.startsWith(RECORD_LINE_BREAK) &&
-    written.endsWith(RECORD_LINE_BREAK);
-  return (padded ? written.slice(1, -1) : written).split(RECORD_LINE_BREAK).length;
+  const lines = record.split(RECORD_LINE_BREAK);
+  const padded = lines.length >= 3 && lines.at(0) === "" && lines.at(-1) === "";
+  return padded ? lines.length - 2 : lines.length;
 };
 
 const spelledRecord = (written: string): string => written.replaceAll(RECORD_ESCAPE, "$1");
