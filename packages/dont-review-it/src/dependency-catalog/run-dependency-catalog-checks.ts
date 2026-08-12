@@ -1,7 +1,5 @@
 import { join } from "node:path";
 
-import { attempt } from "es-toolkit";
-
 import { readTextFile } from "../lint/oxlint/lib/canonical-values/source-files.ts";
 import { bypassedCatalogFindings } from "./checks/bypassed-catalog-entry.ts";
 import { singleUseCatalogEntryFindings } from "./checks/single-use-catalog-entry.ts";
@@ -18,7 +16,7 @@ import {
 import { recordOf } from "./record-fields.ts";
 import {
   catalogReferencingOverridesIn,
-  parseWorkspaceDefinition,
+  parsedWorkspaceDefinitionOrNull,
   type OverrideCatalogReference,
   type WorkspaceDefinition,
 } from "./workspace-definition.ts";
@@ -32,19 +30,6 @@ const byFileThenMessage = (
   left.file === right.file
     ? left.message.localeCompare(right.message)
     : left.file.localeCompare(right.file);
-
-const parsedDefinitionOrNull = ({
-  source,
-  config,
-}: {
-  readonly source: string;
-  readonly config: DependencyCatalogChecksConfig;
-}): WorkspaceDefinition | null => {
-  const [unparsableSource, definition] = attempt(() =>
-    parseWorkspaceDefinition({ source, config }),
-  );
-  return unparsableSource === null ? definition : null;
-};
 
 const rootOverrideReferences = ({
   manifests,
@@ -141,7 +126,7 @@ export const runDependencyCatalogChecks = ({
     };
   }
 
-  const definition = parsedDefinitionOrNull({ source, config });
+  const definition = parsedWorkspaceDefinitionOrNull({ source, config });
   if (definition === null) {
     return {
       problems: [

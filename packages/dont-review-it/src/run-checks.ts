@@ -20,6 +20,8 @@ import {
 import { duplicatedClustersIn } from "./lint/oxlint/lib/duplicated-bodies/body-index.ts";
 import { buildRepositoryBodyIndex } from "./lint/oxlint/lib/duplicated-bodies/builder.ts";
 import { formatDuplicatedCluster } from "./lint/oxlint/lib/duplicated-bodies/site-report.ts";
+import { defaultPresetAdoptionConfig } from "./preset-adoption/config.ts";
+import { runPresetAdoptionChecks } from "./preset-adoption/run-preset-adoption-checks.ts";
 import { formatRepositoryProblem } from "./problem.ts";
 import { defaultWorkflowChecksConfig } from "./workflows/config.ts";
 import { runWorkflowChecks } from "./workflows/run-workflow-checks.ts";
@@ -34,6 +36,8 @@ export type CheckReport = {
 };
 
 const NO_WORKSPACE_DEFINITION = "no workspace definition";
+
+const NO_TOOLCHAIN_CONFIG = "no toolchain configuration";
 
 const UNREADABLE_WORKSPACE_DEFINITION = "workspace definition does not parse";
 
@@ -50,6 +54,10 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
   const catalog = buildCanonicalValuesCatalog({ repositoryRoot });
   const workflows = runWorkflowChecks({ repositoryRoot, config: defaultWorkflowChecksConfig });
   const skills = shippedSkillsProblems({ repositoryRoot, config: defaultIntentSkillsConfig });
+  const presetAdoption = runPresetAdoptionChecks({
+    repositoryRoot,
+    config: defaultPresetAdoptionConfig,
+  });
   const ruleIndex = dependencyCatalog.definitionUnreadable
     ? { problems: [], scanned: 0 }
     : lintRuleIndexProblems({ repositoryRoot, write: false });
@@ -118,6 +126,14 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
       skippedReason: dependencyCatalog.definitionMissing ? NO_WORKSPACE_DEFINITION : null,
       problems: dependencyCatalog.problems.map(formatDependencyCatalogProblem).toSorted(),
       warnings: dependencyCatalog.warnings.map(formatDependencyCatalogProblem).toSorted(),
+    },
+    {
+      check: "preset-adoption",
+      unit: "workspace",
+      count: presetAdoption.scanned,
+      skippedReason: presetAdoption.configMissing ? NO_TOOLCHAIN_CONFIG : null,
+      problems: [],
+      warnings: presetAdoption.warnings.map(formatRepositoryProblem).toSorted(),
     },
     {
       check: "intent-skills",

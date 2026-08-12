@@ -2,12 +2,12 @@ import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 
 import {
+  createCliRunner,
   EXIT_MISUSE,
   EXIT_PROBLEMS_FOUND,
   EXIT_SUCCESS,
   type CliResult,
 } from "@mst/repository-checks";
-import { attemptAsync } from "es-toolkit";
 
 import { defaultConfig } from "./config.ts";
 import { formatProblem } from "./problem.ts";
@@ -53,9 +53,4 @@ const dispatch = async (argv: readonly string[]): Promise<CliResult> => {
   };
 };
 
-export const runAgenticDocuments = async (argv: readonly string[]): Promise<CliResult> => {
-  const [failure, checked] = await attemptAsync<CliResult, Error>(async () => dispatch(argv));
-  return failure === null
-    ? checked
-    : { exitCode: EXIT_MISUSE, out: "", error: `${failure.message}\n` };
-};
+export const runAgenticDocuments = createCliRunner(dispatch);

@@ -97,6 +97,7 @@ export const noAmbiguousVariableName = createDontReviewItRule({
       },
       PropertyDefinition(node: ESTree.PropertyDefinition) {
         if (node.computed) return;
+        if (node.override === true) return;
         if (node.key.type !== "Identifier") return;
         reportForbidden(node.key);
       },

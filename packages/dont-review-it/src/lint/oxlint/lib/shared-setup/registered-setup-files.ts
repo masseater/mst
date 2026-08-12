@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { memoize } from "es-toolkit";
 
 import { LINT_CONFIGURATION_FILE } from "../lint-suppression/lint-config-suppression.ts";
+import { ARRAY_EXPRESSION } from "../node-kinds.ts";
 import { toPosixPath } from "../posix-path.ts";
 import {
   UNSCANNED_DIRECTORY_NAMES,
@@ -28,8 +29,6 @@ const REGISTERED_SETUP_KEYS: readonly string[] = ["setupFiles", "globalSetup"];
 export const RUNNER_BLOCK_KEY = "test";
 
 const PROJECT_LIST_KEY = "projects";
-
-const ARRAY_EXPRESSION = "ArrayExpression";
 
 export const isRunnerConfigurationFile = (filename: string): boolean =>
   LINT_CONFIGURATION_FILE.test(toPosixPath(filename));

@@ -1,4 +1,5 @@
 import { loadCanonicalValuesCatalog } from "./lint/oxlint/lib/canonical-values/builder.ts";
+import { loadCatalogEntries } from "./lint/oxlint/lib/dependency-catalog/catalog-entries.ts";
 import { loadWorkspaceDependencies } from "./lint/oxlint/lib/dependency-catalog/workspace-manifests.ts";
 import { loadRepositoryBodyIndex } from "./lint/oxlint/lib/duplicated-bodies/builder.ts";
 import { loadLibraryVocabulary } from "./lint/oxlint/lib/library-vocabulary/harvester.ts";
@@ -87,6 +88,7 @@ import { noUnorderedImport } from "./lint/oxlint/rules/no-unordered-import--grou
 import { createNoUnusedStyleClass } from "./lint/oxlint/rules/no-unused-style-class--delete-or-reference-it.ts";
 import { noUnwrappedToolchainConfig } from "./lint/oxlint/rules/no-unwrapped-toolchain-config--wrap-with-git-excludes.ts";
 import { noVacuousHostObjectEquality } from "./lint/oxlint/rules/no-vacuous-host-object-equality--assert-parsed-value.ts";
+import { createNoVersionRange } from "./lint/oxlint/rules/no-version-range--pin-the-exact-version.ts";
 import { noViMockFactoryBehavior } from "./lint/oxlint/rules/no-vi-mock-factory-behavior--use-spy-true-and-fixture.ts";
 import { noVitestContextExpect } from "./lint/oxlint/rules/no-vitest-context-expect--import-expect-from-vitest.ts";
 import { createRequireCatalogEntry } from "./lint/oxlint/rules/require-catalog-entry--register-shared-dependency.ts";
@@ -134,6 +136,11 @@ const noSplitTypeAuthority = createNoSplitTypeAuthority({
 
 const requireCatalogEntry = createRequireCatalogEntry({
   loadWorkspaces: loadWorkspaceDependencies,
+});
+
+const noVersionRange = createNoVersionRange({
+  loadWorkspaces: loadWorkspaceDependencies,
+  loadCatalog: loadCatalogEntries,
 });
 
 const plugin: Plugin = {
@@ -221,6 +228,7 @@ const plugin: Plugin = {
     [noUnwrappedToolchainConfig.name]: noUnwrappedToolchainConfig,
     [noVacuousHostObjectEquality.name]: noVacuousHostObjectEquality,
     [noViMockFactoryBehavior.name]: noViMockFactoryBehavior,
+    [noVersionRange.name]: noVersionRange,
     [noVitestContextExpect.name]: noVitestContextExpect,
     [requireCatalogEntry.name]: requireCatalogEntry,
     [requireItOnlyExpect.name]: requireItOnlyExpect,

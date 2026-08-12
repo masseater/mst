@@ -15,12 +15,25 @@ export type DeclaredDependency = {
   readonly declaredVersion: string;
 };
 
-const aliasTargetOf = (declaredVersion: string): string | null => {
+const aliasPartsOf = (
+  declaredVersion: string,
+): { readonly targetName: string; readonly range: string } => {
   const checked = declaredVersion.slice(ALIAS_PROTOCOL.length);
   const rangeAt = checked.lastIndexOf("@");
-  const targetName = rangeAt > 0 ? checked.slice(0, rangeAt) : checked;
+  return rangeAt > 0
+    ? { targetName: checked.slice(0, rangeAt), range: checked.slice(rangeAt + 1) }
+    : { targetName: checked, range: "" };
+};
+
+const aliasTargetOf = (declaredVersion: string): string | null => {
+  const { targetName } = aliasPartsOf(declaredVersion);
   return targetName === "" ? null : targetName;
 };
+
+export const declaredRangeOf = (declaredVersion: string): string =>
+  declaredVersion.startsWith(ALIAS_PROTOCOL)
+    ? aliasPartsOf(declaredVersion).range
+    : declaredVersion;
 
 const packageNameOf = (declaration: {
   readonly declaredName: string;

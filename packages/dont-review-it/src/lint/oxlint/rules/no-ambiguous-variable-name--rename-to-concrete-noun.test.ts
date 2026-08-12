@@ -47,6 +47,10 @@ describe("dont-review-it/no-ambiguous-variable-name--rename-to-concrete-noun", (
         code: "const toLabel = ({ data }: { data: string }) => data;",
       },
       {
+        name: "a field overriding a base class member takes the name the base declared",
+        code: 'class Failure extends Error {\n  override readonly name = "Failure";\n}',
+      },
+      {
         name: "a computed class field is named by the key expression",
         code: "class Report {\n  [fieldName] = 1;\n}",
       },

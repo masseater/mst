@@ -1,11 +1,12 @@
+const COUNT_ATTRIBUTE = "data-count";
+
 export const setupCounter = (button: HTMLButtonElement): void => {
-  let clickCount = 0;
   const renderCount = (renderedCount: number): void => {
-    clickCount = renderedCount;
-    button.textContent = `Count is ${clickCount}`;
+    button.setAttribute(COUNT_ATTRIBUTE, String(renderedCount));
+    button.replaceChildren(`Count is ${renderedCount}`);
   };
   button.addEventListener("click", () => {
-    renderCount(clickCount + 1);
+    renderCount(Number(button.getAttribute(COUNT_ATTRIBUTE)) + 1);
   });
   renderCount(0);
 };

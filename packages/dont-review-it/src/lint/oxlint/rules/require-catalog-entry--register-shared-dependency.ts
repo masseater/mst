@@ -1,38 +1,19 @@
-import { dirname, resolve } from "node:path";
-
 import { createDontReviewItRule } from "../../../create-rule.ts";
-import { nearestPackageDirectory } from "../lib/canonical-values/source-files.ts";
-import { findWorkspaceRoot } from "../lib/canonical-values/workspace-root.ts";
 import {
   CATALOG_ENTRY_SCHEMA,
   catalogFrom,
   deviationsFrom,
 } from "../lib/dependency-catalog/catalog-options.ts";
+import { declaringWorkspaceOf } from "../lib/dependency-catalog/declaring-workspace.ts";
 import {
   describeSites,
   sharedDependencyIndex,
-  workspaceDirectoryOf,
   type UnregisteredSharedDependency,
   type WorkspaceDependenciesLoader,
 } from "../lib/dependency-catalog/shared-dependency-index.ts";
 
 import type { WorkspaceLintRule } from "@mst/lint-rule-authoring";
 import type { Context, ESTree } from "@oxlint/plugins";
-
-const declaringWorkspaceOf = (inspection: {
-  readonly cwd: string;
-  readonly filename: string;
-}): { readonly repositoryRoot: string; readonly relativeDir: string } | null => {
-  const fileDirectory = dirname(resolve(inspection.cwd, inspection.filename));
-  const repositoryRoot = findWorkspaceRoot(fileDirectory);
-  const packageDirectory = nearestPackageDirectory(fileDirectory, repositoryRoot);
-  if (packageDirectory === null) return null;
-
-  return {
-    repositoryRoot,
-    relativeDir: workspaceDirectoryOf({ repositoryRoot, packageDirectory }),
-  };
-};
 
 const unregisteredSharedFor = (lookup: {
   readonly inspection: Context;

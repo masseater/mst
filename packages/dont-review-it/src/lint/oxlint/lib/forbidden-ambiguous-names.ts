@@ -194,7 +194,7 @@ const withoutLeadingQualifiers = (parts: readonly string[]): readonly string[] =
     ? withoutLeadingQualifiers(parts.slice(1))
     : parts;
 
-export const normalizeIdentifierName = (spelled: string): string =>
+const normalizeIdentifierName = (spelled: string): string =>
   withoutLeadingQualifiers(withoutTrailingDigits(words(spelled))).join("");
 
 export const createForbiddenNameMatcher = (

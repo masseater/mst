@@ -3,7 +3,6 @@ import { describe, expect, test } from "vite-plus/test";
 import {
   createForbiddenNameMatcher,
   FORBIDDEN_AMBIGUOUS_NAMES,
-  normalizeIdentifierName,
 } from "./forbidden-ambiguous-names.ts";
 
 describe("forbidden-ambiguous-names", () => {
@@ -131,22 +130,14 @@ describe("forbidden-ambiguous-names", () => {
   });
 
   test("normalizing strips decorations down to the subject", () => {
-    expect(normalizeIdentifierName("theNewData")).toBe("Data");
-    expect(normalizeIdentifierName("_res2")).toBe("res");
-    expect(normalizeIdentifierName("parseResult")).toBe("parseResult");
-  });
-
-  test("normalizing keeps the last word even when every word decorates", () => {
-    expect(normalizeIdentifierName("theCurrent")).toBe("Current");
+    expect(isForbidden("theNewData")).toBe(true);
+    expect(isForbidden("_res2")).toBe(true);
+    expect(isForbidden("parseResult")).toBe(true);
   });
 
   test("a name with no words at all is judged as nothing", () => {
     expect(isForbidden("__")).toBe(false);
-    expect(normalizeIdentifierName("__")).toBe("");
-  });
-
-  test("a name made only of digits keeps them", () => {
-    expect(normalizeIdentifierName("_2")).toBe("2");
+    expect(isForbidden("_2")).toBe(false);
   });
 
   test("an empty vocabulary forbids nothing", () => {
