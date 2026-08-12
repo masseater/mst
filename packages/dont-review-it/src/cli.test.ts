@@ -16,6 +16,9 @@ const NO_LOCAL_CODE = NO_LOCAL_RULE.replace("/", "(") + ")";
 
 const NO_STRICT_CODE = NO_STRICT_RULE.replace("/", "(") + ")";
 
+const CANONICAL_VALUES_SUCCESS_LINE =
+  /^(?:checked canonical-values \d+ source files? 0 problems 0 warnings|[ \t]+✓ canonical-values[ \t]+\d+ source files?)$/mu;
+
 const CLI_PATH = fileURLToPath(new URL("./cli.ts", import.meta.url));
 
 const PLUGIN_PATH = fileURLToPath(new URL("./plugin.ts", import.meta.url));
@@ -133,7 +136,7 @@ describe("canonical values process e2e", { timeout: PROCESS_TIMEOUT * 4 }, () =>
 
     const verified = runCli(root);
     expect(verified).toMatchObject({ exitCode: 0, out: "" });
-    expect(verified.error).toContain("checked canonical-values");
+    expect(verified.error).toMatch(CANONICAL_VALUES_SUCCESS_LINE);
     expect(runLint(root, "src/owner.ts")).toMatchObject({ exitCode: 0 });
     const consumer = runLint(root, "src/consumer.ts");
     expect(consumer.exitCode).toBe(1);
@@ -214,7 +217,7 @@ describe("canonical values process e2e", { timeout: PROCESS_TIMEOUT * 4 }, () =>
 
     const verified = runCli(root);
     expect(verified).toMatchObject({ exitCode: 0, out: "" });
-    expect(verified.error).toContain("checked canonical-values");
+    expect(verified.error).toMatch(CANONICAL_VALUES_SUCCESS_LINE);
     const linted = runLint(root, "src/shadow-consumer.ts");
     expect(linted.exitCode).toBe(1);
     expect(linted.out).toContain(NO_LOCAL_CODE);
@@ -226,7 +229,7 @@ describe("canonical values process e2e", { timeout: PROCESS_TIMEOUT * 4 }, () =>
 
     const verified = runCli(root);
     expect(verified).toMatchObject({ exitCode: 0, out: "" });
-    expect(verified.error).toContain("checked canonical-values");
+    expect(verified.error).toMatch(CANONICAL_VALUES_SUCCESS_LINE);
     expect(runLint(root, "src/alias-consumer.ts")).toMatchObject({ exitCode: 0 });
   });
 
