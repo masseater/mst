@@ -185,12 +185,12 @@ const MEANINGLESS_QUALIFIERS: ReadonlySet<string> = new Set([
 const isDigitsOnly = (word: string): boolean => /^\d+$/u.test(word);
 
 const withoutTrailingDigits = (parts: readonly string[]): readonly string[] =>
-  parts.length > 1 && isDigitsOnly(parts[parts.length - 1] ?? "")
+  parts.length > 1 && isDigitsOnly(String(parts.at(-1)))
     ? withoutTrailingDigits(parts.slice(0, -1))
     : parts;
 
 const withoutLeadingQualifiers = (parts: readonly string[]): readonly string[] =>
-  parts.length > 1 && MEANINGLESS_QUALIFIERS.has((parts[0] ?? "").toLowerCase())
+  parts.length > 1 && MEANINGLESS_QUALIFIERS.has(String(parts.at(0)).toLowerCase())
     ? withoutLeadingQualifiers(parts.slice(1))
     : parts;
 

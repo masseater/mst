@@ -140,6 +140,15 @@ describe("forbidden-ambiguous-names", () => {
     expect(normalizeIdentifierName("theCurrent")).toBe("Current");
   });
 
+  test("a name with no words at all is judged as nothing", () => {
+    expect(isForbidden("__")).toBe(false);
+    expect(normalizeIdentifierName("__")).toBe("");
+  });
+
+  test("a name made only of digits keeps them", () => {
+    expect(normalizeIdentifierName("_2")).toBe("2");
+  });
+
   test("an empty vocabulary forbids nothing", () => {
     expect(createForbiddenNameMatcher([])("data")).toBe(false);
   });

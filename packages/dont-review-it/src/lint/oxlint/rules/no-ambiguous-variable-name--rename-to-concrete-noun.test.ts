@@ -31,6 +31,22 @@ describe("dont-review-it/no-ambiguous-variable-name--rename-to-concrete-noun", (
         code: "const currentUser = load();",
       },
       {
+        name: "a class field spelled as a literal is named by the key",
+        code: 'class Report {\n  "data" = 1;\n}',
+      },
+      {
+        name: "a rest binding in an object pattern takes the shape of what is left",
+        code: "const { ...data } = payload;",
+      },
+      {
+        name: "a hole in an array pattern binds nothing",
+        code: "const [, first] = lines;",
+      },
+      {
+        name: "a destructuring parameter takes its names from the shape",
+        code: "const toLabel = ({ data }: { data: string }) => data;",
+      },
+      {
         name: "a computed class field is named by the key expression",
         code: "class Report {\n  [fieldName] = 1;\n}",
       },
@@ -113,6 +129,11 @@ describe("dont-review-it/no-ambiguous-variable-name--rename-to-concrete-noun", (
         name: "a rest parameter is reported on the binding",
         code: "const join = (...args: string[]) => args.join('');",
         errors: [{ messageId: "ambiguousVariableName", data: { name: "args" } }],
+      },
+      {
+        name: "a function expression parameter is a name its author chooses",
+        code: "const render = function (data: string) {\n  return data;\n};",
+        errors: [{ messageId: "ambiguousVariableName", data: { name: "data" } }],
       },
       {
         name: "a class field is a name its author chooses",
