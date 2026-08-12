@@ -1,9 +1,6 @@
 #!/usr/bin/env node
-import { runAutoDevelop } from "./run-cli.ts";
+import { runMain } from "citty";
 
-const { exitCode, out, error } = runAutoDevelop();
+import { autoDevelopCommand } from "./cli/runtime-command.ts";
 
-if (out !== "") process.stdout.write(out);
-if (error !== "") process.stderr.write(error);
-
-process.exitCode = exitCode;
+await runMain(autoDevelopCommand);

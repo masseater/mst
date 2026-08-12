@@ -1,14 +1,9 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import {
-  LAUNCH_AUTO,
-  parseRunContext,
-  RUN_CONTEXT_SCHEMA_VERSION,
-  safeParseRunContext,
-} from "./run-context.ts";
+import { LAUNCH_AUTO, parseRunContext } from "./run-context.ts";
 
 const validContext = {
-  schemaVersion: RUN_CONTEXT_SCHEMA_VERSION,
+  schemaVersion: 1,
   mode: "reviewer",
   launchPath: LAUNCH_AUTO,
   prNumber: 7,
@@ -30,29 +25,35 @@ const validContext = {
   },
 };
 
+const rejectionTextOf = (candidate: unknown): string => {
+  try {
+    parseRunContext(candidate);
+    return "no failure";
+  } catch (parseFailure) {
+    return String(parseFailure);
+  }
+};
+
+const it = test
+  .extend("acceptedContext", () => parseRunContext(validContext))
+  .extend("schemaVersionRejection", () => rejectionTextOf({ ...validContext, schemaVersion: 2 }))
+  .extend("prNumberRejection", () => rejectionTextOf({ ...validContext, prNumber: 0 }))
+  .extend("modeRejection", () => rejectionTextOf({ ...validContext, mode: "other" }));
+
 describe("parseRunContext", () => {
-  test("妥当なコンテキストはそのまま通る", () => {
-    expect(parseRunContext(validContext).prNumber).toStrictEqual(7);
+  it("妥当なコンテキストはそのまま通る", ({ acceptedContext }) => {
+    expect(acceptedContext.prNumber).toStrictEqual(7);
   });
 
-  test("スキーマ版数が違えば例外になる", () => {
-    expect(() => parseRunContext({ ...validContext, schemaVersion: 2 })).toThrow("Invalid");
+  it("スキーマ版数が違えば例外になる", ({ schemaVersionRejection }) => {
+    expect(schemaVersionRejection).toContain("Invalid");
   });
 
-  test("PR 番号が正整数でなければ例外になる", () => {
-    expect(() => parseRunContext({ ...validContext, prNumber: 0 })).toThrow("Too small");
+  it("PR 番号が正整数でなければ例外になる", ({ prNumberRejection }) => {
+    expect(prNumberRejection).toContain("Too small");
   });
 
-  test("モードが語彙外なら例外になる", () => {
-    expect(() => parseRunContext({ ...validContext, mode: "other" })).toThrow("invalid mode");
-  });
-});
-
-describe("safeParseRunContext", () => {
-  test("妥当なら値、不正なら null を返す", () => {
-    expect([
-      safeParseRunContext(validContext)?.mode,
-      safeParseRunContext({ broken: true }),
-    ]).toStrictEqual(["reviewer", null]);
+  it("モードが語彙外なら例外になる", ({ modeRejection }) => {
+    expect(modeRejection).toContain("invalid mode");
   });
 });

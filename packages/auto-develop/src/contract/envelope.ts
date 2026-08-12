@@ -9,7 +9,7 @@ export type EventEnvelope = {
   readonly payload: Readonly<Record<string, unknown>>;
 };
 
-export class InvalidEnvelopeError extends Error {
+class InvalidEnvelopeError extends Error {
   override readonly name = "InvalidEnvelopeError";
 
   constructor() {

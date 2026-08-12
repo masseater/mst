@@ -9,7 +9,7 @@ const RUN_ROOT_DIRECTORY: Readonly<Record<Mode, string>> = {
   author: "author",
 };
 
-export const timestampSlug = (isoTime: string): string =>
+const timestampSlug = (isoTime: string): string =>
   isoTime.replaceAll(":", "-").replaceAll(".", "-");
 
 export const runIdFor = (build: { readonly prNumber: number; readonly isoTime: string }): string =>

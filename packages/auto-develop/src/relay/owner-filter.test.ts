@@ -28,9 +28,9 @@ const stubGithub = (overrides: Partial<GithubReader> = {}): GithubReader => ({
 const filterWith = (overrides: Partial<GithubReader> = {}) =>
   createOwnerFilter({ events: createMemoryEventStore(), github: stubGithub(overrides) });
 
-describe("review_requested の宛先判定", () => {
-  test("指名された reviewer には配る", async () => {
-    const owned = await filterWith().owns({
+const it = test
+  .extend("reviewRequestForNamedReviewer", () =>
+    filterWith().owns({
       event: relayedEvent("delivery-1", {
         payload: {
           action: "review_requested",
@@ -39,12 +39,9 @@ describe("review_requested の宛先判定", () => {
         },
       }),
       subscriberLogin: "hubot",
-    });
-    expect(owned).toStrictEqual(true);
-  });
-
-  test("他人宛のレビュー依頼は作者にも配らない", async () => {
-    const owned = await filterWith().owns({
+    }))
+  .extend("reviewRequestForAuthor", () =>
+    filterWith().owns({
       event: relayedEvent("delivery-1", {
         payload: {
           action: "review_requested",
@@ -53,14 +50,10 @@ describe("review_requested の宛先判定", () => {
         },
       }),
       subscriberLogin: "octocat",
-    });
-    expect(owned).toStrictEqual(false);
-  });
-});
-
-describe("レビュー入力変更の宛先判定", () => {
-  test("synchronize は現任レビュアーに配る", async () => {
-    const owned = await filterWith().owns({
+    }),
+  )
+  .extend("synchronizeForCurrentReviewer", () =>
+    filterWith().owns({
       event: relayedEvent("delivery-1", {
         payload: {
           action: "synchronize",
@@ -72,12 +65,10 @@ describe("レビュー入力変更の宛先判定", () => {
         },
       }),
       subscriberLogin: "hubot",
-    });
-    expect(owned).toStrictEqual(true);
-  });
-
-  test("synchronize は作者にも配る（両取り）", async () => {
-    const owned = await filterWith().owns({
+    }),
+  )
+  .extend("synchronizeForAuthor", () =>
+    filterWith().owns({
       event: relayedEvent("delivery-1", {
         payload: {
           action: "synchronize",
@@ -89,12 +80,10 @@ describe("レビュー入力変更の宛先判定", () => {
         },
       }),
       subscriberLogin: "octocat",
-    });
-    expect(owned).toStrictEqual(true);
-  });
-
-  test("changes.base を伴う edited は現任レビュアーに配る", async () => {
-    const owned = await filterWith().owns({
+    }),
+  )
+  .extend("baseEditedForCurrentReviewer", () =>
+    filterWith().owns({
       event: relayedEvent("delivery-1", {
         payload: {
           action: "edited",
@@ -107,12 +96,10 @@ describe("レビュー入力変更の宛先判定", () => {
         },
       }),
       subscriberLogin: "hubot",
-    });
-    expect(owned).toStrictEqual(true);
-  });
-
-  test("title だけの edited はレビュー入力変更ではなく reviewer には配らない", async () => {
-    const owned = await filterWith().owns({
+    }),
+  )
+  .extend("titleEditedForCurrentReviewer", () =>
+    filterWith().owns({
       event: relayedEvent("delivery-1", {
         payload: {
           action: "edited",
@@ -125,33 +112,25 @@ describe("レビュー入力変更の宛先判定", () => {
         },
       }),
       subscriberLogin: "hubot",
-    });
-    expect(owned).toStrictEqual(false);
-  });
-});
-
-describe("作者判定", () => {
-  test("payload の作者と一致すれば配る", async () => {
-    const owned = await filterWith().owns({
+    }),
+  )
+  .extend("openedForMatchingAuthor", () =>
+    filterWith().owns({
       event: relayedEvent("delivery-1", {
         payload: { action: "opened", pull_request: { number: 7, user: { login: "octocat" } } },
       }),
       subscriberLogin: "octocat",
-    });
-    expect(owned).toStrictEqual(true);
-  });
-
-  test("login の比較は大文字小文字を区別する", async () => {
-    const owned = await filterWith().owns({
+    }),
+  )
+  .extend("openedForDifferentlyCasedAuthor", () =>
+    filterWith().owns({
       event: relayedEvent("delivery-1", {
         payload: { action: "opened", pull_request: { number: 7, user: { login: "OctoCat" } } },
       }),
       subscriberLogin: "octocat",
-    });
-    expect(owned).toStrictEqual(false);
-  });
-
-  test("記憶済みの PR は作者無しイベントでもキャッシュで判定し解決器を呼ばない", async () => {
+    }),
+  )
+  .extend("lookupOverRememberedPull", async () => {
     const resolvePullAuthor = vi.fn<GithubReader["resolvePullAuthor"]>();
     const ownerFilter = filterWith({ resolvePullAuthor });
     ownerFilter.remember(
@@ -173,93 +152,62 @@ describe("作者判定", () => {
       }),
       subscriberLogin: "octocat",
     });
-    expect([owned, resolvePullAuthor.mock.calls.length]).toStrictEqual([true, 0]);
-  });
-
-  test("キャッシュに無ければ保存イベントから作者を引く", async () => {
+    return { owned, resolvePullAuthor };
+  })
+  .extend("ownershipFromStoredEvent", async () => {
     const events = createMemoryEventStore();
     await events.createIfAbsent(
       relayedEvent("delivery-authored", {
         payload: { pull_request: { number: 7, user: { login: "octocat" } } },
       }),
     );
-    const ownerFilter = createOwnerFilter({ events, github: stubGithub() });
-    const owned = await ownerFilter.owns({
+    return createOwnerFilter({ events, github: stubGithub() }).owns({
       event: relayedEvent("delivery-2", {
         eventType: "check_suite",
         payload: { check_suite: { pull_requests: [{ number: 7 }] } },
       }),
       subscriberLogin: "octocat",
     });
-    expect(owned).toStrictEqual(true);
-  });
-
-  test("保存イベントに無ければ GitHub の現在状態から作者を引く", async () => {
-    const ownerFilter = filterWith({ resolvePullAuthor: () => Promise.resolve("octocat") });
-    const owned = await ownerFilter.owns({
+  })
+  .extend("ownershipFromGithubState", () =>
+    filterWith({ resolvePullAuthor: () => Promise.resolve("octocat") }).owns({
       event: relayedEvent("delivery-2", {
         eventType: "check_suite",
         payload: { check_suite: { pull_requests: [{ number: 7 }] } },
       }),
       subscriberLogin: "octocat",
-    });
-    expect(owned).toStrictEqual(true);
-  });
-
-  test("どの PR でも作者を解決できなければ誰にも配らない", async () => {
-    const owned = await filterWith().owns({
+    }),
+  )
+  .extend("ownershipWithoutResolvableAuthor", () =>
+    filterWith().owns({
       event: relayedEvent("delivery-2", {
         eventType: "check_suite",
         payload: { check_suite: { pull_requests: [{ number: 7 }] } },
       }),
       subscriberLogin: "octocat",
-    });
-    expect(owned).toStrictEqual(false);
-  });
-
-  test("PR 番号も作者も無いイベントは誰にも配らない", async () => {
-    const owned = await filterWith().owns({
+    }),
+  )
+  .extend("ownershipWithoutPullNumber", () =>
+    filterWith().owns({
       event: relayedEvent("delivery-2", {
         eventType: "check_suite",
         payload: { check_suite: { pull_requests: [] } },
       }),
       subscriberLogin: "octocat",
-    });
-    expect(owned).toStrictEqual(false);
-  });
-
-  test("複数 PR は最初に解決できた作者で即決する", async () => {
-    const ownerFilter = filterWith({
+    }),
+  )
+  .extend("ownershipFromFirstResolvedPull", () =>
+    filterWith({
       resolvePullAuthor: (prNumber) => Promise.resolve(prNumber === 7 ? "hubot" : "octocat"),
-    });
-    const owned = await ownerFilter.owns({
+    }).owns({
       event: relayedEvent("delivery-2", {
         eventType: "check_suite",
         payload: { check_suite: { pull_requests: [{ number: 7 }, { number: 8 }] } },
       }),
       subscriberLogin: "octocat",
-    });
-    expect(owned).toStrictEqual(false);
-  });
-
-  test("解決器の失敗は黙って配らず伝播する", async () => {
-    const ownerFilter = filterWith({
-      resolvePullAuthor: () => Promise.reject(new Error("github unreachable")),
-    });
-    await expect(
-      ownerFilter.owns({
-        event: relayedEvent("delivery-2", {
-          eventType: "check_suite",
-          payload: { check_suite: { pull_requests: [{ number: 7 }] } },
-        }),
-        subscriberLogin: "octocat",
-      }),
-    ).rejects.toThrow("github unreachable");
-  });
-});
-
-describe("キャッシュの破棄", () => {
-  test("close イベントで記憶が破棄され次は解決器をやり直す", async () => {
+    }),
+  )
+  .extend("lookupAfterClose", async () => {
     const resolvePullAuthor = vi.fn<GithubReader["resolvePullAuthor"]>(() =>
       Promise.resolve("hubot"),
     );
@@ -279,10 +227,9 @@ describe("キャッシュの破棄", () => {
       }),
       subscriberLogin: "octocat",
     });
-    expect([owned, resolvePullAuthor.mock.calls.length]).toStrictEqual([false, 1]);
-  });
-
-  test("close でないイベントでは記憶を破棄しない", async () => {
+    return { owned, resolvePullAuthor };
+  })
+  .extend("lookupAfterNonClose", async () => {
     const resolvePullAuthor = vi.fn<GithubReader["resolvePullAuthor"]>();
     const ownerFilter = filterWith({ resolvePullAuthor });
     ownerFilter.remember(
@@ -300,38 +247,141 @@ describe("キャッシュの破棄", () => {
       }),
       subscriberLogin: "octocat",
     });
-    expect([owned, resolvePullAuthor.mock.calls.length]).toStrictEqual([true, 0]);
-  });
-
-  test("PR 番号の無いイベントの記憶は何も登録しない", async () => {
+    return { owned, resolvePullAuthor };
+  })
+  .extend("lookupAfterNumberlessRemember", () => {
     const ownerFilter = filterWith();
     ownerFilter.remember(
       relayedEvent("delivery-1", {
         payload: { action: "opened", pull_request: { user: { login: "octocat" } } },
       }),
     );
-    const owned = await ownerFilter.owns({
+    return ownerFilter.owns({
       event: relayedEvent("delivery-2", {
         eventType: "check_suite",
         payload: { check_suite: { pull_requests: [{ number: 7 }] } },
       }),
       subscriberLogin: "octocat",
     });
-    expect(owned).toStrictEqual(false);
-  });
-
-  test("作者無しイベントの記憶は何も登録しない", async () => {
+  })
+  .extend("lookupAfterAuthorlessRemember", () => {
     const ownerFilter = filterWith();
     ownerFilter.remember(
       relayedEvent("delivery-1", { payload: { action: "opened", pull_request: { number: 7 } } }),
     );
-    const owned = await ownerFilter.owns({
+    return ownerFilter.owns({
       event: relayedEvent("delivery-2", {
         eventType: "check_suite",
         payload: { check_suite: { pull_requests: [{ number: 7 }] } },
       }),
       subscriberLogin: "octocat",
     });
-    expect(owned).toStrictEqual(false);
+  });
+
+describe("review_requested の宛先判定", () => {
+  it("指名された reviewer には配る", ({ reviewRequestForNamedReviewer }) => {
+    expect(reviewRequestForNamedReviewer).toStrictEqual(true);
+  });
+
+  it("他人宛のレビュー依頼は作者にも配らない", ({ reviewRequestForAuthor }) => {
+    expect(reviewRequestForAuthor).toStrictEqual(false);
+  });
+});
+
+describe("レビュー入力変更の宛先判定", () => {
+  it("synchronize は現任レビュアーに配る", ({ synchronizeForCurrentReviewer }) => {
+    expect(synchronizeForCurrentReviewer).toStrictEqual(true);
+  });
+
+  it("synchronize は作者にも配る（両取り）", ({ synchronizeForAuthor }) => {
+    expect(synchronizeForAuthor).toStrictEqual(true);
+  });
+
+  it("changes.base を伴う edited は現任レビュアーに配る", ({ baseEditedForCurrentReviewer }) => {
+    expect(baseEditedForCurrentReviewer).toStrictEqual(true);
+  });
+
+  it("title だけの edited はレビュー入力変更ではなく reviewer には配らない", ({
+    titleEditedForCurrentReviewer,
+  }) => {
+    expect(titleEditedForCurrentReviewer).toStrictEqual(false);
+  });
+});
+
+describe("作者判定", () => {
+  it("payload の作者と一致すれば配る", ({ openedForMatchingAuthor }) => {
+    expect(openedForMatchingAuthor).toStrictEqual(true);
+  });
+
+  it("login の比較は大文字小文字を区別する", ({ openedForDifferentlyCasedAuthor }) => {
+    expect(openedForDifferentlyCasedAuthor).toStrictEqual(false);
+  });
+
+  it("記憶済みの PR は作者無しイベントでもキャッシュで判定する", ({ lookupOverRememberedPull }) => {
+    expect(lookupOverRememberedPull.owned).toStrictEqual(true);
+  });
+
+  it("記憶済みの PR の判定では解決器を呼ばない", ({ lookupOverRememberedPull }) => {
+    expect(lookupOverRememberedPull.resolvePullAuthor.mock.calls.length).toStrictEqual(0);
+  });
+
+  it("キャッシュに無ければ保存イベントから作者を引く", ({ ownershipFromStoredEvent }) => {
+    expect(ownershipFromStoredEvent).toStrictEqual(true);
+  });
+
+  it("保存イベントに無ければ GitHub の現在状態から作者を引く", ({ ownershipFromGithubState }) => {
+    expect(ownershipFromGithubState).toStrictEqual(true);
+  });
+
+  it("どの PR でも作者を解決できなければ誰にも配らない", ({ ownershipWithoutResolvableAuthor }) => {
+    expect(ownershipWithoutResolvableAuthor).toStrictEqual(false);
+  });
+
+  it("PR 番号も作者も無いイベントは誰にも配らない", ({ ownershipWithoutPullNumber }) => {
+    expect(ownershipWithoutPullNumber).toStrictEqual(false);
+  });
+
+  it("複数 PR は最初に解決できた作者で即決する", ({ ownershipFromFirstResolvedPull }) => {
+    expect(ownershipFromFirstResolvedPull).toStrictEqual(false);
+  });
+
+  it("解決器の失敗は黙って配らず伝播する", async () => {
+    await expect(
+      filterWith({
+        resolvePullAuthor: () => Promise.reject(new Error("github unreachable")),
+      }).owns({
+        event: relayedEvent("delivery-2", {
+          eventType: "check_suite",
+          payload: { check_suite: { pull_requests: [{ number: 7 }] } },
+        }),
+        subscriberLogin: "octocat",
+      }),
+    ).rejects.toThrow("github unreachable");
+  });
+});
+
+describe("キャッシュの破棄", () => {
+  it("close イベントで記憶が破棄される", ({ lookupAfterClose }) => {
+    expect(lookupAfterClose.owned).toStrictEqual(false);
+  });
+
+  it("close イベントの後は解決器をやり直す", ({ lookupAfterClose }) => {
+    expect(lookupAfterClose.resolvePullAuthor.mock.calls.length).toStrictEqual(1);
+  });
+
+  it("close でないイベントでは記憶を破棄しない", ({ lookupAfterNonClose }) => {
+    expect(lookupAfterNonClose.owned).toStrictEqual(true);
+  });
+
+  it("close でないイベントの後は解決器を呼ばない", ({ lookupAfterNonClose }) => {
+    expect(lookupAfterNonClose.resolvePullAuthor.mock.calls.length).toStrictEqual(0);
+  });
+
+  it("PR 番号の無いイベントの記憶は何も登録しない", ({ lookupAfterNumberlessRemember }) => {
+    expect(lookupAfterNumberlessRemember).toStrictEqual(false);
+  });
+
+  it("作者無しイベントの記憶は何も登録しない", ({ lookupAfterAuthorlessRemember }) => {
+    expect(lookupAfterAuthorlessRemember).toStrictEqual(false);
   });
 });

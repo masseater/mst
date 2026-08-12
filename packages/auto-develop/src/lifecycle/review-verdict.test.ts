@@ -11,40 +11,62 @@ const review = (shape: Partial<Review>): Review => ({
   ...shape,
 });
 
+const it = test
+  .extend("latestEffectiveReview", () =>
+    effectiveReviewOf({
+      reviews: [
+        review({ state: "APPROVED", submittedAt: "1" }),
+        review({ state: "CHANGES_REQUESTED", submittedAt: "2" }),
+      ],
+      login: "bot",
+    }))
+  .extend("reviewIgnoringComments", () =>
+    effectiveReviewOf({
+      reviews: [review({ state: "APPROVED" }), review({ state: "COMMENTED" })],
+      login: "bot",
+    }),
+  )
+  .extend("reviewFromOtherLogin", () =>
+    effectiveReviewOf({
+      reviews: [review({ state: "CHANGES_REQUESTED", authorLogin: "human" })],
+      login: "bot",
+    }),
+  )
+  .extend("reviewFromEmptyList", () => effectiveReviewOf({ reviews: [], login: "bot" }))
+  .extend("stateForChangesRequested", () =>
+    reviewVerdictState(review({ state: "CHANGES_REQUESTED" })),
+  )
+  .extend("stateForApproved", () => reviewVerdictState(review({ state: "APPROVED" })))
+  .extend("stateForNoReview", () => reviewVerdictState(null));
+
 describe("effectiveReviewOf", () => {
-  test("指定ログインの承認/変更要求のうち最新 1 件を返す", () => {
-    const reviews = [
-      review({ state: "APPROVED", submittedAt: "1" }),
-      review({ state: "CHANGES_REQUESTED", submittedAt: "2" }),
-    ];
-    expect(effectiveReviewOf({ reviews, login: "bot" })?.state).toStrictEqual("CHANGES_REQUESTED");
+  it("指定ログインの承認/変更要求のうち最新 1 件を返す", ({ latestEffectiveReview }) => {
+    expect(latestEffectiveReview?.state).toStrictEqual("CHANGES_REQUESTED");
   });
 
-  test("コメントのみのレビューは判定に数えない", () => {
-    const reviews = [review({ state: "APPROVED" }), review({ state: "COMMENTED" })];
-    expect(effectiveReviewOf({ reviews, login: "bot" })?.state).toStrictEqual("APPROVED");
+  it("コメントのみのレビューは判定に数えない", ({ reviewIgnoringComments }) => {
+    expect(reviewIgnoringComments?.state).toStrictEqual("APPROVED");
   });
 
-  test("別ログインのレビューは無視する", () => {
-    const reviews = [review({ state: "CHANGES_REQUESTED", authorLogin: "human" })];
-    expect(effectiveReviewOf({ reviews, login: "bot" })).toStrictEqual(null);
+  it("別ログインのレビューは無視する", ({ reviewFromOtherLogin }) => {
+    expect(reviewFromOtherLogin).toStrictEqual(null);
   });
 
-  test("該当なしは null", () => {
-    expect(effectiveReviewOf({ reviews: [], login: "bot" })).toStrictEqual(null);
+  it("該当なしは null", ({ reviewFromEmptyList }) => {
+    expect(reviewFromEmptyList).toStrictEqual(null);
   });
 });
 
 describe("reviewVerdictState", () => {
-  test("変更要求は error", () => {
-    expect(reviewVerdictState(review({ state: "CHANGES_REQUESTED" }))).toStrictEqual("error");
+  it("変更要求は error", ({ stateForChangesRequested }) => {
+    expect(stateForChangesRequested).toStrictEqual("error");
   });
 
-  test("承認は success", () => {
-    expect(reviewVerdictState(review({ state: "APPROVED" }))).toStrictEqual("success");
+  it("承認は success", ({ stateForApproved }) => {
+    expect(stateForApproved).toStrictEqual("success");
   });
 
-  test("実効レビューなし（null）は success 側に倒す", () => {
-    expect(reviewVerdictState(null)).toStrictEqual("success");
+  it("実効レビューなし（null）は success 側に倒す", ({ stateForNoReview }) => {
+    expect(stateForNoReview).toStrictEqual("success");
   });
 });

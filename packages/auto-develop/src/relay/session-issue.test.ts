@@ -19,8 +19,8 @@ const stubGithub = (overrides: Partial<GithubReader> = {}): GithubReader => ({
   ...overrides,
 });
 
-describe("issueSession", () => {
-  test("本人性とリポジトリ読取を確認して短命クレデンシャルを発行する", async () => {
+const it = test
+  .extend("issuanceWithStoredSession", async () => {
     const sessions = createMemorySessionStore();
     const issued = await issueSession({
       githubToken: "github-token",
@@ -30,16 +30,34 @@ describe("issueSession", () => {
       generateCredential: () => "connection-credential",
     });
     const savedSession = await sessions.resolve(credentialDigest("connection-credential"));
-    expect([issued, savedSession]).toStrictEqual([
-      {
-        token: "connection-credential",
-        expiresAt: new Date(1_000_000 + 8 * 3_600_000).toISOString(),
-      },
-      { login: "octocat", expiresAtMs: 1_000_000 + 8 * 3_600_000 },
-    ]);
+    return { issued, savedSession };
+  })
+  .extend("issuanceWithDefaultCredential", () =>
+    issueSession({
+      githubToken: "github-token",
+      github: stubGithub(),
+      sessions: createMemorySessionStore(),
+    }),
+  );
+
+describe("issueSession", () => {
+  it("本人性とリポジトリ読取を確認して短命クレデンシャルを発行する", ({
+    issuanceWithStoredSession,
+  }) => {
+    expect(issuanceWithStoredSession.issued).toStrictEqual({
+      token: "connection-credential",
+      expiresAt: new Date(1_000_000 + 8 * 3_600_000).toISOString(),
+    });
   });
 
-  test("GitHub トークンが無ければ確定的拒否になる", async () => {
+  it("発行したクレデンシャルは login と期限つきでストアに残る", ({ issuanceWithStoredSession }) => {
+    expect(issuanceWithStoredSession.savedSession).toStrictEqual({
+      login: "octocat",
+      expiresAtMs: 1_000_000 + 8 * 3_600_000,
+    });
+  });
+
+  it("GitHub トークンが無ければ確定的拒否になる", async () => {
     await expect(
       issueSession({
         githubToken: undefined,
@@ -49,7 +67,7 @@ describe("issueSession", () => {
     ).rejects.toThrow(UnauthenticatedError);
   });
 
-  test("対象リポジトリが public なら read は証明にならず拒否される", async () => {
+  it("対象リポジトリが public なら read は証明にならず拒否される", async () => {
     await expect(
       issueSession({
         githubToken: "github-token",
@@ -59,7 +77,7 @@ describe("issueSession", () => {
     ).rejects.toThrow(UnauthenticatedError);
   });
 
-  test("GitHub の確定的拒否は 401 系の型になる", async () => {
+  it("GitHub の確定的拒否は 401 系の型になる", async () => {
     await expect(
       issueSession({
         githubToken: "github-token",
@@ -71,7 +89,7 @@ describe("issueSession", () => {
     ).rejects.toThrow(UnauthenticatedError);
   });
 
-  test("GitHub 到達不能は検証器不能の型になる", async () => {
+  it("GitHub 到達不能は検証器不能の型になる", async () => {
     await expect(
       issueSession({
         githubToken: "github-token",
@@ -83,7 +101,7 @@ describe("issueSession", () => {
     ).rejects.toThrow(VerifierUnavailableError);
   });
 
-  test("どちらでもない失敗は変換されず伝播する", async () => {
+  it("どちらでもない失敗は変換されず伝播する", async () => {
     await expect(
       issueSession({
         githubToken: "github-token",
@@ -95,12 +113,9 @@ describe("issueSession", () => {
     ).rejects.toThrow("unexpected shape");
   });
 
-  test("既定では 32 バイトの暗号乱数を base64url 化したクレデンシャルになる", async () => {
-    const issued = await issueSession({
-      githubToken: "github-token",
-      github: stubGithub(),
-      sessions: createMemorySessionStore(),
-    });
-    expect(issued.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+  it("既定では 32 バイトの暗号乱数を base64url 化したクレデンシャルになる", ({
+    issuanceWithDefaultCredential,
+  }) => {
+    expect(issuanceWithDefaultCredential.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
   });
 });

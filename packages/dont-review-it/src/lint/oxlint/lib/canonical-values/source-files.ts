@@ -1,10 +1,11 @@
 import { readdirSync, readFileSync, statSync, type Stats } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 
+import { readUnlessMissing } from "@mst/repository-checks";
 import { sortBy } from "es-toolkit";
 
-import { readUnlessMissing } from "../path-failure.ts";
 import { toPosixPath } from "../posix-path.ts";
+import { UNSCANNED_DIRECTORY_NAMES } from "../repository-scan/worktree-files.ts";
 import { MANIFEST_FILE_NAME } from "./package-manifest.ts";
 
 export type ScannedFile = {
@@ -21,15 +22,6 @@ export type RepositoryFiles = {
   readonly markupSources: readonly ScannedFile[];
   readonly manifests: readonly ScannedFile[];
 };
-
-const UNSCANNED_DIRECTORY_NAMES: ReadonlySet<string> = new Set([
-  ".cache",
-  ".git",
-  "coverage",
-  "dist",
-  "dist-ssr",
-  "node_modules",
-]);
 
 const SCRIPT_FILE_NAME_PATTERN = /\.[cm]?[jt]sx?$/u;
 

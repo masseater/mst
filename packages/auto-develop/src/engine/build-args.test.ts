@@ -2,11 +2,34 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { buildClaudeArgs, buildCodexArgs } from "./build-args.ts";
 
+const it = test
+  .extend("claudeArgsWithBypass", () =>
+    buildClaudeArgs({ prompt: "review this", prNumber: 7, bypassPermissions: true }))
+  .extend("claudeArgsWithoutBypass", () =>
+    buildClaudeArgs({ prompt: "review this", prNumber: 7, bypassPermissions: false }),
+  )
+  .extend("codexArgsWithBypass", () =>
+    buildCodexArgs({
+      prompt: "fix this",
+      cwd: "/work/pr-1",
+      repoRoot: "/repo",
+      sharedGitDir: "/repo/.git",
+      bypassPermissions: true,
+    }),
+  )
+  .extend("codexArgsWithoutBypass", () =>
+    buildCodexArgs({
+      prompt: "fix this",
+      cwd: "/work/pr-1",
+      repoRoot: null,
+      sharedGitDir: null,
+      bypassPermissions: false,
+    }),
+  );
+
 describe("buildClaudeArgs", () => {
-  test("バイパス有効時は完全形の引数列になる", () => {
-    expect(
-      buildClaudeArgs({ prompt: "review this", prNumber: 7, bypassPermissions: true }),
-    ).toStrictEqual([
+  it("バイパス有効時は完全形の引数列になる", ({ claudeArgsWithBypass }) => {
+    expect(claudeArgsWithBypass).toStrictEqual([
       "-p",
       "--dangerously-skip-permissions",
       "--name",
@@ -15,10 +38,8 @@ describe("buildClaudeArgs", () => {
     ]);
   });
 
-  test("バイパス無効時は permission-mode auto になる", () => {
-    expect(
-      buildClaudeArgs({ prompt: "review this", prNumber: 7, bypassPermissions: false }),
-    ).toStrictEqual([
+  it("バイパス無効時は permission-mode auto になる", ({ claudeArgsWithoutBypass }) => {
+    expect(claudeArgsWithoutBypass).toStrictEqual([
       "-p",
       "--permission-mode",
       "auto",
@@ -30,16 +51,10 @@ describe("buildClaudeArgs", () => {
 });
 
 describe("buildCodexArgs", () => {
-  test("バイパス有効時は承認ポリシーが exec の前、全権フラグが exec の後になる", () => {
-    expect(
-      buildCodexArgs({
-        prompt: "fix this",
-        cwd: "/work/pr-1",
-        repoRoot: "/repo",
-        sharedGitDir: "/repo/.git",
-        bypassPermissions: true,
-      }),
-    ).toStrictEqual([
+  it("バイパス有効時は承認ポリシーが exec の前、全権フラグが exec の後になる", ({
+    codexArgsWithBypass,
+  }) => {
+    expect(codexArgsWithBypass).toStrictEqual([
       "-a",
       "never",
       "exec",
@@ -54,16 +69,8 @@ describe("buildCodexArgs", () => {
     ]);
   });
 
-  test("バイパス無効時は on-request と自動レビュアー設定になる", () => {
-    expect(
-      buildCodexArgs({
-        prompt: "fix this",
-        cwd: "/work/pr-1",
-        repoRoot: null,
-        sharedGitDir: null,
-        bypassPermissions: false,
-      }),
-    ).toStrictEqual([
+  it("バイパス無効時は on-request と自動レビュアー設定になる", ({ codexArgsWithoutBypass }) => {
+    expect(codexArgsWithoutBypass).toStrictEqual([
       "-a",
       "on-request",
       "-c",

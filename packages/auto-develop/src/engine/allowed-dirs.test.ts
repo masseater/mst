@@ -2,38 +2,44 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { normalizeAllowedDirs } from "./allowed-dirs.ts";
 
+const it = test
+  .extend("dirsForDistinctRoot", () =>
+    normalizeAllowedDirs({ cwd: "/work/pr-1", repoRoot: "/repo", sharedGitDir: "/repo/.git" }))
+  .extend("dirsForRootEqualToCwd", () =>
+    normalizeAllowedDirs({
+      cwd: "/work/pr-1",
+      repoRoot: "/work/pr-1",
+      sharedGitDir: "/repo/.git/worktrees/pr-1",
+    }),
+  )
+  .extend("dirsForNullPaths", () =>
+    normalizeAllowedDirs({ cwd: "/work/pr-1", repoRoot: null, sharedGitDir: null }),
+  )
+  .extend("dirsForRepeatedPath", () =>
+    normalizeAllowedDirs({ cwd: "/work/pr-1", repoRoot: "/repo", sharedGitDir: "/repo" }),
+  )
+  .extend("dirsForEmptyRoot", () =>
+    normalizeAllowedDirs({ cwd: "/work/pr-1", repoRoot: "", sharedGitDir: "/repo/.git" }),
+  );
+
 describe("normalizeAllowedDirs", () => {
-  test("リポジトリルートと共通ディレクトリをこの順で並べる", () => {
-    expect(
-      normalizeAllowedDirs({ cwd: "/work/pr-1", repoRoot: "/repo", sharedGitDir: "/repo/.git" }),
-    ).toStrictEqual(["/repo", "/repo/.git"]);
+  it("リポジトリルートと共通ディレクトリをこの順で並べる", ({ dirsForDistinctRoot }) => {
+    expect(dirsForDistinctRoot).toStrictEqual(["/repo", "/repo/.git"]);
   });
 
-  test("ルートが cwd と同一なら除外され共通ディレクトリだけになる", () => {
-    expect(
-      normalizeAllowedDirs({
-        cwd: "/work/pr-1",
-        repoRoot: "/work/pr-1",
-        sharedGitDir: "/repo/.git/worktrees/pr-1",
-      }),
-    ).toStrictEqual(["/repo/.git/worktrees/pr-1"]);
+  it("ルートが cwd と同一なら除外され共通ディレクトリだけになる", ({ dirsForRootEqualToCwd }) => {
+    expect(dirsForRootEqualToCwd).toStrictEqual(["/repo/.git/worktrees/pr-1"]);
   });
 
-  test("両方 null なら空になる", () => {
-    expect(
-      normalizeAllowedDirs({ cwd: "/work/pr-1", repoRoot: null, sharedGitDir: null }),
-    ).toStrictEqual([]);
+  it("両方 null なら空になる", ({ dirsForNullPaths }) => {
+    expect(dirsForNullPaths).toStrictEqual([]);
   });
 
-  test("重複は先勝ちで除去される", () => {
-    expect(
-      normalizeAllowedDirs({ cwd: "/work/pr-1", repoRoot: "/repo", sharedGitDir: "/repo" }),
-    ).toStrictEqual(["/repo"]);
+  it("重複は先勝ちで除去される", ({ dirsForRepeatedPath }) => {
+    expect(dirsForRepeatedPath).toStrictEqual(["/repo"]);
   });
 
-  test("空文字列は落とされる", () => {
-    expect(
-      normalizeAllowedDirs({ cwd: "/work/pr-1", repoRoot: "", sharedGitDir: "/repo/.git" }),
-    ).toStrictEqual(["/repo/.git"]);
+  it("空文字列は落とされる", ({ dirsForEmptyRoot }) => {
+    expect(dirsForEmptyRoot).toStrictEqual(["/repo/.git"]);
   });
 });

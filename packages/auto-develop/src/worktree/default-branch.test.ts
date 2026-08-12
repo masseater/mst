@@ -14,69 +14,110 @@ const gitFailing = (message: string): GitRunner => ({
   run: () => Promise.reject(new Error(message)),
 });
 
-describe("resolveDefaultBranch", () => {
-  test("origin/HEAD の symbolic-ref から接頭辞を剥がして返す", async () => {
-    const branch = await resolveDefaultBranch({
+class GitStderrError extends Error {
+  readonly stderr: string;
+
+  constructor(stderr: string) {
+    super("git failed");
+    this.stderr = stderr;
+  }
+}
+
+const gitFailingWithStderr = (stderr: string): GitRunner => ({
+  run: () => Promise.reject(new GitStderrError(stderr)),
+});
+
+const it = test
+  .extend("defaultBranchFromSymbolicRef", () =>
+    resolveDefaultBranch({
       git: gitReturning("refs/remotes/origin/develop\n"),
       repoDir: "/repo",
       log: silentLogger,
-    });
-    expect(branch).toStrictEqual("develop");
-  });
-
-  test("出力が空なら既定値 main に落ちる", async () => {
-    const branch = await resolveDefaultBranch({
+    }))
+  .extend("defaultBranchFromBlankOutput", () =>
+    resolveDefaultBranch({
       git: gitReturning("  \n"),
       repoDir: "/repo",
       log: silentLogger,
-    });
-    expect(branch).toStrictEqual("main");
-  });
-
-  test("解決に失敗したら null を返す", async () => {
-    const branch = await resolveDefaultBranch({
+    }),
+  )
+  .extend("defaultBranchAfterFailure", () =>
+    resolveDefaultBranch({
       git: gitFailing("no origin/HEAD"),
       repoDir: "/repo",
       log: silentLogger,
-    });
-    expect(branch).toStrictEqual(null);
+    }),
+  )
+  .extend("currentBranchFromSymbolicRef", () =>
+    resolveCurrentBranch({
+      git: gitReturning("topic/x\n"),
+      worktreePath: "/worktree",
+      log: silentLogger,
+    }),
+  )
+  .extend("currentBranchFromBlankOutput", () =>
+    resolveCurrentBranch({
+      git: gitReturning("  \n"),
+      worktreePath: "/worktree",
+      log: silentLogger,
+    }),
+  )
+  .extend("currentBranchAfterDetachedFailure", () =>
+    resolveCurrentBranch({
+      git: gitFailing("fatal: ref HEAD is not a symbolic ref"),
+      worktreePath: "/worktree",
+      log: silentLogger,
+    }),
+  )
+  .extend("currentBranchAfterDetachedStderr", () =>
+    resolveCurrentBranch({
+      git: gitFailingWithStderr("fatal: ref HEAD is not a symbolic ref"),
+      worktreePath: "/worktree",
+      log: silentLogger,
+    }),
+  )
+  .extend("currentBranchAfterUnexpectedFailure", () =>
+    resolveCurrentBranch({
+      git: gitFailing("unexpected git failure"),
+      worktreePath: "/worktree",
+      log: silentLogger,
+    }),
+  );
+
+describe("resolveDefaultBranch", () => {
+  it("origin/HEAD の symbolic-ref から接頭辞を剥がして返す", ({ defaultBranchFromSymbolicRef }) => {
+    expect(defaultBranchFromSymbolicRef).toStrictEqual("develop");
+  });
+
+  it("出力が空なら既定値 main に落ちる", ({ defaultBranchFromBlankOutput }) => {
+    expect(defaultBranchFromBlankOutput).toStrictEqual("main");
+  });
+
+  it("解決に失敗したら null を返す", ({ defaultBranchAfterFailure }) => {
+    expect(defaultBranchAfterFailure).toStrictEqual(null);
   });
 });
 
 describe("resolveCurrentBranch", () => {
-  test("symbolic-ref の出力をそのまま現在ブランチにする", async () => {
-    const branch = await resolveCurrentBranch({
-      git: gitReturning("topic/x\n"),
-      worktreePath: "/worktree",
-      log: silentLogger,
-    });
-    expect(branch).toStrictEqual("topic/x");
+  it("symbolic-ref の出力をそのまま現在ブランチにする", ({ currentBranchFromSymbolicRef }) => {
+    expect(currentBranchFromSymbolicRef).toStrictEqual("topic/x");
   });
 
-  test("空の出力はブランチ不明 null になる", async () => {
-    const branch = await resolveCurrentBranch({
-      git: gitReturning("  \n"),
-      worktreePath: "/worktree",
-      log: silentLogger,
-    });
-    expect(branch).toStrictEqual(null);
+  it("空の出力はブランチ不明 null になる", ({ currentBranchFromBlankOutput }) => {
+    expect(currentBranchFromBlankOutput).toStrictEqual(null);
   });
 
-  test("detached HEAD の失敗は null と同じ扱いになる", async () => {
-    const branch = await resolveCurrentBranch({
-      git: gitFailing("fatal: ref HEAD is not a symbolic ref"),
-      worktreePath: "/worktree",
-      log: silentLogger,
-    });
-    expect(branch).toStrictEqual(null);
+  it("detached HEAD の失敗は null と同じ扱いになる", ({ currentBranchAfterDetachedFailure }) => {
+    expect(currentBranchAfterDetachedFailure).toStrictEqual(null);
   });
 
-  test("予期しない失敗は不明マーカーになる", async () => {
-    const branch = await resolveCurrentBranch({
-      git: gitFailing("unexpected git failure"),
-      worktreePath: "/worktree",
-      log: silentLogger,
-    });
-    expect(branch).toStrictEqual(UNKNOWN_BRANCH_MARKER);
+  it("detached の判定は失敗の stderr プロパティからも行う", ({
+    currentBranchAfterDetachedStderr,
+  }) => {
+    expect(currentBranchAfterDetachedStderr).toStrictEqual(null);
+  });
+
+  it("予期しない失敗は不明マーカーになる", ({ currentBranchAfterUnexpectedFailure }) => {
+    expect(currentBranchAfterUnexpectedFailure).toStrictEqual(UNKNOWN_BRANCH_MARKER);
   });
 });

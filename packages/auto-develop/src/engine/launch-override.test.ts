@@ -2,27 +2,31 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { parseLaunchOverride } from "./launch-override.ts";
 
+const it = test
+  .extend("overrideFromUndefined", () => parseLaunchOverride(undefined))
+  .extend("overrideFromEmptyString", () => parseLaunchOverride(""))
+  .extend("overrideFromBlankString", () => parseLaunchOverride("  \t "))
+  .extend("overrideFromSingleToken", () => parseLaunchOverride("wrapper"))
+  .extend("overrideFromMultipleTokens", () => parseLaunchOverride("  wrapper   sub  "));
+
 describe("parseLaunchOverride", () => {
-  test("undefined は上書きなしになる", () => {
-    expect(parseLaunchOverride(undefined)).toStrictEqual(null);
+  it("undefined は上書きなしになる", ({ overrideFromUndefined }) => {
+    expect(overrideFromUndefined).toStrictEqual(null);
   });
 
-  test("空文字列は上書きなしになる", () => {
-    expect(parseLaunchOverride("")).toStrictEqual(null);
+  it("空文字列は上書きなしになる", ({ overrideFromEmptyString }) => {
+    expect(overrideFromEmptyString).toStrictEqual(null);
   });
 
-  test("空白のみは上書きなしになる", () => {
-    expect(parseLaunchOverride("  \t ")).toStrictEqual(null);
+  it("空白のみは上書きなしになる", ({ overrideFromBlankString }) => {
+    expect(overrideFromBlankString).toStrictEqual(null);
   });
 
-  test("単一トークンはバイナリ名だけで接頭引数は空になる", () => {
-    expect(parseLaunchOverride("wrapper")).toStrictEqual({ binary: "wrapper", prefixArgs: [] });
+  it("単一トークンはバイナリ名だけで接頭引数は空になる", ({ overrideFromSingleToken }) => {
+    expect(overrideFromSingleToken).toStrictEqual({ binary: "wrapper", prefixArgs: [] });
   });
 
-  test("複数トークンは先頭がバイナリで残りが接頭引数になる", () => {
-    expect(parseLaunchOverride("  wrapper   sub  ")).toStrictEqual({
-      binary: "wrapper",
-      prefixArgs: ["sub"],
-    });
+  it("複数トークンは先頭がバイナリで残りが接頭引数になる", ({ overrideFromMultipleTokens }) => {
+    expect(overrideFromMultipleTokens).toStrictEqual({ binary: "wrapper", prefixArgs: ["sub"] });
   });
 });

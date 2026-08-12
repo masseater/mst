@@ -7,39 +7,67 @@ import { describe, expect, test } from "vite-plus/test";
 import { LAST_USED_MARKER_NAME } from "./paths.ts";
 import { createWorktreeFs } from "./worktree-fs.ts";
 
-describe("createWorktreeFs", () => {
-  test("存在確認は ENOENT を不在として返し実在を真にする", () => {
+const it = test
+  .extend("existenceChecks", () => {
     const baseDir = mkdtempSync(join(tmpdir(), "auto-develop-fs-"));
     const fs = createWorktreeFs();
-    expect([fs.exists(baseDir), fs.exists(join(baseDir, "missing"))]).toStrictEqual([true, false]);
-  });
-
-  test("マーカー書き込みは ISO 文字列と改行を書き mtime が読める", () => {
+    return { presentDir: fs.exists(baseDir), missingDir: fs.exists(join(baseDir, "missing")) };
+  })
+  .extend("markerWrite", () => {
     const worktreePath = mkdtempSync(join(tmpdir(), "auto-develop-fs-"));
     const fs = createWorktreeFs();
     fs.writeMarker(worktreePath, "2026-08-11T00:00:00.000Z");
     const markerPath = join(worktreePath, LAST_USED_MARKER_NAME);
-    expect([readFileSync(markerPath, "utf8"), fs.markerMtimeMs(worktreePath)]).toStrictEqual([
-      "2026-08-11T00:00:00.000Z\n",
-      statSync(markerPath).mtimeMs,
-    ]);
-  });
-
-  test("マーカーが無ければ mtime は null になる", () => {
-    const worktreePath = mkdtempSync(join(tmpdir(), "auto-develop-fs-"));
-    expect(createWorktreeFs().markerMtimeMs(worktreePath)).toStrictEqual(null);
-  });
-
-  test("ENOENT 以外の stat 失敗は例外として伝播する", () => {
-    const fs = createWorktreeFs();
-    const brokenPath = join("\0invalid", "path");
-    expect(() => fs.exists(brokenPath)).toThrow("null bytes");
-  });
-
-  test("再帰削除でディレクトリごと消える", () => {
+    return {
+      fileText: readFileSync(markerPath, "utf8"),
+      readMtimeMs: fs.markerMtimeMs(worktreePath),
+      statMtimeMs: statSync(markerPath).mtimeMs,
+    };
+  })
+  .extend("missingMarkerMtime", () =>
+    createWorktreeFs().markerMtimeMs(mkdtempSync(join(tmpdir(), "auto-develop-fs-"))),
+  )
+  .extend("invalidPathFailure", (): Error | null => {
+    try {
+      createWorktreeFs().exists(join("\0invalid", "path"));
+      return null;
+    } catch (statFailure) {
+      return statFailure instanceof Error ? statFailure : null;
+    }
+  })
+  .extend("existenceAfterRemoval", () => {
     const worktreePath = mkdtempSync(join(tmpdir(), "auto-develop-fs-"));
     const fs = createWorktreeFs();
     fs.removeRecursive(worktreePath);
-    expect(fs.exists(worktreePath)).toStrictEqual(false);
+    return fs.exists(worktreePath);
+  });
+
+describe("createWorktreeFs", () => {
+  it("存在確認は実在するディレクトリを真にする", ({ existenceChecks }) => {
+    expect(existenceChecks.presentDir).toStrictEqual(true);
+  });
+
+  it("存在確認は ENOENT を不在として返す", ({ existenceChecks }) => {
+    expect(existenceChecks.missingDir).toStrictEqual(false);
+  });
+
+  it("マーカー書き込みは ISO 文字列と改行を書く", ({ markerWrite }) => {
+    expect(markerWrite.fileText).toStrictEqual("2026-08-11T00:00:00.000Z\n");
+  });
+
+  it("書き込んだマーカーの mtime が読める", ({ markerWrite }) => {
+    expect(markerWrite.readMtimeMs).toStrictEqual(markerWrite.statMtimeMs);
+  });
+
+  it("マーカーが無ければ mtime は null になる", ({ missingMarkerMtime }) => {
+    expect(missingMarkerMtime).toStrictEqual(null);
+  });
+
+  it("ENOENT 以外の stat 失敗は例外として伝播する", ({ invalidPathFailure }) => {
+    expect(invalidPathFailure?.message).toContain("null bytes");
+  });
+
+  it("再帰削除でディレクトリごと消える", ({ existenceAfterRemoval }) => {
+    expect(existenceAfterRemoval).toStrictEqual(false);
   });
 });

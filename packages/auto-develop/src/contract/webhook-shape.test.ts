@@ -15,91 +15,175 @@ const roundTrip = (event: FilteredEvent, mode: Mode): FilteredEvent | null => {
   return filterEvent(flattened, mode);
 };
 
+const it = test
+  .extend("detailedReviewRequestRoundTrip", () =>
+    roundTrip(
+      {
+        kind: "review-requested",
+        pullNumber: 7,
+        reviewerLogin: "octocat",
+        title: "Add retry",
+        draft: false,
+      },
+      "reviewer",
+    ))
+  .extend("bareReviewRequestRoundTrip", () =>
+    roundTrip({ kind: "review-requested", pullNumber: 7 }, "reviewer"),
+  )
+  .extend("headInputChangeRoundTrip", () =>
+    roundTrip({ kind: "review-input-changed", changedInput: "head", pullNumber: 7 }, "reviewer"),
+  )
+  .extend("baseInputChangeRoundTrip", () =>
+    roundTrip({ kind: "review-input-changed", changedInput: "base", pullNumber: 7 }, "reviewer"),
+  )
+  .extend("sourceReviewRoundTrip", () =>
+    roundTrip(
+      {
+        kind: "source-review-submitted",
+        pullNumber: 7,
+        state: "changes_requested",
+        body: "Fix the failing test.",
+      },
+      "author",
+    ),
+  )
+  .extend("ciCompletionRoundTrip", () =>
+    roundTrip(
+      { kind: "ci-completed", pullNumber: 7, conclusion: "failure", headSha: "0a1b2c3" },
+      "author",
+    ),
+  )
+  .extend("mergeConflictRoundTrip", () =>
+    roundTrip({ kind: "merge-conflict", pullNumber: 7 }, "author"),
+  )
+  .extend("baseUpdateRoundTrip", () => roundTrip({ kind: "base-update", pullNumber: 7 }, "author"))
+  .extend("closureRoundTripForAuthor", () =>
+    roundTrip({ kind: "pr-closed", pullNumber: 7 }, "author"),
+  )
+  .extend("closureRoundTripForReviewer", () =>
+    roundTrip({ kind: "pr-closed", pullNumber: 7 }, "reviewer"),
+  )
+  .extend("exclusionRoundTripForAuthor", () =>
+    roundTrip({ kind: "pr-excluded", pullNumber: 7 }, "author"),
+  )
+  .extend("exclusionRoundTripForReviewer", () =>
+    roundTrip({ kind: "pr-excluded", pullNumber: 7 }, "reviewer"),
+  )
+  .extend("exclusionWebhookShape", () => toWebhookShape({ kind: "pr-excluded", pullNumber: 7 }))
+  .extend("baseUpdateWebhookShape", () => toWebhookShape({ kind: "base-update", pullNumber: 7 }));
+
 describe("封筒の往復不変条件", () => {
-  test("review-requested の全フィールドが reviewer で元に戻る", () => {
-    const event: FilteredEvent = {
+  it("review-requested の全フィールドが reviewer で元に戻る", ({
+    detailedReviewRequestRoundTrip,
+  }) => {
+    expect(detailedReviewRequestRoundTrip).toStrictEqual({
       kind: "review-requested",
       pullNumber: 7,
       reviewerLogin: "octocat",
       title: "Add retry",
       draft: false,
-    };
-    expect(roundTrip(event, "reviewer")).toStrictEqual({ ...event, deliveryId: "delivery-1" });
+      deliveryId: "delivery-1",
+    });
   });
 
-  test("review-requested の最小形が reviewer で元に戻る", () => {
-    const event: FilteredEvent = { kind: "review-requested", pullNumber: 7 };
-    expect(roundTrip(event, "reviewer")).toStrictEqual({ ...event, deliveryId: "delivery-1" });
+  it("review-requested の最小形が reviewer で元に戻る", ({ bareReviewRequestRoundTrip }) => {
+    expect(bareReviewRequestRoundTrip).toStrictEqual({
+      kind: "review-requested",
+      pullNumber: 7,
+      deliveryId: "delivery-1",
+    });
   });
 
-  test("head 側の review-input-changed が reviewer で元に戻る", () => {
-    const event: FilteredEvent = {
+  it("head 側の review-input-changed が reviewer で元に戻る", ({ headInputChangeRoundTrip }) => {
+    expect(headInputChangeRoundTrip).toStrictEqual({
       kind: "review-input-changed",
       changedInput: "head",
       pullNumber: 7,
-    };
-    expect(roundTrip(event, "reviewer")).toStrictEqual({ ...event, deliveryId: "delivery-1" });
+      deliveryId: "delivery-1",
+    });
   });
 
-  test("base 側の review-input-changed が reviewer で元に戻る", () => {
-    const event: FilteredEvent = {
+  it("base 側の review-input-changed が reviewer で元に戻る", ({ baseInputChangeRoundTrip }) => {
+    expect(baseInputChangeRoundTrip).toStrictEqual({
       kind: "review-input-changed",
       changedInput: "base",
       pullNumber: 7,
-    };
-    expect(roundTrip(event, "reviewer")).toStrictEqual({ ...event, deliveryId: "delivery-1" });
+      deliveryId: "delivery-1",
+    });
   });
 
-  test("source-review-submitted が author で元に戻る", () => {
-    const event: FilteredEvent = {
+  it("source-review-submitted が author で元に戻る", ({ sourceReviewRoundTrip }) => {
+    expect(sourceReviewRoundTrip).toStrictEqual({
       kind: "source-review-submitted",
       pullNumber: 7,
       state: "changes_requested",
       body: "Fix the failing test.",
-    };
-    expect(roundTrip(event, "author")).toStrictEqual({ ...event, deliveryId: "delivery-1" });
+      deliveryId: "delivery-1",
+    });
   });
 
-  test("ci-completed が author で元に戻る", () => {
-    const event: FilteredEvent = {
+  it("ci-completed が author で元に戻る", ({ ciCompletionRoundTrip }) => {
+    expect(ciCompletionRoundTrip).toStrictEqual({
       kind: "ci-completed",
       pullNumber: 7,
       conclusion: "failure",
       headSha: "0a1b2c3",
-    };
-    expect(roundTrip(event, "author")).toStrictEqual({ ...event, deliveryId: "delivery-1" });
+      deliveryId: "delivery-1",
+    });
   });
 
-  test("merge-conflict が author で元に戻る", () => {
-    const event: FilteredEvent = { kind: "merge-conflict", pullNumber: 7 };
-    expect(roundTrip(event, "author")).toStrictEqual({ ...event, deliveryId: "delivery-1" });
+  it("merge-conflict が author で元に戻る", ({ mergeConflictRoundTrip }) => {
+    expect(mergeConflictRoundTrip).toStrictEqual({
+      kind: "merge-conflict",
+      pullNumber: 7,
+      deliveryId: "delivery-1",
+    });
   });
 
-  test("base-update が author で元に戻る", () => {
-    const event: FilteredEvent = { kind: "base-update", pullNumber: 7 };
-    expect(roundTrip(event, "author")).toStrictEqual({ ...event, deliveryId: "delivery-1" });
+  it("base-update が author で元に戻る", ({ baseUpdateRoundTrip }) => {
+    expect(baseUpdateRoundTrip).toStrictEqual({
+      kind: "base-update",
+      pullNumber: 7,
+      deliveryId: "delivery-1",
+    });
   });
 
-  test("pr-closed が両モードで元に戻る", () => {
-    const event: FilteredEvent = { kind: "pr-closed", pullNumber: 7 };
-    expect([roundTrip(event, "author"), roundTrip(event, "reviewer")]).toStrictEqual([
-      { ...event, deliveryId: "delivery-1" },
-      { ...event, deliveryId: "delivery-1" },
-    ]);
+  it("pr-closed が author で元に戻る", ({ closureRoundTripForAuthor }) => {
+    expect(closureRoundTripForAuthor).toStrictEqual({
+      kind: "pr-closed",
+      pullNumber: 7,
+      deliveryId: "delivery-1",
+    });
   });
 
-  test("pr-excluded が両モードで元に戻る", () => {
-    const event: FilteredEvent = { kind: "pr-excluded", pullNumber: 7 };
-    expect([roundTrip(event, "author"), roundTrip(event, "reviewer")]).toStrictEqual([
-      { ...event, deliveryId: "delivery-1" },
-      { ...event, deliveryId: "delivery-1" },
-    ]);
+  it("pr-closed が reviewer で元に戻る", ({ closureRoundTripForReviewer }) => {
+    expect(closureRoundTripForReviewer).toStrictEqual({
+      kind: "pr-closed",
+      pullNumber: 7,
+      deliveryId: "delivery-1",
+    });
+  });
+
+  it("pr-excluded が author で元に戻る", ({ exclusionRoundTripForAuthor }) => {
+    expect(exclusionRoundTripForAuthor).toStrictEqual({
+      kind: "pr-excluded",
+      pullNumber: 7,
+      deliveryId: "delivery-1",
+    });
+  });
+
+  it("pr-excluded が reviewer で元に戻る", ({ exclusionRoundTripForReviewer }) => {
+    expect(exclusionRoundTripForReviewer).toStrictEqual({
+      kind: "pr-excluded",
+      pullNumber: 7,
+      deliveryId: "delivery-1",
+    });
   });
 });
 
 describe("合成ペイロードの形", () => {
-  test("pr-excluded は除外ラベル名を label.name に載せる", () => {
-    expect(toWebhookShape({ kind: "pr-excluded", pullNumber: 7 })).toStrictEqual({
+  it("pr-excluded は除外ラベル名を label.name に載せる", ({ exclusionWebhookShape }) => {
+    expect(exclusionWebhookShape).toStrictEqual({
       eventType: "pull_request",
       payload: {
         action: "labeled",
@@ -109,8 +193,10 @@ describe("合成ペイロードの形", () => {
     });
   });
 
-  test("base-update は MERGEABLE と BEHIND を焼き込んだ synchronize になる", () => {
-    expect(toWebhookShape({ kind: "base-update", pullNumber: 7 })).toStrictEqual({
+  it("base-update は MERGEABLE と BEHIND を焼き込んだ synchronize になる", ({
+    baseUpdateWebhookShape,
+  }) => {
+    expect(baseUpdateWebhookShape).toStrictEqual({
       eventType: "pull_request",
       payload: {
         action: "synchronize",

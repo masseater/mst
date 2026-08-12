@@ -30,68 +30,56 @@ const manualClock = (
   };
 };
 
-describe("createMemoryEventStore", () => {
-  test("保存したイベントが受信時刻昇順かつ同時刻ならID昇順で読める", async () => {
+const it = test
+  .extend("eventsInReadOrder", async () => {
     const eventStore = createMemoryEventStore();
     await eventStore.createIfAbsent(storedEvent("delivery-b", { receivedAtMs: 100 }));
     await eventStore.createIfAbsent(storedEvent("delivery-a", { receivedAtMs: 100 }));
     await eventStore.createIfAbsent(storedEvent("delivery-c", { receivedAtMs: 50 }));
-    const eventIds = (await eventStore.readSince(0)).map((stored) => stored.id);
-    expect(eventIds).toStrictEqual(["delivery-c", "delivery-a", "delivery-b"]);
-  });
-
-  test("同じ delivery ID の 2 回目は元の保存済みイベントを返す", async () => {
+    return eventStore.readSince(0);
+  })
+  .extend("duplicateDeliveryCreation", async () => {
     const eventStore = createMemoryEventStore();
     const original = await eventStore.createIfAbsent(storedEvent("delivery-1"));
     const replayed = await eventStore.createIfAbsent(
       storedEvent("delivery-1", { receivedAtMs: 999 }),
     );
-    expect([replayed, (await eventStore.readSince(0)).length]).toStrictEqual([original, 1]);
-  });
-
-  test("readAfterId は参照イベントより後だけを返す", async () => {
+    const storedEvents = await eventStore.readSince(0);
+    return { original, replayed, storedEvents };
+  })
+  .extend("eventsAfterFirstDelivery", async () => {
     const eventStore = createMemoryEventStore();
     await eventStore.createIfAbsent(storedEvent("delivery-1", { receivedAtMs: 100 }));
     await eventStore.createIfAbsent(storedEvent("delivery-2", { receivedAtMs: 200 }));
     await eventStore.createIfAbsent(storedEvent("delivery-3", { receivedAtMs: 300 }));
-    const followingIds = (await eventStore.readAfterId("delivery-1"))?.map((stored) => stored.id);
-    expect(followingIds).toStrictEqual(["delivery-2", "delivery-3"]);
-  });
-
-  test("readAfterId は参照イベント不在なら null を返す", async () => {
-    const eventStore = createMemoryEventStore();
-    expect(await eventStore.readAfterId("delivery-missing")).toStrictEqual(null);
-  });
-
-  test("期限切れイベントは読み出しから消える", async () => {
+    return eventStore.readAfterId("delivery-1");
+  })
+  .extend("eventsAfterMissingDelivery", () =>
+    createMemoryEventStore().readAfterId("delivery-missing"),
+  )
+  .extend("eventsAfterExpiry", async () => {
     const clock = manualClock(0);
     const eventStore = createMemoryEventStore(clock.now);
     await eventStore.createIfAbsent(storedEvent("delivery-old", { expiresAtMs: 10 }));
     clock.advanceTo(11);
-    expect(await eventStore.readSince(0)).toStrictEqual([]);
-  });
-
-  test("期限切れの参照イベントからの readAfterId は null になる", async () => {
+    return eventStore.readSince(0);
+  })
+  .extend("eventsAfterExpiredReference", async () => {
     const clock = manualClock(0);
     const eventStore = createMemoryEventStore(clock.now);
     await eventStore.createIfAbsent(storedEvent("delivery-old", { expiresAtMs: 10 }));
     clock.advanceTo(11);
-    expect(await eventStore.readAfterId("delivery-old")).toStrictEqual(null);
-  });
-
-  test("期限切れイベントは次の保存時に間引かれ、同じ ID の再保存が新規になる", async () => {
+    return eventStore.readAfterId("delivery-old");
+  })
+  .extend("recreatedExpiredEvent", async () => {
     const clock = manualClock(0);
     const eventStore = createMemoryEventStore(clock.now);
     await eventStore.createIfAbsent(storedEvent("delivery-old", { expiresAtMs: 10 }));
     clock.advanceTo(11);
     await eventStore.createIfAbsent(storedEvent("delivery-new"));
-    const recreated = await eventStore.createIfAbsent(
-      storedEvent("delivery-old", { receivedAtMs: 500 }),
-    );
-    expect(recreated.receivedAtMs).toStrictEqual(500);
-  });
-
-  test("subscribeAfterId は参照不在なら null、以後の追加だけを通知する", async () => {
+    return eventStore.createIfAbsent(storedEvent("delivery-old", { receivedAtMs: 500 }));
+  })
+  .extend("subscriptionAfterReference", async () => {
     const eventStore = createMemoryEventStore();
     await eventStore.createIfAbsent(storedEvent("delivery-ref", { receivedAtMs: 100 }));
     const onAdd = vi.fn<(added: StoredEvent) => void>();
@@ -104,21 +92,18 @@ describe("createMemoryEventStore", () => {
     await eventStore.createIfAbsent(storedEvent("delivery-before", { receivedAtMs: 50 }));
     subscription?.unsubscribe();
     await eventStore.createIfAbsent(storedEvent("delivery-after-stop", { receivedAtMs: 300 }));
-    const notifiedIds = onAdd.mock.calls.map(([added]) => added.id);
-    expect([missingSubscription, notifiedIds]).toStrictEqual([null, ["delivery-next"]]);
-  });
-
-  test("同時刻の追加は ID の並びで参照より後と判定される", async () => {
+    return { missingSubscription, onAdd };
+  })
+  .extend("sameInstantSubscriptionSpy", async () => {
     const eventStore = createMemoryEventStore();
     await eventStore.createIfAbsent(storedEvent("delivery-a", { receivedAtMs: 100 }));
     const onAdd = vi.fn<(added: StoredEvent) => void>();
     const subscription = eventStore.subscribeAfterId({ eventId: "delivery-a", onAdd });
     await eventStore.createIfAbsent(storedEvent("delivery-b", { receivedAtMs: 100 }));
     subscription?.unsubscribe();
-    expect(onAdd.mock.calls.map(([added]) => added.id)).toStrictEqual(["delivery-b"]);
-  });
-
-  test("subscribeSince は起点時刻以降の追加だけを通知する", async () => {
+    return onAdd;
+  })
+  .extend("subscribeSinceSpy", async () => {
     const eventStore = createMemoryEventStore();
     const onAdd = vi.fn<(added: StoredEvent) => void>();
     const subscription = eventStore.subscribeSince({ sinceMs: 150, onAdd });
@@ -126,10 +111,9 @@ describe("createMemoryEventStore", () => {
     await eventStore.createIfAbsent(storedEvent("delivery-late", { receivedAtMs: 200 }));
     subscription.unsubscribe();
     await eventStore.createIfAbsent(storedEvent("delivery-after-stop", { receivedAtMs: 300 }));
-    expect(onAdd.mock.calls.map(([added]) => added.id)).toStrictEqual(["delivery-late"]);
-  });
-
-  test("findAuthorEvent は作者入りの最新イベントを返す", async () => {
+    return onAdd;
+  })
+  .extend("latestAuthoredEvent", async () => {
     const eventStore = createMemoryEventStore();
     await eventStore.createIfAbsent(
       storedEvent("delivery-1", {
@@ -140,10 +124,9 @@ describe("createMemoryEventStore", () => {
     await eventStore.createIfAbsent(
       storedEvent("delivery-2", { receivedAtMs: 200, payload: { pull_request: { number: 7 } } }),
     );
-    expect((await eventStore.findAuthorEvent(7))?.id).toStrictEqual("delivery-1");
-  });
-
-  test("findAuthorEvent は直近 10 件より古い作者入りイベントを見ない", async () => {
+    return eventStore.findAuthorEvent(7);
+  })
+  .extend("authoredEventBeyondWindow", async () => {
     const eventStore = createMemoryEventStore();
     await eventStore.createIfAbsent(
       storedEvent("delivery-authored", {
@@ -159,10 +142,9 @@ describe("createMemoryEventStore", () => {
         }),
       );
     }
-    expect(await eventStore.findAuthorEvent(7)).toStrictEqual(null);
-  });
-
-  test("deleteForPr は除外配送 ID 以外の対象 PR イベントを消して件数を返す", async () => {
+    return eventStore.findAuthorEvent(7);
+  })
+  .extend("prDeletion", async () => {
     const eventStore = createMemoryEventStore();
     await eventStore.createIfAbsent(
       storedEvent("delivery-1", { receivedAtMs: 100, payload: { pull_request: { number: 7 } } }),
@@ -177,44 +159,163 @@ describe("createMemoryEventStore", () => {
       prNumber: 7,
       excludeDeliveryId: "delivery-2",
     });
-    const remainingIds = (await eventStore.readSince(0)).map((stored) => stored.id);
-    expect([deletedCount, remainingIds]).toStrictEqual([1, ["delivery-2", "delivery-3"]]);
-  });
-});
-
-describe("createMemoryCursorStore", () => {
-  test("書いたカーソルが読める", async () => {
+    const remainingEvents = await eventStore.readSince(0);
+    return { deletedCount, remainingEvents };
+  })
+  .extend("cursorAfterWrite", async () => {
     const cursorStore = createMemoryCursorStore();
     await cursorStore.write({ clientId: "octocat-author", eventId: "delivery-1" });
-    expect(await cursorStore.read("octocat-author")).toStrictEqual("delivery-1");
-  });
-
-  test("不在のカーソルは null になる", async () => {
-    const cursorStore = createMemoryCursorStore();
-    expect(await cursorStore.read("octocat-author")).toStrictEqual(null);
-  });
-
-  test("48 時間の期限が切れたカーソルは null になる", async () => {
+    return cursorStore.read("octocat-author");
+  })
+  .extend("cursorNeverWritten", () => createMemoryCursorStore().read("octocat-author"))
+  .extend("cursorAfterExpiry", async () => {
     const clock = manualClock(0);
     const cursorStore = createMemoryCursorStore(clock.now);
     await cursorStore.write({ clientId: "octocat-author", eventId: "delivery-1" });
     clock.advanceTo(48 * 60 * 60 * 1000);
-    expect(await cursorStore.read("octocat-author")).toStrictEqual(null);
+    return cursorStore.read("octocat-author");
+  })
+  .extend("sessionAfterSave", async () => {
+    const sessionStore = createMemorySessionStore();
+    await sessionStore.save({ digest: "digest-1", login: "octocat", expiresAtMs: 2_000_000 });
+    return sessionStore.resolve("digest-1");
+  })
+  .extend("sessionForMissingDigest", () => createMemorySessionStore().resolve("digest-missing"));
+
+describe("createMemoryEventStore", () => {
+  it("保存したイベントは 3 件とも読める", ({ eventsInReadOrder }) => {
+    expect(eventsInReadOrder.length).toStrictEqual(3);
+  });
+
+  it("受信時刻が最も早いイベントが先頭に来る", ({ eventsInReadOrder }) => {
+    expect(eventsInReadOrder[0]?.id).toStrictEqual("delivery-c");
+  });
+
+  it("同時刻のイベントは ID 昇順で 2 番目に来る", ({ eventsInReadOrder }) => {
+    expect(eventsInReadOrder[1]?.id).toStrictEqual("delivery-a");
+  });
+
+  it("同時刻のイベントは ID 昇順で 3 番目に来る", ({ eventsInReadOrder }) => {
+    expect(eventsInReadOrder[2]?.id).toStrictEqual("delivery-b");
+  });
+
+  it("同じ delivery ID の 2 回目は元の保存済みイベントを返す", ({ duplicateDeliveryCreation }) => {
+    expect(duplicateDeliveryCreation.replayed).toStrictEqual(duplicateDeliveryCreation.original);
+  });
+
+  it("同じ delivery ID の 2 回目でも保存件数は 1 件のまま", ({ duplicateDeliveryCreation }) => {
+    expect(duplicateDeliveryCreation.storedEvents.length).toStrictEqual(1);
+  });
+
+  it("readAfterId は参照イベントより後の 2 件を返す", ({ eventsAfterFirstDelivery }) => {
+    expect(eventsAfterFirstDelivery?.length).toStrictEqual(2);
+  });
+
+  it("readAfterId が返す先頭は参照イベントの次になる", ({ eventsAfterFirstDelivery }) => {
+    expect(eventsAfterFirstDelivery?.[0]?.id).toStrictEqual("delivery-2");
+  });
+
+  it("readAfterId が返す末尾は最後のイベントになる", ({ eventsAfterFirstDelivery }) => {
+    expect(eventsAfterFirstDelivery?.[1]?.id).toStrictEqual("delivery-3");
+  });
+
+  it("readAfterId は参照イベント不在なら null を返す", ({ eventsAfterMissingDelivery }) => {
+    expect(eventsAfterMissingDelivery).toStrictEqual(null);
+  });
+
+  it("期限切れイベントは読み出しから消える", ({ eventsAfterExpiry }) => {
+    expect(eventsAfterExpiry).toStrictEqual([]);
+  });
+
+  it("期限切れの参照イベントからの readAfterId は null になる", ({
+    eventsAfterExpiredReference,
+  }) => {
+    expect(eventsAfterExpiredReference).toStrictEqual(null);
+  });
+
+  it("期限切れイベントは次の保存時に間引かれ、同じ ID の再保存が新規になる", ({
+    recreatedExpiredEvent,
+  }) => {
+    expect(recreatedExpiredEvent.receivedAtMs).toStrictEqual(500);
+  });
+
+  it("subscribeAfterId は参照不在なら null を返す", ({ subscriptionAfterReference }) => {
+    expect(subscriptionAfterReference.missingSubscription).toStrictEqual(null);
+  });
+
+  it("subscribeAfterId は参照より後の追加だけを 1 度通知する", ({ subscriptionAfterReference }) => {
+    expect(subscriptionAfterReference.onAdd.mock.calls.length).toStrictEqual(1);
+  });
+
+  it("subscribeAfterId が通知するのは参照より後のイベントになる", ({
+    subscriptionAfterReference,
+  }) => {
+    expect(subscriptionAfterReference.onAdd.mock.calls[0]?.[0].id).toStrictEqual("delivery-next");
+  });
+
+  it("同時刻の追加は 1 度だけ通知される", ({ sameInstantSubscriptionSpy }) => {
+    expect(sameInstantSubscriptionSpy.mock.calls.length).toStrictEqual(1);
+  });
+
+  it("同時刻の追加は ID の並びで参照より後と判定される", ({ sameInstantSubscriptionSpy }) => {
+    expect(sameInstantSubscriptionSpy.mock.calls[0]?.[0].id).toStrictEqual("delivery-b");
+  });
+
+  it("subscribeSince は起点時刻以降の追加だけを 1 度通知する", ({ subscribeSinceSpy }) => {
+    expect(subscribeSinceSpy.mock.calls.length).toStrictEqual(1);
+  });
+
+  it("subscribeSince が通知するのは起点時刻以降のイベントになる", ({ subscribeSinceSpy }) => {
+    expect(subscribeSinceSpy.mock.calls[0]?.[0].id).toStrictEqual("delivery-late");
+  });
+
+  it("findAuthorEvent は作者入りの最新イベントを返す", ({ latestAuthoredEvent }) => {
+    expect(latestAuthoredEvent?.id).toStrictEqual("delivery-1");
+  });
+
+  it("findAuthorEvent は直近 10 件より古い作者入りイベントを見ない", ({
+    authoredEventBeyondWindow,
+  }) => {
+    expect(authoredEventBeyondWindow).toStrictEqual(null);
+  });
+
+  it("deleteForPr は除外配送 ID 以外の対象 PR イベントを消して件数を返す", ({ prDeletion }) => {
+    expect(prDeletion.deletedCount).toStrictEqual(1);
+  });
+
+  it("deleteForPr の後は 2 件が残る", ({ prDeletion }) => {
+    expect(prDeletion.remainingEvents.length).toStrictEqual(2);
+  });
+
+  it("deleteForPr は除外した配送 ID を残す", ({ prDeletion }) => {
+    expect(prDeletion.remainingEvents[0]?.id).toStrictEqual("delivery-2");
+  });
+
+  it("deleteForPr は対象 PR 以外のイベントを残す", ({ prDeletion }) => {
+    expect(prDeletion.remainingEvents[1]?.id).toStrictEqual("delivery-3");
+  });
+});
+
+describe("createMemoryCursorStore", () => {
+  it("書いたカーソルが読める", ({ cursorAfterWrite }) => {
+    expect(cursorAfterWrite).toStrictEqual("delivery-1");
+  });
+
+  it("不在のカーソルは null になる", ({ cursorNeverWritten }) => {
+    expect(cursorNeverWritten).toStrictEqual(null);
+  });
+
+  it("48 時間の期限が切れたカーソルは null になる", ({ cursorAfterExpiry }) => {
+    expect(cursorAfterExpiry).toStrictEqual(null);
   });
 });
 
 describe("createMemorySessionStore", () => {
-  test("保存したセッションが digest で解決できる", async () => {
-    const sessionStore = createMemorySessionStore();
-    await sessionStore.save({ digest: "digest-1", login: "octocat", expiresAtMs: 2_000_000 });
-    expect(await sessionStore.resolve("digest-1")).toStrictEqual({
-      login: "octocat",
-      expiresAtMs: 2_000_000,
-    });
+  it("保存したセッションが digest で解決できる", ({ sessionAfterSave }) => {
+    expect(sessionAfterSave).toStrictEqual({ login: "octocat", expiresAtMs: 2_000_000 });
   });
 
-  test("不在の digest は null になる", async () => {
-    const sessionStore = createMemorySessionStore();
-    expect(await sessionStore.resolve("digest-missing")).toStrictEqual(null);
+  it("不在の digest は null になる", ({ sessionForMissingDigest }) => {
+    expect(sessionForMissingDigest).toStrictEqual(null);
   });
 });

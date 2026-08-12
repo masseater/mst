@@ -81,168 +81,241 @@ const contextWith = (parts: {
   now: () => new Date("2026-08-11T00:00:00.000Z"),
 });
 
-describe("acquireWorktree", () => {
-  test("head を強制 refspec で fetch してから作り直し reset とマーカーで終える", async () => {
-    const { git, calls } = gitFor({
-      "worktree list --porcelain": { stdout: "" },
-    });
+const registeredListOutput = `worktree ${managedPath}\nHEAD abc\nbranch refs/heads/topic/x`;
+
+const it = test
+  .extend("freshAcquisition", async () => {
+    const { git, calls } = gitFor({ "worktree list --porcelain": { stdout: "" } });
     const fs = fakeFs();
     const acquired = await acquireWorktree({
       context: contextWith({ git, fs }),
       request: { headBranch: "topic/x", prNumber: 7 },
     });
-    expect([acquired, calls(), fs.markers()]).toStrictEqual([
-      managedPath,
-      [
-        "fetch origin +refs/heads/topic/x:refs/remotes/origin/topic/x",
-        "worktree list --porcelain",
-        "worktree prune",
-        `worktree add ${managedPath} topic/x`,
-        `reset --hard origin/topic/x`,
-      ],
-      [managedPath],
-    ]);
-  });
-
-  test("base ブランチ指定時は base も fetch する", async () => {
+    return { acquired, calls: calls(), markers: fs.markers() };
+  })
+  .extend("baseBranchFetchCalls", async () => {
     const { git, calls } = gitFor({ "worktree list --porcelain": { stdout: "" } });
     await acquireWorktree({
       context: contextWith({ git, fs: fakeFs() }),
       request: { headBranch: "topic/x", baseBranch: "main", prNumber: 7 },
     });
-    expect(calls().slice(0, 2)).toStrictEqual([
-      "fetch origin +refs/heads/topic/x:refs/remotes/origin/topic/x",
-      "fetch origin +refs/heads/main:refs/remotes/origin/main",
-    ]);
-  });
-
-  test("登録済みで同ブランチ・実体ありなら clean と reset で再利用する", async () => {
-    const listOutput = `worktree ${managedPath}\nHEAD abc\nbranch refs/heads/topic/x`;
+    return calls();
+  })
+  .extend("reuseCalls", async () => {
     const { git, calls } = gitFor({
-      "worktree list --porcelain": { stdout: listOutput },
+      "worktree list --porcelain": { stdout: registeredListOutput },
       "symbolic-ref --short HEAD": { stdout: "topic/x\n" },
     });
-    const fs = fakeFs([managedPath]);
     await acquireWorktree({
-      context: contextWith({ git, fs }),
+      context: contextWith({ git, fs: fakeFs([managedPath]) }),
       request: { headBranch: "topic/x", prNumber: 7 },
     });
-    expect(calls()).not.toContain(`worktree add ${managedPath} topic/x`);
-    expect(calls()).toContain("clean -ffdx");
-  });
-
-  test("再利用の reset が失敗したら作り直しへ落ちる", async () => {
-    const listOutput = `worktree ${managedPath}\nHEAD abc\nbranch refs/heads/topic/x`;
+    return calls();
+  })
+  .extend("resetFailureCalls", async () => {
     const { git, calls } = gitFor({
-      "worktree list --porcelain": { stdout: listOutput },
+      "worktree list --porcelain": { stdout: registeredListOutput },
       "symbolic-ref --short HEAD": { stdout: "topic/x\n" },
       "clean -ffdx": { error: new Error("rebase in progress") },
       "symbolic-ref refs/remotes/origin/HEAD": { stdout: "refs/remotes/origin/main\n" },
     });
-    const fs = fakeFs([managedPath]);
     await acquireWorktree({
-      context: contextWith({ git, fs }),
+      context: contextWith({ git, fs: fakeFs([managedPath]) }),
       request: { headBranch: "topic/x", prNumber: 7 },
     });
-    expect(calls()).toContain(`worktree add ${managedPath} topic/x`);
-  });
-
-  test("同じ head を別 worktree が持つなら再利用せず作り直す", async () => {
-    const listOutput = [
-      `worktree ${managedPath}`,
-      "HEAD abc",
-      "branch refs/heads/topic/x",
-      "",
-      "worktree /tmp/auto-develop-worktree/pr-9",
-      "HEAD def",
-      "branch refs/heads/topic/x",
-    ].join("\n");
+    return calls();
+  })
+  .extend("duplicateHeadCalls", async () => {
     const { git, calls } = gitFor({
-      "worktree list --porcelain": { stdout: listOutput },
+      "worktree list --porcelain": {
+        stdout: [
+          `worktree ${managedPath}`,
+          "HEAD abc",
+          "branch refs/heads/topic/x",
+          "",
+          "worktree /tmp/auto-develop-worktree/pr-9",
+          "HEAD def",
+          "branch refs/heads/topic/x",
+        ].join("\n"),
+      },
       "symbolic-ref refs/remotes/origin/HEAD": { stdout: "refs/remotes/origin/main\n" },
     });
-    const fs = fakeFs([managedPath]);
     await acquireWorktree({
-      context: contextWith({ git, fs }),
+      context: contextWith({ git, fs: fakeFs([managedPath]) }),
       request: { headBranch: "topic/x", prNumber: 7 },
     });
-    expect(calls()).toContain(`worktree add ${managedPath} topic/x`);
-  });
-
-  test("登録はあるが実体が無ければ現在ブランチを問わず作り直す", async () => {
-    const listOutput = `worktree ${managedPath}\nHEAD abc\nbranch refs/heads/topic/x`;
+    return calls();
+  })
+  .extend("missingDirectoryCalls", async () => {
     const { git, calls } = gitFor({
-      "worktree list --porcelain": { stdout: listOutput },
+      "worktree list --porcelain": { stdout: registeredListOutput },
       "symbolic-ref refs/remotes/origin/HEAD": { stdout: "refs/remotes/origin/main\n" },
     });
-    const fs = fakeFs();
     await acquireWorktree({
-      context: contextWith({ git, fs }),
+      context: contextWith({ git, fs: fakeFs() }),
       request: { headBranch: "topic/x", prNumber: 7 },
     });
-    expect(calls()).not.toContain("symbolic-ref --short HEAD");
-    expect(calls()).toContain(`worktree add ${managedPath} topic/x`);
-  });
-
-  test("base が head と同じなら base の fetch は行わない", async () => {
+    return calls();
+  })
+  .extend("sameBaseAsHeadCalls", async () => {
     const { git, calls } = gitFor({ "worktree list --porcelain": { stdout: "" } });
     await acquireWorktree({
       context: contextWith({ git, fs: fakeFs() }),
       request: { headBranch: "topic/x", baseBranch: "topic/x", prNumber: 7 },
     });
-    const fetchCalls = calls().filter((call) => call.startsWith("fetch origin +"));
-    expect(fetchCalls).toStrictEqual([
-      "fetch origin +refs/heads/topic/x:refs/remotes/origin/topic/x",
-    ]);
-  });
-
-  test("登録先が別ブランチを持つなら再利用せず作り直す", async () => {
-    const listOutput = `worktree ${managedPath}\nHEAD abc\nbranch refs/heads/topic/x`;
+    return calls();
+  })
+  .extend("otherBranchCalls", async () => {
     const { git, calls } = gitFor({
-      "worktree list --porcelain": { stdout: listOutput },
+      "worktree list --porcelain": { stdout: registeredListOutput },
       "symbolic-ref --short HEAD": { stdout: "other-branch\n" },
       "symbolic-ref refs/remotes/origin/HEAD": { stdout: "refs/remotes/origin/main\n" },
     });
-    const fs = fakeFs([managedPath]);
     await acquireWorktree({
-      context: contextWith({ git, fs }),
+      context: contextWith({ git, fs: fakeFs([managedPath]) }),
       request: { headBranch: "topic/x", prNumber: 7 },
     });
-    expect(calls()).not.toContain("clean -ffdx");
-    expect(calls()).toContain(`worktree add ${managedPath} topic/x`);
+    return calls();
+  })
+  .extend(
+    "addFailureWithLeftover",
+    async (): Promise<{ readonly caught: Error | null; readonly removed: readonly string[] }> => {
+      const stateful = statefulFsAppearingOnAdd();
+      try {
+        await acquireWorktree({
+          context: contextWith({ git: stateful.git, fs: stateful.fs }),
+          request: { headBranch: "topic/x", prNumber: 7 },
+        });
+        return { caught: null, removed: stateful.removed() };
+      } catch (acquireFailure) {
+        return {
+          caught: acquireFailure instanceof Error ? acquireFailure : null,
+          removed: stateful.removed(),
+        };
+      }
+    },
+  )
+  .extend(
+    "addFailureWithoutLeftover",
+    async (): Promise<{ readonly caught: Error | null; readonly removed: readonly string[] }> => {
+      const { git } = gitFor({
+        "worktree list --porcelain": { stdout: "" },
+        [`worktree add ${managedPath} topic/x`]: { error: new Error("add failed") },
+      });
+      const removedPaths = new Map<number, string>();
+      const fs: WorktreeFs = {
+        exists: () => false,
+        removeRecursive: (path) => {
+          removedPaths.set(removedPaths.size, path);
+        },
+        writeMarker: () => undefined,
+        markerMtimeMs: () => null,
+      };
+      try {
+        await acquireWorktree({
+          context: contextWith({ git, fs }),
+          request: { headBranch: "topic/x", prNumber: 7 },
+        });
+        return { caught: null, removed: [...removedPaths.values()] };
+      } catch (acquireFailure) {
+        return {
+          caught: acquireFailure instanceof Error ? acquireFailure : null,
+          removed: [...removedPaths.values()],
+        };
+      }
+    },
+  );
+
+describe("acquireWorktree", () => {
+  it("取得した worktree のパスを返す", ({ freshAcquisition }) => {
+    expect(freshAcquisition.acquired).toStrictEqual(managedPath);
   });
 
-  test("作成コマンドが失敗し作りかけが残っていれば掃除して元のエラーを投げる", async () => {
-    const stateful = statefulFsAppearingOnAdd();
-    await expect(
-      acquireWorktree({
-        context: contextWith({ git: stateful.git, fs: stateful.fs }),
-        request: { headBranch: "topic/x", prNumber: 7 },
-      }),
-    ).rejects.toThrow("add failed");
-    expect(stateful.removed()).toContain(managedPath);
+  it("head を強制 refspec で fetch してから作り直し reset で終える", ({ freshAcquisition }) => {
+    expect(freshAcquisition.calls).toStrictEqual([
+      "fetch origin +refs/heads/topic/x:refs/remotes/origin/topic/x",
+      "worktree list --porcelain",
+      "worktree prune",
+      `worktree add ${managedPath} topic/x`,
+      `reset --hard origin/topic/x`,
+    ]);
   });
 
-  test("作成失敗時に作りかけが残っていなければ fs 削除を呼ばず元のエラーを投げる", async () => {
-    const { git } = gitFor({
-      "worktree list --porcelain": { stdout: "" },
-      [`worktree add ${managedPath} topic/x`]: { error: new Error("add failed") },
-    });
-    const removed = new Map<number, string>();
-    const fs: WorktreeFs = {
-      exists: () => false,
-      removeRecursive: (path) => {
-        removed.set(removed.size, path);
-      },
-      writeMarker: () => undefined,
-      markerMtimeMs: () => null,
-    };
-    await expect(
-      acquireWorktree({
-        context: contextWith({ git, fs }),
-        request: { headBranch: "topic/x", prNumber: 7 },
-      }),
-    ).rejects.toThrow("add failed");
-    expect([...removed.values()]).toStrictEqual(["/repo/.git/worktrees/pr-7"]);
+  it("最後に最終使用マーカーを書く", ({ freshAcquisition }) => {
+    expect(freshAcquisition.markers).toStrictEqual([managedPath]);
+  });
+
+  it("head を先に fetch する", ({ baseBranchFetchCalls }) => {
+    expect(baseBranchFetchCalls[0]).toStrictEqual(
+      "fetch origin +refs/heads/topic/x:refs/remotes/origin/topic/x",
+    );
+  });
+
+  it("base ブランチ指定時は base も fetch する", ({ baseBranchFetchCalls }) => {
+    expect(baseBranchFetchCalls[1]).toStrictEqual(
+      "fetch origin +refs/heads/main:refs/remotes/origin/main",
+    );
+  });
+
+  it("登録済みで同ブランチ・実体ありなら作り直さない", ({ reuseCalls }) => {
+    expect(reuseCalls).not.toContain(`worktree add ${managedPath} topic/x`);
+  });
+
+  it("登録済みで同ブランチ・実体ありなら clean で再利用する", ({ reuseCalls }) => {
+    expect(reuseCalls).toContain("clean -ffdx");
+  });
+
+  it("再利用の reset が失敗したら作り直しへ落ちる", ({ resetFailureCalls }) => {
+    expect(resetFailureCalls).toContain(`worktree add ${managedPath} topic/x`);
+  });
+
+  it("同じ head を別 worktree が持つなら再利用せず作り直す", ({ duplicateHeadCalls }) => {
+    expect(duplicateHeadCalls).toContain(`worktree add ${managedPath} topic/x`);
+  });
+
+  it("登録はあるが実体が無ければ現在ブランチを問い合わせない", ({ missingDirectoryCalls }) => {
+    expect(missingDirectoryCalls).not.toContain("symbolic-ref --short HEAD");
+  });
+
+  it("登録はあるが実体が無ければ作り直す", ({ missingDirectoryCalls }) => {
+    expect(missingDirectoryCalls).toContain(`worktree add ${managedPath} topic/x`);
+  });
+
+  it("base が head と同じなら base の fetch は行わない", ({ sameBaseAsHeadCalls }) => {
+    expect(sameBaseAsHeadCalls).toStrictEqual([
+      "fetch origin +refs/heads/topic/x:refs/remotes/origin/topic/x",
+      "worktree list --porcelain",
+      "worktree prune",
+      `worktree add ${managedPath} topic/x`,
+      `reset --hard origin/topic/x`,
+    ]);
+  });
+
+  it("登録先が別ブランチを持つなら再利用しない", ({ otherBranchCalls }) => {
+    expect(otherBranchCalls).not.toContain("clean -ffdx");
+  });
+
+  it("登録先が別ブランチを持つなら作り直す", ({ otherBranchCalls }) => {
+    expect(otherBranchCalls).toContain(`worktree add ${managedPath} topic/x`);
+  });
+
+  it("作成コマンドが失敗したら元のエラーを投げる", ({ addFailureWithLeftover }) => {
+    expect(addFailureWithLeftover.caught?.message).toStrictEqual("add failed");
+  });
+
+  it("作成コマンドが失敗し作りかけが残っていれば掃除する", ({ addFailureWithLeftover }) => {
+    expect(addFailureWithLeftover.removed).toContain(managedPath);
+  });
+
+  it("作成失敗時に作りかけが残っていなくても元のエラーを投げる", ({
+    addFailureWithoutLeftover,
+  }) => {
+    expect(addFailureWithoutLeftover.caught?.message).toStrictEqual("add failed");
+  });
+
+  it("作成失敗時に作りかけが残っていなければ worktree の fs 削除を呼ばない", ({
+    addFailureWithoutLeftover,
+  }) => {
+    expect(addFailureWithoutLeftover.removed).toStrictEqual(["/repo/.git/worktrees/pr-7"]);
   });
 });

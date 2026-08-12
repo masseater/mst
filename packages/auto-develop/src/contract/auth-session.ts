@@ -5,11 +5,11 @@ export type AuthSessionResponse = {
   readonly expiresAt: string;
 };
 
-export class InvalidAuthSessionError extends Error {
+class InvalidAuthSessionError extends Error {
   override readonly name = "InvalidAuthSessionError";
 
   constructor() {
-    super("認可セッション応答が契約の形と一致しない");
+    super("the auth session response does not match the contract shape");
   }
 }
 

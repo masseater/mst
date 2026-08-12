@@ -1,51 +1,64 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import { remoteBranchPresentIn, shouldReclaim, STALE_AFTER_MS } from "./staleness.ts";
+import { remoteBranchPresentIn, shouldReclaim } from "./staleness.ts";
+
+const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
+
+const it = test
+  .extend("reclaimWithUnknownRemote", () =>
+    shouldReclaim({ remoteBranchExists: null, lastUsedMtimeMs: 0, nowMs: threeDaysMs * 10 }))
+  .extend("reclaimWithVanishedRemote", () =>
+    shouldReclaim({ remoteBranchExists: false, lastUsedMtimeMs: Date.now(), nowMs: Date.now() }),
+  )
+  .extend("reclaimWithUnreadableMarker", () =>
+    shouldReclaim({ remoteBranchExists: true, lastUsedMtimeMs: null, nowMs: Date.now() }),
+  )
+  .extend("reclaimAtExactlyThreeDays", () =>
+    shouldReclaim({ remoteBranchExists: true, lastUsedMtimeMs: 0, nowMs: threeDaysMs }),
+  )
+  .extend("reclaimJustUnderThreeDays", () =>
+    shouldReclaim({ remoteBranchExists: true, lastUsedMtimeMs: 0, nowMs: threeDaysMs - 1 }),
+  )
+  .extend("presenceForExactRef", () =>
+    remoteBranchPresentIn("abc123\trefs/heads/feature/x\n", "feature/x"),
+  )
+  .extend("presenceForPrefixOnlyRef", () =>
+    remoteBranchPresentIn("abc123\trefs/heads/feature/x-extra\n", "feature/x"),
+  )
+  .extend("presenceForEmptyOutput", () => remoteBranchPresentIn("", "feature/x"));
 
 describe("shouldReclaim", () => {
-  test("リモート存在確認に失敗したら保守側で回収しない", () => {
-    expect(
-      shouldReclaim({ remoteBranchExists: null, lastUsedMtimeMs: 0, nowMs: STALE_AFTER_MS * 10 }),
-    ).toStrictEqual(false);
+  it("リモート存在確認に失敗したら保守側で回収しない", ({ reclaimWithUnknownRemote }) => {
+    expect(reclaimWithUnknownRemote).toStrictEqual(false);
   });
 
-  test("リモートブランチが消滅していれば無条件で回収する", () => {
-    expect(
-      shouldReclaim({ remoteBranchExists: false, lastUsedMtimeMs: Date.now(), nowMs: Date.now() }),
-    ).toStrictEqual(true);
+  it("リモートブランチが消滅していれば無条件で回収する", ({ reclaimWithVanishedRemote }) => {
+    expect(reclaimWithVanishedRemote).toStrictEqual(true);
   });
 
-  test("マーカー mtime が読めなければ回収しない", () => {
-    expect(
-      shouldReclaim({ remoteBranchExists: true, lastUsedMtimeMs: null, nowMs: Date.now() }),
-    ).toStrictEqual(false);
+  it("マーカー mtime が読めなければ回収しない", ({ reclaimWithUnreadableMarker }) => {
+    expect(reclaimWithUnreadableMarker).toStrictEqual(false);
   });
 
-  test("最終使用から 3 日ちょうどで回収する", () => {
-    expect(
-      shouldReclaim({ remoteBranchExists: true, lastUsedMtimeMs: 0, nowMs: STALE_AFTER_MS }),
-    ).toStrictEqual(true);
+  it("最終使用から 3 日ちょうどで回収する", ({ reclaimAtExactlyThreeDays }) => {
+    expect(reclaimAtExactlyThreeDays).toStrictEqual(true);
   });
 
-  test("3 日以内なら保持する", () => {
-    expect(
-      shouldReclaim({ remoteBranchExists: true, lastUsedMtimeMs: 0, nowMs: STALE_AFTER_MS - 1 }),
-    ).toStrictEqual(false);
+  it("3 日以内なら保持する", ({ reclaimJustUnderThreeDays }) => {
+    expect(reclaimJustUnderThreeDays).toStrictEqual(false);
   });
 });
 
 describe("remoteBranchPresentIn", () => {
-  test("タブ区切りの完全修飾 ref の末尾一致で存在を判定する", () => {
-    const output = "abc123\trefs/heads/feature/x\n";
-    expect(remoteBranchPresentIn(output, "feature/x")).toStrictEqual(true);
+  it("タブ区切りの完全修飾 ref の末尾一致で存在を判定する", ({ presenceForExactRef }) => {
+    expect(presenceForExactRef).toStrictEqual(true);
   });
 
-  test("前方一致だけの行は消滅とみなす", () => {
-    const output = "abc123\trefs/heads/feature/x-extra\n";
-    expect(remoteBranchPresentIn(output, "feature/x")).toStrictEqual(false);
+  it("前方一致だけの行は消滅とみなす", ({ presenceForPrefixOnlyRef }) => {
+    expect(presenceForPrefixOnlyRef).toStrictEqual(false);
   });
 
-  test("空の出力は消滅とみなす", () => {
-    expect(remoteBranchPresentIn("", "feature/x")).toStrictEqual(false);
+  it("空の出力は消滅とみなす", ({ presenceForEmptyOutput }) => {
+    expect(presenceForEmptyOutput).toStrictEqual(false);
   });
 });

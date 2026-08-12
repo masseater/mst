@@ -1,5 +1,3 @@
-import { lineAtOffset } from "@mst/utils";
-
 import { isInsideGeneratedRegion } from "../markdown/generated-region.ts";
 import { descendants, offsetOf } from "../markdown/nodes.ts";
 
@@ -43,7 +41,7 @@ export const versionLiteralsInProse = ({
         .filter(({ found }) => !isExcluded({ found, patterns: config.versionExclusionPatterns }))
         .map(({ offset, found }) => ({
           file: document.file,
-          line: lineAtOffset(document.source, offset),
+          line: document.source.slice(0, offset).split("\n").length,
           message: message(found),
         }));
     });

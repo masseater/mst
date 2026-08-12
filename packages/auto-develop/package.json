@@ -2,6 +2,9 @@
   "name": "@mst/auto-develop",
   "version": "0.0.0",
   "description": "A pull-request review loop that keeps running without a human starting it.",
+  "keywords": [
+    "tanstack-intent"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -13,6 +16,7 @@
   },
   "files": [
     "dist",
+    "skills",
     "src"
   ],
   "type": "module",
@@ -25,17 +29,21 @@
     "access": "public"
   },
   "scripts": {
-    "build": "vp pack",
+    "build": "spool -- vp pack",
     "dev": "vp pack --watch",
-    "test": "vp test",
-    "check": "vp check"
+    "test": "spool -- vp test",
+    "check": "spool -- vp check",
+    "check:skills": "intent validate"
   },
   "dependencies": {
-    "@mst/utils": "workspace:*",
+    "@mst/repository-checks": "workspace:*",
+    "citty": "catalog:",
     "es-toolkit": "catalog:",
-    "zod": "^4.4.3"
+    "octokit": "5.0.5",
+    "zod": "4.4.3"
   },
   "devDependencies": {
+    "@tanstack/intent": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "typescript": "catalog:",

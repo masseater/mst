@@ -2,36 +2,50 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { splitFrames } from "./sse-frames.ts";
 
+const it = test
+  .extend("fullFieldSplit", () => splitFrames('id: evt-1\nevent: pull_request\ndata: {"a":1}\n\n'))
+  .extend("repeatedFieldSplit", () => splitFrames("data: first\ndata: second\n\n"))
+  .extend("noiseLineSplit", () =>
+    splitFrames(": comment line\nretry: 5000\nunknown line\ndata: kept\n\n"),
+  )
+  .extend("dataLessBlockSplit", () =>
+    splitFrames("id: evt-1\nevent: pull_request\n\ndata: kept\n\n"),
+  )
+  .extend("partialTailSplit", () => splitFrames("data: complete\n\ndata: partial"))
+  .extend("separatorLessSplit", () => splitFrames("data: partial"));
+
 describe("splitFrames", () => {
-  test("id と event と data の 3 フィールドを読み取る", () => {
-    const { frames, rest } = splitFrames('id: evt-1\nevent: pull_request\ndata: {"a":1}\n\n');
-    expect([frames, rest]).toStrictEqual([
-      [{ id: "evt-1", event: "pull_request", data: '{"a":1}' }],
-      "",
+  it("id と event と data の 3 フィールドを読み取る", ({ fullFieldSplit }) => {
+    expect(fullFieldSplit.frames).toStrictEqual([
+      { id: "evt-1", event: "pull_request", data: '{"a":1}' },
     ]);
   });
 
-  test("同一ブロックで同じフィールドが複数回現れたら最後の行が勝つ", () => {
-    const { frames } = splitFrames("data: first\ndata: second\n\n");
-    expect(frames).toStrictEqual([{ data: "second" }]);
+  it("区切りで終わる入力は端数を残さない", ({ fullFieldSplit }) => {
+    expect(fullFieldSplit.rest).toStrictEqual("");
   });
 
-  test("コメント行と retry 行と未知の行は無視される", () => {
-    const { frames } = splitFrames(": comment line\nretry: 5000\nunknown line\ndata: kept\n\n");
-    expect(frames).toStrictEqual([{ data: "kept" }]);
+  it("同一ブロックで同じフィールドが複数回現れたら最後の行が勝つ", ({ repeatedFieldSplit }) => {
+    expect(repeatedFieldSplit.frames).toStrictEqual([{ data: "second" }]);
   });
 
-  test("data を持たないブロックはブロックごと破棄される", () => {
-    const { frames } = splitFrames("id: evt-1\nevent: pull_request\n\ndata: kept\n\n");
-    expect(frames).toStrictEqual([{ data: "kept" }]);
+  it("コメント行と retry 行と未知の行は無視される", ({ noiseLineSplit }) => {
+    expect(noiseLineSplit.frames).toStrictEqual([{ data: "kept" }]);
   });
 
-  test("区切りに満たない端数は rest として保持される", () => {
-    const { frames, rest } = splitFrames("data: complete\n\ndata: partial");
-    expect([frames, rest]).toStrictEqual([[{ data: "complete" }], "data: partial"]);
+  it("data を持たないブロックはブロックごと破棄される", ({ dataLessBlockSplit }) => {
+    expect(dataLessBlockSplit.frames).toStrictEqual([{ data: "kept" }]);
   });
 
-  test("区切りが 1 つも無ければ全体が rest になる", () => {
-    expect(splitFrames("data: partial")).toStrictEqual({ frames: [], rest: "data: partial" });
+  it("区切りを満たすブロックだけがフレームになる", ({ partialTailSplit }) => {
+    expect(partialTailSplit.frames).toStrictEqual([{ data: "complete" }]);
+  });
+
+  it("区切りに満たない端数は rest として保持される", ({ partialTailSplit }) => {
+    expect(partialTailSplit.rest).toStrictEqual("data: partial");
+  });
+
+  it("区切りが 1 つも無ければ全体が rest になる", ({ separatorLessSplit }) => {
+    expect(separatorLessSplit).toStrictEqual({ frames: [], rest: "data: partial" });
   });
 });

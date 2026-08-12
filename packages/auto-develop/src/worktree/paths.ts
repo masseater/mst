@@ -17,7 +17,7 @@ export const resolveRealPath = (candidate: string): string => {
   }
 };
 
-export const worktreeRoot = (): string => join(resolveRealPath(tmpdir()), WORKTREE_ROOT_NAME);
+const worktreeRoot = (): string => join(resolveRealPath(tmpdir()), WORKTREE_ROOT_NAME);
 
 export const worktreePathFor = (prNumber: number): string => {
   if (!Number.isSafeInteger(prNumber) || prNumber < 1) {
@@ -26,7 +26,7 @@ export const worktreePathFor = (prNumber: number): string => {
   return join(worktreeRoot(), `pr-${prNumber}`);
 };
 
-export const prNumberFromDirectoryName = (directoryName: string): number | null => {
+const prNumberFromDirectoryName = (directoryName: string): number | null => {
   const matched = PR_DIRECTORY_PATTERN.exec(directoryName);
   const digits = matched?.[1];
   return digits === undefined ? null : Number(digits);

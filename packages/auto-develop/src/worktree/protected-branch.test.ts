@@ -2,33 +2,58 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { isProtectedBranch, UNKNOWN_BRANCH_MARKER } from "./protected-branch.ts";
 
+const it = test
+  .extend("protectionWithoutDefaultBranch", () =>
+    isProtectedBranch({ branch: "topic/x", defaultBranch: null }))
+  .extend("protectionForBranchlessWorktree", () =>
+    isProtectedBranch({ branch: null, defaultBranch: "main" }),
+  )
+  .extend("protectionForUnknownMarker", () =>
+    isProtectedBranch({ branch: UNKNOWN_BRANCH_MARKER, defaultBranch: "main" }),
+  )
+  .extend("protectionForDefaultBranch", () =>
+    isProtectedBranch({ branch: "develop", defaultBranch: "develop" }),
+  )
+  .extend("protectionForMain", () =>
+    isProtectedBranch({ branch: "main", defaultBranch: "develop" }),
+  )
+  .extend("protectionForMaster", () =>
+    isProtectedBranch({ branch: "master", defaultBranch: "develop" }),
+  )
+  .extend("protectionForTopicBranch", () =>
+    isProtectedBranch({ branch: "topic/x", defaultBranch: "main" }),
+  );
+
 describe("isProtectedBranch", () => {
-  test("デフォルトブランチの解決に失敗したら全ブランチを保護する", () => {
-    expect(isProtectedBranch({ branch: "topic/x", defaultBranch: null })).toStrictEqual(true);
+  it("デフォルトブランチの解決に失敗したら全ブランチを保護する", ({
+    protectionWithoutDefaultBranch,
+  }) => {
+    expect(protectionWithoutDefaultBranch).toStrictEqual(true);
   });
 
-  test("ブランチが存在しない worktree は保護せず削除可能側に倒す", () => {
-    expect(isProtectedBranch({ branch: null, defaultBranch: "main" })).toStrictEqual(false);
+  it("ブランチが存在しない worktree は保護せず削除可能側に倒す", ({
+    protectionForBranchlessWorktree,
+  }) => {
+    expect(protectionForBranchlessWorktree).toStrictEqual(false);
   });
 
-  test("ブランチ不明マーカーは保護する", () => {
-    expect(
-      isProtectedBranch({ branch: UNKNOWN_BRANCH_MARKER, defaultBranch: "main" }),
-    ).toStrictEqual(true);
+  it("ブランチ不明マーカーは保護する", ({ protectionForUnknownMarker }) => {
+    expect(protectionForUnknownMarker).toStrictEqual(true);
   });
 
-  test("デフォルトブランチと一致するブランチは保護する", () => {
-    expect(isProtectedBranch({ branch: "develop", defaultBranch: "develop" })).toStrictEqual(true);
+  it("デフォルトブランチと一致するブランチは保護する", ({ protectionForDefaultBranch }) => {
+    expect(protectionForDefaultBranch).toStrictEqual(true);
   });
 
-  test("main と master は常に保護する", () => {
-    expect([
-      isProtectedBranch({ branch: "main", defaultBranch: "develop" }),
-      isProtectedBranch({ branch: "master", defaultBranch: "develop" }),
-    ]).toStrictEqual([true, true]);
+  it("main は常に保護する", ({ protectionForMain }) => {
+    expect(protectionForMain).toStrictEqual(true);
   });
 
-  test("保護対象でない作業ブランチは削除可能", () => {
-    expect(isProtectedBranch({ branch: "topic/x", defaultBranch: "main" })).toStrictEqual(false);
+  it("master は常に保護する", ({ protectionForMaster }) => {
+    expect(protectionForMaster).toStrictEqual(true);
+  });
+
+  it("保護対象でない作業ブランチは削除可能", ({ protectionForTopicBranch }) => {
+    expect(protectionForTopicBranch).toStrictEqual(false);
   });
 });

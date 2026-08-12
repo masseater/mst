@@ -1,3 +1,5 @@
+import { Octokit } from "octokit";
+
 import { asRecord } from "../contract/unknown-record.ts";
 import { GithubRejectionError } from "./github-rejection-error.ts";
 import { GithubUnavailableError } from "./github-unavailable-error.ts";
@@ -53,19 +55,19 @@ const CHECK_BUCKETS_QUERY = `query($owner: String!, $name: String!, $number: Int
   }
 }`;
 
-const isRateLimited = (response: Response): boolean =>
-  response.headers.get("x-ratelimit-remaining") === "0";
+const rateLimitExhausted = (failure: Readonly<Record<string, unknown>> | undefined): boolean =>
+  asRecord(asRecord(failure?.response)?.headers)?.["x-ratelimit-remaining"] === "0";
 
-const classifyStatus = (response: Response): never => {
+const rethrowClassified = (failure: unknown): never => {
+  const record = asRecord(failure);
+  const status = typeof record?.status === "number" ? record.status : 0;
   const transient =
-    response.status >= 500 ||
-    response.status === 408 ||
-    response.status === 429 ||
-    (response.status === 403 && isRateLimited(response));
-  if (transient) {
-    throw new GithubUnavailableError(`github responded with ${response.status}`);
-  }
-  throw new GithubRejectionError(`github rejected the request with ${response.status}`);
+    status >= 500 ||
+    status === 408 ||
+    status === 429 ||
+    (status === 403 && rateLimitExhausted(record));
+  if (transient) throw new GithubUnavailableError(`github responded with ${status}`);
+  throw new GithubRejectionError(`github rejected the request with ${status}`);
 };
 
 const stringOrNull = (candidate: unknown): string | null =>
@@ -120,51 +122,82 @@ const checkRunBucket = (node: Readonly<Record<string, unknown>>): readonly Check
 const toCheckBucket = (node: Readonly<Record<string, unknown>>): readonly CheckBucket[] =>
   typeof node.state === "string" ? statusContextBucket(node.state) : checkRunBucket(node);
 
+export type GithubApiAccess = {
+  readonly graphql: (
+    query: string,
+    variables: Readonly<Record<string, unknown>>,
+  ) => Promise<unknown>;
+  readonly authenticatedLogin: () => Promise<string>;
+  readonly repositoryIsPrivate: (target: {
+    readonly owner: string;
+    readonly repo: string;
+  }) => Promise<boolean>;
+};
+
+const octokitAccess = (client: {
+  readonly token: string;
+  readonly baseUrl: string;
+  readonly fetchImpl: typeof fetch;
+}): GithubApiAccess => {
+  const octokit = new Octokit({
+    auth: client.token,
+    baseUrl: client.baseUrl,
+    request: { fetch: client.fetchImpl },
+  });
+  return {
+    graphql: (query, variables) => octokit.graphql(query, variables),
+    authenticatedLogin: async () => (await octokit.rest.users.getAuthenticated()).data.login,
+    repositoryIsPrivate: async (target) => (await octokit.rest.repos.get(target)).data.private,
+  };
+};
+
+export const octokitAccessFor =
+  (client: {
+    readonly baseUrl: string;
+    readonly fetchImpl: typeof fetch;
+  }): ((token: string) => GithubApiAccess) =>
+  (token) =>
+    octokitAccess({ token, baseUrl: client.baseUrl, fetchImpl: client.fetchImpl });
+
 export const createGithubFetchReader = (access: {
-  readonly apiOrigin: string;
   readonly repository: string;
   readonly token: string;
-  readonly fetchImpl?: typeof fetch;
+  readonly accessFor: (token: string) => GithubApiAccess;
 }): GithubReader => {
-  const fetchImpl = access.fetchImpl ?? fetch;
-  const [owner, name] = access.repository.split("/");
+  const [owner = "", name = ""] = access.repository.split("/");
+  const clientFor = access.accessFor;
 
-  const restGet = async (request: {
-    readonly path: string;
-    readonly token: string;
-  }): Promise<Readonly<Record<string, unknown>>> => {
-    const response = await fetchImpl(new URL(request.path, access.apiOrigin), {
-      headers: { accept: "application/vnd.github+json", authorization: `Bearer ${request.token}` },
-    });
-    if (!response.ok) classifyStatus(response);
-    return asRecord(await response.json()) ?? {};
+  const viewerLogin = async (token: string): Promise<string> => {
+    try {
+      return await clientFor(token).authenticatedLogin();
+    } catch (requestFailure) {
+      return rethrowClassified(requestFailure);
+    }
+  };
+
+  const readPrivacy = async (token: string): Promise<boolean> => {
+    try {
+      return await clientFor(token).repositoryIsPrivate({ owner, repo: name });
+    } catch (requestFailure) {
+      return rethrowClassified(requestFailure);
+    }
   };
 
   const graphql = async (request: {
     readonly query: string;
     readonly variables: Readonly<Record<string, unknown>>;
   }): Promise<Readonly<Record<string, unknown>>> => {
-    const response = await fetchImpl(new URL("/graphql", access.apiOrigin), {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${access.token}` },
-      body: JSON.stringify({ query: request.query, variables: request.variables }),
-    });
-    if (!response.ok) classifyStatus(response);
-    return asRecord(asRecord(await response.json())?.data) ?? {};
+    try {
+      const responseData = await clientFor(access.token).graphql(request.query, request.variables);
+      return asRecord(responseData) ?? {};
+    } catch (queryFailure) {
+      return rethrowClassified(queryFailure);
+    }
   };
 
   return {
-    resolveTokenLogin: async (githubToken) => {
-      const viewer = await restGet({ path: "/user", token: githubToken });
-      if (typeof viewer.login !== "string") {
-        throw new GithubRejectionError("github user response has no login");
-      }
-      return viewer.login;
-    },
-    readRepositoryPrivacy: async (githubToken) => {
-      const repository = await restGet({ path: `/repos/${access.repository}`, token: githubToken });
-      return repository.private === true;
-    },
+    resolveTokenLogin: (githubToken) => viewerLogin(githubToken),
+    readRepositoryPrivacy: (githubToken) => readPrivacy(githubToken),
     listOpenPullRequests: async () => {
       const responseData = await graphql({
         query: PULL_SUMMARY_QUERY,

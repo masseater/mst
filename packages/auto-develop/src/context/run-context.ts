@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { isMode, type Mode } from "../contract/vocabulary.ts";
 
-export const RUN_CONTEXT_SCHEMA_VERSION = 1;
+const RUN_CONTEXT_SCHEMA_VERSION = 1;
 
 const LAUNCH_PATHS = ["auto", "manual"] as const;
 
@@ -42,8 +42,3 @@ export type RunContext = z.infer<typeof runContextSchema>;
 
 export const parseRunContext = (candidate: unknown): RunContext =>
   runContextSchema.parse(candidate);
-
-export const safeParseRunContext = (candidate: unknown): RunContext | null => {
-  const parsed = runContextSchema.safeParse(candidate);
-  return parsed.success ? parsed.data : null;
-};

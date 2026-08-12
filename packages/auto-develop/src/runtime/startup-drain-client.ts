@@ -8,7 +8,7 @@ import {
 import type { Mode } from "../contract/vocabulary.ts";
 import type { Logger } from "../logging/logger.ts";
 
-export class StartupDrainRejectedError extends Error {
+class StartupDrainRejectedError extends Error {
   override readonly name = "StartupDrainRejectedError";
 
   readonly status: number;

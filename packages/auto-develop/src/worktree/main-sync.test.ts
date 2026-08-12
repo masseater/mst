@@ -21,14 +21,77 @@ const scriptedGit = (
   return { git, calls: () => [...recorded.values()] };
 };
 
-describe("syncMain", () => {
-  test("既に対象ブランチ上ならチェックアウトせず fetch と reset だけ行う", async () => {
+const it = test
+  .extend("alreadyOnTargetCalls", async () => {
     const { git, calls } = scriptedGit({
       "rev-parse --show-toplevel": { stdout: "/repo\n" },
       "rev-parse --abbrev-ref HEAD": { stdout: "main\n" },
     });
     await syncMain({ git, startDir: "/repo/sub", log: silentLogger });
-    expect(calls()).toStrictEqual([
+    return calls();
+  })
+  .extend("otherBranchCalls", async () => {
+    const { git, calls } = scriptedGit({
+      "rev-parse --show-toplevel": { stdout: "/repo\n" },
+      "rev-parse --abbrev-ref HEAD": { stdout: "topic/x\n" },
+    });
+    await syncMain({ git, startDir: "/repo", log: silentLogger });
+    return calls();
+  })
+  .extend("detachedHeadCalls", async () => {
+    const { git, calls } = scriptedGit({
+      "rev-parse --show-toplevel": { stdout: "/repo\n" },
+      "rev-parse --abbrev-ref HEAD": { stdout: "HEAD\n" },
+    });
+    await syncMain({ git, startDir: "/repo", log: silentLogger });
+    return calls();
+  })
+  .extend("customTargetCalls", async () => {
+    const { git, calls } = scriptedGit({
+      "rev-parse --show-toplevel": { stdout: "/repo\n" },
+      "rev-parse --abbrev-ref HEAD": { stdout: "main\n" },
+    });
+    await syncMain({ git, startDir: "/repo", targetBranch: "develop", log: silentLogger });
+    return calls();
+  })
+  .extend(
+    "checkoutFailureRun",
+    async (): Promise<{ readonly caught: Error | null; readonly calls: readonly string[] }> => {
+      const { git, calls } = scriptedGit({
+        "rev-parse --show-toplevel": { stdout: "/repo\n" },
+        "rev-parse --abbrev-ref HEAD": { stdout: "topic/x\n" },
+        "checkout --force main": { fail: true },
+      });
+      try {
+        await syncMain({ git, startDir: "/repo", log: silentLogger });
+        return { caught: null, calls: calls() };
+      } catch (syncFailure) {
+        return { caught: syncFailure instanceof Error ? syncFailure : null, calls: calls() };
+      }
+    },
+  )
+  .extend(
+    "fetchFailureRun",
+    async (): Promise<{ readonly caught: Error | null; readonly calls: readonly string[] }> => {
+      const { git, calls } = scriptedGit({
+        "rev-parse --show-toplevel": { stdout: "/repo\n" },
+        "rev-parse --abbrev-ref HEAD": { stdout: "main\n" },
+        "fetch origin": { fail: true },
+      });
+      try {
+        await syncMain({ git, startDir: "/repo", log: silentLogger });
+        return { caught: null, calls: calls() };
+      } catch (syncFailure) {
+        return { caught: syncFailure instanceof Error ? syncFailure : null, calls: calls() };
+      }
+    },
+  );
+
+describe("syncMain", () => {
+  it("既に対象ブランチ上ならチェックアウトせず fetch と reset だけ行う", ({
+    alreadyOnTargetCalls,
+  }) => {
+    expect(alreadyOnTargetCalls).toStrictEqual([
       "rev-parse --show-toplevel",
       "rev-parse --abbrev-ref HEAD",
       "fetch origin",
@@ -36,13 +99,8 @@ describe("syncMain", () => {
     ]);
   });
 
-  test("別ブランチ上なら先に強制チェックアウトする", async () => {
-    const { git, calls } = scriptedGit({
-      "rev-parse --show-toplevel": { stdout: "/repo\n" },
-      "rev-parse --abbrev-ref HEAD": { stdout: "topic/x\n" },
-    });
-    await syncMain({ git, startDir: "/repo", log: silentLogger });
-    expect(calls()).toStrictEqual([
+  it("別ブランチ上なら先に強制チェックアウトする", ({ otherBranchCalls }) => {
+    expect(otherBranchCalls).toStrictEqual([
       "rev-parse --show-toplevel",
       "rev-parse --abbrev-ref HEAD",
       "checkout --force main",
@@ -51,22 +109,12 @@ describe("syncMain", () => {
     ]);
   });
 
-  test("detached HEAD は不一致となりチェックアウト経由で復帰する", async () => {
-    const { git, calls } = scriptedGit({
-      "rev-parse --show-toplevel": { stdout: "/repo\n" },
-      "rev-parse --abbrev-ref HEAD": { stdout: "HEAD\n" },
-    });
-    await syncMain({ git, startDir: "/repo", log: silentLogger });
-    expect(calls()).toContain("checkout --force main");
+  it("detached HEAD は不一致となりチェックアウト経由で復帰する", ({ detachedHeadCalls }) => {
+    expect(detachedHeadCalls).toContain("checkout --force main");
   });
 
-  test("対象ブランチは引数で差し替えられる", async () => {
-    const { git, calls } = scriptedGit({
-      "rev-parse --show-toplevel": { stdout: "/repo\n" },
-      "rev-parse --abbrev-ref HEAD": { stdout: "main\n" },
-    });
-    await syncMain({ git, startDir: "/repo", targetBranch: "develop", log: silentLogger });
-    expect(calls()).toStrictEqual([
+  it("対象ブランチは引数で差し替えられる", ({ customTargetCalls }) => {
+    expect(customTargetCalls).toStrictEqual([
       "rev-parse --show-toplevel",
       "rev-parse --abbrev-ref HEAD",
       "checkout --force develop",
@@ -75,27 +123,19 @@ describe("syncMain", () => {
     ]);
   });
 
-  test("チェックアウト失敗なら fetch せず伝播する", async () => {
-    const { git, calls } = scriptedGit({
-      "rev-parse --show-toplevel": { stdout: "/repo\n" },
-      "rev-parse --abbrev-ref HEAD": { stdout: "topic/x\n" },
-      "checkout --force main": { fail: true },
-    });
-    await expect(syncMain({ git, startDir: "/repo", log: silentLogger })).rejects.toThrow(
-      "git failed: checkout --force main",
-    );
-    expect(calls()).not.toContain("fetch origin");
+  it("チェックアウト失敗は伝播する", ({ checkoutFailureRun }) => {
+    expect(checkoutFailureRun.caught?.message).toStrictEqual("git failed: checkout --force main");
   });
 
-  test("fetch 失敗なら reset せず伝播する", async () => {
-    const { git, calls } = scriptedGit({
-      "rev-parse --show-toplevel": { stdout: "/repo\n" },
-      "rev-parse --abbrev-ref HEAD": { stdout: "main\n" },
-      "fetch origin": { fail: true },
-    });
-    await expect(syncMain({ git, startDir: "/repo", log: silentLogger })).rejects.toThrow(
-      "git failed: fetch origin",
-    );
-    expect(calls()).not.toContain("reset --hard origin/main");
+  it("チェックアウト失敗なら fetch しない", ({ checkoutFailureRun }) => {
+    expect(checkoutFailureRun.calls).not.toContain("fetch origin");
+  });
+
+  it("fetch 失敗は伝播する", ({ fetchFailureRun }) => {
+    expect(fetchFailureRun.caught?.message).toStrictEqual("git failed: fetch origin");
+  });
+
+  it("fetch 失敗なら reset しない", ({ fetchFailureRun }) => {
+    expect(fetchFailureRun.calls).not.toContain("reset --hard origin/main");
   });
 });

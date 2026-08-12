@@ -3,15 +3,6 @@ import type { LifecycleGate } from "../lifecycle/lifecycle-gate.ts";
 import type { Logger } from "../logging/logger.ts";
 import type { AcquireContext } from "../worktree/acquire-worktree.ts";
 
-export type WorktreeAcquirer = (request: {
-  readonly context: AcquireContext;
-  readonly request: {
-    readonly headBranch: string;
-    readonly baseBranch?: string;
-    readonly prNumber: number;
-  };
-}) => Promise<string>;
-
 export type SessionOrchestrator = {
   readonly runInWorktree: (session: {
     readonly prNumber: number;
@@ -22,7 +13,14 @@ export type SessionOrchestrator = {
 };
 
 export type SessionOrchestratorConfig = {
-  readonly acquireWorktree: WorktreeAcquirer;
+  readonly acquireWorktree: (request: {
+    readonly context: AcquireContext;
+    readonly request: {
+      readonly headBranch: string;
+      readonly baseBranch?: string;
+      readonly prNumber: number;
+    };
+  }) => Promise<string>;
   readonly acquireContext: AcquireContext;
   readonly setupWorktree: (worktreePath: string) => Promise<void>;
   readonly engine: Engine;

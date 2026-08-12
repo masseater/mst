@@ -30,19 +30,135 @@ const githubWith = (github: {
   listCheckBuckets: () => Promise.resolve(github.buckets ?? []),
 });
 
-describe("reviewer モードの巻き取り", () => {
-  test("自分が requested reviewer の PR ごとに review-requested を合成する", async () => {
-    const pulls = [
-      openPull({ number: 7, requestedReviewerLogins: ["hubot"], draft: true }),
-      openPull({ number: 8, requestedReviewerLogins: ["octocat"] }),
-    ];
-    const envelopes = await runStartupDrain({
+const it = test
+  .extend("reviewerDrain", () =>
+    runStartupDrain({
       login: "hubot",
       mode: "reviewer",
-      github: githubWith({ pulls }),
+      github: githubWith({
+        pulls: [
+          openPull({ number: 7, requestedReviewerLogins: ["hubot"], draft: true }),
+          openPull({ number: 8, requestedReviewerLogins: ["octocat"] }),
+        ],
+      }),
       ciSuppressionLabel: undefined,
-    });
-    expect(envelopes).toStrictEqual([
+    }))
+  .extend("authorlessReviewerDrain", () =>
+    runStartupDrain({
+      login: "hubot",
+      mode: "reviewer",
+      github: githubWith({
+        pulls: [openPull({ authorLogin: null, requestedReviewerLogins: ["hubot"] })],
+      }),
+      ciSuppressionLabel: undefined,
+    }),
+  )
+  .extend("excludedLabelReviewerDrain", () =>
+    runStartupDrain({
+      login: "hubot",
+      mode: "reviewer",
+      github: githubWith({
+        pulls: [
+          openPull({ requestedReviewerLogins: ["hubot"], labelNames: ["exclude-auto-develop"] }),
+        ],
+      }),
+      ciSuppressionLabel: undefined,
+    }),
+  )
+  .extend("changesRequestedWithFailingCiDrain", () =>
+    runStartupDrain({
+      login: "octocat",
+      mode: "author",
+      github: githubWith({
+        pulls: [openPull({ reviewDecision: "CHANGES_REQUESTED" })],
+        buckets: ["pass", "fail"],
+      }),
+      ciSuppressionLabel: undefined,
+    }),
+  )
+  .extend("conflictingAndBehindDrain", () =>
+    runStartupDrain({
+      login: "octocat",
+      mode: "author",
+      github: githubWith({
+        pulls: [openPull({ mergeable: "CONFLICTING", mergeStateStatus: "BEHIND" })],
+      }),
+      ciSuppressionLabel: undefined,
+    }),
+  )
+  .extend("approvedAndPassingDrain", () =>
+    runStartupDrain({
+      login: "octocat",
+      mode: "author",
+      github: githubWith({
+        pulls: [openPull({ reviewDecision: "APPROVED" })],
+        buckets: ["pass", "pass"],
+      }),
+      ciSuppressionLabel: undefined,
+    }),
+  )
+  .extend("foreignAuthorDrain", () =>
+    runStartupDrain({
+      login: "octocat",
+      mode: "author",
+      github: githubWith({
+        pulls: [openPull({ authorLogin: "hubot", mergeStateStatus: "BEHIND" })],
+      }),
+      ciSuppressionLabel: undefined,
+    }),
+  )
+  .extend("noChecksDrain", () =>
+    runStartupDrain({
+      login: "octocat",
+      mode: "author",
+      github: githubWith({ pulls: [openPull()], buckets: [] }),
+      ciSuppressionLabel: undefined,
+    }),
+  )
+  .extend("pendingChecksDrain", () =>
+    runStartupDrain({
+      login: "octocat",
+      mode: "author",
+      github: githubWith({ pulls: [openPull()], buckets: ["fail", "pending"] }),
+      ciSuppressionLabel: undefined,
+    }),
+  )
+  .extend("cancelledChecksDrain", () =>
+    runStartupDrain({
+      login: "octocat",
+      mode: "author",
+      github: githubWith({ pulls: [openPull()], buckets: ["cancel", "skipping"] }),
+      ciSuppressionLabel: undefined,
+    }),
+  )
+  .extend("passingChecksDrain", () =>
+    runStartupDrain({
+      login: "octocat",
+      mode: "author",
+      github: githubWith({ pulls: [openPull()], buckets: ["pass"] }),
+      ciSuppressionLabel: undefined,
+    }),
+  )
+  .extend("suppressedCiFailureDrain", () =>
+    runStartupDrain({
+      login: "octocat",
+      mode: "author",
+      github: githubWith({ pulls: [openPull({ labelNames: ["needs-human"] })], buckets: ["fail"] }),
+      ciSuppressionLabel: "needs-human",
+    }),
+  )
+  .extend("behindDrain", () =>
+    runStartupDrain({
+      login: "octocat",
+      mode: "author",
+      github: githubWith({ pulls: [openPull({ mergeStateStatus: "BEHIND" })] }),
+      ciSuppressionLabel: undefined,
+    }),
+  );
+
+describe("reviewer モードの巻き取り", () => {
+  it("自分が requested reviewer の PR ごとに review-requested を合成する", ({ reviewerDrain }) => {
+    expect(reviewerDrain).toStrictEqual([
       {
         schema_version: 1,
         event_type: "pull_request",
@@ -55,146 +171,86 @@ describe("reviewer モードの巻き取り", () => {
     ]);
   });
 
-  test("作者削除済みの PR は user なしのペイロードで出る", async () => {
-    const pulls = [openPull({ authorLogin: null, requestedReviewerLogins: ["hubot"] })];
-    const [envelope] = await runStartupDrain({
-      login: "hubot",
-      mode: "reviewer",
-      github: githubWith({ pulls }),
-      ciSuppressionLabel: undefined,
-    });
-    expect(envelope?.payload).toStrictEqual({
+  it("作者削除済みの PR は user なしのペイロードで出る", ({ authorlessReviewerDrain }) => {
+    expect(authorlessReviewerDrain[0]?.payload).toStrictEqual({
       action: "review_requested",
       pull_request: { number: 7, title: "Add retry", draft: false },
     });
   });
 
-  test("除外ラベル付き PR は対象外になる", async () => {
-    const pulls = [
-      openPull({ requestedReviewerLogins: ["hubot"], labelNames: ["exclude-auto-develop"] }),
-    ];
-    const envelopes = await runStartupDrain({
-      login: "hubot",
-      mode: "reviewer",
-      github: githubWith({ pulls }),
-      ciSuppressionLabel: undefined,
-    });
-    expect(envelopes).toStrictEqual([]);
+  it("除外ラベル付き PR は対象外になる", ({ excludedLabelReviewerDrain }) => {
+    expect(excludedLabelReviewerDrain).toStrictEqual([]);
   });
 });
 
 describe("author モードの巻き取り", () => {
-  test("変更要求と CI 失敗が同時ならレビュー → CI の順で両方出る", async () => {
-    const pulls = [openPull({ reviewDecision: "CHANGES_REQUESTED" })];
-    const envelopes = await runStartupDrain({
-      login: "octocat",
-      mode: "author",
-      github: githubWith({ pulls, buckets: ["pass", "fail"] }),
-      ciSuppressionLabel: undefined,
-    });
-    expect(envelopes.map((envelope) => envelope.delivery_id)).toStrictEqual([
+  it("変更要求と CI 失敗が同時なら 2 件出る", ({ changesRequestedWithFailingCiDrain }) => {
+    expect(changesRequestedWithFailingCiDrain.length).toStrictEqual(2);
+  });
+
+  it("変更要求と CI 失敗が同時ならレビューが先に出る", ({ changesRequestedWithFailingCiDrain }) => {
+    expect(changesRequestedWithFailingCiDrain[0]?.delivery_id).toStrictEqual(
       "startup-drain:pull_request_review:7:head-sha:changes_requested",
+    );
+  });
+
+  it("変更要求と CI 失敗が同時なら CI が後に出る", ({ changesRequestedWithFailingCiDrain }) => {
+    expect(changesRequestedWithFailingCiDrain[1]?.delivery_id).toStrictEqual(
       "startup-drain:check_suite:7:head-sha:failure",
-    ]);
+    );
   });
 
-  test("衝突と base 遅れは判定式が独立で両方出うる", async () => {
-    const pulls = [openPull({ mergeable: "CONFLICTING", mergeStateStatus: "BEHIND" })];
-    const envelopes = await runStartupDrain({
-      login: "octocat",
-      mode: "author",
-      github: githubWith({ pulls }),
-      ciSuppressionLabel: undefined,
-    });
-    expect(envelopes.map((envelope) => envelope.delivery_id)).toStrictEqual([
+  it("衝突と base 遅れは判定式が独立で 2 件出る", ({ conflictingAndBehindDrain }) => {
+    expect(conflictingAndBehindDrain.length).toStrictEqual(2);
+  });
+
+  it("衝突と base 遅れは判定式が独立で衝突が出る", ({ conflictingAndBehindDrain }) => {
+    expect(conflictingAndBehindDrain[0]?.delivery_id).toStrictEqual(
       "startup-drain:pull_request:7:base-sha:head-sha:merge-conflict",
+    );
+  });
+
+  it("衝突と base 遅れは判定式が独立で base 遅れも出る", ({ conflictingAndBehindDrain }) => {
+    expect(conflictingAndBehindDrain[1]?.delivery_id).toStrictEqual(
       "startup-drain:pull_request:7:base-sha:head-sha:base-update",
-    ]);
+    );
   });
 
-  test("approved でチェック pass なら何も出ない", async () => {
-    const pulls = [openPull({ reviewDecision: "APPROVED" })];
-    const envelopes = await runStartupDrain({
-      login: "octocat",
-      mode: "author",
-      github: githubWith({ pulls, buckets: ["pass", "pass"] }),
-      ciSuppressionLabel: undefined,
-    });
-    expect(envelopes).toStrictEqual([]);
+  it("approved でチェック pass なら何も出ない", ({ approvedAndPassingDrain }) => {
+    expect(approvedAndPassingDrain).toStrictEqual([]);
   });
 
-  test("他人の PR は出ない", async () => {
-    const pulls = [openPull({ authorLogin: "hubot", mergeStateStatus: "BEHIND" })];
-    const envelopes = await runStartupDrain({
-      login: "octocat",
-      mode: "author",
-      github: githubWith({ pulls }),
-      ciSuppressionLabel: undefined,
-    });
-    expect(envelopes).toStrictEqual([]);
+  it("他人の PR は出ない", ({ foreignAuthorDrain }) => {
+    expect(foreignAuthorDrain).toStrictEqual([]);
   });
 
-  test("チェック 0 件は成功扱いでイベントなし", async () => {
-    const envelopes = await runStartupDrain({
-      login: "octocat",
-      mode: "author",
-      github: githubWith({ pulls: [openPull()], buckets: [] }),
-      ciSuppressionLabel: undefined,
-    });
-    expect(envelopes).toStrictEqual([]);
+  it("チェック 0 件は成功扱いでイベントなし", ({ noChecksDrain }) => {
+    expect(noChecksDrain).toStrictEqual([]);
   });
 
-  test("pending があれば failure でもイベントなし", async () => {
-    const envelopes = await runStartupDrain({
-      login: "octocat",
-      mode: "author",
-      github: githubWith({ pulls: [openPull()], buckets: ["fail", "pending"] }),
-      ciSuppressionLabel: undefined,
-    });
-    expect(envelopes).toStrictEqual([]);
+  it("pending があれば failure でもイベントなし", ({ pendingChecksDrain }) => {
+    expect(pendingChecksDrain).toStrictEqual([]);
   });
 
-  test("cancel や skip だけなら判定なしでイベントなし", async () => {
-    const envelopes = await runStartupDrain({
-      login: "octocat",
-      mode: "author",
-      github: githubWith({ pulls: [openPull()], buckets: ["cancel", "skipping"] }),
-      ciSuppressionLabel: undefined,
-    });
-    expect(envelopes).toStrictEqual([]);
+  it("cancel や skip だけなら判定なしでイベントなし", ({ cancelledChecksDrain }) => {
+    expect(cancelledChecksDrain).toStrictEqual([]);
   });
 
-  test("pass だけなら成功でイベントなし", async () => {
-    const envelopes = await runStartupDrain({
-      login: "octocat",
-      mode: "author",
-      github: githubWith({ pulls: [openPull()], buckets: ["pass"] }),
-      ciSuppressionLabel: undefined,
-    });
-    expect(envelopes).toStrictEqual([]);
+  it("pass だけなら成功でイベントなし", ({ passingChecksDrain }) => {
+    expect(passingChecksDrain).toStrictEqual([]);
   });
 
-  test("抑止ラベル付きの PR は CI 失敗イベントを出さない", async () => {
-    const pulls = [openPull({ labelNames: ["needs-human"] })];
-    const envelopes = await runStartupDrain({
-      login: "octocat",
-      mode: "author",
-      github: githubWith({ pulls, buckets: ["fail"] }),
-      ciSuppressionLabel: "needs-human",
-    });
-    expect(envelopes).toStrictEqual([]);
+  it("抑止ラベル付きの PR は CI 失敗イベントを出さない", ({ suppressedCiFailureDrain }) => {
+    expect(suppressedCiFailureDrain).toStrictEqual([]);
   });
 
-  test("BEHIND は base-update イベントになる", async () => {
-    const pulls = [openPull({ mergeStateStatus: "BEHIND" })];
-    const envelopes = await runStartupDrain({
-      login: "octocat",
-      mode: "author",
-      github: githubWith({ pulls }),
-      ciSuppressionLabel: undefined,
-    });
-    expect(envelopes.map((envelope) => envelope.delivery_id)).toStrictEqual([
+  it("BEHIND は base-update イベントを 1 件出す", ({ behindDrain }) => {
+    expect(behindDrain.length).toStrictEqual(1);
+  });
+
+  it("BEHIND は base-update イベントになる", ({ behindDrain }) => {
+    expect(behindDrain[0]?.delivery_id).toStrictEqual(
       "startup-drain:pull_request:7:base-sha:head-sha:base-update",
-    ]);
+    );
   });
 });

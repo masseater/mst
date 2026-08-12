@@ -24,7 +24,7 @@ export const matchedAuthExpiryPattern = (matching: {
   AUTH_EXPIRY_PATTERNS[matching.engine].find((pattern) => matching.output.includes(pattern)) ??
   null;
 
-export const ENGINE_AUTHENTICATION_CODE = "engine_authentication";
+const ENGINE_AUTHENTICATION_CODE = "engine_authentication";
 
 export class EngineAuthExpiredError extends HaltQueueKeepJobError {
   override readonly name = "EngineAuthExpiredError";

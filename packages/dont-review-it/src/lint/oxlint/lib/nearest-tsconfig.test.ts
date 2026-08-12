@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -6,9 +6,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { extendsOneOf, nearestTsconfigExtends } from "./nearest-tsconfig.ts";
 
-const fixtureDir = join(tmpdir(), "dont-review-it-nearest-tsconfig");
-rmSync(fixtureDir, { recursive: true, force: true });
-mkdirSync(fixtureDir, { recursive: true });
+const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-nearest-tsconfig-"));
 
 const writeWorkspaceFixture = (name: string, tsconfig: string): string => {
   const directory = join(fixtureDir, name);

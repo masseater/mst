@@ -14,19 +14,10 @@ const baseContext: PrContext = {
   ci: { checks: [], failedLogPaths: [] },
 };
 
-describe("renderMarkdown", () => {
-  test("見出しと PR 節を持つ", () => {
-    const markdown = renderMarkdown(baseContext);
-    expect([
-      markdown.startsWith("# PR Context"),
-      markdown.includes("- PR: #7"),
-      markdown.includes("- Base: main"),
-      markdown.includes("- Head: topic/x"),
-    ]).toStrictEqual([true, true, true, true]);
-  });
-
-  test("本文ありは included、省略は理由付き、理由なしは not available", () => {
-    const markdown = renderMarkdown({
+const it = test
+  .extend("emptyMarkdown", () => renderMarkdown(baseContext))
+  .extend("changedFilesMarkdown", () =>
+    renderMarkdown({
       ...baseContext,
       changedFiles: [
         { statusCode: "M", path: "a.ts", previousPath: null, content: "x", omissionReason: null },
@@ -39,16 +30,10 @@ describe("renderMarkdown", () => {
         },
         { statusCode: "A", path: "c.ts", previousPath: null, content: null, omissionReason: null },
       ],
-    });
-    expect([
-      markdown.includes("| M | a.ts | included |"),
-      markdown.includes("| D | b.ts | omitted: deleted |"),
-      markdown.includes("| A | c.ts | omitted: not available |"),
-    ]).toStrictEqual([true, true, true]);
-  });
-
-  test("スレッド集計は未解決・outdated・outdated かつ未解決を別々に数える", () => {
-    const markdown = renderMarkdown({
+    }),
+  )
+  .extend("threadSummaryMarkdown", () =>
+    renderMarkdown({
       ...baseContext,
       comments: {
         reviews: [],
@@ -60,16 +45,10 @@ describe("renderMarkdown", () => {
           { id: "3", resolved: false, outdated: false, path: "c", line: 3, comments: [] },
         ],
       },
-    });
-    expect([
-      markdown.includes("- Unresolved threads: 2"),
-      markdown.includes("- Outdated threads: 2"),
-      markdown.includes("- Outdated and unresolved threads: 1"),
-    ]).toStrictEqual([true, true, true]);
-  });
-
-  test("CI 詳細リンク欠損は空セル、失敗ログ 0 件は 1 文になる", () => {
-    const markdown = renderMarkdown({
+    }),
+  )
+  .extend("failingCheckMarkdown", () =>
+    renderMarkdown({
       ...baseContext,
       ci: {
         checks: [
@@ -77,15 +56,10 @@ describe("renderMarkdown", () => {
         ],
         failedLogPaths: [],
       },
-    });
-    expect([
-      markdown.includes("| build | failure | fail |  |"),
-      markdown.includes("No failed CI logs were downloaded."),
-    ]).toStrictEqual([true, true]);
-  });
-
-  test("パイプと改行はエスケープされる", () => {
-    const markdown = renderMarkdown({
+    }),
+  )
+  .extend("escapedPathMarkdown", () =>
+    renderMarkdown({
       ...baseContext,
       changedFiles: [
         {
@@ -96,12 +70,10 @@ describe("renderMarkdown", () => {
           omissionReason: null,
         },
       ],
-    });
-    expect(markdown).toContain("a\\|b<br>c.ts");
-  });
-
-  test("CI 詳細リンクがあればセルに入る", () => {
-    const markdown = renderMarkdown({
+    }),
+  )
+  .extend("linkedCheckMarkdown", () =>
+    renderMarkdown({
       ...baseContext,
       ci: {
         checks: [
@@ -115,18 +87,77 @@ describe("renderMarkdown", () => {
         ],
         failedLogPaths: [],
       },
-    });
-    expect(markdown).toContain("| build | success | pass | https://ci.example/build |");
-  });
-
-  test("失敗ログがあれば一覧で並ぶ", () => {
-    const markdown = renderMarkdown({
+    }),
+  )
+  .extend("failedLogsMarkdown", () =>
+    renderMarkdown({
       ...baseContext,
       ci: { checks: [], failedLogPaths: ["ci-logs/build.log"] },
-    });
-    expect([
-      markdown.includes("Failed CI logs:"),
-      markdown.includes("- ci-logs/build.log"),
-    ]).toStrictEqual([true, true]);
+    }),
+  );
+
+describe("renderMarkdown", () => {
+  it("見出しから始まる", ({ emptyMarkdown }) => {
+    expect(emptyMarkdown).toMatch(/^# PR Context/u);
+  });
+
+  it("PR 節は PR 番号を持つ", ({ emptyMarkdown }) => {
+    expect(emptyMarkdown).toContain("- PR: #7");
+  });
+
+  it("PR 節は base を持つ", ({ emptyMarkdown }) => {
+    expect(emptyMarkdown).toContain("- Base: main");
+  });
+
+  it("PR 節は head を持つ", ({ emptyMarkdown }) => {
+    expect(emptyMarkdown).toContain("- Head: topic/x");
+  });
+
+  it("本文ありは included になる", ({ changedFilesMarkdown }) => {
+    expect(changedFilesMarkdown).toContain("| M | a.ts | included |");
+  });
+
+  it("省略は理由付きになる", ({ changedFilesMarkdown }) => {
+    expect(changedFilesMarkdown).toContain("| D | b.ts | omitted: deleted |");
+  });
+
+  it("理由なしの省略は not available になる", ({ changedFilesMarkdown }) => {
+    expect(changedFilesMarkdown).toContain("| A | c.ts | omitted: not available |");
+  });
+
+  it("スレッド集計は未解決を数える", ({ threadSummaryMarkdown }) => {
+    expect(threadSummaryMarkdown).toContain("- Unresolved threads: 2");
+  });
+
+  it("スレッド集計は outdated を数える", ({ threadSummaryMarkdown }) => {
+    expect(threadSummaryMarkdown).toContain("- Outdated threads: 2");
+  });
+
+  it("スレッド集計は outdated かつ未解決を別に数える", ({ threadSummaryMarkdown }) => {
+    expect(threadSummaryMarkdown).toContain("- Outdated and unresolved threads: 1");
+  });
+
+  it("CI 詳細リンク欠損は空セルになる", ({ failingCheckMarkdown }) => {
+    expect(failingCheckMarkdown).toContain("| build | failure | fail |  |");
+  });
+
+  it("失敗ログ 0 件は 1 文になる", ({ failingCheckMarkdown }) => {
+    expect(failingCheckMarkdown).toContain("No failed CI logs were downloaded.");
+  });
+
+  it("パイプと改行はエスケープされる", ({ escapedPathMarkdown }) => {
+    expect(escapedPathMarkdown).toContain("a\\|b<br>c.ts");
+  });
+
+  it("CI 詳細リンクがあればセルに入る", ({ linkedCheckMarkdown }) => {
+    expect(linkedCheckMarkdown).toContain("| build | success | pass | https://ci.example/build |");
+  });
+
+  it("失敗ログがあれば見出しが付く", ({ failedLogsMarkdown }) => {
+    expect(failedLogsMarkdown).toContain("Failed CI logs:");
+  });
+
+  it("失敗ログがあれば一覧で並ぶ", ({ failedLogsMarkdown }) => {
+    expect(failedLogsMarkdown).toContain("- ci-logs/build.log");
   });
 });

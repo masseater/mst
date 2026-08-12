@@ -5,7 +5,7 @@ import { resolveRepositoryRoot } from "./config/repository-root.ts";
 import { createConsoleLogger } from "./logging/console-logger.ts";
 import { createDailyLogFileSink } from "./logging/daily-log-file.ts";
 import { createRelayServer } from "./relay/app.ts";
-import { createGithubFetchReader } from "./relay/github-fetch-reader.ts";
+import { createGithubFetchReader, octokitAccessFor } from "./relay/github-fetch-reader.ts";
 import { IdTokenRejectionError } from "./relay/id-token-rejection-error.ts";
 import {
   createMemoryCursorStore,
@@ -36,9 +36,9 @@ const relay = createRelayServer({
   cursors: createMemoryCursorStore(),
   sessions: createMemorySessionStore(),
   github: createGithubFetchReader({
-    apiOrigin: relayConfig.githubApiOrigin,
     repository: relayConfig.githubRepository,
     token: githubToken,
+    accessFor: octokitAccessFor({ baseUrl: relayConfig.githubApiOrigin, fetchImpl: fetch }),
   }),
   verifyIdToken: () =>
     Promise.reject(new IdTokenRejectionError("no id token verifier is wired into this build")),

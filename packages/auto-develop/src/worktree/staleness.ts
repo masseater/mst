@@ -1,4 +1,4 @@
-export const STALE_AFTER_MS = 3 * 24 * 60 * 60 * 1000;
+const STALE_AFTER_MS = 3 * 24 * 60 * 60 * 1000;
 
 export type StalenessInputs = {
   readonly remoteBranchExists: boolean | null;

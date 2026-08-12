@@ -10,8 +10,6 @@ import type { TmuxRunRequest } from "./tmux-runner.ts";
 
 const IDLE_TIMEOUT_MS = 30 * 60_000;
 
-export type EngineRunner = (request: TmuxRunRequest) => AsyncGenerator<string, void, undefined>;
-
 export type Engine = {
   readonly execute: (execution: {
     readonly prompt: string;
@@ -31,7 +29,7 @@ export type EngineConfig = {
   readonly launchOverride?: string;
   readonly timeoutMs: number;
   readonly bypassPermissions: boolean;
-  readonly runner: EngineRunner;
+  readonly runner: (request: TmuxRunRequest) => AsyncGenerator<string, void, undefined>;
   readonly killSession: (sessionName: string) => Promise<void>;
   readonly log: Logger;
 };

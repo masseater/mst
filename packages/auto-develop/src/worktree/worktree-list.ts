@@ -5,7 +5,7 @@ export type RegisteredWorktree = {
   readonly branch: string | null;
 };
 
-export const parseWorktreeList = (porcelain: string): readonly RegisteredWorktree[] => {
+const parseWorktreeList = (porcelain: string): readonly RegisteredWorktree[] => {
   const blocks = porcelain.split("\n\n").filter((block) => block.trim() !== "");
   return blocks.flatMap((block) => {
     const lines = block.split("\n");

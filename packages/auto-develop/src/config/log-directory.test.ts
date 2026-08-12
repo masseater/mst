@@ -2,20 +2,30 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "vite-plus/test";
 
-import { LOG_DIR_ENV_VAR, resolveLogDirectory } from "./log-directory.ts";
+import { resolveLogDirectory } from "./log-directory.ts";
+
+const it = test
+  .extend("overriddenLogDir", () =>
+    resolveLogDirectory("/repo", { AUTO_DEVELOP_LOG_DIR: "/var/log/auto-develop" }))
+  .extend("logDirForEmptyOverride", () =>
+    resolveLogDirectory("/repo", { AUTO_DEVELOP_LOG_DIR: "" }),
+  )
+  .extend("logDirWithoutOverride", () => resolveLogDirectory("/repo", {}))
+  .extend("defaultLogDir", () => join("/repo", "logs"));
 
 describe("resolveLogDirectory", () => {
-  test("上書き変数が非空ならその値をそのまま使う", () => {
-    const env = { [LOG_DIR_ENV_VAR]: "/var/log/auto-develop" };
-    expect(resolveLogDirectory("/repo", env)).toStrictEqual("/var/log/auto-develop");
+  it("上書き変数が非空ならその値をそのまま使う", ({ overriddenLogDir }) => {
+    expect(overriddenLogDir).toStrictEqual("/var/log/auto-develop");
   });
 
-  test("空文字列なら repoRoot 直下の logs に既定する", () => {
-    const env = { [LOG_DIR_ENV_VAR]: "" };
-    expect(resolveLogDirectory("/repo", env)).toStrictEqual(join("/repo", "logs"));
+  it("空文字列なら repoRoot 直下の logs に既定する", ({
+    logDirForEmptyOverride,
+    defaultLogDir,
+  }) => {
+    expect(logDirForEmptyOverride).toStrictEqual(defaultLogDir);
   });
 
-  test("未設定でも repoRoot 直下の logs に既定する", () => {
-    expect(resolveLogDirectory("/repo", {})).toStrictEqual(join("/repo", "logs"));
+  it("未設定でも repoRoot 直下の logs に既定する", ({ logDirWithoutOverride, defaultLogDir }) => {
+    expect(logDirWithoutOverride).toStrictEqual(defaultLogDir);
   });
 });

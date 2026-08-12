@@ -24,6 +24,7 @@ export type ConnectionCycleConfig = {
   readonly dispatcher: EventDispatcher;
   readonly queue: JobQueue;
   readonly restart: RestartRequest;
+  readonly onActivity: () => void;
   readonly signalled: () => boolean;
   readonly log: Logger;
 };
@@ -42,6 +43,7 @@ const dispatchAll = (dispatching: {
 
 const consumeStream = async (config: ConnectionCycleConfig): Promise<CycleOutcome | null> => {
   for await (const raw of config.subscribe()) {
+    config.onActivity();
     const filtered = filterEvent(raw, config.mode);
     if (filtered !== null) config.dispatcher.dispatch(filtered);
     if (config.signalled()) return SIGNALLED;

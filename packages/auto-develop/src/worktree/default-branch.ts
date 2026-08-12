@@ -1,7 +1,7 @@
+import { indicatesDetachedHead, type GitRunner } from "./git-runner.ts";
 import { UNKNOWN_BRANCH_MARKER } from "./protected-branch.ts";
 
 import type { Logger } from "../logging/logger.ts";
-import type { GitRunner } from "./git-runner.ts";
 
 export const DEFAULT_BRANCH_FALLBACK = "main";
 
@@ -37,9 +37,7 @@ export const resolveCurrentBranch = async (resolution: {
     const trimmed = stdout.trim();
     return trimmed === "" ? null : trimmed;
   } catch (failure) {
-    if (failure instanceof Error && failure.message.includes("is not a symbolic ref")) {
-      return null;
-    }
+    if (indicatesDetachedHead(failure)) return null;
     resolution.log.warn(
       { worktreePath: resolution.worktreePath, err: failure },
       "unexpected failure resolving current branch",

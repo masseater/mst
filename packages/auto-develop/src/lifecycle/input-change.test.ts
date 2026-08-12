@@ -2,40 +2,45 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { changedEndpoint } from "./input-change.ts";
 
+const it = test
+  .extend("retargetedEndpoint", () =>
+    changedEndpoint({
+      before: { baseRefName: "main", headRefOid: "abc" },
+      after: { baseRefName: "develop", headRefOid: "abc" },
+    }))
+  .extend("newCommitEndpoint", () =>
+    changedEndpoint({
+      before: { baseRefName: "main", headRefOid: "abc" },
+      after: { baseRefName: "main", headRefOid: "def" },
+    }),
+  )
+  .extend("unchangedEndpoint", () =>
+    changedEndpoint({
+      before: { baseRefName: "main", headRefOid: "abc" },
+      after: { baseRefName: "main", headRefOid: "abc" },
+    }),
+  )
+  .extend("bothChangedEndpoint", () =>
+    changedEndpoint({
+      before: { baseRefName: "main", headRefOid: "abc" },
+      after: { baseRefName: "develop", headRefOid: "def" },
+    }),
+  );
+
 describe("changedEndpoint", () => {
-  test("base ブランチ名が変われば base", () => {
-    expect(
-      changedEndpoint({
-        before: { baseRefName: "main", headRefOid: "abc" },
-        after: { baseRefName: "develop", headRefOid: "abc" },
-      }),
-    ).toStrictEqual("base");
+  it("base ブランチ名が変われば base", ({ retargetedEndpoint }) => {
+    expect(retargetedEndpoint).toStrictEqual("base");
   });
 
-  test("base 同名で head SHA が変われば head", () => {
-    expect(
-      changedEndpoint({
-        before: { baseRefName: "main", headRefOid: "abc" },
-        after: { baseRefName: "main", headRefOid: "def" },
-      }),
-    ).toStrictEqual("head");
+  it("base 同名で head SHA が変われば head", ({ newCommitEndpoint }) => {
+    expect(newCommitEndpoint).toStrictEqual("head");
   });
 
-  test("base が前進しても同名なら変更なし", () => {
-    expect(
-      changedEndpoint({
-        before: { baseRefName: "main", headRefOid: "abc" },
-        after: { baseRefName: "main", headRefOid: "abc" },
-      }),
-    ).toStrictEqual(null);
+  it("base が前進しても同名なら変更なし", ({ unchangedEndpoint }) => {
+    expect(unchangedEndpoint).toStrictEqual(null);
   });
 
-  test("両方変わった場合は base を優先して返す", () => {
-    expect(
-      changedEndpoint({
-        before: { baseRefName: "main", headRefOid: "abc" },
-        after: { baseRefName: "develop", headRefOid: "def" },
-      }),
-    ).toStrictEqual("base");
+  it("両方変わった場合は base を優先して返す", ({ bothChangedEndpoint }) => {
+    expect(bothChangedEndpoint).toStrictEqual("base");
   });
 });

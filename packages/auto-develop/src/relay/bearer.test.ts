@@ -2,24 +2,31 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { extractBearer } from "./bearer.ts";
 
+const it = test
+  .extend("credentialFromBearerScheme", () => extractBearer("Bearer relay-credential"))
+  .extend("credentialFromUppercasedScheme", () => extractBearer("BEARER relay-credential"))
+  .extend("credentialFromAbsentHeader", () => extractBearer(undefined))
+  .extend("credentialFromSchemeOnlyHeader", () => extractBearer("Bearer"))
+  .extend("credentialFromBasicScheme", () => extractBearer("Basic dXNlcjpwYXNz"));
+
 describe("extractBearer", () => {
-  test("bearer スキームのクレデンシャルを取り出す", () => {
-    expect(extractBearer("Bearer relay-credential")).toStrictEqual("relay-credential");
+  it("bearer スキームのクレデンシャルを取り出す", ({ credentialFromBearerScheme }) => {
+    expect(credentialFromBearerScheme).toStrictEqual("relay-credential");
   });
 
-  test("スキームの大文字小文字は無視される", () => {
-    expect(extractBearer("BEARER relay-credential")).toStrictEqual("relay-credential");
+  it("スキームの大文字小文字は無視される", ({ credentialFromUppercasedScheme }) => {
+    expect(credentialFromUppercasedScheme).toStrictEqual("relay-credential");
   });
 
-  test("ヘッダなしは提示なしになる", () => {
-    expect(extractBearer(undefined)).toStrictEqual(undefined);
+  it("ヘッダなしは提示なしになる", ({ credentialFromAbsentHeader }) => {
+    expect(credentialFromAbsentHeader).toStrictEqual(undefined);
   });
 
-  test("スペースを含まないヘッダは提示なしになる", () => {
-    expect(extractBearer("Bearer")).toStrictEqual(undefined);
+  it("スペースを含まないヘッダは提示なしになる", ({ credentialFromSchemeOnlyHeader }) => {
+    expect(credentialFromSchemeOnlyHeader).toStrictEqual(undefined);
   });
 
-  test("別スキームは提示なしになる", () => {
-    expect(extractBearer("Basic dXNlcjpwYXNz")).toStrictEqual(undefined);
+  it("別スキームは提示なしになる", ({ credentialFromBasicScheme }) => {
+    expect(credentialFromBasicScheme).toStrictEqual(undefined);
   });
 });

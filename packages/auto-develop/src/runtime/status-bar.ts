@@ -10,7 +10,7 @@ export type StatusSnapshot = {
 const clipToWidth = (line: string, width: number): string =>
   line.length <= width ? line : `${line.slice(0, Math.max(0, width - 1))}…`;
 
-export const formatUptime = (uptimeMs: number): string => {
+const formatUptime = (uptimeMs: number): string => {
   const totalSeconds = Math.max(0, Math.floor(uptimeMs / 1000));
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);

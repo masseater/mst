@@ -11,9 +11,86 @@ const completedSuite = (conclusion: string) => ({
   },
 });
 
+const it = test
+  .extend("failureVerdict", () => filterCheckSuiteEvent(completedSuite("failure"), "author"))
+  .extend("timedOutVerdict", () => filterCheckSuiteEvent(completedSuite("timed_out"), "author"))
+  .extend("startupFailureVerdict", () =>
+    filterCheckSuiteEvent(completedSuite("startup_failure"), "author"),
+  )
+  .extend("deliveryCarryingVerdict", () =>
+    filterCheckSuiteEvent({ ...completedSuite("failure"), delivery_id: "delivery-1" }, "author"),
+  )
+  .extend("multiPullVerdict", () =>
+    filterCheckSuiteEvent(
+      {
+        action: "completed",
+        check_suite: {
+          conclusion: "failure",
+          head_sha: "0a1b2c3",
+          pull_requests: [{ number: 7 }, { number: 8 }],
+        },
+      },
+      "author",
+    ),
+  )
+  .extend("successVerdict", () => filterCheckSuiteEvent(completedSuite("success"), "author"))
+  .extend("cancelledVerdict", () => filterCheckSuiteEvent(completedSuite("cancelled"), "author"))
+  .extend("reviewerModeVerdict", () => filterCheckSuiteEvent(completedSuite("failure"), "reviewer"))
+  .extend("requestedActionVerdict", () =>
+    filterCheckSuiteEvent({ ...completedSuite("failure"), action: "requested" }, "author"),
+  )
+  .extend("emptyPullsVerdict", () =>
+    filterCheckSuiteEvent(
+      {
+        action: "completed",
+        check_suite: { conclusion: "failure", head_sha: "0a1b2c3", pull_requests: [] },
+      },
+      "author",
+    ),
+  )
+  .extend("nonArrayPullsVerdict", () =>
+    filterCheckSuiteEvent(
+      {
+        action: "completed",
+        check_suite: { conclusion: "failure", head_sha: "0a1b2c3", pull_requests: "all" },
+      },
+      "author",
+    ),
+  )
+  .extend("nullSuiteVerdict", () =>
+    filterCheckSuiteEvent({ action: "completed", check_suite: null }, "author"),
+  )
+  .extend("unnumberedPullVerdict", () =>
+    filterCheckSuiteEvent(
+      {
+        action: "completed",
+        check_suite: { conclusion: "failure", head_sha: "0a1b2c3", pull_requests: [{ id: 1 }] },
+      },
+      "author",
+    ),
+  )
+  .extend("nullConclusionVerdict", () =>
+    filterCheckSuiteEvent(
+      {
+        action: "completed",
+        check_suite: { conclusion: null, head_sha: "0a1b2c3", pull_requests: [{ number: 7 }] },
+      },
+      "author",
+    ),
+  )
+  .extend("headShaLessVerdict", () =>
+    filterCheckSuiteEvent(
+      {
+        action: "completed",
+        check_suite: { conclusion: "failure", pull_requests: [{ number: 7 }] },
+      },
+      "author",
+    ),
+  );
+
 describe("採用される結論", () => {
-  test("failure は ci-completed になり結論と head SHA を保持する", () => {
-    expect(filterCheckSuiteEvent(completedSuite("failure"), "author")).toStrictEqual({
+  it("failure は ci-completed になり結論と head SHA を保持する", ({ failureVerdict }) => {
+    expect(failureVerdict).toStrictEqual({
       kind: "ci-completed",
       pullNumber: 7,
       conclusion: "failure",
@@ -21,8 +98,8 @@ describe("採用される結論", () => {
     });
   });
 
-  test("timed_out は ci-completed になる", () => {
-    expect(filterCheckSuiteEvent(completedSuite("timed_out"), "author")).toStrictEqual({
+  it("timed_out は ci-completed になる", ({ timedOutVerdict }) => {
+    expect(timedOutVerdict).toStrictEqual({
       kind: "ci-completed",
       pullNumber: 7,
       conclusion: "timed_out",
@@ -30,8 +107,8 @@ describe("採用される結論", () => {
     });
   });
 
-  test("startup_failure は ci-completed になる", () => {
-    expect(filterCheckSuiteEvent(completedSuite("startup_failure"), "author")).toStrictEqual({
+  it("startup_failure は ci-completed になる", ({ startupFailureVerdict }) => {
+    expect(startupFailureVerdict).toStrictEqual({
       kind: "ci-completed",
       pullNumber: 7,
       conclusion: "startup_failure",
@@ -39,9 +116,8 @@ describe("採用される結論", () => {
     });
   });
 
-  test("delivery_id があれば引き継ぐ", () => {
-    const event = { ...completedSuite("failure"), delivery_id: "delivery-1" };
-    expect(filterCheckSuiteEvent(event, "author")).toStrictEqual({
+  it("delivery_id があれば引き継ぐ", ({ deliveryCarryingVerdict }) => {
+    expect(deliveryCarryingVerdict).toStrictEqual({
       kind: "ci-completed",
       pullNumber: 7,
       conclusion: "failure",
@@ -50,16 +126,8 @@ describe("採用される結論", () => {
     });
   });
 
-  test("複数の PR があれば先頭の番号だけ採用する", () => {
-    const event = {
-      action: "completed",
-      check_suite: {
-        conclusion: "failure",
-        head_sha: "0a1b2c3",
-        pull_requests: [{ number: 7 }, { number: 8 }],
-      },
-    };
-    expect(filterCheckSuiteEvent(event, "author")).toStrictEqual({
+  it("複数の PR があれば先頭の番号だけ採用する", ({ multiPullVerdict }) => {
+    expect(multiPullVerdict).toStrictEqual({
       kind: "ci-completed",
       pullNumber: 7,
       conclusion: "failure",
@@ -69,66 +137,43 @@ describe("採用される結論", () => {
 });
 
 describe("不採用になる形", () => {
-  test("success は自動応答を起こさない", () => {
-    expect(filterCheckSuiteEvent(completedSuite("success"), "author")).toStrictEqual(null);
+  it("success は自動応答を起こさない", ({ successVerdict }) => {
+    expect(successVerdict).toStrictEqual(null);
   });
 
-  test("cancelled は自動応答を起こさない", () => {
-    expect(filterCheckSuiteEvent(completedSuite("cancelled"), "author")).toStrictEqual(null);
+  it("cancelled は自動応答を起こさない", ({ cancelledVerdict }) => {
+    expect(cancelledVerdict).toStrictEqual(null);
   });
 
-  test("reviewer モードでは結論を問わず不採用になる", () => {
-    expect(filterCheckSuiteEvent(completedSuite("failure"), "reviewer")).toStrictEqual(null);
+  it("reviewer モードでは結論を問わず不採用になる", ({ reviewerModeVerdict }) => {
+    expect(reviewerModeVerdict).toStrictEqual(null);
   });
 
-  test("completed 以外の action は不採用になる", () => {
-    const event = { ...completedSuite("failure"), action: "requested" };
-    expect(filterCheckSuiteEvent(event, "author")).toStrictEqual(null);
+  it("completed 以外の action は不採用になる", ({ requestedActionVerdict }) => {
+    expect(requestedActionVerdict).toStrictEqual(null);
   });
 
-  test("pull_requests が空配列なら不採用になる", () => {
-    const event = {
-      action: "completed",
-      check_suite: { conclusion: "failure", head_sha: "0a1b2c3", pull_requests: [] },
-    };
-    expect(filterCheckSuiteEvent(event, "author")).toStrictEqual(null);
+  it("pull_requests が空配列なら不採用になる", ({ emptyPullsVerdict }) => {
+    expect(emptyPullsVerdict).toStrictEqual(null);
   });
 
-  test("pull_requests が配列でなければ不採用になる", () => {
-    const event = {
-      action: "completed",
-      check_suite: { conclusion: "failure", head_sha: "0a1b2c3", pull_requests: "all" },
-    };
-    expect(filterCheckSuiteEvent(event, "author")).toStrictEqual(null);
+  it("pull_requests が配列でなければ不採用になる", ({ nonArrayPullsVerdict }) => {
+    expect(nonArrayPullsVerdict).toStrictEqual(null);
   });
 
-  test("check_suite が null なら不採用になる", () => {
-    expect(
-      filterCheckSuiteEvent({ action: "completed", check_suite: null }, "author"),
-    ).toStrictEqual(null);
+  it("check_suite が null なら不採用になる", ({ nullSuiteVerdict }) => {
+    expect(nullSuiteVerdict).toStrictEqual(null);
   });
 
-  test("先頭の PR に number が無ければ不採用になる", () => {
-    const event = {
-      action: "completed",
-      check_suite: { conclusion: "failure", head_sha: "0a1b2c3", pull_requests: [{ id: 1 }] },
-    };
-    expect(filterCheckSuiteEvent(event, "author")).toStrictEqual(null);
+  it("先頭の PR に number が無ければ不採用になる", ({ unnumberedPullVerdict }) => {
+    expect(unnumberedPullVerdict).toStrictEqual(null);
   });
 
-  test("結論が null なら構造不適合として不採用になる", () => {
-    const event = {
-      action: "completed",
-      check_suite: { conclusion: null, head_sha: "0a1b2c3", pull_requests: [{ number: 7 }] },
-    };
-    expect(filterCheckSuiteEvent(event, "author")).toStrictEqual(null);
+  it("結論が null なら構造不適合として不採用になる", ({ nullConclusionVerdict }) => {
+    expect(nullConclusionVerdict).toStrictEqual(null);
   });
 
-  test("head_sha が欠けていれば不採用になる", () => {
-    const event = {
-      action: "completed",
-      check_suite: { conclusion: "failure", pull_requests: [{ number: 7 }] },
-    };
-    expect(filterCheckSuiteEvent(event, "author")).toStrictEqual(null);
+  it("head_sha が欠けていれば不採用になる", ({ headShaLessVerdict }) => {
+    expect(headShaLessVerdict).toStrictEqual(null);
   });
 });

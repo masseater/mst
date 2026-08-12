@@ -1,6 +1,11 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import {
+  resolveBinding,
+  type BindingResolution,
+  type ScopeLookup,
+} from "../lib/resolved-bindings.ts";
 
-import type { Definition, ESTree, Scope, Variable } from "@oxlint/plugins";
+import type { Definition, ESTree } from "@oxlint/plugins";
 
 const IN_PLACE_ARRAY_METHODS: ReadonlySet<string> = new Set([
   "copyWithin",
@@ -35,13 +40,6 @@ const ARRAY_RETURNING_ARRAY_METHODS: ReadonlySet<string> = new Set([
 const ARRAY_GLOBAL_FACTORY_METHODS: ReadonlySet<string> = new Set(["from", "of"]);
 
 const ARRAY_TYPE_NAMES: ReadonlySet<string> = new Set(["Array", "ReadonlyArray"]);
-
-type ScopeLookup = (node: ESTree.Node) => Scope;
-
-type BindingResolution = {
-  readonly scopeAt: ScopeLookup;
-  readonly seenBindings: ReadonlySet<Variable>;
-};
 
 const staticPropertyName = (node: ESTree.MemberExpression): string | null => {
   if (!node.computed) return node.property.type === "Identifier" ? node.property.name : null;
@@ -105,11 +103,6 @@ const isArrayLikeType = (
     default:
       return false;
   }
-};
-
-const resolveBinding = (scope: Scope | null, name: string): Variable | null => {
-  if (scope === null) return null;
-  return scope.set.get(name) ?? resolveBinding(scope.upper, name);
 };
 
 const isArrayLikeDefinition = (definition: Definition, resolution: BindingResolution): boolean => {

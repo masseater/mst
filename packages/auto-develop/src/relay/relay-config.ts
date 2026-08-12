@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { readEnvVar } from "../config/env.ts";
 
-export const relayConfigSchema = z
+const relayConfigSchema = z
   .object({
     port: z.coerce.number().int().min(1).max(65535).default(8080),
     githubRepository: z.string().regex(/^[^\s/]+\/[^\s/]+$/),

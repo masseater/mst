@@ -4,51 +4,81 @@ import { basename, dirname, join } from "node:path";
 
 import { describe, expect, test } from "vite-plus/test";
 
-import {
-  isManagedWorktreePath,
-  prNumberFromDirectoryName,
-  worktreePathFor,
-  worktreeRoot,
-} from "./paths.ts";
+import { isManagedWorktreePath, resolveRealPath, worktreePathFor } from "./paths.ts";
+
+const managedRoot = dirname(worktreePathFor(7));
+
+const it = test
+  .extend("managedDirectoryName", () => basename(worktreePathFor(7)))
+  .extend("managedRootName", () => basename(managedRoot))
+  .extend("managedRootParent", () => dirname(managedRoot))
+  .extend("realTmpDir", () => resolveRealPath(tmpdir()))
+  .extend("zeroPrNumberFailure", (): Error | null => {
+    try {
+      worktreePathFor(0);
+      return null;
+    } catch (failure) {
+      return failure instanceof Error ? failure : null;
+    }
+  })
+  .extend("fractionalPrNumberFailure", (): Error | null => {
+    try {
+      worktreePathFor(1.5);
+      return null;
+    } catch (failure) {
+      return failure instanceof Error ? failure : null;
+    }
+  })
+  .extend("managedPathVerdict", () => isManagedWorktreePath(worktreePathFor(7)))
+  .extend("strayPathVerdict", () =>
+    isManagedWorktreePath(join(mkdtempSync(join(tmpdir(), "auto-develop-stray-")), "pr-7")),
+  )
+  .extend("zeroPrNameVerdict", () => isManagedWorktreePath(join(managedRoot, "pr-0")))
+  .extend("nonPrNameVerdict", () => isManagedWorktreePath(join(managedRoot, "system")));
 
 describe("worktreePathFor", () => {
-  test("PR 番号から専用ルート直下の pr- 固定名パスを導く", () => {
-    expect([basename(worktreePathFor(7)), dirname(worktreePathFor(7))]).toStrictEqual([
-      "pr-7",
-      worktreeRoot(),
-    ]);
+  it("PR 番号から pr- 固定名のディレクトリ名を導く", ({ managedDirectoryName }) => {
+    expect(managedDirectoryName).toStrictEqual("pr-7");
   });
 
-  test("正の安全整数でない PR 番号は即座に拒否される", () => {
-    expect(() => worktreePathFor(0)).toThrow("Invalid PR number for auto-develop worktree");
+  it("導いたパスは専用ルート直下に置かれる", ({ managedRootName }) => {
+    expect(managedRootName).toStrictEqual("auto-develop-worktree");
   });
 
-  test("小数の PR 番号も拒否される", () => {
-    expect(() => worktreePathFor(1.5)).toThrow("Invalid PR number for auto-develop worktree");
+  it("専用ルートは実体解決した一時ディレクトリ直下に置かれる", ({
+    managedRootParent,
+    realTmpDir,
+  }) => {
+    expect(managedRootParent).toStrictEqual(realTmpDir);
   });
-});
 
-describe("prNumberFromDirectoryName", () => {
-  test("pr- に続く先頭ゼロなしの正整数だけを受ける", () => {
-    expect([
-      prNumberFromDirectoryName("pr-7"),
-      prNumberFromDirectoryName("pr-0"),
-      prNumberFromDirectoryName("not-pr"),
-    ]).toStrictEqual([7, null, null]);
+  it("正の安全整数でない PR 番号は即座に拒否される", ({ zeroPrNumberFailure }) => {
+    expect(zeroPrNumberFailure?.message).toStrictEqual(
+      "Invalid PR number for auto-develop worktree",
+    );
+  });
+
+  it("小数の PR 番号も拒否される", ({ fractionalPrNumberFailure }) => {
+    expect(fractionalPrNumberFailure?.message).toStrictEqual(
+      "Invalid PR number for auto-develop worktree",
+    );
   });
 });
 
 describe("isManagedWorktreePath", () => {
-  test("専用ルート直下の pr- ディレクトリだけを管理対象と認める", () => {
-    expect(isManagedWorktreePath(join(worktreeRoot(), "pr-7"))).toStrictEqual(true);
+  it("専用ルート直下の pr- ディレクトリだけを管理対象と認める", ({ managedPathVerdict }) => {
+    expect(managedPathVerdict).toStrictEqual(true);
   });
 
-  test("専用ルート外のディレクトリは管理対象でない", () => {
-    const strayDir = mkdtempSync(join(tmpdir(), "auto-develop-stray-"));
-    expect(isManagedWorktreePath(join(strayDir, "pr-7"))).toStrictEqual(false);
+  it("専用ルート外のディレクトリは管理対象でない", ({ strayPathVerdict }) => {
+    expect(strayPathVerdict).toStrictEqual(false);
   });
 
-  test("専用ルート直下でも pr- 名でなければ管理対象でない", () => {
-    expect(isManagedWorktreePath(join(worktreeRoot(), "system"))).toStrictEqual(false);
+  it("pr-0 は正整数でないため管理対象でない", ({ zeroPrNameVerdict }) => {
+    expect(zeroPrNameVerdict).toStrictEqual(false);
+  });
+
+  it("専用ルート直下でも pr- 名でなければ管理対象でない", ({ nonPrNameVerdict }) => {
+    expect(nonPrNameVerdict).toStrictEqual(false);
   });
 });

@@ -2,33 +2,31 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { buildPrompt } from "./prompt.ts";
 
-describe("buildPrompt", () => {
-  test("claude reviewer はスラッシュ起動 + review 引数で始まる", () => {
-    const prompt = buildPrompt({
-      engine: "claude",
-      mode: "reviewer",
-      prNumber: 7,
-      baseRef: "main",
-      headRef: "topic/x",
-      runContextJsonPath: "/work/run-context.json",
-    });
-    expect(prompt.split("\n")[0]).toStrictEqual("/auto-develop-review review");
+const claudeReviewerPrompt = (): string =>
+  buildPrompt({
+    engine: "claude",
+    mode: "reviewer",
+    prNumber: 7,
+    baseRef: "main",
+    headRef: "topic/x",
+    runContextJsonPath: "/work/run-context.json",
   });
 
-  test("codex はドル記号前置になる", () => {
-    const prompt = buildPrompt({
+const it = test
+  .extend("reviewerPrompt", () => claudeReviewerPrompt())
+  .extend("reviewerPromptLines", () => claudeReviewerPrompt().split("\n"))
+  .extend("codexReviewerPromptLines", () =>
+    buildPrompt({
       engine: "codex",
       mode: "reviewer",
       prNumber: 7,
       baseRef: "main",
       headRef: "topic/x",
       runContextJsonPath: "/work/run-context.json",
-    });
-    expect(prompt.split("\n")[0]).toStrictEqual("$auto-develop-review review");
-  });
-
-  test("author は引数なしの起動 + 理由行を持つ", () => {
-    const prompt = buildPrompt({
+    }).split("\n"),
+  )
+  .extend("authorPromptLines", () =>
+    buildPrompt({
       engine: "claude",
       mode: "author",
       prNumber: 7,
@@ -36,39 +34,39 @@ describe("buildPrompt", () => {
       headRef: "topic/x",
       runContextJsonPath: "/work/run-context.json",
       reason: "request_changes",
-    });
-    const lines = prompt.split("\n");
-    expect([lines[0], lines.includes("Task: request_changes")]).toStrictEqual([
-      "/auto-develop-fix",
-      true,
-    ]);
+    }).split("\n"),
+  );
+
+describe("buildPrompt", () => {
+  it("claude reviewer はスラッシュ起動 + review 引数で始まる", ({ reviewerPromptLines }) => {
+    expect(reviewerPromptLines[0]).toStrictEqual("/auto-develop-review review");
   });
 
-  test("PR 番号・base・head・run context のパスを含む", () => {
-    const prompt = buildPrompt({
-      engine: "claude",
-      mode: "reviewer",
-      prNumber: 7,
-      baseRef: "main",
-      headRef: "topic/x",
-      runContextJsonPath: "/work/run-context.json",
-    });
-    expect([
-      prompt.includes("PR #7"),
-      prompt.includes("(base: main, head: topic/x)"),
-      prompt.includes("Run context: /work/run-context.json"),
-    ]).toStrictEqual([true, true, true]);
+  it("codex はドル記号前置になる", ({ codexReviewerPromptLines }) => {
+    expect(codexReviewerPromptLines[0]).toStrictEqual("$auto-develop-review review");
   });
 
-  test("diff やガイドラインは埋め込まない", () => {
-    const prompt = buildPrompt({
-      engine: "claude",
-      mode: "reviewer",
-      prNumber: 7,
-      baseRef: "main",
-      headRef: "topic/x",
-      runContextJsonPath: "/work/run-context.json",
-    });
-    expect(prompt).toContain("not passed inline");
+  it("author は引数なしの起動になる", ({ authorPromptLines }) => {
+    expect(authorPromptLines[0]).toStrictEqual("/auto-develop-fix");
+  });
+
+  it("author は理由行を持つ", ({ authorPromptLines }) => {
+    expect(authorPromptLines).toContain("Task: request_changes");
+  });
+
+  it("PR 番号を含む", ({ reviewerPrompt }) => {
+    expect(reviewerPrompt).toContain("PR #7");
+  });
+
+  it("base と head を含む", ({ reviewerPrompt }) => {
+    expect(reviewerPrompt).toContain("(base: main, head: topic/x)");
+  });
+
+  it("run context のパスを含む", ({ reviewerPrompt }) => {
+    expect(reviewerPrompt).toContain("Run context: /work/run-context.json");
+  });
+
+  it("diff やガイドラインは埋め込まない", ({ reviewerPrompt }) => {
+    expect(reviewerPrompt).toContain("not passed inline");
   });
 });

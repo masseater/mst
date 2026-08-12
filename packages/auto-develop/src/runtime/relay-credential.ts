@@ -7,13 +7,11 @@ import type { Logger } from "../logging/logger.ts";
 
 const RENEW_BEFORE_MS = 60_000;
 
-export type SessionIssuer = (issue: {
-  readonly githubToken: string;
-}) => Promise<{ readonly token: string; readonly expiresAt: string }>;
-
 export type RelayCredentialConfig = {
   readonly allowedOrigin: string;
-  readonly issueSession: SessionIssuer;
+  readonly issueSession: (issue: {
+    readonly githubToken: string;
+  }) => Promise<{ readonly token: string; readonly expiresAt: string }>;
   readonly resolveGithubToken: () => Promise<string | null>;
   readonly now: () => number;
   readonly log: Logger;

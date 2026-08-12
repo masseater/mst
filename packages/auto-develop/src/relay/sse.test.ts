@@ -86,8 +86,8 @@ const startStream = (session: {
   };
 };
 
-describe("バックログ再生", () => {
-  test("所有イベントだけが配信され 1 件ごとにカーソルが進む", async () => {
+const it = test
+  .extend("mixedBacklogStream", async () => {
     const events = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
     const nowMs = Date.now();
@@ -101,13 +101,10 @@ describe("バックログ再生", () => {
     await settleQueue();
     stream.hangup();
     await stream.finished;
-    expect([writtenIds(), await cursors.read("octocat-author")]).toStrictEqual([
-      ["delivery-1", "delivery-3"],
-      "delivery-3",
-    ]);
-  });
-
-  test("Last-Event-ID は保存カーソルより優先される", async () => {
+    const cursorAfterStream = await cursors.read("octocat-author");
+    return { writtenEventIds: writtenIds(), cursorAfterStream };
+  })
+  .extend("lastEventIdStream", async () => {
     const events = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
     await events.createIfAbsent(authoredEvent("delivery-1", { receivedAtMs: 100 }));
@@ -119,23 +116,22 @@ describe("バックログ再生", () => {
     await settleQueue();
     stream.hangup();
     await stream.finished;
-    expect(writtenIds()).toStrictEqual(["delivery-2", "delivery-3"]);
-  });
-
-  test("再開位置のイベントが消えていたら replay window にフォールバックする", async () => {
+    return writtenIds();
+  })
+  .extend("fallbackStream", async () => {
     const events = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
-    const nowMs = Date.now();
-    await events.createIfAbsent(authoredEvent("delivery-recent", { receivedAtMs: nowMs - 1000 }));
+    await events.createIfAbsent(
+      authoredEvent("delivery-recent", { receivedAtMs: Date.now() - 1000 }),
+    );
     const { sink, writtenIds } = recordingSink();
     const stream = startStream({ events, cursors, sink, lastEventId: "delivery-vanished" });
     await settleQueue();
     stream.hangup();
     await stream.finished;
-    expect(writtenIds()).toStrictEqual(["delivery-recent"]);
-  });
-
-  test("所有者を解決できないイベントで再生が中断されカーソルは進まない", async () => {
+    return writtenIds();
+  })
+  .extend("unresolvableOwnerStream", async () => {
     const events = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
     const nowMs = Date.now();
@@ -158,12 +154,10 @@ describe("バックログ再生", () => {
       }),
     });
     await stream.finished;
-    expect([writtenIds(), await cursors.read("octocat-author")]).toStrictEqual([[], null]);
-  });
-});
-
-describe("live 配信", () => {
-  test("live の追加イベントは配信されカーソルが進む", async () => {
+    const cursorAfterStream = await cursors.read("octocat-author");
+    return { writtenEventIds: writtenIds(), cursorAfterStream };
+  })
+  .extend("liveDeliveryStream", async () => {
     const events = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
     const { sink, writtenIds } = recordingSink();
@@ -173,13 +167,10 @@ describe("live 配信", () => {
     await settleQueue();
     stream.hangup();
     await stream.finished;
-    expect([writtenIds(), await cursors.read("octocat-author")]).toStrictEqual([
-      ["delivery-live"],
-      "delivery-live",
-    ]);
-  });
-
-  test("バックログと同一 ID の live イベントは重複配信されない", async () => {
+    const cursorAfterStream = await cursors.read("octocat-author");
+    return { writtenEventIds: writtenIds(), cursorAfterStream };
+  })
+  .extend("replayedLiveIdStream", async () => {
     const events = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
     const nowMs = Date.now();
@@ -191,12 +182,11 @@ describe("live 配信", () => {
     await settleQueue();
     stream.hangup();
     await stream.finished;
-    expect(writtenIds()).toStrictEqual(["delivery-1"]);
-  });
-
-  test("SSE 書き込み失敗でストリームは停止する", async () => {
-    const events = createMemoryEventStore();
+    return writtenIds();
+  })
+  .extend("failingSinkCursor", async () => {
     const cursors = createMemoryCursorStore();
+    const events = createMemoryEventStore();
     const failingSink: SseSink = {
       writeEvent: () => {
         throw new Error("socket closed");
@@ -208,10 +198,9 @@ describe("live 配信", () => {
     await events.createIfAbsent(authoredEvent("delivery-live", { receivedAtMs: Date.now() }));
     await settleQueue();
     await stream.finished;
-    expect(await cursors.read("octocat-author")).toStrictEqual(null);
-  });
-
-  test("live 配信は到着順に直列処理される", async () => {
+    return cursors.read("octocat-author");
+  })
+  .extend("serialLiveStream", async () => {
     const events = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
     const { sink, writtenIds } = recordingSink();
@@ -223,12 +212,9 @@ describe("live 配信", () => {
     await settleQueue();
     stream.hangup();
     await stream.finished;
-    expect(writtenIds()).toStrictEqual(["delivery-live-1", "delivery-live-2"]);
-  });
-});
-
-describe("live watch の開始位置", () => {
-  test("バックログが空で再開位置のイベントも消えていれば時刻起点で購読する", async () => {
+    return writtenIds();
+  })
+  .extend("emptyBacklogLiveStream", async () => {
     const events = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
     const { sink, writtenIds } = recordingSink();
@@ -238,10 +224,9 @@ describe("live watch の開始位置", () => {
     await settleQueue();
     stream.hangup();
     await stream.finished;
-    expect(writtenIds()).toStrictEqual(["delivery-live"]);
-  });
-
-  test("既知 ID 集合は上限を超えると最古から追い出される", async () => {
+    return writtenIds();
+  })
+  .extend("evictingKnownIdStream", async () => {
     const events = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
     const { sink, writtenIds } = recordingSink();
@@ -266,12 +251,9 @@ describe("live watch の開始位置", () => {
     await settleQueue();
     clientHangup.abort();
     await finished;
-    expect(writtenIds()).toStrictEqual(["delivery-live-1", "delivery-live-2"]);
-  });
-});
-
-describe("停止後の抑止", () => {
-  test("再生の途中で停止したら残りのバックログは配られない", async () => {
+    return writtenIds();
+  })
+  .extend("hangupDuringReplayStream", async () => {
     const events = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
     const nowMs = Date.now();
@@ -279,7 +261,7 @@ describe("停止後の抑止", () => {
     await events.createIfAbsent(authoredEvent("delivery-2", { receivedAtMs: nowMs - 1000 }));
     const clientHangup = new AbortController();
     const frames = new Map<number, string>();
-    const finished = runEventStream({
+    await runEventStream({
       clientId: "octocat-author",
       subscriberLogin: "octocat",
       lastEventId: null,
@@ -296,11 +278,9 @@ describe("停止後の抑止", () => {
       clientAbort: clientHangup.signal,
       log: silentLogger,
     });
-    await finished;
-    expect([...frames.values()]).toStrictEqual(["delivery-1"]);
-  });
-
-  test("停止後に完了した所有者判定は書き込まれずキューの後続も走らない", async () => {
+    return [...frames.values()];
+  })
+  .extend("lateOwnerResolutionStream", async () => {
     const events = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
     const resolverGate = new Map<string, (login: string | null) => void>();
@@ -328,38 +308,115 @@ describe("停止後の抑止", () => {
     resolverGate.get("release")?.("octocat");
     await stream.finished;
     await settleQueue();
-    expect([writtenIds(), await cursors.read("octocat-author")]).toStrictEqual([[], null]);
-  });
-});
-
-describe("keepalive と切断", () => {
-  test("keepalive の書き込み失敗でストリームは停止する", async () => {
-    const events = createMemoryEventStore();
-    const cursors = createMemoryCursorStore();
+    const cursorAfterStream = await cursors.read("octocat-author");
+    return { writtenEventIds: writtenIds(), cursorAfterStream };
+  })
+  .extend("failingKeepaliveSpy", async () => {
     const writeKeepalive = vi.fn<() => void>(() => {
       throw new Error("socket closed");
     });
+    const events = createMemoryEventStore();
     const clientHangup = new AbortController();
     await runEventStream({
       clientId: "octocat-author",
       subscriberLogin: "octocat",
       lastEventId: null,
       events,
-      cursors,
+      cursors: createMemoryCursorStore(),
       ownerFilter: createOwnerFilter({ events, github: stubGithub() }),
       sink: { writeEvent: () => undefined, writeKeepalive },
       clientAbort: clientHangup.signal,
       log: silentLogger,
       keepaliveMs: 1,
     });
-    expect(writeKeepalive).toHaveBeenCalledTimes(1);
+    return writeKeepalive;
   });
 
-  test("クライアント切断でストリームは終了する", async () => {
+describe("バックログ再生", () => {
+  it("所有イベントだけが配信される", ({ mixedBacklogStream }) => {
+    expect(mixedBacklogStream.writtenEventIds).toStrictEqual(["delivery-1", "delivery-3"]);
+  });
+
+  it("1 件ごとにカーソルが進む", ({ mixedBacklogStream }) => {
+    expect(mixedBacklogStream.cursorAfterStream).toStrictEqual("delivery-3");
+  });
+
+  it("Last-Event-ID は保存カーソルより優先される", ({ lastEventIdStream }) => {
+    expect(lastEventIdStream).toStrictEqual(["delivery-2", "delivery-3"]);
+  });
+
+  it("再開位置のイベントが消えていたら replay window にフォールバックする", ({
+    fallbackStream,
+  }) => {
+    expect(fallbackStream).toStrictEqual(["delivery-recent"]);
+  });
+
+  it("所有者を解決できないイベントで再生が中断される", ({ unresolvableOwnerStream }) => {
+    expect(unresolvableOwnerStream.writtenEventIds).toStrictEqual([]);
+  });
+
+  it("所有者を解決できないイベントではカーソルは進まない", ({ unresolvableOwnerStream }) => {
+    expect(unresolvableOwnerStream.cursorAfterStream).toStrictEqual(null);
+  });
+});
+
+describe("live 配信", () => {
+  it("live の追加イベントは配信される", ({ liveDeliveryStream }) => {
+    expect(liveDeliveryStream.writtenEventIds).toStrictEqual(["delivery-live"]);
+  });
+
+  it("live の追加イベントでカーソルが進む", ({ liveDeliveryStream }) => {
+    expect(liveDeliveryStream.cursorAfterStream).toStrictEqual("delivery-live");
+  });
+
+  it("バックログと同一 ID の live イベントは重複配信されない", ({ replayedLiveIdStream }) => {
+    expect(replayedLiveIdStream).toStrictEqual(["delivery-1"]);
+  });
+
+  it("SSE 書き込み失敗でストリームは停止する", ({ failingSinkCursor }) => {
+    expect(failingSinkCursor).toStrictEqual(null);
+  });
+
+  it("live 配信は到着順に直列処理される", ({ serialLiveStream }) => {
+    expect(serialLiveStream).toStrictEqual(["delivery-live-1", "delivery-live-2"]);
+  });
+});
+
+describe("live watch の開始位置", () => {
+  it("バックログが空で再開位置のイベントも消えていれば時刻起点で購読する", ({
+    emptyBacklogLiveStream,
+  }) => {
+    expect(emptyBacklogLiveStream).toStrictEqual(["delivery-live"]);
+  });
+
+  it("既知 ID 集合は上限を超えると最古から追い出される", ({ evictingKnownIdStream }) => {
+    expect(evictingKnownIdStream).toStrictEqual(["delivery-live-1", "delivery-live-2"]);
+  });
+});
+
+describe("停止後の抑止", () => {
+  it("再生の途中で停止したら残りのバックログは配られない", ({ hangupDuringReplayStream }) => {
+    expect(hangupDuringReplayStream).toStrictEqual(["delivery-1"]);
+  });
+
+  it("停止後に完了した所有者判定は書き込まれない", ({ lateOwnerResolutionStream }) => {
+    expect(lateOwnerResolutionStream.writtenEventIds).toStrictEqual([]);
+  });
+
+  it("停止後はキューの後続も走らずカーソルは進まない", ({ lateOwnerResolutionStream }) => {
+    expect(lateOwnerResolutionStream.cursorAfterStream).toStrictEqual(null);
+  });
+});
+
+describe("keepalive と切断", () => {
+  it("keepalive の書き込み失敗でストリームは停止する", ({ failingKeepaliveSpy }) => {
+    expect(failingKeepaliveSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("クライアント切断でストリームは終了する", async () => {
     const events = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
-    const { sink } = recordingSink();
-    const stream = startStream({ events, cursors, sink });
+    const stream = startStream({ events, cursors, sink: recordingSink().sink });
     await settleQueue();
     stream.hangup();
     await expect(stream.finished).resolves.toStrictEqual(undefined);

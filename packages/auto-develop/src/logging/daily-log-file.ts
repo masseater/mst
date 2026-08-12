@@ -5,7 +5,7 @@ export type LogFileSink = {
   readonly append: (line: string) => void;
 };
 
-export const dailyLogFileName = (name: string, isoTime: string): string =>
+const dailyLogFileName = (name: string, isoTime: string): string =>
   `${name}-${isoTime.slice(0, 10)}.log`;
 
 export const createDailyLogFileSink = (sink: {

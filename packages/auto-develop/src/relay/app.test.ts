@@ -11,7 +11,7 @@ import {
   createMemoryEventStore,
   createMemorySessionStore,
 } from "./memory-store.ts";
-import { relayConfigSchema } from "./relay-config.ts";
+import { relayConfigFromEnv } from "./relay-config.ts";
 
 import type { GithubPullSummary, GithubReader } from "./github-reader.ts";
 import type { RelayDependencies } from "./routes.ts";
@@ -44,9 +44,9 @@ const listeningRelay = async (
   overrides: Partial<RelayDependencies> = {},
 ): Promise<{ readonly origin: string; readonly relay: RelayServer }> => {
   const relay = createRelayServer({
-    config: relayConfigSchema.parse({
-      githubRepository: "example-org/example-repo",
-      webhookSecret: "shared-secret",
+    config: relayConfigFromEnv({
+      GITHUB_REPOSITORY: "example-org/example-repo",
+      GITHUB_WEBHOOK_SECRET: "shared-secret",
     }),
     events: createMemoryEventStore(),
     cursors: createMemoryCursorStore(),
@@ -105,30 +105,24 @@ const deliverOpenedWebhook = async (origin: string, deliveryId: string): Promise
   return webhookResponse.status;
 };
 
-describe("relay サーバー", () => {
-  test("health は status ok を返す", async () => {
+const it = test
+  .extend("healthCall", async () => {
     const { origin, relay } = await listeningRelay();
     const healthResponse = await fetch(new URL("/health", origin));
-    expect([healthResponse.status, await healthResponse.json()]).toStrictEqual([
-      200,
-      { status: "ok" },
-    ]);
+    const healthBody = await healthResponse.json();
     await relay.shutdown();
-  });
-
-  test("未定義のルートは 404 を返す", async () => {
+    return { status: healthResponse.status, body: healthBody };
+  })
+  .extend("missingRouteCall", async () => {
     const { origin, relay } = await listeningRelay();
     const missingResponse = await fetch(new URL("/missing", origin));
-    expect([missingResponse.status, await missingResponse.json()]).toStrictEqual([
-      404,
-      { error: "Not Found" },
-    ]);
+    const missingBody = await missingResponse.json();
     await relay.shutdown();
-  });
-
-  test("発行したトークンで poll すると発行時の login から導出したカーソルで所有分が返る", async () => {
+    return { status: missingResponse.status, body: missingBody };
+  })
+  .extend("authenticatedPoll", async () => {
     const { origin, relay } = await listeningRelay();
-    expect(await deliverOpenedWebhook(origin, "delivery-1")).toStrictEqual(200);
+    const webhookStatus = await deliverOpenedWebhook(origin, "delivery-1");
     const connectionToken = await issuedToken(origin);
     const pollResponse = await fetch(new URL("/events/poll?mode=author", origin), {
       headers: { authorization: `Bearer ${connectionToken}` },
@@ -136,37 +130,27 @@ describe("relay サーバー", () => {
     const pollBody = (await pollResponse.json()) as {
       readonly events: readonly { readonly delivery_id: string }[];
     };
-    expect([pollResponse.status, pollBody.events.map((event) => event.delivery_id)]).toStrictEqual([
-      200,
-      ["delivery-1"],
-    ]);
     await relay.shutdown();
-  });
-
-  test("接続クレデンシャルなしの poll は 401 を返す", async () => {
+    return { webhookStatus, pollStatus: pollResponse.status, pollEvents: pollBody.events };
+  })
+  .extend("unauthenticatedPoll", async () => {
     const { origin, relay } = await listeningRelay();
     const pollResponse = await fetch(new URL("/events/poll?mode=author", origin));
-    expect([pollResponse.status, await pollResponse.json()]).toStrictEqual([
-      401,
-      { error: "Unauthorized" },
-    ]);
+    const pollBody = await pollResponse.json();
     await relay.shutdown();
-  });
-
-  test("不正な mode は 400 を返す", async () => {
+    return { status: pollResponse.status, body: pollBody };
+  })
+  .extend("unknownModePoll", async () => {
     const { origin, relay } = await listeningRelay();
     const connectionToken = await issuedToken(origin);
     const pollResponse = await fetch(new URL("/events/poll?mode=observer", origin), {
       headers: { authorization: `Bearer ${connectionToken}` },
     });
-    expect([pollResponse.status, await pollResponse.json()]).toStrictEqual([
-      400,
-      { error: "Invalid or missing mode" },
-    ]);
+    const pollBody = await pollResponse.json();
     await relay.shutdown();
-  });
-
-  test("GitHub 到達不能のセッション発行は 503 を返す", async () => {
+    return { status: pollResponse.status, body: pollBody };
+  })
+  .extend("githubDownSession", async () => {
     const { origin, relay } = await listeningRelay({
       github: stubGithub({
         resolveTokenLogin: () => Promise.reject(new GithubUnavailableError("rate limited")),
@@ -176,14 +160,11 @@ describe("relay サーバー", () => {
       method: "POST",
       headers: { authorization: "Bearer github-token" },
     });
-    expect([sessionResponse.status, await sessionResponse.json()]).toStrictEqual([
-      503,
-      { error: "Service Unavailable" },
-    ]);
+    const sessionBody = await sessionResponse.json();
     await relay.shutdown();
-  });
-
-  test("startup drain は認証 operator の未処理作業を返す", async () => {
+    return { status: sessionResponse.status, body: sessionBody };
+  })
+  .extend("reviewerDrainEvents", async () => {
     const { origin, relay } = await listeningRelay({
       github: stubGithub({
         listOpenPullRequests: () =>
@@ -197,32 +178,26 @@ describe("relay サーバー", () => {
     const drainBody = (await drainResponse.json()) as {
       readonly events: readonly { readonly delivery_id: string }[];
     };
-    expect(drainBody.events.map((event) => event.delivery_id)).toStrictEqual([
-      "startup-drain:pull_request:7:head-sha:review-requested",
-    ]);
     await relay.shutdown();
-  });
-
-  test("スケジューラ許可リストが空なら check-base-updates は 401 で閉じる", async () => {
+    return drainBody.events;
+  })
+  .extend("deniedTask", async () => {
     const { origin, relay } = await listeningRelay();
     const checkResponse = await fetch(new URL("/tasks/check-base-updates", origin), {
       method: "POST",
       headers: { authorization: "Bearer signed-id-token" },
     });
-    expect([checkResponse.status, await checkResponse.json()]).toStrictEqual([
-      401,
-      { error: "Unauthorized" },
-    ]);
+    const checkBody = await checkResponse.json();
     await relay.shutdown();
-  });
-
-  test("許可された scheduler は base 遅れを保存して件数を返す", async () => {
+    return { status: checkResponse.status, body: checkBody };
+  })
+  .extend("allowedSchedulerTask", async () => {
     const { origin, relay } = await listeningRelay({
-      config: relayConfigSchema.parse({
-        githubRepository: "example-org/example-repo",
-        webhookSecret: "shared-secret",
-        schedulerServiceAccountEmails: ["scheduler@example.test"],
-        publicOrigin: "https://relay.example.test",
+      config: relayConfigFromEnv({
+        GITHUB_REPOSITORY: "example-org/example-repo",
+        GITHUB_WEBHOOK_SECRET: "shared-secret",
+        SCHEDULER_SERVICE_ACCOUNT_EMAILS: "scheduler@example.test",
+        RELAY_PUBLIC_ORIGIN: "https://relay.example.test",
       }),
       github: stubGithub({
         listOpenPullRequests: () => Promise.resolve([openPull({ mergeStateStatus: "BEHIND" })]),
@@ -234,14 +209,11 @@ describe("relay サーバー", () => {
       method: "POST",
       headers: { authorization: "Bearer signed-id-token" },
     });
-    expect([checkResponse.status, await checkResponse.json()]).toStrictEqual([
-      200,
-      { scanned: 1, behind: 1, stored: 1 },
-    ]);
+    const checkBody = await checkResponse.json();
     await relay.shutdown();
-  });
-
-  test("未分類のルート失敗は 500 の JSON になる", async () => {
+    return { status: checkResponse.status, body: checkBody };
+  })
+  .extend("explodingDrain", async () => {
     const { origin, relay } = await listeningRelay({
       github: stubGithub({
         listOpenPullRequests: () => Promise.reject(new Error("github exploded")),
@@ -251,22 +223,18 @@ describe("relay サーバー", () => {
     const drainResponse = await fetch(new URL("/events/startup-drain?mode=author", origin), {
       headers: { authorization: `Bearer ${connectionToken}` },
     });
-    expect([drainResponse.status, await drainResponse.json()]).toStrictEqual([
-      500,
-      { error: "Internal Server Error" },
-    ]);
+    const drainBody = await drainResponse.json();
     await relay.shutdown();
-  });
-
-  test("クレデンシャルなしの startup drain と stream は 401 で閉じる", async () => {
+    return { status: drainResponse.status, body: drainBody };
+  })
+  .extend("anonymousDrainAndStream", async () => {
     const { origin, relay } = await listeningRelay();
     const drainResponse = await fetch(new URL("/events/startup-drain?mode=author", origin));
     const streamResponse = await fetch(new URL("/events/stream?mode=author", origin));
-    expect([drainResponse.status, streamResponse.status]).toStrictEqual([401, 401]);
     await relay.shutdown();
-  });
-
-  test("keepalive は ping の空データフレームとして届く", async () => {
+    return { drainStatus: drainResponse.status, streamStatus: streamResponse.status };
+  })
+  .extend("keepaliveFrameText", async () => {
     const { origin, relay } = await listeningRelay({ now: Date.now, keepaliveMs: 5 });
     const connectionToken = await issuedToken(origin);
     const abort = new AbortController();
@@ -274,15 +242,12 @@ describe("relay サーバー", () => {
       headers: { authorization: `Bearer ${connectionToken}` },
       signal: abort.signal,
     });
-    const frameReader = streamResponse.body?.getReader();
-    const firstChunk = await frameReader?.read();
-    const frameText = decodeChunk(firstChunk);
+    const frameText = decodeChunk(await streamResponse.body?.getReader().read());
     abort.abort();
-    expect(frameText).toStrictEqual("event: ping\ndata:\n\n");
     await relay.shutdown();
-  });
-
-  test("メソッドと URL の欠けたリクエストは GET / として 404 になる", async () => {
+    return frameText;
+  })
+  .extend("bareRequestStatus", async () => {
     const { relay } = await listeningRelay();
     const { IncomingMessage, ServerResponse } = await import("node:http");
     const { Socket } = await import("node:net");
@@ -290,55 +255,191 @@ describe("relay サーバー", () => {
     const bareResponse = new ServerResponse(bareRequest);
     relay.server.emit("request", bareRequest, bareResponse);
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(bareResponse.statusCode).toStrictEqual(404);
     await relay.shutdown();
-  });
-
-  test("ヘッダ送信後の失敗は応答を閉じて終える", async () => {
-    const failingCursors = {
-      read: () => Promise.reject(new Error("cursor store exploded")),
-      write: () => Promise.resolve(),
-    };
-    const { origin, relay } = await listeningRelay({ cursors: failingCursors });
+    return bareResponse.statusCode;
+  })
+  .extend("lateFailingStream", async () => {
+    const { origin, relay } = await listeningRelay({
+      cursors: {
+        read: () => Promise.reject(new Error("cursor store exploded")),
+        write: () => Promise.resolve(),
+      },
+    });
     const connectionToken = await issuedToken(origin);
     const streamResponse = await fetch(new URL("/events/stream?mode=author", origin), {
       headers: { authorization: `Bearer ${connectionToken}` },
     });
-    const frameReader = streamResponse.body?.getReader();
-    const finalChunk = await frameReader?.read();
-    expect([streamResponse.status, finalChunk?.done]).toStrictEqual([200, true]);
+    const finalChunk = await streamResponse.body?.getReader().read();
     await relay.shutdown();
-  });
-
-  test("ドレイン予算を超えた SSE 接続は強制切断されて shutdown が完了する", async () => {
+    return { status: streamResponse.status, done: finalChunk?.done };
+  })
+  .extend("openStreamShutdown", async () => {
     const { origin, relay } = await listeningRelay();
     const connectionToken = await issuedToken(origin);
     const streamResponse = await fetch(new URL("/events/stream?mode=author", origin), {
       headers: { authorization: `Bearer ${connectionToken}` },
     });
-    await expect(relay.shutdown()).resolves.toStrictEqual(undefined);
-    expect(streamResponse.status).toStrictEqual(200);
-  });
-
-  test("SSE ストリームは契約どおりのフレームでバックログを配る", async () => {
+    const [settlement] = await Promise.allSettled([relay.shutdown()]);
+    return { settlement, streamStatus: streamResponse.status };
+  })
+  .extend("backlogStreamFrame", async () => {
     const { origin, relay } = await listeningRelay();
-    expect(await deliverOpenedWebhook(origin, "delivery-1")).toStrictEqual(200);
+    const webhookStatus = await deliverOpenedWebhook(origin, "delivery-1");
     const connectionToken = await issuedToken(origin);
     const abort = new AbortController();
     const streamResponse = await fetch(new URL("/events/stream?mode=author", origin), {
       headers: { authorization: `Bearer ${connectionToken}` },
       signal: abort.signal,
     });
-    const frameReader = streamResponse.body?.getReader();
-    const firstChunk = await frameReader?.read();
-    const frameText = decodeChunk(firstChunk);
+    const frameText = decodeChunk(await streamResponse.body?.getReader().read());
     abort.abort();
-    expect([
-      streamResponse.status,
-      streamResponse.headers.get("content-type"),
-      frameText.startsWith("event: pull_request\ndata: "),
-      frameText.endsWith("id: delivery-1\n\n"),
-    ]).toStrictEqual([200, "text/event-stream", true, true]);
+    const contentType = streamResponse.headers.get("content-type");
     await relay.shutdown();
+    return { webhookStatus, status: streamResponse.status, contentType, frameText };
+  });
+
+describe("relay サーバー", () => {
+  it("health は 200 を返す", ({ healthCall }) => {
+    expect(healthCall.status).toStrictEqual(200);
+  });
+
+  it("health は status ok を返す", ({ healthCall }) => {
+    expect(healthCall.body).toStrictEqual({ status: "ok" });
+  });
+
+  it("未定義のルートは 404 を返す", ({ missingRouteCall }) => {
+    expect(missingRouteCall.status).toStrictEqual(404);
+  });
+
+  it("未定義のルートは Not Found を返す", ({ missingRouteCall }) => {
+    expect(missingRouteCall.body).toStrictEqual({ error: "Not Found" });
+  });
+
+  it("webhook 配送は 200 で受理される", ({ authenticatedPoll }) => {
+    expect(authenticatedPoll.webhookStatus).toStrictEqual(200);
+  });
+
+  it("発行したトークンでの poll は 200 を返す", ({ authenticatedPoll }) => {
+    expect(authenticatedPoll.pollStatus).toStrictEqual(200);
+  });
+
+  it("発行時の login から導出したカーソルで所有分が 1 件返る", ({ authenticatedPoll }) => {
+    expect(authenticatedPoll.pollEvents.length).toStrictEqual(1);
+  });
+
+  it("発行したトークンで poll すると所有分が返る", ({ authenticatedPoll }) => {
+    expect(authenticatedPoll.pollEvents[0]?.delivery_id).toStrictEqual("delivery-1");
+  });
+
+  it("接続クレデンシャルなしの poll は 401 を返す", ({ unauthenticatedPoll }) => {
+    expect(unauthenticatedPoll.status).toStrictEqual(401);
+  });
+
+  it("接続クレデンシャルなしの poll は Unauthorized を返す", ({ unauthenticatedPoll }) => {
+    expect(unauthenticatedPoll.body).toStrictEqual({ error: "Unauthorized" });
+  });
+
+  it("不正な mode は 400 を返す", ({ unknownModePoll }) => {
+    expect(unknownModePoll.status).toStrictEqual(400);
+  });
+
+  it("不正な mode は理由つきで拒否される", ({ unknownModePoll }) => {
+    expect(unknownModePoll.body).toStrictEqual({ error: "Invalid or missing mode" });
+  });
+
+  it("GitHub 到達不能のセッション発行は 503 を返す", ({ githubDownSession }) => {
+    expect(githubDownSession.status).toStrictEqual(503);
+  });
+
+  it("GitHub 到達不能のセッション発行は Service Unavailable を返す", ({ githubDownSession }) => {
+    expect(githubDownSession.body).toStrictEqual({ error: "Service Unavailable" });
+  });
+
+  it("startup drain は認証 operator の未処理作業を 1 件返す", ({ reviewerDrainEvents }) => {
+    expect(reviewerDrainEvents.length).toStrictEqual(1);
+  });
+
+  it("startup drain は認証 operator の未処理作業を返す", ({ reviewerDrainEvents }) => {
+    expect(reviewerDrainEvents[0]?.delivery_id).toStrictEqual(
+      "startup-drain:pull_request:7:head-sha:review-requested",
+    );
+  });
+
+  it("スケジューラ許可リストが空なら check-base-updates は 401 で閉じる", ({ deniedTask }) => {
+    expect(deniedTask.status).toStrictEqual(401);
+  });
+
+  it("スケジューラ許可リストが空なら check-base-updates は Unauthorized を返す", ({
+    deniedTask,
+  }) => {
+    expect(deniedTask.body).toStrictEqual({ error: "Unauthorized" });
+  });
+
+  it("許可された scheduler の check-base-updates は 200 になる", ({ allowedSchedulerTask }) => {
+    expect(allowedSchedulerTask.status).toStrictEqual(200);
+  });
+
+  it("許可された scheduler は base 遅れを保存して件数を返す", ({ allowedSchedulerTask }) => {
+    expect(allowedSchedulerTask.body).toStrictEqual({ scanned: 1, behind: 1, stored: 1 });
+  });
+
+  it("未分類のルート失敗は 500 になる", ({ explodingDrain }) => {
+    expect(explodingDrain.status).toStrictEqual(500);
+  });
+
+  it("未分類のルート失敗は 500 の JSON になる", ({ explodingDrain }) => {
+    expect(explodingDrain.body).toStrictEqual({ error: "Internal Server Error" });
+  });
+
+  it("クレデンシャルなしの startup drain は 401 で閉じる", ({ anonymousDrainAndStream }) => {
+    expect(anonymousDrainAndStream.drainStatus).toStrictEqual(401);
+  });
+
+  it("クレデンシャルなしの stream は 401 で閉じる", ({ anonymousDrainAndStream }) => {
+    expect(anonymousDrainAndStream.streamStatus).toStrictEqual(401);
+  });
+
+  it("keepalive は ping の空データフレームとして届く", ({ keepaliveFrameText }) => {
+    expect(keepaliveFrameText).toStrictEqual("event: ping\ndata:\n\n");
+  });
+
+  it("メソッドと URL の欠けたリクエストは GET / として 404 になる", ({ bareRequestStatus }) => {
+    expect(bareRequestStatus).toStrictEqual(404);
+  });
+
+  it("ヘッダ送信後の失敗でも応答は 200 で始まっている", ({ lateFailingStream }) => {
+    expect(lateFailingStream.status).toStrictEqual(200);
+  });
+
+  it("ヘッダ送信後の失敗は応答を閉じて終える", ({ lateFailingStream }) => {
+    expect(lateFailingStream.done).toStrictEqual(true);
+  });
+
+  it("ドレイン予算を超えた SSE 接続があっても shutdown が完了する", ({ openStreamShutdown }) => {
+    expect(openStreamShutdown.settlement).toStrictEqual({ status: "fulfilled", value: undefined });
+  });
+
+  it("ドレイン予算を超えた SSE 接続は強制切断される", ({ openStreamShutdown }) => {
+    expect(openStreamShutdown.streamStatus).toStrictEqual(200);
+  });
+
+  it("バックログ配信前の webhook は 200 で受理される", ({ backlogStreamFrame }) => {
+    expect(backlogStreamFrame.webhookStatus).toStrictEqual(200);
+  });
+
+  it("SSE ストリームは 200 で始まる", ({ backlogStreamFrame }) => {
+    expect(backlogStreamFrame.status).toStrictEqual(200);
+  });
+
+  it("SSE ストリームは text/event-stream を名乗る", ({ backlogStreamFrame }) => {
+    expect(backlogStreamFrame.contentType).toStrictEqual("text/event-stream");
+  });
+
+  it("SSE フレームは契約どおりの event と data で始まる", ({ backlogStreamFrame }) => {
+    expect(backlogStreamFrame.frameText).toMatch(/^event: pull_request\ndata: /);
+  });
+
+  it("SSE フレームは契約どおりの id で終わる", ({ backlogStreamFrame }) => {
+    expect(backlogStreamFrame.frameText).toMatch(/id: delivery-1\n\n$/);
   });
 });
