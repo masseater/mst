@@ -1,6 +1,8 @@
 import { readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
+import { memoize } from "es-toolkit";
+
 import { readUnlessMissing } from "../path-failure.ts";
 import { toPosixPath } from "../posix-path.ts";
 
@@ -39,21 +41,16 @@ const filePathsUnder = (worktree: Worktree, directory: string): readonly string[
   });
 };
 
-const filePathsByWorktree = new Map<string, readonly string[]>();
-
 const worktreeKeyOf = (worktree: Worktree): string =>
   [worktree.root, ...[...worktree.unscannedDirectoryNames].toSorted()].join("\n");
 
-export const worktreeFilePathsUnder = (asked: Worktree): readonly string[] => {
-  const worktree: Worktree = {
+const scannedFilePathsUnder = memoize(
+  (worktree: Worktree): readonly string[] => filePathsUnder(worktree, worktree.root).toSorted(),
+  { getCacheKey: worktreeKeyOf },
+);
+
+export const worktreeFilePathsUnder = (asked: Worktree): readonly string[] =>
+  scannedFilePathsUnder({
     root: resolve(asked.root),
     unscannedDirectoryNames: asked.unscannedDirectoryNames,
-  };
-  const key = worktreeKeyOf(worktree);
-  const memoized = filePathsByWorktree.get(key);
-  if (memoized !== undefined) return memoized;
-
-  const scanned = filePathsUnder(worktree, worktree.root).toSorted();
-  filePathsByWorktree.set(key, scanned);
-  return scanned;
-};
+  });

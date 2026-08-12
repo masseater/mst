@@ -1,18 +1,27 @@
 import { range } from "es-toolkit";
 
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { isSpecFile, specFileSuffixesFrom } from "../lib/spec-syntax/spec-files.ts";
 
 import type { ESTree, Options } from "@oxlint/plugins";
 
-const DEFAULT_MAX_LINES = 400;
+const DEFAULT_MAX_LINES = 500;
 
-const maxLinesFrom = (options: Readonly<Options>): number => {
+const DEFAULT_MAX_SPEC_LINES = 1500;
+
+const optionObjectFrom = (options: Readonly<Options>): Readonly<Record<string, unknown>> => {
   const [first] = options;
-  if (typeof first !== "object" || first === null || Array.isArray(first)) {
-    return DEFAULT_MAX_LINES;
-  }
-  const { maxLines } = first;
-  return typeof maxLines === "number" ? maxLines : DEFAULT_MAX_LINES;
+  if (typeof first !== "object" || first === null || Array.isArray(first)) return {};
+  return first;
+};
+
+const budgetFrom = (options: Readonly<Options>, filename: string): number => {
+  const configured = optionObjectFrom(options);
+  const spec = isSpecFile(filename, specFileSuffixesFrom(options));
+  const key = spec ? "maxSpecLines" : "maxLines";
+  const fallback = spec ? DEFAULT_MAX_SPEC_LINES : DEFAULT_MAX_LINES;
+  const written = configured[key];
+  return typeof written === "number" ? written : fallback;
 };
 
 const codeLineCountOf = (tokens: readonly ESTree.Token[]): number =>
@@ -36,13 +45,15 @@ export const forbidOversizedFile = createDontReviewItRule({
         type: "object",
         properties: {
           maxLines: { type: "integer", minimum: 1 },
+          maxSpecLines: { type: "integer", minimum: 1 },
+          specFileSuffixes: { type: "array", items: { type: "string" } },
         },
         additionalProperties: false,
       },
     ],
   },
   create(context) {
-    const maxLines = maxLinesFrom(context.options);
+    const maxLines = budgetFrom(context.options, context.filename);
     return {
       Program(node: ESTree.Program) {
         const codeLines = codeLineCountOf(context.sourceCode.ast.tokens);

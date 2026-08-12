@@ -1,4 +1,5 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { fixtureContextParameterName } from "../lib/spec-syntax/fixture-declarations.ts";
 import {
   isHeldContextReach,
@@ -42,6 +43,15 @@ const contextBindingsOf = (callback: SpecFunction): readonly HeldContext[] => {
   return name === null ? [] : [{ name, start: callback.start, end: callback.end }];
 };
 
+const contextReachesIn = (program: ESTree.Program): readonly ContextReach[] =>
+  nodesOfType(program, "MemberExpression").flatMap((node) => {
+    if (node.computed) return [];
+    if (staticMemberName(node) !== ASSERTION_ENTRY) return [];
+
+    const receiver = unwrapSubject(node.object);
+    return receiver.type === "Identifier" ? [{ node, name: receiver.name }] : [];
+  });
+
 export const noVitestContextExpect = createDontReviewItRule({
   name: "no-vitest-context-expect--import-expect-from-vitest",
   meta: {
@@ -61,8 +71,6 @@ export const noVitestContextExpect = createDontReviewItRule({
   },
   create(context) {
     const bindings = testBlockBindings();
-    const calls = new Set<ESTree.CallExpression>();
-    const accesses = new Set<ContextReach>();
 
     const reportTakenEntry = (callback: SpecFunction): void => {
       const pattern = contextPatternOf(callback);
@@ -76,27 +84,16 @@ export const noVitestContextExpect = createDontReviewItRule({
     return {
       ImportDeclaration: bindings.takeImport,
       VariableDeclarator: bindings.takeLocalBinding,
-      CallExpression(node: ESTree.CallExpression) {
-        calls.add(node);
-      },
-      MemberExpression(node: ESTree.MemberExpression) {
-        if (node.computed) return;
-        if (staticMemberName(node) !== ASSERTION_ENTRY) return;
-
-        const receiver = unwrapSubject(node.object);
-        if (receiver.type !== "Identifier") return;
-        accesses.add({ node, name: receiver.name });
-      },
-      "Program:exit"() {
+      "Program:exit"(program: ESTree.Program) {
         const rootNames = bindings.rootNames();
-        const callbacks = [...calls]
+        const callbacks = nodesOfType(program, "CallExpression")
           .filter((call) => declaresTestBlock(call, rootNames))
           .flatMap((call) => testCallbacksOf(call));
 
         for (const callback of callbacks) reportTakenEntry(callback);
 
         const held = callbacks.flatMap((callback) => contextBindingsOf(callback));
-        for (const access of accesses) {
+        for (const access of contextReachesIn(program)) {
           if (isHeldContextReach(access, held)) {
             context.report({ node: access.node, messageId: "reachedContextExpect" });
           }

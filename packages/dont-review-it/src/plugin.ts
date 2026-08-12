@@ -1,4 +1,4 @@
-import { loadCanonicalValuesCatalog } from "./lint/oxlint/lib/canonical-values/builder.ts";
+import { loadCanonicalValuesCatalog } from "./lint/oxlint/lib/canonical-values/loaded-catalog.ts";
 import { loadWorkspaceDependencies } from "./lint/oxlint/lib/dependency-catalog/workspace-manifests.ts";
 import { loadRepositoryBodyIndex } from "./lint/oxlint/lib/duplicated-bodies/builder.ts";
 import { loadLibraryVocabulary } from "./lint/oxlint/lib/library-vocabulary/harvester.ts";
@@ -31,6 +31,7 @@ import { noDoubleTypeAssertion } from "./lint/oxlint/rules/no-double-type-assert
 import { noDryTestSetup } from "./lint/oxlint/rules/no-dry-test-setup--inline-owned-setup.ts";
 import { createNoDuplicateValueDeclaration } from "./lint/oxlint/rules/no-duplicate-value-declaration--reuse-authoritative-value.ts";
 import { createNoDuplicatedBody } from "./lint/oxlint/rules/no-duplicated-body--import-the-existing-declaration.ts";
+import { noEmptyCatch } from "./lint/oxlint/rules/no-empty-catch--throw-or-handle.ts";
 import { noExpectCallExpression } from "./lint/oxlint/rules/no-expect-call-expression--yield-from-fixture.ts";
 import { noExpectForbiddenSubjectName } from "./lint/oxlint/rules/no-expect-forbidden-subject-name--rename-to-concrete-subject.ts";
 import { noExpectMemberSubject } from "./lint/oxlint/rules/no-expect-member-subject--yield-subject-from-fixture.ts";
@@ -66,6 +67,7 @@ import { noReassign } from "./lint/oxlint/rules/no-reassign--use-spread-or-iife.
 import { noReceiverMutation } from "./lint/oxlint/rules/no-receiver-mutation--derive-new-value.ts";
 import { noRedundantMockReset } from "./lint/oxlint/rules/no-redundant-mock-reset--lift-mocks-into-fixture.ts";
 import { noRuleSuppression } from "./lint/oxlint/rules/no-rule-suppression--fix-the-violation.ts";
+import { noSilentCatch } from "./lint/oxlint/rules/no-silent-catch--rethrow-or-handle.ts";
 import { noSilentSuppression } from "./lint/oxlint/rules/no-silent-suppression--fix-or-justify-inline.ts";
 import { noSingleUseLocalType } from "./lint/oxlint/rules/no-single-use-local-type--inline-at-the-use-site.ts";
 import { noSpecFileHelperFunction } from "./lint/oxlint/rules/no-spec-file-helper-function--inline-or-use-fixture.ts";
@@ -158,6 +160,7 @@ const plugin: Plugin = {
     [noDryTestSetup.name]: noDryTestSetup,
     [noDuplicateValueDeclaration.name]: noDuplicateValueDeclaration,
     [noDuplicatedBody.name]: noDuplicatedBody,
+    [noEmptyCatch.name]: noEmptyCatch,
     [noExpectCallExpression.name]: noExpectCallExpression,
     [noExpectForbiddenSubjectName.name]: noExpectForbiddenSubjectName,
     [noExpectMemberSubject.name]: noExpectMemberSubject,
@@ -193,6 +196,7 @@ const plugin: Plugin = {
     [noReceiverMutation.name]: noReceiverMutation,
     [noRedundantMockReset.name]: noRedundantMockReset,
     [noRuleSuppression.name]: noRuleSuppression,
+    [noSilentCatch.name]: noSilentCatch,
     [noSilentSuppression.name]: noSilentSuppression,
     [noSingleUseLocalType.name]: noSingleUseLocalType,
     [noSpecFileHelperFunction.name]: noSpecFileHelperFunction,
