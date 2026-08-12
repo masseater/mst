@@ -28,6 +28,7 @@ describe("gitOutput", () => {
       cwd: repositoryRoot,
       env: {
         ...cleanEnvironment,
+        GIT_CONFIG_COUNT: "not-a-number",
         GIT_DIR: join(repositoryRoot, "elsewhere", ".git"),
         GIT_INDEX_FILE: join(repositoryRoot, "elsewhere", "index"),
       },

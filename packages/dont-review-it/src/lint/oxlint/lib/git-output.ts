@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 
-import { attempt } from "es-toolkit";
+import { attempt, omitBy } from "es-toolkit";
 
 import { isEnvironmentFailure } from "./path-failure.ts";
 
@@ -16,15 +16,9 @@ const answeredWithoutValue = (failure: unknown): boolean =>
   typeof failure.status === "number";
 
 export const gitOutput = (args: readonly string[], environment: GitEnvironment): string | null => {
-  const {
-    GIT_COMMON_DIR,
-    GIT_DIR,
-    GIT_INDEX_FILE,
-    GIT_OBJECT_DIRECTORY,
-    GIT_PREFIX,
-    GIT_WORK_TREE,
-    ...repositoryAgnosticEnv
-  } = environment.env;
+  const repositoryAgnosticEnv = omitBy(environment.env, (_, name) =>
+    String(name).startsWith("GIT_"),
+  );
   const [unaskableGit, answer] = attempt<string, Error>(() =>
     execFileSync("git", [...args], {
       cwd: environment.cwd,
