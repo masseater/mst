@@ -75,7 +75,7 @@ expect(basket.items).toHaveLength(1);
 - 片方を定数や変数に置き換える（`const expected = 1; expect(expected).toBe(1);`）。このルールは書き下したリテラルどうしだけを見るので報告は消えるが、検査対象のコードは相変わらず動いていない
 - 値を式で組み立てて綴りをずらす（`expect(1).toBe(0 + 1)`）。同上
 - 片方をオブジェクトリテラルで包む（`expect({ total: 1 }).toEqual({ total: 1 })`）。判定の範囲外に出るだけで、両辺がこのファイルで決まっていることは変わらない
-- 恒等関数を通して呼び出しの形にする（`expect(identity(1)).toBe(1)`）。左辺が呼び出しになるので報告は消える。通した関数は `no-identity-wrapper--call-the-target-directly` に当たる
+- 恒等関数を通して呼び出しの形にする（`expect(identity(1)).toBe(1)`）。左辺が呼び出しになるので報告は消える。通した関数は `no-identity-wrapper--use-the-target-directly` に当たる
 - matcher を対象外のものに変える（`toBeCloseTo` など）。比べているものが同じである以上、結果が固定であることは変わらない
 - ケースごと `it.skip` にする。検査されていない状態は同じで、緑であることだけが保たれる
 - 抑制ディレクティブ

@@ -17,7 +17,7 @@ const noticesOf = (rule: LintRuleFacts): string =>
     .filter((symbol) => symbol !== "")
     .join(" ");
 
-const escapePipes = (text: string): string => text.replaceAll("|", "\\|");
+const escapePipes = (text: string): string => text.replaceAll("|", String.raw`\|`);
 
 const rowOf = (rule: LintRuleFacts): string =>
   `| [${rule.name}](./${rule.name}.md) | ${escapePipes(rule.description)} | ${toolOf(rule.sourcePath)} | ${noticesOf(rule)} |`;

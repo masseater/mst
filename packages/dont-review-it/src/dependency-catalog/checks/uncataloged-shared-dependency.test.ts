@@ -19,7 +19,7 @@ const findingsFor = ({
 
 describe("sharedDependencyFindings", () => {
   it("reports a version that two manifests pin outside the catalog", () => {
-    const { problems, warnings } = findingsFor({
+    const findings = findingsFor({
       usages: [
         {
           dependencyName: "typescript",
@@ -32,16 +32,15 @@ describe("sharedDependencyFindings", () => {
       ],
     });
 
-    expect(warnings).toStrictEqual([]);
-    expect(problems.length).toBe(1);
-    expect(problems[0]?.file).toBe(DEFINITION_PATH);
-    expect(problems[0]?.message).toContain("apps/web/package.json");
-    expect(problems[0]?.message).toContain("packages/utils/package.json");
-    expect(problems[0]?.message).toContain("^5.0.0");
+    expect(findings.length).toBe(1);
+    expect(findings[0]?.file).toBe(DEFINITION_PATH);
+    expect(findings[0]?.message).toContain("apps/web/package.json");
+    expect(findings[0]?.message).toContain("packages/utils/package.json");
+    expect(findings[0]?.message).toContain("^5.0.0");
   });
 
-  it("warns instead when the pinned versions disagree", () => {
-    const { problems, warnings } = findingsFor({
+  it("reports when the pinned versions disagree", () => {
+    const findings = findingsFor({
       usages: [
         {
           dependencyName: "typescript",
@@ -54,14 +53,14 @@ describe("sharedDependencyFindings", () => {
       ],
     });
 
-    expect(problems).toStrictEqual([]);
-    expect(warnings.length).toBe(1);
-    expect(warnings[0]?.message).toContain("apps/web/package.json pins ^5.0.0");
-    expect(warnings[0]?.message).toContain("packages/utils/package.json pins ^5.5.0");
+    expect(findings.length).toBe(1);
+    expect(findings[0]?.message).toContain("apps/web/package.json pins ^5.0.0");
+    expect(findings[0]?.message).toContain("packages/utils/package.json pins ^5.5.0");
+    expect(findings[0]?.message).toContain("Choose the intended version");
   });
 
   it("leaves a version that only one manifest pins alone", () => {
-    const { problems, warnings } = findingsFor({
+    const findings = findingsFor({
       usages: [
         {
           dependencyName: "typescript",
@@ -71,12 +70,11 @@ describe("sharedDependencyFindings", () => {
       ],
     });
 
-    expect(problems).toStrictEqual([]);
-    expect(warnings).toStrictEqual([]);
+    expect(findings).toStrictEqual([]);
   });
 
   it("leaves a dependency that the catalog holds to the catalog checks", () => {
-    const { problems, warnings } = findingsFor({
+    const findings = findingsFor({
       usages: [
         {
           dependencyName: "typescript",
@@ -90,7 +88,6 @@ describe("sharedDependencyFindings", () => {
       catalogedNames: ["typescript"],
     });
 
-    expect(problems).toStrictEqual([]);
-    expect(warnings).toStrictEqual([]);
+    expect(findings).toStrictEqual([]);
   });
 });

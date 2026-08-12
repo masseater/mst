@@ -64,7 +64,7 @@ const parseUser = (input: unknown): User | null => (isUser(input) ? input : null
 ## 禁じる回避策
 
 - アサーションを 2 文に割る（`const raw = x as unknown;` のあとに `const user = raw as User;`）。このルールは式の入れ子を見るので報告は消えるが、検査が消える経路はそのまま残っている。読み手にとっては、消えた検査が 2 行に散った分だけ見つけにくくなる
-- 恒等関数を挟んで段を分ける（`identity(x as A) as B`）。関数呼び出しを 1 つ挟んだだけで、通っている型の経路は同じである。挟んだ関数は `no-identity-wrapper--call-the-target-directly` に当たる
+- 恒等関数を挟んで段を分ける（`identity(x as A) as B`）。関数呼び出しを 1 つ挟んだだけで、通っている型の経路は同じである。挟んだ関数は `no-identity-wrapper--use-the-target-directly` に当たる
 - 中間の型を `unknown` や `any` 以外の具体的な型にして、二段に見えなくする。このルールは中間の型を見ないので報告は変わらない
 - `satisfies` を挟んで見た目を変える。`satisfies` は検査を消さないため、`(x as A) satisfies B` は型が合わなければ落ちる。落ちない形にするために `as` を足せば、また報告される
 - 抑制ディレクティブ。二段のアサーションは「型が分からない」ことの表明であり、抑止理由として書けることは、このルールが指しているものと同じ内容にしかならない

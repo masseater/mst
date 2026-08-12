@@ -61,20 +61,40 @@ describe("readWorkspaceManifests", () => {
     ]);
   });
 
-  it("skips a negated pattern instead of guessing what it removes", () => {
+  it("subtracts a negated pattern from positive workspace matches", () => {
     const repositoryRoot = repositoryWith({
       "package.json": `{"name": "root"}`,
       "packages/left/package.json": `{"name": "left"}`,
+      "packages/right/package.json": `{"name": "right"}`,
     });
 
     const manifests = readWorkspaceManifests({
       repositoryRoot,
-      packagePatterns: ["!packages/left"],
+      packagePatterns: ["packages/**", "!packages/left"],
       config,
     });
 
     expect(manifests.map((workspaceManifest) => workspaceManifest.relativePath)).toStrictEqual([
       "package.json",
+      "packages/right/package.json",
+    ]);
+  });
+
+  it("reads manifests nested below a recursive workspace pattern", () => {
+    const repositoryRoot = repositoryWith({
+      "package.json": `{"name": "root"}`,
+      "packages/features/left/package.json": `{"name": "left"}`,
+    });
+
+    const manifests = readWorkspaceManifests({
+      repositoryRoot,
+      packagePatterns: ["packages/**"],
+      config,
+    });
+
+    expect(manifests.map((workspaceManifest) => workspaceManifest.relativePath)).toStrictEqual([
+      "package.json",
+      "packages/features/left/package.json",
     ]);
   });
 

@@ -13,13 +13,16 @@ import {
 import { duplicatedClustersIn } from "./lint/oxlint/lib/duplicated-bodies/body-index.ts";
 import { buildRepositoryBodyIndex } from "./lint/oxlint/lib/duplicated-bodies/builder.ts";
 import { formatDuplicatedCluster } from "./lint/oxlint/lib/duplicated-bodies/site-report.ts";
+import {
+  formatTestCommandOverrideProblem,
+  testCommandOverrideProblems,
+} from "./test-execution/test-command-overrides.ts";
 import { defaultWorkflowChecksConfig } from "./workflows/config.ts";
 import { formatWorkflowProblem } from "./workflows/problem.ts";
 import { runWorkflowChecks } from "./workflows/run-workflow-checks.ts";
 
 export type CheckReport = {
   readonly problems: readonly string[];
-  readonly warnings: readonly string[];
 };
 
 export const runChecks = (repositoryRoot: string): CheckReport => {
@@ -41,8 +44,8 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
         formatWorkflowProblem,
       ),
       ...lintRuleIndexProblems({ repositoryRoot, write: false }).map(formatLintRuleIndexProblem),
-      ...dependencyCatalog.problems.map(formatDependencyCatalogProblem),
+      ...dependencyCatalog.map(formatDependencyCatalogProblem),
+      ...testCommandOverrideProblems(repositoryRoot).map(formatTestCommandOverrideProblem),
     ].toSorted(),
-    warnings: dependencyCatalog.warnings.map(formatDependencyCatalogProblem).toSorted(),
   };
 };

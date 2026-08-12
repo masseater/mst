@@ -33,6 +33,21 @@ describe("dont-review-it/no-lenient-coverage-threshold--demand-full-coverage", (
         filename: "vitest.config.ts",
       },
       {
+        name: "an aliased Vite config factory is resolved",
+        code: `import { defineConfig as config } from "vite";\nexport default config({ test: { coverage: { thresholds: ${FULL_THRESHOLDS} } } });\n`,
+        filename: "vite.config.mts",
+      },
+      {
+        name: "a Vite Plus namespace config factory is resolved",
+        code: `import * as vitePlus from "vite-plus";\nexport default vitePlus.defineConfig({ test: { coverage: { thresholds: ${FULL_THRESHOLDS} } } });\n`,
+        filename: "vite.config.ts",
+      },
+      {
+        name: "a Vitest namespace config factory is resolved",
+        code: `import * as vitest from "vitest/config";\nexport default vitest.defineConfig({ test: { coverage: { thresholds: ${FULL_THRESHOLDS} } } });\n`,
+        filename: "vitest.config.mts",
+      },
+      {
         name: "a config written as a plain object literal is read the same way",
         code: `export default { test: { coverage: { thresholds: ${FULL_THRESHOLDS} } } };\n`,
         filename: "vite.config.mts",
@@ -70,6 +85,11 @@ describe("dont-review-it/no-lenient-coverage-threshold--demand-full-coverage", (
         filename: "vite.config.ts",
       },
       {
+        name: "TypeScript wrappers preserve config objects and threshold values",
+        code: `import { defineConfig } from "vite-plus";\nexport default (defineConfig(({ test: { coverage: ({ thresholds: ({ branches: (100 as number), functions: 100, lines: 100, statements: 100, perFile: (true as boolean) } satisfies Thresholds) } as Coverage) } } satisfies Config)) satisfies Config);`,
+        filename: "vite.config.ts",
+      },
+      {
         name: "a metric written with a computed string key is the metric it names",
         code: `export default { test: { coverage: { thresholds: { ["branches"]: 100, functions: 100, lines: 100, statements: 100, perFile: true } } } };\n`,
         filename: "vite.config.ts",
@@ -94,6 +114,11 @@ describe("dont-review-it/no-lenient-coverage-threshold--demand-full-coverage", (
         code: "export default { test: { coverage: {} } };\n",
         filename: "knip.config.ts",
       },
+      {
+        name: "an authentic config factory outside the canonical filename is not selected",
+        code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { coverage: {} } });`,
+        filename: "test-factory.ts",
+      },
     ],
     invalid: [
       {
@@ -112,19 +137,19 @@ describe("dont-review-it/no-lenient-coverage-threshold--demand-full-coverage", (
         name: "a config with no default export cannot be read and is reported",
         code: `export const config = { test: { coverage: { thresholds: ${FULL_THRESHOLDS} } } };\n`,
         filename: "vite.config.ts",
-        errors: [{ messageId: "missingCoverageThresholds" }],
+        errors: [{ messageId: "dynamicCoverageConfiguration" }],
       },
       {
         name: "a config assembled behind an identifier cannot be read and is reported",
         code: `const config = { test: { coverage: { thresholds: ${FULL_THRESHOLDS} } } };\nexport default config;\n`,
         filename: "vite.config.ts",
-        errors: [{ messageId: "missingCoverageThresholds" }],
+        errors: [{ messageId: "dynamicCoverageConfiguration" }],
       },
       {
         name: "coverage handed over as a value that is not an object literal is reported once",
         code: `import { coverage } from "./shared.ts";\nexport default { test: { coverage } };\n`,
         filename: "vite.config.ts",
-        errors: [{ messageId: "missingCoverageThresholds" }],
+        errors: [{ messageId: "dynamicCoverageConfiguration" }],
       },
       {
         name: "a full threshold checked against the package total is reported",
@@ -142,13 +167,7 @@ describe("dont-review-it/no-lenient-coverage-threshold--demand-full-coverage", (
         name: "thresholds spread in from elsewhere cannot be read and are reported",
         code: `import { shared } from "./shared.ts";\nexport default { test: { coverage: { thresholds: { ...shared } } } };\n`,
         filename: "vite.config.ts",
-        errors: [
-          { messageId: "aggregateCoverageThreshold" },
-          { messageId: "unsetCoverageThreshold" },
-          { messageId: "unsetCoverageThreshold" },
-          { messageId: "unsetCoverageThreshold" },
-          { messageId: "unsetCoverageThreshold" },
-        ],
+        errors: [{ messageId: "dynamicCoverageConfiguration" }],
       },
       {
         name: "a metric left out is reported on its own",
@@ -166,25 +185,25 @@ describe("dont-review-it/no-lenient-coverage-threshold--demand-full-coverage", (
         name: "a metric behind a computed name cannot be read and is reported",
         code: `import { metric } from "./shared.ts";\nexport default { test: { coverage: { thresholds: { [metric]: 100, functions: 100, lines: 100, statements: 100, perFile: true } } } };\n`,
         filename: "vite.config.ts",
-        errors: [{ messageId: "unsetCoverageThreshold" }],
+        errors: [{ messageId: "dynamicCoverageConfiguration" }],
       },
       {
         name: "a metric behind a computed expression cannot be read and is reported",
         code: `import { prefix } from "./shared.ts";\nexport default { test: { coverage: { thresholds: { [prefix + "es"]: 100, functions: 100, lines: 100, statements: 100, perFile: true } } } };\n`,
         filename: "vite.config.ts",
-        errors: [{ messageId: "unsetCoverageThreshold" }],
+        errors: [{ messageId: "dynamicCoverageConfiguration" }],
       },
       {
         name: "a config helper called with no argument at all is reported once",
         code: `import { defineConfig } from "vite-plus";\nexport default defineConfig();\n`,
         filename: "vite.config.ts",
-        errors: [{ messageId: "missingCoverageThresholds" }],
+        errors: [{ messageId: "dynamicCoverageConfiguration" }],
       },
       {
         name: "a config helper handed a spread cannot be read and is reported once",
         code: `import { defineConfig } from "vite-plus";\nimport { base } from "./shared.ts";\nexport default defineConfig(...base);\n`,
         filename: "vite.config.ts",
-        errors: [{ messageId: "missingCoverageThresholds" }],
+        errors: [{ messageId: "dynamicCoverageConfiguration" }],
       },
       {
         name: "every metric below full coverage is reported one by one",
@@ -224,6 +243,18 @@ describe("dont-review-it/no-lenient-coverage-threshold--demand-full-coverage", (
         code: `import { defineConfig } from "vitest/config";\nexport default defineConfig({ test: { coverage: { thresholds: { branches: 90, functions: 100, lines: 100, statements: 100, perFile: true } } } });\n`,
         filename: "vitest.config.ts",
         errors: [{ messageId: "lenientCoverageThreshold" }],
+      },
+      {
+        name: "a CommonJS cjs config is directed to the inspectable ESM form",
+        code: `module.exports = { test: { coverage: { thresholds: ${FULL_THRESHOLDS} } } };`,
+        filename: "vite.config.cjs",
+        errors: [{ messageId: "commonJsTestConfig" }],
+      },
+      {
+        name: "a CommonJS js config cannot bypass the ESM resolver",
+        code: `module["exports"] = { test: { coverage: { thresholds: ${FULL_THRESHOLDS} } } };`,
+        filename: "vitest.config.js",
+        errors: [{ messageId: "commonJsTestConfig" }],
       },
     ],
   });

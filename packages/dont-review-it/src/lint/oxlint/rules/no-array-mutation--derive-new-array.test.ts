@@ -137,6 +137,14 @@ describe("dont-review-it/no-array-mutation--derive-new-array", () => {
     ],
     invalid: [
       {
+        name: "retrieving from a sliced temporary uses direct element access",
+        code: "const items: string[] = [];\nitems.slice(-1).pop();\nitems.slice(-1).shift();",
+        errors: [
+          { messageId: "slicedTemporaryElementAccess" },
+          { messageId: "slicedTemporaryElementAccess" },
+        ],
+      },
+      {
         name: "pushing onto an annotated array is an in-place change",
         code: "const items: string[] = [];\nitems.push('a');",
         errors: [{ messageId: "inPlaceArrayMutation" }],

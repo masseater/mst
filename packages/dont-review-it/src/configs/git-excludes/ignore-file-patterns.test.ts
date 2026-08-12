@@ -18,7 +18,7 @@ describe("ignore-file-patterns", () => {
   });
 
   test("an escaped hash is a pattern rather than a comment", () => {
-    expect(ignoreFilePatterns("\\#not-a-comment\n")).toStrictEqual(["\\#not-a-comment"]);
+    expect(ignoreFilePatterns("\\#not-a-comment\n")).toStrictEqual([String.raw`\#not-a-comment`]);
   });
 
   test("carriage returns and unescaped trailing spaces are stripped", () => {
@@ -26,6 +26,6 @@ describe("ignore-file-patterns", () => {
   });
 
   test("a trailing space kept by a backslash survives", () => {
-    expect(ignoreFilePatterns("trailing\\ \n")).toStrictEqual(["trailing\\ "]);
+    expect(ignoreFilePatterns("trailing\\ \n")).toStrictEqual([String.raw`trailing\ `]);
   });
 });

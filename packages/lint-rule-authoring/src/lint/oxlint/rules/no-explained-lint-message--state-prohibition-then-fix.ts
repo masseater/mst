@@ -87,7 +87,7 @@ const proseOf = (node: ESTree.Node): string | null => {
 };
 
 const inspectableOf = (prose: string): string =>
-  prose.replace(/`[^`]*`/gu, " ").replace(/\{\{[^}]*\}\}/gu, " ");
+  prose.replaceAll(/`[^`]*`/gu, " ").replaceAll(/\{\{[^}]*\}\}/gu, " ");
 
 const opensWithFixVerb = (inspectable: string): boolean =>
   inspectable.split(/(?<=[.!?])\s+/u).some((sentence) =>

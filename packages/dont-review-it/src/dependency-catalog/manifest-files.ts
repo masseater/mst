@@ -1,8 +1,7 @@
-import { readdirSync } from "node:fs";
+import { globSync } from "node:fs";
 import { join } from "node:path";
 import { normalize } from "node:path/posix";
 
-import { readUnlessMissing } from "@mst/utils";
 import { uniq } from "es-toolkit";
 
 import { readJsonFile } from "../lint/oxlint/lib/canonical-values/read-json-file.ts";
@@ -14,30 +13,15 @@ export type WorkspaceManifest = {
   readonly manifest: unknown;
 };
 
-const SINGLE_LEVEL_PATTERN_SUFFIX = "/*";
-
 const NEGATION_PREFIX = "!";
 
-const directoriesMatching = ({
-  repositoryRoot,
-  pattern,
+const manifestPatternFor = ({
+  directoryPattern,
+  manifestFileName,
 }: {
-  readonly repositoryRoot: string;
-  readonly pattern: string;
-}): readonly string[] => {
-  if (pattern.startsWith(NEGATION_PREFIX)) return [];
-  if (!pattern.endsWith(SINGLE_LEVEL_PATTERN_SUFFIX)) return [pattern];
-
-  const parentDirectory = pattern.slice(0, -SINGLE_LEVEL_PATTERN_SUFFIX.length);
-  const parentEntries =
-    readUnlessMissing(() =>
-      readdirSync(join(repositoryRoot, parentDirectory), { withFileTypes: true }),
-    ) ?? [];
-
-  return parentEntries
-    .filter((parentEntry) => parentEntry.isDirectory())
-    .map((parentEntry) => `${parentDirectory}/${parentEntry.name}`);
-};
+  readonly directoryPattern: string;
+  readonly manifestFileName: string;
+}): string => normalize(`${directoryPattern}/${manifestFileName}`);
 
 export const readWorkspaceManifests = ({
   repositoryRoot,
@@ -48,10 +32,21 @@ export const readWorkspaceManifests = ({
   readonly packagePatterns: readonly string[];
   readonly config: DependencyCatalogChecksConfig;
 }): readonly WorkspaceManifest[] => {
+  const positivePatterns = packagePatterns
+    .filter((pattern) => !pattern.startsWith(NEGATION_PREFIX))
+    .map((directoryPattern) =>
+      manifestPatternFor({ directoryPattern, manifestFileName: config.manifestFileName }),
+    );
+  const excludedPatterns = packagePatterns
+    .filter((pattern) => pattern.startsWith(NEGATION_PREFIX))
+    .map((pattern) => pattern.slice(NEGATION_PREFIX.length))
+    .map((directoryPattern) =>
+      manifestPatternFor({ directoryPattern, manifestFileName: config.manifestFileName }),
+    );
   const workspaceManifestPaths = uniq(
-    packagePatterns
-      .flatMap((pattern) => directoriesMatching({ repositoryRoot, pattern }))
-      .map((directory) => normalize(`${directory}/${config.manifestFileName}`)),
+    positivePatterns.length === 0
+      ? []
+      : globSync(positivePatterns, { cwd: repositoryRoot, exclude: excludedPatterns }),
   )
     .toSorted()
     .filter((relativePath) => relativePath !== config.manifestFileName);

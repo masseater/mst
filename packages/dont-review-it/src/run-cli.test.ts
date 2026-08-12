@@ -131,7 +131,7 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
     expect(run.out).toContain("pnpm-workspace.yaml The catalog must not hold react");
   });
 
-  test("check prints a version disagreement as a warning and still exits zero", () => {
+  test("check reports a version disagreement and exits one", () => {
     const root = repositoryWith({
       "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
       "packages/web/package.json": `{"devDependencies": {"typescript": "^5.0.0"}}`,
@@ -140,8 +140,9 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
 
     const run = runDontReviewIt(["check", "--repository-root", root]);
 
-    expect(run.exitCode).toBe(0);
-    expect(run.out).toContain("warning: pnpm-workspace.yaml typescript is pinned to different");
+    expect(run.exitCode).toBe(1);
+    expect(run.out).toContain("pnpm-workspace.yaml typescript is pinned to different");
+    expect(run.out).not.toContain("warning:");
   });
 
   test("an unknown command returns the usage as an error and exits two", () => {
@@ -151,6 +152,7 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
     expect(run.out).toBe("");
     expect(run.error).toContain("Usage: dont-review-it check [--repository-root <path>]");
     expect(run.error).toContain("--repository-root <path>");
+    expect(run.error).toContain("override static coverage settings");
   });
 
   test("no command at all is answered the same way an unknown command is", () => {

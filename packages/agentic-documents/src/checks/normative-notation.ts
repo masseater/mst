@@ -1,7 +1,7 @@
 import type { AgenticDocumentsConfig } from "../config.ts";
 
 const escapeForPattern = (literal: string): string =>
-  literal.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  literal.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
 
 const keywordAlternation = (keywords: readonly string[]): string =>
   keywords.map(escapeForPattern).join("|");

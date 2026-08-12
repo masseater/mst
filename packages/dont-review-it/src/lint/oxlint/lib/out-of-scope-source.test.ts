@@ -25,8 +25,8 @@ describe("out-of-scope-source", () => {
   });
 
   test("a windows path is split on its own separator", () => {
-    expect(isOutOfScopeSource("packages\\order\\fixtures\\order-status.ts")).toBe(true);
-    expect(isOutOfScopeSource("packages\\order\\src\\order-status.test.ts")).toBe(true);
+    expect(isOutOfScopeSource(String.raw`packages\order\fixtures\order-status.ts`)).toBe(true);
+    expect(isOutOfScopeSource(String.raw`packages\order\src\order-status.test.ts`)).toBe(true);
   });
 
   test("a production source stays in scope even when the words appear inside a name", () => {

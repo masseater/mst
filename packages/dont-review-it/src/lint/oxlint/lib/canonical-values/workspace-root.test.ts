@@ -1,14 +1,13 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 
 import { describe, expect, test } from "vite-plus/test";
 
 import { findWorkspaceRoot } from "./workspace-root.ts";
 
 describe("workspace-root", () => {
-  const thisDirectory = dirname(fileURLToPath(import.meta.url));
+  const thisDirectory = import.meta.dirname;
 
   const repositoryRoot = resolve(thisDirectory, "../../../../../../..");
 

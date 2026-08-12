@@ -6,7 +6,9 @@ production の TypeScript ソースで、そのファイルがトップレベル
 
 宣言として見るのは型エイリアスとインターフェースの 2 つ。どちらもファイルのトップレベルに立っているものだけを対象にする。関数やブロックの内側に置かれた型宣言は対象にしない。
 
-参照として数えるのは型の位置に書かれた名前で、次の 3 つ。
+宣言から scope が解決した Variable を取得し、その Variable に解決された参照だけを数える。識別子の文字列が同じだけでは同じ型として扱わない。関数内の型引数や nested interface がトップレベルの型と同名でも、それぞれ別の Variable なので参照は混ざらない。
+
+参照として数えるのは次の 3 つ。
 
 - 型参照（`readonly draft: Draft` の `Draft`）
 - インターフェースの `extends` 節
@@ -26,7 +28,7 @@ production の TypeScript ソースで、そのファイルがトップレベル
 
 決定的に判定できる範囲に限る、という [EDR 0013](../../../../docs/engineering-decision-logs/0013-draw-the-duplication-line-at-decidability.md) の線をここでも引いている。1 ファイルの中に閉じた参照は構文だけで数え切れる。
 
-そのため、export を付けるとこのルールの対象から外れる。これは検出の穴であって、直し方ではない。「禁じる回避策」に挙げてある。
+そのため、宣言自体を export した型と、後続の `export type { Draft }` や `export type { Draft as PublishedDraft }` で公開した型は対象から外れる。export specifier も同じ resolved Variable を参照していることを確認して判定する。これは検出の穴であって、直し方ではない。「禁じる回避策」に挙げてある。
 
 ## なぜそれが要るか
 
@@ -40,11 +42,17 @@ production の TypeScript ソースで、そのファイルがトップレベル
 
 ## どう直すか
 
-宣言を消して、形を使用箇所にそのまま書く。関数の引数や戻り値の位置に書くのが最も多い形になる。
+型エイリアスが通常の型位置から 1 回だけ参照されているなら、参照をエイリアスの右辺で置き換え、宣言を消す。型引数を持つ宣言なら、使用箇所で型引数を実引数に置き換えてから書く。
 
-型引数を持つ宣言なら、使用箇所で型引数を実引数に置き換えてから書く。
+interface が通常の型位置から 1 回だけ参照されているなら、その interface の members と継承した contracts を含む object type で参照を置き換え、interface を消す。
 
-参照が 0 回なら宣言ごと消す。export も一緒に消す。
+型エイリアスの右辺や interface の members と継承元が free type name を参照している場合、使用箇所へ移したあとも同じ binding を指すようにする。使用箇所を囲む type parameter や nested type declaration が同名なら、先にその shadowing binding を alpha-rename してから展開する。名前の文字列をそのままコピーすると、展開前は外側の import や宣言を指していた type reference が、展開後には使用箇所の type parameter を指すように変わる。
+
+参照が 0 回なら宣言ごと消す。自己参照しかない recursive type も consumer が存在しないので、展開せず宣言全体を消す。
+
+参照が interface の `extends` 節 1 箇所だけなら、base declaration 自身の members を extending interface へ移し、base が継承または alias していた object types で `extends Base` を置き換え、型引数を置換してから base declaration を消す。この移動でも、extending interface の type parameter が base declaration の free type name を shadow するなら先に alpha-rename する。
+
+参照が class の `implements` 節 1 箇所だけなら、interface と type alias のどちらでも `implements TypeName` と型宣言を削除する。class は structural contract を満たす concrete members を既に持っている。
 
 その形が本当に 2 箇所で共有されるべきものなら、足りないのは 2 つ目の使用箇所である。同じ形を別に綴っている場所を探し、そこにこの型を使わせる。宣言を残す理由になるのは、実際に 2 箇所目が参照することだけで、将来そうなる見込みではない。
 
@@ -64,9 +72,11 @@ knip が「どこからも import されていない export」を挙げ、それ
 ## 何を検出しないか
 
 - export された型。前述のとおり、1 ファイルに閉じた判定でないと決定的に数えられない
+- declaration file の型。ambient declaration は別ファイルから参照・merge されるため、1 ファイル内の参照数では local type と判定できない
 - 関数やブロックの内側で宣言された型。トップレベルに立っていないものは、その場の手続きの一部である
 - 値の宣言。定数もヘルパー関数も、1 回しか使われていないことを理由には報告しない。[EDR 0013](../../../../docs/engineering-decision-logs/0013-draw-the-duplication-line-at-decidability.md) で数えて外した判断をそのまま引き継ぐ
 - 2 回以上参照されている型。参照が型の位置に現れる限り、それが同じ関数の中にまとまっていても報告しない
+- declaration merging された interface / type binding。同じ resolved Variable に複数のトップレベル宣言が属する場合、1 宣言だけを展開・削除する修正は成立しない
 
 ## 導入時に直した数
 

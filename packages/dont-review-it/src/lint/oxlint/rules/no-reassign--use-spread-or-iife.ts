@@ -128,7 +128,7 @@ export const noReassign = createDontReviewItRule({
     },
     messages: {
       identifierAssignment:
-        "An existing binding must not be written to. Decide the value where the name is bound: a conditional expression for two branches, an immediately invoked function that returns from each branch or from `try` / `catch` for more, `reduce` for an accumulation. Derive a new `const` from a parameter rather than overwriting it.",
+        "An existing binding must not be written to. Decide the value where the name is bound: a default parameter for a fallback, a conditional expression for two branches, an immediately invoked function that returns from each branch or from `try` / `catch` for more, `reduce` for an accumulation. Derive a new `const` from a parameter rather than overwriting it.",
       identifierUpdate:
         "An existing binding must not be incremented or decremented. Replace the counting with a derivation: `reduce` for a running total, the length of a `filter` for a count of matches, an iteration method that receives the index instead of a hand-advanced cursor.",
       mutatingCall:
@@ -136,7 +136,7 @@ export const noReassign = createDontReviewItRule({
       patternAssignment:
         "An array or object pattern must not be assigned to without a declaration. Move the pattern to the binding site: `const [first, second] = pair;`.",
       propertyAssignment:
-        "A property of an existing object must not be written to. Build a new object: spread the original and override the keys, drop a key with a rest element, or `map` a collection into a new one.",
+        "A property of an existing object must not be written to. Build a new object with spread, use `Object.fromEntries` for dynamic key-value pairs, or `map` a collection. For an external API, use its non-assigning method such as `addEventListener` or `replaceChildren`.",
       propertyUpdate:
         "A property of an existing object must not be incremented or decremented. Derive the next object from the current one with a spread that overrides the key, or compute the total with `reduce`.",
       propertyDeletion:

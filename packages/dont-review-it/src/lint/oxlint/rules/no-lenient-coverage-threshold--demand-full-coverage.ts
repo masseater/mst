@@ -1,11 +1,15 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
-import { defaultExportedObject } from "../lib/default-exported-object.ts";
-import { nestedObjectAt, objectPropertyOf, objectValueOf } from "../lib/object-literal.ts";
-import { toPosixPath } from "../lib/posix-path.ts";
+import { objectPropertyOf, objectValueOf } from "../lib/object-literal.ts";
+import {
+  resolveTestConfig,
+  staticallyClosedObject,
+  staticObjectPathAt,
+  type StaticObjectResolution,
+  type TestConfigResolution,
+} from "../lib/static-test-config.ts";
+import { unwrapTransparentExpression } from "../lib/transparent-expression.ts";
 
 import type { ESTree, Options } from "@oxlint/plugins";
-
-const TEST_CONFIG_PATH = /(?:^|\/)vite(?:st)?\.config\.[cm]?[jt]s$/u;
 
 const THRESHOLDS_PATH = ["test", "coverage", "thresholds"];
 
@@ -43,8 +47,10 @@ const requirementsFrom = (options: Readonly<Options>): readonly CoverageRequirem
 const requirementSummaryOf = (requirements: readonly CoverageRequirement[]): string =>
   requirements.map(({ metric, required }) => `\`${metric}\` to ${required}`).join(", ");
 
-const declaredNumberOf = (literal: ESTree.Expression): number | null =>
-  literal.type === "Literal" && typeof literal.value === "number" ? literal.value : null;
+const declaredNumberOf = (literal: ESTree.Expression): number | null => {
+  const declared = unwrapTransparentExpression(literal);
+  return declared.type === "Literal" && typeof declared.value === "number" ? declared.value : null;
+};
 
 const declaresTrueAt = ({
   thresholds,
@@ -54,7 +60,9 @@ const declaresTrueAt = ({
   readonly key: string;
 }): boolean => {
   const declared = objectValueOf({ object: thresholds, key });
-  return declared?.type === "Literal" && declared.value === true;
+  if (declared === null) return false;
+  const unwrapped = unwrapTransparentExpression(declared);
+  return unwrapped.type === "Literal" && unwrapped.value === true;
 };
 
 const violationsIn = ({
@@ -105,6 +113,10 @@ export const noLenientCoverageThreshold = createDontReviewItRule({
         "A coverage metric must not be left without a threshold. `{{metric}}` carries no number in `test.coverage.thresholds`. Set it to {{required}}.",
       lenientCoverageThreshold:
         "A coverage threshold must not sit below what this repository demands. `{{metric}}` is declared as {{declared}} against a demanded {{required}}. Raise it to {{required}} and cover the code that made you lower it.",
+      dynamicCoverageConfiguration:
+        "Coverage thresholds must not be assembled from merge calls, variables, spreads, or computed properties. Export one static `defineConfig({...})` object and write `test.coverage.thresholds` as one object literal.",
+      commonJsTestConfig:
+        "A CommonJS test config must not sit outside the static coverage guards. Rename this file to `vite.config.ts` or `vitest.config.ts`, import `defineConfig` from Vite, Vite Plus, or `vitest/config`, and export one ESM `defineConfig({...})` object as the default.",
     },
     schema: [
       {
@@ -120,31 +132,63 @@ export const noLenientCoverageThreshold = createDontReviewItRule({
     ],
   },
   create(context) {
-    if (!TEST_CONFIG_PATH.test(toPosixPath(context.filename))) return {};
     const requirements = requirementsFrom(context.options);
+
+    const reportMissingThresholds = (node: ESTree.Program): void => {
+      context.report({
+        node,
+        messageId: "missingCoverageThresholds",
+        data: {
+          path: THRESHOLDS_PATH.join("."),
+          requirement: requirementSummaryOf(requirements),
+        },
+      });
+    };
+
+    const inspectThresholds = (thresholds: StaticObjectResolution, node: ESTree.Program): void => {
+      if (thresholds.kind === "dynamic") {
+        context.report({ node, messageId: "dynamicCoverageConfiguration" });
+        return;
+      }
+      if (thresholds.kind === "missing") {
+        reportMissingThresholds(node);
+        return;
+      }
+      if (!declaresTrueAt({ thresholds: thresholds.object, key: PER_FILE_KEY })) {
+        context.report({ node: thresholds.object, messageId: "aggregateCoverageThreshold" });
+      }
+      for (const violation of violationsIn({
+        thresholds: thresholds.object,
+        requirements,
+      })) {
+        context.report(violation);
+      }
+    };
+
+    const inspectResolvedConfig = (resolved: TestConfigResolution, node: ESTree.Program): void => {
+      if (resolved.kind === "not-test-config") return;
+      if (resolved.kind === "commonjs") {
+        context.report({ node, messageId: "commonJsTestConfig" });
+        return;
+      }
+      if (resolved.kind === "dynamic") {
+        context.report({ node, messageId: "dynamicCoverageConfiguration" });
+        return;
+      }
+      inspectThresholds(
+        staticallyClosedObject(
+          staticObjectPathAt({ object: resolved.config, path: THRESHOLDS_PATH }),
+        ),
+        node,
+      );
+    };
 
     return {
       Program(node: ESTree.Program) {
-        const config = defaultExportedObject(node);
-        const thresholds =
-          config === null ? null : nestedObjectAt({ object: config, path: THRESHOLDS_PATH });
-        if (thresholds === null) {
-          context.report({
-            node,
-            messageId: "missingCoverageThresholds",
-            data: {
-              path: THRESHOLDS_PATH.join("."),
-              requirement: requirementSummaryOf(requirements),
-            },
-          });
-          return;
-        }
-        if (!declaresTrueAt({ thresholds, key: PER_FILE_KEY })) {
-          context.report({ node: thresholds, messageId: "aggregateCoverageThreshold" });
-        }
-        for (const violation of violationsIn({ thresholds, requirements })) {
-          context.report(violation);
-        }
+        inspectResolvedConfig(
+          resolveTestConfig({ filename: context.filename, program: node }),
+          node,
+        );
       },
     };
   },

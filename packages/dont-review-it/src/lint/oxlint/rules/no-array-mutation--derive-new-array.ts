@@ -155,6 +155,16 @@ const isArrayProducingCall = (
   );
 };
 
+const isSlicedTemporaryElementAccess = (
+  receiver: ESTree.Expression,
+  methodName: string,
+): boolean => {
+  if (methodName !== "pop" && methodName !== "shift") return false;
+  if (receiver.type !== "CallExpression") return false;
+  const target = receiver.callee;
+  return target.type === "MemberExpression" && staticPropertyName(target) === "slice";
+};
+
 const isArrayLikeThroughWrapper = (
   node: ESTree.Expression,
   resolution: BindingResolution,
@@ -205,6 +215,8 @@ export const noArrayMutation = createDontReviewItRule({
     messages: {
       inPlaceArrayMutation:
         "`{{method}}` must not be called on an array. Derive a new array and bind it: spread the old one to add elements, `filter` or `map` or `reduce` to narrow or transform, and `toSorted` or `toReversed` or `toSpliced` or `with` to order, reverse, splice or replace.",
+      slicedTemporaryElementAccess:
+        "`{{method}}` must not mutate a sliced temporary just to read one element. Replace the `slice(...).{{method}}()` chain with direct element access such as `at(index)`.",
     },
     schema: [],
   },
@@ -223,7 +235,9 @@ export const noArrayMutation = createDontReviewItRule({
 
         context.report({
           node: callee.property,
-          messageId: "inPlaceArrayMutation",
+          messageId: isSlicedTemporaryElementAccess(callee.object, methodName)
+            ? "slicedTemporaryElementAccess"
+            : "inPlaceArrayMutation",
           data: { method: methodName },
         });
       },

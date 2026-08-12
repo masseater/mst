@@ -142,7 +142,7 @@ description: 外から入る値・型の主張・定義の所有者・失敗と�
 - PROHIBIT: 一つの発生源の記録を、複数の経路へ重複して流す
 - IF: 一つの発生源の記録が既に複数の経路へ流れている; THEN MUST: 経路を一本に寄せる
 - PROHIBIT: 記録を中継するためだけに存在する中間の処理を残す
-  - 呼び先をそのまま呼ぶだけの中継は [no-identity-wrapper--call-the-target-directly](../../packages/dont-review-it/docs/lint/no-identity-wrapper--call-the-target-directly.md) が落とす
+  - target をそのまま呼び出すか構築するだけの中継は [no-identity-wrapper--use-the-target-directly](../../packages/dont-review-it/docs/lint/no-identity-wrapper--use-the-target-directly.md) が落とす
 - IF: 実行時の計測を足す; THEN MUST: 何をどこへ送るかを [0021. 自作 lint ルールの実行時間を自分で測り、送り先は使う側に決めさせる](../engineering-decision-logs/0021-measure-our-own-lint-rules-and-let-the-user-choose-the-sink.md) の決定に従って決める
 - IF: 出してよいと判断した内容が、記録の出力先の容量に収まらない; THEN
   - MUST: 出力先を分けるか、構造化した欄へ移す

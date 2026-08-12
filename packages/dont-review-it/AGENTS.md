@@ -8,22 +8,28 @@ description: Machine-enforced answers to the writing questions that would otherw
 
 コードの書き方について、レビューで人間が問い直さずに済む状態。
 
-同じ問いがレビューのたびに立つなら、その問いには答えが 1 つあるはずで、答えがあるなら人間が毎回出す必要はない。ここに入るのは、答えが一意に決まる問いだけである。答えが状況によって変わるものは、機械で止めるとかえって判断を奪う。
+同じ問いがレビューのたびに立ち、その違反状態を機械が一意に判定できるなら、人間が毎回答えを出す必要はない。ここに入るのは違反かどうかが一意に決まる問いであり、直し方が 1 つに決まる問いだけではない。直し方が複数あっても、破られた不変条件と修正の方向を報告できるなら機械で止める。
 
 ## ルールの境界
 
 - IF: ある書き方を禁じたい; THEN
-  - MUST: 直し方が一意に決まることを先に確かめる
-  - PROHIBIT: 直し方が複数ある問いをルールにする
-    - 報告を受けた側がどれを選ぶかで迷い、迷いをレビューに戻すことになる
+  - MUST: 違反状態を機械が一意に判定できることを先に確かめる
+  - MUST: 破られた不変条件と修正の方向を報告する
+- IF: 安全で決定的な直し方がちょうど 1 つに定まる; THEN MUST: 自動修正を用意する
+- IF: 有効な直し方が複数残る; THEN
+  - PROHIBIT: 自動修正を用意する
+  - MUST: 失敗するガードとして報告する
+    - 直し方の選択と、違反しているかの判定は別である
 - IF: 検出できない回避策がある; THEN MUST: 文書の禁止事項として名指しする
   - 検出できないことは許していることを意味しない。この差を文書で埋める
 
 同じ不変条件を守る公式のルールを先に探すこと、どの順に検討するか、自前で書いてよい条件と書いたあとの後始末は [AGENTS.md](../../AGENTS.md) が持つ。
 
+違反の判定と修正案の選択を分ける判断は [EDR 0030](../../docs/engineering-decision-logs/0030-separate-the-violation-from-the-choice-of-repair.md)、Ponytail から機械で決定できる範囲だけを取り込む判断は [EDR 0032](../../docs/engineering-decision-logs/0032-enforce-only-the-decidable-parts-of-ponytail.md) が持つ。
+
 ## 文書
 
-ルールごとに `docs/lint/<ルール名>.md` を持つ。何を検出するか、なぜそれが要るか、どう直すか、どんな回避策を禁じるかを書く。報告メッセージには直し方だけを載せ、理由は文書側が持つ。
+ルールごとに `docs/lint/<ルール名>.md` を持つ。何を検出するか、なぜそれが要るか、どう直すか、どんな回避策を禁じるかを書く。報告メッセージには禁止と修正の方向だけを載せ、理由と修正の選択肢は文書側が持つ。
 
 説明に載せる例をどこから作るかは [文書](../../docs/guidelines/documents.md) が持つ。良い例と悪い例を対で置かないことは [規範の書き方](../../docs/normative-notation.md) が持つ。
 
@@ -43,9 +49,6 @@ CLI が持つコマンドは `check` の 1 つで、そこが全部の検査を�
   - MUST: 非ゼロで終わらせる
   - PROHIBIT: 報告だけ出してゼロで終わる
     - 報告が出るのに通る検査は、ゲートに名前があるだけの状態になる
-- IF: 見つけた事象の直し方が一意に決まらない; THEN
-  - MUST: `warning:` を先頭に付けて報告し、終了コードに数えない
-    - 直し方が複数ある問いで落とすと、どれを選ぶかの迷いがレビューに戻る。これはルールの境界と同じ判断で、警告は検出できることを伝えるためだけに出す
 
 ## ワークフロー定義の検査
 
@@ -67,11 +70,20 @@ CLI が持つコマンドは `check` の 1 つで、そこが全部の検査を�
 
 ## 依存宣言の検査
 
-`check` が `pnpm-workspace.yaml` と、そこに宣言されたワークスペースの `package.json` も読む。ワークスペース定義が無いリポジトリでは何も検査しない。守っているのは「catalog は複数のワークスペースが共有するバージョンだけを持つ」という規範で、判断は [EDR 0028](../../docs/engineering-decision-logs/0028-keep-the-catalog-for-shared-versions-only.md) にある。
+`check` が `pnpm-workspace.yaml` と、そこに宣言されたワークスペースの `package.json` も読む。守っているのは「catalog は複数のワークスペースが共有するバージョンだけを持つ」という規範で、配置の判断は [EDR 0028](../../docs/engineering-decision-logs/0028-keep-the-catalog-for-shared-versions-only.md)、修正案が複数あっても違反を error にする判断は [EDR 0030](../../docs/engineering-decision-logs/0030-separate-the-violation-from-the-choice-of-repair.md) にある。
 
 - 読めないワークスペース定義が残っていない
 - 1 つのマニフェストしか使わない catalog エントリが残っていない。overrides が `catalog:` で参照するエントリは除く
 - catalog が持つバージョンを、マニフェストが直接書き写していない
 - 複数のマニフェストが同じバージョンを catalog の外で繰り返していない
-- バージョンが食い違う宣言は警告として出す。どちらへ揃えるかは判断なので落とさない
+- バージョンが食い違う宣言も失敗として出す。どのバージョンへ揃えるかは人が選び、選んだバージョンを catalog に置いて全マニフェストから参照する
 - 何も使っていない catalog エントリは報告しない。未使用の検出は knip が持つ
+
+## テスト設定と実行経路の検査
+
+`check` はワークスペース定義の有無にかかわらずルートの `package.json` を読み、定義があれば一致するワークスペースの `package.json` も読む。lint は Vite/Vitest 設定を静的に検査する。coverage の source universe を明示する判断は [EDR 0031](../../docs/engineering-decision-logs/0031-make-the-coverage-source-universe-explicit.md)、manifest の列挙方法は [EDR 0033](../../docs/engineering-decision-logs/0033-use-node-globs-for-workspace-manifests.md) が持つ。
+
+- test command が `--config` / `-c` で別の設定を選んでいない。test 設定は自動発見される `vite.config` / `vitest.config` に置く
+- test command が bare `--coverage` 以外の coverage CLI option で静的設定を上書きしていない。coverage の lint と実行時ゲートは同じ source universe と threshold を読む
+- canonical な `vite.config` / `vitest.config` が ESM の静的な `defineConfig({...})` として書かれている。CommonJS と動的な合成は source universe と threshold の証明を妨げる
+- `run.tasks.test` が存在しない。test の入口は `package.json#scripts.test` に置き、config と coverage override の CLI 検査を必ず通す

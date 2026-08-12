@@ -4,13 +4,15 @@
 
 テストランナーの設定ファイルが、カバレッジの下限を宣言しているか、そしてその下限がリポジトリの要求と等しいかを見る。
 
-対象になるのはファイル名が `vite.config` または `vitest.config` で始まり、拡張子が `.ts` / `.mts` / `.cts` / `.js` / `.mjs` / `.cjs` のいずれかであるファイルだけである。それ以外のファイルは一切見ない。Vite+ を使う構成では設定が `vite.config.ts` に集約されるが、Vitest を単体で使う構成では `vitest.config.ts` が別に置かれることがあり、どちらに書かれていても同じ要求が効く必要がある。
+対象になるのは basename が `vite.config` または `vitest.config` で、拡張子が `.ts` / `.mts` / `.cts` / `.js` / `.mjs` / `.cjs` のいずれかであるファイルだけである。それ以外のファイルは一切見ない。Vite+ を使う構成では設定が `vite.config.ts` に集約されるが、Vitest を単体で使う構成では `vitest.config.ts` が別に置かれることがあり、どちらに書かれていても同じ要求が効く必要がある。
 
-読むのは、そのファイルが default export している式である。`defineConfig({ ... })` のように関数呼び出しで包まれている場合は第 1 引数まで降りる。そこから `test` → `coverage` → `thresholds` とオブジェクトリテラルを辿り、`branches` / `functions` / `lines` / `statements` の 4 つを 1 つずつ見る。
+読むのは、そのファイルが default export している object literal、または `vite` / `vite-plus` / `vitest/config` から value import した `defineConfig` に渡す唯一の object literal である。named import の alias と namespace import を解決し、TypeScript の `as` / `satisfies` / non-null / angle-bracket assertion は透過して読む。そこから `test` → `coverage` → `thresholds` と静的なオブジェクトリテラルを辿り、`branches` / `functions` / `lines` / `statements` の 4 つを 1 つずつ見る。
 
-報告は 4 種類ある。
+CommonJS の `.cjs` / `.cts` と、`module.exports` を使う `.js` は内容を推測しない。両方の coverage ルールが同じ静的 resolver を使える ESM config へ変換するよう報告する。spread、動的 computed property、変数、未知の factory call で設定を組み立てた場合も、下限を証明できない動的設定として報告する。
 
-`thresholds` に辿り着けなかった場合は 1 件だけ報告する。`test` が無い、`coverage` が無い、`thresholds` が無い、default export が無い、default export が変数を指していてリテラルを読めない、のいずれもこれに畳まれる。どこで辿れなくなったかを区別しても直し方は同じで、`thresholds` を書くことだからである。
+報告は CommonJS、動的設定、下限の欠落、メトリクスの欠落、要求を下回る数値、package 集計の 6 種類に分ける。
+
+静的な config に `test`、`coverage`、`thresholds` が無い場合は 1 件だけ報告する。default export が無い、default export が変数を指す、spread や動的 computed property で構成する、のいずれかなら、単なる欠落ではなく動的設定として区別して報告する。前者は `thresholds` の追加で直るが、後者は一つの静的な `defineConfig({...})` へ構成を戻さなければ下限を証明できないためである。
 
 `thresholds` はあるが、あるメトリクスに数値リテラルが無い場合は、そのメトリクスについて報告する。プロパティ自体が無い場合と、値が数値リテラルでない場合（変数参照、スプレッドで流し込まれたもの、計算式）の両方が該当する。設定ファイルの外に値が置かれていると、そのファイルを読んだだけでは下限が確定しないため、宣言されていないものとして扱う。
 
@@ -49,6 +51,7 @@ Vitest の短縮記法 `thresholds: { 100: true }` は、全メトリクスを 1
 - 設定ファイルから `test` ブロックごと消して報告を止める。`thresholds` が無い状態として同じ報告が出る。仮に対象外にできたとしても、消した先にあるのは下限が無い状態そのものである
 - 下限を満たすために `coverage.exclude` へ届いていないファイルを足す。分母から外れるので数字は上がるが、未検証のコードは 1 行も減っていない。除外は「そもそも計測対象でないもの」に対する操作であって、計測したくないものに対する操作ではない
 - `thresholds` の値を別ファイルの定数に逃がす。設定ファイルを読んだだけでは下限が確定しなくなるため、このルールは宣言されていないものとして扱う。下限は使う場所に数値で書く
+- CommonJS の config へ下限を移し、ESM の静的 resolver から見えなくする
 - `perFile` を外して集計で通す。届いていないファイルはそのまま残り、数字だけが緑になる。どのファイルが届いていないのかは集計から読み取れないので、外した瞬間に「あと何をすれば満たせるか」も分からなくなる
 - 満たせないメトリクスだけを設定ファイルから外す。外したメトリクスは報告されるが、仮に報告を抑制できたとしても、そのメトリクスは以後どこまで下がっても誰も気付かない
 - そのファイルだけ抑制ディレクティブで黙らせる。下限はリポジトリ全体に対する合意なので、ファイル単位の免除はそのまま合意の無効化になる

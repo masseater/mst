@@ -20,9 +20,9 @@ Reports every canonical values annotation that is broken or retired, every value
 that more than one concept declares, every body that more than one declaration spells
 the same way, every workflow definition that narrows its own start, hides a failure,
 holds logic, or leaves its permissions unstated, and every pnpm catalog entry or
-dependency pin that keeps a version declared in the wrong place. Exits non-zero when
-any of them is found. Manifests whose versions disagree with each other or with the
-catalog are printed as warnings and do not fail the run.
+dependency pin that keeps a version declared in the wrong place. It also reports test
+commands that replace the auto-discovered config or override static coverage settings.
+Exits non-zero when any of them is found.
 
 Options:
   --repository-root <path>  Root of the repository to scan. Defaults to the current working directory.
@@ -48,10 +48,10 @@ const dispatch = (argv: readonly string[]): CliResult => {
     };
   }
 
-  const { problems, warnings } = runChecks(repositoryRoot);
+  const { problems } = runChecks(repositoryRoot);
   return {
     exitCode: problems.length === 0 ? EXIT_SUCCESS : EXIT_PROBLEMS_FOUND,
-    out: toLines([...problems, ...warnings.map((warning) => `warning: ${warning}`)]),
+    out: toLines(problems),
     error: "",
   };
 };

@@ -5,7 +5,7 @@ const SPEC_FILES = ["**/*.spec.ts", "**/*.spec.tsx"];
 
 const SPEC_DIRECTORIES = ["**/specs/**"];
 
-const SPEC_FILE_NAME_PATTERN = "\\.spec\\.tsx?$";
+const SPEC_FILE_NAME_PATTERN = String.raw`\.spec\.tsx?$`;
 
 const SPEC_DESCRIBE_DEPTH = 1;
 

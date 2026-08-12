@@ -109,14 +109,9 @@ const findingsIn = ({
     config,
   });
 
-  return {
-    problems: [
-      ...singleUse.map((finding) => finding.problem),
-      ...bypassed.problems,
-      ...shared.problems,
-    ].toSorted(byFileThenMessage),
-    warnings: [...bypassed.warnings, ...shared.warnings].toSorted(byFileThenMessage),
-  };
+  return [...singleUse.map((finding) => finding.problem), ...bypassed, ...shared].toSorted(
+    byFileThenMessage,
+  );
 };
 
 export const runDependencyCatalogChecks = ({
@@ -132,16 +127,13 @@ export const runDependencyCatalogChecks = ({
 
   const definition = parsedDefinitionOrNull({ source, config });
   if (definition === null) {
-    return {
-      problems: [
-        {
-          file: definitionPath,
-          line: null,
-          message: `A workspace definition that does not parse must not stay in the repository, because every dependency check reads it as an empty file and reports nothing. Fix the YAML here so the definition can be read.`,
-        },
-      ],
-      warnings: [],
-    };
+    return [
+      {
+        file: definitionPath,
+        line: null,
+        message: `A workspace definition that does not parse must not stay in the repository, because every dependency check reads it as an empty file and reports nothing. Fix the YAML here so the definition can be read.`,
+      },
+    ];
   }
 
   return findingsIn({ repositoryRoot, definition, definitionPath, config });

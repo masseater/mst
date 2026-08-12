@@ -1,3 +1,4 @@
+import { unwrapTransparentExpression as unwrapExpression } from "../transparent-expression.ts";
 import { canonicalValueKey, type CanonicalValue } from "./fingerprint.ts";
 
 import type { ESTree } from "@oxlint/plugins";
@@ -11,12 +12,7 @@ export const SET_CONSTRUCTOR = "Set";
 
 const SCHEMA_LITERAL_MEMBER = "literal";
 
-export const unwrapExpression = (node: ESTree.Expression): ESTree.Expression => {
-  if (node.type === "TSAsExpression") return unwrapExpression(node.expression);
-  if (node.type === "TSSatisfiesExpression") return unwrapExpression(node.expression);
-  if (node.type === "TSTypeAssertion") return unwrapExpression(node.expression);
-  return node;
-};
+export { unwrapExpression };
 
 const templateSpelling = (
   quasis: readonly ESTree.TemplateElement[],
