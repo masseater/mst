@@ -28,6 +28,7 @@ import {
 import { sourceNodes } from "./source-analysis.ts";
 
 import type { ESTree, SourceCode } from "@oxlint/plugins";
+import type { ScopeLookup } from "../resolved-bindings.ts";
 import type { CanonicalValuesCatalog, CanonicalValuesEntry } from "./catalog.ts";
 
 export type LocalFiniteValueDiagnostic =
@@ -49,6 +50,7 @@ type AnalysisInput = {
   readonly catalog: CanonicalValuesCatalog;
   readonly filename: string;
   readonly repositoryRoot: string;
+  readonly scopeAt: ScopeLookup;
 };
 
 const vocabularyDiagnostic = (input: {
@@ -227,15 +229,10 @@ const keyofDiagnostics = (
   if (unwrapped.type !== "TSTypeOperator" || unwrapped.operator !== "keyof") return [];
   const target = unwrapType(unwrapped.typeAnnotation);
   if (target.type === "TSTypeReference" && target.typeName.type === "Identifier") {
-    const imported = input.bindings.imports.get(target.typeName.name);
-    return imported === undefined
+    const position = localFiniteIdentifierPosition(input, target.typeName);
+    return position?.kind === "values"
       ? []
-      : routeDiagnostic(input, {
-          kind: "import",
-          name: target.typeName.name,
-          node: target.typeName,
-          ...imported,
-        });
+      : diagnosticsForPosition(input, { onlyWhenOwned: false, position });
   }
   if (target.type !== "TSImportType" || typeof target.source.value !== "string") return [];
   const name = importTypeName(target.qualifier);
@@ -279,7 +276,11 @@ export const analyzeLocalFiniteValues = (input: {
     repositoryRoot: input.repositoryRoot,
     sourceText: input.sourceCode.text,
   });
-  const analysisInput = { ...input, bindings: localFiniteValueBindings(input.sourceCode.ast) };
+  const analysisInput = {
+    ...input,
+    bindings: localFiniteValueBindings(input.sourceCode.ast),
+    scopeAt: (node: ESTree.Node) => input.sourceCode.getScope(node),
+  };
   const diagnostics = sourceNodes(input.sourceCode).flatMap(({ node }) =>
     diagnosticsForNode(analysisInput, node),
   );

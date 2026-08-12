@@ -79,6 +79,30 @@ const libraryOwnerReport = (input: {
   };
 };
 
+const preparedReport = (input: {
+  readonly diagnostic: ReturnType<typeof analyzeLocalFiniteValues>[number];
+  readonly filename: string;
+  readonly loadLibraryVocabulary: LibraryVocabularyLoader;
+  readonly ownershipPolicy: string;
+  readonly repositoryRoot: string;
+}): RuleMessage & {
+  readonly node: ReturnType<typeof analyzeLocalFiniteValues>[number]["node"];
+} => {
+  const { diagnostic } = input;
+  if (diagnostic.kind === "unregistered-route") {
+    return {
+      node: diagnostic.node,
+      messageId: "unregisteredCanonicalValuesImportRoute",
+      data: { name: diagnostic.name, specifier: diagnostic.specifier },
+    };
+  }
+  const report =
+    diagnostic.owners.length === 0
+      ? libraryOwnerReport({ ...input, values: diagnostic.values })
+      : catalogOwnerReport({ owners: diagnostic.owners, ownershipPolicy: input.ownershipPolicy });
+  return { node: diagnostic.node, ...report };
+};
+
 export const createNoLocalFiniteValueSet = (input: {
   readonly loadCatalog: CanonicalValuesCatalogLoader;
   readonly loadLibraryVocabulary: LibraryVocabularyLoader;
@@ -113,35 +137,25 @@ export const createNoLocalFiniteValueSet = (input: {
       if (isOutOfScopeLintSource(context.filename, repositoryRoot)) return {};
       const catalog = input.loadCatalog({ repositoryRoot });
       const ownershipPolicy = ownershipPolicyOf(context.options);
-      const diagnostics = analyzeLocalFiniteValues({
+      const reports = analyzeLocalFiniteValues({
         catalog,
         filename: context.filename,
         repositoryRoot,
         sourceCode: context.sourceCode,
-      });
+      }).map((diagnostic) =>
+        preparedReport({
+          diagnostic,
+          filename: context.filename,
+          loadLibraryVocabulary: input.loadLibraryVocabulary,
+          ownershipPolicy,
+          repositoryRoot,
+        }),
+      );
       return {
         Program() {
-          for (const diagnostic of diagnostics) {
-            if (diagnostic.kind === "unregistered-route") {
-              context.report({
-                node: diagnostic.node,
-                messageId: "unregisteredCanonicalValuesImportRoute",
-                data: { name: diagnostic.name, specifier: diagnostic.specifier },
-              });
-              continue;
-            }
-            const report =
-              diagnostic.owners.length === 0
-                ? libraryOwnerReport({
-                    ...input,
-                    filename: context.filename,
-                    ownershipPolicy,
-                    repositoryRoot,
-                    values: diagnostic.values,
-                  })
-                : catalogOwnerReport({ owners: diagnostic.owners, ownershipPolicy });
+          for (const report of reports) {
             context.report({
-              node: diagnostic.node,
+              node: report.node,
               messageId: report.messageId,
               data: report.data,
             });

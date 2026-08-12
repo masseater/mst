@@ -1,3 +1,4 @@
+import { resolveBinding, type ScopeLookup } from "../resolved-bindings.ts";
 import {
   calleeMemberName,
   propertyKeyName,
@@ -10,14 +11,31 @@ import type { CanonicalValuesCatalog } from "./catalog.ts";
 import type { CanonicalValue } from "./fingerprint.ts";
 
 type ImportedBinding = {
+  readonly definition: ESTree.ImportSpecifier;
   readonly importedName: string;
   readonly specifier: string;
 };
 
+type ArrayBinding = {
+  readonly definition: ESTree.VariableDeclarator;
+  readonly value: ESTree.ArrayExpression;
+};
+
+type ObjectBinding = {
+  readonly definition: ESTree.VariableDeclarator;
+  readonly value: ESTree.ObjectExpression;
+};
+
 export type LocalFiniteValueBindings = {
-  readonly arrays: ReadonlyMap<string, ESTree.ArrayExpression>;
+  readonly arrays: ReadonlyMap<string, ArrayBinding>;
   readonly imports: ReadonlyMap<string, ImportedBinding>;
-  readonly objects: ReadonlyMap<string, ESTree.ObjectExpression>;
+  readonly objects: ReadonlyMap<string, ObjectBinding>;
+};
+
+type PositionInput = {
+  readonly bindings: LocalFiniteValueBindings;
+  readonly catalog: CanonicalValuesCatalog;
+  readonly scopeAt: ScopeLookup;
 };
 
 export type LocalFiniteValuePosition =
@@ -35,6 +53,37 @@ export type LocalFiniteValuePosition =
     }
   | { readonly kind: "unknown-owner-name"; readonly name: string; readonly node: ESTree.Node };
 
+const bindingAt = <Binding extends { readonly definition: ESTree.Node }>(input: {
+  readonly bindings: ReadonlyMap<string, Binding>;
+  readonly identifier: ESTree.IdentifierReference;
+  readonly position: PositionInput;
+}): Binding | null => {
+  const candidate = input.bindings.get(input.identifier.name);
+  if (candidate === undefined) return null;
+  const resolved = resolveBinding(input.position.scopeAt(input.identifier), input.identifier.name);
+  return resolved?.defs.some((definition) => definition.node === candidate.definition) === true
+    ? candidate
+    : null;
+};
+
+const catalogOwnsImport = (catalog: CanonicalValuesCatalog, imported: ImportedBinding): boolean =>
+  catalog.entries.some(
+    (entry) =>
+      entry.binding === imported.importedName ||
+      entry.importRoutes.some((route) => route.exportName === imported.importedName),
+  );
+
+const unknownOwnerPosition = (
+  input: PositionInput,
+  identifier: ESTree.IdentifierReference,
+): Extract<LocalFiniteValuePosition, { readonly kind: "unknown-owner-name" }> | null => {
+  const shadowedImport = input.bindings.imports.get(identifier.name);
+  return input.catalog.entries.some((entry) => entry.binding === identifier.name) ||
+    (shadowedImport !== undefined && catalogOwnsImport(input.catalog, shadowedImport))
+    ? { kind: "unknown-owner-name", name: identifier.name, node: identifier }
+    : null;
+};
+
 const importName = (specifier: ESTree.ImportSpecifier): string => {
   const imported = specifier.imported;
   return imported.type === "Identifier" ? imported.name : imported.value;
@@ -43,8 +92,8 @@ const importName = (specifier: ESTree.ImportSpecifier): string => {
 const staticBindingEntries = (
   statement: ESTree.Program["body"][number],
 ): readonly (
-  | { readonly kind: "array"; readonly name: string; readonly node: ESTree.ArrayExpression }
-  | { readonly kind: "object"; readonly name: string; readonly node: ESTree.ObjectExpression }
+  | { readonly kind: "array"; readonly name: string; readonly binding: ArrayBinding }
+  | { readonly kind: "object"; readonly name: string; readonly binding: ObjectBinding }
 )[] => {
   const variableStatement =
     statement.type === "VariableDeclaration"
@@ -58,16 +107,28 @@ const staticBindingEntries = (
     (
       declaration,
     ): readonly (
-      | { readonly kind: "array"; readonly name: string; readonly node: ESTree.ArrayExpression }
-      | { readonly kind: "object"; readonly name: string; readonly node: ESTree.ObjectExpression }
+      | { readonly kind: "array"; readonly name: string; readonly binding: ArrayBinding }
+      | { readonly kind: "object"; readonly name: string; readonly binding: ObjectBinding }
     )[] => {
       if (declaration.id.type !== "Identifier" || declaration.init === null) return [];
       const initializer = unwrapExpression(declaration.init);
       if (initializer.type === "ArrayExpression") {
-        return [{ kind: "array", name: declaration.id.name, node: initializer }];
+        return [
+          {
+            kind: "array",
+            name: declaration.id.name,
+            binding: { definition: declaration, value: initializer },
+          },
+        ];
       }
       return initializer.type === "ObjectExpression"
-        ? [{ kind: "object", name: declaration.id.name, node: initializer }]
+        ? [
+            {
+              kind: "object",
+              name: declaration.id.name,
+              binding: { definition: declaration, value: initializer },
+            },
+          ]
         : [];
     },
   );
@@ -80,7 +141,12 @@ const importBindingEntries = (
   return statement.specifiers.flatMap((specifier) => {
     if (specifier.type !== "ImportSpecifier") return [];
     const importedName = importName(specifier);
-    return [[specifier.local.name, { importedName, specifier: statement.source.value }]] as const;
+    return [
+      [
+        specifier.local.name,
+        { definition: specifier, importedName, specifier: statement.source.value },
+      ],
+    ] as const;
   });
 };
 
@@ -89,13 +155,13 @@ export const localFiniteValueBindings = (program: ESTree.Program): LocalFiniteVa
   return {
     arrays: new Map(
       staticBindings.flatMap((binding) =>
-        binding.kind === "array" ? [[binding.name, binding.node] as const] : [],
+        binding.kind === "array" ? [[binding.name, binding.binding] as const] : [],
       ),
     ),
     imports: new Map(program.body.flatMap(importBindingEntries)),
     objects: new Map(
       staticBindings.flatMap((binding) =>
-        binding.kind === "object" ? [[binding.name, binding.node] as const] : [],
+        binding.kind === "object" ? [[binding.name, binding.binding] as const] : [],
       ),
     ),
   };
@@ -114,28 +180,18 @@ const arrayPosition = (array: ESTree.ArrayExpression): LocalFiniteValuePosition 
 };
 
 export const localFiniteIdentifierPosition = (
-  input: {
-    readonly bindings: LocalFiniteValueBindings;
-    readonly catalog: CanonicalValuesCatalog;
-  },
+  input: PositionInput,
   identifier: ESTree.IdentifierReference,
 ): LocalFiniteValuePosition | null => {
-  const array = input.bindings.arrays.get(identifier.name);
-  if (array !== undefined) return arrayPosition(array);
-  const imported = input.bindings.imports.get(identifier.name);
-  if (imported !== undefined) {
-    return { kind: "import", name: identifier.name, node: identifier, ...imported };
-  }
-  return input.catalog.entries.some((entry) => entry.binding === identifier.name)
-    ? { kind: "unknown-owner-name", name: identifier.name, node: identifier }
-    : null;
+  const array = bindingAt({ bindings: input.bindings.arrays, identifier, position: input });
+  if (array !== null) return arrayPosition(array.value);
+  const imported = localFiniteImportPosition(input, identifier);
+  if (imported !== null) return imported;
+  return unknownOwnerPosition(input, identifier);
 };
 
 export const localFiniteValuePosition = (
-  input: {
-    readonly bindings: LocalFiniteValueBindings;
-    readonly catalog: CanonicalValuesCatalog;
-  },
+  input: PositionInput,
   candidate: ESTree.Expression,
 ): LocalFiniteValuePosition | null => {
   const expression = unwrapExpression(candidate);
@@ -152,19 +208,18 @@ const objectPropertyNames = (object: ESTree.ObjectExpression): readonly string[]
 };
 
 const identifierObjectKeysPosition = (
-  input: {
-    readonly bindings: LocalFiniteValueBindings;
-    readonly catalog: CanonicalValuesCatalog;
-  },
+  input: PositionInput,
   candidate: { readonly call: ESTree.CallExpression; readonly source: ESTree.IdentifierReference },
 ): LocalFiniteValuePosition | null => {
-  const imported = input.bindings.imports.get(candidate.source.name);
-  if (imported !== undefined) {
-    return { kind: "import", name: candidate.source.name, node: candidate.source, ...imported };
-  }
-  const object = input.bindings.objects.get(candidate.source.name);
-  if (object === undefined) return null;
-  const canonicalItems = objectPropertyNames(object);
+  const imported = localFiniteImportPosition(input, candidate.source);
+  if (imported !== null) return imported;
+  const object = bindingAt({
+    bindings: input.bindings.objects,
+    identifier: candidate.source,
+    position: input,
+  });
+  if (object === null) return unknownOwnerPosition(input, candidate.source);
+  const canonicalItems = objectPropertyNames(object.value);
   return canonicalItems === null
     ? null
     : { kind: "values", node: candidate.call, values: canonicalItems };
@@ -180,10 +235,7 @@ const objectKeysSource = (call: ESTree.CallExpression): ESTree.Expression | null
 };
 
 const objectKeysPosition = (
-  input: {
-    readonly bindings: LocalFiniteValueBindings;
-    readonly catalog: CanonicalValuesCatalog;
-  },
+  input: PositionInput,
   call: ESTree.CallExpression,
 ): LocalFiniteValuePosition | null => {
   const source = objectKeysSource(call);
@@ -195,14 +247,27 @@ const objectKeysPosition = (
 };
 
 export const localFiniteSchemaPosition = (
-  input: {
-    readonly bindings: LocalFiniteValueBindings;
-    readonly catalog: CanonicalValuesCatalog;
-  },
+  input: PositionInput,
   argument: ESTree.Expression,
 ): LocalFiniteValuePosition | null => {
   const expression = unwrapExpression(argument);
   return expression.type === "CallExpression"
     ? objectKeysPosition(input, expression)
     : localFiniteValuePosition(input, expression);
+};
+
+export const localFiniteImportPosition = (
+  input: PositionInput,
+  identifier: ESTree.IdentifierReference,
+): Extract<LocalFiniteValuePosition, { readonly kind: "import" }> | null => {
+  const imported = bindingAt({ bindings: input.bindings.imports, identifier, position: input });
+  return imported === null
+    ? null
+    : {
+        importedName: imported.importedName,
+        kind: "import",
+        name: identifier.name,
+        node: identifier,
+        specifier: imported.specifier,
+      };
 };

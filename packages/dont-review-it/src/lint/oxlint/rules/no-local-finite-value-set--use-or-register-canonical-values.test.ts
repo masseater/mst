@@ -1,9 +1,14 @@
+import { join } from "node:path";
+
 import { testLintRule } from "@mst/lint-rule-authoring";
-import { describe } from "vite-plus/test";
+import { describe, vi } from "vite-plus/test";
 
 import { buildCatalog } from "../lib/canonical-values/catalog.ts";
 import { fingerprintValues } from "../lib/canonical-values/fingerprint.ts";
+import { findWorkspaceRoot } from "../lib/canonical-values/workspace-root.ts";
 import { createNoLocalFiniteValueSet } from "./no-local-finite-value-set--use-or-register-canonical-values.ts";
+
+import type { LibraryVocabularyLoader } from "../lib/library-vocabulary/vocabulary-loader.ts";
 
 const canonicalItems = ["draft", "published"] as const;
 const entry = {
@@ -84,6 +89,46 @@ const singleLibraryRule = createNoLocalFiniteValueSet({
     },
   ],
 });
+
+const repositoryRoot = findWorkspaceRoot(process.cwd());
+const engineValues = ["claude", "codex"] as const;
+const engineRule = createNoLocalFiniteValueSet({
+  loadCatalog: () =>
+    buildCatalog([
+      {
+        ...entry,
+        binding: "ENGINES",
+        conceptId: "auto-develop.engine",
+        declarationPath: "packages/auto-develop/src/config/engine.ts",
+        fingerprint: fingerprintValues(engineValues),
+        values: engineValues,
+      },
+    ]),
+  loadLibraryVocabulary: () => [],
+});
+
+const createLibraryPreanalysisRule = () => {
+  const loadLibraryVocabulary = vi
+    .fn<LibraryVocabularyLoader>()
+    .mockReturnValueOnce([])
+    .mockImplementation(() => {
+      throw new Error("Library vocabulary was loaded from the visitor");
+    });
+  const observed = createNoLocalFiniteValueSet({
+    loadCatalog: () => buildCatalog([]),
+    loadLibraryVocabulary,
+  });
+  return {
+    ...observed,
+    create(context: Parameters<typeof observed.create>[0]) {
+      const visitor = observed.create(context);
+      if (loadLibraryVocabulary.mock.calls.length === 0) {
+        throw new Error("Library vocabulary was not loaded during pre-analysis");
+      }
+      return visitor;
+    },
+  };
+};
 
 describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-values", () => {
   testLintRule(rule, {
@@ -260,6 +305,46 @@ describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-va
       {
         code: 'export type Status = "draft" | "published";',
         errors: [{ messageId: "localFiniteValueSetOwnedByLibraryType" }],
+      },
+    ],
+  });
+
+  testLintRule(engineRule, {
+    valid: [
+      {
+        code: 'import { ENGINES } from "./config/engine.ts";\nexport const schema = z.enum(ENGINES);',
+        cwd: repositoryRoot,
+        filename: join(repositoryRoot, "packages/auto-develop/src/direct-engine-schema.ts"),
+      },
+    ],
+    invalid: [
+      {
+        code: 'import { ENGINES } from "./config/engine.ts";\nexport function schema(ENGINES: readonly ["shadow", "values"]) { return z.enum(ENGINES); }',
+        cwd: repositoryRoot,
+        filename: join(repositoryRoot, "packages/auto-develop/src/shadow-engine-schema.ts"),
+        errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
+      },
+      {
+        code: 'import { ENGINES } from "./config/engine.ts";\nexport function schema() { const ENGINES = ["shadow", "values"] as const; return z.enum(ENGINES); }',
+        cwd: repositoryRoot,
+        filename: join(repositoryRoot, "packages/auto-develop/src/shadow-engine-schema.ts"),
+        errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
+      },
+      {
+        code: 'import { ENGINES } from "./config/engine.ts";\nexport function schema(ENGINES: { shadow: null; values: null }) { return z.enum(Object.keys(ENGINES)); }',
+        cwd: repositoryRoot,
+        filename: join(repositoryRoot, "packages/auto-develop/src/shadow-engine-schema.ts"),
+        errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
+      },
+    ],
+  });
+
+  testLintRule(createLibraryPreanalysisRule(), {
+    valid: [],
+    invalid: [
+      {
+        code: 'export const schema = z.enum(["draft", "published"]);',
+        errors: [{ messageId: "localFiniteValueSetWithoutOwner" }],
       },
     ],
   });
