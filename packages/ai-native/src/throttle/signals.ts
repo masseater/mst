@@ -4,15 +4,6 @@ export const raiseSignal = (signal: NodeJS.Signals): void => {
   process.kill(process.pid, signal);
 };
 
-export const safeKill = (pid: number, signal: NodeJS.Signals): boolean => {
-  try {
-    process.kill(pid, signal);
-    return true;
-  } catch (undeliverableSignal) {
-    return false;
-  }
-};
-
 export const installInterruptHandler = (takenHandler: (signal: NodeJS.Signals) => void): void => {
   for (const signal of INTERRUPT_SIGNALS) process.once(signal, takenHandler);
 };
@@ -60,9 +51,11 @@ export const makeHeldInterruptHandler = (
 
 export const makeRunningInterruptHandler = (dependencies: {
   childPid: number;
-  kill: (pid: number, signal: NodeJS.Signals) => boolean;
+  signalTree: (input: { pid: number; signal: NodeJS.Signals }) => Error | null;
+  reportFailure: (failure: Error) => void;
 }): ((signal: NodeJS.Signals) => void) => {
   return (signal) => {
-    dependencies.kill(-dependencies.childPid, signal);
+    const failure = dependencies.signalTree({ pid: dependencies.childPid, signal });
+    if (failure !== null) dependencies.reportFailure(failure);
   };
 };

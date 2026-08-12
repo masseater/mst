@@ -1,19 +1,29 @@
 import { randomBytes } from "node:crypto";
-import { mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  closeSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 
-import { lock } from "proper-lockfile";
+import { tryLock, unlock } from "fs-native-extensions";
+
+import { tryAcquireFileLock } from "./acquire-file-lock.ts";
 
 export type SlotHold = { release: () => Promise<void> };
 
 export type AcquireConfiguration = {
   slotDir: string;
   limit: number;
-  staleMs: number;
-  onCompromised: (failure: Error) => void;
 };
 
 const markerPath = (slotDir: string, index: number): string => join(slotDir, `slot-${index}`);
+
+const lockPath = (marker: string): string => `${marker}.lock`;
 
 const waitersDir = (slotDir: string): string => join(slotDir, "waiters");
 
@@ -22,48 +32,45 @@ const slotIndexes = (limit: number): number[] => [...Array(limit).keys()];
 export const ensureSlots = (slotDir: string, limit: number): void => {
   mkdirSync(waitersDir(slotDir), { recursive: true });
   for (const index of slotIndexes(limit)) {
-    writeFileSync(markerPath(slotDir, index), "", { flag: "a" });
+    const marker = markerPath(slotDir, index);
+    writeFileSync(marker, "", { flag: "a" });
+    writeFileSync(lockPath(marker), "", { flag: "a" });
   }
 };
 
-const lockUnlessHeld = async (
-  marker: string,
-  configuration: AcquireConfiguration,
-): Promise<SlotHold | null> => {
+const lockUnlessHeld = (marker: string): SlotHold | null => {
+  return tryAcquireFileLock({
+    path: lockPath(marker),
+    open: (path) => openSync(path, "r+"),
+    tryLock,
+    unlock,
+    close: closeSync,
+    recordGeneration: () => {
+      writeFileSync(marker, randomBytes(16).toString("hex"));
+    },
+  });
+};
+
+export const tryAcquireAny = (configuration: AcquireConfiguration): Promise<SlotHold | null> =>
+  Promise.try(() => {
+    for (const index of slotIndexes(configuration.limit)) {
+      const acquired = lockUnlessHeld(markerPath(configuration.slotDir, index));
+      if (acquired !== null) return acquired;
+    }
+    return null;
+  });
+
+const generationIdentity = (marker: string): string => {
   try {
-    const release = await lock(marker, {
-      stale: configuration.staleMs,
-      retries: 0,
-      onCompromised: configuration.onCompromised,
-    });
-    return { release };
-  } catch (failure) {
-    if ((failure as { code?: string }).code === "ELOCKED") return null;
-    throw failure;
-  }
-};
-
-export const tryAcquireAny = async (
-  configuration: AcquireConfiguration,
-): Promise<SlotHold | null> => {
-  for (const index of slotIndexes(configuration.limit)) {
-    const acquired = await lockUnlessHeld(markerPath(configuration.slotDir, index), configuration);
-    if (acquired !== null) return acquired;
-  }
-  return null;
-};
-
-const lockIdentity = (lockPath: string): string => {
-  try {
-    return String(statSync(lockPath).ino);
-  } catch (absentLock) {
-    return "free";
+    return readFileSync(marker, "utf8") || "unused";
+  } catch (unreadableGeneration) {
+    return `unreadable:${(unreadableGeneration as { code: string }).code}`;
   }
 };
 
 export const slotStateFingerprint = (slotDir: string, limit: number): string =>
   slotIndexes(limit)
-    .map((index) => lockIdentity(`${markerPath(slotDir, index)}.lock`))
+    .map((index) => generationIdentity(markerPath(slotDir, index)))
     .join(",");
 
 export const enqueueWaiter = (slotDir: string): string => {

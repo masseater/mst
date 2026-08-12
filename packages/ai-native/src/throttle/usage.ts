@@ -5,14 +5,15 @@ const USAGE = `Usage: throttle [--timeout <seconds>] -- <command> [handedArgs...
 Runs the command while keeping the number of simultaneous executions that
 share this host and namespace at or below the limit. When every slot is held
 the wrapper joins a wait queue, reports its position on stderr, and retries
-every slot on each poll, for at most the wait budget. A slot whose holder
-died without releasing is reclaimed once the holder's liveness mark goes
-stale. Do not nest throttle inside a command it wraps: the inner call counts
+every slot on each poll, for at most the wait budget. The operating system
+releases a slot when its holder exits, including an abrupt termination. Do
+not nest throttle inside a command it wraps: the inner call counts
 as one more competitor and consumes a second slot.
 
 Options:
-  --timeout <seconds>  Send SIGTERM to the command's process group after this
-                       many seconds, then SIGKILL after a short grace period.
+  --timeout <seconds>  Stop the command's whole process tree after this many
+                       seconds. POSIX sends SIGTERM, then SIGKILL after a short
+                       grace period; Windows uses taskkill /T /F immediately.
                        0 never interrupts the command. Defaults to 0.
 
 Environment:
@@ -23,7 +24,7 @@ Environment:
 Exit codes:
   0  the wrapped command succeeded
   1  the wrapped command failed, was killed, could not be started, ran past
-     the timeout, or the wrapper could not get a slot
+     the timeout, or the wrapper could not get or release a slot
   2  throttle itself was called incorrectly`;
 
 export type Invocation = {

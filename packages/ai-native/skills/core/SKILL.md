@@ -34,14 +34,16 @@ throttle [--timeout <seconds>] -- <command> [args...]
 
 - Holds one slot per run. When every slot is held it joins a wait queue,
   reports its position on stderr, and retries each slot on every poll.
-- A holder that died without releasing is reclaimed once its liveness mark
-  goes stale; nobody has to clean up by hand.
-- `--timeout` kills the command's whole process group (SIGTERM, then
-  SIGKILL after a grace period). `0` means never.
+- The operating system releases a slot when its holder exits, including an
+  abrupt termination; nobody has to clean up by hand.
+- `--timeout` stops the command's whole process tree. POSIX sends SIGTERM and
+  then SIGKILL after a grace period; Windows uses `taskkill /T /F` immediately.
+  `0` means never.
 - `MST_THROTTLE_LIMIT` sets the slot count for the host and namespace.
   Invalid values fall back to the default of 1.
-- Exit codes: `0` success, `1` the wrapped command failed (any reason),
-  `2` throttle itself was misused. The reason is on stderr.
+- Exit codes: `0` success, `1` the wrapped command failed or throttle could
+  not acquire or release its slot, `2` throttle itself was misused. The
+  reason is on stderr.
 
 ## spool
 
@@ -72,6 +74,10 @@ independent competitor and consumes a second slot.
 
 - Do not wrap interactive commands with `spool`. Prompts go to the log file
   and the terminal stays silent while the child waits for input.
+- Keep the throttle namespace on a host-local file system. Network file
+  systems do not provide this lock contract.
+- Do not delete, rename, or replace `slot-*.lock` while a throttle process may
+  be active.
 - To watch progress, read the growing log file from another terminal; the
   record is written as the child writes.
 - Open the log file the summary points to instead of re-running the command

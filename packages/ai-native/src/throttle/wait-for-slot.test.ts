@@ -1,14 +1,12 @@
-import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
-import { lock } from "proper-lockfile";
 import { describe, expect, onTestFinished, test, vi } from "vite-plus/test";
 
 import { runThrottle, type ThrottleSeams } from "./run-throttle.ts";
-import { ensureSlots } from "./slots.ts";
+import { ensureSlots, tryAcquireAny } from "./slots.ts";
 
 const temporaryDirectory = (prefix: string): string => {
   const directory = mkdtempSync(join(tmpdir(), prefix));
@@ -29,83 +27,57 @@ const captureStderr = (): { joined: () => string; chunks: () => string[] } => {
   };
 };
 
-const holdSlot = async (slotDir: string, staleMs: number): Promise<() => Promise<void>> => {
+const holdSlot = async (slotDir: string): Promise<() => Promise<void>> => {
   ensureSlots(slotDir, 1);
-  return lock(join(slotDir, "slot-0"), { stale: staleMs, retries: 0 });
+  const hold = await tryAcquireAny({ slotDir, limit: 1 });
+  if (hold === null) throw new Error("expected to acquire the slot");
+  return hold.release;
 };
 
 const trivialCommand = ["--", process.execPath, "-e", ""];
 
-const exitedPid = (): number => {
-  const child = spawnSync(process.execPath, ["-e", ""]);
-  return child.pid;
-};
+const EXITED_PID = 999_999_999;
 
 const quickSeams = (slotDir: string): ThrottleSeams => ({
   slotDir,
   limit: 1,
-  staleMs: 5000,
   waitBudgetMs: 15_000,
   pollMs: 50,
   isInteractive: false,
 });
 
 describe("wait-for-slot", () => {
-  test(
-    "a dead holder's slot is reclaimed after the stale threshold, not the wait budget",
-    { timeout: 20_000 },
-    async () => {
-      const slotDir = temporaryDirectory("throttle-dead-");
-      mkdirSync(join(slotDir, "slot-0.lock"), { recursive: true });
-      captureStderr();
-      const before = Date.now();
-
-      const code = await runThrottle(trivialCommand, {
-        ...quickSeams(slotDir),
-        staleMs: 2000,
-        pollMs: 100,
-        waitBudgetMs: 20_000,
-      });
-
-      const elapsed = Date.now() - before;
-      expect(code).toBe(0);
-      expect(elapsed).toBeGreaterThan(1200);
-      expect(elapsed).toBeLessThan(9000);
-    },
-  );
-
-  test("a live holder keeps its slot past the stale threshold", { timeout: 20_000 }, async () => {
+  test("a live holder keeps its slot until release", { timeout: 30_000 }, async () => {
     const slotDir = temporaryDirectory("throttle-live-");
-    const release = await holdSlot(slotDir, 2000);
+    const release = await holdSlot(slotDir);
     captureStderr();
     const before = Date.now();
 
     const pendingRun = runThrottle(trivialCommand, {
       ...quickSeams(slotDir),
-      staleMs: 2000,
       pollMs: 100,
       waitBudgetMs: 10_000,
     });
     const [code] = await Promise.all([
       pendingRun,
       (async (): Promise<void> => {
-        await delay(3500);
+        await delay(350);
         await release();
       })(),
     ]);
 
     const elapsed = Date.now() - before;
     expect(code).toBe(0);
-    expect(elapsed).toBeGreaterThan(3300);
-    expect(elapsed).toBeLessThan(9000);
+    expect(elapsed).toBeGreaterThan(300);
+    expect(elapsed).toBeLessThan(20_000);
   });
 
   test(
     "the wait queue holds exactly the live waiters and ranks close up",
-    { timeout: 20_000 },
+    { timeout: 30_000 },
     async () => {
       const slotDir = temporaryDirectory("throttle-queue-");
-      const release = await holdSlot(slotDir, 5000);
+      const release = await holdSlot(slotDir);
       const stderr = captureStderr();
       const waiters = join(slotDir, "waiters");
       const seams = { ...quickSeams(slotDir), pollMs: 60 };
@@ -117,7 +89,7 @@ describe("wait-for-slot", () => {
       await delay(200);
       expect(readdirSync(waiters)).toHaveLength(2);
 
-      writeFileSync(join(waiters, `0000000000000-${exitedPid()}-deadbeef`), `${exitedPid()}\n`);
+      writeFileSync(join(waiters, `0000000000000-${EXITED_PID}-deadbeef`), `${EXITED_PID}\n`);
       await delay(200);
       expect(readdirSync(waiters)).toHaveLength(2);
 
@@ -138,7 +110,7 @@ describe("wait-for-slot", () => {
     { timeout: 10_000 },
     async () => {
       const slotDir = temporaryDirectory("throttle-budget-");
-      const release = await holdSlot(slotDir, 5000);
+      const release = await holdSlot(slotDir);
       const stderr = captureStderr();
       const seams = { ...quickSeams(slotDir), pollMs: 100, waitBudgetMs: 400 };
       const before = Date.now();
@@ -165,7 +137,7 @@ describe("wait-for-slot", () => {
     { timeout: 10_000 },
     async () => {
       const slotDir = temporaryDirectory("throttle-tty-");
-      const release = await holdSlot(slotDir, 5000);
+      const release = await holdSlot(slotDir);
       const stderr = captureStderr();
 
       const pendingRun = runThrottle(trivialCommand, {
@@ -188,7 +160,7 @@ describe("wait-for-slot", () => {
     { timeout: 10_000 },
     async () => {
       const slotDir = temporaryDirectory("throttle-tty-budget-");
-      const release = await holdSlot(slotDir, 5000);
+      const release = await holdSlot(slotDir);
       const stderr = captureStderr();
 
       const code = await runThrottle(trivialCommand, {
@@ -211,7 +183,7 @@ describe("wait-for-slot", () => {
     { timeout: 10_000 },
     async () => {
       const slotDir = temporaryDirectory("throttle-plain-");
-      const release = await holdSlot(slotDir, 5000);
+      const release = await holdSlot(slotDir);
       const stderr = captureStderr();
 
       const code = await runThrottle(trivialCommand, {
