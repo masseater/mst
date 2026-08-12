@@ -9,9 +9,11 @@ import {
   type CliResult,
 } from "@mst/repository-checks";
 
-import { comparisonRangeIn, type ComparisonRange } from "./comparison-range.ts";
+import { type ComparisonRange } from "./comparison-range.ts";
+import { githubRequestFor } from "./github-request.ts";
 import { formatProblem } from "./problem.ts";
-import { compareRevisions } from "./repository-comparison.ts";
+import { compareRevisions, type RepositoryComparison } from "./repository-comparison.ts";
+import { resolvedComparison } from "./resolved-comparison.ts";
 import { runChecks } from "./run-checks.ts";
 
 const USAGE = `Usage: stop-ai-slop check [--base <revision> --head <revision>] [--repository-root <path>]
@@ -52,11 +54,7 @@ const namedRange = (base: string | undefined, head: string | undefined): Compari
     ? null
     : { baseRevision: base, headRevision: head };
 
-const reportedComparison = async (
-  repositoryRoot: string,
-  range: ComparisonRange,
-): Promise<CliResult> => {
-  const comparison = await compareRevisions({ repositoryRoot, ...range });
+const reportedComparison = (comparison: RepositoryComparison): CliResult => {
   const problems = runChecks({ comparison });
   return {
     exitCode: problems.length === 0 ? EXIT_SUCCESS : EXIT_PROBLEMS_FOUND,
@@ -64,6 +62,17 @@ const reportedComparison = async (
     error: "",
   };
 };
+
+const comparisonFor = async (
+  repositoryRoot: string,
+  named: ComparisonRange | null,
+): Promise<RepositoryComparison> =>
+  named === null
+    ? resolvedComparison(repositoryRoot, {
+        repository: process.env.GITHUB_REPOSITORY,
+        request: githubRequestFor(process.env.GITHUB_TOKEN),
+      })
+    : compareRevisions({ repositoryRoot, ...named });
 
 const dispatch = async (argv: readonly string[]): Promise<CliResult> => {
   const parsed = parsedArguments(argv);
@@ -75,7 +84,7 @@ const dispatch = async (argv: readonly string[]): Promise<CliResult> => {
   if (named === null && (base !== undefined || head !== undefined)) return misuse();
 
   const repositoryRoot = resolve(parsed.values["repository-root"] ?? process.cwd());
-  return reportedComparison(repositoryRoot, named ?? (await comparisonRangeIn(repositoryRoot)));
+  return reportedComparison(await comparisonFor(repositoryRoot, named));
 };
 
 export const runStopAiSlop = createCliRunner(dispatch);

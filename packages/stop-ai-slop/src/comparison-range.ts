@@ -23,7 +23,9 @@ const mergeBaseOf = async (
 ): Promise<string> =>
   (await runGitText({ repositoryRoot, args: ["merge-base", ...revisions] })).trim();
 
-export const comparisonRangeIn = async (repositoryRoot: string): Promise<ComparisonRange> => {
+export const comparisonRangeIn = async (
+  repositoryRoot: string,
+): Promise<ComparisonRange | null> => {
   const mergeHead = await commitOrNull(repositoryRoot, "MERGE_HEAD");
   if (mergeHead !== null) {
     return {
@@ -33,11 +35,7 @@ export const comparisonRangeIn = async (repositoryRoot: string): Promise<Compari
   }
 
   const integration = await commitOrNull(repositoryRoot, INTEGRATION_REVISION);
-  if (integration === null) {
-    throw new Error(
-      `Do not leave the compared change to guesswork: ${INTEGRATION_REVISION} is not in this repository. Fetch it, or name both ends with --base and --head.`,
-    );
-  }
+  if (integration === null) return null;
 
   return {
     baseRevision: await mergeBaseOf(repositoryRoot, [integration, "HEAD"]),

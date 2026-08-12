@@ -19,6 +19,10 @@ const runGit = (repositoryRoot: string, args: readonly string[]): string =>
     cwd: repositoryRoot,
     encoding: "utf8",
     env: {
+      GIT_AUTHOR_EMAIL: "stop-ai-slop@example.test",
+      GIT_AUTHOR_NAME: "Stop AI Slop",
+      GIT_COMMITTER_EMAIL: "stop-ai-slop@example.test",
+      GIT_COMMITTER_NAME: "Stop AI Slop",
       GIT_CONFIG_GLOBAL: "/dev/null",
       GIT_CONFIG_SYSTEM: "/dev/null",
       HOME: repositoryRoot,
@@ -43,8 +47,6 @@ export const withTestRepository = async <Result>(
 ): Promise<Result> => {
   const repositoryRoot = mkdtempSync(join(tmpdir(), "stop-ai-slop-"));
   runGit(repositoryRoot, ["init", "--quiet", "--initial-branch=main"]);
-  runGit(repositoryRoot, ["config", "user.email", "stop-ai-slop@example.test"]);
-  runGit(repositoryRoot, ["config", "user.name", "Stop AI Slop"]);
 
   const commit = (changes: RepositoryChanges): string => {
     writeChanges(repositoryRoot, changes);

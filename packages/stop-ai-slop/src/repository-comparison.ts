@@ -72,36 +72,32 @@ const resolveCommit = async (repositoryRoot: string, revision: string): Promise<
 
 const sourceExtensions = [".cjs", ".cts", ".js", ".jsx", ".mjs", ".mts", ".ts", ".tsx"];
 
-const readSource = async ({
-  repositoryRoot,
-  revision,
-  path,
-}: Readonly<{
-  repositoryRoot: string;
-  revision: string;
-  path: string;
-}>): Promise<string | null> => {
-  if (!sourceExtensions.includes(extname(path).toLowerCase())) {
-    return null;
-  }
-
-  const stdout = await runGitBuffer({
-    repositoryRoot,
-    args: ["cat-file", "blob", `${revision}:${path}`],
-  });
-  if (stdout.includes(0)) {
+export const decodedSource = (path: string, blob: Uint8Array): string => {
+  if (blob.includes(0)) {
     throw new Error(`Source blob contains NUL bytes: ${path}`);
   }
 
-  return new TextDecoder("utf-8").decode(stdout);
+  return new TextDecoder("utf-8").decode(blob);
 };
 
+export type SideSources = Readonly<{
+  base: (path: string) => Promise<string>;
+  head: (path: string) => Promise<string>;
+}>;
+
+const readSource = async ({
+  sources,
+  side,
+  path,
+}: Readonly<{
+  sources: SideSources;
+  side: keyof SideSources;
+  path: string;
+}>): Promise<string | null> =>
+  sourceExtensions.includes(extname(path).toLowerCase()) ? sources[side](path) : null;
+
 type FileConversionInput<File extends RepositoryChange> = Readonly<{
-  context: Readonly<{
-    repositoryRoot: string;
-    baseCommit: string;
-    headCommit: string;
-  }>;
+  context: Readonly<{ sources: SideSources }>;
   file: File;
 }>;
 
@@ -115,8 +111,8 @@ const toAddedComparisonFile = async ({
     ...file,
     beforeSource: null,
     afterSource: await readSource({
-      repositoryRoot: context.repositoryRoot,
-      revision: context.headCommit,
+      sources: context.sources,
+      side: "head",
       path: file.afterPath,
     }),
     firstAddedLine: file.addedLines[0] ?? null,
@@ -132,8 +128,8 @@ const toDeletedComparisonFile = async ({
   return {
     ...file,
     beforeSource: await readSource({
-      repositoryRoot: context.repositoryRoot,
-      revision: context.baseCommit,
+      sources: context.sources,
+      side: "base",
       path: file.beforePath,
     }),
     afterSource: null,
@@ -141,49 +137,15 @@ const toDeletedComparisonFile = async ({
   };
 };
 
-const toChangedComparisonFile = async ({
+const toTwoSidedComparisonFile = async ({
   context,
   file,
-}: FileConversionInput<
-  Extract<RepositoryChange, { kind: "changed" }>
->): Promise<ChangedComparisonFile> => {
+}: FileConversionInput<Extract<RepositoryChange, { kind: "changed" | "renamed" }>>): Promise<
+  ChangedComparisonFile | RenamedComparisonFile
+> => {
   const [beforeSource, afterSource] = await Promise.all([
-    readSource({
-      repositoryRoot: context.repositoryRoot,
-      revision: context.baseCommit,
-      path: file.beforePath,
-    }),
-    readSource({
-      repositoryRoot: context.repositoryRoot,
-      revision: context.headCommit,
-      path: file.afterPath,
-    }),
-  ]);
-  return {
-    ...file,
-    beforeSource,
-    afterSource,
-    firstAddedLine: file.addedLines[0] ?? null,
-  };
-};
-
-const toRenamedComparisonFile = async ({
-  context,
-  file,
-}: FileConversionInput<
-  Extract<RepositoryChange, { kind: "renamed" }>
->): Promise<RenamedComparisonFile> => {
-  const [beforeSource, afterSource] = await Promise.all([
-    readSource({
-      repositoryRoot: context.repositoryRoot,
-      revision: context.baseCommit,
-      path: file.beforePath,
-    }),
-    readSource({
-      repositoryRoot: context.repositoryRoot,
-      revision: context.headCommit,
-      path: file.afterPath,
-    }),
+    readSource({ sources: context.sources, side: "base", path: file.beforePath }),
+    readSource({ sources: context.sources, side: "head", path: file.afterPath }),
   ]);
   return {
     ...file,
@@ -203,11 +165,25 @@ const toComparisonFile = ({
     case "deleted":
       return toDeletedComparisonFile({ context, file });
     case "changed":
-      return toChangedComparisonFile({ context, file });
     case "renamed":
-      return toRenamedComparisonFile({ context, file });
+      return toTwoSidedComparisonFile({ context, file });
   }
 };
+
+export const comparisonFrom = async ({
+  inventoryOutput,
+  diff,
+  sources,
+}: Readonly<{
+  inventoryOutput: string;
+  diff: string;
+  sources: SideSources;
+}>): Promise<readonly ComparisonFile[]> =>
+  Promise.all(
+    parseRepositoryChanges({ inventoryOutput, diff }).map((file) =>
+      toComparisonFile({ context: { sources }, file }),
+    ),
+  );
 
 const diffArguments = ({
   baseCommit,
@@ -253,17 +229,20 @@ export const compareRevisions = async ({
       args: diffArguments({ baseCommit, headCommit, presentation: ["--unified=0"] }),
     }),
   ]);
-  const context = { repositoryRoot, baseCommit, headCommit };
-  const files = await Promise.all(
-    parseRepositoryChanges({ inventoryOutput, diff }).map((file) =>
-      toComparisonFile({ context, file }),
-    ),
-  );
+  const blobAt = (revision: string) => async (path: string) =>
+    decodedSource(
+      path,
+      await runGitBuffer({ repositoryRoot, args: ["cat-file", "blob", `${revision}:${path}`] }),
+    );
 
   return {
     repositoryRoot,
     baseRevision,
     headRevision,
-    files,
+    files: await comparisonFrom({
+      inventoryOutput,
+      diff,
+      sources: { base: blobAt(baseCommit), head: blobAt(headCommit) },
+    }),
   };
 };

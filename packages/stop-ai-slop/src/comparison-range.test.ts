@@ -39,13 +39,11 @@ describe("comparisonRangeIn", () => {
     });
   });
 
-  it("refuses to guess when the integration branch is absent", async () => {
+  it("names no range when the integration branch is absent", async () => {
     await withTestRepository(async (repository) => {
       repository.commit({ files: { "src/current.ts": "export const current = true;\n" } });
 
-      await expect(comparisonRangeIn(repository.root)).rejects.toThrow(
-        "origin/main is not in this repository",
-      );
+      await expect(comparisonRangeIn(repository.root)).resolves.toBeNull();
     });
   });
 });
