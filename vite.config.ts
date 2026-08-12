@@ -39,6 +39,15 @@ export default defineConfig({
         "error",
         { assignOnlyTargets: ["RuleTester.describe", "RuleTester.it", "RuleTester.itOnly"] },
       ],
+      "dont-review-it/no-array-mutation--derive-new-array": "error",
+      "dont-review-it/no-receiver-mutation--derive-new-value": "error",
+      "dont-review-it/no-class-as-mutable-cell--decide-in-an-iife": "error",
+      "dont-review-it/no-promise-chain--use-async-await": "error",
+      "dont-review-it/no-floating-promise--await-the-result": "error",
+      "dont-review-it/no-blanket-suppression--name-and-record": "error",
+      "dont-review-it/no-partial-rule-set--enable-the-whole-set": "error",
+      "dont-review-it/no-empty-catch--throw-or-handle": "error",
+      "dont-review-it/no-silent-catch--rethrow-or-handle": "error",
     },
     overrides: [
       {
@@ -48,13 +57,6 @@ export default defineConfig({
             "error",
             { pattern: "place-the-test-file-next-to-its-source-instead-of-a-test-directory" },
           ],
-        },
-      },
-      {
-        files: ["apps/website/src/**"],
-        rules: {
-          "dont-review-it/no-array-mutation--derive-new-array": "off",
-          "dont-review-it/no-reassign--use-spread-or-iife": "off",
         },
       },
     ],
