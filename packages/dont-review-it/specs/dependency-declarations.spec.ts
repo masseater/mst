@@ -26,7 +26,7 @@ describe("依存宣言の検査", () => {
       "packages/web/package.json": `{"devDependencies": {"typescript": "^5.0.0"}}`,
       "packages/site/package.json": `{"devDependencies": {"typescript": "^5.5.0"}}`,
     });
-    expect(runChecks(repositoryRoot)).toStrictEqual({ problems: [], warnings: [] });
+    expect(runChecks(repositoryRoot)).toStrictEqual({ problems: [], warnings: [], failures: [] });
   });
 
   it("解釈できないワークスペース定義を、どの検査も素通りする前に報告する", async () => {
@@ -57,7 +57,7 @@ overrides:
 `,
       "packages/web/package.json": `{"devDependencies": {"vite": "catalog:"}}`,
     });
-    expect(runChecks(repositoryRoot)).toStrictEqual({ problems: [], warnings: [] });
+    expect(runChecks(repositoryRoot)).toStrictEqual({ problems: [], warnings: [], failures: [] });
   });
 
   it("catalog が持つバージョンをマニフェストが直接書き写していたら報告する", async () => {

@@ -33,10 +33,10 @@
     "access": "public"
   },
   "scripts": {
-    "build": "vp pack",
+    "build": "spool -- vp pack",
     "dev": "vp pack --watch",
-    "test": "vp test",
-    "check": "vp check",
+    "test": "spool -- vp test",
+    "check": "spool -- vp check",
     "check:skills": "intent validate"
   },
   "dependencies": {
@@ -53,6 +53,7 @@
     "yaml": "catalog:"
   },
   "devDependencies": {
+    "@mst/ai-native": "workspace:*",
     "@tanstack/intent": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",

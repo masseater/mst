@@ -143,6 +143,6 @@ jobs:
       - run: vp run guard
 `,
     });
-    expect(runChecks(repositoryRoot)).toStrictEqual({ problems: [], warnings: [] });
+    expect(runChecks(repositoryRoot)).toStrictEqual({ problems: [], warnings: [], failures: [] });
   });
 });

@@ -17,7 +17,7 @@ export type WorkspaceManifest = {
 
 const SINGLE_LEVEL_PATTERN_SUFFIX = "/*";
 
-const directoriesMatching = ({
+export const directoriesMatching = ({
   repositoryRoot,
   pattern,
 }: {

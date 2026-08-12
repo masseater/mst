@@ -3,10 +3,16 @@ import { resolve } from "node:path";
 import { EXIT_MISUSE, EXIT_PROBLEMS_FOUND } from "@mst/repository-checks";
 import { defineCommand } from "citty";
 
+import { defaultEntryCompositionConfig } from "./entry-composition/config.ts";
+import { writeEntryComposition } from "./entry-composition/write-entry-composition.ts";
 import { isDirectory } from "./lint/oxlint/lib/canonical-values/source-files.ts";
 import { runChecks } from "./run-checks.ts";
 
 const REPOSITORY_ROOT_FLAG = "--repository-root";
+
+const WRITE_FLAG = "--write";
+
+const KNOWN_FLAGS = [REPOSITORY_ROOT_FLAG, WRITE_FLAG];
 
 const flagsIn = (rawArgs: readonly string[]): readonly string[] =>
   rawArgs.filter((token) => token.startsWith("-")).map((token) => token.replace(/=.*$/u, ""));
@@ -16,10 +22,21 @@ const refuseMisuse = (message: string): void => {
   process.exitCode = EXIT_MISUSE;
 };
 
+const repairComposition = (repositoryRoot: string): boolean => {
+  const written = writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
+  if (written.failures.length === 0) return true;
+  refuseMisuse(written.failures.map((failure) => `${failure}\n`).join(""));
+  return false;
+};
+
 const reportProblems = (repositoryRoot: string): void => {
-  const { problems, warnings } = runChecks(repositoryRoot);
+  const { problems, warnings, failures } = runChecks(repositoryRoot);
   const lines = [...problems, ...warnings.map((warning) => `warning: ${warning}`)];
   if (lines.length > 0) process.stdout.write(lines.map((line) => `${line}\n`).join(""));
+  if (failures.length > 0) {
+    refuseMisuse(failures.map((failure) => `${failure}\n`).join(""));
+    return;
+  }
   if (problems.length > 0) process.exitCode = EXIT_PROBLEMS_FOUND;
 };
 
@@ -34,9 +51,15 @@ export const checkCommand = defineCommand({
       description: "Root of the repository to scan (defaults to the current working directory)",
       valueHint: "path",
     },
+    write: {
+      type: "boolean",
+      default: false,
+      description:
+        "Rewrite the manifest entry scripts that break the wrapper composition, then re-run the checks",
+    },
   },
   run({ args, rawArgs }) {
-    const unknownFlags = flagsIn(rawArgs).filter((flag) => flag !== REPOSITORY_ROOT_FLAG);
+    const unknownFlags = flagsIn(rawArgs).filter((flag) => !KNOWN_FLAGS.includes(flag));
     if (unknownFlags.length > 0) {
       refuseMisuse(`Unknown option ${unknownFlags.join(", ")}. Run --help for usage.\n`);
       return;
@@ -47,6 +70,8 @@ export const checkCommand = defineCommand({
       refuseMisuse(`${repositoryRoot} is not a directory that can be scanned.\n`);
       return;
     }
+
+    if (args.write && !repairComposition(repositoryRoot)) return;
 
     reportProblems(repositoryRoot);
   },
