@@ -25,7 +25,7 @@ const WHOLE_SURFACE = "*";
 const DEFAULT_EXPORT_NAME = "default";
 
 const fieldListOf = (held: unknown): readonly AstFields[] =>
-  Array.isArray(held) ? held.map(astFieldsOf).filter((entry) => entry !== null) : [];
+  Array.isArray(held) ? held.map(astFieldsOf).filter((candidate) => candidate !== null) : [];
 
 const specifierTextOf = (held: unknown): string | null => {
   const source = astFieldsOf(held);
@@ -46,9 +46,10 @@ const importedBindingOf = (
   const local = nameOf(imported.local);
   if (local === null) return [];
 
-  const type = nodeTypeOf(imported);
-  if (type === "ImportNamespaceSpecifier") return [[local, { specifier, exported: null }] as const];
-  if (type === "ImportDefaultSpecifier") {
+  const nodeType = nodeTypeOf(imported);
+  if (nodeType === "ImportNamespaceSpecifier")
+    return [[local, { specifier, exported: null }] as const];
+  if (nodeType === "ImportDefaultSpecifier") {
     return [[local, { specifier, exported: DEFAULT_EXPORT_NAME }] as const];
   }
   return [[local, { specifier, exported: nameOf(imported.imported) }] as const];
@@ -69,9 +70,9 @@ const requiredBindingOf = (
 const importedBindingsIn = (
   statement: AstFields,
 ): readonly (readonly [string, ImportedBinding])[] => {
-  const type = nodeTypeOf(statement);
-  if (type === "TSImportEqualsDeclaration") return requiredBindingOf(statement);
-  if (type !== "ImportDeclaration") return [];
+  const nodeType = nodeTypeOf(statement);
+  if (nodeType === "TSImportEqualsDeclaration") return requiredBindingOf(statement);
+  if (nodeType !== "ImportDeclaration") return [];
 
   const specifier = specifierTextOf(statement.source);
   if (specifier === null) return [];
@@ -120,10 +121,10 @@ const forwardedIn = (
   statement: AstFields,
   bindings: ReadonlyMap<string, ImportedBinding>,
 ): readonly ForwardedName[] => {
-  const type = nodeTypeOf(statement);
-  if (type === "ExportAllDeclaration") return forwardedFromSource(statement);
-  if (type === "ExportDefaultDeclaration") return forwardedDefault(statement, bindings);
-  if (type !== "ExportNamedDeclaration") return [];
+  const nodeType = nodeTypeOf(statement);
+  if (nodeType === "ExportAllDeclaration") return forwardedFromSource(statement);
+  if (nodeType === "ExportDefaultDeclaration") return forwardedDefault(statement, bindings);
+  if (nodeType !== "ExportNamedDeclaration") return [];
 
   const source = astFieldsOf(statement.source);
   return source === null
@@ -132,9 +133,12 @@ const forwardedIn = (
 };
 
 export const passThroughExportsIn = <Statement>(
-  body: readonly Statement[],
+  writtenBody: readonly Statement[],
 ): readonly PassThroughExport<Statement>[] => {
-  const statements = body.map((statement) => ({ statement, fields: astFieldsOf(statement) }));
+  const statements = writtenBody.map((statement) => ({
+    statement,
+    fields: astFieldsOf(statement),
+  }));
   const bindings = new Map(
     statements.flatMap(({ fields }) => (fields === null ? [] : importedBindingsIn(fields))),
   );

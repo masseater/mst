@@ -28,7 +28,10 @@ const messageOf = (comment: Comment): RuleMessage | null => {
   }
   return {
     messageId: "namedSuppression",
-    data: { ...spelling, silenced: directive.ruleNames.map((name) => `\`${name}\``).join(", ") },
+    data: {
+      ...spelling,
+      silenced: directive.ruleNames.map((ruleName) => `\`${ruleName}\``).join(", "),
+    },
   };
 };
 
@@ -52,15 +55,15 @@ export const noLintSuppressionInSpec = createDontReviewItRule({
     schema: [],
     fixable: "code",
   },
-  create(context) {
+  create(inspection) {
     return {
       Program(node: ESTree.Program) {
         for (const comment of node.comments) {
-          const message = messageOf(comment);
-          if (message === null) continue;
-          context.report({
+          const complaint = messageOf(comment);
+          if (complaint === null) continue;
+          inspection.report({
             loc: comment.loc,
-            ...message,
+            ...complaint,
             fix: (fixer) => fixer.removeRange([comment.start, comment.end]),
           });
         }

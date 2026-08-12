@@ -17,7 +17,7 @@ const TEST_BLOCK_MODIFIERS: ReadonlySet<string> = new Set([
   "todo",
 ]);
 
-const isTestBlockModifier = (name: string): boolean => TEST_BLOCK_MODIFIERS.has(name);
+const isTestBlockModifier = (spelled: string): boolean => TEST_BLOCK_MODIFIERS.has(spelled);
 
 export const testBlockRootIdentifier = (
   callee: ESTree.Expression,

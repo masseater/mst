@@ -20,7 +20,7 @@ const canonicalValuesEntriesIn = (
 ): readonly CanonicalValuesEntry[] => {
   const specifierIndexFor = memoize(buildExportSpecifierIndex);
 
-  const entries = sources.flatMap((source) => {
+  const listedEntries = sources.flatMap((source) => {
     if (source.declarations.length === 0) return [];
 
     const packageDirectory = nearestPackageDirectory(dirname(source.absolutePath), repositoryRoot);
@@ -38,7 +38,7 @@ const canonicalValuesEntriesIn = (
     }));
   });
 
-  return sortBy(entries, ["declarationPath", "conceptId"]);
+  return sortBy(listedEntries, ["declarationPath", "conceptId"]);
 };
 
 export const buildCanonicalValuesCatalog = ({
@@ -57,17 +57,19 @@ export const buildCanonicalValuesCatalog = ({
   const cached = readCachedEntries(root, fingerprint);
   if (cached !== null) return buildCatalog(cached);
 
-  const entries = canonicalValuesEntriesIn(root, readDeclarationSources(repositoryFiles));
-  writeCachedEntries(root, { fingerprint, entries });
-  return buildCatalog(entries);
+  const listedEntries = canonicalValuesEntriesIn(root, readDeclarationSources(repositoryFiles));
+  writeCachedEntries(root, { fingerprint, entries: listedEntries });
+  return buildCatalog(listedEntries);
 };
 
 const catalogByRepositoryRoot = new Map<string, CanonicalValuesCatalog>();
 
-export const loadCanonicalValuesCatalog = (options: {
+export const loadCanonicalValuesCatalog = ({
+  repositoryRoot,
+}: {
   readonly repositoryRoot: string;
 }): CanonicalValuesCatalog => {
-  const root = resolve(options.repositoryRoot);
+  const root = resolve(repositoryRoot);
   const memoized = catalogByRepositoryRoot.get(root);
   if (memoized !== undefined) return memoized;
 

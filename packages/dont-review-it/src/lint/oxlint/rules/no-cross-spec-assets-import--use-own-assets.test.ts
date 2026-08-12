@@ -10,10 +10,10 @@ import { noCrossSpecAssetsImport } from "./no-cross-spec-assets-import--use-own-
 const fixtureDir = join(realpathSync(tmpdir()), "dont-review-it-no-cross-spec-assets-import");
 rmSync(fixtureDir, { recursive: true, force: true });
 
-const fixturePath = (name: string): string => join(fixtureDir, name);
+const fixturePath = (fixtureName: string): string => join(fixtureDir, fixtureName);
 
-const writeFixture = (name: string, source: string): string => {
-  const path = fixturePath(name);
+const writeFixture = (fixtureName: string, source: string): string => {
+  const path = fixturePath(fixtureName);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, source);
   return path;
@@ -101,7 +101,7 @@ describe("dont-review-it/no-cross-spec-assets-import--use-own-assets", () => {
       },
       {
         name: "a specifier decided at run time cannot be followed to a file",
-        code: "export const load = (name: string) => import(name);",
+        code: "export const load = (fixtureName: string) => import(spelled);",
         filename: fixturePath("owner/checkout.test.ts"),
       },
       {

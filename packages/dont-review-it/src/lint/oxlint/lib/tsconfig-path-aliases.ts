@@ -43,8 +43,8 @@ const inheritedSpecifiersOf = (config: Readonly<Record<string, unknown>>): reado
 
 const aliasesAt = (configPath: string, visited: ReadonlySet<string>): PathAliases | null => {
   if (visited.has(configPath)) return null;
-  const text = readTextFile(configPath);
-  const config = text === null ? null : recordOf(parseJsonc(text));
+  const writtenText = readTextFile(configPath);
+  const config = writtenText === null ? null : recordOf(parseJsonc(writtenText));
   if (config === null) return null;
 
   const own = aliasesIn(configPath, config);
@@ -73,8 +73,8 @@ const nearestAliasesFrom = (directory: string): PathAliases | null => {
   return found;
 };
 
-const filledTarget = (target: string, captured: string): string =>
-  target.replace(WILDCARD, captured);
+const filledTarget = (checked: string, captured: string): string =>
+  checked.replace(WILDCARD, captured);
 
 const capturedBy = (pattern: string, specifier: string): string | null => {
   const [prefix, suffix, ...extraParts] = pattern.split(WILDCARD);
@@ -99,15 +99,17 @@ const prefixLengthOf = (pattern: string): number => {
 };
 
 const matchedAliasesIn = (aliases: PathAliases, specifier: string): readonly MatchedAlias[] =>
-  [...aliases.patternTargets].flatMap(([pattern, targets]) => {
+  [...aliases.patternTargets].flatMap(([pattern, checkedTargets]) => {
     const captured = capturedBy(pattern, specifier);
-    return captured === null ? [] : [{ prefixLength: prefixLengthOf(pattern), captured, targets }];
+    return captured === null
+      ? []
+      : [{ prefixLength: prefixLengthOf(pattern), captured, targets: checkedTargets }];
   });
 
 const longestMatchOf = (matched: readonly MatchedAlias[]): MatchedAlias | null =>
   matched.reduce<MatchedAlias | null>(
-    (longest, entry) =>
-      longest === null || entry.prefixLength > longest.prefixLength ? entry : longest,
+    (longest, listed) =>
+      longest === null || listed.prefixLength > longest.prefixLength ? listed : longest,
     null,
   );
 
@@ -126,7 +128,7 @@ export const aliasedPathsFor = ({
   const matched = longestMatchOf(matchedAliasesIn(aliases, specifier));
   if (matched === null) return [];
 
-  return matched.targets.map((target) =>
-    resolve(aliases.baseDirectory, filledTarget(target, matched.captured)),
+  return matched.targets.map((checked) =>
+    resolve(aliases.baseDirectory, filledTarget(checked, matched.captured)),
   );
 };

@@ -9,9 +9,9 @@ const measured = ({
   readonly ruleName: string;
   readonly handler: (...args: readonly never[]) => unknown;
 }): ((...args: readonly never[]) => unknown) => {
-  return (...args) => {
+  return (...handed) => {
     const startedAt = performance.now();
-    const handled = handler(...args);
+    const handled = handler(...handed);
     ruleDuration().record(performance.now() - startedAt, { rule: ruleName });
     return handled;
   };
@@ -28,8 +28,10 @@ export const measureVisitor = ({
     return visitor;
   }
   return Object.fromEntries(
-    Object.entries(visitor).flatMap(([nodeType, handler]) =>
-      handler === undefined ? [] : [[nodeType, measured({ ruleName, handler })] as const],
+    Object.entries(visitor).flatMap(([nodeType, visiting]) =>
+      visiting === undefined
+        ? []
+        : [[nodeType, measured({ ruleName, handler: visiting })] as const],
     ),
   );
 };

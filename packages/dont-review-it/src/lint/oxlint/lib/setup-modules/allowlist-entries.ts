@@ -7,14 +7,14 @@ const MODULE_FILE_SPECIFIER = /\.[cm]?[jt]sx?$/u;
 
 const REPOSITORY_PATH_PREFIXES: readonly string[] = [".", "/", "#"];
 
-const isPackageSpecifier = (entry: string): boolean =>
-  !REPOSITORY_PATH_PREFIXES.some((prefix) => entry.startsWith(prefix)) &&
-  !isAbsolute(entry) &&
-  !MODULE_FILE_SPECIFIER.test(entry) &&
-  packageReferenceOf(entry) !== null;
+const isPackageSpecifier = (listed: string): boolean =>
+  !REPOSITORY_PATH_PREFIXES.some((prefix) => listed.startsWith(prefix)) &&
+  !isAbsolute(listed) &&
+  !MODULE_FILE_SPECIFIER.test(listed) &&
+  packageReferenceOf(listed) !== null;
 
 const reachesOwnPublicEntry = ({
-  entry,
+  entry: listed,
   fromFile,
   workspaceRoot,
 }: {
@@ -22,7 +22,7 @@ const reachesOwnPublicEntry = ({
   readonly fromFile: string;
   readonly workspaceRoot: string;
 }): boolean => {
-  const found = packageDirectoryInWorkspace({ specifier: entry, fromFile, workspaceRoot });
+  const found = packageDirectoryInWorkspace({ specifier: listed, fromFile, workspaceRoot });
   if (found === null) return true;
   return declaresPublicSubpath({ packageDirectory: found.directory, subpath: found.subpath });
 };
@@ -37,6 +37,7 @@ export const misplacedFixturePackages = ({
   readonly workspaceRoot: string;
 }): readonly string[] =>
   allowed.filter(
-    (entry) =>
-      !isPackageSpecifier(entry) || !reachesOwnPublicEntry({ entry, fromFile, workspaceRoot }),
+    (listed) =>
+      !isPackageSpecifier(listed) ||
+      !reachesOwnPublicEntry({ entry: listed, fromFile, workspaceRoot }),
   );

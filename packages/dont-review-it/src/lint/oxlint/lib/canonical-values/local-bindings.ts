@@ -14,13 +14,13 @@ export type FileBindings = {
 
 const collectArrays = (
   declaration: ESTree.VariableDeclaration,
-  arrays: Map<string, ESTree.ArrayExpression>,
+  listedArrays: Map<string, ESTree.ArrayExpression>,
 ): void => {
   for (const declarator of declaration.declarations) {
     if (declarator.id.type !== "Identifier") continue;
     if (declarator.init === null) continue;
     const init = unwrapExpression(declarator.init);
-    if (init.type === "ArrayExpression") arrays.set(declarator.id.name, init);
+    if (init.type === "ArrayExpression") listedArrays.set(declarator.id.name, init);
   }
 };
 
@@ -35,21 +35,25 @@ const collectNamedImports = (
 };
 
 export const collectFileBindings = (program: ESTree.Program, sourceText: string): FileBindings => {
-  const arrays = new Map<string, ESTree.ArrayExpression>();
+  const listedArrays = new Map<string, ESTree.ArrayExpression>();
   const namedImports = new Map<string, string>();
 
   for (const statement of program.body) {
     if (statement.type === "ImportDeclaration") collectNamedImports(statement, namedImports);
-    else if (statement.type === "VariableDeclaration") collectArrays(statement, arrays);
+    else if (statement.type === "VariableDeclaration") collectArrays(statement, listedArrays);
     else if (
       statement.type === "ExportNamedDeclaration" &&
       statement.declaration?.type === "VariableDeclaration"
     ) {
-      collectArrays(statement.declaration, arrays);
+      collectArrays(statement.declaration, listedArrays);
     }
   }
 
-  return { arrays, namedImports, annotatedRanges: annotatedDeclarationRanges(program, sourceText) };
+  return {
+    arrays: listedArrays,
+    namedImports,
+    annotatedRanges: annotatedDeclarationRanges(program, sourceText),
+  };
 };
 
 export const firstNonSpreadArgument = (

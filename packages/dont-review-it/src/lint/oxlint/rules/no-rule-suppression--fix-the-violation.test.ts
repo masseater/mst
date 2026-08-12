@@ -25,12 +25,13 @@ const DECLARATION = "export const total = 1;";
 
 const configFor = (lint: string): string => `export default { lint: ${lint} };`;
 
-const rulesHolding = (entries: string): string => configFor(`{ rules: { ${entries} } }`);
+const rulesHolding = (listedEntries: string): string =>
+  configFor(`{ rules: { ${listedEntries} } }`);
 
 const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-no-rule-suppression-"));
 
-const writeFixture = (name: string, source: string): string => {
-  const path = join(fixtureDir, name);
+const writeFixture = (fixtureName: string, source: string): string => {
+  const path = join(fixtureDir, fixtureName);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, source);
   return path;

@@ -131,8 +131,8 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
 
   return {
     outcomes,
-    problems: outcomes.flatMap((outcome) => outcome.problems).toSorted(),
-    warnings: outcomes.flatMap((outcome) => outcome.warnings).toSorted(),
+    problems: outcomes.flatMap((ranCheck) => ranCheck.problems).toSorted(),
+    warnings: outcomes.flatMap((ranCheck) => ranCheck.warnings).toSorted(),
     failures: entryComposition.failures.toSorted(),
   };
 };

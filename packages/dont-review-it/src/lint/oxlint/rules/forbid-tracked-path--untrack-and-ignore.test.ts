@@ -29,13 +29,13 @@ const writtenFile = (root: string, relativePath: string): string => {
 };
 
 const workspaceFixture = ({
-  name,
+  name: spelled,
   ignoreText,
 }: {
   readonly name: string;
   readonly ignoreText: string | null;
 }): string => {
-  const root = join(fixtureDir, name);
+  const root = join(fixtureDir, spelled);
   mkdirSync(root, { recursive: true });
   writeFileSync(join(root, "pnpm-workspace.yaml"), "packages:\n  - packages/*\n");
   if (ignoreText !== null) writeFileSync(join(root, ".gitignore"), ignoreText);

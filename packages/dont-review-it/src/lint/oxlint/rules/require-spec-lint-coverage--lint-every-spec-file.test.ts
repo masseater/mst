@@ -23,8 +23,8 @@ const configFor = (lint: string): string => `export default { lint: ${lint} };`;
 
 const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-require-spec-lint-coverage-"));
 
-const writeFixture = (name: string, source: string): string => {
-  const path = join(fixtureDir, name);
+const writeFixture = (fixtureName: string, source: string): string => {
+  const path = join(fixtureDir, fixtureName);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, source);
   return path;

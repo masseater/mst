@@ -18,7 +18,7 @@ const expressionIn = (source: string): ESTree.Expression => {
 };
 
 const runtimeLookup: HostTypeLookup = {
-  named: (name) => (name === "Request" || name === "Response" ? name : null),
+  named: (spelled) => (spelled === "Request" || spelled === "Response" ? spelled : null),
   qualified: (namespace, member) =>
     namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
 };

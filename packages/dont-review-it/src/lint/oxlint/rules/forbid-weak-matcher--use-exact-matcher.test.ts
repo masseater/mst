@@ -17,7 +17,7 @@ describe("dont-review-it/forbid-weak-matcher--use-exact-matcher", () => {
       },
       {
         name: "comparing the subject with the structure it has to equal is the other shape it keeps",
-        code: "expect(subject).toStrictEqual({ id: 1, name: 'ada' });",
+        code: "expect(subject).toStrictEqual({ id: 1, spelled: 'ada' });",
         filename: SPEC_FILENAME,
       },
       {
@@ -236,7 +236,7 @@ describe("dont-review-it/forbid-weak-matcher--use-exact-matcher", () => {
       },
       {
         name: "an asymmetric matcher nested inside an expected structure is reported where it stands",
-        code: "expect(save).toHaveBeenCalledWith({ id: expect.any(Number), name: expect.stringContaining('ada') });",
+        code: "expect(save).toHaveBeenCalledWith({ id: expect.any(Number), spelled: expect.stringContaining('ada') });",
         filename: SPEC_FILENAME,
         errors: [{ messageId: "weakAsymmetricMatcher" }, { messageId: "weakAsymmetricMatcher" }],
       },

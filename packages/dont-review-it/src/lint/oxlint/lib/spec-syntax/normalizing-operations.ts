@@ -50,13 +50,15 @@ export const SPREADING_ASSIGNMENT_NAMESPACE = "Object";
 
 const NORMALIZING_FUNCTIONS_OPTION = "normalizingFunctions";
 
-export const normalizingFunctionsFrom = (options: Readonly<Options>): ReadonlySet<string> => {
-  const [first] = options;
+export const normalizingFunctionsFrom = (ruleOptions: Readonly<Options>): ReadonlySet<string> => {
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) {
     return new Set(DEFAULT_NORMALIZING_FUNCTIONS);
   }
 
   const configured = first[NORMALIZING_FUNCTIONS_OPTION];
   if (!Array.isArray(configured)) return new Set(DEFAULT_NORMALIZING_FUNCTIONS);
-  return new Set(configured.filter((entry): entry is string => typeof entry === "string"));
+  return new Set(
+    configured.filter((candidate): candidate is string => typeof candidate === "string"),
+  );
 };

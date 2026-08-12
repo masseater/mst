@@ -18,25 +18,25 @@ type PublishedManifest = {
   readonly root: Node;
 };
 
-const propertyValueOf = (root: Node, key: string): unknown => {
-  const node = findNodeAtLocation(root, [key]);
+const propertyValueOf = (root: Node, named: string): unknown => {
+  const node = findNodeAtLocation(root, [named]);
   return node === undefined ? undefined : getNodeValue(node);
 };
 
 const lineOfProperty = ({
   manifest,
-  key,
+  key: named,
 }: {
   manifest: PublishedManifest;
   key: string;
 }): number => {
-  const node = findNodeAtLocation(manifest.root, [key]);
+  const node = findNodeAtLocation(manifest.root, [named]);
   return manifest.source.slice(0, node?.offset ?? manifest.root.offset).split("\n").length;
 };
 
 const stringEntriesOf = (declared: unknown): readonly string[] | null =>
   Array.isArray(declared)
-    ? declared.filter((entry): entry is string => typeof entry === "string")
+    ? declared.filter((candidate): candidate is string => typeof candidate === "string")
     : null;
 
 const containsSkillFile = ({
@@ -46,11 +46,12 @@ const containsSkillFile = ({
   readonly directory: string;
   readonly config: IntentSkillsConfig;
 }): boolean => {
-  const entries = readUnlessMissing(() => readdirSync(directory, { withFileTypes: true })) ?? [];
-  return entries.some((entry) =>
-    entry.isDirectory()
-      ? containsSkillFile({ directory: join(directory, entry.name), config })
-      : entry.isFile() && entry.name === config.skillFileName,
+  const listedEntries =
+    readUnlessMissing(() => readdirSync(directory, { withFileTypes: true })) ?? [];
+  return listedEntries.some((listed) =>
+    listed.isDirectory()
+      ? containsSkillFile({ directory: join(directory, listed.name), config })
+      : listed.isFile() && listed.name === config.skillFileName,
   );
 };
 

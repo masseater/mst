@@ -7,7 +7,7 @@ export type BindingResolution = {
   readonly seenBindings: ReadonlySet<Variable>;
 };
 
-export const resolveBinding = (scope: Scope | null, name: string): Variable | null => {
+export const resolveBinding = (scope: Scope | null, spelled: string): Variable | null => {
   if (scope === null) return null;
-  return scope.set.get(name) ?? resolveBinding(scope.upper, name);
+  return scope.set.get(spelled) ?? resolveBinding(scope.upper, spelled);
 };

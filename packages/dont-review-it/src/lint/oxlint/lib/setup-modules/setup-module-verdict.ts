@@ -38,11 +38,11 @@ const TYPE_DECLARATION_TYPES: ReadonlySet<string> = new Set([
 ]);
 
 const isTypeStatement = (statement: AstFields): boolean => {
-  const type = nodeTypeOf(statement);
-  if (TYPE_DECLARATION_TYPES.has(type) || statement.declare === true) return true;
-  if (type === "ImportDeclaration") return statement.importKind === TYPE_ONLY_KIND;
-  if (type === "ExportAllDeclaration") return statement.exportKind === TYPE_ONLY_KIND;
-  if (type !== "ExportNamedDeclaration") return false;
+  const nodeType = nodeTypeOf(statement);
+  if (TYPE_DECLARATION_TYPES.has(nodeType) || statement.declare === true) return true;
+  if (nodeType === "ImportDeclaration") return statement.importKind === TYPE_ONLY_KIND;
+  if (nodeType === "ExportAllDeclaration") return statement.exportKind === TYPE_ONLY_KIND;
+  if (nodeType !== "ExportNamedDeclaration") return false;
   if (statement.exportKind === TYPE_ONLY_KIND) return true;
 
   const declared = astFieldsOf(statement.declaration);

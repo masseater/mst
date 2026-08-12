@@ -26,13 +26,15 @@ const exactRestatements: ReadonlyMap<string, string> = new Map(
   ),
 );
 
-const allowedMatchersFrom = (options: Readonly<Options>): ReadonlySet<string> => {
-  const [first] = options;
+const allowedMatchersFrom = (ruleOptions: Readonly<Options>): ReadonlySet<string> => {
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) return new Set();
 
   const configured = first[ALLOWED_MATCHERS_OPTION];
   if (!Array.isArray(configured)) return new Set();
-  return new Set(configured.filter((entry): entry is string => typeof entry === "string"));
+  return new Set(
+    configured.filter((candidate): candidate is string => typeof candidate === "string"),
+  );
 };
 
 const asymmetricReportFor = (matcher: string): RuleMessage | null => {
@@ -84,10 +86,10 @@ export const forbidWeakMatcher = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
-    const allowedMatchers = allowedMatchersFrom(context.options);
+    const allowedMatchers = allowedMatchersFrom(inspection.options);
 
     return {
       CallExpression(node: ESTree.CallExpression) {
@@ -99,7 +101,7 @@ export const forbidWeakMatcher = createDontReviewItRule({
 
         const report = reportFor(callee, matcher);
         if (report === null) return;
-        context.report({ node: callee.property, ...report });
+        inspection.report({ node: callee.property, ...report });
       },
     };
   },

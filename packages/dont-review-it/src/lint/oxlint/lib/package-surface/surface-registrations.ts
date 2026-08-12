@@ -35,8 +35,8 @@ type PackageSurfaceOptions = {
   readonly exceptions?: readonly SurfaceRegistration[];
 };
 
-const optionsOf = (options: Context["options"]): PackageSurfaceOptions =>
-  (options[0] ?? {}) as PackageSurfaceOptions;
+const optionsOf = (ruleOptions: Context["options"]): PackageSurfaceOptions =>
+  (ruleOptions[0] ?? {}) as PackageSurfaceOptions;
 
 const namesIn = (registrations: readonly SurfaceRegistration[]): ReadonlySet<string> =>
   new Set(
@@ -46,15 +46,15 @@ const namesIn = (registrations: readonly SurfaceRegistration[]): ReadonlySet<str
     }),
   );
 
-export const runnablePackagesFrom = (options: Context["options"]): ReadonlySet<string> =>
-  namesIn(optionsOf(options).runnablePackages ?? []);
+export const runnablePackagesFrom = (ruleOptions: Context["options"]): ReadonlySet<string> =>
+  namesIn(optionsOf(ruleOptions).runnablePackages ?? []);
 
-export const importablePackagesFrom = (options: Context["options"]): ReadonlySet<string> =>
-  namesIn(optionsOf(options).importablePackages ?? []);
+export const importablePackagesFrom = (ruleOptions: Context["options"]): ReadonlySet<string> =>
+  namesIn(optionsOf(ruleOptions).importablePackages ?? []);
 
-export const exemptPackagesFrom = (options: Context["options"]): ReadonlySet<string> =>
+export const exemptPackagesFrom = (ruleOptions: Context["options"]): ReadonlySet<string> =>
   namesIn(
-    (optionsOf(options).exceptions ?? []).filter(
+    (optionsOf(ruleOptions).exceptions ?? []).filter(
       (registration) => (registration.reason ?? "").trim() !== "",
     ),
   );

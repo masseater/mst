@@ -30,8 +30,8 @@ type HookReading = {
   readonly scopeAt: ScopeLookup;
 };
 
-const hookNamesFrom = (options: Readonly<Options>): ReadonlySet<string> => {
-  const [first] = options;
+const hookNamesFrom = (ruleOptions: Readonly<Options>): ReadonlySet<string> => {
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) {
     return new Set(INJECTED_TEST_HOOK_SPELLINGS);
   }
@@ -202,8 +202,8 @@ const calleeReports = (
     return callee.type === "Identifier" ? [{ call, name: callee.name }] : [];
   });
   const reaching = new Set(
-    uniq(called.map((reached) => reached.name)).filter((name) =>
-      reachesHookThrough({ ...reading, name }),
+    uniq(called.map((reached) => reached.name)).filter((spelled) =>
+      reachesHookThrough({ ...reading, name: spelled }),
     ),
   );
 
@@ -245,11 +245,11 @@ export const forbidTestHook = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
-    const hookNames = hookNamesFrom(context.options);
-    const scopeAt: ScopeLookup = (node) => context.sourceCode.getScope(node);
+    const hookNames = hookNamesFrom(inspection.options);
+    const scopeAt: ScopeLookup = (node) => inspection.sourceCode.getScope(node);
     const reading = { hookNames, scopeAt };
     const members = new Set<ESTree.MemberExpression>();
     const calls = new Set<ESTree.CallExpression>();
@@ -273,11 +273,11 @@ export const forbidTestHook = createDontReviewItRule({
           ...namespaceReports(members, { ...reading, namespaces }),
           ...calleeReports(calls, {
             hookNames,
-            module: moduleDeclarationsOf(context.filename, node.body),
+            module: moduleDeclarationsOf(inspection.filename, node.body),
           }),
         ];
 
-        for (const report of reports) context.report(report);
+        for (const report of reports) inspection.report(report);
       },
     };
   },

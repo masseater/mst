@@ -37,25 +37,25 @@ export const requireRegisteredFile = createDontReviewItRule({
     },
     schema: REQUIRED_FILE_SCHEMA,
   },
-  create(context) {
-    const entries = requiredFilesFrom(context.options);
-    if (entries.length === 0) return {};
+  create(inspection) {
+    const listedEntries = requiredFilesFrom(inspection.options);
+    if (listedEntries.length === 0) return {};
 
     return {
       Program(node: ESTree.Program) {
-        const fileDirectory = dirname(resolve(context.cwd, context.filename));
+        const fileDirectory = dirname(resolve(inspection.cwd, inspection.filename));
         const repositoryRoot = findWorkspaceRoot(fileDirectory);
         const packageDirectory = nearestPackageDirectory(fileDirectory, repositoryRoot);
         if (packageDirectory === null) return;
 
         const unmet = unmetRegistrationsIn({
           repositoryRoot,
-          entries,
-          unscannedDirectoryNames: unscannedDirectoryNamesFrom(context.options),
+          entries: listedEntries,
+          unscannedDirectoryNames: unscannedDirectoryNamesFrom(inspection.options),
         });
         const held = unmet.get(workspaceDirectoryOf({ repositoryRoot, packageDirectory })) ?? [];
         for (const report of held) {
-          context.report({ node, messageId: report.messageId, data: report.data });
+          inspection.report({ node, messageId: report.messageId, data: report.data });
         }
       },
     };

@@ -18,10 +18,10 @@ const noDebugger = createRule({
     },
     schema: [],
   },
-  create(context) {
+  create(inspection) {
     return {
       DebuggerStatement(node) {
-        context.report({ node, messageId: "debuggerFound" });
+        inspection.report({ node, messageId: "debuggerFound" });
       },
     };
   },

@@ -1,3 +1,5 @@
+import { isJsonObject } from "../restricted-targets/restricted-entries.ts";
+
 const DEPENDENCY_SECTIONS: readonly string[] = [
   "dependencies",
   "devDependencies",
@@ -13,13 +15,10 @@ export type DeclaredDependency = {
   readonly declaredVersion: string;
 };
 
-const isJsonObject = (value: unknown): value is Readonly<Record<string, unknown>> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
 const aliasTargetOf = (declaredVersion: string): string | null => {
-  const target = declaredVersion.slice(ALIAS_PROTOCOL.length);
-  const rangeAt = target.lastIndexOf("@");
-  const targetName = rangeAt > 0 ? target.slice(0, rangeAt) : target;
+  const checked = declaredVersion.slice(ALIAS_PROTOCOL.length);
+  const rangeAt = checked.lastIndexOf("@");
+  const targetName = rangeAt > 0 ? checked.slice(0, rangeAt) : checked;
   return targetName === "" ? null : targetName;
 };
 

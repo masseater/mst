@@ -56,8 +56,8 @@ type Report = {
   readonly data: Readonly<Record<string, number | string>>;
 };
 
-const maxAssertionsFrom = (options: Readonly<Options>): number => {
-  const [first] = options;
+const maxAssertionsFrom = (ruleOptions: Readonly<Options>): number => {
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) {
     return DEFAULT_MAX_ASSERTIONS;
   }
@@ -79,18 +79,22 @@ const helperCalledBy = (sourceCode: SourceCode, call: ESTree.CallExpression): Ca
   const binding = resolveBinding(sourceCode.getScope(call), callee.name);
   if (binding === null) return null;
 
-  const body = binding.defs
+  const declaredBody = binding.defs
     .flatMap((definition) => {
       const declared = declaredFunctionOf(definition);
       return declared === null ? [] : [declared];
     })
     .at(-1);
-  return body === undefined ? null : { kind: "helper", label: callee.name, body };
+  return declaredBody === undefined
+    ? null
+    : { kind: "helper", label: callee.name, body: declaredBody };
 };
 
-const isUnder = (owner: Owner | null, target: ESTree.Node): boolean => {
+const isUnder = (owner: Owner | null, enclosingNode: ESTree.Node): boolean => {
   if (owner === null) return false;
-  return owner.kind === "block" ? owner.block === target : owner.callee.body === target;
+  return owner.kind === "block"
+    ? owner.block === enclosingNode
+    : owner.callee.body === enclosingNode;
 };
 
 const inSourceOrder = <Held extends Placed>(placed: readonly Held[]): readonly Held[] =>
@@ -98,7 +102,7 @@ const inSourceOrder = <Held extends Placed>(placed: readonly Held[]): readonly H
 
 const beyondBudget = (placed: readonly Placed[], budget: number): readonly Placed[] =>
   inSourceOrder(placed)
-    .flatMap((entry) => range(0, entry.count).map(() => entry))
+    .flatMap((placement) => range(0, placement.count).map(() => placement))
     .slice(budget);
 
 const throughText = (reached: readonly Reached[]): string =>
@@ -121,8 +125,8 @@ const readingOf = (collected: {
   const blocks = new Map<ESTree.CallExpression, SpecFunction>(
     [...calls].flatMap((call): readonly (readonly [ESTree.CallExpression, SpecFunction])[] => {
       if (!declaresTestBlock(call, rootNames)) return [];
-      const body = testCallbacksOf(call).at(-1);
-      return body === undefined ? [] : [[call, body]];
+      const callbackBody = testCallbacksOf(call).at(-1);
+      return callbackBody === undefined ? [] : [[call, callbackBody]];
     }),
   );
   const calleeByCall = new Map<ESTree.CallExpression, Callee>(
@@ -155,18 +159,18 @@ const readingOf = (collected: {
 };
 
 const overflowingIn = (reading: Reading, budget: number): readonly Report[] => {
-  const carriedBy = (target: ESTree.Node): readonly ESTree.CallExpression[] =>
+  const carriedBy = (enclosingNode: ESTree.Node): readonly ESTree.CallExpression[] =>
     [...reading.assertions].filter((assertion) =>
-      isUnder(reading.ownerByCall.get(assertion) ?? null, target),
+      isUnder(reading.ownerByCall.get(assertion) ?? null, enclosingNode),
     );
-  const rootsUnder = (target: ESTree.Node): readonly Reached[] =>
+  const rootsUnder = (enclosingNode: ESTree.Node): readonly Reached[] =>
     [...reading.calleeByCall].flatMap(([call, through]) =>
-      isUnder(reading.ownerByCall.get(call) ?? null, target)
+      isUnder(reading.ownerByCall.get(call) ?? null, enclosingNode)
         ? [{ at: call, through, count: 0 }]
         : [],
     );
-  const fixtureRootsOf = (body: SpecFunction): readonly Reached[] =>
-    (fixtureDependenciesOf(body) ?? []).flatMap((dependency) => {
+  const fixtureRootsOf = (fixtureBody: SpecFunction): readonly Reached[] =>
+    (fixtureDependenciesOf(fixtureBody) ?? []).flatMap((dependency) => {
       const through = reading.fixtures.get(dependency.name);
       return through === undefined ? [] : [{ at: dependency.property, through, count: 0 }];
     });
@@ -181,23 +185,25 @@ const overflowingIn = (reading: Reading, budget: number): readonly Report[] => {
     if (seen.has(source.body)) return 0;
     seen.add(source.body);
     return reachedFrom(source).reduce(
-      (total, next) => total + assertionsThrough(next, seen),
+      (counted, reachedCallee) => counted + assertionsThrough(reachedCallee, seen),
       carriedBy(source.body).length,
     );
   };
 
-  return [...reading.blocks].flatMap(([block, body]) => {
+  return [...reading.blocks].flatMap(([block, blockBody]) => {
     const seen = new Set<SpecFunction>();
-    const reached = inSourceOrder([...fixtureRootsOf(body), ...rootsUnder(block)]).map((root) => ({
-      ...root,
-      count: assertionsThrough(root.through, seen),
-    }));
+    const reached = inSourceOrder([...fixtureRootsOf(blockBody), ...rootsUnder(block)]).map(
+      (root) => ({
+        ...root,
+        count: assertionsThrough(root.through, seen),
+      }),
+    );
     const direct = carriedBy(block);
     const placed: readonly Placed[] = [
       ...direct.map((assertion) => ({ at: assertion, count: 1 })),
       ...reached,
     ];
-    const attributed = placed.reduce((total, entry) => total + entry.count, 0);
+    const attributed = placed.reduce((counted, placement) => counted + placement.count, 0);
     const elsewhere = throughText(reached);
     return beyondBudget(placed, budget).map(
       (overflowing): Report => ({
@@ -235,10 +241,10 @@ export const forbidMultiExpectIt = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
-    const budget = maxAssertionsFrom(context.options);
+    const budget = maxAssertionsFrom(inspection.options);
     const blockBindings = testBlockBindings();
     const calls = new Set<ESTree.CallExpression>();
     const assertions = new Set<ESTree.CallExpression>();
@@ -269,9 +275,9 @@ export const forbidMultiExpectIt = createDontReviewItRule({
           calls,
           fixtures,
           rootNames: blockBindings.rootNames(),
-          sourceCode: context.sourceCode,
+          sourceCode: inspection.sourceCode,
         });
-        for (const report of overflowingIn(reading, budget)) context.report(report);
+        for (const report of overflowingIn(reading, budget)) inspection.report(report);
       },
     };
   },

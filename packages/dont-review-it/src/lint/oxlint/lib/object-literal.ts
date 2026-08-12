@@ -29,8 +29,8 @@ export const nestedObjectAt = ({
   readonly object: ESTree.ObjectExpression;
   readonly path: readonly string[];
 }): ESTree.ObjectExpression | null =>
-  path.reduce<ESTree.ObjectExpression | null>((current, key) => {
-    if (current === null) return null;
-    const nested = objectValueOf({ object: current, key });
+  path.reduce<ESTree.ObjectExpression | null>((reached, named) => {
+    if (reached === null) return null;
+    const nested = objectValueOf({ object: reached, key: named });
     return nested?.type === "ObjectExpression" ? nested : null;
   }, object);

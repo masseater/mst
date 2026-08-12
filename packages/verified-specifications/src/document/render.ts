@@ -16,22 +16,22 @@ const PROVENANCE_LINE =
   "生成物。`vp run guard:fix` が `specs/` の仕様担保テストから再生成する。手で編集しない。";
 
 const mergedSubjects = (subjects: readonly ListedSubject[]): readonly MergedSubject[] =>
-  subjects.reduce<readonly MergedSubject[]>((merged, entry) => {
-    const known = merged.find((candidate) => candidate.subject === entry.subject);
+  subjects.reduce<readonly MergedSubject[]>((mergedOnes, listed) => {
+    const known = mergedOnes.find((candidate) => candidate.subject === listed.subject);
     if (known === undefined) {
       return [
-        ...merged,
-        { subject: entry.subject, claims: entry.claims, sourceFiles: [entry.sourceFile] },
+        ...mergedOnes,
+        { subject: listed.subject, claims: listed.claims, sourceFiles: [listed.sourceFile] },
       ];
     }
-    return merged.map((candidate) =>
+    return mergedOnes.map((candidate) =>
       candidate === known
         ? {
             subject: candidate.subject,
-            claims: [...candidate.claims, ...entry.claims],
-            sourceFiles: candidate.sourceFiles.includes(entry.sourceFile)
+            claims: [...candidate.claims, ...listed.claims],
+            sourceFiles: candidate.sourceFiles.includes(listed.sourceFile)
               ? candidate.sourceFiles
-              : [...candidate.sourceFiles, entry.sourceFile],
+              : [...candidate.sourceFiles, listed.sourceFile],
           }
         : candidate,
     );
@@ -48,13 +48,13 @@ export const renderSpecificationsDocument = (input: {
     `# ${input.packageName}`,
     "",
     PROVENANCE_LINE,
-    ...mergedSubjects(input.subjects).flatMap((entry) => [
+    ...mergedSubjects(input.subjects).flatMap((listed) => [
       "",
-      `## ${entry.subject}`,
+      `## ${listed.subject}`,
       "",
-      sourceLinksOf(entry.sourceFiles),
+      sourceLinksOf(listed.sourceFiles),
       "",
-      ...entry.claims.map((claim) => `- ${claim}`),
+      ...listed.claims.map((claim: string) => `- ${claim}`),
     ]),
   ]
     .map((line) => `${line}\n`)

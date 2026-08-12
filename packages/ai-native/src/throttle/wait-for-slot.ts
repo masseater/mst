@@ -29,16 +29,16 @@ type PollState = {
   lastPrinted: string;
 };
 
-const reportProgress = (configuration: WaitConfiguration, state: PollState): string => {
+const reportProgress = (configuration: WaitConfiguration, heldState: PollState): string => {
   const waiting = sweepWaiters(configuration.slotDir);
-  const line = `throttle: waiting ${waiting.indexOf(state.entryName) + 1}/${waiting.length}`;
+  const line = `throttle: waiting ${waiting.indexOf(heldState.entryName) + 1}/${waiting.length}`;
   if (configuration.interactive) {
-    const elapsedSec = Math.floor((Date.now() - state.startedAt) / 1000);
+    const elapsedSec = Math.floor((Date.now() - heldState.startedAt) / 1000);
     process.stderr.write(`\r\u001B[K${line} ${elapsedSec}s`);
-    return state.lastPrinted;
+    return heldState.lastPrinted;
   }
   const printKey = `${line}|${slotStateFingerprint(configuration.slotDir, configuration.limit)}`;
-  if (printKey !== state.lastPrinted) process.stderr.write(`${line}\n`);
+  if (printKey !== heldState.lastPrinted) process.stderr.write(`${line}\n`);
   return printKey;
 };
 
@@ -56,18 +56,18 @@ const budgetExhausted = (configuration: WaitConfiguration): "budget-exhausted" =
 
 const pollForSlot = async (
   configuration: WaitConfiguration,
-  state: PollState,
+  heldState: PollState,
 ): Promise<SlotHold | "budget-exhausted"> => {
-  const lastPrinted = reportProgress(configuration, state);
+  const lastPrinted = reportProgress(configuration, heldState);
   const hold = await tryAcquireAny(configuration);
   if (hold !== null) {
     closeProgressLine(configuration);
     return hold;
   }
-  if (Date.now() - state.startedAt >= configuration.waitBudgetMs)
+  if (Date.now() - heldState.startedAt >= configuration.waitBudgetMs)
     return budgetExhausted(configuration);
   await delay(configuration.pollMs);
-  return pollForSlot(configuration, { ...state, lastPrinted });
+  return pollForSlot(configuration, { ...heldState, lastPrinted });
 };
 
 export const waitForSlot = async (

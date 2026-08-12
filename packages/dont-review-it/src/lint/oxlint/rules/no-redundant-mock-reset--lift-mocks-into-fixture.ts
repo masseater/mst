@@ -52,16 +52,16 @@ type Reading = {
   readonly mock: ReachLookup;
 };
 
-const cleanupMembersFrom = (options: Readonly<Options>): CleanupMembers => ({
-  perMock: spellingsFrom(options, {
+const cleanupMembersFrom = (ruleOptions: Readonly<Options>): CleanupMembers => ({
+  perMock: spellingsFrom(ruleOptions, {
     option: PER_MOCK_RESET_MEMBERS_OPTION,
     fallback: DEFAULT_PER_MOCK_RESET_MEMBERS,
   }),
-  bulkReset: spellingsFrom(options, {
+  bulkReset: spellingsFrom(ruleOptions, {
     option: BULK_RESET_MEMBERS_OPTION,
     fallback: DEFAULT_BULK_RESET_MEMBERS,
   }),
-  bulkRelease: spellingsFrom(options, {
+  bulkRelease: spellingsFrom(ruleOptions, {
     option: BULK_STUB_RELEASE_MEMBERS_OPTION,
     fallback: DEFAULT_BULK_STUB_RELEASE_MEMBERS,
   }),
@@ -247,9 +247,9 @@ export const noRedundantMockReset = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    const scopeAt = (node: ESTree.Node): Scope => context.sourceCode.getScope(node);
-    const namespace = mockNamespaceFrom(context.options);
+  create(inspection) {
+    const scopeAt = (node: ESTree.Node): Scope => inspection.sourceCode.getScope(node);
+    const namespace = mockNamespaceFrom(inspection.options);
     const namespaceLookup: ReachLookup = {
       scopeAt,
       seen: new Set(),
@@ -257,7 +257,7 @@ export const noRedundantMockReset = createDontReviewItRule({
       isImportedSource: (exported) => exported === namespace,
     };
     const reading: Reading = {
-      members: cleanupMembersFrom(context.options),
+      members: cleanupMembersFrom(inspection.options),
       namespace: namespaceLookup,
       mock: {
         scopeAt,
@@ -267,9 +267,9 @@ export const noRedundantMockReset = createDontReviewItRule({
         isImportedSource: () => false,
       },
     };
-    const reportFound = (node: ESTree.Node, message: RuleMessage | null): void => {
-      if (message === null) return;
-      context.report({ node, messageId: message.messageId, data: message.data });
+    const reportFound = (node: ESTree.Node, complaint: RuleMessage | null): void => {
+      if (complaint === null) return;
+      inspection.report({ node, messageId: complaint.messageId, data: complaint.data });
     };
 
     return {

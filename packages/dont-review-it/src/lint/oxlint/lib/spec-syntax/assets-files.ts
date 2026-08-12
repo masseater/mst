@@ -8,9 +8,9 @@ const ASSETS_NAME_MARKERS_OPTION = "assetsNameMarkers";
 
 const NAME_SEPARATOR = ".";
 
-export const assetsNameMarkersFrom = (options: Readonly<Options>): ReadonlySet<string> =>
+export const assetsNameMarkersFrom = (ruleOptions: Readonly<Options>): ReadonlySet<string> =>
   new Set(
-    configuredSuffixesFrom(options, {
+    configuredSuffixesFrom(ruleOptions, {
       optionName: ASSETS_NAME_MARKERS_OPTION,
       carried: DEFAULT_ASSETS_NAME_MARKERS,
     }),

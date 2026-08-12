@@ -41,19 +41,19 @@ const standsInsideTest = (node: ESTree.Node, regions: readonly ESTree.Node[]): b
   regions.some((region) => region.start <= node.start && node.end <= region.end);
 
 const writtenLeavesOf = (
-  target:
+  checked:
     | ESTree.AssignmentTargetMaybeDefault
     | ESTree.AssignmentTargetProperty
     | ESTree.AssignmentTargetRest,
 ): readonly ESTree.Expression[] => {
-  if (target.type === "ArrayPattern") {
-    return target.elements.flatMap((element) => (element === null ? [] : writtenLeavesOf(element)));
+  if (checked.type === "ArrayPattern") {
+    return checked.elements.flatMap((held) => (held === null ? [] : writtenLeavesOf(held)));
   }
-  if (target.type === "ObjectPattern") return target.properties.flatMap(writtenLeavesOf);
-  if (target.type === "Property") return writtenLeavesOf(target.value);
-  if (target.type === "RestElement") return writtenLeavesOf(target.argument);
-  if (target.type === "AssignmentPattern") return writtenLeavesOf(target.left);
-  return [unwrapSubject(target)];
+  if (checked.type === "ObjectPattern") return checked.properties.flatMap(writtenLeavesOf);
+  if (checked.type === "Property") return writtenLeavesOf(checked.value);
+  if (checked.type === "RestElement") return writtenLeavesOf(checked.argument);
+  if (checked.type === "AssignmentPattern") return writtenLeavesOf(checked.left);
+  return [unwrapSubject(checked)];
 };
 
 const memberWriteOf = (node: ESTree.Node, leaf: ESTree.Expression): readonly StateWrite[] => {
@@ -150,10 +150,10 @@ export const noModuleScopeMutableState = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, DEFAULT_SPEC_FILE_SUFFIXES)) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, DEFAULT_SPEC_FILE_SUFFIXES)) return {};
 
-    const scopeAt: ScopeLookup = (node) => context.sourceCode.getScope(node);
+    const scopeAt: ScopeLookup = (node) => inspection.sourceCode.getScope(node);
     const namespaces: NamespaceLookup = {
       scopeAt,
       spellings: new Set(DEFAULT_MOCK_NAMESPACE_SPELLINGS),
@@ -189,7 +189,7 @@ export const noModuleScopeMutableState = createDontReviewItRule({
     return {
       ImportDeclaration(node: ESTree.ImportDeclaration) {
         blocks.takeImport(node);
-        for (const name of hookLocalNamesIn(node)) hookNames.add(name);
+        for (const spelled of hookLocalNamesIn(node)) hookNames.add(spelled);
       },
       VariableDeclarator(node: ESTree.VariableDeclarator) {
         blocks.takeLocalBinding(node);
@@ -217,7 +217,7 @@ export const noModuleScopeMutableState = createDontReviewItRule({
             if (write.messageId === REBINDING_MESSAGE && !declaresRebindableName(definition)) {
               continue;
             }
-            context.report({
+            inspection.report({
               node: write.node,
               messageId: write.messageId,
               data: { name: write.root.name, origin: originOf(definition), member: write.member },

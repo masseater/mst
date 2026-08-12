@@ -79,11 +79,16 @@ export const entryReachableFilesOf = ({
   const remembered = reachableByPackage.get(packageDirectory);
   if (remembered !== undefined) return remembered;
 
-  const entries = publicEntryFilesOf(packageDirectory);
+  const listedEntries = publicEntryFilesOf(packageDirectory);
   const reachable =
-    entries === null
+    listedEntries === null
       ? null
-      : reachedFrom({ frontier: entries, reached: new Set(), packageDirectory, workspaceRoot });
+      : reachedFrom({
+          frontier: listedEntries,
+          reached: new Set(),
+          packageDirectory,
+          workspaceRoot,
+        });
   reachableByPackage.set(packageDirectory, reachable);
   return reachable;
 };

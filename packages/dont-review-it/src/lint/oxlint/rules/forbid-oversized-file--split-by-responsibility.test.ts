@@ -3,8 +3,8 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { forbidOversizedFile } from "./forbid-oversized-file--split-by-responsibility.ts";
 
-const sourceOfLines = (count: number): string =>
-  Array.from({ length: count }, (_, index) => `const line${index} = ${index};`).join("\n");
+const sourceOfLines = (counted: number): string =>
+  Array.from({ length: counted }, (_, index) => `const line${index} = ${index};`).join("\n");
 
 describe("dont-review-it/forbid-oversized-file--split-by-responsibility", () => {
   testLintRule(forbidOversizedFile, {
@@ -94,7 +94,7 @@ describe("dont-review-it/forbid-oversized-file--split-by-responsibility", () => 
         errors: [{ messageId: "oversizedFile", data: { codeLines: 3, maxLines: 2 } }],
       },
       {
-        name: "comments between code lines do not lower the count of the code lines themselves",
+        name: "comments between code lines do not lower the counted of the code lines themselves",
         code: "const first = 1;\n// a note about the next line\nconst second = 2;",
         options: [{ maxLines: 1 }],
         errors: [{ messageId: "oversizedFile", data: { codeLines: 2, maxLines: 1 } }],

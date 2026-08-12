@@ -38,7 +38,7 @@ describe("dont-review-it/no-fixture-construct-in-use--yield-sut-output", () => {
       {
         name: "a buffer a statement fills is filled by the run, not by the spec",
         filename: SPEC_FILE,
-        code: 'const test = baseTest.extend("collected", async () => {\n  const collected = [];\n  const record = await run();\n  collected.push(record);\n  return collected;\n});',
+        code: 'const test = baseTest.extend("collected", async () => {\n  const collected = [];\n  const record = await run();\n  collected.push(written);\n  return collected;\n});',
       },
       {
         name: "a binding another fixture handed over is not a value this fixture built",

@@ -45,7 +45,8 @@ const KEY_FIELD_BY_NODE_TYPE: ReadonlyMap<string, string> = new Map([
   ["TSPropertySignature", "key"],
 ]);
 
-const lineAt = (text: string, offset: number): number => text.slice(0, offset).split("\n").length;
+const lineAt = (writtenText: string, offset: number): number =>
+  writtenText.slice(0, offset).split("\n").length;
 
 const withoutRetiredTags = (commentValue: string): string =>
   RETIRED_ANNOTATION_TAGS.reduce((remaining, tag) => remaining.replaceAll(tag, ""), commentValue);
@@ -90,7 +91,7 @@ const spelledOutValuesIn = (node: unknown): readonly CanonicalValue[] => {
   const keyField = KEY_FIELD_BY_NODE_TYPE.get(fields[NODE_TYPE_FIELD]);
   return Object.entries(fields)
     .filter(([field]) => field !== NODE_TYPE_FIELD && field !== keyField)
-    .flatMap(([, value]) => spelledOutValuesIn(value));
+    .flatMap(([, held]) => spelledOutValuesIn(held));
 };
 
 const declarationAfter = (program: ParseResult["program"], comment: Comment): unknown =>
@@ -157,9 +158,9 @@ export const scanCanonicalValuesText = (
   sourceText: string,
   sourceName: string = DEFAULT_SOURCE_NAME,
 ): CanonicalValuesTextScan => {
-  const parsed = parseSync(sourceName, sourceText);
-  const source: ParsedSource = { sourceText, program: parsed.program };
-  const scans = parsed.comments.map((comment) => scanComment(source, comment));
+  const parsedNode = parseSync(sourceName, sourceText);
+  const source: ParsedSource = { sourceText, program: parsedNode.program };
+  const scans = parsedNode.comments.map((comment) => scanComment(source, comment));
 
   return {
     declarations: scans.flatMap((scan) => scan.declarations),

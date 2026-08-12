@@ -17,7 +17,7 @@ const pathsCovering = (
   );
 
 describe("specifier-exceptions", () => {
-  test("an entry names the path it covers and the grounds it carries", () => {
+  test("an listed names the path it covers and the grounds it carries", () => {
     expect(
       specifierExceptionsIn([
         { exceptions: [{ path: "apps/host/**", reason: "the candidates arrive as settings" }] },
@@ -25,25 +25,25 @@ describe("specifier-exceptions", () => {
     ).toStrictEqual([{ path: "apps/host/**", reason: "the candidates arrive as settings" }]);
   });
 
-  test("an entry whose grounds are only spacing carries no grounds", () => {
-    const [entry] = specifierExceptionsIn([
+  test("an listed whose grounds are only spacing carries no grounds", () => {
+    const [listed] = specifierExceptionsIn([
       { exceptions: [{ path: "apps/host/**", reason: "  " }] },
     ]);
-    expect(entry === undefined ? null : carriesGrounds(entry)).toBe(false);
+    expect(listed === undefined ? null : carriesGrounds(listed)).toBe(false);
   });
 
-  test("an entry written without grounds at all carries no grounds", () => {
-    const [entry] = specifierExceptionsIn([{ exceptions: [{ path: "apps/host/**" }] }]);
-    expect(entry === undefined ? null : carriesGrounds(entry)).toBe(false);
+  test("an listed written without grounds at all carries no grounds", () => {
+    const [listed] = specifierExceptionsIn([{ exceptions: [{ path: "apps/host/**" }] }]);
+    expect(listed === undefined ? null : carriesGrounds(listed)).toBe(false);
   });
 
-  test("an entry that names no path registers nothing", () => {
+  test("an listed that names no path registers nothing", () => {
     expect(
       specifierExceptionsIn([{ exceptions: [{ reason: "the candidates arrive as settings" }] }]),
     ).toStrictEqual([]);
   });
 
-  test("an entry that is not written as a record registers nothing", () => {
+  test("an listed that is not written as a record registers nothing", () => {
     expect(specifierExceptionsIn([{ exceptions: ["apps/host/**", null, []] }])).toStrictEqual([]);
   });
 
@@ -59,7 +59,7 @@ describe("specifier-exceptions", () => {
     expect(specifierExceptionsIn([])).toStrictEqual([]);
   });
 
-  test("an entry covers the files its pattern reaches", () => {
+  test("an listed covers the files its pattern reaches", () => {
     expect(
       pathsCovering(
         [{ path: "apps/host/**", reason: "the candidates arrive as settings" }],
@@ -68,7 +68,7 @@ describe("specifier-exceptions", () => {
     ).toStrictEqual(["apps/host/**"]);
   });
 
-  test("an entry covers no file its pattern misses", () => {
+  test("an listed covers no file its pattern misses", () => {
     expect(
       pathsCovering(
         [{ path: "apps/host/**", reason: "the candidates arrive as settings" }],

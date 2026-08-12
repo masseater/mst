@@ -46,11 +46,12 @@ const settledNames = (
   initializers: ReadonlyMap<string, ESTree.Expression>,
 ): ReadonlySet<string> => {
   const gained = [...initializers].filter(
-    ([name, initializer]) => !reached.has(name) && reached.has(boundRootName(initializer) ?? ""),
+    ([spelled, initializer]) =>
+      !reached.has(spelled) && reached.has(boundRootName(initializer) ?? ""),
   );
   if (gained.length === 0) return reached;
 
-  for (const [name] of gained) reached.add(name);
+  for (const [spelled] of gained) reached.add(spelled);
   return settledNames(reached, initializers);
 };
 
@@ -60,7 +61,7 @@ const blockBindingsOf = (spellings: ReadonlySet<string>): TestBlockBindings => {
 
   return {
     takeImport: (declaration) => {
-      for (const name of importedBlockNames(declaration, spellings)) imported.add(name);
+      for (const spelled of importedBlockNames(declaration, spellings)) imported.add(spelled);
     },
     takeLocalBinding: (declarator) => {
       if (declarator.id.type !== "Identifier") return;

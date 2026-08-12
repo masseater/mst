@@ -14,9 +14,9 @@ const createFixtureDirectory = (): string => {
   return root;
 };
 
-const writeManifest = (root: string, text: string): string => {
+const writeManifest = (root: string, writtenText: string): string => {
   const path = join(root, "package.json");
-  writeFileSync(path, text, "utf8");
+  writeFileSync(path, writtenText, "utf8");
   return path;
 };
 

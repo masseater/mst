@@ -37,7 +37,7 @@ export const noPromiseChain = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
+  create(inspection) {
     return {
       CallExpression(node: ESTree.CallExpression) {
         const { callee } = node;
@@ -46,7 +46,7 @@ export const noPromiseChain = createDontReviewItRule({
         const method = chainMemberName(callee);
         if (method === null || !CHAIN_MEMBER_NAMES.has(method)) return;
 
-        context.report({
+        inspection.report({
           node: callee.property,
           messageId: "promiseChainCall",
           data: { method },

@@ -13,8 +13,8 @@ import { testBlockRootIdentifier } from "../lib/spec-syntax/test-block-modifiers
 
 import type { ESTree, FixFn, Options, Variable } from "@oxlint/plugins";
 
-const blockSpellingFrom = (options: Readonly<Options>): string => {
-  const [first] = options;
+const blockSpellingFrom = (ruleOptions: Readonly<Options>): string => {
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) return "it";
 
   const { blockSpelling } = first;
@@ -31,20 +31,20 @@ const blockBodiesOf = (call: ESTree.CallExpression): readonly BlockBody[] => {
   const root = testBlockRootIdentifier(call.callee);
   if (root === null || !carriesSpelledTitle(call)) return [];
 
-  return testCallbacksOf(call).map((callback) => ({
+  return testCallbacksOf(call).map((testCallback) => ({
     root,
-    start: callback.start,
-    end: callback.end,
+    start: testCallback.start,
+    end: testCallback.end,
   }));
 };
 
 const innermostBodyAround = (
   assertion: ESTree.CallExpression,
-  bodies: readonly BlockBody[],
+  blockBodies: readonly BlockBody[],
 ): BlockBody | null =>
-  bodies
-    .filter((body) => body.start <= assertion.start && assertion.end <= body.end)
-    .toSorted((held, other) => other.start - held.start)
+  blockBodies
+    .filter((blockBody) => blockBody.start <= assertion.start && assertion.end <= blockBody.end)
+    .toSorted((held, later) => later.start - held.start)
     .at(0) ?? null;
 
 const derivedFactoryBase = (initializer: ESTree.Expression): ESTree.Expression | null => {
@@ -60,10 +60,10 @@ const namesRootedAt = (
   reached: Set<string>,
   bases: ReadonlyMap<string, string>,
 ): ReadonlySet<string> => {
-  const gained = [...bases].filter(([name, base]) => !reached.has(name) && reached.has(base));
+  const gained = [...bases].filter(([derived, base]) => !reached.has(derived) && reached.has(base));
   if (gained.length === 0) return reached;
 
-  for (const [name] of gained) reached.add(name);
+  for (const [derived] of gained) reached.add(derived);
   return namesRootedAt(reached, bases);
 };
 
@@ -118,8 +118,8 @@ export const noExpectOutsideIt = createDontReviewItRule({
     ],
     fixable: "code",
   },
-  create(context) {
-    const required = blockSpellingFrom(context.options);
+  create(inspection) {
+    const required = blockSpellingFrom(inspection.options);
     const bindings = testBlockBindings();
     const calls = new Set<ESTree.CallExpression>();
     const harvested = {
@@ -142,7 +142,7 @@ export const noExpectOutsideIt = createDontReviewItRule({
     };
 
     const renameFixOf = (root: ESTree.IdentifierReference): FixFn | null => {
-      const scope = context.sourceCode.getScope(root);
+      const scope = inspection.sourceCode.getScope(root);
       const bound = resolveBinding(scope, root.name);
       if (bound === null) {
         return INJECTED_TEST_BLOCK_SPELLINGS.has(required)
@@ -157,19 +157,19 @@ export const noExpectOutsideIt = createDontReviewItRule({
       return (fixer) => renamedSpots(bound).map((spot) => fixer.replaceText(spot, required));
     };
 
-    const reportPlacement = (assertion: ESTree.CallExpression, body: BlockBody): void => {
-      const written = body.root.name;
+    const reportPlacement = (assertion: ESTree.CallExpression, blockBody: BlockBody): void => {
+      const written = blockBody.root.name;
       if (written === required) return;
 
       const spelling = { written, required };
       if (!bindings.rootNames().has(written)) {
-        context.report({ node: assertion, messageId: "groupingBlockAssertion", data: spelling });
+        inspection.report({ node: assertion, messageId: "groupingBlockAssertion", data: spelling });
         return;
       }
 
-      const fix = fixedRoots.has(body.root.start) ? null : renameFixOf(body.root);
-      if (fix !== null) fixedRoots.add(body.root.start);
-      context.report({
+      const fix = fixedRoots.has(blockBody.root.start) ? null : renameFixOf(blockBody.root);
+      if (fix !== null) fixedRoots.add(blockBody.root.start);
+      inspection.report({
         node: assertion,
         messageId: "foreignTestBlockAssertion",
         data: spelling,
@@ -181,23 +181,23 @@ export const noExpectOutsideIt = createDontReviewItRule({
       ImportDeclaration: bindings.takeImport,
       VariableDeclarator: takeDerivation,
       ExportNamedDeclaration(node: ESTree.ExportNamedDeclaration) {
-        for (const name of exportedNamesOf(node)) harvested.exportedNames.add(name);
+        for (const exportedName of exportedNamesOf(node)) harvested.exportedNames.add(exportedName);
       },
       CallExpression(node: ESTree.CallExpression) {
         calls.add(node);
       },
       "Program:exit"() {
-        const bodies = [...calls].flatMap((call) => blockBodiesOf(call));
+        const blockBodies = [...calls].flatMap((call) => blockBodiesOf(call));
 
         for (const call of calls) {
           if (!isAssertionEntryCall(call)) continue;
 
-          const body = innermostBodyAround(call, bodies);
-          if (body === null) {
-            context.report({ node: call, messageId: "detachedAssertion", data: { required } });
+          const blockBody = innermostBodyAround(call, blockBodies);
+          if (blockBody === null) {
+            inspection.report({ node: call, messageId: "detachedAssertion", data: { required } });
             continue;
           }
-          reportPlacement(call, body);
+          reportPlacement(call, blockBody);
         }
       },
     };

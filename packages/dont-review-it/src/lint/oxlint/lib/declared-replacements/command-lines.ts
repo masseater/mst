@@ -87,7 +87,7 @@ const withoutVersion = (token: string): string => {
 
 const addressElementsOf = (token: string): readonly string[] =>
   ADDRESS_TOKEN.test(token)
-    ? token.split(ADDRESS_ELEMENT_SEPARATOR).filter((element) => element !== "")
+    ? token.split(ADDRESS_ELEMENT_SEPARATOR).filter((held) => held !== "")
     : [];
 
 const namesUnderSegment = (segment: CommandSegment): readonly string[] => {

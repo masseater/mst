@@ -22,10 +22,10 @@ describe("verify", () => {
     onTestFinished(() => {
       rmSync(root, { recursive: true, force: true });
     });
-    for (const [path, text] of Object.entries(files)) {
-      const target = join(root, path);
-      mkdirSync(dirname(target), { recursive: true });
-      writeFileSync(target, text, "utf8");
+    for (const [path, source] of Object.entries(files)) {
+      const absolutePath = join(root, path);
+      mkdirSync(dirname(absolutePath), { recursive: true });
+      writeFileSync(absolutePath, source, "utf8");
     }
     return root;
   };
@@ -38,11 +38,11 @@ ${declaration}
   const declaring = (conceptId: string, binding: string): string =>
     annotatedWith(conceptId, `export const ${binding} = ["draft"] as const;`);
 
-  const conceptIdsOf = (group: readonly { readonly conceptId: string }[]): readonly string[] =>
-    group.map((entry) => entry.conceptId);
+  const conceptIdsOf = (grouped: readonly { readonly conceptId: string }[]): readonly string[] =>
+    grouped.map((listed) => listed.conceptId);
 
   const catalogPathsOf = (repositoryRoot: string): readonly string[] =>
-    buildCanonicalValuesCatalog({ repositoryRoot }).entries.map((entry) => entry.declarationPath);
+    buildCanonicalValuesCatalog({ repositoryRoot }).entries.map((listed) => listed.declarationPath);
 
   test("a repository whose annotations are all well formed yields no problem", () => {
     const repositoryRoot = repositoryWith({
@@ -152,7 +152,7 @@ const FIXTURE_STATUSES = ["draft"] as const;
     expect(verifyCanonicalValues({ repositoryRoot })).toStrictEqual([]);
   });
 
-  test("two concepts that declare the same value set are reported as one group", () => {
+  test("two concepts that declare the same value set are reported as one grouped", () => {
     const repositoryRoot = repositoryWith({
       "src/article.ts": `/** ${CANONICAL_VALUES_TAG} article.status */
 export const ARTICLE_STATUSES = ["published", "draft"] as const;
@@ -164,12 +164,12 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
 
     const { entries } = buildCanonicalValuesCatalog({ repositoryRoot });
 
-    expect(findEquivalentConcepts(entries).map((group) => conceptIdsOf(group))).toStrictEqual([
+    expect(findEquivalentConcepts(entries).map((grouped) => conceptIdsOf(grouped))).toStrictEqual([
       ["article.status", "order.status"],
     ]);
   });
 
-  test("concepts that declare different value sets form no group", () => {
+  test("concepts that declare different value sets form no grouped", () => {
     const repositoryRoot = repositoryWith({
       "src/article.ts": `/** ${CANONICAL_VALUES_TAG} article.status */
 export const ARTICLE_STATUSES = ["published", "archived"] as const;
@@ -228,7 +228,7 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
     );
   });
 
-  test("a group of equivalent concepts is reported with its shared values", () => {
+  test("a grouped of equivalent concepts is reported with its shared values", () => {
     expect(
       formatEquivalentConceptGroup([
         {
@@ -291,10 +291,10 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
   ];
 
   const cataloguedRows = (repositoryRoot: string): readonly unknown[] =>
-    buildCanonicalValuesCatalog({ repositoryRoot }).entries.map((entry) => [
-      entry.declarationPath,
-      entry.conceptId,
-      entry.values,
+    buildCanonicalValuesCatalog({ repositoryRoot }).entries.map((listed) => [
+      listed.declarationPath,
+      listed.conceptId,
+      listed.values,
     ]);
 
   const verifiedRows = (repositoryRoot: string): readonly unknown[] =>

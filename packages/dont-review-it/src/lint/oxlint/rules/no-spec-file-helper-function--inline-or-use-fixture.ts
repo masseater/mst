@@ -50,7 +50,7 @@ const standsInHelperScope = (held: ESTree.Node, reading: ScopeReading): boolean 
   const holder = innermostHolderOf(held, reading.functions);
   if (holder === null) return true;
   return reading.groupingBodies.some(
-    (body) => body.start === holder.start && body.end === holder.end,
+    (writtenBody) => writtenBody.start === holder.start && writtenBody.end === holder.end,
   );
 };
 
@@ -66,8 +66,8 @@ const functionsInLiteral = (written: ESTree.Expression): readonly ESTree.Express
     );
   }
   if (written.type !== "ArrayExpression") return [];
-  return written.elements.flatMap((element) =>
-    element === null || element.type === "SpreadElement" ? [] : heldFunctionsIn(element),
+  return written.elements.flatMap((held) =>
+    held === null || held.type === "SpreadElement" ? [] : heldFunctionsIn(held),
   );
 };
 
@@ -77,14 +77,14 @@ const functionsHeldByLiteral = (initializer: ESTree.Expression): readonly ESTree
   return functionsInLiteral(written);
 };
 
-const functionsHandedBack = (fn: SpecFunction): readonly ESTree.Expression[] =>
-  returnedExpressionsOf(fn).flatMap((handed) => {
+const functionsHandedBack = (takenFunction: SpecFunction): readonly ESTree.Expression[] =>
+  returnedExpressionsOf(takenFunction).flatMap((handed) => {
     const written = unwrapSubject(handed);
     return asSpecFunction(written) === null ? [] : [written];
   });
 
-const anythingHandedBack = (fn: SpecFunction): readonly ESTree.Expression[] =>
-  returnedExpressionsOf(fn).flatMap((handed) => heldFunctionsIn(handed));
+const anythingHandedBack = (takenFunction: SpecFunction): readonly ESTree.Expression[] =>
+  returnedExpressionsOf(takenFunction).flatMap((handed) => heldFunctionsIn(handed));
 
 const declaredFunctionOf = (declared: ESTree.Node): SpecFunction | null => {
   if (declared.type === "FunctionDeclaration") return declared;
@@ -119,8 +119,8 @@ const disguisedYieldOf = (
   return factory === null ? [] : functionsHandedBack(factory);
 };
 
-const boundNameOf = (target: ESTree.VariableDeclarator["id"], source: string): string =>
-  target.type === "Identifier" ? target.name : source.slice(target.start, target.end);
+const boundNameOf = (checked: ESTree.VariableDeclarator["id"], source: string): string =>
+  checked.type === "Identifier" ? checked.name : source.slice(checked.start, checked.end);
 
 const bindingReportOf = (
   declarator: ESTree.VariableDeclarator,
@@ -188,12 +188,12 @@ export const noSpecFileHelperFunction = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
     const binding: BindingReading = {
-      lookup: (node) => context.sourceCode.getScope(node),
-      source: context.sourceCode.text,
+      lookup: (node) => inspection.sourceCode.getScope(node),
+      source: inspection.sourceCode.text,
     };
     const bindings = groupingBlockBindings();
     const functions = new Set<ESTree.Node>();
@@ -235,7 +235,7 @@ export const noSpecFileHelperFunction = createDontReviewItRule({
 
         for (const declared of declarations) {
           if (!standsInHelperScope(declared, reading)) continue;
-          context.report({
+          inspection.report({
             node: declared,
             messageId: "scopedHelperDeclaration",
             data: { name: declared.id?.name ?? ANONYMOUS_DECLARATION_NAME },
@@ -244,10 +244,10 @@ export const noSpecFileHelperFunction = createDontReviewItRule({
         for (const declarator of declarators) {
           if (!standsInHelperScope(declarator, reading)) continue;
           const report = bindingReportOf(declarator, binding);
-          if (report !== null) context.report(report);
+          if (report !== null) inspection.report(report);
         }
         for (const call of calls) {
-          for (const report of fixtureReportsOf(call)) context.report(report);
+          for (const report of fixtureReportsOf(call)) inspection.report(report);
         }
       },
     };

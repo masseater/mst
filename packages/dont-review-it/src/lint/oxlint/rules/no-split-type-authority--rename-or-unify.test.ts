@@ -23,7 +23,7 @@ const SUBJECT: Placement = {
   workspacePath: "packages/dont-review-it",
 };
 
-const OTHER: Placement = {
+const OTHER_PLACEMENT: Placement = {
   relativePath: "packages/dont-review-it/src/other.ts",
   workspacePath: "packages/dont-review-it",
 };
@@ -52,21 +52,27 @@ const fileAt = (placement: Placement, source: string): ScannedTypeFile => ({
 const ruleOver = (files: readonly ScannedTypeFile[]) =>
   createNoSplitTypeAuthority({ loadIndex: () => buildTypeAuthorityIndex(files) });
 
-const splitShapeRule = ruleOver([fileAt(SUBJECT, SUBJECT_CODE), fileAt(OTHER, OTHER_SHAPE_CODE)]);
+const splitShapeRule = ruleOver([
+  fileAt(SUBJECT, SUBJECT_CODE),
+  fileAt(OTHER_PLACEMENT, OTHER_SHAPE_CODE),
+]);
 
 const splitNameRule = ruleOver([fileAt(SUBJECT, SUBJECT_CODE), fileAt(FAR, FAR_NAME_CODE)]);
 
 const splitBothWaysRule = ruleOver([
   fileAt(SUBJECT, SUBJECT_CODE),
-  fileAt(OTHER, OTHER_SHAPE_CODE),
+  fileAt(OTHER_PLACEMENT, OTHER_SHAPE_CODE),
   fileAt(FAR, FAR_NAME_CODE),
 ]);
 
-const settledRule = ruleOver([fileAt(SUBJECT, SUBJECT_CODE), fileAt(OTHER, SUBJECT_CODE)]);
+const settledRule = ruleOver([
+  fileAt(SUBJECT, SUBJECT_CODE),
+  fileAt(OTHER_PLACEMENT, SUBJECT_CODE),
+]);
 
 const offPageRule = ruleOver([
   fileAt(SUBJECT, `\n\n\n\n\n${SUBJECT_CODE}`),
-  fileAt(OTHER, OTHER_SHAPE_CODE),
+  fileAt(OTHER_PLACEMENT, OTHER_SHAPE_CODE),
 ]);
 
 describe("dont-review-it/no-split-type-authority--rename-or-unify", () => {

@@ -11,20 +11,20 @@ const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-declared-surfaces-
 
 const MODULE_SOURCE = "export const shipped = true;\n";
 
-const writeFixture = (name: string, source: string): string => {
-  const path = join(fixtureDir, name);
+const writeFixture = (fixtureName: string, source: string): string => {
+  const path = join(fixtureDir, fixtureName);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, source);
   return path;
 };
 
-const writeManifest = (name: string, manifest: unknown): void => {
-  writeFixture(`${name}/package.json`, `${JSON.stringify(manifest, null, 2)}\n`);
+const writeManifest = (fixtureName: string, manifest: unknown): void => {
+  writeFixture(`${fixtureName}/package.json`, `${JSON.stringify(manifest, null, 2)}\n`);
 };
 
-const writePackage = (name: string, manifest: unknown): string => {
-  writeManifest(`repo/${name}`, manifest);
-  return writeFixture(`repo/${name}/entry.ts`, MODULE_SOURCE);
+const writePackage = (fixtureName: string, manifest: unknown): string => {
+  writeManifest(`repo/${fixtureName}`, manifest);
+  return writeFixture(`repo/${fixtureName}/entry.ts`, MODULE_SOURCE);
 };
 
 const surfacesFor = (filename: string): ReturnType<typeof governingSurfacesOf> =>

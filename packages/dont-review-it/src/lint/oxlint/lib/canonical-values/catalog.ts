@@ -17,27 +17,29 @@ export type CanonicalValuesCatalog = {
 };
 
 const groupBy = (
-  entries: readonly CanonicalValuesEntry[],
+  listedEntries: readonly CanonicalValuesEntry[],
   keysOf: (entry: CanonicalValuesEntry) => readonly string[],
 ): ReadonlyMap<string, readonly CanonicalValuesEntry[]> => {
   const grouped = new Map<string, CanonicalValuesEntry[]>();
-  for (const entry of entries) {
-    for (const key of keysOf(entry)) {
-      const bucket = grouped.get(key);
+  for (const listed of listedEntries) {
+    for (const named of keysOf(listed)) {
+      const bucket = grouped.get(named);
       if (bucket === undefined) {
-        grouped.set(key, [entry]);
+        grouped.set(named, [listed]);
         continue;
       }
-      if (!bucket.includes(entry)) bucket.push(entry);
+      if (!bucket.includes(listed)) bucket.push(listed);
     }
   }
   return grouped;
 };
 
-export const buildCatalog = (entries: readonly CanonicalValuesEntry[]): CanonicalValuesCatalog => ({
-  entries,
-  entriesByFingerprint: groupBy(entries, (entry) => [entry.fingerprint]),
-  entriesByValue: groupBy(entries, (entry) => entry.values.map(canonicalValueKey)),
+export const buildCatalog = (
+  listedEntries: readonly CanonicalValuesEntry[],
+): CanonicalValuesCatalog => ({
+  entries: listedEntries,
+  entriesByFingerprint: groupBy(listedEntries, (listed) => [listed.fingerprint]),
+  entriesByValue: groupBy(listedEntries, (listed) => listed.values.map(canonicalValueKey)),
 });
 
 export const EMPTY_CANONICAL_VALUES_CATALOG: CanonicalValuesCatalog = buildCatalog([]);

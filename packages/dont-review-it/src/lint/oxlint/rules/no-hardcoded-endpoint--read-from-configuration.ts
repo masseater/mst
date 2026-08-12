@@ -63,11 +63,11 @@ export const noHardcodedEndpoint = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
+  create(inspection) {
     const reportWrittenOutDestination = (node: DestinationTaker) => {
       const destination = writtenOutDestinationOf(node);
       if (destination === null) return;
-      context.report({ node: destination, messageId: "hardcodedEndpoint" });
+      inspection.report({ node: destination, messageId: "hardcodedEndpoint" });
     };
 
     return {

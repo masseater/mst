@@ -21,25 +21,25 @@ const PROBE_META = {
   schema: [],
 };
 
-const spelt = (value: unknown): string => JSON.stringify(value);
+const spelt = (held: unknown): string => JSON.stringify(held);
 
 const valueReader: WorkspaceLintRule = {
-  name: "probe-literal-value",
+  name: "probe-literal-held",
   meta: PROBE_META,
-  create(context) {
+  create(inspection) {
     return {
       Literal(node: LiteralNode) {
-        context.report({ node, messageId: "read", data: { text: spelt(literalValue(node)) } });
+        inspection.report({ node, messageId: "read", data: { text: spelt(literalValue(node)) } });
       },
       TemplateLiteral(node: ESTree.TemplateLiteral) {
-        context.report({
+        inspection.report({
           node,
           messageId: "read",
           data: { text: spelt(templateLiteralValue(node)) },
         });
       },
       UnaryExpression(node: ESTree.UnaryExpression) {
-        context.report({
+        inspection.report({
           node,
           messageId: "read",
           data: { text: spelt(negatedNumericValue(node)) },
@@ -52,7 +52,7 @@ const valueReader: WorkspaceLintRule = {
 const positionReader: WorkspaceLintRule = {
   name: "probe-literal-position",
   meta: PROBE_META,
-  create(context) {
+  create(inspection) {
     return {
       Literal(node: LiteralNode) {
         const ancestors = ancestorsOf(node);
@@ -63,16 +63,16 @@ const positionReader: WorkspaceLintRule = {
           isKeySelectorArgument(ancestors),
         ];
         if (!held.includes(true)) return;
-        context.report({ node, messageId: "read", data: { text: held.join(" ") } });
+        inspection.report({ node, messageId: "read", data: { text: held.join(" ") } });
       },
     };
   },
 };
 
-const reads = (code: string, ...texts: readonly string[]) => ({
-  name: `${code} reads as ${texts.join(" then ")}`,
+const reads = (code: string, ...writtenTexts: readonly string[]) => ({
+  name: `${code} reads as ${writtenTexts.join(" then ")}`,
   code,
-  errors: texts.map((text) => ({ messageId: "read", data: { text } })),
+  errors: writtenTexts.map((writtenText) => ({ messageId: "read", data: { text: writtenText } })),
 });
 
 const STRUCTURAL = "true false false";
@@ -108,7 +108,7 @@ describe("literal-position", () => {
         name: "a computed type member key is not a structural key",
         code: 'type A = { ["draft"]: string };',
       },
-      { name: "an enum value is not the member name", code: 'enum A { draft = "draft" }' },
+      { name: "an enum held is not the member name", code: 'enum A { draft = "draft" }' },
       {
         name: "a selector that is not a key selection is left alone",
         code: 'type A = Record<string, "draft">;',

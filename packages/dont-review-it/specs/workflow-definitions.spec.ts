@@ -13,10 +13,10 @@ const repositoryWith = async (files: Readonly<Record<string, string>>): Promise<
   onTestFinished(async () => rm(repositoryRoot, { recursive: true, force: true }));
 
   await Promise.all(
-    Object.entries(files).map(async ([name, source]) => {
-      const target = join(repositoryRoot, name);
-      await mkdir(dirname(target), { recursive: true });
-      await writeFile(target, source, "utf-8");
+    Object.entries(files).map(async ([fileName, source]) => {
+      const absolutePath = join(repositoryRoot, fileName);
+      await mkdir(dirname(absolutePath), { recursive: true });
+      await writeFile(absolutePath, source, "utf-8");
     }),
   );
   return repositoryRoot;

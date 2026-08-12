@@ -140,7 +140,7 @@ describe("cli", () => {
         },
       );
       const ownEntries = (): string[] =>
-        readdirSync(waitersDir).filter((name) => name.includes(`-${child.pid}-`));
+        readdirSync(waitersDir).filter((spelled) => spelled.includes(`-${child.pid}-`));
 
       await waitUntil(() => ownEntries().length === 1);
 

@@ -43,10 +43,12 @@ const duplicateConceptProblem = (
   declaredLine: first.line,
 });
 
-export const verifyCanonicalValues = (options: {
+export const verifyCanonicalValues = ({
+  repositoryRoot,
+}: {
   readonly repositoryRoot: string;
 }): readonly CanonicalValuesProblem[] => {
-  const sources = readAnnotatedSources(listRepositoryFiles(resolve(options.repositoryRoot)));
+  const sources = readAnnotatedSources(listRepositoryFiles(resolve(repositoryRoot)));
   const firstSiteByConcept = new Map<string, DeclarationSite>();
 
   return sources.flatMap((source) => [
@@ -63,10 +65,10 @@ export const verifyCanonicalValues = (options: {
 };
 
 export const findEquivalentConcepts = (
-  entries: readonly CanonicalValuesEntry[],
+  declared: readonly CanonicalValuesEntry[],
 ): readonly (readonly CanonicalValuesEntry[])[] =>
-  [...buildCatalog(entries).entriesByFingerprint.values()].filter(
-    (grouped) => new Set(grouped.map((entry) => entry.conceptId)).size > 1,
+  [...buildCatalog(declared).entriesByFingerprint.values()].filter(
+    (grouped) => new Set(grouped.map((declaredEntry) => declaredEntry.conceptId)).size > 1,
   );
 
 export const formatCanonicalValuesProblem = (problem: CanonicalValuesProblem): string => {
@@ -83,12 +85,14 @@ export const formatCanonicalValuesProblem = (problem: CanonicalValuesProblem): s
   return `${location} A concept must be declared in one place. ${problem.conceptId} is already declared at ${problem.declaredFilePath}:${problem.declaredLine}. Delete one of the two declarations, and derive from the one that stays.`;
 };
 
-const formatValues = (values: readonly CanonicalValue[]): string =>
-  [...new Set(values.map((value) => JSON.stringify(value)))].toSorted().join(", ");
+const formatValues = (vocabulary: readonly CanonicalValue[]): string =>
+  [...new Set(vocabulary.map((held) => JSON.stringify(held)))].toSorted().join(", ");
 
-export const formatEquivalentConceptGroup = (group: readonly CanonicalValuesEntry[]): string => {
-  const declarations = group
-    .map((entry) => `${entry.conceptId} (${entry.declarationPath})`)
+export const formatEquivalentConceptGroup = (
+  equivalent: readonly CanonicalValuesEntry[],
+): string => {
+  const declarations = equivalent
+    .map((declaredEntry) => `${declaredEntry.conceptId} (${declaredEntry.declarationPath})`)
     .join(", ");
-  return `${group.map((entry) => entry.declarationPath).join(" ")} One set of values must belong to one concept, because two names for the same set let each of them drift on its own. ${formatValues(group.flatMap((entry) => entry.values))} is declared by ${declarations}. Keep one of the concepts, and derive the others from the declaration that stays.`;
+  return `${equivalent.map((declaredEntry) => declaredEntry.declarationPath).join(" ")} One set of values must belong to one concept, because two names for the same set let each of them drift on its own. ${formatValues(equivalent.flatMap((declaredEntry) => declaredEntry.values))} is declared by ${declarations}. Keep one of the concepts, and derive the others from the declaration that stays.`;
 };

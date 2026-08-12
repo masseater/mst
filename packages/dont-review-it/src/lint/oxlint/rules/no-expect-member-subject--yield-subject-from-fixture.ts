@@ -48,8 +48,8 @@ type Reading = {
 const handsRowsToCallback = (call: ESTree.CallExpression): boolean =>
   testBlockModifiersOf(call.callee).some((modifier) => TABLE_DRIVEN_MEMBERS.has(modifier.name));
 
-const contextSitesOf = (callback: SpecFunction): readonly HandedSite[] => {
-  const [parameter] = callback.params;
+const contextSitesOf = (taken: SpecFunction): readonly HandedSite[] => {
+  const [parameter] = taken.params;
   if (parameter === undefined) return [];
   return destructuredBindingsOf(parameter).map((binding) => ({
     name: binding.name,
@@ -112,10 +112,10 @@ const readingOfSubject = (subject: ESTree.Expression, lookup: Lookup): SubjectRe
 };
 
 const reportedSubjectIn = (
-  entry: ESTree.CallExpression,
+  assertionEntry: ESTree.CallExpression,
   lookup: Lookup,
 ): { readonly node: ESTree.Expression; readonly messageId: string } | null => {
-  const [handed] = entry.arguments;
+  const [handed] = assertionEntry.arguments;
   if (handed === undefined || handed.type === "SpreadElement") return null;
 
   const subject = unwrapSubject(handed);
@@ -139,7 +139,7 @@ export const noExpectMemberSubject = createDontReviewItRule({
       boundMemberSubject:
         "The subject of an assertion must not be a binding that holds a member reached off the value a fixture handed over. `{{subject}}` arrives at that member through the bindings this spec declares, and every face left unnamed here passes unread. Split the fixture into one fixture per face, or assert the whole value the fixture hands over with an exact matcher.",
       destructuredMemberSubject:
-        "The subject of an assertion must not be a binding taken out of a pattern nested inside the test context. `{{subject}}` names one face of the value a fixture handed over, and every face left unnamed here passes unread. Take the fixture value whole in the callback parameter, and split the fixture into one fixture per face or assert the whole value with an exact matcher. Renaming the binding in the pattern leaves the face it names unchanged.",
+        "The subject of an assertion must not be a binding taken out of a pattern nested inside the test context. `{{subject}}` names one face of the value a fixture handed over, and every face left unnamed here passes unread. Take the fixture value whole in the taken parameter, and split the fixture into one fixture per face or assert the whole value with an exact matcher. Renaming the binding in the pattern leaves the face it names unchanged.",
     },
     schema: [
       {
@@ -151,12 +151,12 @@ export const noExpectMemberSubject = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
     const blockBindings = testBlockBindings();
     const calls = new Set<ESTree.CallExpression>();
-    const entries = new Set<ESTree.CallExpression>();
+    const listedEntries = new Set<ESTree.CallExpression>();
     const declarators = new Set<ESTree.VariableDeclarator>();
 
     return {
@@ -167,29 +167,29 @@ export const noExpectMemberSubject = createDontReviewItRule({
       },
       CallExpression(node: ESTree.CallExpression) {
         calls.add(node);
-        if (isAssertionEntryCall(node)) entries.add(node);
+        if (isAssertionEntryCall(node)) listedEntries.add(node);
       },
       "Program:exit"() {
         const rootNames = blockBindings.rootNames();
-        const callbacks = [...calls]
+        const specCallbacks = [...calls]
           .filter((call) => declaresTestBlock(call, rootNames) && !handsRowsToCallback(call))
           .flatMap((call) => testCallbacksOf(call));
 
         const lookup: Lookup = {
           sites: [
-            ...callbacks.flatMap((callback) => contextSitesOf(callback)),
+            ...specCallbacks.flatMap((taken: SpecFunction) => contextSitesOf(taken)),
             ...[...declarators].flatMap((declarator) => declaredSitesOf(declarator)),
           ],
-          scopeAt: (node: ESTree.Node) => context.sourceCode.getScope(node),
+          scopeAt: (node: ESTree.Node) => inspection.sourceCode.getScope(node),
         };
 
-        for (const entry of entries) {
-          const reported = reportedSubjectIn(entry, lookup);
+        for (const assertionEntry of listedEntries) {
+          const reported = reportedSubjectIn(assertionEntry, lookup);
           if (reported === null) continue;
-          context.report({
+          inspection.report({
             node: reported.node,
             messageId: reported.messageId,
-            data: { subject: context.sourceCode.getText(reported.node) },
+            data: { subject: inspection.sourceCode.getText(reported.node) },
           });
         }
       },

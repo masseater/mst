@@ -44,8 +44,8 @@ import type {
 import type { LibraryVocabularyLoader } from "../lib/library-vocabulary/vocabulary-loader.ts";
 import type { RuleMessage } from "../lib/rule-message.ts";
 
-const describeOwner = (entry: CanonicalValuesEntry): string =>
-  `${entry.conceptId} (${entry.exportPath ?? entry.declarationPath})`;
+const describeOwner = (listed: CanonicalValuesEntry): string =>
+  `${listed.conceptId} (${listed.exportPath ?? listed.declarationPath})`;
 
 const libraryOwnerReport = (input: {
   readonly libraries: ReturnType<typeof libraryOwnersOf>;
@@ -91,7 +91,7 @@ const catalogOwnerReport = (input: {
 };
 
 const fileSourcesFor = (input: {
-  readonly context: {
+  readonly inspection: {
     readonly cwd: string;
     readonly filename: string;
     readonly sourceCode: { readonly ast: ESTree.Program; readonly text: string };
@@ -104,8 +104,8 @@ const fileSourcesFor = (input: {
   readonly bindingsOf: () => FileBindings;
   readonly libraryVocabularyOf: () => LibraryVocabularyIndex;
 } => {
-  const { context, loadCatalog, loadLibraryVocabulary } = input;
-  const repositoryRootOf = memoize((): string => findWorkspaceRoot(context.cwd));
+  const { inspection, loadCatalog, loadLibraryVocabulary } = input;
+  const repositoryRootOf = memoize((): string => findWorkspaceRoot(inspection.cwd));
 
   return {
     repositoryRootOf,
@@ -113,11 +113,15 @@ const fileSourcesFor = (input: {
       (): CanonicalValuesCatalog => loadCatalog({ repositoryRoot: repositoryRootOf() }),
     ),
     bindingsOf: memoize(
-      (): FileBindings => collectFileBindings(context.sourceCode.ast, context.sourceCode.text),
+      (): FileBindings =>
+        collectFileBindings(inspection.sourceCode.ast, inspection.sourceCode.text),
     ),
     libraryVocabularyOf: memoize(
       (): LibraryVocabularyIndex =>
-        loadLibraryVocabulary({ filename: context.filename, repositoryRoot: repositoryRootOf() }),
+        loadLibraryVocabulary({
+          filename: inspection.filename,
+          repositoryRoot: repositoryRootOf(),
+        }),
     ),
   };
 };
@@ -167,11 +171,11 @@ export const createNoLocalFiniteValueSet = ({
       },
       schema: OWNERSHIP_POLICY_SCHEMA,
     },
-    create(context) {
-      if (isOutOfScopeSource(context.filename)) return {};
+    create(inspection) {
+      if (isOutOfScopeSource(inspection.filename)) return {};
 
       const { repositoryRootOf, catalogOf, bindingsOf, libraryVocabularyOf } = fileSourcesFor({
-        context,
+        inspection,
         loadCatalog,
         loadLibraryVocabulary,
       });
@@ -187,7 +191,7 @@ export const createNoLocalFiniteValueSet = ({
         const span = `${report.node.start}:${report.node.end}`;
         if (reportedSpans.has(span)) return;
         reportedSpans.add(span);
-        context.report(report);
+        inspection.report(report);
       };
 
       const reportVocabulary = (
@@ -199,7 +203,7 @@ export const createNoLocalFiniteValueSet = ({
         const owners = catalogOf().entriesByFingerprint.get(fingerprintValues(vocabulary)) ?? [];
         if (onlyWhenOwned && owners.length === 0) return;
 
-        const ownershipPolicy = ownershipPolicyOf(context.options);
+        const ownershipPolicy = ownershipPolicyOf(inspection.options);
         const report =
           owners.length === 0
             ? libraryOwnerReport({
@@ -211,20 +215,22 @@ export const createNoLocalFiniteValueSet = ({
         reportOnce({ node, messageId: report.messageId, data: { ...report.data } });
       };
 
-      const resolveName = (name: string, reference: ESTree.Span): ValuesPosition | null => {
-        const array = bindingsOf().arrays.get(name);
-        if (array !== undefined) {
-          const vocabulary = staticArrayValues(array);
-          return vocabulary === null ? null : { kind: "values", values: vocabulary, node: array };
+      const resolveName = (spelled: string, reference: ESTree.Span): ValuesPosition | null => {
+        const listedArray = bindingsOf().arrays.get(spelled);
+        if (listedArray !== undefined) {
+          const vocabulary = staticArrayValues(listedArray);
+          return vocabulary === null
+            ? null
+            : { kind: "values", values: vocabulary, node: listedArray };
         }
-        const specifier = bindingsOf().namedImports.get(name);
+        const specifier = bindingsOf().namedImports.get(spelled);
         if (specifier === undefined) return null;
         const route = importRouteStatus(
-          { specifier, filename: context.filename, repositoryRoot: repositoryRootOf() },
+          { specifier, filename: inspection.filename, repositoryRoot: repositoryRootOf() },
           catalogOf(),
         );
         if (route !== "unregistered") return null;
-        return { kind: "unregisteredRoute", name, specifier, node: reference };
+        return { kind: "unregisteredRoute", name: spelled, specifier, node: reference };
       };
 
       const resolveExpression = (node: ESTree.Expression): ValuesPosition | null => {

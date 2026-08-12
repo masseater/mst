@@ -29,10 +29,10 @@ const templateSpelling = (
         .join("")
     : null;
 
-const literalSpelling = (value: unknown): CanonicalValue | null => {
-  if (typeof value === "string") return value;
-  if (typeof value === "number") return value;
-  if (typeof value === "boolean") return value;
+const literalSpelling = (candidate: unknown): CanonicalValue | null => {
+  if (typeof candidate === "string") return candidate;
+  if (typeof candidate === "number") return candidate;
+  if (typeof candidate === "boolean") return candidate;
   return null;
 };
 
@@ -52,28 +52,29 @@ const scalarLiteralValue = (node: ESTree.Expression): CanonicalValue | null => {
 export const staticArrayValues = (
   node: ESTree.ArrayExpression,
 ): readonly CanonicalValue[] | null => {
-  const spellings = node.elements.map((element) =>
-    element === null || element.type === "SpreadElement" ? null : scalarLiteralValue(element),
+  const spellings = node.elements.map((held) =>
+    held === null || held.type === "SpreadElement" ? null : scalarLiteralValue(held),
   );
   return spellings.every((spelling) => spelling !== null) ? spellings : null;
 };
 
-export const isFiniteVocabulary = (values: readonly CanonicalValue[]): boolean => {
-  const distinct = new Set(values.map(canonicalValueKey));
+export const isFiniteVocabulary = (vocabulary: readonly CanonicalValue[]): boolean => {
+  const distinct = new Set(vocabulary.map(canonicalValueKey));
   if (distinct.size < MIN_VOCABULARY_SIZE) return false;
-  return !values.every((value) => typeof value === "boolean");
+  return !vocabulary.every((held) => typeof held === "boolean");
 };
 
-const literalTypeValue = (type: ESTree.TSType): CanonicalValue | null => {
-  if (type.type === "TSLiteralType") return scalarLiteralValue(type.literal);
-  if (type.type === "TSTemplateLiteralType") return templateSpelling(type.quasis, type.types);
+const literalTypeValue = (written: ESTree.TSType): CanonicalValue | null => {
+  if (written.type === "TSLiteralType") return scalarLiteralValue(written.literal);
+  if (written.type === "TSTemplateLiteralType")
+    return templateSpelling(written.quasis, written.types);
   return null;
 };
 
-export const literalUnionValues = (type: ESTree.TSType): readonly CanonicalValue[] | null => {
-  if (type.type !== "TSUnionType") return null;
+export const literalUnionValues = (written: ESTree.TSType): readonly CanonicalValue[] | null => {
+  if (written.type !== "TSUnionType") return null;
 
-  const spellings = type.types
+  const spellings = written.types
     .filter((member) => member.type !== "TSNullKeyword" && member.type !== "TSUndefinedKeyword")
     .map((member) => literalTypeValue(member));
   return spellings.every((spelling) => spelling !== null) ? spellings : null;
@@ -86,18 +87,18 @@ export const calleeMemberName = (node: ESTree.Expression): string | null => {
   return callee.property.type === "Identifier" ? callee.property.name : null;
 };
 
-export const propertyKeyName = (key: ESTree.ObjectProperty["key"]): string | null => {
-  if (key.type === "Identifier") return key.name;
-  if (key.type === "Literal" && typeof key.value === "string") return key.value;
+export const propertyKeyName = (keyNode: ESTree.ObjectProperty["key"]): string | null => {
+  if (keyNode.type === "Identifier") return keyNode.name;
+  if (keyNode.type === "Literal" && typeof keyNode.value === "string") return keyNode.value;
   return null;
 };
 
 const schemaLiteralArgumentValue = (
-  element: ESTree.ArrayExpression["elements"][number],
+  held: ESTree.ArrayExpression["elements"][number],
 ): CanonicalValue | null => {
-  if (element === null || element.type === "SpreadElement") return null;
+  if (held === null || held.type === "SpreadElement") return null;
 
-  const call = unwrapExpression(element);
+  const call = unwrapExpression(held);
   if (call.type !== "CallExpression") return null;
   if (calleeMemberName(call.callee) !== SCHEMA_LITERAL_MEMBER) return null;
 
@@ -111,10 +112,10 @@ export const schemaUnionLiterals = (
 ): { readonly values: readonly CanonicalValue[]; readonly node: ESTree.ArrayExpression } | null => {
   const [argument] = node.arguments;
   if (argument === undefined || argument.type === "SpreadElement") return null;
-  const array = unwrapExpression(argument);
-  if (array.type !== "ArrayExpression") return null;
+  const arrayExpression = unwrapExpression(argument);
+  if (arrayExpression.type !== "ArrayExpression") return null;
 
-  const spellings = array.elements.map((element) => schemaLiteralArgumentValue(element));
+  const spellings = arrayExpression.elements.map((held) => schemaLiteralArgumentValue(held));
   if (!spellings.every((spelling) => spelling !== null)) return null;
-  return { values: spellings, node: array };
+  return { values: spellings, node: arrayExpression };
 };

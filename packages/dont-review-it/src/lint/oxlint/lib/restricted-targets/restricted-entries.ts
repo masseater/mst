@@ -58,13 +58,13 @@ export const RESTRICTED_TARGET_SCHEMA: RuleMeta["schema"] = [
   },
 ];
 
-const isJsonObject = (held: unknown): held is Readonly<Record<string, unknown>> =>
+export const isJsonObject = (held: unknown): held is Readonly<Record<string, unknown>> =>
   typeof held === "object" && held !== null && !Array.isArray(held);
 
-const declaredListOf = (options: Context["options"], key: string): readonly unknown[] => {
-  const [first] = options;
+const declaredListOf = (ruleOptions: Context["options"], named: string): readonly unknown[] => {
+  const [first] = ruleOptions;
   if (!isJsonObject(first)) return [];
-  const declared = first[key];
+  const declared = first[named];
   return Array.isArray(declared) ? declared : [];
 };
 
@@ -90,22 +90,22 @@ const aliasOf = (held: unknown): InternalAlias | null => {
 };
 
 export const restrictedTargetsFrom = (
-  options: Context["options"],
+  ruleOptions: Context["options"],
 ): readonly RestrictedTargetEntry[] =>
-  declaredListOf(options, "restricted")
+  declaredListOf(ruleOptions, "restricted")
     .map(entryOf)
-    .filter((entry) => entry !== null);
+    .filter((candidate) => candidate !== null);
 
-export const internalAliasesFrom = (options: Context["options"]): readonly InternalAlias[] =>
-  declaredListOf(options, "internalAliases")
+export const internalAliasesFrom = (ruleOptions: Context["options"]): readonly InternalAlias[] =>
+  declaredListOf(ruleOptions, "internalAliases")
     .map(aliasOf)
     .filter((alias) => alias !== null);
 
-const namesModule = (entry: RestrictedTargetEntry, specifier: string): boolean =>
-  specifier === entry.module || specifier.startsWith(`${entry.module}/`);
+const namesModule = (listed: RestrictedTargetEntry, specifier: string): boolean =>
+  specifier === listed.module || specifier.startsWith(`${listed.module}/`);
 
-const coversExported = (entry: RestrictedTargetEntry, exported: string | null): boolean =>
-  entry.exports.length === 0 || exported === null || entry.exports.includes(exported);
+const coversExported = (listed: RestrictedTargetEntry, exported: string | null): boolean =>
+  listed.exports.length === 0 || exported === null || listed.exports.includes(exported);
 
 export const matchingRestrictedTarget = ({
   entries,
@@ -115,7 +115,8 @@ export const matchingRestrictedTarget = ({
   readonly forwarded: ForwardedTarget;
 }): RestrictedTargetEntry | null =>
   entries.find(
-    (entry) => namesModule(entry, forwarded.specifier) && coversExported(entry, forwarded.exported),
+    (listed) =>
+      namesModule(listed, forwarded.specifier) && coversExported(listed, forwarded.exported),
   ) ?? null;
 
 export const entriesInForceAt = ({
@@ -129,8 +130,8 @@ export const entriesInForceAt = ({
 }): readonly RestrictedTargetEntry[] => {
   const pathSegments = segmentsOf({ path: file, separator: sep });
   return entries.filter(
-    (entry) =>
-      !entry.allowedPositions.some((pattern) => matchesGlobPath({ pathSegments, pattern, cwd })),
+    (listed) =>
+      !listed.allowedPositions.some((pattern) => matchesGlobPath({ pathSegments, pattern, cwd })),
   );
 };
 

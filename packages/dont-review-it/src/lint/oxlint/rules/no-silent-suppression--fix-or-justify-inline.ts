@@ -38,18 +38,18 @@ const EVERY_GUARDED_RULE = "every rule this package enforces";
 
 const STRING_LIST_SCHEMA = { type: "array", items: { type: "string" } } as const;
 
-const spelledListOf = (names: readonly string[]): string =>
-  names.map((name) => `\`${name}\``).join(", ");
+const spelledListOf = (spelledNames: readonly string[]): string =>
+  spelledNames.map((spelled) => `\`${spelled}\``).join(", ");
 
 const configuredListOf = (
-  options: Readonly<Options>,
+  ruleOptions: Readonly<Options>,
   { name, carried }: { readonly name: string; readonly carried: readonly string[] },
 ): readonly string[] => {
-  const [declared] = options;
+  const [declared] = ruleOptions;
   if (typeof declared !== "object" || declared === null || Array.isArray(declared)) return carried;
   const listed = declared[name];
   if (!Array.isArray(listed)) return carried;
-  return listed.filter((entry): entry is string => typeof entry === "string");
+  return listed.filter((candidate): candidate is string => typeof candidate === "string");
 };
 
 const namesDeclaredRegion = ({
@@ -84,7 +84,7 @@ export const noSilentSuppression = createDontReviewItRule({
       undeclaredIgnoredRegion:
         "An ignore pattern must not name `{{pattern}}`, a place outside the regions this repository excludes from the walk. Delete the pattern and rewrite the code it hides, or declare the region in the definition this configuration receives.",
       ignoredForbiddenPath:
-        "An ignore pattern must not cover `{{forbiddenPath}}`, a path registered as forbidden. Delete the pattern, and delete that file or move it to the place its owner names.",
+        "An ignore pattern must not cover `{{forbiddenPath}}`, a path registered as forbidden. Delete the pattern, and delete that file or move it to the place its owner spelledNames.",
     },
     schema: [
       {
@@ -98,16 +98,16 @@ export const noSilentSuppression = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    const guardedRules = configuredListOf(context.options, {
+  create(inspection) {
+    const guardedRules = configuredListOf(inspection.options, {
       name: "guardedRules",
       carried: GUARDED_RULES,
     });
-    const excludedRegions = configuredListOf(context.options, {
+    const excludedRegions = configuredListOf(inspection.options, {
       name: "excludedRegions",
       carried: EXCLUDED_REGIONS,
     });
-    const forbiddenPaths = configuredListOf(context.options, {
+    const forbiddenPaths = configuredListOf(inspection.options, {
       name: "forbiddenPaths",
       carried: [],
     });
@@ -126,11 +126,11 @@ export const noSilentSuppression = createDontReviewItRule({
         covered: directive.ruleNames.length === 0 ? EVERY_GUARDED_RULE : spelledListOf(covered),
       };
       if (directive.coversWholeFile) {
-        context.report({ loc: comment.loc, messageId: "wholeFileSuppression", data: coverage });
+        inspection.report({ loc: comment.loc, messageId: "wholeFileSuppression", data: coverage });
         return;
       }
       if (directive.carriesGrounds) return;
-      context.report({ loc: comment.loc, messageId: "groundlessSuppression", data: coverage });
+      inspection.report({ loc: comment.loc, messageId: "groundlessSuppression", data: coverage });
     };
 
     const reportComment = (comment: Comment): void => {
@@ -140,7 +140,7 @@ export const noSilentSuppression = createDontReviewItRule({
         reportCoverage({ comment, directive });
         return;
       }
-      context.report({
+      inspection.report({
         loc: comment.loc,
         messageId: "selfSuppression",
         data: { ruleName: RULE_NAME },
@@ -152,25 +152,25 @@ export const noSilentSuppression = createDontReviewItRule({
         matchesGlobPath({
           pathSegments: segmentsOf({ path: toPosixPath(forbiddenPath), separator: "/" }),
           pattern,
-          cwd: context.cwd,
+          cwd: inspection.cwd,
         }),
       );
 
-    const reportIgnoreEntry = (entry: IgnoreEntry): void => {
-      const hidden = hiddenForbiddenPathOf(entry.pattern);
+    const reportIgnoreEntry = (listed: IgnoreEntry): void => {
+      const hidden = hiddenForbiddenPathOf(listed.pattern);
       if (hidden !== undefined) {
-        context.report({
-          node: entry.element,
+        inspection.report({
+          node: listed.element,
           messageId: "ignoredForbiddenPath",
           data: { forbiddenPath: hidden },
         });
         return;
       }
-      if (namesDeclaredRegion({ pattern: entry.pattern, excludedRegions })) return;
-      context.report({
-        node: entry.element,
+      if (namesDeclaredRegion({ pattern: listed.pattern, excludedRegions })) return;
+      inspection.report({
+        node: listed.element,
         messageId: "undeclaredIgnoredRegion",
-        data: { pattern: entry.pattern },
+        data: { pattern: listed.pattern },
       });
     };
 
@@ -178,19 +178,19 @@ export const noSilentSuppression = createDontReviewItRule({
       const lint = lintBlockOf(program);
       if (lint === null) return;
       for (const weakened of weakenedTargetRulesIn({ lint, targetRules: guardedRules })) {
-        context.report({
+        inspection.report({
           node: weakened.property,
           messageId: "weakenedRule",
           data: { ruleName: weakened.ruleName, severity: weakened.severity },
         });
       }
-      for (const entry of ignoreEntriesIn(lint)) reportIgnoreEntry(entry);
+      for (const listed of ignoreEntriesIn(lint)) reportIgnoreEntry(listed);
     };
 
     return {
       Program(node: ESTree.Program) {
         for (const comment of node.comments) reportComment(comment);
-        if (!LINT_CONFIGURATION_FILE.test(toPosixPath(context.filename))) return;
+        if (!LINT_CONFIGURATION_FILE.test(toPosixPath(inspection.filename))) return;
         reportConfiguration(node);
       },
     };

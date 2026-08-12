@@ -28,21 +28,21 @@ const manifestOf = (packageDirectory: string): Readonly<Record<string, unknown>>
 };
 
 const entriesUnder = (
-  value: unknown,
+  held: unknown,
   { subpath, depth }: { readonly subpath: string; readonly depth: number },
 ): readonly DeclaredEntry[] => {
-  if (typeof value === "string") {
-    return value.startsWith(RELATIVE_TARGET_PREFIX) ? [{ subpath, target: value }] : [];
+  if (typeof held === "string") {
+    return held.startsWith(RELATIVE_TARGET_PREFIX) ? [{ subpath, target: held }] : [];
   }
-  if (depth > EXPORTS_CONDITION_DEPTH_LIMIT || value === null || typeof value !== "object") {
+  if (depth > EXPORTS_CONDITION_DEPTH_LIMIT || held === null || typeof held !== "object") {
     return [];
   }
-  if (Array.isArray(value)) {
-    return value.flatMap((nested) => entriesUnder(nested, { subpath, depth: depth + 1 }));
+  if (Array.isArray(held)) {
+    return held.flatMap((nested) => entriesUnder(nested, { subpath, depth: depth + 1 }));
   }
-  return Object.entries(value).flatMap(([key, nested]) =>
+  return Object.entries(held).flatMap(([named, nested]) =>
     entriesUnder(nested, {
-      subpath: key.startsWith(".") ? key : subpath,
+      subpath: named.startsWith(".") ? named : subpath,
       depth: depth + 1,
     }),
   );
@@ -71,7 +71,7 @@ export const publicEntryFilesOf = (packageDirectory: string): readonly string[] 
   if (declared.length === 0) return null;
 
   const files = declared
-    .map((entry) => resolve(packageDirectory, entry.target))
+    .map((listed) => resolve(packageDirectory, listed.target))
     .filter(isModuleFile);
   return files.length === 0 ? null : [...new Set(files)];
 };
@@ -95,7 +95,7 @@ export const declaresPublicSubpath = ({
   const manifest = manifestOf(packageDirectory);
   if (manifest === null) return false;
 
-  const declared = importableEntriesOf(manifest).map((entry) => entry.subpath);
+  const declared = importableEntriesOf(manifest).map((listed) => listed.subpath);
   if (subpath === ".") return declared.includes(".");
   return declared.some((spelled) => matchesSubpath(spelled, subpath));
 };

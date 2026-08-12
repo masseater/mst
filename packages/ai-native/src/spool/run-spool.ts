@@ -98,9 +98,9 @@ const startFailureSummary = (commandLine: string, spawnError: Error): string =>
 
 const recordFailureSummary = (
   commandLine: string,
-  record: { filePath: string; reason: unknown },
+  written: { filePath: string; reason: unknown },
 ): string =>
-  `spool: command: ${commandLine}\nspool: error: cannot record to ${record.filePath}: ${String(record.reason)}\n`;
+  `spool: command: ${commandLine}\nspool: error: cannot record to ${written.filePath}: ${String(written.reason)}\n`;
 
 const openRecordFile = async (rootDir: string, filePath: string): Promise<WriteStream | Error> => {
   try {
@@ -151,7 +151,7 @@ class SpoolRecording {
 
   private observe(part: Buffer): void {
     this.bytes += part.length;
-    this.newlines += part.reduce((count, byte) => (byte === 0x0a ? count + 1 : count), 0);
+    this.newlines += part.reduce((counted, byte) => (byte === 0x0a ? counted + 1 : counted), 0);
     this.endsWithNewline = part.at(-1) === 0x0a;
     this.tailParts = [...this.tailParts, part];
     this.tailLength += part.length;
@@ -339,7 +339,7 @@ const usageText = [
   "",
   "Runs the command with its stdout and stderr recorded to a single log file",
   "under the repository's .spool directory, and prints a fixed-size summary",
-  "instead of the output. Terminal escape sequences are removed from the record.",
+  "instead of the output. Terminal escape sequences are removed from the written.",
   "On a non-zero exit the summary is followed by the last 20 recorded lines.",
   'When the CI environment variable is set to a non-empty value other than "false",',
   "the command's stdio passes through untouched and no log file is created.",

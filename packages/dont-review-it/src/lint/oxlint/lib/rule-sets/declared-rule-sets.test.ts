@@ -2,9 +2,9 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { DECLARED_RULE_SETS, memberNamedBy, type RuleSet } from "./declared-rule-sets.ts";
 
-const setNamed = (name: string): RuleSet => {
-  const found = DECLARED_RULE_SETS.find((declared) => declared.name === name);
-  if (found === undefined) throw new Error(`no rule set named ${name}`);
+const setNamed = (spelled: string): RuleSet => {
+  const found = DECLARED_RULE_SETS.find((declared) => declared.name === spelled);
+  if (found === undefined) throw new Error(`no rule set named ${spelled}`);
   return found;
 };
 
@@ -53,14 +53,17 @@ describe("declared-rule-sets", () => {
     ).toStrictEqual([]);
   });
 
-  test("a rule of the set is found through the name a configuration spells", () => {
-    const set = setNamed("single-assignment");
-    expect(memberNamedBy({ set, ruleName: "no-reassign--use-spread-or-iife" })?.rule).toBe(
-      "no-reassign--use-spread-or-iife",
-    );
+  test("a rule of the set is found through the spelled a configuration spells", () => {
+    const listedSet = setNamed("single-assignment");
     expect(
-      memberNamedBy({ set, ruleName: "dont-review-it/no-array-mutation--derive-new-array" })?.rule,
+      memberNamedBy({ set: listedSet, ruleName: "no-reassign--use-spread-or-iife" })?.rule,
+    ).toBe("no-reassign--use-spread-or-iife");
+    expect(
+      memberNamedBy({
+        set: listedSet,
+        ruleName: "dont-review-it/no-array-mutation--derive-new-array",
+      })?.rule,
     ).toBe("no-array-mutation--derive-new-array");
-    expect(memberNamedBy({ set, ruleName: "no-console" })).toBeNull();
+    expect(memberNamedBy({ set: listedSet, ruleName: "no-console" })).toBeNull();
   });
 });

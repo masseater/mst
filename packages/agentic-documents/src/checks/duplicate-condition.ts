@@ -11,7 +11,7 @@ import { conditionOf } from "./normative-notation.ts";
 import type { DocumentProblem } from "../problem.ts";
 import type { NormativeDocument } from "../scan/normative-documents.ts";
 
-const message = (condition: string): string =>
+const complaint = (condition: string): string =>
   `同じ階層で条件 \`${condition}\` を繰り返すことは禁止されている。条件を 1 度だけ書き、行動をその下に入れ子で並べる。`;
 
 type ConditionSite = {
@@ -19,15 +19,15 @@ type ConditionSite = {
   readonly line: number | null;
 };
 
-const conditionSitesIn = (list: {
+const conditionSitesIn = (listed: {
   readonly children: readonly Parameters<typeof leadingParagraphOf>[0][];
 }): readonly ConditionSite[] =>
-  list.children.flatMap((item): readonly ConditionSite[] => {
-    const paragraph = leadingParagraphOf(item);
+  listed.children.flatMap((member): readonly ConditionSite[] => {
+    const paragraph = leadingParagraphOf(member);
     if (paragraph === null) return [];
 
     const condition = conditionOf(flattenTextKeepingCode(paragraph));
-    return condition === null ? [] : [{ condition, line: lineOf(item) }];
+    return condition === null ? [] : [{ condition, line: lineOf(member) }];
   });
 
 const firstIndexOfCondition = (sites: readonly ConditionSite[], condition: string): number =>
@@ -40,12 +40,12 @@ export const repeatedConditions = (document: NormativeDocument): readonly Docume
   descendants(document.tree)
     .filter((node) => node.type === "list")
     .filter((node) => !isInsideGeneratedRegion(offsetOf(node), document.generated))
-    .flatMap((list): readonly DocumentProblem[] => {
-      const sites = conditionSitesIn(list);
+    .flatMap((listed): readonly DocumentProblem[] => {
+      const sites = conditionSitesIn(listed);
 
       return repeatedSitesIn(sites).map((site) => ({
         file: document.file,
         line: site.line,
-        message: message(site.condition),
+        message: complaint(site.condition),
       }));
     });

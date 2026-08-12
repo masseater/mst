@@ -22,10 +22,10 @@ type Reading = {
   readonly factory: SpecFunction | null;
 };
 
-const boundInitializer = (reading: Reading, name: string): ESTree.Expression | null => {
-  const body = reading.factory === null ? null : blockBodyOf(reading.factory);
-  const held = body === null ? null : localConstInitializer(body, name);
-  return held ?? reading.module.initializerByName.get(name) ?? null;
+const boundInitializer = (reading: Reading, spelled: string): ESTree.Expression | null => {
+  const writtenBody = reading.factory === null ? null : blockBodyOf(reading.factory);
+  const held = writtenBody === null ? null : localConstInitializer(writtenBody, spelled);
+  return held ?? reading.module.initializerByName.get(spelled) ?? null;
 };
 
 const resolvedObject = (
@@ -43,26 +43,29 @@ const resolvedObject = (
   return bound.type === "ObjectExpression" ? bound : null;
 };
 
-const readNameOf = (reading: Reading, value: ESTree.Expression): string | null => {
-  const written = unwrapSubject(value);
+const readNameOf = (reading: Reading, held: ESTree.Expression): string | null => {
+  const written = unwrapSubject(held);
   if (written.type === "MemberExpression") return staticMemberName(written);
   if (written.type !== "Identifier") return null;
 
-  const held = boundInitializer(reading, written.name);
-  if (held === null) return null;
+  const initializer = boundInitializer(reading, written.name);
+  if (initializer === null) return null;
 
-  const bound = unwrapSubject(held);
+  const bound = unwrapSubject(initializer);
   return bound.type === "MemberExpression" ? staticMemberName(bound) : null;
 };
 
-const copiedNamesIn = (reading: Reading, object: ESTree.ObjectExpression): readonly string[] =>
-  object.properties.flatMap((property) => {
+const copiedNamesIn = (
+  reading: Reading,
+  objectExpression: ESTree.ObjectExpression,
+): readonly string[] =>
+  objectExpression.properties.flatMap((property) => {
     if (property.type !== "Property") return [];
     if (property.method || property.kind !== "init") return [];
 
-    const name = staticPropertyName(property);
-    if (name === null) return [];
-    return readNameOf(reading, property.value) === name ? [name] : [];
+    const spelled = staticPropertyName(property);
+    if (spelled === null) return [];
+    return readNameOf(reading, property.value) === spelled ? [spelled] : [];
   });
 
 const reportsFor = (input: {
@@ -77,14 +80,14 @@ const reportsFor = (input: {
     const reading = { module: input.module, factory: declaration.factory };
 
     return declaration.subjects.flatMap((subject) => {
-      const object = resolvedObject(reading, subject);
-      if (object === null) return [];
+      const objectExpression = resolvedObject(reading, subject);
+      if (objectExpression === null) return [];
 
-      const copied = uniq(copiedNamesIn(reading, object));
+      const copied = uniq(copiedNamesIn(reading, objectExpression));
       if (copied.length === 0) return [];
       return [
         {
-          node: object,
+          node: objectExpression,
           messageId: "copiedSubject",
           data: { fixture: declaration.name, properties: copied.join(", ") },
         },
@@ -98,12 +101,12 @@ export const noFixtureCopySubject = createDontReviewItRule({
     type: "problem",
     docs: {
       description:
-        "Disallow a fixture handing back a subject assembled by reading same-named properties off another value, so an assertion compares the shape the code under test produced instead of a hand-written copy that goes stale on its own",
+        "Disallow a fixture handing back a subject assembled by reading same-named properties off another held, so an assertion compares the shape the code under test produced instead of a hand-written copy that goes stale on its own",
       relatedGuidelines: [],
     },
     messages: {
       copiedSubject:
-        "A fixture must not hand back a subject assembled by reading same-named properties off another value. `{{fixture}}` reads {{properties}} into keys spelled the same way. Return the value the code under test produced, whole, and read the parts an assertion needs in the `it` body. Holding the copy in a binding before handing it back, and renaming every key but one, are reported all the same.",
+        "A fixture must not hand back a subject assembled by reading same-named properties off another held. `{{fixture}}` reads {{properties}} into keys spelled the same way. Return the held the code under test produced, whole, and read the parts an assertion needs in the `it` body. Holding the copy in a binding before handing it back, and renaming every key but one, are reported all the same.",
     },
     schema: [
       {
@@ -115,8 +118,8 @@ export const noFixtureCopySubject = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
     const fixtures = new Set<ESTree.CallExpression>();
 
@@ -125,9 +128,9 @@ export const noFixtureCopySubject = createDontReviewItRule({
         if (fixtureDeclarationsOf(node).length > 0) fixtures.add(node);
       },
       "Program:exit"(node: ESTree.Program) {
-        const module = moduleDeclarationsOf(context.filename, node.body);
+        const module = moduleDeclarationsOf(inspection.filename, node.body);
         for (const call of fixtures) {
-          for (const report of reportsFor({ module, call })) context.report(report);
+          for (const report of reportsFor({ module, call })) inspection.report(report);
         }
       },
     };

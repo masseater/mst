@@ -103,10 +103,10 @@ const memberKeyOf = (member: { readonly type: string; readonly method: string })
   `${member.type}.${member.method}`;
 
 const membersOf = (
-  groups: readonly MemberGroup[],
+  groupedSets: readonly MemberGroup[],
   sink: boolean,
 ): readonly MutatingBuiltinMember[] =>
-  groups.flatMap(({ type, methods, derivation }) =>
+  groupedSets.flatMap(({ type, methods, derivation }) =>
     methods.map((method) => ({ type, method, derivation, sink })),
   );
 

@@ -29,10 +29,11 @@ const frontmatterOf = (document: NormativeDocument): Record<string, unknown> | n
   const [first] = document.tree.children;
   if (first?.type !== "yaml") return null;
 
-  const parsed: unknown = parse(first.value);
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return null;
+  const parsedNode: unknown = parse(first.value);
+  if (typeof parsedNode !== "object" || parsedNode === null || Array.isArray(parsedNode))
+    return null;
 
-  return parsed as Record<string, unknown>;
+  return parsedNode as Record<string, unknown>;
 };
 
 const manifestDescriptionOf = async ({

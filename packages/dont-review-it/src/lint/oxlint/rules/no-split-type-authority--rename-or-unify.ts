@@ -39,21 +39,21 @@ export const createNoSplitTypeAuthority = ({
       },
       schema: [],
     },
-    create(context) {
-      if (isOutOfScopeSource(context.filename)) return {};
+    create(inspection) {
+      if (isOutOfScopeSource(inspection.filename)) return {};
 
-      const repositoryRootOf = memoize((): string => findWorkspaceRoot(context.cwd));
+      const repositoryRootOf = memoize((): string => findWorkspaceRoot(inspection.cwd));
 
       return {
         Program(node: ESTree.Program) {
           const repositoryRoot = repositoryRootOf();
           const reports = splitTypeReportsIn({
             index: loadIndex({ repositoryRoot }),
-            relativePath: toPosixPath(relative(repositoryRoot, resolve(context.filename))),
+            relativePath: toPosixPath(relative(repositoryRoot, resolve(inspection.filename))),
           });
 
           for (const report of reports) {
-            context.report({
+            inspection.report({
               node: statementCovering(node.body, report.line) ?? node,
               messageId: report.messageId,
               data: report.data,

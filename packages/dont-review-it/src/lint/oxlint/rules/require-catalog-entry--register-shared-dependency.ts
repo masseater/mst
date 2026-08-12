@@ -19,11 +19,11 @@ import {
 import type { WorkspaceLintRule } from "@mst/lint-rule-authoring";
 import type { Context, ESTree } from "@oxlint/plugins";
 
-const declaringWorkspaceOf = (context: {
+const declaringWorkspaceOf = (inspection: {
   readonly cwd: string;
   readonly filename: string;
 }): { readonly repositoryRoot: string; readonly relativeDir: string } | null => {
-  const fileDirectory = dirname(resolve(context.cwd, context.filename));
+  const fileDirectory = dirname(resolve(inspection.cwd, inspection.filename));
   const repositoryRoot = findWorkspaceRoot(fileDirectory);
   const packageDirectory = nearestPackageDirectory(fileDirectory, repositoryRoot);
   if (packageDirectory === null) return null;
@@ -35,17 +35,17 @@ const declaringWorkspaceOf = (context: {
 };
 
 const unregisteredSharedFor = (lookup: {
-  readonly context: Context;
+  readonly inspection: Context;
   readonly loadWorkspaces: WorkspaceDependenciesLoader;
 }): readonly UnregisteredSharedDependency[] => {
-  const { context, loadWorkspaces } = lookup;
-  const declaring = declaringWorkspaceOf(context);
+  const { inspection, loadWorkspaces } = lookup;
+  const declaring = declaringWorkspaceOf(inspection);
   if (declaring === null) return [];
 
   const index = sharedDependencyIndex({
     workspaces: loadWorkspaces({ repositoryRoot: declaring.repositoryRoot }),
-    catalog: catalogFrom(context.options),
-    deviations: deviationsFrom(context.options),
+    catalog: catalogFrom(inspection.options),
+    deviations: deviationsFrom(inspection.options),
   });
   return index.get(declaring.relativeDir) ?? [];
 };
@@ -70,16 +70,16 @@ export const createRequireCatalogEntry = ({
       },
       schema: CATALOG_ENTRY_SCHEMA,
     },
-    create(context) {
-      if (catalogFrom(context.options).size === 0) return {};
+    create(inspection) {
+      if (catalogFrom(inspection.options).size === 0) return {};
 
       return {
         Program(node: ESTree.Program) {
-          for (const entry of unregisteredSharedFor({ context, loadWorkspaces })) {
-            context.report({
+          for (const listed of unregisteredSharedFor({ inspection, loadWorkspaces })) {
+            inspection.report({
               node,
               messageId: "unregisteredSharedDependency",
-              data: { packageName: entry.packageName, sites: describeSites(entry.sites) },
+              data: { packageName: listed.packageName, sites: describeSites(listed.sites) },
             });
           }
         },

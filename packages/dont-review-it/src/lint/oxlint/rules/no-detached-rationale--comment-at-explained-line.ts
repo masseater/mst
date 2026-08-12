@@ -30,7 +30,7 @@ export const noDetachedRationale = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
+  create(inspection) {
     return {
       Program(node: ESTree.Program) {
         for (const comment of node.comments) {
@@ -39,7 +39,7 @@ export const noDetachedRationale = createDontReviewItRule({
           const [firstProse] = descriptionProse(comment);
           if (firstProse === undefined) continue;
 
-          context.report({
+          inspection.report({
             loc: {
               start: { line: comment.loc.start.line + firstProse.lineOffset, column: 0 },
               end: comment.loc.end,

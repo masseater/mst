@@ -107,8 +107,8 @@ const writtenTextOf = (held: unknown): string | null => {
 };
 
 const writtenTextsOf = (held: unknown): readonly string[] =>
-  (Array.isArray(held) ? held : []).flatMap((entry: unknown) => {
-    const written = writtenTextOf(entry);
+  (Array.isArray(held) ? held : []).flatMap((listed: unknown) => {
+    const written = writtenTextOf(listed);
     return written === null ? [] : [written];
   });
 
@@ -117,8 +117,8 @@ const readEach = <Read>(
   readOne: (declared: Readonly<Record<string, unknown>>) => Read | null,
 ): readonly Read[] =>
   (Array.isArray(held) ? held : [])
-    .map((entry: unknown) => readOne(fieldsOf(entry)))
-    .filter((entry) => entry !== null);
+    .map((listed: unknown) => readOne(fieldsOf(listed)))
+    .filter((candidate) => candidate !== null);
 
 const rowOf = (declared: Readonly<Record<string, unknown>>): RegistrationRow | null => {
   const pattern = writtenTextOf(declared.pattern);
@@ -128,21 +128,21 @@ const rowOf = (declared: Readonly<Record<string, unknown>>): RegistrationRow | n
 };
 
 const checkOf = (declared: Readonly<Record<string, unknown>>): DeclaredCheck | null => {
-  const name = writtenTextOf(declared.name);
-  if (name === null) return null;
+  const spelled = writtenTextOf(declared.name);
+  if (spelled === null) return null;
   return {
-    name,
+    name: spelled,
     coveredPaths: writtenTextsOf(declared.coveredPaths),
     excludedPaths: writtenTextsOf(declared.excludedPaths),
   };
 };
 
 const tableOf = (declared: Readonly<Record<string, unknown>>): RegistrationTable | null => {
-  const name = writtenTextOf(declared.name);
+  const spelled = writtenTextOf(declared.name);
   const consumedBy = writtenTextOf(declared.consumedBy);
-  if (name === null || consumedBy === null) return null;
+  if (spelled === null || consumedBy === null) return null;
   return {
-    name,
+    name: spelled,
     consumedBy,
     rows: readEach(declared.rows, rowOf),
     allowances: readEach(declared.allowances, rowOf),
@@ -150,13 +150,13 @@ const tableOf = (declared: Readonly<Record<string, unknown>>): RegistrationTable
 };
 
 const scopeOf = (declared: Readonly<Record<string, unknown>>): ScopeRegistration | null => {
-  const name = writtenTextOf(declared.name);
-  if (name === null) return null;
-  return { name, registeredPaths: writtenTextsOf(declared.registeredPaths) };
+  const spelled = writtenTextOf(declared.name);
+  if (spelled === null) return null;
+  return { name: spelled, registeredPaths: writtenTextsOf(declared.registeredPaths) };
 };
 
-export const coverageDeclarationsFrom = (options: Context["options"]): CoverageDeclarations => {
-  const declared = fieldsOf(options[0]);
+export const coverageDeclarationsFrom = (ruleOptions: Context["options"]): CoverageDeclarations => {
+  const declared = fieldsOf(ruleOptions[0]);
   return {
     checks: readEach(declared.declaredChecks, checkOf),
     tables: readEach(declared.registries, tableOf),

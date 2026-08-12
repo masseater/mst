@@ -1,7 +1,7 @@
 export const setupCounter = (button: HTMLButtonElement): void => {
   let clickCount = 0;
-  const renderCount = (nextCount: number): void => {
-    clickCount = nextCount;
+  const renderCount = (renderedCount: number): void => {
+    clickCount = renderedCount;
     button.textContent = `Count is ${clickCount}`;
   };
   button.addEventListener("click", () => {

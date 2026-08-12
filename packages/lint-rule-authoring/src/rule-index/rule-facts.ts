@@ -29,9 +29,9 @@ const nodesIn = (candidate: unknown): readonly UnknownFields[] =>
   Array.isArray(candidate) ? candidate.filter(isAstNode) : [];
 
 const keyNameOf = (property: UnknownFields): string | null => {
-  const key = property.key as UnknownFields;
-  if (key.type === "Identifier") return key.name as string;
-  if (key.type === "Literal" && typeof key.value === "string") return key.value;
+  const named = property.key as UnknownFields;
+  if (named.type === "Identifier") return named.name as string;
+  if (named.type === "Literal" && typeof named.value === "string") return named.value;
   return null;
 };
 
@@ -162,8 +162,8 @@ const factsOf = ({
   const meta = propertyOf(definition, "meta");
   if (meta === null || meta.type !== "ObjectExpression") return [];
 
-  const messages = propertyOf(meta, "messages");
-  if (messages === null || messages.type !== "ObjectExpression") return [];
+  const complaints = propertyOf(meta, "messages");
+  if (complaints === null || complaints.type !== "ObjectExpression") return [];
 
   const schema = propertyOf(meta, "schema");
   const suggestionsFlag = propertyOf(meta, "hasSuggestions");

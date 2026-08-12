@@ -9,10 +9,10 @@ import { noDetachedTestFile } from "./no-detached-test-file--move-beside-source.
 
 const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-no-detached-test-file-"));
 
-const fixturePath = (name: string): string => join(fixtureDir, name);
+const fixturePath = (fixtureName: string): string => join(fixtureDir, fixtureName);
 
-const writeSourceFixture = (name: string): string => {
-  const path = fixturePath(name);
+const writeSourceFixture = (fixtureName: string): string => {
+  const path = fixturePath(fixtureName);
   writeFileSync(path, "export const total = 1;\n");
   return path;
 };

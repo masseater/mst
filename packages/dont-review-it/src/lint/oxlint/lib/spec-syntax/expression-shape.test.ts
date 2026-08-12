@@ -6,8 +6,8 @@ import { syntaxShapeOf } from "./expression-shape.ts";
 import type { ESTree } from "@oxlint/plugins";
 
 const shapeOfSource = (expressionSource: string): string => {
-  const parsed = parseSync("spec.ts", `const written = ${expressionSource};`);
-  const declared = parsed.program.body[0] as ESTree.Statement;
+  const parsedNode = parseSync("spec.ts", `const written = ${expressionSource};`);
+  const declared = parsedNode.program.body[0] as ESTree.Statement;
   const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
   return syntaxShapeOf(declarator?.init);
 };

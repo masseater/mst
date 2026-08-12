@@ -19,15 +19,15 @@ const PROBE_META = {
   schema: [],
 };
 
-const spelt = (value: unknown): string => JSON.stringify(value);
+const spelt = (held: unknown): string => JSON.stringify(held);
 
 const arrayReader: WorkspaceLintRule = {
   name: "probe-static-array-values",
   meta: PROBE_META,
-  create(context) {
+  create(inspection) {
     return {
       ArrayExpression(node: ESTree.ArrayExpression) {
-        context.report({
+        inspection.report({
           node,
           messageId: "read",
           data: { text: spelt(staticArrayValues(node)) },
@@ -40,10 +40,10 @@ const arrayReader: WorkspaceLintRule = {
 const unionTypeReader: WorkspaceLintRule = {
   name: "probe-literal-union-values",
   meta: PROBE_META,
-  create(context) {
+  create(inspection) {
     return {
       TSTypeAliasDeclaration(node: ESTree.TSTypeAliasDeclaration) {
-        context.report({
+        inspection.report({
           node,
           messageId: "read",
           data: { text: spelt(literalUnionValues(node.typeAnnotation)) },
@@ -56,12 +56,12 @@ const unionTypeReader: WorkspaceLintRule = {
 const schemaReader: WorkspaceLintRule = {
   name: "probe-schema-union-literals",
   meta: PROBE_META,
-  create(context) {
+  create(inspection) {
     return {
       CallExpression(node: ESTree.CallExpression) {
         if (calleeMemberName(node.callee) !== "union") return;
         const read = schemaUnionLiterals(node);
-        context.report({
+        inspection.report({
           node,
           messageId: "read",
           data: { text: spelt(read === null ? null : read.values) },
@@ -74,10 +74,10 @@ const schemaReader: WorkspaceLintRule = {
 const propertyKeyReader: WorkspaceLintRule = {
   name: "probe-property-key-name",
   meta: PROBE_META,
-  create(context) {
+  create(inspection) {
     return {
       Property(node: ESTree.ObjectProperty) {
-        context.report({
+        inspection.report({
           node,
           messageId: "read",
           data: { text: spelt(propertyKeyName(node.key)) },
@@ -87,22 +87,22 @@ const propertyKeyReader: WorkspaceLintRule = {
   },
 };
 
-const reads = (code: string, text: string) => ({
-  name: `${code} reads as ${text}`,
+const reads = (code: string, writtenText: string) => ({
+  name: `${code} reads as ${writtenText}`,
   code,
-  errors: [{ messageId: "read", data: { text } }],
+  errors: [{ messageId: "read", data: { text: writtenText } }],
 });
 
-describe("finite-value-syntax", () => {
+describe("finite-held-syntax", () => {
   test("two distinct spellings are a vocabulary", () => {
     expect(isFiniteVocabulary(["draft", "published"])).toBe(true);
   });
 
-  test("one spelling names a single value rather than a vocabulary", () => {
+  test("one spelling names a single held rather than a vocabulary", () => {
     expect(isFiniteVocabulary(["draft"])).toBe(false);
   });
 
-  test("the same spelling repeated is still one value", () => {
+  test("the same spelling repeated is still one held", () => {
     expect(isFiniteVocabulary(["draft", "draft"])).toBe(false);
   });
 
@@ -114,7 +114,7 @@ describe("finite-value-syntax", () => {
     expect(isFiniteVocabulary([true, "draft"])).toBe(true);
   });
 
-  test("a number and the same digits written as text are two values", () => {
+  test("a number and the same digits written as writtenText are two values", () => {
     expect(isFiniteVocabulary([1, "1"])).toBe(true);
   });
 

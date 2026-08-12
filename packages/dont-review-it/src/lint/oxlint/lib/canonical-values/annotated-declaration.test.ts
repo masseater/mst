@@ -7,9 +7,9 @@ import {
 } from "./annotated-declaration.ts";
 
 const rangesIn = (sourceText: string) => {
-  const parsed = parseSync("source.ts", sourceText);
+  const parsedNode = parseSync("source.ts", sourceText);
   return annotatedDeclarationRanges(
-    { body: parsed.program.body, comments: parsed.comments },
+    { body: parsedNode.program.body, comments: parsedNode.comments },
     sourceText,
   );
 };

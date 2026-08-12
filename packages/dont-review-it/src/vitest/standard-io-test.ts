@@ -4,15 +4,15 @@ type CapturedStream = {
   readonly text: string;
 };
 
-const decoded = (chunk: string | Uint8Array): string =>
-  typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk);
+const decoded = (writtenChunk: string | Uint8Array): string =>
+  typeof writtenChunk === "string" ? writtenChunk : new TextDecoder().decode(writtenChunk);
 
 const captureWrites = (stream: NodeJS.WriteStream) => {
   const spy = vi.spyOn(stream, "write").mockImplementation(() => true);
   return {
     subject: {
       get text(): string {
-        return spy.mock.calls.map(([chunk]) => decoded(chunk)).join("");
+        return spy.mock.calls.map(([writtenChunk]) => decoded(writtenChunk)).join("");
       },
     },
     restore: (): void => {

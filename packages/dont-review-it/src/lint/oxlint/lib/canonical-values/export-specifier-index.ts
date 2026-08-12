@@ -32,12 +32,12 @@ const filesReachableByReExport = (entryFile: string): ReadonlySet<string> => {
     if (reached.has(file)) return;
     reached.add(file);
     if (depth >= RE_EXPORT_DEPTH_LIMIT) return;
-    const text = readTextFile(file);
-    if (text === null) return;
-    for (const match of text.matchAll(RE_EXPORT_PATTERN)) {
+    const writtenText = readTextFile(file);
+    if (writtenText === null) return;
+    for (const match of writtenText.matchAll(RE_EXPORT_PATTERN)) {
       const [, specifier] = match;
-      const target = resolveRelativeSpecifier(file, String(specifier));
-      if (target !== null) visit(target, depth + 1);
+      const checked = resolveRelativeSpecifier(file, String(specifier));
+      if (checked !== null) visit(checked, depth + 1);
     }
   };
   visit(entryFile, 0);
@@ -48,35 +48,35 @@ const exportSubpathTargets = (
   packageDirectory: string,
   exportsField: unknown,
 ): ReadonlyMap<string, readonly string[]> => {
-  const targets = new Map<string, string[]>();
+  const checkedTargets = new Map<string, string[]>();
 
-  const record = (subpath: string, value: string): void => {
-    if (!value.startsWith("./") || value.endsWith(".d.ts")) return;
-    const resolved = resolve(packageDirectory, value);
-    const bucket = targets.get(subpath);
-    if (bucket === undefined) targets.set(subpath, [resolved]);
+  const written = (subpath: string, held: string): void => {
+    if (!held.startsWith("./") || held.endsWith(".d.ts")) return;
+    const resolved = resolve(packageDirectory, held);
+    const bucket = checkedTargets.get(subpath);
+    if (bucket === undefined) checkedTargets.set(subpath, [resolved]);
     else if (!bucket.includes(resolved)) bucket.push(resolved);
   };
 
   const collect = (
-    value: unknown,
+    held: unknown,
     { subpath, depth }: { readonly subpath: string; readonly depth: number },
   ): void => {
-    if (typeof value === "string") {
-      record(subpath, value);
+    if (typeof held === "string") {
+      written(subpath, held);
       return;
     }
     if (depth > EXPORTS_CONDITION_DEPTH_LIMIT) return;
-    if (value === null || typeof value !== "object" || Array.isArray(value)) return;
-    const conditions: readonly (readonly [string, unknown])[] = Object.entries(value);
-    for (const [key, nested] of conditions) {
-      if (key === `./${MANIFEST_FILE_NAME}`) continue;
-      collect(nested, { subpath: key.startsWith(".") ? key : subpath, depth: depth + 1 });
+    if (held === null || typeof held !== "object" || Array.isArray(held)) return;
+    const conditions: readonly (readonly [string, unknown])[] = Object.entries(held);
+    for (const [named, nested] of conditions) {
+      if (named === `./${MANIFEST_FILE_NAME}`) continue;
+      collect(nested, { subpath: named.startsWith(".") ? named : subpath, depth: depth + 1 });
     }
   };
 
   collect(exportsField, { subpath: ".", depth: 0 });
-  return targets;
+  return checkedTargets;
 };
 
 const exportSpecifierOf = (packageName: string, subpath: string): string =>

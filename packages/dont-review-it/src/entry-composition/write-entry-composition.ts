@@ -21,7 +21,7 @@ const MODIFICATION_OPTIONS: ModificationOptions = {
 };
 
 const strippedRestOf = ({
-  value,
+  value: held,
   ownNames,
   separator,
 }: {
@@ -29,19 +29,19 @@ const strippedRestOf = ({
   readonly ownNames: readonly string[];
   readonly separator: string;
 }): string => {
-  const separatorIndex = value.indexOf(separator);
-  if (separatorIndex === -1) return value;
-  return ownNames.includes(wrapperNameOf(value.slice(0, separatorIndex)))
+  const separatorIndex = held.indexOf(separator);
+  if (separatorIndex === -1) return held;
+  return ownNames.includes(wrapperNameOf(held.slice(0, separatorIndex)))
     ? strippedRestOf({
-        value: value.slice(separatorIndex + separator.length),
+        value: held.slice(separatorIndex + separator.length),
         ownNames,
         separator,
       })
-    : value;
+    : held;
 };
 
 const composedValueOf = ({
-  value,
+  value: held,
   layer,
   config,
 }: {
@@ -53,12 +53,12 @@ const composedValueOf = ({
   const foreignNames = [config.rootLayer, config.workspaceLayer]
     .flatMap((declared) => declared.wrappers)
     .map(wrapperNameOf)
-    .filter((name) => !ownNames.includes(name));
-  const separatorIndex = value.indexOf(config.wrapperSeparator);
-  const headName = wrapperNameOf(separatorIndex === -1 ? value : value.slice(0, separatorIndex));
+    .filter((spelled) => !ownNames.includes(spelled));
+  const separatorIndex = held.indexOf(config.wrapperSeparator);
+  const headName = wrapperNameOf(separatorIndex === -1 ? held : held.slice(0, separatorIndex));
   if (foreignNames.includes(headName)) return null;
 
-  const rest = strippedRestOf({ value, ownNames, separator: config.wrapperSeparator });
+  const rest = strippedRestOf({ value: held, ownNames, separator: config.wrapperSeparator });
   return `${composedPrefixOf({ layer, config })}${rest}`;
 };
 
@@ -90,8 +90,11 @@ export const writeEntryComposition = ({
   const listing = readEntryManifests({ repositoryRoot, config });
   const writeFailures = listing.manifests.flatMap((manifest) => {
     const rewritten = editedEntriesOf({ manifest, config }).reduce(
-      (text, [entryName, value]) =>
-        applyEdits(text, modify(text, [config.scriptsKey, entryName], value, MODIFICATION_OPTIONS)),
+      (writtenText, [entryName, held]) =>
+        applyEdits(
+          writtenText,
+          modify(writtenText, [config.scriptsKey, entryName], held, MODIFICATION_OPTIONS),
+        ),
       manifest.source,
     );
     if (rewritten === manifest.source) return [];

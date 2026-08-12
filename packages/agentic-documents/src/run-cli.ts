@@ -26,7 +26,7 @@ Options:
 const CHECK_COMMAND = "check";
 
 const dispatch = async (argv: readonly string[]): Promise<CliResult> => {
-  const parsed = parseArgs({
+  const parsedNode = parseArgs({
     args: [...argv],
     allowPositionals: true,
     options: {
@@ -35,15 +35,15 @@ const dispatch = async (argv: readonly string[]): Promise<CliResult> => {
     },
   });
 
-  const [command] = parsed.positionals;
+  const [command] = parsedNode.positionals;
   if (command !== CHECK_COMMAND) {
     return { exitCode: EXIT_MISUSE, out: "", error: USAGE };
   }
 
   const problems = await runChecks({
-    repositoryRoot: resolve(parsed.values["repository-root"] ?? process.cwd()),
+    repositoryRoot: resolve(parsedNode.values["repository-root"] ?? process.cwd()),
     config: defaultConfig,
-    write: parsed.values.write,
+    write: parsedNode.values.write,
   });
 
   return {

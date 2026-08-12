@@ -15,23 +15,27 @@ import {
 
 describe("signals", () => {
   test("install and drop register the same handler once per interrupt signal", () => {
-    const handler = vi.fn<(signal: NodeJS.Signals) => void>();
+    const takenHandler = vi.fn<(signal: NodeJS.Signals) => void>();
 
-    installInterruptHandler(handler);
-    expect(process.listeners("SIGINT")).toContain(handler);
-    expect(process.listeners("SIGTERM")).toContain(handler);
+    installInterruptHandler(takenHandler);
+    expect(process.listeners("SIGINT")).toContain(takenHandler);
+    expect(process.listeners("SIGTERM")).toContain(takenHandler);
 
-    dropInterruptHandler(handler);
-    expect(process.listeners("SIGINT")).not.toContain(handler);
-    expect(process.listeners("SIGTERM")).not.toContain(handler);
+    dropInterruptHandler(takenHandler);
+    expect(process.listeners("SIGINT")).not.toContain(takenHandler);
+    expect(process.listeners("SIGTERM")).not.toContain(takenHandler);
   });
 
   test("the waiting handler removes its own queue entry before re-raising", () => {
     const removeEntry = vi.fn<(entryPath: string) => void>();
     const raise = vi.fn<(signal: NodeJS.Signals) => void>();
-    const handler = makeWaitingInterruptHandler({ entryPath: "/queue/entry", removeEntry, raise });
+    const takenHandler = makeWaitingInterruptHandler({
+      entryPath: "/queue/entry",
+      removeEntry,
+      raise,
+    });
 
-    handler("SIGTERM");
+    takenHandler("SIGTERM");
 
     expect(removeEntry).toHaveBeenCalledWith("/queue/entry");
     expect(raise).toHaveBeenCalledWith("SIGTERM");
@@ -43,9 +47,9 @@ describe("signals", () => {
   test("the held handler releases the slot and then re-raises", async () => {
     const release = vi.fn<() => Promise<void>>(async () => undefined);
     const raise = vi.fn<(signal: NodeJS.Signals) => void>();
-    const handler = makeHeldInterruptHandler({ release, raise });
+    const takenHandler = makeHeldInterruptHandler({ release, raise });
 
-    handler("SIGINT");
+    takenHandler("SIGINT");
     await delay(20);
 
     expect(release).toHaveBeenCalledTimes(1);
@@ -57,9 +61,9 @@ describe("signals", () => {
       throw new Error("lease already reclaimed");
     });
     const raise = vi.fn<(signal: NodeJS.Signals) => void>();
-    const handler = makeHeldInterruptHandler({ release, raise });
+    const takenHandler = makeHeldInterruptHandler({ release, raise });
 
-    handler("SIGTERM");
+    takenHandler("SIGTERM");
     await delay(20);
 
     expect(raise).toHaveBeenCalledWith("SIGTERM");
@@ -67,9 +71,9 @@ describe("signals", () => {
 
   test("the running handler forwards the signal to the child's process group", () => {
     const kill = vi.fn<(pid: number, signal: NodeJS.Signals) => boolean>(() => true);
-    const handler = makeRunningInterruptHandler({ childPid: 4321, kill });
+    const takenHandler = makeRunningInterruptHandler({ childPid: 4321, kill });
 
-    handler("SIGINT");
+    takenHandler("SIGINT");
 
     expect(kill).toHaveBeenCalledWith(-4321, "SIGINT");
   });

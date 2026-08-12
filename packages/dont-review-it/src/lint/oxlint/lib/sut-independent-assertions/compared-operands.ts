@@ -33,10 +33,10 @@ export const comparedOperandsOf = (call: ESTree.CallExpression): ComparedOperand
   const callee = unwrapSubject(call.callee);
   if (callee.type !== "MemberExpression") return null;
 
-  const entry = assertionEntryCallOf(callee.object);
-  if (entry === null) return null;
+  const listed = assertionEntryCallOf(callee.object);
+  if (listed === null) return null;
 
-  const [handed] = entry.arguments;
+  const [handed] = listed.arguments;
   if (handed === undefined || handed.type === "SpreadElement") return null;
   return { subject: handed, expectations: handedValues(call.arguments) };
 };

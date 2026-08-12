@@ -11,11 +11,11 @@ const visitsOf = (sourceText: string) => nodeVisitsIn(parseSync("held.ts", sourc
 const kindsOf = (sourceText: string): readonly string[] =>
   visitsOf(sourceText).map((visit) => nodeTypeOf(visit.node));
 
-const namedVisit = (sourceText: string, name: string) => {
+const namedVisit = (sourceText: string, spelled: string) => {
   const found = visitsOf(sourceText).find(
-    (visit) => nodeTypeOf(visit.node) === "Identifier" && visit.node.name === name,
+    (visit) => nodeTypeOf(visit.node) === "Identifier" && visit.node.name === spelled,
   );
-  if (found === undefined) throw new Error(`no ${name} is written in: ${sourceText}`);
+  if (found === undefined) throw new Error(`no ${spelled} is written in: ${sourceText}`);
   return found;
 };
 

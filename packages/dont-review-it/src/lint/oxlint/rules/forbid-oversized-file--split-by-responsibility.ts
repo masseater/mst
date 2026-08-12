@@ -6,8 +6,8 @@ import type { ESTree, Options } from "@oxlint/plugins";
 
 const DEFAULT_MAX_LINES = 400;
 
-const maxLinesFrom = (options: Readonly<Options>): number => {
-  const [first] = options;
+const maxLinesFrom = (ruleOptions: Readonly<Options>): number => {
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) {
     return DEFAULT_MAX_LINES;
   }
@@ -41,13 +41,13 @@ export const forbidOversizedFile = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    const maxLines = maxLinesFrom(context.options);
+  create(inspection) {
+    const maxLines = maxLinesFrom(inspection.options);
     return {
       Program(node: ESTree.Program) {
-        const codeLines = codeLineCountOf(context.sourceCode.ast.tokens);
+        const codeLines = codeLineCountOf(inspection.sourceCode.ast.tokens);
         if (codeLines <= maxLines) return;
-        context.report({
+        inspection.report({
           node,
           messageId: "oversizedFile",
           data: { codeLines, maxLines },

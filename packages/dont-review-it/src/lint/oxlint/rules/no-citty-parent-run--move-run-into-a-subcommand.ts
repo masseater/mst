@@ -23,7 +23,7 @@ export const noCittyParentRun = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
+  create(inspection) {
     const factory = { exportedName: COMMAND_FACTORY_NAME, binding: newBinding() };
 
     return {
@@ -38,7 +38,7 @@ export const noCittyParentRun = createDontReviewItRule({
         if (objectPropertyOf({ object: definition, key: "subCommands" }) === null) return;
         const runProperty = objectPropertyOf({ object: definition, key: "run" });
         if (runProperty === null) return;
-        context.report({ node: runProperty, messageId: "parentRun" });
+        inspection.report({ node: runProperty, messageId: "parentRun" });
       },
     };
   },

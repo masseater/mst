@@ -40,19 +40,19 @@ type Reference = {
   readonly line: number | null;
 };
 
-const anchorOf = (target: string): string | null => {
-  const index = target.indexOf("#");
-  if (index === -1 || index === target.length - 1) return null;
+const anchorOf = (checked: string): string | null => {
+  const index = checked.indexOf("#");
+  if (index === -1 || index === checked.length - 1) return null;
 
-  const encoded = target.slice(index + 1);
+  const encoded = checked.slice(index + 1);
   const [failure, decoded] = attempt(() => decodeURIComponent(encoded));
 
   return failure === null ? decoded : encoded;
 };
 
-const withoutAnchor = (target: string): string => {
-  const index = target.indexOf("#");
-  return index === -1 ? target : target.slice(0, index);
+const withoutAnchor = (checked: string): string => {
+  const index = checked.indexOf("#");
+  return index === -1 ? checked : checked.slice(0, index);
 };
 
 const headingAnchor = (heading: string): string =>
@@ -71,15 +71,15 @@ const headingAnchorsOf = (source: string): ReadonlySet<string> =>
       .map((line) => headingAnchor(line.replace(/^#{1,6}\s+/u, ""))),
   );
 
-const isSkippable = (target: string): boolean =>
-  target === "" ||
-  target.startsWith("#") ||
-  target.startsWith("http://") ||
-  target.startsWith("https://") ||
-  target.startsWith("mailto:") ||
-  isAbsolute(target) ||
-  !withoutAnchor(target).endsWith(DOCUMENT_EXTENSION) ||
-  PLACEHOLDER_MARKS.some((mark) => target.includes(mark));
+const isSkippable = (checked: string): boolean =>
+  checked === "" ||
+  checked.startsWith("#") ||
+  checked.startsWith("http://") ||
+  checked.startsWith("https://") ||
+  checked.startsWith("mailto:") ||
+  isAbsolute(checked) ||
+  !withoutAnchor(checked).endsWith(DOCUMENT_EXTENSION) ||
+  PLACEHOLDER_MARKS.some((mark) => checked.includes(mark));
 
 const referencesIn = ({
   document,
