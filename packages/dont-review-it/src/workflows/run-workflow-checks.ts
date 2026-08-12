@@ -1,7 +1,9 @@
 import { crossWorkflowChains } from "./checks/cross-workflow-chain.ts";
 import { undeclaredPermissions } from "./checks/declared-permissions.ts";
 import { gatingTriggerFilters } from "./checks/gating-trigger-filter.ts";
+import { unboundedHistoryFetches } from "./checks/history-fetch-depth.ts";
 import { maskedFailures } from "./checks/masked-failure.ts";
+import { unpinnedActionRefs } from "./checks/pinned-action-ref.ts";
 import { reusableWorkflowTriggers } from "./checks/reusable-workflow-trigger.ts";
 import { multiCommandRuns } from "./checks/single-command-run.ts";
 import { lineAtOffset, type WorkflowDocument } from "./workflow-document.ts";
@@ -35,6 +37,8 @@ const problemsIn = ({
     ...undeclaredPermissions({ document, config }),
     ...multiCommandRuns({ document, config }),
     ...maskedFailures({ document, config }),
+    ...unpinnedActionRefs({ document, config }),
+    ...unboundedHistoryFetches({ document, config }),
   ];
 };
 

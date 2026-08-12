@@ -48,6 +48,17 @@ export const valueOf = (node: unknown, key: string): unknown => entryOf(node, ke
 export const scalarText = (node: unknown): string | null =>
   isScalar(node) && typeof node.value === "string" ? node.value : null;
 
+export const scalarValueText = (node: unknown): string | null => {
+  if (!isScalar(node)) return null;
+
+  const { value } = node;
+  if (typeof value === "string") return value;
+  return typeof value === "number" || typeof value === "boolean" ? String(value) : null;
+};
+
+export const trailingComment = (node: unknown): string | null =>
+  isScalar(node) ? (node.comment ?? null) : null;
+
 export const isTruthyScalar = (node: unknown): boolean => isScalar(node) && node.value === true;
 
 export const keysOf = (node: unknown): readonly string[] =>

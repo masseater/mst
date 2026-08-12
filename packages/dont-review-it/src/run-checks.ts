@@ -21,6 +21,7 @@ import { duplicatedClustersIn } from "./lint/oxlint/lib/duplicated-bodies/body-i
 import { buildRepositoryBodyIndex } from "./lint/oxlint/lib/duplicated-bodies/builder.ts";
 import { formatDuplicatedCluster } from "./lint/oxlint/lib/duplicated-bodies/site-report.ts";
 import { formatRepositoryProblem } from "./problem.ts";
+import { actionUpdateProblems } from "./workflows/action-updates.ts";
 import { defaultWorkflowChecksConfig } from "./workflows/config.ts";
 import { runWorkflowChecks } from "./workflows/run-workflow-checks.ts";
 
@@ -34,6 +35,8 @@ export type CheckReport = {
 };
 
 const NO_WORKSPACE_DEFINITION = "no workspace definition";
+
+const NO_WORKFLOW_DEFINITION = "no workflow definition";
 
 const UNREADABLE_WORKSPACE_DEFINITION = "workspace definition does not parse";
 
@@ -49,6 +52,10 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
   const repositoryFiles = listRepositoryFiles(resolve(repositoryRoot));
   const catalog = buildCanonicalValuesCatalog({ repositoryRoot });
   const workflows = runWorkflowChecks({ repositoryRoot, config: defaultWorkflowChecksConfig });
+  const actionUpdates =
+    workflows.scanned === 0
+      ? { problems: [], scanned: 0 }
+      : actionUpdateProblems({ repositoryRoot, config: defaultWorkflowChecksConfig });
   const skills = shippedSkillsProblems({ repositoryRoot, config: defaultIntentSkillsConfig });
   const ruleIndex = dependencyCatalog.definitionUnreadable
     ? { problems: [], scanned: 0 }
@@ -99,6 +106,14 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
       count: workflows.scanned,
       skippedReason: null,
       problems: workflows.problems.map(formatRepositoryProblem).toSorted(),
+      warnings: [],
+    },
+    {
+      check: "action-updates",
+      unit: "update configuration",
+      count: actionUpdates.scanned,
+      skippedReason: workflows.scanned === 0 ? NO_WORKFLOW_DEFINITION : null,
+      problems: actionUpdates.problems.map(formatRepositoryProblem).toSorted(),
       warnings: [],
     },
     {
