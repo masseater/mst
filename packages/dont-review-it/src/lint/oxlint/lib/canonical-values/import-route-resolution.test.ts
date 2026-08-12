@@ -1,10 +1,10 @@
-import { execFileSync } from "node:child_process";
 import { mkdirSync, realpathSync, symlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import * as ts from "typescript-6";
 import { describe, expect, test } from "vite-plus/test";
 
+import { gitOutput } from "../git-output.ts";
 import {
   createCanonicalValuesTestRepository,
   writeCanonicalValuesTestFiles,
@@ -87,7 +87,7 @@ describe("import route source resolution", () => {
 
   test("an ignored untracked source is external while the same tracked source is repository code", () => {
     const repositoryRoot = createCanonicalValuesTestRepository();
-    execFileSync("git", ["init", "--quiet"], { cwd: repositoryRoot });
+    gitOutput(["init", "--quiet"], { cwd: repositoryRoot, env: process.env });
     writeCanonicalValuesTestFiles({
       repositoryRoot,
       files: {
@@ -112,7 +112,10 @@ describe("import route source resolution", () => {
       ),
     ).toBe("external");
 
-    execFileSync("git", ["add", "-f", "ignored/status.ts"], { cwd: repositoryRoot });
+    gitOutput(["add", "-f", "ignored/status.ts"], {
+      cwd: repositoryRoot,
+      env: process.env,
+    });
 
     expect(importRouteStatus(query, buildCatalog([]))).toBe("unregistered");
   });

@@ -224,6 +224,23 @@ describe("canonical values process e2e", { timeout: PROCESS_TIMEOUT * 4 }, () =>
     expect(runLint(root, "src/alias-consumer.ts")).toMatchObject({ exitCode: 0 });
   });
 
+  test("an ambient global with an owner binding name is not a registered route", () => {
+    const root = packageRouteRepository();
+    writeRepositoryFile(root, {
+      relativePath: "src/globals.d.ts",
+      contents: 'declare const ORDER_STATUSES: readonly ["shadow", "values"];\n',
+    });
+    writeRepositoryFile(root, {
+      relativePath: "src/global-consumer.ts",
+      contents: "export const schema = z.enum(ORDER_STATUSES);\n",
+    });
+
+    const linted = runLint(root, "src/global-consumer.ts");
+    expect(linted.exitCode).toBe(1);
+    expect(linted.out).toContain(NO_LOCAL_CODE);
+    expect(lintMessages(linted)).toContain("neither a registered public export path");
+  });
+
   test("property vocabularies keep repository route identity across module boundaries", () => {
     const root = repositoryWith({
       "src/import-type.ts": 'export type Status = keyof import("./shape.ts").Shape;\n',
