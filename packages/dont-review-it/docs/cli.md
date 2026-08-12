@@ -55,6 +55,16 @@ bin を公開するパッケージが守る規範。機械で止められるも�
   - PROHIBIT: 呼び出し側が保守するモードフラグや、複製したスクリプトで分岐する
 - IF: stdout / stderr の内容をテストする; THEN MUST: `@mst/dont-review-it/vitest` の `standardIoTest` からテストを導出し、両ストリームをスナップショットで固定する
   - 機械で強制される側は [no-handmade-standard-io-double](lint/no-handmade-standard-io-double--use-standard-io-test.md) と [require-standard-io-snapshot](lint/require-standard-io-snapshot--pin-both-streams.md) が持つ
+- IF: 検査を走らせるコマンドが、どの観点をどれだけ開いたかを残す; THEN
+  - MUST: 走査証跡を stderr に書く
+  - PROHIBIT: stdout に混ぜる
+    - 走査の事実は結果ではない。判断は [EDR 0038](../../../docs/engineering-decision-logs/0038-write-the-scan-trace-to-stderr-and-read-the-reader-from-the-runtime.md) にある
+  - MUST: 対象を開かなかった観点を、開いて何も見つからなかった観点と別の形で書く
+  - PROHIBIT: 対象がゼロだったことを理由に終了コードを変える
+- IF: 読み手が人間か AI かで出力の形を変える; THEN
+  - MUST: `std-env` の `isAgent` で実行時文脈から判別する
+  - PROHIBIT: 呼び出し側が渡すフラグで切り替える
+  - PROHIBIT: 判別に使う環境変数の一覧を自前で持つ
 
 ## パッケージ境界
 
