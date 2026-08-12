@@ -73,6 +73,43 @@ describe("compareGitHubPullRequest", () => {
     });
   });
 
+  it("compares a source after removing NUL bytes from its previous API blob", async () => {
+    const comparison = await compareGitHubPullRequest({
+      repositoryRoot: "/checkout",
+      repository: "owner/name",
+      baseRevision: "basetip",
+      headRevision: "headsha",
+      request: answering({
+        "/repos/owner/name/contents/src/legacy.ts?ref=basesha": "export const current = \0true;\n",
+        "/repos/owner/name/contents/src/legacy.ts?ref=headsha": LEGACY_AFTER,
+        "/repos/owner/name/contents/src/legacy-api.test.ts?ref=headsha": "const added = true;\n",
+      }),
+    });
+
+    expect(comparison.files[0]).toMatchObject({
+      kind: "changed",
+      beforeSource: null,
+      afterSource: LEGACY_AFTER,
+    });
+  });
+
+  it("rejects a NUL-bearing source in the API head", async () => {
+    await expect(
+      compareGitHubPullRequest({
+        repositoryRoot: "/checkout",
+        repository: "owner/name",
+        baseRevision: "basetip",
+        headRevision: "headsha",
+        request: answering({
+          "/repos/owner/name/contents/src/legacy.ts?ref=basesha": LEGACY_BEFORE,
+          "/repos/owner/name/contents/src/legacy.ts?ref=headsha":
+            "export const current = \0true;\n",
+          "/repos/owner/name/contents/src/legacy-api.test.ts?ref=headsha": "const added = true;\n",
+        }),
+      }),
+    ).rejects.toThrow("Source blob contains NUL bytes: src/legacy.ts");
+  });
+
   it("reads a removal, a rename and a copy the compare reported", async () => {
     const comparison = await compareGitHubPullRequest({
       repositoryRoot: "/checkout",

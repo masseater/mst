@@ -80,9 +80,12 @@ export const decodedSource = (path: string, blob: Uint8Array): string => {
   return new TextDecoder("utf-8").decode(blob);
 };
 
+export const decodedPreviousSource = (blob: Uint8Array): string | null =>
+  blob.includes(0) ? null : new TextDecoder("utf-8").decode(blob);
+
 export type SideSources = Readonly<{
-  base: (path: string) => Promise<string>;
-  head: (path: string) => Promise<string>;
+  base: (path: string) => Promise<string | null>;
+  head: (path: string) => Promise<string | null>;
 }>;
 
 const readSource = async ({
@@ -229,11 +232,13 @@ export const compareRevisions = async ({
       args: diffArguments({ baseCommit, headCommit, presentation: ["--unified=0"] }),
     }),
   ]);
-  const blobAt = (revision: string) => async (path: string) =>
-    decodedSource(
-      path,
-      await runGitBuffer({ repositoryRoot, args: ["cat-file", "blob", `${revision}:${path}`] }),
-    );
+  const blobAt =
+    (revision: string, decode: (path: string, blob: Uint8Array) => string | null) =>
+    async (path: string) =>
+      decode(
+        path,
+        await runGitBuffer({ repositoryRoot, args: ["cat-file", "blob", `${revision}:${path}`] }),
+      );
 
   return {
     repositoryRoot,
@@ -242,7 +247,10 @@ export const compareRevisions = async ({
     files: await comparisonFrom({
       inventoryOutput,
       diff,
-      sources: { base: blobAt(baseCommit), head: blobAt(headCommit) },
+      sources: {
+        base: blobAt(baseCommit, (_path, blob) => decodedPreviousSource(blob)),
+        head: blobAt(headCommit, decodedSource),
+      },
     }),
   };
 };

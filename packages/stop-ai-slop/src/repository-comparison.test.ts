@@ -213,6 +213,33 @@ describe("compareRevisions", () => {
     });
   });
 
+  it("compares a source after removing NUL bytes from its previous blob", async () => {
+    await withTestRepository(async (repository) => {
+      const base = repository.commit({
+        files: { "src/current.ts": "export const current = \0true;\n" },
+      });
+      const head = repository.commit({
+        files: { "src/current.ts": "export const current = true;\n" },
+      });
+
+      await expect(
+        compareRevisions({
+          repositoryRoot: repository.root,
+          baseRevision: base,
+          headRevision: head,
+        }),
+      ).resolves.toMatchObject({
+        files: [
+          {
+            kind: "changed",
+            beforeSource: null,
+            afterSource: "export const current = true;\n",
+          },
+        ],
+      });
+    });
+  });
+
   it("classifies a regular file changed to a symbolic link as changed", async () => {
     await withTestRepository(async (repository) => {
       const path = "src/current.ts";
