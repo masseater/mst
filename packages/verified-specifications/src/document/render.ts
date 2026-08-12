@@ -1,5 +1,3 @@
-import { toLines } from "@mst/utils";
-
 export const SPECIFICATIONS_FILE_NAME = "SPECIFICATIONS.md";
 
 export type ListedSubject = {
@@ -46,7 +44,7 @@ export const renderSpecificationsDocument = (input: {
   readonly packageName: string;
   readonly subjects: readonly ListedSubject[];
 }): string =>
-  toLines([
+  [
     `# ${input.packageName}`,
     "",
     PROVENANCE_LINE,
@@ -58,4 +56,6 @@ export const renderSpecificationsDocument = (input: {
       "",
       ...entry.claims.map((claim) => `- ${claim}`),
     ]),
-  ]);
+  ]
+    .map((line) => `${line}\n`)
+    .join("");

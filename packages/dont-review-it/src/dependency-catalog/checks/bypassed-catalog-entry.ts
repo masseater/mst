@@ -23,8 +23,8 @@ const findingsForUsage = ({
   readonly usage: DependencyUsage;
   readonly entriesForName: readonly CatalogEntry[];
   readonly config: DependencyCatalogChecksConfig;
-}): DependencyCatalogFindings =>
-  usage.directReferences.map((reference) => {
+}): DependencyCatalogFindings => ({
+  problems: usage.directReferences.map((reference) => {
     const matchingEntry = entriesForName.find((entry) => entry.version === reference.specifier);
     if (matchingEntry !== undefined) {
       const specifier = catalogReferenceSpecifier({
@@ -44,7 +44,8 @@ const findingsForUsage = ({
       line: null,
       message: `${usage.dependencyName} is pinned to ${reference.specifier} here while the catalog pins ${catalogVersions}. Choose the intended version, keep it in one catalog entry, and replace this manifest's specifier with a reference to that entry.`,
     };
-  });
+  }),
+});
 
 export const bypassedCatalogFindings = ({
   catalogEntries,
@@ -55,11 +56,15 @@ export const bypassedCatalogFindings = ({
   readonly usages: readonly DependencyUsage[];
   readonly config: DependencyCatalogChecksConfig;
 }): DependencyCatalogFindings => {
-  return usages.flatMap((usage) => {
+  const findings = usages.flatMap((usage) => {
     const entriesForName = catalogEntries.filter(
       (entry) => entry.dependencyName === usage.dependencyName,
     );
     if (entriesForName.length === 0) return [];
-    return findingsForUsage({ usage, entriesForName, config });
+    return [findingsForUsage({ usage, entriesForName, config })];
   });
+
+  return {
+    problems: findings.flatMap((finding) => finding.problems),
+  };
 };

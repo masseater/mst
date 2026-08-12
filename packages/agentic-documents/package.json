@@ -2,6 +2,9 @@
   "name": "@mst/agentic-documents",
   "version": "0.0.0",
   "description": "AI-facing documents that stay true to the repository and keep a shape machines can follow.",
+  "keywords": [
+    "tanstack-intent"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -13,6 +16,7 @@
   },
   "files": [
     "dist",
+    "skills",
     "src"
   ],
   "type": "module",
@@ -27,10 +31,11 @@
     "build": "vp pack",
     "dev": "vp pack --watch",
     "test": "vp test",
-    "check": "vp check"
+    "check": "vp check",
+    "check:skills": "intent validate"
   },
   "dependencies": {
-    "@mst/utils": "workspace:*",
+    "@mst/repository-checks": "workspace:*",
     "es-toolkit": "catalog:",
     "remark-frontmatter": "^5.0.0",
     "remark-gfm": "^4.0.1",
@@ -39,6 +44,7 @@
     "yaml": "catalog:"
   },
   "devDependencies": {
+    "@tanstack/intent": "catalog:",
     "@types/mdast": "^4.0.4",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",

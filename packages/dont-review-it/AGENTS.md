@@ -25,13 +25,17 @@ description: Machine-enforced answers to the writing questions that would otherw
 
 同じ不変条件を守る公式のルールを先に探すこと、どの順に検討するか、自前で書いてよい条件と書いたあとの後始末は [AGENTS.md](../../AGENTS.md) が持つ。
 
-違反の判定と修正案の選択を分ける判断は [EDR 0030](../../docs/engineering-decision-logs/0030-separate-the-violation-from-the-choice-of-repair.md)、Ponytail から機械で決定できる範囲だけを取り込む判断は [EDR 0032](../../docs/engineering-decision-logs/0032-enforce-only-the-decidable-parts-of-ponytail.md) が持つ。
+違反の判定と修正案の選択を分ける判断は [EDR 0034](../../docs/engineering-decision-logs/0034-separate-the-violation-from-the-choice-of-repair.md)、Ponytail から機械で決定できる範囲だけを取り込む判断は [EDR 0036](../../docs/engineering-decision-logs/0036-enforce-only-the-decidable-parts-of-ponytail.md) が持つ。
 
 ## 文書
 
 ルールごとに `docs/lint/<ルール名>.md` を持つ。何を検出するか、なぜそれが要るか、どう直すか、どんな回避策を禁じるかを書く。報告メッセージには禁止と修正の方向だけを載せ、理由と修正の選択肢は文書側が持つ。
 
 説明に載せる例をどこから作るかは [文書](../../docs/guidelines/documents.md) が持つ。良い例と悪い例を対で置かないことは [規範の書き方](../../docs/normative-notation.md) が持つ。
+
+## CLI 向け config
+
+bin を公開するパッケージ向けに、全部入り config の厳密な上位集合 `oxlintCli` を公開する。何を足しているか、lint で検出できない CLI の規範は [CLI の作り方](docs/cli.md) が持つ。上位集合の形にした判断は [EDR 0032](../../docs/engineering-decision-logs/0032-ship-the-cli-config-as-a-strict-superset.md) にある。
 
 ## 検証コマンド
 
@@ -70,7 +74,7 @@ CLI が持つコマンドは `check` の 1 つで、そこが全部の検査を�
 
 ## 依存宣言の検査
 
-`check` が `pnpm-workspace.yaml` と、そこに宣言されたワークスペースの `package.json` も読む。守っているのは「catalog は複数のワークスペースが共有するバージョンだけを持つ」という規範で、配置の判断は [EDR 0028](../../docs/engineering-decision-logs/0028-keep-the-catalog-for-shared-versions-only.md)、修正案が複数あっても違反を error にする判断は [EDR 0030](../../docs/engineering-decision-logs/0030-separate-the-violation-from-the-choice-of-repair.md) にある。
+`check` が `pnpm-workspace.yaml` と、そこに宣言されたワークスペースの `package.json` も読む。守っているのは「catalog は複数のワークスペースが共有するバージョンだけを持つ」という規範で、配置の判断は [EDR 0028](../../docs/engineering-decision-logs/0028-keep-the-catalog-for-shared-versions-only.md)、修正案が複数あっても違反を error にする判断は [EDR 0034](../../docs/engineering-decision-logs/0034-separate-the-violation-from-the-choice-of-repair.md) にある。
 
 - 読めないワークスペース定義が残っていない
 - 1 つのマニフェストしか使わない catalog エントリが残っていない。overrides が `catalog:` で参照するエントリは除く
@@ -81,9 +85,26 @@ CLI が持つコマンドは `check` の 1 つで、そこが全部の検査を�
 
 ## テスト設定と実行経路の検査
 
-`check` はワークスペース定義の有無にかかわらずルートの `package.json` を読み、定義があれば一致するワークスペースの `package.json` も読む。lint は Vite/Vitest 設定を静的に検査する。coverage の source universe を明示する判断は [EDR 0031](../../docs/engineering-decision-logs/0031-make-the-coverage-source-universe-explicit.md)、manifest の列挙方法は [EDR 0033](../../docs/engineering-decision-logs/0033-use-node-globs-for-workspace-manifests.md) が持つ。
+`check` はワークスペース定義の有無にかかわらずルートの `package.json` を読み、定義があれば一致するワークスペースの `package.json` も読む。lint は Vite/Vitest 設定を静的に検査する。coverage の source universe を明示する判断は [EDR 0035](../../docs/engineering-decision-logs/0035-make-the-coverage-source-universe-explicit.md)、manifest の列挙方法は [EDR 0037](../../docs/engineering-decision-logs/0037-use-node-globs-for-workspace-manifests.md) が持つ。
 
 - test command が `--config` / `-c` で別の設定を選んでいない。test 設定は自動発見される `vite.config` / `vitest.config` に置く
 - test command が bare `--coverage` 以外の coverage CLI option で静的設定を上書きしていない。coverage の lint と実行時ゲートは同じ source universe と threshold を読む
+- test command が `--changed` / `--changed=...` で変更ファイルだけを選んでいない。`env`、`command`、`exec`、`spool --`、`npx`、`pnpm exec`、`npm exec`、`vp exec` を使う場合も内側の test runner を静的に読める形にし、未知の wrapper や shell mode を置かない
 - canonical な `vite.config` / `vitest.config` が ESM の静的な `defineConfig({...})` として書かれている。CommonJS と動的な合成は source universe と threshold の証明を妨げる
+- canonical config の `test.changed` と `test.coverage.changed` は literal `false` または空文字だけを許す。`true` と空でない ref は削除し、動的な値は実効値を証明できる静的宣言へ直す
 - `run.tasks.test` が存在しない。test の入口は `package.json#scripts.test` に置き、config と coverage override の CLI 検査を必ず通す
+
+## 公開パッケージの skill の検査
+
+`check` が、TanStack Intent の skill と package.json の宣言が食い違っていないことも読む。見るのは同梱と配布の配線だけで、両方向を検知する。
+
+npm へ公開できるパッケージには、あることを要求する。
+
+- `skills/**/SKILL.md` が 1 つ以上ある
+- `files` の許可リストがあるなら `skills` を載せている
+- `keywords` が `tanstack-intent` を含んでいる
+
+`private: true` のパッケージには、同じ 3 点が書かれていないことを要求する。出荷されない skill と、出荷されない前提の配線は、読む側に嘘を教える。
+
+- IF: SKILL.md の中身の構造を検査したくなった; THEN MUST: この検査に足さず、上流の `intent validate`（各パッケージの `check:skills`）に任せる
+  - 不変条件の分担は [EDR 0030](../../docs/engineering-decision-logs/0030-ship-agent-skills-with-published-packages-and-gate-the-shipping-ourselves.md) が決めている

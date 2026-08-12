@@ -12,6 +12,8 @@ overload signature を持つ関数実装も報告しない。見えている呼�
 
 通常の function が仮引数の初期化子または本体から自分の `arguments` を参照する場合も報告しない。仮引数と実引数を削除すると `arguments.length` と `arguments[index]` が変わり、値を本体へ埋め込むだけでは修復できない。arrow function 内の `arguments` は外側の function に属するため、この除外には含めない。
 
+対象の仮引数より前にある仮引数の初期化子が対象を参照する場合も報告しない。仮引数は左から右へ初期化されるため、先行する初期化子が後続の仮引数を読むと、その binding は TDZ にある。値へ置換すると元の `ReferenceError` が消え、実行結果を変える。TypeScript ではこの直接参照自体が type error になる。反対に、後続の初期化子が既に初期化された対象を読む形は報告し、そこにある resolved reference も値へ置換する。
+
 対象 function の内側に unshadowed global `eval(...)` の直接呼び出しがある場合も報告しない。direct eval は仮引数の lexical binding を名前で読めるためである。`eval!`、`eval as typeof eval`、`eval satisfies typeof eval`、`<typeof eval>eval` は emit 時に wrapper が消えるので同じく direct eval として扱う。ローカルに束縛された `eval`、`(0, eval)(...)`、`eval?.(...)` は direct eval ではなく、仮引数環境を名前解決しないので除外しない。
 
 TypeScript の `this` pseudo-parameter は emit されないため、callsite の実引数位置には数えない。
@@ -28,7 +30,7 @@ TypeScript の `this` pseudo-parameter は emit されないため、callsite �
 
 ## どう直すか
 
-仮引数を削除し、各呼び出しから対応する実引数を削除する。関数本体でその名前を参照していた場所には、報告された一つの実効値を置く。
+残す仮引数の初期化子と関数本体で、対象の仮引数へ解決する参照をすべて報告された実効値へ置き換える。その後で対象の仮引数を削除し、各呼び出しから対応する実引数を削除する。同じ名前の別 binding は置き換えない。
 
 値が本当に変わる契約であるなら、足りないのは異なる値を使う実在の呼び出し元である。将来変わるという見込みだけでは仮引数を残さず、値を選ぶ要件が生じた変更で仮引数を戻す。
 
@@ -50,3 +52,4 @@ TypeScript の `this` pseudo-parameter は emit されないため、callsite �
 - 非有限 number と、数値リテラル以外へ単項演算子を適用した式。静的な有限 scalar として比較できない
 - overload signature を持つ関数実装。signature が宣言する option 契約をローカル callsite だけでは削除できない
 - 自分の `arguments` を読む通常の function と、direct eval を含む function。引数を消すと関数本体から観測できる実行環境が変わる
+- 先行する仮引数の初期化子から参照される後続の仮引数。TDZ にある binding を固定値へ変える修復は元の失敗を保存しない

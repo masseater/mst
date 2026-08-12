@@ -44,6 +44,11 @@ describe("dont-review-it/no-invariant-default-parameter--remove-unused-option", 
         filename: productionFile,
       },
       {
+        name: "an earlier initializer cannot read a later parameter before initialization",
+        code: "function format(copy = compact, compact = false) { return copy; }\nformat();",
+        filename: productionFile,
+      },
+      {
         name: "direct eval in a function declaration can resolve the parameter binding",
         code: "function format(value, compact = false) { return eval('compact'); }\nformat(1, false);\nformat(2, false);",
         filename: productionFile,
@@ -192,6 +197,17 @@ describe("dont-review-it/no-invariant-default-parameter--remove-unused-option", 
         code: "function format(value, compact = false) { return compact ? String(value) : value; }\nformat(1);\nformat(2, false);",
         filename: productionFile,
         errors: [{ messageId: "invariantDefaultParameter" }],
+      },
+      {
+        name: "a later initializer reads the fixed earlier parameter through its resolved binding",
+        code: "function format(compact = false, copy = compact) { return copy; }\nformat(false);",
+        filename: productionFile,
+        errors: [
+          {
+            messageId: "invariantDefaultParameter",
+            data: { name: "compact", value: "false" },
+          },
+        ],
       },
       {
         name: "an explicit value at every call site makes the unused default irrelevant",

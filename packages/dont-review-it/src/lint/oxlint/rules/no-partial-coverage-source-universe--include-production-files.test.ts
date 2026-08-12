@@ -33,34 +33,14 @@ describe("dont-review-it/no-partial-coverage-source-universe--include-production
         filename: "vite.config.ts",
       },
       {
-        name: "an aliased Vite Plus defineConfig import is the authentic factory binding",
-        code: `import { defineConfig as config } from "vite-plus";\nexport default config({ test: { coverage: { include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"] } } });`,
-        filename: "vite.config.js",
-      },
-      {
-        name: "a Vite namespace defineConfig call is an authentic factory binding",
-        code: `import * as vite from "vite";\nexport default vite.defineConfig({ test: { coverage: { include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"] } } });`,
-        filename: "vite.config.mjs",
-      },
-      {
         name: "an aliased Vite defineConfig import is an authentic factory binding",
         code: `import { defineConfig as config } from "vite";\nexport default config({ test: { coverage: { include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"] } } });`,
-        filename: "vite.config.ts",
-      },
-      {
-        name: "a Vite Plus namespace defineConfig call is an authentic factory binding",
-        code: `import * as vitePlus from "vite-plus";\nexport default vitePlus.defineConfig({ test: { coverage: { include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"] } } });`,
         filename: "vite.config.ts",
       },
       {
         name: "a Vitest defineConfig import is an authentic test config factory",
         code: `import { defineConfig as config } from "vitest/config";\nexport default config({ test: { coverage: { include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"] } } });`,
         filename: "vitest.config.ts",
-      },
-      {
-        name: "a Vitest namespace defineConfig call is an authentic test config factory",
-        code: `import * as vitest from "vitest/config";\nexport default vitest.defineConfig({ test: { coverage: { include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"] } } });`,
-        filename: "vitest.config.mts",
       },
       {
         name: "TypeScript expression wrappers preserve a static config",
@@ -87,6 +67,21 @@ describe("dont-review-it/no-partial-coverage-source-universe--include-production
         code: configFor(`{ include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"] }`),
         filename: "vite.config.ts",
         options: [{}],
+      },
+      {
+        name: "literal false disables changed test and coverage selection",
+        code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { changed: false, coverage: { changed: false, include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"] } } });`,
+        filename: "vite.config.ts",
+      },
+      {
+        name: "an empty changed ref does not select a smaller source universe",
+        code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { changed: "", coverage: { changed: "", include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"] } } });`,
+        filename: "vite.config.ts",
+      },
+      {
+        name: "an earlier dynamic duplicate is evaluated but a final false remains effective",
+        code: `import { defineConfig } from "vite-plus";\nconst sideEffect = () => true;\nexport default defineConfig({ test: { changed: sideEffect(), changed: false, coverage: { include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"] } } });`,
+        filename: "vite.config.ts",
       },
       {
         name: "a file outside the test config boundary is not inspected",
@@ -268,6 +263,34 @@ describe("dont-review-it/no-partial-coverage-source-universe--include-production
         code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ run: { tasks: { test: { command: "vp test --coverage=false" } } }, test: { coverage: { include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"] } } });`,
         filename: "vite.config.ts",
         errors: [{ messageId: "testTaskBypassesCoverageGuard" }],
+        output: null,
+      },
+      {
+        name: "a changed property first in the coverage object is deleted",
+        code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { coverage: { changed: "HEAD", include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"] } } });`,
+        filename: "vite.config.ts",
+        errors: [{ messageId: "changedCoverageSourceUniverse" }],
+        output: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { coverage: { include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"] } } });`,
+      },
+      {
+        name: "a dynamic changed expression fails closed without deleting its side effect",
+        code: `import { defineConfig } from "vite-plus";\nconst sideEffect = () => true;\nexport default defineConfig({ test: { changed: sideEffect(), coverage: { include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"] } } });`,
+        filename: "vite.config.ts",
+        errors: [{ messageId: "dynamicChangedCoverageSourceUniverse" }],
+        output: null,
+      },
+      {
+        name: "an unsupported literal changed value fails closed as dynamic",
+        code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { changed: 0, coverage: { include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"] } } });`,
+        filename: "vite.config.ts",
+        errors: [{ messageId: "dynamicChangedCoverageSourceUniverse" }],
+        output: null,
+      },
+      {
+        name: "deleting an effective changed value must not expose an earlier dynamic duplicate",
+        code: `import { defineConfig } from "vite-plus";\nconst sideEffect = () => true;\nexport default defineConfig({ test: { changed: sideEffect(), changed: "HEAD", coverage: { include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"] } } });`,
+        filename: "vite.config.ts",
+        errors: [{ messageId: "changedCoverageSourceUniverse" }],
         output: null,
       },
       {

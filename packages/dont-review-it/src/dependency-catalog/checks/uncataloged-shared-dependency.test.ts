@@ -19,48 +19,48 @@ const findingsFor = ({
 
 describe("sharedDependencyFindings", () => {
   it("reports a version that two manifests pin outside the catalog", () => {
-    const findings = findingsFor({
+    const { problems } = findingsFor({
       usages: [
         {
           dependencyName: "typescript",
           catalogReferences: [],
           directReferences: [
             { manifestPath: "apps/web/package.json", specifier: "^5.0.0" },
-            { manifestPath: "packages/utils/package.json", specifier: "^5.0.0" },
+            { manifestPath: "packages/repository-checks/package.json", specifier: "^5.0.0" },
           ],
         },
       ],
     });
 
-    expect(findings.length).toBe(1);
-    expect(findings[0]?.file).toBe(DEFINITION_PATH);
-    expect(findings[0]?.message).toContain("apps/web/package.json");
-    expect(findings[0]?.message).toContain("packages/utils/package.json");
-    expect(findings[0]?.message).toContain("^5.0.0");
+    expect(problems.length).toBe(1);
+    expect(problems[0]?.file).toBe(DEFINITION_PATH);
+    expect(problems[0]?.message).toContain("apps/web/package.json");
+    expect(problems[0]?.message).toContain("packages/repository-checks/package.json");
+    expect(problems[0]?.message).toContain("^5.0.0");
   });
 
   it("reports when the pinned versions disagree", () => {
-    const findings = findingsFor({
+    const { problems } = findingsFor({
       usages: [
         {
           dependencyName: "typescript",
           catalogReferences: [],
           directReferences: [
             { manifestPath: "apps/web/package.json", specifier: "^5.0.0" },
-            { manifestPath: "packages/utils/package.json", specifier: "^5.5.0" },
+            { manifestPath: "packages/repository-checks/package.json", specifier: "^5.5.0" },
           ],
         },
       ],
     });
 
-    expect(findings.length).toBe(1);
-    expect(findings[0]?.message).toContain("apps/web/package.json pins ^5.0.0");
-    expect(findings[0]?.message).toContain("packages/utils/package.json pins ^5.5.0");
-    expect(findings[0]?.message).toContain("Choose the intended version");
+    expect(problems.length).toBe(1);
+    expect(problems[0]?.message).toContain("apps/web/package.json pins ^5.0.0");
+    expect(problems[0]?.message).toContain("packages/repository-checks/package.json pins ^5.5.0");
+    expect(problems[0]?.message).toContain("Choose the intended version");
   });
 
   it("leaves a version that only one manifest pins alone", () => {
-    const findings = findingsFor({
+    const { problems } = findingsFor({
       usages: [
         {
           dependencyName: "typescript",
@@ -70,24 +70,24 @@ describe("sharedDependencyFindings", () => {
       ],
     });
 
-    expect(findings).toStrictEqual([]);
+    expect(problems).toStrictEqual([]);
   });
 
   it("leaves a dependency that the catalog holds to the catalog checks", () => {
-    const findings = findingsFor({
+    const { problems } = findingsFor({
       usages: [
         {
           dependencyName: "typescript",
           catalogReferences: [],
           directReferences: [
             { manifestPath: "apps/web/package.json", specifier: "^5.0.0" },
-            { manifestPath: "packages/utils/package.json", specifier: "^5.0.0" },
+            { manifestPath: "packages/repository-checks/package.json", specifier: "^5.0.0" },
           ],
         },
       ],
       catalogedNames: ["typescript"],
     });
 
-    expect(findings).toStrictEqual([]);
+    expect(problems).toStrictEqual([]);
   });
 });

@@ -5,6 +5,7 @@ import { normalize } from "node:path/posix";
 import { uniq } from "es-toolkit";
 
 import { readJsonFile } from "../lint/oxlint/lib/canonical-values/read-json-file.ts";
+import { NEGATION_PREFIX } from "../lint/oxlint/lib/tracked-paths/ignore-listing.ts";
 
 import type { DependencyCatalogChecksConfig } from "./config.ts";
 
@@ -12,8 +13,6 @@ export type WorkspaceManifest = {
   readonly relativePath: string;
   readonly manifest: unknown;
 };
-
-const NEGATION_PREFIX = "!";
 
 const manifestPatternFor = ({
   directoryPattern,

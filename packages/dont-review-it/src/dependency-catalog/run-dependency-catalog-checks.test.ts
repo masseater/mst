@@ -22,8 +22,10 @@ const repositoryWith = (files: Readonly<Record<string, string>>): string => {
   return root;
 };
 
-const findingsFor = (files: Readonly<Record<string, string>>) =>
+const reportFor = (files: Readonly<Record<string, string>>) =>
   runDependencyCatalogChecks({ repositoryRoot: repositoryWith(files), config });
+
+const findingsFor = (files: Readonly<Record<string, string>>) => reportFor(files).problems;
 
 describe("runDependencyCatalogChecks", () => {
   it("stays silent where no workspace definition marks pnpm usage", () => {
@@ -33,13 +35,14 @@ describe("runDependencyCatalogChecks", () => {
   });
 
   it("reports a workspace definition that does not parse", () => {
-    const findings = findingsFor({
+    const { problems, definitionUnreadable } = reportFor({
       "pnpm-workspace.yaml": "packages: [\n",
     });
 
-    expect(findings.length).toBe(1);
-    expect(findings[0]?.file).toBe("pnpm-workspace.yaml");
-    expect(findings[0]?.message).toContain("does not parse");
+    expect(problems.length).toBe(1);
+    expect(problems[0]?.file).toBe("pnpm-workspace.yaml");
+    expect(problems[0]?.message).toContain("does not parse");
+    expect(definitionUnreadable).toBe(true);
   });
 
   it("reports the catalog entry that only one manifest uses", () => {
@@ -106,14 +109,14 @@ describe("runDependencyCatalogChecks", () => {
   });
 
   it("reports disagreements as problems", () => {
-    const findings = findingsFor({
+    const { problems } = reportFor({
       "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
       "packages/web/package.json": `{"devDependencies": {"typescript": "^5.0.0"}}`,
       "packages/site/package.json": `{"devDependencies": {"typescript": "^5.5.0"}}`,
     });
 
-    expect(findings.length).toBe(1);
-    expect(findings[0]?.message).toContain("Choose the intended version");
+    expect(problems.length).toBe(1);
+    expect(problems[0]?.message).toContain("Choose the intended version");
   });
 
   it("orders the findings by file and then by message", () => {

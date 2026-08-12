@@ -1,5 +1,10 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
-import { objectPropertyOf, objectValueOf } from "../lib/object-literal.ts";
+import {
+  objectPropertyOf,
+  objectValueOf,
+  propertyKeyOf,
+  removeObjectPropertyFix,
+} from "../lib/object-literal.ts";
 import {
   resolveTestConfig,
   staticallyClosedObject,
@@ -54,6 +59,82 @@ const declaredCoverageOf = (
   if (unwrapped !== null && unwrapped.type !== "ArrayExpression") return null;
   const patterns = declaredPatternsOf(unwrapped);
   return patterns === null ? null : { include: unwrapped, patterns };
+};
+
+type ChangedSetting =
+  | { readonly kind: "absent-or-disabled" }
+  | { readonly kind: "dynamic"; readonly property: ESTree.ObjectProperty }
+  | {
+      readonly kind: "enabled";
+      readonly fixable: boolean;
+      readonly property: ESTree.ObjectProperty;
+    };
+
+const changedValueKindOf = (expression: ESTree.Expression): "disabled" | "dynamic" | "enabled" => {
+  const changedExpression = unwrapTransparentExpression(expression);
+  if (changedExpression.type !== "Literal") return "dynamic";
+  if (changedExpression.value === false || changedExpression.value === "") return "disabled";
+  return changedExpression.value === true || typeof changedExpression.value === "string"
+    ? "enabled"
+    : "dynamic";
+};
+
+const changedSettingOf = (object: ESTree.ObjectExpression): ChangedSetting => {
+  const properties = object.properties.filter(
+    (property): property is ESTree.ObjectProperty =>
+      property.type === "Property" && propertyKeyOf(property) === "changed",
+  );
+  const property = properties.at(-1);
+  if (property === undefined) return { kind: "absent-or-disabled" };
+  const kind = changedValueKindOf(property.value);
+  if (kind === "disabled") return { kind: "absent-or-disabled" };
+  if (kind === "dynamic") return { kind, property };
+  const previous = properties.at(-2);
+  return {
+    kind,
+    property,
+    fixable: previous === undefined || changedValueKindOf(previous.value) === "disabled",
+  };
+};
+
+const changedProblemFor = ({
+  setting,
+  sourceCode,
+}: {
+  readonly setting: ChangedSetting;
+  readonly sourceCode: SourceCode;
+}): {
+  readonly node: ESTree.ObjectProperty;
+  readonly messageId: "changedCoverageSourceUniverse" | "dynamicChangedCoverageSourceUniverse";
+  readonly fix?: FixFn;
+} | null => {
+  if (setting.kind === "absent-or-disabled") return null;
+  if (setting.kind === "dynamic") {
+    return { node: setting.property, messageId: "dynamicChangedCoverageSourceUniverse" };
+  }
+  return {
+    node: setting.property,
+    messageId: "changedCoverageSourceUniverse",
+    fix: setting.fixable
+      ? removeObjectPropertyFix({ property: setting.property, sourceCode })
+      : undefined,
+  };
+};
+
+const changedProblemOf = (
+  object: ESTree.ObjectExpression,
+  sourceCode: SourceCode,
+): ReturnType<typeof changedProblemFor> =>
+  changedProblemFor({ setting: changedSettingOf(object), sourceCode });
+
+const coverageBoundaryProblemsOf = (
+  coverage: ESTree.ObjectExpression,
+): readonly {
+  readonly node: ESTree.ObjectProperty;
+  readonly messageId: "excludedCoverageSource";
+}[] => {
+  const excluded = objectPropertyOf({ object: coverage, key: "exclude" });
+  return excluded === null ? [] : [{ node: excluded, messageId: "excludedCoverageSource" }];
 };
 
 const renderedPatterns = (patterns: readonly string[]): string =>
@@ -130,11 +211,15 @@ export const noPartialCoverageSourceUniverse = createDontReviewItRule({
       commonJsTestConfig:
         "A CommonJS test config must not sit outside the static coverage guards. Rename this file to `vite.config.ts` or `vitest.config.ts`, import `defineConfig` from Vite, Vite Plus, or `vitest/config`, and export one ESM `defineConfig({...})` object as the default.",
       testTaskBypassesCoverageGuard:
-        "A `run.tasks.test` task must not provide a second test entrypoint outside the package-script guard. Delete this task and put a bare `vp test` command in `package.json#scripts.test`, so test config and coverage command overrides are inspected before execution.",
+        "A `run.tasks.test` task must not provide a second test entrypoint outside the package-script guard. Delete this task and put `spool -- vp test` in `package.json#scripts.test`, so test config and coverage command overrides are inspected before execution.",
       dynamicTestTaskConfiguration:
-        "A Vite task configuration must not hide a test entrypoint behind variables, spreads, or computed properties. Write `run.tasks` as one static object, delete its `test` task, and put a bare `vp test` command in `package.json#scripts.test`.",
+        "A Vite task configuration must not hide a test entrypoint behind variables, spreads, or computed properties. Write `run.tasks` as one static object, delete its `test` task, and put `spool -- vp test` in `package.json#scripts.test`.",
       negatedCoveragePattern:
         "A coverage include pattern must not subtract files from the production source universe. Delete `{{pattern}}` and keep every owned production file inside a positive include pattern.",
+      changedCoverageSourceUniverse:
+        "A test config must not reduce the coverage source universe with `test.changed: true`, a non-empty changed ref, or the equivalent `test.coverage.changed` value. Delete this property so every production file declared by `test.coverage.include` remains in the coverage gate.",
+      dynamicChangedCoverageSourceUniverse:
+        "A dynamic `test.changed` or `test.coverage.changed` value must not leave the coverage source universe indeterminate. Move any required side effect into a separate statement, then delete this property or replace it with literal `false` or an empty string.",
     },
     fixable: "code",
     schema: [
@@ -213,9 +298,10 @@ export const noPartialCoverageSourceUniverse = createDontReviewItRule({
         include: declared.include,
         declaredPatterns: declared.patterns,
       });
-      const excluded = objectPropertyOf({ object: coverage, key: "exclude" });
-      if (excluded !== null) {
-        context.report({ node: excluded, messageId: "excludedCoverageSource" });
+      const changedProblem = changedProblemOf(coverage, context.sourceCode);
+      if (changedProblem !== null) context.report(changedProblem);
+      for (const problem of coverageBoundaryProblemsOf(coverage)) {
+        context.report(problem);
       }
     };
     const inspectResolvedCoverage = (
@@ -248,6 +334,10 @@ export const noPartialCoverageSourceUniverse = createDontReviewItRule({
         return;
       }
       inspectTestTask(closed.object, node);
+      const test = staticObjectPathAt({ object: closed.object, path: ["test"] });
+      const changedProblem =
+        test.kind === "static" ? changedProblemOf(test.object, context.sourceCode) : null;
+      if (changedProblem !== null) context.report(changedProblem);
       inspectResolvedCoverage(
         staticallyClosedObject(
           staticObjectPathAt({ object: closed.object, path: ["test", "coverage"] }),

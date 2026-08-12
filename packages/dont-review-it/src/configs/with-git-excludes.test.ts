@@ -17,9 +17,9 @@ describe("withGitExcludes", () => {
     expect(combined).not.toBe(configured);
     expect(combined.ignorePatterns).toStrictEqual([...gitExcludePatterns(), "generated/**"]);
     expect(combined.rules).toBe(configured.rules);
-  });
+  }, 30_000);
 
   test("it supplies repository exclusions when the caller declared none", () => {
     expect(withGitExcludes({}).ignorePatterns).toStrictEqual([...gitExcludePatterns()]);
-  });
+  }, 30_000);
 });

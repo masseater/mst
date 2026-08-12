@@ -1,4 +1,4 @@
-import type { ESTree } from "@oxlint/plugins";
+import type { ESTree, FixFn, SourceCode } from "@oxlint/plugins";
 
 type ObjectLookup = {
   readonly object: ESTree.ObjectExpression;
@@ -21,3 +21,53 @@ export const objectValueOf = (lookup: ObjectLookup): ESTree.Expression | null =>
   const property = objectPropertyOf(lookup);
   return property === null ? null : property.value;
 };
+
+const endAfterHorizontalWhitespace = (source: string, start: number): number => {
+  const suffix = source.slice(start);
+  return source.length - suffix.replace(/^[\t ]*/u, "").length;
+};
+
+const trailingCommaRemovalRange = ({
+  property,
+  comma,
+  sourceCode,
+}: {
+  readonly property: ESTree.ObjectProperty;
+  readonly comma: ESTree.Token;
+  readonly sourceCode: SourceCode;
+}): [number, number] => {
+  const afterComma = sourceCode.getTokenAfter(comma);
+  const previous = sourceCode.getTokenBefore(property);
+  if (afterComma?.value === "}" && previous?.value === ",") {
+    return [previous.start, comma.end];
+  }
+  return [property.start, endAfterHorizontalWhitespace(sourceCode.getText(), comma.end)];
+};
+
+const objectPropertyRemovalRange = ({
+  property,
+  sourceCode,
+}: {
+  readonly property: ESTree.ObjectProperty;
+  readonly sourceCode: SourceCode;
+}): [number, number] => {
+  const next = sourceCode.getTokenAfter(property);
+  if (next?.value === ",") {
+    return trailingCommaRemovalRange({ property, comma: next, sourceCode });
+  }
+  const previous = sourceCode.getTokenBefore(property);
+  return previous?.value === ","
+    ? [previous.start, property.end]
+    : [property.start, endAfterHorizontalWhitespace(sourceCode.getText(), property.end)];
+};
+
+export const removeObjectPropertyFix =
+  ({
+    property,
+    sourceCode,
+  }: {
+    readonly property: ESTree.ObjectProperty;
+    readonly sourceCode: SourceCode;
+  }): FixFn =>
+  (fixer) =>
+    fixer.removeRange(objectPropertyRemovalRange({ property, sourceCode }));

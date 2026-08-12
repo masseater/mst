@@ -162,6 +162,28 @@ const invariantValueFor = ({
   return first;
 };
 
+const parameterIsReadFromEarlierInitializer = ({
+  declared,
+  binding,
+  index,
+  variablesFor,
+}: {
+  readonly declared: ESTree.Function | ESTree.ArrowFunctionExpression;
+  readonly binding: ESTree.BindingIdentifier;
+  readonly index: number;
+  readonly variablesFor: (node: ESTree.Node) => readonly Variable[];
+}): boolean => {
+  const earlierParameters = runtimeParametersOf(declared).slice(0, index);
+  const references = variablesFor(declared)
+    .filter((variable) => variable.identifiers.includes(binding))
+    .flatMap((variable) => variable.references);
+  return references.some(
+    (reference) =>
+      reference.isRead() &&
+      earlierParameters.some((earlier) => isWithin(reference.identifier, earlier)),
+  );
+};
+
 const usesOwnArguments = (
   declared: ESTree.Function | ESTree.ArrowFunctionExpression,
   scopeFor: (node: ESTree.Function | ESTree.ArrowFunctionExpression) => Scope,
@@ -189,7 +211,7 @@ export const noInvariantDefaultParameter = createDontReviewItRule({
     },
     messages: {
       invariantDefaultParameter:
-        "A defaulted parameter with one effective value across every closed call site must not remain configurable. Remove `{{name}}` and its arguments, then use `{{value}}` inside the function.",
+        "A defaulted parameter with one effective value across every closed call site must not remain configurable. Replace every reference resolved to `{{name}}` in the remaining parameter initializers and function body with `{{value}}`, then remove the parameter and its corresponding actual argument from every call site.",
     },
     schema: [],
   },
@@ -232,6 +254,16 @@ export const noInvariantDefaultParameter = createDontReviewItRule({
       runtimeParametersOf(named.declared).forEach((parameter, index) => {
         if (parameter.type !== "AssignmentPattern") return;
         if (parameter.left.type !== "Identifier") return;
+        if (
+          parameterIsReadFromEarlierInitializer({
+            declared: named.declared,
+            binding: parameter.left,
+            index,
+            variablesFor,
+          })
+        ) {
+          return;
+        }
         const fallback = literalValueOf(parameter.right, sourceTextOf);
         if (fallback === null) return;
         const invariant = invariantValueFor({

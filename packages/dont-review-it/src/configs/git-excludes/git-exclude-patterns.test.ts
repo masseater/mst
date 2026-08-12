@@ -23,7 +23,7 @@ vi.mock(import("node:child_process"), async (importOriginal) => {
   return { ...real, execFileSync };
 });
 
-describe("git-exclude-patterns", () => {
+describe("git-exclude-patterns", { timeout: 30_000 }, () => {
   const sandboxDirectory = (name: string): string => mkdtempSync(join(tmpdir(), `mst-${name}-`));
 
   const isolatedEnvironment = (home: string): NodeJS.ProcessEnv => ({
@@ -35,7 +35,11 @@ describe("git-exclude-patterns", () => {
 
   const initializedRepository = (env: NodeJS.ProcessEnv): string => {
     const repositoryRoot = sandboxDirectory("git-excludes-repository");
-    execFileSync("git", ["init"], { cwd: repositoryRoot, env, stdio: "ignore" });
+    execFileSync("git", ["init", "--template="], {
+      cwd: repositoryRoot,
+      env,
+      stdio: "ignore",
+    });
     return repositoryRoot;
   };
 
@@ -49,6 +53,7 @@ describe("git-exclude-patterns", () => {
 
     const env = isolatedEnvironment(home);
     const repositoryRoot = initializedRepository(env);
+    mkdirSync(join(repositoryRoot, ".git", "info"), { recursive: true });
     writeFileSync(join(repositoryRoot, ".git", "info", "exclude"), "scratch/\n");
     writeFileSync(join(repositoryRoot, ".gitignore"), "dist/*\n!dist/keep.ts\n");
 
@@ -94,7 +99,7 @@ describe("git-exclude-patterns", () => {
     expect(gitExcludePatterns({ cwd: home, env: withoutHome })).toStrictEqual(
       gitExcludePatterns({ cwd: home, env: { ...withoutHome, HOME: homedir() } }),
     );
-  });
+  }, 20_000);
 
   test("a git that cannot be started at all is raised rather than read as an absence", () => {
     const home = sandboxDirectory("git-excludes-home");

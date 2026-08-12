@@ -2,9 +2,11 @@
 
 ## 何を検出するか
 
-production の TypeScript ソースで、そのファイルがトップレベルに宣言し、export していない型が、同じファイルの中から 1 回以下しか参照されていない状態。
+production の TypeScript ソースで、そのファイルがトップレベルに宣言し、export していない型エイリアスが、同じファイルの中から 1 回以下しか参照されていない状態。
 
-宣言として見るのは型エイリアスとインターフェースの 2 つ。どちらもファイルのトップレベルに立っているものだけを対象にする。関数やブロックの内側に置かれた型宣言は対象にしない。
+宣言として見るのは型エイリアスだけで、ファイルのトップレベルに立っているものだけを対象にする。関数やブロックの内側に置かれた型宣言は対象にしない。
+
+interface は同時に報告しない。配布 config の `typescript/consistent-type-definitions` が interface を type alias へ自動修正し、その後も参照が 1 回以下なら、この rule が type alias を報告する。通常の型位置、唯一の `implements`、唯一の interface heritage、自己参照のどれに使われる interface でも、この順序で診断の authority を 1 本ずつにする。
 
 宣言から scope が解決した Variable を取得し、その Variable に解決された参照だけを数える。識別子の文字列が同じだけでは同じ型として扱わない。関数内の型引数や nested interface がトップレベルの型と同名でも、それぞれ別の Variable なので参照は混ざらない。
 
@@ -44,15 +46,13 @@ production の TypeScript ソースで、そのファイルがトップレベル
 
 型エイリアスが通常の型位置から 1 回だけ参照されているなら、参照をエイリアスの右辺で置き換え、宣言を消す。型引数を持つ宣言なら、使用箇所で型引数を実引数に置き換えてから書く。
 
-interface が通常の型位置から 1 回だけ参照されているなら、その interface の members と継承した contracts を含む object type で参照を置き換え、interface を消す。
-
-型エイリアスの右辺や interface の members と継承元が free type name を参照している場合、使用箇所へ移したあとも同じ binding を指すようにする。使用箇所を囲む type parameter や nested type declaration が同名なら、先にその shadowing binding を alpha-rename してから展開する。名前の文字列をそのままコピーすると、展開前は外側の import や宣言を指していた type reference が、展開後には使用箇所の type parameter を指すように変わる。
+型エイリアスの右辺が free type name を参照している場合、使用箇所へ移したあとも同じ binding を指すようにする。使用箇所を囲む type parameter や nested type declaration が同名なら、先にその shadowing binding を alpha-rename してから展開する。名前の文字列をそのままコピーすると、展開前は外側の import や宣言を指していた type reference が、展開後には使用箇所の type parameter を指すように変わる。
 
 参照が 0 回なら宣言ごと消す。自己参照しかない recursive type も consumer が存在しないので、展開せず宣言全体を消す。
 
-参照が interface の `extends` 節 1 箇所だけなら、base declaration 自身の members を extending interface へ移し、base が継承または alias していた object types で `extends Base` を置き換え、型引数を置換してから base declaration を消す。この移動でも、extending interface の type parameter が base declaration の free type name を shadow するなら先に alpha-rename する。
+参照が interface の `extends` 節 1 箇所だけなら、type alias の右辺が表す object types で `extends Base` を置き換え、型引数を置換してから type alias を消す。この移動でも、extending interface の type parameter が type alias の free type name を shadow するなら先に alpha-rename する。
 
-参照が class の `implements` 節 1 箇所だけなら、interface と type alias のどちらでも `implements TypeName` と型宣言を削除する。class は structural contract を満たす concrete members を既に持っている。
+参照が class の `implements` 節 1 箇所だけなら、`implements TypeName` と型エイリアスを削除する。class は structural contract を満たす concrete members を既に持っている。
 
 その形が本当に 2 箇所で共有されるべきものなら、足りないのは 2 つ目の使用箇所である。同じ形を別に綴っている場所を探し、そこにこの型を使わせる。宣言を残す理由になるのは、実際に 2 箇所目が参照することだけで、将来そうなる見込みではない。
 
@@ -72,11 +72,11 @@ knip が「どこからも import されていない export」を挙げ、それ
 ## 何を検出しないか
 
 - export された型。前述のとおり、1 ファイルに閉じた判定でないと決定的に数えられない
+- interface。配布 config の `typescript/consistent-type-definitions` が先に type alias へ修正し、修正後の source をこの rule が検査する
 - declaration file の型。ambient declaration は別ファイルから参照・merge されるため、1 ファイル内の参照数では local type と判定できない
 - 関数やブロックの内側で宣言された型。トップレベルに立っていないものは、その場の手続きの一部である
 - 値の宣言。定数もヘルパー関数も、1 回しか使われていないことを理由には報告しない。[EDR 0013](../../../../docs/engineering-decision-logs/0013-draw-the-duplication-line-at-decidability.md) で数えて外した判断をそのまま引き継ぐ
 - 2 回以上参照されている型。参照が型の位置に現れる限り、それが同じ関数の中にまとまっていても報告しない
-- declaration merging された interface / type binding。同じ resolved Variable に複数のトップレベル宣言が属する場合、1 宣言だけを展開・削除する修正は成立しない
 
 ## 導入時に直した数
 

@@ -39,6 +39,22 @@ describe("dont-review-it/no-single-use-local-type--inline-at-the-use-site", () =
         code: "interface Draft {\n  readonly title: string;\n}\nconst read = (draft: Draft): Draft => draft;",
       },
       {
+        name: "an interface with one ordinary use is converted by the official type definition rule first",
+        code: "interface Draft {\n  readonly title: string;\n}\nconst read = (draft: Draft) => draft.title;",
+      },
+      {
+        name: "an interface with one implementation is converted by the official type definition rule first",
+        code: "interface Parser {\n  parse(): void;\n}\nclass JsonParser implements Parser {\n  parse() {}\n}",
+      },
+      {
+        name: "an interface with one heritage use is converted by the official type definition rule first",
+        code: "interface Titled {\n  readonly title: string;\n}\ninterface Draft extends Titled {\n  readonly body: string;\n}",
+      },
+      {
+        name: "a recursive interface is converted by the official type definition rule first",
+        code: "interface Branch {\n  readonly child: Branch | null;\n}",
+      },
+      {
         name: "merged interface declarations remain one contract",
         code: "interface Draft {\n  readonly title: string;\n}\ninterface Draft {\n  readonly body: string;\n}\nconst read = (draft: Draft) => draft.title;",
       },
@@ -90,16 +106,6 @@ describe("dont-review-it/no-single-use-local-type--inline-at-the-use-site", () =
         errors: [{ messageId: "unusedLocalType" }],
       },
       {
-        name: "an interface one declaration names is reported",
-        code: "interface Draft {\n  readonly title: string;\n}\nconst read = (draft: Draft) => draft.title;",
-        errors: [{ messageId: "singleUseLocalInterface" }],
-      },
-      {
-        name: "an interface implemented by one concrete class is reported",
-        code: "interface Parser {\n  parse(): void;\n}\nclass JsonParser implements Parser {\n  parse() {}\n}",
-        errors: [{ messageId: "singleImplementationLocalType" }],
-      },
-      {
         name: "a type alias implemented by one concrete class gets the same executable repair",
         code: "type Parser = { parse(): void };\nclass JsonParser implements Parser {\n  parse() {}\n}",
         errors: [{ messageId: "singleImplementationLocalType" }],
@@ -120,11 +126,6 @@ describe("dont-review-it/no-single-use-local-type--inline-at-the-use-site", () =
         errors: [{ message: /Alpha-rename every use-site binding/u }],
       },
       {
-        name: "an interface named once by an extends clause is reported",
-        code: "interface Titled {\n  readonly title: string;\n}\ninterface Draft extends Titled {\n  readonly body: string;\n}\nconst read = (draft: Draft): Draft => draft;",
-        errors: [{ messageId: "singleInterfaceHeritageLocalType" }],
-      },
-      {
         name: "a type alias named once by an extends clause gets the same executable repair",
         code: "type Titled = { readonly title: string };\ninterface Draft extends Titled {\n  readonly body: string;\n}\nconst read = (draft: Draft): Draft => draft;",
         errors: [{ messageId: "singleInterfaceHeritageLocalType" }],
@@ -132,11 +133,6 @@ describe("dont-review-it/no-single-use-local-type--inline-at-the-use-site", () =
       {
         name: "a recursive type reached only from itself is deleted rather than inlined",
         code: "type Branch = { readonly children: readonly Branch[] };",
-        errors: [{ messageId: "selfOnlyLocalType" }],
-      },
-      {
-        name: "a recursive interface reached only from itself is deleted rather than inlined",
-        code: "interface Branch {\n  readonly child: Branch | null;\n}",
         errors: [{ messageId: "selfOnlyLocalType" }],
       },
       {

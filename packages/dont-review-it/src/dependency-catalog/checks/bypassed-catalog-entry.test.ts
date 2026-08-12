@@ -18,7 +18,7 @@ const findingsFor = ({
 
 describe("bypassedCatalogFindings", () => {
   it("reports a direct pin whose version the default catalog already holds", () => {
-    const findings = findingsFor({
+    const { problems } = findingsFor({
       catalogEntries: [{ catalogName: "", dependencyName: "react", version: "^19.0.0" }],
       usages: [
         {
@@ -29,13 +29,13 @@ describe("bypassedCatalogFindings", () => {
       ],
     });
 
-    expect(findings.length).toBe(1);
-    expect(findings[0]?.file).toBe("apps/web/package.json");
-    expect(findings[0]?.message).toContain("Replace the specifier with catalog:");
+    expect(problems.length).toBe(1);
+    expect(problems[0]?.file).toBe("apps/web/package.json");
+    expect(problems[0]?.message).toContain("Replace the specifier with catalog:");
   });
 
   it("names the catalog that holds the version when it is not the default one", () => {
-    const findings = findingsFor({
+    const { problems } = findingsFor({
       catalogEntries: [{ catalogName: "legacy", dependencyName: "react", version: "^18.0.0" }],
       usages: [
         {
@@ -46,11 +46,11 @@ describe("bypassedCatalogFindings", () => {
       ],
     });
 
-    expect(findings[0]?.message).toContain("catalog:legacy");
+    expect(problems[0]?.message).toContain("catalog:legacy");
   });
 
   it("reports a direct pin that disagrees with the catalog", () => {
-    const findings = findingsFor({
+    const { problems } = findingsFor({
       catalogEntries: [{ catalogName: "", dependencyName: "react", version: "^19.0.0" }],
       usages: [
         {
@@ -61,15 +61,15 @@ describe("bypassedCatalogFindings", () => {
       ],
     });
 
-    expect(findings.length).toBe(1);
-    expect(findings[0]?.file).toBe("apps/web/package.json");
-    expect(findings[0]?.message).toContain("^18.0.0");
-    expect(findings[0]?.message).toContain("^19.0.0");
-    expect(findings[0]?.message).toContain("Choose the intended version");
+    expect(problems.length).toBe(1);
+    expect(problems[0]?.file).toBe("apps/web/package.json");
+    expect(problems[0]?.message).toContain("^18.0.0");
+    expect(problems[0]?.message).toContain("^19.0.0");
+    expect(problems[0]?.message).toContain("Choose the intended version");
   });
 
   it("leaves a dependency that no catalog holds to the shared-dependency check", () => {
-    const findings = findingsFor({
+    const { problems } = findingsFor({
       catalogEntries: [{ catalogName: "", dependencyName: "react", version: "^19.0.0" }],
       usages: [
         {
@@ -80,6 +80,6 @@ describe("bypassedCatalogFindings", () => {
       ],
     });
 
-    expect(findings).toStrictEqual([]);
+    expect(problems).toStrictEqual([]);
   });
 });

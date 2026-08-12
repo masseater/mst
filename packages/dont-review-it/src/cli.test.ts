@@ -1,52 +1,20 @@
+import * as citty from "citty";
 import { describe, expect, onTestFinished, test, vi } from "vite-plus/test";
 
-import type { CliResult } from "@mst/utils";
+import { dontReviewItCommand } from "./dont-review-it-command.ts";
 
-const runDontReviewItMock = vi.hoisted(() => vi.fn<(argv: readonly string[]) => CliResult>());
-
-vi.mock(import("./run-cli.ts"), () => ({ runDontReviewIt: runDontReviewItMock }));
-
-const executeCli = async (answer: CliResult) => {
-  const previousExitCode = process.exitCode;
-  vi.resetModules();
-  runDontReviewItMock.mockReturnValue(answer);
-  const stdoutWrite = vi.spyOn(process.stdout, "write").mockReturnValue(true);
-  const stderrWrite = vi.spyOn(process.stderr, "write").mockReturnValue(true);
-  onTestFinished(() => {
-    stdoutWrite.mockRestore();
-    stderrWrite.mockRestore();
-    runDontReviewItMock.mockReset();
-    process.exitCode = previousExitCode;
-  });
-
-  await import("./cli.ts");
-
-  return { stdoutWrite, stderrWrite };
-};
+vi.mock(import("citty"), { spy: true });
 
 describe("cli entrypoint", () => {
-  test("it passes process arguments through and publishes both output channels", async () => {
-    const { stdoutWrite, stderrWrite } = await executeCli({
-      exitCode: 7,
-      out: "problems\n",
-      error: "diagnostic\n",
+  test("it runs the public command through citty", async () => {
+    const runMain = vi.mocked(citty.runMain);
+    runMain.mockResolvedValue();
+    onTestFinished(() => {
+      runMain.mockReset();
     });
 
-    expect(runDontReviewItMock).toHaveBeenCalledExactlyOnceWith(process.argv.slice(2));
-    expect(stdoutWrite).toHaveBeenCalledExactlyOnceWith("problems\n");
-    expect(stderrWrite).toHaveBeenCalledExactlyOnceWith("diagnostic\n");
-    expect(process.exitCode).toBe(7);
-  });
+    await import("./cli.ts");
 
-  test("it writes neither channel when the command answered with empty text", async () => {
-    const { stdoutWrite, stderrWrite } = await executeCli({
-      exitCode: 0,
-      out: "",
-      error: "",
-    });
-
-    expect(stdoutWrite).not.toHaveBeenCalled();
-    expect(stderrWrite).not.toHaveBeenCalled();
-    expect(process.exitCode).toBe(0);
+    expect(runMain).toHaveBeenCalledExactlyOnceWith(dontReviewItCommand);
   });
 });

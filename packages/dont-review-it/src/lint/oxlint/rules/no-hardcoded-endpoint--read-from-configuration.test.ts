@@ -131,7 +131,7 @@ describe("dont-review-it/no-hardcoded-endpoint--read-from-configuration", () => 
       {
         name: "a test file carries no exemption",
         code: "fetch('https://example.test/catalog');",
-        filename: "/repo/packages/utils/src/catalog.test.ts",
+        filename: "/repo/packages/repository-checks/src/catalog.test.ts",
         errors: [{ messageId: "hardcodedEndpoint" }],
       },
     ],

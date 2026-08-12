@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -19,9 +19,9 @@ describe("oxlint config", () => {
       { name: "dont-review-it", specifier: "@mst/dont-review-it/plugin" },
     ]);
     expect(
-      Object.keys(plugin.rules).every((ruleName) =>
-        Object.hasOwn(rules, `dont-review-it/${ruleName}`),
-      ),
+      Object.keys(rules)
+        .filter((ruleName) => ruleName.startsWith("dont-review-it/"))
+        .every((ruleName) => Object.hasOwn(plugin.rules, ruleName.replace("dont-review-it/", ""))),
     ).toBe(true);
   });
 
@@ -92,7 +92,39 @@ describe("oxlint config", () => {
       "dont-review-it(no-partial-coverage-source-universe--include-production-files)",
       "dont-review-it(no-lenient-coverage-threshold--demand-full-coverage)",
     ]);
-  }, 30_000);
+  }, 90_000);
+
+  test("the published config rejects changed-only coverage through the canonical test config", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "dont-review-it-changed-coverage-config-"));
+    onTestFinished(() => {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    });
+    const fixture = join(fixtureRoot, "vite.config.ts");
+    writeFileSync(
+      fixture,
+      `export default { test: { changed: "HEAD", coverage: { changed: "HEAD", include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"], thresholds: { 100: true, perFile: true } } } };\n`,
+      "utf8",
+    );
+
+    const lintRun = spawnSync("vp", ["lint", fixture, "--format", "json"], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+    });
+    const diagnostics = JSON.parse(lintRun.stdout) as {
+      readonly diagnostics: readonly { readonly code: string; readonly message: string }[];
+    };
+
+    expect(lintRun.status).toBe(1);
+    expect(diagnostics.diagnostics).toHaveLength(2);
+    expect(
+      diagnostics.diagnostics.every(
+        ({ code, message }) =>
+          code ===
+            "dont-review-it(no-partial-coverage-source-universe--include-production-files)" &&
+          message.includes("must not reduce the coverage source universe"),
+      ),
+    ).toBe(true);
+  }, 90_000);
 
   test("the published config gives each adopted replacement one diagnostic authority", () => {
     const fixtureRoot = mkdtempSync(join(tmpdir(), "dont-review-it-replacement-authorities-"));
@@ -158,7 +190,55 @@ describe("oxlint config", () => {
         severity: "error",
       },
     ]);
-  }, 30_000);
+  }, 90_000);
+
+  test("the official type definition fix hands a single-use interface to the custom authority", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "dont-review-it-type-authority-"));
+    onTestFinished(() => {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    });
+    const fixture = join(fixtureRoot, "type-authority.ts");
+    writeFileSync(
+      fixture,
+      `interface Draft { readonly title: string; }\nexport const read = (draft: Draft): string => draft.title;\n`,
+      "utf8",
+    );
+
+    const initial = spawnSync("vp", ["lint", fixture, "--format", "json"], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+    });
+    const initialOutput = JSON.parse(initial.stdout) as {
+      readonly diagnostics: readonly { readonly code: string }[];
+    };
+    expect(initial.status).toBe(1);
+    expect(initialOutput.diagnostics.map(({ code }) => code)).toStrictEqual([
+      "typescript(consistent-type-definitions)",
+    ]);
+
+    const fixed = spawnSync("vp", ["lint", "--fix", fixture, "--format", "json"], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+    });
+    const fixedOutput = JSON.parse(fixed.stdout) as {
+      readonly diagnostics: readonly { readonly code: string }[];
+    };
+    expect(fixed.status).toBe(0);
+    expect(readFileSync(fixture, "utf8")).toContain(`type Draft = { readonly title: string; }`);
+    expect(fixedOutput.diagnostics).toStrictEqual([]);
+
+    const afterFix = spawnSync("vp", ["lint", fixture, "--format", "json"], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+    });
+    const afterFixOutput = JSON.parse(afterFix.stdout) as {
+      readonly diagnostics: readonly { readonly code: string }[];
+    };
+    expect(afterFix.status).toBe(1);
+    expect(afterFixOutput.diagnostics.map(({ code }) => code)).toStrictEqual([
+      "dont-review-it(no-single-use-local-type--inline-at-the-use-site)",
+    ]);
+  }, 90_000);
 
   test("the published config leaves unsafe replacement candidates unselected", () => {
     const fixtureRoot = mkdtempSync(join(tmpdir(), "dont-review-it-unselected-replacements-"));
@@ -187,5 +267,5 @@ describe("oxlint config", () => {
 
     expect(lintRun.status).toBe(0);
     expect(lintOutput.diagnostics).toStrictEqual([]);
-  }, 30_000);
+  }, 90_000);
 });

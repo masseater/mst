@@ -24,7 +24,7 @@ const problemsIn = async (files: Readonly<Record<string, string>>): Promise<read
   const repositoryRoot = await repositoryWith(files);
   const problems = await tsconfigScopeProblemsOf({
     repositoryRoot,
-    workspaceDirectory: join(repositoryRoot, "packages/utils"),
+    workspaceDirectory: join(repositoryRoot, "packages/repository-checks"),
   });
   return problems.map((problem) => problem.message);
 };
@@ -32,32 +32,32 @@ const problemsIn = async (files: Readonly<Record<string, string>>): Promise<read
 describe("tsconfigScopeProblemsOf", () => {
   test("accepts a tsconfig that only extends a preset", async () => {
     await expect(
-      problemsIn({ "packages/utils/tsconfig.json": '{ "extends": "preset" }' }),
+      problemsIn({ "packages/repository-checks/tsconfig.json": '{ "extends": "preset" }' }),
     ).resolves.toStrictEqual([]);
   });
 
   test("reports a tsconfig that narrows with include", async () => {
     await expect(
-      problemsIn({ "packages/utils/tsconfig.json": '{ "include": ["src"] }' }),
+      problemsIn({ "packages/repository-checks/tsconfig.json": '{ "include": ["src"] }' }),
     ).resolves.toStrictEqual([expect.stringContaining("with include")]);
   });
 
   test("reports a tsconfig that narrows with files", async () => {
     await expect(
-      problemsIn({ "packages/utils/tsconfig.json": '{ "files": ["src/index.ts"] }' }),
+      problemsIn({ "packages/repository-checks/tsconfig.json": '{ "files": ["src/index.ts"] }' }),
     ).resolves.toStrictEqual([expect.stringContaining("with files")]);
   });
 
   test("reports a tsconfig that narrows with exclude", async () => {
     await expect(
-      problemsIn({ "packages/utils/tsconfig.json": '{ "exclude": ["specs"] }' }),
+      problemsIn({ "packages/repository-checks/tsconfig.json": '{ "exclude": ["specs"] }' }),
     ).resolves.toStrictEqual([expect.stringContaining("with exclude")]);
   });
 
   test("reads comments in a tsconfig without failing", async () => {
     await expect(
       problemsIn({
-        "packages/utils/tsconfig.json": '{\n  // note\n  "include": ["src"]\n}',
+        "packages/repository-checks/tsconfig.json": '{\n  // note\n  "include": ["src"]\n}',
       }),
     ).resolves.toStrictEqual([expect.stringContaining("with include")]);
   });
@@ -74,18 +74,20 @@ describe("tsconfigScopeProblemsOf", () => {
 
   test("stays silent for a tsconfig that does not parse into a mapping", async () => {
     await expect(
-      problemsIn({ "packages/utils/tsconfig.json": '["not a mapping"]' }),
+      problemsIn({ "packages/repository-checks/tsconfig.json": '["not a mapping"]' }),
     ).resolves.toStrictEqual([]);
   });
 
   test("names the tsconfig file relative to the repository root", async () => {
     const repositoryRoot = await repositoryWith({
-      "packages/utils/tsconfig.json": '{ "include": ["src"] }',
+      "packages/repository-checks/tsconfig.json": '{ "include": ["src"] }',
     });
     const problems = await tsconfigScopeProblemsOf({
       repositoryRoot,
-      workspaceDirectory: join(repositoryRoot, "packages/utils"),
+      workspaceDirectory: join(repositoryRoot, "packages/repository-checks"),
     });
-    expect(problems.map((problem) => problem.file)).toStrictEqual(["packages/utils/tsconfig.json"]);
+    expect(problems.map((problem) => problem.file)).toStrictEqual([
+      "packages/repository-checks/tsconfig.json",
+    ]);
   });
 });

@@ -1,8 +1,8 @@
 import { triggerKeyNodeOf, triggerNamesOf } from "../steps.ts";
 import { lineOf, type WorkflowDocument } from "../workflow-document.ts";
 
+import type { RepositoryProblem } from "../../problem.ts";
 import type { WorkflowChecksConfig } from "../config.ts";
-import type { WorkflowProblem } from "../problem.ts";
 
 export const crossWorkflowChains = ({
   document,
@@ -10,7 +10,7 @@ export const crossWorkflowChains = ({
 }: {
   readonly document: WorkflowDocument;
   readonly config: WorkflowChecksConfig;
-}): readonly WorkflowProblem[] => {
+}): readonly RepositoryProblem[] => {
   if (!triggerNamesOf({ document, config }).includes(config.crossWorkflowTrigger)) return [];
 
   return [

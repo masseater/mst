@@ -37,7 +37,7 @@ import {
 } from "../plugin.ts";
 import { UPSTREAM_PLUGINS, UPSTREAM_RULES, UPSTREAM_TEST_RULES } from "./upstream-rules.ts";
 
-const PLUGIN_NAME = "dont-review-it";
+export const PLUGIN_NAME = "dont-review-it";
 
 const MAX_LINES_PER_FILE = 400;
 

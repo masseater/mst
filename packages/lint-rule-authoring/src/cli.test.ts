@@ -1,6 +1,6 @@
 import { describe, expect, onTestFinished, test, vi } from "vite-plus/test";
 
-import type { CliResult } from "@mst/utils";
+import type { CliResult } from "@mst/repository-checks";
 
 const runLintRuleAuthoringMock = vi.hoisted(() => vi.fn<(argv: readonly string[]) => CliResult>());
 

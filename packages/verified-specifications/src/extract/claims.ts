@@ -1,6 +1,7 @@
-import { lineAtOffset, type RepositoryProblem } from "@mst/utils";
 import { isPlainObject } from "es-toolkit";
 import { parseSync } from "oxc-parser";
+
+import type { RepositoryProblem } from "@mst/repository-checks";
 
 export type SpecificationSubject = {
   readonly subject: string;
@@ -192,7 +193,7 @@ const readStatements = (input: {
     .flatMap((entry) => entry.problems)
     .map(({ offset, message }) => ({
       file: input.file,
-      line: lineAtOffset(input.source, offset),
+      line: input.source.slice(0, offset).split("\n").length,
       message,
     }));
   if (subjects.length === 0 && problems.length === 0) {
