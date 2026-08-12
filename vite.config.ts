@@ -40,6 +40,7 @@ export default defineConfig({
         "error",
         { assignOnlyTargets: ["RuleTester.describe", "RuleTester.it", "RuleTester.itOnly"] },
       ],
+      "dont-review-it/no-version-range--pin-the-exact-version": "error",
     },
     overrides: [
       {

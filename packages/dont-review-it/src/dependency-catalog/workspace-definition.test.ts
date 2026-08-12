@@ -1,13 +1,20 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import { defaultDependencyCatalogChecksConfig } from "./config.ts";
-import { parseWorkspaceDefinition } from "./workspace-definition.ts";
+import {
+  parsedWorkspaceDefinitionOrNull,
+  type WorkspaceDefinition,
+} from "./workspace-definition.ts";
 
 const config = defaultDependencyCatalogChecksConfig;
 
-const definitionFor = (source: string) => parseWorkspaceDefinition({ source, config });
+const definitionFor = (source: string): WorkspaceDefinition => {
+  const definition = parsedWorkspaceDefinitionOrNull({ source, config });
+  if (definition === null) throw new Error(`the fixture does not parse: ${source}`);
+  return definition;
+};
 
-describe("parseWorkspaceDefinition", () => {
+describe("parsedWorkspaceDefinitionOrNull", () => {
   it("reads the package patterns, the default catalog, and the named catalogs", () => {
     const definition = definitionFor(
       "packages:\n  - packages/*\ncatalog:\n  react: ^19.0.0\ncatalogs:\n  legacy:\n    react: ^18.0.0\n",
@@ -61,7 +68,7 @@ describe("parseWorkspaceDefinition", () => {
   });
 });
 
-describe("parseWorkspaceDefinition override targets", () => {
+describe("parsedWorkspaceDefinitionOrNull override targets", () => {
   const overrideNamesFor = (overrideKey: string) =>
     definitionFor(`overrides:\n  "${overrideKey}": "catalog:"\n`).catalogReferencingOverrides.map(
       (reference) => reference.dependencyName,
