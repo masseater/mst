@@ -27,8 +27,6 @@ describe("git-exclude-patterns", { timeout: 30_000 }, () => {
   const sandboxDirectory = (name: string): string => mkdtempSync(join(tmpdir(), `mst-${name}-`));
 
   const isolatedEnvironment = (home: string): NodeJS.ProcessEnv => ({
-    GIT_CONFIG_GLOBAL: join(home, "gitconfig"),
-    GIT_CONFIG_SYSTEM: "/dev/null",
     HOME: home,
     PATH: process.env.PATH ?? "",
   });
@@ -43,7 +41,7 @@ describe("git-exclude-patterns", { timeout: 30_000 }, () => {
     const home = sandboxDirectory("git-excludes-home");
     writeFileSync(join(home, "global-ignore"), "# machine wide\n.agents/\n");
     writeFileSync(
-      join(home, "gitconfig"),
+      join(home, ".gitconfig"),
       `[core]\n\texcludesFile = ${join(home, "global-ignore")}\n`,
     );
 
