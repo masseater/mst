@@ -74,7 +74,7 @@ const fieldsWrittenBy = (member: unknown): readonly string[] => {
   const nodeKind = kindAt(member);
   if (nodeKind === "MethodDefinition") {
     const written = fieldOf(fieldOf(member, "value"), "body");
-    return fieldsWrittenUnder(written, fieldOf(member, "nodeKind") === "constructor");
+    return fieldsWrittenUnder(written, fieldOf(member, "kind") === "constructor");
   }
   if (HELD_STATE_MEMBER_KINDS.has(nodeKind))
     return fieldsWrittenUnder(fieldOf(member, "value"), true);

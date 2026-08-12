@@ -30,7 +30,7 @@ describe("declarationsIn", () => {
 
   test("gives two bindings that differ only in comments the same structure", () => {
     expect(structureOfFirst("const twice = (value: number) => value * 2;")).toBe(
-      structureOfFirst("// doubles it\nconst twice = (held: number) => /* here */ value * 2;"),
+      structureOfFirst("// doubles it\nconst twice = (value: number) => /* here */ value * 2;"),
     );
   });
 
