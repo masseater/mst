@@ -1,6 +1,16 @@
 import type { LogFileSink } from "./daily-log-file.ts";
 import type { Logger } from "./logger.ts";
 
+const readableFailure = (_key: string, field: unknown): unknown =>
+  field instanceof Error
+    ? {
+        name: field.name,
+        message: field.message,
+        stack: field.stack,
+        ...(field.cause === undefined ? {} : { cause: field.cause }),
+      }
+    : field;
+
 export const createConsoleLogger = (
   name: string,
   options: { readonly fileSink?: LogFileSink; readonly out?: NodeJS.WritableStream } = {},
@@ -11,13 +21,16 @@ export const createConsoleLogger = (
     readonly fields: Readonly<Record<string, unknown>>;
     readonly message: string;
   }): void => {
-    const line = `${JSON.stringify({
-      level: entry.level,
-      name,
-      time: new Date().toISOString(),
-      ...entry.fields,
-      msg: entry.message,
-    })}\n`;
+    const line = `${JSON.stringify(
+      {
+        level: entry.level,
+        name,
+        time: new Date().toISOString(),
+        ...entry.fields,
+        msg: entry.message,
+      },
+      readableFailure,
+    )}\n`;
     out.write(line);
     options.fileSink?.append(line);
   };

@@ -1,6 +1,7 @@
 import { standardIoTest } from "@mst/dont-review-it/vitest";
 import { describe, expect, test, vi } from "vite-plus/test";
 
+import { asRecord } from "../contract/unknown-record.ts";
 import { createConsoleLogger } from "./console-logger.ts";
 
 const recordingOut = (): {
@@ -33,6 +34,18 @@ const it = test
     const recording = recordingOut();
     createConsoleLogger("relay", { out: recording.out }).error({}, "broken");
     return parsedLine(recording.lines()[0] ?? "{}").level;
+  })
+  .extend("failureField", () => {
+    const recording = recordingOut();
+    const failure = new Error("the relay is unreachable", { cause: new Error("ECONNREFUSED") });
+    createConsoleLogger("relay", { out: recording.out }).error({ err: failure }, "cycle failed");
+    const logged = asRecord(parsedLine(recording.lines()[0] ?? "{}").err);
+    return {
+      name: logged?.name,
+      message: logged?.message,
+      carriesStack: typeof logged?.stack === "string",
+      causeMessage: asRecord(logged?.cause)?.message,
+    };
   })
   .extend("mirroredLines", () => {
     const recording = recordingOut();
@@ -80,6 +93,15 @@ describe("createConsoleLogger", () => {
 
   it("エラーは error の水準になる", ({ errorLevel }) => {
     expect(errorLevel).toStrictEqual("error");
+  });
+
+  it("Error は名前とメッセージと原因が読める形に開いて載せる", ({ failureField }) => {
+    expect(failureField).toStrictEqual({
+      name: "Error",
+      message: "the relay is unreachable",
+      carriesStack: true,
+      causeMessage: "ECONNREFUSED",
+    });
   });
 
   it("ファイル出力先があれば同じ行を書き分ける", ({ mirroredLines }) => {

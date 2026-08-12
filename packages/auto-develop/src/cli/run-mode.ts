@@ -14,7 +14,6 @@ import { withJobBanner } from "../queue/job-banner.ts";
 import { prLaneNumber, type PrFilter } from "../queue/pr-lane.ts";
 import { createPeriodicScheduler } from "../queue/scheduler.ts";
 import { composeRuntime, type ComposedRuntime } from "../runtime/compose-runtime.ts";
-import { runConnectionCycle, STREAM_ENDED } from "../runtime/connection-cycle.ts";
 import { createIdleMonitor, type IdleMonitor } from "../runtime/idle-monitor.ts";
 import {
   codeMovedOn,
@@ -22,9 +21,9 @@ import {
   type RestartRequest,
 } from "../runtime/restart-request.ts";
 import { buildRunMetadata, runMetadataLogFields } from "../runtime/run-metadata.ts";
-import { registerShutdown } from "../runtime/shutdown.ts";
 import { renderStatusBar } from "../runtime/status-bar.ts";
 import { worktreePathFor } from "../worktree/paths.ts";
+import { cycleUntilStopped } from "./cycle-loop.ts";
 import { runContextFsOnDisk } from "./run-context-fs.ts";
 
 import type { Mode } from "../contract/vocabulary.ts";
@@ -33,8 +32,6 @@ import type { HandlerGithubClient } from "../handlers/github-client.ts";
 const UPDATE_CHECK_INTERVAL_MS = 15 * 60_000;
 
 const IDLE_RESTART_THRESHOLD_MS = 30 * 60_000;
-
-const CYCLE_RESTART_DELAY_MS = 3_000;
 
 export type ModeRunRequest = {
   readonly mode: Mode;
@@ -245,12 +242,12 @@ const reclaimIdleWorktrees = async (reclaiming: {
 };
 
 const requestRestartWhenCodeMovedOn = async (checking: {
-  readonly startupCommit: string | null;
+  readonly baseline: Map<string, string>;
   readonly runtime: ComposedRuntime;
   readonly restart: RestartRequest;
 }): Promise<void> => {
-  const { startupCommit } = checking;
-  if (startupCommit === null) return;
+  const startupCommit = checking.baseline.get("commit");
+  if (startupCommit === undefined) return;
   const currentCommit = await checking.runtime.remoteHeadCommit();
   if (!codeMovedOn({ startupCommit, currentCommit })) return;
   checking.runtime.log.info(
@@ -265,7 +262,7 @@ const startedSchedulers = (starting: {
   readonly runtime: ComposedRuntime;
   readonly restart: RestartRequest;
   readonly idleMonitor: IdleMonitor;
-  readonly startupCommit: string | null;
+  readonly baseline: Map<string, string>;
 }): { readonly stop: () => void } => {
   const startedAtMs = Date.now();
   const statusBar = createPeriodicScheduler({
@@ -291,69 +288,25 @@ const startedSchedulers = (starting: {
   };
 };
 
-const cycleUntilStopped = async (cycling: {
-  readonly request: ModeRunRequest;
-  readonly runtime: ComposedRuntime;
-  readonly restart: RestartRequest;
-  readonly idleMonitor: IdleMonitor;
-}): Promise<void> => {
-  const { request, runtime } = cycling;
-  const stopped = new Map([["signalled", false]]);
-  const shutdown = registerShutdown({
-    target: process,
-    onSignal: () => {
-      stopped.set("signalled", true);
-      runtime.disconnect();
-    },
-    log: runtime.log,
-  });
-  try {
-    for (;;) {
-      const ending = await runConnectionCycle({
-        mode: request.mode,
-        syncMain: () => runtime.syncToMain(),
-        startupDrain: () => runtime.drainStartup(),
-        connect: () => runtime.connect(),
-        subscribe: () => runtime.subscribe(),
-        dispatcher: runtime.dispatcher,
-        queue: runtime.queue,
-        restart: cycling.restart,
-        onActivity: () => {
-          cycling.idleMonitor.recordActivity();
-        },
-        signalled: () => stopped.get("signalled") === true,
-        log: runtime.log,
-      });
-      if (ending !== STREAM_ENDED) return;
-      runtime.log.warn({ ending }, "the connection cycle ended; reconnecting after a short delay");
-      await new Promise((resolve) => setTimeout(resolve, CYCLE_RESTART_DELAY_MS));
-    }
-  } finally {
-    shutdown.release();
-  }
-};
-
-export const runMode = async (request: ModeRunRequest): Promise<void> => {
-  const runtime = runtimeFor(request);
-  announceStart({ request, runtime });
-  const restart = createRestartRequest({
+const restartRequestFor = (runtime: ComposedRuntime): RestartRequest =>
+  createRestartRequest({
     onRequest: (reason) => {
       runtime.log.warn({ reason }, "restart requested; disconnecting without draining");
       runtime.disconnect();
     },
   });
+
+export const runMode = async (request: ModeRunRequest): Promise<void> => {
+  const runtime = runtimeFor(request);
+  announceStart({ request, runtime });
+  const restart = restartRequestFor(runtime);
   const idleMonitor = createIdleMonitor({
     startedAtMs: Date.now(),
     thresholdMs: IDLE_RESTART_THRESHOLD_MS,
     now: () => Date.now(),
   });
-  const schedulers = startedSchedulers({
-    request,
-    runtime,
-    restart,
-    idleMonitor,
-    startupCommit: await runtime.remoteHeadCommit(),
-  });
+  const baseline = new Map<string, string>();
+  const schedulers = startedSchedulers({ request, runtime, restart, idleMonitor, baseline });
   attachHandlers({
     request,
     runtime,
@@ -363,7 +316,7 @@ export const runMode = async (request: ModeRunRequest): Promise<void> => {
     }),
   });
   try {
-    await cycleUntilStopped({ request, runtime, restart, idleMonitor });
+    await cycleUntilStopped({ mode: request.mode, runtime, restart, idleMonitor, baseline });
   } finally {
     schedulers.stop();
   }
