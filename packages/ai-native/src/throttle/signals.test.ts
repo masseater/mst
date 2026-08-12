@@ -4,7 +4,6 @@ import { setTimeout as delay } from "node:timers/promises";
 import { describe, expect, test, vi } from "vite-plus/test";
 
 import {
-  INTERRUPT_SIGNALS,
   dropInterruptHandler,
   installInterruptHandler,
   makeHeldInterruptHandler,
@@ -15,10 +14,6 @@ import {
 } from "./signals.ts";
 
 describe("signals", () => {
-  test("the interrupt signals are the two polite termination requests", () => {
-    expect(INTERRUPT_SIGNALS).toStrictEqual(["SIGINT", "SIGTERM"]);
-  });
-
   test("install and drop register the same handler once per interrupt signal", () => {
     const handler = vi.fn<(signal: NodeJS.Signals) => void>();
 

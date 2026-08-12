@@ -2,7 +2,6 @@ import { spawnSync } from "node:child_process";
 import {
   createReadStream,
   existsSync,
-  mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
@@ -16,7 +15,7 @@ import { PassThrough } from "node:stream";
 
 import { describe, expect, onTestFinished, test, vi } from "vite-plus/test";
 
-import { defaultSpoolRoot, runSpool, type SpoolDeps } from "./run-spool.ts";
+import { runSpool, type SpoolDeps } from "./run-spool.ts";
 
 class CapturedStream extends PassThrough {
   private captured = "";
@@ -421,23 +420,5 @@ describe("縫い目と既定値", () => {
     expect(filePath.startsWith(join(process.cwd(), ".spool"))).toBe(true);
     expect(basename(filePath)).toMatch(/^\d{8}T\d{6}Z-node--e-[0-9a-f]{8}\.log$/);
     expect(readFileSync(filePath, "utf8")).toContain("default run\n");
-  });
-
-  test("退避先の既定は package.json を目印にした上方探索で決まる", () => {
-    const dir = makeTempDir();
-    writeFileSync(join(dir, "package.json"), "{}");
-    const nested = join(dir, "a", "b");
-    mkdirSync(nested, { recursive: true });
-    expect(defaultSpoolRoot(nested)).toBe(join(dir, ".spool"));
-    expect(defaultSpoolRoot(dir)).toBe(join(dir, ".spool"));
-  });
-
-  test("package.json が見つからなければ起点の .spool になる", () => {
-    const dir = makeTempDir();
-    expect(defaultSpoolRoot(dir)).toBe(join(dir, ".spool"));
-  });
-
-  test("起点を渡さない探索は作業ディレクトリから始まる", () => {
-    expect(defaultSpoolRoot()).toBe(join(process.cwd(), ".spool"));
   });
 });

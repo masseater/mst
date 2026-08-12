@@ -73,7 +73,7 @@ const guardChild = async (child: ChildProcess, invocation: Invocation): Promise<
   return { settled, timedOut };
 };
 
-export const releaseQuietly = async (release: () => Promise<void>): Promise<void> => {
+const releaseQuietly = async (release: () => Promise<void>): Promise<void> => {
   try {
     await release();
   } catch (staleRelease) {

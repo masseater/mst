@@ -1,11 +1,12 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { once } from "node:events";
-import { createWriteStream, existsSync, type WriteStream } from "node:fs";
+import { createWriteStream, type WriteStream } from "node:fs";
 import { mkdir, unlink } from "node:fs/promises";
 import { constants } from "node:os";
-import { basename, dirname, join, resolve } from "node:path";
+import { join } from "node:path";
 
+import { commandIdOf, defaultSpoolRoot, timestampOf } from "./log-destination.ts";
 import { createEscapeStripper } from "./strip-escapes.ts";
 
 import type { Duplex, Readable, Writable } from "node:stream";
@@ -49,17 +50,6 @@ const defaultIsPassthrough = (): boolean => {
   return ciSignal !== undefined && ciSignal !== "" && ciSignal !== "false";
 };
 
-const findSpoolRoot = (currentDir: string, fallbackDir: string): string => {
-  if (existsSync(join(currentDir, "package.json"))) {
-    return join(currentDir, ".spool");
-  }
-  const parent = dirname(currentDir);
-  return parent === currentDir ? join(fallbackDir, ".spool") : findSpoolRoot(parent, fallbackDir);
-};
-
-export const defaultSpoolRoot = (startDir: string = process.cwd()): string =>
-  findSpoolRoot(resolve(startDir), resolve(startDir));
-
 const resolveDeps = (deps: SpoolDeps): ResolvedDeps => ({
   stdout: deps.stdout,
   stderr: deps.stderr,
@@ -68,15 +58,6 @@ const resolveDeps = (deps: SpoolDeps): ResolvedDeps => ({
   uniqueSuffix: deps.uniqueSuffix ?? (() => randomBytes(4).toString("hex")),
   spoolRoot: deps.spoolRoot ?? defaultSpoolRoot,
 });
-
-const timestampOf = (date: Date): string =>
-  `${date.toISOString().slice(0, 19).replaceAll(/[:-]/g, "")}Z`;
-
-const commandIdOf = (command: Command): string =>
-  [basename(command[0]), ...command.slice(1, 2)]
-    .join(" ")
-    .replaceAll(/[^\w-]+/g, "-")
-    .slice(0, 40);
 
 const formatElapsed = (milliseconds: number): string => {
   const totalSeconds = milliseconds / 1000;

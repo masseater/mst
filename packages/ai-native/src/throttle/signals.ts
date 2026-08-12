@@ -1,4 +1,4 @@
-export const INTERRUPT_SIGNALS = ["SIGINT", "SIGTERM"] as const;
+const INTERRUPT_SIGNALS = ["SIGINT", "SIGTERM"] as const;
 
 export const raiseSignal = (signal: NodeJS.Signals): void => {
   process.kill(process.pid, signal);

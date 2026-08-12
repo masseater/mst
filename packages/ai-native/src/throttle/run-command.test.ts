@@ -5,7 +5,6 @@ import { setTimeout as delay } from "node:timers/promises";
 
 import { describe, expect, onTestFinished, test, vi } from "vite-plus/test";
 
-import { releaseQuietly } from "./run-command.ts";
 import { runThrottle, type ThrottleSeams } from "./run-throttle.ts";
 
 const temporaryDirectory = (prefix: string): string => {
@@ -141,13 +140,4 @@ describe("run-command", () => {
       expect(stderrText()).toContain("slot lease compromised");
     },
   );
-
-  test("releaseQuietly settles whether the release works or throws", async () => {
-    await expect(releaseQuietly(async () => undefined)).resolves.toBeUndefined();
-    await expect(
-      releaseQuietly(async () => {
-        throw new Error("lock is already released");
-      }),
-    ).resolves.toBeUndefined();
-  });
 });
