@@ -30,24 +30,24 @@ const githubWith = (pulls: readonly GithubPullSummary[]): GithubReader => ({
 
 const it = test
   .extend("behindScan", async () => {
-    const events = createMemoryEventStore();
+    const eventStore = createMemoryEventStore();
     const report = await runBaseUpdateCheck({
       github: githubWith([openPull({ mergeStateStatus: "BEHIND" })]),
-      events,
+      events: eventStore,
     });
-    const [storedEvent] = await events.readSince(0);
+    const [storedEvent] = await eventStore.readSince(0);
     return { report, storedEvent };
   })
   .extend("conflictingScan", async () => {
-    const events = createMemoryEventStore();
+    const eventStore = createMemoryEventStore();
     const report = await runBaseUpdateCheck({
       github: githubWith([
         openPull({ number: 7, mergeable: "CONFLICTING", mergeStateStatus: "BEHIND" }),
         openPull({ number: 8, mergeStateStatus: "DIRTY" }),
       ]),
-      events,
+      events: eventStore,
     });
-    const storedEvents = await events.readSince(0);
+    const storedEvents = await eventStore.readSince(0);
     return { report, storedEvents };
   })
   .extend("excludedLabelScanReport", () =>
@@ -65,20 +65,20 @@ const it = test
     }),
   )
   .extend("authorlessBehindStoredEvent", async () => {
-    const events = createMemoryEventStore();
+    const eventStore = createMemoryEventStore();
     await runBaseUpdateCheck({
       github: githubWith([openPull({ authorLogin: null, mergeStateStatus: "BEHIND" })]),
-      events,
+      events: eventStore,
     });
-    const [storedEvent] = await events.readSince(0);
+    const [storedEvent] = await eventStore.readSince(0);
     return storedEvent;
   })
   .extend("repeatedBehindScan", async () => {
-    const events = createMemoryEventStore();
+    const eventStore = createMemoryEventStore();
     const github = githubWith([openPull({ mergeStateStatus: "BEHIND" })]);
-    await runBaseUpdateCheck({ github, events });
-    const secondReport = await runBaseUpdateCheck({ github, events });
-    const storedEvents = await events.readSince(0);
+    await runBaseUpdateCheck({ github, events: eventStore });
+    const secondReport = await runBaseUpdateCheck({ github, events: eventStore });
+    const storedEvents = await eventStore.readSince(0);
     return { secondReport, storedEvents };
   });
 

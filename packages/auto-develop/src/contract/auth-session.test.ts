@@ -2,9 +2,9 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { parseAuthSession, serializeAuthSession } from "./auth-session.ts";
 
-const rejectionNameOf = (response: unknown): string => {
+const rejectionNameOf = (produced: unknown): string => {
   try {
-    parseAuthSession(response);
+    parseAuthSession(produced);
     return "no rejection";
   } catch (rejection) {
     return rejection instanceof Error ? rejection.name : typeof rejection;

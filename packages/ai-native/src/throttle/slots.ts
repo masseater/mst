@@ -67,12 +67,12 @@ export const slotStateFingerprint = (slotDir: string, limit: number): string =>
     .join(",");
 
 export const enqueueWaiter = (slotDir: string): string => {
-  const name = [
+  const spelled = [
     String(Date.now()).padStart(13, "0"),
     String(process.pid),
     randomBytes(4).toString("hex"),
   ].join("-");
-  const entryPath = join(waitersDir(slotDir), name);
+  const entryPath = join(waitersDir(slotDir), spelled);
   writeFileSync(entryPath, `${process.pid}\n`);
   return entryPath;
 };
@@ -92,8 +92,8 @@ const isAlive = (pid: number): boolean => {
 
 const recordedPid = (entryPath: string): number | null => {
   try {
-    const record = readFileSync(entryPath, "utf8").trim();
-    return /^[0-9]+$/.test(record) ? Number(record) : null;
+    const written = readFileSync(entryPath, "utf8").trim();
+    return /^[0-9]+$/.test(written) ? Number(written) : null;
   } catch (unreadableEntry) {
     return null;
   }
@@ -109,4 +109,4 @@ const survives = (entryPath: string): boolean => {
 export const sweepWaiters = (slotDir: string): string[] =>
   readdirSync(waitersDir(slotDir))
     .toSorted()
-    .filter((name) => survives(join(waitersDir(slotDir), name)));
+    .filter((spelled) => survives(join(waitersDir(slotDir), spelled)));

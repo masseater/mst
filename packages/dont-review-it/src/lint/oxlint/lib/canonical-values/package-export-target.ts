@@ -7,17 +7,17 @@ import { toPosixPath } from "../posix-path.ts";
 import { EXPORTS_CONDITION_DEPTH_LIMIT } from "./package-manifest.ts";
 import { isFile } from "./source-files.ts";
 
-const javaScriptSourceCandidates = (target: string): readonly string[] =>
+const javaScriptSourceCandidates = (exportTarget: string): readonly string[] =>
   uniq([
-    target.replace(/\.js$/u, ".ts"),
-    target.replace(/\.jsx$/u, ".tsx"),
-    target.replace(/\.mjs$/u, ".mts"),
-    target.replace(/\.cjs$/u, ".cts"),
-    target,
+    exportTarget.replace(/\.js$/u, ".ts"),
+    exportTarget.replace(/\.jsx$/u, ".tsx"),
+    exportTarget.replace(/\.mjs$/u, ".mts"),
+    exportTarget.replace(/\.cjs$/u, ".cts"),
+    exportTarget,
   ]);
 
-const targetCandidates = (packageDirectory: string, target: string): readonly string[] => {
-  const base = resolve(packageDirectory, target);
+const targetCandidates = (packageDirectory: string, exportTarget: string): readonly string[] => {
+  const base = resolve(packageDirectory, exportTarget);
   return [
     ...javaScriptSourceCandidates(base),
     `${base}.ts`,
@@ -31,15 +31,17 @@ const targetCandidates = (packageDirectory: string, target: string): readonly st
   ];
 };
 
-export const packageExportSourceFile = (packageDirectory: string, target: string): string | null =>
-  targetCandidates(packageDirectory, target).find(isFile) ?? null;
+export const packageExportSourceFile = (
+  packageDirectory: string,
+  exportTarget: string,
+): string | null => targetCandidates(packageDirectory, exportTarget).find(isFile) ?? null;
 
 export const singleWildcardPattern = (
-  value: string,
+  pattern: string,
 ): { readonly prefix: string; readonly suffix: string } | null => {
-  const wildcard = value.indexOf("*");
-  if (wildcard === -1 || value.includes("*", wildcard + 1)) return null;
-  return { prefix: value.slice(0, wildcard), suffix: value.slice(wildcard + 1) };
+  const wildcard = pattern.indexOf("*");
+  if (wildcard === -1 || pattern.includes("*", wildcard + 1)) return null;
+  return { prefix: pattern.slice(0, wildcard), suffix: pattern.slice(wildcard + 1) };
 };
 
 const packageExportPatternBaseLength = (pattern: string): number => {
@@ -83,26 +85,26 @@ export const winningPackageExportSubpath = (
 export const packageExportTargetPatterns = ({
   depth,
   includeTypes,
-  value,
+  value: exportTarget,
 }: {
   readonly depth: number;
   readonly includeTypes: boolean;
   readonly value: unknown;
 }): readonly string[] | null => {
-  if (typeof value === "string") return [value];
-  if (value === null) return [];
-  if (depth > EXPORTS_CONDITION_DEPTH_LIMIT || typeof value !== "object") return null;
-  if (Array.isArray(value)) {
-    const nested = value.map((item) =>
-      packageExportTargetPatterns({ depth: depth + 1, includeTypes, value: item }),
+  if (typeof exportTarget === "string") return [exportTarget];
+  if (exportTarget === null) return [];
+  if (depth > EXPORTS_CONDITION_DEPTH_LIMIT || typeof exportTarget !== "object") return null;
+  if (Array.isArray(exportTarget)) {
+    const nested = exportTarget.map((alternative) =>
+      packageExportTargetPatterns({ depth: depth + 1, includeTypes, value: alternative }),
     );
     return nested.some((patterns) => patterns === null)
       ? null
       : nested.flatMap((patterns) => patterns as readonly string[]);
   }
-  const nested = Object.entries(value).flatMap(([condition, target]) => {
-    if ((!includeTypes && /^types(?:@|$)/u.test(condition)) || target === null) return [];
-    return [packageExportTargetPatterns({ depth: depth + 1, includeTypes, value: target })];
+  const nested = Object.entries(exportTarget).flatMap(([condition, branchTarget]) => {
+    if ((!includeTypes && /^types(?:@|$)/u.test(condition)) || branchTarget === null) return [];
+    return [packageExportTargetPatterns({ depth: depth + 1, includeTypes, value: branchTarget })];
   });
   return nested.some((patterns) => patterns === null)
     ? null
@@ -111,10 +113,10 @@ export const packageExportTargetPatterns = ({
 
 export const validPackageExportTargetPattern = (
   packageDirectory: string,
-  target: string,
+  exportTarget: string,
 ): boolean => {
-  if (!target.startsWith("./") || singleWildcardPattern(target) === null) return false;
-  return pathIsInside(packageDirectory, resolve(packageDirectory, target));
+  if (!exportTarget.startsWith("./") || singleWildcardPattern(exportTarget) === null) return false;
+  return pathIsInside(packageDirectory, resolve(packageDirectory, exportTarget));
 };
 
 const captureFromPattern = (pattern: string, candidate: string): string | null => {
@@ -137,7 +139,9 @@ export const packageExportPatternCaptures = ({
   readonly targets: readonly string[];
 }): readonly string[] => {
   const candidatePatterns = uniq(
-    targets.flatMap((target) => javaScriptSourceCandidates(resolve(packageDirectory, target))),
+    targets.flatMap((exportTarget) =>
+      javaScriptSourceCandidates(resolve(packageDirectory, exportTarget)),
+    ),
   );
   return uniq(
     repositoryFiles.flatMap((sourceFile) =>
@@ -149,16 +153,16 @@ export const packageExportPatternCaptures = ({
   ).toSorted();
 };
 
-export const substitutePackageExportPattern = (value: unknown, capture: string): unknown => {
-  if (typeof value === "string") return value.replace("*", capture);
-  if (Array.isArray(value)) {
-    return value.map((item) => substitutePackageExportPattern(item, capture));
+export const substitutePackageExportPattern = (exportTarget: unknown, capture: string): unknown => {
+  if (typeof exportTarget === "string") return exportTarget.replace("*", capture);
+  if (Array.isArray(exportTarget)) {
+    return exportTarget.map((alternative) => substitutePackageExportPattern(alternative, capture));
   }
-  if (value === null || typeof value !== "object") return value;
+  if (exportTarget === null || typeof exportTarget !== "object") return exportTarget;
   return Object.fromEntries(
-    Object.entries(value).map(([condition, target]) => [
+    Object.entries(exportTarget).map(([condition, branchTarget]) => [
       condition,
-      substitutePackageExportPattern(target, capture),
+      substitutePackageExportPattern(branchTarget, capture),
     ]),
   );
 };

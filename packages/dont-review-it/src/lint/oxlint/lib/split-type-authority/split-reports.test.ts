@@ -18,7 +18,7 @@ const SUBJECT: Placement = {
   workspacePath: "packages/order",
 };
 
-const OTHER: Placement = {
+const OTHER_PLACEMENT: Placement = {
   relativePath: "packages/order/src/other.ts",
   workspacePath: "packages/order",
 };
@@ -44,7 +44,7 @@ const reportsIn = (
 describe("splitTypeReportsIn on one name carrying two shapes", () => {
   const splitShapeFiles = [
     fileAt(SUBJECT, `export type Shape = ${THREE_NAMED_MEMBERS};`),
-    fileAt(OTHER, "export type Shape = { readonly a: string };"),
+    fileAt(OTHER_PLACEMENT, "export type Shape = { readonly a: string };"),
   ];
 
   test("a name declared with two shapes inside one workspace is reported", () => {
@@ -80,7 +80,7 @@ describe("splitTypeReportsIn on one name carrying two shapes", () => {
     expect(
       reportsIn([
         fileAt(SUBJECT, `export type Shape = ${THREE_NAMED_MEMBERS};`),
-        fileAt(OTHER, `export type Shape = ${THREE_NAMED_MEMBERS};`),
+        fileAt(OTHER_PLACEMENT, `export type Shape = ${THREE_NAMED_MEMBERS};`),
       ]),
     ).toStrictEqual([]);
   });
@@ -109,7 +109,7 @@ describe("splitTypeReportsIn on one name carrying two shapes", () => {
     expect(
       reportsIn([
         fileAt(SUBJECT, `export interface Shape ${THREE_NAMED_MEMBERS}`),
-        fileAt(OTHER, `export type Shape = ${THREE_NAMED_MEMBERS};`),
+        fileAt(OTHER_PLACEMENT, `export type Shape = ${THREE_NAMED_MEMBERS};`),
       ]).map((report) => report.messageId),
     ).toStrictEqual([SPLIT_SHAPE_MESSAGE_ID]);
   });
@@ -146,7 +146,7 @@ describe("splitTypeReportsIn on one shape carrying two names", () => {
     expect(
       reportsIn([
         fileAt(SUBJECT, "export type Shape = { readonly a: Named };"),
-        fileAt(OTHER, "export type Basket = { readonly a: Named };"),
+        fileAt(OTHER_PLACEMENT, "export type Basket = { readonly a: Named };"),
       ]),
     ).toStrictEqual([]);
   });
@@ -157,7 +157,7 @@ describe("splitTypeReportsIn on one shape carrying two names", () => {
     expect(
       reportsIn([
         fileAt(SUBJECT, `export type Shape = ${primitives};`),
-        fileAt(OTHER, `export type Basket = ${primitives};`),
+        fileAt(OTHER_PLACEMENT, `export type Basket = ${primitives};`),
       ]),
     ).toStrictEqual([]);
   });
@@ -168,7 +168,7 @@ describe("splitTypeReportsIn on one shape carrying two names", () => {
     expect(
       reportsIn([
         fileAt(SUBJECT, `export type Shape = ${derived};`),
-        fileAt(OTHER, `export type Basket = ${derived};`),
+        fileAt(OTHER_PLACEMENT, `export type Basket = ${derived};`),
       ]),
     ).toStrictEqual([]);
   });
@@ -181,7 +181,7 @@ describe("splitTypeReportsIn on one shape carrying two names", () => {
           "export type Shape<T> = { readonly a: T; readonly b: Named; readonly c: number };",
         ),
         fileAt(
-          OTHER,
+          OTHER_PLACEMENT,
           "export type Basket<U> = { readonly a: U; readonly b: Named; readonly c: number };",
         ),
       ]).map((report) => report.messageId),
@@ -197,7 +197,7 @@ describe("splitTypeReportsIn on a file the index cannot place", () => {
   test("a path the index does not hold is left alone", () => {
     expect(
       reportsIn(
-        [fileAt(OTHER, `export type Shape = ${THREE_NAMED_MEMBERS};`)],
+        [fileAt(OTHER_PLACEMENT, `export type Shape = ${THREE_NAMED_MEMBERS};`)],
         "packages/order/src/unknown.ts",
       ),
     ).toStrictEqual([]);

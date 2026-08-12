@@ -30,7 +30,9 @@ describe("declaration-path", () => {
   ]);
 
   const conceptIdsAt = (path: string, repositoryRoot: string): readonly string[] =>
-    declarationEntriesAt(CATALOG, { path, repositoryRoot }).map((entry) => entry.conceptId);
+    declarationEntriesAt(CATALOG, { path, repositoryRoot }).map(
+      (declarationEntry) => declarationEntry.conceptId,
+    );
 
   test("the declaring file declares the concept the annotation names", () => {
     expect(conceptIdsAt("/repo/packages/order/src/status.ts", "/repo")).toContain("order.status");

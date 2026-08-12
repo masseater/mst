@@ -9,10 +9,10 @@ import { forbidNumberedSiblingFile } from "./forbid-numbered-sibling-file--name-
 
 const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-forbid-numbered-sibling-file-"));
 
-const fixturePath = (name: string): string => join(fixtureDir, name);
+const fixturePath = (fixtureName: string): string => join(fixtureDir, fixtureName);
 
-const writeFixture = (name: string): string => {
-  const path = fixturePath(name);
+const writeFixture = (fixtureName: string): string => {
+  const path = fixturePath(fixtureName);
   mkdirSync(join(path, ".."), { recursive: true });
   writeFileSync(path, "export const total = 1;\n");
   return path;

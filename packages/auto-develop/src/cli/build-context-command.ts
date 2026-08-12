@@ -33,12 +33,12 @@ const gitFor = (cwd: string): PrContextGit => {
       ).stdout,
     unifiedDiff: async (ends) =>
       (await git.run({ args: ["diff", `${ends.base}...${ends.head}`], cwd })).stdout,
-    treeEntryMode: async (entry) => {
-      const listed = await git.run({ args: ["ls-tree", entry.ref, "--", entry.path], cwd });
-      return listed.stdout.trim().split(/\s+/u)[0] ?? null;
+    treeEntryMode: async (listed) => {
+      const ranGit = await git.run({ args: ["ls-tree", listed.ref, "--", listed.path], cwd });
+      return ranGit.stdout.trim().split(/\s+/u)[0] ?? null;
     },
-    showFile: async (entry) =>
-      (await git.run({ args: ["show", `${entry.ref}:${entry.path}`], cwd })).stdout,
+    showFile: async (listed) =>
+      (await git.run({ args: ["show", `${listed.ref}:${listed.path}`], cwd })).stdout,
   };
 };
 
@@ -50,7 +50,7 @@ const writeContextFor = async (writing: {
   const repoDir = resolveRepositoryRoot(process.cwd());
   const runId = runIdFor({ prNumber: writing.prNumber, isoTime: new Date().toISOString() });
   const outputDir = join(repoDir, ".repo-workflow", "review-context", runId);
-  const context = await collectPrContext({
+  const carried = await collectPrContext({
     git: gitFor(repoDir),
     github: emptyGithubContext,
     prNumber: writing.prNumber,
@@ -59,9 +59,9 @@ const writeContextFor = async (writing: {
     failedLogsDir: join(outputDir, "ci-logs"),
   });
   runContextFsOnDisk.mkdirRecursive(outputDir);
-  runContextFsOnDisk.writeJson(join(outputDir, "review-context.json"), context);
-  writeFileSync(join(outputDir, "review-context.md"), `${renderMarkdown(context)}\n`);
-  return [join(outputDir, "review-context.json"), join(outputDir, "review-context.md")];
+  runContextFsOnDisk.writeJson(join(outputDir, "review-carried.json"), carried);
+  writeFileSync(join(outputDir, "review-carried.md"), `${renderMarkdown(carried)}\n`);
+  return [join(outputDir, "review-carried.json"), join(outputDir, "review-carried.md")];
 };
 
 export const buildContextCommand = defineCommand({

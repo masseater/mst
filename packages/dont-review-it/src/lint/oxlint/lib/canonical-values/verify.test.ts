@@ -17,10 +17,10 @@ describe("verify", () => {
     onTestFinished(() => {
       rmSync(root, { recursive: true, force: true });
     });
-    for (const [path, text] of Object.entries(files)) {
-      const target = join(root, path);
-      mkdirSync(dirname(target), { recursive: true });
-      writeFileSync(target, text, "utf8");
+    for (const [relativePath, fileText] of Object.entries(files)) {
+      const absolutePath = join(root, relativePath);
+      mkdirSync(dirname(absolutePath), { recursive: true });
+      writeFileSync(absolutePath, fileText, "utf8");
     }
     return root;
   };
@@ -33,17 +33,20 @@ ${declaration}
   const declaring = (conceptId: string, binding: string): string =>
     annotatedWith(conceptId, `export const ${binding} = ["draft"] as const;`);
 
-  const conceptIdsOf = (group: readonly { readonly conceptId: string }[]): readonly string[] =>
-    group.map((entry) => entry.conceptId);
+  const conceptIdsOf = (
+    equivalentDeclarations: readonly { readonly conceptId: string }[],
+  ): readonly string[] => equivalentDeclarations.map((declaration) => declaration.conceptId);
 
-  const verifyCanonicalValues = (options: { readonly repositoryRoot: string }) =>
-    inspectCanonicalValues(options).problems;
+  const verifyCanonicalValues = (inspectionRequest: { readonly repositoryRoot: string }) =>
+    inspectCanonicalValues(inspectionRequest).problems;
 
-  const buildCanonicalValuesCatalog = (options: { readonly repositoryRoot: string }) =>
-    inspectCanonicalValues(options).catalog;
+  const buildCanonicalValuesCatalog = (inspectionRequest: { readonly repositoryRoot: string }) =>
+    inspectCanonicalValues(inspectionRequest).catalog;
 
   const catalogPathsOf = (repositoryRoot: string): readonly string[] =>
-    buildCanonicalValuesCatalog({ repositoryRoot }).entries.map((entry) => entry.declarationPath);
+    buildCanonicalValuesCatalog({ repositoryRoot }).entries.map(
+      (declaration) => declaration.declarationPath,
+    );
 
   test("a repository whose annotations are all well formed yields no problem", () => {
     const repositoryRoot = repositoryWith({
@@ -209,9 +212,11 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
 
     const { entries } = buildCanonicalValuesCatalog({ repositoryRoot });
 
-    expect(findEquivalentConcepts(entries).map((group) => conceptIdsOf(group))).toStrictEqual([
-      ["article.status", "order.status"],
-    ]);
+    expect(
+      findEquivalentConcepts(entries).map((equivalentDeclarations) =>
+        conceptIdsOf(equivalentDeclarations),
+      ),
+    ).toStrictEqual([["article.status", "order.status"]]);
   });
 
   test("concepts that declare different value sets form no group", () => {
@@ -282,10 +287,10 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
       const inspection = inspectCanonicalValues({ repositoryRoot });
       return {
         form,
-        catalogued: inspection.catalog.entries.map((entry) => [
-          entry.declarationPath,
-          entry.conceptId,
-          entry.values,
+        catalogued: inspection.catalog.entries.map((declarationEntry) => [
+          declarationEntry.declarationPath,
+          declarationEntry.conceptId,
+          declarationEntry.values,
         ]),
         verified: inspection.problems.map((problem) => [problem.kind, problem.filePath]),
       };

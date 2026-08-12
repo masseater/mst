@@ -63,19 +63,19 @@ const combineTargets = (left: ResolvedTarget, right: ResolvedTarget): ResolvedTa
 const resolvedArrayTarget = ({
   depth,
   packageDirectory,
-  values,
+  alternatives,
 }: {
   readonly depth: number;
   readonly packageDirectory: string;
-  readonly values: readonly unknown[];
+  readonly alternatives: readonly unknown[];
 }): ResolvedTarget => {
-  const [value, ...remaining] = values;
-  if (value === undefined) return unresolvedTarget();
-  const resolved = resolvedTarget({ depth: depth + 1, packageDirectory, value });
+  const [alternative, ...remaining] = alternatives;
+  if (alternative === undefined) return unresolvedTarget();
+  const resolved = resolvedTarget({ depth: depth + 1, packageDirectory, value: alternative });
   if (resolved.exhaustive) return resolved;
   return combineTargets(
     resolved,
-    resolvedArrayTarget({ depth, packageDirectory, values: remaining }),
+    resolvedArrayTarget({ depth, packageDirectory, alternatives: remaining }),
   );
 };
 
@@ -88,13 +88,13 @@ const resolvedConditionTarget = ({
   readonly depth: number;
   readonly packageDirectory: string;
 }): ResolvedTarget => {
-  const [entry, ...remaining] = conditions;
-  if (entry === undefined) return { exhaustive: true, sourceFiles: [] };
-  const [condition, value] = entry;
-  if (/^types(?:@|$)/u.test(condition) || value === null) {
+  const [conditionBranch, ...remaining] = conditions;
+  if (conditionBranch === undefined) return { exhaustive: true, sourceFiles: [] };
+  const [condition, branchTarget] = conditionBranch;
+  if (/^types(?:@|$)/u.test(condition) || branchTarget === null) {
     return resolvedConditionTarget({ conditions: remaining, depth, packageDirectory });
   }
-  const resolved = resolvedTarget({ depth: depth + 1, packageDirectory, value });
+  const resolved = resolvedTarget({ depth: depth + 1, packageDirectory, value: branchTarget });
   if (condition === "default") return resolved;
   const rest = resolvedConditionTarget({ conditions: remaining, depth, packageDirectory });
   return {
@@ -119,7 +119,7 @@ const resolvedTarget = ({
     return unresolvedTarget();
   }
   if (Array.isArray(value)) {
-    return resolvedArrayTarget({ depth, packageDirectory, values: value });
+    return resolvedArrayTarget({ depth, packageDirectory, alternatives: value });
   }
   return resolvedConditionTarget({
     conditions: Object.entries(value),
@@ -144,7 +144,11 @@ const patternSurfaces = ({
   readonly target: unknown;
 }): readonly { readonly sourceFiles: readonly string[]; readonly specifier: string }[] => {
   if (singleWildcardPattern(subpath) === null) return [];
-  const allTargets = packageExportTargetPatterns({ depth: 0, includeTypes: true, value: target });
+  const allTargets = packageExportTargetPatterns({
+    depth: 0,
+    includeTypes: true,
+    value: target,
+  });
   const runtimeTargets = packageExportTargetPatterns({
     depth: 0,
     includeTypes: false,
@@ -195,7 +199,7 @@ const packageSurfaces = ({
     exportsField !== null &&
     typeof exportsField === "object" &&
     !Array.isArray(exportsField) &&
-    Object.keys(exportsField).some((key) => key.startsWith("."))
+    Object.keys(exportsField).some((subpathKey) => subpathKey.startsWith("."))
       ? Object.entries(exportsField)
       : [[".", exportsField] as const];
 
@@ -204,7 +208,7 @@ const packageSurfaces = ({
     : [];
   const subpathKeys = subpaths.map(([subpath]) => subpath);
 
-  return subpaths.flatMap(([subpath, target]) => {
+  return subpaths.flatMap(([subpath, exportTarget]) => {
     if ((subpath !== "." && !subpath.startsWith("./")) || subpath === `./${MANIFEST_FILE_NAME}`) {
       return [];
     }
@@ -215,10 +219,10 @@ const packageSurfaces = ({
         repositoryFiles,
         subpath,
         subpaths: subpathKeys,
-        target,
+        target: exportTarget,
       });
     }
-    const resolved = resolvedTarget({ depth: 0, packageDirectory, value: target });
+    const resolved = resolvedTarget({ depth: 0, packageDirectory, value: exportTarget });
     if (!resolved.exhaustive) return [];
     const { sourceFiles } = resolved;
     return sourceFiles.length === 0
@@ -304,7 +308,7 @@ const sharedExportNames = ([firstExportNames, ...remaining]: readonly [
   ...(readonly string[])[],
 ]): readonly string[] => {
   return firstExportNames.filter((exportName) =>
-    remaining.every((names) => names.includes(exportName)),
+    remaining.every((exportNames) => exportNames.includes(exportName)),
   );
 };
 

@@ -18,8 +18,8 @@ const RETIRED_LIB: RestrictedTargetEntry = {
   substitute: "Read the same value through the reader this package owns.",
 };
 
-const workspaceHolding = (name: string, held: Readonly<Record<string, string>>): string => {
-  const root = join(fixtureDir, name);
+const workspaceHolding = (spelled: string, held: Readonly<Record<string, string>>): string => {
+  const root = join(fixtureDir, spelled);
   for (const [spelled, source] of Object.entries(held)) {
     const path = join(root, spelled);
     mkdirSync(dirname(path), { recursive: true });
@@ -45,14 +45,14 @@ const reachedFrom = ({
 
 const installedUnder = ({
   workspaceRoot,
-  name,
+  name: spelled,
   directory,
 }: {
   readonly workspaceRoot: string;
   readonly name: string;
   readonly directory: string;
 }): void => {
-  const link = join(workspaceRoot, "node_modules", name);
+  const link = join(workspaceRoot, "node_modules", spelled);
   mkdirSync(dirname(link), { recursive: true });
   symlinkSync(join(workspaceRoot, directory), link, "dir");
 };

@@ -66,14 +66,14 @@ const listeningRelay = async (
   return { origin: `http://127.0.0.1:${address.port}`, relay };
 };
 
-const decodeChunk = (chunk: { readonly value?: unknown } | undefined): string =>
-  new TextDecoder().decode(chunk?.value as Uint8Array | undefined);
+const decodeChunk = (writtenChunk: { readonly value?: unknown } | undefined): string =>
+  new TextDecoder().decode(writtenChunk?.value as Uint8Array | undefined);
 
-const signedWebhookBody = (payload: Readonly<Record<string, unknown>>) => {
-  const rawBody = JSON.stringify(payload);
+const signedWebhookBody = (carried: Readonly<Record<string, unknown>>) => {
+  const requestBody = JSON.stringify(carried);
   return {
-    rawBody,
-    signature: `sha256=${createHmac("sha256", "shared-secret").update(rawBody).digest("hex")}`,
+    requestBody,
+    signature: `sha256=${createHmac("sha256", "shared-secret").update(requestBody).digest("hex")}`,
   };
 };
 
@@ -87,7 +87,7 @@ const issuedToken = async (origin: string): Promise<string> => {
 };
 
 const deliverOpenedWebhook = async (origin: string, deliveryId: string): Promise<number> => {
-  const { rawBody, signature } = signedWebhookBody({
+  const { requestBody, signature } = signedWebhookBody({
     repository: { full_name: "example-org/example-repo" },
     action: "opened",
     pull_request: { number: 7, user: { login: "octocat" } },
@@ -100,7 +100,7 @@ const deliverOpenedWebhook = async (origin: string, deliveryId: string): Promise
       "x-hub-signature-256": signature,
       "content-type": "application/json",
     },
-    body: rawBody,
+    body: requestBody,
   });
   return webhookResponse.status;
 };

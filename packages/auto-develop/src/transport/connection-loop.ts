@@ -22,13 +22,13 @@ export type ConnectionRuntime = {
 const isAbortError = (failure: unknown): boolean =>
   failure instanceof Error && failure.name === "AbortError";
 
-const classifyResponse = (response: Response, credentials: CredentialProvider): void => {
-  if (response.status === 401 || response.status === 403) {
+const classifyResponse = (produced: Response, credentials: CredentialProvider): void => {
+  if (produced.status === 401 || produced.status === 403) {
     credentials.invalidate();
-    throw new Error(`SSE connect refused the connection credential: ${response.status}`);
+    throw new Error(`SSE connect refused the connection credential: ${produced.status}`);
   }
-  if (response.status === 408 || response.status === 429 || response.status >= 500) {
-    throw new Error(`SSE connect failed: ${response.status}`);
+  if (produced.status === 408 || produced.status === 429 || produced.status >= 500) {
+    throw new Error(`SSE connect failed: ${produced.status}`);
   }
   throw new SseRequestRejectedError();
 };
@@ -68,11 +68,11 @@ export const createConnectionLoop = (wiring: {
         }, opening.windowRemainingMs)
       : undefined;
     try {
-      const response = await requestStream(
+      const produced = await requestStream(
         AbortSignal.any([opening.disconnectSignal, deadlineHalt.signal]),
       );
-      if (!response.ok) classifyResponse(response, runtime.credentials);
-      return response;
+      if (!produced.ok) classifyResponse(produced, runtime.credentials);
+      return produced;
     } catch (openFailure) {
       if (deadlineHalt.signal.aborted) {
         throw new Error("SSE retry deadline exceeded", { cause: openFailure });
@@ -86,12 +86,12 @@ export const createConnectionLoop = (wiring: {
   const attemptStream = async (windowRemainingMs: number): Promise<"client" | "server"> => {
     const disconnectHalt = new AbortController();
     controllers.set("current", disconnectHalt);
-    const response = await openStream({
+    const produced = await openStream({
       windowRemainingMs,
       disconnectSignal: disconnectHalt.signal,
     });
-    if (response.body === null) return "server";
-    return streamReader.readStream(response.body);
+    if (produced.body === null) return "server";
+    return streamReader.readStream(produced.body);
   };
 
   const windowElapsedMs = (retry: Map<string, number>): number => {

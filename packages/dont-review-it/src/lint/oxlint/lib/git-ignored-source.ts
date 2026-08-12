@@ -37,11 +37,13 @@ const firstSymbolicPath = (repositoryRoot: string, repositoryPath: string): stri
 };
 
 const ignoredRepositoryPaths = (repositoryRoot: string): ReadonlySet<string> => {
-  const output = gitOutput(
+  const ignoredPathOutput = gitOutput(
     ["ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z"],
     { cwd: repositoryRoot, env: process.env },
   );
-  return output !== null ? new Set(output.split("\0").filter((path) => path !== "")) : new Set();
+  return ignoredPathOutput !== null
+    ? new Set(ignoredPathOutput.split("\0").filter((path) => path !== ""))
+    : new Set();
 };
 
 const pathIsIgnored = (repositoryPath: string, ignoredPaths: ReadonlySet<string>): boolean =>

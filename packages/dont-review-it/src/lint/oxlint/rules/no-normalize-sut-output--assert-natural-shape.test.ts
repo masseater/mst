@@ -16,8 +16,8 @@ writeFileSync(join(importingDir, "held.ts"), "export const held = summarise(inpu
 
 const IMPORTING_SPEC_FILE = join(importingDir, "report.test.ts");
 
-const reshapedBehind = (name: string) => [
-  { messageId: "normalizedBehindName", data: { name, operation: "sort" } },
+const reshapedBehind = (spelled: string) => [
+  { messageId: "normalizedBehindName", data: { name: spelled, operation: "sort" } },
 ];
 
 const rewrittenBy = (operation: string) => [

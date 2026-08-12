@@ -44,18 +44,18 @@ const takenRoutesOf = ({
   readonly named: AstFields;
   readonly specifier: string;
 }): readonly (readonly [string, string])[] => {
-  const type = nodeTypeOf(named);
-  if (type === "Identifier") {
+  const nodeType = nodeTypeOf(named);
+  if (nodeType === "Identifier") {
     return [[String(named.name), `${specifier}${ROUTE_MARK}${NAMESPACE_ROUTE_EXPORT}`] as const];
   }
-  if (type !== "ObjectPattern") return [];
+  if (nodeType !== "ObjectPattern") return [];
 
   return listedFieldsOf(named.properties).flatMap((property) => {
-    const key = astFieldsOf(property.key);
+    const named = astFieldsOf(property.key);
     const taken = astFieldsOf(property.value);
-    if (key === null || taken === null || property.computed === true) return [];
-    if (nodeTypeOf(key) !== "Identifier" || nodeTypeOf(taken) !== "Identifier") return [];
-    return [[String(taken.name), `${specifier}${ROUTE_MARK}${String(key.name)}`] as const];
+    if (named === null || taken === null || property.computed === true) return [];
+    if (nodeTypeOf(named) !== "Identifier" || nodeTypeOf(taken) !== "Identifier") return [];
+    return [[String(taken.name), `${specifier}${ROUTE_MARK}${String(named.name)}`] as const];
   });
 };
 
@@ -140,16 +140,16 @@ const calleeRouteOf = ({
   readonly callee: AstFields;
   readonly routes: ImportRoutes;
 }): string | null => {
-  const type = nodeTypeOf(callee);
-  if (type === "Identifier") return routes.get(String(callee.name)) ?? null;
-  if (type !== "MemberExpression" || callee.computed === true) return null;
+  const nodeType = nodeTypeOf(callee);
+  if (nodeType === "Identifier") return routes.get(String(callee.name)) ?? null;
+  if (nodeType !== "MemberExpression" || callee.computed === true) return null;
   return memberRouteOf({ callee, routes });
 };
 
 const calledFieldOf = (node: AstFields): AstFields | null => {
-  const type = nodeTypeOf(node);
-  if (type === "TaggedTemplateExpression") return astFieldsOf(node.tag);
-  return type === "CallExpression" ? astFieldsOf(node.callee) : null;
+  const nodeType = nodeTypeOf(node);
+  if (nodeType === "TaggedTemplateExpression") return astFieldsOf(node.tag);
+  return nodeType === "CallExpression" ? astFieldsOf(node.callee) : null;
 };
 
 export const handedTextsOf = ({
@@ -162,11 +162,11 @@ export const handedTextsOf = ({
   const [listed] = handed;
   if (listed === undefined || nodeTypeOf(listed) !== "ArrayExpression") return null;
 
-  const elements = listedFieldsOf(listed.elements);
-  const spelled = elements
-    .map((element) => staticSpecifierOf(element, constants))
-    .filter((text) => text !== null);
-  return spelled.length === elements.length ? spelled : null;
+  const heldElements = listedFieldsOf(listed.elements);
+  const spelled = heldElements
+    .map((held) => staticSpecifierOf(held, constants))
+    .filter((writtenText) => writtenText !== null);
+  return spelled.length === heldElements.length ? spelled : null;
 };
 
 const spawnFormAt = ({

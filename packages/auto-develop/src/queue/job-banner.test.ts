@@ -7,14 +7,14 @@ const recordingOut = (): {
   readonly out: { readonly write: (chunk: string) => void };
   readonly lines: () => readonly string[];
 } => {
-  const chunks = new Map<number, string>();
+  const writtenChunks = new Map<number, string>();
   return {
     out: {
-      write: (chunk) => {
-        chunks.set(chunks.size, chunk);
+      write: (writtenChunk) => {
+        writtenChunks.set(writtenChunks.size, writtenChunk);
       },
     },
-    lines: () => [...chunks.values()],
+    lines: () => [...writtenChunks.values()],
   };
 };
 

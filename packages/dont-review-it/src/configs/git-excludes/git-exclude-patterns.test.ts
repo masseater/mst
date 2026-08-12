@@ -14,8 +14,8 @@ const ONE_LINE_CWD = "/mst-git-answers-with-one-line";
 vi.mock(import("node:child_process"), async (importOriginal) => {
   const real = await importOriginal();
   const execFileSync = ((...call: Parameters<typeof real.execFileSync>) => {
-    const [, , options] = call;
-    const where = (options as { readonly cwd?: string } | undefined)?.cwd;
+    const [, , ruleOptions] = call;
+    const where = (ruleOptions as { readonly cwd?: string } | undefined)?.cwd;
     if (where === UNRUNNABLE_CWD) throw new Error("git could not be started at all");
     if (where === ONE_LINE_CWD) return "/the-only-line\n";
     return real.execFileSync(...call);
@@ -24,7 +24,8 @@ vi.mock(import("node:child_process"), async (importOriginal) => {
 });
 
 describe("git-exclude-patterns", { timeout: 30_000 }, () => {
-  const sandboxDirectory = (name: string): string => mkdtempSync(join(tmpdir(), `mst-${name}-`));
+  const sandboxDirectory = (spelled: string): string =>
+    mkdtempSync(join(tmpdir(), `mst-${spelled}-`));
 
   const isolatedEnvironment = (home: string): NodeJS.ProcessEnv => ({
     HOME: home,

@@ -10,25 +10,25 @@ import type { GithubReader } from "./github-reader.ts";
 import type { EventStore, StoredEvent } from "./store.ts";
 
 export type OwnerFilter = {
-  readonly remember: (event: StoredEvent) => void;
-  readonly discardIfClosed: (event: StoredEvent) => void;
+  readonly remember: (stored: StoredEvent) => void;
+  readonly discardIfClosed: (stored: StoredEvent) => void;
   readonly owns: (ownership: {
-    readonly event: StoredEvent;
+    readonly stored: StoredEvent;
     readonly subscriberLogin: string;
   }) => Promise<boolean>;
 };
 
-const eventPullNumber = (event: StoredEvent): number | undefined => {
-  const pullNumber = asRecord(event.payload.pull_request)?.number;
+const eventPullNumber = (stored: StoredEvent): number | undefined => {
+  const pullNumber = asRecord(stored.payload.pull_request)?.number;
   return typeof pullNumber === "number" ? pullNumber : undefined;
 };
 
-const isReviewInputChange = (event: StoredEvent): boolean => {
-  if (event.eventType !== "pull_request") return false;
-  if (event.payload.action === "synchronize") return true;
-  const changes = asRecord(event.payload.changes);
+const isReviewInputChange = (stored: StoredEvent): boolean => {
+  if (stored.eventType !== "pull_request") return false;
+  if (stored.payload.action === "synchronize") return true;
+  const changes = asRecord(stored.payload.changes);
   return (
-    event.payload.action === "edited" && changes !== undefined && Object.hasOwn(changes, "base")
+    stored.payload.action === "edited" && changes !== undefined && Object.hasOwn(changes, "base")
   );
 };
 
@@ -50,12 +50,12 @@ export const createOwnerFilter = (upstream: {
   };
 
   const ownsByAuthor = async (ownership: {
-    readonly event: StoredEvent;
+    readonly stored: StoredEvent;
     readonly subscriberLogin: string;
   }): Promise<boolean> => {
-    const payloadAuthor = pullRequestAuthorLogin(ownership.event.payload);
+    const payloadAuthor = pullRequestAuthorLogin(ownership.stored.payload);
     if (payloadAuthor !== undefined) return payloadAuthor === ownership.subscriberLogin;
-    for (const prNumber of mentionedPullNumbers(ownership.event.payload)) {
+    for (const prNumber of mentionedPullNumbers(ownership.stored.payload)) {
       const resolvedAuthor = await resolveAuthor(prNumber);
       if (resolvedAuthor !== undefined) return resolvedAuthor === ownership.subscriberLogin;
     }
@@ -63,34 +63,34 @@ export const createOwnerFilter = (upstream: {
   };
 
   return {
-    remember: (event) => {
-      const prNumber = eventPullNumber(event);
-      const authorLogin = pullRequestAuthorLogin(event.payload);
+    remember: (stored) => {
+      const prNumber = eventPullNumber(stored);
+      const authorLogin = pullRequestAuthorLogin(stored.payload);
       if (prNumber !== undefined && authorLogin !== undefined) {
         authorByPullNumber.set(prNumber, authorLogin);
       }
     },
-    discardIfClosed: (event) => {
-      const prNumber = eventPullNumber(event);
+    discardIfClosed: (stored) => {
+      const prNumber = eventPullNumber(stored);
       if (
-        event.eventType === "pull_request" &&
-        event.payload.action === "closed" &&
+        stored.eventType === "pull_request" &&
+        stored.payload.action === "closed" &&
         prNumber !== undefined
       ) {
         authorByPullNumber.delete(prNumber);
       }
     },
-    owns: async ({ event, subscriberLogin }) => {
-      if (event.eventType === "pull_request" && event.payload.action === "review_requested") {
-        return requestedReviewerLogin(event.payload) === subscriberLogin;
+    owns: async ({ stored, subscriberLogin }) => {
+      if (stored.eventType === "pull_request" && stored.payload.action === "review_requested") {
+        return requestedReviewerLogin(stored.payload) === subscriberLogin;
       }
       if (
-        isReviewInputChange(event) &&
-        requestedReviewerLogins(event.payload).includes(subscriberLogin)
+        isReviewInputChange(stored) &&
+        requestedReviewerLogins(stored.payload).includes(subscriberLogin)
       ) {
         return true;
       }
-      return ownsByAuthor({ event, subscriberLogin });
+      return ownsByAuthor({ stored: stored, subscriberLogin });
     },
   };
 };

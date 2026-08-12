@@ -34,9 +34,9 @@ export const noFloatingPromise = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
+  create(inspection) {
     const lookup: BindingResolution = {
-      scopeAt: (node) => context.sourceCode.getScope(node),
+      scopeAt: (node) => inspection.sourceCode.getScope(node),
       seenBindings: new Set(),
     };
 
@@ -46,17 +46,17 @@ export const noFloatingPromise = createDontReviewItRule({
 
         if (expression.type === "UnaryExpression" && expression.operator === VOID_OPERATOR) {
           if (!isPromiseValuedExpression(expression.argument, lookup)) return;
-          context.report({ node: expression, messageId: "voidedPromise" });
+          inspection.report({ node: expression, messageId: "voidedPromise" });
           return;
         }
 
         if (expression.type === "CallExpression" && isWidenedAsyncCall(expression, lookup)) {
-          context.report({ node: expression, messageId: "widenedAsyncCall" });
+          inspection.report({ node: expression, messageId: "widenedAsyncCall" });
           return;
         }
 
         if (!isPromiseValuedCall(expression, lookup)) return;
-        context.report({ node: expression, messageId: "floatingPromiseStatement" });
+        inspection.report({ node: expression, messageId: "floatingPromiseStatement" });
       },
       CallExpression(node: ESTree.CallExpression) {
         const signature = callSignatureOf(node.callee, lookup);
@@ -66,7 +66,7 @@ export const noFloatingPromise = createDontReviewItRule({
           if (argument.type === "SpreadElement") return;
           if (synchronousReturnOfParameter(signature, index) === null) return;
           if (!isPromiseYieldingCallee(argument, lookup)) return;
-          context.report({ node: argument, messageId: "floatingPromiseCallback" });
+          inspection.report({ node: argument, messageId: "floatingPromiseCallback" });
         });
       },
     };

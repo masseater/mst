@@ -5,20 +5,22 @@ import type { CanonicalValuesCatalog, CanonicalValuesEntry } from "./catalog.ts"
 const matchesDeclarationPath = ({
   path,
   repositoryRoot,
-  entry,
+  declaration,
 }: {
-  readonly entry: CanonicalValuesEntry;
+  readonly declaration: CanonicalValuesEntry;
   readonly path: string;
   readonly repositoryRoot: string;
 }): boolean => {
   const normalizedPath = toPosixPath(path);
-  if (normalizedPath === entry.declarationPath) return true;
+  if (normalizedPath === declaration.declarationPath) return true;
   const normalizedRoot = toPosixPath(repositoryRoot).replace(/\/+$/u, "");
-  return normalizedPath === `${normalizedRoot}/${entry.declarationPath}`;
+  return normalizedPath === `${normalizedRoot}/${declaration.declarationPath}`;
 };
 
 export const declarationEntriesAt = (
   catalog: CanonicalValuesCatalog,
   { path, repositoryRoot }: { readonly path: string; readonly repositoryRoot: string },
 ): readonly CanonicalValuesEntry[] =>
-  catalog.entries.filter((entry) => matchesDeclarationPath({ entry, path, repositoryRoot }));
+  catalog.entries.filter((declaration) =>
+    matchesDeclarationPath({ declaration, path, repositoryRoot }),
+  );

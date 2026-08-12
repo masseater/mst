@@ -13,8 +13,8 @@ const isNode = (candidate: unknown): candidate is ESTree.Node =>
   typeof Reflect.get(candidate, "type") === "string";
 
 const childNodes = (sourceCode: SourceTree, node: ESTree.Node): readonly ESTree.Node[] =>
-  (sourceCode.visitorKeys[node.type] ?? []).flatMap((key) => {
-    const child: unknown = Reflect.get(node, key);
+  (sourceCode.visitorKeys[node.type] ?? []).flatMap((visitorKey) => {
+    const child: unknown = Reflect.get(node, visitorKey);
     return (Array.isArray(child) ? child : [child]).filter(isNode);
   });
 

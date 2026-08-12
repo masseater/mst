@@ -28,11 +28,11 @@ type CoverageViolation = {
   readonly data: Record<string, number | string>;
 };
 
-const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
-  value instanceof Object;
+const isRecord = (held: unknown): held is Readonly<Record<string, unknown>> =>
+  held instanceof Object;
 
-const requirementsFrom = (options: Readonly<Options>): readonly CoverageRequirement[] => {
-  const [first] = options;
+const requirementsFrom = (ruleOptions: Readonly<Options>): readonly CoverageRequirement[] => {
+  const [first] = ruleOptions;
   const overrides = isRecord(first) ? first : {};
   return COVERAGE_METRICS.map((metric) => {
     const override = overrides[metric];
@@ -119,9 +119,9 @@ export const noLenientCoverageThreshold = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!TEST_CONFIG_PATH.test(toPosixPath(context.filename))) return {};
-    const requirements = requirementsFrom(context.options);
+  create(inspection) {
+    if (!TEST_CONFIG_PATH.test(toPosixPath(inspection.filename))) return {};
+    const requirements = requirementsFrom(inspection.options);
 
     return {
       Program(node: ESTree.Program) {
@@ -129,7 +129,7 @@ export const noLenientCoverageThreshold = createDontReviewItRule({
         const thresholds =
           config === null ? null : nestedObjectAt({ object: config, path: THRESHOLDS_PATH });
         if (thresholds === null) {
-          context.report({
+          inspection.report({
             node,
             messageId: "missingCoverageThresholds",
             data: {
@@ -140,10 +140,10 @@ export const noLenientCoverageThreshold = createDontReviewItRule({
           return;
         }
         if (!declaresTrueAt({ thresholds, key: PER_FILE_KEY })) {
-          context.report({ node: thresholds, messageId: "aggregateCoverageThreshold" });
+          inspection.report({ node: thresholds, messageId: "aggregateCoverageThreshold" });
         }
         for (const violation of violationsIn({ thresholds, requirements })) {
-          context.report(violation);
+          inspection.report(violation);
         }
       },
     };

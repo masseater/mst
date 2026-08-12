@@ -5,27 +5,30 @@ import { HaltQueueKeepJobError } from "./halt-disposition.ts";
 import { createJobExecution, type QueueSharedState } from "./job-execution.ts";
 import { createJobLedger, type JobRecord } from "./job-ledger.ts";
 
-const record = (id: string, shape: Partial<Omit<JobRecord, "id">> = {}): JobRecord => ({
-  id,
+const written = (
+  identity: string,
+  shape: Partial<Omit<JobRecord, "identity">> = {},
+): JobRecord => ({
+  id: identity,
   type: "pr-events",
-  payload: { jobId: id },
-  key: `key-${id}`,
-  lane: `lane-${id}`,
-  label: `job ${id}`,
+  payload: { jobId: identity },
+  key: `key-${identity}`,
+  lane: `lane-${identity}`,
+  label: `job ${identity}`,
   state: "waiting",
   acceptedAt: "2026-08-11T00:00:00.000Z",
   ...shape,
 });
 
 const sharedState = (
-  handler: (payload: unknown) => Promise<void>,
+  takenHandler: (payload: unknown) => Promise<void>,
   onHalt?: (failure: unknown) => void,
 ): QueueSharedState => ({
   ledger: createJobLedger(),
   flags: new Map([["halted", false]]),
   reservedLanes: new Set<string>(),
   drainWaiters: new Set<() => void>(),
-  handlerTable: new Map([["pr-events", handler]]),
+  handlerTable: new Map([["pr-events", takenHandler]]),
   onHaltCell: new Map([["cb", onHalt]]),
 });
 
@@ -39,100 +42,100 @@ const haltFailure = new HaltQueueKeepJobError("engine auth expired");
 const it = test
   .extend("arrivalOrderHandlerCalls", async () => {
     const handled = vi.fn<(payload: unknown) => Promise<void>>(() => Promise.resolve());
-    const state = sharedState(handled);
+    const heldState = sharedState(handled);
     const execution = createJobExecution({
-      state,
+      state: heldState,
       concurrency: 2,
       snapshotNow: vi.fn<() => void>(),
       log: silentLogger,
     });
-    state.ledger.put(record("job-1"));
-    state.ledger.put(record("job-2"));
-    state.ledger.put(record("job-3"));
+    heldState.ledger.put(written("job-1"));
+    heldState.ledger.put(written("job-2"));
+    heldState.ledger.put(written("job-3"));
     execution.pump();
     await settle();
     return handled.mock.calls;
   })
   .extend("recordsAfterBusyAndReservedPump", () => {
-    const state = sharedState(() => new Promise<void>(() => undefined));
+    const heldState = sharedState(() => new Promise<void>(() => undefined));
     const execution = createJobExecution({
-      state,
+      state: heldState,
       concurrency: 3,
       snapshotNow: vi.fn<() => void>(),
       log: silentLogger,
     });
-    state.ledger.put(record("job-1", { lane: "pr-7", state: "running" }));
-    state.ledger.put(record("job-2", { lane: "pr-7" }));
-    state.reservedLanes.add("pr-8");
-    state.ledger.put(record("job-3", { lane: "pr-8" }));
-    state.ledger.put(record("job-4", { lane: "pr-9" }));
+    heldState.ledger.put(written("job-1", { lane: "pr-7", state: "running" }));
+    heldState.ledger.put(written("job-2", { lane: "pr-7" }));
+    heldState.reservedLanes.add("pr-8");
+    heldState.ledger.put(written("job-3", { lane: "pr-8" }));
+    heldState.ledger.put(written("job-4", { lane: "pr-9" }));
     execution.pump();
-    return state.ledger.records();
+    return heldState.ledger.records();
   })
   .extend("haltedPumpHandlerCalls", () => {
     const handled = vi.fn<(payload: unknown) => Promise<void>>(() => Promise.resolve());
-    const state = sharedState(handled);
+    const heldState = sharedState(handled);
     const execution = createJobExecution({
-      state,
+      state: heldState,
       concurrency: 1,
       snapshotNow: vi.fn<() => void>(),
       log: silentLogger,
     });
-    state.flags.set("halted", true);
-    state.ledger.put(record("job-1"));
+    heldState.flags.set("halted", true);
+    heldState.ledger.put(written("job-1"));
     execution.pump();
     return handled.mock.calls;
   })
   .extend("unregisteredTypePump", async () => {
     const log = { ...silentLogger, error: vi.fn<(typeof silentLogger)["error"]>() };
-    const state = sharedState(() => Promise.resolve());
-    state.handlerTable.clear();
+    const heldState = sharedState(() => Promise.resolve());
+    heldState.handlerTable.clear();
     const execution = createJobExecution({
-      state,
+      state: heldState,
       concurrency: 1,
       snapshotNow: vi.fn<() => void>(),
       log,
     });
-    state.ledger.put(record("job-1"));
+    heldState.ledger.put(written("job-1"));
     execution.pump();
     await settle();
-    return { records: state.ledger.records(), errorCalls: log.error.mock.calls };
+    return { records: heldState.ledger.records(), errorCalls: log.error.mock.calls };
   })
   .extend("runAfterSingleFailure", async () => {
-    const handled = vi.fn<(payload: unknown) => Promise<void>>((payload) =>
-      (payload as { readonly jobId: string }).jobId === "job-1"
+    const handled = vi.fn<(carried: unknown) => Promise<void>>((carried) =>
+      (carried as { readonly jobId: string }).jobId === "job-1"
         ? Promise.reject(new Error("flaky"))
         : Promise.resolve(),
     );
-    const state = sharedState(handled);
+    const heldState = sharedState(handled);
     const execution = createJobExecution({
-      state,
+      state: heldState,
       concurrency: 1,
       snapshotNow: vi.fn<() => void>(),
       log: silentLogger,
     });
-    state.ledger.put(record("job-1"));
-    state.ledger.put(record("job-2"));
+    heldState.ledger.put(written("job-1"));
+    heldState.ledger.put(written("job-2"));
     execution.pump();
     await settle();
-    return { handlerCalls: handled.mock.calls, records: state.ledger.records() };
+    return { handlerCalls: handled.mock.calls, records: heldState.ledger.records() };
   })
   .extend("permanentFailureRun", async () => {
     const onHalt = vi.fn<(failure: unknown) => void>();
     const handled = vi.fn<(payload: unknown) => Promise<void>>(() => Promise.reject(haltFailure));
-    const state = sharedState(handled, onHalt);
+    const heldState = sharedState(handled, onHalt);
     const execution = createJobExecution({
-      state,
+      state: heldState,
       concurrency: 1,
       snapshotNow: vi.fn<() => void>(),
       log: silentLogger,
     });
-    state.ledger.put(record("job-1"));
-    state.ledger.put(record("job-2"));
+    heldState.ledger.put(written("job-1"));
+    heldState.ledger.put(written("job-2"));
     execution.pump();
     await settle();
     return {
-      records: state.ledger.records(),
+      records: heldState.ledger.records(),
       onHaltCalls: onHalt.mock.calls,
       handlerCalls: handled.mock.calls,
     };
@@ -140,7 +143,7 @@ const it = test
   .extend("canceledJobPermanentFailureRun", async () => {
     const gate = new Map<string, () => void>();
     const onHalt = vi.fn<(failure: unknown) => void>();
-    const state = sharedState(
+    const heldState = sharedState(
       () =>
         new Promise<void>((_resolve, reject) => {
           gate.set("fail", () => {
@@ -150,40 +153,45 @@ const it = test
       onHalt,
     );
     const execution = createJobExecution({
-      state,
+      state: heldState,
       concurrency: 1,
       snapshotNow: vi.fn<() => void>(),
       log: silentLogger,
     });
-    state.ledger.put(record("job-1"));
+    heldState.ledger.put(written("job-1"));
     execution.pump();
-    state.ledger.remove("job-1");
+    heldState.ledger.remove("job-1");
     gate.get("fail")?.();
     await settle();
-    return { records: state.ledger.records(), onHaltCalls: onHalt.mock.calls };
+    return { records: heldState.ledger.records(), onHaltCalls: onHalt.mock.calls };
   })
   .extend("recordsAfterCanceledCompletion", async () => {
     const gate = new Map<string, () => void>();
-    const state = sharedState(
+    const heldState = sharedState(
       () =>
         new Promise<void>((resolve) => {
           gate.set("release", resolve);
         }),
     );
     const snapshotNow = vi.fn<() => void>();
-    const execution = createJobExecution({ state, concurrency: 1, snapshotNow, log: silentLogger });
-    state.ledger.put(record("job-1"));
-    state.ledger.put(record("job-2", { lane: "lane-job-1" }));
+    const execution = createJobExecution({
+      state: heldState,
+      concurrency: 1,
+      snapshotNow,
+      log: silentLogger,
+    });
+    heldState.ledger.put(written("job-1"));
+    heldState.ledger.put(written("job-2", { lane: "lane-job-1" }));
     execution.pump();
-    state.ledger.remove("job-1");
+    heldState.ledger.remove("job-1");
     gate.get("release")?.();
     await settle();
-    return state.ledger.records();
+    return heldState.ledger.records();
   })
   .extend("drainedWhenEmpty", () => {
-    const state = sharedState(() => Promise.resolve());
+    const heldState = sharedState(() => Promise.resolve());
     const execution = createJobExecution({
-      state,
+      state: heldState,
       concurrency: 1,
       snapshotNow: vi.fn<() => void>(),
       log: silentLogger,
@@ -191,28 +199,28 @@ const it = test
     return execution.isDrained();
   })
   .extend("drainedWhileHalted", () => {
-    const state = sharedState(() => Promise.resolve());
+    const heldState = sharedState(() => Promise.resolve());
     const execution = createJobExecution({
-      state,
+      state: heldState,
       concurrency: 1,
       snapshotNow: vi.fn<() => void>(),
       log: silentLogger,
     });
-    state.ledger.put(record("job-1"));
-    state.flags.set("halted", true);
+    heldState.ledger.put(written("job-1"));
+    heldState.flags.set("halted", true);
     return execution.isDrained();
   })
   .extend("drainWhileReserved", () => {
-    const state = sharedState(() => Promise.resolve());
+    const heldState = sharedState(() => Promise.resolve());
     const execution = createJobExecution({
-      state,
+      state: heldState,
       concurrency: 1,
       snapshotNow: vi.fn<() => void>(),
       log: silentLogger,
     });
-    state.reservedLanes.add("pr-7");
+    heldState.reservedLanes.add("pr-7");
     const waiter = vi.fn<() => void>();
-    state.drainWaiters.add(waiter);
+    heldState.drainWaiters.add(waiter);
     execution.notifyDrain();
     return { drained: execution.isDrained(), waiterCalls: waiter.mock.calls };
   });
@@ -230,10 +238,10 @@ describe("pump", () => {
     recordsAfterBusyAndReservedPump,
   }) => {
     expect(recordsAfterBusyAndReservedPump).toStrictEqual([
-      record("job-1", { lane: "pr-7", state: "running" }),
-      record("job-2", { lane: "pr-7" }),
-      record("job-3", { lane: "pr-8" }),
-      record("job-4", { lane: "pr-9", state: "running" }),
+      written("job-1", { lane: "pr-7", state: "running" }),
+      written("job-2", { lane: "pr-7" }),
+      written("job-3", { lane: "pr-8" }),
+      written("job-4", { lane: "pr-9", state: "running" }),
     ]);
   });
 
@@ -260,7 +268,7 @@ describe("失敗の扱い", () => {
   });
 
   it("恒久的失敗はジョブを待機に戻す", ({ permanentFailureRun }) => {
-    expect(permanentFailureRun.records).toStrictEqual([record("job-1"), record("job-2")]);
+    expect(permanentFailureRun.records).toStrictEqual([written("job-1"), written("job-2")]);
   });
 
   it("恒久的失敗は通知先を 1 回呼ぶ", ({ permanentFailureRun }) => {
@@ -284,7 +292,9 @@ describe("失敗の扱い", () => {
   it("取り消し済みの実行中ジョブの完了は完了処理を発生させない", ({
     recordsAfterCanceledCompletion,
   }) => {
-    expect(recordsAfterCanceledCompletion).toStrictEqual([record("job-2", { lane: "lane-job-1" })]);
+    expect(recordsAfterCanceledCompletion).toStrictEqual([
+      written("job-2", { lane: "lane-job-1" }),
+    ]);
   });
 });
 

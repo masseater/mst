@@ -46,13 +46,13 @@ export const createSessionOrchestrator = (
     await config.setupWorktree(worktreePath);
     const prompt = await session.buildPrompt(worktreePath);
     const signal = config.gate.openSignal(session.prNumber);
-    for await (const chunk of config.engine.execute({
+    for await (const writtenChunk of config.engine.execute({
       prompt,
       cwd: worktreePath,
       prNumber: session.prNumber,
       signal,
     })) {
-      config.log.info({ prNumber: session.prNumber, chunk }, "engine output");
+      config.log.info({ prNumber: session.prNumber, chunk: writtenChunk }, "engine output");
     }
   },
 });

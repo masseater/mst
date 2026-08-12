@@ -97,9 +97,9 @@ const catalogNamesImport = (
   position: Extract<LocalFiniteValuePosition, { readonly kind: "import" }>,
 ): boolean =>
   catalog.entries.some(
-    (entry) =>
-      entry.binding === position.importedName ||
-      entry.importRoutes.map((route) => route.exportName).includes(position.importedName),
+    (declaration) =>
+      declaration.binding === position.importedName ||
+      declaration.importRoutes.map((route) => route.exportName).includes(position.importedName),
   );
 
 const diagnosticsForPosition = (
@@ -223,26 +223,27 @@ const importTypeName = (qualifier: ESTree.TSImportType["qualifier"]): string | n
 
 const keyofDiagnostics = (
   input: AnalysisInput,
-  type: ESTree.TSType,
+  typeAnnotation: ESTree.TSType,
 ): readonly LocalFiniteValueDiagnostic[] => {
-  const unwrapped = unwrapType(type);
+  const unwrapped = unwrapType(typeAnnotation);
   if (unwrapped.type !== "TSTypeOperator" || unwrapped.operator !== "keyof") return [];
-  const target = unwrapType(unwrapped.typeAnnotation);
-  if (target.type === "TSTypeReference" && target.typeName.type === "Identifier") {
-    const position = localFiniteIdentifierPosition(input, target.typeName);
+  const operandType = unwrapType(unwrapped.typeAnnotation);
+  if (operandType.type === "TSTypeReference" && operandType.typeName.type === "Identifier") {
+    const position = localFiniteIdentifierPosition(input, operandType.typeName);
     return position?.kind === "values"
       ? []
       : diagnosticsForPosition(input, { onlyWhenOwned: false, position });
   }
-  if (target.type !== "TSImportType" || typeof target.source.value !== "string") return [];
-  const name = importTypeName(target.qualifier);
-  if (name === null) return [];
+  if (operandType.type !== "TSImportType" || typeof operandType.source.value !== "string")
+    return [];
+  const importedName = importTypeName(operandType.qualifier);
+  if (importedName === null) return [];
   return routeDiagnostic(input, {
-    importedName: name,
+    importedName,
     kind: "import",
-    name,
-    node: target,
-    specifier: target.source.value,
+    name: importedName,
+    node: operandType,
+    specifier: operandType.source.value,
   });
 };
 

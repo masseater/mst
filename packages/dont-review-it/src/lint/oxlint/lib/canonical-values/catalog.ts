@@ -35,36 +35,38 @@ export type CanonicalValuesCatalog = {
 const ALL_SOURCES: GitSourceScope = { isIgnored: () => false };
 
 const groupBy = (
-  entries: readonly CanonicalValuesEntry[],
-  keysOf: (entry: CanonicalValuesEntry) => readonly string[],
+  declarations: readonly CanonicalValuesEntry[],
+  keysOf: (declaration: CanonicalValuesEntry) => readonly string[],
 ): ReadonlyMap<string, readonly CanonicalValuesEntry[]> => {
   const grouped = new Map<string, CanonicalValuesEntry[]>();
-  for (const entry of entries) {
-    for (const key of keysOf(entry)) {
-      const bucket = grouped.get(key);
+  for (const declaration of declarations) {
+    for (const lookupKey of keysOf(declaration)) {
+      const bucket = grouped.get(lookupKey);
       if (bucket === undefined) {
-        grouped.set(key, [entry]);
+        grouped.set(lookupKey, [declaration]);
         continue;
       }
-      if (!bucket.includes(entry)) bucket.push(entry);
+      if (!bucket.includes(declaration)) bucket.push(declaration);
     }
   }
   return grouped;
 };
 
 export const buildCatalog = (
-  entries: readonly CanonicalValuesEntry[],
-  options: {
+  declarations: readonly CanonicalValuesEntry[],
+  catalogConfiguration: {
     readonly packageNames?: readonly string[];
     readonly sourceScope?: GitSourceScope;
   } = {},
 ): CanonicalValuesCatalog => ({
-  entries,
-  entriesByFingerprint: groupBy(entries, (entry) => [entry.fingerprint]),
-  entriesByValue: groupBy(entries, (entry) => entry.values.map(canonicalValueKey)),
+  entries: declarations,
+  entriesByFingerprint: groupBy(declarations, (declaration) => [declaration.fingerprint]),
+  entriesByValue: groupBy(declarations, (declaration) => declaration.values.map(canonicalValueKey)),
   packageNames: new Set(
-    options.packageNames ??
-      entries.flatMap((entry) => (entry.packageName === null ? [] : [entry.packageName])),
+    catalogConfiguration.packageNames ??
+      declarations.flatMap((declaration) =>
+        declaration.packageName === null ? [] : [declaration.packageName],
+      ),
   ),
-  sourceScope: options.sourceScope ?? ALL_SOURCES,
+  sourceScope: catalogConfiguration.sourceScope ?? ALL_SOURCES,
 });

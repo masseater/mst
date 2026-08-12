@@ -5,15 +5,17 @@ import { createGitOperations } from "./git-operations.ts";
 import type { GitRunner } from "./git-runner.ts";
 
 const scriptedGit = (
-  outputs: Readonly<Record<string, { readonly stdout?: string; readonly fail?: boolean }>>,
+  producedByCommand: Readonly<
+    Record<string, { readonly stdout?: string; readonly fail?: boolean }>
+  >,
 ): { readonly git: GitRunner; readonly calls: () => readonly string[] } => {
   const recorded = new Map<number, string>();
   const git: GitRunner = {
     run: (invocation) => {
-      const key = invocation.args.join(" ");
-      recorded.set(recorded.size, key);
-      const scriptedOutput = outputs[key];
-      if (scriptedOutput?.fail === true) return Promise.reject(new Error(`git failed: ${key}`));
+      const named = invocation.args.join(" ");
+      recorded.set(recorded.size, named);
+      const scriptedOutput = producedByCommand[named];
+      if (scriptedOutput?.fail === true) return Promise.reject(new Error(`git failed: ${named}`));
       return Promise.resolve({ stdout: scriptedOutput?.stdout ?? "", stderr: "" });
     },
   };

@@ -10,15 +10,15 @@ const byStoreOrder = (first: StoredEvent, second: StoredEvent): number => {
   return first.id < second.id ? -1 : 1;
 };
 
-const payloadPullNumber = (event: StoredEvent): unknown =>
-  asRecord(event.payload.pull_request)?.number;
+const payloadPullNumber = (stored: StoredEvent): unknown =>
+  asRecord(stored.payload.pull_request)?.number;
 
-export const createMemoryEventStore = (now: () => number = Date.now): EventStore => {
+export const createMemoryEventStore = (stampedNow: () => number = Date.now): EventStore => {
   const eventsById = new Map<string, StoredEvent>();
   const listeners = new Set<(added: StoredEvent) => void>();
 
   const liveEvents = (): readonly StoredEvent[] => {
-    const currentMs = now();
+    const currentMs = stampedNow();
     return [...eventsById.values()]
       .filter((stored) => stored.expiresAtMs > currentMs)
       .toSorted(byStoreOrder);
@@ -26,20 +26,20 @@ export const createMemoryEventStore = (now: () => number = Date.now): EventStore
 
   const referencedEvent = (eventId: string): StoredEvent | undefined => {
     const stored = eventsById.get(eventId);
-    return stored !== undefined && stored.expiresAtMs > now() ? stored : undefined;
+    return stored !== undefined && stored.expiresAtMs > stampedNow() ? stored : undefined;
   };
 
   return {
-    createIfAbsent: (event) => {
-      const existing = eventsById.get(event.id);
+    createIfAbsent: (stored) => {
+      const existing = eventsById.get(stored.id);
       if (existing !== undefined) return Promise.resolve(existing);
-      const currentMs = now();
-      for (const [id, stored] of eventsById) {
-        if (stored.expiresAtMs <= currentMs) eventsById.delete(id);
+      const currentMs = stampedNow();
+      for (const [identity, stored] of eventsById) {
+        if (stored.expiresAtMs <= currentMs) eventsById.delete(identity);
       }
-      eventsById.set(event.id, event);
-      for (const listener of listeners) listener(event);
-      return Promise.resolve(event);
+      eventsById.set(stored.id, stored);
+      for (const listener of listeners) listener(stored);
+      return Promise.resolve(stored);
     },
     readAfterId: (eventId) => {
       const reference = referencedEvent(eventId);
@@ -81,26 +81,26 @@ export const createMemoryEventStore = (now: () => number = Date.now): EventStore
       return Promise.resolve(authorEvent ?? null);
     },
     deleteForPr: ({ prNumber, excludeDeliveryId }) => {
-      const targets = [...eventsById.values()].filter(
+      const checkedTargets = [...eventsById.values()].filter(
         (stored) =>
           payloadPullNumber(stored) === prNumber && stored.deliveryId !== excludeDeliveryId,
       );
-      for (const target of targets) eventsById.delete(target.id);
-      return Promise.resolve(targets.length);
+      for (const checked of checkedTargets) eventsById.delete(checked.id);
+      return Promise.resolve(checkedTargets.length);
     },
   };
 };
 
-export const createMemoryCursorStore = (now: () => number = Date.now): CursorStore => {
+export const createMemoryCursorStore = (stampedNow: () => number = Date.now): CursorStore => {
   const cursors = new Map<string, { readonly eventId: string; readonly expiresAtMs: number }>();
   return {
     read: (clientId) => {
       const cursor = cursors.get(clientId);
-      if (cursor === undefined || cursor.expiresAtMs <= now()) return Promise.resolve(null);
+      if (cursor === undefined || cursor.expiresAtMs <= stampedNow()) return Promise.resolve(null);
       return Promise.resolve(cursor.eventId);
     },
     write: ({ clientId, eventId }) => {
-      cursors.set(clientId, { eventId, expiresAtMs: now() + CURSOR_TTL_MS });
+      cursors.set(clientId, { eventId, expiresAtMs: stampedNow() + CURSOR_TTL_MS });
       return Promise.resolve();
     },
   };

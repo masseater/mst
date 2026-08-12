@@ -29,13 +29,13 @@ export const EMPTY_BODY_INDEX: BodyIndex = {
 
 const MINIMUM_BODY_NODES = 8;
 
-const carriesEnoughNodes = (body: { readonly nodeCount: number }): boolean =>
-  body.nodeCount >= MINIMUM_BODY_NODES;
+const carriesEnoughNodes = (writtenBody: { readonly nodeCount: number }): boolean =>
+  writtenBody.nodeCount >= MINIMUM_BODY_NODES;
 
-export const namedFingerprintOf = (body: {
+export const namedFingerprintOf = (writtenBody: {
   readonly name: string;
   readonly fingerprint: string;
-}): string => JSON.stringify([body.name, body.fingerprint]);
+}): string => JSON.stringify([writtenBody.name, writtenBody.fingerprint]);
 
 export type IndexedFile = {
   readonly relativePath: string;
@@ -58,23 +58,26 @@ const siteOf = ({ relativePath, name, line }: PlacedBody): BodySite => ({
 });
 
 const sitesByKey = (
-  bodies: readonly PlacedBody[],
+  writtenBodies: readonly PlacedBody[],
   keyOf: (body: PlacedBody) => string,
 ): ReadonlyMap<string, readonly BodySite[]> =>
   new Map(
-    Object.entries(groupBy(bodies, keyOf)).map(([key, grouped]) => [
-      key,
+    Object.entries(groupBy(writtenBodies, keyOf)).map(([named, grouped]) => [
+      named,
       grouped.map(siteOf).toSorted(bySiteOrder),
     ]),
   );
 
 export const buildBodyIndex = (files: readonly IndexedFile[]): BodyIndex => {
   const placed: readonly PlacedBody[] = files.flatMap((file) =>
-    file.bodies.map((body) => ({ ...body, relativePath: file.relativePath })),
+    file.bodies.map((writtenBody) => ({ ...writtenBody, relativePath: file.relativePath })),
   );
 
   return {
-    sitesByFingerprint: sitesByKey(placed.filter(carriesEnoughNodes), (body) => body.fingerprint),
+    sitesByFingerprint: sitesByKey(
+      placed.filter(carriesEnoughNodes),
+      (writtenBody) => writtenBody.fingerprint,
+    ),
     sitesByNamedFingerprint: sitesByKey(placed, namedFingerprintOf),
     bodiesByPath: new Map(files.map((file) => [file.relativePath, file.bodies])),
   };

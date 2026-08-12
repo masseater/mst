@@ -46,7 +46,7 @@ export const writeCachedEntries = (
 ): void => {
   const path = cacheFilePath(repositoryRoot);
   const temporaryPath = `${path}.${process.pid}.tmp`;
-  const payload: CachedCatalog = {
+  const cacheDocument: CachedCatalog = {
     version: CACHE_FORMAT_VERSION,
     fingerprint,
     entries,
@@ -54,7 +54,7 @@ export const writeCachedEntries = (
   };
   const [unwritableCache] = attempt(() => {
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(temporaryPath, JSON.stringify(payload), "utf8");
+    writeFileSync(temporaryPath, JSON.stringify(cacheDocument), "utf8");
     renameSync(temporaryPath, path);
   });
   if (unwritableCache !== null) return;

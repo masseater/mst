@@ -20,15 +20,17 @@ export const stemBefore = (filename: string, suffix: string): string => {
 };
 
 export const configuredSuffixesFrom = (
-  options: Readonly<Options>,
+  ruleOptions: Readonly<Options>,
   { optionName, carried }: { readonly optionName: string; readonly carried: readonly string[] },
 ): readonly string[] => {
-  const [first] = options;
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) return carried;
 
   const configured = first[optionName];
   if (!Array.isArray(configured)) return carried;
 
-  const spelled = configured.filter((entry): entry is string => typeof entry === "string");
+  const spelled = configured.filter(
+    (candidate): candidate is string => typeof candidate === "string",
+  );
   return spelled.length === 0 ? carried : spelled;
 };

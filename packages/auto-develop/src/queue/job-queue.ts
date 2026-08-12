@@ -57,7 +57,7 @@ export const createJobQueue = (config: JobQueueConfig): JobQueue => {
     throw new Error("concurrency must be a positive integer");
   }
   const log = config.log ?? silentLogger;
-  const state: QueueSharedState = {
+  const heldState: QueueSharedState = {
     ledger: createJobLedger(),
     flags: new Map([["halted", false]]),
     reservedLanes: new Set<string>(),
@@ -73,16 +73,16 @@ export const createJobQueue = (config: JobQueueConfig): JobQueue => {
     log,
   });
   const snapshotNow = (): void => {
-    snapshotWriter.write(state.ledger.records());
+    snapshotWriter.write(heldState.ledger.records());
   };
   const execution = createJobExecution({
-    state,
+    state: heldState,
     concurrency: config.concurrency,
     snapshotNow,
     log,
   });
   const intakeDesk = createJobIntakeDesk({
-    ledger: state.ledger,
+    ledger: heldState.ledger,
     execution,
     snapshotNow,
     log,
@@ -97,35 +97,35 @@ export const createJobQueue = (config: JobQueueConfig): JobQueue => {
     enqueue: intakeDesk.enqueue,
     enqueueFollowUp: intakeDesk.enqueueFollowUp,
     setHandlers: (wiring) => {
-      state.handlerTable.clear();
-      for (const [jobType, handler] of Object.entries(wiring.handlers)) {
-        state.handlerTable.set(jobType, handler);
+      heldState.handlerTable.clear();
+      for (const [jobType, takenHandler] of Object.entries(wiring.handlers)) {
+        heldState.handlerTable.set(jobType, takenHandler);
       }
-      state.onHaltCell.set("cb", wiring.onHalt);
+      heldState.onHaltCell.set("cb", wiring.onHalt);
     },
     runningLanes: () =>
       sortedUniqueLanes(
-        state.ledger
+        heldState.ledger
           .records()
-          .filter((record) => record.state === "running")
-          .map((record) => record.lane),
+          .filter((written) => written.state === "running")
+          .map((written) => written.lane),
       ),
     waitingLanes: () =>
       sortedUniqueLanes(
-        state.ledger
+        heldState.ledger
           .records()
-          .filter((record) => record.state === "waiting")
-          .map((record) => record.lane),
+          .filter((written) => written.state === "waiting")
+          .map((written) => written.lane),
       ),
     size: () => ({
-      waiting: state.ledger.waitingCount(),
-      running: state.ledger.runningCount(),
+      waiting: heldState.ledger.waitingCount(),
+      running: heldState.ledger.runningCount(),
     }),
-    isIdle: () => state.ledger.records().length === 0,
+    isIdle: () => heldState.ledger.records().length === 0,
     admitsLane: (lane) => laneAdmitted({ lane, prFilter: config.prFilter }),
     cancelLane: (lane) => {
-      const canceledRecords = state.ledger.records().filter((record) => record.lane === lane);
-      for (const record of canceledRecords) state.ledger.remove(record.id);
+      const canceledRecords = heldState.ledger.records().filter((written) => written.lane === lane);
+      for (const written of canceledRecords) heldState.ledger.remove(written.id);
       if (canceledRecords.length > 0) {
         snapshotNow();
         log.info({ lane, canceledCount: canceledRecords.length }, "lane canceled");
@@ -136,19 +136,19 @@ export const createJobQueue = (config: JobQueueConfig): JobQueue => {
     drain: () => {
       execution.pump();
       if (execution.isDrained()) return Promise.resolve();
-      return new Promise((resolve) => state.drainWaiters.add(resolve));
+      return new Promise((resolve) => heldState.drainWaiters.add(resolve));
     },
     reserveLane: async (lane, task) => {
       const laneBusy =
-        state.ledger.laneOccupied(lane) ||
-        state.flags.get("halted") === true ||
-        state.reservedLanes.has(lane);
+        heldState.ledger.laneOccupied(lane) ||
+        heldState.flags.get("halted") === true ||
+        heldState.reservedLanes.has(lane);
       if (laneBusy) return null;
-      state.reservedLanes.add(lane);
+      heldState.reservedLanes.add(lane);
       try {
         return await task();
       } finally {
-        state.reservedLanes.delete(lane);
+        heldState.reservedLanes.delete(lane);
         execution.pump();
         execution.notifyDrain();
       }

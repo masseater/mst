@@ -1,7 +1,8 @@
 import type { ChangedFile } from "./name-status.ts";
 import type { CiCheck, PrContext, ReviewThread } from "./pr-context.ts";
 
-const cell = (text: string): string => text.replaceAll("|", "\\|").replaceAll("\n", "<br>");
+const cell = (writtenText: string): string =>
+  writtenText.replaceAll("|", "\\|").replaceAll("\n", "<br>");
 
 const contentLabel = (file: ChangedFile): string => {
   if (file.content !== null) return "included";
@@ -30,48 +31,48 @@ const outdatedCount = (threads: readonly ReviewThread[]): number =>
 const outdatedUnresolvedCount = (threads: readonly ReviewThread[]): number =>
   threads.filter((thread) => thread.outdated && !thread.resolved).length;
 
-const commentsSection = (context: PrContext): readonly string[] => [
+const commentsSection = (carried: PrContext): readonly string[] => [
   "## Existing Comments",
   "",
-  `- Reviews: ${context.comments.reviews.length}`,
-  `- PR-level comments: ${context.comments.prComments.length}`,
-  `- Inline comments: ${context.comments.inlineComments.length}`,
-  `- Threads: ${context.comments.threads.length}`,
-  `- Unresolved threads: ${unresolvedCount(context.comments.threads)}`,
-  `- Outdated threads: ${outdatedCount(context.comments.threads)}`,
-  `- Outdated and unresolved threads: ${outdatedUnresolvedCount(context.comments.threads)}`,
+  `- Reviews: ${carried.comments.reviews.length}`,
+  `- PR-level comments: ${carried.comments.prComments.length}`,
+  `- Inline comments: ${carried.comments.inlineComments.length}`,
+  `- Threads: ${carried.comments.threads.length}`,
+  `- Unresolved threads: ${unresolvedCount(carried.comments.threads)}`,
+  `- Outdated threads: ${outdatedCount(carried.comments.threads)}`,
+  `- Outdated and unresolved threads: ${outdatedUnresolvedCount(carried.comments.threads)}`,
   "",
 ];
 
 const ciRow = (check: CiCheck): string =>
   `| ${cell(check.name)} | ${cell(check.state)} | ${cell(check.bucket)} | ${check.detailsUrl === null ? "" : cell(check.detailsUrl)} |`;
 
-const ciSection = (context: PrContext): readonly string[] => [
+const ciSection = (carried: PrContext): readonly string[] => [
   "## CI",
   "",
   "| Name | State | Bucket | Details |",
   "| --- | --- | --- | --- |",
-  ...context.ci.checks.map(ciRow),
+  ...carried.ci.checks.map(ciRow),
   "",
 ];
 
-const failedLogsSection = (context: PrContext): readonly string[] =>
-  context.ci.failedLogPaths.length === 0
+const failedLogsSection = (carried: PrContext): readonly string[] =>
+  carried.ci.failedLogPaths.length === 0
     ? ["No failed CI logs were downloaded."]
-    : ["Failed CI logs:", "", ...context.ci.failedLogPaths.map((path) => `- ${path}`)];
+    : ["Failed CI logs:", "", ...carried.ci.failedLogPaths.map((path) => `- ${path}`)];
 
-export const renderMarkdown = (context: PrContext): string =>
+export const renderMarkdown = (carried: PrContext): string =>
   [
     "# PR Context",
     "",
     "## Pull Request",
     "",
-    `- PR: #${context.prNumber}`,
-    `- Base: ${context.base}`,
-    `- Head: ${context.head}`,
+    `- PR: #${carried.prNumber}`,
+    `- Base: ${carried.base}`,
+    `- Head: ${carried.head}`,
     "",
-    ...changedFilesSection(context.changedFiles),
-    ...commentsSection(context),
-    ...ciSection(context),
-    ...failedLogsSection(context),
+    ...changedFilesSection(carried.changedFiles),
+    ...commentsSection(carried),
+    ...ciSection(carried),
+    ...failedLogsSection(carried),
   ].join("\n");

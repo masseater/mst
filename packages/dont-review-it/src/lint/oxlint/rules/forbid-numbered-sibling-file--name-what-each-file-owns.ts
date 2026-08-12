@@ -63,12 +63,12 @@ export const forbidNumberedSiblingFile = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
+  create(inspection) {
     return {
       Program(node: ESTree.Program) {
-        const sibling = splitSiblingOf(resolve(context.cwd, context.filename));
+        const sibling = splitSiblingOf(resolve(inspection.cwd, inspection.filename));
         if (sibling === null) return;
-        context.report({ node, messageId: "numberedSiblingFile", data: { sibling } });
+        inspection.report({ node, messageId: "numberedSiblingFile", data: { sibling } });
       },
     };
   },

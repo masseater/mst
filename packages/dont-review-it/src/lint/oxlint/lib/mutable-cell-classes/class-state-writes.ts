@@ -16,28 +16,28 @@ const HELD_STATE_MEMBER_KINDS: ReadonlySet<string> = new Set([
 const unwrapped = (held: unknown): unknown =>
   SUGARED_NODE_TYPES.has(kindAt(held)) ? unwrapped(fieldOf(held, "expression")) : held;
 
-const soleQuasiText = (key: unknown): string | null => {
-  const spelled = listedFieldsOf(fieldOf(key, "quasis"))
+const soleQuasiText = (named: unknown): string | null => {
+  const spelled = listedFieldsOf(fieldOf(named, "quasis"))
     .flatMap((quasi) => listedFieldsOf(quasi.value))
-    .map((value) => String(value.cooked));
-  return listedFieldsOf(fieldOf(key, "expressions")).length === 0 ? spelled.join("") : null;
+    .map((held) => String(held.cooked));
+  return listedFieldsOf(fieldOf(named, "expressions")).length === 0 ? spelled.join("") : null;
 };
 
 const spelledKey = (member: unknown): string | null => {
-  const key = fieldOf(member, "property");
+  const named = fieldOf(member, "property");
   if (fieldOf(member, "computed") !== true) {
-    const spelled = String(fieldOf(key, "name"));
-    return kindAt(key) === "PrivateIdentifier" ? `${PRIVATE_NAME_MARK}${spelled}` : spelled;
+    const spelled = String(fieldOf(named, "name"));
+    return kindAt(named) === "PrivateIdentifier" ? `${PRIVATE_NAME_MARK}${spelled}` : spelled;
   }
-  if (kindAt(key) === "Literal") {
-    const spelled = fieldOf(key, "value");
+  if (kindAt(named) === "Literal") {
+    const spelled = fieldOf(named, "value");
     return typeof spelled === "string" ? spelled : null;
   }
-  return kindAt(key) === "TemplateLiteral" ? soleQuasiText(key) : null;
+  return kindAt(named) === "TemplateLiteral" ? soleQuasiText(named) : null;
 };
 
-const ownStateFieldOf = (target: unknown): string | null => {
-  const written = unwrapped(target);
+const ownStateFieldOf = (checked: unknown): string | null => {
+  const written = unwrapped(checked);
   if (kindAt(written) !== "MemberExpression") return null;
 
   const receiver = unwrapped(fieldOf(written, "object"));
@@ -71,12 +71,13 @@ const fieldsWrittenUnder = (root: unknown, deferralRequired: boolean): readonly 
 const fieldsWrittenBy = (member: unknown): readonly string[] => {
   if (fieldOf(member, "static") === true) return [];
 
-  const kind = kindAt(member);
-  if (kind === "MethodDefinition") {
+  const nodeKind = kindAt(member);
+  if (nodeKind === "MethodDefinition") {
     const written = fieldOf(fieldOf(member, "value"), "body");
     return fieldsWrittenUnder(written, fieldOf(member, "kind") === "constructor");
   }
-  if (HELD_STATE_MEMBER_KINDS.has(kind)) return fieldsWrittenUnder(fieldOf(member, "value"), true);
+  if (HELD_STATE_MEMBER_KINDS.has(nodeKind))
+    return fieldsWrittenUnder(fieldOf(member, "value"), true);
   return [];
 };
 

@@ -8,8 +8,8 @@ import { extendsOneOf, nearestTsconfigExtends } from "./nearest-tsconfig.ts";
 
 const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-nearest-tsconfig-"));
 
-const writeWorkspaceFixture = (name: string, tsconfig: string): string => {
-  const directory = join(fixtureDir, name);
+const writeWorkspaceFixture = (spelled: string, tsconfig: string): string => {
+  const directory = join(fixtureDir, spelled);
   mkdirSync(directory, { recursive: true });
   writeFileSync(join(directory, "tsconfig.json"), tsconfig);
   return join(directory, "index.ts");
@@ -124,7 +124,7 @@ describe("extendsOneOf", () => {
     ).toBe(true);
   });
 
-  it("rejects a preset of the same name owned by somebody else", () => {
+  it("rejects a preset of the same spelled owned by somebody else", () => {
     expect(
       extendsOneOf(["@other/tsconfig/library.json"], ["dont-review-it/tsconfig/library.json"]),
     ).toBe(false);

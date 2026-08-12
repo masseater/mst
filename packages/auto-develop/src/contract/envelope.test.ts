@@ -11,9 +11,9 @@ const unwrapRejectionOf = (envelope: unknown): string => {
   }
 };
 
-const pollRejectionOf = (response: unknown): string => {
+const pollRejectionOf = (produced: unknown): string => {
   try {
-    unwrapPollResponse(response);
+    unwrapPollResponse(produced);
     return "no rejection";
   } catch (rejection) {
     return rejection instanceof Error ? rejection.name : typeof rejection;

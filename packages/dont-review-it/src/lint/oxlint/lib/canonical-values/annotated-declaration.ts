@@ -23,25 +23,25 @@ export const registeredDeclarationRanges = (input: {
   return declarationEntriesAt(input.catalog, {
     path: input.filename,
     repositoryRoot: input.repositoryRoot,
-  }).flatMap((entry) => {
+  }).flatMap((catalogDeclaration) => {
     const matchesCurrentSource = declarations.some(
       (declaration) =>
-        declaration.annotationStart === entry.annotationStart &&
-        declaration.binding === entry.binding &&
-        declaration.bindingStart === entry.bindingStart &&
-        declaration.conceptId === entry.conceptId &&
-        declaration.declarationStart === entry.declarationStart &&
-        declaration.declarationEnd === entry.declarationEnd,
+        declaration.annotationStart === catalogDeclaration.annotationStart &&
+        declaration.binding === catalogDeclaration.binding &&
+        declaration.bindingStart === catalogDeclaration.bindingStart &&
+        declaration.conceptId === catalogDeclaration.conceptId &&
+        declaration.declarationStart === catalogDeclaration.declarationStart &&
+        declaration.declarationEnd === catalogDeclaration.declarationEnd,
     );
     if (!matchesCurrentSource) return [];
     return [
       {
-        binding: entry.binding,
-        conceptId: entry.conceptId,
-        fingerprint: entry.fingerprint,
-        start: entry.declarationStart,
-        end: entry.declarationEnd,
-        values: entry.values,
+        binding: catalogDeclaration.binding,
+        conceptId: catalogDeclaration.conceptId,
+        fingerprint: catalogDeclaration.fingerprint,
+        start: catalogDeclaration.declarationStart,
+        end: catalogDeclaration.declarationEnd,
+        values: catalogDeclaration.values,
       },
     ];
   });

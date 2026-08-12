@@ -6,18 +6,18 @@ export type CanonicalValuesInspection = {
   readonly problems: ReturnType<typeof analyzeCanonicalValuesRepository>["problems"];
 };
 
-export const inspectCanonicalValues = (options: {
+export const inspectCanonicalValues = (inspectionRequest: {
   readonly repositoryRoot: string;
 }): CanonicalValuesInspection => {
-  const analyzed = analyzeCanonicalValuesRepository(options);
+  const analyzed = analyzeCanonicalValuesRepository(inspectionRequest);
   return { catalog: analyzed.catalog, problems: analyzed.problems };
 };
 
 export const findEquivalentConcepts = (
-  entries: readonly CanonicalValuesEntry[],
+  declarations: readonly CanonicalValuesEntry[],
 ): readonly (readonly CanonicalValuesEntry[])[] =>
-  [...buildCatalog(entries).entriesByFingerprint.values()].filter(
-    (grouped) => new Set(grouped.map((entry) => entry.conceptId)).size > 1,
+  [...buildCatalog(declarations).entriesByFingerprint.values()].filter(
+    (grouped) => new Set(grouped.map((declaration) => declaration.conceptId)).size > 1,
   );
 
 export { formatCanonicalValuesProblem, formatEquivalentConceptGroup } from "./verify-format.ts";

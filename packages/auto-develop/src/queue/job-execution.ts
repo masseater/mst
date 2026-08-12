@@ -26,7 +26,10 @@ const logSettled = (
     log.info({ lane: settling.record.lane, label: settling.record.label }, "job completed");
     return;
   }
-  log.error({ label: settling.record.label, err: settling.failure }, "job failed; record consumed");
+  log.error(
+    { label: settling.record.label, err: settling.failure },
+    "job failed; written consumed",
+  );
 };
 
 export const createJobExecution = (execution: {
@@ -92,29 +95,29 @@ export const createJobExecution = (execution: {
     settleConsumed(failing);
   };
 
-  const runJob = async (record: JobRecord): Promise<void> => {
-    const handler = state.handlerTable.get(record.type);
-    if (handler === undefined) {
+  const runJob = async (written: JobRecord): Promise<void> => {
+    const takenHandler = state.handlerTable.get(written.type);
+    if (takenHandler === undefined) {
       log.error(
-        { key: record.key, type: record.type, label: record.label },
-        "no job handler is registered for this type",
+        { key: written.key, type: written.type, label: written.label },
+        "no job takenHandler is registered for this type",
       );
-      settleConsumed({ record });
+      settleConsumed({ record: written });
       return;
     }
     try {
-      await handler(record.payload);
-      settleConsumed({ record });
+      await takenHandler(written.payload);
+      settleConsumed({ record: written });
     } catch (jobFailure) {
-      settleFailure({ record, failure: jobFailure });
+      settleFailure({ record: written, failure: jobFailure });
     }
   };
 
-  const startJob = (record: JobRecord): void => {
-    state.ledger.put({ ...record, state: "running" });
+  const startJob = (written: JobRecord): void => {
+    state.ledger.put({ ...written, state: "running" });
     snapshotNow();
-    log.info({ lane: record.lane, label: record.label }, "job started");
-    void runJob(record);
+    log.info({ lane: written.lane, label: written.label }, "job started");
+    void runJob(written);
   };
 
   const pump = (): void => {
@@ -124,10 +127,10 @@ export const createJobExecution = (execution: {
       const nextJob = state.ledger
         .records()
         .find(
-          (record) =>
-            record.state === "waiting" &&
-            !state.ledger.laneRunning(record.lane) &&
-            !state.reservedLanes.has(record.lane),
+          (written) =>
+            written.state === "waiting" &&
+            !state.ledger.laneRunning(written.lane) &&
+            !state.reservedLanes.has(written.lane),
         );
       if (nextJob === undefined) return;
       startJob(nextJob);

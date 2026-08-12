@@ -13,18 +13,18 @@ import { isRunnerConfigurationFile, sharedSetupFilesUnder } from "./registered-s
 const fixtureDir = join(realpathSync(tmpdir()), "dont-review-it-registered-setup-files");
 rmSync(fixtureDir, { recursive: true, force: true });
 
-const writeFixture = (name: string, source: string): string => {
-  const path = join(fixtureDir, name);
+const writeFixture = (fixtureName: string, source: string): string => {
+  const path = join(fixtureDir, fixtureName);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, source);
   return path;
 };
 
-const writeRepository = (name: string, held: Readonly<Record<string, string>>): string => {
-  writeFixture(`${name}/pnpm-workspace.yaml`, "packages:\n  - packages/*\n");
-  writeFixture(`${name}/package.json`, '{ "name": "@fixture/root" }\n');
-  for (const [path, source] of Object.entries(held)) writeFixture(`${name}/${path}`, source);
-  return join(fixtureDir, name);
+const writeRepository = (fixtureName: string, held: Readonly<Record<string, string>>): string => {
+  writeFixture(`${fixtureName}/pnpm-workspace.yaml`, "packages:\n  - packages/*\n");
+  writeFixture(`${fixtureName}/package.json`, '{ "name": "@fixture/root" }\n');
+  for (const [path, source] of Object.entries(held)) writeFixture(`${fixtureName}/${path}`, source);
+  return join(fixtureDir, fixtureName);
 };
 
 const configHolding = (block: string): string =>

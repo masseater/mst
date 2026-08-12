@@ -8,8 +8,8 @@ import { analyzeCanonicalValuesRepository } from "./builder.ts";
 import { publicPackageEntries, publicPackageName } from "./export-specifier-index.ts";
 import { importRouteStatus } from "./import-route.ts";
 
-const buildCanonicalValuesCatalog = (options: { readonly repositoryRoot: string }) =>
-  analyzeCanonicalValuesRepository(options).catalog;
+const buildCanonicalValuesCatalog = (catalogRequest: { readonly repositoryRoot: string }) =>
+  analyzeCanonicalValuesRepository(catalogRequest).catalog;
 
 const writeRepositoryFile = ({
   contents,
@@ -76,8 +76,8 @@ const createPackageRepository = (
     relativePath: "packages/vocabulary/src/public/shadow.ts",
     root,
   });
-  for (const [relativePath, contents] of Object.entries(extraFiles)) {
-    writeRepositoryFile({ contents, relativePath, root });
+  for (const [relativePath, fileText] of Object.entries(extraFiles)) {
+    writeRepositoryFile({ contents: fileText, relativePath, root });
   }
   return root;
 };
@@ -115,16 +115,16 @@ describe("export specifier index", () => {
   );
 
   test("package.json and invalid subpaths never become public source entries", () => {
-    const entries = publicEntriesFor({
+    const packageExports = publicEntriesFor({
       ".": "./src/index.ts",
       invalid: "./src/index.ts",
       "./package.json": "./package.json",
       "./blocked": null,
     });
 
-    expect(entries).toHaveLength(1);
-    expect(entries[0]).toMatchObject({ specifier: "@fixture/vocabulary" });
-    expect(String((entries[0] as { readonly sourceFile: unknown }).sourceFile)).toMatch(
+    expect(packageExports).toHaveLength(1);
+    expect(packageExports[0]).toMatchObject({ specifier: "@fixture/vocabulary" });
+    expect(String((packageExports[0] as { readonly sourceFile: unknown }).sourceFile)).toMatch(
       /packages\/vocabulary\/src\/index\.ts$/u,
     );
   });
@@ -241,7 +241,7 @@ describe("export specifier index", () => {
   });
 
   test("a more specific null pattern overrides a matching broad wildcard route", () => {
-    const expected = [
+    const ownerRoutes = [
       {
         exportName: "ORDER_STATUSES",
         resolvedSourcePaths: ["packages/vocabulary/src/public/owner.ts"],
@@ -262,7 +262,7 @@ describe("export specifier index", () => {
         "./private/*": null,
       },
     ]) {
-      expect(importRoutesFor(exportsField, extraFiles)).toStrictEqual(expected);
+      expect(importRoutesFor(exportsField, extraFiles)).toStrictEqual(ownerRoutes);
     }
   });
 
@@ -419,8 +419,8 @@ describe("export specifier index", () => {
         'export declare const ORDER_STATUSES: readonly ["draft", "published"];\n',
       "src/consumer.ts": "export {};\n",
     };
-    for (const [relativePath, contents] of Object.entries(files)) {
-      writeRepositoryFile({ contents, relativePath, root });
+    for (const [relativePath, fileText] of Object.entries(files)) {
+      writeRepositoryFile({ contents: fileText, relativePath, root });
     }
     const packageLink = join(root, "node_modules/@fixture/vocabulary");
     mkdirSync(dirname(packageLink), { recursive: true });

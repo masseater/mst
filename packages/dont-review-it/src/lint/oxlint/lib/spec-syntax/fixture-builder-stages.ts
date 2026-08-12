@@ -125,10 +125,10 @@ const blockFactoryText = (
 };
 
 const expressionFactoryText = (
-  body: ESTree.Expression,
+  factoryBody: ESTree.Expression,
   { opened, context, handoff, source }: FactoryShape,
 ): string | null => {
-  const handed = handoffCallOf(body, handoff);
+  const handed = handoffCallOf(factoryBody, handoff);
   if (handed === null) return null;
 
   const yielded = soleArgumentOf(handed);
@@ -136,36 +136,38 @@ const expressionFactoryText = (
 };
 
 const factoryShapeOf = (
-  fn: ESTree.ArrowFunctionExpression,
+  arrow: ESTree.ArrowFunctionExpression,
   source: FixtureSource,
 ): FactoryShape | null => {
-  const [contextParameter, handoffParameter, ...extraParameters] = fn.params;
+  const [contextParameter, handoffParameter, ...extraParameters] = arrow.params;
   if (extraParameters.length !== 0) return null;
   if (contextParameter === undefined) return null;
   if (handoffParameter?.type !== "Identifier") return null;
   if (source.readCountOf(handoffParameter, handoffParameter.name) !== 1) return null;
 
   return {
-    opened: fn.async ? "async " : "",
+    opened: arrow.async ? "async " : "",
     context: source.textOf(contextParameter),
     handoff: handoffParameter.name,
     source,
   };
 };
 
-const factoryParts = (fn: SpecFunction, source: FixtureSource): FixtureParts | null => {
-  if (fn.type !== "ArrowFunctionExpression") return null;
+const factoryParts = (takenFunction: SpecFunction, source: FixtureSource): FixtureParts | null => {
+  if (takenFunction.type !== "ArrowFunctionExpression") return null;
 
-  const shape = factoryShapeOf(fn, source);
+  const shape = factoryShapeOf(takenFunction, source);
   if (shape === null) return null;
 
-  const dependencies = (fixtureDependenciesOf(fn) ?? []).map((dependency) => dependency.name);
-  if (fn.body.type !== "BlockStatement") {
-    const written = expressionFactoryText(fn.body, shape);
+  const dependencies = (fixtureDependenciesOf(takenFunction) ?? []).map(
+    (dependency) => dependency.name,
+  );
+  if (takenFunction.body.type !== "BlockStatement") {
+    const written = expressionFactoryText(takenFunction.body, shape);
     return written === null ? null : { written, dependencies };
   }
 
-  const split = handoffSplitOf({ fn, body: fn.body }, shape);
+  const split = handoffSplitOf({ fn: takenFunction, body: takenFunction.body }, shape);
   return split === null ? null : { written: blockFactoryText(split, shape), dependencies };
 };
 
@@ -186,24 +188,24 @@ const scopedFixtureParts = (
   written: ESTree.ArrayExpression,
   source: FixtureSource,
 ): FixtureParts | null => {
-  const [declared, options, ...rivals] = written.elements;
+  const [declared, ruleOptions, ...rivals] = written.elements;
   if (rivals.length !== 0) return null;
   if (declared === undefined || declared === null || declared.type === "SpreadElement") return null;
 
   const fixture = declaredFixtureParts(declared, source);
   if (fixture === null) return null;
-  if (options === undefined) return fixture;
-  if (options === null || options.type === "SpreadElement") return null;
-  if (unwrapSubject(options).type !== "ObjectExpression") return null;
+  if (ruleOptions === undefined) return fixture;
+  if (ruleOptions === null || ruleOptions.type === "SpreadElement") return null;
+  if (unwrapSubject(ruleOptions).type !== "ObjectExpression") return null;
 
-  return { ...fixture, written: `${source.textOf(options)}, ${fixture.written}` };
+  return { ...fixture, written: `${source.textOf(ruleOptions)}, ${fixture.written}` };
 };
 
 const stageOf = (property: ESTree.ObjectProperty, source: FixtureSource): BuilderStage | null => {
   if (property.computed || property.method || property.kind !== "init") return null;
 
-  const name = staticPropertyName(property);
-  if (name === null) return null;
+  const spelled = staticPropertyName(property);
+  if (spelled === null) return null;
 
   const bare = unwrapSubject(property.value);
   const parts =
@@ -213,7 +215,7 @@ const stageOf = (property: ESTree.ObjectProperty, source: FixtureSource): Builde
 
   return parts === null
     ? null
-    : { ...parts, name, written: `${JSON.stringify(name)}, ${parts.written}` };
+    : { ...parts, name: spelled, written: `${JSON.stringify(spelled)}, ${parts.written}` };
 };
 
 const orderedStages = (
@@ -223,22 +225,22 @@ const orderedStages = (
   if (pending.length === 0) return placed;
 
   const settled = new Set(placed.map((stage) => stage.name));
-  const next = pending.find((stage) =>
+  const reachedNext = pending.find((stage) =>
     stage.dependencies.every((dependency) => settled.has(dependency)),
   );
-  if (next === undefined) return null;
+  if (reachedNext === undefined) return null;
 
   return orderedStages(
-    pending.filter((stage) => stage !== next),
-    [...placed, next],
+    pending.filter((stage) => stage !== reachedNext),
+    [...placed, reachedNext],
   );
 };
 
 export const builderStagesFor = (
-  object: ESTree.ObjectExpression,
+  builderObject: ESTree.ObjectExpression,
   source: FixtureSource,
 ): readonly string[] | null => {
-  const stages = object.properties.map((property) =>
+  const stages = builderObject.properties.map((property) =>
     property.type === "Property" ? stageOf(property, source) : null,
   );
 

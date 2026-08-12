@@ -39,4 +39,5 @@ const namesBoundWithin = (held: unknown): readonly string[] => {
   return [...namesBoundAt(held), ...Object.values(held).flatMap(namesBoundWithin)];
 };
 
-export const boundNamesIn = (body: unknown): ReadonlySet<string> => new Set(namesBoundWithin(body));
+export const boundNamesIn = (writtenBody: unknown): ReadonlySet<string> =>
+  new Set(namesBoundWithin(writtenBody));

@@ -17,17 +17,17 @@ describe("dont-review-it-command", () => {
     onTestFinished(() => {
       rmSync(root, { recursive: true, force: true });
     });
-    for (const [path, text] of Object.entries(files)) {
-      const target = join(root, path);
-      mkdirSync(dirname(target), { recursive: true });
-      writeFileSync(target, text, "utf8");
+    for (const [path, source] of Object.entries(files)) {
+      const absolutePath = join(root, path);
+      mkdirSync(dirname(absolutePath), { recursive: true });
+      writeFileSync(absolutePath, source, "utf8");
     }
     return root;
   };
 
-  const cliExitCode = async (rawArgs: readonly string[]): Promise<number> => {
+  const cliExitCode = async (commandLine: readonly string[]): Promise<number> => {
     process.exitCode = 0;
-    await runCommand(dontReviewItCommand, { rawArgs: [...rawArgs] });
+    await runCommand(dontReviewItCommand, { rawArgs: [...commandLine] });
     const exitCode = process.exitCode;
     process.exitCode = 0;
     return typeof exitCode === "number" ? exitCode : 0;

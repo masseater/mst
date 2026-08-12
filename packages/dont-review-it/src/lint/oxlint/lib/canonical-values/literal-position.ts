@@ -102,7 +102,8 @@ const isModuleNamePosition = (parent: ESTree.Node, node: ESTree.Node): boolean |
 export const isModuleSyntaxPosition = (parent: ESTree.Node, node: ESTree.Node): boolean =>
   isModuleSourcePosition(parent, node) ?? isModuleNamePosition(parent, node) ?? false;
 
-const isKeySelectionTypeName = (name: string): boolean => KEY_SELECTION_TYPE_NAMES.has(name);
+const isKeySelectionTypeName = (typeName: string): boolean =>
+  KEY_SELECTION_TYPE_NAMES.has(typeName);
 
 export const isKeySelectorArgument = (ancestors: readonly ESTree.Node[]): boolean => {
   for (const [index, ancestor] of ancestors.entries()) {

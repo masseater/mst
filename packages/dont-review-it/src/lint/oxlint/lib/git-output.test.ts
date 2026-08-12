@@ -24,7 +24,7 @@ describe("gitOutput", () => {
   test("git answers about the asked directory, not about the repository a hook environment names", () => {
     const repositoryRoot = initializedRepository();
 
-    const answer = gitOutput(["rev-parse", "--show-toplevel"], {
+    const produced = gitOutput(["rev-parse", "--show-toplevel"], {
       cwd: repositoryRoot,
       env: {
         ...cleanEnvironment,
@@ -34,7 +34,7 @@ describe("gitOutput", () => {
       },
     });
 
-    expect(answer).toBe(realpathSync(repositoryRoot));
+    expect(produced).toBe(realpathSync(repositoryRoot));
   });
 
   test("a question git answers with a failure status yields null", () => {

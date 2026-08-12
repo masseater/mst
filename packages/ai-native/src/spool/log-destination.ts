@@ -12,8 +12,8 @@ const findSpoolRoot = (currentDir: string, fallbackDir: string): string => {
 export const defaultSpoolRoot = (startDir: string = process.cwd()): string =>
   findSpoolRoot(resolve(startDir), resolve(startDir));
 
-export const timestampOf = (date: Date): string =>
-  `${date.toISOString().slice(0, 19).replaceAll(/[:-]/g, "")}Z`;
+export const timestampOf = (stampedDate: Date): string =>
+  `${stampedDate.toISOString().slice(0, 19).replaceAll(/[:-]/g, "")}Z`;
 
 export const commandIdOf = (command: readonly [string, ...string[]]): string =>
   [basename(command[0]), ...command.slice(1, 2)]

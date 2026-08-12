@@ -68,9 +68,9 @@ const bindingAt = <Binding extends { readonly definition: ESTree.Node }>(input: 
 
 const catalogOwnsImport = (catalog: CanonicalValuesCatalog, imported: ImportedBinding): boolean =>
   catalog.entries.some(
-    (entry) =>
-      entry.binding === imported.importedName ||
-      entry.importRoutes.some((route) => route.exportName === imported.importedName),
+    (declaration) =>
+      declaration.binding === imported.importedName ||
+      declaration.importRoutes.some((route) => route.exportName === imported.importedName),
   );
 
 const unknownOwnerPosition = (
@@ -78,7 +78,7 @@ const unknownOwnerPosition = (
   identifier: ESTree.IdentifierReference,
 ): Extract<LocalFiniteValuePosition, { readonly kind: "unknown-owner-name" }> | null => {
   const shadowedImport = input.bindings.imports.get(identifier.name);
-  return input.catalog.entries.some((entry) => entry.binding === identifier.name) ||
+  return input.catalog.entries.some((declaration) => declaration.binding === identifier.name) ||
     (shadowedImport !== undefined && catalogOwnsImport(input.catalog, shadowedImport))
     ? { kind: "unknown-owner-name", name: identifier.name, node: identifier }
     : null;
@@ -174,17 +174,21 @@ export const firstFiniteValueArgument = (
   return argument === undefined || argument.type === "SpreadElement" ? null : argument;
 };
 
-const arrayPosition = (array: ESTree.ArrayExpression): LocalFiniteValuePosition | null => {
-  const canonicalItems = staticArrayValues(array);
-  return canonicalItems === null ? null : { kind: "values", node: array, values: canonicalItems };
+const arrayPosition = (
+  arrayExpression: ESTree.ArrayExpression,
+): LocalFiniteValuePosition | null => {
+  const canonicalItems = staticArrayValues(arrayExpression);
+  return canonicalItems === null
+    ? null
+    : { kind: "values", node: arrayExpression, values: canonicalItems };
 };
 
 export const localFiniteIdentifierPosition = (
   input: PositionInput,
   identifier: ESTree.IdentifierReference,
 ): LocalFiniteValuePosition | null => {
-  const array = bindingAt({ bindings: input.bindings.arrays, identifier, position: input });
-  if (array !== null) return arrayPosition(array.value);
+  const arrayBinding = bindingAt({ bindings: input.bindings.arrays, identifier, position: input });
+  if (arrayBinding !== null) return arrayPosition(arrayBinding.value);
   const imported = localFiniteImportPosition(input, identifier);
   if (imported !== null) return imported;
   return unknownOwnerPosition(input, identifier);
@@ -199,8 +203,10 @@ export const localFiniteValuePosition = (
   return expression.type === "Identifier" ? localFiniteIdentifierPosition(input, expression) : null;
 };
 
-const objectPropertyNames = (object: ESTree.ObjectExpression): readonly string[] | null => {
-  const propertyNames = object.properties.map((property) => {
+const objectPropertyNames = (
+  objectExpression: ESTree.ObjectExpression,
+): readonly string[] | null => {
+  const propertyNames = objectExpression.properties.map((property) => {
     if (property.type !== "Property" || property.computed) return null;
     return propertyKeyName(property.key);
   });
@@ -213,13 +219,13 @@ const identifierObjectKeysPosition = (
 ): LocalFiniteValuePosition | null => {
   const imported = localFiniteImportPosition(input, candidate.source);
   if (imported !== null) return imported;
-  const object = bindingAt({
+  const objectBinding = bindingAt({
     bindings: input.bindings.objects,
     identifier: candidate.source,
     position: input,
   });
-  if (object === null) return unknownOwnerPosition(input, candidate.source);
-  const canonicalItems = objectPropertyNames(object.value);
+  if (objectBinding === null) return unknownOwnerPosition(input, candidate.source);
+  const canonicalItems = objectPropertyNames(objectBinding.value);
   return canonicalItems === null
     ? null
     : { kind: "values", node: candidate.call, values: canonicalItems };
@@ -256,7 +262,7 @@ export const localFiniteSchemaPosition = (
     : localFiniteValuePosition(input, expression);
 };
 
-export const localFiniteImportPosition = (
+const localFiniteImportPosition = (
   input: PositionInput,
   identifier: ESTree.IdentifierReference,
 ): Extract<LocalFiniteValuePosition, { readonly kind: "import" }> | null => {

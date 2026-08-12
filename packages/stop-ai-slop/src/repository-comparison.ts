@@ -62,26 +62,27 @@ export type RepositoryComparison = Readonly<{
   files: readonly ComparisonFile[];
 }>;
 
-const resolveCommit = async (repositoryRoot: string, revision: string): Promise<string> =>
-  (
+const resolveRevisionObject = async (repositoryRoot: string, revision: string): Promise<string> => {
+  return (
     await runGitText({
       repositoryRoot,
-      args: ["rev-parse", "--verify", "--end-of-options", `${revision}^{commit}`],
+      args: ["rev-parse", "--verify", "--end-of-options", `${revision}^{tree}`],
     })
   ).trim();
+};
 
 const sourceExtensions = [".cjs", ".cts", ".js", ".jsx", ".mjs", ".mts", ".ts", ".tsx"];
 
-export const decodedSource = (path: string, blob: Uint8Array): string => {
-  if (blob.includes(0)) {
+export const decodedSource = (path: string, sourceBytes: Uint8Array): string => {
+  if (sourceBytes.includes(0)) {
     throw new Error(`Source blob contains NUL bytes: ${path}`);
   }
 
-  return new TextDecoder("utf-8").decode(blob);
+  return new TextDecoder("utf-8").decode(sourceBytes);
 };
 
-export const decodedPreviousSource = (blob: Uint8Array): string | null =>
-  blob.includes(0) ? null : new TextDecoder("utf-8").decode(blob);
+export const decodedPreviousSource = (sourceBytes: Uint8Array): string | null =>
+  sourceBytes.includes(0) ? null : new TextDecoder("utf-8").decode(sourceBytes);
 
 export type SideSources = Readonly<{
   base: (path: string) => Promise<string | null>;
@@ -189,12 +190,12 @@ export const comparisonFrom = async ({
   );
 
 const diffArguments = ({
-  baseCommit,
-  headCommit,
+  baseObject,
+  headObject,
   presentation,
 }: Readonly<{
-  baseCommit: string;
-  headCommit: string;
+  baseObject: string;
+  headObject: string;
   presentation: readonly string[];
 }>): readonly string[] => [
   "-c",
@@ -208,8 +209,8 @@ const diffArguments = ({
   "--no-color",
   "--no-textconv",
   ...presentation,
-  baseCommit,
-  headCommit,
+  baseObject,
+  headObject,
   "--",
 ];
 
@@ -218,22 +219,22 @@ export const compareRevisions = async ({
   baseRevision,
   headRevision,
 }: CompareRevisionsOptions): Promise<RepositoryComparison> => {
-  const [baseCommit, headCommit] = await Promise.all([
-    resolveCommit(repositoryRoot, baseRevision),
-    resolveCommit(repositoryRoot, headRevision),
+  const [baseObject, headObject] = await Promise.all([
+    resolveRevisionObject(repositoryRoot, baseRevision),
+    resolveRevisionObject(repositoryRoot, headRevision),
   ]);
   const [inventoryOutput, diff] = await Promise.all([
     runGitText({
       repositoryRoot,
-      args: diffArguments({ baseCommit, headCommit, presentation: ["--name-status", "-z"] }),
+      args: diffArguments({ baseObject, headObject, presentation: ["--name-status", "-z"] }),
     }),
     runGitText({
       repositoryRoot,
-      args: diffArguments({ baseCommit, headCommit, presentation: ["--unified=0"] }),
+      args: diffArguments({ baseObject, headObject, presentation: ["--unified=0"] }),
     }),
   ]);
   const blobAt =
-    (revision: string, decode: (path: string, blob: Uint8Array) => string | null) =>
+    (revision: string, decode: (path: string, sourceBytes: Uint8Array) => string | null) =>
     async (path: string) =>
       decode(
         path,
@@ -248,8 +249,8 @@ export const compareRevisions = async ({
       inventoryOutput,
       diff,
       sources: {
-        base: blobAt(baseCommit, (_path, blob) => decodedPreviousSource(blob)),
-        head: blobAt(headCommit, decodedSource),
+        base: blobAt(baseObject, (_path, sourceBytes) => decodedPreviousSource(sourceBytes)),
+        head: blobAt(headObject, decodedSource),
       },
     }),
   };

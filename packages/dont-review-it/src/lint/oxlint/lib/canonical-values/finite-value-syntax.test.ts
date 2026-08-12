@@ -15,18 +15,18 @@ import {
 import type { ESTree } from "@oxlint/plugins";
 
 const expressionFrom = (source: string): ESTree.Expression => {
-  const parsed = parseSync("source.ts", source);
-  const [statement] = parsed.program.body;
-  if (parsed.errors.length !== 0 || statement?.type !== "ExpressionStatement") {
+  const syntaxTree = parseSync("source.ts", source);
+  const [statement] = syntaxTree.program.body;
+  if (syntaxTree.errors.length !== 0 || statement?.type !== "ExpressionStatement") {
     throw new Error(`Expected one expression statement: ${source}`);
   }
   return statement.expression as ESTree.Expression;
 };
 
 const unionFrom = (source: string): ESTree.TSType => {
-  const parsed = parseSync("source.ts", source);
-  const [statement] = parsed.program.body;
-  if (parsed.errors.length !== 0 || statement?.type !== "TSTypeAliasDeclaration") {
+  const syntaxTree = parseSync("source.ts", source);
+  const [statement] = syntaxTree.program.body;
+  if (syntaxTree.errors.length !== 0 || statement?.type !== "TSTypeAliasDeclaration") {
     throw new Error(`Expected one type alias: ${source}`);
   }
   return statement.typeAnnotation as ESTree.TSType;

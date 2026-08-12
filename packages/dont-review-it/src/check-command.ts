@@ -16,11 +16,11 @@ const WRITE_FLAG = "--write";
 
 const KNOWN_FLAGS = [REPOSITORY_ROOT_FLAG, WRITE_FLAG];
 
-const flagsIn = (rawArgs: readonly string[]): readonly string[] =>
-  rawArgs.filter((token) => token.startsWith("-")).map((token) => token.replace(/=.*$/u, ""));
+const flagsIn = (commandLine: readonly string[]): readonly string[] =>
+  commandLine.filter((token) => token.startsWith("-")).map((token) => token.replace(/=.*$/u, ""));
 
-const refuseMisuse = (message: string): void => {
-  process.stderr.write(message);
+const refuseMisuse = (complaint: string): void => {
+  process.stderr.write(complaint);
   process.exitCode = EXIT_MISUSE;
 };
 
@@ -62,7 +62,7 @@ export const checkCommand = defineCommand({
     },
   },
   run({ args, rawArgs }) {
-    const unknownFlags = flagsIn(rawArgs).filter((flag) => !KNOWN_FLAGS.includes(flag));
+    const unknownFlags = flagsIn(rawArgs).filter((raised) => !KNOWN_FLAGS.includes(raised));
     if (unknownFlags.length > 0) {
       refuseMisuse(`Unknown option ${unknownFlags.join(", ")}. Run --help for usage.\n`);
       return;

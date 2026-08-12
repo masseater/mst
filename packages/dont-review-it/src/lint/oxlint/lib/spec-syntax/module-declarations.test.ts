@@ -15,8 +15,8 @@ import type { SpecStatement } from "./subject-expressions.ts";
 
 const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-module-declarations-"));
 
-const writeModule = (name: string, source: string): string => {
-  const path = join(fixtureDir, name);
+const writeModule = (fixtureName: string, source: string): string => {
+  const path = join(fixtureDir, fixtureName);
   writeFileSync(path, source);
   return path;
 };

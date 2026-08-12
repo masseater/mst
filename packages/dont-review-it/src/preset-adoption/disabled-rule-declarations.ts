@@ -32,9 +32,10 @@ const propertiesOf = (held: unknown): readonly AstFields[] =>
   fieldsIn(nodeOfType({ held, type: OBJECT_EXPRESSION })?.properties);
 
 const keyNameOf = (property: AstFields): string | null => {
-  const key = property.key;
-  if (nodeOfType({ held: key, type: LITERAL }) !== null) return String((key as AstFields).value);
-  const identifier = nodeOfType({ held: key, type: IDENTIFIER });
+  const named = property.key;
+  if (nodeOfType({ held: named, type: LITERAL }) !== null)
+    return String((named as AstFields).value);
+  const identifier = nodeOfType({ held: named, type: IDENTIFIER });
   return identifier === null || property.computed === true ? null : String(identifier.name);
 };
 
@@ -48,8 +49,8 @@ const unwrappedCall = (held: unknown): unknown => {
 
 const stringLiteralsIn = (held: unknown): readonly string[] =>
   fieldsIn(nodeOfType({ held, type: ARRAY_EXPRESSION })?.elements)
-    .filter((element) => String(element[NODE_TYPE_FIELD]) === LITERAL)
-    .map((element) => String(element.value));
+    .filter((held) => String(held[NODE_TYPE_FIELD]) === LITERAL)
+    .map((held) => String(held.value));
 
 const disabledEntriesIn = ({
   rules,
@@ -83,7 +84,7 @@ const overrideDeclarations = ({
   ).flatMap((override) => {
     const filePatterns = stringLiteralsIn(valueAt({ held: override, key: config.filesFieldName }));
     const rules = valueAt({ held: override, key: config.rulesFieldName });
-    return disabledEntriesIn({ rules, source }).map((entry) => ({ ...entry, filePatterns }));
+    return disabledEntriesIn({ rules, source }).map((listed) => ({ ...listed, filePatterns }));
   });
 
 export const disabledRuleDeclarationsIn = ({
@@ -102,7 +103,7 @@ export const disabledRuleDeclarationsIn = ({
   const everywhere = disabledEntriesIn({
     rules: valueAt({ held: lint, key: config.rulesFieldName }),
     source,
-  }).map((entry) => ({ ...entry, filePatterns: [] }));
+  }).map((listed) => ({ ...listed, filePatterns: [] }));
 
   return [...everywhere, ...overrideDeclarations({ lint, source, config })].filter((declaration) =>
     declaration.ruleId.startsWith(config.presetRulePrefix),

@@ -24,8 +24,8 @@ const ALLOWED_UTILITIES_OPTION = "allowedExpectUtilities";
 
 const DEFAULT_ALLOWED_UTILITIES: ReadonlySet<string> = new Set(["assertions", "hasAssertions"]);
 
-const allowedUtilitiesFrom = (options: Readonly<Options>): ReadonlySet<string> => {
-  const [first] = options;
+const allowedUtilitiesFrom = (ruleOptions: Readonly<Options>): ReadonlySet<string> => {
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) {
     return DEFAULT_ALLOWED_UTILITIES;
   }
@@ -101,13 +101,13 @@ const testCallbackOf = (call: ESTree.CallExpression): SpecFunction | null => {
   return handed.flatMap((argument) => asSpecFunction(argument) ?? []).at(-1) ?? null;
 };
 
-const statementsOf = (callback: SpecFunction): readonly SpecStatement[] => {
-  const body = blockBodyOf(callback);
-  return body === null ? [] : body.body;
+const statementsOf = (taken: SpecFunction): readonly SpecStatement[] => {
+  const writtenBody = blockBodyOf(taken);
+  return writtenBody === null ? [] : writtenBody.body;
 };
 
-const conciseBodyOf = (callback: SpecFunction): ESTree.Expression | null => {
-  const { body } = callback;
+const conciseBodyOf = (taken: SpecFunction): ESTree.Expression | null => {
+  const { body } = taken;
   return body === null || body.type === "BlockStatement" ? null : body;
 };
 
@@ -149,10 +149,10 @@ export const requireItOnlyExpect = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
-    const allowed = allowedUtilitiesFrom(context.options);
+    const allowed = allowedUtilitiesFrom(inspection.options);
     const pending = new Set<{ readonly node: ESTree.Node; readonly messageId: string }>();
     const utilityCalls = new Set<ESTree.CallExpression>();
     const executions = new Set<ESTree.Node>();
@@ -184,10 +184,10 @@ export const requireItOnlyExpect = createDontReviewItRule({
       pending.add({ node: statement, messageId });
     };
 
-    const readCallback = (callback: SpecFunction): void => {
-      for (const statement of statementsOf(callback)) readStatement(statement);
+    const readCallback = (taken: SpecFunction): void => {
+      for (const statement of statementsOf(taken)) readStatement(statement);
 
-      const concise = conciseBodyOf(callback);
+      const concise = conciseBodyOf(taken);
       if (concise === null) return;
       readExpression({ expression: concise, reported: concise, messageId: "nonAssertionBody" });
     };
@@ -195,8 +195,8 @@ export const requireItOnlyExpect = createDontReviewItRule({
     return {
       CallExpression(node: ESTree.CallExpression) {
         executions.add(node);
-        const callback = testCallbackOf(node);
-        if (callback !== null) readCallback(callback);
+        const taken = testCallbackOf(node);
+        if (taken !== null) readCallback(taken);
       },
       NewExpression(node: ESTree.NewExpression) {
         executions.add(node);
@@ -205,10 +205,10 @@ export const requireItOnlyExpect = createDontReviewItRule({
         executions.add(node);
       },
       "Program:exit"() {
-        for (const report of pending) context.report(report);
+        for (const report of pending) inspection.report(report);
         for (const call of utilityCalls) {
           if (!spansExecutedArgument(call, executions)) continue;
-          context.report({ node: call, messageId: "utilityArgument" });
+          inspection.report({ node: call, messageId: "utilityArgument" });
         }
       },
     };

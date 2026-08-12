@@ -1,3 +1,6 @@
+import { writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { describe, expect, it, vi } from "vite-plus/test";
 
 import { resolvedComparison } from "./resolved-comparison.ts";
@@ -24,6 +27,36 @@ describe("resolvedComparison", () => {
     });
   });
 
+  it("reads the resolved index while a merge is in progress", async () => {
+    await withTestRepository(async (repository) => {
+      const common = repository.commit({
+        files: { "src/current.ts": "export const current = true;\n" },
+      });
+      repository.git(["switch", "--quiet", "--create", "feature", common]);
+      const featureTip = repository.commit({ files: { "src/repaired.ts": "\0binary\0" } });
+      repository.git(["switch", "--quiet", "main"]);
+      repository.commit({ files: { "src/main-only.ts": "export const mainOnly = true;\n" } });
+      repository.git(["merge", "--quiet", "--no-commit", "--no-ff", "feature"]);
+      writeFileSync(resolve(repository.root, "src/repaired.ts"), "export const repaired = true;\n");
+      repository.git(["add", "src/repaired.ts"]);
+      const mergedTree = repository.git(["write-tree"]).trim();
+
+      await expect(resolvedComparison(repository.root, WITHOUT_GITHUB)).resolves.toMatchObject({
+        baseRevision: common,
+        headRevision: mergedTree,
+        files: [
+          { kind: "added", afterPath: "src/main-only.ts" },
+          {
+            kind: "added",
+            afterPath: "src/repaired.ts",
+            afterSource: "export const repaired = true;\n",
+          },
+        ],
+      });
+      expect(featureTip).not.toBe(mergedTree);
+    });
+  });
+
   it("reads the pull request through the API when the checkout holds only its merge", async () => {
     await withTestRepository(async (repository) => {
       const base = repository.commit({
@@ -34,10 +67,10 @@ describe("resolvedComparison", () => {
         files: { "src/current.ts": "export const current = false;\n" },
       });
       const tree = repository.git(["rev-parse", `${head}^{tree}`]).trim();
-      const merged = repository
+      const mergedOnes = repository
         .git(["commit-tree", tree, "-p", base, "-p", head, "-m", "pull request merge"])
         .trim();
-      repository.git(["reset", "--hard", "--quiet", merged]);
+      repository.git(["reset", "--hard", "--quiet", mergedOnes]);
 
       const requested = vi.fn<GitHubRequest>(async () => ({
         merge_base_commit: { sha: base },

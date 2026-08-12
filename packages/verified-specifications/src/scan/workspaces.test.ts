@@ -13,10 +13,10 @@ const repositoryWith = async (files: Readonly<Record<string, string>>): Promise<
   onTestFinished(async () => rm(repositoryRoot, { recursive: true, force: true }));
 
   await Promise.all(
-    Object.entries(files).map(async ([name, source]) => {
-      const target = join(repositoryRoot, name);
-      await mkdir(dirname(target), { recursive: true });
-      await writeFile(target, source, "utf-8");
+    Object.entries(files).map(async ([fileName, source]) => {
+      const absolutePath = join(repositoryRoot, fileName);
+      await mkdir(dirname(absolutePath), { recursive: true });
+      await writeFile(absolutePath, source, "utf-8");
     }),
   );
   return repositoryRoot;
@@ -30,7 +30,7 @@ describe("listWorkspaces", () => {
       "packages/other/package.json": '{ "name": "@mst/other" }',
     });
     const listed = await listWorkspaces({ repositoryRoot });
-    expect(listed.workspaces.map((entry) => entry.packageName)).toStrictEqual([
+    expect(listed.workspaces.map((workspace) => workspace.packageName)).toStrictEqual([
       "@mst/other",
       "@mst/repository-checks",
     ]);
@@ -43,7 +43,7 @@ describe("listWorkspaces", () => {
       "packages/empty/notes.txt": "not a workspace",
     });
     const listed = await listWorkspaces({ repositoryRoot });
-    expect(listed.workspaces.map((entry) => entry.packageName)).toStrictEqual([
+    expect(listed.workspaces.map((workspace) => workspace.packageName)).toStrictEqual([
       "@mst/repository-checks",
     ]);
   });
@@ -75,7 +75,9 @@ describe("listWorkspaces", () => {
       "package.json": '{ "name": "standalone" }',
     });
     const listed = await listWorkspaces({ repositoryRoot });
-    expect(listed.workspaces.map((entry) => entry.packageName)).toStrictEqual(["standalone"]);
+    expect(listed.workspaces.map((workspace) => workspace.packageName)).toStrictEqual([
+      "standalone",
+    ]);
   });
 
   test("lists nothing when the sole root workspace has no package.json", async () => {
@@ -117,7 +119,7 @@ describe("listWorkspaces", () => {
       "packages/repository-checks/package.json": '{ "name": "@mst/repository-checks" }',
     });
     const listed = await listWorkspaces({ repositoryRoot });
-    expect(listed.workspaces.map((entry) => entry.packageName)).toStrictEqual([
+    expect(listed.workspaces.map((workspace) => workspace.packageName)).toStrictEqual([
       "@mst/repository-checks",
     ]);
   });

@@ -34,8 +34,8 @@ export const readTextOrNull = async (absolutePath: string): Promise<string | nul
 
 export const directoryNamesIn = async (absolutePath: string): Promise<readonly string[]> => {
   try {
-    const entries = await readdir(absolutePath, { withFileTypes: true });
-    return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+    const listedEntries = await readdir(absolutePath, { withFileTypes: true });
+    return listedEntries.filter((listed) => listed.isDirectory()).map((listed) => listed.name);
   } catch (failure) {
     if (isAbsent(failure)) return [];
     throw failure;
@@ -48,15 +48,16 @@ export const readJsonObjectOrNull = async (
   const raw = await readTextOrNull(absolutePath);
   if (raw === null) return null;
 
-  const parsed: unknown = JSON.parse(raw);
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return null;
+  const parsedNode: unknown = JSON.parse(raw);
+  if (typeof parsedNode !== "object" || parsedNode === null || Array.isArray(parsedNode))
+    return null;
 
-  return parsed as Record<string, unknown>;
+  return parsedNode as Record<string, unknown>;
 };
 
-export const nonEmptyStringOrNull = (value: unknown): string | null => {
-  if (typeof value !== "string") return null;
+export const nonEmptyStringOrNull = (held: unknown): string | null => {
+  if (typeof held !== "string") return null;
 
-  const trimmed = value.trim();
+  const trimmed = held.trim();
   return trimmed === "" ? null : trimmed;
 };

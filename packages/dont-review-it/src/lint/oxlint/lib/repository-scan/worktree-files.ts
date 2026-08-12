@@ -21,22 +21,26 @@ export type Worktree = {
   readonly unscannedDirectoryNames: ReadonlySet<string>;
 };
 
-export const unscannedDirectoryNamesFrom = (options: Context["options"]): ReadonlySet<string> => {
-  const declared = ((options[0] ?? {}) as { readonly unscannedDirectories?: readonly string[] })
+export const unscannedDirectoryNamesFrom = (
+  ruleOptions: Context["options"],
+): ReadonlySet<string> => {
+  const declared = ((ruleOptions[0] ?? {}) as { readonly unscannedDirectories?: readonly string[] })
     .unscannedDirectories;
   return declared === undefined ? UNSCANNED_DIRECTORY_NAMES : new Set(declared);
 };
 
 const filePathsUnder = (worktree: Worktree, directory: string): readonly string[] => {
-  const entries = readUnlessMissing(() => readdirSync(directory, { withFileTypes: true }));
-  if (entries === null) return [];
+  const listedEntries = readUnlessMissing(() => readdirSync(directory, { withFileTypes: true }));
+  if (listedEntries === null) return [];
 
-  return entries.flatMap((entry) => {
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) {
-      return worktree.unscannedDirectoryNames.has(entry.name) ? [] : filePathsUnder(worktree, path);
+  return listedEntries.flatMap((listed) => {
+    const path = join(directory, listed.name);
+    if (listed.isDirectory()) {
+      return worktree.unscannedDirectoryNames.has(listed.name)
+        ? []
+        : filePathsUnder(worktree, path);
     }
-    return entry.isFile() ? [toPosixPath(relative(worktree.root, path))] : [];
+    return listed.isFile() ? [toPosixPath(relative(worktree.root, path))] : [];
   });
 };
 
@@ -50,11 +54,11 @@ export const worktreeFilePathsUnder = (asked: Worktree): readonly string[] => {
     root: resolve(asked.root),
     unscannedDirectoryNames: asked.unscannedDirectoryNames,
   };
-  const key = worktreeKeyOf(worktree);
-  const memoized = filePathsByWorktree.get(key);
+  const named = worktreeKeyOf(worktree);
+  const memoized = filePathsByWorktree.get(named);
   if (memoized !== undefined) return memoized;
 
   const scanned = filePathsUnder(worktree, worktree.root).toSorted();
-  filePathsByWorktree.set(key, scanned);
+  filePathsByWorktree.set(named, scanned);
   return scanned;
 };

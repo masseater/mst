@@ -25,7 +25,7 @@ export const heldNamesOf = (visit: NodeVisit): readonly string[] => {
       : visit.ancestors
           .slice(-1)
           .flatMap((parent) => (parent.init === visit.node ? [identifierNameOf(parent.id)] : []));
-  return named.flatMap((name) => (name === null ? [] : [name]));
+  return named.flatMap((spelled) => (spelled === null ? [] : [spelled]));
 };
 
 const nestedScopeOf = ({ scope }: Surroundings, visit: NodeVisit): AstFields | null =>
@@ -45,16 +45,16 @@ const isReadReference = (visit: NodeVisit): boolean =>
     }
   });
 
-const referencesTo = (surroundings: Surroundings, name: string): readonly NodeVisit[] =>
+const referencesTo = (surroundings: Surroundings, spelled: string): readonly NodeVisit[] =>
   surroundings.visits.filter(
     (visit) =>
-      identifierNameOf(visit.node) === name &&
+      identifierNameOf(visit.node) === spelled &&
       visit.ancestors.includes(surroundings.scope) &&
       isReadReference(visit),
   );
 
-const bindingEscapes = (trace: Trace, name: string): boolean =>
-  referencesTo(trace.surroundings, name).some((visit) => referenceEscapes(trace, visit));
+const bindingEscapes = (trace: Trace, spelled: string): boolean =>
+  referencesTo(trace.surroundings, spelled).some((visit) => referenceEscapes(trace, visit));
 
 const capturingScopeEscapes = (trace: Trace, visit: NodeVisit): boolean => {
   const { surroundings, followed } = trace;

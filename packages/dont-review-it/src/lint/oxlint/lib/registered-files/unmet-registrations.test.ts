@@ -200,9 +200,9 @@ describe("unmet-registrations", () => {
 
   test("the same registry is read once and answered from what was read", () => {
     const root = createRepository();
-    const entries = [rowFor({})];
-    const read = unmetIn({ root, entries });
+    const listedEntries = [rowFor({})];
+    const read = unmetIn({ root, entries: listedEntries });
 
-    expect(unmetIn({ root, entries })).toBe(read);
+    expect(unmetIn({ root, entries: listedEntries })).toBe(read);
   });
 });

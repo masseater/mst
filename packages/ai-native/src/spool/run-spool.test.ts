@@ -89,8 +89,8 @@ const waitFor = async (isReady: () => boolean): Promise<void> => {
 };
 
 const recordIn = (root: string): string => {
-  const entries = readdirSync(root);
-  return entries[0] === undefined ? "" : readFileSync(join(root, entries[0]), "utf8");
+  const listedEntries = readdirSync(root);
+  return listedEntries[0] === undefined ? "" : readFileSync(join(root, listedEntries[0]), "utf8");
 };
 
 const clockOf = (ticks: number[]): (() => number) => {
@@ -123,9 +123,9 @@ describe("退避の記録", () => {
     expect(summaryLines[3]).toBe("");
     expect(summaryLines[0]).toBe(`spool: command: ${commandLine}`);
     const filePath = logPathFrom(recordedRun.stdout);
-    const expected = Array.from({ length: 5000 }, (_, lineIndex) => `line ${lineIndex}\n`).join("");
-    expect(readFileSync(filePath, "utf8")).toBe(`${commandLine}\n\n${expected}`);
-    expect(summaryLines[1]).toBe(`spool: log: ${filePath} (${expected.length} bytes, 5000 lines)`);
+    const wanted = Array.from({ length: 5000 }, (_, lineIndex) => `line ${lineIndex}\n`).join("");
+    expect(readFileSync(filePath, "utf8")).toBe(`${commandLine}\n\n${wanted}`);
+    expect(summaryLines[1]).toBe(`spool: log: ${filePath} (${wanted.length} bytes, 5000 lines)`);
   });
 
   test(
@@ -158,9 +158,9 @@ describe("退避の記録", () => {
   test("エスケープ列は記録から除去され可視文字は残る", async () => {
     const script = 'process.stdout.write("\\u001b[31mred\\u001b[0m plain\\n");';
     const recordedRun = await runRecorded(["--", node, "-e", script]);
-    const body = readFileSync(logPathFrom(recordedRun.stdout), "utf8");
-    expect(body).toContain("red plain\n");
-    expect(body).not.toContain("");
+    const writtenBody = readFileSync(logPathFrom(recordedRun.stdout), "utf8");
+    expect(writtenBody).toContain("red plain\n");
+    expect(writtenBody).not.toContain("");
   });
 
   test(
@@ -173,8 +173,8 @@ describe("退避の記録", () => {
       ].join(" ");
       const recordedRun = await runRecorded(["--", node, "-e", script]);
       expect(recordedRun.exitCode).toBe(0);
-      const body = readFileSync(logPathFrom(recordedRun.stdout), "utf8");
-      expect(body.endsWith("out one\nerr two\nout three\n")).toBe(true);
+      const writtenBody = readFileSync(logPathFrom(recordedRun.stdout), "utf8");
+      expect(writtenBody.endsWith("out one\nerr two\nout three\n")).toBe(true);
     },
   );
 
@@ -206,8 +206,8 @@ describe("終了コードと結末", () => {
     const script = 'for (let i = 1; i <= 30; i += 1) console.log("row " + i); process.exit(3);';
     const recordedRun = await runRecorded(["--", node, "-e", script]);
     expect(recordedRun.exitCode).toBe(3);
-    const expected = Array.from({ length: 20 }, (_, rowIndex) => `row ${rowIndex + 11}\n`).join("");
-    expect(recordedRun.stdout.endsWith(`\n${expected}`)).toBe(true);
+    const wanted = Array.from({ length: 20 }, (_, rowIndex) => `row ${rowIndex + 11}\n`).join("");
+    expect(recordedRun.stdout.endsWith(`\n${wanted}`)).toBe(true);
     expect(recordedRun.stdout).not.toContain("row 10\n");
   });
 

@@ -57,12 +57,16 @@ export const formatCanonicalValuesProblem = (problem: CanonicalValuesProblem): s
   return `${location} ${problemMessage(problem)}`;
 };
 
-const formatValues = (values: readonly CanonicalValue[]): string =>
-  [...new Set(values.map((value) => JSON.stringify(value)))].toSorted().join(", ");
-
-export const formatEquivalentConceptGroup = (group: readonly CanonicalValuesEntry[]): string => {
-  const declarations = group
-    .map((entry) => `${entry.conceptId} (${entry.declarationPath})`)
+const formatValues = (canonicalLiterals: readonly CanonicalValue[]): string =>
+  [...new Set(canonicalLiterals.map((canonicalLiteral) => JSON.stringify(canonicalLiteral)))]
+    .toSorted()
     .join(", ");
-  return `${formatValues(group.flatMap((entry) => entry.values))} is declared by more than one concept: ${declarations}`;
+
+export const formatEquivalentConceptGroup = (
+  equivalentDeclarations: readonly CanonicalValuesEntry[],
+): string => {
+  const declarations = equivalentDeclarations
+    .map((declaration) => `${declaration.conceptId} (${declaration.declarationPath})`)
+    .join(", ");
+  return `${formatValues(equivalentDeclarations.flatMap((declaration) => declaration.values))} is declared by more than one concept: ${declarations}`;
 };

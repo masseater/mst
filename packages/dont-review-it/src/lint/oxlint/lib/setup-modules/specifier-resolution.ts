@@ -135,26 +135,26 @@ const entryFilesUnder = (packageDirectory: string, specifier: string): readonly 
     .filter(([, spelled]) => spelled === specifier)
     .map(([file]) => file);
 
-export const relativeSpecifierTo = (fromFile: string, target: string): string => {
-  const spelled = toPosixPath(relative(dirname(fromFile), target));
+export const relativeSpecifierTo = (fromFile: string, checked: string): string => {
+  const spelled = toPosixPath(relative(dirname(fromFile), checked));
   return spelled.startsWith(".") ? spelled : `./${spelled}`;
 };
 
-const aliasedFilesFor = (request: CouplingRequest): readonly string[] =>
-  aliasedPathsFor({ specifier: request.specifier, fromFile: request.fromFile }).flatMap((path) => {
+const aliasedFilesFor = (asked: CouplingRequest): readonly string[] =>
+  aliasedPathsFor({ specifier: asked.specifier, fromFile: asked.fromFile }).flatMap((path) => {
     const resolved = resolveCoupling({
-      specifier: relativeSpecifierTo(request.fromFile, path),
-      fromFile: request.fromFile,
-      workspaceRoot: request.workspaceRoot,
+      specifier: relativeSpecifierTo(asked.fromFile, path),
+      fromFile: asked.fromFile,
+      workspaceRoot: asked.workspaceRoot,
     });
     return resolved?.kind === "repositoryFile" ? [resolved.path] : [];
   });
 
-export const repositoryFilesFor = (request: CouplingRequest): readonly string[] => {
-  const { specifier, fromFile, workspaceRoot } = request;
+export const repositoryFilesFor = (asked: CouplingRequest): readonly string[] => {
+  const { specifier, fromFile, workspaceRoot } = asked;
   const resolved = resolveCoupling({ specifier, fromFile, workspaceRoot });
   if (resolved?.kind === "repositoryFile") return [resolved.path];
 
   const found = packageDirectoryInWorkspace({ specifier, fromFile, workspaceRoot });
-  return found === null ? aliasedFilesFor(request) : entryFilesUnder(found.directory, specifier);
+  return found === null ? aliasedFilesFor(asked) : entryFilesUnder(found.directory, specifier);
 };

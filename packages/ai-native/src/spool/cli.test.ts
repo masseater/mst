@@ -34,22 +34,25 @@ const makeWorkTree = (): string => {
 const cleanEnv = (overrides: Record<string, string> = {}): Record<string, string> => ({
   ...Object.fromEntries(
     Object.entries(process.env).filter(
-      (entry): entry is [string, string] => entry[0] !== "CI" && entry[1] !== undefined,
+      (listed): listed is [string, string] => listed[0] !== "CI" && listed[1] !== undefined,
     ),
   ),
   ...overrides,
 });
 
-const runCli = (args: string[], options: { cwd: string; env: Record<string, string> }) =>
-  spawnSync(process.execPath, [cliPath, ...args], {
-    cwd: options.cwd,
-    env: options.env,
+const runCli = (
+  commandLine: string[],
+  { cwd, env }: { cwd: string; env: Record<string, string> },
+) =>
+  spawnSync(process.execPath, [cliPath, ...commandLine], {
+    cwd,
+    env,
     encoding: "utf8" as const,
     maxBuffer: 64 * 1024 * 1024,
   });
 
 const spoolFilesIn = (dir: string): string[] =>
-  readdirSync(join(dir, ".spool")).map((name) => join(dir, ".spool", name));
+  readdirSync(join(dir, ".spool")).map((spelled) => join(dir, ".spool", spelled));
 
 class RssSampler {
   private maxKiloBytes = 0;
@@ -134,9 +137,9 @@ describe("spool cli", () => {
     expect(execution.stdout.split("\n")).toHaveLength(4);
     const files = spoolFilesIn(dir);
     expect(files).toHaveLength(2);
-    const bodies = files.map((file) => readFileSync(file, "utf8"));
-    const outer = bodies.find((body) => body.includes("spool: log: "));
-    const inner = bodies.find((body) => !body.includes("spool: log: "));
+    const writtenBodies = files.map((file) => readFileSync(file, "utf8"));
+    const outer = writtenBodies.find((writtenBody) => writtenBody.includes("spool: log: "));
+    const inner = writtenBodies.find((writtenBody) => !writtenBody.includes("spool: log: "));
     expect(outer).toBeDefined();
     expect(inner).toBeDefined();
     expect((outer as string).split("\n").length).toBeLessThan(10);

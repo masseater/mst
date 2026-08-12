@@ -29,7 +29,7 @@ const weakenedIn = (lint: string): readonly string[] => {
 const patternsIn = (lint: string): readonly string[] => {
   const block = lintIn(configWith(lint));
   if (block === null) throw new Error(`no lint block in ${lint}`);
-  return ignoreEntriesIn(block).map((entry) => entry.pattern);
+  return ignoreEntriesIn(block).map((listed) => listed.pattern);
 };
 
 describe("lint-config-suppression", () => {

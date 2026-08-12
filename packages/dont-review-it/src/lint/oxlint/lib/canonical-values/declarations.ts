@@ -81,7 +81,8 @@ const CANONICAL_RULE_BASENAMES: ReadonlySet<string> = new Set([
 const LINT_DISABLE_DIRECTIVE =
   /\b(?:eslint|oxlint)-disable(?:-line|-next-line)?(?:[ \t]+([^\n]*))?/gu;
 
-const lineAt = (text: string, offset: number): number => text.slice(0, offset).split("\n").length;
+const lineAt = (sourceText: string, offset: number): number =>
+  sourceText.slice(0, offset).split("\n").length;
 
 const normalizedCommentLines = (commentValue: string): readonly string[] =>
   commentValue.split("\n").map((line) => line.replace(/^\s*\*?\s?/u, "").trim());
@@ -93,16 +94,16 @@ const withoutRetiredTags = (commentValue: string): string =>
   RETIRED_ANNOTATION_TAGS.reduce((remaining, tag) => remaining.replaceAll(tag, ""), commentValue);
 
 const isNodeFields = (
-  value: unknown,
-): value is { readonly end: number; readonly start: number; readonly type: string } =>
-  value !== null &&
-  typeof value === "object" &&
-  "type" in value &&
-  typeof value.type === "string" &&
-  "start" in value &&
-  typeof value.start === "number" &&
-  "end" in value &&
-  typeof value.end === "number";
+  candidate: unknown,
+): candidate is { readonly end: number; readonly start: number; readonly type: string } =>
+  candidate !== null &&
+  typeof candidate === "object" &&
+  "type" in candidate &&
+  typeof candidate.type === "string" &&
+  "start" in candidate &&
+  typeof candidate.start === "number" &&
+  "end" in candidate &&
+  typeof candidate.end === "number";
 
 const variableDeclarationIn = (statement: ProgramStatement): VariableDeclarationFields | null => {
   if (statement.type === "VariableDeclaration") return statement;
@@ -323,16 +324,16 @@ const canonicalRuleSuppressionProblemsIn = (
   [...comment.value.matchAll(LINT_DISABLE_DIRECTIVE)].flatMap((match) => {
     const directiveParameters = match[1] ?? "";
     const reason = /(?:^|[ \t]+)--(?:[ \t]+|$)/u.exec(directiveParameters);
-    const targets = directiveParameters
+    const suppressedRules = directiveParameters
       .slice(0, reason?.index ?? directiveParameters.length)
       .split(/[\s,]+/u)
-      .filter((target) => target !== "");
-    const targetsCanonicalRule = targets.some((target) => {
-      const diagnosticRule = /^[^()]+\(([^()]+)\)$/u.exec(target)?.[1] ?? target;
+      .filter((suppressedRule) => suppressedRule !== "");
+    const targetsCanonicalRule = suppressedRules.some((suppressedRule) => {
+      const diagnosticRule = /^[^()]+\(([^()]+)\)$/u.exec(suppressedRule)?.[1] ?? suppressedRule;
       const segments = diagnosticRule.split("/");
       return CANONICAL_RULE_BASENAMES.has(segments[segments.length - 1] as string);
     });
-    if (targets.length !== 0 && !targets.includes("all") && !targetsCanonicalRule) {
+    if (suppressedRules.length !== 0 && !suppressedRules.includes("all") && !targetsCanonicalRule) {
       return [];
     }
     return [
@@ -376,8 +377,8 @@ export const scanCanonicalValuesText = (
   sourceText: string,
   sourceName: string = DEFAULT_SOURCE_NAME,
 ): CanonicalValuesTextScan => {
-  const parsed = parseSync(sourceName, sourceText);
-  if (parsed.errors.length > 0 && containsCanonicalValuesAnnotation(sourceText)) {
+  const parsedSource = parseSync(sourceName, sourceText);
+  if (parsedSource.errors.length > 0 && containsCanonicalValuesAnnotation(sourceText)) {
     return {
       declarations: [],
       problems: [
@@ -388,8 +389,8 @@ export const scanCanonicalValuesText = (
       ],
     };
   }
-  const scans = parsed.comments.map((comment) =>
-    scanComment({ sourceText, program: parsed.program }, comment),
+  const scans = parsedSource.comments.map((comment) =>
+    scanComment({ sourceText, program: parsedSource.program }, comment),
   );
 
   return {

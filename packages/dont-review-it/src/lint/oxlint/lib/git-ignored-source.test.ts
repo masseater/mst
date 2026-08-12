@@ -50,15 +50,15 @@ describe("git-ignored-source", () => {
 
   test("an ignored symbolic-link ancestor excludes its target path", () => {
     inRepository((root) => {
-      const target = mkdtempSync(join(tmpdir(), "git-ignored-target-"));
+      const externalDirectory = mkdtempSync(join(tmpdir(), "git-ignored-target-"));
       try {
         writeFileSync(join(root, ".gitignore"), ".local-agents\n");
-        writeFileSync(join(target, "status.ts"), "export {};");
-        symlinkSync(target, join(root, ".local-agents"));
+        writeFileSync(join(externalDirectory, "status.ts"), "export {};");
+        symlinkSync(externalDirectory, join(root, ".local-agents"));
 
         expect(isGitIgnoredSource(join(root, ".local-agents/status.ts"), root)).toBe(true);
       } finally {
-        rmSync(target, { force: true, recursive: true });
+        rmSync(externalDirectory, { force: true, recursive: true });
       }
     });
   });

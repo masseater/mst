@@ -15,10 +15,10 @@ const WRAPPED_FIELD_BY_TYPE: ReadonlyMap<string, string> = new Map([
 const CALLED_TYPES: ReadonlySet<string> = new Set(["CallExpression", "NewExpression"]);
 
 const spelledNameOf = (node: AstFields): string | null => {
-  const type = nodeTypeOf(node);
-  if (type === "Identifier") return String(node.name);
-  if (type === "MetaProperty") return dottedNameOf([node.meta, node.property]);
-  if (type !== "MemberExpression" || node.computed === true) return null;
+  const nodeType = nodeTypeOf(node);
+  if (nodeType === "Identifier") return String(node.name);
+  if (nodeType === "MetaProperty") return dottedNameOf([node.meta, node.property]);
+  if (nodeType !== "MemberExpression" || node.computed === true) return null;
   return dottedNameOf([node.object, node.property]);
 };
 
@@ -28,10 +28,10 @@ const dottedNameOf = (parts: readonly unknown[]): string | null => {
 };
 
 const carriedInsideOf = (node: AstFields): AstFields | null => {
-  const type = nodeTypeOf(node);
-  const wrappedField = WRAPPED_FIELD_BY_TYPE.get(type);
+  const nodeType = nodeTypeOf(node);
+  const wrappedField = WRAPPED_FIELD_BY_TYPE.get(nodeType);
   if (wrappedField !== undefined) return node[wrappedField] as AstFields;
-  return type === "MemberExpression" ? (node.object as AstFields) : null;
+  return nodeType === "MemberExpression" ? (node.object as AstFields) : null;
 };
 
 const calledFormOf = (

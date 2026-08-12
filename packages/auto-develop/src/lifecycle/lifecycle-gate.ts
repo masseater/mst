@@ -16,36 +16,36 @@ export type LifecycleGate = {
 };
 
 export const createLifecycleGate = (): LifecycleGate => {
-  const state = {
+  const heldState = {
     controllers: new Map<number, AbortController>(),
     generations: new Map<number, number>(),
     closed: new Set<number>(),
   };
   const abortWith = (prNumber: number, reason: Error): void => {
-    state.controllers.get(prNumber)?.abort(reason);
+    heldState.controllers.get(prNumber)?.abort(reason);
   };
   return {
     openSignal: (prNumber) => {
-      const existing = state.controllers.get(prNumber);
+      const existing = heldState.controllers.get(prNumber);
       if (existing !== undefined && !existing.signal.aborted) return existing.signal;
       const controller = new AbortController();
-      state.controllers.set(prNumber, controller);
+      heldState.controllers.set(prNumber, controller);
       return controller.signal;
     },
     close: (prNumber) => {
-      state.closed.add(prNumber);
+      heldState.closed.add(prNumber);
       abortWith(prNumber, new PrClosedError(prNumber));
     },
     excludeSession: (prNumber) => {
       abortWith(prNumber, new PrExcludedError(prNumber));
     },
     interruptForInputChange: (prNumber) => {
-      state.generations.set(prNumber, (state.generations.get(prNumber) ?? 0) + 1);
+      heldState.generations.set(prNumber, (heldState.generations.get(prNumber) ?? 0) + 1);
       abortWith(prNumber, new ReviewInputChangedError(prNumber));
     },
-    generationOf: (prNumber) => state.generations.get(prNumber) ?? 0,
+    generationOf: (prNumber) => heldState.generations.get(prNumber) ?? 0,
     isCurrentGeneration: (check) =>
-      (state.generations.get(check.prNumber) ?? 0) === check.generation,
-    isClosed: (prNumber) => state.closed.has(prNumber),
+      (heldState.generations.get(check.prNumber) ?? 0) === check.generation,
+    isClosed: (prNumber) => heldState.closed.has(prNumber),
   };
 };

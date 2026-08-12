@@ -36,8 +36,8 @@ const dispatchAll = (dispatching: {
   readonly mode: Mode;
 }): number => {
   const dispatched = dispatching.events.flatMap((raw) => {
-    const filtered = filterEvent(raw, dispatching.mode);
-    return filtered === null ? [] : [dispatching.dispatcher.dispatch(filtered)];
+    const filteredOnes = filterEvent(raw, dispatching.mode);
+    return filteredOnes === null ? [] : [dispatching.dispatcher.dispatch(filteredOnes)];
   });
   return dispatched.filter(Boolean).length;
 };
@@ -45,8 +45,8 @@ const dispatchAll = (dispatching: {
 const consumeStream = async (config: ConnectionCycleConfig): Promise<CycleOutcome | null> => {
   for await (const raw of config.subscribe()) {
     config.onActivity();
-    const filtered = filterEvent(raw, config.mode);
-    if (filtered !== null) config.dispatcher.dispatch(filtered);
+    const filteredOnes = filterEvent(raw, config.mode);
+    if (filteredOnes !== null) config.dispatcher.dispatch(filteredOnes);
     if (config.signalled()) return SIGNALLED;
     if (config.restart.requested() !== null) return RESTART_REQUESTED;
   }

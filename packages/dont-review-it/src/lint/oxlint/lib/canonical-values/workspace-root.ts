@@ -18,7 +18,7 @@ const manifestDeclaresWorkspaces = (directory: string): boolean => {
 };
 
 const isWorkspaceRoot = (directory: string): boolean =>
-  WORKSPACE_MANIFEST_FILE_NAMES.some((name) => isFile(join(directory, name))) ||
+  WORKSPACE_MANIFEST_FILE_NAMES.some((spelled) => isFile(join(directory, spelled))) ||
   manifestDeclaresWorkspaces(directory);
 
 const nearestWorkspaceRoot = (directory: string): string | null => {

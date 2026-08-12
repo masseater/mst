@@ -11,7 +11,7 @@ import { createNoLocalFiniteValueSet } from "./no-local-finite-value-set--use-or
 import type { LibraryVocabularyLoader } from "../lib/library-vocabulary/vocabulary-loader.ts";
 
 const canonicalItems = ["draft", "published"] as const;
-const entry = {
+const canonicalEntry = {
   annotationStart: 0,
   binding: "ORDER_STATUSES",
   bindingStart: 40,
@@ -25,15 +25,15 @@ const entry = {
   values: canonicalItems,
 } as const;
 const catalog = buildCatalog([
-  entry,
+  canonicalEntry,
   {
-    ...entry,
+    ...canonicalEntry,
     binding: "ORDER_STATUS_NAMES",
     conceptId: "order.status.name",
     declarationPath: "packages/vocabulary/src/status-name.ts",
   },
   {
-    ...entry,
+    ...canonicalEntry,
     binding: "STATE_CODES",
     conceptId: "state.code",
     declarationPath: "packages/vocabulary/src/state-code.ts",
@@ -48,7 +48,7 @@ const catalog = buildCatalog([
 ]);
 
 const singleOwnerRule = createNoLocalFiniteValueSet({
-  loadCatalog: () => buildCatalog([entry]),
+  loadCatalog: () => buildCatalog([canonicalEntry]),
   loadLibraryVocabulary: () => [],
 });
 
@@ -96,11 +96,18 @@ const engineRule = createNoLocalFiniteValueSet({
   loadCatalog: () =>
     buildCatalog([
       {
-        ...entry,
+        ...canonicalEntry,
         binding: "ENGINES",
         conceptId: "auto-develop.engine",
         declarationPath: "packages/auto-develop/src/config/engine.ts",
         fingerprint: fingerprintValues(engineValues),
+        importRoutes: [
+          {
+            exportName: "ENGINE_NAMES",
+            resolvedSourcePaths: ["packages/auto-develop/src/config/engine.ts"],
+            specifier: "@mst/auto-develop/engine",
+          },
+        ],
         values: engineValues,
       },
     ]),
@@ -120,8 +127,8 @@ const createLibraryPreanalysisRule = () => {
   });
   return {
     ...observed,
-    create(context: Parameters<typeof observed.create>[0]) {
-      const visitor = observed.create(context);
+    create(ruleContext: Parameters<typeof observed.create>[0]) {
+      const visitor = observed.create(ruleContext);
       if (loadLibraryVocabulary.mock.calls.length === 0) {
         throw new Error("Library vocabulary was not loaded during pre-analysis");
       }
@@ -153,6 +160,9 @@ describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-va
       { code: "z.enum(Object.keys({ [name]: null, published: null }));" },
       { code: "type Loose = LocalValues[number];" },
       { code: "type Loose = keyof LocalShape;" },
+      {
+        code: 'const LocalShape = ["draft", "published"] as const; type Loose = keyof LocalShape;',
+      },
       {
         code: 'import DefaultShape, * as Shapes from "./shape.ts"; void DefaultShape; void Shapes;',
       },
@@ -276,7 +286,7 @@ describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-va
     loadCatalog: () =>
       buildCatalog([
         {
-          ...entry,
+          ...canonicalEntry,
           annotationStart: 0,
           binding: "VALUES",
           bindingStart: declarationSource.indexOf("VALUES"),
@@ -332,6 +342,12 @@ describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-va
       },
       {
         code: 'import { ENGINES } from "./config/engine.ts";\nexport function schema(ENGINES: { shadow: null; values: null }) { return z.enum(Object.keys(ENGINES)); }',
+        cwd: repositoryRoot,
+        filename: join(repositoryRoot, "packages/auto-develop/src/shadow-engine-schema.ts"),
+        errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
+      },
+      {
+        code: 'import { ENGINE_NAMES } from "./config/engine.ts";\nexport function schema(ENGINE_NAMES: readonly ["shadow", "values"]) { return z.enum(ENGINE_NAMES); }',
         cwd: repositoryRoot,
         filename: join(repositoryRoot, "packages/auto-develop/src/shadow-engine-schema.ts"),
         errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],

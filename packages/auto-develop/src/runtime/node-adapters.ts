@@ -11,9 +11,9 @@ const runFile = promisify(execFile);
 
 export const createGitRunner = (): GitRunner => ({
   run: async (invocation) => {
-    const configArgs = Object.entries(invocation.configOverrides ?? {}).flatMap(([key, value]) => [
+    const configArgs = Object.entries(invocation.configOverrides ?? {}).flatMap(([named, held]) => [
       "-c",
-      `${key}=${value}`,
+      `${named}=${held}`,
     ]);
     const finished = await runFile("git", [...configArgs, ...invocation.args], {
       cwd: invocation.cwd,
@@ -56,8 +56,8 @@ export const createTailFs = (): TailFs => ({
   },
   readExitCode: (path) => {
     try {
-      const parsed = Number(readFileSync(path, "utf8").trim());
-      return Number.isFinite(parsed) ? parsed : null;
+      const parsedNode = Number(readFileSync(path, "utf8").trim());
+      return Number.isFinite(parsedNode) ? parsedNode : null;
     } catch (readFailure) {
       void readFailure;
       return null;

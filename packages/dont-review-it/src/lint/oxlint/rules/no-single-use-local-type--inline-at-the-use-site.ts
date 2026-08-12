@@ -20,14 +20,14 @@ export const noSingleUseLocalType = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
-    if (isOutOfScopeSource(context.filename)) return {};
+  create(inspection) {
+    if (isOutOfScopeSource(inspection.filename)) return {};
 
     const declaredNodeByName = new Map<string, ESTree.Node>();
     const referenceCountByName = new Map<string, number>();
 
-    const countReference = (name: string): void => {
-      referenceCountByName.set(name, (referenceCountByName.get(name) ?? 0) + 1);
+    const countReference = (spelled: string): void => {
+      referenceCountByName.set(spelled, (referenceCountByName.get(spelled) ?? 0) + 1);
     };
 
     const declare = (node: ESTree.TSTypeAliasDeclaration | ESTree.TSInterfaceDeclaration): void => {
@@ -48,13 +48,13 @@ export const noSingleUseLocalType = createDontReviewItRule({
         if (node.expression.type === "Identifier") countReference(node.expression.name);
       },
       "Program:exit"() {
-        for (const [name, node] of declaredNodeByName) {
-          const count = referenceCountByName.get(name) ?? 0;
-          if (count >= REFERENCES_A_SHARED_TYPE) continue;
-          context.report({
+        for (const [spelled, node] of declaredNodeByName) {
+          const counted = referenceCountByName.get(spelled) ?? 0;
+          if (counted >= REFERENCES_A_SHARED_TYPE) continue;
+          inspection.report({
             node,
             messageId: "singleUseLocalType",
-            data: { name, count: count === 0 ? "nowhere" : "one place" },
+            data: { name: spelled, count: counted === 0 ? "nowhere" : "one place" },
           });
         }
       },

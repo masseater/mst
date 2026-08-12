@@ -37,20 +37,20 @@ export const noComputedTestApiMember = createDontReviewItRule({
     schema: [],
     fixable: "code",
   },
-  create(context) {
+  create(inspection) {
     const blocks = testBlockBindings();
-    const entries = assertionEntryBindings();
+    const listedEntries = assertionEntryBindings();
     const subscripts = new Set<ESTree.ComputedMemberExpression>();
 
     const reportSubscript = (node: ESTree.ComputedMemberExpression): void => {
       const member = staticSpelling(node.property);
       if (member === null) {
-        context.report({ node: node.property, messageId: "unreadableSubscript" });
+        inspection.report({ node: node.property, messageId: "unreadableSubscript" });
         return;
       }
 
       const written = `${node.optional ? "?." : "."}${member}`;
-      context.report({
+      inspection.report({
         node: node.property,
         messageId: "spelledSubscript",
         data: { member },
@@ -63,17 +63,17 @@ export const noComputedTestApiMember = createDontReviewItRule({
     return {
       ImportDeclaration(node: ESTree.ImportDeclaration) {
         blocks.takeImport(node);
-        entries.takeImport(node);
+        listedEntries.takeImport(node);
       },
       VariableDeclarator(node: ESTree.VariableDeclarator) {
         blocks.takeLocalBinding(node);
-        entries.takeLocalBinding(node);
+        listedEntries.takeLocalBinding(node);
       },
       MemberExpression(node: ESTree.MemberExpression) {
         if (node.computed) subscripts.add(node);
       },
       "Program:exit"() {
-        const rootNames = new Set([...blocks.rootNames(), ...entries.rootNames()]);
+        const rootNames = new Set([...blocks.rootNames(), ...listedEntries.rootNames()]);
         for (const node of subscripts) {
           if (rootNames.has(chainRootName(node.object) ?? "")) reportSubscript(node);
         }

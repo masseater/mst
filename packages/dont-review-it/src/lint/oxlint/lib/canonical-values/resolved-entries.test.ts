@@ -9,8 +9,8 @@ import {
 import { fingerprintValues } from "./fingerprint.ts";
 
 describe("resolved entries", () => {
-  const buildCanonicalValuesCatalog = (options: { readonly repositoryRoot: string }) =>
-    analyzeCanonicalValuesRepository(options).catalog;
+  const buildCanonicalValuesCatalog = (catalogRequest: { readonly repositoryRoot: string }) =>
+    analyzeCanonicalValuesRepository(catalogRequest).catalog;
 
   test("an annotated array becomes one binding-aware catalog entry", () => {
     const repositoryRoot = createCanonicalValuesTestRepository();
@@ -88,7 +88,7 @@ ${annotateCanonicalValues(
 
     expect(
       buildCanonicalValuesCatalog({ repositoryRoot }).entries.find(
-        (entry) => entry.conceptId === "order.status",
+        (declarationEntry) => declarationEntry.conceptId === "order.status",
       )?.values,
     ).toStrictEqual(["draft", "published"]);
   });
@@ -149,8 +149,8 @@ ${annotateCanonicalValues(conceptId, `export const STATUSES = [...BASE, "${added
 
     expect(
       buildCanonicalValuesCatalog({ repositoryRoot })
-        .entries.filter((entry) => entry.conceptId.endsWith(".status"))
-        .map((entry) => [entry.conceptId, entry.values]),
+        .entries.filter((declarationEntry) => declarationEntry.conceptId.endsWith(".status"))
+        .map((declarationEntry) => [declarationEntry.conceptId, declarationEntry.values]),
     ).toStrictEqual([
       ["article.status", ["review", "writing"]],
       ["order.status", ["draft", "published"]],
@@ -188,7 +188,7 @@ ${annotateCanonicalValues(conceptId, `export const STATUSES = [...BASE, "${added
       "an optional object key",
       "export const VALUES: { draft?: null; published: null } = { published: null };",
     ],
-  ])("%s creates a strict problem and no catalog entry", (_name, declaration) => {
+  ])("%s creates a strict problem and no catalog entry", (_caseDescription, declaration) => {
     const repositoryRoot = createCanonicalValuesTestRepository();
     writeCanonicalValuesTestFile({
       repositoryRoot,

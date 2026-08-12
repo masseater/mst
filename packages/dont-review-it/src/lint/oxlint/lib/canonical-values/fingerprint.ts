@@ -2,20 +2,22 @@ import { createHash } from "node:crypto";
 
 export type CanonicalValue = string | number | boolean | null;
 
-export const isCanonicalValue = (value: unknown): value is CanonicalValue =>
-  value === null ||
-  typeof value === "string" ||
-  typeof value === "number" ||
-  typeof value === "boolean";
+export const isCanonicalValue = (candidate: unknown): candidate is CanonicalValue =>
+  candidate === null ||
+  typeof candidate === "string" ||
+  typeof candidate === "number" ||
+  typeof candidate === "boolean";
 
-export const canonicalValueKey = (value: CanonicalValue): string =>
-  value === null ? "null:null" : `${typeof value}:${String(value)}`;
+export const canonicalValueKey = (canonicalLiteral: CanonicalValue): string =>
+  canonicalLiteral === null
+    ? "null:null"
+    : `${typeof canonicalLiteral}:${String(canonicalLiteral)}`;
 
-const normalizeValues = (values: readonly CanonicalValue[]): readonly string[] =>
-  [...new Set(values.map(canonicalValueKey))].toSorted();
+const normalizeValues = (canonicalLiterals: readonly CanonicalValue[]): readonly string[] =>
+  [...new Set(canonicalLiterals.map(canonicalValueKey))].toSorted();
 
-export const fingerprintValues = (values: readonly CanonicalValue[]): string =>
+export const fingerprintValues = (canonicalLiterals: readonly CanonicalValue[]): string =>
   createHash("sha256")
-    .update(JSON.stringify(normalizeValues(values)))
+    .update(JSON.stringify(normalizeValues(canonicalLiterals)))
     .digest("hex")
     .slice(0, 32);

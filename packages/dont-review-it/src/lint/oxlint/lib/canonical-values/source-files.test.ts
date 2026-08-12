@@ -170,15 +170,15 @@ describe("source-files", () => {
 
   test("an internal source symlink keeps cache identity but cannot promote generated source", () => {
     const root = createRepository();
-    const target = join(root, "dist/generated/consumer.ts");
+    const generatedSource = join(root, "dist/generated/consumer.ts");
     const link = join(root, "src/consumer.ts");
-    mkdirSync(dirname(target), { recursive: true });
+    mkdirSync(dirname(generatedSource), { recursive: true });
     mkdirSync(dirname(link), { recursive: true });
     writeFileSync(
-      target,
+      generatedSource,
       '// eslint-disable-next-line -- escape\nexport const status = "draft";\n',
     );
-    symlinkSync(target, link);
+    symlinkSync(generatedSource, link);
 
     const listed = listRepositoryFiles(root);
 

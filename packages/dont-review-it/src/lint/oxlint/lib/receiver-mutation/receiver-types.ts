@@ -23,23 +23,23 @@ const IMPORTED_NAMESPACE_NAME = "*";
 const firstJudged = (judged: readonly (JudgedReceiver | null)[]): JudgedReceiver | null =>
   judged.find((one) => one !== null) ?? null;
 
-const constraintDeclaredFor = (at: ESTree.Node, name: string): ESTree.TSType | null => {
+const constraintDeclaredFor = (at: ESTree.Node, spelled: string): ESTree.TSType | null => {
   const declared = ancestorsOf(at).flatMap((ancestor) =>
     "typeParameters" in ancestor ? (ancestor.typeParameters?.params ?? []) : [],
   );
-  return declared.findLast((parameter) => parameter.name.name === name)?.constraint ?? null;
+  return declared.findLast((parameter) => parameter.name.name === spelled)?.constraint ?? null;
 };
 
-const judgedTypeOf = (request: {
+const judgedTypeOf = (asked: {
   readonly node: ESTree.TSType;
   readonly at: ESTree.Node;
   readonly seenTypeNames: ReadonlySet<string>;
 }): JudgedReceiver | null => {
-  const { node, at, seenTypeNames } = request;
+  const { node, at, seenTypeNames } = asked;
   if (WIDENED_TYPE_NODES.has(node.type)) return COLLAPSED_RECEIVER;
 
   if (node.type === "TSUnionType" || node.type === "TSIntersectionType") {
-    return firstJudged(node.types.map((member) => judgedTypeOf({ ...request, node: member })));
+    return firstJudged(node.types.map((member) => judgedTypeOf({ ...asked, node: member })));
   }
   if (node.type !== "TSTypeReference" || node.typeName.type !== "Identifier") return null;
 
@@ -77,12 +77,12 @@ const judgedConstructionOf = (node: ESTree.NewExpression): JudgedReceiver | null
   return called.type === "Identifier" ? { kind: "named", type: called.name } : null;
 };
 
-const judgedDefinitionOf = (request: {
+const judgedDefinitionOf = (asked: {
   readonly definition: Definition;
   readonly at: ESTree.IdentifierReference;
   readonly reading: BindingResolution;
 }): JudgedReceiver | null => {
-  const { definition, at, reading } = request;
+  const { definition, at, reading } = asked;
   const annotation = definition.name.typeAnnotation;
   const judgedAnnotation =
     annotation === null || annotation === undefined
@@ -149,9 +149,9 @@ const declaredNamesOf = (statement: ESTree.Node): readonly string[] => {
   );
 };
 
-export const declaredTypeNamesIn = (body: ESTree.Program["body"]): ReadonlySet<string> =>
+export const declaredTypeNamesIn = (writtenBody: ESTree.Program["body"]): ReadonlySet<string> =>
   new Set(
-    body
+    writtenBody
       .map(declaringStatementOf)
       .flatMap((statement) => (statement === null ? [] : declaredNamesOf(statement))),
   );
@@ -163,9 +163,11 @@ const importedNameOf = (specifier: ESTree.ImportDeclarationSpecifier): string =>
   return imported.type === "Identifier" ? imported.name : imported.value;
 };
 
-export const importedNamesIn = (body: ESTree.Program["body"]): ReadonlyMap<string, ImportedName> =>
+export const importedNamesIn = (
+  writtenBody: ESTree.Program["body"],
+): ReadonlyMap<string, ImportedName> =>
   new Map(
-    body
+    writtenBody
       .filter((statement) => statement.type === "ImportDeclaration")
       .flatMap((statement) =>
         statement.specifiers.map((specifier): readonly [string, ImportedName] => [

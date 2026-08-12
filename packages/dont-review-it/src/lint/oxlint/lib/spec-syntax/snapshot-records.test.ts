@@ -13,17 +13,17 @@ import {
 
 const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-snapshot-records-"));
 
-const writeRecordFixture = (name: string, records: string): string => {
-  const directory = join(fixtureDir, name);
+const writeRecordFixture = (spelled: string, writtenRecords: string): string => {
+  const directory = join(fixtureDir, spelled);
   mkdirSync(join(directory, "__snapshots__"), { recursive: true });
   writeFileSync(
     join(directory, "__snapshots__", "subject.test.ts.snap"),
-    `// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html\n\n${records}`,
+    `// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html\n\n${writtenRecords}`,
   );
   return join(directory, "subject.test.ts");
 };
 
-const plainRecords = writeRecordFixture(
+const unescapedRecords = writeRecordFixture(
   "plain",
   [
     'exports[`outer > names a behaviour 1`] = `"alpha"`;',
@@ -53,7 +53,7 @@ const escapedRecords = writeRecordFixture(
 
 const withoutRecordFile = join(fixtureDir, "absent", "subject.test.ts");
 
-describe("dont-review-it/spec-syntax/snapshot-records", () => {
+describe("dont-review-it/spec-syntax/snapshot-writtenRecords", () => {
   test("a key joins the enclosing titles and ends with the ordinal", () => {
     expect(externalRecordKeyOf(["outer", "names a behaviour"], 2)).toBe(
       "outer > names a behaviour 2",
@@ -61,17 +61,17 @@ describe("dont-review-it/spec-syntax/snapshot-records", () => {
   });
 
   test("a record written on one line is read back whole", () => {
-    expect(externalRecordOf(plainRecords, "outer > names a behaviour 1")).toBe('"alpha"');
+    expect(externalRecordOf(unescapedRecords, "outer > names a behaviour 1")).toBe('"alpha"');
   });
 
   test("a record written across lines keeps the padding the runner wrote", () => {
-    expect(externalRecordOf(plainRecords, "outer > names a behaviour 2")).toBe(
+    expect(externalRecordOf(unescapedRecords, "outer > names a behaviour 2")).toBe(
       '\n{\n  "alpha": 1,\n}\n',
     );
   });
 
   test("a key the file does not carry reads as no record", () => {
-    expect(externalRecordOf(plainRecords, "outer > some other behaviour 1")).toBe(null);
+    expect(externalRecordOf(unescapedRecords, "outer > some other behaviour 1")).toBe(null);
   });
 
   test("a spec with no record file reads as no record", () => {

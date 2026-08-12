@@ -56,8 +56,8 @@ export const issueSession = async (issuance: {
   const generateCredential =
     issuance.generateCredential ?? ((): string => randomBytes(32).toString("base64url"));
   const credential = generateCredential();
-  const now = issuance.now ?? Date.now;
-  const expiresAtMs = now() + SESSION_TTL_MS;
+  const stampedNow = issuance.now ?? Date.now;
+  const expiresAtMs = stampedNow() + SESSION_TTL_MS;
   await issuance.sessions.save({
     digest: credentialDigest(credential),
     login,

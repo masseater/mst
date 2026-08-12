@@ -15,7 +15,7 @@ const formatUptime = (uptimeMs: number): string => {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
-  const padded = (value: number): string => String(value).padStart(2, "0");
+  const padded = (held: number): string => String(held).padStart(2, "0");
   return `${padded(hours)}:${padded(minutes)}:${padded(seconds)}`;
 };
 
@@ -24,8 +24,8 @@ export const renderStatusBar = (render: {
   readonly width: number;
 }): readonly string[] => {
   const { snapshot } = render;
-  const lanes = (labels: readonly string[]): string =>
-    labels.length === 0 ? "none" : labels.join(" ");
+  const lanes = (spelledLabels: readonly string[]): string =>
+    spelledLabels.length === 0 ? "none" : spelledLabels.join(" ");
   return [
     `[${snapshot.mode}] ${snapshot.engineCommand} — ${snapshot.connected ? "connected" : "reconnecting"} — up ${formatUptime(snapshot.uptimeMs)}`,
     `running: ${lanes(snapshot.runningLanes)}`,

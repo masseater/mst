@@ -9,13 +9,15 @@ const DEFAULT_EXPORT_NAME = "default";
 const exportedNameOf = (exported: ESTree.ModuleExportName): string =>
   exported.type === "Literal" ? exported.value : exported.name;
 
-const toolRequiredFileNamesFrom = (options: Readonly<Options>): readonly string[] => {
-  const [first] = options;
+const toolRequiredFileNamesFrom = (ruleOptions: Readonly<Options>): readonly string[] => {
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) return [];
 
   const { toolRequiredFileNames } = first;
   if (!Array.isArray(toolRequiredFileNames)) return [];
-  return toolRequiredFileNames.filter((entry): entry is string => typeof entry === "string");
+  return toolRequiredFileNames.filter(
+    (candidate): candidate is string => typeof candidate === "string",
+  );
 };
 
 export const noDefaultExport = createDontReviewItRule({
@@ -47,29 +49,29 @@ export const noDefaultExport = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    const isToolRequiredEntry = toolRequiredFileNamesFrom(context.options).includes(
-      basename(context.filename),
+  create(inspection) {
+    const isToolRequiredEntry = toolRequiredFileNamesFrom(inspection.options).includes(
+      basename(inspection.filename),
     );
 
     return {
       ExportDefaultDeclaration(node: ESTree.ExportDefaultDeclaration) {
         if (isToolRequiredEntry) return;
-        context.report({ node, messageId: "defaultExport" });
+        inspection.report({ node, messageId: "defaultExport" });
       },
       ExportNamedDeclaration(node: ESTree.ExportNamedDeclaration) {
         for (const specifier of node.specifiers) {
           if (exportedNameOf(specifier.exported) !== DEFAULT_EXPORT_NAME) continue;
-          context.report({ node: specifier, messageId: "defaultAliasReExport" });
+          inspection.report({ node: specifier, messageId: "defaultAliasReExport" });
         }
       },
       ExportAllDeclaration(node: ESTree.ExportAllDeclaration) {
         if (node.exported === null) return;
         if (exportedNameOf(node.exported) !== DEFAULT_EXPORT_NAME) return;
-        context.report({ node, messageId: "namespaceDefaultReExport" });
+        inspection.report({ node, messageId: "namespaceDefaultReExport" });
       },
       TSExportAssignment(node: ESTree.TSExportAssignment) {
-        context.report({ node, messageId: "exportAssignment" });
+        inspection.report({ node, messageId: "exportAssignment" });
       },
     };
   },

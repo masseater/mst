@@ -8,12 +8,12 @@ const recordingOut = (): {
   readonly out: NodeJS.WritableStream;
   readonly lines: () => readonly string[];
 } => {
-  const chunks = new Map<number, string>();
-  const write = (chunk: string): boolean => {
-    chunks.set(chunks.size, chunk);
+  const writtenChunks = new Map<number, string>();
+  const write = (writtenChunk: string): boolean => {
+    writtenChunks.set(writtenChunks.size, writtenChunk);
     return true;
   };
-  return { out: { write } as NodeJS.WritableStream, lines: () => [...chunks.values()] };
+  return { out: { write } as NodeJS.WritableStream, lines: () => [...writtenChunks.values()] };
 };
 
 const parsedLine = (line: string): Readonly<Record<string, unknown>> =>

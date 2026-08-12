@@ -91,13 +91,13 @@ const emptyTailFs: TailFs = {
 };
 
 const collect = async (stream: AsyncGenerator<string, void, undefined>): Promise<string> => {
-  const chunks = new Map<number, string>();
-  for await (const chunk of stream) chunks.set(chunks.size, chunk);
-  return [...chunks.values()].join("");
+  const writtenChunks = new Map<number, string>();
+  for await (const writtenChunk of stream) writtenChunks.set(writtenChunks.size, writtenChunk);
+  return [...writtenChunks.values()].join("");
 };
 
 type ScriptedRun = {
-  readonly output: string;
+  readonly produced: string;
   readonly rejection: unknown;
   readonly execCalls: readonly string[];
   readonly removedDirs: readonly string[];
@@ -109,16 +109,16 @@ const runScripted = async (setup: {
 }): Promise<ScriptedRun> => {
   const scripted = scriptedDeps(setup.script);
   try {
-    const output = await collect(runInTmux(scripted.deps)(setup.request));
+    const produced = await collect(runInTmux(scripted.deps)(setup.request));
     return {
-      output,
+      produced,
       rejection: undefined,
       execCalls: scripted.execArgs(),
       removedDirs: scripted.removed(),
     };
   } catch (streamFailure) {
     return {
-      output: "",
+      produced: "",
       rejection: streamFailure,
       execCalls: scripted.execArgs(),
       removedDirs: scripted.removed(),
@@ -188,14 +188,14 @@ const sleepCallsWithoutPollInterval = async (): Promise<readonly (readonly [numb
 
 const outputFlushedAtSessionEnd = (): Promise<string> => {
   const counters = new Map<string, number>([["checks", 0]]);
-  const buffers = new Map([["out", ""]]);
+  const bufferByStream = new Map([["out", ""]]);
   const exec: CommandExecutor = {
     run: (invocation) => {
       if (invocation.args[0] === "has-session") {
         const index = counters.get("checks") as number;
         counters.set("checks", index + 1);
         if (index === 0) return Promise.resolve({ exitCode: 1, stdout: "", stderr: "" });
-        buffers.set("out", "final bytes\n");
+        bufferByStream.set("out", "final bytes\n");
         return Promise.resolve({ exitCode: 1, stdout: "", stderr: "" });
       }
       return Promise.resolve({ exitCode: 0, stdout: "", stderr: "" });
@@ -203,8 +203,8 @@ const outputFlushedAtSessionEnd = (): Promise<string> => {
   };
   const fs: TailFs = {
     ...emptyTailFs,
-    readFrom: ({ offset }) => (buffers.get("out") as string).slice(offset),
-    readAll: () => buffers.get("out") as string,
+    readFrom: ({ offset }) => (bufferByStream.get("out") as string).slice(offset),
+    readAll: () => bufferByStream.get("out") as string,
   };
   return collect(
     runInTmux({ exec, fs, now: () => 0, sleep: () => Promise.resolve(), log: silentLogger })(
@@ -275,7 +275,7 @@ describe("runInTmux", () => {
   });
 
   it("正常完了時は捕捉された出力が断片の連結として得られる", ({ twoChunkRun }) => {
-    expect(twoChunkRun.output).toStrictEqual("step 1\nstep 2\n");
+    expect(twoChunkRun.produced).toStrictEqual("step 1\nstep 2\n");
   });
 
   it("非ゼロ終了はプロセス失敗エラーになる", ({ nonZeroExitRun }) => {
@@ -287,7 +287,7 @@ describe("runInTmux", () => {
   });
 
   it("非ゼロ終了のエラーは出力全文を運ぶ", ({ nonZeroExitRun }) => {
-    expect((nonZeroExitRun.rejection as ProcessFailedError).output).toStrictEqual("boom\n");
+    expect((nonZeroExitRun.rejection as ProcessFailedError).produced).toStrictEqual("boom\n");
   });
 
   it("終了コードファイルが無ければ終了コード -1 として失敗する", ({ missingExitCodeRun }) => {

@@ -21,36 +21,36 @@ describe("owner-description", () => {
   });
 
   test("a type that admits more values names the ones it admits beyond these", () => {
-    const entry = severity({ values: ["allow", "deny", "error", "off", "warn"] });
+    const listed = severity({ values: ["allow", "deny", "error", "off", "warn"] });
 
-    expect(describeLibraryOwner(entry, ["error", "warn", "off"])).toBe(
+    expect(describeLibraryOwner(listed, ["error", "warn", "off"])).toBe(
       'AllowWarnDeny from oxlint (which also admits "allow" | "deny", so narrow it)',
     );
   });
 
   test("a type that admits values outside its literals says so instead of listing them", () => {
-    const entry = severity({ admitsUnnamedValues: true });
+    const listed = severity({ admitsUnnamedValues: true });
 
-    expect(describeLibraryOwner(entry, ["error", "warn", "off"])).toBe(
+    expect(describeLibraryOwner(listed, ["error", "warn", "off"])).toBe(
       "AllowWarnDeny from oxlint (which also admits values that are not spelled out as literals, so narrow it)",
     );
   });
 
   test("a type that is wider in both ways names the extra literals and says the rest is open", () => {
-    const entry = severity({
+    const listed = severity({
       values: ["allow", "deny", "error", "off", "warn"],
       admitsUnnamedValues: true,
     });
 
-    expect(describeLibraryOwner(entry, ["error", "warn", "off"])).toBe(
+    expect(describeLibraryOwner(listed, ["error", "warn", "off"])).toBe(
       'AllowWarnDeny from oxlint (which also admits "allow" | "deny" and values that are not spelled out as literals, so narrow it)',
     );
   });
 
   test("numbers keep their spelling apart from the text that looks the same", () => {
-    const entry = severity({ typeName: "Digits", values: [1, 2, "2"] });
+    const listed = severity({ typeName: "Digits", values: [1, 2, "2"] });
 
-    expect(describeLibraryOwner(entry, [1])).toBe(
+    expect(describeLibraryOwner(listed, [1])).toBe(
       'Digits from oxlint (which also admits 2 | "2", so narrow it)',
     );
   });

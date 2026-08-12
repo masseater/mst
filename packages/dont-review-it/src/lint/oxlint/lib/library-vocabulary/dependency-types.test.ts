@@ -50,7 +50,7 @@ describe("dependency-types", () => {
   };
 
   const packageNamesOf = (packageDirectory: string): readonly string[] =>
-    dependencyTypeEntries(packageDirectory).map((entry) => entry.packageName);
+    dependencyTypeEntries(packageDirectory).map((listed) => listed.packageName);
 
   test("a dependency that names its declarations through its export map becomes an entry", () => {
     const packageDirectory = createPackage({ dependencies: { oxlint: "1.76.0" } });

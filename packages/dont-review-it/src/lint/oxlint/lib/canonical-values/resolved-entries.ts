@@ -46,13 +46,15 @@ const normalizedItems = (canonicalItems: readonly CanonicalValue[]): readonly Ca
 
 const literalValueFromType = (
   checker: ts.TypeChecker,
-  type: ts.Type,
+  literalType: ts.Type,
 ): CanonicalValue | undefined => {
-  if ((type.flags & ts.TypeFlags.StringLiteral) !== 0) return (type as ts.StringLiteralType).value;
-  if ((type.flags & ts.TypeFlags.NumberLiteral) !== 0) return (type as ts.NumberLiteralType).value;
-  if ((type.flags & ts.TypeFlags.BooleanLiteral) !== 0)
-    return checker.typeToString(type) === "true";
-  return (type.flags & ts.TypeFlags.Null) !== 0 ? null : undefined;
+  if ((literalType.flags & ts.TypeFlags.StringLiteral) !== 0)
+    return (literalType as ts.StringLiteralType).value;
+  if ((literalType.flags & ts.TypeFlags.NumberLiteral) !== 0)
+    return (literalType as ts.NumberLiteralType).value;
+  if ((literalType.flags & ts.TypeFlags.BooleanLiteral) !== 0)
+    return checker.typeToString(literalType) === "true";
+  return (literalType.flags & ts.TypeFlags.Null) !== 0 ? null : undefined;
 };
 
 const objectDomain = (input: {
@@ -91,7 +93,10 @@ const arrayDomain = (input: {
   }
   const memberTypes = input.elementType.isUnion() ? input.elementType.types : [input.elementType];
   const canonicalItems = memberTypes.map((member) => literalValueFromType(input.checker, member));
-  if (canonicalItems.length === 0 || canonicalItems.some((item) => item === undefined)) {
+  if (
+    canonicalItems.length === 0 ||
+    canonicalItems.some((canonicalItem) => canonicalItem === undefined)
+  ) {
     throw new Error(`${input.declaration.name.getText()}: canonical array must contain literals`);
   }
   return normalizedItems(canonicalItems as CanonicalValue[]);
@@ -139,13 +144,13 @@ const directInitializerValue = (expression: ts.Expression): CanonicalValue | und
 const validateDirectDuplicates = (declaration: ts.VariableDeclaration): void => {
   const unwrapped = unwrapInitializer(declaration.initializer as ts.Expression);
   if (!ts.isArrayLiteralExpression(unwrapped)) return;
-  const directItems = unwrapped.elements.flatMap((element) => {
-    if (ts.isSpreadElement(element) || ts.isOmittedExpression(element)) return [];
-    const canonicalItem = directInitializerValue(element);
+  const directItems = unwrapped.elements.flatMap((arrayElement) => {
+    if (ts.isSpreadElement(arrayElement) || ts.isOmittedExpression(arrayElement)) return [];
+    const canonicalItem = directInitializerValue(arrayElement);
     return canonicalItem === undefined ? [] : [canonicalItem];
   });
-  const keys = directItems.map(canonicalValueKey);
-  if (new Set(keys).size !== keys.length) {
+  const literalKeys = directItems.map(canonicalValueKey);
+  if (new Set(literalKeys).size !== literalKeys.length) {
     throw new Error(`${declaration.name.getText()}: canonical array contains duplicate values`);
   }
 };
@@ -223,8 +228,10 @@ const publicSourceFilesFor = (
         repositoryRoot,
       );
       if (packageDirectory === null) return [];
-      const [failure, entries] = attempt(() => publicPackageEntries(packageDirectory));
-      return failure === null && entries !== null ? entries.map((entry) => entry.sourceFile) : [];
+      const [failure, packageExports] = attempt(() => publicPackageEntries(packageDirectory));
+      return failure === null && packageExports !== null
+        ? packageExports.map((packageExport) => packageExport.sourceFile)
+        : [];
     }),
     (sourceFile) => sourceFile,
   );
@@ -266,11 +273,11 @@ const resolveGroup = (input: {
   });
   const checker = program.getTypeChecker();
   const resolutions = input.declarations.map((declaration) => {
-    const [failure, entry] = attempt(() =>
+    const [failure, declarationEntry] = attempt(() =>
       entryFor({ checker, declaration, program, repositoryRoot: input.repositoryRoot }),
     );
-    return failure === null && entry !== null
-      ? { entry, problem: null }
+    return failure === null && declarationEntry !== null
+      ? { entry: declarationEntry, problem: null }
       : { entry: null, problem: problemFor(declaration) };
   });
   return {
@@ -292,16 +299,16 @@ export const resolveCanonicalValuesEntries = (input: {
   readonly problems: readonly CanonicalValuesSourceProblem[];
 } => {
   const publicSourceFiles = publicSourceFilesFor(input.declarations, input.repositoryRoot);
-  const groups = Object.values(
+  const configurationGroups = Object.values(
     groupBy(input.declarations, (declaration) =>
       configurationKey(declaration, input.repositoryRoot),
     ),
   );
-  const resolved = groups.map((declarations) =>
+  const resolvedGroups = configurationGroups.map((declarations) =>
     resolveGroup({ ...input, declarations, publicSourceFiles }),
   );
   return {
-    entries: resolved.flatMap((result) => result.entries),
-    problems: resolved.flatMap((result) => result.problems),
+    entries: resolvedGroups.flatMap((resolution) => resolution.entries),
+    problems: resolvedGroups.flatMap((resolution) => resolution.problems),
   };
 };

@@ -12,17 +12,17 @@ const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-require-catalog-en
 
 const MODULE_SOURCE = "export const shipped = true;\n";
 
-const fixturePath = (name: string): string => join(fixtureDir, name);
+const fixturePath = (fixtureName: string): string => join(fixtureDir, fixtureName);
 
-const writeFixture = (name: string, source: string): string => {
-  const path = fixturePath(name);
+const writeFixture = (fixtureName: string, source: string): string => {
+  const path = fixturePath(fixtureName);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, source);
   return path;
 };
 
-const writeManifest = (name: string, manifest: unknown): void => {
-  writeFixture(`${name}/package.json`, `${JSON.stringify(manifest, null, 2)}\n`);
+const writeManifest = (fixtureName: string, manifest: unknown): void => {
+  writeFixture(`${fixtureName}/package.json`, `${JSON.stringify(manifest, null, 2)}\n`);
 };
 
 writeFixture("shared/pnpm-workspace.yaml", "packages:\n  - packages/*\n");
@@ -67,7 +67,7 @@ writeManifest("aliased/packages/one", {
     pad: "npm:left-pad@^1.0.0",
     scoped: "npm:@fixture/tool",
     broken: "npm:",
-    count: 5,
+    counted: 5,
   },
   optionalDependencies: { "opt-shared": "^4.0.0" },
 });
@@ -80,7 +80,7 @@ writeManifest("aliased/packages/two", {
 writeManifest("aliased/sectionless", { name: "sectionless", dependencies: "oops" });
 writeFixture("aliased/manifestless/package.json", "[]\n");
 
-const oneEntry = writeFixture("aliased/packages/one/entry.ts", MODULE_SOURCE);
+const aliasedEntryPath = writeFixture("aliased/packages/one/entry.ts", MODULE_SOURCE);
 const twoEntry = writeFixture("aliased/packages/two/entry.ts", MODULE_SOURCE);
 
 writeFixture("no-manifest/pnpm-workspace.yaml", "packages: []\n");
@@ -208,7 +208,7 @@ describe("dont-review-it/require-catalog-entry--register-shared-dependency", () 
       {
         name: "an alias is counted under the package it resolves to",
         code: MODULE_SOURCE,
-        filename: oneEntry,
+        filename: aliasedEntryPath,
         options: CATALOG,
         errors: [
           {

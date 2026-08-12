@@ -32,8 +32,8 @@ const DEFAULT_BUILTIN_MODULE_PREFIXES: readonly string[] = ["node:"];
 
 const WHITESPACE = /\s+/u;
 
-const builtinModulePrefixesFrom = (options: Readonly<Options>): readonly string[] => {
-  const [first] = options;
+const builtinModulePrefixesFrom = (ruleOptions: Readonly<Options>): readonly string[] => {
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) {
     return DEFAULT_BUILTIN_MODULE_PREFIXES;
   }
@@ -41,7 +41,9 @@ const builtinModulePrefixesFrom = (options: Readonly<Options>): readonly string[
   const configured = first[BUILTIN_MODULE_PREFIXES_OPTION];
   if (!Array.isArray(configured)) return DEFAULT_BUILTIN_MODULE_PREFIXES;
 
-  const spelled = configured.filter((entry): entry is string => typeof entry === "string");
+  const spelled = configured.filter(
+    (candidate): candidate is string => typeof candidate === "string",
+  );
   return spelled.length === 0 ? DEFAULT_BUILTIN_MODULE_PREFIXES : spelled;
 };
 
@@ -169,20 +171,20 @@ export const noViMockFactoryBehavior = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
+  create(inspection) {
     const lookup: NamespaceLookup = {
-      scopeAt: (node: ESTree.Node): Scope => context.sourceCode.getScope(node),
+      scopeAt: (node: ESTree.Node): Scope => inspection.sourceCode.getScope(node),
       spellings: new Set(DEFAULT_MOCK_NAMESPACE_SPELLINGS),
       seenBindings: new Set(),
     };
-    const builtinPrefixes = builtinModulePrefixesFrom(context.options);
+    const builtinPrefixes = builtinModulePrefixesFrom(inspection.options);
     const factories = new Set<SpecFunction>();
     const settled = new Set<SpecFunction>();
 
     const reportBehaviour = (factory: SpecFunction): void => {
       if (settled.has(factory)) return;
       settled.add(factory);
-      context.report({ node: factory, messageId: "factoryBehaviour" });
+      inspection.report({ node: factory, messageId: "factoryBehaviour" });
     };
 
     const enclosingFactory = (node: ESTree.Node): SpecFunction | null =>
@@ -190,12 +192,12 @@ export const noViMockFactoryBehavior = createDontReviewItRule({
       null;
 
     const grantsExemption = (call: ESTree.CallExpression): boolean => {
-      const written = commentBlockAbove(context.sourceCode.ast.comments, call.loc.start.line)
+      const written = commentBlockAbove(inspection.sourceCode.ast.comments, call.loc.start.line)
         .map((comment) => exemptionIn(comment))
         .filter((exemption) => exemption !== null);
 
       for (const exemption of written.filter((carried) => carried.grounds === "")) {
-        context.report({ loc: exemption.comment.loc, messageId: "unreasonedExemption" });
+        inspection.report({ loc: exemption.comment.loc, messageId: "unreasonedExemption" });
       }
       return written.some((exemption) => exemption.grounds !== "");
     };
@@ -210,7 +212,7 @@ export const noViMockFactoryBehavior = createDontReviewItRule({
       if (namesBuiltinModule(replacement.specifier, builtinPrefixes)) return;
       if (yieldsEmptyObjectOnly(replacement.factory)) return;
       if (exempted) return;
-      context.report({ node: replacement.factory, messageId: "factoryShape" });
+      inspection.report({ node: replacement.factory, messageId: "factoryShape" });
     };
 
     return {

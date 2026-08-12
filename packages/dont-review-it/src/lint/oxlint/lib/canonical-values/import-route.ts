@@ -28,8 +28,8 @@ const registeredEntriesForImportRoute = (
   query: ImportRouteQuery,
   catalog: CanonicalValuesCatalog,
 ): readonly CanonicalValuesEntry[] => {
-  const publicEntries = catalog.entries.filter((entry) =>
-    entry.importRoutes.some(
+  const publicEntries = catalog.entries.filter((declaration) =>
+    declaration.importRoutes.some(
       (route) => route.specifier === query.specifier && route.exportName === query.importedName,
     ),
   );

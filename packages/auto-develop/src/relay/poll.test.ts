@@ -16,12 +16,12 @@ const stubGithub: GithubReader = {
 };
 
 const authoredEvent = (
-  id: string,
+  identity: string,
   shape: { readonly receivedAtMs: number; readonly authorLogin?: string },
 ): StoredEvent => ({
-  id,
+  id: identity,
   eventType: "pull_request",
-  deliveryId: id,
+  deliveryId: identity,
   payload: {
     action: "opened",
     pull_request: { number: 7, user: { login: shape.authorLogin ?? "octocat" } },
@@ -32,98 +32,100 @@ const authoredEvent = (
 
 const it = test
   .extend("pollFromCursor", async () => {
-    const events = createMemoryEventStore();
+    const eventStore = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
-    await events.createIfAbsent(authoredEvent("delivery-1", { receivedAtMs: 100 }));
-    await events.createIfAbsent(authoredEvent("delivery-2", { receivedAtMs: 200 }));
-    await events.createIfAbsent(
+    await eventStore.createIfAbsent(authoredEvent("delivery-1", { receivedAtMs: 100 }));
+    await eventStore.createIfAbsent(authoredEvent("delivery-2", { receivedAtMs: 200 }));
+    await eventStore.createIfAbsent(
       authoredEvent("delivery-3", { receivedAtMs: 300, authorLogin: "hubot" }),
     );
     await cursors.write({ clientId: "octocat-author", eventId: "delivery-1" });
     const envelopes = await runPoll({
       clientId: "octocat-author",
       subscriberLogin: "octocat",
-      events,
+      events: eventStore,
       cursors,
-      ownerFilter: createOwnerFilter({ events, github: stubGithub }),
+      ownerFilter: createOwnerFilter({ events: eventStore, github: stubGithub }),
     });
     const cursorAfterPoll = await cursors.read("octocat-author");
     return { envelopes, cursorAfterPoll };
   })
   .extend("pollWithoutCursor", async () => {
-    const events = createMemoryEventStore();
-    await events.createIfAbsent(
+    const eventStore = createMemoryEventStore();
+    await eventStore.createIfAbsent(
       authoredEvent("delivery-recent", { receivedAtMs: Date.now() - 1000 }),
     );
     return runPoll({
       clientId: "octocat-author",
       subscriberLogin: "octocat",
-      events,
+      events: eventStore,
       cursors: createMemoryCursorStore(),
-      ownerFilter: createOwnerFilter({ events, github: stubGithub }),
+      ownerFilter: createOwnerFilter({ events: eventStore, github: stubGithub }),
     });
   })
   .extend("pollFromVanishedCursor", async () => {
-    const events = createMemoryEventStore();
+    const eventStore = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
     await cursors.write({ clientId: "octocat-author", eventId: "delivery-vanished" });
-    await events.createIfAbsent(
+    await eventStore.createIfAbsent(
       authoredEvent("delivery-recent", { receivedAtMs: Date.now() - 1000 }),
     );
     return runPoll({
       clientId: "octocat-author",
       subscriberLogin: "octocat",
-      events,
+      events: eventStore,
       cursors,
-      ownerFilter: createOwnerFilter({ events, github: stubGithub }),
+      ownerFilter: createOwnerFilter({ events: eventStore, github: stubGithub }),
     });
   })
   .extend("pollWithNothingFollowing", async () => {
-    const events = createMemoryEventStore();
+    const eventStore = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
-    await events.createIfAbsent(authoredEvent("delivery-1", { receivedAtMs: 100 }));
+    await eventStore.createIfAbsent(authoredEvent("delivery-1", { receivedAtMs: 100 }));
     await cursors.write({ clientId: "octocat-author", eventId: "delivery-1" });
     const envelopes = await runPoll({
       clientId: "octocat-author",
       subscriberLogin: "octocat",
-      events,
+      events: eventStore,
       cursors,
-      ownerFilter: createOwnerFilter({ events, github: stubGithub }),
+      ownerFilter: createOwnerFilter({ events: eventStore, github: stubGithub }),
     });
     const cursorAfterPoll = await cursors.read("octocat-author");
     return { envelopes, cursorAfterPoll };
   })
   .extend("pollOverForeignEventsOnly", async () => {
-    const events = createMemoryEventStore();
+    const eventStore = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
-    await events.createIfAbsent(authoredEvent("delivery-1", { receivedAtMs: 100 }));
-    await events.createIfAbsent(
+    await eventStore.createIfAbsent(authoredEvent("delivery-1", { receivedAtMs: 100 }));
+    await eventStore.createIfAbsent(
       authoredEvent("delivery-2", { receivedAtMs: 200, authorLogin: "hubot" }),
     );
     await cursors.write({ clientId: "octocat-author", eventId: "delivery-1" });
     const envelopes = await runPoll({
       clientId: "octocat-author",
       subscriberLogin: "octocat",
-      events,
+      events: eventStore,
       cursors,
-      ownerFilter: createOwnerFilter({ events, github: stubGithub }),
+      ownerFilter: createOwnerFilter({ events: eventStore, github: stubGithub }),
     });
     const cursorAfterPoll = await cursors.read("octocat-author");
     return { envelopes, cursorAfterPoll };
   })
   .extend("pollForSecondOperator", async () => {
-    const events = createMemoryEventStore();
+    const eventStore = createMemoryEventStore();
     const nowMs = Date.now();
-    await events.createIfAbsent(authoredEvent("delivery-octocat", { receivedAtMs: nowMs - 2000 }));
-    await events.createIfAbsent(
+    await eventStore.createIfAbsent(
+      authoredEvent("delivery-octocat", { receivedAtMs: nowMs - 2000 }),
+    );
+    await eventStore.createIfAbsent(
       authoredEvent("delivery-hubot", { receivedAtMs: nowMs - 1000, authorLogin: "hubot" }),
     );
     return runPoll({
       clientId: "hubot-author",
       subscriberLogin: "hubot",
-      events,
+      events: eventStore,
       cursors: createMemoryCursorStore(),
-      ownerFilter: createOwnerFilter({ events, github: stubGithub }),
+      ownerFilter: createOwnerFilter({ events: eventStore, github: stubGithub }),
     });
   });
 

@@ -67,17 +67,17 @@ const unitOf = (
   file: ScannedTypeFile,
   named: readonly [string, readonly ScannedTypeDeclaration[]],
 ): IndexedType => {
-  const [name, declared] = named;
+  const [spelled, declared] = named;
   const structure = mergedStructureOf(declared);
   const structureForm = structureFormOf(structure);
-  const kinds = uniq(declared.map((declaration) => declaration.kind)).toSorted();
+  const nodeKinds = uniq(declared.map((declaration) => declaration.kind)).toSorted();
 
   return {
     relativePath: file.relativePath,
     workspacePath: file.workspacePath,
-    name,
+    name: spelled,
     line: Math.min(...declared.map((declaration) => declaration.line)),
-    declarationForm: JSON.stringify([kinds, structureForm]),
+    declarationForm: JSON.stringify([nodeKinds, structureForm]),
     structureForm,
     memberCount: structure.members.length,
     referencesNamedType: declared.some((declaration) => declaration.referencesNamedType),
@@ -95,18 +95,18 @@ const sitesKeyedBy = (
   keyOf: (unit: IndexedType) => string,
 ): ReadonlyMap<string, readonly IndexedType[]> =>
   new Map(
-    Object.entries(groupBy(units, keyOf)).map(([key, grouped]) => [
-      key,
+    Object.entries(groupBy(units, keyOf)).map(([namedKey, grouped]) => [
+      namedKey,
       sortBy(grouped, ["relativePath", "line"]),
     ]),
   );
 
 export const buildTypeAuthorityIndex = (files: readonly ScannedTypeFile[]): TypeAuthorityIndex => {
   const indexed = files.map((file) => ({ relativePath: file.relativePath, units: unitsIn(file) }));
-  const units = indexed.flatMap((entry) => entry.units);
+  const units = indexed.flatMap((listed) => listed.units);
 
   return {
-    typesByPath: new Map(indexed.map((entry) => [entry.relativePath, entry.units])),
+    typesByPath: new Map(indexed.map((listed) => [listed.relativePath, listed.units])),
     sitesByWorkspaceName: sitesKeyedBy(units, workspaceNameKeyOf),
     sitesByStructure: sitesKeyedBy(
       units.filter(carriesNonTrivialStructure),

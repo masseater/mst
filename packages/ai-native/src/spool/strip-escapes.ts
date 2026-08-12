@@ -63,24 +63,24 @@ const stringEscape: StripState = {
     byte === 0x5c || byte === BEL ? { state: ground, emitted: "" } : escapeLead.consume(byte),
 };
 
-const consumeBytes = (state: StripState, bytes: Buffer): StripStep =>
+const consumeBytes = (heldState: StripState, bytes: Buffer): StripStep =>
   bytes.reduce<StripStep>(
     (accumulated, byte) => {
       const step = accumulated.state.consume(byte);
       return { state: step.state, emitted: accumulated.emitted + step.emitted };
     },
-    { state, emitted: "" },
+    { state: heldState, emitted: "" },
   );
 
 class StripCursor {
-  private state: StripState = ground;
+  private heldState: StripState = ground;
 
-  advance(chunk: Buffer): Buffer | undefined {
-    if (this.state === ground && !chunk.includes(ESC)) {
-      return chunk;
+  advance(writtenChunk: Buffer): Buffer | undefined {
+    if (this.heldState === ground && !writtenChunk.includes(ESC)) {
+      return writtenChunk;
     }
-    const consumed = consumeBytes(this.state, chunk);
-    this.state = consumed.state;
+    const consumed = consumeBytes(this.heldState, writtenChunk);
+    this.heldState = consumed.state;
     return consumed.emitted === "" ? undefined : Buffer.from(consumed.emitted, "latin1");
   }
 }
@@ -88,8 +88,8 @@ class StripCursor {
 export const createEscapeStripper = (): Duplex =>
   Duplex.from(async function* (source: AsyncIterable<Buffer>) {
     const cursor = new StripCursor();
-    for await (const chunk of source) {
-      const emitted = cursor.advance(chunk);
+    for await (const writtenChunk of source) {
+      const emitted = cursor.advance(writtenChunk);
       if (emitted !== undefined) {
         yield emitted;
       }

@@ -25,16 +25,16 @@ describe("catalog cache fingerprint", () => {
     const firstTarget = join(repositoryRoot, "src/first.ts");
     const secondTarget = join(repositoryRoot, "src/second.ts");
     const link = join(repositoryRoot, "src/public.ts");
-    const contents = 'export const value = "draft";\n';
+    const fileText = 'export const value = "draft";\n';
     writeCanonicalValuesTestFile({
       repositoryRoot,
       relativePath: "src/first.ts",
-      contents,
+      contents: fileText,
     });
     writeCanonicalValuesTestFile({
       repositoryRoot,
       relativePath: "src/second.ts",
-      contents,
+      contents: fileText,
     });
     symlinkSync(firstTarget, link);
     const first = cacheInputFingerprint(listRepositoryFiles(repositoryRoot).cacheInputs);

@@ -12,9 +12,9 @@ describe("catalog cache", () => {
   const cachePathOf = (repositoryRoot: string): string =>
     join(repositoryRoot, "node_modules", ".cache", "mst-dont-review-it", "canonical-values.json");
 
-  const cacheIntegrity = (fingerprint: string, entries: readonly unknown[]): string =>
+  const cacheIntegrity = (fingerprint: string, catalogEntries: readonly unknown[]): string =>
     createHash("sha256")
-      .update(JSON.stringify({ version: 5, fingerprint, entries }))
+      .update(JSON.stringify({ version: 5, fingerprint, entries: catalogEntries }))
       .digest("hex");
 
   const validEntry = {
@@ -37,33 +37,33 @@ describe("catalog cache", () => {
     values: ["draft"],
   };
 
-  const writeCachePayload = (repositoryRoot: string, payload: unknown): void => {
+  const writeCachePayload = (repositoryRoot: string, cacheDocument: unknown): void => {
     const path = cachePathOf(repositoryRoot);
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, JSON.stringify(payload), "utf8");
+    writeFileSync(path, JSON.stringify(cacheDocument), "utf8");
   };
 
-  const currentPayload = (
-    entries: readonly unknown[] = [validEntry],
+  const validCacheDocument = (
+    catalogEntries: readonly unknown[] = [validEntry],
     fingerprint = "repository-fingerprint",
   ) => ({
-    entries,
+    entries: catalogEntries,
     fingerprint,
-    integrity: cacheIntegrity(fingerprint, entries),
+    integrity: cacheIntegrity(fingerprint, catalogEntries),
     version: 5,
   });
 
-  const readPayload = (payload: unknown, fingerprint = "repository-fingerprint") => {
+  const readCacheDocument = (cacheDocument: unknown, fingerprint = "repository-fingerprint") => {
     const repositoryRoot = createCanonicalValuesTestRepository();
-    writeCachePayload(repositoryRoot, payload);
+    writeCachePayload(repositoryRoot, cacheDocument);
     return readCachedEntries(repositoryRoot, fingerprint);
   };
 
   test("a valid current payload is read only for its own repository fingerprint", () => {
-    const payload = currentPayload();
+    const cacheDocument = validCacheDocument();
 
-    expect(readPayload(payload)).toStrictEqual([validEntry]);
-    expect(readPayload(payload, "other-fingerprint")).toBe(null);
+    expect(readCacheDocument(cacheDocument)).toStrictEqual([validEntry]);
+    expect(readCacheDocument(cacheDocument, "other-fingerprint")).toBe(null);
   });
 
   test("an unreadable cache is treated as a cache miss", () => {
@@ -79,13 +79,13 @@ describe("catalog cache", () => {
     null,
     "cache",
     {},
-    { ...currentPayload(), version: 4 },
-    { ...currentPayload(), fingerprint: 1 },
-    { ...currentPayload(), integrity: 1 },
-    { ...currentPayload(), entries: "entries" },
-    { ...currentPayload(), integrity: "forged" },
-  ])("an invalid cache envelope is rejected", (payload) => {
-    expect(readPayload(payload)).toBe(null);
+    { ...validCacheDocument(), version: 4 },
+    { ...validCacheDocument(), fingerprint: 1 },
+    { ...validCacheDocument(), integrity: 1 },
+    { ...validCacheDocument(), entries: "entries" },
+    { ...validCacheDocument(), integrity: "forged" },
+  ])("an invalid cache envelope is rejected", (cacheDocument) => {
+    expect(readCacheDocument(cacheDocument)).toBe(null);
   });
 
   test.each([
@@ -112,8 +112,8 @@ describe("catalog cache", () => {
     { ...validEntry, fingerprint: "not-a-fingerprint" },
     { ...validEntry, packageName: 1 },
     { ...validEntry, packageName: "" },
-  ])("an entry with invalid identity or offsets is rejected", (entry) => {
-    expect(readPayload(currentPayload([entry]))).toBe(null);
+  ])("an entry with invalid identity or offsets is rejected", (candidateEntry) => {
+    expect(readCacheDocument(validCacheDocument([candidateEntry]))).toBe(null);
   });
 
   test.each([
@@ -153,8 +153,8 @@ describe("catalog cache", () => {
         { ...validEntry.importRoutes[0], resolvedSourcePaths: ["src/index.ts", "src/index.ts"] },
       ],
     },
-  ])("an entry with an invalid import route is rejected", (entry) => {
-    expect(readPayload(currentPayload([entry]))).toBe(null);
+  ])("an entry with an invalid import route is rejected", (candidateEntry) => {
+    expect(readCacheDocument(validCacheDocument([candidateEntry]))).toBe(null);
   });
 
   test.each([
@@ -163,8 +163,8 @@ describe("catalog cache", () => {
     { ...validEntry, values: [{}] },
     { ...validEntry, values: ["draft", "draft"] },
     { ...validEntry, values: ["draft"], fingerprint: fingerprintValues(["other"]) },
-  ])("an entry with an invalid canonical domain is rejected", (entry) => {
-    expect(readPayload(currentPayload([entry]))).toBe(null);
+  ])("an entry with an invalid canonical domain is rejected", (candidateEntry) => {
+    expect(readCacheDocument(validCacheDocument([candidateEntry]))).toBe(null);
   });
 
   test("cache input problems participate in the fingerprint", () => {

@@ -70,8 +70,10 @@ const duplicateConceptsIn = (
   readonly conceptIds: ReadonlySet<string>;
   readonly problems: readonly CanonicalValuesDuplicateProblem[];
 } => {
-  const groups = [...Map.groupBy(declarations, (declaration) => declaration.conceptId).values()];
-  const duplicates = groups.filter(hasDuplicateDeclarations);
+  const conceptGroups = [
+    ...Map.groupBy(declarations, (declaration) => declaration.conceptId).values(),
+  ];
+  const duplicates = conceptGroups.filter(hasDuplicateDeclarations);
   return {
     conceptIds: new Set(duplicates.map(([first]) => first.conceptId)),
     problems: duplicates.flatMap(([first, ...rest]) => {
@@ -120,10 +122,10 @@ const analyzeRepositoryFiles = ({
     repositoryRoot,
     sourceFiles: repositoryFiles.commentSources.map((source) => source.absolutePath),
   });
-  const entries = repositoryFiles.problems.length === 0 ? resolved.entries : [];
+  const catalogEntries = repositoryFiles.problems.length === 0 ? resolved.entries : [];
 
   return {
-    catalog: buildCatalog(sortBy(entries, ["declarationPath", "declarationStart"]), {
+    catalog: buildCatalog(sortBy(catalogEntries, ["declarationPath", "declarationStart"]), {
       packageNames: packageNamesIn(repositoryFiles.manifests),
       sourceScope,
     }),
@@ -202,5 +204,5 @@ const buildAndCacheCatalog = (input: {
 };
 
 export const loadCanonicalValuesCatalogSnapshot = memoize(buildCanonicalValuesCatalog, {
-  getCacheKey: (options) => resolve(options.repositoryRoot),
+  getCacheKey: (catalogRequest) => resolve(catalogRequest.repositoryRoot),
 });

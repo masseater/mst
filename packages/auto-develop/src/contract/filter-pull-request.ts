@@ -11,20 +11,22 @@ import {
 import type { FilteredEvent } from "./filtered-event.ts";
 
 type PullRequestShape = {
-  readonly event: Readonly<Record<string, unknown>>;
+  readonly delivered: Readonly<Record<string, unknown>>;
   readonly action: string;
   readonly pullRequest: Readonly<Record<string, unknown>>;
   readonly pullNumber: number;
 };
 
-const pullRequestShape = (event: Readonly<Record<string, unknown>>): PullRequestShape | null => {
-  const action = event.action;
-  const pullRequest = asRecord(event.pull_request);
+const pullRequestShape = (
+  delivered: Readonly<Record<string, unknown>>,
+): PullRequestShape | null => {
+  const action = delivered.action;
+  const pullRequest = asRecord(delivered.pull_request);
   const pullNumber = pullRequest?.number;
   if (typeof action !== "string" || pullRequest === undefined || typeof pullNumber !== "number") {
     return null;
   }
-  return { event, action, pullRequest, pullNumber };
+  return { delivered, action, pullRequest, pullNumber };
 };
 
 const reviewRequestedEvent = (
@@ -39,15 +41,19 @@ const reviewRequestedEvent = (
     ...(reviewerLogin === undefined ? {} : { reviewerLogin }),
     ...(typeof title === "string" ? { title } : {}),
     ...(typeof draft === "boolean" ? { draft } : {}),
-    ...carriedDeliveryId(shape.event),
+    ...carriedDeliveryId(shape.delivered),
   };
 };
 
-const exclusionEdgeEvent = (shape: PullRequestShape, mode: Mode): FilteredEvent | null => {
+const exclusionEdgeEvent = (shape: PullRequestShape, spelledMode: Mode): FilteredEvent | null => {
   if (shape.action === "labeled") {
-    return { kind: "pr-excluded", pullNumber: shape.pullNumber, ...carriedDeliveryId(shape.event) };
+    return {
+      kind: "pr-excluded",
+      pullNumber: shape.pullNumber,
+      ...carriedDeliveryId(shape.delivered),
+    };
   }
-  return mode === "reviewer" ? reviewRequestedEvent(shape, undefined) : null;
+  return spelledMode === "reviewer" ? reviewRequestedEvent(shape, undefined) : null;
 };
 
 const filterForReviewer = (shape: PullRequestShape): FilteredEvent | null => {
@@ -56,20 +62,20 @@ const filterForReviewer = (shape: PullRequestShape): FilteredEvent | null => {
       kind: "review-input-changed",
       changedInput: "head",
       pullNumber: shape.pullNumber,
-      ...carriedDeliveryId(shape.event),
+      ...carriedDeliveryId(shape.delivered),
     };
   }
-  const changes = asRecord(shape.event.changes);
+  const changes = asRecord(shape.delivered.changes);
   if (shape.action === "edited" && changes !== undefined && Object.hasOwn(changes, "base")) {
     return {
       kind: "review-input-changed",
       changedInput: "base",
       pullNumber: shape.pullNumber,
-      ...carriedDeliveryId(shape.event),
+      ...carriedDeliveryId(shape.delivered),
     };
   }
   if (shape.action === "review_requested") {
-    return reviewRequestedEvent(shape, requestedReviewerLogin(shape.event));
+    return reviewRequestedEvent(shape, requestedReviewerLogin(shape.delivered));
   }
   return null;
 };
@@ -79,27 +85,31 @@ const filterForAuthor = (shape: PullRequestShape): FilteredEvent | null => {
     return {
       kind: "merge-conflict",
       pullNumber: shape.pullNumber,
-      ...carriedDeliveryId(shape.event),
+      ...carriedDeliveryId(shape.delivered),
     };
   }
   if (indicatesBehindBase(shape.pullRequest)) {
-    return { kind: "base-update", pullNumber: shape.pullNumber, ...carriedDeliveryId(shape.event) };
+    return {
+      kind: "base-update",
+      pullNumber: shape.pullNumber,
+      ...carriedDeliveryId(shape.delivered),
+    };
   }
   return null;
 };
 
 export const filterPullRequestEvent = (
-  event: Readonly<Record<string, unknown>>,
-  mode: Mode,
+  delivered: Readonly<Record<string, unknown>>,
+  spelledMode: Mode,
 ): FilteredEvent | null => {
-  const shape = pullRequestShape(event);
+  const shape = pullRequestShape(delivered);
   if (shape === null) return null;
   if (shape.action === "closed") {
-    return { kind: "pr-closed", pullNumber: shape.pullNumber, ...carriedDeliveryId(event) };
+    return { kind: "pr-closed", pullNumber: shape.pullNumber, ...carriedDeliveryId(delivered) };
   }
   const isExclusionEdge = shape.action === "labeled" || shape.action === "unlabeled";
-  if (isExclusionEdge && asRecord(event.label)?.name === EXCLUSION_LABEL) {
-    return exclusionEdgeEvent(shape, mode);
+  if (isExclusionEdge && asRecord(delivered.label)?.name === EXCLUSION_LABEL) {
+    return exclusionEdgeEvent(shape, spelledMode);
   }
-  return mode === "reviewer" ? filterForReviewer(shape) : filterForAuthor(shape);
+  return spelledMode === "reviewer" ? filterForReviewer(shape) : filterForAuthor(shape);
 };

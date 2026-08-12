@@ -52,13 +52,15 @@ type SnapshotPin = {
   readonly site: BlockSite;
 };
 
-const snapshotMatchersFrom = (options: Readonly<Options>): ReadonlySet<string> => {
-  const [first] = options;
+const snapshotMatchersFrom = (ruleOptions: Readonly<Options>): ReadonlySet<string> => {
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) return SNAPSHOT_MATCHERS;
 
   const configured = first[SNAPSHOT_MATCHERS_OPTION];
   if (!Array.isArray(configured)) return SNAPSHOT_MATCHERS;
-  return new Set(configured.filter((entry): entry is string => typeof entry === "string"));
+  return new Set(
+    configured.filter((candidate): candidate is string => typeof candidate === "string"),
+  );
 };
 
 const matcherCalledOn = (node: ESTree.Node): string | null => {
@@ -98,7 +100,7 @@ const blockSiteAround = (node: ESTree.Node, rootNames: ReadonlySet<string>): Blo
 
 const fixtureBoundName = (block: ESTree.CallExpression, local: string): string | null =>
   testCallbacksOf(block)
-    .flatMap((callback) => fixtureDependenciesOf(callback) ?? [])
+    .flatMap((taken) => fixtureDependenciesOf(taken) ?? [])
     .find((dependency) => dependency.boundAs === local)?.name ?? null;
 
 const fixtureRootOf = (subject: ESTree.Expression, site: BlockSite | null): string | null => {
@@ -109,17 +111,17 @@ const fixtureRootOf = (subject: ESTree.Expression, site: BlockSite | null): stri
 };
 
 const handedTo = (
-  entry: ESTree.CallExpression,
+  assertionEntry: ESTree.CallExpression,
 ): ESTree.Expression | ESTree.SpreadElement | null => {
-  const [handed] = entry.arguments;
+  const [handed] = assertionEntry.arguments;
   return handed ?? null;
 };
 
 const projectionOf = (
-  entry: ESTree.CallExpression,
+  assertionEntry: ESTree.CallExpression,
   rootNames: ReadonlySet<string>,
 ): Projection | null => {
-  const handed = handedTo(entry);
+  const handed = handedTo(assertionEntry);
   if (handed === null) return null;
   if (handed.type === "SpreadElement") {
     return { at: handed, messageId: DERIVED_SUBJECT, root: null, site: null };
@@ -129,7 +131,7 @@ const projectionOf = (
   const messageId = messageIdFor(subject);
   if (messageId === null) return null;
 
-  const site = blockSiteAround(entry, rootNames);
+  const site = blockSiteAround(assertionEntry, rootNames);
   return { at: subject, messageId, root: fixtureRootOf(subject, site), site };
 };
 
@@ -173,27 +175,27 @@ export const noExpectProjectedSubject = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
-    const snapshotMatchers = snapshotMatchersFrom(context.options);
+    const snapshotMatchers = snapshotMatchersFrom(inspection.options);
     const bindings = testBlockBindings();
-    const entries = new Set<ESTree.CallExpression>();
+    const listedEntries = new Set<ESTree.CallExpression>();
 
     const pinOf = (
-      entry: ESTree.CallExpression,
+      assertionEntry: ESTree.CallExpression,
       rootNames: ReadonlySet<string>,
     ): SnapshotPin | null => {
-      const handed = handedTo(entry);
+      const handed = handedTo(assertionEntry);
       if (handed === null || handed.type === "SpreadElement") return null;
 
       const subject = unwrapSubject(handed);
       if (subject.type !== "Identifier") return null;
 
-      const matcher = matcherCalledOn(entry);
+      const matcher = matcherCalledOn(assertionEntry);
       if (matcher === null || !snapshotMatchers.has(matcher)) return null;
 
-      const site = blockSiteAround(entry, rootNames);
+      const site = blockSiteAround(assertionEntry, rootNames);
       if (site === null) return null;
 
       const root = fixtureBoundName(site.block, subject.name);
@@ -208,20 +210,20 @@ export const noExpectProjectedSubject = createDontReviewItRule({
         bindings.takeLocalBinding(node);
       },
       CallExpression(node: ESTree.CallExpression) {
-        if (isAssertionEntryCall(node)) entries.add(node);
+        if (isAssertionEntryCall(node)) listedEntries.add(node);
       },
       "Program:exit"() {
         const rootNames = bindings.rootNames();
-        const pins = [...entries].flatMap((entry) => {
-          const pin = pinOf(entry, rootNames);
+        const pins = [...listedEntries].flatMap((listed) => {
+          const pin = pinOf(listed, rootNames);
           return pin === null ? [] : [pin];
         });
 
-        for (const entry of entries) {
-          const projection = projectionOf(entry, rootNames);
+        for (const listed of listedEntries) {
+          const projection = projectionOf(listed, rootNames);
           if (projection === null) continue;
           if (pins.some((pin) => excusedBy(pin, projection))) continue;
-          context.report({ node: projection.at, messageId: projection.messageId });
+          inspection.report({ node: projection.at, messageId: projection.messageId });
         }
       },
     };

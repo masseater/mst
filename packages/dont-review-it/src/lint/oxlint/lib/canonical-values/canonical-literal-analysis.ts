@@ -96,9 +96,10 @@ export const analyzeCanonicalLiterals = (input: {
   return sourceNodes(input.sourceCode).flatMap(({ ancestors, node }) => {
     const candidate = candidateAt({ ancestors, node });
     if (candidate === null || exemptPosition(ancestors, candidate.node)) return [];
-    const entries = input.catalog.entriesByValue.get(canonicalValueKey(candidate.spelling)) ?? [];
-    if (entries.length === 0) return [];
+    const declarations =
+      input.catalog.entriesByValue.get(canonicalValueKey(candidate.spelling)) ?? [];
+    if (declarations.length === 0) return [];
     if (ranges.some((range) => rangeContainsCandidate(range, candidate))) return [];
-    return [{ entries, ...candidate }];
+    return [{ entries: declarations, ...candidate }];
   });
 };

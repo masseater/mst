@@ -39,10 +39,12 @@ const buildRepositoryCellClassIndex = ({
 
 const indexByRepositoryRoot = new Map<string, CellClassIndex>();
 
-export const loadRepositoryCellClassIndex = (options: {
+export const loadRepositoryCellClassIndex = ({
+  repositoryRoot,
+}: {
   readonly repositoryRoot: string;
 }): CellClassIndex => {
-  const root = resolve(options.repositoryRoot);
+  const root = resolve(repositoryRoot);
   const memoized = indexByRepositoryRoot.get(root);
   if (memoized !== undefined) return memoized;
 

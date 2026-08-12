@@ -6,7 +6,7 @@ import type { AgenticDocumentsConfig } from "../config.ts";
 import type { DocumentProblem } from "../problem.ts";
 import type { NormativeDocument } from "../scan/normative-documents.ts";
 
-const MESSAGE =
+const COMPLAINT =
   "同じ節に良い例と悪い例のコードを対で置くことは禁止されている。差を機械が判別できるなら検査を作り、例はその検査の説明文書へ移す。判別できないなら例を消し、何を見て判断するのかを条件と行動として書く。";
 
 const COMMENT_PREFIXES = ["//", "#", "--", ";;", "%"];
@@ -137,7 +137,7 @@ export const contrastiveCodePairs = ({
     marked
       .filter((site) =>
         marked.some(
-          (other) => other.sectionKey === site.sectionKey && other.marker !== site.marker,
+          (later) => later.sectionKey === site.sectionKey && later.marker !== site.marker,
         ),
       )
       .map((site) => site.sectionKey),
@@ -145,5 +145,5 @@ export const contrastiveCodePairs = ({
 
   return marked
     .filter((site) => pairedSections.has(site.sectionKey))
-    .map((site) => ({ file: document.file, line: lineOf(site.node), message: MESSAGE }));
+    .map((site) => ({ file: document.file, line: lineOf(site.node), message: COMPLAINT }));
 };

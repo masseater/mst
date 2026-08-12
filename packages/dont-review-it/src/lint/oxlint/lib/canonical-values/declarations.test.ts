@@ -61,7 +61,7 @@ export const ORDER_STATUSES = ["draft"] as const;
     ["an enum", 'export enum Status { Draft = "draft" }'],
     ["a function", "export function status() { return 'draft'; }"],
     ["a class", "export class Status {}"],
-  ])("%s cannot become an owner", (_name, statement) => {
+  ])("%s cannot become an owner", (_declarationForm, statement) => {
     expect(
       scanCanonicalValuesText(`/** ${CANONICAL_VALUES_TAG} fake.owner */
 ${statement}

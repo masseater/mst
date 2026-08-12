@@ -111,11 +111,11 @@ const foreignFilesByScan = new Map<string, ReadonlyMap<string, readonly ForeignF
 export const foreignFilesIn = (
   scan: SpecDirectoryScan,
 ): ReadonlyMap<string, readonly ForeignFile[]> => {
-  const key = keyOf(scan);
-  const memoized = foreignFilesByScan.get(key);
+  const named = keyOf(scan);
+  const memoized = foreignFilesByScan.get(named);
   if (memoized !== undefined) return memoized;
 
   const read = readScan(scan);
-  foreignFilesByScan.set(key, read);
+  foreignFilesByScan.set(named, read);
   return read;
 };

@@ -62,10 +62,10 @@ const isTautologicalAssertion = (node: ESTree.CallExpression): boolean => {
   const operands = equalityOperandsOf(node);
   if (operands === null) return false;
 
-  const expected = fixedValueOf(operands.expectedNode);
+  const wanted = fixedValueOf(operands.expectedNode);
   const subject = fixedValueOf(operands.subjectNode);
-  if (expected === null || subject === null) return false;
-  return isEqual(expected.held, subject.held);
+  if (wanted === null || subject === null) return false;
+  return isEqual(wanted.held, subject.held);
 };
 
 export const noTautologicalAssertion = createDontReviewItRule({
@@ -83,11 +83,11 @@ export const noTautologicalAssertion = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
+  create(inspection) {
     return {
       CallExpression(node: ESTree.CallExpression) {
         if (!isTautologicalAssertion(node)) return;
-        context.report({ node, messageId: "tautologicalAssertion" });
+        inspection.report({ node, messageId: "tautologicalAssertion" });
       },
     };
   },

@@ -16,9 +16,9 @@ import type { CanonicalValue } from "../lib/canonical-values/fingerprint.ts";
 import type { LibraryVocabularyLoader } from "../lib/library-vocabulary/vocabulary-loader.ts";
 import type { RuleMessage } from "../lib/rule-message.ts";
 
-const ownerDescription = (entry: CanonicalValuesEntry): string => {
-  const routes = entry.importRoutes.map((route) => route.specifier).join(", ");
-  return `${entry.conceptId} ${routes === "" ? `declared in ${entry.declarationPath}` : `exported from ${routes}`}`;
+const ownerDescription = (canonicalOwner: CanonicalValuesEntry): string => {
+  const routes = canonicalOwner.importRoutes.map((route) => route.specifier).join(", ");
+  return `${canonicalOwner.conceptId} ${routes === "" ? `declared in ${canonicalOwner.declarationPath}` : `exported from ${routes}`}`;
 };
 
 const catalogOwnerReport = (input: {
@@ -132,20 +132,20 @@ export const createNoLocalFiniteValueSet = (input: {
       },
       schema: OWNERSHIP_POLICY_SCHEMA,
     },
-    create(context) {
-      const repositoryRoot = findWorkspaceRoot(context.cwd);
-      if (isOutOfScopeLintSource(context.filename, repositoryRoot)) return {};
+    create(ruleContext) {
+      const repositoryRoot = findWorkspaceRoot(ruleContext.cwd);
+      if (isOutOfScopeLintSource(ruleContext.filename, repositoryRoot)) return {};
       const catalog = input.loadCatalog({ repositoryRoot });
-      const ownershipPolicy = ownershipPolicyOf(context.options);
+      const ownershipPolicy = ownershipPolicyOf(ruleContext.options);
       const reports = analyzeLocalFiniteValues({
         catalog,
-        filename: context.filename,
+        filename: ruleContext.filename,
         repositoryRoot,
-        sourceCode: context.sourceCode,
+        sourceCode: ruleContext.sourceCode,
       }).map((diagnostic) =>
         preparedReport({
           diagnostic,
-          filename: context.filename,
+          filename: ruleContext.filename,
           loadLibraryVocabulary: input.loadLibraryVocabulary,
           ownershipPolicy,
           repositoryRoot,
@@ -154,7 +154,7 @@ export const createNoLocalFiniteValueSet = (input: {
       return {
         Program() {
           for (const report of reports) {
-            context.report({
+            ruleContext.report({
               node: report.node,
               messageId: report.messageId,
               data: report.data,

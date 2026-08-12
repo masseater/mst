@@ -26,8 +26,8 @@ const DECLARATIONS_SUFFIX_PATTERN = /\.[cm]?tsx?$/u;
 
 const SCRIPT_SUFFIX_PATTERN = /\.([cm]?)js$/u;
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  value !== null && typeof value === "object" && !Array.isArray(value);
+const isRecord = (held: unknown): held is Record<string, unknown> =>
+  held !== null && typeof held === "object" && !Array.isArray(held);
 
 const stringFieldOf = (manifest: Record<string, unknown>, field: string): string | null => {
   const declared = manifest[field];
@@ -51,11 +51,11 @@ const rootExportsOf = (exportsField: unknown): unknown => {
   return subpaths.some(([subpath]) => subpath.startsWith(ROOT_SUBPATH)) ? null : exportsField;
 };
 
-const typesConditionIn = (value: unknown, depth: number): string | null => {
-  if (!isRecord(value) || depth > EXPORTS_CONDITION_DEPTH_LIMIT) return null;
-  const conditions = Object.entries(value);
+const typesConditionIn = (held: unknown, depth: number): string | null => {
+  if (!isRecord(held) || depth > EXPORTS_CONDITION_DEPTH_LIMIT) return null;
+  const conditions = Object.entries(held);
   const declared = conditions.find(
-    ([condition, target]) => condition === TYPES_CONDITION && typeof target === "string",
+    ([condition, checked]) => condition === TYPES_CONDITION && typeof checked === "string",
   );
   if (declared !== undefined) return String(declared[1]);
   for (const [, nested] of conditions) {
@@ -65,10 +65,10 @@ const typesConditionIn = (value: unknown, depth: number): string | null => {
   return null;
 };
 
-const anyConditionIn = (value: unknown, depth: number): string | null => {
-  if (typeof value === "string") return value;
-  if (!isRecord(value) || depth > EXPORTS_CONDITION_DEPTH_LIMIT) return null;
-  for (const [, nested] of Object.entries(value)) {
+const anyConditionIn = (held: unknown, depth: number): string | null => {
+  if (typeof held === "string") return held;
+  if (!isRecord(held) || depth > EXPORTS_CONDITION_DEPTH_LIMIT) return null;
+  for (const [, nested] of Object.entries(held)) {
     const found = anyConditionIn(nested, depth + 1);
     if (found !== null) return found;
   }
@@ -114,7 +114,7 @@ export const dependencyTypeEntries = (packageDirectory: string): readonly Depend
     ...recordFieldOf(manifest, "peerDependencies"),
   };
 
-  const entries = Object.entries(specifiers).flatMap(([packageName, range]) => {
+  const listedEntries = Object.entries(specifiers).flatMap(([packageName, range]) => {
     if (typeof range === "string" && range.startsWith(WORKSPACE_PROTOCOL)) return [];
     const declarationsPath = declarationsOf(
       join(packageDirectory, NODE_MODULES_DIRECTORY_NAME, packageName),
@@ -122,5 +122,5 @@ export const dependencyTypeEntries = (packageDirectory: string): readonly Depend
     return declarationsPath === null ? [] : [{ packageName, declarationsPath }];
   });
 
-  return sortBy(entries, ["packageName"]);
+  return sortBy(listedEntries, ["packageName"]);
 };

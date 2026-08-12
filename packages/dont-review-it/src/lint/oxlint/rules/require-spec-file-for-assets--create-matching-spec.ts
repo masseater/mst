@@ -48,18 +48,18 @@ export const requireSpecFileForAssets = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    const markers = assetsNameMarkersFrom(context.options);
-    const specSuffixes = specFileSuffixesFrom(context.options);
+  create(inspection) {
+    const markers = assetsNameMarkersFrom(inspection.options);
+    const specSuffixes = specFileSuffixesFrom(inspection.options);
 
     return {
       Program(node: ESTree.Program) {
-        const ownerNames = unownedAssetsNamesIn(resolve(context.cwd, context.filename), {
+        const ownerNames = unownedAssetsNamesIn(resolve(inspection.cwd, inspection.filename), {
           markers,
           specSuffixes,
         });
         if (ownerNames === null) return;
-        context.report({ node, messageId: "unownedAssets", data: { ownerNames } });
+        inspection.report({ node, messageId: "unownedAssets", data: { ownerNames } });
       },
     };
   },

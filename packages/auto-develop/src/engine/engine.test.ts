@@ -10,18 +10,18 @@ import type { TmuxRunRequest } from "./tmux-runner.ts";
 type EngineRunner = EngineConfig["runner"];
 
 const collect = async (stream: AsyncGenerator<string, void, undefined>): Promise<string> => {
-  const chunks = new Map<number, string>();
-  for await (const chunk of stream) chunks.set(chunks.size, chunk);
-  return [...chunks.values()].join("");
+  const writtenChunks = new Map<number, string>();
+  for await (const writtenChunk of stream) writtenChunks.set(writtenChunks.size, writtenChunk);
+  return [...writtenChunks.values()].join("");
 };
 
 const emittingRunner = (
-  chunks: readonly string[],
+  writtenChunks: readonly string[],
 ): { readonly runner: EngineRunner; readonly requests: () => readonly TmuxRunRequest[] } => {
   const seen = new Map<number, TmuxRunRequest>();
-  const runner: EngineRunner = async function* run(request) {
-    seen.set(seen.size, request);
-    for (const chunk of chunks) yield chunk;
+  const runner: EngineRunner = async function* run(asked) {
+    seen.set(seen.size, asked);
+    for (const writtenChunk of writtenChunks) yield writtenChunk;
   };
   return { runner, requests: () => [...seen.values()] };
 };

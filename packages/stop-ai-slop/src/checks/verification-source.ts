@@ -41,10 +41,10 @@ export const exportVerificationLocator = ({
 }): string => JSON.stringify(["declaration", modulePath, exportName]);
 
 const parsedSource = (file: string, source: string): ParseResult => {
-  const parsed = parseSync(file, source, { preserveParens: false });
-  const [problem] = parsed.errors;
+  const parsedNode = parseSync(file, source, { preserveParens: false });
+  const [problem] = parsedNode.errors;
   if (problem !== undefined) throw new Error(`${file}: ${problem.message}`);
-  return parsed;
+  return parsedNode;
 };
 
 const namedImportBindings = ({
@@ -59,49 +59,50 @@ const namedImportBindings = ({
   parsed.module.staticImports
     .filter((declaration) => declaration.moduleRequest.value === moduleRequest)
     .flatMap((declaration) => declaration.entries)
-    .filter((entry) => {
-      const importKind: string = entry.importName.kind;
-      return !entry.isType && importKind === "Name" && entry.importName.name === importedName;
+    .filter((listed) => {
+      const importKind: string = listed.importName.kind;
+      return !listed.isType && importKind === "Name" && listed.importName.name === importedName;
     })
-    .map((entry) => entry.localName.value);
+    .map((listed) => listed.localName.value);
 
-const namespaceImports = (parsed: ParseResult): ReadonlyMap<string, string> =>
+const namespaceImports = (parsedNode: ParseResult): ReadonlyMap<string, string> =>
   new Map(
-    parsed.module.staticImports.flatMap((declaration) =>
-      declaration.entries.flatMap((entry): readonly (readonly [string, string])[] => {
-        const importKind: string = entry.importName.kind;
-        return !entry.isType && importKind === "NamespaceObject"
-          ? [[entry.localName.value, declaration.moduleRequest.value]]
+    parsedNode.module.staticImports.flatMap((declaration) =>
+      declaration.entries.flatMap((listed): readonly (readonly [string, string])[] => {
+        const importKind: string = listed.importName.kind;
+        return !listed.isType && importKind === "NamespaceObject"
+          ? [[listed.localName.value, declaration.moduleRequest.value]]
           : [];
       }),
     ),
   );
 
-const callExpression = (value: Argument | Expression | null): CallExpression | null =>
-  value?.type === "CallExpression" ? value : null;
+const callExpression = (held: Argument | Expression | null): CallExpression | null =>
+  held?.type === "CallExpression" ? held : null;
 
-const identifierName = (value: Node | null): string | null =>
-  value?.type === "Identifier" ? value.name : null;
+const identifierName = (held: Node | null): string | null =>
+  held?.type === "Identifier" ? held.name : null;
 
-const literalValue = (value: Argument | null): unknown =>
-  value?.type === "Literal" ? value.value : null;
+const literalValue = (held: Argument | null): unknown =>
+  held?.type === "Literal" ? held.value : null;
 
 const staticMember = (
-  value: Expression,
+  held: Expression,
   propertyName: string,
 ): { readonly object: Expression } | null => {
-  if (value.type !== "MemberExpression" || value.computed) return null;
-  return identifierName(value.property) === propertyName ? { object: value.object } : null;
+  if (held.type !== "MemberExpression" || held.computed) return null;
+  return identifierName(held.property) === propertyName ? { object: held.object } : null;
 };
 
 const onlyArgument = (call: CallExpression): Argument | null =>
   call.arguments.length === 1 ? (call.arguments[0] as Argument) : null;
 
-const repositoryPath = (value: string): string | null => {
-  if (value.startsWith("/") || /^[A-Za-z]:[\\/]/u.test(value)) return null;
-  const normalized = posix.normalize(value);
-  if (normalized === "." || normalized === ".." || normalized.startsWith("../")) return null;
-  return normalized;
+const repositoryPath = (held: string): string | null => {
+  if (held.startsWith("/") || /^[A-Za-z]:[\\/]/u.test(held)) return null;
+  const normalizedText = posix.normalize(held);
+  if (normalizedText === "." || normalizedText === ".." || normalizedText.startsWith("../"))
+    return null;
+  return normalizedText;
 };
 
 const importedBindingIsUnshadowed = ({
@@ -274,19 +275,19 @@ const exportVerificationFrom = ({
   readonly namespaces: ReadonlyMap<string, string>;
   readonly localBindings: ReadonlySet<string>;
 }): ExportAbsenceVerification | null => {
-  const target =
+  const checked =
     missingPropertyTargetFrom({ call, expectBindings, localBindings }) ??
     undefinedPropertyTargetFrom({ call, expectBindings, localBindings });
-  if (target === null || localBindings.has(target.namespaceBinding)) return null;
-  const moduleRequest = namespaces.get(target.namespaceBinding);
+  if (checked === null || localBindings.has(checked.namespaceBinding)) return null;
+  const moduleRequest = namespaces.get(checked.namespaceBinding);
   if (moduleRequest === undefined) return null;
   const modulePath = importedModulePath(file, moduleRequest);
   if (modulePath === null) return null;
   return {
     kind: "export",
-    locator: exportVerificationLocator({ modulePath, exportName: target.exportName }),
+    locator: exportVerificationLocator({ modulePath, exportName: checked.exportName }),
     modulePath,
-    exportName: target.exportName,
+    exportName: checked.exportName,
     file,
     ...sourceRangeFor(source, call),
   };
@@ -299,20 +300,20 @@ export const absenceVerificationsIn = ({
   readonly file: string;
   readonly source: string;
 }): readonly AbsenceVerification[] => {
-  const parsed = parsedSource(file, source);
+  const parsedNode = parsedSource(file, source);
   const expectBindings = namedImportBindings({
-    parsed,
+    parsed: parsedNode,
     moduleRequest: "vite-plus/test",
     importedName: "expect",
   });
   const existsBindings = namedImportBindings({
-    parsed,
+    parsed: parsedNode,
     moduleRequest: "node:fs",
     importedName: "existsSync",
   });
-  const namespaces = namespaceImports(parsed);
+  const namespaces = namespaceImports(parsedNode);
 
-  return scopedCallExpressionsIn(parsed.program).flatMap(
+  return scopedCallExpressionsIn(parsedNode.program).flatMap(
     ({ call, localBindings }): readonly AbsenceVerification[] => {
       const fileVerification = fileVerificationFrom({
         file,
@@ -344,13 +345,13 @@ export const valueExportsIn = ({
   readonly source: string;
 }): readonly string[] =>
   parsedSource(file, source).module.staticExports.flatMap((declaration) =>
-    declaration.entries.flatMap((entry) => {
-      const exportKind: string = entry.exportName.kind;
-      return !entry.isType &&
+    declaration.entries.flatMap((listed) => {
+      const exportKind: string = listed.exportName.kind;
+      return !listed.isType &&
         exportKind === "Name" &&
-        entry.exportName.name !== null &&
-        entry.exportName.name !== "default"
-        ? [entry.exportName.name]
+        listed.exportName.name !== null &&
+        listed.exportName.name !== "default"
+        ? [listed.exportName.name]
         : [];
     }),
   );

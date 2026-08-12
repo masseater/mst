@@ -24,9 +24,9 @@ const entryFor = (
 });
 
 const matchedName = (
-  entries: readonly RestrictedTargetEntry[],
+  listedEntries: readonly RestrictedTargetEntry[],
   forwarded: { readonly specifier: string; readonly exported: string | null },
-): string | null => matchingRestrictedTarget({ entries, forwarded })?.module ?? null;
+): string | null => matchingRestrictedTarget({ entries: listedEntries, forwarded })?.module ?? null;
 
 const retiredLib = [entryFor({ module: "retired-lib" })];
 
@@ -66,15 +66,17 @@ describe("restricted-targets/restricted-entries", () => {
   });
 
   test("an entry stays in force at a position it does not allow", () => {
-    const entries = [entryFor({ module: "retired-lib", allowedPositions: ["owner/**"] })];
+    const listedEntries = [entryFor({ module: "retired-lib", allowedPositions: ["owner/**"] })];
     const file = resolve("/repo", "reader", "reader.ts").split("/").join(sep);
-    expect(entriesInForceAt({ entries, file, cwd: "/repo" })).toStrictEqual(entries);
+    expect(entriesInForceAt({ entries: listedEntries, file, cwd: "/repo" })).toStrictEqual(
+      listedEntries,
+    );
   });
 
   test("an entry falls out of force at a position it allows", () => {
-    const entries = [entryFor({ module: "retired-lib", allowedPositions: ["owner/**"] })];
+    const listedEntries = [entryFor({ module: "retired-lib", allowedPositions: ["owner/**"] })];
     const file = resolve("/repo", "owner", "reader.ts").split("/").join(sep);
-    expect(entriesInForceAt({ entries, file, cwd: "/repo" })).toStrictEqual([]);
+    expect(entriesInForceAt({ entries: listedEntries, file, cwd: "/repo" })).toStrictEqual([]);
   });
 
   test("an entry missing the name of what it restricts is no entry", () => {
@@ -103,11 +105,11 @@ describe("restricted-targets/restricted-entries", () => {
     ]);
   });
 
-  test("options carrying no entries at all yield no entries", () => {
+  test("options carrying no listedEntries at all yield no listedEntries", () => {
     expect(restrictedTargetsFrom([])).toStrictEqual([]);
   });
 
-  test("a declaration written without the list around it carries no entries", () => {
+  test("a declaration written without the list around it carries no listedEntries", () => {
     expect(
       restrictedTargetsFrom([{ restricted: { module: "retired-lib", substitute } }]),
     ).toStrictEqual([]);

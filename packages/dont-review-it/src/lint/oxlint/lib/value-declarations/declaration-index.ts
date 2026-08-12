@@ -28,8 +28,8 @@ const gatheredBy = (
   keyOf: (site: ValueSite) => string,
 ): ReadonlyMap<string, readonly ValueSite[]> =>
   new Map(
-    Object.entries(groupBy(sites, keyOf)).map(([key, gathered]) => [
-      key,
+    Object.entries(groupBy(sites, keyOf)).map(([named, gathered]) => [
+      named,
       sortBy(gathered, ["relativePath", "line"]),
     ]),
   );
@@ -45,15 +45,15 @@ export const buildValueDeclarationIndex = (
   };
 };
 
-const standsElsewhere = (site: ValueSite, other: ValueSite): boolean =>
-  other.relativePath !== site.relativePath || other.line !== site.line;
+const standsElsewhere = (site: ValueSite, later: ValueSite): boolean =>
+  later.relativePath !== site.relativePath || later.line !== site.line;
 
 const rivalsOf = (index: ValueDeclarationIndex, site: ValueSite): readonly ValueSite[] =>
   (index.sitesByName.get(site.name) ?? []).filter(
-    (other) =>
-      other.fingerprint === site.fingerprint &&
-      standsElsewhere(site, other) &&
-      (other.exported || site.exported),
+    (later) =>
+      later.fingerprint === site.fingerprint &&
+      standsElsewhere(site, later) &&
+      (later.exported || site.exported),
   );
 
 export const duplicateValueReportsIn = (input: {

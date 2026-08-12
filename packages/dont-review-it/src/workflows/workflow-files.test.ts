@@ -11,8 +11,8 @@ const config = defaultWorkflowChecksConfig;
 
 const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-workflow-files-"));
 
-const repositoryWith = (name: string, files: Readonly<Record<string, string>>): string => {
-  const repositoryRoot = join(fixtureDir, name);
+const repositoryWith = (spelled: string, files: Readonly<Record<string, string>>): string => {
+  const repositoryRoot = join(fixtureDir, spelled);
   const directory = join(repositoryRoot, config.workflowDirectory);
   mkdirSync(directory, { recursive: true });
   Object.entries(files).forEach(([fileName, source]) => {

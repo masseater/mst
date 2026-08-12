@@ -1,9 +1,9 @@
-const MODES = ["author", "reviewer"] as const;
+const DECLARED_MODES = ["author", "reviewer"] as const;
 
-export type Mode = (typeof MODES)[number];
+export type Mode = (typeof DECLARED_MODES)[number];
 
 export const isMode = (candidate: unknown): candidate is Mode =>
-  (MODES as readonly unknown[]).includes(candidate);
+  (DECLARED_MODES as readonly unknown[]).includes(candidate);
 
 const REVIEW_STATES = ["changes_requested", "commented", "approved"] as const;
 

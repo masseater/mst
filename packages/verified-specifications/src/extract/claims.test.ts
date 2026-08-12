@@ -31,7 +31,7 @@ describe("two", () => {
   it("second", () => {});
 });
 `);
-    expect(read.subjects.map((entry) => entry.subject)).toStrictEqual(["one", "two"]);
+    expect(read.subjects.map((subject) => subject.subject)).toStrictEqual(["one", "two"]);
   });
 
   test("reads a claim through parentheses around names and callbacks", () => {

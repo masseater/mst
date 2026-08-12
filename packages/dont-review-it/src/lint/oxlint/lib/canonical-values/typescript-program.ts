@@ -30,14 +30,14 @@ const parsedConfigAt = (input: {
   readonly repositoryRoot: string;
 }): ts.ParsedCommandLine => {
   const source = ts.readJsonConfigFile(input.configPath, (fileName) => ts.sys.readFile(fileName));
-  const parsed = ts.parseJsonSourceFileConfigFileContent(
+  const parsedConfig = ts.parseJsonSourceFileConfigFileContent(
     source,
     ts.sys,
     dirname(input.configPath),
     undefined,
     input.configPath,
   );
-  const [firstError] = parsed.errors;
+  const [firstError] = parsedConfig.errors;
   if (firstError !== undefined) throw new Error(diagnosticText(firstError));
   const externalConfig = source.extendedSourceFiles?.find(
     (fileName) => !pathIsInside(input.repositoryRoot, resolve(fileName)),
@@ -45,7 +45,7 @@ const parsedConfigAt = (input: {
   if (externalConfig !== undefined) {
     throw new Error(`TypeScript config extends outside the repository: ${externalConfig}`);
   }
-  return parsed;
+  return parsedConfig;
 };
 
 const requiredOptions = (configured: ts.CompilerOptions): ts.CompilerOptions => ({
@@ -74,30 +74,30 @@ const assertCacheBoundedSources = (repositoryRoot: string, program: ts.Program):
 
 export const createCanonicalValuesTypeScriptProgram = (input: ProgramInput): ts.Program => {
   const configPath = canonicalValuesTypeScriptConfigPath(input);
-  const parsed =
+  const parsedConfig =
     configPath === null
       ? null
       : parsedConfigAt({ configPath, repositoryRoot: input.repositoryRoot });
   const rootNames = uniqBy(
-    [...(parsed?.fileNames ?? []), ...input.rootNames].map((fileName) => resolve(fileName)),
+    [...(parsedConfig?.fileNames ?? []), ...input.rootNames].map((fileName) => resolve(fileName)),
     (fileName) => fileName,
   );
-  const options = requiredOptions(parsed?.options ?? {});
-  const baseHost = ts.createCompilerHost(options);
+  const compilerOptions = requiredOptions(parsedConfig?.options ?? {});
+  const baseHost = ts.createCompilerHost(compilerOptions);
   const host: ts.CompilerHost = {
     ...baseHost,
-    getSourceFile: (...args: Parameters<ts.CompilerHost["getSourceFile"]>) => {
-      const [fileName, languageVersion] = args;
+    getSourceFile: (...sourceFileArguments: Parameters<ts.CompilerHost["getSourceFile"]>) => {
+      const [fileName, languageVersion] = sourceFileArguments;
       const sourceText = input.sourceOverrides?.get(resolve(fileName));
-      if (sourceText === undefined) return baseHost.getSourceFile(...args);
+      if (sourceText === undefined) return baseHost.getSourceFile(...sourceFileArguments);
       const scriptKind = fileName.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
       return ts.createSourceFile(fileName, sourceText, languageVersion, true, scriptKind);
     },
   };
   const program = ts.createProgram({
     host,
-    options,
-    projectReferences: parsed?.projectReferences,
+    options: compilerOptions,
+    projectReferences: parsedConfig?.projectReferences,
     rootNames,
   });
   assertCacheBoundedSources(input.repositoryRoot, program);

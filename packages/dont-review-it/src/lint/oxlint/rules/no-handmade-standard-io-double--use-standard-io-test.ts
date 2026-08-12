@@ -14,15 +14,15 @@ const TEST_FILE_SUFFIXES = [".test.ts", ".test.tsx", ".spec.ts", ".spec.tsx"];
 const isExtendCall = (callee: ESTree.Expression): boolean =>
   staticMemberOf(callee)?.name === "extend";
 
-const isFunctionValued = (value: ESTree.Expression): boolean =>
-  value.type === "FunctionExpression" || value.type === "ArrowFunctionExpression";
+const isFunctionValued = (held: ESTree.Expression): boolean =>
+  held.type === "FunctionExpression" || held.type === "ArrowFunctionExpression";
 
-const isWriteShapedDouble = (value: ESTree.Expression): boolean => {
-  if (value.type === "NewExpression") {
-    return value.callee.type === "Identifier" && STREAM_CLASS_NAMES.has(value.callee.name);
+const isWriteShapedDouble = (held: ESTree.Expression): boolean => {
+  if (held.type === "NewExpression") {
+    return held.callee.type === "Identifier" && STREAM_CLASS_NAMES.has(held.callee.name);
   }
-  if (value.type !== "ObjectExpression") return false;
-  return value.properties.some(
+  if (held.type !== "ObjectExpression") return false;
+  return held.properties.some(
     (property) =>
       property.type === "Property" &&
       propertyKeyOf(property) === "write" &&
@@ -40,9 +40,9 @@ const capturedStreamPropertiesOf = (
 ): readonly NamedStreamProperty[] =>
   definition.properties.flatMap((property): readonly NamedStreamProperty[] => {
     if (property.type !== "Property") return [];
-    const name = propertyKeyOf(property);
-    if (name === null || !CAPTURED_STREAM_NAMES.has(name)) return [];
-    return [{ property, name }];
+    const spelled = propertyKeyOf(property);
+    if (spelled === null || !CAPTURED_STREAM_NAMES.has(spelled)) return [];
+    return [{ property, name: spelled }];
   });
 
 export const noHandmadeStandardIoDouble = createDontReviewItRule({
@@ -64,8 +64,8 @@ export const noHandmadeStandardIoDouble = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
-    if (!TEST_FILE_SUFFIXES.some((suffix) => context.filename.endsWith(suffix))) return {};
+  create(inspection) {
+    if (!TEST_FILE_SUFFIXES.some((suffix) => inspection.filename.endsWith(suffix))) return {};
 
     const fixtureImports = new Set<string>();
 
@@ -82,7 +82,7 @@ export const noHandmadeStandardIoDouble = createDontReviewItRule({
           typeof definition.value === "string" &&
           CAPTURED_STREAM_NAMES.has(definition.value)
         ) {
-          context.report({
+          inspection.report({
             node: definition,
             messageId: "ownFixture",
             data: { name: definition.value },
@@ -91,7 +91,7 @@ export const noHandmadeStandardIoDouble = createDontReviewItRule({
         }
         if (definition?.type !== "ObjectExpression") return;
         for (const { property, name } of capturedStreamPropertiesOf(definition)) {
-          context.report({ node: property, messageId: "ownFixture", data: { name } });
+          inspection.report({ node: property, messageId: "ownFixture", data: { name } });
         }
       },
       MemberExpression(node: ESTree.MemberExpression) {
@@ -100,12 +100,12 @@ export const noHandmadeStandardIoDouble = createDontReviewItRule({
         if (member === null) return;
         if (member.object.type !== "Identifier" || member.object.name !== "process") return;
         if (!CAPTURED_STREAM_NAMES.has(member.name)) return;
-        context.report({ node, messageId: "directStream", data: { name: member.name } });
+        inspection.report({ node, messageId: "directStream", data: { name: member.name } });
       },
       ObjectExpression(node: ESTree.ObjectExpression) {
         for (const { property, name } of capturedStreamPropertiesOf(node)) {
           if (!isWriteShapedDouble(property.value)) continue;
-          context.report({ node: property, messageId: "streamShapedDouble", data: { name } });
+          inspection.report({ node: property, messageId: "streamShapedDouble", data: { name } });
         }
       },
     };

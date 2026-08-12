@@ -6,7 +6,7 @@ export const FUNCTION_NODE_TYPES: ReadonlySet<string> = new Set([
   "FunctionExpression",
 ]);
 
-export const isFunctionNodeType = (type: string): boolean => FUNCTION_NODE_TYPES.has(type);
+export const isFunctionNodeType = (nodeType: string): boolean => FUNCTION_NODE_TYPES.has(nodeType);
 
 export const SUGARED_NODE_TYPES: ReadonlySet<string> = new Set([
   "ChainExpression",

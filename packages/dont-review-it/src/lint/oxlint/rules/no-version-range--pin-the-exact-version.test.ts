@@ -13,15 +13,15 @@ const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-no-version-range-"
 
 const MODULE_SOURCE = "export const shipped = true;\n";
 
-const writeFixture = (name: string, source: string): string => {
-  const path = join(fixtureDir, name);
+const writeFixture = (spelled: string, source: string): string => {
+  const path = join(fixtureDir, spelled);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, source);
   return path;
 };
 
-const writeManifest = (name: string, manifest: unknown): void => {
-  writeFixture(`${name}/package.json`, `${JSON.stringify(manifest, null, 2)}\n`);
+const writeManifest = (spelled: string, manifest: unknown): void => {
+  writeFixture(`${spelled}/package.json`, `${JSON.stringify(manifest, null, 2)}\n`);
 };
 
 writeFixture(
@@ -92,7 +92,7 @@ describe("dont-review-it/no-version-range--pin-the-exact-version", () => {
   testLintRule(noVersionRange, {
     valid: [
       {
-        name: "a repository whose manifests and catalog all name one release passes",
+        name: "a repository whose manifests and catalog all spelled one release passes",
         code: MODULE_SOURCE,
         filename: exactRootEntry,
       },

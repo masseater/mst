@@ -16,7 +16,7 @@ const baseRequest = {
 };
 
 const prepareWith = (
-  mode: "reviewer" | "author",
+  spelledMode: "reviewer" | "author",
 ): {
   readonly runContext: RunContext;
   readonly mkdirCount: number;
@@ -26,7 +26,7 @@ const prepareWith = (
   const writeJson = vi.fn<(path: string, value: unknown) => void>();
   const fs: RunContextFs = { mkdirRecursive, writeJson };
   const runContext = prepareRunContext({
-    request: { ...baseRequest, mode },
+    request: { ...baseRequest, mode: spelledMode },
     fs,
     nowIso: () => "2026-08-11T00:00:00.000Z",
   });

@@ -80,27 +80,27 @@ const promptFor = (build: {
   });
 };
 
-const runtimeFor = (request: ModeRunRequest): ComposedRuntime => {
+const runtimeFor = (asked: ModeRunRequest): ComposedRuntime => {
   const repoDir = resolveRepositoryRoot(process.cwd());
   const engineCommand = readEnvVar("AUTO_DEVELOP_ENGINE_COMMAND");
   return composeRuntime({
-    mode: request.mode,
-    relayOrigin: request.relayOrigin,
+    mode: asked.mode,
+    relayOrigin: asked.relayOrigin,
     repoDir,
     logDirectory: resolveLogDirectory(repoDir),
     engineKind: DEFAULT_ENGINE,
     ...(engineCommand === undefined ? {} : { engineOverride: engineCommand }),
-    engineTimeoutMs: request.engineTimeoutMs,
-    bypassPermissions: request.bypassPermissions,
-    concurrency: request.concurrency,
-    prFilter: request.prFilter,
-    githubToken: request.githubToken,
+    engineTimeoutMs: asked.engineTimeoutMs,
+    bypassPermissions: asked.bypassPermissions,
+    concurrency: asked.concurrency,
+    prFilter: asked.prFilter,
+    githubToken: asked.githubToken,
     setupWorktree: () => Promise.resolve(),
   });
 };
 
-const pullNumberOf = (payload: unknown): number => {
-  const pullNumber = asRecord(payload)?.pullNumber;
+const pullNumberOf = (carried: unknown): number => {
+  const pullNumber = asRecord(carried)?.pullNumber;
   return typeof pullNumber === "number" ? pullNumber : 0;
 };
 
@@ -109,7 +109,7 @@ const attachHandlers = (attaching: {
   readonly runtime: ComposedRuntime;
   readonly github: HandlerGithubClient;
 }): void => {
-  const { request, runtime, github } = attaching;
+  const { request: asked, runtime, github } = attaching;
   const coordinate = createReviewInputCoordinator({
     gate: runtime.gate,
     queue: runtime.queue,
@@ -128,7 +128,7 @@ const attachHandlers = (attaching: {
         buildPrompt: (worktreePath) =>
           Promise.resolve(
             promptFor({
-              mode: request.mode,
+              mode: asked.mode,
               prNumber: session.prNumber,
               baseRef: `origin/${session.baseBranch}`,
               headRef: session.headBranch,
@@ -139,8 +139,8 @@ const attachHandlers = (attaching: {
     requestFollowUpReview: (followUp) => {
       void coordinate({ prNumber: followUp.prNumber, endpoint: followUp.endpoint });
     },
-    dryRun: request.dryRun,
-    proxyLogin: request.reviewerLogin,
+    dryRun: asked.dryRun,
+    proxyLogin: asked.reviewerLogin,
     log: runtime.log,
   });
   const author = createAuthorHandler({
@@ -152,7 +152,7 @@ const attachHandlers = (attaching: {
         buildPrompt: (worktreePath) =>
           Promise.resolve(
             promptFor({
-              mode: request.mode,
+              mode: asked.mode,
               prNumber: session.prNumber,
               baseRef: session.headBranch,
               headRef: session.headBranch,
@@ -161,19 +161,19 @@ const attachHandlers = (attaching: {
             }),
           ),
       }),
-    reviewerLogin: request.reviewerLogin,
-    dryRun: request.dryRun,
+    reviewerLogin: asked.reviewerLogin,
+    dryRun: asked.dryRun,
     log: runtime.log,
   });
   runtime.queue.setHandlers({
     handlers: {
-      "pr-event": (payload) => {
-        const prNumber = pullNumberOf(payload);
+      "pr-event": (carried) => {
+        const prNumber = pullNumberOf(carried);
         return withJobBanner({
-          mode: request.mode,
+          mode: asked.mode,
           prNumber,
           run: async () => {
-            if (request.mode === "reviewer") {
+            if (asked.mode === "reviewer") {
               await reviewer(prNumber);
               return;
             }
@@ -208,20 +208,20 @@ const announceStart = (announcing: {
   readonly request: ModeRunRequest;
   readonly runtime: ComposedRuntime;
 }): void => {
-  const { request } = announcing;
+  const { request: asked } = announcing;
   announcing.runtime.log.info(
     runMetadataLogFields(
       buildRunMetadata({
-        mode: request.mode,
+        mode: asked.mode,
         engine: DEFAULT_ENGINE,
-        ghUser: request.reviewerLogin,
+        ghUser: asked.reviewerLogin,
         ghUserSource: "override",
         ghTokenSource: "environment-variable",
-        concurrency: request.concurrency,
-        dryRun: request.dryRun,
-        dangerouslySkipPermissions: request.bypassPermissions,
-        targetPrs: request.prFilter.targetPrs,
-        excludedPrs: request.prFilter.excludedPrs,
+        concurrency: asked.concurrency,
+        dryRun: asked.dryRun,
+        dangerouslySkipPermissions: asked.bypassPermissions,
+        targetPrs: asked.prFilter.targetPrs,
+        excludedPrs: asked.prFilter.excludedPrs,
       }),
     ),
     "runtime starting",
@@ -296,9 +296,9 @@ const restartRequestFor = (runtime: ComposedRuntime): RestartRequest =>
     },
   });
 
-export const runMode = async (request: ModeRunRequest): Promise<void> => {
-  const runtime = runtimeFor(request);
-  announceStart({ request, runtime });
+export const runMode = async (asked: ModeRunRequest): Promise<void> => {
+  const runtime = runtimeFor(asked);
+  announceStart({ request: asked, runtime });
   const restart = restartRequestFor(runtime);
   const idleMonitor = createIdleMonitor({
     startedAtMs: Date.now(),
@@ -306,17 +306,17 @@ export const runMode = async (request: ModeRunRequest): Promise<void> => {
     now: () => Date.now(),
   });
   const baseline = new Map<string, string>();
-  const schedulers = startedSchedulers({ request, runtime, restart, idleMonitor, baseline });
+  const schedulers = startedSchedulers({ request: asked, runtime, restart, idleMonitor, baseline });
   attachHandlers({
-    request,
+    request: asked,
     runtime,
     github: createGithubApiClient({
-      repository: request.repository,
-      token: request.githubToken,
+      repository: asked.repository,
+      token: asked.githubToken,
     }),
   });
   try {
-    await cycleUntilStopped({ mode: request.mode, runtime, restart, idleMonitor, baseline });
+    await cycleUntilStopped({ mode: asked.mode, runtime, restart, idleMonitor, baseline });
   } finally {
     schedulers.stop();
   }

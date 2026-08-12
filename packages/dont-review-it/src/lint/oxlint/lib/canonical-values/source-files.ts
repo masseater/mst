@@ -130,12 +130,12 @@ const scannedFileAt = (input: {
   };
 };
 
-const isScannedName = (name: string): boolean =>
-  SCRIPT_FILE_NAME_PATTERN.test(name) ||
-  name.endsWith(STYLE_SHEET_EXTENSION) ||
-  MARKUP_SOURCE_NAME_PATTERN.test(name) ||
-  name.endsWith(".json") ||
-  DEPENDENCY_INPUT_FILE_NAMES.has(name);
+const isScannedName = (fileName: string): boolean =>
+  SCRIPT_FILE_NAME_PATTERN.test(fileName) ||
+  fileName.endsWith(STYLE_SHEET_EXTENSION) ||
+  MARKUP_SOURCE_NAME_PATTERN.test(fileName) ||
+  fileName.endsWith(".json") ||
+  DEPENDENCY_INPUT_FILE_NAMES.has(fileName);
 
 const EMPTY_SCANNED_FILES: ScannedFiles = { files: [], problems: [] };
 
@@ -151,10 +151,10 @@ const unsafeLinkAt = (repositoryRoot: string, absolutePath: string): ScannedFile
 });
 
 const resolvedSymbolicTarget = (input: ScanDirectoryInput, absolutePath: string): string | null => {
-  const [failure, realTarget] = attempt(() => realpathSync.native(absolutePath));
-  if (failure !== null || realTarget === null) return null;
-  if (!pathIsInside(input.realRepositoryRoot, realTarget)) return null;
-  return input.ancestry.has(realTarget) ? null : realTarget;
+  const [failure, resolvedTargetPath] = attempt(() => realpathSync.native(absolutePath));
+  if (failure !== null || resolvedTargetPath === null) return null;
+  if (!pathIsInside(input.realRepositoryRoot, resolvedTargetPath)) return null;
+  return input.ancestry.has(resolvedTargetPath) ? null : resolvedTargetPath;
 };
 
 type ScanDirectoryInput = {
@@ -170,20 +170,20 @@ type ScanDirectoryInput = {
 const scannedSymbolicLink = (input: ScanDirectoryInput, directoryEntry: Dirent): ScannedFiles => {
   const absolutePath = join(input.directory, directoryEntry.name);
   if (input.sourceScope.isIgnored(absolutePath)) return EMPTY_SCANNED_FILES;
-  const realTarget = resolvedSymbolicTarget(input, absolutePath);
-  if (realTarget === null) return unsafeLinkAt(input.repositoryRoot, absolutePath);
-  const target = statOf(absolutePath);
-  if (target?.isDirectory() === true) {
+  const resolvedTargetPath = resolvedSymbolicTarget(input, absolutePath);
+  if (resolvedTargetPath === null) return unsafeLinkAt(input.repositoryRoot, absolutePath);
+  const targetStats = statOf(absolutePath);
+  if (targetStats?.isDirectory() === true) {
     return scannedFilesUnder({
       ...input,
-      ancestry: new Set([...input.ancestry, realTarget]),
+      ancestry: new Set([...input.ancestry, resolvedTargetPath]),
       directory: absolutePath,
     });
   }
   return scannedSymbolicFile(input, {
     absolutePath,
     directoryEntry,
-    isFile: target?.isFile() === true,
+    isFile: targetStats?.isFile() === true,
   });
 };
 
@@ -257,8 +257,8 @@ const scannedFilesUnder = ({
     ),
   );
   return {
-    files: scanned.flatMap((result) => result.files),
-    problems: scanned.flatMap((result) => result.problems),
+    files: scanned.flatMap((scan) => scan.files),
+    problems: scanned.flatMap((scan) => scan.problems),
   };
 };
 
@@ -281,10 +281,10 @@ const isScannedSourcePath = (file: ScannedFile): boolean =>
     .some((segment) => UNSCANNED_DIRECTORY_NAMES.has(segment));
 
 const isDeclarationSource = (file: ScannedFile): boolean => {
-  const name = basename(file.absolutePath);
+  const fileName = basename(file.absolutePath);
   return (
-    DECLARATION_SOURCE_NAME_PATTERN.test(name) &&
-    !TYPE_DECLARATION_FILE_NAME_PATTERN.test(name) &&
+    DECLARATION_SOURCE_NAME_PATTERN.test(fileName) &&
+    !TYPE_DECLARATION_FILE_NAME_PATTERN.test(fileName) &&
     !isOutOfScopeSource(file.relativePath) &&
     !isOutOfScopeSource(file.realPathIdentity)
   );

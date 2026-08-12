@@ -11,10 +11,10 @@ const packageHolding = (files: Readonly<Record<string, string>>): string => {
   onTestFinished(() => {
     rmSync(root, { recursive: true, force: true });
   });
-  for (const [relativePath, content] of Object.entries(files)) {
+  for (const [relativePath, fileText] of Object.entries(files)) {
     const path = join(root, relativePath);
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, content);
+    writeFileSync(path, fileText);
   }
   return root;
 };
@@ -77,7 +77,7 @@ describe("setup-modules/export-specifier-index", () => {
 
   test("an over-deep export condition contributes no source", () => {
     const nested = Array.from({ length: 12 }).reduce<unknown>(
-      (value) => ({ default: value }),
+      (nestedTarget) => ({ default: nestedTarget }),
       "./src/index.ts",
     );
     const root = packageHolding({

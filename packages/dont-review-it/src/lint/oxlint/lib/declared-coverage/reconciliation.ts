@@ -55,7 +55,9 @@ const findingsIn = (reconciled: CoverageReconciliation): readonly CoverageFindin
     ...broadDeclarationFindings(uncheckedDeclarations),
     ...deadRowFindings({
       registry: UNCHECKED_DECLARATION_REGISTRY,
-      rows: uncheckedDeclarations.filter((row) => !coversWholeDirectory(row.pattern)),
+      rows: uncheckedDeclarations.filter(
+        (uncheckedDeclaration) => !coversWholeDirectory(uncheckedDeclaration.pattern),
+      ),
       paths,
     }),
     ...registrationFindings({ tables: declarations.tables, checks, paths }),
@@ -88,11 +90,11 @@ const findingsByReconciliation = new Map<string, ReadonlyMap<string, readonly Co
 export const coverageFindingsIn = (
   reconciled: CoverageReconciliation,
 ): ReadonlyMap<string, readonly CoverageFinding[]> => {
-  const key = keyOf(reconciled);
-  const memoized = findingsByReconciliation.get(key);
+  const named = keyOf(reconciled);
+  const memoized = findingsByReconciliation.get(named);
   if (memoized !== undefined) return memoized;
 
   const read = readReconciliation(reconciled);
-  findingsByReconciliation.set(key, read);
+  findingsByReconciliation.set(named, read);
   return read;
 };

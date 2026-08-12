@@ -15,12 +15,12 @@ type GitCommandOptions = Readonly<{
 }>;
 
 const environmentOutsideAnyRepository = (): Readonly<Record<string, string | undefined>> =>
-  omitBy(process.env, (_, name) => String(name).startsWith("GIT_"));
+  omitBy(process.env, (_, spelled) => String(spelled).startsWith("GIT_"));
 
 const executeFile = promisify(execFile);
 
-const executeGitCommand: GitCommandExecutor = async (repositoryRoot, args) =>
-  executeFile("git", [...args], {
+const executeGitCommand: GitCommandExecutor = async (repositoryRoot, handedArgs) =>
+  executeFile("git", [...handedArgs], {
     cwd: repositoryRoot,
     encoding: "buffer",
     env: environmentOutsideAnyRepository(),
@@ -29,10 +29,10 @@ const executeGitCommand: GitCommandExecutor = async (repositoryRoot, args) =>
 
 export const runGitBuffer = async ({
   repositoryRoot,
-  args,
+  args: handedArgs,
   execute = executeGitCommand,
 }: GitCommandOptions): Promise<Uint8Array> => {
-  const { stderr, stdout } = await execute(repositoryRoot, args);
+  const { stderr, stdout } = await execute(repositoryRoot, handedArgs);
   if (stderr.length > 0) {
     throw new Error(
       `Git command wrote to stderr: ${new TextDecoder("utf-8", { fatal: true }).decode(stderr)}`,
@@ -42,5 +42,5 @@ export const runGitBuffer = async ({
   return stdout;
 };
 
-export const runGitText = async (options: GitCommandOptions): Promise<string> =>
-  new TextDecoder("utf-8", { fatal: true }).decode(await runGitBuffer(options));
+export const runGitText = async (ruleOptions: GitCommandOptions): Promise<string> =>
+  new TextDecoder("utf-8", { fatal: true }).decode(await runGitBuffer(ruleOptions));

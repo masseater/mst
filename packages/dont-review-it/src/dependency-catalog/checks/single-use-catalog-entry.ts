@@ -36,27 +36,29 @@ export const singleUseCatalogEntryFindings = ({
   readonly usages: readonly DependencyUsage[];
   readonly overrideReferences: readonly OverrideCatalogReference[];
 }): readonly SingleUseCatalogEntryFinding[] =>
-  catalogEntries.flatMap((entry) => {
+  catalogEntries.flatMap((catalogEntry) => {
     const overridden = overrideReferences.some(
       (reference) =>
-        reference.dependencyName === entry.dependencyName &&
-        reference.catalogName === entry.catalogName,
+        reference.dependencyName === catalogEntry.dependencyName &&
+        reference.catalogName === catalogEntry.catalogName,
     );
     if (overridden) return [];
 
-    const usage = usages.find((candidate) => candidate.dependencyName === entry.dependencyName);
+    const usage = usages.find(
+      (candidate) => candidate.dependencyName === catalogEntry.dependencyName,
+    );
     if (usage === undefined) return [];
 
-    const [onlyManifest, secondManifest] = manifestsUsingEntry({ entry, usage });
+    const [onlyManifest, secondManifest] = manifestsUsingEntry({ entry: catalogEntry, usage });
     if (onlyManifest === undefined || secondManifest !== undefined) return [];
 
     return [
       {
-        entry,
+        entry: catalogEntry,
         problem: {
           file: definitionPath,
           line: null,
-          message: `The catalog must not hold ${entry.dependencyName} while ${onlyManifest} is the only manifest that uses it, because a catalog entry exists to share one version between manifests. Write ${entry.version} into that manifest and delete the entry.`,
+          message: `The catalog must not hold ${catalogEntry.dependencyName} while ${onlyManifest} is the only manifest that uses it, because a catalog entry exists to share one version between manifests. Write ${catalogEntry.version} into that manifest and delete the entry.`,
         },
       },
     ];

@@ -10,14 +10,14 @@ export type RestartRequest = {
 export const createRestartRequest = (latch: {
   readonly onRequest: (reason: RestartReason) => void;
 }): RestartRequest => {
-  const state = new Map<string, RestartReason>();
+  const heldState = new Map<string, RestartReason>();
   return {
     request: (reason) => {
-      if (state.has("reason")) return;
-      state.set("reason", reason);
+      if (heldState.has("reason")) return;
+      heldState.set("reason", reason);
       latch.onRequest(reason);
     },
-    requested: () => state.get("reason") ?? null,
+    requested: () => heldState.get("reason") ?? null,
   };
 };
 

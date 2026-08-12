@@ -13,10 +13,10 @@ const ASSETS_SOURCE = "export const orderTotals = [1, 2];\n";
 
 const SPEC_SOURCE = "export const covered = true;\n";
 
-const fixturePath = (name: string): string => join(fixtureDir, name);
+const fixturePath = (fixtureName: string): string => join(fixtureDir, fixtureName);
 
-const writeFixture = (name: string, source: string): string => {
-  const path = fixturePath(name);
+const writeFixture = (fixtureName: string, source: string): string => {
+  const path = fixturePath(fixtureName);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, source);
   return path;

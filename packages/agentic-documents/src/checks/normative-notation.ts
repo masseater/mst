@@ -29,7 +29,7 @@ export const actionClauseOf = ({
   return keywordMatch === null ? null : withoutCondition.slice(keywordMatch[0].length);
 };
 
-export const conditionOf = (text: string): string | null => {
-  const condition = conditionPrefixPattern.exec(text)?.[1];
+export const conditionOf = (writtenText: string): string | null => {
+  const condition = conditionPrefixPattern.exec(writtenText)?.[1];
   return condition === undefined ? null : condition.trim();
 };

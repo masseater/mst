@@ -96,10 +96,10 @@ const patchEntryOf = (file: ComparedFile): string => {
   return `${lines.join("\n")}\n`;
 };
 
-const comparedFrom = (payload: unknown): Compared => payload as Compared;
+const comparedFrom = (carried: unknown): Compared => carried as Compared;
 
-const decodedContent = (payload: unknown): Uint8Array => {
-  const { content } = payload as Readonly<{ content?: string }>;
+const decodedContent = (carried: unknown): Uint8Array => {
+  const { content } = carried as Readonly<{ content?: string }>;
   if (content === undefined) {
     throw new Error("Do not read a file the contents API answered without content.");
   }
@@ -119,7 +119,7 @@ export const compareGitHubPullRequest = async ({
   const files = compared.files ?? [];
   const mergeBase = compared.merge_base_commit.sha;
   const contentsAt =
-    (revision: string, decode: (path: string, blob: Uint8Array) => string | null) =>
+    (revision: string, decode: (path: string, sourceBytes: Uint8Array) => string | null) =>
     async (path: string) =>
       decode(
         path,
@@ -136,7 +136,7 @@ export const compareGitHubPullRequest = async ({
       inventoryOutput: files.map(inventoryEntryOf).join(""),
       diff: files.map(patchEntryOf).join(""),
       sources: {
-        base: contentsAt(mergeBase, (_path, blob) => decodedPreviousSource(blob)),
+        base: contentsAt(mergeBase, (_path, sourceBytes) => decodedPreviousSource(sourceBytes)),
         head: contentsAt(headRevision, decodedSource),
       },
     }),

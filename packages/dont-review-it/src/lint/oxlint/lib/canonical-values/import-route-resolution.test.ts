@@ -129,7 +129,7 @@ describe("import route source resolution", () => {
         "src/schema.ts": "export {};\n",
       },
     });
-    const entry: CanonicalValuesEntry = {
+    const ownerDeclaration: CanonicalValuesEntry = {
       annotationStart: 0,
       binding: "ORDER_STATUSES",
       bindingStart: 40,
@@ -150,7 +150,10 @@ describe("import route source resolution", () => {
     } as const;
 
     expect(
-      importRouteStatus(query, buildCatalog([entry], { sourceScope: { isIgnored: () => true } })),
+      importRouteStatus(
+        query,
+        buildCatalog([ownerDeclaration], { sourceScope: { isIgnored: () => true } }),
+      ),
     ).toBe("external");
   });
 
@@ -258,7 +261,7 @@ describe("import route source resolution", () => {
           "interface Local {}\ndeclare const LOCAL: string;\nexport const STATUS: string;\n",
       },
     });
-    const entry = {
+    const ownerDeclaration = {
       annotationStart: 0,
       binding: "STATUS",
       bindingStart: 0,
@@ -284,13 +287,15 @@ describe("import route source resolution", () => {
       specifier: "./public.d.ts",
     } as const;
 
-    expect(resolvedPublicImportEntries(query, [entry])).toStrictEqual([entry]);
+    expect(resolvedPublicImportEntries(query, [ownerDeclaration])).toStrictEqual([
+      ownerDeclaration,
+    ]);
     expect(
-      resolvedPublicImportEntries({ ...query, importedName: "MISSING" }, [entry]),
+      resolvedPublicImportEntries({ ...query, importedName: "MISSING" }, [ownerDeclaration]),
     ).toStrictEqual([]);
-    expect(resolvedPublicImportEntries({ ...query, specifier: "node:fs" }, [entry])).toStrictEqual(
-      [],
-    );
+    expect(
+      resolvedPublicImportEntries({ ...query, specifier: "node:fs" }, [ownerDeclaration]),
+    ).toStrictEqual([]);
   });
 
   test("direct and public entry matching requires source and exported binding identity", () => {
@@ -303,7 +308,7 @@ describe("import route source resolution", () => {
         "src/public.ts": 'export { ORDER_STATUSES } from "./owner.ts";\n',
       },
     });
-    const entry = {
+    const ownerDeclaration = {
       annotationStart: 0,
       binding: "ORDER_STATUSES",
       bindingStart: 0,
@@ -329,23 +334,23 @@ describe("import route source resolution", () => {
     } as const;
 
     expect(
-      resolvedDirectImportEntries({ ...query, specifier: "./owner.ts" }, [entry]),
-    ).toStrictEqual([entry]);
+      resolvedDirectImportEntries({ ...query, specifier: "./owner.ts" }, [ownerDeclaration]),
+    ).toStrictEqual([ownerDeclaration]);
     expect(
-      resolvedDirectImportEntries({ ...query, specifier: "./missing.ts" }, [entry]),
+      resolvedDirectImportEntries({ ...query, specifier: "./missing.ts" }, [ownerDeclaration]),
     ).toStrictEqual([]);
     expect(
-      resolvedPublicImportEntries({ ...query, specifier: "./public.ts" }, [entry]),
-    ).toStrictEqual([entry]);
+      resolvedPublicImportEntries({ ...query, specifier: "./public.ts" }, [ownerDeclaration]),
+    ).toStrictEqual([ownerDeclaration]);
     expect(
       resolvedPublicImportEntries({ ...query, importedName: "SHADOW", specifier: "./public.ts" }, [
-        entry,
+        ownerDeclaration,
       ]),
     ).toStrictEqual([]);
     expect(
       resolvedPublicImportEntries({ ...query, specifier: "./public.ts" }, [
         {
-          ...entry,
+          ...ownerDeclaration,
           importRoutes: [
             {
               exportName: "ORDER_STATUSES",

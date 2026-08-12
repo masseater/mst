@@ -8,10 +8,13 @@ import {
 
 import type { StoredEvent } from "./store.ts";
 
-const storedEvent = (id: string, shape: Partial<Omit<StoredEvent, "id">> = {}): StoredEvent => ({
-  id,
+const storedEvent = (
+  identity: string,
+  shape: Partial<Omit<StoredEvent, "identity">> = {},
+): StoredEvent => ({
+  id: identity,
   eventType: "pull_request",
-  deliveryId: id,
+  deliveryId: identity,
   payload: {},
   receivedAtMs: 100,
   expiresAtMs: Number.MAX_SAFE_INTEGER,

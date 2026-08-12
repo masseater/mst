@@ -30,11 +30,14 @@ type CommandResult = {
 
 const writeRepositoryFile = (
   root: string,
-  { relativePath, contents }: { readonly relativePath: string; readonly contents: string },
+  {
+    relativePath,
+    contents: fileText,
+  }: { readonly relativePath: string; readonly contents: string },
 ): void => {
   const absolutePath = join(root, relativePath);
   mkdirSync(dirname(absolutePath), { recursive: true });
-  writeFileSync(absolutePath, contents, "utf8");
+  writeFileSync(absolutePath, fileText, "utf8");
 };
 
 const lintConfigSource = (): string =>
@@ -63,8 +66,8 @@ const repositoryWith = (files: Readonly<Record<string, string>>): string => {
     }),
   });
   writeRepositoryFile(root, { relativePath: "vite.config.ts", contents: lintConfigSource() });
-  for (const [relativePath, contents] of Object.entries(files)) {
-    writeRepositoryFile(root, { relativePath, contents });
+  for (const [relativePath, fileText] of Object.entries(files)) {
+    writeRepositoryFile(root, { relativePath, contents: fileText });
   }
   return root;
 };
@@ -102,11 +105,11 @@ const runLint = (root: string, relativePath: string): CommandResult =>
     cwd: root,
   });
 
-const messagesIn = (value: unknown): readonly string[] => {
-  if (Array.isArray(value)) return value.flatMap(messagesIn);
-  if (value === null || typeof value !== "object") return [];
-  return Object.entries(value).flatMap(([key, nested]) =>
-    key === "message" && typeof nested === "string" ? [nested] : messagesIn(nested),
+const messagesIn = (jsonNode: unknown): readonly string[] => {
+  if (Array.isArray(jsonNode)) return jsonNode.flatMap(messagesIn);
+  if (jsonNode === null || typeof jsonNode !== "object") return [];
+  return Object.entries(jsonNode).flatMap(([fieldName, nested]) =>
+    fieldName === "message" && typeof nested === "string" ? [nested] : messagesIn(nested),
   );
 };
 
@@ -115,8 +118,11 @@ const lintMessages = (run: CommandResult): string => messagesIn(JSON.parse(run.o
 const annotated = (conceptId: string, declaration: string): string =>
   `/** @canonical-values ${conceptId} */\n${declaration}\n`;
 
-const validOwner = (value: string): string =>
-  annotated("real.status", `export const REAL_STATUSES = [${JSON.stringify(value)}] as const;`);
+const validOwner = (statusName: string): string =>
+  annotated(
+    "real.status",
+    `export const REAL_STATUSES = [${JSON.stringify(statusName)}] as const;`,
+  );
 
 describe("canonical values process e2e", { timeout: PROCESS_TIMEOUT * 4 }, () => {
   test("a canonical owner verifies and its consumer raw literal is linted", () => {
@@ -313,11 +319,11 @@ describe("canonical values process e2e", { timeout: PROCESS_TIMEOUT * 4 }, () =>
     expect(runLint(root, "src/order.ts").exitCode).toBe(0);
     const consumer = runLint(root, "src/consumer.ts");
     expect(consumer.exitCode).toBe(1);
-    const messages = lintMessages(consumer);
-    expect(messages).toContain("retry.outcome");
-    expect(messages).toContain("order.status");
-    expect(messages).toContain("-1");
-    expect(messages).toContain("null");
+    const lintMessageText = lintMessages(consumer);
+    expect(lintMessageText).toContain("retry.outcome");
+    expect(lintMessageText).toContain("order.status");
+    expect(lintMessageText).toContain("-1");
+    expect(lintMessageText).toContain("null");
   });
 
   test("a NUL-bearing value cannot collide with a two-value fingerprint", () => {

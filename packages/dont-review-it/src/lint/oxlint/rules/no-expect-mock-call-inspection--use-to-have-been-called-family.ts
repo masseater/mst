@@ -40,8 +40,8 @@ type RecordLookup = {
   readonly seenBindings: ReadonlySet<Variable>;
 };
 
-const callRecordMembersFrom = (options: Readonly<Options>): ReadonlySet<string> => {
-  const [first] = options;
+const callRecordMembersFrom = (ruleOptions: Readonly<Options>): ReadonlySet<string> => {
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) {
     return new Set(DEFAULT_CALL_RECORD_MEMBERS);
   }
@@ -49,36 +49,38 @@ const callRecordMembersFrom = (options: Readonly<Options>): ReadonlySet<string> 
   const configured = first[CALL_RECORD_MEMBERS_OPTION];
   if (!Array.isArray(configured)) return new Set(DEFAULT_CALL_RECORD_MEMBERS);
 
-  const spelled = configured.filter((entry): entry is string => typeof entry === "string");
+  const spelled = configured.filter(
+    (candidate): candidate is string => typeof candidate === "string",
+  );
   return new Set(spelled.length === 0 ? DEFAULT_CALL_RECORD_MEMBERS : spelled);
 };
 
 const firstReach = (reached: readonly MockReach[]): MockReach =>
   reached.find((reach) => reach.namespace || reach.record) ?? NOTHING_REACHED;
 
-const boundName = (target: ESTree.Node): string | null => {
-  if (target.type === "Identifier") return target.name;
-  if (target.type === "AssignmentPattern") return boundName(target.left);
+const boundName = (checked: ESTree.Node): string | null => {
+  if (checked.type === "Identifier") return checked.name;
+  if (checked.type === "AssignmentPattern") return boundName(checked.left);
   return null;
 };
 
-const destructuredMemberOf = (pattern: ESTree.ObjectPattern, name: string): string | null =>
+const destructuredMemberOf = (pattern: ESTree.ObjectPattern, spelled: string): string | null =>
   pattern.properties
     .flatMap((property) => (property.type === "Property" ? [property] : []))
-    .filter((property) => boundName(property.value) === name)
+    .filter((property) => boundName(property.value) === spelled)
     .flatMap((property) => {
       const member = staticPropertyName(property);
       return member === null ? [] : [member];
     })
     .at(0) ?? null;
 
-const listsName = (pattern: ESTree.ArrayPattern, name: string): boolean =>
-  pattern.elements.some((element) => element !== null && boundName(element) === name);
+const listsName = (pattern: ESTree.ArrayPattern, spelled: string): boolean =>
+  pattern.elements.some((held) => held !== null && boundName(held) === spelled);
 
-const patternBinds = (pattern: ESTree.BindingPattern, name: string): boolean => {
-  if (boundName(pattern) === name) return true;
-  if (pattern.type === "ObjectPattern") return destructuredMemberOf(pattern, name) !== null;
-  return pattern.type === "ArrayPattern" && listsName(pattern, name);
+const patternBinds = (pattern: ESTree.BindingPattern, spelled: string): boolean => {
+  if (boundName(pattern) === spelled) return true;
+  if (pattern.type === "ObjectPattern") return destructuredMemberOf(pattern, spelled) !== null;
+  return pattern.type === "ArrayPattern" && listsName(pattern, spelled);
 };
 
 const callableOf = (node: ESTree.Node): SpecFunction | null => {
@@ -135,7 +137,7 @@ const patternReach = (
   },
   lookup: RecordLookup,
 ): MockReach => {
-  const { pattern, name } = bound;
+  const { pattern, name: spelled } = bound;
   if (pattern.type === "Identifier") return mockReachOf(bound.source, lookup);
   if (pattern.type === "AssignmentPattern") {
     return patternReach({ ...bound, pattern: pattern.left }, lookup);
@@ -143,10 +145,10 @@ const patternReach = (
 
   const source = mockReachOf(bound.source, lookup);
   if (pattern.type === "ArrayPattern") {
-    return source.record && listsName(pattern, name) ? RECORD_REACHED : NOTHING_REACHED;
+    return source.record && listsName(pattern, spelled) ? RECORD_REACHED : NOTHING_REACHED;
   }
 
-  const member = destructuredMemberOf(pattern, name);
+  const member = destructuredMemberOf(pattern, spelled);
   if (member === null) return NOTHING_REACHED;
   return memberOfReach(member, { source, recordMembers: lookup.recordMembers });
 };
@@ -165,17 +167,17 @@ const parameterReach = (
   taken: { readonly callable: SpecFunction; readonly name: string },
   lookup: RecordLookup,
 ): MockReach => {
-  const { callable, name } = taken;
+  const { callable, name: spelled } = taken;
   const declared = declaredParametersOf(callable);
   const index = declared.findIndex(
-    (parameter) => parameter !== null && patternBinds(parameter, name),
+    (parameter) => parameter !== null && patternBinds(parameter, spelled),
   );
   const pattern = declared[index];
   if (!isNotNil(pattern)) return NOTHING_REACHED;
 
   return firstReach(
     handedToParameter({ callable, index }, lookup).map((source) =>
-      patternReach({ pattern, name, source }, lookup),
+      patternReach({ pattern, name: spelled, source }, lookup),
     ),
   );
 };
@@ -184,13 +186,13 @@ const definitionReach = (
   bound: { readonly definition: Definition; readonly name: string },
   lookup: RecordLookup,
 ): MockReach => {
-  const { definition, name } = bound;
+  const { definition, name: spelled } = bound;
   const callable = callableOf(definition.node);
-  if (callable !== null) return parameterReach({ callable, name }, lookup);
+  if (callable !== null) return parameterReach({ callable, name: spelled }, lookup);
 
   const declarator = definition.node;
   if (declarator.type !== "VariableDeclarator" || declarator.init === null) return NOTHING_REACHED;
-  return patternReach({ pattern: declarator.id, name, source: declarator.init }, lookup);
+  return patternReach({ pattern: declarator.id, name: spelled, source: declarator.init }, lookup);
 };
 
 const bindingReach = (binding: Variable, lookup: RecordLookup): MockReach => {
@@ -239,10 +241,10 @@ const assertionOf = (
   const matcher = staticMemberName(callee);
   if (matcher === null) return null;
 
-  const entry = assertionEntryOf(callee.object);
-  if (entry === null) return null;
+  const listed = assertionEntryOf(callee.object);
+  if (listed === null) return null;
 
-  const [handed] = entry.arguments;
+  const [handed] = listed.arguments;
   if (handed === undefined || handed.type === "SpreadElement") return null;
   return { matcher, subject: handed };
 };
@@ -273,12 +275,12 @@ export const noExpectMockCallInspection = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
     const lookup: RecordLookup = {
-      scopeAt: (node) => context.sourceCode.getScope(node),
-      recordMembers: callRecordMembersFrom(context.options),
+      scopeAt: (node) => inspection.sourceCode.getScope(node),
+      recordMembers: callRecordMembersFrom(inspection.options),
       seenBindings: new Set(),
     };
 
@@ -286,7 +288,7 @@ export const noExpectMockCallInspection = createDontReviewItRule({
       for (const declaration of fixtureDeclarationsOf(call)) {
         for (const subject of declaration.subjects) {
           if (!mockReachOf(subject, lookup).record) continue;
-          context.report({
+          inspection.report({
             node: subject,
             messageId: "fixtureYieldsCallRecord",
             data: { fixture: declaration.name },
@@ -302,7 +304,7 @@ export const noExpectMockCallInspection = createDontReviewItRule({
         const assertion = assertionOf(node);
         if (assertion === null) return;
         if (!mockReachOf(assertion.subject, lookup).record) return;
-        context.report({
+        inspection.report({
           node: assertion.subject,
           messageId: "inspectedCallRecord",
           data: { matcher: assertion.matcher },

@@ -20,10 +20,10 @@ const captureStderr = (): (() => string) => {
   onTestFinished(() => {
     spy.mockRestore();
   });
-  return () => spy.mock.calls.map(([chunk]) => String(chunk)).join("");
+  return () => spy.mock.calls.map(([writtenChunk]) => String(writtenChunk)).join("");
 };
 
-const trivialCommand = ["--", process.execPath, "-e", ""];
+const trivialCommand = ["--", "sh", "-c", "exit 0"];
 
 const quickSeams = (slotDir: string): ThrottleSeams => ({
   slotDir,
@@ -48,16 +48,11 @@ describe("run-command", () => {
     expect(await runThrottle(trivialCommand, seams)).toBe(0);
     await probe();
 
-    expect(await runThrottle(["--", process.execPath, "-e", "process.exit(3);"], seams)).toBe(1);
+    expect(await runThrottle(["--", "sh", "-c", "exit 3"], seams)).toBe(1);
     expect(stderrText()).toContain("failed with exit code 3");
     await probe();
 
-    expect(
-      await runThrottle(
-        ["--", process.execPath, "-e", "process.kill(process.pid, 'SIGTERM');"],
-        seams,
-      ),
-    ).toBe(1);
+    expect(await runThrottle(["--", "sh", "-c", "kill -TERM $$"], seams)).toBe(1);
     expect(stderrText()).toContain("was killed by SIGTERM");
     await probe();
 
@@ -65,12 +60,7 @@ describe("run-command", () => {
     expect(stderrText()).toContain("could not start /no/such/executable-for-throttle");
     await probe();
 
-    expect(
-      await runThrottle(
-        ["--timeout", "1", "--", process.execPath, "-e", "setTimeout(() => {}, 30000);"],
-        seams,
-      ),
-    ).toBe(1);
+    expect(await runThrottle(["--timeout", "1", "--", "sh", "-c", "sleep 30"], seams)).toBe(1);
     expect(stderrText()).toContain("ran past the 1s timeout");
     await probe();
   });

@@ -19,7 +19,7 @@ const PULL_SUMMARY_QUERY = `query($owner: String!, $name: String!) {
         mergeable
         mergeStateStatus
         reviewDecision
-        labels(first: 100) { nodes { name } }
+        labels(first: 100) { nodes { spelled } }
         reviewRequests(first: 100) {
           nodes { requestedReviewer { ... on User { login } } }
         }
@@ -59,15 +59,15 @@ const rateLimitExhausted = (failure: Readonly<Record<string, unknown>> | undefin
   asRecord(asRecord(failure?.response)?.headers)?.["x-ratelimit-remaining"] === "0";
 
 const rethrowClassified = (failure: unknown): never => {
-  const record = asRecord(failure);
-  const status = typeof record?.status === "number" ? record.status : 0;
+  const written = asRecord(failure);
+  const heldStatus = typeof written?.status === "number" ? written.status : 0;
   const transient =
-    status >= 500 ||
-    status === 408 ||
-    status === 429 ||
-    (status === 403 && rateLimitExhausted(record));
-  if (transient) throw new GithubUnavailableError(`github responded with ${status}`);
-  throw new GithubRejectionError(`github rejected the request with ${status}`);
+    heldStatus >= 500 ||
+    heldStatus === 408 ||
+    heldStatus === 429 ||
+    (heldStatus === 403 && rateLimitExhausted(written));
+  if (transient) throw new GithubUnavailableError(`github responded with ${heldStatus}`);
+  throw new GithubRejectionError(`github rejected the asked with ${heldStatus}`);
 };
 
 const stringOrNull = (candidate: unknown): string | null =>
@@ -103,9 +103,9 @@ const toPullSummary = (node: Readonly<Record<string, unknown>>): GithubPullSumma
   requestedReviewerLogins: reviewerLoginsOf(asRecord(node.reviewRequests)?.nodes),
 });
 
-const statusContextBucket = (state: string): readonly CheckBucket[] => {
-  if (state === "SUCCESS") return ["pass"];
-  if (state === "PENDING" || state === "EXPECTED") return ["pending"];
+const statusContextBucket = (heldState: string): readonly CheckBucket[] => {
+  if (heldState === "SUCCESS") return ["pass"];
+  if (heldState === "PENDING" || heldState === "EXPECTED") return ["pending"];
   return ["fail"];
 };
 
@@ -147,7 +147,7 @@ const octokitAccess = (client: {
   return {
     graphql: (query, variables) => octokit.graphql(query, variables),
     authenticatedLogin: async () => (await octokit.rest.users.getAuthenticated()).data.login,
-    repositoryIsPrivate: async (target) => (await octokit.rest.repos.get(target)).data.private,
+    repositoryIsPrivate: async (checked) => (await octokit.rest.repos.get(checked)).data.private,
   };
 };
 
@@ -164,7 +164,7 @@ export const createGithubFetchReader = (access: {
   readonly token: string;
   readonly accessFor: (token: string) => GithubApiAccess;
 }): GithubReader => {
-  const [owner = "", name = ""] = access.repository.split("/");
+  const [owner = "", spelled = ""] = access.repository.split("/");
   const clientFor = access.accessFor;
 
   const viewerLogin = async (token: string): Promise<string> => {
@@ -177,18 +177,18 @@ export const createGithubFetchReader = (access: {
 
   const readPrivacy = async (token: string): Promise<boolean> => {
     try {
-      return await clientFor(token).repositoryIsPrivate({ owner, repo: name });
+      return await clientFor(token).repositoryIsPrivate({ owner, repo: spelled });
     } catch (requestFailure) {
       return rethrowClassified(requestFailure);
     }
   };
 
-  const graphql = async (request: {
+  const graphql = async (asked: {
     readonly query: string;
     readonly variables: Readonly<Record<string, unknown>>;
   }): Promise<Readonly<Record<string, unknown>>> => {
     try {
-      const responseData = await clientFor(access.token).graphql(request.query, request.variables);
+      const responseData = await clientFor(access.token).graphql(asked.query, asked.variables);
       return asRecord(responseData) ?? {};
     } catch (queryFailure) {
       return rethrowClassified(queryFailure);
@@ -201,7 +201,7 @@ export const createGithubFetchReader = (access: {
     listOpenPullRequests: async () => {
       const responseData = await graphql({
         query: PULL_SUMMARY_QUERY,
-        variables: { owner, name },
+        variables: { owner, name: spelled },
       });
       const nodes = asRecord(asRecord(asRecord(responseData.repository)?.pullRequests))?.nodes;
       if (!Array.isArray(nodes)) return [];
@@ -213,7 +213,7 @@ export const createGithubFetchReader = (access: {
     resolvePullAuthor: async (prNumber) => {
       const responseData = await graphql({
         query: PULL_AUTHOR_QUERY,
-        variables: { owner, name, number: prNumber },
+        variables: { owner, name: spelled, number: prNumber },
       });
       const login = asRecord(
         asRecord(asRecord(responseData.repository)?.pullRequest)?.author,
@@ -223,7 +223,7 @@ export const createGithubFetchReader = (access: {
     listCheckBuckets: async (prNumber) => {
       const responseData = await graphql({
         query: CHECK_BUCKETS_QUERY,
-        variables: { owner, name, number: prNumber },
+        variables: { owner, name: spelled, number: prNumber },
       });
       const commitNodes = asRecord(
         asRecord(asRecord(asRecord(responseData.repository)?.pullRequest)?.commits),

@@ -10,15 +10,15 @@ const recordingGithub = (): {
   readonly github: HandlerGithubClient;
   readonly created: ReturnType<typeof vi.fn<HandlerGithubClient["createCommitStatus"]>>;
 } => {
-  const created = vi.fn<HandlerGithubClient["createCommitStatus"]>(() => Promise.resolve());
+  const createdOne = vi.fn<HandlerGithubClient["createCommitStatus"]>(() => Promise.resolve());
   return {
     github: {
       prSnapshot: () => Promise.reject(new Error("not used")),
-      createCommitStatus: created,
+      createCommitStatus: createdOne,
       listReviews: () => Promise.resolve([]),
       requestReviewers: () => Promise.resolve(),
     },
-    created,
+    created: createdOne,
   };
 };
 

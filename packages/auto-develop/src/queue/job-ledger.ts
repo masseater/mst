@@ -29,27 +29,29 @@ export type JobLedger = {
 
 export const createJobLedger = (): JobLedger => {
   const recordsById = new Map<string, JobRecord>();
-  const records = (): readonly JobRecord[] => [...recordsById.values()];
+  const writtenRecords = (): readonly JobRecord[] => [...recordsById.values()];
   return {
-    records,
-    get: (id) => recordsById.get(id),
-    has: (id) => recordsById.has(id),
-    put: (record) => {
-      recordsById.set(record.id, record);
+    records: writtenRecords,
+    get: (identity) => recordsById.get(identity),
+    has: (identity) => recordsById.has(identity),
+    put: (written) => {
+      recordsById.set(written.id, written);
     },
-    remove: (id) => recordsById.delete(id),
-    runningCount: () => records().filter((record) => record.state === "running").length,
-    waitingCount: () => records().filter((record) => record.state === "waiting").length,
+    remove: (identity) => recordsById.delete(identity),
+    runningCount: () => writtenRecords().filter((written) => written.state === "running").length,
+    waitingCount: () => writtenRecords().filter((written) => written.state === "waiting").length,
     laneRunning: (lane) =>
-      records().some((record) => record.lane === lane && record.state === "running"),
+      writtenRecords().some((written) => written.lane === lane && written.state === "running"),
     laneWaiting: (lane) =>
-      records().some((record) => record.lane === lane && record.state === "waiting"),
-    laneOccupied: (lane) => records().some((record) => record.lane === lane),
+      writtenRecords().some((written) => written.lane === lane && written.state === "waiting"),
+    laneOccupied: (lane) => writtenRecords().some((written) => written.lane === lane),
     findWaiting: (search) =>
-      records().find(
-        (record) =>
-          record.type === search.type && record.lane === search.lane && record.state === "waiting",
+      writtenRecords().find(
+        (written) =>
+          written.type === search.type &&
+          written.lane === search.lane &&
+          written.state === "waiting",
       ),
-    hasKey: (key) => records().some((record) => record.key === key),
+    hasKey: (named) => writtenRecords().some((written) => written.key === named),
   };
 };

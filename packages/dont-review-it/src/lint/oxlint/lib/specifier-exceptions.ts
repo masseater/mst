@@ -18,17 +18,17 @@ export const SPECIFIER_EXCEPTION_SCHEMA = {
 } as const;
 
 export const specifierExceptionsIn = (
-  options: Readonly<Options>,
+  ruleOptions: Readonly<Options>,
 ): readonly SpecifierException[] => {
-  const [declared] = options;
+  const [declared] = ruleOptions;
   if (typeof declared !== "object" || declared === null || Array.isArray(declared)) return [];
 
   const listed = declared.exceptions;
   if (!Array.isArray(listed)) return [];
 
-  return listed.flatMap((entry) => {
-    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) return [];
-    const { path, reason } = entry;
+  return listed.flatMap((listed) => {
+    if (typeof listed !== "object" || listed === null || Array.isArray(listed)) return [];
+    const { path, reason } = listed;
     if (typeof path !== "string") return [];
     return [{ path, reason: typeof reason === "string" ? reason.trim() : "" }];
   });

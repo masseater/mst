@@ -22,9 +22,9 @@ const repository = (): string => {
   return root;
 };
 
-const write = (path: string, contents = "export {};\n"): void => {
+const write = (path: string, fileText = "export {};\n"): void => {
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, contents, "utf8");
+  writeFileSync(path, fileText, "utf8");
 };
 
 describe("package export targets", () => {
@@ -70,16 +70,16 @@ describe("package export targets", () => {
   });
 
   test("conditional target patterns distinguish runtime and type-only targets", () => {
-    const target = {
+    const conditionalTarget = {
       types: "./types/index.d.ts",
       import: ["./src/index.js", null],
       default: "./src/fallback.js",
     };
     expect(
-      packageExportTargetPatterns({ depth: 0, includeTypes: true, value: target }),
+      packageExportTargetPatterns({ depth: 0, includeTypes: true, value: conditionalTarget }),
     ).toStrictEqual(["./types/index.d.ts", "./src/index.js", "./src/fallback.js"]);
     expect(
-      packageExportTargetPatterns({ depth: 0, includeTypes: false, value: target }),
+      packageExportTargetPatterns({ depth: 0, includeTypes: false, value: conditionalTarget }),
     ).toStrictEqual(["./src/index.js", "./src/fallback.js"]);
     expect(
       packageExportTargetPatterns({ depth: 0, includeTypes: true, value: null }),
@@ -105,11 +105,11 @@ describe("package export targets", () => {
   test("pattern captures are derived from repository files once and sorted", () => {
     const root = repository();
     const owner = join(root, "src/public/owner.ts");
-    const status = join(root, "src/public/status.ts");
+    const statusModule = join(root, "src/public/status.ts");
     expect(
       packageExportPatternCaptures({
         packageDirectory: root,
-        repositoryFiles: [status, owner, owner, join(root, "src/private/value.ts")],
+        repositoryFiles: [statusModule, owner, owner, join(root, "src/private/value.ts")],
         targets: ["./src/public/*.js", "./src/public/*.ts"],
       }),
     ).toStrictEqual(["owner", "status"]);

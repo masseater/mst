@@ -15,7 +15,7 @@ export const createCanonicalValuesTestRepository = (): string => {
 export const writeCanonicalValuesTestFile = ({
   repositoryRoot,
   relativePath,
-  contents,
+  contents: fileText,
 }: {
   readonly repositoryRoot: string;
   readonly relativePath: string;
@@ -23,7 +23,7 @@ export const writeCanonicalValuesTestFile = ({
 }): void => {
   const absolutePath = join(repositoryRoot, relativePath);
   mkdirSync(dirname(absolutePath), { recursive: true });
-  writeFileSync(absolutePath, contents, "utf8");
+  writeFileSync(absolutePath, fileText, "utf8");
 };
 
 export const writeCanonicalValuesTestFiles = ({
@@ -33,8 +33,8 @@ export const writeCanonicalValuesTestFiles = ({
   readonly repositoryRoot: string;
   readonly files: Readonly<Record<string, string>>;
 }): void => {
-  for (const [relativePath, contents] of Object.entries(files)) {
-    writeCanonicalValuesTestFile({ contents, relativePath, repositoryRoot });
+  for (const [relativePath, fileText] of Object.entries(files)) {
+    writeCanonicalValuesTestFile({ contents: fileText, relativePath, repositoryRoot });
   }
 };
 

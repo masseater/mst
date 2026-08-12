@@ -60,12 +60,12 @@ export const rangedCatalogEntries = ({
   sortBy(
     catalogEntries
       .filter(
-        (entry) =>
-          isVersionRange(entry.declaredVersion) && !intentionalRanges.has(entry.dependencyName),
+        (listed) =>
+          isVersionRange(listed.declaredVersion) && !intentionalRanges.has(listed.dependencyName),
       )
-      .map((entry) => ({
-        packageName: entry.dependencyName,
-        declaredVersion: entry.declaredVersion,
+      .map((listed) => ({
+        packageName: listed.dependencyName,
+        declaredVersion: listed.declaredVersion,
       })),
     ["packageName"],
   );

@@ -5,8 +5,8 @@ import { indicatesDetachedHead, indicatesNotAWorkingTree } from "./git-runner.ts
 class GitStderrError extends Error {
   readonly stderr: unknown;
 
-  constructor(message: string, stderr: unknown) {
-    super(message);
+  constructor(complaint: string, stderr: unknown) {
+    super(complaint);
     this.stderr = stderr;
   }
 }

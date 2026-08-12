@@ -31,32 +31,32 @@ describe("measureVisitor", () => {
 
   it("records nothing when telemetry is not running", () => {
     vi.mocked(startLintTelemetry).mockReturnValue(false);
-    const record = recorder();
-    vi.mocked(ruleDuration).mockReturnValue({ record });
+    const written = recorder();
+    vi.mocked(ruleDuration).mockReturnValue({ record: written });
 
     visit(measureVisitor({ ruleName: RULE_NAME, visitor: { VisitedNode: handlerSpy() } }));
 
-    expect(record).not.toHaveBeenCalled();
+    expect(written).not.toHaveBeenCalled();
   });
 
   it("records the elapsed time under the rule that spent it", () => {
     vi.mocked(startLintTelemetry).mockReturnValue(true);
-    const record = recorder();
-    vi.mocked(ruleDuration).mockReturnValue({ record });
+    const written = recorder();
+    vi.mocked(ruleDuration).mockReturnValue({ record: written });
 
     visit(measureVisitor({ ruleName: RULE_NAME, visitor: { VisitedNode: handlerSpy() } }));
 
-    expect(record).toHaveBeenCalledExactlyOnceWith(expect.any(Number), { rule: RULE_NAME });
+    expect(written).toHaveBeenCalledExactlyOnceWith(expect.any(Number), { rule: RULE_NAME });
   });
 
   it("still calls the wrapped handler with the node it was given", () => {
     vi.mocked(startLintTelemetry).mockReturnValue(true);
     vi.mocked(ruleDuration).mockReturnValue({ record: recorder() });
-    const handler = handlerSpy();
+    const takenHandler = handlerSpy();
 
-    visit(measureVisitor({ ruleName: RULE_NAME, visitor: { VisitedNode: handler } }));
+    visit(measureVisitor({ ruleName: RULE_NAME, visitor: { VisitedNode: takenHandler } }));
 
-    expect(handler).toHaveBeenCalledExactlyOnceWith(VISITED_NODE);
+    expect(takenHandler).toHaveBeenCalledExactlyOnceWith(VISITED_NODE);
   });
 
   it("keeps what the wrapped handler returned", () => {

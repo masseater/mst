@@ -11,13 +11,13 @@ const config = defaultWorkflowChecksConfig;
 
 const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-workflow-outcomes-"));
 
-const outcomesFor = (name: string, files: Readonly<Record<string, string>>) => {
-  const repositoryRoot = join(fixtureDir, name);
+const outcomesFor = (fixtureName: string, files: Readonly<Record<string, string>>) => {
+  const repositoryRoot = join(fixtureDir, fixtureName);
   mkdirSync(repositoryRoot, { recursive: true });
   Object.entries(files).forEach(([relativePath, source]) => {
-    const target = join(repositoryRoot, relativePath);
-    mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, source);
+    const workflowPath = join(repositoryRoot, relativePath);
+    mkdirSync(dirname(workflowPath), { recursive: true });
+    writeFileSync(workflowPath, source);
   });
   return workflowOutcomesOf({ repositoryRoot, config });
 };

@@ -55,7 +55,7 @@ const findingFor = ({
   return {
     className: declared.name,
     fields: declared.fields,
-    scopeName: sites.map((site) => site.scopeName).find((name) => name !== null) ?? null,
+    scopeName: sites.map((site) => site.scopeName).find((spelled) => spelled !== null) ?? null,
   };
 };
 

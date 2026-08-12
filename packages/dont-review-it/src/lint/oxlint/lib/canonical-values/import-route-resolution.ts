@@ -65,11 +65,11 @@ const compilerOptionsFor = (
   const configPath =
     configPathAtOrAbove({ configName: "tsconfig.json", directory, repositoryRoot }) ??
     configPathAtOrAbove({ configName: "jsconfig.json", directory, repositoryRoot });
-  const options =
+  const compilerOptions =
     configPath === undefined
       ? { module: ts.ModuleKind.NodeNext, moduleResolution: ts.ModuleResolutionKind.NodeNext }
       : parsedCompilerOptions(configPath);
-  return { containingFile, options: options ?? {} };
+  return { containingFile, options: compilerOptions ?? {} };
 };
 
 const repositoryLocation = (
@@ -166,13 +166,13 @@ export const isIgnoredRepositoryModule = (
 };
 
 const matchesDeclarationPath = (input: {
-  readonly entry: CanonicalValuesEntry;
+  readonly declaration: CanonicalValuesEntry;
   readonly query: ImportRouteQuery;
   readonly resolvedPath: string;
 }): boolean =>
-  input.query.importedName === input.entry.binding &&
+  input.query.importedName === input.declaration.binding &&
   input.resolvedPath ===
-    realPathOf(resolve(input.query.repositoryRoot, input.entry.declarationPath));
+    realPathOf(resolve(input.query.repositoryRoot, input.declaration.declarationPath));
 
 const routeMatchesResolvedSource = (input: {
   readonly location: Extract<ResolvedModuleLocation, { readonly kind: "repository" }>;
@@ -207,8 +207,8 @@ const matchingRuntimeRoute = (input: {
   readonly query: ImportRouteQuery;
 }): readonly CanonicalValuesEntry[] => {
   if (!declarationExportsName(input.location.path, input.query.importedName)) return [];
-  return input.entries.filter((entry) =>
-    entry.importRoutes.some(
+  return input.entries.filter((declaration) =>
+    declaration.importRoutes.some(
       (route) =>
         route.specifier === input.query.specifier && route.exportName === input.query.importedName,
     ),
@@ -217,23 +217,27 @@ const matchingRuntimeRoute = (input: {
 
 export const resolvedPublicImportEntries = (
   query: ImportRouteQuery,
-  entries: readonly CanonicalValuesEntry[],
+  declarations: readonly CanonicalValuesEntry[],
 ): readonly CanonicalValuesEntry[] => {
   const location = resolvedModuleLocation(query);
   if (location.kind !== "repository") return [];
-  const exact = entries.filter((entry) =>
-    entry.importRoutes.some((route) => routeMatchesResolvedSource({ location, query, route })),
+  const exact = declarations.filter((declaration) =>
+    declaration.importRoutes.some((route) =>
+      routeMatchesResolvedSource({ location, query, route }),
+    ),
   );
-  return exact.length === 0 ? matchingRuntimeRoute({ entries, location, query }) : exact;
+  return exact.length === 0
+    ? matchingRuntimeRoute({ entries: declarations, location, query })
+    : exact;
 };
 
 export const resolvedDirectImportEntries = (
   query: ImportRouteQuery,
-  entries: readonly CanonicalValuesEntry[],
+  declarations: readonly CanonicalValuesEntry[],
 ): readonly CanonicalValuesEntry[] => {
   const location = resolvedModuleLocation(query);
   if (location.kind !== "repository") return [];
-  return entries.filter((entry) =>
-    matchesDeclarationPath({ entry, query, resolvedPath: location.path }),
+  return declarations.filter((declaration) =>
+    matchesDeclarationPath({ declaration, query, resolvedPath: location.path }),
   );
 };

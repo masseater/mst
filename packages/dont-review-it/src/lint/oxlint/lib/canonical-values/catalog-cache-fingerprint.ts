@@ -11,12 +11,12 @@ const updateLengthPrefixed = (hash: ReturnType<typeof createHash>, identity: str
 };
 
 const updateFileFingerprint = (hash: ReturnType<typeof createHash>, file: ScannedFile): void => {
-  const contents = readFileSync(file.absolutePath);
+  const fileBytes = readFileSync(file.absolutePath);
   [file.relativePath, file.realPathIdentity, file.symbolicLinkTarget ?? ""].forEach((identity) => {
     updateLengthPrefixed(hash, identity);
   });
-  hash.update(`${contents.byteLength}:`);
-  hash.update(contents);
+  hash.update(`${fileBytes.byteLength}:`);
+  hash.update(fileBytes);
 };
 
 const updateProblemFingerprint = (

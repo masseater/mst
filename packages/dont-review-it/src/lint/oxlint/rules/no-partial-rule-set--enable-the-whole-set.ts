@@ -38,7 +38,7 @@ export const noPartialRuleSet = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
+  create(inspection) {
     return {
       ObjectExpression(node: ESTree.ObjectExpression) {
         const rules = ruleBlockObjectOf(node);
@@ -49,7 +49,7 @@ export const noPartialRuleSet = createDontReviewItRule({
           ancestors: ancestorsOf(node),
         });
         for (const deviation of setDeviationsIn(block)) {
-          context.report({
+          inspection.report({
             node: deviation.property,
             messageId: deviation.messageId,
             data: deviation.data,

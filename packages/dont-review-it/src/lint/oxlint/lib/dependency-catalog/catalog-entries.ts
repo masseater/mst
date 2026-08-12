@@ -21,9 +21,9 @@ const registeredEntries = (repositoryRoot: string): readonly CatalogEntryVersion
   const definition = parsedWorkspaceDefinitionOrNull({ source, config });
   if (definition === null) return [];
 
-  return definition.catalogEntries.map((entry) => ({
-    dependencyName: entry.dependencyName,
-    declaredVersion: entry.version,
+  return definition.catalogEntries.map((catalogEntry) => ({
+    dependencyName: catalogEntry.dependencyName,
+    declaredVersion: catalogEntry.version,
   }));
 };
 

@@ -15,13 +15,13 @@ const fieldValue = (line: string, field: string): string | undefined =>
 
 const parseFrame = (block: string): PartialFrame =>
   block.split("\n").reduce<PartialFrame>((frame, line) => {
-    const id = fieldValue(line, "id");
-    const event = fieldValue(line, "event");
+    const identity = fieldValue(line, "id");
+    const frameEvent = fieldValue(line, "event");
     const dataEntry = fieldValue(line, "data");
     return {
       ...frame,
-      ...(id === undefined ? {} : { id }),
-      ...(event === undefined ? {} : { event }),
+      ...(identity === undefined ? {} : { id: identity }),
+      ...(frameEvent === undefined ? {} : { event: frameEvent }),
       ...(dataEntry === undefined ? {} : { data: dataEntry }),
     };
   }, {});

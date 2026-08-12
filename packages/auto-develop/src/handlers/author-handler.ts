@@ -43,18 +43,18 @@ const requestRereview = async (rerequest: {
 const runSessionWithStatus = async (running: {
   readonly config: AuthorHandlerConfig;
   readonly statusWriter: StatusWriter;
-  readonly event: { readonly prNumber: number; readonly reason: AuthorReason };
+  readonly delivered: { readonly prNumber: number; readonly reason: AuthorReason };
   readonly headBranch: string;
 }): Promise<void> => {
-  const { config, event } = running;
+  const { config, delivered } = running;
   try {
     await config.runSession({
-      prNumber: event.prNumber,
+      prNumber: delivered.prNumber,
       headBranch: running.headBranch,
-      reason: event.reason,
+      reason: delivered.reason,
     });
   } catch (sessionFailure) {
-    const failed = await config.github.prSnapshot(event.prNumber);
+    const failed = await config.github.prSnapshot(delivered.prNumber);
     await running.statusWriter.write({
       sha: failed.headRefOid,
       state: "failure",
@@ -65,12 +65,12 @@ const runSessionWithStatus = async (running: {
 };
 
 export const createAuthorHandler = (config: AuthorHandlerConfig) => {
-  return async (event: {
+  return async (delivered: {
     readonly prNumber: number;
     readonly reason: AuthorReason;
   }): Promise<void> => {
     if (config.dryRun) {
-      config.log.info(event, "dry run; skipping the author session");
+      config.log.info(delivered, "dry run; skipping the author session");
       return;
     }
     const statusWriter = createStatusWriter({
@@ -78,7 +78,7 @@ export const createAuthorHandler = (config: AuthorHandlerConfig) => {
       context: AUTHOR_STATUS_CONTEXT,
       log: config.log,
     });
-    const before = await config.github.prSnapshot(event.prNumber);
+    const before = await config.github.prSnapshot(delivered.prNumber);
     await statusWriter.write({
       sha: before.headRefOid,
       state: "pending",
@@ -87,10 +87,10 @@ export const createAuthorHandler = (config: AuthorHandlerConfig) => {
     await runSessionWithStatus({
       config,
       statusWriter,
-      event,
+      delivered,
       headBranch: before.headRefName,
     });
-    const after = await config.github.prSnapshot(event.prNumber);
+    const after = await config.github.prSnapshot(delivered.prNumber);
     await statusWriter.write({
       sha: after.headRefOid,
       state: "success",
@@ -99,7 +99,7 @@ export const createAuthorHandler = (config: AuthorHandlerConfig) => {
     await requestRereview({
       config,
       statusWriter,
-      prNumber: event.prNumber,
+      prNumber: delivered.prNumber,
       sha: after.headRefOid,
     });
   };

@@ -29,7 +29,7 @@ const terminalCredentials = stubCredentials({
   authorizationFor: () => Promise.reject(new CredentialTerminalError("credential source is gone")),
 });
 
-const sseResponse = (body: string | null, status = 200): Response => new Response(body, { status });
+const sseOf = (sent: string | null, code = 200): Response => new Response(sent, { status: code });
 
 type PlannedResponse = (planning: {
   readonly init: RequestInit | undefined;
@@ -51,7 +51,7 @@ const abortByDisconnect: PlannedResponse = (planning) => {
 
 const disconnectThenClose: PlannedResponse = ({ disconnect }) => {
   disconnect();
-  return sseResponse("");
+  return sseOf("");
 };
 
 const silentStream = (): Response =>
@@ -104,8 +104,8 @@ const probeTransport = async (setup: {
     ...setup.config,
     fetchImpl,
     diagnostics: {
-      write: (chunk) => {
-        written.set(written.size, chunk);
+      write: (writtenChunk) => {
+        written.set(written.size, writtenChunk);
       },
     },
   });
@@ -132,18 +132,18 @@ const probeTransport = async (setup: {
     invalidateCount: credentials.invalidate.mock.calls.length,
     rejection: settled.rejection,
     rejectionText: String(settled.rejection),
-    carriesStatusProperty: settled.rejection instanceof Error && "status" in settled.rejection,
+    carriesStatusProperty: settled.rejection instanceof Error && "heldStatus" in settled.rejection,
     connectValue: settled.connectValue,
     consumerStep: stepping === undefined ? undefined : await stepping,
   };
 };
 
-const probeBody = (body: string, config?: Partial<SseTransportConfig>) =>
-  probeTransport({ plannedResponses: [() => sseResponse(body)], config, consume: true });
+const probeBody = (writtenBody: string, config?: Partial<SseTransportConfig>) =>
+  probeTransport({ plannedResponses: [() => sseOf(writtenBody)], config, consume: true });
 
 const probeRejectedStatus = (rejectedStatus: number) =>
   probeTransport({
-    plannedResponses: [() => sseResponse(null, rejectedStatus), () => sseResponse("")],
+    plannedResponses: [() => sseOf(null, rejectedStatus), () => sseOf("")],
   });
 
 const probeEarlyDisconnect = () => {
@@ -161,7 +161,7 @@ const it = test
   .extend("resumedProbe", () =>
     probeTransport({
       plannedResponses: [
-        () => sseResponse(envelopeFrame({ id: "evt-1", prNumber: 7 })),
+        () => sseOf(envelopeFrame({ id: "evt-1", prNumber: 7 })),
         disconnectThenClose,
       ],
       config: { reconnectOnClose: true },
@@ -199,19 +199,15 @@ const it = test
   .extend("forbiddenProbe", () => probeRejectedStatus(403))
   .extend("retriedStatusProbe", () =>
     probeTransport({
-      plannedResponses: [
-        () => sseResponse(null, 408),
-        () => sseResponse(null, 429),
-        () => sseResponse(""),
-      ],
+      plannedResponses: [() => sseOf(null, 408), () => sseOf(null, 429), () => sseOf("")],
     }),
   )
   .extend("notFoundProbe", () =>
-    probeTransport({ plannedResponses: [() => sseResponse(null, 404)], stepOnce: true }),
+    probeTransport({ plannedResponses: [() => sseOf(null, 404)], stepOnce: true }),
   )
   .extend("credentialGoneProbe", () =>
     probeTransport({
-      plannedResponses: [() => sseResponse("")],
+      plannedResponses: [() => sseOf("")],
       credentials: terminalCredentials,
     }),
   )
@@ -219,7 +215,7 @@ const it = test
   .extend("exhaustedRetryProbe", () => {
     const clock = new Map([["nowMs", 0]]);
     return probeTransport({
-      plannedResponses: [() => sseResponse(null, 500)],
+      plannedResponses: [() => sseOf(null, 500)],
       config: {
         now: () => clock.get("nowMs") ?? 0,
         sleep: (delayMs) => {
@@ -232,8 +228,8 @@ const it = test
   .extend("endlessRetryProbe", () =>
     probeTransport({
       plannedResponses: [
-        ...Array.from({ length: 6 }, (): PlannedResponse => () => sseResponse(null, 500)),
-        () => sseResponse(""),
+        ...Array.from({ length: 6 }, (): PlannedResponse => () => sseOf(null, 500)),
+        () => sseOf(""),
       ],
       config: { retryDeadlineMs: Number.POSITIVE_INFINITY },
     }),
@@ -243,7 +239,7 @@ const it = test
   )
   .extend("serverClosedProbe", () =>
     probeTransport({
-      plannedResponses: [() => sseResponse(""), disconnectThenClose],
+      plannedResponses: [() => sseOf(""), disconnectThenClose],
       config: { reconnectOnClose: true },
     }),
   )
@@ -253,26 +249,26 @@ const it = test
       config: { readTimeoutMs: 10, reconnectOnClose: true },
     }),
   )
-  .extend("bodylessProbe", () => probeTransport({ plannedResponses: [() => sseResponse(null)] }))
+  .extend("bodylessProbe", () => probeTransport({ plannedResponses: [() => sseOf(null)] }))
   .extend("reentrantProbe", () =>
-    probeTransport({ plannedResponses: [() => sseResponse("")], connectTwice: true }),
+    probeTransport({ plannedResponses: [() => sseOf("")], connectTwice: true }),
   )
   .extend("earlyDisconnectStep", () => probeEarlyDisconnect())
   .extend("realSleepProbe", () =>
     probeTransport({
-      plannedResponses: [() => sseResponse(null, 500), disconnectThenClose],
+      plannedResponses: [() => sseOf(null, 500), disconnectThenClose],
       config: { sleep: undefined },
     }),
   )
   .extend("brokenSleepProbe", () =>
     probeTransport({
-      plannedResponses: [() => sseResponse(null, 500)],
+      plannedResponses: [() => sseOf(null, 500)],
       config: { sleep: () => Promise.reject(new Error("timer broke")) },
     }),
   )
   .extend("interruptedSleepProbe", () =>
     probeTransport({
-      plannedResponses: [() => sseResponse(null, 500)],
+      plannedResponses: [() => sseOf(null, 500)],
       config: { sleep: undefined, reconnectOnClose: true },
       disconnectAfterMs: 20,
     }),
@@ -353,7 +349,7 @@ describe("接続失敗の分類", () => {
     expect(notFoundProbe.rejection).toBeInstanceOf(SseRequestRejectedError);
   });
 
-  it("その他の 4xx の致命エラーは status を持たない", ({ notFoundProbe }) => {
+  it("その他の 4xx の致命エラーは heldStatus を持たない", ({ notFoundProbe }) => {
     expect(notFoundProbe.carriesStatusProperty).toStrictEqual(false);
   });
 
@@ -422,7 +418,7 @@ describe("サーバー側クローズと読み取りタイムアウト", () => {
     expect(readTimeoutProbe.requestCount).toStrictEqual(2);
   });
 
-  it("body の無い応答はサーバー側クローズとして扱う", ({ bodylessProbe }) => {
+  it("writtenBody の無い応答はサーバー側クローズとして扱う", ({ bodylessProbe }) => {
     expect(bodylessProbe.requestCount).toStrictEqual(1);
   });
 });

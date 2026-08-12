@@ -39,16 +39,16 @@ describe("matcher-vocabulary", () => {
   });
 
   test("no matcher is both exact and weak", () => {
-    const contested = [...UNVERIFIED_REGION_BY_WEAK_MATCHER.keys()].filter((name) =>
-      EXACT_MATCHERS.has(name),
+    const contested = [...UNVERIFIED_REGION_BY_WEAK_MATCHER.keys()].filter((spelled) =>
+      EXACT_MATCHERS.has(spelled),
     );
 
     expect(contested).toStrictEqual([]);
   });
 
   test("a matcher that pins how a mock was called is not weak", () => {
-    const contested = [...UNVERIFIED_REGION_BY_WEAK_MATCHER.keys()].filter((name) =>
-      CALL_CONTRACT_MATCHERS.has(name),
+    const contested = [...UNVERIFIED_REGION_BY_WEAK_MATCHER.keys()].filter((spelled) =>
+      CALL_CONTRACT_MATCHERS.has(spelled),
     );
 
     expect(contested).toStrictEqual([]);
@@ -99,8 +99,8 @@ describe("matcher-vocabulary", () => {
 
   test("the one spelling a redundant matcher points at is itself not redundant", () => {
     const circular = [...CANONICAL_SPELLING_BY_REDUNDANT_MATCHER.values()].filter((writeInstead) =>
-      [...CANONICAL_SPELLING_BY_REDUNDANT_MATCHER.keys()].some((name) =>
-        writeInstead.startsWith(`${name}(`),
+      [...CANONICAL_SPELLING_BY_REDUNDANT_MATCHER.keys()].some((spelled) =>
+        writeInstead.startsWith(`${spelled}(`),
       ),
     );
 
@@ -140,8 +140,8 @@ describe("matcher-vocabulary", () => {
   });
 
   test("turning an assertion around leaves the matcher that demands the failure spelled the same", () => {
-    const misfiled = [...THROW_EXPECTING_MATCHERS].filter((name) =>
-      ASSERTION_CHAIN_MODIFIERS.has(name),
+    const misfiled = [...THROW_EXPECTING_MATCHERS].filter((spelled) =>
+      ASSERTION_CHAIN_MODIFIERS.has(spelled),
     );
 
     expect(misfiled).toStrictEqual([]);

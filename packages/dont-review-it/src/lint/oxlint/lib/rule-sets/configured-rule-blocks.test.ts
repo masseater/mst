@@ -20,16 +20,16 @@ const objectIn = (written: string): ESTree.ObjectExpression => {
 };
 
 const blockIn = (written: string): ConfiguredRuleBlock | null => {
-  const object = objectIn(written);
-  const rules = ruleBlockObjectOf(object);
-  return rules === null ? null : configuredRuleBlockOf({ object, rules, ancestors: [] });
+  const holder = objectIn(written);
+  const rules = ruleBlockObjectOf(holder);
+  return rules === null ? null : configuredRuleBlockOf({ object: holder, rules, ancestors: [] });
 };
 
-const firstOverrideOf = (object: ESTree.ObjectExpression): ESTree.ObjectExpression => {
-  const overrides = objectValueOf({ object, key: "overrides" });
-  const [element] = overrides?.type === "ArrayExpression" ? overrides.elements : [];
-  if (element?.type !== "ObjectExpression") throw new Error("no override object");
-  return element;
+const firstOverrideOf = (holder: ESTree.ObjectExpression): ESTree.ObjectExpression => {
+  const overrides = objectValueOf({ object: holder, key: "overrides" });
+  const [held] = overrides?.type === "ArrayExpression" ? overrides.elements : [];
+  if (held?.type !== "ObjectExpression") throw new Error("no override holder");
+  return held;
 };
 
 const spelledRulesIn = (written: string): readonly string[] =>
@@ -52,7 +52,7 @@ describe("configured-rule-blocks", () => {
     expect(spelledRulesIn(`{ rules: { [computed]: "error", ...shared } }`)).toStrictEqual([]);
   });
 
-  test("an object carrying no rules object is no block", () => {
+  test("an holder carrying no rules holder is no block", () => {
     expect(blockIn(`{ test: { coverage: {} } }`)).toBeNull();
     expect(blockIn(`{ rules: elsewhere }`)).toBeNull();
   });
@@ -87,14 +87,14 @@ describe("configured-rule-blocks", () => {
   });
 
   test("an override takes the type awareness the configuration around it declares", () => {
-    const object = objectIn(
+    const holder = objectIn(
       `{ options: { typeAware: true }, overrides: [{ files: [], rules: {} }] }`,
     );
-    const override = firstOverrideOf(object);
+    const override = firstOverrideOf(holder);
     const rules = ruleBlockObjectOf(override);
     if (rules === null) throw new Error("no rules in the override");
     expect(
-      configuredRuleBlockOf({ object: override, rules, ancestors: [object] }).declaresTypeAwareness,
+      configuredRuleBlockOf({ object: override, rules, ancestors: [holder] }).declaresTypeAwareness,
     ).toBe(true);
     expect(
       configuredRuleBlockOf({ object: override, rules, ancestors: [] }).declaresTypeAwareness,

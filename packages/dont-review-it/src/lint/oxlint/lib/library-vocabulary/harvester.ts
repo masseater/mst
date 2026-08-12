@@ -69,7 +69,7 @@ const vocabulariesExportedBy = (
   return project.checker
     .getExportsOfModule(moduleSymbol)
     .map((exported) => declaredVocabularyOf(dependency, exported))
-    .filter((entry) => entry !== null);
+    .filter((candidate) => candidate !== null);
 };
 
 const harvestedFrom = (
@@ -77,10 +77,10 @@ const harvestedFrom = (
   typeEntries: readonly DependencyTypeEntry[],
 ): LibraryVocabularyIndex => {
   const snapshot = api.updateSnapshot({
-    openFiles: typeEntries.map((entry) => entry.declarationsPath),
+    openFiles: typeEntries.map((typeEntry) => typeEntry.declarationsPath),
   });
   return buildLibraryVocabularyIndex(
-    typeEntries.flatMap((entry) => vocabulariesExportedBy(snapshot, entry)),
+    typeEntries.flatMap((typeEntry) => vocabulariesExportedBy(snapshot, typeEntry)),
   );
 };
 

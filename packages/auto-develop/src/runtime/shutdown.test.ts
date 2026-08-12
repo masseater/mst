@@ -23,7 +23,8 @@ const recordingTarget = (): {
     fire: (signal) => {
       for (const listener of listeners.get(signal) ?? []) listener();
     },
-    listenerCount: () => [...listeners.values()].reduce((total, set) => total + set.size, 0),
+    listenerCount: () =>
+      [...listeners.values()].reduce((counted, listedSet) => counted + listedSet.size, 0),
   };
 };
 

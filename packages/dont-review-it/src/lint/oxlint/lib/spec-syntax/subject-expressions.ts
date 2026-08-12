@@ -60,30 +60,32 @@ const nestedStatements = (statement: SpecStatement): readonly SpecStatement[] =>
   return carriedBodyOf(statement);
 };
 
-const ownStatementsOf = (body: ESTree.FunctionBody): readonly SpecStatement[] => {
+const ownStatementsOf = (writtenBody: ESTree.FunctionBody): readonly SpecStatement[] => {
   const reached = (statements: readonly SpecStatement[]): readonly SpecStatement[] =>
     statements.flatMap((statement) => [statement, ...reached(nestedStatements(statement))]);
-  return reached(body.body);
+  return reached(writtenBody.body);
 };
 
-export const blockBodyOf = (fn: SpecFunction): ESTree.FunctionBody | null =>
-  fn.body?.type !== "BlockStatement" ? null : fn.body;
+export const blockBodyOf = (takenFunction: SpecFunction): ESTree.FunctionBody | null =>
+  takenFunction.body?.type !== "BlockStatement" ? null : takenFunction.body;
 
-export const returnedExpressionsOf = (fn: SpecFunction): readonly ESTree.Expression[] => {
-  if (fn.body === null) return [];
-  if (fn.body.type !== "BlockStatement") return [fn.body];
-  return ownStatementsOf(fn.body).flatMap((statement) =>
+export const returnedExpressionsOf = (
+  takenFunction: SpecFunction,
+): readonly ESTree.Expression[] => {
+  if (takenFunction.body === null) return [];
+  if (takenFunction.body.type !== "BlockStatement") return [takenFunction.body];
+  return ownStatementsOf(takenFunction.body).flatMap((statement) =>
     statement.type === "ReturnStatement" && statement.argument !== null ? [statement.argument] : [],
   );
 };
 
 export const argumentsPassedTo = (
-  fn: SpecFunction,
+  takenFunction: SpecFunction,
   calleeName: string,
 ): readonly ESTree.Expression[] => {
-  const body = blockBodyOf(fn);
-  if (body === null) return [];
-  return ownStatementsOf(body)
+  const writtenBody = blockBodyOf(takenFunction);
+  if (writtenBody === null) return [];
+  return ownStatementsOf(writtenBody)
     .flatMap((statement) =>
       statement.type === "ExpressionStatement" ? [statement.expression] : [],
     )
@@ -97,13 +99,13 @@ export const argumentsPassedTo = (
 };
 
 export const localConstInitializer = (
-  body: ESTree.FunctionBody,
-  name: string,
+  writtenBody: ESTree.FunctionBody,
+  spelled: string,
 ): ESTree.Expression | null => {
-  const [onlyBinding, ...rivalBindings] = body.body
+  const [onlyBinding, ...rivalBindings] = writtenBody.body
     .flatMap((statement) => (statement.type === "VariableDeclaration" ? [statement] : []))
     .filter((declaration) => declaration.kind === "const")
     .flatMap((declaration) => declaration.declarations)
-    .filter((declarator) => declarator.id.type === "Identifier" && declarator.id.name === name);
+    .filter((declarator) => declarator.id.type === "Identifier" && declarator.id.name === spelled);
   return onlyBinding === undefined || rivalBindings.length !== 0 ? null : onlyBinding.init;
 };

@@ -1,6 +1,6 @@
 import { parseArgs } from "node:util";
 
-const USAGE = `Usage: throttle [--timeout <seconds>] -- <command> [args...]
+const USAGE = `Usage: throttle [--timeout <seconds>] -- <command> [handedArgs...]
 
 Runs the command while keeping the number of simultaneous executions that
 share this host and namespace at or below the limit. When every slot is held
@@ -57,12 +57,12 @@ export const parseInvocation = (argv: readonly string[]): Invocation | string =>
   if (split === -1) return USAGE;
   const timeout = parsedTimeoutSeconds(argv.slice(0, split));
   if (typeof timeout === "string") return timeout;
-  const [executable, ...args] = argv.slice(split + 1);
+  const [executable, ...handedArgs] = argv.slice(split + 1);
   if (executable === undefined) return USAGE;
   return {
     timeoutSec: timeout.seconds,
     executable,
-    args,
-    commandLine: [executable, ...args].join(" "),
+    args: handedArgs,
+    commandLine: [executable, ...handedArgs].join(" "),
   };
 };

@@ -13,8 +13,8 @@ const expressionIn = (sourceText: string): ESTree.Expression => {
 
 const reachOf = (declarations: Readonly<Record<string, string | null>>): SpecNameReach => {
   const declared = new Map(
-    Object.entries(declarations).map(([name, spelled]) => [
-      name,
+    Object.entries(declarations).map(([declaredName, spelled]) => [
+      declaredName,
       spelled === null ? null : expressionIn(spelled),
     ]),
   );
@@ -44,7 +44,7 @@ describe("isSpecClosedValue", () => {
     expect(isClosed('true ? "a" : "b"')).toBe(true);
   });
 
-  it("reads a name the spec filled with a written-out value as closed", () => {
+  it("reads a spelled the spec filled with a written-out value as closed", () => {
     expect(isClosed("id", reachOf({ id: '"a"' }))).toBe(true);
   });
 
@@ -52,15 +52,15 @@ describe("isSpecClosedValue", () => {
     expect(isClosed("carried", reachOf({ carried: "id", id: '"a"' }))).toBe(true);
   });
 
-  it("reads a name whose value the spec never wrote as open", () => {
+  it("reads a spelled whose value the spec never wrote as open", () => {
     expect(isClosed("report")).toBe(false);
   });
 
-  it("reads a name declared without a value the spec can read as open", () => {
+  it("reads a spelled declared without a value the spec can read as open", () => {
     expect(isClosed("report", reachOf({ report: null }))).toBe(false);
   });
 
-  it("stops at a name that reaches itself instead of walking forever", () => {
+  it("stops at a spelled that reaches itself instead of walking forever", () => {
     expect(isClosed("looped", reachOf({ looped: "looped" }))).toBe(false);
   });
 
@@ -70,11 +70,11 @@ describe("isSpecClosedValue", () => {
     expect(isClosed("sql`a`")).toBe(false);
   });
 
-  it("reads a construction on a name this file declares as open", () => {
+  it("reads a construction on a spelled this file declares as open", () => {
     expect(isClosed('new Report("a")', reachOf({ Report: null }))).toBe(false);
   });
 
-  it("reads a construction on a name from outside the spec as closed", () => {
+  it("reads a construction on a spelled from outside the spec as closed", () => {
     expect(isClosed('new Headers({ accept: "text/plain" })')).toBe(true);
   });
 
@@ -100,14 +100,14 @@ describe("isSpecClosedValue", () => {
     expect(isClosed('({ id: "a" })[picked]')).toBe(false);
   });
 
-  it("reads a container a name holds as open, since anything holding it can write into it", () => {
+  it("reads a container a spelled holds as open, since anything holding it can write into it", () => {
     expect(isClosed("sink", reachOf({ sink: "({})" }))).toBe(false);
     expect(isClosed("ids", reachOf({ ids: '["a"]' }))).toBe(false);
     expect(isClosed("sink", reachOf({ sink: "new Set()" }))).toBe(false);
     expect(isClosed("sink.size", reachOf({ sink: "new Set()" }))).toBe(false);
   });
 
-  it("reads a value a name holds that nothing can write into as closed", () => {
+  it("reads a value a spelled holds that nothing can write into as closed", () => {
     expect(isClosed("spelled", reachOf({ spelled: '"a" + "b"' }))).toBe(true);
     expect(isClosed("spelled", reachOf({ spelled: "`a`" }))).toBe(true);
   });

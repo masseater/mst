@@ -43,97 +43,101 @@ const ENTRY_FIELDS = [
 
 type CanonicalValuesEntryFields = Record<(typeof ENTRY_FIELDS)[number], unknown>;
 
-const hasEntryFields = (value: object): value is CanonicalValuesEntryFields =>
-  ENTRY_FIELDS.every((field) => field in value);
+const hasEntryFields = (candidate: object): candidate is CanonicalValuesEntryFields =>
+  ENTRY_FIELDS.every((field) => field in candidate);
 
-const hasValidEntryOffsets = (value: CanonicalValuesEntryFields): boolean =>
-  Number.isSafeInteger(value.annotationStart) &&
-  Number.isSafeInteger(value.bindingStart) &&
-  Number.isSafeInteger(value.declarationEnd) &&
-  Number.isSafeInteger(value.declarationStart) &&
-  (value.annotationStart as number) >= 0 &&
-  (value.declarationStart as number) >= 0 &&
-  (value.annotationStart as number) < (value.declarationStart as number) &&
-  (value.bindingStart as number) >= (value.declarationStart as number) &&
-  (value.bindingStart as number) < (value.declarationEnd as number) &&
-  (value.declarationEnd as number) > (value.declarationStart as number);
+const hasValidEntryOffsets = (candidate: CanonicalValuesEntryFields): boolean =>
+  Number.isSafeInteger(candidate.annotationStart) &&
+  Number.isSafeInteger(candidate.bindingStart) &&
+  Number.isSafeInteger(candidate.declarationEnd) &&
+  Number.isSafeInteger(candidate.declarationStart) &&
+  (candidate.annotationStart as number) >= 0 &&
+  (candidate.declarationStart as number) >= 0 &&
+  (candidate.annotationStart as number) < (candidate.declarationStart as number) &&
+  (candidate.bindingStart as number) >= (candidate.declarationStart as number) &&
+  (candidate.bindingStart as number) < (candidate.declarationEnd as number) &&
+  (candidate.declarationEnd as number) > (candidate.declarationStart as number);
 
-const isPackageName = (value: unknown): value is string | null =>
-  value === null || (typeof value === "string" && value.length > 0);
+const isPackageName = (candidate: unknown): candidate is string | null =>
+  candidate === null || (typeof candidate === "string" && candidate.length > 0);
 
-const hasValidEntryIdentity = (value: CanonicalValuesEntryFields): boolean =>
-  typeof value.binding === "string" &&
-  value.binding.length > 0 &&
-  typeof value.conceptId === "string" &&
-  /^[a-z0-9]+(?:[-.][a-z0-9]+)*$/u.test(value.conceptId) &&
-  typeof value.declarationPath === "string" &&
-  value.declarationPath.length > 0 &&
-  typeof value.fingerprint === "string" &&
-  /^[a-f0-9]{32}$/u.test(value.fingerprint) &&
-  isPackageName(value.packageName);
+const hasValidEntryIdentity = (candidate: CanonicalValuesEntryFields): boolean =>
+  typeof candidate.binding === "string" &&
+  candidate.binding.length > 0 &&
+  typeof candidate.conceptId === "string" &&
+  /^[a-z0-9]+(?:[-.][a-z0-9]+)*$/u.test(candidate.conceptId) &&
+  typeof candidate.declarationPath === "string" &&
+  candidate.declarationPath.length > 0 &&
+  typeof candidate.fingerprint === "string" &&
+  /^[a-f0-9]{32}$/u.test(candidate.fingerprint) &&
+  isPackageName(candidate.packageName);
 
 const staysWithinRepository = (path: string): boolean =>
   !isAbsolute(path) && !/^[A-Za-z]:\//u.test(path) && path !== ".." && !path.startsWith("../");
 
-const isResolvedSourcePath = (value: unknown): value is string =>
-  typeof value === "string" &&
-  value.length > 0 &&
-  value !== "." &&
-  !value.includes("\0") &&
-  !value.includes("\\") &&
-  posix.normalize(value) === value &&
-  staysWithinRepository(value);
+const isResolvedSourcePath = (candidate: unknown): candidate is string =>
+  typeof candidate === "string" &&
+  candidate.length > 0 &&
+  candidate !== "." &&
+  !candidate.includes("\0") &&
+  !candidate.includes("\\") &&
+  posix.normalize(candidate) === candidate &&
+  staysWithinRepository(candidate);
 
 const hasNonemptyStringProperty = (
-  value: object,
+  candidate: object,
   property: "exportName" | "specifier",
 ): boolean => {
-  const propertyValue = (value as Partial<Record<typeof property, unknown>>)[property];
+  const propertyValue = (candidate as Partial<Record<typeof property, unknown>>)[property];
   return typeof propertyValue === "string" && propertyValue.length > 0;
 };
 
-const hasResolvedSourcePaths = (value: object): boolean => {
-  if (!("resolvedSourcePaths" in value)) return false;
-  if (!Array.isArray(value.resolvedSourcePaths)) return false;
-  if (value.resolvedSourcePaths.length === 0) return false;
-  if (!value.resolvedSourcePaths.every(isResolvedSourcePath)) return false;
-  return new Set(value.resolvedSourcePaths).size === value.resolvedSourcePaths.length;
+const hasResolvedSourcePaths = (candidate: object): boolean => {
+  if (!("resolvedSourcePaths" in candidate)) return false;
+  if (!Array.isArray(candidate.resolvedSourcePaths)) return false;
+  if (candidate.resolvedSourcePaths.length === 0) return false;
+  if (!candidate.resolvedSourcePaths.every(isResolvedSourcePath)) return false;
+  return new Set(candidate.resolvedSourcePaths).size === candidate.resolvedSourcePaths.length;
 };
 
-const isImportRoute = (value: unknown): boolean => {
-  if (value === null || typeof value !== "object") return false;
-  if (!hasNonemptyStringProperty(value, "exportName")) return false;
-  if (!hasNonemptyStringProperty(value, "specifier")) return false;
-  return hasResolvedSourcePaths(value);
+const isImportRoute = (candidate: unknown): boolean => {
+  if (candidate === null || typeof candidate !== "object") return false;
+  if (!hasNonemptyStringProperty(candidate, "exportName")) return false;
+  if (!hasNonemptyStringProperty(candidate, "specifier")) return false;
+  return hasResolvedSourcePaths(candidate);
 };
 
-const hasCanonicalValues = (value: unknown): value is readonly CanonicalValue[] => {
-  if (!Array.isArray(value) || value.length === 0) return false;
-  if (!value.every(isCanonicalValue)) return false;
-  return new Set(value.map(canonicalValueKey)).size === value.length;
+const hasCanonicalValues = (candidate: unknown): candidate is readonly CanonicalValue[] => {
+  if (!Array.isArray(candidate) || candidate.length === 0) return false;
+  if (!candidate.every(isCanonicalValue)) return false;
+  return new Set(candidate.map(canonicalValueKey)).size === candidate.length;
 };
 
-const isCanonicalValuesEntry = (value: unknown): value is CanonicalValuesEntry => {
-  if (value === null || typeof value !== "object") return false;
-  if (!hasEntryFields(value)) return false;
-  if (!hasValidEntryOffsets(value) || !hasValidEntryIdentity(value)) return false;
-  if (!Array.isArray(value.importRoutes) || !value.importRoutes.every(isImportRoute)) return false;
-  if (!hasCanonicalValues(value.values)) return false;
-  return value.fingerprint === fingerprintValues(value.values);
+const isCanonicalValuesEntry = (candidate: unknown): candidate is CanonicalValuesEntry => {
+  if (candidate === null || typeof candidate !== "object") return false;
+  if (!hasEntryFields(candidate)) return false;
+  if (!hasValidEntryOffsets(candidate) || !hasValidEntryIdentity(candidate)) return false;
+  if (!Array.isArray(candidate.importRoutes) || !candidate.importRoutes.every(isImportRoute))
+    return false;
+  if (!hasCanonicalValues(candidate.values)) return false;
+  return candidate.fingerprint === fingerprintValues(candidate.values);
 };
 
 const hasCachedCatalogFields = (
-  value: object,
-): value is Record<"entries" | "fingerprint" | "integrity" | "version", unknown> =>
-  ["entries", "fingerprint", "integrity", "version"].every((field) => field in value);
+  candidate: object,
+): candidate is Record<"entries" | "fingerprint" | "integrity" | "version", unknown> =>
+  ["entries", "fingerprint", "integrity", "version"].every((field) => field in candidate);
 
-export const isCachedCatalog = (value: unknown): value is CachedCatalog => {
-  if (value === null || typeof value !== "object") return false;
-  if (!hasCachedCatalogFields(value)) return false;
-  if (value.version !== CACHE_FORMAT_VERSION) return false;
-  if (typeof value.fingerprint !== "string" || typeof value.integrity !== "string") return false;
-  if (!Array.isArray(value.entries) || !value.entries.every(isCanonicalValuesEntry)) return false;
+export const isCachedCatalog = (candidate: unknown): candidate is CachedCatalog => {
+  if (candidate === null || typeof candidate !== "object") return false;
+  if (!hasCachedCatalogFields(candidate)) return false;
+  if (candidate.version !== CACHE_FORMAT_VERSION) return false;
+  if (typeof candidate.fingerprint !== "string" || typeof candidate.integrity !== "string")
+    return false;
+  if (!Array.isArray(candidate.entries) || !candidate.entries.every(isCanonicalValuesEntry))
+    return false;
   return (
-    value.integrity === cacheIntegrity({ fingerprint: value.fingerprint, entries: value.entries })
+    candidate.integrity ===
+    cacheIntegrity({ fingerprint: candidate.fingerprint, entries: candidate.entries })
   );
 };

@@ -74,19 +74,19 @@ export const noDiscardedFailure = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
+  create(inspection) {
     return {
       CatchClause(node: ESTree.CatchClause) {
         if (node.param !== null && bindsFailure(node.param)) return;
 
-        context.report({ node, messageId: "unnamedCatchFailure" });
+        inspection.report({ node, messageId: "unnamedCatchFailure" });
       },
       CallExpression(node: ESTree.CallExpression) {
         if (node.callee.type !== "Identifier") return;
         if (!FAILURE_PAIR_CALLEE_NAMES.has(node.callee.name)) return;
         if (!discardsFailure(node)) return;
 
-        context.report({ node, messageId: "discardedFailurePair" });
+        inspection.report({ node, messageId: "discardedFailurePair" });
       },
     };
   },

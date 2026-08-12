@@ -14,8 +14,8 @@ export type TestRepository = {
   readonly commit: (changes: RepositoryChanges) => string;
 };
 
-const runGit = (repositoryRoot: string, args: readonly string[]): string =>
-  execFileSync("git", [...args], {
+const runGit = (repositoryRoot: string, handedArgs: readonly string[]): string =>
+  execFileSync("git", [...handedArgs], {
     cwd: repositoryRoot,
     encoding: "utf8",
     env: {
@@ -31,10 +31,10 @@ const runGit = (repositoryRoot: string, args: readonly string[]): string =>
   });
 
 const writeChanges = (repositoryRoot: string, changes: RepositoryChanges): void => {
-  for (const [relativePath, contents] of Object.entries(changes.files ?? {})) {
+  for (const [relativePath, writtenContents] of Object.entries(changes.files ?? {})) {
     const absolutePath = resolve(repositoryRoot, relativePath);
     mkdirSync(dirname(absolutePath), { recursive: true });
-    writeFileSync(absolutePath, contents);
+    writeFileSync(absolutePath, writtenContents);
   }
 
   for (const relativePath of changes.removed ?? []) {
@@ -58,7 +58,7 @@ export const withTestRepository = async <Result>(
   try {
     return await exercise({
       root: repositoryRoot,
-      git: (args) => runGit(repositoryRoot, args),
+      git: (handedArgs) => runGit(repositoryRoot, handedArgs),
       commit,
     });
   } finally {

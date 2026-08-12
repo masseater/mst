@@ -43,8 +43,8 @@ const markerNumbersIn = ({
       return digits === undefined ? [] : [Number(digits)];
     });
 
-const isContiguousFromOne = (numbers: readonly number[]): boolean =>
-  numbers.every((value, index) => value === index + 1);
+const isContiguousFromOne = (sequenceNumbers: readonly number[]): boolean =>
+  sequenceNumbers.every((held, index) => held === index + 1);
 
 const decimalMarkerLines = ({
   source,
@@ -70,14 +70,14 @@ const orderedListProblems = ({
     .filter((node) => node.type === "list")
     .filter((node) => node.ordered === true)
     .filter((node) => !isInsideGeneratedRegion(offsetOf(node), document.generated))
-    .flatMap((list): readonly DocumentProblem[] => {
-      const startOffset = offsetOf(list);
-      const endOffset = endOffsetOf(list);
+    .flatMap((listed): readonly DocumentProblem[] => {
+      const startOffset = offsetOf(listed);
+      const endOffset = endOffsetOf(listed);
 
-      const numbers = markerNumbersIn({ source: document.source, startOffset, endOffset });
-      const sequenceProblems = isContiguousFromOne(numbers)
+      const sequenceNumbers = markerNumbersIn({ source: document.source, startOffset, endOffset });
+      const sequenceProblems = isContiguousFromOne(sequenceNumbers)
         ? []
-        : [{ file: document.file, line: lineOf(list), message: NON_CONTIGUOUS_MESSAGE }];
+        : [{ file: document.file, line: lineOf(listed), message: NON_CONTIGUOUS_MESSAGE }];
 
       const decimalProblems = decimalMarkerLines({
         source: document.source,
@@ -99,9 +99,9 @@ const zeroLabelProblems = ({
     .filter((node) => node.type === "heading" || node.type === "strong")
     .filter((node) => !isInsideGeneratedRegion(offsetOf(node), document.generated))
     .flatMap((node): readonly DocumentProblem[] => {
-      const text = flattenTextKeepingCode(node);
+      const writtenText = flattenTextKeepingCode(node);
       const word = config.orderedLabelWords.find((candidate) =>
-        new RegExp(`(?<![A-Za-z])${candidate}\\s*0(?![0-9])`, "u").test(text),
+        new RegExp(`(?<![A-Za-z])${candidate}\\s*0(?![0-9])`, "u").test(writtenText),
       );
 
       return word === undefined

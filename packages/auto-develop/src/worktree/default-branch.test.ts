@@ -10,8 +10,8 @@ const gitReturning = (stdout: string): GitRunner => ({
   run: () => Promise.resolve({ stdout, stderr: "" }),
 });
 
-const gitFailing = (message: string): GitRunner => ({
-  run: () => Promise.reject(new Error(message)),
+const gitFailing = (complaint: string): GitRunner => ({
+  run: () => Promise.reject(new Error(complaint)),
 });
 
 class GitStderrError extends Error {

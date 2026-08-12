@@ -24,8 +24,8 @@ const captureStderr = (): { joined: () => string; chunks: () => string[] } => {
     spy.mockRestore();
   });
   return {
-    joined: () => spy.mock.calls.map(([chunk]) => String(chunk)).join(""),
-    chunks: () => spy.mock.calls.map(([chunk]) => String(chunk)),
+    joined: () => spy.mock.calls.map(([writtenChunk]) => String(writtenChunk)).join(""),
+    chunks: () => spy.mock.calls.map(([writtenChunk]) => String(writtenChunk)),
   };
 };
 
@@ -152,7 +152,7 @@ describe("wait-for-slot", () => {
       expect(second).toBe(1);
       expect(elapsed).toBeGreaterThanOrEqual(400);
       expect(elapsed).toBeLessThan(1500);
-      const failures = stderr.chunks().filter((chunk) => chunk.includes("gave up"));
+      const failures = stderr.chunks().filter((writtenChunk) => writtenChunk.includes("gave up"));
       expect(failures).toHaveLength(2);
       expect(failures[0]).toBe(failures[1]);
       expect(failures[0]).toContain("400ms");

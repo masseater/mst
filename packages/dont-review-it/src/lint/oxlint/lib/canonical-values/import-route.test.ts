@@ -14,7 +14,7 @@ import { importRouteStatus } from "./import-route.ts";
 describe("import-route", () => {
   const REPOSITORY_ROOT = "/repository";
 
-  const entry = (overrides: Partial<CanonicalValuesEntry>): CanonicalValuesEntry => ({
+  const declarationFor = (overrides: Partial<CanonicalValuesEntry>): CanonicalValuesEntry => ({
     annotationStart: 0,
     binding: "ORDER_STATUSES",
     bindingStart: 40,
@@ -40,7 +40,7 @@ describe("import-route", () => {
     ...overrides,
   });
 
-  const catalog = buildCatalog([entry({})]);
+  const catalog = buildCatalog([declarationFor({})]);
 
   const statusOf = (
     ...[specifier, filename, importedName = "ORDER_STATUSES"]: readonly [string, string, string?]
@@ -75,7 +75,7 @@ describe("import-route", () => {
         specifier: specifier(repositoryRoot),
       },
       buildCatalog([
-        entry({
+        declarationFor({
           declarationPath,
           importRoutes: [],
         }),
@@ -100,7 +100,7 @@ describe("import-route", () => {
   });
 
   test("a package with no public owner route still rejects its shadow export", () => {
-    const privateCatalog = buildCatalog([entry({ importRoutes: [] })]);
+    const privateCatalog = buildCatalog([declarationFor({ importRoutes: [] })]);
 
     expect(
       importRouteStatus(
@@ -151,7 +151,7 @@ describe("import-route", () => {
       },
     });
     const ignoredCatalog = buildCatalog(
-      [entry({ declarationPath: "src/order-status.ts", importRoutes: [] })],
+      [declarationFor({ declarationPath: "src/order-status.ts", importRoutes: [] })],
       { sourceScope: { isIgnored: () => true } },
     );
     expect(
@@ -244,12 +244,12 @@ describe("import-route", () => {
       },
     });
     const aliasCatalog = buildCatalog([
-      entry({
+      declarationFor({
         declarationPath: "packages/order-vocabulary/src/order-status.ts",
         importRoutes: [],
       }),
     ]);
-    const status = (specifier: string, importedName = "ORDER_STATUSES"): string =>
+    const routeStatus = (specifier: string, importedName = "ORDER_STATUSES"): string =>
       importRouteStatus(
         {
           importedName,
@@ -260,13 +260,13 @@ describe("import-route", () => {
         aliasCatalog,
       );
 
-    expect(status("@internal/owner")).toBe("registered");
-    expect(status("@internal/owner", "SHADOW_STATUSES")).toBe("unregistered");
-    expect(status("@internal/shadow")).toBe("unregistered");
-    expect(status("@internal/missing")).toBe("unregistered");
-    expect(status("@internal/missing/statuses")).toBe("unregistered");
-    expect(status("@vite/unresolved-alias")).toBe("external");
-    expect(status("order-statuses")).toBe("external");
+    expect(routeStatus("@internal/owner")).toBe("registered");
+    expect(routeStatus("@internal/owner", "SHADOW_STATUSES")).toBe("unregistered");
+    expect(routeStatus("@internal/shadow")).toBe("unregistered");
+    expect(routeStatus("@internal/missing")).toBe("unregistered");
+    expect(routeStatus("@internal/missing/statuses")).toBe("unregistered");
+    expect(routeStatus("@vite/unresolved-alias")).toBe("external");
+    expect(routeStatus("order-statuses")).toBe("external");
   });
 
   test("a parent TypeScript config cannot redefine routes inside the repository", () => {
@@ -316,7 +316,7 @@ describe("import-route", () => {
       },
     });
     const directCatalog = analyzeCanonicalValuesRepository({ repositoryRoot: root }).catalog;
-    const status = (specifier: string): string =>
+    const routeStatus = (specifier: string): string =>
       importRouteStatus(
         {
           importedName: "ORDER_STATUSES",
@@ -327,10 +327,10 @@ describe("import-route", () => {
         directCatalog,
       );
 
-    expect(status("./status.js")).toBe("registered");
-    expect(status("./status.jsx")).toBe("unregistered");
-    expect(status(join(root, "src/status.js"))).toBe("registered");
-    expect(status(join(root, "src/status.jsx"))).toBe("unregistered");
+    expect(routeStatus("./status.js")).toBe("registered");
+    expect(routeStatus("./status.jsx")).toBe("unregistered");
+    expect(routeStatus(join(root, "src/status.js"))).toBe("registered");
+    expect(routeStatus(join(root, "src/status.jsx"))).toBe("unregistered");
   });
 
   test("a relative specifier the catalog does not resolve is unregistered", () => {
@@ -360,7 +360,7 @@ describe("import-route", () => {
       },
     });
     const subpathCatalog = buildCatalog([
-      entry({
+      declarationFor({
         declarationPath: "src/statuses.ts",
         importRoutes: [
           {
@@ -397,7 +397,7 @@ describe("import-route", () => {
 
   test("a directory index owner does not capture a sibling file route", () => {
     const indexCatalog = buildCatalog([
-      entry({
+      declarationFor({
         declarationPath: "packages/order-vocabulary/src/status/index.ts",
         importRoutes: [],
       }),

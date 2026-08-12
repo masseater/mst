@@ -58,8 +58,8 @@ type PlacedImport = {
   readonly sortKey: string;
 };
 
-const placedImportsOf = (body: readonly ESTree.Statement[]): readonly PlacedImport[] =>
-  body.flatMap((statement) =>
+const placedImportsOf = (statements: readonly ESTree.Statement[]): readonly PlacedImport[] =>
+  statements.flatMap((statement) =>
     statement.type === "ImportDeclaration" && statement.specifiers.length > 0
       ? [
           {
@@ -71,35 +71,38 @@ const placedImportsOf = (body: readonly ESTree.Statement[]): readonly PlacedImpo
       : [],
   );
 
-const blankLinesBetween = (preceding: PlacedImport, current: PlacedImport): number =>
-  current.declaration.loc.start.line - preceding.declaration.loc.end.line - 1;
+const blankLinesBetween = (preceding: PlacedImport, placedImport: PlacedImport): number =>
+  placedImport.declaration.loc.start.line - preceding.declaration.loc.end.line - 1;
 
 const crossOriginMisplacement = (
   preceding: PlacedImport,
-  current: PlacedImport,
+  placedImport: PlacedImport,
 ): RuleMessage | null => {
-  const origin = originNameOf(current.origin);
+  const origin = originNameOf(placedImport.origin);
   const precedingOrigin = originNameOf(preceding.origin);
-  if (originRank(current.origin) < originRank(preceding.origin)) {
+  if (originRank(placedImport.origin) < originRank(preceding.origin)) {
     return { messageId: "originOutOfOrder", data: { origin, precedingOrigin } };
   }
-  return blankLinesBetween(preceding, current) < 1
+  return blankLinesBetween(preceding, placedImport) < 1
     ? { messageId: "missingBlankLineBetweenOrigins", data: { origin, precedingOrigin } }
     : null;
 };
 
 const sameOriginMisplacement = (
   preceding: PlacedImport,
-  current: PlacedImport,
+  placedImport: PlacedImport,
 ): RuleMessage | null => {
-  if (blankLinesBetween(preceding, current) > 0) {
-    return { messageId: "blankLineInsideOrigin", data: { origin: originNameOf(current.origin) } };
+  if (blankLinesBetween(preceding, placedImport) > 0) {
+    return {
+      messageId: "blankLineInsideOrigin",
+      data: { origin: originNameOf(placedImport.origin) },
+    };
   }
-  if (current.sortKey >= preceding.sortKey) return null;
+  if (placedImport.sortKey >= preceding.sortKey) return null;
   return {
     messageId: "specifierOutOfOrder",
     data: {
-      specifier: current.declaration.source.value,
+      specifier: placedImport.declaration.source.value,
       precedingSpecifier: preceding.declaration.source.value,
     },
   };
@@ -107,12 +110,12 @@ const sameOriginMisplacement = (
 
 const misplacementBetween = (
   preceding: PlacedImport | undefined,
-  current: PlacedImport,
+  placedImport: PlacedImport,
 ): RuleMessage | null => {
   if (preceding === undefined) return null;
-  return current.origin === preceding.origin
-    ? sameOriginMisplacement(preceding, current)
-    : crossOriginMisplacement(preceding, current);
+  return placedImport.origin === preceding.origin
+    ? sameOriginMisplacement(preceding, placedImport)
+    : crossOriginMisplacement(preceding, placedImport);
 };
 
 export const noUnorderedImport = createDontReviewItRule({
@@ -136,14 +139,14 @@ export const noUnorderedImport = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
+  create(ruleContext) {
     return {
       Program(node: ESTree.Program) {
         const placed = placedImportsOf(node.body);
-        for (const [index, current] of placed.entries()) {
-          const misplacement = misplacementBetween(placed[index - 1], current);
+        for (const [index, placedImport] of placed.entries()) {
+          const misplacement = misplacementBetween(placed[index - 1], placedImport);
           if (misplacement === null) continue;
-          context.report({ node: current.declaration, ...misplacement });
+          ruleContext.report({ node: placedImport.declaration, ...misplacement });
         }
       },
     };

@@ -8,17 +8,22 @@ import {
 import { GithubRejectionError } from "./github-rejection-error.ts";
 import { GithubUnavailableError } from "./github-unavailable-error.ts";
 
-class GithubStatusError extends Error {
+type GithubStatusFailure = {
+  readonly name: string;
+  readonly message: string;
   readonly status: number;
-
   readonly response: { readonly headers: Readonly<Record<string, string>> };
+};
 
-  constructor(status: number, headers: Readonly<Record<string, string>>) {
-    super(`github responded ${status}`);
-    this.status = status;
-    this.response = { headers };
-  }
-}
+const githubStatusFailure = (
+  code: number,
+  headers: Readonly<Record<string, string>>,
+): GithubStatusFailure => ({
+  name: "GithubStatusError",
+  message: `github responded ${code}`,
+  status: code,
+  response: { headers },
+});
 
 const accessReturning = (parts: {
   readonly graphqlData?: unknown;
@@ -45,12 +50,12 @@ const readerWith = (parts: Parameters<typeof accessReturning>[0]) =>
   });
 
 const failureWith = (
-  status: number,
+  heldStatus: number,
   headers: Readonly<Record<string, string>> = {},
-): GithubStatusError => new GithubStatusError(status, headers);
+): GithubStatusFailure => githubStatusFailure(heldStatus, headers);
 
-const jsonResponse = (body: unknown): Response =>
-  new Response(JSON.stringify(body), {
+const jsonResponse = (writtenBody: unknown): Response =>
+  new Response(JSON.stringify(writtenBody), {
     status: 200,
     headers: { "content-type": "application/json" },
   });
@@ -231,7 +236,7 @@ const it = test
   )
   .extend("failureWithoutStatus", () =>
     rejectionOf(() =>
-      readerWith({ failure: new Error("no status on this failure") }).listOpenPullRequests(),
+      readerWith({ failure: new Error("no heldStatus on this failure") }).listOpenPullRequests(),
     ),
   )
   .extend("loginFailureOverDefaultPath", () =>

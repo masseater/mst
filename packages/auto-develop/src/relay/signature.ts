@@ -1,14 +1,14 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-export const verifyWebhookSignature = (request: {
+export const verifyWebhookSignature = (asked: {
   readonly body: string;
   readonly signatureHeader: string | undefined;
   readonly secret: string;
 }): boolean => {
-  if (request.signatureHeader === undefined) return false;
-  const expectedHex = createHmac("sha256", request.secret).update(request.body).digest("hex");
+  if (asked.signatureHeader === undefined) return false;
+  const expectedHex = createHmac("sha256", asked.secret).update(asked.body).digest("hex");
   const expectedHeader = Buffer.from(`sha256=${expectedHex}`);
-  const providedHeader = Buffer.from(request.signatureHeader);
+  const providedHeader = Buffer.from(asked.signatureHeader);
   return (
     providedHeader.length === expectedHeader.length &&
     timingSafeEqual(providedHeader, expectedHeader)

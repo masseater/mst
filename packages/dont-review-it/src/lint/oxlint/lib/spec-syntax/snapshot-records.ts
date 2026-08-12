@@ -21,8 +21,8 @@ export const MAX_INLINE_RECORD_LINES = 12;
 export const externalRecordKeyOf = (titles: readonly string[], ordinal: number): string =>
   `${titles.join(RECORD_TITLE_SEPARATOR)} ${ordinal}`;
 
-export const recordLineCountOf = (record: string): number => {
-  const written = record.replaceAll("\r\n", RECORD_LINE_BREAK);
+export const recordLineCountOf = (recorded: string): number => {
+  const written = recorded.replaceAll("\r\n", RECORD_LINE_BREAK);
   const padded =
     written.length >= 2 &&
     written.startsWith(RECORD_LINE_BREAK) &&
@@ -32,25 +32,25 @@ export const recordLineCountOf = (record: string): number => {
 
 const spelledRecord = (written: string): string => written.replaceAll(RECORD_ESCAPE, "$1");
 
-const recordsIn = (text: string): ReadonlyMap<string, string> =>
+const recordsIn = (writtenText: string): ReadonlyMap<string, string> =>
   new Map(
-    [...text.matchAll(RECORD_ENTRY)].map(
-      (entry) => [spelledRecord(String(entry[1])), spelledRecord(String(entry[2]))] as const,
+    [...writtenText.matchAll(RECORD_ENTRY)].map(
+      (listed) => [spelledRecord(String(listed[1])), spelledRecord(String(listed[2]))] as const,
     ),
   );
 
-export const externalRecordOf = (specPath: string, key: string): string | null => {
+export const externalRecordOf = (specPath: string, named: string): string | null => {
   const recordsPath = join(
     dirname(specPath),
     EXTERNAL_RECORDS_DIRECTORY,
     `${basename(specPath)}${EXTERNAL_RECORDS_SUFFIX}`,
   );
-  const text = readTextFile(recordsPath);
-  return text === null ? null : (recordsIn(text).get(key) ?? null);
+  const writtenText = readTextFile(recordsPath);
+  return writtenText === null ? null : (recordsIn(writtenText).get(named) ?? null);
 };
 
 export const fileRecordOf = (specPath: string, written: string): string | null =>
   readTextFile(resolve(dirname(specPath), written));
 
-export const emptyBodyConstructorOf = (record: string): string | null =>
-  EMPTY_BODY_RECORD.exec(record.trim())?.[1] ?? null;
+export const emptyBodyConstructorOf = (written: string): string | null =>
+  EMPTY_BODY_RECORD.exec(written.trim())?.[1] ?? null;

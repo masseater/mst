@@ -10,13 +10,13 @@ import { isOutOfScopeLintSource } from "../lib/out-of-scope-source.ts";
 import type { CanonicalValuesCatalogLoader } from "../lib/canonical-values/catalog-loader.ts";
 import type { CanonicalValuesEntry } from "../lib/canonical-values/catalog.ts";
 
-const conceptSummary = (entries: readonly CanonicalValuesEntry[]): string =>
-  entries
-    .map((entry) => {
-      const routes = entry.importRoutes.map((route) => route.specifier).join(", ");
+const conceptSummary = (canonicalOwners: readonly CanonicalValuesEntry[]): string =>
+  canonicalOwners
+    .map((canonicalOwner) => {
+      const routes = canonicalOwner.importRoutes.map((route) => route.specifier).join(", ");
       return routes === ""
-        ? `${entry.conceptId} declared in ${entry.declarationPath}`
-        : `${entry.conceptId} exported from ${routes}`;
+        ? `${canonicalOwner.conceptId} declared in ${canonicalOwner.declarationPath}`
+        : `${canonicalOwner.conceptId} exported from ${routes}`;
     })
     .toSorted()
     .join("; ");
@@ -39,24 +39,24 @@ export const createNoStrictCanonicalLiteralUseRule = (input: {
       },
       schema: OWNERSHIP_POLICY_SCHEMA,
     },
-    create(context) {
-      const repositoryRoot = findWorkspaceRoot(context.cwd);
-      if (isOutOfScopeLintSource(context.filename, repositoryRoot)) return {};
+    create(ruleContext) {
+      const repositoryRoot = findWorkspaceRoot(ruleContext.cwd);
+      if (isOutOfScopeLintSource(ruleContext.filename, repositoryRoot)) return {};
       const diagnostics = analyzeCanonicalLiterals({
         catalog: input.loadCatalog({ repositoryRoot }),
-        filename: context.filename,
+        filename: ruleContext.filename,
         repositoryRoot,
-        sourceCode: context.sourceCode,
+        sourceCode: ruleContext.sourceCode,
       });
-      const ownershipPolicy = ownershipPolicyOf(context.options);
+      const ownershipPolicy = ownershipPolicyOf(ruleContext.options);
       return {
         Program() {
           for (const diagnostic of diagnostics) {
-            context.report({
+            ruleContext.report({
               node: diagnostic.node,
               messageId: "canonicalValueLiteral",
               data: {
-                value: context.sourceCode.getText(diagnostic.node),
+                value: ruleContext.sourceCode.getText(diagnostic.node),
                 concepts: conceptSummary(diagnostic.entries),
                 ownershipPolicy,
               },
