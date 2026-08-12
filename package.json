@@ -24,7 +24,7 @@
     "@mst/verified-specifications": "workspace:*",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
-    "knip": "^6.32.0",
+    "knip": "6.32.0",
     "vite": "catalog:",
     "vite-plus": "catalog:"
   },

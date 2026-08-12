@@ -73,6 +73,46 @@ describe("compareGitHubPullRequest", () => {
     });
   });
 
+  it("reads a removal, a rename and a copy the compare reported", async () => {
+    const comparison = await compareGitHubPullRequest({
+      repositoryRoot: "/checkout",
+      repository: "owner/name",
+      baseRevision: "basetip",
+      headRevision: "headsha",
+      request: async (path: string) =>
+        path.startsWith("/repos/owner/name/compare/")
+          ? {
+              merge_base_commit: { sha: "basesha" },
+              files: [
+                {
+                  filename: "src/gone.ts",
+                  status: "removed",
+                  patch: "@@ -1,1 +0,0 @@\n-export const gone = true;\n",
+                },
+                {
+                  filename: "src/moved.ts",
+                  status: "renamed",
+                  previous_filename: "src/was-here.ts",
+                },
+                {
+                  filename: "src/copy.ts",
+                  status: "copied",
+                  previous_filename: "src/original.ts",
+                },
+              ],
+            }
+          : { content: encoded("export const kept = true;\n") },
+    });
+
+    expect(
+      comparison.files.map((file) => [file.kind, file.beforePath, file.afterPath]),
+    ).toStrictEqual([
+      ["deleted", "src/gone.ts", null],
+      ["renamed", "src/was-here.ts", "src/moved.ts"],
+      ["added", null, "src/copy.ts"],
+    ]);
+  });
+
   it("refuses a compare status it cannot map to a change", async () => {
     await expect(
       compareGitHubPullRequest({

@@ -14,15 +14,6 @@ export type GitHubPullRequestComparison = Readonly<{
   request: GitHubRequest;
 }>;
 
-const INVENTORY_STATUS: Readonly<Record<string, string>> = {
-  added: "A",
-  changed: "M",
-  copied: "C100",
-  modified: "M",
-  removed: "D",
-  renamed: "R100",
-};
-
 type ComparedFile = Readonly<{
   filename: string;
   status: string;
@@ -45,43 +36,60 @@ const movedFrom = (file: ComparedFile): string => {
   return before;
 };
 
-const statusOf = (file: ComparedFile): string => {
-  const status = INVENTORY_STATUS[file.status];
-  if (status === undefined) {
+type ChangeShape = Readonly<{
+  inventory: (file: ComparedFile) => string;
+  formerPath: (file: ComparedFile) => string;
+  headers: (file: ComparedFile) => readonly string[];
+}>;
+
+const asAdded: ChangeShape = {
+  inventory: (file) => `A\0${file.filename}\0`,
+  formerPath: (file) => file.filename,
+  headers: (file) => ["new file mode 100644", "--- /dev/null", `+++ b/${file.filename}`],
+};
+
+const asModified: ChangeShape = {
+  inventory: (file) => `M\0${file.filename}\0`,
+  formerPath: (file) => file.filename,
+  headers: (file) => [`--- a/${file.filename}`, `+++ b/${file.filename}`],
+};
+
+const SHAPES_BY_STATUS: Readonly<Record<string, ChangeShape>> = {
+  added: asAdded,
+  changed: asModified,
+  copied: asAdded,
+  modified: asModified,
+  removed: {
+    inventory: (file) => `D\0${file.filename}\0`,
+    formerPath: (file) => file.filename,
+    headers: (file) => ["deleted file mode 100644", `--- a/${file.filename}`, "+++ /dev/null"],
+  },
+  renamed: {
+    inventory: (file) => `R100\0${movedFrom(file)}\0${file.filename}\0`,
+    formerPath: movedFrom,
+    headers: (file) => [
+      "similarity index 100%",
+      `rename from ${movedFrom(file)}`,
+      `rename to ${file.filename}`,
+    ],
+  },
+};
+
+const shapeOf = (file: ComparedFile): ChangeShape => {
+  const shape = SHAPES_BY_STATUS[file.status];
+  if (shape === undefined) {
     throw new Error(`Do not read past an unknown compare status "${file.status}".`);
   }
-  return status;
+  return shape;
 };
 
-const inventoryEntryOf = (file: ComparedFile): string => {
-  const status = statusOf(file);
-  return status === "R100" || status === "C100"
-    ? `${status}\0${movedFrom(file)}\0${file.filename}\0`
-    : `${status}\0${file.filename}\0`;
-};
-
-const HEADERS_BY_STATUS: Readonly<Record<string, (file: ComparedFile) => readonly string[]>> = {
-  A: (file) => ["new file mode 100644", "--- /dev/null", `+++ b/${file.filename}`],
-  C100: (file) => [
-    "similarity index 100%",
-    `copy from ${movedFrom(file)}`,
-    `copy to ${file.filename}`,
-  ],
-  D: (file) => ["deleted file mode 100644", `--- a/${file.filename}`, "+++ /dev/null"],
-  M: (file) => [`--- a/${file.filename}`, `+++ b/${file.filename}`],
-  R100: (file) => [
-    "similarity index 100%",
-    `rename from ${movedFrom(file)}`,
-    `rename to ${file.filename}`,
-  ],
-};
+const inventoryEntryOf = (file: ComparedFile): string => shapeOf(file).inventory(file);
 
 const patchEntryOf = (file: ComparedFile): string => {
-  const status = statusOf(file);
-  const before = status === "R100" || status === "C100" ? movedFrom(file) : file.filename;
+  const shape = shapeOf(file);
   const lines = [
-    `diff --git a/${before} b/${file.filename}`,
-    ...(HEADERS_BY_STATUS[status]?.(file) ?? []),
+    `diff --git a/${shape.formerPath(file)} b/${file.filename}`,
+    ...shape.headers(file),
     ...(file.patch === undefined ? [] : [file.patch.replace(/\n+$/u, "")]),
   ];
   return `${lines.join("\n")}\n`;

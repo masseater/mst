@@ -16,12 +16,25 @@ export type DeclaredDependency = {
 const isJsonObject = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-const aliasTargetOf = (declaredVersion: string): string | null => {
+const aliasPartsOf = (
+  declaredVersion: string,
+): { readonly targetName: string; readonly range: string } => {
   const target = declaredVersion.slice(ALIAS_PROTOCOL.length);
   const rangeAt = target.lastIndexOf("@");
-  const targetName = rangeAt > 0 ? target.slice(0, rangeAt) : target;
+  return rangeAt > 0
+    ? { targetName: target.slice(0, rangeAt), range: target.slice(rangeAt + 1) }
+    : { targetName: target, range: "" };
+};
+
+const aliasTargetOf = (declaredVersion: string): string | null => {
+  const { targetName } = aliasPartsOf(declaredVersion);
   return targetName === "" ? null : targetName;
 };
+
+export const declaredRangeOf = (declaredVersion: string): string =>
+  declaredVersion.startsWith(ALIAS_PROTOCOL)
+    ? aliasPartsOf(declaredVersion).range
+    : declaredVersion;
 
 const packageNameOf = (declaration: {
   readonly declaredName: string;

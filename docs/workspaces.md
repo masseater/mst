@@ -7,6 +7,7 @@
 - `apps/website` — The Vite+ dev-server target of this repository.
 - `packages/agentic-documents` — AI-facing documents that stay true to the repository and keep a shape machines can follow.
 - `packages/ai-native` — Command wrappers that keep parallel heavy commands within the host's capacity and their output out of the caller's context window.
+- `packages/auto-develop` — A pull-request review loop that keeps running without a human starting it.
 - `packages/dont-review-it` — Machine-enforced answers to the writing questions that would otherwise be raised in review.
 - `packages/lint-rule-authoring` — Materials for authoring lint rules that keep working after they are written.
 - `packages/repository-checks` — The shared contract of this repository's checks: how they read files, shape problems, and exit.
