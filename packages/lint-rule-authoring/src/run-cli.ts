@@ -52,7 +52,10 @@ const dispatch = (argv: readonly string[]): CliResult => {
     };
   }
 
-  const problems = lintRuleIndexProblems({ repositoryRoot, write: parsed.values.write ?? false });
+  const { problems } = lintRuleIndexProblems({
+    repositoryRoot,
+    write: parsed.values.write ?? false,
+  });
   return {
     exitCode: problems.length === 0 ? EXIT_SUCCESS : EXIT_PROBLEMS_FOUND,
     out: problems.map((problem) => `${formatLintRuleIndexProblem(problem)}\n`).join(""),

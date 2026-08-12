@@ -38,7 +38,8 @@ jobs:
 describe("runWorkflowChecks", () => {
   it("says nothing about a definition that keeps every discipline", () => {
     expect(
-      runWorkflowChecks({ repositoryRoot: repositoryWith("gated", { "ci.yml": GATED }), config }),
+      runWorkflowChecks({ repositoryRoot: repositoryWith("gated", { "ci.yml": GATED }), config })
+        .problems,
     ).toStrictEqual([]);
   });
 
@@ -55,7 +56,7 @@ jobs:
     });
 
     expect(
-      runWorkflowChecks({ repositoryRoot, config }).map((problem) => problem.line),
+      runWorkflowChecks({ repositoryRoot, config }).problems.map((problem) => problem.line),
     ).toStrictEqual([3, 5, 7, 7]);
   });
 
@@ -65,7 +66,7 @@ jobs:
     });
 
     expect(
-      runWorkflowChecks({ repositoryRoot, config }).map((problem) => problem.message),
+      runWorkflowChecks({ repositoryRoot, config }).problems.map((problem) => problem.message),
     ).toStrictEqual([
       "A workflow definition that does not parse must not stay in the repository, because every check below reads it as an empty file and reports nothing. Fix the YAML here so the definition can be read.",
     ]);
@@ -78,7 +79,7 @@ jobs:
     });
 
     expect(
-      runWorkflowChecks({ repositoryRoot, config }).map((problem) => problem.file),
+      runWorkflowChecks({ repositoryRoot, config }).problems.map((problem) => problem.file),
     ).toStrictEqual([".github/workflows/ci.yml", ".github/workflows/release.yml"]);
   });
 });

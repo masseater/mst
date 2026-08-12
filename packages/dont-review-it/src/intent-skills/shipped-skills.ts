@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { readUnlessMissing } from "@mst/repository-checks";
+import { readUnlessMissing, type ScannedProblems } from "@mst/repository-checks";
 import { findNodeAtLocation, getNodeValue, parseTree, type Node } from "jsonc-parser";
 
 import {
@@ -215,7 +215,10 @@ export const shippedSkillsProblems = ({
 }: {
   readonly repositoryRoot: string;
   readonly config: IntentSkillsConfig;
-}): readonly RepositoryProblem[] =>
-  listRepositoryFiles(repositoryRoot).manifests.flatMap((file) =>
-    manifestProblems({ file, config }),
-  );
+}): ScannedProblems => {
+  const manifests = listRepositoryFiles(repositoryRoot).manifests;
+  return {
+    problems: manifests.flatMap((file) => manifestProblems({ file, config })),
+    scanned: manifests.length,
+  };
+};
