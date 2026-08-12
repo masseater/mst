@@ -13,6 +13,17 @@ const calleeRootNameOf = (callee: ESTree.Expression): string | null => {
   return callee.object.name;
 };
 
+const isDerivedFromFixture = (
+  expression: ESTree.Expression,
+  fixtureLocalNames: ReadonlySet<string>,
+): boolean => {
+  if (expression.type === "Identifier") return fixtureLocalNames.has(expression.name);
+  if (expression.type !== "CallExpression") return false;
+  const { callee } = expression;
+  if (callee.type !== "MemberExpression") return false;
+  return isDerivedFromFixture(callee.object, fixtureLocalNames);
+};
+
 const snapshotSubjectOf = (node: ESTree.CallExpression): ESTree.Expression | null => {
   const { callee } = node;
   if (callee.type !== "MemberExpression" || callee.property.type !== "Identifier") return null;
@@ -57,6 +68,12 @@ export const requireStandardIoSnapshot = createDontReviewItRule({
       ImportDeclaration(node: ESTree.ImportDeclaration) {
         const localName = standardIoFixtureLocalNameOf(node);
         if (localName !== null) fixtureLocalNames.add(localName);
+      },
+      VariableDeclarator(node: ESTree.VariableDeclarator) {
+        if (node.id.type !== "Identifier" || node.init === null) return;
+        if (isDerivedFromFixture(node.init, fixtureLocalNames)) {
+          fixtureLocalNames.add(node.id.name);
+        }
       },
       CallExpression(node: ESTree.CallExpression) {
         const rootName = calleeRootNameOf(node.callee);

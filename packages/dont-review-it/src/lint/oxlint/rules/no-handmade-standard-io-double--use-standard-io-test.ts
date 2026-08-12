@@ -77,6 +77,18 @@ export const noHandmadeStandardIoDouble = createDontReviewItRule({
       CallExpression(node: ESTree.CallExpression) {
         if (!isExtendCall(node.callee)) return;
         const [definition] = node.arguments;
+        if (
+          definition?.type === "Literal" &&
+          typeof definition.value === "string" &&
+          CAPTURED_STREAM_NAMES.has(definition.value)
+        ) {
+          context.report({
+            node: definition,
+            messageId: "ownFixture",
+            data: { name: definition.value },
+          });
+          return;
+        }
         if (definition?.type !== "ObjectExpression") return;
         for (const { property, name } of capturedStreamPropertiesOf(definition)) {
           context.report({ node: property, messageId: "ownFixture", data: { name } });
