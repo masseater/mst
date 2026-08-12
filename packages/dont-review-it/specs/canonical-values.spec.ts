@@ -78,6 +78,6 @@ export const ORDER_STATUSES = ["draft"] as const;
 const FIXTURE_STATUSES = ["draft"] as const;
 `,
     });
-    expect(runChecks(repositoryRoot)).toStrictEqual({ problems: [], warnings: [] });
+    expect(runChecks(repositoryRoot)).toStrictEqual({ problems: [], warnings: [], failures: [] });
   });
 });

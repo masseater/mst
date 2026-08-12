@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -50,8 +50,9 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
 
   standardIoTest(
     "check given no repository root scans the working directory",
-    async ({ stderr }) => {
-      expect(await cliExitCode(["check"])).toBe(0);
+    async ({ stdout, stderr }) => {
+      expect(await cliExitCode(["check"])).toBe(1);
+      expect(stdout.text).toContain('The required "guard" script must not be missing.');
       expect(stderr.text).toBe("");
     },
   );
@@ -242,6 +243,60 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
     expect(await cliExitCode(["check", "--repository-root", root])).toBe(0);
     expect(stdout.text).toBe("");
   });
+
+  standardIoTest(
+    "check --write repairs the entry composition and exits zero",
+    async ({ stdout, stderr }) => {
+      const root = repositoryWith({
+        "package.json": `{ "scripts": { "guard": "vp check" } }`,
+        "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
+        "packages/web/package.json": `{ "scripts": { "test": "vp test" } }`,
+      });
+
+      expect(await cliExitCode(["check", "--write", "--repository-root", root])).toBe(0);
+      expect(stdout.text).toBe("");
+      expect(stderr.text).toBe("");
+      expect(readFileSync(join(root, "package.json"), "utf8")).toContain(
+        "throttle --timeout 1800 -- spool -- vp check",
+      );
+    },
+  );
+
+  standardIoTest(
+    "check --write reports what it must not repair and exits one",
+    async ({ stdout, stderr }) => {
+      const root = repositoryWith({
+        "package.json": `{ "scripts": { "guard": "throttle --timeout 1800 -- spool -- vp check" } }`,
+        "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
+        "packages/web/package.json": `{ "scripts": { "test": "throttle -- spool -- vp test" } }`,
+      });
+
+      expect(await cliExitCode(["check", "--write", "--repository-root", root])).toBe(1);
+      expect(stdout.text).toContain("packages/web/package.json");
+      expect(stderr.text).toBe("");
+    },
+  );
+
+  standardIoTest(
+    "check exits two when a manifest exists but does not parse",
+    async ({ stdout, stderr }) => {
+      const root = repositoryWith({ "package.json": "{ oops" });
+
+      expect(await cliExitCode(["check", "--repository-root", root])).toBe(2);
+      expect(stdout.text).toBe("");
+      expect(stderr.text).toContain("package.json exists but does not parse as a JSON object");
+    },
+  );
+
+  standardIoTest(
+    "check --write exits two when a manifest exists but does not parse",
+    async ({ stderr }) => {
+      const root = repositoryWith({ "package.json": "{ oops" });
+
+      expect(await cliExitCode(["check", "--write", "--repository-root", root])).toBe(2);
+      expect(stderr.text).toContain("package.json exists but does not parse as a JSON object");
+    },
+  );
 
   standardIoTest(
     "check fails on a workflow definition that narrows its own start",

@@ -6,10 +6,12 @@
   "type": "module",
   "scripts": {
     "dev": "vp dev",
-    "build": "tsc && vp build",
+    "build": "spool -- vp run build:all",
+    "build:all": "tsc && vp build",
     "preview": "vp preview"
   },
   "devDependencies": {
+    "@mst/ai-native": "workspace:*",
     "@mst/dont-review-it": "workspace:*",
     "typescript": "catalog:",
     "vite": "catalog:",
