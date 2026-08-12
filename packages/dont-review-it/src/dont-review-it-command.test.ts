@@ -1,17 +1,20 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { renderUsage, runCommand } from "citty";
-import { describe, expect, onTestFinished, test } from "vite-plus/test";
+import { describe, expect, onTestFinished, test, vi } from "vite-plus/test";
 
 import { checkCommand } from "./check-command.ts";
 import { dontReviewItCommand } from "./dont-review-it-command.ts";
 import { RETIRED_ANNOTATION_TAGS } from "./lint/oxlint/lib/canonical-values/annotation.ts";
+import { runAsyncProcess } from "./vitest/async-process.ts";
 import { standardIoTest } from "./vitest/standard-io-test.ts";
 
 describe("dont-review-it-command", () => {
   const CANONICAL_VALUES_TAG = "@canonical-values";
+  const CLI_PATH = fileURLToPath(new URL("./cli.ts", import.meta.url));
 
   const repositoryWith = (files: Readonly<Record<string, string>>): string => {
     const root = mkdtempSync(join(tmpdir(), "dont-review-it-cli-"));
@@ -49,13 +52,41 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
     },
   );
 
-  standardIoTest(
-    "check given no repository root scans the working directory",
-    async ({ stderr }) => {
-      expect(await cliExitCode(["check"])).toBe(0);
-      expect(stderr.text).toBe("");
-    },
-  );
+  test("check given no repository root scans the working directory", async () => {
+    const root = repositoryWith({
+      "src/order.ts": `/** ${CANONICAL_VALUES_TAG} order.status */
+export const ORDER_STATUSES = ["draft", "published"] as const;
+`,
+    });
+
+    const invocation = await runAsyncProcess({
+      label: "dont-review-it check",
+      command: process.execPath,
+      arguments_: [CLI_PATH, "check"],
+      cwd: root,
+      timeoutMs: 28_000,
+    });
+
+    expect(invocation.status).toBe(0);
+    expect(invocation.stdout).toBe("");
+    expect(invocation.stderr).toBe("");
+  }, 30_000);
+
+  test("an omitted repository root is resolved from the current directory", async () => {
+    const root = repositoryWith({
+      "src/order.ts": `/** ${CANONICAL_VALUES_TAG} order.status */
+export const ORDER_STATUSES = ["draft", "published"] as const;
+`,
+    });
+    const currentDirectory = vi.spyOn(process, "cwd").mockReturnValue(root);
+    onTestFinished(() => {
+      currentDirectory.mockRestore();
+    });
+
+    await runCommand(dontReviewItCommand, { rawArgs: ["check"] });
+
+    expect(currentDirectory).toHaveBeenCalledExactlyOnceWith();
+  });
 
   standardIoTest("the repository root can arrive glued to the flag", async ({ stdout, stderr }) => {
     const root = repositoryWith({
@@ -186,11 +217,11 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
     await expect(cliExitCode([])).rejects.toThrow(/No command specified/u);
   });
 
-  test("check help names the test command overrides it rejects", async () => {
+  test("check help names the missing and indirect test entries it rejects", async () => {
     const help = await renderUsage(checkCommand);
 
     expect(help).toContain(
-      "test commands that replace the auto-discovered config or override static coverage settings",
+      "missing or indirect test entries that bypass the auto-discovered config and static coverage settings",
     );
     expect(help).toContain("--repository-root");
   });
@@ -252,6 +283,60 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
     expect(await cliExitCode(["check", "--repository-root", root])).toBe(0);
     expect(stdout.text).toBe("");
   });
+
+  standardIoTest(
+    "check --write repairs the entry composition and exits zero",
+    async ({ stdout, stderr }) => {
+      const root = repositoryWith({
+        "package.json": `{ "scripts": { "guard": "vp check" } }`,
+        "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
+        "packages/web/package.json": `{ "scripts": { "test": "vp test" } }`,
+      });
+
+      expect(await cliExitCode(["check", "--write", "--repository-root", root])).toBe(0);
+      expect(stdout.text).toBe("");
+      expect(stderr.text).toBe("");
+      expect(readFileSync(join(root, "package.json"), "utf8")).toContain(
+        "throttle --timeout 1800 -- spool -- vp check",
+      );
+    },
+  );
+
+  standardIoTest(
+    "check --write reports what it must not repair and exits one",
+    async ({ stdout, stderr }) => {
+      const root = repositoryWith({
+        "package.json": `{ "scripts": { "guard": "throttle --timeout 1800 -- spool -- vp check" } }`,
+        "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
+        "packages/web/package.json": `{ "scripts": { "test": "throttle -- spool -- vp test" } }`,
+      });
+
+      expect(await cliExitCode(["check", "--write", "--repository-root", root])).toBe(1);
+      expect(stdout.text).toContain("packages/web/package.json");
+      expect(stderr.text).toBe("");
+    },
+  );
+
+  standardIoTest(
+    "check exits two when a manifest exists but does not parse",
+    async ({ stdout, stderr }) => {
+      const root = repositoryWith({ "package.json": "{ oops" });
+
+      expect(await cliExitCode(["check", "--repository-root", root])).toBe(2);
+      expect(stdout.text).toBe("");
+      expect(stderr.text).toContain("package.json exists but does not parse as a JSON object");
+    },
+  );
+
+  standardIoTest(
+    "check --write exits two when a manifest exists but does not parse",
+    async ({ stderr }) => {
+      const root = repositoryWith({ "package.json": "{ oops" });
+
+      expect(await cliExitCode(["check", "--write", "--repository-root", root])).toBe(2);
+      expect(stderr.text).toContain("package.json exists but does not parse as a JSON object");
+    },
+  );
 
   standardIoTest(
     "check fails on a workflow definition that narrows its own start",

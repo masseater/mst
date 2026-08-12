@@ -25,7 +25,7 @@ description: Machine-enforced answers to the writing questions that would otherw
 
 同じ不変条件を守る公式のルールを先に探すこと、どの順に検討するか、自前で書いてよい条件と書いたあとの後始末は [AGENTS.md](../../AGENTS.md) が持つ。
 
-違反の判定と修正案の選択を分ける判断は [EDR 0034](../../docs/engineering-decision-logs/0034-separate-the-violation-from-the-choice-of-repair.md)、Ponytail から機械で決定できる範囲だけを取り込む判断は [EDR 0036](../../docs/engineering-decision-logs/0036-enforce-only-the-decidable-parts-of-ponytail.md) が持つ。
+違反の判定と修正案の選択を分ける判断は [EDR 0037](../../docs/engineering-decision-logs/0037-separate-the-violation-from-the-choice-of-repair.md)、Ponytail から機械で決定できる範囲だけを取り込む判断は [EDR 0039](../../docs/engineering-decision-logs/0039-enforce-only-the-decidable-parts-of-ponytail.md) が持つ。
 
 ## 文書
 
@@ -74,7 +74,7 @@ CLI が持つコマンドは `check` の 1 つで、そこが全部の検査を�
 
 ## 依存宣言の検査
 
-`check` が `pnpm-workspace.yaml` と、そこに宣言されたワークスペースの `package.json` も読む。守っているのは「catalog は複数のワークスペースが共有するバージョンだけを持つ」という規範で、配置の判断は [EDR 0028](../../docs/engineering-decision-logs/0028-keep-the-catalog-for-shared-versions-only.md)、修正案が複数あっても違反を error にする判断は [EDR 0034](../../docs/engineering-decision-logs/0034-separate-the-violation-from-the-choice-of-repair.md) にある。
+`check` が `pnpm-workspace.yaml` と、そこに宣言されたワークスペースの `package.json` も読む。守っているのは「catalog は複数のワークスペースが共有するバージョンだけを持つ」という規範で、配置の判断は [EDR 0028](../../docs/engineering-decision-logs/0028-keep-the-catalog-for-shared-versions-only.md)、修正案が複数あっても違反を error にする判断は [EDR 0037](../../docs/engineering-decision-logs/0037-separate-the-violation-from-the-choice-of-repair.md) にある。
 
 - 読めないワークスペース定義が残っていない
 - 1 つのマニフェストしか使わない catalog エントリが残っていない。overrides が `catalog:` で参照するエントリは除く
@@ -85,12 +85,13 @@ CLI が持つコマンドは `check` の 1 つで、そこが全部の検査を�
 
 ## テスト設定と実行経路の検査
 
-`check` はワークスペース定義の有無にかかわらずルートの `package.json` を読み、定義があれば一致するワークスペースの `package.json` も読む。lint は Vite/Vitest 設定を静的に検査する。coverage の source universe を明示する判断は [EDR 0035](../../docs/engineering-decision-logs/0035-make-the-coverage-source-universe-explicit.md)、manifest の列挙方法は [EDR 0037](../../docs/engineering-decision-logs/0037-use-node-globs-for-workspace-manifests.md) が持つ。
+`check` はワークスペース定義の有無にかかわらずルートの `package.json` を読み、定義があれば一致するワークスペースの `package.json` も読む。lint は Vite/Vitest 設定を静的に検査する。coverage の source universe を明示する判断は [EDR 0038](../../docs/engineering-decision-logs/0038-make-the-coverage-source-universe-explicit.md)、manifest の列挙方法は [EDR 0040](../../docs/engineering-decision-logs/0040-use-node-globs-for-workspace-manifests.md) が持つ。
 
 - test command が `--config` / `-c` で別の設定を選んでいない。test 設定は自動発見される `vite.config` / `vitest.config` に置く
 - test command が bare `--coverage` 以外の coverage CLI option で静的設定を上書きしていない。coverage の lint と実行時ゲートは同じ source universe と threshold を読む
-- test command が `--changed` / `--changed=...` で変更ファイルだけを選んでいない。`env`、`command`、`exec`、`spool --`、`npx`、`pnpm exec`、`npm exec`、`vp exec` を使う場合も内側の test runner を静的に読める形にし、未知の wrapper や shell mode を置かない
-- canonical な `vite.config` / `vitest.config` が ESM の静的な `defineConfig({...})` として書かれている。CommonJS と動的な合成は source universe と threshold の証明を妨げる
+- test config を持つ workspace が文字列の `scripts.test` を持ち、現在packageの通常test runを1回だけ静的に露出する。`spool -- vp test` を標準形とし、直接Vitestを使う場合は`vitest run`または`./node_modules/.bin/vitest run`とする。runner引数は任意のbare `--coverage` 1個以外を置かない。`--changed` / `--changed=...`、`pretest` / `posttest`、環境・cwd・workspace・package・binary解決を変えるwrapper、package-manager / Vite Plus exec、別root / project、watchを含む非run mode、任意pathの実行ファイル、parameter / command / pathname / brace expansion、`env -S`、未知のwrapper、shell mode、control operator、別名のscriptへの委譲を置かない
+- canonical な `vite.config` / `vitest.config` が ESM の静的な object literal、または正規 module から import した `defineConfig({...})` として書かれている。CommonJS と動的な合成は source universe と threshold の証明を妨げる
+- canonical config に top-level `root` が存在しない。config と source discovery は package root を基準にし、所有する production source は `test.coverage.include` で宣言する
 - canonical config の `test.changed` と `test.coverage.changed` は literal `false` または空文字だけを許す。`true` と空でない ref は削除し、動的な値は実効値を証明できる静的宣言へ直す
 - `run.tasks.test` が存在しない。test の入口は `package.json#scripts.test` に置き、config と coverage override の CLI 検査を必ず通す
 

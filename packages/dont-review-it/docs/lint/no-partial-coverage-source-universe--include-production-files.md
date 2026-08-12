@@ -10,6 +10,8 @@ basename が `vite.config` または `vitest.config` で、拡張子が `.js` / 
 
 root、`test`、`coverage` の spread・動的な computed property、`mergeConfig`、変数、関数の返り値、複数引数は、後から `include` や `exclude` を上書きできるため動的設定として報告する。`include` は文字列リテラルだけの array literal に限る。CommonJS の `.cjs` / `.cts` と、`module.exports` を使う `.js` は静的な ESM resolver の外へ設定を置くため、内容を推測せず ESM への変換を報告する。
 
+canonical config の top-level `root` は値にかかわらず報告する。`root` は config の解決基準と source discovery を package のディレクトリから移し、同じ `include` の綴りが別の source 集合を指す状態を作れる。config は package root に置き、そこで自動発見される基準を維持する。
+
 `run.tasks.test` は `package.json#scripts.test` の検査を通らず別の test command を実行できるため報告する。変数、spread、computed property で `run.tasks` の有無を隠す構成も報告する。test の入口は package script の `spool -- vp test` に置く。
 
 `include` 内の `!` で始まる否定 glob と、`coverage.exclude` は、いずれも明示した source universe からファイルを引けるため報告する。truthy な `test.changed` は Vitest が coverage の changed 設定へ継承し、truthy な `test.coverage.changed` は直接、未変更の production source を分母から除くため報告する。literal `false` と空文字は分母を縮めないため許可する。動的な changed 値は実効値を証明できない専用の問題として報告し、必要な副作用を別の文へ残したうえで property を削除するか literal `false` / 空文字へ置き換えるよう示す。ルールオプションの必須 glob も空文字・否定 globを schema で受け付けない。
@@ -24,9 +26,9 @@ root、`test`、`coverage` の spread・動的な computed property、`mergeConf
 
 設定の対象は canonical な `vite.config` / `vitest.config` に限定する。任意名の設定まで lint が推測すると、ESLint や Playwright の config を誤って coverage config とみなす。一方、test command の `--config` / `-c` と coverage override は CLI が package script を検査して止める。`--coverage.*`、`--coverage=...`、`--no-coverage`、boolean 値を続けた `--coverage`、`--changed` / `--changed=...` を禁止し、値を伴わない bare `--coverage` だけを許可する。lint は canonical config の静的宣言、CLI は実行時の選択経路を持ち、両方が揃って同じ設定を検査と実行に使わせる。
 
-package script の `--` より後ろも検査する。root guard が script の末尾へ渡す `--coverage` と同じ test runner がこの位置の option も解釈するため、境界の後ろへ override を移しても source universe は守られない。
+`package.json#scripts.test` の `--` より後ろも検査する。root guard が script の末尾へ渡す `--coverage` と同じ test runner がこの位置の option も解釈するため、境界の後ろへ override を移しても source universe は守られない。
 
-package script が POSIX `env`、shell の `command` / `exec`、`spool --`、または `npx` / `pnpm exec` / `npm exec` / `vp exec` を通す場合は、各 wrapper の option 境界を解いて内側の test runner を検査する。shell mode、call mode、未知の wrapper で内側を静的に読めない `scripts.test` は失敗させる。`echo` が test command の綴りを表示するだけの script や、`vp run --filter test build` の filter 値は test runner とみなさない。
+`package.json#scripts.test` は現在packageの通常test runを1回だけ静的に露出する。許可するrunnerはbare `vp test`と、明示的な`vitest run` / `./node_modules/.bin/vitest run`であり、runner引数は任意のbare `--coverage` 1個だけを許す。bare `vitest` は対話端末でwatch modeへ入るため許可しない。`spool --`と、環境・cwd・実行対象を変えない`env --` / `command --` / `exec --`だけをtransparent wrapperとして扱う。環境変数の代入、`env -S`、cwd・workspace・package・binary解決を変えるoption、package-manager / Vite Plus exec、任意pathの実行ファイル、別root / project、help・watch・list等の非run mode、parameter / command / pathname / brace expansion、shell / call mode、未知のwrapperは失敗させる。shellのcontrol operatorと別名のscriptへの委譲も禁止する。別名のscriptはroot guardが実行するtest entryではないため直接検査しない。
 
 `run.tasks.test` を禁じるのも同じ理由である。Vite config 内の task は package script の検査対象にならず、そこへ `--coverage=false` や別設定の選択を置ける。設定を lint できても、実際の test command が別の分母を選べるなら source universe の保証にはならない。
 
@@ -44,9 +46,11 @@ coverage: {
 
 source root が異なる場合は、実際の root を覆う glob を設定へ書き、同じ集合をルールの `include` オプションへ渡す。
 
+top-level `root` は削除する。値の評価に必要な副作用がある場合は別の文へ移してから削除し、config と source discovery の基準を package root に戻す。
+
 独自の `coverage.exclude` がある場合は削除する。`test.changed` または `test.coverage.changed` が `true` か空でない ref なら削除し、動的な値なら literal `false`、空文字、または property の削除へ置き換えて実効値を静的に決める。production でない生成物や fixture が include に入っているなら、exclude で引くのではなく、production source だけを指すよう include の root を狭める。
 
-`coverage` が静的な object literal で、`include` が無いか文字列だけの array literal で不足している場合、自動修正が必須 glob を追加する。`true` または空でない ref を持つ単独の changed property も、安全に既定の無効状態へ戻せる場合は自動修正で削除する。削除後に先行する重複 changed property が有効になる場合と、動的構成、否定 glob、`exclude` は自動修正しない。
+`coverage` が静的な object literal で、`include` が無いか文字列だけの array literal で不足している場合、自動修正が必須 glob を追加する。単独でliteral 値を持つ top-level `root` と、`true` または空でない ref を持つ単独の changed property も、安全に既定の基準へ戻せる場合は自動修正で削除する。root 値を評価する式、重複した root、削除後に先行する重複 changed property が有効になる場合、動的構成、否定 glob、`exclude` は自動修正しない。
 
 CommonJS config は `vite.config.ts` または `vitest.config.ts` へ改名し、`vite` / `vite-plus` / `vitest/config` の `defineConfig` を ESM で import して default export する。`run.tasks.test` は削除し、package manifest の `scripts.test` に `spool -- vp test` を置く。
 
@@ -56,6 +60,7 @@ CommonJS config は `vite.config.ts` または `vitest.config.ts` へ改名し�
 - production source を `coverage.exclude` へ足す。数字だけが上がり、未検証コードは残る
 - include を変数や共有設定から流し込む。test config だけでは対象集合が確定せず、変更時に分母が動いたことを読めない
 - spread、computed property、`mergeConfig` で静的な include の後から設定を上書きする
+- top-level `root` で config と source discovery の基準を package 外へ移す
 - include に否定 glob を足して個別ファイルを差し引く
 - truthy または動的な `test.changed` / `test.coverage.changed`、test command の `--changed` で未変更の production source を分母から外す
 - CommonJS の config へ同じ設定を移して静的検査から外す

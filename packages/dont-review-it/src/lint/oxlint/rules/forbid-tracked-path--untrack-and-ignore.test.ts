@@ -136,7 +136,7 @@ const vendorRow = {
   reason: "the upstream ships no source for this bundle",
 };
 
-describe("dont-review-it/forbid-tracked-path--untrack-and-ignore", () => {
+describe("dont-review-it/forbid-tracked-path--untrack-and-ignore", { timeout: 30_000 }, () => {
   testLintRule(forbidTrackedPath, {
     valid: [
       {

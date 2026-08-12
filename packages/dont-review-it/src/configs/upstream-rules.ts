@@ -194,7 +194,6 @@ export const UPSTREAM_RULES: NonNullable<OxlintConfig["rules"]> = {
   "unicorn/prefer-modern-math-apis": LINT_SEVERITY.ERROR,
   "unicorn/prefer-negative-index": LINT_SEVERITY.ERROR,
   "unicorn/prefer-number-coercion": LINT_SEVERITY.ERROR,
-  "unicorn/prefer-optional-catch-binding": LINT_SEVERITY.ERROR,
   "unicorn/prefer-query-selector": LINT_SEVERITY.ERROR,
   "unicorn/prefer-regexp-test": LINT_SEVERITY.ERROR,
   "unicorn/prefer-response-static-json": LINT_SEVERITY.ERROR,

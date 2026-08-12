@@ -1,5 +1,11 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "includeEntryExports": true,
-  "ignoreDependencies": ["vite", "@mst/agentic-documents"]
+  "ignoreBinaries": ["mkfifo"],
+  "ignoreDependencies": ["vite", "@mst/agentic-documents"],
+  "workspaces": {
+    "packages/dont-review-it": {
+      "project": ["**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}!", "!src/vitest/async-process.ts!"]
+    }
+  }
 }

@@ -21,6 +21,24 @@
 - 依存バージョンの食い違いを報告して失敗する
 - test command が config を差し替える経路を報告して失敗する
 - test command が coverage 設定を上書きするか対象を変更ファイルだけに絞る経路を報告して失敗する
+- test entry が別 package へ委譲する経路と通常run以外のrunner引数を報告して失敗する
+- test entry の前後に pretest と posttest の別経路を置く構成を報告して失敗する
+- test config を持つ workspace の scripts.test 欠落と非文字列を報告して失敗する
+- wrapper prefix が欠けた entry を報告して失敗する
+- check --write が安全な entry composition を修復して再検査を通す
+- check --write が本体の無い guard を生成せず問題として残す
+- check --write が command body の空の guard を補完せず問題として残す
+- check --write が他 layer の wrapper を自動修復せず問題として残す
+- check --write が解釈できない manifest を書き換えず misuse として失敗する
+
+## カバレッジのソース集合
+
+[`specs/coverage-source-universe.spec.ts`](specs/coverage-source-universe.spec.ts)
+
+- canonical test config の top-level root は値を評価する形でも報告し、副作用を自動削除しない
+- 重複した top-level root は先行値を露出させず診断だけを返す
+- 未importのproduction sourceを分母へ含め、CLIによる除外を問題にする
+- changed選択では未変更のproduction sourceをcoverage gateから除外できない
 
 ## 依存宣言の検査
 

@@ -1,4 +1,4 @@
-# 0036. Ponytail のうち違反状態を決定できる部分だけを強制する
+# 0039. Ponytail のうち違反状態を決定できる部分だけを強制する
 
 - ステータス: Accepted
 - 日付: 2026-08-11
@@ -9,15 +9,15 @@
 
 この指針には、機械で判定できる構文上の状態と、要求・将来・責務の読み取りを要する判断が混ざっている。「本当に必要か」「最小か」「ファイルが多すぎるか」は同じ構文でも状況により答えが変わる。一方、呼び先と引数を変えずに中継する local function や、全 callsite が同じ既定値しか使わない local parameter は、scope と call graph を閉じられる範囲なら違反状態を決定できる。
 
-[強制の機構](../guidelines/enforcement.md) は、機械で一意に判定できる違反にガードを置き、破られた不変条件と修正の方向を報告することを求める。[0034](0034-separate-the-violation-from-the-choice-of-repair.md) は、修正案が複数あることを理由に違反を成功へ読み替えない。
+[強制の機構](../guidelines/enforcement.md) は、機械で一意に判定できる違反にガードを置き、破られた不変条件と修正の方向を報告することを求める。[0037](0037-separate-the-violation-from-the-choice-of-repair.md) は、修正案が複数あることを理由に違反を成功へ読み替えない。
 
 ## 決定
 
 **Ponytail の文を lint の規範として直接取り込まない。** 各主張を、不変条件、判定に必要な材料、既存の強制、報告できる修正方向へ分解する。リポジトリ内の構文・binding・静的 callsite だけで違反状態を決定できる項目だけを error にする。
 
-**既製の rule が同じ不変条件を持つ項目は既製の rule に任せる。** core 3 件、TypeScript 1 件、Unicorn 22 件の計 26 件を追加する。対象は、不要な call/return、`Object.hasOwn`、readonly property、collection argument、flatMap、Blob、classList、code point、Date、DOM、import.meta、Math、negative index、number coercion、optional catch binding、query selector、regexp test、Response JSON、`String.raw`、`replaceAll`、`structuredClone` への置換である。
+**既製の rule が同じ不変条件を持つ項目は既製の rule に任せる。** core 3 件、TypeScript 1 件、Unicorn 21 件の計 25 件を追加する。対象は、不要な call/return、`Object.hasOwn`、readonly property、collection argument、flatMap、Blob、classList、code point、Date、DOM、import.meta、Math、negative index、number coercion、query selector、regexp test、Response JSON、`String.raw`、`replaceAll`、`structuredClone` への置換である。
 
-既製 rule 同士、または既存の自作 rule と同じ箇所を二重に報告する候補は採らない。異なる修正先を同時に要求する候補、安全でない自動修正を持つ候補、同じ式を同じ rule が二重報告する候補も採らない。追加した rule は実際の違反入力で発火を確認し、同じ違反の権威を 1 本にする。
+既製 rule 同士、または既存の自作 rule と同じ箇所を二重に報告する候補は採らない。異なる修正先を同時に要求する候補、安全でない自動修正を持つ候補、同じ式を同じ rule が二重報告する候補も採らない。`unicorn/prefer-optional-catch-binding` は既存の `no-discarded-failure--receive-and-surface-it` と正反対の修正を要求するため採らない。追加した rule は実際の違反入力で発火を確認し、同じ違反の権威を 1 本にする。
 
 **local な単純委譲と単一 product factory を `no-identity-wrapper--use-the-target-directly` が検出する。** 呼出しまたは構築を target へそのまま転送し、参照が 1 件以上の閉じた direct call/new 集合で、runtime parameter と引数が一致する local function に限る。export、callback、値としての escape、overload、async/generator、実行 context に依存する target は対象にしない。binding の shadow と評価順を保ったうえで callsite に target を置き、wrapper を削除する方向を報告する。
 
@@ -30,9 +30,13 @@
 **次の主張は lint にしない。**
 
 - speculative な要求、将来の拡張、機能そのものが要るかという YAGNI の判断
+- cross-file または公開 contract が実装を 1 つしか持たないこと。自作 rule が扱うのは参照を閉じられる非 export の local type alias だけである
+- arbitrary な factory が product を 1 種類しか返さないこと。自作 rule が扱うのは target と引数をそのまま転送する local function だけである
+- cross-file callsite や外部設定を含む flag/config が実質固定かという判断。自作 rule が扱うのは全 callsite と静的値を閉じられる local parameter だけである
 - 任意の layer に caller が 1 つしかないこと、file が 1 つだけ export すること、ファイル数が最小であること
 - arbitrary な実装が「最短」「boring」「clever」であるかという評価
 - native platform と dependency のどちらが product 要件を満たすかという選択
+- 導入済み dependency の API を再利用できるかという意味上の判断。未使用 dependency/export の既存検査と、具体的な置換を知る既製 rule が覆う範囲だけを機械化する
 - Ponytail の応答形式、強度、agent の persistence
 - `ponytail:` comment による debt ledger。このリポジトリは説明 comment を禁止し、判断の根拠を commit と EDR に置く
 - Ponytail が提案する最小 1 件の smoke test。このリポジトリの test 配置と coverage 100% の規範を弱めない

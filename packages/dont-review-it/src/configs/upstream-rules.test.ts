@@ -23,7 +23,6 @@ const PONYTAIL_UPSTREAM_RULE_NAMES = [
   "unicorn/prefer-modern-math-apis",
   "unicorn/prefer-negative-index",
   "unicorn/prefer-number-coercion",
-  "unicorn/prefer-optional-catch-binding",
   "unicorn/prefer-query-selector",
   "unicorn/prefer-regexp-test",
   "unicorn/prefer-response-static-json",
@@ -45,13 +44,13 @@ describe("upstream rule policy", () => {
     ]);
   });
 
-  test("all 26 upstream Ponytail rules are fixed at error severity", () => {
+  test("all 25 upstream Ponytail rules are fixed at error severity", () => {
     const configuredRules = Object.fromEntries(
       PONYTAIL_UPSTREAM_RULE_NAMES.map((ruleName) => [ruleName, UPSTREAM_RULES[ruleName]]),
     );
 
-    expect(PONYTAIL_UPSTREAM_RULE_NAMES).toHaveLength(26);
-    expect(new Set(PONYTAIL_UPSTREAM_RULE_NAMES)).toHaveLength(26);
+    expect(PONYTAIL_UPSTREAM_RULE_NAMES).toHaveLength(25);
+    expect(new Set(PONYTAIL_UPSTREAM_RULE_NAMES)).toHaveLength(25);
     expect(configuredRules).toStrictEqual(
       Object.fromEntries(
         PONYTAIL_UPSTREAM_RULE_NAMES.map((ruleName) => [ruleName, LINT_SEVERITY.ERROR]),
@@ -101,6 +100,7 @@ describe("upstream rule policy", () => {
     expect(UPSTREAM_RULES["unicorn/prefer-keyboard-event-key"]).toBeUndefined();
     expect(UPSTREAM_RULES["unicorn/prefer-node-protocol"]).toBeUndefined();
     expect(UPSTREAM_RULES["unicorn/prefer-native-coercion-functions"]).toBeUndefined();
+    expect(UPSTREAM_RULES["unicorn/prefer-optional-catch-binding"]).toBeUndefined();
     expect(UPSTREAM_RULES["unicorn/prefer-string-slice"]).toBeUndefined();
     expect(UPSTREAM_RULES["unicorn/prefer-string-trim-start-end"]).toBeUndefined();
   });

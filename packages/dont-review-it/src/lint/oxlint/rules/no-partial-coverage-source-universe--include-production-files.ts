@@ -14,6 +14,7 @@ import {
   type TestConfigResolution,
 } from "../lib/static-test-config.ts";
 import { unwrapTransparentExpression } from "../lib/transparent-expression.ts";
+import { configRootProblemOf } from "./no-partial-coverage-source-universe--config-root.ts";
 
 import type { ESTree, FixFn, Options, SourceCode } from "@oxlint/plugins";
 
@@ -137,6 +138,14 @@ const coverageBoundaryProblemsOf = (
   return excluded === null ? [] : [{ node: excluded, messageId: "excludedCoverageSource" }];
 };
 
+const testChangedProblemOf = (
+  config: ESTree.ObjectExpression,
+  sourceCode: SourceCode,
+): ReturnType<typeof changedProblemOf> => {
+  const test = staticObjectPathAt({ object: config, path: ["test"] });
+  return test.kind === "static" ? changedProblemOf(test.object, sourceCode) : null;
+};
+
 const renderedPatterns = (patterns: readonly string[]): string =>
   patterns.map((pattern) => JSON.stringify(pattern)).join(", ");
 
@@ -208,6 +217,8 @@ export const noPartialCoverageSourceUniverse = createDontReviewItRule({
         "Production source must not be removed from the coverage universe with `test.coverage.exclude`. Delete this property and narrow `test.coverage.include` to the source roots that the package owns.",
       dynamicCoverageConfiguration:
         "A coverage source universe must not be assembled from merge calls, variables, spreads, computed properties, or nonliteral include entries. Export one static `defineConfig({...})` object and write every `test.coverage.include` pattern as a string literal.",
+      testRootMovesSourceUniverse:
+        "A canonical test config must not move config and source discovery with a top-level `root`. Move any required side effect into a separate statement, then delete this property and keep the config at the package root.",
       commonJsTestConfig:
         "A CommonJS test config must not sit outside the static coverage guards. Rename this file to `vite.config.ts` or `vitest.config.ts`, import `defineConfig` from Vite, Vite Plus, or `vitest/config`, and export one ESM `defineConfig({...})` object as the default.",
       testTaskBypassesCoverageGuard:
@@ -334,10 +345,12 @@ export const noPartialCoverageSourceUniverse = createDontReviewItRule({
         return;
       }
       inspectTestTask(closed.object, node);
-      const test = staticObjectPathAt({ object: closed.object, path: ["test"] });
-      const changedProblem =
-        test.kind === "static" ? changedProblemOf(test.object, context.sourceCode) : null;
-      if (changedProblem !== null) context.report(changedProblem);
+      for (const problem of [
+        configRootProblemOf(closed.object, context.sourceCode),
+        testChangedProblemOf(closed.object, context.sourceCode),
+      ]) {
+        if (problem !== null) context.report(problem);
+      }
       inspectResolvedCoverage(
         staticallyClosedObject(
           staticObjectPathAt({ object: closed.object, path: ["test", "coverage"] }),

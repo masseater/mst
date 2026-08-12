@@ -36,6 +36,6 @@ describe("重複した宣言本体の検査", () => {
       "src/twice.ts": "export const twice = (value: number): number => value * 2;\n",
       "src/twice.test.ts": "export const doubled = (value: number): number => value * 2;\n",
     });
-    expect(runChecks(repositoryRoot)).toStrictEqual({ problems: [] });
+    expect(runChecks(repositoryRoot)).toStrictEqual({ problems: [], failures: [] });
   });
 });

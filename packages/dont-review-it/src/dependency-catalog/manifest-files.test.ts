@@ -165,4 +165,21 @@ describe("readWorkspaceManifests", () => {
       "packages/left/package.json",
     ]);
   });
+
+  it("leaves an invalid manifest for the entry composition failure", () => {
+    const repositoryRoot = repositoryWith({
+      "package.json": "{ not json",
+      "packages/left/package.json": `{"name": "left"}`,
+    });
+
+    const manifests = readWorkspaceManifests({
+      repositoryRoot,
+      packagePatterns: ["packages/*"],
+      config,
+    });
+
+    expect(manifests).toStrictEqual([
+      { relativePath: "packages/left/package.json", manifest: { name: "left" } },
+    ]);
+  });
 });

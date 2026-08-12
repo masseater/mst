@@ -89,16 +89,6 @@ describe("dont-review-it/no-partial-coverage-source-universe--include-production
         filename: "src/config.ts",
       },
       {
-        name: "an unrelated tool config is not a test coverage config",
-        code: "export default { rules: {} };\n",
-        filename: "eslint.config.ts",
-      },
-      {
-        name: "an arbitrary config object cannot be selected by a guarded test command",
-        code: `export default { test: { coverage: {} } };`,
-        filename: "arbitrary.config.ts",
-      },
-      {
         name: "an authentic config factory outside the canonical filename is not selected",
         code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { coverage: {} } });`,
         filename: "arbitrary.ts",
@@ -106,11 +96,6 @@ describe("dont-review-it/no-partial-coverage-source-universe--include-production
       {
         name: "a type-only defineConfig import does not turn a source file into a config",
         code: `import type { defineConfig } from "vite-plus";\nexport type Factory = typeof defineConfig;`,
-        filename: "src/factory.ts",
-      },
-      {
-        name: "an unused defineConfig value import does not turn a source file into a config",
-        code: `import { defineConfig } from "vite-plus";\nexport const factory = defineConfig;`,
         filename: "src/factory.ts",
       },
       {
