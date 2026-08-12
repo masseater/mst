@@ -1,19 +1,7 @@
-import {
-  oxlint as dontReviewItOxlint,
-  oxlintCli as dontReviewItOxlintCli,
-  withGitExcludes,
-} from "@mst/dont-review-it";
+import { oxlint as dontReviewItOxlint, withGitExcludes } from "@mst/dont-review-it";
 import { oxlint as lintRuleAuthoringOxlint } from "@mst/lint-rule-authoring";
 import { oxlint as verifiedSpecificationsOxlint } from "@mst/verified-specifications";
 import { defineConfig } from "vite-plus";
-
-const dontReviewItBaseRuleIds = new Set(Object.keys(dontReviewItOxlint.rules ?? {}));
-
-const dontReviewItCliOnlyRules = Object.fromEntries(
-  Object.entries(dontReviewItOxlintCli.rules ?? {}).filter(
-    ([ruleId]) => !dontReviewItBaseRuleIds.has(ruleId),
-  ),
-);
 
 export default defineConfig({
   staged: {
@@ -56,8 +44,10 @@ export default defineConfig({
     },
     overrides: [
       {
-        files: ["packages/dont-review-it/**"],
-        rules: dontReviewItCliOnlyRules,
+        files: ["packages/ai-native/**", "packages/lint-rule-authoring/**"],
+        rules: {
+          "dont-review-it/no-handmade-standard-io-double--use-standard-io-test": "off",
+        },
       },
       {
         files: ["**/{test,tests,__tests__,spec,__specs__}/**"],
@@ -66,13 +56,6 @@ export default defineConfig({
             "error",
             { pattern: "place-the-test-file-next-to-its-source-instead-of-a-test-directory" },
           ],
-        },
-      },
-      {
-        files: ["apps/website/src/**"],
-        rules: {
-          "dont-review-it/no-array-mutation--derive-new-array": "off",
-          "dont-review-it/no-reassign--use-spread-or-iife": "off",
         },
       },
     ],

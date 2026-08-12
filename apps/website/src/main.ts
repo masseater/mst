@@ -7,7 +7,9 @@ import { setupCounter } from "./counter.ts";
 const appRoot = document.querySelector<HTMLDivElement>("#app");
 if (appRoot === null) throw new Error("#app is missing from index.html");
 
-appRoot.innerHTML = `
+appRoot.insertAdjacentHTML(
+  "afterbegin",
+  `
 <section id="center">
   <div class="hero">
     <img src="${heroImg}" class="base" width="170" height="179">
@@ -58,7 +60,8 @@ appRoot.innerHTML = `
 
 <div class="ticks"></div>
 <section id="spacer"></section>
-`;
+`,
+);
 
 const counterButton = document.querySelector<HTMLButtonElement>("#counter");
 if (counterButton === null) throw new Error("#counter is missing from the rendered markup");

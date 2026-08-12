@@ -27,9 +27,11 @@ description: Machine-enforced answers to the writing questions that would otherw
 
 説明に載せる例をどこから作るかは [文書](../../docs/guidelines/documents.md) が持つ。良い例と悪い例を対で置かないことは [規範の書き方](../../docs/normative-notation.md) が持つ。
 
-## CLI 向け config
+## 公開する config
 
-bin を公開するパッケージ向けに、全部入り config の厳密な上位集合 `oxlintCli` を公開する。何を足しているか、lint で検出できない CLI の規範は [CLI の作り方](docs/cli.md) が持つ。上位集合の形にした判断は [EDR 0032](../../docs/engineering-decision-logs/0032-ship-the-cli-config-as-a-strict-superset.md) にある。
+公開する oxlint の config は `oxlint` の 1 枚だけである。対象種別による出し分けはしない。ルートの `lint` が `extends` した時点でリポジトリ全体に効き、採用の判断は残らない。CLI に固有の規律もこの中にあり、対象を絞るのはルールの側である。判断は [EDR 0042](../../docs/engineering-decision-logs/0042-apply-one-preset-at-the-root-and-report-the-exception-the-toolchain-forces.md) にある。
+
+lint で検出できない CLI の規範は [CLI の作り方](docs/cli.md) が持つ。
 
 ## 検証コマンド
 
@@ -79,6 +81,20 @@ CLI が持つコマンドは `check` の 1 つで、そこが全部の検査を�
 - 複数のマニフェストが同じバージョンを catalog の外で繰り返していない
 - バージョンが食い違う宣言は警告として出す。どちらへ揃えるかは判断なので落とさない
 - 何も使っていない catalog エントリは報告しない。未使用の検出は knip が持つ
+
+## preset の適用範囲の検査
+
+`check` が、ルートのツールチェーン設定とワークスペースの一覧を突き合わせる。preset を `extends` した時点で全体に効くという前提が、実際に成り立っているかを見る。
+
+設定を読んで `off` にされている preset のルールを拾い、その `files` が届くワークスペースを名指しして警告する。パスを絞らずに止めたルールは、すべてのワークスペースに届かないものとして数える。preset の外のルールは見ない。ツールチェーン設定が無いリポジトリでは何も検査しない。
+
+報告を警告に留めるのは、止め方を解く手段が 1 つに決まらないためである。override を消して報告を直す道と、依存の向きなどで届かないことを記録して残す道があり、どちらを選ぶかは判断になる。
+
+- IF: preset のルールを `overrides` で止める; THEN
+  - MUST: 止めた理由を EDR に残す
+    - 警告は消えない。理由が無い `off` は、適用範囲への載せ忘れと見分けが付かない
+- IF: 警告が指すワークスペースを preset の下に戻せた; THEN MUST: `off` を消す
+  - 残った `off` は、いつか誰かが「元からそうだった」として読む
 
 ## 公開パッケージの skill の検査
 

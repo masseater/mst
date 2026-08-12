@@ -45,6 +45,16 @@
 - 呼び手が書いた除外パターンを、git 由来の除外の後ろに残す
 - 除外を書いていない呼び手の設定にも、除外パターンの配列を与える
 
+## preset の適用範囲の検査
+
+[`specs/preset-adoption.spec.ts`](specs/preset-adoption.spec.ts)
+
+- すべてのワークスペースが preset の下にある設定を黙って通す
+- preset のルールを止めている override を、届かなくなったワークスペースごとに挙げて報告する
+- パスを絞らずに止めたルールは、すべてのワークスペースに届かないものとして報告する
+- preset の外のルールを止めても報告しない
+- ツールチェーンの設定が無いリポジトリでは適用範囲を検査しない
+
 ## 検査の走査証跡
 
 [`specs/scan-trace.spec.ts`](specs/scan-trace.spec.ts)
