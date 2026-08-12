@@ -1,4 +1,4 @@
-export const asRecord = (value: unknown): Readonly<Record<string, unknown>> | undefined =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
+export const asRecord = (held: unknown): Readonly<Record<string, unknown>> | undefined =>
+  typeof held === "object" && held !== null && !Array.isArray(held)
+    ? (held as Record<string, unknown>)
     : undefined;

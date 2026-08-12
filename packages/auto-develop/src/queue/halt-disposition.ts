@@ -7,8 +7,8 @@ export class HaltQueueKeepJobError extends Error {
 
   readonly queueDisposition = HALT_KEEP_JOB_DISPOSITION;
 
-  constructor(reason: string, options?: { readonly cause?: unknown }) {
-    super(reason, options);
+  constructor(reason: string, ruleOptions?: { readonly cause?: unknown }) {
+    super(reason, ruleOptions);
   }
 }
 

@@ -111,8 +111,8 @@ describe("dont-review-it/require-vitest-extend-builder--infer-fixture-type", () 
       },
       {
         name: "a context taken under one name is carried across unchanged",
-        code: "baseTest.extend({ report: async (ctx, use) => { await use(summarise(ctx)); } });",
-        output: 'baseTest.extend("report", async (ctx) => summarise(ctx));',
+        code: "baseTest.extend({ report: async (carried, use) => { await use(summarise(carried)); } });",
+        output: 'baseTest.extend("report", async (carried) => summarise(carried));',
         errors: [{ messageId: "objectFixtureDeclaration" }],
       },
       {

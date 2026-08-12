@@ -6,8 +6,8 @@ import type { AgenticDocumentsConfig } from "../config.ts";
 import type { DocumentProblem } from "../problem.ts";
 import type { NormativeDocument } from "../scan/normative-documents.ts";
 
-const message = (found: string, expected: string): string =>
-  `判断キーワードとして \`${found}\` を使うことは禁止されている。\`${expected}:\` に置き換える。行頭の 1 語で禁止だと判別できる綴りに固定するため。`;
+const complaint = (found: string, wanted: string): string =>
+  `判断キーワードとして \`${found}\` を使うことは禁止されている。\`${wanted}:\` に置き換える。行頭の 1 語で禁止だと判別できる綴りに固定するため。`;
 
 export const negatedKeywordSpellings = ({
   document,
@@ -27,6 +27,6 @@ export const negatedKeywordSpellings = ({
         .map(({ offset, found }) => ({
           file: document.file,
           line: document.source.slice(0, offset).split("\n").length,
-          message: message(found, config.prohibitionKeyword),
+          message: complaint(found, config.prohibitionKeyword),
         }));
     });

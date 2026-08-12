@@ -45,7 +45,9 @@ describe("builder", () => {
     ]);
 
   const conceptIdsOf = (root: string): readonly string[] =>
-    buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map((entry) => entry.conceptId);
+    buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map(
+      (declared) => declared.conceptId,
+    );
 
   test("an annotated array declaration becomes the catalog entry for its concept", () => {
     const root = createRepository();
@@ -82,7 +84,9 @@ describe("builder", () => {
 
     const catalog = buildCanonicalValuesCatalog({ repositoryRoot: root });
 
-    expect(catalog.entries.map((entry) => entry.values)).toStrictEqual([["draft", "published"]]);
+    expect(catalog.entries.map((declared) => declared.values)).toStrictEqual([
+      ["draft", "published"],
+    ]);
   });
 
   test("an annotated type alias takes the members of its union", () => {
@@ -94,7 +98,9 @@ describe("builder", () => {
 
     const catalog = buildCanonicalValuesCatalog({ repositoryRoot: root });
 
-    expect(catalog.entries.map((entry) => entry.values)).toStrictEqual([["draft", "published"]]);
+    expect(catalog.entries.map((declared) => declared.values)).toStrictEqual([
+      ["draft", "published"],
+    ]);
   });
 
   test("a declaration the package export map reaches carries the specifier that reaches it", () => {
@@ -114,7 +120,9 @@ describe("builder", () => {
 
     const catalog = buildCanonicalValuesCatalog({ repositoryRoot: root });
 
-    expect(catalog.entries.map((entry) => entry.exportPath)).toStrictEqual(["@fixture/vocabulary"]);
+    expect(catalog.entries.map((declared) => declared.exportPath)).toStrictEqual([
+      "@fixture/vocabulary",
+    ]);
   });
 
   test("a declaration no export map reaches carries no specifier", () => {
@@ -134,7 +142,7 @@ describe("builder", () => {
 
     const catalog = buildCanonicalValuesCatalog({ repositoryRoot: root });
 
-    expect(catalog.entries.map((entry) => entry.exportPath)).toStrictEqual([null]);
+    expect(catalog.entries.map((declared) => declared.exportPath)).toStrictEqual([null]);
   });
 
   test("a concept written outside the vocabulary drops the hint instead of failing the build", () => {
@@ -189,7 +197,7 @@ describe("builder", () => {
     const second = loadCanonicalValuesCatalog({ repositoryRoot: root });
 
     expect(second).toBe(first);
-    expect(second.entries.map((entry) => entry.conceptId)).toStrictEqual(["order.status"]);
+    expect(second.entries.map((declared) => declared.conceptId)).toStrictEqual(["order.status"]);
   });
 
   test("a catalog left behind by an earlier process is reused while the inputs are unchanged", () => {
@@ -243,7 +251,9 @@ describe("builder", () => {
     });
     const catalog = buildCanonicalValuesCatalog({ repositoryRoot: root });
 
-    expect(catalog.entries.map((entry) => entry.values)).toStrictEqual([["draft", "archived"]]);
+    expect(catalog.entries.map((declared) => declared.values)).toStrictEqual([
+      ["draft", "archived"],
+    ]);
   });
 
   test("a repository root that is not on disk yields an empty catalog and creates nothing", () => {
@@ -289,7 +299,9 @@ describe("builder", () => {
   ];
 
   const valuesOf = (root: string): readonly (readonly CanonicalValue[])[] =>
-    buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map((entry) => entry.values);
+    buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map(
+      (declared) => declared.values,
+    );
 
   test.each([...ANNOTATION_FORMS])(
     "an annotation written as $form declares its concept",
@@ -444,10 +456,10 @@ describe("builder", () => {
 
     const catalog = buildCanonicalValuesCatalog({ repositoryRoot: root });
 
-    expect(catalog.entries.map((entry) => [entry.conceptId, entry.values])).toStrictEqual(
+    expect(catalog.entries.map((declared) => [declared.conceptId, declared.values])).toStrictEqual(
       sources.flatMap((source) => declaredRowsIn(source.text)),
     );
-    expect(catalog.entries.map((entry) => entry.conceptId)).toStrictEqual([
+    expect(catalog.entries.map((declared) => declared.conceptId)).toStrictEqual([
       "array.form",
       "enum.form",
       "object.form",

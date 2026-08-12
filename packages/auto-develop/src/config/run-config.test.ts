@@ -16,8 +16,11 @@ const parseTargetPrsTwice = (): {
   readonly sharesInputInstance: boolean;
 } => {
   const targetPrs = [7, 8];
-  const parsed = runConfigSchema.parse({ targetPrs });
-  return { parsedTargetPrs: parsed.targetPrs, sharesInputInstance: parsed.targetPrs === targetPrs };
+  const parsedNode = runConfigSchema.parse({ targetPrs });
+  return {
+    parsedTargetPrs: parsedNode.targetPrs,
+    sharesInputInstance: parsedNode.targetPrs === targetPrs,
+  };
 };
 
 const it = test

@@ -2,9 +2,9 @@ export type SerialGate = {
   readonly run: <TaskResult>(task: () => Promise<TaskResult>) => Promise<TaskResult>;
 };
 
-const settleQuietly = async (previous: Promise<unknown>): Promise<void> => {
+const settleQuietly = async (earlier: Promise<unknown>): Promise<void> => {
   try {
-    await previous;
+    await earlier;
   } catch (previousFailure) {
     void previousFailure;
   }

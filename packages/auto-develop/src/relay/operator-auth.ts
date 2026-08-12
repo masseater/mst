@@ -29,8 +29,8 @@ export const authenticateOperator = async (auth: {
     sessions: auth.sessions,
     digest: credentialDigest(auth.credential),
   });
-  const now = auth.now ?? Date.now;
-  if (session === null || session.expiresAtMs <= now()) {
+  const stampedNow = auth.now ?? Date.now;
+  if (session === null || session.expiresAtMs <= stampedNow()) {
     throw new UnauthenticatedError("connection credential is not recognized");
   }
   return { login: session.login };

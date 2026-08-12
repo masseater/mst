@@ -6,7 +6,7 @@ import type { AgenticDocumentsConfig } from "../config.ts";
 import type { DocumentProblem } from "../problem.ts";
 import type { NormativeDocument } from "../scan/normative-documents.ts";
 
-const message = ({
+const complaint = ({
   files,
   unit,
 }: {
@@ -15,10 +15,10 @@ const message = ({
 }): string =>
   `同じ規範が ${files.length} つの文書に逐語で写されている（${files.join(", ")}）: "${unit}"。持ち主を 1 つ決めてそこに残し、他の文書は本文を消して持ち主を指す案内に置き換える。言い回しを変えて一致を外すことは解決ではない。`;
 
-const truncate = (text: string, limit: number): string =>
-  text.length > limit ? `${text.slice(0, limit)}…` : text;
+const truncate = (writtenText: string, limit: number): string =>
+  writtenText.length > limit ? `${writtenText.slice(0, limit)}…` : writtenText;
 
-const normalize = (text: string): string => text.trim().replaceAll(/\s+/gu, " ");
+const normalize = (writtenText: string): string => writtenText.trim().replaceAll(/\s+/gu, " ");
 
 type Unit = {
   readonly file: string;
@@ -66,14 +66,14 @@ export const duplicatedNormativeUnits = ({
     new Map(),
   );
 
-  return [...byText].flatMap(([text, sites]): readonly DocumentProblem[] => {
+  return [...byText].flatMap(([writtenText, sites]): readonly DocumentProblem[] => {
     const files = [...new Set(sites.map((site) => site.file))].toSorted();
     if (files.length < 2) return [];
 
     return sites.slice(0, 1).map((first) => ({
       file: first.file,
       line: first.line,
-      message: message({ files, unit: truncate(text, 120) }),
+      message: complaint({ files, unit: truncate(writtenText, 120) }),
     }));
   });
 };

@@ -9,8 +9,8 @@ const TEST_BLOCK_SPELLING = "it";
 
 const FIXTURE_FACTORY_BASE = "test";
 
-const variableNamed = (scope: Scope | null, name: string): Variable | null =>
-  scope === null ? null : (scope.set.get(name) ?? variableNamed(scope.upper, name));
+const variableNamed = (scope: Scope | null, spelled: string): Variable | null =>
+  scope === null ? null : (scope.set.get(spelled) ?? variableNamed(scope.upper, spelled));
 
 const importedSpelling = (specifier: ESTree.ImportSpecifier): string | null =>
   specifier.imported.type === "Identifier"
@@ -50,7 +50,7 @@ export const forbidItExtend = createDontReviewItRule({
     type: "problem",
     docs: {
       description:
-        "Disallow a fixture factory that stands on the test block spelling, so the name that declares test blocks carries that one role and everything scanning the suite can settle what a name means by reading it",
+        "Disallow a fixture factory that stands on the test block spelling, so the spelled that declares test blocks carries that one role and everything scanning the suite can settle what a spelled means by reading it",
       relatedGuidelines: [],
     },
     messages: {
@@ -60,23 +60,23 @@ export const forbidItExtend = createDontReviewItRule({
     schema: [],
     fixable: "code",
   },
-  create(context) {
+  create(inspection) {
     return {
       MemberExpression(node: ESTree.MemberExpression) {
         if (staticMemberName(node) !== FIXTURE_BUILDER_MEMBER) return;
 
         const base = unwrapSubject(node.object);
         if (base.type !== "Identifier") return;
-        if (!standsOnTestBlock(base, { sourceCode: context.sourceCode, followed: [] })) return;
+        if (!standsOnTestBlock(base, { sourceCode: inspection.sourceCode, followed: [] })) return;
 
-        const scope = context.sourceCode.getScope(base);
+        const scope = inspection.sourceCode.getScope(base);
         const replaceable =
           !node.computed &&
           base.name === TEST_BLOCK_SPELLING &&
           (variableNamed(scope, TEST_BLOCK_SPELLING) === null ||
             variableNamed(scope, FIXTURE_FACTORY_BASE) !== null);
 
-        context.report({
+        inspection.report({
           node: base,
           messageId: "itExtend",
           data: { base: base.name },

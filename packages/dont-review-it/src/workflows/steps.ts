@@ -38,8 +38,8 @@ export const entriesNamedInSteps = ({
 }): readonly Pair[] =>
   jobEntriesOf({ document, config }).flatMap((job) =>
     stepsOf({ job: job.value, config }).flatMap((step) => {
-      const entry = entryOf(step, key);
-      return entry === null ? [] : [entry];
+      const listed = entryOf(step, key);
+      return listed === null ? [] : [listed];
     }),
   );
 
@@ -63,9 +63,9 @@ export const triggerNamesOf = ({
   if (only !== null) return [only];
 
   return [
-    ...itemsOf(triggers).flatMap((item) => {
-      const name = scalarText(item);
-      return name === null ? [] : [name];
+    ...itemsOf(triggers).flatMap((member) => {
+      const spelled = scalarText(member);
+      return spelled === null ? [] : [spelled];
     }),
     ...keysOf(triggers),
   ];

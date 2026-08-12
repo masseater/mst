@@ -49,8 +49,8 @@ const passThroughExportsAt = (file: string): readonly PassThroughExport<AstField
 
 const reachedFilesFor = (walk: Walk): readonly string[] => {
   const { specifier, fromFile, policy } = walk;
-  const request = { specifier, fromFile, workspaceRoot: policy.workspaceRoot };
-  const found = repositoryFilesFor(request);
+  const asked = { specifier, fromFile, workspaceRoot: policy.workspaceRoot };
+  const found = repositoryFilesFor(asked);
   if (found.length > 0) return found;
 
   const aliased = aliasedSpecifierIn({
@@ -60,17 +60,17 @@ const reachedFilesFor = (walk: Walk): readonly string[] => {
   });
   return aliased === null
     ? []
-    : repositoryFilesFor({ ...request, specifier: relativeSpecifierTo(fromFile, aliased) });
+    : repositoryFilesFor({ ...asked, specifier: relativeSpecifierTo(fromFile, aliased) });
 };
 
 const matchedForward = (
   forwards: readonly PassThroughExport<AstFields>[],
-  entries: readonly RestrictedTargetEntry[],
+  listedEntries: readonly RestrictedTargetEntry[],
 ): { readonly entry: RestrictedTargetEntry; readonly target: string } | null =>
   forwards
     .map((forwarded) => {
-      const entry = matchingRestrictedTarget({ entries, forwarded });
-      return entry === null ? null : { entry, target: forwarded.specifier };
+      const listed = matchingRestrictedTarget({ entries: listedEntries, forwarded });
+      return listed === null ? null : { entry: listed, target: forwarded.specifier };
     })
     .find((found) => found !== null) ?? null;
 

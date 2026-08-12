@@ -4,23 +4,23 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { verifyWebhookSignature } from "./signature.ts";
 
-const signedHeader = (body: string, secret: string): string =>
-  `sha256=${createHmac("sha256", secret).update(body).digest("hex")}`;
+const signedHeader = (writtenBody: string, secret: string): string =>
+  `sha256=${createHmac("sha256", secret).update(writtenBody).digest("hex")}`;
 
 const it = test
   .extend("verdictForSharedSecretSignature", () => {
-    const body = '{"action":"closed"}';
+    const writtenBody = '{"action":"closed"}';
     return verifyWebhookSignature({
-      body,
-      signatureHeader: signedHeader(body, "shared-secret"),
+      body: writtenBody,
+      signatureHeader: signedHeader(writtenBody, "shared-secret"),
       secret: "shared-secret",
     });
   })
   .extend("verdictForForeignSecretSignature", () => {
-    const body = '{"action":"closed"}';
+    const writtenBody = '{"action":"closed"}';
     return verifyWebhookSignature({
-      body,
-      signatureHeader: signedHeader(body, "another-secret"),
+      body: writtenBody,
+      signatureHeader: signedHeader(writtenBody, "another-secret"),
       secret: "shared-secret",
     });
   })

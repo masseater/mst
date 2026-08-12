@@ -16,10 +16,12 @@ const scannedWorkspaces = (repositoryRoot: string): readonly WorkspaceDependenci
 
 const workspacesByRepositoryRoot = new Map<string, readonly WorkspaceDependencies[]>();
 
-export const loadWorkspaceDependencies = (options: {
+export const loadWorkspaceDependencies = ({
+  repositoryRoot,
+}: {
   readonly repositoryRoot: string;
 }): readonly WorkspaceDependencies[] => {
-  const root = resolve(options.repositoryRoot);
+  const root = resolve(repositoryRoot);
   const memoized = workspacesByRepositoryRoot.get(root);
   if (memoized !== undefined) return memoized;
 

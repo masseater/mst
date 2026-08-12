@@ -23,10 +23,10 @@ const repositoryWith = async (files: Readonly<Record<string, string>>): Promise<
   onTestFinished(async () => rm(repositoryRoot, { recursive: true, force: true }));
 
   await Promise.all(
-    Object.entries(files).map(async ([name, source]) => {
-      const target = join(repositoryRoot, name);
-      await mkdir(dirname(target), { recursive: true });
-      await writeFile(target, source, "utf-8");
+    Object.entries(files).map(async ([fileName, source]) => {
+      const absolutePath = join(repositoryRoot, fileName);
+      await mkdir(dirname(absolutePath), { recursive: true });
+      await writeFile(absolutePath, source, "utf-8");
     }),
   );
   return repositoryRoot;
@@ -39,9 +39,9 @@ describe("検査の走査証跡", () => {
       ".github/workflows/ci.yml": GATED_WORKFLOW,
     });
 
-    const scanned = runChecks(repositoryRoot).outcomes.map((outcome) => [
-      outcome.check,
-      outcome.count,
+    const scanned = runChecks(repositoryRoot).outcomes.map((ranCheck) => [
+      ranCheck.check,
+      ranCheck.count,
     ]);
 
     expect(scanned).toStrictEqual([
@@ -62,8 +62,8 @@ describe("検査の走査証跡", () => {
     const repositoryRoot = await repositoryWith({ "package.json": `{"name": "solo"}` });
 
     const skipped = runChecks(repositoryRoot)
-      .outcomes.filter((outcome) => outcome.skippedReason !== null)
-      .map((outcome) => [outcome.check, outcome.skippedReason]);
+      .outcomes.filter((ranCheck) => ranCheck.skippedReason !== null)
+      .map((ranCheck) => [ranCheck.check, ranCheck.skippedReason]);
 
     expect(skipped).toStrictEqual([
       ["action-updates", "no workflow definition"],
@@ -125,8 +125,8 @@ describe("検査の走査証跡", () => {
     });
 
     const reported = runChecks(repositoryRoot)
-      .outcomes.filter((outcome) => outcome.problems.length > 0)
-      .map((outcome) => [outcome.check, outcome.problems.length]);
+      .outcomes.filter((ranCheck) => ranCheck.problems.length > 0)
+      .map((ranCheck) => [ranCheck.check, ranCheck.problems.length]);
 
     expect(reported).toStrictEqual([["workflow-definitions", 1]]);
   });

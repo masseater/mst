@@ -11,8 +11,8 @@ const sharedPresets = ["dont-review-it/tsconfig/library.json", "dont-review-it/t
 
 const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-no-standalone-tsconfig-"));
 
-const writeWorkspaceFixture = (name: string, tsconfig: string): string => {
-  const directory = join(fixtureDir, name);
+const writeWorkspaceFixture = (spelled: string, tsconfig: string): string => {
+  const directory = join(fixtureDir, spelled);
   mkdirSync(directory, { recursive: true });
   writeFileSync(join(directory, "tsconfig.json"), tsconfig);
   return join(directory, "index.ts");
@@ -90,13 +90,13 @@ describe("dont-review-it/no-standalone-tsconfig--extend-shared-preset", () => {
         options: [[]],
       },
       {
-        name: "extending the library preset by package name passes",
+        name: "extending the library preset by package spelled passes",
         code: "export const total = 1;",
         filename: extendsLibrary,
         options: [sharedPresets],
       },
       {
-        name: "extending the app preset by package name passes",
+        name: "extending the app preset by package spelled passes",
         code: "export const total = 1;",
         filename: extendsApp,
         options: [sharedPresets],

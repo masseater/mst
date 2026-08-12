@@ -17,10 +17,10 @@ const repositoryWith = (files: Readonly<Record<string, string>>): string => {
   onTestFinished(() => {
     rmSync(repositoryRoot, { recursive: true, force: true });
   });
-  for (const [relativePath, text] of Object.entries(files)) {
-    const target = join(repositoryRoot, relativePath);
-    mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, text, "utf8");
+  for (const [relativePath, source] of Object.entries(files)) {
+    const absolutePath = join(repositoryRoot, relativePath);
+    mkdirSync(dirname(absolutePath), { recursive: true });
+    writeFileSync(absolutePath, source, "utf8");
   }
   return repositoryRoot;
 };
@@ -29,8 +29,8 @@ const manifestTextIn = (repositoryRoot: string, relativePath: string): string =>
   readFileSync(join(repositoryRoot, relativePath), "utf8");
 
 const guardValueIn = (repositoryRoot: string): unknown => {
-  const parsed: unknown = JSON.parse(manifestTextIn(repositoryRoot, "package.json"));
-  return (parsed as { scripts: Record<string, unknown> }).scripts.guard;
+  const parsedNode: unknown = JSON.parse(manifestTextIn(repositoryRoot, "package.json"));
+  return (parsedNode as { scripts: Record<string, unknown> }).scripts.guard;
 };
 
 describe("writeEntryComposition", () => {
@@ -122,8 +122,10 @@ describe("writeEntryComposition", () => {
 
     writeEntryComposition({ repositoryRoot, config });
 
-    const parsed: unknown = JSON.parse(manifestTextIn(repositoryRoot, "packages/web/package.json"));
-    expect((parsed as { scripts: Record<string, unknown> }).scripts).toStrictEqual({
+    const parsedNode: unknown = JSON.parse(
+      manifestTextIn(repositoryRoot, "packages/web/package.json"),
+    );
+    expect((parsedNode as { scripts: Record<string, unknown> }).scripts).toStrictEqual({
       test: "spool -- vp test",
       check: "spool -- vp check",
     });

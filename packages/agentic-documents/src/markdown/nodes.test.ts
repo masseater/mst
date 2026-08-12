@@ -14,9 +14,9 @@ import type { Nodes, Parent } from "mdast";
 
 const nodesIn = (source: string): readonly Nodes[] => descendants(parseMarkdown(source));
 
-const firstOfType = (source: string, type: string): Nodes => {
-  const found = nodesIn(source).find((node) => node.type === type);
-  if (found === undefined) throw new Error(`no ${type} in: ${source}`);
+const firstOfType = (source: string, nodeType: string): Nodes => {
+  const found = nodesIn(source).find((node) => node.type === nodeType);
+  if (found === undefined) throw new Error(`no ${nodeType} in: ${source}`);
   return found;
 };
 
@@ -57,20 +57,20 @@ describe("markdown nodes", () => {
   });
 
   test("a list item that opens with prose hands back that paragraph", () => {
-    const item = firstOfType("- one\n", "listItem") as Nodes & Parent;
+    const member = firstOfType("- one\n", "listItem") as Nodes & Parent;
 
-    expect(leadingParagraphOf(item)?.type).toBe("paragraph");
+    expect(leadingParagraphOf(member)?.type).toBe("paragraph");
   });
 
   test("a list item that opens with something else hands back nothing", () => {
-    const item = firstOfType("- - nested\n", "listItem") as Nodes & Parent;
+    const member = firstOfType("- - nested\n", "listItem") as Nodes & Parent;
 
-    expect(leadingParagraphOf(item)).toBe(null);
+    expect(leadingParagraphOf(member)).toBe(null);
   });
 
   test("a list item that holds nothing at all hands back nothing", () => {
-    const item = firstOfType("-\n", "listItem") as Nodes & Parent;
+    const member = firstOfType("-\n", "listItem") as Nodes & Parent;
 
-    expect(leadingParagraphOf(item)).toBe(null);
+    expect(leadingParagraphOf(member)).toBe(null);
   });
 });

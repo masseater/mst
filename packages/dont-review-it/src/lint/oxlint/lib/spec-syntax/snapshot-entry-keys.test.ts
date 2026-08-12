@@ -21,7 +21,7 @@ const fieldsOf = (held: unknown): readonly unknown[] | null => {
 const visitsUnder = (held: unknown, ancestors: readonly ESTree.Node[]): readonly Visit[] => {
   if (Array.isArray(held)) {
     const listed: readonly unknown[] = held;
-    return listed.flatMap((entry) => visitsUnder(entry, ancestors));
+    return listed.flatMap((listed) => visitsUnder(listed, ancestors));
   }
 
   const fields = fieldsOf(held);
@@ -38,7 +38,9 @@ const keysIn = (sourceText: string): readonly (readonly string[] | string)[] => 
       ? (snapshotMatcherSiteOf(visit.node, visit.ancestors) ?? [])
       : [],
   );
-  return entryKeysOf(sites).map((entry) => (entry.kind === "spelled" ? entry.keys : entry.kind));
+  return entryKeysOf(sites).map((listed) =>
+    listed.kind === "spelled" ? listed.keys : listed.kind,
+  );
 };
 
 describe("dont-review-it/spec-syntax/snapshot-entry-keys", () => {

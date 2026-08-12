@@ -8,7 +8,7 @@ const LEGACY_BEFORE = "export const current = true;\nexport const legacyMode = t
 
 const LEGACY_AFTER = "export const current = true;\n";
 
-const answering = (contents: Readonly<Record<string, string>>): GitHubRequest =>
+const answering = (writtenContents: Readonly<Record<string, string>>): GitHubRequest =>
   async function answer(path: string): Promise<unknown> {
     if (path.startsWith("/repos/owner/name/compare/")) {
       return {
@@ -27,9 +27,9 @@ const answering = (contents: Readonly<Record<string, string>>): GitHubRequest =>
         ],
       };
     }
-    const content = contents[path];
-    if (content === undefined) throw new Error(`unexpected request ${path}`);
-    return { content: encoded(content) };
+    const writtenContent = writtenContents[path];
+    if (writtenContent === undefined) throw new Error(`unexpected request ${path}`);
+    return { content: encoded(writtenContent) };
   };
 
 describe("compareGitHubPullRequest", () => {

@@ -77,8 +77,8 @@ export const createRelayServer = (deps: RelayDependencies): RelayServer => {
       handling.res.end();
     }
   };
-  const server = createServer((req, res) => {
-    void handleRequest({ req, res });
+  const server = createServer((asked, produced) => {
+    void handleRequest({ req: asked, res: produced });
   });
   server.on("connection", (socket) => {
     openSockets.add(socket);

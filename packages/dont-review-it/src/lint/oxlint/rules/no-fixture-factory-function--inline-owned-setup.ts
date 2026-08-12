@@ -49,8 +49,8 @@ type ThunkReading = {
   readonly scopeAt: ScopeLookup;
 };
 
-const throwExpectingMatchersFrom = (options: Readonly<Options>): ReadonlySet<string> => {
-  const [first] = options;
+const throwExpectingMatchersFrom = (ruleOptions: Readonly<Options>): ReadonlySet<string> => {
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) {
     return THROW_EXPECTING_MATCHERS;
   }
@@ -122,10 +122,10 @@ const readsOnlyDemandFailure = (dependency: FixtureDependency, reading: ThunkRea
   );
 };
 
-const isDemandedFailureThunk = (name: string, reading: ThunkReading): boolean =>
-  !reading.handedOn.has(name) &&
+const isDemandedFailureThunk = (spelled: string, reading: ThunkReading): boolean =>
+  !reading.handedOn.has(spelled) &&
   reading.takenApart
-    .filter((dependency) => dependency.name === name)
+    .filter((dependency) => dependency.name === spelled)
     .every((dependency) => readsOnlyDemandFailure(dependency, reading));
 
 const reportForSubject = (input: {
@@ -134,7 +134,7 @@ const reportForSubject = (input: {
   readonly reading: ThunkReading;
 }): FactoryReport | null => {
   const { declaration, subject, reading } = input;
-  const { name, factory } = declaration;
+  const { name: spelled, factory } = declaration;
   if (factory === null) return null;
 
   const handedBack = handedBackFunctionOf({
@@ -145,11 +145,11 @@ const reportForSubject = (input: {
   if (handedBack === null) return null;
 
   if (handedBack.params.length > 0) {
-    return { node: subject, messageId: "parameterisedFactory", data: { fixture: name } };
+    return { node: subject, messageId: "parameterisedFactory", data: { fixture: spelled } };
   }
-  return isDemandedFailureThunk(name, reading)
+  return isDemandedFailureThunk(spelled, reading)
     ? null
-    : { node: subject, messageId: "handedBackFunction", data: { fixture: name } };
+    : { node: subject, messageId: "handedBackFunction", data: { fixture: spelled } };
 };
 
 const reportsFor = (
@@ -176,7 +176,7 @@ export const noFixtureFactoryFunction = createDontReviewItRule({
       parameterisedFactory:
         "A fixture must not hand back a function that declares parameters. `{{fixture}}` hands one back, leaving every test block to pick the arguments its own subject is built from. Move the setup into this fixture, return the subject the scenario produces, and declare one fixture per scenario, repeating the setup the scenarios share. Renaming the fixture leaves the same function standing, and dropping the parameters to pass it off as a thunk leaves it reported.",
       handedBackFunction:
-        "A fixture must not hand back a function as its subject. `{{fixture}}` hands one back, and the test blocks reading it ask for something other than a thrown value. Move the setup into this fixture, return the subject the scenario produces, and declare one fixture per scenario, repeating the setup the scenarios share. Wrapping the function in a type assertion, binding it to a name inside the fixture first, and handing it to the older `use` callback are all read the same way. Keep a thunk that takes no parameters only for assertions demanding a thrown value.",
+        "A fixture must not hand back a function as its subject. `{{fixture}}` hands one back, and the test blocks reading it ask for something other than a thrown value. Move the setup into this fixture, return the subject the scenario produces, and declare one fixture per scenario, repeating the setup the scenarios share. Wrapping the function in a type assertion, binding it to a spelled inside the fixture first, and handing it to the older `use` callback are all read the same way. Keep a thunk that takes no parameters only for assertions demanding a thrown value.",
     },
     schema: [
       {
@@ -189,10 +189,10 @@ export const noFixtureFactoryFunction = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
-    const matchers = throwExpectingMatchersFrom(context.options);
+    const matchers = throwExpectingMatchersFrom(inspection.options);
     const bindings = testBlockBindings();
     const calls = new Set<ESTree.CallExpression>();
 
@@ -210,27 +210,27 @@ export const noFixtureFactoryFunction = createDontReviewItRule({
         const rootNames = bindings.rootNames();
         const declarations = [...calls].flatMap((call) => fixtureDeclarationsOf(call));
         const factories = declarations.flatMap(({ factory }) => factory ?? []);
-        const callbacks = [...calls]
+        const takenCallbacks = [...calls]
           .filter((call) => declaresTestBlock(call, rootNames))
           .flatMap((call) => testCallbacksOf(call));
 
         const reading: ThunkReading = {
           handedOn: new Set(
             factories.flatMap((factory) =>
-              (fixtureDependenciesOf(factory) ?? []).map(({ name }) => name),
+              (fixtureDependenciesOf(factory) ?? []).map(({ name: spelled }) => spelled),
             ),
           ),
-          takenApart: callbacks.flatMap((callback) => fixtureDependenciesOf(callback) ?? []),
+          takenApart: takenCallbacks.flatMap((taken) => fixtureDependenciesOf(taken) ?? []),
           throwSubjects: new Set(
             [...calls]
               .flatMap((call) => assertedChainOf(call) ?? [])
               .filter((chain) => demandsFailure(chain, matchers))
               .flatMap((chain) => (chain.subject.type === "Identifier" ? [chain.subject] : [])),
           ),
-          scopeAt: (node) => context.sourceCode.getScope(node),
+          scopeAt: (node) => inspection.sourceCode.getScope(node),
         };
 
-        for (const report of reportsFor(declarations, reading)) context.report(report);
+        for (const report of reportsFor(declarations, reading)) inspection.report(report);
       },
     };
   },

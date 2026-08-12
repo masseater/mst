@@ -2,13 +2,16 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { createJobLedger, type JobRecord } from "./job-ledger.ts";
 
-const record = (id: string, shape: Partial<Omit<JobRecord, "id">> = {}): JobRecord => ({
-  id,
+const written = (
+  identity: string,
+  shape: Partial<Omit<JobRecord, "identity">> = {},
+): JobRecord => ({
+  id: identity,
   type: "pr-events",
   payload: {},
-  key: `key-${id}`,
+  key: `key-${identity}`,
   lane: "pr-7",
-  label: `job ${id}`,
+  label: `job ${identity}`,
   state: "waiting",
   acceptedAt: "2026-08-11T00:00:00.000Z",
   ...shape,
@@ -17,20 +20,20 @@ const record = (id: string, shape: Partial<Omit<JobRecord, "id">> = {}): JobReco
 const it = test
   .extend("storedRecords", () => {
     const ledger = createJobLedger();
-    ledger.put(record("job-1"));
-    ledger.put(record("job-2", { lane: "pr-8" }));
+    ledger.put(written("job-1"));
+    ledger.put(written("job-2", { lane: "pr-8" }));
     return ledger.records();
   })
   .extend("stateCounts", () => {
     const ledger = createJobLedger();
-    ledger.put(record("job-1"));
-    ledger.put(record("job-2", { lane: "pr-8", state: "running" }));
+    ledger.put(written("job-1"));
+    ledger.put(written("job-2", { lane: "pr-8", state: "running" }));
     return { waiting: ledger.waitingCount(), running: ledger.runningCount() };
   })
   .extend("laneStates", () => {
     const ledger = createJobLedger();
-    ledger.put(record("job-1", { state: "running" }));
-    ledger.put(record("job-2", { lane: "pr-8" }));
+    ledger.put(written("job-1", { state: "running" }));
+    ledger.put(written("job-2", { lane: "pr-8" }));
     return {
       runningLane: ledger.laneRunning("pr-7"),
       waitingOnlyLaneRunning: ledger.laneRunning("pr-8"),
@@ -42,18 +45,18 @@ const it = test
   })
   .extend("waitingSameTypeAndLane", () => {
     const ledger = createJobLedger();
-    ledger.put(record("job-1", { state: "running" }));
-    ledger.put(record("job-2"));
+    ledger.put(written("job-1", { state: "running" }));
+    ledger.put(written("job-2"));
     return ledger.findWaiting({ type: "pr-events", lane: "pr-7" });
   })
   .extend("keyPresence", () => {
     const ledger = createJobLedger();
-    ledger.put(record("job-1", { state: "running" }));
+    ledger.put(written("job-1", { state: "running" }));
     return { known: ledger.hasKey("key-job-1"), unknown: ledger.hasKey("key-unknown") };
   })
   .extend("removalAndLookup", () => {
     const ledger = createJobLedger();
-    ledger.put(record("job-1"));
+    ledger.put(written("job-1"));
     return {
       presentBeforeRemoval: ledger.has("job-1"),
       firstRemoval: ledger.remove("job-1"),
@@ -64,7 +67,7 @@ const it = test
 
 describe("createJobLedger", () => {
   it("追加した順に記録が読める", ({ storedRecords }) => {
-    expect(storedRecords).toStrictEqual([record("job-1"), record("job-2", { lane: "pr-8" })]);
+    expect(storedRecords).toStrictEqual([written("job-1"), written("job-2", { lane: "pr-8" })]);
   });
 
   it("待機を数える", ({ stateCounts }) => {

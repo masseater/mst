@@ -58,7 +58,7 @@ describe("entriesNamedInSteps", () => {
   it("collects the named entry from the steps of every job", () => {
     expect(
       entriesNamedInSteps({ document: documentOf(TWO_JOBS), config, key: config.runKey }).map(
-        (entry) => scalarText(entry.value),
+        (listed) => scalarText(listed.value),
       ),
     ).toStrictEqual(["vp run build", "vp run test"]);
   });

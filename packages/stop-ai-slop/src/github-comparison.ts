@@ -95,10 +95,10 @@ const patchEntryOf = (file: ComparedFile): string => {
   return `${lines.join("\n")}\n`;
 };
 
-const comparedFrom = (payload: unknown): Compared => payload as Compared;
+const comparedFrom = (carried: unknown): Compared => carried as Compared;
 
-const decodedContent = (payload: unknown): Uint8Array => {
-  const { content } = payload as Readonly<{ content?: string }>;
+const decodedContent = (carried: unknown): Uint8Array => {
+  const { content } = carried as Readonly<{ content?: string }>;
   if (content === undefined) {
     throw new Error("Do not read a file the contents API answered without content.");
   }

@@ -15,13 +15,13 @@ export const parseWorkflowDocument = ({
   readonly source: string;
 }): WorkflowDocument => {
   const lineCounter = new LineCounter();
-  const parsed = parseDocument(source, { lineCounter });
+  const parsedDocument = parseDocument(source, { lineCounter });
 
   return {
     relativePath,
-    root: parsed.contents,
+    root: parsedDocument.contents,
     lineCounter,
-    parseFailureOffsets: parsed.errors.map((failure) => failure.pos[0]),
+    parseFailureOffsets: parsedDocument.errors.map((failure) => failure.pos[0]),
   };
 };
 
@@ -37,13 +37,14 @@ export const entriesOf = (node: unknown): readonly Pair[] => (isMap(node) ? node
 
 export const itemsOf = (node: unknown): readonly unknown[] => (isSeq(node) ? node.items : []);
 
-export const keyOf = (entry: Pair): string | null =>
-  isScalar(entry.key) ? String(entry.key.value) : null;
+export const keyOf = (pair: Pair): string | null =>
+  isScalar(pair.key) ? String(pair.key.value) : null;
 
-export const entryOf = (node: unknown, key: string): Pair | null =>
-  entriesOf(node).find((entry) => keyOf(entry) === key) ?? null;
+export const entryOf = (node: unknown, named: string): Pair | null =>
+  entriesOf(node).find((pair) => keyOf(pair) === named) ?? null;
 
-export const valueOf = (node: unknown, key: string): unknown => entryOf(node, key)?.value ?? null;
+export const valueOf = (node: unknown, named: string): unknown =>
+  entryOf(node, named)?.value ?? null;
 
 export const scalarText = (node: unknown): string | null =>
   isScalar(node) && typeof node.value === "string" ? node.value : null;
@@ -62,7 +63,7 @@ export const trailingComment = (node: unknown): string | null =>
 export const isTruthyScalar = (node: unknown): boolean => isScalar(node) && node.value === true;
 
 export const keysOf = (node: unknown): readonly string[] =>
-  entriesOf(node).flatMap((entry) => {
-    const key = keyOf(entry);
-    return key === null ? [] : [key];
+  entriesOf(node).flatMap((pair) => {
+    const pairKey = keyOf(pair);
+    return pairKey === null ? [] : [pairKey];
   });

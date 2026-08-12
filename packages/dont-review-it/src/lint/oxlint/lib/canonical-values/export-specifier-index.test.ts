@@ -12,10 +12,10 @@ describe("buildExportSpecifierIndex", () => {
     onTestFinished(() => {
       rmSync(root, { recursive: true, force: true });
     });
-    for (const [path, text] of Object.entries(files)) {
-      const target = join(root, path);
-      mkdirSync(dirname(target), { recursive: true });
-      writeFileSync(target, text, "utf8");
+    for (const [path, source] of Object.entries(files)) {
+      const absolutePath = join(root, path);
+      mkdirSync(dirname(absolutePath), { recursive: true });
+      writeFileSync(absolutePath, source, "utf8");
     }
     return root;
   };
@@ -119,7 +119,7 @@ describe("buildExportSpecifierIndex", () => {
   });
 
   test("a re-export chain deeper than the limit stops there", () => {
-    const step = (next: string): string => `export * from "./${next}.ts";\n`;
+    const step = (reachedNext: string): string => `export * from "./${reachedNext}.ts";\n`;
     const root = packageWith({
       "package.json": manifest({ name: "@mst/user", exports: "./src/a.ts" }),
       "src/a.ts": step("b"),

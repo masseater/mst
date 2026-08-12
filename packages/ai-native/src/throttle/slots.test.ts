@@ -110,10 +110,10 @@ describe("slots", () => {
   test("removeWaiter tolerates an entry that is already gone", () => {
     const directory = slotDirectory();
     ensureSlots(directory, 1);
-    const entry = enqueueWaiter(directory);
+    const listed = enqueueWaiter(directory);
 
-    removeWaiter(entry);
-    removeWaiter(entry);
+    removeWaiter(listed);
+    removeWaiter(listed);
 
     expect(readdirSync(join(directory, "waiters"))).toStrictEqual([]);
   });

@@ -33,14 +33,14 @@ const collectTrackingShow = async (
 ): Promise<{ readonly context: PrContext; readonly shownCount: number }> => {
   const shownPaths = new Map<number, string>();
   const git = gitWith(overrides);
-  const context = await collectWith({
+  const carried = await collectWith({
     ...git,
-    showFile: (entry) => {
-      shownPaths.set(shownPaths.size, entry.path);
-      return git.showFile(entry);
+    showFile: (listed) => {
+      shownPaths.set(shownPaths.size, listed.path);
+      return git.showFile(listed);
     },
   });
-  return { context, shownCount: shownPaths.size };
+  return { context: carried, shownCount: shownPaths.size };
 };
 
 const it = test
@@ -53,22 +53,22 @@ const it = test
     }),
   )
   .extend("oversizedFile", async () => {
-    const context = await collectWith(
+    const carried = await collectWith(
       gitWith({
         nameStatusDiff: () => Promise.resolve("M\tbig.ts"),
         showFile: () => Promise.resolve("x".repeat(1_000_001)),
       }),
     );
-    return context.changedFiles[0];
+    return carried.changedFiles[0];
   })
   .extend("smallFile", async () => {
-    const context = await collectWith(
+    const carried = await collectWith(
       gitWith({
         nameStatusDiff: () => Promise.resolve("M\tsmall.ts"),
         showFile: () => Promise.resolve("hello"),
       }),
     );
-    return context.changedFiles[0];
+    return carried.changedFiles[0];
   })
   .extend("emptyDiffCollection", () => collectWith(gitWith({})));
 

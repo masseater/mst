@@ -9,17 +9,17 @@ import { aliasedPathsFor } from "./tsconfig-path-aliases.ts";
 const fixtureDir = join(realpathSync(tmpdir()), "dont-review-it-tsconfig-path-aliases");
 rmSync(fixtureDir, { recursive: true, force: true });
 
-const fixturePath = (name: string): string => join(fixtureDir, name);
+const fixturePath = (fixtureName: string): string => join(fixtureDir, fixtureName);
 
-const writeFixture = (name: string, content: string): string => {
-  const path = fixturePath(name);
+const writeFixture = (fixtureName: string, writtenContent: string): string => {
+  const path = fixturePath(fixtureName);
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, content);
+  writeFileSync(path, writtenContent);
   return path;
 };
 
-const writeConfig = (name: string, config: unknown): string =>
-  writeFixture(name, JSON.stringify(config));
+const writeConfig = (fixtureName: string, config: unknown): string =>
+  writeFixture(fixtureName, JSON.stringify(config));
 
 writeConfig("wildcard/tsconfig.json", {
   compilerOptions: { baseUrl: ".", paths: { "@data/*": ["./values/*"] } },

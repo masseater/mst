@@ -13,7 +13,7 @@ const SELF_RULE = "no-lint-suppression-in-spec--fix-the-violation";
 
 const EVERY_RULE_REACHING_HERE = "every rule this file is checked by";
 
-const spelled = (name: string): string => `\`${name}\``;
+const spelled = (ruleName: string): string => `\`${ruleName}\``;
 
 describe("dont-review-it/no-lint-suppression-in-spec--fix-the-violation", () => {
   testLintRule(noLintSuppressionInSpec, {

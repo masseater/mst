@@ -41,13 +41,13 @@ const writtenFile = ({
 };
 
 const repositoryHolding = ({
-  name,
+  name: spelled,
   rows,
 }: {
   readonly name: string;
   readonly rows: readonly Readonly<Record<string, string>>[];
 }): string => {
-  const root = join(fixtureDir, name);
+  const root = join(fixtureDir, spelled);
   mkdirSync(root, { recursive: true });
   writeFileSync(join(root, "pnpm-workspace.yaml"), "packages:\n  - packages/*\n");
   writeFileSync(join(root, LEDGER_FILE_NAME), JSON.stringify(rows));

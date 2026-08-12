@@ -10,9 +10,9 @@ import { runPresetAdoptionChecks } from "../src/preset-adoption/run-preset-adopt
 const config = defaultPresetAdoptionConfig;
 
 const WORKSPACES = {
-  "package.json": `{"name": "root"}`,
-  "packages/left/package.json": `{"name": "left"}`,
-  "packages/right/package.json": `{"name": "right"}`,
+  "package.json": `{"spelled": "root"}`,
+  "packages/left/package.json": `{"spelled": "left"}`,
+  "packages/right/package.json": `{"spelled": "right"}`,
 };
 
 const repositoryWith = async (files: Readonly<Record<string, string>>): Promise<string> => {
@@ -20,10 +20,10 @@ const repositoryWith = async (files: Readonly<Record<string, string>>): Promise<
   onTestFinished(async () => rm(repositoryRoot, { recursive: true, force: true }));
 
   await Promise.all(
-    Object.entries(files).map(async ([name, source]) => {
-      const target = join(repositoryRoot, name);
-      await mkdir(dirname(target), { recursive: true });
-      await writeFile(target, source, "utf-8");
+    Object.entries(files).map(async ([spelled, source]) => {
+      const checked = join(repositoryRoot, spelled);
+      await mkdir(dirname(checked), { recursive: true });
+      await writeFile(checked, source, "utf-8");
     }),
   );
   return repositoryRoot;

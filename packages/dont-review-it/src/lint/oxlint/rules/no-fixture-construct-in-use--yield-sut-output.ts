@@ -103,10 +103,10 @@ const assemblyInMemberRead = (
 };
 
 const assemblyBehindName = (
-  name: ESTree.IdentifierReference,
+  spelled: ESTree.IdentifierReference,
   reading: Reading,
 ): Assembly | null => {
-  const bound = resolveBinding(reading.scopeAt(name), name.name);
+  const bound = resolveBinding(reading.scopeAt(spelled), spelled.name);
   if (bound === null || reading.walked.has(bound)) return null;
 
   const declared = declaredValueOf(bound);
@@ -119,7 +119,7 @@ const assemblyBehindName = (
     walked: new Set([...reading.walked, bound]),
   });
   if (carried === null) return null;
-  return carried.kind === "built" ? { ...carried, boundAs: name.name } : carried;
+  return carried.kind === "built" ? { ...carried, boundAs: spelled.name } : carried;
 };
 
 const findingFor = (
@@ -169,10 +169,10 @@ export const noFixtureConstructInUse = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
-    const scopeAt: ScopeLookup = (node: ESTree.Node) => context.sourceCode.getScope(node);
+    const scopeAt: ScopeLookup = (node: ESTree.Node) => inspection.sourceCode.getScope(node);
     const fixtures = new Set<ESTree.CallExpression>();
     const calls = new Set<ESTree.CallExpression>();
 
@@ -194,7 +194,7 @@ export const noFixtureConstructInUse = createDontReviewItRule({
                 calls,
               });
               if (assembly === null) continue;
-              context.report(findingFor(subject, assembly));
+              inspection.report(findingFor(subject, assembly));
             }
           }
         }

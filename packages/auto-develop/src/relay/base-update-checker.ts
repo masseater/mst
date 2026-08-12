@@ -42,8 +42,8 @@ export const runBaseUpdateCheck = async (check: {
   const behindPulls = eligiblePulls.filter(
     (pull) => !indicatesSummaryConflict(pull) && pull.mergeStateStatus === "BEHIND",
   );
-  const now = check.now ?? Date.now;
-  const nowMs = now();
+  const stampedNow = check.now ?? Date.now;
+  const nowMs = stampedNow();
   for (const pull of behindPulls) {
     await storeBehindEvent({ pull, events: check.events, nowMs });
   }

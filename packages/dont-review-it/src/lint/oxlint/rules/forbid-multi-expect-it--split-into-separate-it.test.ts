@@ -11,7 +11,7 @@ describe("dont-review-it/forbid-multi-expect-it--split-into-separate-it", () => 
       {
         name: "one exact comparison pins the one behaviour the block names",
         filename: SPEC_FILE,
-        code: 'const test = baseTest.extend("report", () => summarise());\nit("carries what it summarised", ({ report }) => {\n  expect(report).toStrictEqual({ id: "a", total: 2 });\n});',
+        code: 'const test = baseTest.extend("report", () => summarise());\nit("carries what it summarised", ({ report }) => {\n  expect(report).toStrictEqual({ id: "a", counted: 2 });\n});',
       },
       {
         name: "a declaration of how many assertions will run claims nothing",

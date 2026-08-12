@@ -18,12 +18,12 @@ const stubGithub = (overrides: Partial<GithubReader> = {}): GithubReader => ({
 });
 
 const authoredEvent = (
-  id: string,
+  identity: string,
   shape: { readonly receivedAtMs: number; readonly authorLogin?: string | null },
 ): StoredEvent => ({
-  id,
+  id: identity,
   eventType: "pull_request",
-  deliveryId: id,
+  deliveryId: identity,
   payload: {
     action: "opened",
     pull_request:
@@ -88,16 +88,16 @@ const startStream = (session: {
 
 const it = test
   .extend("mixedBacklogStream", async () => {
-    const events = createMemoryEventStore();
+    const store = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
     const nowMs = Date.now();
-    await events.createIfAbsent(authoredEvent("delivery-1", { receivedAtMs: nowMs - 3000 }));
-    await events.createIfAbsent(
+    await store.createIfAbsent(authoredEvent("delivery-1", { receivedAtMs: nowMs - 3000 }));
+    await store.createIfAbsent(
       authoredEvent("delivery-2", { receivedAtMs: nowMs - 2000, authorLogin: "hubot" }),
     );
-    await events.createIfAbsent(authoredEvent("delivery-3", { receivedAtMs: nowMs - 1000 }));
+    await store.createIfAbsent(authoredEvent("delivery-3", { receivedAtMs: nowMs - 1000 }));
     const { sink, writtenIds } = recordingSink();
-    const stream = startStream({ events, cursors, sink });
+    const stream = startStream({ events: store, cursors, sink });
     await settleQueue();
     stream.hangup();
     await stream.finished;
@@ -105,37 +105,37 @@ const it = test
     return { writtenEventIds: writtenIds(), cursorAfterStream };
   })
   .extend("lastEventIdStream", async () => {
-    const events = createMemoryEventStore();
+    const store = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
-    await events.createIfAbsent(authoredEvent("delivery-1", { receivedAtMs: 100 }));
-    await events.createIfAbsent(authoredEvent("delivery-2", { receivedAtMs: 200 }));
-    await events.createIfAbsent(authoredEvent("delivery-3", { receivedAtMs: 300 }));
+    await store.createIfAbsent(authoredEvent("delivery-1", { receivedAtMs: 100 }));
+    await store.createIfAbsent(authoredEvent("delivery-2", { receivedAtMs: 200 }));
+    await store.createIfAbsent(authoredEvent("delivery-3", { receivedAtMs: 300 }));
     await cursors.write({ clientId: "octocat-author", eventId: "delivery-2" });
     const { sink, writtenIds } = recordingSink();
-    const stream = startStream({ events, cursors, sink, lastEventId: "delivery-1" });
+    const stream = startStream({ events: store, cursors, sink, lastEventId: "delivery-1" });
     await settleQueue();
     stream.hangup();
     await stream.finished;
     return writtenIds();
   })
   .extend("fallbackStream", async () => {
-    const events = createMemoryEventStore();
+    const store = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
-    await events.createIfAbsent(
+    await store.createIfAbsent(
       authoredEvent("delivery-recent", { receivedAtMs: Date.now() - 1000 }),
     );
     const { sink, writtenIds } = recordingSink();
-    const stream = startStream({ events, cursors, sink, lastEventId: "delivery-vanished" });
+    const stream = startStream({ events: store, cursors, sink, lastEventId: "delivery-vanished" });
     await settleQueue();
     stream.hangup();
     await stream.finished;
     return writtenIds();
   })
   .extend("unresolvableOwnerStream", async () => {
-    const events = createMemoryEventStore();
+    const store = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
     const nowMs = Date.now();
-    await events.createIfAbsent({
+    await store.createIfAbsent({
       id: "delivery-unresolvable",
       eventType: "pull_request",
       deliveryId: "delivery-unresolvable",
@@ -143,10 +143,10 @@ const it = test
       receivedAtMs: nowMs - 2000,
       expiresAtMs: Number.MAX_SAFE_INTEGER,
     });
-    await events.createIfAbsent(authoredEvent("delivery-owned", { receivedAtMs: nowMs - 1000 }));
+    await store.createIfAbsent(authoredEvent("delivery-owned", { receivedAtMs: nowMs - 1000 }));
     const { sink, writtenIds } = recordingSink();
     const stream = startStream({
-      events,
+      events: store,
       cursors,
       sink,
       github: stubGithub({
@@ -158,12 +158,12 @@ const it = test
     return { writtenEventIds: writtenIds(), cursorAfterStream };
   })
   .extend("liveDeliveryStream", async () => {
-    const events = createMemoryEventStore();
+    const store = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
     const { sink, writtenIds } = recordingSink();
-    const stream = startStream({ events, cursors, sink });
+    const stream = startStream({ events: store, cursors, sink });
     await settleQueue();
-    await events.createIfAbsent(authoredEvent("delivery-live", { receivedAtMs: Date.now() }));
+    await store.createIfAbsent(authoredEvent("delivery-live", { receivedAtMs: Date.now() }));
     await settleQueue();
     stream.hangup();
     await stream.finished;
@@ -171,14 +171,14 @@ const it = test
     return { writtenEventIds: writtenIds(), cursorAfterStream };
   })
   .extend("replayedLiveIdStream", async () => {
-    const events = createMemoryEventStore();
+    const store = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
     const nowMs = Date.now();
-    await events.createIfAbsent(authoredEvent("delivery-1", { receivedAtMs: nowMs - 1000 }));
+    await store.createIfAbsent(authoredEvent("delivery-1", { receivedAtMs: nowMs - 1000 }));
     const { sink, writtenIds } = recordingSink();
-    const stream = startStream({ events, cursors, sink });
+    const stream = startStream({ events: store, cursors, sink });
     await settleQueue();
-    await events.createIfAbsent(authoredEvent("delivery-1", { receivedAtMs: nowMs }));
+    await store.createIfAbsent(authoredEvent("delivery-1", { receivedAtMs: nowMs }));
     await settleQueue();
     stream.hangup();
     await stream.finished;
@@ -186,48 +186,48 @@ const it = test
   })
   .extend("failingSinkCursor", async () => {
     const cursors = createMemoryCursorStore();
-    const events = createMemoryEventStore();
+    const store = createMemoryEventStore();
     const failingSink: SseSink = {
       writeEvent: () => {
         throw new Error("socket closed");
       },
       writeKeepalive: () => undefined,
     };
-    const stream = startStream({ events, cursors, sink: failingSink });
+    const stream = startStream({ events: store, cursors, sink: failingSink });
     await settleQueue();
-    await events.createIfAbsent(authoredEvent("delivery-live", { receivedAtMs: Date.now() }));
+    await store.createIfAbsent(authoredEvent("delivery-live", { receivedAtMs: Date.now() }));
     await settleQueue();
     await stream.finished;
     return cursors.read("octocat-author");
   })
   .extend("serialLiveStream", async () => {
-    const events = createMemoryEventStore();
+    const store = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
     const { sink, writtenIds } = recordingSink();
-    const stream = startStream({ events, cursors, sink });
+    const stream = startStream({ events: store, cursors, sink });
     await settleQueue();
     const nowMs = Date.now();
-    await events.createIfAbsent(authoredEvent("delivery-live-1", { receivedAtMs: nowMs }));
-    await events.createIfAbsent(authoredEvent("delivery-live-2", { receivedAtMs: nowMs + 1 }));
+    await store.createIfAbsent(authoredEvent("delivery-live-1", { receivedAtMs: nowMs }));
+    await store.createIfAbsent(authoredEvent("delivery-live-2", { receivedAtMs: nowMs + 1 }));
     await settleQueue();
     stream.hangup();
     await stream.finished;
     return writtenIds();
   })
   .extend("emptyBacklogLiveStream", async () => {
-    const events = createMemoryEventStore();
+    const store = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
     const { sink, writtenIds } = recordingSink();
-    const stream = startStream({ events, cursors, sink, lastEventId: "delivery-vanished" });
+    const stream = startStream({ events: store, cursors, sink, lastEventId: "delivery-vanished" });
     await settleQueue();
-    await events.createIfAbsent(authoredEvent("delivery-live", { receivedAtMs: Date.now() }));
+    await store.createIfAbsent(authoredEvent("delivery-live", { receivedAtMs: Date.now() }));
     await settleQueue();
     stream.hangup();
     await stream.finished;
     return writtenIds();
   })
   .extend("evictingKnownIdStream", async () => {
-    const events = createMemoryEventStore();
+    const store = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
     const { sink, writtenIds } = recordingSink();
     const clientHangup = new AbortController();
@@ -235,9 +235,9 @@ const it = test
       clientId: "octocat-author",
       subscriberLogin: "octocat",
       lastEventId: null,
-      events,
+      events: store,
       cursors,
-      ownerFilter: createOwnerFilter({ events, github: stubGithub() }),
+      ownerFilter: createOwnerFilter({ events: store, github: stubGithub() }),
       sink,
       clientAbort: clientHangup.signal,
       log: silentLogger,
@@ -245,29 +245,29 @@ const it = test
     });
     await settleQueue();
     const nowMs = Date.now();
-    await events.createIfAbsent(authoredEvent("delivery-live-1", { receivedAtMs: nowMs }));
+    await store.createIfAbsent(authoredEvent("delivery-live-1", { receivedAtMs: nowMs }));
     await settleQueue();
-    await events.createIfAbsent(authoredEvent("delivery-live-2", { receivedAtMs: nowMs + 1 }));
+    await store.createIfAbsent(authoredEvent("delivery-live-2", { receivedAtMs: nowMs + 1 }));
     await settleQueue();
     clientHangup.abort();
     await finished;
     return writtenIds();
   })
   .extend("hangupDuringReplayStream", async () => {
-    const events = createMemoryEventStore();
+    const store = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
     const nowMs = Date.now();
-    await events.createIfAbsent(authoredEvent("delivery-1", { receivedAtMs: nowMs - 2000 }));
-    await events.createIfAbsent(authoredEvent("delivery-2", { receivedAtMs: nowMs - 1000 }));
+    await store.createIfAbsent(authoredEvent("delivery-1", { receivedAtMs: nowMs - 2000 }));
+    await store.createIfAbsent(authoredEvent("delivery-2", { receivedAtMs: nowMs - 1000 }));
     const clientHangup = new AbortController();
     const frames = new Map<number, string>();
     await runEventStream({
       clientId: "octocat-author",
       subscriberLogin: "octocat",
       lastEventId: null,
-      events,
+      events: store,
       cursors,
-      ownerFilter: createOwnerFilter({ events, github: stubGithub() }),
+      ownerFilter: createOwnerFilter({ events: store, github: stubGithub() }),
       sink: {
         writeEvent: (frame) => {
           frames.set(frames.size, frame.eventId);
@@ -281,7 +281,7 @@ const it = test
     return [...frames.values()];
   })
   .extend("lateOwnerResolutionStream", async () => {
-    const events = createMemoryEventStore();
+    const store = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
     const resolverGate = new Map<string, (login: string | null) => void>();
     const gatedGithub = stubGithub({
@@ -291,10 +291,10 @@ const it = test
         }),
     });
     const { sink, writtenIds } = recordingSink();
-    const stream = startStream({ events, cursors, sink, github: gatedGithub });
+    const stream = startStream({ events: store, cursors, sink, github: gatedGithub });
     await settleQueue();
     const nowMs = Date.now();
-    await events.createIfAbsent({
+    await store.createIfAbsent({
       id: "delivery-slow",
       eventType: "pull_request",
       deliveryId: "delivery-slow",
@@ -302,7 +302,7 @@ const it = test
       receivedAtMs: nowMs,
       expiresAtMs: Number.MAX_SAFE_INTEGER,
     });
-    await events.createIfAbsent(authoredEvent("delivery-after", { receivedAtMs: nowMs + 1 }));
+    await store.createIfAbsent(authoredEvent("delivery-after", { receivedAtMs: nowMs + 1 }));
     await settleQueue();
     stream.hangup();
     resolverGate.get("release")?.("octocat");
@@ -315,15 +315,15 @@ const it = test
     const writeKeepalive = vi.fn<() => void>(() => {
       throw new Error("socket closed");
     });
-    const events = createMemoryEventStore();
+    const store = createMemoryEventStore();
     const clientHangup = new AbortController();
     await runEventStream({
       clientId: "octocat-author",
       subscriberLogin: "octocat",
       lastEventId: null,
-      events,
+      events: store,
       cursors: createMemoryCursorStore(),
-      ownerFilter: createOwnerFilter({ events, github: stubGithub() }),
+      ownerFilter: createOwnerFilter({ events: store, github: stubGithub() }),
       sink: { writeEvent: () => undefined, writeKeepalive },
       clientAbort: clientHangup.signal,
       log: silentLogger,
@@ -414,9 +414,9 @@ describe("keepalive と切断", () => {
   });
 
   it("クライアント切断でストリームは終了する", async () => {
-    const events = createMemoryEventStore();
+    const store = createMemoryEventStore();
     const cursors = createMemoryCursorStore();
-    const stream = startStream({ events, cursors, sink: recordingSink().sink });
+    const stream = startStream({ events: store, cursors, sink: recordingSink().sink });
     await settleQueue();
     stream.hangup();
     await expect(stream.finished).resolves.toStrictEqual(undefined);

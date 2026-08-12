@@ -82,8 +82,8 @@ describe("startLintTelemetry", () => {
   test("an export that fails names what it carried, whatever was thrown", async () => {
     await started();
     const written = new Map<number, string>();
-    const write = vi.spyOn(process.stderr, "write").mockImplementation((text) => {
-      written.set(written.size, String(text));
+    const write = vi.spyOn(process.stderr, "write").mockImplementation((writtenText) => {
+      written.set(written.size, String(writtenText));
       return true;
     });
 

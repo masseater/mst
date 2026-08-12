@@ -5,7 +5,7 @@ import { buildCatalog, EMPTY_CANONICAL_VALUES_CATALOG } from "../lib/canonical-v
 import { fingerprintValues, type CanonicalValue } from "../lib/canonical-values/fingerprint.ts";
 import { createNoStrictCanonicalLiteralUseRule } from "./no-strict-canonical-literal-use--use-canonical-import.ts";
 
-const entry = (
+const listed = (
   conceptId: string,
   declaration: {
     readonly declarationPath: string;
@@ -15,22 +15,22 @@ const entry = (
 ) => ({ conceptId, ...declaration, fingerprint: fingerprintValues(declaration.values) });
 
 const CATALOG = buildCatalog([
-  entry("order.status", {
+  listed("order.status", {
     declarationPath: "packages/order/src/status.ts",
     exportPath: "@mst/order",
     values: ["draft", "published"],
   }),
-  entry("article.status", {
+  listed("article.status", {
     declarationPath: "packages/article/src/status.ts",
     exportPath: null,
     values: ["draft", "archived"],
   }),
-  entry("retry.budget", {
+  listed("retry.budget", {
     declarationPath: "packages/retry/src/budget.ts",
     exportPath: "@mst/retry",
     values: [3, -1],
   }),
-  entry("sync.mode", {
+  listed("sync.mode", {
     declarationPath: "packages/sync/src/mode.ts",
     exportPath: "@mst/sync",
     values: ["auto", true],

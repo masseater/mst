@@ -18,10 +18,10 @@ const repositoryWith = (files: Readonly<Record<string, string>>): string => {
   onTestFinished(() => {
     rmSync(repositoryRoot, { recursive: true, force: true });
   });
-  for (const [relativePath, text] of Object.entries(files)) {
-    const target = join(repositoryRoot, relativePath);
-    mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, text, "utf8");
+  for (const [relativePath, source] of Object.entries(files)) {
+    const absolutePath = join(repositoryRoot, relativePath);
+    mkdirSync(dirname(absolutePath), { recursive: true });
+    writeFileSync(absolutePath, source, "utf8");
   }
   return repositoryRoot;
 };

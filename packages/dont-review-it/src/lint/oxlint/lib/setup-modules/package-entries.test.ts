@@ -17,10 +17,10 @@ const packageDirectoryHolding = (files: Readonly<Record<string, string>>): strin
     rmSync(root, { recursive: true, force: true });
   });
 
-  for (const [relativePath, content] of Object.entries(files)) {
+  for (const [relativePath, writtenContent] of Object.entries(files)) {
     const path = join(root, relativePath);
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, content);
+    writeFileSync(path, writtenContent);
   }
   return root;
 };

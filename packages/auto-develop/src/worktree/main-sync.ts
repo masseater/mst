@@ -31,7 +31,7 @@ export const syncMain = async (sync: {
     cwd: sync.startDir,
   });
   const repoDir = rootOutput.stdout.trim();
-  const run = (args: readonly string[]) => sync.git.run({ args, cwd: repoDir });
+  const run = (handedArgs: readonly string[]) => sync.git.run({ args: handedArgs, cwd: repoDir });
   sync.log.info({ targetBranch }, "syncing repository to the target branch");
   await checkoutIfNeeded({ run, targetBranch, log: sync.log });
   await run(["fetch", "origin"]);

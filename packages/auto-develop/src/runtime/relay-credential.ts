@@ -47,8 +47,8 @@ export const createRelayCredentialProvider = (
     return session.token;
   };
   return {
-    authorizationFor: async (request) => {
-      assertAllowedOrigin({ url: request.url, allowedOrigin: config.allowedOrigin });
+    authorizationFor: async (asked) => {
+      assertAllowedOrigin({ url: asked.url, allowedOrigin: config.allowedOrigin });
       const cached = cache.get("session");
       if (cached !== undefined && cached.expiresAtMs - config.now() > RENEW_BEFORE_MS) {
         return `Bearer ${cached.token}`;

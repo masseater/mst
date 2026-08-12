@@ -25,14 +25,14 @@ const acquireContext = {
 } satisfies AcquireContext;
 
 const engineWith = (
-  chunks: readonly string[],
+  writtenChunks: readonly string[],
 ): {
   readonly engine: Engine;
   readonly executions: ReturnType<typeof vi.fn<Engine["execute"]>>;
 } => {
   const executions = vi.fn<Engine["execute"]>(async function* execute() {
     await Promise.resolve();
-    for (const chunk of chunks) yield chunk;
+    for (const writtenChunk of writtenChunks) yield writtenChunk;
   });
   return { engine: { execute: executions, kill: () => Promise.resolve() }, executions };
 };

@@ -196,28 +196,34 @@ describe("subject-expressions", () => {
   });
 
   test("a single const in the body is the initializer that name stands for", () => {
-    const body = blockBodyOf(functionIn("() => { const caught = runSut(); return caught; }"));
-    const initializer = localConstInitializer(body as ESTree.FunctionBody, "caught");
+    const writtenBody = blockBodyOf(
+      functionIn("() => { const caught = runSut(); return caught; }"),
+    );
+    const initializer = localConstInitializer(writtenBody as ESTree.FunctionBody, "caught");
 
     expect(spellingOf(initializer as ESTree.Expression)).toBe("CallExpression");
   });
 
   test("a name declared with let is not a name this reading resolves", () => {
-    const body = blockBodyOf(functionIn("() => { let caught = runSut(); return caught; }"));
+    const writtenBody = blockBodyOf(functionIn("() => { let caught = runSut(); return caught; }"));
 
-    expect(localConstInitializer(body as ESTree.FunctionBody, "caught")).toBe(null);
+    expect(localConstInitializer(writtenBody as ESTree.FunctionBody, "caught")).toBe(null);
   });
 
   test("a name declared by destructuring is not a name this reading resolves", () => {
-    const body = blockBodyOf(functionIn("() => { const { caught } = runSut(); return caught; }"));
+    const writtenBody = blockBodyOf(
+      functionIn("() => { const { caught } = runSut(); return caught; }"),
+    );
 
-    expect(localConstInitializer(body as ESTree.FunctionBody, "caught")).toBe(null);
+    expect(localConstInitializer(writtenBody as ESTree.FunctionBody, "caught")).toBe(null);
   });
 
   test("a name that no const in the body declares stands for nothing here", () => {
-    const body = blockBodyOf(functionIn("() => { const caught = runSut(); return caught; }"));
+    const writtenBody = blockBodyOf(
+      functionIn("() => { const caught = runSut(); return caught; }"),
+    );
 
-    expect(localConstInitializer(body as ESTree.FunctionBody, "other")).toBe(null);
+    expect(localConstInitializer(writtenBody as ESTree.FunctionBody, "other")).toBe(null);
   });
 
   test("a concise arrow has no block body to read names out of", () => {

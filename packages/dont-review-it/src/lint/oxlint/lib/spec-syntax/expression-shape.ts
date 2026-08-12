@@ -44,33 +44,33 @@ const literalShape = (node: AstFields): string => {
   return `value ${spelledOut(node.value)}`;
 };
 
-const atomShapeOf = (node: AstFields, type: string): string | null => {
-  if (type === "Literal") return literalShape(node);
-  if (type !== "TemplateLiteral") return null;
+const atomShapeOf = (node: AstFields, nodeType: string): string | null => {
+  if (nodeType === "Literal") return literalShape(node);
+  if (nodeType !== "TemplateLiteral") return null;
 
   const spelling = spelledTemplate(node);
   return spelling === null ? null : `value ${spelledOut(spelling)}`;
 };
 
 export const syntaxShapeOf = (held: unknown): string => {
-  if (Array.isArray(held)) return `[${held.map((element) => syntaxShapeOf(element)).join(",")}]`;
+  if (Array.isArray(held)) return `[${held.map((held) => syntaxShapeOf(held)).join(",")}]`;
   if (!isAstFields(held)) return spelledOut(held);
 
-  const type = typeof held.type === "string" ? held.type : "";
-  const forwarded = FORWARDED_BY_TYPE.get(type);
+  const nodeType = typeof held.type === "string" ? held.type : "";
+  const forwarded = FORWARDED_BY_TYPE.get(nodeType);
   if (forwarded !== undefined) return syntaxShapeOf(held[forwarded]);
 
-  const atom = atomShapeOf(held, type);
+  const atom = atomShapeOf(held, nodeType);
   if (atom !== null) return atom;
 
   const members = Object.keys(held)
-    .filter((key) => !NOTATION_KEYS.has(key))
+    .filter((named) => !NOTATION_KEYS.has(named))
     .toSorted()
-    .map((key) => {
-      const carried = held[key];
-      const unordered = type === UNORDERED_MEMBERS_TYPE && Array.isArray(carried);
+    .map((named) => {
+      const carried = held[named];
+      const unordered = nodeType === UNORDERED_MEMBERS_TYPE && Array.isArray(carried);
       const shapes = unordered ? carried.map((member) => syntaxShapeOf(member)).toSorted() : null;
-      return `${key}:${shapes === null ? syntaxShapeOf(carried) : `[${shapes.join(",")}]`}`;
+      return `${named}:${shapes === null ? syntaxShapeOf(carried) : `[${shapes.join(",")}]`}`;
     });
-  return `${type}(${members.join(",")})`;
+  return `${nodeType}(${members.join(",")})`;
 };

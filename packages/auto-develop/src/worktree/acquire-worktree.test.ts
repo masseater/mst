@@ -10,15 +10,15 @@ import type { WorktreeFs } from "./worktree-fs.ts";
 const managedPath = worktreePathFor(7);
 
 const gitFor = (
-  outputs: Readonly<Record<string, { readonly stdout?: string; readonly error?: Error }>>,
+  producedByCommand: Readonly<Record<string, { readonly stdout?: string; readonly error?: Error }>>,
 ): { readonly git: GitRunner; readonly calls: () => readonly string[] } => {
   const recorded = new Map<number, string>();
   return {
     git: {
       run: (invocation) => {
-        const key = invocation.args.join(" ");
-        recorded.set(recorded.size, key);
-        const scriptedOutput = outputs[key];
+        const named = invocation.args.join(" ");
+        recorded.set(recorded.size, named);
+        const scriptedOutput = producedByCommand[named];
         if (scriptedOutput?.error !== undefined) return Promise.reject(scriptedOutput.error);
         return Promise.resolve({ stdout: scriptedOutput?.stdout ?? "", stderr: "" });
       },

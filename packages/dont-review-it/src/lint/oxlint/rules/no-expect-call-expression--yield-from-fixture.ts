@@ -32,10 +32,10 @@ const assertedSubjectOf = (node: ESTree.CallExpression): AssertedSubject | null 
   const matcher = staticMemberName(callee);
   if (matcher === null) return null;
 
-  const entry = chainRootOf(callee.object);
-  if (entry.type !== "CallExpression" || !isAssertionEntryCall(entry)) return null;
+  const listed = chainRootOf(callee.object);
+  if (listed.type !== "CallExpression" || !isAssertionEntryCall(listed)) return null;
 
-  const [handed] = entry.arguments;
+  const [handed] = listed.arguments;
   if (handed === undefined || handed.type === "SpreadElement") return null;
   return { matcher, subject: unwrapSubject(handed) };
 };
@@ -68,8 +68,8 @@ const declaresParameters = (definition: Definition): boolean => {
   return written !== null && written > 0;
 };
 
-const bindingOf = (scope: Scope | null, name: string): Variable | null =>
-  scope === null ? null : (scope.set.get(name) ?? bindingOf(scope.upper, name));
+const bindingOf = (scope: Scope | null, spelled: string): Variable | null =>
+  scope === null ? null : (scope.set.get(spelled) ?? bindingOf(scope.upper, spelled));
 
 const hidesArguments = (
   { matcher, subject }: AssertedSubject,
@@ -93,7 +93,7 @@ export const noExpectCallExpression = createDontReviewItRule({
       producedSubject:
         "The value handed to `expect` must not be produced inside the assertion. This one is {{production}}. Move the production into the fixture, return the value from there, and write the assertion against that binding. Give a thrown-message assertion a thunk that takes no arguments, handed back by the same fixture. Lifting the production into a statement at the top of the `it` lands on `require-it-only-expect--move-setup-into-fixture`. Wrapping it in a type assertion, a non-null assertion, parentheses or `await` is stripped before this reading, and respelling it as `new` or as a tagged template is read the same way.",
       argumentTakingSubject:
-        "A callable handed to `expect` must not declare parameters. `{{subject}}` declares them, and the matcher calls it inside the assertion with whatever was bound into it. Move the values the call needs into the fixture, return a thunk that takes no arguments, and give that binding to the matcher. Binding the arguments into another callable first leaves the same call standing behind another name.",
+        "A callable handed to `expect` must not declare parameters. `{{subject}}` declares them, and the matcher calls it inside the assertion with whatever was bound into it. Move the values the call needs into the fixture, return a thunk that takes no arguments, and give that binding to the matcher. Binding the arguments into another callable first leaves the same call standing behind another spelled.",
     },
     schema: [
       {
@@ -105,10 +105,10 @@ export const noExpectCallExpression = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
-    const scopeAt = (node: ESTree.Node): Scope => context.sourceCode.getScope(node);
+    const scopeAt = (node: ESTree.Node): Scope => inspection.sourceCode.getScope(node);
 
     return {
       CallExpression(node: ESTree.CallExpression) {
@@ -118,12 +118,12 @@ export const noExpectCallExpression = createDontReviewItRule({
         const { subject } = asserted;
         const production = PRODUCED_SUBJECT_FORMS.get(subject.type);
         if (production !== undefined) {
-          context.report({ node: subject, messageId: "producedSubject", data: { production } });
+          inspection.report({ node: subject, messageId: "producedSubject", data: { production } });
         } else if (hidesArguments(asserted, scopeAt)) {
-          context.report({
+          inspection.report({
             node: subject,
             messageId: "argumentTakingSubject",
-            data: { subject: context.sourceCode.getText(subject) },
+            data: { subject: inspection.sourceCode.getText(subject) },
           });
         }
       },

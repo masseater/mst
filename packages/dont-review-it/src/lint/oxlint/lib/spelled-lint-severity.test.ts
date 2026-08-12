@@ -7,7 +7,7 @@ import type { ESTree } from "@oxlint/plugins";
 
 const spelledIn = (written: string): string | null => {
   const [statement] = parseSync("severity.ts", `const held = ${written};`).program.body.map(
-    (parsed) => parsed as ESTree.Statement,
+    (parsedNode) => parsedNode as ESTree.Statement,
   );
   if (statement?.type !== "VariableDeclaration") throw new Error(`no declaration in ${written}`);
   const [binding] = statement.declarations;

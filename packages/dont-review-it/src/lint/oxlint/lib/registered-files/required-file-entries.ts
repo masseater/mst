@@ -51,15 +51,15 @@ const entryOf = (declared: DeclaredRequiredFile): RequiredFileEntry | null => {
     owner: spelledTextOf(declared.owner),
     reason,
     contentChecks: (declared.contentChecks ?? []).filter(
-      (name): name is string => typeof name === "string",
+      (spelled): spelled is string => typeof spelled === "string",
     ),
   };
 };
 
-export const requiredFilesFrom = (options: Context["options"]): readonly RequiredFileEntry[] =>
+export const requiredFilesFrom = (ruleOptions: Context["options"]): readonly RequiredFileEntry[] =>
   (
-    ((options[0] ?? {}) as { readonly requiredFiles?: readonly DeclaredRequiredFile[] })
+    ((ruleOptions[0] ?? {}) as { readonly requiredFiles?: readonly DeclaredRequiredFile[] })
       .requiredFiles ?? []
   )
     .map(entryOf)
-    .filter((entry) => entry !== null);
+    .filter((candidate) => candidate !== null);

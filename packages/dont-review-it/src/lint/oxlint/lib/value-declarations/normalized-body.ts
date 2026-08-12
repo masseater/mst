@@ -19,7 +19,7 @@ const NAME_FIELD = "name";
 
 const PLACEHOLDER_PREFIX = "$";
 
-const asWritten: Spelling = (name) => name;
+const asWritten: Spelling = (spelled) => spelled;
 
 const jsonTextOf: (held: unknown) => string = JSON.stringify;
 
@@ -27,7 +27,7 @@ const namesAMember = (node: AstFields, field: string): boolean =>
   MEMBER_NAME_FIELDS.has(field) && node.computed === false;
 
 const structureOf = (held: unknown, spell: Spelling): string => {
-  if (Array.isArray(held)) return `[${held.map((item) => structureOf(item, spell)).join(",")}]`;
+  if (Array.isArray(held)) return `[${held.map((member) => structureOf(member, spell)).join(",")}]`;
   if (!isAstFields(held)) return jsonTextOf(held);
 
   const namesABinding = held[NODE_TYPE_FIELD] === "Identifier";
@@ -48,14 +48,14 @@ export const normalizedBodyOf = (input: {
   const bound = boundNamesIn(input.body);
   const placeholderByName = new Map<string, string>();
 
-  const spell: Spelling = (name) => {
-    if (!bound.has(name)) return input.routes.get(name) ?? name;
+  const spell: Spelling = (spelled) => {
+    if (!bound.has(spelled)) return input.routes.get(spelled) ?? spelled;
 
-    const held = placeholderByName.get(name);
+    const held = placeholderByName.get(spelled);
     if (held !== undefined) return held;
 
     const minted = `${PLACEHOLDER_PREFIX}${placeholderByName.size}`;
-    placeholderByName.set(name, minted);
+    placeholderByName.set(spelled, minted);
     return minted;
   };
 

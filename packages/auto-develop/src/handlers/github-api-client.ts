@@ -29,14 +29,14 @@ export const createGithubApiClient = (client: {
         requestedReviewerLogins: (data.requested_reviewers ?? []).map((reviewer) => reviewer.login),
       };
     },
-    createCommitStatus: async (request) => {
+    createCommitStatus: async (asked) => {
       await octokit.rest.repos.createCommitStatus({
         owner,
         repo,
-        sha: request.sha,
-        state: request.state,
-        context: request.context,
-        description: request.description,
+        sha: asked.sha,
+        state: asked.state,
+        context: asked.context,
+        description: asked.description,
       });
     },
     listReviews: async (prNumber): Promise<readonly Review[]> => {
@@ -54,12 +54,12 @@ export const createGithubApiClient = (client: {
         authorLogin: review.user?.login ?? "",
       }));
     },
-    requestReviewers: async (request) => {
+    requestReviewers: async (asked) => {
       await octokit.rest.pulls.requestReviewers({
         owner,
         repo,
-        pull_number: request.prNumber,
-        reviewers: [...request.logins],
+        pull_number: asked.prNumber,
+        reviewers: [...asked.logins],
       });
     },
   };

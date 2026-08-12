@@ -40,8 +40,8 @@ const scopedPathsOf = (property: ESTree.ObjectProperty): readonly (string | null
   if (scope === undefined) return null;
   const files = objectValueOf({ object: scope, key: "files" });
   if (files?.type !== "ArrayExpression") return [];
-  return files.elements.map((element) =>
-    element?.type === "Literal" && typeof element.value === "string" ? element.value : null,
+  return files.elements.map((held) =>
+    held?.type === "Literal" && typeof held.value === "string" ? held.value : null,
   );
 };
 
@@ -94,10 +94,12 @@ export const noInlineSuppressionOfProtectedRule = createDontReviewItRule({
     },
     schema: [PROTECTION_SCHEMA],
   },
-  create(context) {
-    const settings = protectionSettingsIn(context.options);
+  create(inspection) {
+    const settings = protectionSettingsIn(inspection.options);
     const protectedRules = protectedRulesFrom({ settings, keptRule: RULE_NAME });
-    const relativePath = toPosixPath(relative(context.cwd, resolve(context.cwd, context.filename)));
+    const relativePath = toPosixPath(
+      relative(inspection.cwd, resolve(inspection.cwd, inspection.filename)),
+    );
     const generated = [...GENERATED_PATHS, ...settings.generatedPaths].some((pattern) =>
       matchesAnchoredGlobPath({ relativePath, pattern }),
     );
@@ -109,11 +111,11 @@ export const noInlineSuppressionOfProtectedRule = createDontReviewItRule({
       if (covered.length === 0) return;
       const spelling = { spelling: directive.spelling };
       if (directive.ruleNames.length === 0) {
-        context.report({ loc: comment.loc, messageId: "blanketSuppression", data: spelling });
+        inspection.report({ loc: comment.loc, messageId: "blanketSuppression", data: spelling });
         return;
       }
       for (const ruleName of covered) {
-        context.report({
+        inspection.report({
           loc: comment.loc,
           messageId: "namedSuppression",
           data: { ...spelling, ruleName },
@@ -123,14 +125,14 @@ export const noInlineSuppressionOfProtectedRule = createDontReviewItRule({
 
     const reportConfiguration = (program: ESTree.Program): void => {
       for (const deviation of settings.deviations) {
-        const message = deviationMessageFor(deviation);
-        if (message !== null) context.report({ node: program, ...message });
+        const complaint = deviationMessageFor(deviation);
+        if (complaint !== null) inspection.report({ node: program, ...complaint });
       }
       const lint = lintBlockOf(program);
       if (lint === null) return;
       for (const weakened of weakenedTargetRulesIn({ lint, targetRules: protectedRules })) {
-        const message = weakeningMessageFor(weakened);
-        if (message !== null) context.report({ node: weakened.property, ...message });
+        const complaint = weakeningMessageFor(weakened);
+        if (complaint !== null) inspection.report({ node: weakened.property, ...complaint });
       }
     };
 
@@ -138,7 +140,7 @@ export const noInlineSuppressionOfProtectedRule = createDontReviewItRule({
       Program(node: ESTree.Program) {
         if (generated) return;
         for (const comment of node.comments) reportComment(comment);
-        if (!LINT_CONFIGURATION_FILE.test(toPosixPath(context.filename))) return;
+        if (!LINT_CONFIGURATION_FILE.test(toPosixPath(inspection.filename))) return;
         reportConfiguration(node);
       },
     };

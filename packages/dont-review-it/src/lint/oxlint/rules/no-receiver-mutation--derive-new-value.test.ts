@@ -126,7 +126,7 @@ describe("dont-review-it/no-receiver-mutation--derive-new-value", () => {
       },
       {
         name: "the weakly held collections are written to the same way",
-        code: "const held = new WeakSet<object>();\nheld.add(key);",
+        code: "const held = new WeakSet<object>();\nheld.add(named);",
         errors: [{ messageId: "builtinReceiverMutation" }],
       },
       {

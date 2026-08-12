@@ -73,10 +73,12 @@ const asFunction = (node: ESTree.Expression): SpecFunction | null => {
   return written.type === "FunctionDeclaration" ? written : null;
 };
 
-const parameterNamesOf = (fn: SpecFunction): ReadonlySet<string> =>
+const parameterNamesOf = (specFunction: SpecFunction): ReadonlySet<string> =>
   new Set([
-    ...fn.params.flatMap((parameter) => (parameter.type === "Identifier" ? [parameter.name] : [])),
-    ...(fixtureDependenciesOf(fn) ?? []).flatMap((dependency) =>
+    ...specFunction.params.flatMap((parameter) =>
+      parameter.type === "Identifier" ? [parameter.name] : [],
+    ),
+    ...(fixtureDependenciesOf(specFunction) ?? []).flatMap((dependency) =>
       dependency.boundAs === null ? [] : [dependency.boundAs],
     ),
   ]);
@@ -86,31 +88,31 @@ const readingIn = (input: {
   readonly factory: SpecFunction | null;
   readonly visitedModules: ReadonlySet<string>;
 }): Reading => {
-  const body = input.factory === null ? null : blockBodyOf(input.factory);
+  const factoryBody = input.factory === null ? null : blockBodyOf(input.factory);
   return {
     ...input,
     locals:
-      body === null
+      factoryBody === null
         ? new Map()
-        : moduleDeclarationsOf(input.module.filename, body.body).initializerByName,
+        : moduleDeclarationsOf(input.module.filename, factoryBody.body).initializerByName,
     bound: input.factory === null ? new Set() : parameterNamesOf(input.factory),
   };
 };
 
-const localInitializer = (name: string, reading: Reading): ESTree.Expression | null => {
-  if (reading.bound.has(name)) return null;
-  return reading.locals.get(name) ?? reading.module.initializerByName.get(name) ?? null;
+const localInitializer = (spelled: string, reading: Reading): ESTree.Expression | null => {
+  if (reading.bound.has(spelled)) return null;
+  return reading.locals.get(spelled) ?? reading.module.initializerByName.get(spelled) ?? null;
 };
 
 const resolvedName = (
-  name: string,
+  spelled: string,
   reading: Reading,
 ): { readonly declared: ESTree.Expression; readonly reading: Reading } | null => {
-  const local = localInitializer(name, reading);
+  const local = localInitializer(spelled, reading);
   if (local !== null) return { declared: local, reading };
-  if (reading.bound.has(name)) return null;
+  if (reading.bound.has(spelled)) return null;
 
-  const imported = reading.module.importedByName.get(name);
+  const imported = reading.module.importedByName.get(spelled);
   if (imported === undefined) return null;
 
   const found = importedDeclarationOf({
@@ -152,8 +154,8 @@ const findingsIn = (walk: Walk): readonly Finding[] => {
   return bare.type === "CallExpression" ? [...beside, ...findingsInCall(bare, walk)] : beside;
 };
 
-const findingsBehindName = (name: ESTree.IdentifierReference, walk: Walk): readonly Finding[] => {
-  const resolved = resolvedName(name.name, walk.reading);
+const findingsBehindName = (named: ESTree.IdentifierReference, walk: Walk): readonly Finding[] => {
+  const resolved = resolvedName(named.name, walk.reading);
   if (resolved === null) return [];
 
   const crossed = resolved.reading.module.filename !== walk.reading.module.filename;
@@ -161,7 +163,7 @@ const findingsBehindName = (name: ESTree.IdentifierReference, walk: Walk): reado
     ...walk,
     written: resolved.declared,
     reading: resolved.reading,
-    origin: walk.origin ?? (crossed ? { node: name, name: name.name } : null),
+    origin: walk.origin ?? (crossed ? { node: named, name: named.name } : null),
   });
 };
 
@@ -170,13 +172,13 @@ const findingsInCall = (call: ESTree.CallExpression, walk: Walk): readonly Findi
     return [operationFinding({ node: call, operation: SPREADING_WRITE, origin: walk.origin })];
   }
 
-  const name = staticCalleeName(call);
-  if (name === null) return [];
-  if (walk.vocabulary.has(name)) {
-    return [operationFinding({ node: call, operation: name, origin: walk.origin })];
+  const calleeName = staticCalleeName(call);
+  if (calleeName === null) return [];
+  if (walk.vocabulary.has(calleeName)) {
+    return [operationFinding({ node: call, operation: calleeName, origin: walk.origin })];
   }
 
-  const resolved = resolvedName(name, walk.reading);
+  const resolved = resolvedName(calleeName, walk.reading);
   const declared = resolved === null ? null : asFunction(resolved.declared);
   if (resolved === null || declared === null) return [];
 
@@ -185,7 +187,7 @@ const findingsInCall = (call: ESTree.CallExpression, walk: Walk): readonly Findi
       ...walk,
       written: returned,
       reading: readingIn({ ...resolved.reading, factory: declared }),
-      origin: walk.origin ?? { node: call, name },
+      origin: walk.origin ?? { node: call, name: calleeName },
     }),
   );
 };
@@ -289,12 +291,12 @@ export const noNormalizeSutOutput = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
     const vocabulary = new Set([
       ...NORMALIZING_METHODS,
-      ...normalizingFunctionsFrom(context.options),
+      ...normalizingFunctionsFrom(inspection.options),
     ]);
     const fixtures = new Set<ESTree.CallExpression>();
     const mutations = new Set<Mutation>();
@@ -321,7 +323,7 @@ export const noNormalizeSutOutput = createDontReviewItRule({
         readMutation(root === null ? null : { node, root, operation: PROPERTY_REMOVAL });
       },
       "Program:exit"(node: ESTree.Program) {
-        const module = moduleDeclarationsOf(context.filename, node.body);
+        const module = moduleDeclarationsOf(inspection.filename, node.body);
         const reported = new Map<string, Finding>();
 
         for (const fixture of fixtures) {
@@ -329,7 +331,7 @@ export const noNormalizeSutOutput = createDontReviewItRule({
             const reading = readingIn({
               module,
               factory: declaration.factory,
-              visitedModules: new Set([context.filename]),
+              visitedModules: new Set([inspection.filename]),
             });
             for (const subject of declaration.subjects) {
               const found = [
@@ -349,7 +351,7 @@ export const noNormalizeSutOutput = createDontReviewItRule({
           }
         }
 
-        for (const finding of reported.values()) context.report(finding);
+        for (const finding of reported.values()) inspection.report(finding);
       },
     };
   },

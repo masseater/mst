@@ -40,10 +40,13 @@ const caughtName = (attempt: ESTree.TryStatement): string | null => {
   return caught?.type === "Identifier" ? caught.name : null;
 };
 
-const thrownUnderCatch = (body: ESTree.FunctionBody, name: string): readonly ESTree.Expression[] =>
-  body.body
+const thrownUnderCatch = (
+  writtenBody: ESTree.FunctionBody,
+  spelled: string,
+): readonly ESTree.Expression[] =>
+  writtenBody.body
     .flatMap((statement) => (statement.type === "TryStatement" ? [statement] : []))
-    .filter((attempt) => caughtName(attempt) === name)
+    .filter((attempt) => caughtName(attempt) === spelled)
     .flatMap((attempt) => attempt.block.body)
     .flatMap((statement) => (statement.type === "ThrowStatement" ? [statement.argument] : []));
 
@@ -120,8 +123,8 @@ const behindName = (input: {
   const bound = boundExpressionAt(scopeAt, written);
   if (bound !== null) return [bound];
 
-  const body = factory === null ? null : blockBodyOf(factory);
-  return body === null ? [] : thrownUnderCatch(body, written.name);
+  const writtenBody = factory === null ? null : blockBodyOf(factory);
+  return writtenBody === null ? [] : thrownUnderCatch(writtenBody, written.name);
 };
 
 const behindCall = (
@@ -144,8 +147,8 @@ const constructionsBehind = (input: {
 
   seen.add(written);
   const bare = unwrapSubject(written);
-  const reached = (next: ESTree.Expression): readonly ESTree.Expression[] =>
-    constructionsBehind({ scopeAt, written: next, factory, seen });
+  const reached = (reachedNext: ESTree.Expression): readonly ESTree.Expression[] =>
+    constructionsBehind({ scopeAt, written: reachedNext, factory, seen });
 
   if (bare.type === "Identifier") {
     return behindName({ scopeAt, written: bare, factory }).flatMap(reached);
@@ -216,13 +219,13 @@ const assertedSubjectOf = (call: ESTree.CallExpression): ESTree.IdentifierRefere
 
 const candidateOf = (call: ESTree.CallExpression): MirrorCandidate | null => {
   const subject = assertedSubjectOf(call);
-  const expected = subject === null ? null : firstValueOf(call);
-  return subject === null || expected === null ? null : { subject, expected };
+  const wanted = subject === null ? null : firstValueOf(call);
+  return subject === null || wanted === null ? null : { subject, expected: wanted };
 };
 
-const spreadSourcesOf = (expected: ESTree.Expression): readonly ESTree.IdentifierReference[] => {
-  if (expected.type !== "ObjectExpression") return [];
-  return expected.properties.flatMap((property) => {
+const spreadSourcesOf = (wanted: ESTree.Expression): readonly ESTree.IdentifierReference[] => {
+  if (wanted.type !== "ObjectExpression") return [];
+  return wanted.properties.flatMap((property) => {
     if (property.type !== "SpreadElement") return [];
     const source = unwrapSubject(property.argument);
     return source.type === "Identifier" ? [source] : [];
@@ -235,13 +238,13 @@ const mirrorReportOf = (input: {
   readonly candidate: MirrorCandidate;
 }): MirrorReport | null => {
   const { scopeAt, shapesByFixture, candidate } = input;
-  const { subject, expected } = candidate;
-  const reached = resolvedExpression({ scopeAt, written: expected });
+  const { subject, expected: wanted } = candidate;
+  const reached = resolvedExpression({ scopeAt, written: wanted });
   const fixture = fixtureNameOf(scopeAt, subject);
   const spreads = spreadSourcesOf(reached).some((source) =>
     namesOneBinding({ scopeAt, left: source, right: subject }),
   );
-  if (spreads) return { node: expected, messageId: "spreadSubject", data: { subject: fixture } };
+  if (spreads) return { node: wanted, messageId: "spreadSubject", data: { subject: fixture } };
 
   const mirrored =
     reached.type === "Identifier"
@@ -249,7 +252,7 @@ const mirrorReportOf = (input: {
       : boundExpressionAt(scopeAt, subject) === null &&
         (shapesByFixture.get(fixture)?.has(syntaxShapeOf(reached)) ?? false);
   if (!mirrored) return null;
-  return { node: expected, messageId: "mirroredSubject", data: { subject: fixture } };
+  return { node: wanted, messageId: "mirroredSubject", data: { subject: fixture } };
 };
 
 const mirrorReportsOf = (input: {
@@ -271,14 +274,14 @@ export const noExpectMirroredSubject = createDontReviewItRule({
     type: "problem",
     docs: {
       description:
-        "Disallow writing the expression a fixture built the subject from as the expected value of an assertion, so a passing assertion states something about the code rather than that one expression evaluates to itself",
+        "Disallow writing the expression a fixture built the subject from as the wanted value of an assertion, so a passing assertion states something about the code rather than that one expression evaluates to itself",
       relatedGuidelines: [],
     },
     messages: {
       mirroredSubject:
-        "An expected value must not repeat the expression the fixture `{{subject}}` built the subject from. Decide what this assertion claims about the code, then write the expected value from outside that expression: the concrete value the code has to produce, or a derived value the fixture hands back for comparison against a literal. Drop the assertion altogether where a stronger claim about the same subject already stands beside it.",
+        "An wanted value must not repeat the expression the fixture `{{subject}}` built the subject from. Decide what this assertion claims about the code, then write the wanted value from outside that expression: the concrete value the code has to produce, or a derived value the fixture hands back for comparison against a literal. Drop the assertion altogether where a stronger claim about the same subject already stands beside it.",
       spreadSubject:
-        "An expected value must not spread the subject into itself, leaving every key it does not override compared against itself. Write the whole expected value from outside the expression that built the fixture `{{subject}}`: the concrete value the code has to produce, or the overridden keys as derived values the fixture hands back for comparison against literals.",
+        "An wanted value must not spread the subject into itself, leaving every key it does not override compared against itself. Write the whole wanted value from outside the expression that built the fixture `{{subject}}`: the concrete value the code has to produce, or the overridden keys as derived values the fixture hands back for comparison against literals.",
     },
     schema: [
       {
@@ -290,10 +293,10 @@ export const noExpectMirroredSubject = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
-    const scopeAt: ScopeLookup = (node) => context.sourceCode.getScope(node);
+    const scopeAt: ScopeLookup = (node) => inspection.sourceCode.getScope(node);
     const declarations = new Set<FixtureDeclaration>();
     const candidates = new Set<MirrorCandidate>();
 
@@ -306,7 +309,7 @@ export const noExpectMirroredSubject = createDontReviewItRule({
       },
       "Program:exit"() {
         for (const report of mirrorReportsOf({ scopeAt, declarations, candidates })) {
-          context.report(report);
+          inspection.report(report);
         }
       },
     };

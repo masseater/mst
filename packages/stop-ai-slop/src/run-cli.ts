@@ -75,15 +75,15 @@ const comparisonFor = async (
     : compareRevisions({ repositoryRoot, ...named });
 
 const dispatch = async (argv: readonly string[]): Promise<CliResult> => {
-  const parsed = parsedArguments(argv);
-  if ("failure" in parsed) return misuse();
-  if (parsed.positionals.length !== 1 || parsed.positionals[0] !== "check") return misuse();
+  const parsedNode = parsedArguments(argv);
+  if ("failure" in parsedNode) return misuse();
+  if (parsedNode.positionals.length !== 1 || parsedNode.positionals[0] !== "check") return misuse();
 
-  const { base, head } = parsed.values;
+  const { base, head } = parsedNode.values;
   const named = namedRange(base, head);
   if (named === null && (base !== undefined || head !== undefined)) return misuse();
 
-  const repositoryRoot = resolve(parsed.values["repository-root"] ?? process.cwd());
+  const repositoryRoot = resolve(parsedNode.values["repository-root"] ?? process.cwd());
   return reportedComparison(await comparisonFor(repositoryRoot, named));
 };
 

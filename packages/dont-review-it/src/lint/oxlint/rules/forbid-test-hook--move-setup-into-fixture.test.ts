@@ -12,10 +12,10 @@ const SPEC_FILENAME = "order.test.ts";
 const fixtureDir = join(realpathSync(tmpdir()), "dont-review-it-forbid-test-hook");
 rmSync(fixtureDir, { recursive: true, force: true });
 
-const fixturePath = (name: string): string => join(fixtureDir, name);
+const fixturePath = (fixtureName: string): string => join(fixtureDir, fixtureName);
 
-const writeFixture = (name: string, source: string): void => {
-  const path = fixturePath(name);
+const writeFixture = (fixtureName: string, source: string): void => {
+  const path = fixturePath(fixtureName);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, source);
 };

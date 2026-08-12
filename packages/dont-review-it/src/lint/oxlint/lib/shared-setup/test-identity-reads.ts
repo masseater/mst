@@ -76,13 +76,13 @@ const headIdentifiesTest = (expression: ESTree.Expression): boolean => {
   if (expression.type === "Identifier") return TEST_IDENTIFYING_NAMES.has(expression.name);
   if (expression.type !== "MemberExpression") return false;
 
-  const name = staticMemberName(expression);
-  if (name !== null && TEST_IDENTIFYING_NAMES.has(name)) return true;
+  const spelled = staticMemberName(expression);
+  if (spelled !== null && TEST_IDENTIFYING_NAMES.has(spelled)) return true;
   return headIdentifiesTest(expression.object);
 };
 
 export const identifyingMemberNameOf = (node: ESTree.MemberExpression): string | null => {
-  const name = staticMemberName(node);
-  if (name === null || !TEST_IDENTIFYING_NAMES.has(name)) return null;
-  return headIdentifiesTest(node.object) ? null : name;
+  const spelled = staticMemberName(node);
+  if (spelled === null || !TEST_IDENTIFYING_NAMES.has(spelled)) return null;
+  return headIdentifiesTest(node.object) ? null : spelled;
 };

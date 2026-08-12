@@ -23,7 +23,7 @@ type WorkspaceVocabulary = {
   readonly vocabulary: readonly CanonicalValue[];
 };
 
-const entry = (
+const listed = (
   conceptId: string,
   { workspace, vocabulary }: WorkspaceVocabulary,
 ): CanonicalValuesEntry => ({
@@ -35,13 +35,13 @@ const entry = (
 });
 
 const ownedCatalog = buildCatalog([
-  entry("order-status", { workspace: "order-vocabulary", vocabulary: ORDER_STATUS_VALUES }),
+  listed("order-status", { workspace: "order-vocabulary", vocabulary: ORDER_STATUS_VALUES }),
 ]);
 
 const ambiguousCatalog = buildCatalog([
-  entry("order-status", { workspace: "order-vocabulary", vocabulary: ORDER_STATUS_VALUES }),
+  listed("order-status", { workspace: "order-vocabulary", vocabulary: ORDER_STATUS_VALUES }),
   {
-    ...entry("article-status", {
+    ...listed("article-status", {
       workspace: "article-vocabulary",
       vocabulary: ORDER_STATUS_VALUES,
     }),
@@ -90,7 +90,7 @@ const withAmbiguousOwners = ruleReading(ambiguousCatalog);
 const withLibraryOwner = ruleReading(EMPTY_CANONICAL_VALUES_CATALOG, severityAndTarget);
 const withCatalogAndLibraryOwners = ruleReading(
   buildCatalog([
-    entry("ssr-target", { workspace: "ssr-vocabulary", vocabulary: ["node", "webworker"] }),
+    listed("ssr-target", { workspace: "ssr-vocabulary", vocabulary: ["node", "webworker"] }),
   ]),
   severityAndTarget,
 );

@@ -14,17 +14,6 @@ describe("dont-review-it/no-expect-forbidden-subject-name--rename-to-concrete-su
   testLintRule(noExpectForbiddenSubjectName, {
     valid: [
       {
-        name: "a spec run without a vocabulary is inspected against nothing",
-        filename: SPEC_FILE,
-        code: "expect(data).toBe(1);",
-      },
-      {
-        name: "an empty vocabulary forbids nothing",
-        filename: SPEC_FILE,
-        code: "expect(data).toBe(1);",
-        options: [{ forbiddenSubjectNames: [] }],
-      },
-      {
         name: "a file outside the spec suffixes is not inspected",
         filename: "report.ts",
         code: "expect(data).toBe(1);",
@@ -33,7 +22,7 @@ describe("dont-review-it/no-expect-forbidden-subject-name--rename-to-concrete-su
       {
         name: "a subject named after the artefact it holds is read as a subject",
         filename: SPEC_FILE,
-        code: 'expect(response).toStrictEqual({ status: 200 });\nexpect(renderedText).toBe("ok");',
+        code: 'expect(fetchedReport).toStrictEqual({ status: 200 });\nexpect(renderedText).toBe("ok");',
         options: [SHARED_VOCABULARY],
       },
       {
@@ -45,19 +34,19 @@ describe("dont-review-it/no-expect-forbidden-subject-name--rename-to-concrete-su
       {
         name: "a property key is a label rather than the subject",
         filename: SPEC_FILE,
-        code: "expect({ data: response }).toStrictEqual({ data: 1 });",
+        code: "expect({ data: fetchedReport }).toStrictEqual({ data: 1 });",
         options: [SHARED_VOCABULARY],
       },
       {
         name: "a member name is written by the shape of the value rather than chosen by the spec",
         filename: SPEC_FILE,
-        code: "expect(response.result).toBe(1);",
+        code: "expect(fetchedReport.result).toBe(1);",
         options: [SHARED_VOCABULARY],
       },
       {
         name: "a binding no assertion receives is left to the declaration side",
         filename: SPEC_FILE,
-        code: "const result = parse(input);\nexpect(parsed).toBe(1);",
+        code: "const result = parse(source);\nexpect(parsedConfig).toBe(1);",
         options: [SHARED_VOCABULARY],
       },
       {
@@ -75,13 +64,13 @@ describe("dont-review-it/no-expect-forbidden-subject-name--rename-to-concrete-su
       {
         name: "an assertion without a matcher keeps a concrete subject",
         filename: SPEC_FILE,
-        code: "expect(response);",
+        code: "expect(fetchedReport);",
         options: [SHARED_VOCABULARY],
       },
       {
         name: "a spread of a concrete binding keeps its subject",
         filename: SPEC_FILE,
-        code: "expect([...entries]).toStrictEqual([]);",
+        code: "expect([...lines]).toStrictEqual([]);",
         options: [SHARED_VOCABULARY],
       },
       {
@@ -295,11 +284,20 @@ describe("dont-review-it/no-expect-forbidden-subject-name--rename-to-concrete-su
         errors: [{ ...reported, data: { name: "data" } }],
       },
       {
-        name: "a vocabulary of one pattern reports only that pattern",
+        name: "the default vocabulary applies without any configuration",
         filename: SPEC_FILE,
-        code: "expect(payload).toBe(1);\nexpect(data).toBe(2);",
-        options: [{ forbiddenSubjectNames: [{ pattern: "^payload$" }] }],
-        errors: [{ ...reported, data: { name: "payload" } }],
+        code: "expect(data).toBe(1);",
+        errors: [{ ...reported, data: { name: "data" } }],
+      },
+      {
+        name: "a configured pattern is added on top of the default vocabulary",
+        filename: SPEC_FILE,
+        code: "expect(bucket).toBe(1);\nexpect(data).toBe(2);",
+        options: [{ forbiddenSubjectNames: [{ pattern: "^bucket$" }] }],
+        errors: [
+          { ...reported, data: { name: "bucket" } },
+          { ...reported, data: { name: "data" } },
+        ],
       },
     ],
   });

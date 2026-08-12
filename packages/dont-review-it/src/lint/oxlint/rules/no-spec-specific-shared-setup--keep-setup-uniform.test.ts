@@ -10,8 +10,8 @@ import { noSpecSpecificSharedSetup } from "./no-spec-specific-shared-setup--keep
 const fixtureDir = join(realpathSync(tmpdir()), "dont-review-it-no-spec-specific-shared-setup");
 rmSync(fixtureDir, { recursive: true, force: true });
 
-const writeFixture = (name: string, source: string): string => {
-  const path = join(fixtureDir, name);
+const writeFixture = (fixtureName: string, source: string): string => {
+  const path = join(fixtureDir, fixtureName);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, source);
   return path;

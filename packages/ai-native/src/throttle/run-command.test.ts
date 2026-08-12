@@ -20,7 +20,7 @@ const captureStderr = (): (() => string) => {
   onTestFinished(() => {
     spy.mockRestore();
   });
-  return () => spy.mock.calls.map(([chunk]) => String(chunk)).join("");
+  return () => spy.mock.calls.map(([writtenChunk]) => String(writtenChunk)).join("");
 };
 
 const trivialCommand = ["--", process.execPath, "-e", ""];

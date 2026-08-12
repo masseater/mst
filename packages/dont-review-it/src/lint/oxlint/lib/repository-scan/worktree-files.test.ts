@@ -54,8 +54,8 @@ describe("worktree-files", () => {
 
   test("an entry that is neither a file nor a directory is left out", () => {
     const root = createWorktree();
-    const target = writeAt({ root, relativePath: "src/entry.ts" });
-    symlinkSync(target, join(root, "link.ts"));
+    const checked = writeAt({ root, relativePath: "src/entry.ts" });
+    symlinkSync(checked, join(root, "link.ts"));
 
     expect(scan(root)).toStrictEqual(["src/entry.ts"]);
   });

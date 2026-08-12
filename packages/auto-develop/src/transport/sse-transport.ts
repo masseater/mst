@@ -115,7 +115,7 @@ export const createSseTransport = (transportConfig: SseTransportConfig): SseTran
     eventQueue.wake();
   };
 
-  const events = async function* (): AsyncGenerator<
+  const streamed = async function* (): AsyncGenerator<
     Readonly<Record<string, unknown>>,
     void,
     undefined
@@ -131,5 +131,5 @@ export const createSseTransport = (transportConfig: SseTransportConfig): SseTran
     }
   };
 
-  return { connect, disconnect, events };
+  return { connect, disconnect, events: streamed };
 };

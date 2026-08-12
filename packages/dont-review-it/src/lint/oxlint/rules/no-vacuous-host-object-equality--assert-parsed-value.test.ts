@@ -15,7 +15,7 @@ const EQUALITY = { messageId: "vacuousStructuralEquality" };
 
 const PARTIAL_SHAPE = { messageId: "vacuousPartialShape" };
 
-const RECORD = { messageId: "vacuousSnapshotRecord" };
+const SNAPSHOT_RECORD = { messageId: "vacuousSnapshotRecord" };
 
 const recordedDir = mkdtempSync(join(tmpdir(), "dont-review-it-no-vacuous-host-object-equality-"));
 
@@ -43,11 +43,11 @@ writeFileSync(join(recordedDir, "response-record.txt"), "Response {}\n");
 
 writeFileSync(join(recordedDir, "order-record.txt"), '{\n  "id": 1,\n}\n');
 
-const inBlock = (title: string, body: string): string =>
-  `describe('outer', () => {\n  it('${title}', () => {\n    ${body}\n  });\n});`;
+const inBlock = (title: string, writtenBody: string): string =>
+  `describe('outer', () => {\n  it('${title}', () => {\n    ${writtenBody}\n  });\n});`;
 
-const repeated = <Reported>(report: Reported, times: number): Reported[] =>
-  Array.from({ length: times }, () => report);
+const repeated = <Reported>(report: Reported, repeatCount: number): Reported[] =>
+  Array.from({ length: repeatCount }, () => report);
 
 describe("dont-review-it/no-vacuous-host-object-equality--assert-parsed-value", () => {
   testLintRule(noVacuousHostObjectEquality, {
@@ -59,7 +59,7 @@ describe("dont-review-it/no-vacuous-host-object-equality--assert-parsed-value", 
       },
       {
         name: "a same-named class the file declares carries enumerable state of its own",
-        code: "class Response {\n  constructor(body) {\n    this.body = body;\n  }\n}\nexpect(subject).toStrictEqual(new Response('a'));\nexpect(new Response()).toMatchInlineSnapshot(`Response {}`);",
+        code: "class Response {\n  constructor(writtenBody) {\n    this.body = writtenBody;\n  }\n}\nexpect(subject).toStrictEqual(new Response('a'));\nexpect(new Response()).toMatchInlineSnapshot(`Response {}`);",
         filename: SPEC_FILENAME,
       },
       {
@@ -186,16 +186,16 @@ describe("dont-review-it/no-vacuous-host-object-equality--assert-parsed-value", 
         errors: repeated(EQUALITY, 4),
       },
       {
-        name: "a record holding a constructor name and an empty body pins nothing",
+        name: "a record holding a constructor name and an empty writtenBody pins nothing",
         code: "expect(subject).toMatchInlineSnapshot(`Response {}`);\nexpect(subject).toMatchInlineSnapshot(`Request {}`);\nexpect(subject).toMatchInlineSnapshot('Response {}');\nexpect(subject).toMatchInlineSnapshot({ id: expect.any(Number) }, `Response {}`);\nexpect.soft(subject).toMatchInlineSnapshot(`Response {}`);",
         filename: SPEC_FILENAME,
-        errors: repeated(RECORD, 5),
+        errors: repeated(SNAPSHOT_RECORD, 5),
       },
       {
         name: "a record kept in the external file is read through the entry the assertion writes",
         code: inBlock("names the response", "expect(subject).toMatchSnapshot();"),
         filename: recordedSpec,
-        errors: [RECORD],
+        errors: [SNAPSHOT_RECORD],
       },
       {
         name: "entries are counted in the order the assertions run",
@@ -204,13 +204,13 @@ describe("dont-review-it/no-vacuous-host-object-equality--assert-parsed-value", 
           "expect(first).toMatchSnapshot();\n    expect(second).toMatchSnapshot();",
         ),
         filename: recordedSpec,
-        errors: [RECORD],
+        errors: [SNAPSHOT_RECORD],
       },
       {
         name: "a record kept in a file the assertion names is read from that file",
         code: "await expect(subject).toMatchFileSnapshot('./response-record.txt');",
         filename: recordedSpec,
-        errors: [RECORD],
+        errors: [SNAPSHOT_RECORD],
       },
       {
         name: "a roster the repository widens brings the added type into range",

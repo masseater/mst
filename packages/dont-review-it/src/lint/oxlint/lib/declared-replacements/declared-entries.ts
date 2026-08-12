@@ -38,8 +38,8 @@ export const WITHDRAWN_OPTION = "withdrawn";
 
 export const DEFAULT_DECLARED_REPLACEMENTS: readonly DeclaredReplacement[] = [];
 
-export const withdrawalsIn = (options: Readonly<Options>): readonly ReplacementWithdrawal[] =>
-  listedUnder(options, WITHDRAWN_OPTION).flatMap(({ name, grounds }) =>
+export const withdrawalsIn = (ruleOptions: Readonly<Options>): readonly ReplacementWithdrawal[] =>
+  listedUnder(ruleOptions, WITHDRAWN_OPTION).flatMap(({ name, grounds }) =>
     typeof name === "string" && name !== ""
       ? [{ name, grounds: typeof grounds === "string" ? grounds.trim() : "" }]
       : [],
@@ -70,7 +70,7 @@ export const replacementsInForce = ({
   const lifted = new Set(
     withdrawals.filter((withdrawal) => withdrawal.grounds !== "").map(({ name }) => name),
   );
-  return declared.filter((entry) => !lifted.has(entry.name));
+  return declared.filter((listed) => !lifted.has(listed.name));
 };
 
 export const groundlessWithdrawals = (
@@ -95,4 +95,4 @@ export const replacementNamed = ({
 }: {
   readonly entries: readonly DeclaredReplacement[];
   readonly name: string;
-}): DeclaredReplacement | null => entries.find((entry) => entry.name === name) ?? null;
+}): DeclaredReplacement | null => entries.find((listed) => listed.name === name) ?? null;

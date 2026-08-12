@@ -34,10 +34,10 @@ describe("resolvedComparison", () => {
         files: { "src/current.ts": "export const current = false;\n" },
       });
       const tree = repository.git(["rev-parse", `${head}^{tree}`]).trim();
-      const merged = repository
+      const mergedOnes = repository
         .git(["commit-tree", tree, "-p", base, "-p", head, "-m", "pull request merge"])
         .trim();
-      repository.git(["reset", "--hard", "--quiet", merged]);
+      repository.git(["reset", "--hard", "--quiet", mergedOnes]);
 
       const requested = vi.fn<GitHubRequest>(async () => ({
         merge_base_commit: { sha: base },

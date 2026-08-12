@@ -6,12 +6,12 @@ import type { FilteredEvent } from "../contract/filtered-event.ts";
 import type { GithubPullSummary } from "./github-reader.ts";
 
 const withAuthor = (
-  payload: Readonly<Record<string, unknown>>,
+  carried: Readonly<Record<string, unknown>>,
   authorLogin: string | null,
 ): Readonly<Record<string, unknown>> => {
-  if (authorLogin === null) return payload;
-  const pullRequest = asRecord(payload.pull_request) ?? {};
-  return { ...payload, pull_request: { ...pullRequest, user: { login: authorLogin } } };
+  if (authorLogin === null) return carried;
+  const pullRequest = asRecord(carried.pull_request) ?? {};
+  return { ...carried, pull_request: { ...pullRequest, user: { login: authorLogin } } };
 };
 
 export const synthesizeEnvelope = (synthesis: {

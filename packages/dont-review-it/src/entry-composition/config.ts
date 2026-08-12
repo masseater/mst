@@ -40,6 +40,6 @@ export const composedPrefixOf = ({
 }: {
   readonly layer: EntryCompositionLayer;
   readonly config: EntryCompositionConfig;
-}): string => layer.wrappers.map((wrapper) => `${wrapper}${config.wrapperSeparator}`).join("");
+}): string => layer.wrappers.map((wrapping) => `${wrapping}${config.wrapperSeparator}`).join("");
 
-export const wrapperNameOf = (wrapper: string): string => wrapper.replace(/ .*$/u, "");
+export const wrapperNameOf = (wrapping: string): string => wrapping.replace(/ .*$/u, "");

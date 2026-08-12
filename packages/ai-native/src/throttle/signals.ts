@@ -13,12 +13,12 @@ export const safeKill = (pid: number, signal: NodeJS.Signals): boolean => {
   }
 };
 
-export const installInterruptHandler = (handler: (signal: NodeJS.Signals) => void): void => {
-  for (const signal of INTERRUPT_SIGNALS) process.once(signal, handler);
+export const installInterruptHandler = (takenHandler: (signal: NodeJS.Signals) => void): void => {
+  for (const signal of INTERRUPT_SIGNALS) process.once(signal, takenHandler);
 };
 
-export const dropInterruptHandler = (handler: (signal: NodeJS.Signals) => void): void => {
-  for (const signal of INTERRUPT_SIGNALS) process.removeListener(signal, handler);
+export const dropInterruptHandler = (takenHandler: (signal: NodeJS.Signals) => void): void => {
+  for (const signal of INTERRUPT_SIGNALS) process.removeListener(signal, takenHandler);
 };
 
 export const makeWaitingInterruptHandler = (dependencies: {

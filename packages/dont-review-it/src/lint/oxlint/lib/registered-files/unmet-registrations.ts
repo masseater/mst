@@ -34,10 +34,10 @@ type ScannedWorktree = {
 const holderOf = (workspace: string): string =>
   workspace === REPOSITORY_ROOT_WORKSPACE ? "the repository root" : `\`${workspace}\``;
 
-const contentGuaranteeOf = (entry: RequiredFileEntry): string =>
-  entry.contentChecks.length === 0
+const contentGuaranteeOf = (listed: RequiredFileEntry): string =>
+  listed.contentChecks.length === 0
     ? "What this file holds is read by no check, so this row asks only that it exists and holds something."
-    : `What this file holds is read by ${entry.contentChecks.map((name) => `\`${name}\``).join(", ")}, so a file that merely exists leaves the row unmet.`;
+    : `What this file holds is read by ${listed.contentChecks.map((contentCheck) => `\`${contentCheck}\``).join(", ")}, so a file that merely exists leaves the row unmet.`;
 
 const registeredPathIn = (asked: {
   readonly workspace: string;
@@ -107,26 +107,26 @@ const unmetInWorkspace = (
 
 const unmetFor = (
   scanned: ScannedWorktree,
-  entry: RequiredFileEntry,
+  listed: RequiredFileEntry,
 ): readonly UnmetRegistration[] => {
   const workspaces = holdingWorkspacesOf({
-    entry,
+    entry: listed,
     workspaceDirectories: scanned.workspaceDirectories,
   });
-  const { owner } = entry;
+  const { owner } = listed;
   if (owner !== null && workspaces.length === 0) {
     return [
       reportOf({
-        entry,
+        entry: listed,
         workspace: REPOSITORY_ROOT_WORKSPACE,
         messageId: DEAD_OWNER_REGISTRATION_MESSAGE_ID,
-        registeredPath: entry.pattern,
+        registeredPath: listed.pattern,
         holder: `\`${owner}\``,
       }),
     ];
   }
 
-  return workspaces.flatMap((workspace) => unmetInWorkspace(scanned, { entry, workspace }));
+  return workspaces.flatMap((workspace) => unmetInWorkspace(scanned, { entry: listed, workspace }));
 };
 
 const registryKeyOf = (registry: RequiredFileRegistry): string =>
@@ -150,18 +150,18 @@ const readRegistry = (
     filePaths,
     workspaceDirectories: workspaceDirectoriesIn(filePaths),
   };
-  const reports = registry.entries.flatMap((entry) => unmetFor(scanned, entry));
+  const reports = registry.entries.flatMap((listed) => unmetFor(scanned, listed));
   return new Map(Object.entries(groupBy(reports, (report) => report.workspace)));
 };
 
 export const unmetRegistrationsIn = (
   registry: RequiredFileRegistry,
 ): ReadonlyMap<string, readonly UnmetRegistration[]> => {
-  const key = registryKeyOf(registry);
-  const memoized = unmetByRegistry.get(key);
+  const named = registryKeyOf(registry);
+  const memoized = unmetByRegistry.get(named);
   if (memoized !== undefined) return memoized;
 
   const read = readRegistry(registry);
-  unmetByRegistry.set(key, read);
+  unmetByRegistry.set(named, read);
   return read;
 };

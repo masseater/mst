@@ -32,7 +32,7 @@ const runHandler = async (setup: {
   readonly rerequestFailure?: Error;
   readonly dryRun?: boolean;
 }) => {
-  const statuses = new Map<number, { readonly sha: string; readonly state: string }>();
+  const statusBySha = new Map<number, { readonly sha: string; readonly state: string }>();
   const snapshotIndex = new Map([["next", 0]]);
   const github: HandlerGithubClient = {
     prSnapshot: () => {
@@ -42,8 +42,8 @@ const runHandler = async (setup: {
         setup.snapshots[Math.min(index, setup.snapshots.length - 1)] as PrSnapshot,
       );
     },
-    createCommitStatus: (request) => {
-      statuses.set(statuses.size, { sha: request.sha, state: request.state });
+    createCommitStatus: (asked) => {
+      statusBySha.set(statusBySha.size, { sha: asked.sha, state: asked.state });
       return Promise.resolve();
     },
     listReviews: () => Promise.resolve([]),
@@ -56,7 +56,7 @@ const runHandler = async (setup: {
   const runSession = vi.fn<AuthorHandlerConfig["runSession"]>(() =>
     setup.sessionFailure === undefined ? Promise.resolve() : Promise.reject(setup.sessionFailure),
   );
-  const handler = createAuthorHandler({
+  const takenHandler = createAuthorHandler({
     github: { ...github, requestReviewers },
     runSession,
     reviewerLogin: "review-bot",
@@ -64,9 +64,9 @@ const runHandler = async (setup: {
     log: silentLogger,
   });
   try {
-    await handler({ prNumber: 7, reason: setup.reason ?? "request_changes" });
+    await takenHandler({ prNumber: 7, reason: setup.reason ?? "request_changes" });
     return {
-      statuses: [...statuses.values()],
+      statuses: [...statusBySha.values()],
       rerequests: requestReviewers.mock.calls,
       sessionArgs: runSession.mock.calls,
       failure: null,
@@ -74,7 +74,7 @@ const runHandler = async (setup: {
     };
   } catch (handlerFailure) {
     return {
-      statuses: [...statuses.values()],
+      statuses: [...statusBySha.values()],
       rerequests: requestReviewers.mock.calls,
       sessionArgs: runSession.mock.calls,
       failure: handlerFailure,

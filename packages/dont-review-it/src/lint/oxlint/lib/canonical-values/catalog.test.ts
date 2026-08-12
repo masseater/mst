@@ -4,16 +4,16 @@ import { buildCatalog, canonicalValueKey, EMPTY_CANONICAL_VALUES_CATALOG } from 
 import { fingerprintValues } from "./fingerprint.ts";
 
 describe("catalog", () => {
-  const entry = (conceptId: string, values: readonly string[]) => ({
+  const listed = (conceptId: string, heldValues: readonly string[]) => ({
     conceptId,
     declarationPath: `packages/example/src/${conceptId}.ts`,
     exportPath: "@mst/example",
-    values,
-    fingerprint: fingerprintValues(values),
+    values: heldValues,
+    fingerprint: fingerprintValues(heldValues),
   });
 
   test("a concept that spells the same value twice is listed against it once", () => {
-    const repeated = entry("order-status", ["draft", "draft"]);
+    const repeated = listed("order-status", ["draft", "draft"]);
 
     expect(buildCatalog([repeated]).entriesByValue.get(canonicalValueKey("draft"))).toStrictEqual([
       repeated,
@@ -26,8 +26,8 @@ describe("catalog", () => {
   });
 
   test("concepts that share a value set are reachable through one fingerprint", () => {
-    const first = entry("order-status", ["draft", "published"]);
-    const second = entry("article-status", ["published", "draft"]);
+    const first = listed("order-status", ["draft", "published"]);
+    const second = listed("article-status", ["published", "draft"]);
 
     const catalog = buildCatalog([first, second]);
 
@@ -35,8 +35,8 @@ describe("catalog", () => {
   });
 
   test("a value resolves to every concept that owns it", () => {
-    const first = entry("order-status", ["draft"]);
-    const second = entry("article-status", ["draft", "archived"]);
+    const first = listed("order-status", ["draft"]);
+    const second = listed("article-status", ["draft", "archived"]);
 
     const catalog = buildCatalog([first, second]);
 
@@ -45,7 +45,7 @@ describe("catalog", () => {
   });
 
   test("a value nobody declares resolves to nothing", () => {
-    const catalog = buildCatalog([entry("order-status", ["draft"])]);
+    const catalog = buildCatalog([listed("order-status", ["draft"])]);
 
     expect(catalog.entriesByValue.get(canonicalValueKey("published"))).toBeUndefined();
   });

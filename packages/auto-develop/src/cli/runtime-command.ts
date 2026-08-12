@@ -47,12 +47,12 @@ const prNumbersFrom = (raw: string | undefined): readonly number[] =>
     ? []
     : raw
         .split(",")
-        .map((entry) => Number(entry.trim()))
-        .filter((parsed) => Number.isInteger(parsed) && parsed > 0);
+        .map((listed) => Number(listed.trim()))
+        .filter((parsedNode) => Number.isInteger(parsedNode) && parsedNode > 0);
 
 const positiveIntegerFrom = (raw: string, fallback: number): number => {
-  const parsed = Number(raw);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+  const parsedNode = Number(raw);
+  return Number.isInteger(parsedNode) && parsedNode > 0 ? parsedNode : fallback;
 };
 
 const startRuntime = async (start: {

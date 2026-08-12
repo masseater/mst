@@ -59,7 +59,7 @@ export const requireStandardIoSnapshot = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
+  create(inspection) {
     const fixtureLocalNames = new Set<string>();
     const fixtureCalls = new Set<ESTree.CallExpression>();
     const snapshottedStreams = new Set<string>();
@@ -86,9 +86,13 @@ export const requireStandardIoSnapshot = createDontReviewItRule({
       "Program:exit"() {
         const [firstFixtureCall] = fixtureCalls;
         if (firstFixtureCall === undefined) return;
-        for (const name of CAPTURED_STREAM_NAMES) {
-          if (snapshottedStreams.has(name)) continue;
-          context.report({ node: firstFixtureCall, messageId: "missingSnapshot", data: { name } });
+        for (const spelled of CAPTURED_STREAM_NAMES) {
+          if (snapshottedStreams.has(spelled)) continue;
+          inspection.report({
+            node: firstFixtureCall,
+            messageId: "missingSnapshot",
+            data: { name: spelled },
+          });
         }
       },
     };

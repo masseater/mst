@@ -22,9 +22,9 @@ const typePositionSpecifierOf = (
   node: AstFields,
   constants: ReadonlyMap<string, string>,
 ): string | null => {
-  const type = nodeTypeOf(node);
-  if (type === "TSImportEqualsDeclaration") return requiredSpecifierOf(node, constants);
-  if (type !== "TSImportType") return null;
+  const nodeType = nodeTypeOf(node);
+  if (nodeType === "TSImportEqualsDeclaration") return requiredSpecifierOf(node, constants);
+  if (nodeType !== "TSImportType") return null;
 
   const source = astFieldsOf(node.source);
   return source === null ? null : staticSpecifierOf(source, constants);

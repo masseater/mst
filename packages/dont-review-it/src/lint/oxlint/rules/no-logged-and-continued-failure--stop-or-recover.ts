@@ -84,7 +84,7 @@ export const noLoggedAndContinuedFailure = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
+  create(inspection) {
     return {
       CallExpression(node: ESTree.CallExpression) {
         if (!isOutputSinkCall(node)) return;
@@ -93,7 +93,7 @@ export const noLoggedAndContinuedFailure = createDontReviewItRule({
         if (clause === null) return;
         if (stopsUnconditionally(clause)) return;
 
-        context.report({ node, messageId: "loggedAndContinuedFailure" });
+        inspection.report({ node, messageId: "loggedAndContinuedFailure" });
       },
     };
   },

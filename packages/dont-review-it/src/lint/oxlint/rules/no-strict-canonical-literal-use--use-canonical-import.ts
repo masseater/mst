@@ -47,12 +47,12 @@ const registeredDeclarationRanges = (
     declaresConceptAt(catalog, { conceptId: range.conceptId, path: filename }),
   );
 
-const conceptSummary = (entries: readonly CanonicalValuesEntry[]): string =>
-  entries
-    .map((entry) =>
-      entry.exportPath === null
-        ? `${entry.conceptId} declared in ${entry.declarationPath}`
-        : `${entry.conceptId} exported from ${entry.exportPath}`,
+const conceptSummary = (declaredEntries: readonly CanonicalValuesEntry[]): string =>
+  declaredEntries
+    .map((listed) =>
+      listed.exportPath === null
+        ? `${listed.conceptId} declared in ${listed.declarationPath}`
+        : `${listed.conceptId} exported from ${listed.exportPath}`,
     )
     .toSorted()
     .join("; ");
@@ -77,18 +77,18 @@ export const createNoStrictCanonicalLiteralUseRule = ({
       },
       schema: OWNERSHIP_POLICY_SCHEMA,
     },
-    create(context): Visitor {
-      if (isOutOfScopeSource(context.filename)) return {};
+    create(inspection): Visitor {
+      if (isOutOfScopeSource(inspection.filename)) return {};
 
-      const ownershipPolicy = ownershipPolicyOf(context.options);
+      const ownershipPolicy = ownershipPolicyOf(inspection.options);
       const loadedCatalog = memoize(
         (): CanonicalValuesCatalog =>
-          loadCatalog({ repositoryRoot: findWorkspaceRoot(context.cwd) }),
+          loadCatalog({ repositoryRoot: findWorkspaceRoot(inspection.cwd) }),
       );
       const lintedSource: LintedSource = {
-        program: context.sourceCode.ast,
-        sourceText: context.sourceCode.text,
-        filename: context.filename,
+        program: inspection.sourceCode.ast,
+        sourceText: inspection.sourceCode.text,
+        filename: inspection.filename,
       };
       const exemptRangesOf = memoize(
         (loaded: CanonicalValuesCatalog): readonly AnnotatedDeclarationRange[] =>
@@ -110,17 +110,17 @@ export const createNoStrictCanonicalLiteralUseRule = ({
         if (isKeySelectorArgument(ancestors)) return;
 
         const loaded = loadedCatalog();
-        const entries = loaded.entriesByValue.get(canonicalValueKey(spelling));
-        if (entries === undefined || entries.length === 0) return;
+        const listedEntries = loaded.entriesByValue.get(canonicalValueKey(spelling));
+        if (listedEntries === undefined || listedEntries.length === 0) return;
 
         if (isInsideAnnotatedDeclaration(exemptRangesOf(loaded), node)) return;
 
-        context.report({
+        inspection.report({
           node,
           messageId: "canonicalValueLiteral",
           data: {
-            value: context.sourceCode.getText(node),
-            concepts: conceptSummary(entries),
+            value: inspection.sourceCode.getText(node),
+            concepts: conceptSummary(listedEntries),
             ownershipPolicy,
           },
         });

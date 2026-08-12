@@ -9,11 +9,11 @@ export type DeclaringWorkspace = {
   readonly relativeDir: string;
 };
 
-export const declaringWorkspaceOf = (context: {
+export const declaringWorkspaceOf = (carried: {
   readonly cwd: string;
   readonly filename: string;
 }): DeclaringWorkspace | null => {
-  const fileDirectory = dirname(resolve(context.cwd, context.filename));
+  const fileDirectory = dirname(resolve(carried.cwd, carried.filename));
   const repositoryRoot = findWorkspaceRoot(fileDirectory);
   const packageDirectory = nearestPackageDirectory(fileDirectory, repositoryRoot);
   if (packageDirectory === null) return null;

@@ -2,10 +2,10 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { createEscapeStripper } from "./strip-escapes.ts";
 
-const strip = async (chunks: (Buffer | string)[]): Promise<string> => {
+const strip = async (writtenChunks: (Buffer | string)[]): Promise<string> => {
   const stripper = createEscapeStripper();
-  for (const chunk of chunks) {
-    stripper.write(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+  for (const writtenChunk of writtenChunks) {
+    stripper.write(typeof writtenChunk === "string" ? Buffer.from(writtenChunk) : writtenChunk);
   }
   stripper.end();
   const collected = await Array.fromAsync(stripper as AsyncIterable<Buffer>);

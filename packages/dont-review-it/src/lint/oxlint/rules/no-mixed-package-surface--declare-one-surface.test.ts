@@ -11,16 +11,16 @@ const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-no-mixed-package-s
 
 const MODULE_SOURCE = "export const shipped = true;\n";
 
-const writeFixture = (name: string, source: string): string => {
-  const path = join(fixtureDir, name);
+const writeFixture = (fixtureName: string, source: string): string => {
+  const path = join(fixtureDir, fixtureName);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, source);
   return path;
 };
 
-const writePackage = (name: string, manifest: unknown): string => {
-  writeFixture(`repo/${name}/package.json`, `${JSON.stringify(manifest, null, 2)}\n`);
-  return writeFixture(`repo/${name}/entry.ts`, MODULE_SOURCE);
+const writePackage = (fixtureName: string, manifest: unknown): string => {
+  writeFixture(`repo/${fixtureName}/package.json`, `${JSON.stringify(manifest, null, 2)}\n`);
+  return writeFixture(`repo/${fixtureName}/entry.ts`, MODULE_SOURCE);
 };
 
 writeFixture("repo/pnpm-workspace.yaml", "packages:\n  - packages/*\n");

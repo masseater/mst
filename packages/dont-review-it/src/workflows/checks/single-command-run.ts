@@ -34,14 +34,14 @@ export const multiCommandRuns = ({
   readonly document: WorkflowDocument;
   readonly config: WorkflowChecksConfig;
 }): readonly RepositoryProblem[] =>
-  entriesNamedInSteps({ document, config, key: config.runKey }).flatMap((entry) => {
-    const script = scalarText(entry.value);
+  entriesNamedInSteps({ document, config, key: config.runKey }).flatMap((listed) => {
+    const script = scalarText(listed.value);
     if (script === null || isSingleCommand(script, config)) return [];
 
     return [
       {
         file: document.relativePath,
-        line: lineOf(document, entry.key),
+        line: lineOf(document, listed.key),
         message: `A run block must not hold more than one command call, because branching, retrying, looping and target discovery placed here run only inside this file and carry neither types nor tests. Move the logic into a command in this repository, and call that command once from here.`,
       },
     ];

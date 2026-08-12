@@ -71,7 +71,7 @@ export const suppressionDirectiveOf = (
 
   const written = comment.value.slice(comment.value.indexOf(spelling) + spelling.length);
   const { listed, grounds } = groundsSplitOf(written);
-  const ruleNames = listed.split(RULE_NAME_SEPARATORS).filter((name) => name !== "");
+  const ruleNames = listed.split(RULE_NAME_SEPARATORS).filter((spelled) => spelled !== "");
 
   return {
     spelling,
@@ -90,7 +90,7 @@ export const coveredRulesOf = ({
 }): readonly string[] => {
   if (directive.ruleNames.length === 0) return targetRules;
   const named = new Set(directive.ruleNames.map(bareRuleNameOf));
-  return targetRules.filter((target) => named.has(bareRuleNameOf(target)));
+  return targetRules.filter((targetRule) => named.has(bareRuleNameOf(targetRule)));
 };
 
 export const namesRule = ({

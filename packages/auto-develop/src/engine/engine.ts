@@ -61,7 +61,7 @@ const argsFor = async (
 
 const reclassifyFailure = (config: EngineConfig, failure: unknown): unknown => {
   if (!(failure instanceof ProcessFailedError)) return failure;
-  const matched = matchedAuthExpiryPattern({ engine: config.kind, output: failure.output });
+  const matched = matchedAuthExpiryPattern({ engine: config.kind, output: failure.produced });
   if (matched === null) return failure;
   const authError = new EngineAuthExpiredError({
     engine: config.kind,
@@ -106,19 +106,19 @@ export const createEngine = (config: EngineConfig): Engine => {
   return {
     execute: async function* execute(execution) {
       const sessionName = engineSessionName(execution.prNumber);
-      const request = await buildRunRequest({ config, override, execution, sessionName });
+      const asked = await buildRunRequest({ config, override, execution, sessionName });
       config.log.info(
         {
           prNumber: execution.prNumber,
           engine: config.kind,
-          command: request.binary,
+          command: asked.binary,
           sessionName,
           timeoutMs: config.timeoutMs,
         },
         "engine execution started",
       );
       try {
-        yield* config.runner(request);
+        yield* config.runner(asked);
         config.log.info(
           { prNumber: execution.prNumber, engine: config.kind, sessionName },
           "engine execution completed",

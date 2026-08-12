@@ -10,21 +10,21 @@ const collect = async ({
   readonly ignoredDirectories: readonly string[];
   readonly matches: (entryName: string) => boolean;
 }): Promise<readonly string[]> => {
-  const entries = await readdir(absoluteDirectory, { withFileTypes: true });
+  const listedEntries = await readdir(absoluteDirectory, { withFileTypes: true });
 
   const nested = await Promise.all(
-    entries.map(async (entry): Promise<readonly string[]> => {
-      const absolutePath = join(absoluteDirectory, entry.name);
+    listedEntries.map(async (listed): Promise<readonly string[]> => {
+      const absolutePath = join(absoluteDirectory, listed.name);
 
-      if (entry.isDirectory()) {
-        if (ignoredDirectories.includes(entry.name)) return [];
+      if (listed.isDirectory()) {
+        if (ignoredDirectories.includes(listed.name)) return [];
         return collect({ absoluteDirectory: absolutePath, ignoredDirectories, matches });
       }
 
-      if (entry.isSymbolicLink()) return [];
-      if (!entry.isFile()) return [];
+      if (listed.isSymbolicLink()) return [];
+      if (!listed.isFile()) return [];
 
-      return matches(entry.name) ? [absolutePath] : [];
+      return matches(listed.name) ? [absolutePath] : [];
     }),
   );
 

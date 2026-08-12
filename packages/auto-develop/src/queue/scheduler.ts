@@ -20,17 +20,17 @@ export const createPeriodicScheduler = (schedule: {
   readonly log: Logger;
 }): PeriodicScheduler => {
   const timers = new Map<string, NodeJS.Timeout>();
-  const flags = new Map<string, boolean>([["cleanupInFlight", false]]);
+  const raisedFlags = new Map<string, boolean>([["cleanupInFlight", false]]);
 
   const runCleanupGuarded = async (run: () => Promise<void>): Promise<void> => {
-    if (flags.get("cleanupInFlight") === true) return;
-    flags.set("cleanupInFlight", true);
+    if (raisedFlags.get("cleanupInFlight") === true) return;
+    raisedFlags.set("cleanupInFlight", true);
     try {
       await run();
     } catch (cleanupFailure) {
       schedule.log.warn({ err: cleanupFailure }, "periodic cleanup failed");
     } finally {
-      flags.set("cleanupInFlight", false);
+      raisedFlags.set("cleanupInFlight", false);
     }
   };
 

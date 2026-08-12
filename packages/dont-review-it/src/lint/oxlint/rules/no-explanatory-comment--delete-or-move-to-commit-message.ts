@@ -40,14 +40,14 @@ export const noExplanatoryComment = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
+  create(inspection) {
     return {
       Program(node: ESTree.Program) {
         for (const comment of node.comments) {
           if (comment.type === "Shebang") continue;
           if (isJsdoc(comment)) continue;
           if (isMachineReadDirective(comment)) continue;
-          context.report({ loc: comment.loc, messageId: "explanatoryComment" });
+          inspection.report({ loc: comment.loc, messageId: "explanatoryComment" });
         }
       },
     };

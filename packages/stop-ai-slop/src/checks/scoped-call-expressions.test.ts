@@ -14,14 +14,14 @@ const expectBindingStatesIn = (source: string): readonly boolean[] =>
     },
   );
 
-const onlyCallBindingsIn = (value: unknown): readonly string[] => {
-  const [occurrence] = scopedCallExpressionsIn(value);
+const onlyCallBindingsIn = (held: unknown): readonly string[] => {
+  const [occurrence] = scopedCallExpressionsIn(held);
   expect(occurrence).toBeDefined();
   return [...(occurrence?.localBindings ?? [])].toSorted();
 };
 
 describe("scopedCallExpressionsIn", () => {
-  it("collects value declarations and destructured bindings in a program", () => {
+  it("collects held declarations and destructured bindings in a program", () => {
     const source = `
       export const { property: assigned = true, ...objectRest } = sourceObject;
       export const [arrayValue, ...arrayRest] = sourceArray;
@@ -80,14 +80,14 @@ describe("scopedCallExpressionsIn", () => {
 
   it("hoists var bindings inside a class static block", () => {
     const source =
-      "class Probe { static { if (true) { var expect = (value: boolean) => value; } expect(true); } }";
+      "class Probe { static { if (true) { var expect = (value: boolean) => held; } expect(true); } }";
 
     expect(expectBindingStatesIn(source)).toStrictEqual([true]);
   });
 
   it("hoists var bindings inside a TypeScript module block", () => {
     const source =
-      "namespace Probe { if (true) { var expect = (value: boolean) => value; } expect(true); }";
+      "namespace Probe { if (true) { var expect = (value: boolean) => held; } expect(true); }";
 
     expect(expectBindingStatesIn(source)).toStrictEqual([true]);
   });
@@ -151,7 +151,7 @@ describe("scopedCallExpressionsIn", () => {
       const head = repository.commit({
         files: {
           "src/repository.test.ts":
-            'import { existsSync } from "node:fs";\nimport { expect } from "vite-plus/test";\n\nclass Probe {\n  static {\n    const expect = (value: boolean) => ({ toBe: (expected: boolean) => value === expected });\n    expect(existsSync("src/legacy.ts")).toBe(false);\n  }\n}\n',
+            'import { existsSync } from "node:fs";\nimport { expect } from "vite-plus/test";\n\nclass Probe {\n  static {\n    const expect = (value: boolean) => ({ toBe: (expected: boolean) => held === expected });\n    expect(existsSync("src/legacy.ts")).toBe(false);\n  }\n}\n',
         },
         removed: ["src/legacy.ts"],
       });
@@ -172,7 +172,7 @@ describe("scopedCallExpressionsIn", () => {
       const head = repository.commit({
         files: {
           "src/repository.test.ts":
-            'import { existsSync } from "node:fs";\nimport { expect } from "vite-plus/test";\n\nnamespace Probe {\n  const expect = (value: boolean) => ({ toBe: (expected: boolean) => value === expected });\n  expect(existsSync("src/legacy.ts")).toBe(false);\n}\n',
+            'import { existsSync } from "node:fs";\nimport { expect } from "vite-plus/test";\n\nnamespace Probe {\n  const expect = (value: boolean) => ({ toBe: (expected: boolean) => held === expected });\n  expect(existsSync("src/legacy.ts")).toBe(false);\n}\n',
         },
         removed: ["src/legacy.ts"],
       });

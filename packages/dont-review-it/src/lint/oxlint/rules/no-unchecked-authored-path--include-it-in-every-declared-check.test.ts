@@ -11,20 +11,20 @@ const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-no-unchecked-autho
 
 const MODULE_SOURCE = "export const shipped = true;\n";
 
-const writeFixture = (name: string, source: string): string => {
-  const path = join(fixtureDir, name);
+const writeFixture = (fixtureName: string, source: string): string => {
+  const path = join(fixtureDir, fixtureName);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, source);
   return path;
 };
 
-const writeRepository = (name: string, held: Readonly<Record<string, string>>): string => {
-  writeFixture(`${name}/pnpm-workspace.yaml`, "packages:\n  - packages/*\n");
-  writeFixture(`${name}/package.json`, '{ "name": "@fixture/root" }\n');
+const writeRepository = (fixtureName: string, held: Readonly<Record<string, string>>): string => {
+  writeFixture(`${fixtureName}/pnpm-workspace.yaml`, "packages:\n  - packages/*\n");
+  writeFixture(`${fixtureName}/package.json`, '{ "name": "@fixture/root" }\n');
   for (const [path, source] of Object.entries(held)) {
-    writeFixture(`${name}/${path}`, source);
+    writeFixture(`${fixtureName}/${path}`, source);
   }
-  return writeFixture(`${name}/src/app.ts`, MODULE_SOURCE);
+  return writeFixture(`${fixtureName}/src/app.ts`, MODULE_SOURCE);
 };
 
 const MANIFEST_READER = {

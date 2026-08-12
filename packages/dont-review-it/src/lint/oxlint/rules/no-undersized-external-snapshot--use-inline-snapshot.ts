@@ -22,8 +22,8 @@ const MAX_LINES_OPTION = "maxLines";
 
 const REPORTED_KEY_LIMIT = 3;
 
-const maxLinesFrom = (options: Readonly<Options>): number => {
-  const [first] = options;
+const maxLinesFrom = (ruleOptions: Readonly<Options>): number => {
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) {
     return MAX_INLINE_RECORD_LINES;
   }
@@ -31,10 +31,10 @@ const maxLinesFrom = (options: Readonly<Options>): number => {
   return typeof configured === "number" ? configured : MAX_INLINE_RECORD_LINES;
 };
 
-const spelledKeys = (keys: readonly string[]): string =>
-  keys.length <= REPORTED_KEY_LIMIT
-    ? keys.join("`, `")
-    : `${keys.slice(0, REPORTED_KEY_LIMIT).join("`, `")}\` and ${String(keys.length - REPORTED_KEY_LIMIT)} more\``;
+const spelledKeys = (namedKeys: readonly string[]): string =>
+  namedKeys.length <= REPORTED_KEY_LIMIT
+    ? namedKeys.join("`, `")
+    : `${namedKeys.slice(0, REPORTED_KEY_LIMIT).join("`, `")}\` and ${String(namedKeys.length - REPORTED_KEY_LIMIT)} more\``;
 
 export const noUndersizedExternalSnapshot = createDontReviewItRule({
   name: "no-undersized-external-snapshot--use-inline-snapshot",
@@ -65,14 +65,14 @@ export const noUndersizedExternalSnapshot = createDontReviewItRule({
     ],
     fixable: "code",
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
-    const maxLines = maxLinesFrom(context.options);
+    const maxLines = maxLinesFrom(inspection.options);
 
-    const recordedLinesOf = (keys: readonly string[]): number | null => {
-      const recorded = keys.map((key) => externalRecordOf(context.filename, key));
-      const found = recorded.flatMap((record) => (record === null ? [] : [record]));
+    const recordedLinesOf = (namedKeys: readonly string[]): number | null => {
+      const recorded = namedKeys.map((named) => externalRecordOf(inspection.filename, named));
+      const found = recorded.flatMap((written) => (written === null ? [] : [written]));
       if (found.length === 0 || found.length !== recorded.length) return null;
       return Math.max(...found.map(recordLineCountOf));
     };
@@ -90,14 +90,14 @@ export const noUndersizedExternalSnapshot = createDontReviewItRule({
 
     const reportUndersized = ({
       site,
-      keys,
+      keys: namedKeys,
       inlineSpelling,
     }: {
       readonly site: SnapshotMatcherSite;
       readonly keys: readonly string[];
       readonly inlineSpelling: string;
     }): void => {
-      const recordedLines = recordedLinesOf(keys);
+      const recordedLines = recordedLinesOf(namedKeys);
       if (recordedLines === null || recordedLines > maxLines) return;
 
       const measured = {
@@ -105,10 +105,10 @@ export const noUndersizedExternalSnapshot = createDontReviewItRule({
         maxLines,
         matcher: site.matcher,
         inlineSpelling,
-        key: spelledKeys(keys),
+        key: spelledKeys(namedKeys),
       };
-      if (keys.length > 1) {
-        context.report({
+      if (namedKeys.length > 1) {
+        inspection.report({
           node: site.matcherNode,
           messageId: "undersizedTableDrivenSnapshot",
           data: measured,
@@ -117,7 +117,7 @@ export const noUndersizedExternalSnapshot = createDontReviewItRule({
       }
 
       const replaced = replacementOf(site, inlineSpelling);
-      context.report({
+      inspection.report({
         node: site.matcherNode,
         messageId: "undersizedExternalSnapshot",
         data: measured,
@@ -128,16 +128,16 @@ export const noUndersizedExternalSnapshot = createDontReviewItRule({
       });
     };
 
-    const reportSite = (site: SnapshotMatcherSite, entries: SnapshotEntryKeys): void => {
+    const reportSite = (site: SnapshotMatcherSite, listedEntries: SnapshotEntryKeys): void => {
       const inlineSpelling = INLINE_SPELLING_BY_EXTERNAL.get(site.matcher);
       if (inlineSpelling === undefined) return;
-      if (entries.kind === "unreadable") return;
-      if (entries.kind === "unresolvable") {
-        context.report({ node: site.matcherNode, messageId: "unresolvableExternalSnapshot" });
+      if (listedEntries.kind === "unreadable") return;
+      if (listedEntries.kind === "unresolvable") {
+        inspection.report({ node: site.matcherNode, messageId: "unresolvableExternalSnapshot" });
         return;
       }
-      if (entries.keys.length === 0) return;
-      reportUndersized({ site, keys: entries.keys, inlineSpelling });
+      if (listedEntries.keys.length === 0) return;
+      reportUndersized({ site, keys: listedEntries.keys, inlineSpelling });
     };
 
     const collected = new Set<SnapshotMatcherSite>();
@@ -149,8 +149,8 @@ export const noUndersizedExternalSnapshot = createDontReviewItRule({
       },
       "Program:exit"() {
         const sites = [...collected];
-        for (const [site, entries] of zip(sites, entryKeysOf(sites))) {
-          reportSite(site, entries);
+        for (const [site, listedEntries] of zip(sites, entryKeysOf(sites))) {
+          reportSite(site, listedEntries);
         }
       },
     };

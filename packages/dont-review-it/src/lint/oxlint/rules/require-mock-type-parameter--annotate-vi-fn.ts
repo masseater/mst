@@ -22,9 +22,9 @@ const UNCONSTRAINED_TYPE_NAMES_OPTION = "unconstrainedTypeNames";
 const DEFAULT_UNCONSTRAINED_TYPE_NAMES: readonly string[] = ["Function"];
 
 const namedSetsFrom =
-  (options: Readonly<Options>) =>
+  (ruleOptions: Readonly<Options>) =>
   (named: string, fallback: readonly string[]): ReadonlySet<string> => {
-    const [first] = options;
+    const [first] = ruleOptions;
     if (typeof first !== "object" || first === null || Array.isArray(first)) {
       return new Set(fallback);
     }
@@ -32,7 +32,9 @@ const namedSetsFrom =
     const configured = first[named];
     if (!Array.isArray(configured)) return new Set(fallback);
 
-    const spelled = configured.filter((entry): entry is string => typeof entry === "string");
+    const spelled = configured.filter(
+      (candidate): candidate is string => typeof candidate === "string",
+    );
     return new Set(spelled.length === 0 ? fallback : spelled);
   };
 
@@ -96,10 +98,10 @@ export const requireMockTypeParameter = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    const namedSets = namedSetsFrom(context.options);
+  create(inspection) {
+    const namedSets = namedSetsFrom(inspection.options);
     const lookup: NamespaceLookup = {
-      scopeAt: (node) => context.sourceCode.getScope(node),
+      scopeAt: (node) => inspection.sourceCode.getScope(node),
       spellings: namedSets(MOCK_NAMESPACE_SPELLINGS_OPTION, DEFAULT_MOCK_NAMESPACE_SPELLINGS),
       seenBindings: new Set(),
     };
@@ -113,12 +115,14 @@ export const requireMockTypeParameter = createDontReviewItRule({
       node: ESTree.CallExpression,
       written: readonly ESTree.TSType[],
     ): void => {
-      const open = written.find((param) => isUnconstrainedType(param, unconstrainedNames));
+      const open = written.find((handedParam) =>
+        isUnconstrainedType(handedParam, unconstrainedNames),
+      );
       if (open === undefined) return;
-      context.report({
+      inspection.report({
         node,
         messageId: "unconstrainedMockTypeParameter",
-        data: { written: context.sourceCode.getText(open) },
+        data: { written: inspection.sourceCode.getText(open) },
       });
     };
 
@@ -133,7 +137,7 @@ export const requireMockTypeParameter = createDontReviewItRule({
 
         const written = node.typeArguments?.params ?? [];
         if (written.length === 0) {
-          context.report({ node, messageId: "untypedMockCreation" });
+          inspection.report({ node, messageId: "untypedMockCreation" });
           return;
         }
         reportUnconstrained(node, written);

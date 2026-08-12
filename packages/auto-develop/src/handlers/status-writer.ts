@@ -23,7 +23,7 @@ export const createStatusWriter = (writer: {
   readonly log: Logger;
   readonly guard?: GenerationGuard;
 }): StatusWriter => ({
-  write: async (status) => {
+  write: async (heldStatus) => {
     const { guard } = writer;
     if (
       guard !== undefined &&
@@ -33,20 +33,23 @@ export const createStatusWriter = (writer: {
       })
     ) {
       writer.log.info(
-        { prNumber: guard.prNumber, state: status.state },
-        "commit status skipped; the review input generation moved on",
+        { prNumber: guard.prNumber, state: heldStatus.state },
+        "commit heldStatus skipped; the review input generation moved on",
       );
       return false;
     }
     try {
       await writer.github.createCommitStatus({
-        sha: status.sha,
-        state: status.state,
+        sha: heldStatus.sha,
+        state: heldStatus.state,
         context: writer.context,
-        description: status.description,
+        description: heldStatus.description,
       });
     } catch (statusFailure) {
-      writer.log.warn({ sha: status.sha, err: statusFailure }, "creating the commit status failed");
+      writer.log.warn(
+        { sha: heldStatus.sha, err: statusFailure },
+        "creating the commit heldStatus failed",
+      );
     }
     return true;
   },

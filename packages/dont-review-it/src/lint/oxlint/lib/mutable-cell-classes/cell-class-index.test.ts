@@ -16,15 +16,16 @@ const sum = (rows: readonly number[]): number => {
 
 const indexOf = (sources: Readonly<Record<string, string>>) =>
   buildCellClassIndex(
-    Object.entries(sources).map(([relativePath, text]) => ({
+    Object.entries(sources).map(([relativePath, writtenText]) => ({
       relativePath,
-      facts: sourceFactsIn(parseSync(relativePath, text).program),
+      facts: sourceFactsIn(parseSync(relativePath, writtenText).program),
     })),
   );
 
-const findingsIn = (text: string, elsewhere = "export {};\n"): readonly CellClassFinding[] =>
-  indexOf({ "src/held.ts": text, "src/other.ts": elsewhere }).findingsByPath.get("src/held.ts") ??
-  [];
+const findingsIn = (writtenText: string, elsewhere = "export {};\n"): readonly CellClassFinding[] =>
+  indexOf({ "src/held.ts": writtenText, "src/other.ts": elsewhere }).findingsByPath.get(
+    "src/held.ts",
+  ) ?? [];
 
 describe("buildCellClassIndex", () => {
   test("a class written into after construction and built once inside one function is found", () => {

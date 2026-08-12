@@ -45,8 +45,11 @@ const titleSpelledIn = (source: string): boolean =>
 
 const bodyShapeIn = (source: string): string | null => {
   const statements = statementsIn(source);
-  const body = testBlockBodyOf(lastCallIn(statements), boundIn(testBlockBindings(), statements));
-  return body === null ? null : body.type;
+  const writtenBody = testBlockBodyOf(
+    lastCallIn(statements),
+    boundIn(testBlockBindings(), statements),
+  );
+  return writtenBody === null ? null : writtenBody.type;
 };
 
 const declaresIn = (source: string): boolean => declaresWith(testBlockBindings(), source);
@@ -55,7 +58,7 @@ const declaresGroupingIn = (source: string): boolean =>
   declaresWith(groupingBlockBindings(), source);
 
 const callbackShapesIn = (source: string): readonly string[] =>
-  testCallbacksOf(lastCallIn(statementsIn(source))).map((callback) => callback.type);
+  testCallbacksOf(lastCallIn(statementsIn(source))).map((taken) => taken.type);
 
 const assertionEntryNamesIn = (source: string): readonly string[] =>
   [...boundIn(assertionEntryBindings(), statementsIn(source))].toSorted();

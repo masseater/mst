@@ -7,12 +7,12 @@ import { toWebhookShape } from "./webhook-shape.ts";
 import type { FilteredEvent } from "./filtered-event.ts";
 import type { Mode } from "./vocabulary.ts";
 
-const roundTrip = (event: FilteredEvent, mode: Mode): FilteredEvent | null => {
-  const shape = toWebhookShape(event);
+const roundTrip = (webhookEvent: FilteredEvent, spelledMode: Mode): FilteredEvent | null => {
+  const shape = toWebhookShape(webhookEvent);
   const flattened = unwrapEnvelope(
     sealEnvelope({ eventType: shape.eventType, deliveryId: "delivery-1", payload: shape.payload }),
   );
-  return filterEvent(flattened, mode);
+  return filterEvent(flattened, spelledMode);
 };
 
 const it = test

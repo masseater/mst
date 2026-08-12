@@ -41,7 +41,7 @@ const runHandler = async (setup: {
   readonly staleGeneration?: boolean;
   readonly staleAfterSession?: boolean;
 }): Promise<RunOutcome> => {
-  const statuses = new Map<number, { readonly sha: string; readonly state: string }>();
+  const statusBySha = new Map<number, { readonly sha: string; readonly state: string }>();
   const snapshotIndex = new Map([["next", 0]]);
   const gate = createLifecycleGate();
   const github: HandlerGithubClient = {
@@ -54,8 +54,8 @@ const runHandler = async (setup: {
         setup.snapshots[Math.min(index, setup.snapshots.length - 1)] as PrSnapshot,
       );
     },
-    createCommitStatus: (request) => {
-      statuses.set(statuses.size, { sha: request.sha, state: request.state });
+    createCommitStatus: (asked) => {
+      statusBySha.set(statusBySha.size, { sha: asked.sha, state: asked.state });
       return Promise.resolve();
     },
     listReviews: () => Promise.resolve(setup.reviews ?? []),
@@ -65,7 +65,7 @@ const runHandler = async (setup: {
   const runSession = vi.fn<ReviewerHandlerConfig["runSession"]>(() =>
     setup.sessionFailure === undefined ? Promise.resolve() : Promise.reject(setup.sessionFailure),
   );
-  const handler = createReviewerHandler({
+  const takenHandler = createReviewerHandler({
     github,
     gate,
     runSession,
@@ -75,9 +75,9 @@ const runHandler = async (setup: {
     log: silentLogger,
   });
   try {
-    await handler(7);
+    await takenHandler(7);
     return {
-      statuses: [...statuses.values()],
+      statuses: [...statusBySha.values()],
       followUps: requestFollowUpReview.mock.calls,
       sessionCalls: runSession.mock.calls.length,
       failure: null,
@@ -85,7 +85,7 @@ const runHandler = async (setup: {
     };
   } catch (handlerFailure) {
     return {
-      statuses: [...statuses.values()],
+      statuses: [...statusBySha.values()],
       followUps: requestFollowUpReview.mock.calls,
       sessionCalls: runSession.mock.calls.length,
       failure: handlerFailure,

@@ -22,10 +22,13 @@ const recordOf = (lines: number): string =>
 const specPathOf = (directory: string, specFileName: string = SPEC_FILE_NAME): string =>
   join(fixtureDir, directory, specFileName);
 
-const writeSpecFixture = (specPath: string, records: Readonly<Record<string, string>>): string => {
+const writeSpecFixture = (
+  specPath: string,
+  writtenRecords: Readonly<Record<string, string>>,
+): string => {
   mkdirSync(join(dirname(specPath), "__snapshots__"), { recursive: true });
-  const written = Object.entries(records)
-    .map(([key, record]) => `exports[\`${key}\`] = \`${record}\`;\n`)
+  const written = Object.entries(writtenRecords)
+    .map(([named, written]) => `exports[\`${named}\`] = \`${written}\`;\n`)
     .join("\n");
   writeFileSync(
     join(dirname(specPath), "__snapshots__", `${basename(specPath)}.snap`),
@@ -34,10 +37,10 @@ const writeSpecFixture = (specPath: string, records: Readonly<Record<string, str
   return specPath;
 };
 
-const plainSpec = (body: string): string =>
-  `describe("outer", () => {\n  it("names a behaviour", () => {\n${body}\n  });\n});`;
+const plainSpec = (writtenBody: string): string =>
+  `describe("outer", () => {\n  it("names a behaviour", () => {\n${writtenBody}\n  });\n});`;
 
-const smallRecord = writeSpecFixture(specPathOf("small-record"), {
+const smallRecord = writeSpecFixture(specPathOf("small-written"), {
   "outer > names a behaviour 1": recordOf(3),
 });
 
@@ -54,30 +57,30 @@ const shiftedByInline = writeSpecFixture(specPathOf("shifted-by-inline"), {
   "outer > names a behaviour 2": recordOf(1),
 });
 
-const shiftedByFileRecord = writeSpecFixture(specPathOf("shifted-by-file-record"), {
+const shiftedByFileRecord = writeSpecFixture(specPathOf("shifted-by-file-written"), {
   "outer > names a behaviour 1": recordOf(13),
   "outer > names a behaviour 2": recordOf(1),
 });
 
-const hintedRecord = writeSpecFixture(specPathOf("hinted-record"), {
+const hintedRecord = writeSpecFixture(specPathOf("hinted-written"), {
   "outer > names a behaviour 1": recordOf(13),
   "outer > names a behaviour > the hint 1": recordOf(1),
 });
 
-const thrownRecord = writeSpecFixture(specPathOf("thrown-record"), {
+const thrownRecord = writeSpecFixture(specPathOf("thrown-written"), {
   "outer > names a behaviour 1": recordOf(1),
 });
 
-const tableRecords = writeSpecFixture(specPathOf("table-records"), {
+const tableRecords = writeSpecFixture(specPathOf("table-writtenRecords"), {
   "outer > scalar 1 1": recordOf(1),
   "outer > scalar 2 1": recordOf(1),
 });
 
-const partialTableRecords = writeSpecFixture(specPathOf("partial-table-records"), {
+const partialTableRecords = writeSpecFixture(specPathOf("partial-table-writtenRecords"), {
   "outer > scalar 1 1": recordOf(1),
 });
 
-const unrecordedKey = writeSpecFixture(specPathOf("unrecorded-key"), {
+const unrecordedKey = writeSpecFixture(specPathOf("unrecorded-named"), {
   "outer > some other behaviour 1": recordOf(1),
 });
 
@@ -102,7 +105,7 @@ const namedSuffixSpec = writeSpecFixture(specPathOf("named-suffix", "subject.spe
   "outer > names a behaviour 1": recordOf(3),
 });
 
-const withoutRecordFile = specPathOf("no-record-file");
+const withoutRecordFile = specPathOf("no-written-file");
 mkdirSync(dirname(withoutRecordFile), { recursive: true });
 
 describe("dont-review-it/no-undersized-external-snapshot--use-inline-snapshot", () => {
@@ -111,35 +114,35 @@ describe("dont-review-it/no-undersized-external-snapshot--use-inline-snapshot", 
       {
         name: "a file that is not a spec is left alone",
         code: plainSpec("expect(subject).toMatchSnapshot();"),
-        filename: join(fixtureDir, "small-record", "subject.ts"),
+        filename: join(fixtureDir, "small-written", "subject.ts"),
       },
       {
-        name: "a spec with no record file has nothing to measure",
+        name: "a spec with no written file has nothing to measure",
         code: plainSpec("expect(subject).toMatchSnapshot();"),
         filename: withoutRecordFile,
       },
       {
-        name: "a key the record file does not carry has nothing to measure",
+        name: "a named the written file does not carry has nothing to measure",
         code: plainSpec("expect(subject).toMatchSnapshot();"),
         filename: unrecordedKey,
       },
       {
-        name: "a record past the budget is already in the right place",
+        name: "a written past the budget is already in the right place",
         code: plainSpec("expect(subject).toMatchSnapshot();"),
         filename: overTheBudget,
       },
       {
-        name: "an inline record is the other rule's subject",
+        name: "an inline written is the other rule's subject",
         code: plainSpec('expect(subject).toMatchInlineSnapshot(`"alpha"`);'),
         filename: smallRecord,
       },
       {
-        name: "a file record is the counter's business and not this rule's",
+        name: "a file written is the counter's business and not this rule's",
         code: plainSpec('expect(subject).toMatchFileSnapshot("./subject.txt");'),
         filename: smallRecord,
       },
       {
-        name: "a snapshot outside every test block resolves to no key",
+        name: "a snapshot outside every test block resolves to no named",
         code: "expect(subject).toMatchSnapshot();",
         filename: smallRecord,
       },
@@ -154,34 +157,34 @@ describe("dont-review-it/no-undersized-external-snapshot--use-inline-snapshot", 
         filename: smallRecord,
       },
       {
-        name: "raising the budget past the record leaves it in place",
+        name: "raising the budget past the written leaves it in place",
         code: plainSpec("expect(subject).toMatchSnapshot();"),
         filename: smallRecord,
         options: [{ maxLines: 2 }],
       },
       {
-        name: "a table declared over no cases records nothing to measure",
+        name: "a table declared over no cases writtenRecords nothing to measure",
         code: 'describe("outer", () => {\n  it.each([])("scalar %s", (value) => {\n    expect(value).toMatchSnapshot();\n  });\n});',
         filename: smallRecord,
       },
     ],
     invalid: [
       {
-        name: "a record inside the budget is reported and moved to an inline record",
+        name: "a written inside the budget is reported and moved to an inline written",
         code: plainSpec("    expect(subject).toMatchSnapshot();"),
         filename: smallRecord,
         errors: [{ messageId: "undersizedExternalSnapshot" }],
         output: plainSpec("    expect(subject).toMatchInlineSnapshot();"),
       },
       {
-        name: "a record at the budget stays on the inline side of the boundary",
+        name: "a written at the budget stays on the inline side of the boundary",
         code: plainSpec("    expect(subject).toMatchSnapshot();"),
         filename: atTheBudget,
         errors: [{ messageId: "undersizedExternalSnapshot" }],
         output: plainSpec("    expect(subject).toMatchInlineSnapshot();"),
       },
       {
-        name: "an inline record ahead of it shifts which entry the call is measured against",
+        name: "an inline written ahead of it shifts which entry the call is measured against",
         code: plainSpec(
           '    expect(first).toMatchInlineSnapshot(`"first"`);\n    expect(subject).toMatchSnapshot();',
         ),
@@ -192,7 +195,7 @@ describe("dont-review-it/no-undersized-external-snapshot--use-inline-snapshot", 
         ),
       },
       {
-        name: "a file record ahead of it shifts which entry the call is measured against",
+        name: "a file written ahead of it shifts which entry the call is measured against",
         code: plainSpec(
           '    expect(first).toMatchFileSnapshot("./first.txt");\n    expect(subject).toMatchSnapshot();',
         ),
@@ -210,7 +213,7 @@ describe("dont-review-it/no-undersized-external-snapshot--use-inline-snapshot", 
         output: plainSpec("    expect(subject).toMatchInlineSnapshot();"),
       },
       {
-        name: "a thrown error record moves to the inline spelling of the same matcher",
+        name: "a thrown error written moves to the inline spelling of the same matcher",
         code: plainSpec("    expect(run).toThrowErrorMatchingSnapshot();"),
         filename: thrownRecord,
         errors: [{ messageId: "undersizedExternalSnapshot" }],
@@ -302,7 +305,7 @@ describe("dont-review-it/no-undersized-external-snapshot--use-inline-snapshot", 
         errors: [{ messageId: "undersizedTableDrivenSnapshot" }],
       },
       {
-        name: "lowering the budget is not a way to leave a record outside",
+        name: "lowering the budget is not a way to leave a written outside",
         code: plainSpec("    expect(subject).toMatchSnapshot();"),
         filename: overTheBudget,
         options: [{ maxLines: 13 }],

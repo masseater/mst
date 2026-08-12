@@ -45,11 +45,12 @@ const writeVerdict = async (verdict: {
   }
   const reviews = await config.github.listReviews(verdict.prNumber);
   const effectiveReview = effectiveReviewOf({ reviews, login: config.proxyLogin });
-  const state = reviewVerdictState(effectiveReview);
+  const heldState = reviewVerdictState(effectiveReview);
   await verdict.statusWriter.write({
     sha: verdict.sha,
-    state,
-    description: state === "error" ? "review completed with changes requested" : "review completed",
+    state: heldState,
+    description:
+      heldState === "error" ? "review completed with changes requested" : "review completed",
   });
 };
 

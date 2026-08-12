@@ -86,28 +86,28 @@ const unreadableDeviationsOf = (reading: SetReading): readonly SetDeviation[] =>
     }));
 
 const heldRulesIn = (named: readonly NamedRule[]): readonly HeldRule[] =>
-  named.flatMap<HeldRule>((entry) => {
-    const { level } = entry.configured;
-    return level === null ? [] : [{ configured: entry.configured, member: entry.member, level }];
+  named.flatMap<HeldRule>((listed) => {
+    const { level } = listed.configured;
+    return level === null ? [] : [{ configured: listed.configured, member: listed.member, level }];
   });
 
 const unevenDeviationsOf = (reading: SetReading): readonly SetDeviation[] => {
   const held = heldRulesIn(reading.named);
-  const strongest = strongestLevelAmong(held.map((entry) => entry.level));
-  const strongestRule = held.find((entry) => entry.level === strongest);
+  const strongest = strongestLevelAmong(held.map((listed) => listed.level));
+  const strongestRule = held.find((listed) => listed.level === strongest);
   if (strongestRule === undefined) return [];
   return held
-    .filter((entry) => rankOfLevel(entry.level) < rankOfLevel(strongest))
-    .map((entry) => ({
-      property: entry.configured.property,
+    .filter((listed) => rankOfLevel(listed.level) < rankOfLevel(strongest))
+    .map((listed) => ({
+      property: listed.configured.property,
       messageId: UNEVEN_SEVERITY_MESSAGE_ID,
       data: {
         ruleSet: reading.set.name,
-        ruleName: entry.configured.ruleName,
-        severity: entry.level,
+        ruleName: listed.configured.ruleName,
+        severity: listed.level,
         matchedRule: strongestRule.configured.ruleName,
         matchedSeverity: strongest,
-        hole: entry.member.hole,
+        hole: listed.member.hole,
       },
     }));
 };
@@ -136,8 +136,8 @@ const deviationsForSet = (reading: SetReading): readonly SetDeviation[] => [
 ];
 
 export const setDeviationsIn = (block: ConfiguredRuleBlock): readonly SetDeviation[] =>
-  DECLARED_RULE_SETS.flatMap((set) => {
-    const named = namedRulesIn({ set, block });
+  DECLARED_RULE_SETS.flatMap((listedSet) => {
+    const named = namedRulesIn({ set: listedSet, block });
     const [first] = named;
-    return first === undefined ? [] : deviationsForSet({ set, block, named, first });
+    return first === undefined ? [] : deviationsForSet({ set: listedSet, block, named, first });
   });

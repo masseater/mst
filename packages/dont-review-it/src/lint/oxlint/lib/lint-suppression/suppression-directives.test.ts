@@ -13,9 +13,9 @@ const DUPLICATE_TYPE_RULE = "no-duplicate-exported-type--reuse-authoritative-typ
 const TARGET_RULES = [DUPLICATE_TYPE_RULE, "forbid-target-file--delete-or-relocate"];
 
 const directiveIn = (written: string): SuppressionDirective => {
-  const parsed = suppressionDirectiveOf({ value: written });
-  if (parsed === null) throw new Error(`no suppression directive in ${written}`);
-  return parsed;
+  const parsedNode = suppressionDirectiveOf({ value: written });
+  if (parsedNode === null) throw new Error(`no suppression directive in ${written}`);
+  return parsedNode;
 };
 
 describe("suppression-directives", () => {

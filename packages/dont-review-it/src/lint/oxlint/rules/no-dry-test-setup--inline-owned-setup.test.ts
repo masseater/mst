@@ -13,10 +13,10 @@ rmSync(workspaceDir, { recursive: true, force: true });
 
 const workspacePath = (relativePath: string): string => join(workspaceDir, relativePath);
 
-const writeWorkspaceFile = (relativePath: string, content: string): void => {
+const writeWorkspaceFile = (relativePath: string, writtenContent: string): void => {
   const path = workspacePath(relativePath);
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, content);
+  writeFileSync(path, writtenContent);
 };
 
 const writeManifest = (
@@ -26,8 +26,8 @@ const writeManifest = (
   writeWorkspaceFile(`${packageDirectory}/package.json`, JSON.stringify(manifest));
 };
 
-const installPackage = (name: string, packageDirectory: string): void => {
-  const link = workspacePath(join("node_modules", name));
+const installPackage = (spelled: string, packageDirectory: string): void => {
+  const link = workspacePath(join("node_modules", spelled));
   mkdirSync(dirname(link), { recursive: true });
   symlinkSync(workspacePath(packageDirectory), link, "dir");
 };
@@ -100,8 +100,8 @@ const entrylessSpec = workspacePath("packages/entryless/src/thing.test.ts");
 
 const couplingTo = (path: string) => [{ messageId: "setupModuleCoupling", data: { path } }];
 
-const allowlistNaming = (entry: string) => [
-  { messageId: "misplacedFixturePackage", data: { entry } },
+const allowlistNaming = (listed: string) => [
+  { messageId: "misplacedFixturePackage", data: { entry: listed } },
 ];
 
 describe("dont-review-it/no-dry-test-setup--inline-owned-setup", () => {
@@ -118,7 +118,7 @@ describe("dont-review-it/no-dry-test-setup--inline-owned-setup", () => {
         filename: widgetSpec,
       },
       {
-        name: "a subject the public entry reaches keeps its name even when the name is forbidden",
+        name: "a subject the public entry reaches keeps its spelled even when the spelled is forbidden",
         code: 'import { shaped } from "./widget-helper.ts";\n\nexport const under = shaped;\n',
         filename: widgetSpec,
       },
@@ -206,7 +206,7 @@ describe("dont-review-it/no-dry-test-setup--inline-owned-setup", () => {
         filename: widgetSpec,
       },
       {
-        name: "a constant that binds no name of its own is not a specifier",
+        name: "a constant that binds no spelled of its own is not a specifier",
         code: "const { picked } = globalThis;\n\nexport const used = picked;\n",
         filename: widgetSpec,
       },
@@ -309,7 +309,7 @@ describe("dont-review-it/no-dry-test-setup--inline-owned-setup", () => {
         errors: couplingTo("packages/widget/src/helpers.ts"),
       },
       {
-        name: "a file the assets vocabulary does not name is judged like every other module",
+        name: "a file the assets vocabulary does not spelled is judged like every other module",
         code: 'import { counted } from "./widget.rows.ts";\n\nexport const data = counted;\n',
         filename: widgetSpec,
         errors: couplingTo("packages/widget/src/widget.rows.ts"),

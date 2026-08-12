@@ -19,10 +19,10 @@ describe("create-workspace-lint-rule", () => {
       },
       schema: [],
     },
-    create(context) {
+    create(inspection) {
       return {
         DebuggerStatement(node) {
-          context.report({ node, messageId: "first" });
+          inspection.report({ node, messageId: "first" });
         },
       };
     },

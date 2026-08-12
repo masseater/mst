@@ -98,10 +98,10 @@ export const noSutIndependentAssertion = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
-    const scopeAt: ScopeLookup = (node) => context.sourceCode.getScope(node);
+    const scopeAt: ScopeLookup = (node) => inspection.sourceCode.getScope(node);
     const bindingAt = (written: ESTree.IdentifierReference): Variable | null =>
       resolveBinding(scopeAt(written), written.name);
 
@@ -120,7 +120,7 @@ export const noSutIndependentAssertion = createDontReviewItRule({
 
         const report = assertionReportOf({ scopeAt, reach, operands });
         if (report === null) return;
-        context.report({ node: operands.subject, ...report });
+        inspection.report({ node: operands.subject, ...report });
       },
     };
   },

@@ -17,16 +17,16 @@ const SPEC_NAMES = "`*.test.ts`, `*.test.tsx`";
 
 const ASSETS_NAMES = "`*.assets.*`";
 
-const writeFixture = (name: string, source: string): string => {
-  const path = join(fixtureDir, name);
+const writeFixture = (fixtureName: string, source: string): string => {
+  const path = join(fixtureDir, fixtureName);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, source, "utf8");
   return path;
 };
 
-const writeRepository = (name: string): void => {
-  writeFixture(`${name}/pnpm-workspace.yaml`, "packages:\n  - packages/*\n");
-  writeFixture(`${name}/package.json`, '{ "name": "fixture" }\n');
+const writeRepository = (fixtureName: string): void => {
+  writeFixture(`${fixtureName}/pnpm-workspace.yaml`, "packages:\n  - packages/*\n");
+  writeFixture(`${fixtureName}/package.json`, '{ "name": "fixture" }\n');
 };
 
 writeRepository("held");

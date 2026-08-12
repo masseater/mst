@@ -25,14 +25,14 @@ export const noBroadLintDisable = createLintRuleAuthoringRule({
     },
     schema: [],
   },
-  create(context) {
+  create(inspection) {
     return {
       Program(node: ESTree.Program) {
         for (const comment of node.comments) {
           const directive = firstToken(comment.value);
           const nextLineDirective = BROAD_LINT_DIRECTIVES.get(directive);
           if (nextLineDirective === undefined) continue;
-          context.report({
+          inspection.report({
             loc: comment.loc,
             messageId: "broadLintDisable",
             data: { directive, nextLineDirective },

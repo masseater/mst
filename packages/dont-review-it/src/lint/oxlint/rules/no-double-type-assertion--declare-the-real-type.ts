@@ -18,10 +18,10 @@ export const noDoubleTypeAssertion = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
+  create(inspection) {
     const reportWhenStacked = (node: ESTree.TSAsExpression | ESTree.TSTypeAssertion): void => {
       if (!isTypeAssertion(node.expression)) return;
-      context.report({ node, messageId: "stackedTypeAssertion" });
+      inspection.report({ node, messageId: "stackedTypeAssertion" });
     };
 
     return {

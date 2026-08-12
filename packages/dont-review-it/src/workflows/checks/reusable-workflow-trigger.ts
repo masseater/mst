@@ -14,7 +14,7 @@ export const reusableWorkflowTriggers = ({
   const declared = triggerNamesOf({ document, config });
   if (!declared.includes(config.reusableTrigger)) return [];
 
-  const owned = declared.filter((name) => name !== config.reusableTrigger);
+  const owned = declared.filter((spelled) => spelled !== config.reusableTrigger);
   if (owned.length === 0) return [];
 
   return [

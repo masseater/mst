@@ -72,12 +72,12 @@ const resolveCommit = async (repositoryRoot: string, revision: string): Promise<
 
 const sourceExtensions = [".cjs", ".cts", ".js", ".jsx", ".mjs", ".mts", ".ts", ".tsx"];
 
-export const decodedSource = (path: string, blob: Uint8Array): string => {
-  if (blob.includes(0)) {
+export const decodedSource = (path: string, writtenBlob: Uint8Array): string => {
+  if (writtenBlob.includes(0)) {
     throw new Error(`Source blob contains NUL bytes: ${path}`);
   }
 
-  return new TextDecoder("utf-8").decode(blob);
+  return new TextDecoder("utf-8").decode(writtenBlob);
 };
 
 export type SideSources = Readonly<{
@@ -232,7 +232,10 @@ export const compareRevisions = async ({
   const blobAt = (revision: string) => async (path: string) =>
     decodedSource(
       path,
-      await runGitBuffer({ repositoryRoot, args: ["cat-file", "blob", `${revision}:${path}`] }),
+      await runGitBuffer({
+        repositoryRoot,
+        args: ["cat-file", "blob", `${revision}:${path}`],
+      }),
     );
 
   return {

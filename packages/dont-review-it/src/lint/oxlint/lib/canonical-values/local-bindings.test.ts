@@ -15,11 +15,11 @@ const PROBE_META = {
 const bindingsReader: WorkspaceLintRule = {
   name: "probe-collect-file-bindings",
   meta: PROBE_META,
-  create(context) {
+  create(inspection) {
     return {
       "Program:exit"(node: ESTree.Program) {
-        const bindings = collectFileBindings(node, context.sourceCode.text);
-        context.report({
+        const bindings = collectFileBindings(node, inspection.sourceCode.text);
+        inspection.report({
           node,
           messageId: "read",
           data: {
@@ -34,11 +34,11 @@ const bindingsReader: WorkspaceLintRule = {
 const argumentReader: WorkspaceLintRule = {
   name: "probe-first-non-spread-argument",
   meta: PROBE_META,
-  create(context) {
+  create(inspection) {
     return {
       CallExpression(node: ESTree.CallExpression) {
         const argument = firstNonSpreadArgument(node);
-        context.report({
+        inspection.report({
           node,
           messageId: "read",
           data: { text: argument === null ? "none" : argument.type },
@@ -48,10 +48,10 @@ const argumentReader: WorkspaceLintRule = {
   },
 };
 
-const reads = (code: string, ...texts: readonly string[]) => ({
-  name: `${code} reads as ${texts.join(" then ")}`,
+const reads = (code: string, ...writtenTexts: readonly string[]) => ({
+  name: `${code} reads as ${writtenTexts.join(" then ")}`,
   code,
-  errors: texts.map((text) => ({ messageId: "read", data: { text } })),
+  errors: writtenTexts.map((writtenText) => ({ messageId: "read", data: { text: writtenText } })),
 });
 
 describe("local-bindings", () => {

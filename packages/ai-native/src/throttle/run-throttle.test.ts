@@ -19,7 +19,7 @@ const captureStderr = (): (() => string) => {
   onTestFinished(() => {
     spy.mockRestore();
   });
-  return () => spy.mock.calls.map(([chunk]) => String(chunk)).join("");
+  return () => spy.mock.calls.map(([writtenChunk]) => String(writtenChunk)).join("");
 };
 
 const stubLimit = (limitEnv: string | undefined): void => {
@@ -45,17 +45,17 @@ const readStamp = (file: string): number => Number(readFileSync(file, "utf8"));
 
 const recordedRun = (
   stamps: string,
-  name: string,
+  spelled: string,
 ): { argsFor: (holdMs: number) => string[]; interval: () => { start: number; end: number } } => ({
   argsFor: (holdMs: number) =>
     recorderArgs({
-      startFile: join(stamps, `${name}-start`),
-      endFile: join(stamps, `${name}-end`),
+      startFile: join(stamps, `${spelled}-start`),
+      endFile: join(stamps, `${spelled}-end`),
       holdMs,
     }),
   interval: () => ({
-    start: readStamp(join(stamps, `${name}-start`)),
-    end: readStamp(join(stamps, `${name}-end`)),
+    start: readStamp(join(stamps, `${spelled}-start`)),
+    end: readStamp(join(stamps, `${spelled}-end`)),
   }),
 });
 
@@ -186,7 +186,7 @@ describe("run-throttle", () => {
         pollMs: 50,
         isInteractive: false,
       };
-      const recorders = ["a", "b", "c"].map((name) => recordedRun(stamps, name));
+      const recorders = ["a", "b", "c"].map((spelled) => recordedRun(stamps, spelled));
 
       const codes = await Promise.all(
         recorders.map((recorder) => runThrottle(["--", ...recorder.argsFor(1500)], seams)),
@@ -200,9 +200,9 @@ describe("run-throttle", () => {
         ])
         .toSorted((left, right) => left[0] - right[0] || left[1] - right[1]);
       const tally = boundaries.reduce(
-        (state, [, delta]) => {
-          const depth = state.depth + delta;
-          return { depth, peak: Math.max(state.peak, depth) };
+        (heldState, [, delta]) => {
+          const depth = heldState.depth + delta;
+          return { depth, peak: Math.max(heldState.peak, depth) };
         },
         { depth: 0, peak: 0 },
       );
@@ -230,7 +230,7 @@ describe("run-throttle", () => {
           }),
         ).toBe(0);
 
-        const markers = readdirSync(slotDir).filter((name) => /^slot-\d+$/.test(name));
+        const markers = readdirSync(slotDir).filter((spelled) => /^slot-\d+$/.test(spelled));
         expect(markers).toStrictEqual(["slot-0"]);
       }
     },

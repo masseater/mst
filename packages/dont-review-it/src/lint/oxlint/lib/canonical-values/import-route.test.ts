@@ -7,7 +7,7 @@ import { importRouteStatus } from "./import-route.ts";
 describe("import-route", () => {
   const REPOSITORY_ROOT = "/repository";
 
-  const entry = (overrides: Partial<CanonicalValuesEntry>): CanonicalValuesEntry => ({
+  const listed = (overrides: Partial<CanonicalValuesEntry>): CanonicalValuesEntry => ({
     conceptId: "order.status",
     declarationPath: "packages/order-vocabulary/src/order-status.ts",
     exportPath: "@mst/order-vocabulary",
@@ -16,7 +16,7 @@ describe("import-route", () => {
     ...overrides,
   });
 
-  const catalog = buildCatalog([entry({})]);
+  const catalog = buildCatalog([listed({})]);
 
   const statusOf = (specifier: string, filename: string): string =>
     importRouteStatus(
@@ -73,7 +73,7 @@ describe("import-route", () => {
   });
 
   test("a subpath specifier the catalog publishes is registered", () => {
-    const subpathCatalog = buildCatalog([entry({ exportPath: "#internal/statuses" })]);
+    const subpathCatalog = buildCatalog([listed({ exportPath: "#internal/statuses" })]);
 
     expect(
       importRouteStatus(
@@ -93,7 +93,7 @@ describe("import-route", () => {
 
   test("a declaration reached through an index module keeps resolving to its owner", () => {
     const indexCatalog = buildCatalog([
-      entry({ declarationPath: "packages/order-vocabulary/src/index.ts" }),
+      listed({ declarationPath: "packages/order-vocabulary/src/index.ts" }),
     ]);
 
     expect(

@@ -38,10 +38,12 @@ const buildRepositoryValueDeclarationIndex = ({
 
 const indexByRoot = new Map<string, ValueDeclarationIndex>();
 
-export const loadRepositoryValueDeclarationIndex = (options: {
+export const loadRepositoryValueDeclarationIndex = ({
+  repositoryRoot,
+}: {
   readonly repositoryRoot: string;
 }): ValueDeclarationIndex => {
-  const root = resolve(options.repositoryRoot);
+  const root = resolve(repositoryRoot);
   const held = indexByRoot.get(root);
   if (held !== undefined) return held;
 

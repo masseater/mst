@@ -26,15 +26,15 @@ type OrderingReport = {
   readonly data: { readonly dependency: string; readonly bound: string };
 };
 
-const orderingAliasPrefixesFrom = (options: Readonly<Options>): readonly string[] => {
-  const [first] = options;
+const orderingAliasPrefixesFrom = (ruleOptions: Readonly<Options>): readonly string[] => {
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) {
     return DEFAULT_ORDERING_ALIAS_PREFIXES;
   }
 
   const configured = first[ORDERING_ALIAS_PREFIXES_OPTION];
   if (!Array.isArray(configured)) return DEFAULT_ORDERING_ALIAS_PREFIXES;
-  return configured.filter((entry): entry is string => typeof entry === "string");
+  return configured.filter((candidate): candidate is string => typeof candidate === "string");
 };
 
 const isOrderingAlias = (input: {
@@ -158,16 +158,16 @@ export const noFixtureOrderingAlias = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
-    const scopeAt: ScopeLookup = (node) => context.sourceCode.getScope(node);
-    const prefixes = orderingAliasPrefixesFrom(context.options);
+    const scopeAt: ScopeLookup = (node) => inspection.sourceCode.getScope(node);
+    const prefixes = orderingAliasPrefixesFrom(inspection.options);
 
     return {
       CallExpression(node: ESTree.CallExpression) {
         for (const report of reportsFor({ scopeAt, call: node, prefixes })) {
-          context.report(report);
+          inspection.report(report);
         }
       },
     };

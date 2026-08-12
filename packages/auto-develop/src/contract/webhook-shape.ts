@@ -8,52 +8,52 @@ export type WebhookShapedEvent = {
 };
 
 const reviewRequestedShape = (
-  event: Extract<FilteredEvent, { kind: "review-requested" }>,
+  webhookEvent: Extract<FilteredEvent, { kind: "review-requested" }>,
 ): WebhookShapedEvent => ({
   eventType: "pull_request",
   payload: {
     action: "review_requested",
     pull_request: {
-      number: event.pullNumber,
-      ...(event.title === undefined ? {} : { title: event.title }),
-      ...(event.draft === undefined ? {} : { draft: event.draft }),
+      number: webhookEvent.pullNumber,
+      ...(webhookEvent.title === undefined ? {} : { title: webhookEvent.title }),
+      ...(webhookEvent.draft === undefined ? {} : { draft: webhookEvent.draft }),
     },
-    ...(event.reviewerLogin === undefined
+    ...(webhookEvent.reviewerLogin === undefined
       ? {}
-      : { requested_reviewer: { login: event.reviewerLogin } }),
+      : { requested_reviewer: { login: webhookEvent.reviewerLogin } }),
   },
 });
 
 const reviewInputChangedShape = (
-  event: Extract<FilteredEvent, { kind: "review-input-changed" }>,
+  webhookEvent: Extract<FilteredEvent, { kind: "review-input-changed" }>,
 ): WebhookShapedEvent =>
-  event.changedInput === "head"
+  webhookEvent.changedInput === "head"
     ? {
         eventType: "pull_request",
-        payload: { action: "synchronize", pull_request: { number: event.pullNumber } },
+        payload: { action: "synchronize", pull_request: { number: webhookEvent.pullNumber } },
       }
     : {
         eventType: "pull_request",
         payload: {
           action: "edited",
           changes: { base: {} },
-          pull_request: { number: event.pullNumber },
+          pull_request: { number: webhookEvent.pullNumber },
         },
       };
 
-export const toWebhookShape = (event: FilteredEvent): WebhookShapedEvent => {
-  switch (event.kind) {
+export const toWebhookShape = (webhookEvent: FilteredEvent): WebhookShapedEvent => {
+  switch (webhookEvent.kind) {
     case "review-requested":
-      return reviewRequestedShape(event);
+      return reviewRequestedShape(webhookEvent);
     case "review-input-changed":
-      return reviewInputChangedShape(event);
+      return reviewInputChangedShape(webhookEvent);
     case "source-review-submitted":
       return {
         eventType: "pull_request_review",
         payload: {
           action: "submitted",
-          pull_request: { number: event.pullNumber },
-          review: { state: event.state, body: event.body },
+          pull_request: { number: webhookEvent.pullNumber },
+          review: { state: webhookEvent.state, body: webhookEvent.body },
         },
       };
     case "ci-completed":
@@ -62,9 +62,9 @@ export const toWebhookShape = (event: FilteredEvent): WebhookShapedEvent => {
         payload: {
           action: "completed",
           check_suite: {
-            conclusion: event.conclusion,
-            head_sha: event.headSha,
-            pull_requests: [{ number: event.pullNumber }],
+            conclusion: webhookEvent.conclusion,
+            head_sha: webhookEvent.headSha,
+            pull_requests: [{ number: webhookEvent.pullNumber }],
           },
         },
       };
@@ -74,7 +74,7 @@ export const toWebhookShape = (event: FilteredEvent): WebhookShapedEvent => {
         payload: {
           action: "synchronize",
           pull_request: {
-            number: event.pullNumber,
+            number: webhookEvent.pullNumber,
             mergeable: "CONFLICTING",
             merge_state_status: "DIRTY",
           },
@@ -86,7 +86,7 @@ export const toWebhookShape = (event: FilteredEvent): WebhookShapedEvent => {
         payload: {
           action: "synchronize",
           pull_request: {
-            number: event.pullNumber,
+            number: webhookEvent.pullNumber,
             mergeable: "MERGEABLE",
             merge_state_status: "BEHIND",
           },
@@ -95,14 +95,14 @@ export const toWebhookShape = (event: FilteredEvent): WebhookShapedEvent => {
     case "pr-closed":
       return {
         eventType: "pull_request",
-        payload: { action: "closed", pull_request: { number: event.pullNumber } },
+        payload: { action: "closed", pull_request: { number: webhookEvent.pullNumber } },
       };
     case "pr-excluded":
       return {
         eventType: "pull_request",
         payload: {
           action: "labeled",
-          pull_request: { number: event.pullNumber },
+          pull_request: { number: webhookEvent.pullNumber },
           label: { name: EXCLUSION_LABEL },
         },
       };

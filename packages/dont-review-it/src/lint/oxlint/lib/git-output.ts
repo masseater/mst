@@ -15,7 +15,10 @@ const answeredWithoutValue = (failure: unknown): boolean =>
   "status" in failure &&
   typeof failure.status === "number";
 
-export const gitOutput = (args: readonly string[], environment: GitEnvironment): string | null => {
+export const gitOutput = (
+  handedArgs: readonly string[],
+  environment: GitEnvironment,
+): string | null => {
   const {
     GIT_COMMON_DIR,
     GIT_DIR,
@@ -25,16 +28,16 @@ export const gitOutput = (args: readonly string[], environment: GitEnvironment):
     GIT_WORK_TREE,
     ...repositoryAgnosticEnv
   } = environment.env;
-  const [unaskableGit, answer] = attempt<string, Error>(() =>
-    execFileSync("git", [...args], {
+  const [unaskableGit, produced] = attempt<string, Error>(() =>
+    execFileSync("git", [...handedArgs], {
       cwd: environment.cwd,
       encoding: "utf8",
       env: repositoryAgnosticEnv,
       stdio: ["ignore", "pipe", "ignore"],
     }),
   );
-  if (unaskableGit === null) return answer.trim();
+  if (unaskableGit === null) return produced.trim();
 
   if (answeredWithoutValue(unaskableGit) || isEnvironmentFailure(unaskableGit)) return null;
-  throw new Error(`git ${args.join(" ")} could not be run`, { cause: unaskableGit });
+  throw new Error(`git ${handedArgs.join(" ")} could not be run`, { cause: unaskableGit });
 };

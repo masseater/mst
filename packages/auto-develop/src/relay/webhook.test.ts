@@ -20,22 +20,22 @@ const deliverWebhook = (delivery: {
   readonly payload: Readonly<Record<string, unknown>>;
   readonly signedWith?: string;
 }) => {
-  const rawBody = JSON.stringify(delivery.payload);
+  const requestBody = JSON.stringify(delivery.payload);
   const secret = delivery.signedWith ?? webhookConfig.webhookSecret;
   return handleWebhook({
-    rawBody,
+    rawBody: requestBody,
     eventType: delivery.eventType,
     deliveryId: delivery.deliveryId,
-    signatureHeader: `sha256=${createHmac("sha256", secret).update(rawBody).digest("hex")}`,
+    signatureHeader: `sha256=${createHmac("sha256", secret).update(requestBody).digest("hex")}`,
     config: webhookConfig,
     events: delivery.events,
     log: silentLogger,
   });
 };
 
-const allowedPayload = (payload: Readonly<Record<string, unknown>>) => ({
+const allowedPayload = (carried: Readonly<Record<string, unknown>>) => ({
   repository: { full_name: "example-org/example-repo" },
-  ...payload,
+  ...carried,
 });
 
 const excludedPullRequest = {
@@ -46,9 +46,9 @@ const excludedPullRequest = {
 
 const it = test
   .extend("acceptedDelivery", async () => {
-    const events = createMemoryEventStore();
+    const eventStore = createMemoryEventStore();
     const webhookResponse = await deliverWebhook({
-      events,
+      events: eventStore,
       eventType: "pull_request",
       deliveryId: "delivery-1",
       payload: allowedPayload({
@@ -56,7 +56,7 @@ const it = test
         pull_request: { number: 7, user: { login: "octocat" }, body: "A long description." },
       }),
     });
-    const [storedEvent] = await events.readSince(0);
+    const [storedEvent] = await eventStore.readSince(0);
     return { webhookResponse, storedEvent };
   })
   .extend("deliveryWithoutEventType", () =>
@@ -67,44 +67,44 @@ const it = test
     }),
   )
   .extend("deliveryWithForeignSignature", async () => {
-    const events = createMemoryEventStore();
+    const eventStore = createMemoryEventStore();
     const webhookResponse = await deliverWebhook({
-      events,
+      events: eventStore,
       eventType: "pull_request",
       deliveryId: "delivery-1",
       payload: allowedPayload({ action: "opened", pull_request: { number: 7 } }),
       signedWith: "another-secret",
     });
-    const storedEvents = await events.readSince(0);
+    const storedEvents = await eventStore.readSince(0);
     return { webhookResponse, storedEvents };
   })
   .extend("pingDelivery", async () => {
-    const events = createMemoryEventStore();
+    const eventStore = createMemoryEventStore();
     const webhookResponse = await deliverWebhook({
-      events,
+      events: eventStore,
       eventType: "ping",
       deliveryId: "delivery-1",
       payload: { zen: "Design for failure." },
     });
-    const storedEvents = await events.readSince(0);
+    const storedEvents = await eventStore.readSince(0);
     return { webhookResponse, storedEvents };
   })
   .extend("deliveryWithBrokenJson", () => {
-    const rawBody = "{broken";
+    const requestBody = "{broken";
     return handleWebhook({
-      rawBody,
+      rawBody: requestBody,
       eventType: "pull_request",
       deliveryId: "delivery-1",
-      signatureHeader: `sha256=${createHmac("sha256", "shared-secret").update(rawBody).digest("hex")}`,
+      signatureHeader: `sha256=${createHmac("sha256", "shared-secret").update(requestBody).digest("hex")}`,
       config: webhookConfig,
       events: createMemoryEventStore(),
       log: silentLogger,
     });
   })
   .extend("deliveryFromForeignRepository", async () => {
-    const events = createMemoryEventStore();
+    const eventStore = createMemoryEventStore();
     const webhookResponse = await deliverWebhook({
-      events,
+      events: eventStore,
       eventType: "pull_request",
       deliveryId: "delivery-1",
       payload: {
@@ -113,7 +113,7 @@ const it = test
         pull_request: { number: 7 },
       },
     });
-    const storedEvents = await events.readSince(0);
+    const storedEvents = await eventStore.readSince(0);
     return { webhookResponse, storedEvents };
   })
   .extend("deliveryWithoutRepository", () =>
@@ -125,31 +125,31 @@ const it = test
     }),
   )
   .extend("excludedPullDelivery", async () => {
-    const events = createMemoryEventStore();
+    const eventStore = createMemoryEventStore();
     const webhookResponse = await deliverWebhook({
-      events,
+      events: eventStore,
       eventType: "pull_request",
       deliveryId: "delivery-1",
       payload: allowedPayload({ action: "review_requested", pull_request: excludedPullRequest }),
     });
-    const storedEvents = await events.readSince(0);
+    const storedEvents = await eventStore.readSince(0);
     return { webhookResponse, storedEvents };
   })
   .extend("closedExcludedPullDelivery", async () => {
-    const events = createMemoryEventStore();
+    const eventStore = createMemoryEventStore();
     const webhookResponse = await deliverWebhook({
-      events,
+      events: eventStore,
       eventType: "pull_request",
       deliveryId: "delivery-1",
       payload: allowedPayload({ action: "closed", pull_request: excludedPullRequest }),
     });
-    const storedEvents = await events.readSince(0);
+    const storedEvents = await eventStore.readSince(0);
     return { webhookResponse, storedEvents };
   })
   .extend("exclusionLabelAddedDelivery", async () => {
-    const events = createMemoryEventStore();
+    const eventStore = createMemoryEventStore();
     const webhookResponse = await deliverWebhook({
-      events,
+      events: eventStore,
       eventType: "pull_request",
       deliveryId: "delivery-1",
       payload: allowedPayload({
@@ -158,13 +158,13 @@ const it = test
         label: { name: "exclude-auto-develop" },
       }),
     });
-    const storedEvents = await events.readSince(0);
+    const storedEvents = await eventStore.readSince(0);
     return { webhookResponse, storedEvents };
   })
   .extend("exclusionLabelRemovedDelivery", async () => {
-    const events = createMemoryEventStore();
+    const eventStore = createMemoryEventStore();
     const webhookResponse = await deliverWebhook({
-      events,
+      events: eventStore,
       eventType: "pull_request",
       deliveryId: "delivery-1",
       payload: allowedPayload({
@@ -173,13 +173,13 @@ const it = test
         label: { name: "exclude-auto-develop" },
       }),
     });
-    const storedEvents = await events.readSince(0);
+    const storedEvents = await eventStore.readSince(0);
     return { webhookResponse, storedEvents };
   })
   .extend("unrelatedLabelDelivery", async () => {
-    const events = createMemoryEventStore();
+    const eventStore = createMemoryEventStore();
     const webhookResponse = await deliverWebhook({
-      events,
+      events: eventStore,
       eventType: "pull_request",
       deliveryId: "delivery-1",
       payload: allowedPayload({
@@ -188,7 +188,7 @@ const it = test
         label: { name: "bug" },
       }),
     });
-    const storedEvents = await events.readSince(0);
+    const storedEvents = await eventStore.readSince(0);
     return { webhookResponse, storedEvents };
   })
   .extend("excludedReviewDelivery", () =>
@@ -204,9 +204,9 @@ const it = test
     }),
   )
   .extend("checkSuiteDelivery", async () => {
-    const events = createMemoryEventStore();
+    const eventStore = createMemoryEventStore();
     const webhookResponse = await deliverWebhook({
-      events,
+      events: eventStore,
       eventType: "check_suite",
       deliveryId: "delivery-1",
       payload: allowedPayload({
@@ -214,24 +214,24 @@ const it = test
         check_suite: { conclusion: "failure", head_sha: "0a1b2c3", pull_requests: [{ number: 7 }] },
       }),
     });
-    const storedEvents = await events.readSince(0);
+    const storedEvents = await eventStore.readSince(0);
     return { webhookResponse, storedEvents };
   })
   .extend("eventsAfterCloseDelivery", async () => {
-    const events = createMemoryEventStore();
+    const eventStore = createMemoryEventStore();
     await deliverWebhook({
-      events,
+      events: eventStore,
       eventType: "pull_request",
       deliveryId: "delivery-1",
       payload: allowedPayload({ action: "opened", pull_request: { number: 7 } }),
     });
     await deliverWebhook({
-      events,
+      events: eventStore,
       eventType: "pull_request",
       deliveryId: "delivery-2",
       payload: allowedPayload({ action: "closed", pull_request: { number: 7 } }),
     });
-    return events.readSince(0);
+    return eventStore.readSince(0);
   })
   .extend("closeDeliveryWithFailingDeletion", () => {
     const failingDeletion: EventStore = {

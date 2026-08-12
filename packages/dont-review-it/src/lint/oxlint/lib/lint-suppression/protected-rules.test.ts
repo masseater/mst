@@ -9,8 +9,8 @@ const KEPT_RULE =
 
 const A_PROTECTED_RULE = "forbid-target-file--delete-or-relocate";
 
-const protectedAfter = (options: Readonly<Options>): readonly string[] =>
-  protectedRulesFrom({ settings: protectionSettingsIn(options), keptRule: KEPT_RULE });
+const protectedAfter = (ruleOptions: Readonly<Options>): readonly string[] =>
+  protectedRulesFrom({ settings: protectionSettingsIn(ruleOptions), keptRule: KEPT_RULE });
 
 describe("protected-rules", () => {
   test("the default protected set is the bundle this package carries", () => {
@@ -20,14 +20,14 @@ describe("protected-rules", () => {
     expect(protectedRules).toContain(KEPT_RULE);
   });
 
-  test("options this rule cannot read leave the default set standing", () => {
+  test("ruleOptions this rule cannot read leave the default set standing", () => {
     expect(protectedAfter([["forbid-target-file--delete-or-relocate"]])).toHaveLength(20);
     expect(protectedAfter([null])).toHaveLength(20);
     expect(protectedAfter([{ protectedRules: "no-console" }])).toHaveLength(20);
     expect(protectedAfter([{ protectedRules: [1, true] }])).toHaveLength(20);
   });
 
-  test("a rule the options name is added to the default set", () => {
+  test("a rule the ruleOptions name is added to the default set", () => {
     expect(protectedAfter([{ protectedRules: ["no-console"] }])).toContain("no-console");
   });
 
@@ -36,19 +36,21 @@ describe("protected-rules", () => {
   });
 
   test("a deviation carrying grounds takes its rule out of the set", () => {
-    const options = [{ unprotected: [{ rule: A_PROTECTED_RULE, reason: "the registry owns it" }] }];
-    expect(protectedAfter(options)).not.toContain(A_PROTECTED_RULE);
+    const ruleOptions = [
+      { unprotected: [{ rule: A_PROTECTED_RULE, reason: "the registry owns it" }] },
+    ];
+    expect(protectedAfter(ruleOptions)).not.toContain(A_PROTECTED_RULE);
   });
 
   test("a deviation spelled with the plugin prefix reaches the same rule", () => {
-    const options = [
+    const ruleOptions = [
       {
         unprotected: [
           { rule: `dont-review-it/${A_PROTECTED_RULE}`, reason: "the registry owns it" },
         ],
       },
     ];
-    expect(protectedAfter(options)).not.toContain(A_PROTECTED_RULE);
+    expect(protectedAfter(ruleOptions)).not.toContain(A_PROTECTED_RULE);
   });
 
   test("a deviation without grounds leaves its rule in the set", () => {
@@ -64,10 +66,10 @@ describe("protected-rules", () => {
   });
 
   test("a deviation naming the rule this set always keeps changes nothing", () => {
-    const options = [
+    const ruleOptions = [
       { unprotected: [{ rule: KEPT_RULE, reason: "this repository writes rules" }] },
     ];
-    expect(protectedAfter(options)).toContain(KEPT_RULE);
+    expect(protectedAfter(ruleOptions)).toContain(KEPT_RULE);
   });
 
   test("deviation entries this rule cannot read are dropped", () => {
@@ -77,7 +79,7 @@ describe("protected-rules", () => {
     ).toHaveLength(20);
   });
 
-  test("the settings carry the lists the options spell out", () => {
+  test("the settings carry the lists the ruleOptions spell out", () => {
     const settings = protectionSettingsIn([
       {
         protectedRules: ["no-console"],
@@ -94,7 +96,7 @@ describe("protected-rules", () => {
     });
   });
 
-  test("settings read from options that spell nothing are empty", () => {
+  test("settings read from ruleOptions that spell nothing are empty", () => {
     expect(protectionSettingsIn([])).toStrictEqual({
       addedRules: [],
       deviations: [],

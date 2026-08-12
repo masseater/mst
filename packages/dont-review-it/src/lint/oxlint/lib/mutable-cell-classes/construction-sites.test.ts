@@ -5,13 +5,13 @@ import { sourceFactsIn, type ConstructionSite } from "./construction-sites.ts";
 
 const factsOf = (sourceText: string) => sourceFactsIn(parseSync("cell.ts", sourceText).program);
 
-const soleSiteOf = (body: string): ConstructionSite => {
-  const [site] = factsOf(`class Cell {}\nconst walk = () => {\n${body}\n};\n`).constructions;
-  if (site === undefined) throw new Error(`nothing is constructed by: ${body}`);
+const soleSiteOf = (writtenBody: string): ConstructionSite => {
+  const [site] = factsOf(`class Cell {}\nconst walk = () => {\n${writtenBody}\n};\n`).constructions;
+  if (site === undefined) throw new Error(`nothing is constructed by: ${writtenBody}`);
   return site;
 };
 
-const escapesFrom = (body: string): boolean => soleSiteOf(body).escapes;
+const escapesFrom = (writtenBody: string): boolean => soleSiteOf(writtenBody).escapes;
 
 const divertsCell = (sourceText: string): boolean => factsOf(sourceText).divertedNames.has("Cell");
 

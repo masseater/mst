@@ -6,10 +6,13 @@ import { createOwnerFilter } from "./owner-filter.ts";
 import type { GithubReader } from "./github-reader.ts";
 import type { StoredEvent } from "./store.ts";
 
-const relayedEvent = (id: string, shape: Partial<Omit<StoredEvent, "id">> = {}): StoredEvent => ({
-  id,
+const relayedEvent = (
+  identity: string,
+  shape: Partial<Omit<StoredEvent, "identity">> = {},
+): StoredEvent => ({
+  id: identity,
   eventType: "pull_request",
-  deliveryId: id,
+  deliveryId: identity,
   payload: {},
   receivedAtMs: 100,
   expiresAtMs: Number.MAX_SAFE_INTEGER,
@@ -31,7 +34,7 @@ const filterWith = (overrides: Partial<GithubReader> = {}) =>
 const it = test
   .extend("reviewRequestForNamedReviewer", () =>
     filterWith().owns({
-      event: relayedEvent("delivery-1", {
+      stored: relayedEvent("delivery-1", {
         payload: {
           action: "review_requested",
           pull_request: { number: 7, user: { login: "octocat" } },
@@ -42,7 +45,7 @@ const it = test
     }))
   .extend("reviewRequestForAuthor", () =>
     filterWith().owns({
-      event: relayedEvent("delivery-1", {
+      stored: relayedEvent("delivery-1", {
         payload: {
           action: "review_requested",
           pull_request: { number: 7, user: { login: "octocat" } },
@@ -54,7 +57,7 @@ const it = test
   )
   .extend("synchronizeForCurrentReviewer", () =>
     filterWith().owns({
-      event: relayedEvent("delivery-1", {
+      stored: relayedEvent("delivery-1", {
         payload: {
           action: "synchronize",
           pull_request: {
@@ -69,7 +72,7 @@ const it = test
   )
   .extend("synchronizeForAuthor", () =>
     filterWith().owns({
-      event: relayedEvent("delivery-1", {
+      stored: relayedEvent("delivery-1", {
         payload: {
           action: "synchronize",
           pull_request: {
@@ -84,7 +87,7 @@ const it = test
   )
   .extend("baseEditedForCurrentReviewer", () =>
     filterWith().owns({
-      event: relayedEvent("delivery-1", {
+      stored: relayedEvent("delivery-1", {
         payload: {
           action: "edited",
           changes: { base: {} },
@@ -100,7 +103,7 @@ const it = test
   )
   .extend("titleEditedForCurrentReviewer", () =>
     filterWith().owns({
-      event: relayedEvent("delivery-1", {
+      stored: relayedEvent("delivery-1", {
         payload: {
           action: "edited",
           changes: { title: { from: "Old" } },
@@ -116,7 +119,7 @@ const it = test
   )
   .extend("openedForMatchingAuthor", () =>
     filterWith().owns({
-      event: relayedEvent("delivery-1", {
+      stored: relayedEvent("delivery-1", {
         payload: { action: "opened", pull_request: { number: 7, user: { login: "octocat" } } },
       }),
       subscriberLogin: "octocat",
@@ -124,7 +127,7 @@ const it = test
   )
   .extend("openedForDifferentlyCasedAuthor", () =>
     filterWith().owns({
-      event: relayedEvent("delivery-1", {
+      stored: relayedEvent("delivery-1", {
         payload: { action: "opened", pull_request: { number: 7, user: { login: "OctoCat" } } },
       }),
       subscriberLogin: "octocat",
@@ -139,7 +142,7 @@ const it = test
       }),
     );
     const owned = await ownerFilter.owns({
-      event: relayedEvent("delivery-2", {
+      stored: relayedEvent("delivery-2", {
         eventType: "check_suite",
         payload: {
           action: "completed",
@@ -155,14 +158,14 @@ const it = test
     return { owned, resolvePullAuthor };
   })
   .extend("ownershipFromStoredEvent", async () => {
-    const events = createMemoryEventStore();
-    await events.createIfAbsent(
+    const eventStore = createMemoryEventStore();
+    await eventStore.createIfAbsent(
       relayedEvent("delivery-authored", {
         payload: { pull_request: { number: 7, user: { login: "octocat" } } },
       }),
     );
-    return createOwnerFilter({ events, github: stubGithub() }).owns({
-      event: relayedEvent("delivery-2", {
+    return createOwnerFilter({ events: eventStore, github: stubGithub() }).owns({
+      stored: relayedEvent("delivery-2", {
         eventType: "check_suite",
         payload: { check_suite: { pull_requests: [{ number: 7 }] } },
       }),
@@ -171,7 +174,7 @@ const it = test
   })
   .extend("ownershipFromGithubState", () =>
     filterWith({ resolvePullAuthor: () => Promise.resolve("octocat") }).owns({
-      event: relayedEvent("delivery-2", {
+      stored: relayedEvent("delivery-2", {
         eventType: "check_suite",
         payload: { check_suite: { pull_requests: [{ number: 7 }] } },
       }),
@@ -180,7 +183,7 @@ const it = test
   )
   .extend("ownershipWithoutResolvableAuthor", () =>
     filterWith().owns({
-      event: relayedEvent("delivery-2", {
+      stored: relayedEvent("delivery-2", {
         eventType: "check_suite",
         payload: { check_suite: { pull_requests: [{ number: 7 }] } },
       }),
@@ -189,7 +192,7 @@ const it = test
   )
   .extend("ownershipWithoutPullNumber", () =>
     filterWith().owns({
-      event: relayedEvent("delivery-2", {
+      stored: relayedEvent("delivery-2", {
         eventType: "check_suite",
         payload: { check_suite: { pull_requests: [] } },
       }),
@@ -200,7 +203,7 @@ const it = test
     filterWith({
       resolvePullAuthor: (prNumber) => Promise.resolve(prNumber === 7 ? "hubot" : "octocat"),
     }).owns({
-      event: relayedEvent("delivery-2", {
+      stored: relayedEvent("delivery-2", {
         eventType: "check_suite",
         payload: { check_suite: { pull_requests: [{ number: 7 }, { number: 8 }] } },
       }),
@@ -221,7 +224,7 @@ const it = test
       relayedEvent("delivery-2", { payload: { action: "closed", pull_request: { number: 7 } } }),
     );
     const owned = await ownerFilter.owns({
-      event: relayedEvent("delivery-3", {
+      stored: relayedEvent("delivery-3", {
         eventType: "check_suite",
         payload: { check_suite: { pull_requests: [{ number: 7 }] } },
       }),
@@ -241,7 +244,7 @@ const it = test
       relayedEvent("delivery-2", { payload: { action: "labeled", pull_request: { number: 7 } } }),
     );
     const owned = await ownerFilter.owns({
-      event: relayedEvent("delivery-3", {
+      stored: relayedEvent("delivery-3", {
         eventType: "check_suite",
         payload: { check_suite: { pull_requests: [{ number: 7 }] } },
       }),
@@ -257,7 +260,7 @@ const it = test
       }),
     );
     return ownerFilter.owns({
-      event: relayedEvent("delivery-2", {
+      stored: relayedEvent("delivery-2", {
         eventType: "check_suite",
         payload: { check_suite: { pull_requests: [{ number: 7 }] } },
       }),
@@ -270,7 +273,7 @@ const it = test
       relayedEvent("delivery-1", { payload: { action: "opened", pull_request: { number: 7 } } }),
     );
     return ownerFilter.owns({
-      event: relayedEvent("delivery-2", {
+      stored: relayedEvent("delivery-2", {
         eventType: "check_suite",
         payload: { check_suite: { pull_requests: [{ number: 7 }] } },
       }),
@@ -350,7 +353,7 @@ describe("作者判定", () => {
       filterWith({
         resolvePullAuthor: () => Promise.reject(new Error("github unreachable")),
       }).owns({
-        event: relayedEvent("delivery-2", {
+        stored: relayedEvent("delivery-2", {
           eventType: "check_suite",
           payload: { check_suite: { pull_requests: [{ number: 7 }] } },
         }),

@@ -15,28 +15,28 @@ const DEFAULT_SOURCE_NAME = "source.tsx";
 
 const POSITION_FIELDS: ReadonlySet<string> = new Set(["start", "end", "range", "loc"]);
 
-const isNode = (value: unknown): value is UnknownFields =>
-  value !== null && typeof value === "object" && !Array.isArray(value);
+const isNode = (candidate: unknown): candidate is UnknownFields =>
+  candidate !== null && typeof candidate === "object" && !Array.isArray(candidate);
 
 const namedFieldsOf = (node: UnknownFields): readonly (readonly [string, unknown])[] =>
   Object.entries(node).filter(([field]) => !POSITION_FIELDS.has(field));
 
 const jsonTextOf: (value: unknown) => string = JSON.stringify;
 
-const structureOf = (value: unknown): string => {
-  if (Array.isArray(value)) return `[${value.map(structureOf).join(",")}]`;
-  if (!isNode(value)) return jsonTextOf(value);
-  return `{${namedFieldsOf(value)
+const structureOf = (held: unknown): string => {
+  if (Array.isArray(held)) return `[${held.map(structureOf).join(",")}]`;
+  if (!isNode(held)) return jsonTextOf(held);
+  return `{${namedFieldsOf(held)
     .map(([field, nested]) => `${field}:${structureOf(nested)}`)
     .join(",")}}`;
 };
 
-const nodeCountOf = (value: unknown): number => {
-  if (Array.isArray(value))
-    return value.reduce<number>((total, item) => total + nodeCountOf(item), 0);
-  if (!isNode(value)) return 0;
-  const own = typeof value[NODE_TYPE_FIELD] === "string" ? 1 : 0;
-  return namedFieldsOf(value).reduce((total, [, nested]) => total + nodeCountOf(nested), own);
+const nodeCountOf = (held: unknown): number => {
+  if (Array.isArray(held))
+    return held.reduce<number>((counted, member) => counted + nodeCountOf(member), 0);
+  if (!isNode(held)) return 0;
+  const own = typeof held[NODE_TYPE_FIELD] === "string" ? 1 : 0;
+  return namedFieldsOf(held).reduce((counted, [, nested]) => counted + nodeCountOf(nested), own);
 };
 
 const declarationFrom = ({
@@ -56,8 +56,8 @@ const bindingsOf = (statement: UnknownFields): readonly UnknownFields[] =>
   (statement.declarations as readonly unknown[]).filter(isNode);
 
 const namedBindingIn = (binding: UnknownFields): string | null => {
-  const id = binding.id as UnknownFields;
-  return id[NODE_TYPE_FIELD] === "Identifier" ? String(id.name) : null;
+  const bound = binding.id as UnknownFields;
+  return bound[NODE_TYPE_FIELD] === "Identifier" ? String(bound.name) : null;
 };
 
 const bindingBodyOf = (binding: UnknownFields): unknown => ({
@@ -101,12 +101,12 @@ const bindingDeclarationsIn = (
   statement: UnknownFields,
 ): readonly BodyDeclaration[] =>
   bindingsOf(statement).flatMap((binding) => {
-    const name = namedBindingIn(binding);
-    if (name === null) return [];
+    const bindingName = namedBindingIn(binding);
+    if (bindingName === null) return [];
     return [
       declarationFrom({
         source,
-        described: { name, start: startOf(statement), body: bindingBodyOf(binding) },
+        described: { name: bindingName, start: startOf(statement), body: bindingBodyOf(binding) },
       }),
     ];
   });
@@ -118,11 +118,11 @@ const namedDeclarationsIn = (
   const bodyOf = BODY_BY_STATEMENT_KIND[String(statement[NODE_TYPE_FIELD])];
   if (bodyOf === undefined) return [];
 
-  const name = declaredNameOf(statement);
+  const declaredName = declaredNameOf(statement);
   return [
     declarationFrom({
       source,
-      described: { name, start: startOf(statement), body: bodyOf(statement) },
+      described: { name: declaredName, start: startOf(statement), body: bodyOf(statement) },
     }),
   ];
 };
@@ -133,15 +133,17 @@ const declarationsFromStatement = (
 ): readonly BodyDeclaration[] => {
   if (!isNode(statement)) return [];
 
-  const kind = statement[NODE_TYPE_FIELD];
-  if (kind === "ExportNamedDeclaration") {
+  const statementType = statement[NODE_TYPE_FIELD];
+  if (statementType === "ExportNamedDeclaration") {
     return declarationsFromStatement(source, statement.declaration);
   }
-  if (kind === "VariableDeclaration") return bindingDeclarationsIn(source, statement);
+  if (statementType === "VariableDeclaration") return bindingDeclarationsIn(source, statement);
   return namedDeclarationsIn(source, statement);
 };
 
 export const declarationsIn = (source: string): readonly BodyDeclaration[] => {
-  const parsed = parseSync(DEFAULT_SOURCE_NAME, source);
-  return parsed.program.body.flatMap((statement) => declarationsFromStatement(source, statement));
+  const parsedProgram = parseSync(DEFAULT_SOURCE_NAME, source);
+  return parsedProgram.program.body.flatMap((statement) =>
+    declarationsFromStatement(source, statement),
+  );
 };

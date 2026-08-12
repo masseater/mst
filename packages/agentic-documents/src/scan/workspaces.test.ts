@@ -16,10 +16,10 @@ describe("collectWorkspaces", () => {
     onTestFinished(() => {
       rmSync(root, { recursive: true, force: true });
     });
-    for (const [path, text] of Object.entries(files)) {
-      const target = join(root, path);
-      mkdirSync(dirname(target), { recursive: true });
-      writeFileSync(target, text, "utf8");
+    for (const [path, source] of Object.entries(files)) {
+      const absolutePath = join(root, path);
+      mkdirSync(dirname(absolutePath), { recursive: true });
+      writeFileSync(absolutePath, source, "utf8");
     }
     return root;
   };
@@ -63,7 +63,7 @@ describe("collectWorkspaces", () => {
     });
 
     expect(
-      (await collected(repositoryRoot)).incomplete.map((entry) => entry.directory),
+      (await collected(repositoryRoot)).incomplete.map((listed) => listed.directory),
     ).toStrictEqual(["packages/session", "packages/user"]);
   });
 

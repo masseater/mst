@@ -79,7 +79,7 @@ export const requireSpecLintCoverage = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
+  create(inspection) {
     const bindings = testBlockBindings();
     const blockCalls = new Set<ESTree.CallExpression>();
     const foreignNames = new Map<string, ESTree.Node>();
@@ -96,9 +96,9 @@ export const requireSpecLintCoverage = createDontReviewItRule({
         rootNames: bindings.rootNames(),
         foreignNames,
       });
-      if (!isSpecFile(context.filename, DEFAULT_SPEC_FILE_SUFFIXES)) {
+      if (!isSpecFile(inspection.filename, DEFAULT_SPEC_FILE_SUFFIXES)) {
         if (root === null) return;
-        context.report({
+        inspection.report({
           node: root,
           messageId: "uncoveredSpecFile",
           data: { blockName: root.name, specSuffixes: SPELLED_SPEC_SUFFIXES },
@@ -106,9 +106,9 @@ export const requireSpecLintCoverage = createDontReviewItRule({
         return;
       }
 
-      if (root !== null || [...reachedNames].some((name) => !foreignNames.has(name))) return;
+      if (root !== null || [...reachedNames].some((spelled) => !foreignNames.has(spelled))) return;
       for (const [boundName, node] of foreignNames) {
-        context.report({
+        inspection.report({
           node,
           messageId: "unrelatedFileInScope",
           data: { boundName, specSuffixes: SPELLED_SPEC_SUFFIXES },
@@ -120,7 +120,7 @@ export const requireSpecLintCoverage = createDontReviewItRule({
       for (const weakened of weakenedTargetRulesIn({ lint, targetRules: SPEC_DISCIPLINE_RULES })) {
         const scope = scopeSpellingOf(weakened.property);
         const carried = { ruleName: weakened.ruleName, severity: weakened.severity };
-        context.report({
+        inspection.report({
           node: weakened.property,
           messageId: scope === null ? "disabledBundleRule" : "scopedDisabledBundleRule",
           data: scope === null ? carried : { ...carried, scope },
@@ -129,9 +129,11 @@ export const requireSpecLintCoverage = createDontReviewItRule({
     };
 
     const reportIgnoredSpecFiles = (lint: ESTree.ObjectExpression): void => {
-      const repositoryRoot = findWorkspaceRoot(dirname(resolve(context.cwd, context.filename)));
+      const repositoryRoot = findWorkspaceRoot(
+        dirname(resolve(inspection.cwd, inspection.filename)),
+      );
       for (const ignored of ignoredSpecFilesIn({ lint, repositoryRoot })) {
-        context.report({
+        inspection.report({
           node: ignored.entry.element,
           messageId: "ignoredSpecFile",
           data: { pattern: ignored.entry.pattern, matchedPath: ignored.matchedPath },
@@ -145,7 +147,7 @@ export const requireSpecLintCoverage = createDontReviewItRule({
       reportWeakenedRules(lint);
       reportIgnoredSpecFiles(lint);
       for (const setting of perRuleSettingsIn(lint)) {
-        context.report({
+        inspection.report({
           node: setting.property,
           messageId: "settingWrittenPerRule",
           data: { settingKey: setting.settingKey, ruleName: setting.ruleName },
@@ -156,7 +158,7 @@ export const requireSpecLintCoverage = createDontReviewItRule({
     return {
       ImportDeclaration(node: ESTree.ImportDeclaration) {
         bindings.takeImport(node);
-        for (const name of importedReservedNames(node)) reachedNames.add(name);
+        for (const spelled of importedReservedNames(node)) reachedNames.add(spelled);
       },
       VariableDeclarator(node: ESTree.VariableDeclarator) {
         bindings.takeLocalBinding(node);
@@ -176,7 +178,8 @@ export const requireSpecLintCoverage = createDontReviewItRule({
       },
       "Program:exit"(node: ESTree.Program) {
         reportFile();
-        if (LINT_CONFIGURATION_FILE.test(toPosixPath(context.filename))) reportConfiguration(node);
+        if (LINT_CONFIGURATION_FILE.test(toPosixPath(inspection.filename)))
+          reportConfiguration(node);
       },
     };
   },

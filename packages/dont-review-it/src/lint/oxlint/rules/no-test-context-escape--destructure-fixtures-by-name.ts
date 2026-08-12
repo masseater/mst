@@ -105,7 +105,7 @@ export const noTestContextEscape = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
+  create(inspection) {
     const bindings = testBlockBindings();
     const calls = new Set<ESTree.CallExpression>();
     const reaches = new Set<ContextReach>();
@@ -149,14 +149,14 @@ export const noTestContextEscape = createDontReviewItRule({
 
         for (const taker of takers) {
           for (const fault of contextFaultsOf(taker)) {
-            context.report({ node: fault.node, messageId: fault.messageId });
+            inspection.report({ node: fault.node, messageId: fault.messageId });
           }
         }
 
         const held = [...takers].flatMap(heldContextOf);
         for (const reach of reaches) {
           if (!isHeldContextReach(reach, held)) continue;
-          context.report({
+          inspection.report({
             node: reach.node,
             messageId: "traversedContext",
             data: { held: reach.name },

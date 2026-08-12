@@ -42,25 +42,27 @@ export const forbidRestrictedTargetRelay = createDontReviewItRule({
     },
     schema: RESTRICTED_TARGET_SCHEMA,
   },
-  create(context) {
-    const entries = restrictedTargetsFrom(context.options);
-    if (entries.length === 0) return {};
+  create(inspection) {
+    const listedEntries = restrictedTargetsFrom(inspection.options);
+    if (listedEntries.length === 0) return {};
 
-    const fromFile = resolve(context.cwd, context.filename);
-    const aliases = internalAliasesFrom(context.options);
+    const fromFile = resolve(inspection.cwd, inspection.filename);
+    const aliases = internalAliasesFrom(inspection.options);
 
     const readingPolicyOf = memoize(
       (): ReachPolicy => ({
         workspaceRoot: findWorkspaceRoot(dirname(fromFile)),
-        entries: entriesInForceAt({ entries, file: fromFile, cwd: context.cwd }),
+        entries: entriesInForceAt({ entries: listedEntries, file: fromFile, cwd: inspection.cwd }),
         aliases,
       }),
     );
 
-    const forwardingPolicyOf = memoize((): ReachPolicy => ({ ...readingPolicyOf(), entries }));
+    const forwardingPolicyOf = memoize(
+      (): ReachPolicy => ({ ...readingPolicyOf(), entries: listedEntries }),
+    );
 
     const constantsOf = memoize(
-      (): ReadonlyMap<string, string> => constantSpecifiersIn(context.sourceCode.ast.body),
+      (): ReadonlyMap<string, string> => constantSpecifiersIn(inspection.sourceCode.ast.body),
     );
 
     const reportForward = (forwarded: {
@@ -69,9 +71,9 @@ export const forbidRestrictedTargetRelay = createDontReviewItRule({
       readonly exported: string | null;
       readonly exposed: string;
     }): void => {
-      const named = matchingRestrictedTarget({ entries, forwarded });
+      const named = matchingRestrictedTarget({ entries: listedEntries, forwarded });
       if (named !== null) {
-        context.report({
+        inspection.report({
           node: forwarded.statement,
           messageId: "restrictedTargetForward",
           data: {
@@ -89,7 +91,7 @@ export const forbidRestrictedTargetRelay = createDontReviewItRule({
         policy: forwardingPolicyOf(),
       });
       if (reached === null) return;
-      context.report({
+      inspection.report({
         node: forwarded.statement,
         messageId: "relayedTargetForward",
         data: {
@@ -111,7 +113,7 @@ export const forbidRestrictedTargetRelay = createDontReviewItRule({
         policy: readingPolicyOf(),
       });
       if (reached === null) return;
-      context.report({
+      inspection.report({
         node,
         messageId: "relayedTargetReach",
         data: {

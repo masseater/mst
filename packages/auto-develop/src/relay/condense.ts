@@ -15,7 +15,7 @@ const condensedPullRequest = (
   pullRequest: Readonly<Record<string, unknown>>,
 ): Readonly<Record<string, unknown>> => {
   const login = asRecord(pullRequest.user)?.login;
-  const labels = namedEntries(pullRequest.labels, "name");
+  const spelledLabels = namedEntries(pullRequest.labels, "name");
   const requestedReviewers = namedEntries(pullRequest.requested_reviewers, "login");
   return {
     ...(typeof pullRequest.number === "number" ? { number: pullRequest.number } : {}),
@@ -24,20 +24,20 @@ const condensedPullRequest = (
     ...(pullRequest.merge_state_status === undefined
       ? {}
       : { merge_state_status: pullRequest.merge_state_status }),
-    ...(labels.length === 0 ? {} : { labels }),
+    ...(spelledLabels.length === 0 ? {} : { labels: spelledLabels }),
     ...(requestedReviewers.length === 0 ? {} : { requested_reviewers: requestedReviewers }),
   };
 };
 
 const condensePullRequestEvent = (
-  payload: Readonly<Record<string, unknown>>,
+  carried: Readonly<Record<string, unknown>>,
 ): Readonly<Record<string, unknown>> => {
-  const pullRequest = asRecord(payload.pull_request);
-  const requestedReviewerLogin = asRecord(payload.requested_reviewer)?.login;
-  const changes = asRecord(payload.changes);
-  const labelName = asRecord(payload.label)?.name;
+  const pullRequest = asRecord(carried.pull_request);
+  const requestedReviewerLogin = asRecord(carried.requested_reviewer)?.login;
+  const changes = asRecord(carried.changes);
+  const labelName = asRecord(carried.label)?.name;
   return {
-    action: payload.action,
+    action: carried.action,
     ...(pullRequest === undefined ? {} : { pull_request: condensedPullRequest(pullRequest) }),
     ...(typeof requestedReviewerLogin === "string"
       ? { requested_reviewer: { login: requestedReviewerLogin } }
@@ -48,13 +48,13 @@ const condensePullRequestEvent = (
 };
 
 const condenseReviewEvent = (
-  payload: Readonly<Record<string, unknown>>,
+  carried: Readonly<Record<string, unknown>>,
 ): Readonly<Record<string, unknown>> => {
-  const pullRequest = asRecord(payload.pull_request);
+  const pullRequest = asRecord(carried.pull_request);
   const login = asRecord(pullRequest?.user)?.login;
-  const review = asRecord(payload.review);
+  const review = asRecord(carried.review);
   return {
-    action: payload.action,
+    action: carried.action,
     ...(pullRequest === undefined
       ? {}
       : {
@@ -68,10 +68,10 @@ const condenseReviewEvent = (
 };
 
 const condenseCheckSuiteEvent = (
-  payload: Readonly<Record<string, unknown>>,
+  carried: Readonly<Record<string, unknown>>,
 ): Readonly<Record<string, unknown>> => {
-  const checkSuite = asRecord(payload.check_suite);
-  if (checkSuite === undefined) return { action: payload.action };
+  const checkSuite = asRecord(carried.check_suite);
+  if (checkSuite === undefined) return { action: carried.action };
   const pullRequests = Array.isArray(checkSuite.pull_requests)
     ? checkSuite.pull_requests.flatMap((candidate) => {
         const mentionedNumber = asRecord(candidate)?.number;
@@ -79,7 +79,7 @@ const condenseCheckSuiteEvent = (
       })
     : [];
   return {
-    action: payload.action,
+    action: carried.action,
     check_suite: {
       conclusion: checkSuite.conclusion,
       head_sha: checkSuite.head_sha,

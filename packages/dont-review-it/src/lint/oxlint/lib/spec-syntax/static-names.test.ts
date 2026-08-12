@@ -17,8 +17,8 @@ const firstPropertyIn = (objectSource: string): ESTree.ObjectProperty => {
   const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
   if (declarator === undefined) throw new Error(`nothing is declared by: ${objectSource}`);
 
-  const object = declarator.init as ESTree.ObjectExpression;
-  const [property] = object.properties;
+  const holder = declarator.init as ESTree.ObjectExpression;
+  const [property] = holder.properties;
   return property as ESTree.ObjectProperty;
 };
 
@@ -53,8 +53,8 @@ describe("spec-syntax/static-names", () => {
   test("a private field stays distinct from a public member of the same spelling", () => {
     const declared = firstStatementIn("class Suite { #skip = 1; read() { return this.#skip; } }");
     const [, method] = (declared as ESTree.Class).body.body;
-    const body = (method as ESTree.MethodDefinition).value.body as ESTree.FunctionBody;
-    const [returned] = body.body;
+    const writtenBody = (method as ESTree.MethodDefinition).value.body as ESTree.FunctionBody;
+    const [returned] = writtenBody.body;
     const read = (returned as ESTree.ReturnStatement).argument as ESTree.MemberExpression;
 
     expect(staticMemberName(read)).toBe(null);

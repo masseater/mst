@@ -3,8 +3,8 @@ import { describe } from "vite-plus/test";
 
 import { noExplainedLintMessage } from "./no-explained-lint-message--state-prohibition-then-fix.ts";
 
-const ruleShape = (description: string, messages: string): string =>
-  `const rule = createRule({ name: "a-rule", meta: { docs: { description: "${description}" }, messages: { ${messages} } } });`;
+const ruleShape = (description: string, complaints: string): string =>
+  `const rule = createRule({ name: "a-rule", meta: { docs: { description: "${description}" }, messages: { ${complaints} } } });`;
 
 describe("lint-rule-authoring/no-explained-lint-message--state-prohibition-then-fix", () => {
   testLintRule(noExplainedLintMessage, {
@@ -35,15 +35,15 @@ describe("lint-rule-authoring/no-explained-lint-message--state-prohibition-then-
         code: "const rule = createRule({ meta: { docs: { description: `Disallow a wrapper` }, messages: { unwrapped: `A block must not skip ${WRAPPER}. Wrap the block.` } } });",
       },
       {
-        name: "an object that carries messages without docs is not a rule meta",
+        name: "an object that carries complaints without docs is not a rule meta",
         code: 'const rule = createRule({ meta: { messages: { note: "anything at all" } } });',
       },
       {
-        name: "an object that carries docs without messages is not a rule meta",
+        name: "an object that carries docs without complaints is not a rule meta",
         code: 'const rule = createRule({ meta: { docs: { description: "anything at all" } } });',
       },
       {
-        name: "an object outside a meta property carries no lint messages to inspect",
+        name: "an object outside a meta property carries no lint complaints to inspect",
         code: 'const probe = { docs: { description: "reports what the reader read" }, messages: { read: "{{text}}" } };',
       },
       {
@@ -63,19 +63,19 @@ describe("lint-rule-authoring/no-explained-lint-message--state-prohibition-then-
         code: 'const rule = createRule({ ["meta"]: { docs: { description: "d" }, messages: { a: "bad" } } });',
       },
       {
-        name: "a meta value that is not an object carries no messages",
+        name: "a meta value that is not an object carries no complaints",
         code: "const rule = createRule({ meta: 1 });",
       },
       {
-        name: "a messages value that is not an object carries no message to read",
+        name: "a complaints value that is not an object carries no message to read",
         code: 'const rule = createRule({ meta: { docs: { description: "d" }, messages: "none" } });',
       },
       {
-        name: "a spread inside meta declares neither docs nor messages",
+        name: "a spread inside meta declares neither docs nor complaints",
         code: 'const rule = createRule({ meta: { ...base, docs: { description: "d" }, messages: { a: "A thing must not stand. Delete it." } } });',
       },
       {
-        name: "a spread inside messages declares no message of its own",
+        name: "a spread inside complaints declares no message of its own",
         code: "const rule = createRule({ meta: { docs: { description: `d` }, messages: { ...shared } } });",
       },
       {
@@ -83,7 +83,7 @@ describe("lint-rule-authoring/no-explained-lint-message--state-prohibition-then-
         code: 'const rule = createRule({ [names.meta]: { docs: { description: "d" }, messages: { a: "bad" } } });',
       },
       {
-        name: "several compliant messages in one rule all pass",
+        name: "several compliant complaints in one rule all pass",
         code: ruleShape(
           "Disallow two shapes",
           'first: "A binding must not be written to. Declare the value where the name is bound.", second: "A property must not be deleted. Take the keys to keep."',

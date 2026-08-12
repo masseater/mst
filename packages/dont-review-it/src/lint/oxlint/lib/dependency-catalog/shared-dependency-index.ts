@@ -83,7 +83,9 @@ export const sharedDependencyIndex = (repository: {
     placed: placedDependenciesIn(repository.workspaces),
     catalog: repository.catalog,
   })
-    .flatMap((entry) => entry.sites.map((site) => ({ relativeDir: site.relativeDir, entry })))
+    .flatMap((listed) =>
+      listed.sites.map((site) => ({ relativeDir: site.relativeDir, entry: listed })),
+    )
     .filter(
       (claim) =>
         repository.deviations.get(claim.relativeDir)?.has(claim.entry.packageName) !== true,

@@ -20,7 +20,7 @@ vi.mock(import("node:fs"), async (importOriginal) => {
 
 const CACHE_SEGMENTS = ["node_modules", ".cache", "mst-dont-review-it", "canonical-values.json"];
 
-const ENTRY = {
+const CATALOG_ENTRY = {
   conceptId: "user.status",
   declarationPath: "src/user.ts",
   exportPath: null,
@@ -37,28 +37,28 @@ describe("catalog-cache", () => {
     return root;
   };
 
-  const withCache = (text: string): string => {
+  const withCache = (writtenText: string): string => {
     const root = repository();
     const path = join(root, ...CACHE_SEGMENTS);
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, text, "utf8");
+    writeFileSync(path, writtenText, "utf8");
     return root;
   };
 
-  const cached = (payload: unknown): string => withCache(JSON.stringify(payload));
+  const cached = (carried: unknown): string => withCache(JSON.stringify(carried));
 
   const entriesFrom = (root: string): unknown => readCachedEntries(root, "input");
 
   test("a cache written for the same input is read back", () => {
     const root = repository();
-    writeCachedEntries(root, { fingerprint: "input", entries: [ENTRY] });
+    writeCachedEntries(root, { fingerprint: "input", entries: [CATALOG_ENTRY] });
 
-    expect(entriesFrom(root)).toStrictEqual([ENTRY]);
+    expect(entriesFrom(root)).toStrictEqual([CATALOG_ENTRY]);
   });
 
   test("a cache written for a different input is not read back", () => {
     const root = repository();
-    writeCachedEntries(root, { fingerprint: "other", entries: [ENTRY] });
+    writeCachedEntries(root, { fingerprint: "other", entries: [CATALOG_ENTRY] });
 
     expect(entriesFrom(root)).toBe(null);
   });
@@ -92,7 +92,7 @@ describe("catalog-cache", () => {
   });
 
   test("a cache holding an entry that is missing a field is not read back", () => {
-    const { fingerprint, ...withoutFingerprint } = ENTRY;
+    const { fingerprint, ...withoutFingerprint } = CATALOG_ENTRY;
 
     expect(
       entriesFrom(cached({ version: 3, fingerprint: "input", entries: [withoutFingerprint] })),
@@ -102,7 +102,7 @@ describe("catalog-cache", () => {
   test("a cache holding an entry whose concept is not a word is not read back", () => {
     expect(
       entriesFrom(
-        cached({ version: 3, fingerprint: "input", entries: [{ ...ENTRY, conceptId: 1 }] }),
+        cached({ version: 3, fingerprint: "input", entries: [{ ...CATALOG_ENTRY, conceptId: 1 }] }),
       ),
     ).toBe(null);
   });
@@ -110,21 +110,27 @@ describe("catalog-cache", () => {
   test("a cache holding an entry whose export path is neither absent nor a word is not read back", () => {
     expect(
       entriesFrom(
-        cached({ version: 3, fingerprint: "input", entries: [{ ...ENTRY, exportPath: 1 }] }),
+        cached({
+          version: 3,
+          fingerprint: "input",
+          entries: [{ ...CATALOG_ENTRY, exportPath: 1 }],
+        }),
       ),
     ).toBe(null);
   });
 
   test("a cache holding an entry whose values are not a list is not read back", () => {
     expect(
-      entriesFrom(cached({ version: 3, fingerprint: "input", entries: [{ ...ENTRY, values: 1 }] })),
+      entriesFrom(
+        cached({ version: 3, fingerprint: "input", entries: [{ ...CATALOG_ENTRY, values: 1 }] }),
+      ),
     ).toBe(null);
   });
 
   test("a cache holding a value that is not a spelling is not read back", () => {
     expect(
       entriesFrom(
-        cached({ version: 3, fingerprint: "input", entries: [{ ...ENTRY, values: [{}] }] }),
+        cached({ version: 3, fingerprint: "input", entries: [{ ...CATALOG_ENTRY, values: [{}] }] }),
       ),
     ).toBe(null);
   });
@@ -135,7 +141,7 @@ describe("catalog-cache", () => {
     mkdirSync(path, { recursive: true });
 
     expect(() => {
-      writeCachedEntries(root, { fingerprint: "input", entries: [ENTRY] });
+      writeCachedEntries(root, { fingerprint: "input", entries: [CATALOG_ENTRY] });
     }).not.toThrow();
   });
 
@@ -143,7 +149,7 @@ describe("catalog-cache", () => {
     const root = join(repository(), UNWRITABLE_MARKER);
 
     expect(() => {
-      writeCachedEntries(root, { fingerprint: "input", entries: [ENTRY] });
+      writeCachedEntries(root, { fingerprint: "input", entries: [CATALOG_ENTRY] });
     }).toThrow("could not be written");
   });
 

@@ -64,12 +64,12 @@ const issueRelaySession = async (issue: {
   readonly relayOrigin: string;
   readonly githubToken: string;
 }): Promise<{ readonly token: string; readonly expiresAt: string }> => {
-  const response = await fetch(`${issue.relayOrigin}${AUTH_SESSION_PATH}`, {
+  const produced = await fetch(`${issue.relayOrigin}${AUTH_SESSION_PATH}`, {
     method: "POST",
     headers: { authorization: `Bearer ${issue.githubToken}` },
   });
-  if (!response.ok) throw new Error(`the relay refused the session with status ${response.status}`);
-  return parseAuthSession(await response.json());
+  if (!produced.ok) throw new Error(`the relay refused the session with status ${produced.status}`);
+  return parseAuthSession(await produced.json());
 };
 
 const probeRemoteHead = async (probe: {

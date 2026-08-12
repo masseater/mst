@@ -33,36 +33,36 @@ const interruptOrOpen = (interrupting: {
 
 const admits = (admitting: {
   readonly config: ReviewInputCoordinatorConfig;
-  readonly event: ReviewInputChangeEvent;
+  readonly changed: ReviewInputChangeEvent;
   readonly lane: string;
 }): boolean => {
-  const { config, event } = admitting;
-  if (config.gate.isClosed(event.prNumber)) {
-    config.log.info(event, "review input change discarded; the PR is closed");
+  const { config, changed } = admitting;
+  if (config.gate.isClosed(changed.prNumber)) {
+    config.log.info(changed, "review input change discarded; the PR is closed");
     return false;
   }
   if (!config.queue.admitsLane(admitting.lane)) {
-    config.log.info(event, "review input change discarded; the lane is filtered out");
+    config.log.info(changed, "review input change discarded; the lane is filtered out");
     return false;
   }
   return true;
 };
 
 export const createReviewInputCoordinator = (config: ReviewInputCoordinatorConfig) => {
-  return async (event: ReviewInputChangeEvent): Promise<boolean> => {
-    const lane = prLaneOf(event.prNumber);
-    if (!admits({ config, event, lane })) return false;
+  return async (changed: ReviewInputChangeEvent): Promise<boolean> => {
+    const lane = prLaneOf(changed.prNumber);
+    if (!admits({ config, changed, lane })) return false;
     const running = config.queue.runningLanes().includes(lane);
-    interruptOrOpen({ config, prNumber: event.prNumber, running });
+    interruptOrOpen({ config, prNumber: changed.prNumber, running });
     const accepted = config.queue.enqueueFollowUp({
       type: config.jobType,
-      payload: event,
-      key: event.deliveryId ?? config.jobType,
+      payload: changed,
+      key: changed.deliveryId ?? config.jobType,
       lane,
-      label: `review input change for PR #${event.prNumber}`,
+      label: `review input change for PR #${changed.prNumber}`,
     });
-    if (!accepted) config.log.info(event, "the queue refused the follow-up review");
-    if (running) await config.stopSession(event.prNumber);
+    if (!accepted) config.log.info(changed, "the queue refused the follow-up review");
+    if (running) await config.stopSession(changed.prNumber);
     return accepted;
   };
 };

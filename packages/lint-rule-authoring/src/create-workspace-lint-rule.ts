@@ -24,17 +24,17 @@ export type WorkspaceLintRule = {
   readonly create: CreateRule["create"];
 };
 
-const appendDocPointer = (body: string, identity: WorkspaceLintRuleIdentity): string =>
-  `${body.trimEnd()} See ${workspaceLintRuleDocsRelativePath(identity)}.`;
+const appendDocPointer = (writtenBody: string, identity: WorkspaceLintRuleIdentity): string =>
+  `${writtenBody.trimEnd()} See ${workspaceLintRuleDocsRelativePath(identity)}.`;
 
 const withDocPointers = (
-  messages: Record<string, string>,
+  complaints: Record<string, string>,
   identity: WorkspaceLintRuleIdentity,
 ): Record<string, string> =>
   Object.fromEntries(
-    Object.entries(messages).map(([messageId, body]) => [
+    Object.entries(complaints).map(([messageId, writtenBody]) => [
       messageId,
-      appendDocPointer(body, identity),
+      appendDocPointer(writtenBody, identity),
     ]),
   );
 
@@ -48,7 +48,8 @@ export const createWorkspaceLintRule = ({ workspaceDir }: { readonly workspaceDi
         docs: { ...rule.meta.docs, url: workspaceLintRuleDocsUrl(identity) },
         messages: withDocPointers(rule.meta.messages, identity),
       },
-      create: (context) => measureVisitor({ ruleName: rule.name, visitor: rule.create(context) }),
+      create: (inspection) =>
+        measureVisitor({ ruleName: rule.name, visitor: rule.create(inspection) }),
     };
   };
 };

@@ -27,26 +27,26 @@ export const noUnwrappedToolchainConfig = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
+  create(inspection) {
     const factory = { exportedName: CONFIG_FACTORY_NAME, binding: newBinding() };
-    const wrapper = { exportedName: WRAPPER_NAME, binding: newBinding() };
+    const wrapping = { exportedName: WRAPPER_NAME, binding: newBinding() };
 
     const reportUnwrapped = (property: ESTree.ObjectProperty): void => {
-      const name = propertyKeyOf(property);
-      if (name !== "lint" && name !== "fmt") return;
-      if (property.value.type === "CallExpression" && isCallOf(property.value.callee, wrapper)) {
+      const spelled = propertyKeyOf(property);
+      if (spelled !== "lint" && spelled !== "fmt") return;
+      if (property.value.type === "CallExpression" && isCallOf(property.value.callee, wrapping)) {
         return;
       }
-      context.report({
+      inspection.report({
         node: property,
-        messageId: name === "lint" ? "unwrappedLint" : "unwrappedFmt",
+        messageId: spelled === "lint" ? "unwrappedLint" : "unwrappedFmt",
       });
     };
 
     return {
       ImportDeclaration(node: ESTree.ImportDeclaration) {
         if (node.source.value === TOOLCHAIN_SPECIFIER) collectBinding(node, factory);
-        if (node.source.value === WRAPPER_SPECIFIER) collectBinding(node, wrapper);
+        if (node.source.value === WRAPPER_SPECIFIER) collectBinding(node, wrapping);
       },
       CallExpression(node: ESTree.CallExpression) {
         if (!isCallOf(node.callee, factory)) return;

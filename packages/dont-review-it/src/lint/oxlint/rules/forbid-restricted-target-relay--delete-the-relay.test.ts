@@ -10,10 +10,10 @@ import { forbidRestrictedTargetRelay } from "./forbid-restricted-target-relay--d
 const fixtureDir = join(realpathSync(tmpdir()), "dont-review-it-forbid-restricted-target-relay");
 rmSync(fixtureDir, { recursive: true, force: true });
 
-const fixturePath = (name: string): string => join(fixtureDir, name);
+const fixturePath = (fixtureName: string): string => join(fixtureDir, fixtureName);
 
-const writeFixture = (name: string, source: string): string => {
-  const path = fixturePath(name);
+const writeFixture = (fixtureName: string, source: string): string => {
+  const path = fixturePath(fixtureName);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, source);
   return path;
@@ -134,7 +134,7 @@ describe("dont-review-it/forbid-restricted-target-relay--delete-the-relay", () =
       },
       {
         name: "a specifier decided at run time cannot be followed to a file",
-        code: "export const load = (name: string) => import(name);",
+        code: "export const load = (fixtureName: string) => import(name);",
         filename: fixturePath("relay/reader.ts"),
         options: restrictedRetiredLib,
       },

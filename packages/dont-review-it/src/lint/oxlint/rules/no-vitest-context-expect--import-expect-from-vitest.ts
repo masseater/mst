@@ -17,8 +17,8 @@ import type { ESTree } from "@oxlint/plugins";
 
 const ASSERTION_ENTRY = "expect";
 
-const contextPatternOf = (callback: SpecFunction): ESTree.ObjectPattern | null => {
-  const [parameter] = callback.params;
+const contextPatternOf = (specCallback: SpecFunction): ESTree.ObjectPattern | null => {
+  const [parameter] = specCallback.params;
   if (parameter === undefined) return null;
 
   const written = parameter.type === "AssignmentPattern" ? parameter.left : parameter;
@@ -37,9 +37,11 @@ const takenAssertionEntry = (pattern: ESTree.ObjectPattern): ESTree.BindingPrope
   return taken[0] ?? null;
 };
 
-const contextBindingsOf = (callback: SpecFunction): readonly HeldContext[] => {
-  const name = fixtureContextParameterName(callback);
-  return name === null ? [] : [{ name, start: callback.start, end: callback.end }];
+const contextBindingsOf = (specCallback: SpecFunction): readonly HeldContext[] => {
+  const parameterName = fixtureContextParameterName(specCallback);
+  return parameterName === null
+    ? []
+    : [{ name: parameterName, start: specCallback.start, end: specCallback.end }];
 };
 
 export const noVitestContextExpect = createDontReviewItRule({
@@ -59,18 +61,18 @@ export const noVitestContextExpect = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
+  create(inspection) {
     const bindings = testBlockBindings();
     const calls = new Set<ESTree.CallExpression>();
     const accesses = new Set<ContextReach>();
 
-    const reportTakenEntry = (callback: SpecFunction): void => {
-      const pattern = contextPatternOf(callback);
+    const reportTakenEntry = (specCallback: SpecFunction): void => {
+      const pattern = contextPatternOf(specCallback);
       if (pattern === null) return;
 
       const taken = takenAssertionEntry(pattern);
       if (taken === null) return;
-      context.report({ node: taken, messageId: "destructuredContextExpect" });
+      inspection.report({ node: taken, messageId: "destructuredContextExpect" });
     };
 
     return {
@@ -89,16 +91,16 @@ export const noVitestContextExpect = createDontReviewItRule({
       },
       "Program:exit"() {
         const rootNames = bindings.rootNames();
-        const callbacks = [...calls]
+        const specCallbacks = [...calls]
           .filter((call) => declaresTestBlock(call, rootNames))
           .flatMap((call) => testCallbacksOf(call));
 
-        for (const callback of callbacks) reportTakenEntry(callback);
+        for (const specCallback of specCallbacks) reportTakenEntry(specCallback);
 
-        const held = callbacks.flatMap((callback) => contextBindingsOf(callback));
+        const held = specCallbacks.flatMap((specCallback) => contextBindingsOf(specCallback));
         for (const access of accesses) {
           if (isHeldContextReach(access, held)) {
-            context.report({ node: access.node, messageId: "reachedContextExpect" });
+            inspection.report({ node: access.node, messageId: "reachedContextExpect" });
           }
         }
       },

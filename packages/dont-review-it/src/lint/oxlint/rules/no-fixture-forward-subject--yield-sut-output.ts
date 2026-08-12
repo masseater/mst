@@ -32,15 +32,17 @@ type ForwardedSubject = {
   readonly root: ESTree.Expression;
 };
 
-const handlerScopingWrappersFrom = (options: Readonly<Options>): ReadonlySet<string> => {
-  const [first] = options;
+const handlerScopingWrappersFrom = (ruleOptions: Readonly<Options>): ReadonlySet<string> => {
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) {
     return new Set(DEFAULT_HANDLER_SCOPING_WRAPPERS);
   }
 
   const configured = first[HANDLER_SCOPING_WRAPPERS_OPTION];
   if (!Array.isArray(configured)) return new Set(DEFAULT_HANDLER_SCOPING_WRAPPERS);
-  return new Set(configured.filter((entry): entry is string => typeof entry === "string"));
+  return new Set(
+    configured.filter((candidate): candidate is string => typeof candidate === "string"),
+  );
 };
 
 const handedNamesOf = (factory: SpecFunction): ReadonlySet<string> => {
@@ -53,10 +55,10 @@ const handedNamesOf = (factory: SpecFunction): ReadonlySet<string> => {
 
 const scopedCallbackOf = (
   call: ESTree.CallExpression,
-  wrappers: ReadonlySet<string>,
+  wrappings: ReadonlySet<string>,
 ): SpecFunction | null => {
   const spelling = staticCalleeName(call);
-  if (spelling === null || !wrappers.has(spelling)) return null;
+  if (spelling === null || !wrappings.has(spelling)) return null;
 
   const handed = call.arguments.at(-1);
   if (handed === undefined || handed.type === "SpreadElement") return null;
@@ -64,19 +66,19 @@ const scopedCallbackOf = (
 };
 
 const handedBackValues = (
-  input: HandedBack & { readonly wrappers: ReadonlySet<string> },
+  given: HandedBack & { readonly wrappers: ReadonlySet<string> },
 ): readonly HandedBack[] => {
-  const { at, bodies, wrappers } = input;
+  const { at, bodies, wrappers: wrappings } = given;
   const written = unwrapSubject(at);
   if (written.type !== "CallExpression") return [{ at, bodies }];
 
-  const scoped = scopedCallbackOf(written, wrappers);
+  const scoped = scopedCallbackOf(written, wrappings);
   if (scoped === null) return [{ at, bodies }];
 
   const inner = blockBodyOf(scoped);
   const reached = inner === null ? bodies : [...bodies, inner];
   return returnedExpressionsOf(scoped).flatMap((handed) =>
-    handedBackValues({ at: handed, bodies: reached, wrappers }),
+    handedBackValues({ at: handed, bodies: reached, wrappers: wrappings }),
   );
 };
 
@@ -88,8 +90,8 @@ const resolvedThrough = (
   const written = unwrapSubject(at);
   if (written.type !== "Identifier" || reached.has(written.name)) return written;
 
-  const bound = bodies.flatMap((body) => {
-    const init = localConstInitializer(body, written.name);
+  const bound = bodies.flatMap((writtenBody) => {
+    const init = localConstInitializer(writtenBody, written.name);
     return init === null ? [] : [init];
   });
 
@@ -123,8 +125,8 @@ const spreadArgumentsOf = (written: ESTree.Expression): readonly ESTree.Expressi
     );
   }
   if (written.type !== "ArrayExpression") return [];
-  return written.elements.flatMap((element) =>
-    element?.type === "SpreadElement" ? [element.argument] : [],
+  return written.elements.flatMap((held) =>
+    held?.type === "SpreadElement" ? [held.argument] : [],
   );
 };
 
@@ -157,39 +159,39 @@ const forwardingOf = (reading: SubjectReading): ForwardedSubject | null => {
   return carriedForwardingOf(reading);
 };
 
-const forwardingsFor = (input: {
+const forwardingsFor = (given: {
   readonly handedBack: HandedBack;
   readonly handed: ReadonlySet<string>;
 }): readonly ForwardedSubject[] => {
-  const { handedBack, handed } = input;
+  const { handedBack, handed } = given;
   const written = resolvedThrough(handedBack, new Set());
   const forwarding = forwardingOf({ at: handedBack.at, written, handed });
   return forwarding === null ? [] : [forwarding];
 };
 
-const declaredForwardings = (input: {
+const declaredForwardings = (given: {
   readonly factory: SpecFunction;
   readonly subjects: readonly ESTree.Expression[];
   readonly wrappers: ReadonlySet<string>;
 }): readonly ForwardedSubject[] => {
-  const { factory, subjects, wrappers } = input;
+  const { factory, subjects, wrappers: wrappings } = given;
   const handed = handedNamesOf(factory);
-  const body = blockBodyOf(factory);
-  const bodies = body === null ? [] : [body];
+  const writtenBody = blockBodyOf(factory);
+  const writtenBodies = writtenBody === null ? [] : [writtenBody];
 
   return subjects.flatMap((subject) =>
-    handedBackValues({ at: subject, bodies, wrappers }).flatMap((handedBack) =>
-      forwardingsFor({ handedBack, handed }),
+    handedBackValues({ at: subject, bodies: writtenBodies, wrappers: wrappings }).flatMap(
+      (handedBack) => forwardingsFor({ handedBack, handed }),
     ),
   );
 };
 
-const forwardedSubjectsIn = (input: {
+const forwardedSubjectsIn = (given: {
   readonly call: ESTree.CallExpression;
   readonly wrappers: ReadonlySet<string>;
 }): readonly ForwardedSubject[] =>
-  fixtureDeclarationsOf(input.call).flatMap(({ factory, subjects }) =>
-    factory === null ? [] : declaredForwardings({ factory, subjects, wrappers: input.wrappers }),
+  fixtureDeclarationsOf(given.call).flatMap(({ factory, subjects }) =>
+    factory === null ? [] : declaredForwardings({ factory, subjects, wrappers: given.wrappers }),
   );
 
 export const noFixtureForwardSubject = createDontReviewItRule({
@@ -222,18 +224,21 @@ export const noFixtureForwardSubject = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
-    const wrappers = handlerScopingWrappersFrom(context.options);
+    const wrappings = handlerScopingWrappersFrom(inspection.options);
 
     return {
       CallExpression(node: ESTree.CallExpression) {
-        for (const { at, messageId, root } of forwardedSubjectsIn({ call: node, wrappers })) {
-          context.report({
+        for (const { at, messageId, root } of forwardedSubjectsIn({
+          call: node,
+          wrappers: wrappings,
+        })) {
+          inspection.report({
             node: at,
             messageId,
-            data: { subject: context.sourceCode.getText(root) },
+            data: { subject: inspection.sourceCode.getText(root) },
           });
         }
       },

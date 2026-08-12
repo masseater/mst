@@ -12,8 +12,8 @@ import type { AgenticDocumentsConfig } from "../config.ts";
 import type { DocumentProblem } from "../problem.ts";
 import type { NormativeDocument } from "../scan/normative-documents.ts";
 
-const message = (count: number): string =>
-  `1 つの項目に判断キーワードを ${count} 個置くことは禁止されている。条件を親の項目へ上げ、判断ごとに入れ子の項目を作る。`;
+const complaint = (counted: number): string =>
+  `1 つの項目に判断キーワードを ${counted} 個置くことは禁止されている。条件を親の項目へ上げ、判断ごとに入れ子の項目を作る。`;
 
 export const multipleDecisionKeywords = ({
   document,
@@ -25,8 +25,8 @@ export const multipleDecisionKeywords = ({
   descendants(document.tree)
     .filter((node) => node.type === "listItem")
     .filter((node) => !isInsideGeneratedRegion(offsetOf(node), document.generated))
-    .flatMap((item): readonly DocumentProblem[] => {
-      const paragraph = leadingParagraphOf(item);
+    .flatMap((member): readonly DocumentProblem[] => {
+      const paragraph = leadingParagraphOf(member);
       if (paragraph === null) return [];
 
       const statements = [
@@ -34,5 +34,5 @@ export const multipleDecisionKeywords = ({
       ];
       if (statements.length < 2) return [];
 
-      return [{ file: document.file, line: lineOf(item), message: message(statements.length) }];
+      return [{ file: document.file, line: lineOf(member), message: complaint(statements.length) }];
     });

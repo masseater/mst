@@ -63,8 +63,8 @@ describe("renderRuleIndex", () => {
       { ...plainRule, name: "no-alpha--promote-it" },
     ]);
 
-    const rows = rendered.split("\n").slice(2);
-    expect(rows[0]).toContain("no-alpha--promote-it");
-    expect(rows[1]).toContain("no-zebra--saddle-it");
+    const linedRows = rendered.split("\n").slice(2);
+    expect(linedRows[0]).toContain("no-alpha--promote-it");
+    expect(linedRows[1]).toContain("no-zebra--saddle-it");
   });
 });
