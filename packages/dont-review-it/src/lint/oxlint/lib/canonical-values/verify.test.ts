@@ -247,7 +247,7 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
         },
       ]),
     ).toBe(
-      `"draft", "published" is declared by more than one concept: article.status (src/article.ts), order.status (src/order.ts)`,
+      `src/article.ts src/order.ts One set of values must belong to one concept, because two names for the same set let each of them drift on its own. "draft", "published" is declared by article.status (src/article.ts), order.status (src/order.ts). Keep one of the concepts, and derive the others from the declaration that stays.`,
     );
   });
 

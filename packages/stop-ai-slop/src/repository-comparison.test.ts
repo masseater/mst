@@ -1,9 +1,8 @@
-import { execFileSync } from "node:child_process";
 import { chmodSync, symlinkSync, unlinkSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { range } from "es-toolkit";
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 import { compareRevisions } from "./repository-comparison.ts";
 import { withTestRepository } from "./test-repository.ts";
@@ -251,7 +250,7 @@ describe("compareRevisions", () => {
       const base = repository.commit({
         files: { "b/legacy.ts": "export const value = 1;\n" },
       });
-      execFileSync("git", ["config", "diff.noprefix", "true"], { cwd: repository.root });
+      repository.git(["config", "diff.noprefix", "true"]);
       const head = repository.commit({
         files: { "b/legacy.ts": "export const value = 2;\n" },
       });
@@ -282,7 +281,7 @@ describe("compareRevisions", () => {
           "src/b.ts": renameSource("b"),
         },
       });
-      execFileSync("git", ["config", "diff.renameLimit", "1"], { cwd: repository.root });
+      repository.git(["config", "diff.renameLimit", "1"]);
       const head = repository.commit({
         files: {
           "src/current-a.ts": renameSource("a", true),
@@ -311,6 +310,33 @@ describe("compareRevisions", () => {
           },
         ],
       });
+    });
+  });
+
+  it("reads the named repository even when the caller runs inside another one", async () => {
+    await withTestRepository(async (repository) => {
+      const base = repository.commit({
+        files: { "src/current.ts": "export const current = true;\n" },
+      });
+      const head = repository.commit({
+        files: { "src/current.ts": "export const current = false;\n" },
+      });
+      vi.stubEnv("GIT_DIR", resolve(repository.root, "absent.git"));
+      vi.stubEnv("GIT_WORK_TREE", resolve(repository.root, "absent"));
+
+      try {
+        await expect(
+          compareRevisions({
+            repositoryRoot: repository.root,
+            baseRevision: base,
+            headRevision: head,
+          }),
+        ).resolves.toMatchObject({
+          files: [{ kind: "changed", beforePath: "src/current.ts", afterPath: "src/current.ts" }],
+        });
+      } finally {
+        vi.unstubAllEnvs();
+      }
     });
   });
 

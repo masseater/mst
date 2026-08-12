@@ -1,6 +1,8 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
+import { omitBy } from "es-toolkit";
+
 type GitCommandExecutor = (
   repositoryRoot: string,
   args: readonly string[],
@@ -12,12 +14,16 @@ type GitCommandOptions = Readonly<{
   execute?: GitCommandExecutor;
 }>;
 
+const environmentOutsideAnyRepository = (): Readonly<Record<string, string | undefined>> =>
+  omitBy(process.env, (_, name) => String(name).startsWith("GIT_"));
+
 const executeFile = promisify(execFile);
 
 const executeGitCommand: GitCommandExecutor = async (repositoryRoot, args) =>
   executeFile("git", [...args], {
     cwd: repositoryRoot,
     encoding: "buffer",
+    env: environmentOutsideAnyRepository(),
     maxBuffer: 100 * 1024 * 1024,
   });
 

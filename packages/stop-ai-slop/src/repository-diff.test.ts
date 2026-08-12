@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { symlinkSync, unlinkSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -89,15 +88,15 @@ index 0000000..6cd59c7
         "--no-textconv",
         "--no-color",
       ];
-      const inventoryOutput = execFileSync(
-        "git",
-        [...sharedArguments, "--name-status", "-z", base, head, "--"],
-        { cwd: repository.root, encoding: "utf8" },
-      );
-      const diff = execFileSync("git", [...sharedArguments, "--unified=0", base, head, "--"], {
-        cwd: repository.root,
-        encoding: "utf8",
-      });
+      const inventoryOutput = repository.git([
+        ...sharedArguments,
+        "--name-status",
+        "-z",
+        base,
+        head,
+        "--",
+      ]);
+      const diff = repository.git([...sharedArguments, "--unified=0", base, head, "--"]);
       const patchFiles = diff.split(/(?=diff --git )/u);
 
       expect(parseRepositoryChanges({ inventoryOutput, diff })).toStrictEqual([

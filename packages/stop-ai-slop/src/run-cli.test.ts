@@ -1,5 +1,3 @@
-import { execFileSync } from "node:child_process";
-
 import { describe, expect, it, vi } from "vite-plus/test";
 
 import { runStopAiSlop } from "./run-cli.ts";
@@ -82,19 +80,11 @@ describe("runStopAiSlop", () => {
             'import * as legacy from "./legacy.ts";\nimport { expect } from "vite-plus/test";\n\nexpect(legacy).not.toHaveProperty("legacyMode");\n',
         },
       });
-      const featureTree = execFileSync("git", ["rev-parse", `${featureTreeCommit}^{tree}`], {
-        cwd: repository.root,
-        encoding: "utf8",
-      }).trim();
-      const head = execFileSync(
-        "git",
-        ["commit-tree", featureTree, "-p", commonRevision, "-m", "feature snapshot"],
-        { cwd: repository.root, encoding: "utf8" },
-      ).trim();
-      const mergeBase = execFileSync("git", ["merge-base", baseTip, head], {
-        cwd: repository.root,
-        encoding: "utf8",
-      }).trim();
+      const featureTree = repository.git(["rev-parse", `${featureTreeCommit}^{tree}`]).trim();
+      const head = repository
+        .git(["commit-tree", featureTree, "-p", commonRevision, "-m", "feature snapshot"])
+        .trim();
+      const mergeBase = repository.git(["merge-base", baseTip, head]).trim();
 
       const directTipComparison = await runStopAiSlop([
         "check",
@@ -123,7 +113,7 @@ describe("runStopAiSlop", () => {
         error: "",
       });
     });
-  }, 15_000);
+  });
 
   it("fails closed when the base revision is invalid", async () => {
     await withTestRepository(async (repository) => {

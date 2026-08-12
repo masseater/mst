@@ -23,10 +23,13 @@ lint による強制が、書かれた時点でも、時間が経った後でも
 
 ## 提供するもの
 
-- `@mst/lint-rule-authoring` — factory・severity 語彙・テスト基盤・このパッケージの oxlint config
+- `@mst/lint-rule-authoring` — factory・severity 語彙・テスト基盤・ルール索引の照合関数・このパッケージの oxlint config
 - `@mst/lint-rule-authoring/plugin` — oxlint が `jsPlugins` の指定子で読むエントリ
+- `lint-rule-authoring check [--write]` — マニフェストの `lintRules` が宣言する置き場からルールを発見し、各ワークスペースの `packages/<workspace>/docs/lint/index.md` の生成領域を照合・再生成する CLI
 
 ## 規約
+
+自前ルールを既定でどの重大度で入れるか、警告へ落とすことを誰が決めるかは [AGENTS.md](../../AGENTS.md) が持つ。
 
 - IF: ルールを定義する; THEN
   - MUST: factory を通す
@@ -53,10 +56,6 @@ lint による強制が、書かれた時点でも、時間が経った後でも
     - 抑制の仕方や免除の申請先を書くと、それが最短の修正手段として読まれる
   - PROHIBIT: 文書への参照を手書きする
     - factory が末尾に付ける
-- IF: 自前ルールの強制度を決める; THEN
-  - MUST: 既定でエラーにする
-    - 警告で出すと、警告が積み上がったまま誰も直さない状態になる
-  - IF: 例外的に警告へ落とす; THEN MUST: なぜ落としているのかと、いつ戻すのかを設定ファイル側に残す
 - IF: ルールのテストを書く; THEN
   - MUST: 対象と同じディレクトリに、対象と同じ名前で `.test.ts` として置く
   - MUST: 通るべきコード片と落ちるべきコード片の 2 系統を持たせる

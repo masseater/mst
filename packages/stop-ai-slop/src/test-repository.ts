@@ -10,11 +10,21 @@ type RepositoryChanges = {
 
 export type TestRepository = {
   readonly root: string;
+  readonly git: (args: readonly string[]) => string;
   readonly commit: (changes: RepositoryChanges) => string;
 };
 
 const runGit = (repositoryRoot: string, args: readonly string[]): string =>
-  execFileSync("git", [...args], { cwd: repositoryRoot, encoding: "utf8" }).trim();
+  execFileSync("git", [...args], {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+    env: {
+      GIT_CONFIG_GLOBAL: "/dev/null",
+      GIT_CONFIG_SYSTEM: "/dev/null",
+      HOME: repositoryRoot,
+      PATH: process.env.PATH,
+    },
+  });
 
 const writeChanges = (repositoryRoot: string, changes: RepositoryChanges): void => {
   for (const [relativePath, contents] of Object.entries(changes.files ?? {})) {
@@ -40,11 +50,15 @@ export const withTestRepository = async <Result>(
     writeChanges(repositoryRoot, changes);
     runGit(repositoryRoot, ["add", "--all"]);
     runGit(repositoryRoot, ["commit", "--quiet", "--message", "snapshot"]);
-    return runGit(repositoryRoot, ["rev-parse", "HEAD"]);
+    return runGit(repositoryRoot, ["rev-parse", "HEAD"]).trim();
   };
 
   try {
-    return await exercise({ root: repositoryRoot, commit });
+    return await exercise({
+      root: repositoryRoot,
+      git: (args) => runGit(repositoryRoot, args),
+      commit,
+    });
   } finally {
     rmSync(repositoryRoot, { recursive: true, force: true });
   }

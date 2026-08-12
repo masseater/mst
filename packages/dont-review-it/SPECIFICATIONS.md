@@ -1,0 +1,10 @@
+# @mst/dont-review-it
+
+生成物。`vp run guard:fix` が `specs/` の仕様担保テストから再生成する。手で編集しない。
+
+## リポジトリ検査の入口
+
+[`specs/check-entry.spec.ts`](specs/check-entry.spec.ts)
+
+- check 以外の命令に使い方を返して失敗する
+- 存在しない場所を検査対象に取らない

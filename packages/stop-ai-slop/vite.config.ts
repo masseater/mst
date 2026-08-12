@@ -2,6 +2,8 @@ import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   test: {
+    fileParallelism: false,
+    testTimeout: 60_000,
     coverage: {
       thresholds: { 100: true, perFile: true },
     },

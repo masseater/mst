@@ -9,6 +9,7 @@
 - `packages/dont-review-it` — Machine-enforced answers to the writing questions that would otherwise be raised in review.
 - `packages/lint-rule-authoring` — Materials for authoring lint rules that keep working after they are written.
 - `packages/stop-ai-slop` — Machine-enforced checks for recurring low-value patterns in AI-authored changes.
-- `packages/utils` — Small text helpers shared by the packages in this repository.
+- `packages/utils` — The neutral home for declarations that more than one package needs and none of them owns.
+- `packages/verified-specifications` — Specifications extracted from the tests that verify them, so a human can read what the AI believes the code promises.
 
 <!-- END GENERATED workspaces -->

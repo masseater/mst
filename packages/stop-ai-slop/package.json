@@ -33,7 +33,7 @@
     "@mst/utils": "workspace:*",
     "es-toolkit": "catalog:",
     "oxc-parser": "catalog:",
-    "parse-git-diff": "catalog:"
+    "parse-git-diff": "0.0.20"
   },
   "devDependencies": {
     "@types/node": "catalog:",
