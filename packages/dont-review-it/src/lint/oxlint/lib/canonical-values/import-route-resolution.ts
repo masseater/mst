@@ -26,7 +26,11 @@ const IMPORT_MODULE_RESOLUTION_MODE: NonNullable<ts.ResolutionMode> = ts.ModuleK
 
 type ResolvedModuleLocation =
   | { readonly kind: "external" }
-  | { readonly kind: "repository"; readonly path: string }
+  | {
+      readonly kind: "repository";
+      readonly path: string;
+      readonly sourcePaths: readonly string[];
+    }
   | { readonly kind: "unresolved" };
 
 const realPathOf = (path: string): string => {
@@ -72,6 +76,15 @@ const compilerOptionsFor = (
   return { containingFile, options: compilerOptions ?? {} };
 };
 
+const lexicalRepositorySource = (query: ImportRouteQuery, resolvedPath: string): string | null => {
+  const repositoryRoot = resolve(query.repositoryRoot);
+  const sourcePath = resolve(resolvedPath);
+  if (!pathIsInside(repositoryRoot, sourcePath)) return null;
+  return relative(repositoryRoot, sourcePath).split(sep).includes("node_modules")
+    ? null
+    : sourcePath;
+};
+
 const repositoryLocation = (
   query: ImportRouteQuery,
   resolvedPath: string,
@@ -79,9 +92,12 @@ const repositoryLocation = (
   const repositoryRoot = realPathOf(query.repositoryRoot);
   const path = realPathOf(resolvedPath);
   if (!pathIsInside(repositoryRoot, path)) return { kind: "external" };
-  return relative(repositoryRoot, path).split(sep).includes("node_modules")
-    ? { kind: "external" }
-    : { kind: "repository", path };
+  if (relative(repositoryRoot, path).split(sep).includes("node_modules")) {
+    return { kind: "external" };
+  }
+  const lexicalPath = lexicalRepositorySource(query, resolvedPath);
+  const sourcePaths = lexicalPath === null || lexicalPath === path ? [path] : [path, lexicalPath];
+  return { kind: "repository", path, sourcePaths };
 };
 
 const fileUrlLocation = (query: ImportRouteQuery): ResolvedModuleLocation | null => {
@@ -161,8 +177,8 @@ export const isIgnoredRepositoryModule = (
   query: ImportRouteQuery,
   catalog: CanonicalValuesCatalog,
 ): boolean => {
-  const path = repositoryModulePath(query);
-  return path !== null && catalog.sourceScope.isIgnored(path);
+  const location = resolvedModuleLocation(query);
+  return location.kind === "repository" && location.sourcePaths.some(catalog.sourceScope.isIgnored);
 };
 
 const matchesDeclarationPath = (input: {

@@ -61,7 +61,7 @@ const bindingAt = <Binding extends { readonly definition: ESTree.Node }>(input: 
   const candidate = input.bindings.get(input.identifier.name);
   if (candidate === undefined) return null;
   const resolved = resolveBinding(input.position.scopeAt(input.identifier), input.identifier.name);
-  return resolved?.defs.some((definition) => definition.node === candidate.definition) === true
+  return resolved?.defs.length === 1 && resolved.defs[0]?.node === candidate.definition
     ? candidate
     : null;
 };
@@ -78,7 +78,11 @@ const unknownOwnerPosition = (
   identifier: ESTree.IdentifierReference,
 ): Extract<LocalFiniteValuePosition, { readonly kind: "unknown-owner-name" }> | null => {
   const shadowedImport = input.bindings.imports.get(identifier.name);
-  return input.catalog.entries.some((declaration) => declaration.binding === identifier.name) ||
+  return input.catalog.entries.some(
+    (declaration) =>
+      declaration.binding === identifier.name ||
+      declaration.importRoutes.some((route) => route.exportName === identifier.name),
+  ) ||
     (shadowedImport !== undefined && catalogOwnsImport(input.catalog, shadowedImport))
     ? { kind: "unknown-owner-name", name: identifier.name, node: identifier }
     : null;

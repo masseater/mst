@@ -326,6 +326,11 @@ describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-va
         cwd: repositoryRoot,
         filename: join(repositoryRoot, "packages/auto-develop/src/direct-engine-schema.ts"),
       },
+      {
+        code: 'import { SHADOW as LOCAL_ENGINES } from "./config/engine.ts";\nexport function schema(LOCAL_ENGINES: readonly ["shadow", "values"]) { return z.enum(LOCAL_ENGINES); }',
+        cwd: repositoryRoot,
+        filename: join(repositoryRoot, "packages/auto-develop/src/shadow-engine-schema.ts"),
+      },
     ],
     invalid: [
       {
@@ -348,6 +353,30 @@ describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-va
       },
       {
         code: 'import { ENGINE_NAMES } from "./config/engine.ts";\nexport function schema(ENGINE_NAMES: readonly ["shadow", "values"]) { return z.enum(ENGINE_NAMES); }',
+        cwd: repositoryRoot,
+        filename: join(repositoryRoot, "packages/auto-develop/src/shadow-engine-schema.ts"),
+        errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
+      },
+      {
+        code: 'import { ENGINES } from "./config/engine.ts";\ndeclare const ENGINES: readonly ["shadow", "values"];\nexport const schema = z.enum(ENGINES);',
+        cwd: repositoryRoot,
+        filename: join(repositoryRoot, "packages/auto-develop/src/shadow-engine-schema.ts"),
+        errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
+      },
+      {
+        code: 'declare const ENGINE_NAMES: readonly ["shadow", "values"];\nexport const schema = z.enum(ENGINE_NAMES);',
+        cwd: repositoryRoot,
+        filename: join(repositoryRoot, "packages/auto-develop/src/shadow-engine-schema.ts"),
+        errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
+      },
+      {
+        code: 'import { ENGINES as LOCAL_ENGINES } from "./config/engine.ts";\nexport function schema(LOCAL_ENGINES: readonly ["shadow", "values"]) { return z.enum(LOCAL_ENGINES); }',
+        cwd: repositoryRoot,
+        filename: join(repositoryRoot, "packages/auto-develop/src/shadow-engine-schema.ts"),
+        errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],
+      },
+      {
+        code: 'import { ENGINE_NAMES as LOCAL_ENGINES } from "./config/engine.ts";\nexport function schema(LOCAL_ENGINES: readonly ["shadow", "values"]) { return z.enum(LOCAL_ENGINES); }',
         cwd: repositoryRoot,
         filename: join(repositoryRoot, "packages/auto-develop/src/shadow-engine-schema.ts"),
         errors: [{ messageId: "unregisteredCanonicalValuesImportRoute" }],

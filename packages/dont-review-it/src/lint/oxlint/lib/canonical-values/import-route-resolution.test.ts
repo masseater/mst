@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import * as ts from "typescript-6";
 import { describe, expect, test } from "vite-plus/test";
 
+import { readGitSourceScope } from "../git-ignored-source.ts";
 import { gitOutput } from "../git-output.ts";
 import {
   createCanonicalValuesTestRepository,
@@ -122,13 +123,16 @@ describe("import route source resolution", () => {
 
   test("an ignored repository module cannot resolve a registered owner entry", () => {
     const repositoryRoot = createCanonicalValuesTestRepository();
+    gitOutput(["init", "--quiet"], { cwd: repositoryRoot, env: process.env });
     writeCanonicalValuesTestFiles({
       repositoryRoot,
       files: {
+        ".gitignore": "ignored\n",
         "src/order-status.ts": "export const ORDER_STATUSES = [] as const;\n",
         "src/schema.ts": "export {};\n",
       },
     });
+    symlinkSync("src", join(repositoryRoot, "ignored"));
     const ownerDeclaration: CanonicalValuesEntry = {
       annotationStart: 0,
       binding: "ORDER_STATUSES",
@@ -146,15 +150,56 @@ describe("import route source resolution", () => {
       filename: join(repositoryRoot, "src/schema.ts"),
       importedName: "ORDER_STATUSES",
       repositoryRoot,
-      specifier: "./order-status.ts",
+      specifier: "../ignored/order-status.ts",
     } as const;
+    const catalog = buildCatalog([ownerDeclaration], {
+      sourceScope: readGitSourceScope(repositoryRoot),
+    });
+
+    expect(importRouteStatus(query, catalog)).toBe("external");
+    expect(importRouteStatus({ ...query, specifier: "./order-status.ts" }, catalog)).toBe(
+      "registered",
+    );
+  });
+
+  test("a linked dependency path keeps the physical repository owner identity", () => {
+    const repositoryRoot = createCanonicalValuesTestRepository();
+    writeCanonicalValuesTestFiles({
+      repositoryRoot,
+      files: {
+        "src/order-status.ts": "export const ORDER_STATUSES = [] as const;\n",
+        "src/schema.ts": "export {};\n",
+      },
+    });
+    mkdirSync(join(repositoryRoot, "node_modules"));
+    symlinkSync("../src", join(repositoryRoot, "node_modules/owner"));
+    const ownerDeclaration: CanonicalValuesEntry = {
+      annotationStart: 0,
+      binding: "ORDER_STATUSES",
+      bindingStart: 40,
+      conceptId: "order.status",
+      declarationEnd: 80,
+      declarationPath: "src/order-status.ts",
+      declarationStart: 20,
+      fingerprint: "fixture",
+      importRoutes: [],
+      packageName: null,
+      values: ["draft", "published"],
+    };
 
     expect(
       importRouteStatus(
-        query,
-        buildCatalog([ownerDeclaration], { sourceScope: { isIgnored: () => true } }),
+        {
+          filename: join(repositoryRoot, "src/schema.ts"),
+          importedName: "ORDER_STATUSES",
+          repositoryRoot,
+          specifier: "../node_modules/owner/order-status.ts",
+        },
+        buildCatalog([ownerDeclaration], {
+          sourceScope: { isIgnored: (sourcePath) => sourcePath.includes("/node_modules/") },
+        }),
       ),
-    ).toBe("external");
+    ).toBe("registered");
   });
 
   test("file URLs and external paths preserve repository identity boundaries", () => {
