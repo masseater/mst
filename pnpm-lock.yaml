@@ -208,6 +208,9 @@ catalogs:
     '@oxlint/plugins':
       specifier: 1.73.0
       version: 1.73.0
+    '@tanstack/intent':
+      specifier: ^0.3.6
+      version: 0.3.6
     '@types/node':
       specifier: ^26
       version: 26.2.0
@@ -246,6 +249,9 @@ importers:
       '@mst/agentic-documents':
         specifier: workspace:*
         version: link:packages/agentic-documents
+      '@mst/ai-native':
+        specifier: workspace:*
+        version: link:packages/ai-native
       '@mst/dont-review-it':
         specifier: workspace:*
         version: link:packages/dont-review-it
@@ -276,6 +282,9 @@ importers:
 
   apps/website:
     devDependencies:
+      '@mst/ai-native':
+        specifier: workspace:*
+        version: link:../../packages/ai-native
       '@mst/dont-review-it':
         specifier: workspace:*
         version: link:../../packages/dont-review-it
@@ -291,9 +300,9 @@ importers:
 
   packages/agentic-documents:
     dependencies:
-      '@mst/utils':
+      '@mst/repository-checks':
         specifier: workspace:*
-        version: link:../utils
+        version: link:../repository-checks
       es-toolkit:
         specifier: 'catalog:'
         version: 1.50.0
@@ -313,6 +322,12 @@ importers:
         specifier: 'catalog:'
         version: 2.9.0
     devDependencies:
+      '@mst/ai-native':
+        specifier: workspace:*
+        version: link:../ai-native
+      '@tanstack/intent':
+        specifier: 'catalog:'
+        version: 0.3.6
       '@types/mdast':
         specifier: ^4.0.4
         version: 4.0.4
@@ -332,17 +347,51 @@ importers:
         specifier: 'catalog:'
         version: 0.2.8(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/coverage-v8@4.1.10)(@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)
 
+  packages/ai-native:
+    dependencies:
+      proper-lockfile:
+        specifier: 4.1.2
+        version: 4.1.2
+    devDependencies:
+      '@mst/ai-native':
+        specifier: workspace:*
+        version: 'link:'
+      '@tanstack/intent':
+        specifier: 'catalog:'
+        version: 0.3.6
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.2.0
+      '@types/proper-lockfile':
+        specifier: 4.1.4
+        version: 4.1.4
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.1.10(@vitest/browser@4.1.10)(vitest@4.1.10)
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vite:
+        specifier: npm:@voidzero-dev/vite-plus-core@0.2.8
+        version: '@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)'
+      vite-plus:
+        specifier: 'catalog:'
+        version: 0.2.8(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/coverage-v8@4.1.10)(@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)
+
   packages/dont-review-it:
     dependencies:
       '@mst/lint-rule-authoring':
         specifier: workspace:*
         version: link:../lint-rule-authoring
-      '@mst/utils':
+      '@mst/repository-checks':
         specifier: workspace:*
-        version: link:../utils
+        version: link:../repository-checks
       '@oxlint/plugins':
         specifier: 'catalog:'
         version: 1.73.0
+      citty:
+        specifier: 0.2.2
+        version: 0.2.2
       es-toolkit:
         specifier: 'catalog:'
         version: 1.50.0
@@ -358,6 +407,9 @@ importers:
       oxlint:
         specifier: 'catalog:'
         version: 1.76.0(oxlint-tsgolint@7.0.2001)(vite-plus@0.2.8(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/coverage-v8@4.1.10)(@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))
+      std-env:
+        specifier: ^4.2.0
+        version: 4.2.0
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -365,6 +417,12 @@ importers:
         specifier: 'catalog:'
         version: 2.9.0
     devDependencies:
+      '@mst/ai-native':
+        specifier: workspace:*
+        version: link:../ai-native
+      '@tanstack/intent':
+        specifier: 'catalog:'
+        version: 0.3.6
       '@types/node':
         specifier: 'catalog:'
         version: 26.2.0
@@ -380,9 +438,9 @@ importers:
 
   packages/lint-rule-authoring:
     dependencies:
-      '@mst/utils':
+      '@mst/repository-checks':
         specifier: workspace:*
-        version: link:../utils
+        version: link:../repository-checks
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -414,6 +472,37 @@ importers:
         specifier: 'catalog:'
         version: 2.9.0
     devDependencies:
+      '@mst/ai-native':
+        specifier: workspace:*
+        version: link:../ai-native
+      '@tanstack/intent':
+        specifier: 'catalog:'
+        version: 0.3.6
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.2.0
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.1.10(@vitest/browser@4.1.10)(vitest@4.1.10)
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vite:
+        specifier: npm:@voidzero-dev/vite-plus-core@0.2.8
+        version: '@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)'
+      vite-plus:
+        specifier: 'catalog:'
+        version: 0.2.8(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/coverage-v8@4.1.10)(@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)
+
+  packages/repository-checks:
+    dependencies:
+      es-toolkit:
+        specifier: 'catalog:'
+        version: 1.50.0
+    devDependencies:
+      '@mst/ai-native':
+        specifier: workspace:*
+        version: link:../ai-native
       '@types/node':
         specifier: 'catalog:'
         version: 26.2.0
@@ -432,9 +521,12 @@ importers:
 
   packages/stop-ai-slop:
     dependencies:
-      '@mst/utils':
+      '@mst/lint-rule-authoring':
         specifier: workspace:*
-        version: link:../utils
+        version: link:../lint-rule-authoring
+      '@mst/repository-checks':
+        specifier: workspace:*
+        version: link:../repository-checks
       es-toolkit:
         specifier: 'catalog:'
         version: 1.50.0
@@ -445,28 +537,12 @@ importers:
         specifier: 0.0.20
         version: 0.0.20
     devDependencies:
-      '@types/node':
+      '@mst/ai-native':
+        specifier: workspace:*
+        version: link:../ai-native
+      '@tanstack/intent':
         specifier: 'catalog:'
-        version: 26.2.0
-      '@vitest/coverage-v8':
-        specifier: 'catalog:'
-        version: 4.1.10(@vitest/browser@4.1.10)(vitest@4.1.10)
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2
-      vite:
-        specifier: npm:@voidzero-dev/vite-plus-core@0.2.8
-        version: '@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)'
-      vite-plus:
-        specifier: 'catalog:'
-        version: 0.2.8(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/coverage-v8@4.1.10)(@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)
-
-  packages/utils:
-    dependencies:
-      es-toolkit:
-        specifier: 'catalog:'
-        version: 1.50.0
-    devDependencies:
+        version: 0.3.6
       '@types/node':
         specifier: 'catalog:'
         version: 26.2.0
@@ -488,9 +564,9 @@ importers:
       '@mst/lint-rule-authoring':
         specifier: workspace:*
         version: link:../lint-rule-authoring
-      '@mst/utils':
+      '@mst/repository-checks':
         specifier: workspace:*
-        version: link:../utils
+        version: link:../repository-checks
       es-toolkit:
         specifier: 'catalog:'
         version: 1.50.0
@@ -507,6 +583,12 @@ importers:
         specifier: 'catalog:'
         version: 2.9.0
     devDependencies:
+      '@mst/ai-native':
+        specifier: workspace:*
+        version: link:../ai-native
+      '@tanstack/intent':
+        specifier: 'catalog:'
+        version: 0.3.6
       '@types/node':
         specifier: 'catalog:'
         version: 26.2.0
@@ -1289,6 +1371,10 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
+  '@tanstack/intent@0.3.6':
+    resolution: {integrity: sha512-ylew/4T3layUXSfE/SDGUSAi1B3U/wuoNUE0adC3j/s6wzX7omV6e6hAv0WyMC52Inren8kqvwpHj+G/ZBbQHQ==}
+    hasBin: true
+
   '@testing-library/dom@10.4.1':
     resolution: {integrity: sha512-o4PXJQidqJl82ckFaXUeoAW+XysPLauYI43Abki5hABd853iMhitooc6znOnczgbTYmEP6U6/y1ZyKAIsvMKGg==}
     engines: {node: '>=18'}
@@ -1325,6 +1411,12 @@ packages:
 
   '@types/node@26.2.0':
     resolution: {integrity: sha512-5IviulTZeRNp2vAJ514cc/HUlY5nZ9fCbq9DMyC52BrhFZACo3nI0R7qBxhQmo/d27NFe96ur/b7Wwxklda+kg==}
+
+  '@types/proper-lockfile@4.1.4':
+    resolution: {integrity: sha512-uo2ABllncSqg9F1D4nugVl9v93RmjxF6LJzQLMLDdPaXCUIDPeOJ21Gbqi43xNKzBi/WQ0Q0dICqufzQbMjipQ==}
+
+  '@types/retry@0.12.5':
+    resolution: {integrity: sha512-3xSjTp3v03X/lSQLkczaN9UIEwJMoMCA1+Nb5HfbJEQWogdeQIyVtTvxPXDQjZ5zws8rFQfVfRdz03ARihPJgw==}
 
   '@types/unist@3.0.3':
     resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
@@ -1752,6 +1844,10 @@ packages:
   bail@2.0.2:
     resolution: {integrity: sha512-0xO6mYd7JB2YesxDKplafRpsiOzPt9V02ddPCLbY1xYGPOX24NTyN50qnUxgCPcSoYMhKpAuBTjQoRZCAkUDRw==}
 
+  cac@6.7.14:
+    resolution: {integrity: sha512-b6Ilus+c3RrdDk+JhLKUAQfzzgLEPy6wcXqS7f/xe1EETvsDP6GORG7SFuOs6cID5YkqchW/LXZbX5bc8j7ZcQ==}
+    engines: {node: '>=8'}
+
   ccount@2.0.1:
     resolution: {integrity: sha512-eyrF0jiFpY+3drT6383f1qhkbGsLSifNAjA61IUjZjmLCWjItY6LB9ft9YhoDgwfmclB2zhu51Lc7+95b8NRAg==}
 
@@ -1761,6 +1857,9 @@ packages:
 
   character-entities@2.0.2:
     resolution: {integrity: sha512-shx7oQ0Awen/BRIdkjkvz54PnEEI/EjwXDSIZp86/KKdbafHh1Df/RYGBhn4hbe2+uKC9FnT5UCEdyPz3ai9hQ==}
+
+  citty@0.2.2:
+    resolution: {integrity: sha512-+6vJA3L98yv+IdfKGZHBNiGW5KHn22e/JwID0Strsz8h4S/csAu/OuICwxrg44k5MRiZHWIo8XXuJgQTriRP4w==}
 
   convert-source-map@2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
@@ -1842,6 +1941,9 @@ packages:
 
   get-tsconfig@4.14.1:
     resolution: {integrity: sha512-Dz/6HxkrxgNehhxLVeyv8sad9UzF2xBVeaKBQNDfJ5XiSXmp2gTR0eO0RWiT2NCKS5aGP9jjkOMggTN90qU50A==}
+
+  graceful-fs@4.2.11:
+    resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
 
   has-flag@4.0.0:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
@@ -2183,6 +2285,9 @@ packages:
     resolution: {integrity: sha512-Qb1gy5OrP5+zDf2Bvnzdl3jsTf1qXVMazbvCoKhtKqVs4/YK4ozX4gKQJJVyNe+cajNPn0KoC0MC3FUmaHWEmQ==}
     engines: {node: ^10.13.0 || ^12.13.0 || ^14.15.0 || >=15.0.0}
 
+  proper-lockfile@4.1.2:
+    resolution: {integrity: sha512-TjNPblN4BwAWMXU8s9AEz4JmQxnD1NNL7bNOY/AKUzyamc379FWASUhc/K1pL2noVb+XmZKLL68cjzLsiOAMaA==}
+
   react-is@17.0.2:
     resolution: {integrity: sha512-w2GsyukL62IJnlaff/nRegPQR94C/XXamvMWmSHRJ4y7Ts/4ocGRmTHvOs8PSE6pB3dWOrD/nueuU5sduBsQ4w==}
 
@@ -2201,6 +2306,10 @@ packages:
   resolve-pkg-maps@1.0.0:
     resolution: {integrity: sha512-seS2Tj26TBVOC2NIc2rOe2y2ZO7efxITtLZcGSOnHHNOQ7CkiUBfw0Iw2ck6xkIhPwLhKNLS8BO+hEpngQlqzw==}
 
+  retry@0.12.0:
+    resolution: {integrity: sha512-9LkiTwjUh6rT555DtE9rTX+BKByPfrMzEAtnlEtdEwr3Nkffwiihqe2bWADg+OQRjt9gl6ICdmB/ZFDCGAtSow==}
+    engines: {node: '>= 4'}
+
   semver@7.8.5:
     resolution: {integrity: sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA==}
     engines: {node: '>=10'}
@@ -2208,6 +2317,9 @@ packages:
 
   siginfo@2.0.0:
     resolution: {integrity: sha512-ybx0WO1/8bSBLEWXZvEd7gMW3Sn3JFlW3TvX1nREbDLRNQNaeNN8WK0meBwPdAaOI7TtRRRJn/Es1zhrrCHu7g==}
+
+  signal-exit@3.0.7:
+    resolution: {integrity: sha512-wnD2ZE+l+SPC/uoS0vXeE9L1+0wuaMqKlfz9AMUo38JsyLSBWSFcHR1Rri62LZc12vLr1gb3jl7iwQhgwpAbGQ==}
 
   sirv@3.0.2:
     resolution: {integrity: sha512-2wcC/oGxHis/BoHkkPwldgiPSYcpZK3JU28WoMVv55yHJgcZ8rlXvuG9iZggz+sU1d4bRgIGASwyWqjxu3FM0g==}
@@ -2839,6 +2951,14 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
+  '@tanstack/intent@0.3.6':
+    dependencies:
+      cac: 6.7.14
+      jsonc-parser: 3.3.1
+      semver: 7.8.5
+      std-env: 4.2.0
+      yaml: 2.9.0
+
   '@testing-library/dom@10.4.1':
     dependencies:
       '@babel/code-frame': 7.29.7
@@ -2883,6 +3003,12 @@ snapshots:
   '@types/node@26.2.0':
     dependencies:
       undici-types: 8.3.0
+
+  '@types/proper-lockfile@4.1.4':
+    dependencies:
+      '@types/retry': 0.12.5
+
+  '@types/retry@0.12.5': {}
 
   '@types/unist@3.0.3': {}
 
@@ -3165,11 +3291,15 @@ snapshots:
 
   bail@2.0.2: {}
 
+  cac@6.7.14: {}
+
   ccount@2.0.1: {}
 
   chai@6.2.2: {}
 
   character-entities@2.0.2: {}
+
+  citty@0.2.2: {}
 
   convert-source-map@2.0.0: {}
 
@@ -3231,6 +3361,8 @@ snapshots:
   get-tsconfig@4.14.1:
     dependencies:
       resolve-pkg-maps: 1.0.0
+
+  graceful-fs@4.2.11: {}
 
   has-flag@4.0.0: {}
 
@@ -3814,6 +3946,12 @@ snapshots:
       ansi-styles: 5.2.0
       react-is: 17.0.2
 
+  proper-lockfile@4.1.2:
+    dependencies:
+      graceful-fs: 4.2.11
+      retry: 0.12.0
+      signal-exit: 3.0.7
+
   react-is@17.0.2: {}
 
   remark-frontmatter@5.0.0(supports-color@7.2.0):
@@ -3853,9 +3991,13 @@ snapshots:
 
   resolve-pkg-maps@1.0.0: {}
 
+  retry@0.12.0: {}
+
   semver@7.8.5: {}
 
   siginfo@2.0.0: {}
+
+  signal-exit@3.0.7: {}
 
   sirv@3.0.2:
     dependencies:

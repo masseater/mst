@@ -2,10 +2,11 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { normalize } from "node:path/posix";
 
-import { readUnlessMissing } from "@mst/utils";
+import { readUnlessMissing } from "@mst/repository-checks";
 import { uniq } from "es-toolkit";
 
 import { readJsonFile } from "../lint/oxlint/lib/canonical-values/read-json-file.ts";
+import { NEGATION_PREFIX } from "../lint/oxlint/lib/tracked-paths/ignore-listing.ts";
 
 import type { DependencyCatalogChecksConfig } from "./config.ts";
 
@@ -16,9 +17,7 @@ export type WorkspaceManifest = {
 
 const SINGLE_LEVEL_PATTERN_SUFFIX = "/*";
 
-const NEGATION_PREFIX = "!";
-
-const directoriesMatching = ({
+export const directoriesMatching = ({
   repositoryRoot,
   pattern,
 }: {

@@ -1,7 +1,8 @@
-import { lineAtOffset, type UnknownFields } from "@mst/utils";
 import { parseSync } from "oxc-parser";
 
 import { NODE_TYPE_FIELD } from "../ast-node.ts";
+
+import type { UnknownFields } from "@mst/lint-rule-authoring";
 
 export type BodyDeclaration = {
   readonly name: string;
@@ -46,7 +47,7 @@ const declarationFrom = ({
   readonly described: { readonly name: string; readonly start: number; readonly body: unknown };
 }): BodyDeclaration => ({
   name: described.name,
-  line: lineAtOffset(source, described.start),
+  line: source.slice(0, described.start).split("\n").length,
   structure: structureOf(described.body),
   nodeCount: nodeCountOf(described.body),
 });

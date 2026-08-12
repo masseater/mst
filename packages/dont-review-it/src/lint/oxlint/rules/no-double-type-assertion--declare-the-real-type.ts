@@ -1,9 +1,7 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { isTypeAssertion } from "../lib/loose-type-claims.ts";
 
 import type { ESTree } from "@oxlint/plugins";
-
-const isAssertion = (expression: ESTree.Expression): boolean =>
-  expression.type === "TSAsExpression" || expression.type === "TSTypeAssertion";
 
 export const noDoubleTypeAssertion = createDontReviewItRule({
   name: "no-double-type-assertion--declare-the-real-type",
@@ -22,7 +20,7 @@ export const noDoubleTypeAssertion = createDontReviewItRule({
   },
   create(context) {
     const reportWhenStacked = (node: ESTree.TSAsExpression | ESTree.TSTypeAssertion): void => {
-      if (!isAssertion(node.expression)) return;
+      if (!isTypeAssertion(node.expression)) return;
       context.report({ node, messageId: "stackedTypeAssertion" });
     };
 

@@ -13,7 +13,7 @@ import { fileTextOrNull } from "./file-text.ts";
 import { tsconfigScopeProblemsOf } from "./scan/tsconfig-scope.ts";
 import { listWorkspaces, type Workspace } from "./scan/workspaces.ts";
 
-import type { RepositoryProblem } from "@mst/utils";
+import type { RepositoryProblem } from "@mst/repository-checks";
 
 const SPEC_FILE_PATTERN = "specs/*.spec.{ts,tsx}";
 

@@ -8,14 +8,16 @@
   },
   "type": "module",
   "scripts": {
-    "guard": "vp check && vp run -r test --coverage && vp run -r build && vp run knip && vp run knip --production && vp exec dont-review-it check && vp exec agentic-documents check && vp exec verified-specifications check && vp exec stop-ai-slop check",
-    "guard:fix": "vp exec lint-rule-authoring check --write && vp check --fix && vp exec agentic-documents check --write && vp exec verified-specifications check --write",
+    "guard": "throttle --timeout 1800 -- spool -- vp run guard:all",
+    "guard:all": "vp check && vp run -r test --coverage && vp run -r build && vp run knip && vp run knip --production && vp exec dont-review-it check && vp exec agentic-documents check && vp exec verified-specifications check && vp exec stop-ai-slop check && vp run -r check:skills",
+    "guard:fix": "vp exec lint-rule-authoring check --write && vp check --fix && vp exec agentic-documents check --write && vp exec verified-specifications check --write && vp exec dont-review-it check --write",
     "dev": "vp run website#dev",
     "knip": "knip",
     "prepare": "vp config && git config merge.ff false"
   },
   "devDependencies": {
     "@mst/agentic-documents": "workspace:*",
+    "@mst/ai-native": "workspace:*",
     "@mst/dont-review-it": "workspace:*",
     "@mst/lint-rule-authoring": "workspace:*",
     "@mst/stop-ai-slop": "workspace:*",

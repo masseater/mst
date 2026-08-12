@@ -1,4 +1,4 @@
-import { type UnknownFields } from "@mst/utils";
+import { type UnknownFields } from "@mst/lint-rule-authoring";
 import { isPlainObject } from "es-toolkit";
 import { type CallExpression } from "oxc-parser";
 

@@ -37,7 +37,7 @@ paths:
 
 ## テンプレートが入れる `vite` 直接依存を「未使用」と判断して消してはいけない
 
-- 症状: knip がルートと `packages/utils` の `vite` を未使用 devDependency として報告する。実際にソースからは参照されていない
+- 症状: knip がルートと `packages/repository-checks` の `vite` を未使用 devDependency として報告する。実際にソースからは参照されていない
 - 消すとどうなるか: pnpm では `overrides` が実際の `vite` 依存エッジを持つワークスペースにしか効かない。直接依存のないワークスペースでは autoInstallPeers が上流の素の vite を別途インストールし、vite/vitest が二重インスタンス化する。これは前項と同じ構造の障害（`vp test` のキャッシュミス、dual instance）を招く
 - 上流: [voidzero-dev/vite-plus#1932](https://github.com/voidzero-dev/vite-plus/issues/1932)。テンプレートが root と `packages/utils` に直接 `vite` 依存を入れているのは、まさにこの対策として入れられたもの
 - 併せて必須の設定: `catalog` の `vite: npm:@voidzero-dev/vite-plus-core@<version>` エイリアスと `overrides.vite: "catalog:"`（[voidzero-dev/vite-plus#2034](https://github.com/voidzero-dev/vite-plus/issues/2034) でコラボレータが「想定どおり」と回答）。`peerDependencyRules` は機能上は任意で、外すと unmet peer の警告が出るだけ（[voidzero-dev/vite-plus#1021](https://github.com/voidzero-dev/vite-plus/issues/1021)）
@@ -69,12 +69,12 @@ pack: { exports: { customExports: { './tsconfig/*': './tsconfig/*' } } }
 
 したがって pnpm 固有の依存解決の挙動（前項の autoInstallPeers など）はこのリポジトリにそのまま該当する。
 
-## `packages/utils/package.json` にプレースホルダのメタデータが残っている
+## テンプレートが置くパッケージのメタデータはプレースホルダである
 
 - 該当箇所: `"author": "Author Name <author.name@mail.com>"`、`"repository.url": "git+https://github.com/author/library.git"`、`"homepage": "https://github.com/author/library#readme"`、`"bugs.url": "https://github.com/author/library/issues"`、`"description": "A starter for creating a TypeScript package."`
 - 出自: Vite+ のテンプレートが [sxzz/tsdown-templates](https://github.com/sxzz/tsdown-templates) の default テンプレートを取り込んだもの。vite-plus の CLI スナップショットテストで期待値として固定されているため、テンプレートの未整備ではなく既知の出力
 - 上流に issue はなく、公開リポジトリでもそのまま残している例が複数ある
-- IF: `packages/utils` を publish する; THEN MUST: これらを実際の値に書き換える
+- IF: テンプレートが生成したパッケージを publish する; THEN MUST: これらを実際の値に書き換える
 
 ## catalog に寄せるときは catalog 側の値が実態と合っているか確認する
 

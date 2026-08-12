@@ -2,6 +2,9 @@
   "name": "@mst/dont-review-it",
   "version": "0.0.0",
   "description": "Machine-enforced answers to the writing questions that would otherwise be raised in review.",
+  "keywords": [
+    "tanstack-intent"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -13,6 +16,7 @@
   },
   "files": [
     "dist",
+    "skills",
     "src",
     "tsconfig"
   ],
@@ -21,6 +25,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./plugin": "./src/plugin.ts",
+    "./vitest": "./src/vitest/standard-io-test.ts",
     "./tsconfig/*": "./tsconfig/*",
     "./package.json": "./package.json"
   },
@@ -28,24 +33,29 @@
     "access": "public"
   },
   "scripts": {
-    "build": "vp pack",
+    "build": "spool -- vp pack",
     "dev": "vp pack --watch",
-    "test": "vp test",
-    "check": "vp check"
+    "test": "spool -- vp test",
+    "check": "spool -- vp check",
+    "check:skills": "intent validate"
   },
   "dependencies": {
     "@mst/lint-rule-authoring": "workspace:*",
-    "@mst/utils": "workspace:*",
+    "@mst/repository-checks": "workspace:*",
     "@oxlint/plugins": "catalog:",
+    "citty": "0.2.2",
     "es-toolkit": "catalog:",
     "jsonc-parser": "catalog:",
     "oxc-parser": "catalog:",
     "oxfmt": "0.61.0",
     "oxlint": "catalog:",
+    "std-env": "^4.2.0",
     "typescript": "catalog:",
     "yaml": "catalog:"
   },
   "devDependencies": {
+    "@mst/ai-native": "workspace:*",
+    "@tanstack/intent": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "vite": "catalog:",

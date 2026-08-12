@@ -1,5 +1,3 @@
-import { attemptAsync } from "es-toolkit";
-
 import { runGitText } from "./git-text.ts";
 
 export type ComparisonRange = Readonly<{
@@ -9,26 +7,14 @@ export type ComparisonRange = Readonly<{
 
 const INTEGRATION_REVISION = "origin/main";
 
-const UNKNOWN_REVISION_STATUS = 1;
-
-const exitStatusOf = (failure: unknown): number | null => {
-  if (typeof failure !== "object" || failure === null) return null;
-  if (!("code" in failure)) return null;
-  return typeof failure.code === "number" ? failure.code : null;
-};
-
 const commitOrNull = async (repositoryRoot: string, revision: string): Promise<string | null> => {
-  const [unreadableRevision, resolved] = await attemptAsync(async () =>
-    runGitText({
+  const found = (
+    await runGitText({
       repositoryRoot,
-      args: ["rev-parse", "--verify", "--quiet", "--end-of-options", `${revision}^{commit}`],
-    }),
-  );
-  if (resolved !== null) return resolved.trim();
-  if (exitStatusOf(unreadableRevision) === UNKNOWN_REVISION_STATUS) return null;
-  throw new Error(`Do not read past a broken ${revision}; repair the repository first.`, {
-    cause: unreadableRevision,
-  });
+      args: ["rev-list", "--max-count=1", "--ignore-missing", "--end-of-options", revision],
+    })
+  ).trim();
+  return found === "" ? null : found;
 };
 
 const mergeBaseOf = async (

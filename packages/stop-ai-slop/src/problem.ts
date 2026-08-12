@@ -1,6 +1,8 @@
-import type { LocatedProblem } from "@mst/utils";
-
-export type CheckProblem = LocatedProblem;
+export type CheckProblem = {
+  readonly file: string;
+  readonly line: number;
+  readonly message: string;
+};
 
 export type SlopProblem = CheckProblem & {
   readonly checkId: string;

@@ -7,7 +7,7 @@ import { parse } from "yaml";
 import { fileTextOrNull } from "../file-text.ts";
 
 import type { Dirent } from "node:fs";
-import type { RepositoryProblem } from "@mst/utils";
+import type { RepositoryProblem } from "@mst/repository-checks";
 
 export type Workspace = {
   readonly directory: string;

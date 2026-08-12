@@ -3,7 +3,7 @@ import { basename, dirname, extname, join } from "node:path";
 
 import { parseSync } from "oxc-parser";
 
-import type { UnknownFields } from "@mst/utils";
+import type { UnknownFields } from "../unknown-fields.ts";
 
 export type LintRuleFacts = {
   readonly name: string;

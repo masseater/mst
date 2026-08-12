@@ -1,8 +1,8 @@
 import { jobEntriesOf } from "../steps.ts";
 import { entryOf, keyOf, lineOf, type WorkflowDocument } from "../workflow-document.ts";
 
+import type { RepositoryProblem } from "../../problem.ts";
 import type { WorkflowChecksConfig } from "../config.ts";
-import type { WorkflowProblem } from "../problem.ts";
 
 export const undeclaredPermissions = ({
   document,
@@ -10,7 +10,7 @@ export const undeclaredPermissions = ({
 }: {
   readonly document: WorkflowDocument;
   readonly config: WorkflowChecksConfig;
-}): readonly WorkflowProblem[] => {
+}): readonly RepositoryProblem[] => {
   if (entryOf(document.root, config.permissionsKey) !== null) return [];
 
   return jobEntriesOf({ document, config }).flatMap((job) => {

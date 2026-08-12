@@ -6,9 +6,8 @@ import {
   EXIT_MISUSE,
   EXIT_PROBLEMS_FOUND,
   EXIT_SUCCESS,
-  toLines,
   type CliResult,
-} from "@mst/utils";
+} from "@mst/repository-checks";
 
 import { comparisonRangeIn, type ComparisonRange } from "./comparison-range.ts";
 import { formatProblem } from "./problem.ts";
@@ -61,7 +60,7 @@ const reportedComparison = async (
   const problems = runChecks({ comparison });
   return {
     exitCode: problems.length === 0 ? EXIT_SUCCESS : EXIT_PROBLEMS_FOUND,
-    out: toLines(problems.map(formatProblem)),
+    out: problems.map((problem) => `${formatProblem(problem)}\n`).join(""),
     error: "",
   };
 };

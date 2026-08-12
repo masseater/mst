@@ -125,7 +125,7 @@ describe("dont-review-it/no-hardcoded-provider-id--read-from-configuration", () 
       {
         name: "a test file carries no exemption",
         code: "import Provider from 'provider-sdk';\nnew Provider({ projectId: 'acme-production' });",
-        filename: "/repo/packages/utils/src/provider.test.ts",
+        filename: "/repo/packages/repository-checks/src/provider.test.ts",
         errors: [{ messageId: "hardcodedProviderId" }],
       },
     ],

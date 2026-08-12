@@ -6,11 +6,9 @@ import {
   EXIT_MISUSE,
   EXIT_PROBLEMS_FOUND,
   EXIT_SUCCESS,
-  failureMessage,
   readUnlessMissing,
-  toLines,
   type CliResult,
-} from "@mst/utils";
+} from "@mst/repository-checks";
 import { attempt } from "es-toolkit";
 
 import {
@@ -54,15 +52,20 @@ const dispatch = (argv: readonly string[]): CliResult => {
     };
   }
 
-  const problems = lintRuleIndexProblems({ repositoryRoot, write: parsed.values.write ?? false });
+  const { problems } = lintRuleIndexProblems({
+    repositoryRoot,
+    write: parsed.values.write ?? false,
+  });
   return {
     exitCode: problems.length === 0 ? EXIT_SUCCESS : EXIT_PROBLEMS_FOUND,
-    out: toLines(problems.map(formatLintRuleIndexProblem)),
+    out: problems.map((problem) => `${formatLintRuleIndexProblem(problem)}\n`).join(""),
     error: "",
   };
 };
 
 export const runLintRuleAuthoring = (argv: readonly string[]): CliResult => {
-  const [failure, outcome] = attempt(() => dispatch(argv));
-  return outcome ?? { exitCode: EXIT_MISUSE, out: "", error: `${failureMessage(failure)}\n` };
+  const [failure, outcome] = attempt<CliResult, Error>(() => dispatch(argv));
+  return failure === null
+    ? outcome
+    : { exitCode: EXIT_MISUSE, out: "", error: `${failure.message}\n` };
 };

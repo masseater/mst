@@ -156,7 +156,7 @@ describe("dont-review-it/no-tautological-assertion--assert-on-a-computed-value",
       {
         name: "a file outside the test suffix carries no exemption",
         code: "expect(1).toBe(1);",
-        filename: "/repo/packages/utils/src/total.ts",
+        filename: "/repo/packages/repository-checks/src/total.ts",
         errors: [{ messageId: "tautologicalAssertion" }],
       },
     ],

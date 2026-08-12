@@ -2,6 +2,9 @@
   "name": "@mst/stop-ai-slop",
   "version": "0.0.0",
   "description": "Machine-enforced checks for recurring low-value patterns in AI-authored changes.",
+  "keywords": [
+    "tanstack-intent"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -13,6 +16,7 @@
   },
   "files": [
     "dist",
+    "skills",
     "src"
   ],
   "type": "module",
@@ -24,18 +28,22 @@
     "access": "public"
   },
   "scripts": {
-    "build": "vp pack",
+    "build": "spool -- vp pack",
     "dev": "vp pack --watch",
-    "test": "vp test",
-    "check": "vp check"
+    "test": "spool -- vp test",
+    "check": "spool -- vp check",
+    "check:skills": "intent validate"
   },
   "dependencies": {
-    "@mst/utils": "workspace:*",
+    "@mst/lint-rule-authoring": "workspace:*",
+    "@mst/repository-checks": "workspace:*",
     "es-toolkit": "catalog:",
     "oxc-parser": "catalog:",
     "parse-git-diff": "0.0.20"
   },
   "devDependencies": {
+    "@mst/ai-native": "workspace:*",
+    "@tanstack/intent": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "typescript": "catalog:",

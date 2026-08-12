@@ -1,4 +1,5 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { VOID_OPERATOR } from "../lib/void-operator.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
@@ -16,8 +17,6 @@ const CARRIED_THROUGH_TYPES: ReadonlySet<string> = new Set([
 const FAILURE_ELEMENT_INDEX = 0;
 
 const RESULT_ELEMENT_INDEX = 1;
-
-const VOID_OPERATOR = "void";
 
 const PLACEHOLDER_NAME_PATTERN = /^_+$/u;
 

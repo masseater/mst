@@ -1,6 +1,5 @@
 import { posix } from "node:path";
 
-import { lineAtOffset } from "@mst/utils";
 import {
   parseSync,
   type Argument,
@@ -134,6 +133,9 @@ const argumentOfImportedCall = ({
     ? onlyArgument(call)
     : null;
 };
+
+const lineAtOffset = (source: string, offset: number): number =>
+  source.slice(0, offset).split("\n").length;
 
 const sourceRangeFor = (
   source: string,

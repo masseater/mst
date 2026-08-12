@@ -30,6 +30,9 @@ coverage
 *.sln
 *.sw?
 
+# Spool wrapper records
+.spool/
+
 # AI agent worktrees
 .claude/worktrees/
 

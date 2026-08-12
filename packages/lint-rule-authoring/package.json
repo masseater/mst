@@ -2,6 +2,9 @@
   "name": "@mst/lint-rule-authoring",
   "version": "0.0.0",
   "description": "Materials for authoring lint rules that keep working after they are written.",
+  "keywords": [
+    "tanstack-intent"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -13,6 +16,7 @@
   },
   "files": [
     "dist",
+    "skills",
     "src"
   ],
   "type": "module",
@@ -26,13 +30,14 @@
     "access": "public"
   },
   "scripts": {
-    "build": "vp pack",
+    "build": "spool -- vp pack",
     "dev": "vp pack --watch",
-    "test": "vp test",
-    "check": "vp check"
+    "test": "spool -- vp test",
+    "check": "spool -- vp check",
+    "check:skills": "intent validate"
   },
   "dependencies": {
-    "@mst/utils": "workspace:*",
+    "@mst/repository-checks": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/core": "^2.10.0",
     "@opentelemetry/exporter-metrics-otlp-http": "^0.221.0",
@@ -45,6 +50,8 @@
     "yaml": "catalog:"
   },
   "devDependencies": {
+    "@mst/ai-native": "workspace:*",
+    "@tanstack/intent": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "typescript": "catalog:",

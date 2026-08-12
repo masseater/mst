@@ -27,6 +27,10 @@ description: Machine-enforced answers to the writing questions that would otherw
 
 説明に載せる例をどこから作るかは [文書](../../docs/guidelines/documents.md) が持つ。良い例と悪い例を対で置かないことは [規範の書き方](../../docs/normative-notation.md) が持つ。
 
+## CLI 向け config
+
+bin を公開するパッケージ向けに、全部入り config の厳密な上位集合 `oxlintCli` を公開する。何を足しているか、lint で検出できない CLI の規範は [CLI の作り方](docs/cli.md) が持つ。上位集合の形にした判断は [EDR 0032](../../docs/engineering-decision-logs/0032-ship-the-cli-config-as-a-strict-superset.md) にある。
+
 ## 検証コマンド
 
 lint ルールとして書けない検査は CLI として持つ。マニフェストや複数ファイルをまたぐ突き合わせと、lint のツールチェーンが解釈できない形式が該当する。
@@ -75,3 +79,18 @@ CLI が持つコマンドは `check` の 1 つで、そこが全部の検査を�
 - 複数のマニフェストが同じバージョンを catalog の外で繰り返していない
 - バージョンが食い違う宣言は警告として出す。どちらへ揃えるかは判断なので落とさない
 - 何も使っていない catalog エントリは報告しない。未使用の検出は knip が持つ
+
+## 公開パッケージの skill の検査
+
+`check` が、TanStack Intent の skill と package.json の宣言が食い違っていないことも読む。見るのは同梱と配布の配線だけで、両方向を検知する。
+
+npm へ公開できるパッケージには、あることを要求する。
+
+- `skills/**/SKILL.md` が 1 つ以上ある
+- `files` の許可リストがあるなら `skills` を載せている
+- `keywords` が `tanstack-intent` を含んでいる
+
+`private: true` のパッケージには、同じ 3 点が書かれていないことを要求する。出荷されない skill と、出荷されない前提の配線は、読む側に嘘を教える。
+
+- IF: SKILL.md の中身の構造を検査したくなった; THEN MUST: この検査に足さず、上流の `intent validate`（各パッケージの `check:skills`）に任せる
+  - 不変条件の分担は [EDR 0030](../../docs/engineering-decision-logs/0030-ship-agent-skills-with-published-packages-and-gate-the-shipping-ourselves.md) が決めている

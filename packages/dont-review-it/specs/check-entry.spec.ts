@@ -1,22 +1,23 @@
-import { EXIT_MISUSE } from "@mst/utils";
+import { EXIT_MISUSE } from "@mst/repository-checks";
+import { runCommand } from "citty";
 import { describe, expect, it } from "vite-plus/test";
 
-import { runDontReviewIt } from "../src/run-cli.ts";
+import { dontReviewItCommand } from "../src/dont-review-it-command.ts";
 
 describe("リポジトリ検査の入口", () => {
-  it("check 以外の命令に使い方を返して失敗する", () => {
-    const finished = runDontReviewIt(["deploy"]);
-    expect(finished.exitCode).toBe(EXIT_MISUSE);
-    expect(finished.error).toContain("Usage:");
+  it("check 以外の命令を名指しで拒否する", async () => {
+    await expect(runCommand(dontReviewItCommand, { rawArgs: ["deploy"] })).rejects.toThrow(
+      /Unknown command/u,
+    );
   });
 
-  it("存在しない場所を検査対象に取らない", () => {
-    const finished = runDontReviewIt([
-      "check",
-      "--repository-root",
-      "/nonexistent/verified-specifications-probe",
-    ]);
-    expect(finished.exitCode).toBe(EXIT_MISUSE);
-    expect(finished.error).toContain("is not a directory");
+  it("存在しない場所を検査対象に取らない", async () => {
+    process.exitCode = 0;
+    await runCommand(dontReviewItCommand, {
+      rawArgs: ["check", "--repository-root", "/nonexistent/verified-specifications-probe"],
+    });
+
+    expect(process.exitCode).toBe(EXIT_MISUSE);
+    process.exitCode = 0;
   });
 });
