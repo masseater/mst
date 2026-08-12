@@ -14,12 +14,13 @@ const RESTART_REQUESTED: CycleOutcome = "restart-requested";
 
 const SIGNALLED: CycleOutcome = "signalled";
 
-const STREAM_ENDED: CycleOutcome = "stream-ended";
+export const STREAM_ENDED: CycleOutcome = "stream-ended";
 
 export type ConnectionCycleConfig = {
   readonly mode: Mode;
   readonly syncMain: () => Promise<void>;
   readonly startupDrain: () => Promise<readonly Readonly<Record<string, unknown>>[]>;
+  readonly connect: () => Promise<void>;
   readonly subscribe: () => AsyncGenerator<Readonly<Record<string, unknown>>, void, undefined>;
   readonly dispatcher: EventDispatcher;
   readonly queue: JobQueue;
@@ -53,8 +54,7 @@ const consumeStream = async (config: ConnectionCycleConfig): Promise<CycleOutcom
   return config.restart.requested() === null ? null : RESTART_REQUESTED;
 };
 
-export const runConnectionCycle = async (config: ConnectionCycleConfig): Promise<CycleOutcome> => {
-  await config.syncMain();
+const dispatchStartupDrain = async (config: ConnectionCycleConfig): Promise<void> => {
   const drained = await config.startupDrain();
   const accepted = dispatchAll({
     events: drained,
@@ -62,7 +62,14 @@ export const runConnectionCycle = async (config: ConnectionCycleConfig): Promise
     mode: config.mode,
   });
   config.log.info({ drained: drained.length, accepted }, "startup drain dispatched");
+};
+
+export const runConnectionCycle = async (config: ConnectionCycleConfig): Promise<CycleOutcome> => {
+  await config.syncMain();
+  await dispatchStartupDrain(config);
+  const connection = config.connect();
   const stopReason = await consumeStream(config);
+  await connection;
   if (stopReason !== null) return stopReason;
   await config.queue.drain();
   return STREAM_ENDED;

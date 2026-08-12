@@ -14,7 +14,7 @@ import { withJobBanner } from "../queue/job-banner.ts";
 import { prLaneNumber, type PrFilter } from "../queue/pr-lane.ts";
 import { createPeriodicScheduler } from "../queue/scheduler.ts";
 import { composeRuntime, type ComposedRuntime } from "../runtime/compose-runtime.ts";
-import { runConnectionCycle } from "../runtime/connection-cycle.ts";
+import { runConnectionCycle, STREAM_ENDED } from "../runtime/connection-cycle.ts";
 import { createIdleMonitor, type IdleMonitor } from "../runtime/idle-monitor.ts";
 import {
   codeMovedOn,
@@ -33,6 +33,8 @@ import type { HandlerGithubClient } from "../handlers/github-client.ts";
 const UPDATE_CHECK_INTERVAL_MS = 15 * 60_000;
 
 const IDLE_RESTART_THRESHOLD_MS = 30 * 60_000;
+
+const CYCLE_RESTART_DELAY_MS = 3_000;
 
 export type ModeRunRequest = {
   readonly mode: Mode;
@@ -306,20 +308,26 @@ const cycleUntilStopped = async (cycling: {
     log: runtime.log,
   });
   try {
-    await runConnectionCycle({
-      mode: request.mode,
-      syncMain: () => runtime.syncToMain(),
-      startupDrain: () => runtime.drainStartup(),
-      subscribe: () => runtime.subscribe(),
-      dispatcher: runtime.dispatcher,
-      queue: runtime.queue,
-      restart: cycling.restart,
-      onActivity: () => {
-        cycling.idleMonitor.recordActivity();
-      },
-      signalled: () => stopped.get("signalled") === true,
-      log: runtime.log,
-    });
+    for (;;) {
+      const ending = await runConnectionCycle({
+        mode: request.mode,
+        syncMain: () => runtime.syncToMain(),
+        startupDrain: () => runtime.drainStartup(),
+        connect: () => runtime.connect(),
+        subscribe: () => runtime.subscribe(),
+        dispatcher: runtime.dispatcher,
+        queue: runtime.queue,
+        restart: cycling.restart,
+        onActivity: () => {
+          cycling.idleMonitor.recordActivity();
+        },
+        signalled: () => stopped.get("signalled") === true,
+        log: runtime.log,
+      });
+      if (ending !== STREAM_ENDED) return;
+      runtime.log.warn({ ending }, "the connection cycle ended; reconnecting after a short delay");
+      await new Promise((resolve) => setTimeout(resolve, CYCLE_RESTART_DELAY_MS));
+    }
   } finally {
     shutdown.release();
   }

@@ -47,6 +47,7 @@ const runCycle = async (setup: {
     mode: "reviewer",
     syncMain,
     startupDrain: () => Promise.resolve(setup.drained ?? []),
+    connect: () => Promise.resolve(),
     subscribe: async function* subscribe() {
       await Promise.resolve();
       for (const raw of setup.streamed ?? []) {

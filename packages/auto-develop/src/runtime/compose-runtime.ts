@@ -45,6 +45,7 @@ export type ComposedRuntime = {
   readonly log: Logger;
   readonly syncToMain: () => Promise<void>;
   readonly drainStartup: () => Promise<readonly Readonly<Record<string, unknown>>[]>;
+  readonly connect: () => Promise<void>;
   readonly subscribe: () => AsyncGenerator<Readonly<Record<string, unknown>>, void, undefined>;
   readonly dispatcher: ReturnType<typeof createEventDispatcher>;
   readonly queue: ReturnType<typeof createJobQueue>;
@@ -158,6 +159,7 @@ export const composeRuntime = (wiring: RuntimeWiring): ComposedRuntime => {
         fetchImpl: fetch,
         log,
       }),
+    connect: () => transport.connect(),
     subscribe: () => transport.events(),
     dispatcher: createEventDispatcher({
       queue,
