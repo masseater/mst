@@ -9,6 +9,19 @@ paths:
 
 各項目は「症状 → 原因 → 対処」で読める形にしている。
 
+## git hook の中で走る git は、cwd ではなく継承した `GIT_DIR` を見る
+
+- 症状: 一時ディレクトリに作った検証用リポジトリに対する git 操作が、共有リポジトリの側に当たった。`codex/feat-stop-ai-slop` の ref がテストの `snapshot` コミット列に進み、共有の `.git/config` に `user.email` / `user.name` / `diff.noprefix` / `diff.renameLimit` が書き込まれた。`git init` は `warning: re-init: ignored --initial-branch=main` だけを出して通る
+- 原因: git は hook を起動するとき `GIT_DIR` / `GIT_INDEX_FILE` などを環境変数に置く。hook から派生したプロセスはこれを継承し、`cwd` を渡しても `GIT_DIR` のほうが勝つ。このリポジトリの `.vite-hooks/pre-commit` と `pre-merge-commit` は `vp run guard` を呼ぶので、guard が走らせるテストと検証コマンドはすべてこの環境の下にいる
+- 気づけない理由: 手元で `vp run guard` を直接叩くぶんには `GIT_DIR` が無いので再現しない。hook 経由の 1 回だけ壊れる
+- 対処: git を起動する側が環境を作り直す。`packages/stop-ai-slop/src/git-text.ts` は `GIT_` で始まる変数をすべて落としてから git を呼ぶ。検証用リポジトリを作る側はさらに強く、`PATH` と `HOME` と `GIT_CONFIG_GLOBAL` / `GIT_CONFIG_SYSTEM` だけを渡す。開発者の global 設定（`init.templatedir` など）も一緒に締め出せる
+
+- IF: リポジトリのパスを引数で受け取って git を起動するコードを書く; THEN
+  - MUST: `GIT_` で始まる環境変数を落としてから起動する
+  - PROHIBIT: `cwd` を渡しただけで対象リポジトリが決まるとみなす
+- IF: テストから git を起動する; THEN MUST: 同じ扱いにする
+  - 検証用リポジトリのつもりの操作が、hook 経由で走ったときだけ本物のリポジトリに当たる
+
 ## npm 経由でグローバル導入した vp は `vp test` を壊す
 
 - 症状: `vp test` および `vp run -r test` が `Vitest failed to find the current suite` で必ず失敗する。`vp check` は通ってしまうため、CLI の導入経路が原因だとは気づきにくい
