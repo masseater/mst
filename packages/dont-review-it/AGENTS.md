@@ -29,7 +29,20 @@ description: Machine-enforced answers to the writing questions that would otherw
 
 ## 公開する config
 
-公開する oxlint の config は `oxlint` の 1 枚だけである。対象種別による出し分けはしない。ルートの `lint` が `extends` した時点でリポジトリ全体に効き、採用の判断は残らない。CLI に固有の規律もこの中にあり、対象を絞るのはルールの側である。判断は [EDR 0042](../../docs/engineering-decision-logs/0042-apply-one-preset-at-the-root-and-report-the-exception-the-toolchain-forces.md) にある。
+公開する config は `dontReviewItPreset` の 1 つだけである。`fmt` と `lint` の 2 つの関数を持ち、ルートの `vite.config.ts` はそれぞれのブロックで対応する関数を呼ぶ。呼び出し側が足したいものは引数に渡し、preset が返した値へ後ろから重なる。呼び忘れは [no-unwrapped-toolchain-config--call-the-preset-for-the-block](docs/lint/no-unwrapped-toolchain-config--call-the-preset-for-the-block.md) が報告する。
+
+`lint` が配るルール集合は 1 枚だけである。対象種別による出し分けはしない。ルートの `lint` が呼んだ時点でリポジトリ全体に効き、採用の判断は残らない。CLI に固有の規律もこの中にあり、対象を絞るのはルールの側である。判断は [EDR 0042](../../docs/engineering-decision-logs/0042-apply-one-preset-at-the-root-and-report-the-exception-the-toolchain-forces.md) にある。
+
+`fmt` が決めているのは、整形結果が読み手に届く見た目を変えず、差分にだけ現れる書き方である。markdown の段落を 1 行に畳むこと、import の並び順がこれにあたる。判断は [EDR 0044](../../docs/engineering-decision-logs/0044-let-the-formatter-own-where-markdown-lines-break.md) と [EDR 0045](../../docs/engineering-decision-logs/0045-hand-every-toolchain-block-one-preset-function.md) にある。
+
+- IF: 整形の選択を `fmt` に足したい; THEN
+  - MUST: レンダリングされた結果が変わらないことを確かめる
+  - PROHIBIT: 読み手に届く見た目を変える選択を入れる
+    - 見た目が変わる選択は書き手の判断であり、機械が一律に決めると表現を奪う
+- IF: 公開する config を増やしたくなった; THEN
+  - MUST: `dontReviewItPreset` の中へ入れる
+  - PROHIBIT: 2 つ目の export を作る
+    - 入口が複数あると、どれを配線したかで効いている範囲が変わり、採用の判断が呼び出し側に戻る
 
 lint で検出できない CLI の規範は [CLI の作り方](docs/cli.md) が持つ。
 

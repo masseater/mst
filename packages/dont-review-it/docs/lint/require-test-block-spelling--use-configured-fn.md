@@ -31,17 +31,17 @@
 
 ### 意図的に広げていない範囲
 
-| 形                                               | 対象にしない理由                                                                                                                                 |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `test.extend({ subject: 1 })`                    | fixture ファクトリであってテストブロックの宣言ではない。`extend` を修飾子として扱わないので根に到達しない                                        |
-| `it.extend({ subject: 1 })`                      | 同上。`it` を土台にしてよいかは `forbid-it-extend--use-test-extend` が持つ                                                                       |
-| `it(...)` / `it.skip(...)` / `it["skip"](...)`   | 正の綴りで書かれている                                                                                                                           |
-| `test[chosen]("...", fn)`                        | どの修飾子に解決されるかが実行時にしか決まらない。名前としては判定しない。形そのものは `no-computed-test-api-member--use-static-member` が落とす |
-| `suite.test("...", fn)`                          | レシーバを持つ同名メソッドの呼び出し                                                                                                             |
-| `const it = test.extend({ subject: 1 });`        | 正の綴りに束縛された派生ビルダー。規約どおりの形                                                                                                 |
-| `describe(...)` / `import { describe as group }` | テストブロック以外の宣言 API                                                                                                                     |
-| `const run = (test) => { test("...", fn); };`    | 引数に束縛された識別子。ランナーの API には解決されない                                                                                          |
-| `import { test as spec } from "./helpers.ts";`   | `runnerModules` にないモジュールからの import                                                                                                    |
+| 形 | 対象にしない理由 |
+| --- | --- |
+| `test.extend({ subject: 1 })` | fixture ファクトリであってテストブロックの宣言ではない。`extend` を修飾子として扱わないので根に到達しない |
+| `it.extend({ subject: 1 })` | 同上。`it` を土台にしてよいかは `forbid-it-extend--use-test-extend` が持つ |
+| `it(...)` / `it.skip(...)` / `it["skip"](...)` | 正の綴りで書かれている |
+| `test[chosen]("...", fn)` | どの修飾子に解決されるかが実行時にしか決まらない。名前としては判定しない。形そのものは `no-computed-test-api-member--use-static-member` が落とす |
+| `suite.test("...", fn)` | レシーバを持つ同名メソッドの呼び出し |
+| `const it = test.extend({ subject: 1 });` | 正の綴りに束縛された派生ビルダー。規約どおりの形 |
+| `describe(...)` / `import { describe as group }` | テストブロック以外の宣言 API |
+| `const run = (test) => { test("...", fn); };` | 引数に束縛された識別子。ランナーの API には解決されない |
+| `import { test as spec } from "./helpers.ts";` | `runnerModules` にないモジュールからの import |
 
 ファイル名による絞り込みはしない。このルールはファイル名のポリシーを持たず、どのファイルに効かせるかは共有 lint 設定の glob が決める。
 

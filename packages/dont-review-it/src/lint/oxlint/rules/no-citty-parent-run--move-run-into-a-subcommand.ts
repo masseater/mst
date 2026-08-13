@@ -1,5 +1,5 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
-import { collectBinding, isCallOf, newBinding } from "../lib/imported-binding.ts";
+import { collectBinding, isReferenceTo, newBinding } from "../lib/imported-binding.ts";
 import { objectPropertyOf } from "../lib/object-literal.ts";
 
 import type { ESTree } from "@oxlint/plugins";
@@ -32,7 +32,7 @@ export const noCittyParentRun = createDontReviewItRule({
         collectBinding(node, factory);
       },
       CallExpression(node: ESTree.CallExpression) {
-        if (!isCallOf(node.callee, factory)) return;
+        if (!isReferenceTo(node.callee, factory)) return;
         const [definition] = node.arguments;
         if (definition?.type !== "ObjectExpression") return;
         if (objectPropertyOf({ object: definition, key: "subCommands" }) === null) return;

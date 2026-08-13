@@ -22,29 +22,29 @@
 
 対象になる形。
 
-| 形                                     | 例                                                                          |
-| -------------------------------------- | --------------------------------------------------------------------------- |
-| 別の綴りのテストブロック               | `test("adds", () => { expect(sum).toBe(3); });`                             |
-| 別名に束ねたファクトリのテストブロック | `const spec = test.extend({});` の `spec("adds", fn)`                       |
-| グルーピングブロックの直下             | `describe("sums", () => { expect(sum).toBe(3); });`                         |
-| フック                                 | `beforeEach(() => { expect(sum).toBe(3); });`                               |
-| module スコープのヘルパ関数の本体      | `const assertTotal = (total) => { expect(total).toBe(3); };`                |
-| fixture ファクトリの本体               | `test.extend({ subject: async (c, use) => { expect(seed).toBe(1); ... } })` |
-| 派生した受け手を `it` の外で使った形   | `expect.soft(sum).toBe(3);`                                                 |
+| 形 | 例 |
+| --- | --- |
+| 別の綴りのテストブロック | `test("adds", () => { expect(sum).toBe(3); });` |
+| 別名に束ねたファクトリのテストブロック | `const spec = test.extend({});` の `spec("adds", fn)` |
+| グルーピングブロックの直下 | `describe("sums", () => { expect(sum).toBe(3); });` |
+| フック | `beforeEach(() => { expect(sum).toBe(3); });` |
+| module スコープのヘルパ関数の本体 | `const assertTotal = (total) => { expect(total).toBe(3); };` |
+| fixture ファクトリの本体 | `test.extend({ subject: async (c, use) => { expect(seed).toBe(1); ... } })` |
+| 派生した受け手を `it` の外で使った形 | `expect.soft(sum).toBe(3);` |
 
 ファイル名による絞り込みはしない。spec から取り込まれるヘルパファイルに書かれたアサーションもこのルールの対象であり、どのファイルに効かせるかは共有 lint 設定の glob が決める。
 
 ### 意図的に広げていない範囲
 
-| 形                                                                          | 対象にしない理由                                                                                                   |
-| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `it.skip(...)` / `it.each(rows)(...)` / `it.skipIf(slow).concurrent(...)`   | 根が正の綴りに解決される修飾形・カリー形                                                                           |
-| `it("adds", () => { rows.forEach((row) => { expect(row).toBe(1); }); });`   | テスト用でないコールバックはそこで打ち切らず、さらに上のテストブロックを見る                                       |
-| `it("adds", () => { expect(sum); });`                                       | 所在は正しい。何も主張していないことは `no-matcherless-expect--assert-with-matcher` が持つ                         |
-| `it("adds", () => { const parsed = parse(raw); expect(parsed).toBe(3); });` | `it` 本体を主張だけに保つのは `require-it-only-expect--move-setup-into-fixture` が持つ                             |
-| `test("adds", () => {});`                                                   | アサーションが無いので所在の問題にならない。綴りそのものは `require-test-block-spelling--use-configured-fn` が持つ |
-| `expect.extend({ toBeReport });`                                            | 被験体を取らない名前空間のメンバ呼び出し                                                                           |
-| `it(1, () => { ... })` / `suite.test("adds", fn)`                           | 形として、または callee の根としてテストブロックに読めない。囲みが無い扱いになる                                   |
+| 形 | 対象にしない理由 |
+| --- | --- |
+| `it.skip(...)` / `it.each(rows)(...)` / `it.skipIf(slow).concurrent(...)` | 根が正の綴りに解決される修飾形・カリー形 |
+| `it("adds", () => { rows.forEach((row) => { expect(row).toBe(1); }); });` | テスト用でないコールバックはそこで打ち切らず、さらに上のテストブロックを見る |
+| `it("adds", () => { expect(sum); });` | 所在は正しい。何も主張していないことは `no-matcherless-expect--assert-with-matcher` が持つ |
+| `it("adds", () => { const parsed = parse(raw); expect(parsed).toBe(3); });` | `it` 本体を主張だけに保つのは `require-it-only-expect--move-setup-into-fixture` が持つ |
+| `test("adds", () => {});` | アサーションが無いので所在の問題にならない。綴りそのものは `require-test-block-spelling--use-configured-fn` が持つ |
+| `expect.extend({ toBeReport });` | 被験体を取らない名前空間のメンバ呼び出し |
+| `it(1, () => { ... })` / `suite.test("adds", fn)` | 形として、または callee の根としてテストブロックに読めない。囲みが無い扱いになる |
 
 このルールが見るのは所在だけで、綴りそのものは見ない。`test` を `it` に揃える担当は `require-test-block-spelling--use-configured-fn` にあり、そちらは `test.extend(...)` の fixture 定義側には手を出さない。
 
@@ -84,13 +84,13 @@ it("adds through the factory", ({ subject }) => {
 
 こちらも自動修正が付くが、次のいずれかに当たる場合は報告だけを出す。
 
-| 形                                                          | 自動修正を出さない理由                                                                    |
-| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `const spec = it.extend({});`                               | 改名すると自分自身を参照する宣言になる。土台は `forbid-it-extend--use-test-extend` が持つ |
-| `const base = it.extend({}); const spec = base.extend({});` | 派生の根が正の綴りに届くので同じ                                                          |
-| 同じスコープに正の綴りの束縛が既にある                      | 改名すると宣言が衝突する                                                                  |
-| `export const spec = test.extend({});`                      | 改名がこのファイルの外の参照を壊す。改名は同一ファイルに閉じる                            |
-| `import { it as check } from "vite-plus/test";`             | import した束縛の改名は綴りルールの担当                                                   |
+| 形 | 自動修正を出さない理由 |
+| --- | --- |
+| `const spec = it.extend({});` | 改名すると自分自身を参照する宣言になる。土台は `forbid-it-extend--use-test-extend` が持つ |
+| `const base = it.extend({}); const spec = base.extend({});` | 派生の根が正の綴りに届くので同じ |
+| 同じスコープに正の綴りの束縛が既にある | 改名すると宣言が衝突する |
+| `export const spec = test.extend({});` | 改名がこのファイルの外の参照を壊す。改名は同一ファイルに閉じる |
+| `import { it as check } from "vite-plus/test";` | import した束縛の改名は綴りルールの担当 |
 
 `describe` の直下に書かれたアサーションは、手で `it` の中へ移す。共有の setup ファクトリは共有のまま残し、具体的なテストファクトリだけを正の綴りに束ねる。段階的に `extend` を重ねる形はそのままでよい。
 

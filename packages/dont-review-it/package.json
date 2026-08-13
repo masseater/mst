@@ -42,6 +42,7 @@
   "dependencies": {
     "@mst/lint-rule-authoring": "workspace:*",
     "@mst/repository-checks": "workspace:*",
+    "@mst/verified-specifications": "workspace:*",
     "@oxlint/plugins": "catalog:",
     "citty": "catalog:",
     "es-toolkit": "catalog:",

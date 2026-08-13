@@ -22,15 +22,15 @@
 
 集合は共有の matcher 語彙（`src/lint/oxlint/lib/spec-syntax/matcher-vocabulary.ts`）が持ち、このルールはそれをそのまま読む。
 
-| 系統            | 名前                                                                                                  | 未検証のまま残るもの                                |
-| --------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| truthiness      | `toBeTruthy` / `toBeFalsy` / `toBeDefined` / `toBeNullable`                                           | 真偽に潰れる前の値そのもの                          |
-| loose-structure | `toEqual`                                                                                             | プロパティの不在と `undefined` の別、生成元のクラス |
-| partial-shape   | `toMatchObject` / `toHaveProperty` / `toHaveLength`                                                   | 期待側が名指ししなかったもの全部                    |
-| containment     | `toContain` / `toContainEqual` / `toMatch`                                                            | 含まれていた部分の外側全部                          |
-| runtime-type    | `toBeInstanceOf` / `toBeTypeOf` / `toSatisfy` / `toBeOneOf`                                           | 型や述語を通過する多くの値のうちどれか              |
-| magnitude       | `toBeGreaterThan` / `toBeGreaterThanOrEqual` / `toBeLessThan` / `toBeLessThanOrEqual` / `toBeCloseTo` | 境界の向こう側にある多くの数のうちどれか            |
-| thrown-value    | `toThrow` / `toThrowError`                                                                            | 投げられた値そのもの                                |
+| 系統 | 名前 | 未検証のまま残るもの |
+| --- | --- | --- |
+| truthiness | `toBeTruthy` / `toBeFalsy` / `toBeDefined` / `toBeNullable` | 真偽に潰れる前の値そのもの |
+| loose-structure | `toEqual` | プロパティの不在と `undefined` の別、生成元のクラス |
+| partial-shape | `toMatchObject` / `toHaveProperty` / `toHaveLength` | 期待側が名指ししなかったもの全部 |
+| containment | `toContain` / `toContainEqual` / `toMatch` | 含まれていた部分の外側全部 |
+| runtime-type | `toBeInstanceOf` / `toBeTypeOf` / `toSatisfy` / `toBeOneOf` | 型や述語を通過する多くの値のうちどれか |
+| magnitude | `toBeGreaterThan` / `toBeGreaterThanOrEqual` / `toBeLessThan` / `toBeLessThanOrEqual` / `toBeCloseTo` | 境界の向こう側にある多くの数のうちどれか |
+| thrown-value | `toThrow` / `toThrowError` | 投げられた値そのもの |
 
 各エントリは「通っても未検証のまま残る領域」を 1 文で持っていて、その文がそのまま報告本文に載る。この 1 文を書けない名前は集合に載せない。名前だけを禁じても、書き手は代わりに何を書けばよいか決められないからである。
 
@@ -40,19 +40,19 @@
 
 ### 意図的に広げていない範囲
 
-| 形                                                  | 対象にしない理由                                                           |
-| --------------------------------------------------- | -------------------------------------------------------------------------- |
-| `expect(x).toBe(1)` / `expect(x).toStrictEqual({})` | このルールが残そうとしている形そのもの                                     |
-| `expect(save).toHaveBeenCalledWith({ id: 1 })`      | 「どう呼ばれたか」の表明であって、値の比較ではない                         |
-| `expect(save).toHaveReturnedWith(1)`                | 返り値の記録を見る形。担当が別                                             |
-| `expect(x).toMatchSnapshot()`                       | 記録との照合。snapshot の担当が別にいる                                    |
-| `expect(save).toBeCalled()`                         | 呼び出し表明の旧綴り。綴りの統一は別の関心事                               |
-| `expect(x).toBeSettled()`                           | 禁止集合に無い名前。弱さを意味論から推論しない                             |
-| `report.toContain(entry)`                           | 根が `expect` チェーンでない。同名メソッドを持つだけの受け手は巻き込まない |
-| `runner.soft(x).toBeTruthy()`                       | 派生した入口と同じ綴りでも、受け手が `expect` でなければ根にならない       |
-| `makeExpect()(x).toBeTruthy()`                      | 入口を別の呼び出しが返している形。根が識別子まで届かない                   |
-| `expect(x)[matcherName]()`                          | 名前が実行時にしか決まらない。解決できないものを推測しない                 |
-| `expect(x).toBeTruthy()`（仕様ファイルの外）        | 仕様ファイルの外では `expect` は何を指す名前でもありうる                   |
+| 形 | 対象にしない理由 |
+| --- | --- |
+| `expect(x).toBe(1)` / `expect(x).toStrictEqual({})` | このルールが残そうとしている形そのもの |
+| `expect(save).toHaveBeenCalledWith({ id: 1 })` | 「どう呼ばれたか」の表明であって、値の比較ではない |
+| `expect(save).toHaveReturnedWith(1)` | 返り値の記録を見る形。担当が別 |
+| `expect(x).toMatchSnapshot()` | 記録との照合。snapshot の担当が別にいる |
+| `expect(save).toBeCalled()` | 呼び出し表明の旧綴り。綴りの統一は別の関心事 |
+| `expect(x).toBeSettled()` | 禁止集合に無い名前。弱さを意味論から推論しない |
+| `report.toContain(entry)` | 根が `expect` チェーンでない。同名メソッドを持つだけの受け手は巻き込まない |
+| `runner.soft(x).toBeTruthy()` | 派生した入口と同じ綴りでも、受け手が `expect` でなければ根にならない |
+| `makeExpect()(x).toBeTruthy()` | 入口を別の呼び出しが返している形。根が識別子まで届かない |
+| `expect(x)[matcherName]()` | 名前が実行時にしか決まらない。解決できないものを推測しない |
+| `expect(x).toBeTruthy()`（仕様ファイルの外） | 仕様ファイルの外では `expect` は何を指す名前でもありうる |
 
 ### 届かない範囲
 

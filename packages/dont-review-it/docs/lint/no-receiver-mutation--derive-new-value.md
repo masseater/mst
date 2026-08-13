@@ -12,17 +12,17 @@
 
 型名とメソッド名の組で持つ。名前だけの一致では報告しない。
 
-| 型                                                                 | 書き換えるメソッド                                                      |
-| ------------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| `Map` / `WeakMap`                                                  | `set` / `delete` / `clear`                                              |
-| `Set` / `WeakSet`                                                  | `add` / `delete` / `clear`                                              |
-| `Date`                                                             | `setTime` と各単位のセッター（`setFullYear` から `setUTCSeconds` まで） |
-| `URLSearchParams`                                                  | `append` / `set` / `delete` / `sort`                                    |
-| `FormData` / `Headers`                                             | `append` / `set` / `delete`                                             |
-| `DataView`                                                         | `setInt8` から `setBigUint64` までの書き込み系                          |
-| `WritableStreamDefaultWriter`                                      | `write` / `close` / `abort`                                             |
-| `ReadableStreamDefaultController` / `ReadableByteStreamController` | `enqueue` / `close` / `error`                                           |
-| `TransformStreamDefaultController`                                 | `enqueue` / `terminate` / `error`                                       |
+| 型 | 書き換えるメソッド |
+| --- | --- |
+| `Map` / `WeakMap` | `set` / `delete` / `clear` |
+| `Set` / `WeakSet` | `add` / `delete` / `clear` |
+| `Date` | `setTime` と各単位のセッター（`setFullYear` から `setUTCSeconds` まで） |
+| `URLSearchParams` | `append` / `set` / `delete` / `sort` |
+| `FormData` / `Headers` | `append` / `set` / `delete` |
+| `DataView` | `setInt8` から `setBigUint64` までの書き込み系 |
+| `WritableStreamDefaultWriter` | `write` / `close` / `abort` |
+| `ReadableStreamDefaultController` / `ReadableByteStreamController` | `enqueue` / `close` / `error` |
+| `TransformStreamDefaultController` | `enqueue` / `terminate` / `error` |
 
 後半 4 つは投入口（sink）として別のメッセージで報告する。導出に書き換えられない形なので、直し方が違う。
 
@@ -77,14 +77,14 @@
 
 元の値を変えず、必要な形の新しい値を作って束縛する。
 
-| レシーバ                       | 導出の形                                                                                        |
-| ------------------------------ | ----------------------------------------------------------------------------------------------- |
-| 連想配列                       | 元の中身を展開して新しい `Map` を作る。要素を除くなら、元から絞り込んだ列を作ってから組み立てる |
-| 集合                           | 同じく展開して新しい `Set` を作る                                                               |
-| 日時                           | セッターで進めるのではなく、必要な時刻を持つ新しい `Date` を作る                                |
-| クエリ文字列・フォーム・ヘッダ | 組み上がった状態を一度に作る。空で作ってから足す形にしない                                      |
-| バイト列の view                | 新しいバッファを作り、新しい view から読む                                                      |
-| 自前クラス                     | 状態を書き換えるメソッドではなく、新しいインスタンスを返すメソッドにする                        |
+| レシーバ | 導出の形 |
+| --- | --- |
+| 連想配列 | 元の中身を展開して新しい `Map` を作る。要素を除くなら、元から絞り込んだ列を作ってから組み立てる |
+| 集合 | 同じく展開して新しい `Set` を作る |
+| 日時 | セッターで進めるのではなく、必要な時刻を持つ新しい `Date` を作る |
+| クエリ文字列・フォーム・ヘッダ | 組み上がった状態を一度に作る。空で作ってから足す形にしない |
+| バイト列の view | 新しいバッファを作り、新しい view から読む |
+| 自前クラス | 状態を書き換えるメソッドではなく、新しいインスタンスを返すメソッドにする |
 
 このパッケージ自身の `lib/receiver-mutation/mutating-members.ts` が後者の形をとっている。列挙を組み立てるとき、空の `Map` を作って `set` を並べるのではなく、組を並べた配列から `new Map(...)` を一度に作っている。読み手は宣言行だけでその中身を確定できる。
 

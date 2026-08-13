@@ -35,12 +35,12 @@ assets かどうかはファイル名で決まる。既定では `<stem>.assets.
 
 ### 意図的に広げていない範囲
 
-| 形                                      | 対象にしない理由                                                                              |
-| --------------------------------------- | --------------------------------------------------------------------------------------------- |
-| assets 以外のファイル                   | 判定はファイル名で行う。同じ中身でも spec ファイルなら対象外で、spec の中身は別の群が受け持つ |
-| 所有者の spec が存在するかどうか        | `require-spec-file-for-assets--create-matching-spec` が受け持つ                               |
-| 誰がこの assets を読んでいるか          | `no-cross-spec-assets-import--use-own-assets` が受け持つ                                      |
-| 他のファイルに書かれた `const` への参照 | 参照するには import が要る。import 自体を報告するので、解決を隣のファイルへ広げる必要がない   |
+| 形 | 対象にしない理由 |
+| --- | --- |
+| assets 以外のファイル | 判定はファイル名で行う。同じ中身でも spec ファイルなら対象外で、spec の中身は別の群が受け持つ |
+| 所有者の spec が存在するかどうか | `require-spec-file-for-assets--create-matching-spec` が受け持つ |
+| 誰がこの assets を読んでいるか | `no-cross-spec-assets-import--use-own-assets` が受け持つ |
+| 他のファイルに書かれた `const` への参照 | 参照するには import が要る。import 自体を報告するので、解決を隣のファイルへ広げる必要がない |
 
 ## なぜそれが要るか
 
