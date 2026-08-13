@@ -9,7 +9,7 @@ export default defineConfig({
     },
   },
   pack: {
-    entry: ["src/throttle/cli.ts", "src/spool/cli.ts"],
+    entry: ["src/throttle/cli.ts", "src/spool/cli.ts", "src/unabridged/cli.ts"],
     dts: {
       tsgo: true,
     },
