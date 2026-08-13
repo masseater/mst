@@ -106,21 +106,25 @@ describe("slots", () => {
     await hold?.release();
   });
 
-  test("slotStateFingerprint changes whenever a slot's lock is created anew", async () => {
+  test("slotStateFingerprint tracks every slot as it becomes held and as it is freed", async () => {
     const directory = slotDirectory();
     ensureSlots(directory, 2);
 
-    const free = slotStateFingerprint(directory, 2);
-    expect(free).toBe("free,free");
+    const idle = slotStateFingerprint(directory, 2);
+    expect(idle).toBe("free,free");
 
     const first = await tryAcquireAny(acquisition(directory, 2));
-    const held = slotStateFingerprint(directory, 2);
-    expect(held).not.toBe(free);
+    const oneHeld = slotStateFingerprint(directory, 2);
+    expect(oneHeld).not.toBe(idle);
+
+    const second = await tryAcquireAny(acquisition(directory, 2));
+    expect(slotStateFingerprint(directory, 2)).not.toBe(oneHeld);
+
+    await second?.release();
+    expect(slotStateFingerprint(directory, 2)).toBe(oneHeld);
 
     await first?.release();
-    const second = await tryAcquireAny(acquisition(directory, 2));
-    expect(slotStateFingerprint(directory, 2)).not.toBe(held);
-    await second?.release();
+    expect(slotStateFingerprint(directory, 2)).toBe(idle);
   });
 
   test("sweepWaiters keeps live entries in name order and deletes the rest", () => {
