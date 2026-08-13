@@ -1,13 +1,7 @@
 ---
 name: core
 description: >
-  Write specification tests with @mst/verified-specifications: declare
-  behavior claims in specs/<feature>.spec.ts with a string-literal top-level
-  describe and it sentences, keep coverage tests separate as
-  <source>.test.ts, and regenerate SPECIFICATIONS.md with
-  verified-specifications check --write. Load when writing a spec test,
-  when SPECIFICATIONS.md is reported stale, or when deciding whether a test
-  is a specification claim or a coverage test.
+  Write specification tests with @mst/verified-specifications: declare behavior claims in specs/<feature>.spec.ts with a string-literal top-level describe and it sentences, keep coverage tests separate as <source>.test.ts, and regenerate SPECIFICATIONS.md with verified-specifications check --write. Load when writing a spec test, when SPECIFICATIONS.md is reported stale, or when deciding whether a test is a specification claim or a coverage test.
 metadata:
   type: core
   library: "@mst/verified-specifications"
@@ -19,10 +13,7 @@ sources:
 
 # @mst/verified-specifications — write specification tests
 
-The source of truth for a specification is the specification test. The
-check extracts every claim from `specs/*.spec.ts` and generates each
-workspace's `SPECIFICATIONS.md`, so a human can read what the AI believes
-the code promises and catch a wrong interpretation in a PR diff.
+The source of truth for a specification is the specification test. The check extracts every claim from `specs/*.spec.ts` and generates each workspace's `SPECIFICATIONS.md`, so a human can read what the AI believes the code promises and catch a wrong interpretation in a PR diff.
 
 ## Setup
 
@@ -40,9 +31,7 @@ pnpm exec verified-specifications check --write
 
 ### Declare a behavior claim
 
-A claim lives in `specs/<feature>.spec.ts` at the package root. The
-top-level `describe` names the subject; each `it` directly under it is one
-claim sentence, written in Japanese for the reader of the generated list.
+A claim lives in `specs/<feature>.spec.ts` at the package root. The top-level `describe` names the subject; each `it` directly under it is one claim sentence, written in Japanese for the reader of the generated list.
 
 ```ts
 import { describe, expect, it } from "vite-plus/test";
@@ -57,15 +46,11 @@ describe("規範文書の検査", () => {
 });
 ```
 
-Claims describe behavior visible to the package's user — one level outside
-unit tests, inside e2e.
+Claims describe behavior visible to the package's user — one level outside unit tests, inside e2e.
 
 ### Decide which kind of test to write
 
-If the test failing would mean a specification was violated, it is a
-specification test and belongs in `specs/`. If it only exists to walk a
-branch for the coverage floor, it is a coverage test and belongs beside its
-source as `<source>.test.ts`.
+If the test failing would mean a specification was violated, it is a specification test and belongs in `specs/`. If it only exists to walk a branch for the coverage floor, it is a coverage test and belongs beside its source as `<source>.test.ts`.
 
 ## Common Mistakes
 
@@ -85,8 +70,7 @@ Correct:
 pnpm exec verified-specifications check --write
 ```
 
-The list is generated from the tests; a hand edit disagrees with the
-extraction on the next check and the next `--write` erases it.
+The list is generated from the tests; a hand edit disagrees with the extraction on the next check and the next `--write` erases it.
 
 Source: masseater/mst:packages/verified-specifications/AGENTS.md
 
@@ -109,8 +93,7 @@ describe("規範文書の検査", () => {
 });
 ```
 
-The extractor reads string literals; a computed name cannot be read and
-the structure check reports it.
+The extractor reads string literals; a computed name cannot be read and the structure check reports it.
 
 Source: masseater/mst:packages/verified-specifications/src/run-cli.ts
 
@@ -128,8 +111,7 @@ Correct:
 src/read-json-file.test.ts
 ```
 
-An execution that is not a claim dilutes the generated list a human reads;
-internal-module details are not specifications.
+An execution that is not a claim dilutes the generated list a human reads; internal-module details are not specifications.
 
 Source: masseater/mst:packages/verified-specifications/AGENTS.md
 
@@ -152,13 +134,10 @@ Correct:
 }
 ```
 
-Narrowing `include` silently drops `specs/` from type checking, so the
-check stays green while the claims rot; the tsconfig check reports the
-narrowing keys in a workspace that holds spec tests.
+Narrowing `include` silently drops `specs/` from type checking, so the check stays green while the claims rot; the tsconfig check reports the narrowing keys in a workspace that holds spec tests.
 
 Source: masseater/mst:packages/verified-specifications/AGENTS.md
 
 ## See also
 
-- `packages/dont-review-it/skills/repository-checks` — the same
-  single-entry, nonzero-exit gate discipline; guard runs both CLIs.
+- `packages/dont-review-it/skills/repository-checks` — the same single-entry, nonzero-exit gate discipline; guard runs both CLIs.

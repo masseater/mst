@@ -66,10 +66,12 @@ export const tryAcquireFileLock = (
   if (descriptor === null) return null;
   recordGeneration(fileLock, descriptor);
   return {
-    release: once(() =>
-      Promise.try(() => {
-        releaseDescriptor(fileLock, descriptor);
-      }),
+    release: once(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseDescriptor(fileLock, descriptor);
+          resolve();
+        }),
     ),
   };
 };

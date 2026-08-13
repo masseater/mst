@@ -37,11 +37,13 @@
     "dev": "vp pack --watch",
     "test": "spool -- vp test",
     "check": "spool -- vp check",
-    "check:skills": "intent validate"
+    "check:skills": "intent validate",
+    "typecheck": "spool -- tsc -p ."
   },
   "dependencies": {
     "@mst/lint-rule-authoring": "workspace:*",
     "@mst/repository-checks": "workspace:*",
+    "@mst/verified-specifications": "workspace:*",
     "@oxlint/plugins": "catalog:",
     "citty": "catalog:",
     "es-toolkit": "catalog:",

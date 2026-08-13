@@ -2,6 +2,8 @@ import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   test: {
+    mockReset: true,
+    restoreMocks: true,
     fileParallelism: false,
     pool: "threads",
     maxWorkers: 1,
@@ -11,7 +13,7 @@ export default defineConfig({
     },
   },
   pack: {
-    entry: ["src/throttle/cli.ts", "src/spool/cli.ts"],
+    entry: ["src/throttle/cli.ts", "src/spool/cli.ts", "src/unabridged/cli.ts"],
     dts: {
       tsgo: true,
     },

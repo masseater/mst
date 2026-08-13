@@ -115,12 +115,12 @@ const engineRule = createNoLocalFiniteValueSet({
 });
 
 const createLibraryPreanalysisRule = () => {
-  const loadLibraryVocabulary = vi
-    .fn<LibraryVocabularyLoader>()
-    .mockReturnValueOnce([])
-    .mockImplementation(() => {
+  const loadLibraryVocabulary = vi.fn<LibraryVocabularyLoader>(() => {
+    if (loadLibraryVocabulary.mock.calls.length > 1) {
       throw new Error("Library vocabulary was loaded from the visitor");
-    });
+    }
+    return [];
+  });
   const observed = createNoLocalFiniteValueSet({
     loadCatalog: () => buildCatalog([]),
     loadLibraryVocabulary,

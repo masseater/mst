@@ -11,12 +11,12 @@ promise を生む式のうち、その値がどこにも接続されていない
 
 報告する形は 4 つで、報告メッセージも 4 つに分かれている。書き換える場所が形ごとに違うためである。
 
-| 形                                                                 | messageId                  | 何が起きているか                                       |
-| ------------------------------------------------------------------ | -------------------------- | ------------------------------------------------------ |
-| `fetchUser();`（呼び出しが文として単独）                           | `floatingPromiseStatement` | 値を捨てる位置に非同期呼び出しが置かれている           |
-| `runEach(async (name) => { ... })`（同期戻り値のコールバック位置） | `floatingPromiseCallback`  | 受け取る側が待たないので、失敗は必ず落ちる             |
-| `void fetchUser();`                                                | `voidedPromise`            | 待たない意図の表明であって、接続ではない               |
-| `widened();`（宣言型が `any` / `unknown`、実体は非同期）           | `widenedAsyncCall`         | 型が広がっていても、たどり着く宣言は非同期のままである |
+| 形 | messageId | 何が起きているか |
+| --- | --- | --- |
+| `fetchUser();`（呼び出しが文として単独） | `floatingPromiseStatement` | 値を捨てる位置に非同期呼び出しが置かれている |
+| `runEach(async (name) => { ... })`（同期戻り値のコールバック位置） | `floatingPromiseCallback` | 受け取る側が待たないので、失敗は必ず落ちる |
+| `void fetchUser();` | `voidedPromise` | 待たない意図の表明であって、接続ではない |
+| `widened();`（宣言型が `any` / `unknown`、実体は非同期） | `widenedAsyncCall` | 型が広がっていても、たどり着く宣言は非同期のままである |
 
 ### promise を生む式の判定
 

@@ -23,6 +23,7 @@ const handlerSpy = () => vi.fn<(node: unknown) => void>();
 
 describe("measureVisitor", () => {
   it("hands back the same visitor when telemetry is not running", () => {
+    // mock-factory-exemption no-replaced-double-behaviour--let-the-replaced-module-answer -- whether the pipeline started is settled inside the boundary this spec replaces
     vi.mocked(startLintTelemetry).mockReturnValue(false);
     const visitor = { VisitedNode: (): undefined => undefined };
 
@@ -30,8 +31,10 @@ describe("measureVisitor", () => {
   });
 
   it("records nothing when telemetry is not running", () => {
+    // mock-factory-exemption no-replaced-double-behaviour--let-the-replaced-module-answer -- whether the pipeline started is settled inside the boundary this spec replaces
     vi.mocked(startLintTelemetry).mockReturnValue(false);
     const written = recorder();
+    // mock-factory-exemption no-replaced-double-behaviour--let-the-replaced-module-answer -- the histogram the pipeline writes to is built inside the boundary this spec replaces
     vi.mocked(ruleDuration).mockReturnValue({ record: written });
 
     visit(measureVisitor({ ruleName: RULE_NAME, visitor: { VisitedNode: handlerSpy() } }));
@@ -40,8 +43,10 @@ describe("measureVisitor", () => {
   });
 
   it("records the elapsed time under the rule that spent it", () => {
+    // mock-factory-exemption no-replaced-double-behaviour--let-the-replaced-module-answer -- whether the pipeline started is settled inside the boundary this spec replaces
     vi.mocked(startLintTelemetry).mockReturnValue(true);
     const written = recorder();
+    // mock-factory-exemption no-replaced-double-behaviour--let-the-replaced-module-answer -- the histogram the pipeline writes to is built inside the boundary this spec replaces
     vi.mocked(ruleDuration).mockReturnValue({ record: written });
 
     visit(measureVisitor({ ruleName: RULE_NAME, visitor: { VisitedNode: handlerSpy() } }));
@@ -50,7 +55,9 @@ describe("measureVisitor", () => {
   });
 
   it("still calls the wrapped handler with the node it was given", () => {
+    // mock-factory-exemption no-replaced-double-behaviour--let-the-replaced-module-answer -- whether the pipeline started is settled inside the boundary this spec replaces
     vi.mocked(startLintTelemetry).mockReturnValue(true);
+    // mock-factory-exemption no-replaced-double-behaviour--let-the-replaced-module-answer -- the histogram the pipeline writes to is built inside the boundary this spec replaces
     vi.mocked(ruleDuration).mockReturnValue({ record: recorder() });
     const takenHandler = handlerSpy();
 
@@ -60,7 +67,9 @@ describe("measureVisitor", () => {
   });
 
   it("keeps what the wrapped handler returned", () => {
+    // mock-factory-exemption no-replaced-double-behaviour--let-the-replaced-module-answer -- whether the pipeline started is settled inside the boundary this spec replaces
     vi.mocked(startLintTelemetry).mockReturnValue(true);
+    // mock-factory-exemption no-replaced-double-behaviour--let-the-replaced-module-answer -- the histogram the pipeline writes to is built inside the boundary this spec replaces
     vi.mocked(ruleDuration).mockReturnValue({ record: recorder() });
 
     const returned = visit(
@@ -71,7 +80,9 @@ describe("measureVisitor", () => {
   });
 
   it("drops handlers that were declared but left undefined", () => {
+    // mock-factory-exemption no-replaced-double-behaviour--let-the-replaced-module-answer -- whether the pipeline started is settled inside the boundary this spec replaces
     vi.mocked(startLintTelemetry).mockReturnValue(true);
+    // mock-factory-exemption no-replaced-double-behaviour--let-the-replaced-module-answer -- the histogram the pipeline writes to is built inside the boundary this spec replaces
     vi.mocked(ruleDuration).mockReturnValue({ record: recorder() });
 
     const measured = measureVisitor({

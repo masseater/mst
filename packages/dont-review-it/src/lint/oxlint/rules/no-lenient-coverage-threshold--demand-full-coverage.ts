@@ -1,11 +1,9 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
 import { defaultExportedObject } from "../lib/default-exported-object.ts";
-import { nestedObjectAt, objectPropertyOf, objectValueOf } from "../lib/object-literal.ts";
-import { toPosixPath } from "../lib/posix-path.ts";
+import { declaresTrueAt, nestedObjectAt, objectPropertyOf } from "../lib/object-literal.ts";
+import { isTestRunnerConfig } from "../lib/test-runner-config.ts";
 
 import type { ESTree, Options } from "@oxlint/plugins";
-
-const TEST_CONFIG_PATH = /(?:^|\/)vite(?:st)?\.config\.[cm]?[jt]s$/u;
 
 const THRESHOLDS_PATH = ["test", "coverage", "thresholds"];
 
@@ -46,17 +44,6 @@ const requirementSummaryOf = (requirements: readonly CoverageRequirement[]): str
 const declaredNumberOf = (literal: ESTree.Expression): number | null =>
   literal.type === "Literal" && typeof literal.value === "number" ? literal.value : null;
 
-const declaresTrueAt = ({
-  thresholds,
-  key,
-}: {
-  readonly thresholds: ESTree.ObjectExpression;
-  readonly key: string;
-}): boolean => {
-  const declared = objectValueOf({ object: thresholds, key });
-  return declared?.type === "Literal" && declared.value === true;
-};
-
 const violationsIn = ({
   thresholds,
   requirements,
@@ -65,7 +52,7 @@ const violationsIn = ({
   readonly requirements: readonly CoverageRequirement[];
 }): readonly CoverageViolation[] => {
   const shorthandDemandsFullCoverage = declaresTrueAt({
-    thresholds,
+    object: thresholds,
     key: String(FULL_COVERAGE),
   });
   return requirements.flatMap<CoverageViolation>(({ metric, required }) => {
@@ -120,7 +107,7 @@ export const noLenientCoverageThreshold = createDontReviewItRule({
     ],
   },
   create(inspection) {
-    if (!TEST_CONFIG_PATH.test(toPosixPath(inspection.filename))) return {};
+    if (!isTestRunnerConfig(inspection.filename)) return {};
     const requirements = requirementsFrom(inspection.options);
 
     return {
@@ -139,7 +126,7 @@ export const noLenientCoverageThreshold = createDontReviewItRule({
           });
           return;
         }
-        if (!declaresTrueAt({ thresholds, key: PER_FILE_KEY })) {
+        if (!declaresTrueAt({ object: thresholds, key: PER_FILE_KEY })) {
           inspection.report({ node: thresholds, messageId: "aggregateCoverageThreshold" });
         }
         for (const violation of violationsIn({ thresholds, requirements })) {

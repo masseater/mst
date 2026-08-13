@@ -13,7 +13,8 @@
   },
   "bin": {
     "spool": "./src/spool/cli.ts",
-    "throttle": "./src/throttle/cli.ts"
+    "throttle": "./src/throttle/cli.ts",
+    "unabridged": "./src/unabridged/cli.ts"
   },
   "files": [
     "dist",
@@ -33,11 +34,14 @@
     "dev": "vp pack --watch",
     "test": "spool -- vp test",
     "check": "spool -- vp check",
-    "check:skills": "intent validate"
+    "check:skills": "intent validate",
+    "typecheck": "spool -- tsc -p ."
   },
   "dependencies": {
+    "cc-hooks-ts": "2.1.220",
     "es-toolkit": "catalog:",
-    "fs-native-extensions": "1.5.0"
+    "fs-native-extensions": "1.5.0",
+    "shell-quote": "1.10.0"
   },
   "devDependencies": {
     "@mst/ai-native": "workspace:*",

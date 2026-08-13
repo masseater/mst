@@ -1,33 +1,13 @@
-import { oxlint as dontReviewItOxlint, withGitExcludes } from "@mst/dont-review-it";
-import { LINT_SEVERITY, oxlint as lintRuleAuthoringOxlint } from "@mst/lint-rule-authoring";
-import { oxlint as verifiedSpecificationsOxlint } from "@mst/verified-specifications";
+import { dontReviewItPreset } from "@mst/dont-review-it";
+import { LINT_SEVERITY } from "@mst/lint-rule-authoring";
 import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   staged: {
     "*": "vp check --fix",
   },
-  fmt: withGitExcludes({
-    sortImports: {
-      customGroups: [
-        { groupName: "typeBuiltin", selector: "type", elementNamePattern: ["node:*"] },
-        { groupName: "typeRepository", selector: "type", elementNamePattern: ["./**", "../**"] },
-        { groupName: "typeInstalled", selector: "type" },
-      ],
-      groups: [
-        "builtin",
-        "external",
-        ["internal", "subpath", "parent", "sibling", "index"],
-        "typeBuiltin",
-        { newlinesBetween: false },
-        "typeInstalled",
-        { newlinesBetween: false },
-        "typeRepository",
-      ],
-    },
-  }),
-  lint: withGitExcludes({
-    extends: [lintRuleAuthoringOxlint, dontReviewItOxlint, verifiedSpecificationsOxlint],
+  fmt: dontReviewItPreset.fmt(),
+  lint: dontReviewItPreset.lint({
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
     rules: {
       "vite-plus/prefer-vite-plus-imports": LINT_SEVERITY.ERROR,
@@ -39,6 +19,10 @@ export default defineConfig({
       "dont-review-it/no-reassign--use-spread-or-iife": [
         LINT_SEVERITY.ERROR,
         { assignOnlyTargets: ["RuleTester.describe", "RuleTester.it", "RuleTester.itOnly"] },
+      ],
+      "dont-review-it/no-non-boundary-double--replace-at-the-external-boundary": [
+        LINT_SEVERITY.ERROR,
+        { externalIoPackages: ["@opentelemetry/exporter-metrics-otlp-http"] },
       ],
       "dont-review-it/no-version-range--pin-the-exact-version": LINT_SEVERITY.ERROR,
     },
@@ -62,6 +46,8 @@ export default defineConfig({
     options: { typeAware: true, typeCheck: true },
   }),
   test: {
+    mockReset: true,
+    restoreMocks: true,
     coverage: {
       thresholds: { 100: true, perFile: true },
     },

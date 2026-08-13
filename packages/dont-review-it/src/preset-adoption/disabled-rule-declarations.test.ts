@@ -11,7 +11,7 @@ describe("disabledRuleDeclarationsIn", () => {
   test("finds a preset rule switched off for the paths an override names", () => {
     const declarations = declarationsIn(
       `export default defineConfig({
-  lint: withGitExcludes({
+  lint: dontReviewItPreset.lint({
     overrides: [
       {
         files: ["packages/ai-native/**", "packages/lint-rule-authoring/**"],

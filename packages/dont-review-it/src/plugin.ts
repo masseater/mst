@@ -2,6 +2,7 @@ import { loadCanonicalValuesCatalogSnapshot } from "./lint/oxlint/lib/canonical-
 import { loadCatalogEntries } from "./lint/oxlint/lib/dependency-catalog/catalog-entries.ts";
 import { loadWorkspaceDependencies } from "./lint/oxlint/lib/dependency-catalog/workspace-manifests.ts";
 import { loadRepositoryBodyIndex } from "./lint/oxlint/lib/duplicated-bodies/builder.ts";
+import { replacedModuleAt } from "./lint/oxlint/lib/external-io-boundary.ts";
 import { loadLibraryVocabulary } from "./lint/oxlint/lib/library-vocabulary/harvester.ts";
 import { loadRepositoryCellClassIndex } from "./lint/oxlint/lib/mutable-cell-classes/builder.ts";
 import { loadRepositoryTypeAuthorityIndex } from "./lint/oxlint/lib/split-type-authority/builder.ts";
@@ -65,13 +66,16 @@ import { noMixedPackageSurface } from "./lint/oxlint/rules/no-mixed-package-surf
 import { noModuleScopeMockConfig } from "./lint/oxlint/rules/no-module-scope-mock-config--lift-into-fixture.ts";
 import { noModuleScopeMutableState } from "./lint/oxlint/rules/no-module-scope-mutable-state--lift-into-fixture.ts";
 import { noMultiBindingDeclaration } from "./lint/oxlint/rules/no-multi-binding-declaration--declare-one-binding-per-statement.ts";
+import { createNoNonBoundaryDouble } from "./lint/oxlint/rules/no-non-boundary-double--replace-at-the-external-boundary.ts";
 import { noNormalizeSutOutput } from "./lint/oxlint/rules/no-normalize-sut-output--assert-natural-shape.ts";
 import { noPartialRuleSet } from "./lint/oxlint/rules/no-partial-rule-set--enable-the-whole-set.ts";
 import { noPromiseChain } from "./lint/oxlint/rules/no-promise-chain--use-async-await.ts";
 import { noReassign } from "./lint/oxlint/rules/no-reassign--use-spread-or-iife.ts";
 import { noReceiverMutation } from "./lint/oxlint/rules/no-receiver-mutation--derive-new-value.ts";
 import { noRedundantMockReset } from "./lint/oxlint/rules/no-redundant-mock-reset--lift-mocks-into-fixture.ts";
+import { noReplacedDoubleBehaviour } from "./lint/oxlint/rules/no-replaced-double-behaviour--let-the-replaced-module-answer.ts";
 import { noRuleSuppression } from "./lint/oxlint/rules/no-rule-suppression--fix-the-violation.ts";
+import { noSharedDoubleState } from "./lint/oxlint/rules/no-shared-double-state--reset-doubles-between-tests.ts";
 import { noSilentSuppression } from "./lint/oxlint/rules/no-silent-suppression--fix-or-justify-inline.ts";
 import { noSingleUseLocalType } from "./lint/oxlint/rules/no-single-use-local-type--inline-at-the-use-site.ts";
 import { noSpecFileHelperFunction } from "./lint/oxlint/rules/no-spec-file-helper-function--inline-or-use-fixture.ts";
@@ -88,8 +92,9 @@ import { noUncheckedCast } from "./lint/oxlint/rules/no-unchecked-cast--parse-at
 import { noUndersizedExternalSnapshot } from "./lint/oxlint/rules/no-undersized-external-snapshot--use-inline-snapshot.ts";
 import { noUnorderedImport } from "./lint/oxlint/rules/no-unordered-import--group-by-origin-then-sort-by-specifier.ts";
 import { createNoUnusedStyleClass } from "./lint/oxlint/rules/no-unused-style-class--delete-or-reference-it.ts";
-import { noUnwrappedToolchainConfig } from "./lint/oxlint/rules/no-unwrapped-toolchain-config--wrap-with-git-excludes.ts";
+import { noUnwrappedToolchainConfig } from "./lint/oxlint/rules/no-unwrapped-toolchain-config--call-the-preset-for-the-block.ts";
 import { noVacuousHostObjectEquality } from "./lint/oxlint/rules/no-vacuous-host-object-equality--assert-parsed-value.ts";
+import { noVacuousTestRun } from "./lint/oxlint/rules/no-vacuous-test-run--let-the-empty-run-fail.ts";
 import { createNoVersionRange } from "./lint/oxlint/rules/no-version-range--pin-the-exact-version.ts";
 import { noViMockFactoryBehavior } from "./lint/oxlint/rules/no-vi-mock-factory-behavior--use-spy-true-and-fixture.ts";
 import { noVitestContextExpect } from "./lint/oxlint/rules/no-vitest-context-expect--import-expect-from-vitest.ts";
@@ -121,6 +126,8 @@ export const noStrictCanonicalLiteralUse = createNoStrictCanonicalLiteralUseRule
 export const noDuplicatedBody = createNoDuplicatedBody({ loadIndex: loadRepositoryBodyIndex });
 
 export const noTwinDeclaration = createNoTwinDeclaration({ loadIndex: loadRepositoryBodyIndex });
+
+export const noNonBoundaryDouble = createNoNonBoundaryDouble({ readBoundary: replacedModuleAt });
 
 export const noUnusedStyleClass = createNoUnusedStyleClass({ loadIndex: loadStyleClassIndex });
 
@@ -206,13 +213,16 @@ const plugin: Plugin = {
     [noModuleScopeMockConfig.name]: noModuleScopeMockConfig,
     [noModuleScopeMutableState.name]: noModuleScopeMutableState,
     [noMultiBindingDeclaration.name]: noMultiBindingDeclaration,
+    [noNonBoundaryDouble.name]: noNonBoundaryDouble,
     [noNormalizeSutOutput.name]: noNormalizeSutOutput,
     [noPartialRuleSet.name]: noPartialRuleSet,
     [noPromiseChain.name]: noPromiseChain,
     [noReassign.name]: noReassign,
     [noReceiverMutation.name]: noReceiverMutation,
     [noRedundantMockReset.name]: noRedundantMockReset,
+    [noReplacedDoubleBehaviour.name]: noReplacedDoubleBehaviour,
     [noRuleSuppression.name]: noRuleSuppression,
+    [noSharedDoubleState.name]: noSharedDoubleState,
     [noSilentSuppression.name]: noSilentSuppression,
     [noSingleUseLocalType.name]: noSingleUseLocalType,
     [noSpecFileHelperFunction.name]: noSpecFileHelperFunction,
@@ -231,6 +241,7 @@ const plugin: Plugin = {
     [noUnusedStyleClass.name]: noUnusedStyleClass,
     [noUnwrappedToolchainConfig.name]: noUnwrappedToolchainConfig,
     [noVacuousHostObjectEquality.name]: noVacuousHostObjectEquality,
+    [noVacuousTestRun.name]: noVacuousTestRun,
     [noViMockFactoryBehavior.name]: noViMockFactoryBehavior,
     [noVersionRange.name]: noVersionRange,
     [noVitestContextExpect.name]: noVitestContextExpect,

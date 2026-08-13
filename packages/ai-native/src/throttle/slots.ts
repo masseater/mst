@@ -51,13 +51,17 @@ const lockUnlessHeld = (marker: string): SlotHold | null => {
   });
 };
 
+const firstFreeSlot = (configuration: AcquireConfiguration): SlotHold | null => {
+  for (const index of slotIndexes(configuration.limit)) {
+    const acquired = lockUnlessHeld(markerPath(configuration.slotDir, index));
+    if (acquired !== null) return acquired;
+  }
+  return null;
+};
+
 export const tryAcquireAny = (configuration: AcquireConfiguration): Promise<SlotHold | null> =>
-  Promise.try(() => {
-    for (const index of slotIndexes(configuration.limit)) {
-      const acquired = lockUnlessHeld(markerPath(configuration.slotDir, index));
-      if (acquired !== null) return acquired;
-    }
-    return null;
+  new Promise((resolve) => {
+    resolve(firstFreeSlot(configuration));
   });
 
 const generationIdentity = (marker: string): string => {

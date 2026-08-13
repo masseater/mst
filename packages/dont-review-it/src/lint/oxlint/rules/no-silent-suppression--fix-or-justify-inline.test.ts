@@ -199,7 +199,7 @@ describe("dont-review-it/no-silent-suppression--fix-or-justify-inline", () => {
       },
       {
         name: "a guarded rule lowered inside the call that wraps the lint block is reported",
-        code: configFor(`withGitExcludes({ rules: { "${GUARDED_RULE}": ["off", {}] } })`),
+        code: configFor(`dontReviewItPreset.lint({ rules: { "${GUARDED_RULE}": ["off", {}] } })`),
         filename: CONFIG_FILE,
         errors: [{ messageId: "weakenedRule" }],
       },

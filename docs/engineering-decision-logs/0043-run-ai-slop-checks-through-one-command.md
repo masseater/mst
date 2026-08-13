@@ -29,17 +29,9 @@ git を起動するときは `GIT_` で始まる環境変数を落とす。git �
 
 Git、revision、diff、source parse の失敗は終了コード 2 にする。読み取れなかった変更を問題なしへ変換しない。問題の抑制、severity、allowlist は設けない。誤検知する形は検出対象から外す。
 
-pull request の CI は、比較する 2 つの側を GitHub API から読む。`actions/checkout` は
-pull request で `refs/pull/N/merge` を depth 1 で 1 本だけ取り、`origin/main` も親コミットも
-置かない。shallow graft で親が切られるので `HEAD^1` も解決できない。取得量が履歴の長さに
-比例する `fetch-depth: 0` は、リポジトリが育つほど CI が遅くなるので採らない。API から
-取るのは compare の結果と、変更があったソースの base と head の中身だけで、量は差分の
-大きさに比例する。base と head の SHA は checkout 済みの merge コミットの parent 行から
-読む。オブジェクトは無くてもコミット自身は手元にある。
+pull request の CI は、比較する 2 つの側を GitHub API から読む。`actions/checkout` は pull request で `refs/pull/N/merge` を depth 1 で 1 本だけ取り、`origin/main` も親コミットも置かない。shallow graft で親が切られるので `HEAD^1` も解決できない。取得量が履歴の長さに比例する `fetch-depth: 0` は、リポジトリが育つほど CI が遅くなるので採らない。API から取るのは compare の結果と、変更があったソースの base と head の中身だけで、量は差分の大きさに比例する。base と head の SHA は checkout 済みの merge コミットの parent 行から読む。オブジェクトは無くてもコミット自身は手元にある。
 
-読む側を切り替えるのは CLI の中で、`origin/main` も merge の親も無いときだけである。
-CI は `contents: read` に限定した `github.token` を guard の `GITHUB_TOKEN` へ渡す。権限の宣言だけでは
-token は run step の環境変数にならず、API fallback を呼び出せないためである。
+読む側を切り替えるのは CLI の中で、`origin/main` も merge の親も無いときだけである。CI は `contents: read` に限定した `github.token` を guard の `GITHUB_TOKEN` へ渡す。権限の宣言だけでは token は run step の環境変数にならず、API fallback を呼び出せないためである。
 
 実行の経路は `vp run guard` の 1 本にする。CI に観測用の実行ブロックを置かない。ゲートを guard の外に置くと、main に変更が入る 2 つの経路が別々の検査集合を通ることになる。観測用に置いていたブロックは、複数行の実行・`continue-on-error`・イベントによる絞り込みを持っていて、[0025](0025-check-workflow-definitions-with-our-own-policy-layer.md) が入れたワークフロー定義の検査にも 3 点で反していた。
 
