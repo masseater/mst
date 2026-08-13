@@ -74,6 +74,38 @@ describe("slots", () => {
     await expect(tryAcquireAny(acquisition(directory))).rejects.toThrow(/ENOENT/);
   });
 
+  test("ensureSlots discards a lock left behind as a file instead of a directory", () => {
+    const directory = slotDirectory();
+    ensureSlots(directory, 1);
+    writeFileSync(join(directory, "slot-0.lock"), "");
+
+    ensureSlots(directory, 1);
+
+    expect(existsSync(join(directory, "slot-0.lock"))).toBe(false);
+  });
+
+  test("ensureSlots keeps the lock directory a running holder created", () => {
+    const directory = slotDirectory();
+    ensureSlots(directory, 1);
+    mkdirSync(join(directory, "slot-0.lock"));
+
+    ensureSlots(directory, 1);
+
+    expect(existsSync(join(directory, "slot-0.lock"))).toBe(true);
+  });
+
+  test("a slot polluted by a file named like a lock is takeable again", async () => {
+    const directory = slotDirectory();
+    ensureSlots(directory, 1);
+    writeFileSync(join(directory, "slot-0.lock"), "");
+
+    ensureSlots(directory, 1);
+    const hold = await tryAcquireAny(acquisition(directory));
+
+    expect(hold).not.toBeNull();
+    await hold?.release();
+  });
+
   test("slotStateFingerprint changes whenever a slot's lock is created anew", async () => {
     const directory = slotDirectory();
     ensureSlots(directory, 2);

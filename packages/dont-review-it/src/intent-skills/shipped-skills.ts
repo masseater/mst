@@ -1,69 +1,29 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { readFileSync } from "node:fs";
 
-import { readUnlessMissing, type ScannedProblems } from "@mst/repository-checks";
-import { findNodeAtLocation, getNodeValue, parseTree, type Node } from "jsonc-parser";
+import { parseTree } from "jsonc-parser";
 
 import {
   listRepositoryFiles,
   type ScannedFile,
 } from "../lint/oxlint/lib/canonical-values/source-files.ts";
+import { lineOfProperty, propertyValueOf, stringEntriesOf } from "./manifest.ts";
+import {
+  publishedVersionProblems,
+  unexpectedChangelogProblems,
+  type SkillPackage,
+} from "./shipped-versions.ts";
+import { listSkillFiles, skillsDirectoryOf } from "./skill-files.ts";
 
+import type { ScannedProblems } from "@mst/repository-checks";
 import type { RepositoryProblem } from "../problem.ts";
 import type { IntentSkillsConfig } from "./config.ts";
 
-type PublishedManifest = {
-  readonly file: ScannedFile;
-  readonly source: string;
-  readonly root: Node;
-};
+const shipsSkillFile = (scope: SkillPackage): boolean =>
+  listSkillFiles({ directory: skillsDirectoryOf(scope), config: scope.config }).length > 0;
 
-const propertyValueOf = (root: Node, named: string): unknown => {
-  const node = findNodeAtLocation(root, [named]);
-  return node === undefined ? undefined : getNodeValue(node);
-};
-
-const lineOfProperty = ({
-  manifest,
-  key: named,
-}: {
-  manifest: PublishedManifest;
-  key: string;
-}): number => {
-  const node = findNodeAtLocation(manifest.root, [named]);
-  return manifest.source.slice(0, node?.offset ?? manifest.root.offset).split("\n").length;
-};
-
-const stringEntriesOf = (declared: unknown): readonly string[] | null =>
-  Array.isArray(declared)
-    ? declared.filter((candidate): candidate is string => typeof candidate === "string")
-    : null;
-
-const containsSkillFile = ({
-  directory,
-  config,
-}: {
-  readonly directory: string;
-  readonly config: IntentSkillsConfig;
-}): boolean => {
-  const listedEntries =
-    readUnlessMissing(() => readdirSync(directory, { withFileTypes: true })) ?? [];
-  return listedEntries.some((listed) =>
-    listed.isDirectory()
-      ? containsSkillFile({ directory: join(directory, listed.name), config })
-      : listed.isFile() && listed.name === config.skillFileName,
-  );
-};
-
-const missingSkillFiles = ({
-  manifest,
-  config,
-}: {
-  readonly manifest: PublishedManifest;
-  readonly config: IntentSkillsConfig;
-}): readonly RepositoryProblem[] => {
-  const skillsDirectory = join(dirname(manifest.file.absolutePath), config.skillsDirectory);
-  if (containsSkillFile({ directory: skillsDirectory, config })) return [];
+const missingSkillFiles = (scope: SkillPackage): readonly RepositoryProblem[] => {
+  const { manifest, config } = scope;
+  if (shipsSkillFile(scope)) return [];
 
   return [
     {
@@ -74,13 +34,7 @@ const missingSkillFiles = ({
   ];
 };
 
-const missingFilesEntry = ({
-  manifest,
-  config,
-}: {
-  readonly manifest: PublishedManifest;
-  readonly config: IntentSkillsConfig;
-}): readonly RepositoryProblem[] => {
+const missingFilesEntry = ({ manifest, config }: SkillPackage): readonly RepositoryProblem[] => {
   const declared = stringEntriesOf(propertyValueOf(manifest.root, "files"));
   if (declared === null || declared.includes(config.requiredFilesEntry)) return [];
 
@@ -93,13 +47,7 @@ const missingFilesEntry = ({
   ];
 };
 
-const missingKeyword = ({
-  manifest,
-  config,
-}: {
-  readonly manifest: PublishedManifest;
-  readonly config: IntentSkillsConfig;
-}): readonly RepositoryProblem[] => {
+const missingKeyword = ({ manifest, config }: SkillPackage): readonly RepositoryProblem[] => {
   const declared = stringEntriesOf(propertyValueOf(manifest.root, "keywords")) ?? [];
   if (declared.includes(config.requiredKeyword)) return [];
 
@@ -112,15 +60,9 @@ const missingKeyword = ({
   ];
 };
 
-const unexpectedSkillFiles = ({
-  manifest,
-  config,
-}: {
-  readonly manifest: PublishedManifest;
-  readonly config: IntentSkillsConfig;
-}): readonly RepositoryProblem[] => {
-  const skillsDirectory = join(dirname(manifest.file.absolutePath), config.skillsDirectory);
-  if (!containsSkillFile({ directory: skillsDirectory, config })) return [];
+const unexpectedSkillFiles = (scope: SkillPackage): readonly RepositoryProblem[] => {
+  const { manifest, config } = scope;
+  if (!shipsSkillFile(scope)) return [];
 
   return [
     {
@@ -131,13 +73,7 @@ const unexpectedSkillFiles = ({
   ];
 };
 
-const unexpectedFilesEntry = ({
-  manifest,
-  config,
-}: {
-  readonly manifest: PublishedManifest;
-  readonly config: IntentSkillsConfig;
-}): readonly RepositoryProblem[] => {
+const unexpectedFilesEntry = ({ manifest, config }: SkillPackage): readonly RepositoryProblem[] => {
   const declared = stringEntriesOf(propertyValueOf(manifest.root, "files")) ?? [];
   if (!declared.includes(config.requiredFilesEntry)) return [];
 
@@ -150,13 +86,7 @@ const unexpectedFilesEntry = ({
   ];
 };
 
-const unexpectedKeyword = ({
-  manifest,
-  config,
-}: {
-  readonly manifest: PublishedManifest;
-  readonly config: IntentSkillsConfig;
-}): readonly RepositoryProblem[] => {
+const unexpectedKeyword = ({ manifest, config }: SkillPackage): readonly RepositoryProblem[] => {
   const declared = stringEntriesOf(propertyValueOf(manifest.root, "keywords")) ?? [];
   if (!declared.includes(config.requiredKeyword)) return [];
 
@@ -169,45 +99,37 @@ const unexpectedKeyword = ({
   ];
 };
 
-const missingProblems = ({
-  manifest,
-  config,
-}: {
-  readonly manifest: PublishedManifest;
-  readonly config: IntentSkillsConfig;
-}): readonly RepositoryProblem[] => [
-  ...missingSkillFiles({ manifest, config }),
-  ...missingFilesEntry({ manifest, config }),
-  ...missingKeyword({ manifest, config }),
+const missingProblems = (scope: SkillPackage): readonly RepositoryProblem[] => [
+  ...missingSkillFiles(scope),
+  ...missingFilesEntry(scope),
+  ...missingKeyword(scope),
+  ...publishedVersionProblems(scope),
 ];
 
-const unexpectedProblems = ({
-  manifest,
-  config,
-}: {
-  readonly manifest: PublishedManifest;
-  readonly config: IntentSkillsConfig;
-}): readonly RepositoryProblem[] => [
-  ...unexpectedSkillFiles({ manifest, config }),
-  ...unexpectedFilesEntry({ manifest, config }),
-  ...unexpectedKeyword({ manifest, config }),
+const unexpectedProblems = (scope: SkillPackage): readonly RepositoryProblem[] => [
+  ...unexpectedSkillFiles(scope),
+  ...unexpectedFilesEntry(scope),
+  ...unexpectedKeyword(scope),
+  ...unexpectedChangelogProblems(scope),
 ];
 
 const manifestProblems = ({
   file,
   config,
+  repositoryRoot,
 }: {
   readonly file: ScannedFile;
   readonly config: IntentSkillsConfig;
+  readonly repositoryRoot: string;
 }): readonly RepositoryProblem[] => {
   const source = readFileSync(file.absolutePath, "utf8");
   const root = parseTree(source);
   if (root === undefined || typeof propertyValueOf(root, "name") !== "string") return [];
 
-  const manifest = { file, source, root };
+  const scope = { manifest: { file, source, root }, config, repositoryRoot };
   return propertyValueOf(root, "private") === true
-    ? unexpectedProblems({ manifest, config })
-    : missingProblems({ manifest, config });
+    ? unexpectedProblems(scope)
+    : missingProblems(scope);
 };
 
 export const shippedSkillsProblems = ({
@@ -219,7 +141,7 @@ export const shippedSkillsProblems = ({
 }): ScannedProblems => {
   const manifests = listRepositoryFiles(repositoryRoot).manifests;
   return {
-    problems: manifests.flatMap((file) => manifestProblems({ file, config })),
+    problems: manifests.flatMap((file) => manifestProblems({ file, config, repositoryRoot })),
     scanned: manifests.length,
   };
 };

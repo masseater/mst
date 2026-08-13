@@ -118,8 +118,18 @@ npm へ公開できるパッケージには、あることを要求する。
 - `skills/**/SKILL.md` が 1 つ以上ある
 - `files` の許可リストがあるなら `skills` を載せている
 - `keywords` が `tanstack-intent` を含んでいる
+- `skills/CHANGELOG.md` があり、マニフェストの `version` を `## <version>` の見出しとして持つ
+- 同梱する各 SKILL.md の `metadata.library_version` が、マニフェストの `version` と一致する
 
-`private: true` のパッケージには、同じ 3 点が書かれていないことを要求する。出荷されない skill と、出荷されない前提の配線は、読む側に嘘を教える。
+`private: true` のパッケージには、同じものが書かれていないことを要求する。出荷されない skill と、出荷されない前提の配線は、読む側に嘘を教える。
+
+`version` を持たないマニフェストには、版に関する 2 点を要求しない。
 
 - IF: SKILL.md の中身の構造を検査したくなった; THEN MUST: この検査に足さず、上流の `intent validate`（各パッケージの `check:skills`）に任せる
   - 不変条件の分担は [EDR 0030](../../docs/engineering-decision-logs/0030-ship-agent-skills-with-published-packages-and-gate-the-shipping-ourselves.md) が決めている
+- IF: 公開パッケージの `version` を上げる; THEN
+  - MUST: 同じ変更で `skills/CHANGELOG.md` にその版の見出しを書く
+  - PROHIBIT: `metadata.library_version` を手で書き換える
+    - マニフェストから一意に決まる値なので `check --write` が揃える
+- IF: 版を上げた変更で SKILL.md の差分も要求したくなった; THEN PROHIBIT: 足す
+  - 書くことが無いのに本文をいじる操作が生まれる。線の引き方は [EDR 0044](../../docs/engineering-decision-logs/0044-ship-a-changelog-beside-the-skills-and-check-it-against-the-manifest.md) が決めている

@@ -1,5 +1,7 @@
 import { extname } from "node:path";
 
+import { attempt } from "es-toolkit";
+
 import { runGitBuffer, runGitText } from "./git-text.ts";
 import { parseRepositoryChanges, type RepositoryChange } from "./repository-diff.ts";
 
@@ -73,11 +75,14 @@ const resolveCommit = async (repositoryRoot: string, revision: string): Promise<
 const sourceExtensions = [".cjs", ".cts", ".js", ".jsx", ".mjs", ".mts", ".ts", ".tsx"];
 
 export const decodedSource = (path: string, writtenBlob: Uint8Array): string => {
-  if (writtenBlob.includes(0)) {
-    throw new Error(`Source blob contains NUL bytes: ${path}`);
+  const [undecodable, decoded] = attempt<string, Error>(() =>
+    new TextDecoder("utf-8", { fatal: true }).decode(writtenBlob),
+  );
+  if (undecodable !== null) {
+    throw new Error(`Source blob does not decode as UTF-8: ${path}`);
   }
 
-  return new TextDecoder("utf-8").decode(writtenBlob);
+  return decoded;
 };
 
 export type SideSources = Readonly<{
