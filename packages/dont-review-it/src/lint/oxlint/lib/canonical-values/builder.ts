@@ -1,5 +1,6 @@
 import { dirname, resolve } from "node:path";
 
+import { measureStage } from "@mst/lint-rule-authoring";
 import { attempt, memoize, sortBy, uniqBy } from "es-toolkit";
 
 import { readGitSourceScope, type GitSourceScope } from "../git-ignored-source.ts";
@@ -111,7 +112,9 @@ const analyzeRepositoryFiles = ({
   readonly repositoryRoot: string;
   readonly sourceScope: GitSourceScope;
 }): CanonicalValuesRepositoryAnalysis => {
-  const sources = readAnnotatedSources(repositoryFiles);
+  const sources = measureStage("canonical.annotations", () =>
+    readAnnotatedSources(repositoryFiles),
+  );
   const declarations = declarationSitesIn(sources);
   const duplicates = duplicateConceptsIn(declarations);
   const resolvableDeclarations = declarations.filter(
@@ -120,7 +123,6 @@ const analyzeRepositoryFiles = ({
   const resolved = resolveCanonicalValuesEntries({
     declarations: resolvableDeclarations,
     repositoryRoot,
-    sourceFiles: repositoryFiles.commentSources.map((source) => source.absolutePath),
   });
   const catalogEntries = repositoryFiles.problems.length === 0 ? resolved.entries : [];
 
@@ -145,9 +147,9 @@ export const analyzeCanonicalValuesRepository = ({
   readonly repositoryRoot: string;
 }): CanonicalValuesRepositoryAnalysis => {
   const root = resolve(repositoryRoot);
-  const sourceScope = readGitSourceScope(root);
+  const sourceScope = measureStage("canonical.scope", () => readGitSourceScope(root));
   return analyzeRepositoryFiles({
-    repositoryFiles: listRepositoryFiles(root, sourceScope),
+    repositoryFiles: measureStage("canonical.scan", () => listRepositoryFiles(root, sourceScope)),
     repositoryRoot: root,
     sourceScope,
   });

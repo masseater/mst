@@ -1,5 +1,6 @@
 import { dirname } from "node:path";
 
+import { measureStage } from "@mst/lint-rule-authoring";
 import { attempt, groupBy, uniqBy } from "es-toolkit";
 import * as ts from "typescript-6";
 
@@ -256,7 +257,6 @@ const resolveGroup = (input: {
   readonly declarations: readonly CanonicalValuesDeclarationSite[];
   readonly publicSourceFiles: readonly string[];
   readonly repositoryRoot: string;
-  readonly sourceFiles: readonly string[];
 }): {
   readonly entries: readonly CanonicalValuesEntry[];
   readonly problems: readonly CanonicalValuesSourceProblem[];
@@ -267,15 +267,16 @@ const resolveGroup = (input: {
     rootNames: [
       ...input.declarations.map((declaration) => declaration.absolutePath),
       ...input.publicSourceFiles,
-      ...input.sourceFiles,
     ],
     searchDirectory: dirname(first.absolutePath),
   });
-  const checker = program.getTypeChecker();
-  const resolutions = input.declarations.map((declaration) => {
-    const [failure, declarationEntry] = attempt(() =>
+  const checker = measureStage("canonical.checker", () => program.getTypeChecker());
+  const measuredEntry = (declaration: CanonicalValuesDeclarationSite): CanonicalValuesEntry =>
+    measureStage("canonical.entry", () =>
       entryFor({ checker, declaration, program, repositoryRoot: input.repositoryRoot }),
     );
+  const resolutions = input.declarations.map((declaration) => {
+    const [failure, declarationEntry] = attempt(() => measuredEntry(declaration));
     return failure === null && declarationEntry !== null
       ? { entry: declarationEntry, problem: null }
       : { entry: null, problem: problemFor(declaration) };
@@ -293,7 +294,6 @@ const resolveGroup = (input: {
 export const resolveCanonicalValuesEntries = (input: {
   readonly declarations: readonly CanonicalValuesDeclarationSite[];
   readonly repositoryRoot: string;
-  readonly sourceFiles: readonly string[];
 }): {
   readonly entries: readonly CanonicalValuesEntry[];
   readonly problems: readonly CanonicalValuesSourceProblem[];

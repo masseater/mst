@@ -1,5 +1,6 @@
 import { dirname, resolve } from "node:path";
 
+import { measureStage } from "@mst/lint-rule-authoring";
 import { uniqBy } from "es-toolkit";
 import * as ts from "typescript-6";
 
@@ -79,7 +80,7 @@ export const createCanonicalValuesTypeScriptProgram = (input: ProgramInput): ts.
       ? null
       : parsedConfigAt({ configPath, repositoryRoot: input.repositoryRoot });
   const rootNames = uniqBy(
-    [...(parsedConfig?.fileNames ?? []), ...input.rootNames].map((fileName) => resolve(fileName)),
+    input.rootNames.map((fileName) => resolve(fileName)),
     (fileName) => fileName,
   );
   const compilerOptions = requiredOptions(parsedConfig?.options ?? {});
@@ -94,12 +95,16 @@ export const createCanonicalValuesTypeScriptProgram = (input: ProgramInput): ts.
       return ts.createSourceFile(fileName, sourceText, languageVersion, true, scriptKind);
     },
   };
-  const program = ts.createProgram({
-    host,
-    options: compilerOptions,
-    projectReferences: parsedConfig?.projectReferences,
-    rootNames,
+  const program = measureStage("canonical.program", () =>
+    ts.createProgram({
+      host,
+      options: compilerOptions,
+      projectReferences: parsedConfig?.projectReferences,
+      rootNames,
+    }),
+  );
+  measureStage("canonical.program.assert", () => {
+    assertCacheBoundedSources(input.repositoryRoot, program);
   });
-  assertCacheBoundedSources(input.repositoryRoot, program);
   return program;
 };
