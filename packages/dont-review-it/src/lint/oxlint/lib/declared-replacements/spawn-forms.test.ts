@@ -9,100 +9,115 @@ import {
 } from "./spawn-forms.ts";
 
 const OWN_FORM = {
-  specifier: "@mst/repository-checks",
+  specifier: "@mst/utils",
   exported: "run",
   position: 1,
   carries: SPAWN_TARGET_NAME,
 };
 
-describe("declared-replacements/spawn-forms", () => {
-  test("options nobody wrote leave the standing table in place", () => {
-    expect(spawnFormsIn({ options: [], standing: DEFAULT_SPAWN_FORMS })).toStrictEqual(
-      DEFAULT_SPAWN_FORMS,
-    );
+describe("spawnFormsIn", () => {
+  describe("options nobody wrote", () => {
+    const it = test.extend("forms", () =>
+      spawnFormsIn({ options: [], standing: DEFAULT_SPAWN_FORMS }));
+
+    it("leaves the standing table in place", ({ forms }) => {
+      expect(forms).toStrictEqual(DEFAULT_SPAWN_FORMS);
+    });
   });
 
-  test("a table the consumer writes stands in place of the one it replaces", () => {
-    expect(
-      spawnFormsIn({ options: [{ spawnForms: [OWN_FORM] }], standing: DEFAULT_SPAWN_FORMS }),
-    ).toStrictEqual([OWN_FORM]);
+  describe("a table the consumer writes", () => {
+    const it = test.extend("forms", () =>
+      spawnFormsIn({ options: [{ spawnForms: [OWN_FORM] }], standing: DEFAULT_SPAWN_FORMS }));
+
+    it("stands in place of the one it replaces", ({ forms }) => {
+      expect(forms).toStrictEqual([OWN_FORM]);
+    });
   });
 
-  test("an entry written without a position takes the first argument", () => {
-    expect(
+  describe("an entry written without a position", () => {
+    const it = test.extend("forms", () =>
       spawnFormsIn({
         options: [
           {
-            spawnForms: [
-              { specifier: "@mst/repository-checks", exported: "run", carries: SPAWN_TARGET_LINE },
-            ],
+            spawnForms: [{ specifier: "@mst/utils", exported: "run", carries: SPAWN_TARGET_LINE }],
           },
         ],
         standing: [],
-      }),
-    ).toStrictEqual([
-      {
-        specifier: "@mst/repository-checks",
-        exported: "run",
-        position: 0,
-        carries: SPAWN_TARGET_LINE,
-      },
-    ]);
+      }));
+
+    it("takes the first argument", ({ forms }) => {
+      expect(forms).toStrictEqual([
+        { specifier: "@mst/utils", exported: "run", position: 0, carries: SPAWN_TARGET_LINE },
+      ]);
+    });
   });
 
-  test("an entry written without a specifier is left out", () => {
-    expect(
+  describe("an entry written without a specifier", () => {
+    const it = test.extend("forms", () =>
       spawnFormsIn({
         options: [{ spawnForms: [{ exported: "run", carries: SPAWN_TARGET_NAME }] }],
         standing: DEFAULT_SPAWN_FORMS,
-      }),
-    ).toStrictEqual(DEFAULT_SPAWN_FORMS);
+      }));
+
+    it("is left out", ({ forms }) => {
+      expect(forms).toStrictEqual(DEFAULT_SPAWN_FORMS);
+    });
   });
 
-  test("an entry written without an exported name is left out", () => {
-    expect(
+  describe("an entry written without an exported name", () => {
+    const it = test.extend("forms", () =>
       spawnFormsIn({
-        options: [
-          { spawnForms: [{ specifier: "@mst/repository-checks", carries: SPAWN_TARGET_NAME }] },
-        ],
+        options: [{ spawnForms: [{ specifier: "@mst/utils", carries: SPAWN_TARGET_NAME }] }],
         standing: DEFAULT_SPAWN_FORMS,
-      }),
-    ).toStrictEqual(DEFAULT_SPAWN_FORMS);
+      }));
+
+    it("is left out", ({ forms }) => {
+      expect(forms).toStrictEqual(DEFAULT_SPAWN_FORMS);
+    });
   });
 
-  test("an entry saying nothing about what its argument carries is left out", () => {
-    expect(
+  describe("an entry saying nothing about what its argument carries", () => {
+    const it = test.extend("forms", () =>
       spawnFormsIn({
-        options: [
-          {
-            spawnForms: [
-              { specifier: "@mst/repository-checks", exported: "run", carries: "shell" },
-            ],
-          },
-        ],
+        options: [{ spawnForms: [{ specifier: "@mst/utils", exported: "run", carries: "shell" }] }],
         standing: DEFAULT_SPAWN_FORMS,
-      }),
-    ).toStrictEqual(DEFAULT_SPAWN_FORMS);
-  });
+      }));
 
-  test("a runtime module named with its prefix reaches the entry named without it", () => {
-    expect(
+    it("is left out", ({ forms }) => {
+      expect(forms).toStrictEqual(DEFAULT_SPAWN_FORMS);
+    });
+  });
+});
+
+describe("spawnFormMatching", () => {
+  describe("a runtime module named without its prefix", () => {
+    const it = test.extend("form", () =>
       spawnFormMatching({
         forms: DEFAULT_SPAWN_FORMS,
         specifier: "child_process",
         exported: "execSync",
-      }),
-    ).toStrictEqual({
-      specifier: "node:child_process",
-      exported: "execSync",
-      position: 0,
-      carries: SPAWN_TARGET_LINE,
+      }));
+
+    it("reaches the entry named with the prefix", ({ form }) => {
+      expect(form).toStrictEqual({
+        specifier: "node:child_process",
+        exported: "execSync",
+        position: 0,
+        carries: SPAWN_TARGET_LINE,
+      });
     });
   });
 
-  test("a module the table says nothing about reaches no entry", () => {
-    expect(
-      spawnFormMatching({ forms: DEFAULT_SPAWN_FORMS, specifier: "node:fs", exported: "readFile" }),
-    ).toBeNull();
+  describe("a module the table says nothing about", () => {
+    const it = test.extend("form", () =>
+      spawnFormMatching({
+        forms: DEFAULT_SPAWN_FORMS,
+        specifier: "node:fs",
+        exported: "readFile",
+      }));
+
+    it("reaches no entry", ({ form }) => {
+      expect(form).toBe(null);
+    });
   });
 });

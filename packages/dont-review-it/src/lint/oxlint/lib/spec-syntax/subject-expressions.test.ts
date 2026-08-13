@@ -9,254 +9,605 @@ import {
   memberRootOf,
   returnedExpressionsOf,
   unwrapSubject,
-  type SpecFunction,
 } from "./subject-expressions.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
-const firstDeclaredInitializer = (initializerSource: string): ESTree.Expression => {
-  const declared = parseSync("spec.ts", `const written = ${initializerSource};`).program
-    .body[0] as ESTree.Statement;
-  const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
-  if (declarator === undefined) throw new Error(`nothing is declared by: ${initializerSource}`);
+describe("asSpecFunction", () => {
+  describe("an arrow written where a spec body belongs", () => {
+    const it = test.extend("specFunctionOfAnArrowWrittenWhereASpecBodyBelongs", () => {
+      const declared = parseSync("spec.ts", "const written = () => runSut();").program
+        .body[0] as ESTree.VariableDeclaration;
+      const [declarator] = declared.declarations;
+      const initializer = declarator?.init ?? null;
+      return initializer !== null && asSpecFunction(initializer) === initializer;
+    });
 
-  return declarator.init as ESTree.Expression;
-};
-
-const functionIn = (functionSource: string): SpecFunction =>
-  firstDeclaredInitializer(functionSource) as SpecFunction;
-
-const signatureIn = (signatureSource: string): SpecFunction => {
-  const [declared] = parseSync("spec.ts", signatureSource).program.body;
-  if (declared === undefined) throw new Error(`nothing is declared by: ${signatureSource}`);
-
-  return declared as SpecFunction;
-};
-
-const spellingOf = (node: ESTree.Expression): string => node.type;
-
-describe("subject-expressions", () => {
-  test("a plain expression is already the expression that produced the subject", () => {
-    expect(spellingOf(unwrapSubject(firstDeclaredInitializer("runSut()")))).toBe("CallExpression");
+    it("is that spec's function", ({ specFunctionOfAnArrowWrittenWhereASpecBodyBelongs }) => {
+      expect(specFunctionOfAnArrowWrittenWhereASpecBodyBelongs).toBe(true);
+    });
   });
 
-  test("a type assertion around a subject does not change what produced it", () => {
-    expect(spellingOf(unwrapSubject(firstDeclaredInitializer("runSut() as Report")))).toBe(
-      "CallExpression",
-    );
+  describe("a function expression written where a spec body belongs", () => {
+    const it = test.extend("specFunctionOfAFunctionExpressionWrittenWhereASpecBodyBelongs", () => {
+      const declared = parseSync("spec.ts", "const written = function () { return runSut(); };")
+        .program.body[0] as ESTree.VariableDeclaration;
+      const [declarator] = declared.declarations;
+      const initializer = declarator?.init ?? null;
+      return initializer !== null && asSpecFunction(initializer) === initializer;
+    });
+
+    it("is that spec's function", ({
+      specFunctionOfAFunctionExpressionWrittenWhereASpecBodyBelongs,
+    }) => {
+      expect(specFunctionOfAFunctionExpressionWrittenWhereASpecBodyBelongs).toBe(true);
+    });
   });
 
-  test("a non-null assertion around a subject does not change what produced it", () => {
-    expect(spellingOf(unwrapSubject(firstDeclaredInitializer("runSut()!")))).toBe("CallExpression");
+  describe("an annotation around a spec body", () => {
+    const it = test.extend("specFunctionOfAnAnnotatedSpecBody", () => {
+      const declared = parseSync("spec.ts", "const written = (() => runSut()) as SpecBody;").program
+        .body[0] as ESTree.VariableDeclaration;
+      const [declarator] = declared.declarations;
+      const initializer = declarator?.init ?? null;
+      return initializer !== null && asSpecFunction(initializer) === unwrapSubject(initializer);
+    });
+
+    it("does not change which function it is", ({ specFunctionOfAnAnnotatedSpecBody }) => {
+      expect(specFunctionOfAnAnnotatedSpecBody).toBe(true);
+    });
   });
 
-  test("awaiting a subject does not change what produced it", () => {
-    const returns = returnedExpressionsOf(functionIn("async () => await runSut()"));
+  describe("an expression that produces no function", () => {
+    const it = test.extend("specFunctionOfAnExpressionProducingNoFunction", () => {
+      const declared = parseSync("spec.ts", "const written = runSut();").program
+        .body[0] as ESTree.VariableDeclaration;
+      const [declarator] = declared.declarations;
+      const initializer = declarator?.init ?? null;
+      return initializer === null ? null : asSpecFunction(initializer);
+    });
 
-    expect(returns.map((returned) => spellingOf(unwrapSubject(returned)))).toStrictEqual([
-      "CallExpression",
-    ]);
+    it("is not a spec body", ({ specFunctionOfAnExpressionProducingNoFunction }) => {
+      expect(specFunctionOfAnExpressionProducingNoFunction).toBe(null);
+    });
+  });
+});
+
+describe("returnedExpressionsOf", () => {
+  describe("a return written in an else branch", () => {
+    const it = test.extend("returnsFromAnElseBranch", () => {
+      const statement = parseSync(
+        "spec.ts",
+        "((flag) => { if (flag) { return runSut(); } else { return null; } });",
+      ).program.body[0] as ESTree.ExpressionStatement;
+      const factory = asSpecFunction(statement.expression);
+      return factory === null
+        ? null
+        : returnedExpressionsOf(factory).map((returned) => returned.type);
+    });
+
+    it("is still the function's own return", ({ returnsFromAnElseBranch }) => {
+      expect(returnsFromAnElseBranch).toStrictEqual(["CallExpression", "Literal"]);
+    });
   });
 
-  test("an arrow written where a spec body belongs is that spec's function", () => {
-    const written = firstDeclaredInitializer("() => runSut()");
+  describe("a concise arrow", () => {
+    const it = test.extend("returnSpellingsOfAConciseArrow", () => {
+      const statement = parseSync("spec.ts", "(() => ({ status: 200 }));").program
+        .body[0] as ESTree.ExpressionStatement;
+      const factory = asSpecFunction(statement.expression);
+      return factory === null
+        ? null
+        : returnedExpressionsOf(factory).map((returned) => returned.type);
+    });
 
-    expect(asSpecFunction(written)).toBe(written);
+    it("hands back the expression written as its body", ({ returnSpellingsOfAConciseArrow }) => {
+      expect(returnSpellingsOfAConciseArrow).toStrictEqual(["ParenthesizedExpression"]);
+    });
   });
 
-  test("a function expression written where a spec body belongs is that spec's function", () => {
-    const written = firstDeclaredInitializer("function () { return runSut(); }");
+  describe("a block body", () => {
+    const it = test.extend("returnSpellingsOfABlockBody", () => {
+      const statement = parseSync(
+        "spec.ts",
+        "((flag) => { if (flag) { return runSut(); } return null; });",
+      ).program.body[0] as ESTree.ExpressionStatement;
+      const factory = asSpecFunction(statement.expression);
+      return factory === null
+        ? null
+        : returnedExpressionsOf(factory).map((returned) => returned.type);
+    });
 
-    expect(asSpecFunction(written)).toBe(written);
+    it("hands back what each of its own return statements names", ({
+      returnSpellingsOfABlockBody,
+    }) => {
+      expect(returnSpellingsOfABlockBody).toStrictEqual(["CallExpression", "Literal"]);
+    });
   });
 
-  test("an annotation around a spec body does not change which function it is", () => {
-    const written = firstDeclaredInitializer("(() => runSut()) as SpecBody");
+  describe("a return written inside a catch clause", () => {
+    const it = test.extend("returnSpellingsOfAReturnInsideACatchClause", () => {
+      const statement = parseSync(
+        "spec.ts",
+        "(() => { try { runSut(); } catch (thrown) { return thrown; } return null; });",
+      ).program.body[0] as ESTree.ExpressionStatement;
+      const factory = asSpecFunction(statement.expression);
+      return factory === null
+        ? null
+        : returnedExpressionsOf(factory).map((returned) => returned.type);
+    });
 
-    expect(asSpecFunction(written)).toBe(unwrapSubject(written));
+    it("is still the function's own return", ({ returnSpellingsOfAReturnInsideACatchClause }) => {
+      expect(returnSpellingsOfAReturnInsideACatchClause).toStrictEqual(["Identifier", "Literal"]);
+    });
   });
 
-  test("an expression that produces no function is not a spec body", () => {
-    expect(asSpecFunction(firstDeclaredInitializer("runSut()"))).toBe(null);
+  describe("a return written inside a loop or a switch", () => {
+    const it = test.extend("returnSpellingsOfAReturnInsideALoopAroundASwitch", () => {
+      const statement = parseSync(
+        "spec.ts",
+        "((rows) => { for (const row of rows) { switch (row) { case 1: return runSut(); } } return null; });",
+      ).program.body[0] as ESTree.ExpressionStatement;
+      const factory = asSpecFunction(statement.expression);
+      return factory === null
+        ? null
+        : returnedExpressionsOf(factory).map((returned) => returned.type);
+    });
+
+    it("is still the function's own return", ({
+      returnSpellingsOfAReturnInsideALoopAroundASwitch,
+    }) => {
+      expect(returnSpellingsOfAReturnInsideALoopAroundASwitch).toStrictEqual([
+        "CallExpression",
+        "Literal",
+      ]);
+    });
   });
 
-  test("a concise arrow hands back the expression written as its body", () => {
-    const returns = returnedExpressionsOf(functionIn("() => ({ status: 200 })"));
+  describe("a return written inside a nested function", () => {
+    const it = test.extend("returnSpellingsOfAReturnInsideANestedFunction", () => {
+      const statement = parseSync(
+        "spec.ts",
+        "(() => { const inner = () => { return runSut(); }; return inner; });",
+      ).program.body[0] as ESTree.ExpressionStatement;
+      const factory = asSpecFunction(statement.expression);
+      return factory === null
+        ? null
+        : returnedExpressionsOf(factory).map((returned) => returned.type);
+    });
 
-    expect(returns.map(spellingOf)).toStrictEqual(["ParenthesizedExpression"]);
+    it("belongs to that function, not this one", ({
+      returnSpellingsOfAReturnInsideANestedFunction,
+    }) => {
+      expect(returnSpellingsOfAReturnInsideANestedFunction).toStrictEqual(["Identifier"]);
+    });
   });
 
-  test("a block body hands back what each of its own return statements names", () => {
-    const returns = returnedExpressionsOf(
-      functionIn("(flag) => { if (flag) { return runSut(); } return null; }"),
-    );
+  describe("a function declared without a body", () => {
+    const it = test.extend("returnsOfAFunctionWithoutABody", () => {
+      const declared = parseSync("spec.ts", "declare function held(): Report;").program
+        .body[0] as ESTree.Statement;
+      return declared.type !== "TSDeclareFunction" ? null : returnedExpressionsOf(declared);
+    });
 
-    expect(returns.map(spellingOf)).toStrictEqual(["CallExpression", "Literal"]);
+    it("hands back nothing", ({ returnsOfAFunctionWithoutABody }) => {
+      expect(returnsOfAFunctionWithoutABody).toStrictEqual([]);
+    });
   });
 
-  test("a return written in an else branch is still the function's own return", () => {
-    const returns = returnedExpressionsOf(
-      functionIn("(flag) => { if (flag) { return runSut(); } else { return null; } }"),
-    );
+  describe("a condition written with both branches", () => {
+    const it = test.extend("returnsFromBothBranchesOfACondition", () => {
+      const statement = parseSync(
+        "spec.ts",
+        "(() => { if (ok) { return runSut(); } else { return runOther(); } });",
+      ).program.body[0] as ESTree.ExpressionStatement;
+      const factory = asSpecFunction(statement.expression);
+      return factory === null
+        ? null
+        : returnedExpressionsOf(factory).map((returned) => returned.type);
+    });
 
-    expect(returns.map(spellingOf)).toStrictEqual(["CallExpression", "Literal"]);
+    it("hands back what each branch returns", ({ returnsFromBothBranchesOfACondition }) => {
+      expect(returnsFromBothBranchesOfACondition).toStrictEqual([
+        "CallExpression",
+        "CallExpression",
+      ]);
+    });
+  });
+});
+
+describe("argumentsPassedTo", () => {
+  describe("a factory written without a block body", () => {
+    const it = test.extend("argumentsHandedToAHandoffInAFactoryWithoutABlockBody", () => {
+      const statement = parseSync("spec.ts", "((held, use) => use(runSut()));").program
+        .body[0] as ESTree.ExpressionStatement;
+      const factory = asSpecFunction(statement.expression);
+      return factory === null
+        ? null
+        : argumentsPassedTo(factory, "use").map((handed) => handed.type);
+    });
+
+    it("has no statement that hands anything over", ({
+      argumentsHandedToAHandoffInAFactoryWithoutABlockBody,
+    }) => {
+      expect(argumentsHandedToAHandoffInAFactoryWithoutABlockBody).toStrictEqual([]);
+    });
   });
 
-  test("a function that declares a signature without a body hands nothing back", () => {
-    expect(returnedExpressionsOf(signatureIn("declare function runSut(): Report;"))).toStrictEqual(
-      [],
-    );
+  describe("a handoff written with a spread", () => {
+    const it = test.extend("argumentsHandedToAHandoffWrittenWithASpread", () => {
+      const statement = parseSync("spec.ts", "((held, use) => { use(...produced()); });").program
+        .body[0] as ESTree.ExpressionStatement;
+      const factory = asSpecFunction(statement.expression);
+      return factory === null
+        ? null
+        : argumentsPassedTo(factory, "use").map((handed) => handed.type);
+    });
+
+    it("hands over nothing this reading can name", ({
+      argumentsHandedToAHandoffWrittenWithASpread,
+    }) => {
+      expect(argumentsHandedToAHandoffWrittenWithASpread).toStrictEqual([]);
+    });
   });
 
-  test("a return written inside a catch clause is still the function's own return", () => {
-    const returns = returnedExpressionsOf(
-      functionIn("() => { try { runSut(); } catch (thrown) { return thrown; } return null; }"),
-    );
+  describe("a function that hands its subject to a named callback", () => {
+    const it = test.extend("handoffSpellingsOfAFunctionNamingItsArgument", () => {
+      const statement = parseSync(
+        "spec.ts",
+        "(async ({ port }, use) => { await use(await runSut(port)); });",
+      ).program.body[0] as ESTree.ExpressionStatement;
+      const factory = asSpecFunction(statement.expression);
+      return factory === null
+        ? null
+        : argumentsPassedTo(factory, "use").map((handed) => handed.type);
+    });
 
-    expect(returns.map(spellingOf)).toStrictEqual(["Identifier", "Literal"]);
+    it("names that argument", ({ handoffSpellingsOfAFunctionNamingItsArgument }) => {
+      expect(handoffSpellingsOfAFunctionNamingItsArgument).toStrictEqual(["AwaitExpression"]);
+    });
   });
 
-  test("a return written inside a loop or a switch is still the function's own return", () => {
-    const returns = returnedExpressionsOf(
-      functionIn(
-        "(rows) => { for (const row of rows) { switch (row) { case 1: return runSut(); } } return null; }",
-      ),
-    );
+  describe("a handoff written inside a try block", () => {
+    const it = test.extend("handoffSpellingsOfAHandoffInsideATryBlock", () => {
+      const statement = parseSync(
+        "spec.ts",
+        "(async ({}, use) => { try { await use(runSut()); } finally { close(); } });",
+      ).program.body[0] as ESTree.ExpressionStatement;
+      const factory = asSpecFunction(statement.expression);
+      return factory === null
+        ? null
+        : argumentsPassedTo(factory, "use").map((handed) => handed.type);
+    });
 
-    expect(returns.map(spellingOf)).toStrictEqual(["CallExpression", "Literal"]);
+    it("is still a handoff", ({ handoffSpellingsOfAHandoffInsideATryBlock }) => {
+      expect(handoffSpellingsOfAHandoffInsideATryBlock).toStrictEqual(["CallExpression"]);
+    });
   });
 
-  test("a return written inside a nested function belongs to that function, not this one", () => {
-    const returns = returnedExpressionsOf(
-      functionIn("() => { const inner = () => { return runSut(); }; return inner; }"),
-    );
+  describe("a call to a different name", () => {
+    const it = test.extend("handoffSpellingsOfACallToADifferentName", () => {
+      const statement = parseSync("spec.ts", "(async ({}, use) => { await report(runSut()); });")
+        .program.body[0] as ESTree.ExpressionStatement;
+      const factory = asSpecFunction(statement.expression);
+      return factory === null
+        ? null
+        : argumentsPassedTo(factory, "use").map((handed) => handed.type);
+    });
 
-    expect(returns.map(spellingOf)).toStrictEqual(["Identifier"]);
+    it("is not a handoff", ({ handoffSpellingsOfACallToADifferentName }) => {
+      expect(handoffSpellingsOfACallToADifferentName).toStrictEqual([]);
+    });
   });
 
-  test("a function that hands its subject to a named callback names that argument", () => {
-    const handed = argumentsPassedTo(
-      functionIn("async ({ port }, use) => { await use(await runSut(port)); }"),
-      "use",
-    );
+  describe("a handoff written inside a nested callback", () => {
+    const it = test.extend("handoffSpellingsOfAHandoffInsideANestedCallback", () => {
+      const statement = parseSync(
+        "spec.ts",
+        "(async ({}, use) => { rows.forEach(() => { use(runSut()); }); });",
+      ).program.body[0] as ESTree.ExpressionStatement;
+      const factory = asSpecFunction(statement.expression);
+      return factory === null
+        ? null
+        : argumentsPassedTo(factory, "use").map((handed) => handed.type);
+    });
 
-    expect(handed.map(spellingOf)).toStrictEqual(["AwaitExpression"]);
+    it("belongs to that callback", ({ handoffSpellingsOfAHandoffInsideANestedCallback }) => {
+      expect(handoffSpellingsOfAHandoffInsideANestedCallback).toStrictEqual([]);
+    });
   });
 
-  test("a handoff written inside a try block is still a handoff", () => {
-    const handed = argumentsPassedTo(
-      functionIn("async ({}, use) => { try { await use(runSut()); } finally { close(); } }"),
-      "use",
-    );
+  describe("a statement that calls nothing", () => {
+    const it = test.extend("argumentsHandedToTheHandoffAroundAPlainStatement", () => {
+      const statement = parseSync("spec.ts", "((held, use) => { held; use(runSut()); });").program
+        .body[0] as ESTree.ExpressionStatement;
+      const factory = asSpecFunction(statement.expression);
+      return factory === null
+        ? null
+        : argumentsPassedTo(factory, "use").map((handed) => handed.type);
+    });
 
-    expect(handed.map(spellingOf)).toStrictEqual(["CallExpression"]);
+    it("hands no argument to the handoff", ({
+      argumentsHandedToTheHandoffAroundAPlainStatement,
+    }) => {
+      expect(argumentsHandedToTheHandoffAroundAPlainStatement).toStrictEqual(["CallExpression"]);
+    });
   });
 
-  test("a call to a different name is not a handoff", () => {
-    const handed = argumentsPassedTo(
-      functionIn("async ({}, use) => { await report(runSut()); }"),
-      "use",
-    );
+  describe("a handoff call carrying nothing", () => {
+    const it = test.extend("argumentsHandedToAHandoffCallCarryingNothing", () => {
+      const statement = parseSync("spec.ts", "((held, use) => { use(); });").program
+        .body[0] as ESTree.ExpressionStatement;
+      const factory = asSpecFunction(statement.expression);
+      return factory === null
+        ? null
+        : argumentsPassedTo(factory, "use").map((handed) => handed.type);
+    });
 
-    expect(handed).toStrictEqual([]);
+    it("hands over no argument", ({ argumentsHandedToAHandoffCallCarryingNothing }) => {
+      expect(argumentsHandedToAHandoffCallCarryingNothing).toStrictEqual([]);
+    });
+  });
+});
+
+describe("unwrapSubject", () => {
+  describe("a call, written plainly and written under an assertion", () => {
+    const it = test
+      .extend("subjectOfAPlainCall", () => {
+        const declared = parseSync("spec.ts", "const written = runSut();").program
+          .body[0] as ESTree.VariableDeclaration;
+        const [declarator] = declared.declarations;
+        const initializer = declarator?.init ?? null;
+        return initializer === null ? null : unwrapSubject(initializer);
+      })
+      .extend("subjectOfACallInsideATypeAssertion", () => {
+        const declared = parseSync("spec.ts", "const written = runSut() as Report;").program
+          .body[0] as ESTree.VariableDeclaration;
+        const [declarator] = declared.declarations;
+        const initializer = declarator?.init ?? null;
+        return initializer === null ? null : unwrapSubject(initializer);
+      })
+      .extend("subjectOfACallInsideANonNullAssertion", () => {
+        const declared = parseSync("spec.ts", "const written = runSut()!;").program
+          .body[0] as ESTree.VariableDeclaration;
+        const [declarator] = declared.declarations;
+        const initializer = declarator?.init ?? null;
+        return initializer === null ? null : unwrapSubject(initializer);
+      });
+
+    it("is already the expression that produced the subject when written plainly", ({
+      subjectOfAPlainCall,
+    }) => {
+      expect(subjectOfAPlainCall).toStrictEqual({
+        type: "CallExpression",
+        start: 16,
+        end: 24,
+        callee: {
+          type: "Identifier",
+          start: 16,
+          end: 22,
+          decorators: [],
+          name: "runSut",
+          optional: false,
+          typeAnnotation: null,
+        },
+        typeArguments: null,
+        arguments: [],
+        optional: false,
+      });
+    });
+
+    it("is left unchanged by a type assertion around it", ({
+      subjectOfACallInsideATypeAssertion,
+      subjectOfAPlainCall,
+    }) => {
+      expect(subjectOfACallInsideATypeAssertion).toStrictEqual(subjectOfAPlainCall);
+    });
+
+    it("is left unchanged by a non-null assertion around it", ({
+      subjectOfACallInsideANonNullAssertion,
+      subjectOfAPlainCall,
+    }) => {
+      expect(subjectOfACallInsideANonNullAssertion).toStrictEqual(subjectOfAPlainCall);
+    });
   });
 
-  test("a handoff written inside a nested callback belongs to that callback", () => {
-    const handed = argumentsPassedTo(
-      functionIn("async ({}, use) => { rows.forEach(() => { use(runSut()); }); }"),
-      "use",
-    );
+  describe("an awaited subject", () => {
+    const it = test.extend("unwrappedReturnSpellingsOfAnAwaitedSubject", () => {
+      const statement = parseSync("spec.ts", "(async () => await runSut());").program
+        .body[0] as ESTree.ExpressionStatement;
+      const factory = asSpecFunction(statement.expression);
+      return factory === null
+        ? null
+        : returnedExpressionsOf(factory).map((returned) => unwrapSubject(returned).type);
+    });
 
-    expect(handed).toStrictEqual([]);
+    it("is left unchanged by the await around it", ({
+      unwrappedReturnSpellingsOfAnAwaitedSubject,
+    }) => {
+      expect(unwrappedReturnSpellingsOfAnAwaitedSubject).toStrictEqual(["CallExpression"]);
+    });
   });
 
-  test("a factory written without a block body has no statement that hands anything over", () => {
-    expect(argumentsPassedTo(functionIn("({}, use) => use(runSut())"), "use")).toStrictEqual([]);
+  describe("a parenthesised subject", () => {
+    const it = test.extend("unwrappedReturnSpellingsOfAParenthesisedSubject", () => {
+      const statement = parseSync("spec.ts", "(() => ({ status: 200 }));").program
+        .body[0] as ESTree.ExpressionStatement;
+      const factory = asSpecFunction(statement.expression);
+      return factory === null
+        ? null
+        : returnedExpressionsOf(factory).map((returned) => unwrapSubject(returned).type);
+    });
+
+    it("is left unchanged by the parentheses around it", ({
+      unwrappedReturnSpellingsOfAParenthesisedSubject,
+    }) => {
+      expect(unwrappedReturnSpellingsOfAParenthesisedSubject).toStrictEqual(["ObjectExpression"]);
+    });
+  });
+});
+
+describe("localConstInitializer", () => {
+  describe("a single const in the body", () => {
+    const it = test.extend("initializerOfASingleConstInTheBody", () => {
+      const statement = parseSync("spec.ts", "(() => { const caught = runSut(); return caught; });")
+        .program.body[0] as ESTree.ExpressionStatement;
+      const factory = asSpecFunction(statement.expression);
+      const factoryBlock = factory === null ? null : blockBodyOf(factory);
+      return factoryBlock === null ? null : localConstInitializer(factoryBlock, "caught");
+    });
+
+    it("is the initializer that name stands for", ({ initializerOfASingleConstInTheBody }) => {
+      expect(initializerOfASingleConstInTheBody).toStrictEqual({
+        type: "CallExpression",
+        start: 24,
+        end: 32,
+        callee: {
+          type: "Identifier",
+          start: 24,
+          end: 30,
+          decorators: [],
+          name: "runSut",
+          optional: false,
+          typeAnnotation: null,
+        },
+        typeArguments: null,
+        arguments: [],
+        optional: false,
+      });
+    });
   });
 
-  test("a statement that calls nothing is not a handoff", () => {
-    const handed = argumentsPassedTo(
-      functionIn("async ({}, use) => { started = true; await use(runSut()); }"),
-      "use",
-    );
+  describe("a name declared with let", () => {
+    const it = test.extend("initializerOfANameDeclaredWithLet", () => {
+      const statement = parseSync("spec.ts", "(() => { let caught = runSut(); return caught; });")
+        .program.body[0] as ESTree.ExpressionStatement;
+      const factory = asSpecFunction(statement.expression);
+      const factoryBlock = factory === null ? null : blockBodyOf(factory);
+      return factoryBlock === null ? null : localConstInitializer(factoryBlock, "caught");
+    });
 
-    expect(handed.map(spellingOf)).toStrictEqual(["CallExpression"]);
+    it("is not a name this reading resolves", ({ initializerOfANameDeclaredWithLet }) => {
+      expect(initializerOfANameDeclaredWithLet).toBe(null);
+    });
   });
 
-  test("a handoff written with no argument hands nothing over", () => {
-    expect(
-      argumentsPassedTo(functionIn("async ({}, use) => { await use(); }"), "use"),
-    ).toStrictEqual([]);
+  describe("a name declared by destructuring", () => {
+    const it = test.extend("initializerOfANameDeclaredByDestructuring", () => {
+      const statement = parseSync(
+        "spec.ts",
+        "(() => { const { caught } = runSut(); return caught; });",
+      ).program.body[0] as ESTree.ExpressionStatement;
+      const factory = asSpecFunction(statement.expression);
+      const factoryBlock = factory === null ? null : blockBodyOf(factory);
+      return factoryBlock === null ? null : localConstInitializer(factoryBlock, "caught");
+    });
+
+    it("is not a name this reading resolves", ({ initializerOfANameDeclaredByDestructuring }) => {
+      expect(initializerOfANameDeclaredByDestructuring).toBe(null);
+    });
   });
 
-  test("a handoff written with a spread hands over nothing this reading can name", () => {
-    expect(
-      argumentsPassedTo(functionIn("async ({}, use) => { await use(...produced()); }"), "use"),
-    ).toStrictEqual([]);
+  describe("a name that no const in the body declares", () => {
+    const it = test.extend("initializerOfANameNoConstInTheBodyDeclares", () => {
+      const statement = parseSync("spec.ts", "(() => { const caught = runSut(); return caught; });")
+        .program.body[0] as ESTree.ExpressionStatement;
+      const factory = asSpecFunction(statement.expression);
+      const factoryBlock = factory === null ? null : blockBodyOf(factory);
+      return factoryBlock === null ? null : localConstInitializer(factoryBlock, "other");
+    });
+
+    it("stands for nothing here", ({ initializerOfANameNoConstInTheBodyDeclares }) => {
+      expect(initializerOfANameNoConstInTheBodyDeclares).toBe(null);
+    });
+  });
+});
+
+describe("blockBodyOf", () => {
+  describe("a concise arrow", () => {
+    const it = test.extend("blockBodyOfAConciseArrow", () => {
+      const statement = parseSync("spec.ts", "(() => runSut());").program
+        .body[0] as ESTree.ExpressionStatement;
+      const factory = asSpecFunction(statement.expression);
+      return factory === null ? null : blockBodyOf(factory);
+    });
+
+    it("has no block body to read names out of", ({ blockBodyOfAConciseArrow }) => {
+      expect(blockBodyOfAConciseArrow).toBe(null);
+    });
+  });
+});
+
+describe("memberRootOf", () => {
+  describe("a bare name", () => {
+    const it = test.extend("memberRootOfABareName", () => {
+      const declared = parseSync("spec.ts", "const written = caught;").program
+        .body[0] as ESTree.VariableDeclaration;
+      const [declarator] = declared.declarations;
+      const initializer = declarator?.init ?? null;
+      return initializer === null ? null : memberRootOf(initializer);
+    });
+
+    it("is the root its own reading starts from", ({ memberRootOfABareName }) => {
+      expect(memberRootOfABareName).toStrictEqual({
+        type: "Identifier",
+        start: 16,
+        end: 22,
+        decorators: [],
+        name: "caught",
+        optional: false,
+        typeAnnotation: null,
+      });
+    });
   });
 
-  test("a single const in the body is the initializer that name stands for", () => {
-    const writtenBody = blockBodyOf(
-      functionIn("() => { const caught = runSut(); return caught; }"),
-    );
-    const initializer = localConstInitializer(writtenBody as ESTree.FunctionBody, "caught");
+  describe("a chain of member reads", () => {
+    const it = test.extend("memberRootOfAChainOfMemberReads", () => {
+      const declared = parseSync("spec.ts", "const written = caught.result!.stdout;").program
+        .body[0] as ESTree.VariableDeclaration;
+      const [declarator] = declared.declarations;
+      const initializer = declarator?.init ?? null;
+      return initializer === null ? null : memberRootOf(initializer);
+    });
 
-    expect(spellingOf(initializer as ESTree.Expression)).toBe("CallExpression");
+    it("is rooted at the name it starts from", ({ memberRootOfAChainOfMemberReads }) => {
+      expect(memberRootOfAChainOfMemberReads).toStrictEqual({
+        type: "Identifier",
+        start: 16,
+        end: 22,
+        decorators: [],
+        name: "caught",
+        optional: false,
+        typeAnnotation: null,
+      });
+    });
   });
 
-  test("a name declared with let is not a name this reading resolves", () => {
-    const writtenBody = blockBodyOf(functionIn("() => { let caught = runSut(); return caught; }"));
+  describe("a chain of optional member reads", () => {
+    const it = test.extend("memberRootOfAChainOfOptionalMemberReads", () => {
+      const declared = parseSync("spec.ts", "const written = caught?.result.stdout;").program
+        .body[0] as ESTree.VariableDeclaration;
+      const [declarator] = declared.declarations;
+      const initializer = declarator?.init ?? null;
+      return initializer === null ? null : memberRootOf(initializer)?.name;
+    });
 
-    expect(localConstInitializer(writtenBody as ESTree.FunctionBody, "caught")).toBe(null);
+    it("is rooted at the name it starts from", ({ memberRootOfAChainOfOptionalMemberReads }) => {
+      expect(memberRootOfAChainOfOptionalMemberReads).toBe("caught");
+    });
   });
 
-  test("a name declared by destructuring is not a name this reading resolves", () => {
-    const writtenBody = blockBodyOf(
-      functionIn("() => { const { caught } = runSut(); return caught; }"),
-    );
+  describe("a member read taken straight off a call", () => {
+    const it = test.extend("memberRootOfAMemberReadTakenOffACall", () => {
+      const declared = parseSync("spec.ts", "const written = runSut().stdout;").program
+        .body[0] as ESTree.VariableDeclaration;
+      const [declarator] = declared.declarations;
+      const initializer = declarator?.init ?? null;
+      return initializer === null ? null : memberRootOf(initializer);
+    });
 
-    expect(localConstInitializer(writtenBody as ESTree.FunctionBody, "caught")).toBe(null);
-  });
-
-  test("a name that no const in the body declares stands for nothing here", () => {
-    const writtenBody = blockBodyOf(
-      functionIn("() => { const caught = runSut(); return caught; }"),
-    );
-
-    expect(localConstInitializer(writtenBody as ESTree.FunctionBody, "other")).toBe(null);
-  });
-
-  test("a concise arrow has no block body to read names out of", () => {
-    expect(blockBodyOf(functionIn("() => runSut()"))).toBe(null);
-  });
-
-  test("parentheses around a subject do not change what produced it", () => {
-    const returns = returnedExpressionsOf(functionIn("() => ({ status: 200 })"));
-
-    expect(returns.map((returned) => spellingOf(unwrapSubject(returned)))).toStrictEqual([
-      "ObjectExpression",
-    ]);
-  });
-
-  test("a bare name is the root its own reading starts from", () => {
-    const root = memberRootOf(firstDeclaredInitializer("caught"));
-
-    expect(root?.name).toBe("caught");
-  });
-
-  test("a chain of member reads is rooted at the name it starts from", () => {
-    const root = memberRootOf(firstDeclaredInitializer("caught.result!.stdout"));
-
-    expect(root?.name).toBe("caught");
-  });
-
-  test("a chain of optional member reads is rooted at the name it starts from", () => {
-    const root = memberRootOf(firstDeclaredInitializer("caught?.result.stdout"));
-
-    expect(root?.name).toBe("caught");
-  });
-
-  test("a member read taken straight off a call has no name at its root", () => {
-    expect(memberRootOf(firstDeclaredInitializer("runSut().stdout"))).toBe(null);
+    it("has no name at its root", ({ memberRootOfAMemberReadTakenOffACall }) => {
+      expect(memberRootOfAMemberReadTakenOffACall).toBe(null);
+    });
   });
 });

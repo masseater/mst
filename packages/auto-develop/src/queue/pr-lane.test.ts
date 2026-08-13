@@ -2,27 +2,14 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { laneAdmitted, prLaneNumber, prLaneOf } from "./pr-lane.ts";
 
-const prFilter = { targetPrs: [7], excludedPrs: [8] };
-
-const it = test
-  .extend("plainPrLaneNumber", () => prLaneNumber("pr-7"))
-  .extend("zeroPrLaneNumber", () => prLaneNumber("pr-0"))
-  .extend("leadingZeroPrLaneNumber", () => prLaneNumber("pr-07"))
-  .extend("nonPrLaneNumber", () => prLaneNumber("system-maintenance"))
-  .extend("laneNameForSeven", () => prLaneOf(7))
-  .extend("targetedLaneAdmission", () => laneAdmitted({ lane: "pr-7", prFilter }))
-  .extend("excludedLaneAdmission", () => laneAdmitted({ lane: "pr-8", prFilter }))
-  .extend("bothListedLaneAdmission", () =>
-    laneAdmitted({ lane: "pr-7", prFilter: { targetPrs: [7], excludedPrs: [7] } }),
-  )
-  .extend("unlistedLaneAdmission", () => laneAdmitted({ lane: "pr-9", prFilter }))
-  .extend("emptyTargetLaneAdmission", () =>
-    laneAdmitted({ lane: "pr-9", prFilter: { targetPrs: [], excludedPrs: [8] } }),
-  )
-  .extend("nonPrLaneAdmission", () => laneAdmitted({ lane: "system-maintenance", prFilter }))
-  .extend("unfilteredLaneAdmission", () => laneAdmitted({ lane: "pr-9", prFilter: undefined }));
-
 describe("prLaneNumber", () => {
+  const it = test
+    .extend("plainPrLaneNumber", () => prLaneNumber("pr-7"))
+    .extend("zeroPrLaneNumber", () => prLaneNumber("pr-0"))
+    .extend("leadingZeroPrLaneNumber", () => prLaneNumber("pr-07"))
+    .extend("nonPrLaneNumber", () => prLaneNumber("system-maintenance"))
+    .extend("laneNameForSeven", () => prLaneOf(7));
+
   it("pr- に続く正整数を PR レーンとみなす", ({ plainPrLaneNumber }) => {
     expect(plainPrLaneNumber).toStrictEqual(7);
   });
@@ -45,6 +32,29 @@ describe("prLaneNumber", () => {
 });
 
 describe("laneAdmitted", () => {
+  const it = test
+    .extend("targetedLaneAdmission", () =>
+      laneAdmitted({ lane: "pr-7", prFilter: { targetPrs: [7], excludedPrs: [8] } }))
+    .extend("excludedLaneAdmission", () =>
+      laneAdmitted({ lane: "pr-8", prFilter: { targetPrs: [7], excludedPrs: [8] } }),
+    )
+    .extend("bothListedLaneAdmission", () =>
+      laneAdmitted({ lane: "pr-7", prFilter: { targetPrs: [7], excludedPrs: [7] } }),
+    )
+    .extend("unlistedLaneAdmission", () =>
+      laneAdmitted({ lane: "pr-9", prFilter: { targetPrs: [7], excludedPrs: [8] } }),
+    )
+    .extend("emptyTargetLaneAdmission", () =>
+      laneAdmitted({ lane: "pr-9", prFilter: { targetPrs: [], excludedPrs: [8] } }),
+    )
+    .extend("nonPrLaneAdmission", () =>
+      laneAdmitted({
+        lane: "system-maintenance",
+        prFilter: { targetPrs: [7], excludedPrs: [8] },
+      }),
+    )
+    .extend("unfilteredLaneAdmission", () => laneAdmitted({ lane: "pr-9", prFilter: undefined }));
+
   it("包含リストに載る PR レーンは通る", ({ targetedLaneAdmission }) => {
     expect(targetedLaneAdmission).toStrictEqual(true);
   });

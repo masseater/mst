@@ -4,15 +4,11 @@ import { unwrapSubject } from "../spec-syntax/subject-expressions.ts";
 import { WIDENED_TYPE_NODES } from "../widened-type-nodes.ts";
 
 import type { Definition, ESTree } from "@oxlint/plugins";
+import type { ImportedName } from "../spec-syntax/module-declarations.ts";
 
 export type JudgedReceiver =
   | { readonly kind: "named"; readonly type: string }
   | { readonly kind: "collapsed" };
-
-export type ImportedName = {
-  readonly specifier: string;
-  readonly name: string;
-};
 
 const COLLAPSED_RECEIVER: JudgedReceiver = { kind: "collapsed" };
 
@@ -172,7 +168,7 @@ export const importedNamesIn = (
       .flatMap((statement) =>
         statement.specifiers.map((specifier): readonly [string, ImportedName] => [
           specifier.local.name,
-          { specifier: statement.source.value, name: importedNameOf(specifier) },
+          { specifier: statement.source.value, exported: importedNameOf(specifier) },
         ]),
       ),
   );

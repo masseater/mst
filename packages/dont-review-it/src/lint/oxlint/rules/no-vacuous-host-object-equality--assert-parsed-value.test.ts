@@ -43,12 +43,6 @@ writeFileSync(join(recordedDir, "response-record.txt"), "Response {}\n");
 
 writeFileSync(join(recordedDir, "order-record.txt"), '{\n  "id": 1,\n}\n');
 
-const inBlock = (title: string, writtenBody: string): string =>
-  `describe('outer', () => {\n  it('${title}', () => {\n    ${writtenBody}\n  });\n});`;
-
-const repeated = <Reported>(report: Reported, repeatCount: number): Reported[] =>
-  Array.from({ length: repeatCount }, () => report);
-
 describe("dont-review-it/no-vacuous-host-object-equality--assert-parsed-value", () => {
   testLintRule(noVacuousHostObjectEquality, {
     valid: [
@@ -59,7 +53,7 @@ describe("dont-review-it/no-vacuous-host-object-equality--assert-parsed-value", 
       },
       {
         name: "a same-named class the file declares carries enumerable state of its own",
-        code: "class Response {\n  constructor(writtenBody) {\n    this.body = writtenBody;\n  }\n}\nexpect(subject).toStrictEqual(new Response('a'));\nexpect(new Response()).toMatchInlineSnapshot(`Response {}`);",
+        code: "class Response {\n  constructor(body) {\n    this.body = body;\n  }\n}\nexpect(subject).toStrictEqual(new Response('a'));\nexpect(new Response()).toMatchInlineSnapshot(`Response {}`);",
         filename: SPEC_FILENAME,
       },
       {
@@ -153,56 +147,59 @@ describe("dont-review-it/no-vacuous-host-object-equality--assert-parsed-value", 
         name: "a construction on either side is compared against whatever the other side holds",
         code: "expect(subject).toStrictEqual(new Response('a'));\nexpect(subject).toEqual(new Response('a'));\nexpect(new Response('a')).toStrictEqual(subject);\nexpect(new Response('a')).toStrictEqual();\nexpect().toStrictEqual(new Response('a'));\nexpect(read()).toStrictEqual(new Response('a'));\nexpect(order.body).toStrictEqual(new Response('a'));\nexpect(subject).toStrictEqual(new Request('https://example.test/'));",
         filename: SPEC_FILENAME,
-        errors: repeated(EQUALITY, 8),
+        errors: [EQUALITY, EQUALITY, EQUALITY, EQUALITY, EQUALITY, EQUALITY, EQUALITY, EQUALITY],
       },
       {
         name: "modifiers, derived entry points and static keys leave the comparison as empty as it was",
         code: "expect(subject).not.toStrictEqual(new Response('a'));\nawait expect(pending).resolves.toStrictEqual(new Response('a'));\nawait expect(pending).rejects.not.toEqual(new Response('a'));\nexpect.soft(subject).toStrictEqual(new Response('a'));\nawait expect.poll(read).toStrictEqual(new Response('a'));\nexpect(subject)['toStrictEqual'](new Response('a'));",
         filename: SPEC_FILENAME,
-        errors: repeated(EQUALITY, 6),
+        errors: [EQUALITY, EQUALITY, EQUALITY, EQUALITY, EQUALITY, EQUALITY],
       },
       {
         name: "type level wrappers and the standard factories reach the comparison unchanged",
         code: "expect(subject).toStrictEqual(new Response('a') as Response);\nexpect(subject).toStrictEqual(new Response('a')!);\nexpect(subject).toStrictEqual((new Response('a')));\nexpect(subject).toStrictEqual(new Response('a') satisfies Response);\nexpect(subject).toStrictEqual(Response.json({ id: 1 }));\nexpect(subject).toStrictEqual(Response.redirect('/next'));\nexpect(subject).toStrictEqual(Response.error());",
         filename: SPEC_FILENAME,
-        errors: repeated(EQUALITY, 7),
+        errors: [EQUALITY, EQUALITY, EQUALITY, EQUALITY, EQUALITY, EQUALITY, EQUALITY],
       },
       {
         name: "a construction behind a name, behind a call, or nested at a position that lines up is the same value",
         code: "const expected = new Response('a');\nconst build = () => new Response('b');\nexpect(subject).toStrictEqual(expected);\nexpect(subject).toStrictEqual(build());\nexpect({ body: subject }).toStrictEqual({ body: new Response('a') });\nexpect({ 1: subject }).toStrictEqual({ '1': new Response('a') });\nexpect([subject]).toStrictEqual([new Response('a')]);\nexpect(subject).toStrictEqual({ body: new Response('a') });",
         filename: SPEC_FILENAME,
-        errors: repeated(EQUALITY, 6),
+        errors: [EQUALITY, EQUALITY, EQUALITY, EQUALITY, EQUALITY, EQUALITY],
       },
       {
         name: "a partial shape comparison holds for any subject once its expected value is empty",
         code: "expect(subject).toMatchObject(new Response('a'));\nexpect(subject).toMatchObject({ body: new Response('a') });\nexpect(subject).toStrictEqual(expect.objectContaining(new Response('a')));",
         filename: SPEC_FILENAME,
-        errors: repeated(PARTIAL_SHAPE, 3),
+        errors: [PARTIAL_SHAPE, PARTIAL_SHAPE, PARTIAL_SHAPE],
       },
       {
         name: "every spelling of the runtime declaration is the same declaration",
         code: "import { Response as HttpResponse } from 'undici';\nimport { 'Response' as TextResponse } from 'undici';\nimport * as undici from 'undici';\nexpect(subject).toStrictEqual(new HttpResponse('a'));\nexpect(subject).toStrictEqual(new TextResponse('a'));\nexpect(subject).toStrictEqual(new undici.Response('a'));\nexpect(subject).toStrictEqual(undici.Response.json({ id: 1 }));",
         filename: SPEC_FILENAME,
-        errors: repeated(EQUALITY, 4),
+        errors: [EQUALITY, EQUALITY, EQUALITY, EQUALITY],
       },
       {
-        name: "a record holding a constructor name and an empty writtenBody pins nothing",
+        name: "a record holding a constructor name and an empty body pins nothing",
         code: "expect(subject).toMatchInlineSnapshot(`Response {}`);\nexpect(subject).toMatchInlineSnapshot(`Request {}`);\nexpect(subject).toMatchInlineSnapshot('Response {}');\nexpect(subject).toMatchInlineSnapshot({ id: expect.any(Number) }, `Response {}`);\nexpect.soft(subject).toMatchInlineSnapshot(`Response {}`);",
         filename: SPEC_FILENAME,
-        errors: repeated(SNAPSHOT_RECORD, 5),
+        errors: [
+          SNAPSHOT_RECORD,
+          SNAPSHOT_RECORD,
+          SNAPSHOT_RECORD,
+          SNAPSHOT_RECORD,
+          SNAPSHOT_RECORD,
+        ],
       },
       {
         name: "a record kept in the external file is read through the entry the assertion writes",
-        code: inBlock("names the response", "expect(subject).toMatchSnapshot();"),
+        code: "describe('outer', () => {\n  it('names the response', () => {\n    expect(subject).toMatchSnapshot();\n  });\n});",
         filename: recordedSpec,
         errors: [SNAPSHOT_RECORD],
       },
       {
         name: "entries are counted in the order the assertions run",
-        code: inBlock(
-          "names the response",
-          "expect(first).toMatchSnapshot();\n    expect(second).toMatchSnapshot();",
-        ),
+        code: "describe('outer', () => {\n  it('names the response', () => {\n    expect(first).toMatchSnapshot();\n    expect(second).toMatchSnapshot();\n  });\n});",
         filename: recordedSpec,
         errors: [SNAPSHOT_RECORD],
       },

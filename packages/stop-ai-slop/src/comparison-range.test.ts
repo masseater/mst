@@ -1,51 +1,197 @@
-import { describe, expect, it } from "vite-plus/test";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { describe, expect, test } from "vite-plus/test";
 
 import { comparisonRangeIn } from "./comparison-range.ts";
-import { withTestRepository } from "./test-repository.ts";
 
 describe("comparisonRangeIn", () => {
-  it("compares the branch being merged against the point it left", async () => {
-    await withTestRepository(async (repository) => {
-      const common = repository.commit({
-        files: { "src/current.ts": "export const current = true;\n" },
-      });
-      repository.git(["switch", "--quiet", "--create", "feature", common]);
-      const featureTip = repository.commit({
-        files: { "src/feature.ts": "export const feature = true;\n" },
-      });
-      repository.git(["switch", "--quiet", "main"]);
-      repository.commit({ files: { "src/main-only.ts": "export const mainOnly = true;\n" } });
-      repository.git(["merge", "--quiet", "--no-commit", "--no-ff", "feature"]);
-      const mergedTree = repository.git(["write-tree"]).trim();
+  const sharedCommitRevision = "2bd9e78c8de105cae8f7e2ee2626041c397fe893";
+  const featureTipCommitRevision = "6558ebc69c85f6fe83d0f6324945fe524f5c9ba8";
+  const mergedIndexTreeRevision = "34ce6086051fdb587dc8ecac255c7a02b7375c4d";
 
-      await expect(comparisonRangeIn(repository.root)).resolves.toStrictEqual({
-        baseRevision: common,
-        headRevision: mergedTree,
+  describe("a repository holding a merge that has not been committed", () => {
+    const it = test.extend("comparisonRangeOfTheMergingRepository", async ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "comparison-range-merging-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
       });
-      expect(featureTip).not.toBe(mergedTree);
+      const runGit = (gitArguments: readonly string[]): string =>
+        execFileSync("git", [...gitArguments], {
+          cwd: repositoryRoot,
+          encoding: "utf8",
+          env: {
+            GIT_AUTHOR_DATE: "@946684800 +0000",
+            GIT_AUTHOR_EMAIL: "comparison-range@example.test",
+            GIT_AUTHOR_NAME: "Comparison Range",
+            GIT_COMMITTER_DATE: "@946684800 +0000",
+            GIT_COMMITTER_EMAIL: "comparison-range@example.test",
+            GIT_COMMITTER_NAME: "Comparison Range",
+            GIT_CONFIG_GLOBAL: "/dev/null",
+            GIT_CONFIG_SYSTEM: "/dev/null",
+            HOME: repositoryRoot,
+            PATH: process.env.PATH,
+          },
+        });
+      runGit(["init", "--quiet", "--initial-branch=main"]);
+      writeFileSync(join(repositoryRoot, "shared.ts"), "export const shared = true;\n");
+      runGit(["add", "--all"]);
+      runGit(["commit", "--quiet", "--message", "shared"]);
+      runGit(["switch", "--quiet", "--create", "feature"]);
+      writeFileSync(join(repositoryRoot, "feature.ts"), "export const feature = true;\n");
+      runGit(["add", "--all"]);
+      runGit(["commit", "--quiet", "--message", "feature"]);
+      runGit(["switch", "--quiet", "main"]);
+      writeFileSync(join(repositoryRoot, "main-only.ts"), "export const mainOnly = true;\n");
+      runGit(["add", "--all"]);
+      runGit(["commit", "--quiet", "--message", "main only"]);
+      runGit(["merge", "--quiet", "--no-commit", "--no-ff", "feature"]);
+      return comparisonRangeIn(repositoryRoot);
+    });
+
+    it("compares the branch being merged against the point it left", ({
+      comparisonRangeOfTheMergingRepository,
+    }) => {
+      expect(comparisonRangeOfTheMergingRepository).toStrictEqual({
+        baseRevision: sharedCommitRevision,
+        headRevision: mergedIndexTreeRevision,
+      });
     });
   });
 
-  it("compares the checked out history against the point it left the integration branch", async () => {
-    await withTestRepository(async (repository) => {
-      const common = repository.commit({
-        files: { "src/current.ts": "export const current = true;\n" },
+  describe("a repository whose merge holds a tree the merged branch never carried", () => {
+    const it = test.extend("comparisonRangeOfTheRepositoryMergingTheFeatureTip", async ({}, {
+      onCleanup,
+    }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "comparison-range-merge-tip-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
       });
-      repository.git(["update-ref", "refs/remotes/origin/main", common]);
-      repository.commit({ files: { "src/later.ts": "export const later = true;\n" } });
+      const runGit = (gitArguments: readonly string[]): string =>
+        execFileSync("git", [...gitArguments], {
+          cwd: repositoryRoot,
+          encoding: "utf8",
+          env: {
+            GIT_AUTHOR_DATE: "@946684800 +0000",
+            GIT_AUTHOR_EMAIL: "comparison-range@example.test",
+            GIT_AUTHOR_NAME: "Comparison Range",
+            GIT_COMMITTER_DATE: "@946684800 +0000",
+            GIT_COMMITTER_EMAIL: "comparison-range@example.test",
+            GIT_COMMITTER_NAME: "Comparison Range",
+            GIT_CONFIG_GLOBAL: "/dev/null",
+            GIT_CONFIG_SYSTEM: "/dev/null",
+            HOME: repositoryRoot,
+            PATH: process.env.PATH,
+          },
+        });
+      runGit(["init", "--quiet", "--initial-branch=main"]);
+      writeFileSync(join(repositoryRoot, "shared.ts"), "export const shared = true;\n");
+      runGit(["add", "--all"]);
+      runGit(["commit", "--quiet", "--message", "shared"]);
+      runGit(["switch", "--quiet", "--create", "feature"]);
+      writeFileSync(join(repositoryRoot, "feature.ts"), "export const feature = true;\n");
+      runGit(["add", "--all"]);
+      runGit(["commit", "--quiet", "--message", "feature"]);
+      runGit(["switch", "--quiet", "main"]);
+      writeFileSync(join(repositoryRoot, "main-only.ts"), "export const mainOnly = true;\n");
+      runGit(["add", "--all"]);
+      runGit(["commit", "--quiet", "--message", "main only"]);
+      runGit(["merge", "--quiet", "--no-commit", "--no-ff", "feature"]);
+      return comparisonRangeIn(repositoryRoot);
+    });
 
-      await expect(comparisonRangeIn(repository.root)).resolves.toStrictEqual({
-        baseRevision: common,
+    it("refuses the tip of the branch being merged as the head revision", ({
+      comparisonRangeOfTheRepositoryMergingTheFeatureTip,
+    }) => {
+      expect(comparisonRangeOfTheRepositoryMergingTheFeatureTip).not.toStrictEqual({
+        baseRevision: sharedCommitRevision,
+        headRevision: featureTipCommitRevision,
+      });
+    });
+  });
+
+  describe("a repository whose checked out history moved past the integration branch", () => {
+    const it = test.extend("comparisonRangeOfTheDivergedRepository", async ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "comparison-range-diverged-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      const runGit = (gitArguments: readonly string[]): string =>
+        execFileSync("git", [...gitArguments], {
+          cwd: repositoryRoot,
+          encoding: "utf8",
+          env: {
+            GIT_AUTHOR_DATE: "@946684800 +0000",
+            GIT_AUTHOR_EMAIL: "comparison-range@example.test",
+            GIT_AUTHOR_NAME: "Comparison Range",
+            GIT_COMMITTER_DATE: "@946684800 +0000",
+            GIT_COMMITTER_EMAIL: "comparison-range@example.test",
+            GIT_COMMITTER_NAME: "Comparison Range",
+            GIT_CONFIG_GLOBAL: "/dev/null",
+            GIT_CONFIG_SYSTEM: "/dev/null",
+            HOME: repositoryRoot,
+            PATH: process.env.PATH,
+          },
+        });
+      runGit(["init", "--quiet", "--initial-branch=main"]);
+      writeFileSync(join(repositoryRoot, "shared.ts"), "export const shared = true;\n");
+      runGit(["add", "--all"]);
+      runGit(["commit", "--quiet", "--message", "shared"]);
+      runGit(["update-ref", "refs/remotes/origin/main", "HEAD"]);
+      writeFileSync(join(repositoryRoot, "later.ts"), "export const later = true;\n");
+      runGit(["add", "--all"]);
+      runGit(["commit", "--quiet", "--message", "later"]);
+      return comparisonRangeIn(repositoryRoot);
+    });
+
+    it("compares the checked out history against the point it left the integration branch", ({
+      comparisonRangeOfTheDivergedRepository,
+    }) => {
+      expect(comparisonRangeOfTheDivergedRepository).toStrictEqual({
+        baseRevision: sharedCommitRevision,
         headRevision: "HEAD",
       });
     });
   });
 
-  it("names no range when the integration branch is absent", async () => {
-    await withTestRepository(async (repository) => {
-      repository.commit({ files: { "src/current.ts": "export const current = true;\n" } });
+  describe("a repository carrying no integration branch", () => {
+    const it = test.extend("comparisonRangeOfTheSoleBranchRepository", async ({}, {
+      onCleanup,
+    }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "comparison-range-sole-branch-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      const runGit = (gitArguments: readonly string[]): string =>
+        execFileSync("git", [...gitArguments], {
+          cwd: repositoryRoot,
+          encoding: "utf8",
+          env: {
+            GIT_AUTHOR_DATE: "@946684800 +0000",
+            GIT_AUTHOR_EMAIL: "comparison-range@example.test",
+            GIT_AUTHOR_NAME: "Comparison Range",
+            GIT_COMMITTER_DATE: "@946684800 +0000",
+            GIT_COMMITTER_EMAIL: "comparison-range@example.test",
+            GIT_COMMITTER_NAME: "Comparison Range",
+            GIT_CONFIG_GLOBAL: "/dev/null",
+            GIT_CONFIG_SYSTEM: "/dev/null",
+            HOME: repositoryRoot,
+            PATH: process.env.PATH,
+          },
+        });
+      runGit(["init", "--quiet", "--initial-branch=main"]);
+      writeFileSync(join(repositoryRoot, "shared.ts"), "export const shared = true;\n");
+      runGit(["add", "--all"]);
+      runGit(["commit", "--quiet", "--message", "shared"]);
+      return comparisonRangeIn(repositoryRoot);
+    });
 
-      await expect(comparisonRangeIn(repository.root)).resolves.toBeNull();
+    it("names no range when the integration branch is absent", ({
+      comparisonRangeOfTheSoleBranchRepository,
+    }) => {
+      expect(comparisonRangeOfTheSoleBranchRepository).toBe(null);
     });
   });
 });

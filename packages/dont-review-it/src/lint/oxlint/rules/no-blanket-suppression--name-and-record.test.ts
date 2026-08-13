@@ -21,38 +21,9 @@ const GROUNDS = "the platform interface writes the total back into the element";
 
 const APPROVER = "the owner of the cart package";
 
-const nextLine = ({ rule, grounds }: { readonly rule: string; readonly grounds: string }): string =>
-  `// oxlint-disable-next-line ${rule} -- ${grounds}\n${STATEMENT}`;
-
 const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-no-blanket-suppression-"));
 
-const writtenFile = ({
-  root,
-  relativePath,
-  written,
-}: {
-  readonly root: string;
-  readonly relativePath: string;
-  readonly written: string;
-}): void => {
-  const path = join(root, relativePath);
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, written);
-};
-
-const repositoryHolding = ({
-  name: spelled,
-  rows,
-}: {
-  readonly name: string;
-  readonly rows: readonly Readonly<Record<string, string>>[];
-}): string => {
-  const root = join(fixtureDir, spelled);
-  mkdirSync(root, { recursive: true });
-  writeFileSync(join(root, "pnpm-workspace.yaml"), "packages:\n  - packages/*\n");
-  writeFileSync(join(root, LEDGER_FILE_NAME), JSON.stringify(rows));
-  return root;
-};
+const WORKSPACE_MANIFEST = "packages:\n  - packages/*\n";
 
 const FULL_ROW = {
   path: HOST_PATH,
@@ -61,36 +32,64 @@ const FULL_ROW = {
   approver: APPROVER,
 };
 
-const recordedHost = join(repositoryHolding({ name: "recorded", rows: [FULL_ROW] }), HOST_PATH);
+const recordedRoot = join(fixtureDir, "recorded");
+mkdirSync(recordedRoot, { recursive: true });
+writeFileSync(join(recordedRoot, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST);
+writeFileSync(join(recordedRoot, LEDGER_FILE_NAME), JSON.stringify([FULL_ROW]));
+const recordedHost = join(recordedRoot, HOST_PATH);
 
-const selfRecordedHost = join(
-  repositoryHolding({ name: "self-recorded", rows: [{ ...FULL_ROW, rule: SELF_RULE }] }),
-  HOST_PATH,
+const selfRecordedRoot = join(fixtureDir, "self-recorded");
+mkdirSync(selfRecordedRoot, { recursive: true });
+writeFileSync(join(selfRecordedRoot, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST);
+writeFileSync(
+  join(selfRecordedRoot, LEDGER_FILE_NAME),
+  JSON.stringify([{ ...FULL_ROW, rule: SELF_RULE }]),
+);
+const selfRecordedHost = join(selfRecordedRoot, HOST_PATH);
+
+const unledgeredRoot = join(fixtureDir, "unledgered");
+mkdirSync(unledgeredRoot, { recursive: true });
+writeFileSync(join(unledgeredRoot, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST);
+writeFileSync(join(unledgeredRoot, LEDGER_FILE_NAME), JSON.stringify([]));
+const unledgeredHost = join(unledgeredRoot, HOST_PATH);
+
+const groundlessRowRoot = join(fixtureDir, "groundless-row");
+mkdirSync(groundlessRowRoot, { recursive: true });
+writeFileSync(join(groundlessRowRoot, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST);
+writeFileSync(
+  join(groundlessRowRoot, LEDGER_FILE_NAME),
+  JSON.stringify([{ ...FULL_ROW, grounds: "" }]),
+);
+const groundlessRowHost = join(groundlessRowRoot, HOST_PATH);
+
+const unapprovedRowRoot = join(fixtureDir, "unapproved-row");
+mkdirSync(unapprovedRowRoot, { recursive: true });
+writeFileSync(join(unapprovedRowRoot, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST);
+writeFileSync(
+  join(unapprovedRowRoot, LEDGER_FILE_NAME),
+  JSON.stringify([{ ...FULL_ROW, approver: "" }]),
+);
+const unapprovedRowHost = join(unapprovedRowRoot, HOST_PATH);
+
+const matchedRoot = join(fixtureDir, "matched");
+mkdirSync(join(matchedRoot, dirname(HOST_PATH)), { recursive: true });
+writeFileSync(join(matchedRoot, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST);
+writeFileSync(join(matchedRoot, LEDGER_FILE_NAME), JSON.stringify([FULL_ROW]));
+writeFileSync(
+  join(matchedRoot, HOST_PATH),
+  `// oxlint-disable-next-line ${REASSIGN_RULE} -- ${GROUNDS}\n${STATEMENT}\n`,
 );
 
-const unledgeredHost = join(repositoryHolding({ name: "unledgered", rows: [] }), HOST_PATH);
+const staleRoot = join(fixtureDir, "stale");
+mkdirSync(join(staleRoot, dirname(HOST_PATH)), { recursive: true });
+writeFileSync(join(staleRoot, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST);
+writeFileSync(join(staleRoot, LEDGER_FILE_NAME), JSON.stringify([FULL_ROW]));
+writeFileSync(join(staleRoot, HOST_PATH), `${STATEMENT}\n`);
 
-const groundlessRowHost = join(
-  repositoryHolding({ name: "groundless-row", rows: [{ ...FULL_ROW, grounds: "" }] }),
-  HOST_PATH,
-);
-
-const unapprovedRowHost = join(
-  repositoryHolding({ name: "unapproved-row", rows: [{ ...FULL_ROW, approver: "" }] }),
-  HOST_PATH,
-);
-
-const matchedRoot = repositoryHolding({ name: "matched", rows: [FULL_ROW] });
-writtenFile({
-  root: matchedRoot,
-  relativePath: HOST_PATH,
-  written: `${nextLine({ rule: REASSIGN_RULE, grounds: GROUNDS })}\n`,
-});
-
-const staleRoot = repositoryHolding({ name: "stale", rows: [FULL_ROW] });
-writtenFile({ root: staleRoot, relativePath: HOST_PATH, written: `${STATEMENT}\n` });
-
-const abandonedRoot = repositoryHolding({ name: "abandoned", rows: [FULL_ROW] });
+const abandonedRoot = join(fixtureDir, "abandoned");
+mkdirSync(abandonedRoot, { recursive: true });
+writeFileSync(join(abandonedRoot, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST);
+writeFileSync(join(abandonedRoot, LEDGER_FILE_NAME), JSON.stringify([FULL_ROW]));
 
 const CONFIG_SOURCE = "export default { lint: {} };";
 
@@ -112,17 +111,17 @@ describe("dont-review-it/no-blanket-suppression--name-and-record", () => {
       },
       {
         name: "a directive that names its rule, covers the next statement, carries grounds and is recorded passes",
-        code: nextLine({ rule: REASSIGN_RULE, grounds: GROUNDS }),
+        code: `// oxlint-disable-next-line ${REASSIGN_RULE} -- ${GROUNDS}\n${STATEMENT}`,
         filename: recordedHost,
       },
       {
         name: "a directive naming this rule is judged on the four conditions every other one is judged on",
-        code: nextLine({ rule: SELF_RULE, grounds: GROUNDS }),
+        code: `// oxlint-disable-next-line ${SELF_RULE} -- ${GROUNDS}\n${STATEMENT}`,
         filename: selfRecordedHost,
       },
       {
         name: "a rule name carrying its plugin prefix reaches the row that names it bare",
-        code: nextLine({ rule: `dont-review-it/${REASSIGN_RULE}`, grounds: GROUNDS }),
+        code: `// oxlint-disable-next-line dont-review-it/${REASSIGN_RULE} -- ${GROUNDS}\n${STATEMENT}`,
         filename: recordedHost,
       },
       {
@@ -175,19 +174,19 @@ describe("dont-review-it/no-blanket-suppression--name-and-record", () => {
       },
       {
         name: "grounds spelled as the rule name alone are no grounds",
-        code: nextLine({ rule: REASSIGN_RULE, grounds: REASSIGN_RULE }),
+        code: `// oxlint-disable-next-line ${REASSIGN_RULE} -- ${REASSIGN_RULE}\n${STATEMENT}`,
         filename: recordedHost,
         errors: [{ messageId: "groundlessSuppression" }],
       },
       {
         name: "grounds spelled as a claim of a wrong report are no grounds",
-        code: nextLine({ rule: REASSIGN_RULE, grounds: "false positive" }),
+        code: `// oxlint-disable-next-line ${REASSIGN_RULE} -- false positive\n${STATEMENT}`,
         filename: recordedHost,
         errors: [{ messageId: "groundlessSuppression" }],
       },
       {
         name: "a directive the ledger does not record is reported for the missing row",
-        code: nextLine({ rule: REASSIGN_RULE, grounds: GROUNDS }),
+        code: `// oxlint-disable-next-line ${REASSIGN_RULE} -- ${GROUNDS}\n${STATEMENT}`,
         filename: unledgeredHost,
         errors: [
           {
@@ -198,7 +197,7 @@ describe("dont-review-it/no-blanket-suppression--name-and-record", () => {
       },
       {
         name: "a directive naming this rule with no row of its own is reported like every other",
-        code: nextLine({ rule: SELF_RULE, grounds: GROUNDS }),
+        code: `// oxlint-disable-next-line ${SELF_RULE} -- ${GROUNDS}\n${STATEMENT}`,
         filename: recordedHost,
         errors: [
           { messageId: "unrecordedSuppression", data: { ruleName: SELF_RULE, path: HOST_PATH } },
@@ -206,7 +205,7 @@ describe("dont-review-it/no-blanket-suppression--name-and-record", () => {
       },
       {
         name: "a row that leaves its grounds empty records nothing",
-        code: nextLine({ rule: REASSIGN_RULE, grounds: GROUNDS }),
+        code: `// oxlint-disable-next-line ${REASSIGN_RULE} -- ${GROUNDS}\n${STATEMENT}`,
         filename: groundlessRowHost,
         errors: [
           {
@@ -217,7 +216,7 @@ describe("dont-review-it/no-blanket-suppression--name-and-record", () => {
       },
       {
         name: "a row that leaves its approver empty records nobody",
-        code: nextLine({ rule: REASSIGN_RULE, grounds: GROUNDS }),
+        code: `// oxlint-disable-next-line ${REASSIGN_RULE} -- ${GROUNDS}\n${STATEMENT}`,
         filename: unapprovedRowHost,
         errors: [
           {
@@ -228,7 +227,7 @@ describe("dont-review-it/no-blanket-suppression--name-and-record", () => {
       },
       {
         name: "each rule a directive names is matched against the ledger on its own",
-        code: nextLine({ rule: `${REASSIGN_RULE}, no-console`, grounds: GROUNDS }),
+        code: `// oxlint-disable-next-line ${REASSIGN_RULE}, no-console -- ${GROUNDS}\n${STATEMENT}`,
         filename: recordedHost,
         errors: [
           { messageId: "unrecordedSuppression", data: { ruleName: "no-console", path: HOST_PATH } },

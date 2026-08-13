@@ -2,184 +2,508 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { describe, expect, onTestFinished, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { formatLintRuleIndexProblem, lintRuleIndexProblems } from "./reconcile-rule-index.ts";
-
-const repositoryWith = (files: Readonly<Record<string, string>>): string => {
-  const root = mkdtempSync(join(tmpdir(), "reconcile-rule-index-"));
-  onTestFinished(() => {
-    rmSync(root, { recursive: true, force: true });
-  });
-  for (const [path, source] of Object.entries(files)) {
-    const absolutePath = join(root, path);
-    mkdirSync(dirname(absolutePath), { recursive: true });
-    writeFileSync(absolutePath, source, "utf8");
-  }
-  return root;
-};
 
 const WORKSPACE_DEFINITION = "packages:\n  - packages/*\n";
 
 const DECLARING_MANIFEST = JSON.stringify({ name: "example", lintRules: ["src/rules"] });
 
-const ruleSource = (spelled: string): string => `export const rule = {
-  name: "${spelled}",
+const INDEX_PATH = "packages/example/docs/lint/index.md";
+
+const RULE_SOURCE = `export const rule = {
+  name: "no-thing--allow-it",
   meta: { docs: { description: "Disallow the thing" }, messages: { report: "No." } },
   create: () => ({}),
 };
 `;
 
-const INDEX_PATH = "packages/example/docs/lint/index.md";
+const MISSING_INDEX = `A workspace that declares lint rules must not go without \`${INDEX_PATH}\`. Generate it with \`vp run guard:fix\`.`;
 
-const declaringRepository = (extraFiles: Readonly<Record<string, string>> = {}): string =>
-  repositoryWith({
-    "pnpm-workspace.yaml": WORKSPACE_DEFINITION,
-    "packages/example/package.json": DECLARING_MANIFEST,
-    "packages/example/src/rules/no-thing--allow-it.ts": ruleSource("no-thing--allow-it"),
-    ...extraFiles,
-  });
+const MISSING_MARKERS = `\`${INDEX_PATH}\` must not lose its generated region. Put \`<!-- BEGIN GENERATED lint-rules -->\` and \`<!-- END GENERATED lint-rules -->\` back, or delete the file and regenerate it with \`vp run guard:fix\`.`;
+
+const STALE_INDEX = `\`${INDEX_PATH}\` must not fall behind the rule implementations. Regenerate it with \`vp run guard:fix\`.`;
+
+const DUPLICATED_RULE_NAME = `Two rules in \`packages/example\` must not share the name \`no-thing--allow-it\`; they claim the same document. Rename one of them.`;
+
+const HANDWRITTEN_INDEX = "# 手書きの索引\n\n散文だけがある。\n";
+
+const STALE_REGION_INDEX = `# 索引\n\n前書き。\n\n<!-- BEGIN GENERATED lint-rules -->\n\n古い表\n\n<!-- END GENERATED lint-rules -->\n\n後書き。\n`;
 
 describe("lintRuleIndexProblems", () => {
-  test("a repository without declaring workspaces has nothing to reconcile", () => {
-    expect(
-      lintRuleIndexProblems({ repositoryRoot: repositoryWith({}), write: false }).problems,
-    ).toStrictEqual([]);
-  });
-
-  test("a missing index is reported and its report spells the path first", () => {
-    const { problems } = lintRuleIndexProblems({
-      repositoryRoot: declaringRepository(),
-      write: false,
+  describe("a repository without declaring workspaces", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "reconcile-rule-index-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      return lintRuleIndexProblems({ repositoryRoot: root, write: false });
     });
 
-    expect(problems.length).toBe(1);
-    expect(formatLintRuleIndexProblem(problems[0] ?? { file: "", message: "" })).toContain(
-      `${INDEX_PATH} A workspace that declares lint rules must not go without`,
-    );
+    it("has nothing to reconcile", ({ report }) => {
+      expect(report).toStrictEqual({ problems: [], scanned: 0 });
+    });
   });
 
-  test("writing a missing index scaffolds it and the next check stays silent", () => {
-    const root = declaringRepository();
-
-    expect(lintRuleIndexProblems({ repositoryRoot: root, write: true }).problems).toStrictEqual([]);
-
-    const written = readFileSync(join(root, INDEX_PATH), "utf8");
-    expect(written).toContain("# lint ルール索引");
-    expect(written).toContain("<!-- BEGIN GENERATED lint-rules -->");
-    expect(written).toContain("[no-thing--allow-it](./no-thing--allow-it.md)");
-    expect(written).toContain("<!-- END GENERATED lint-rules -->");
-    expect(lintRuleIndexProblems({ repositoryRoot: root, write: false }).problems).toStrictEqual(
-      [],
-    );
-  });
-
-  test("an index without the generated region is reported until writing inserts one", () => {
-    const root = declaringRepository({ [INDEX_PATH]: "# 手書きの索引\n\n散文だけがある。\n" });
-
-    const { problems } = lintRuleIndexProblems({ repositoryRoot: root, write: false });
-    expect(problems[0]?.message).toContain("must not lose its generated region");
-
-    expect(lintRuleIndexProblems({ repositoryRoot: root, write: true }).problems).toStrictEqual([]);
-    const written = readFileSync(join(root, INDEX_PATH), "utf8");
-    expect(written.indexOf("<!-- BEGIN GENERATED lint-rules -->")).toBeLessThan(
-      written.indexOf("# 手書きの索引"),
-    );
-  });
-
-  test("the inserted region lands after frontmatter when the document opens with one", () => {
-    const root = declaringRepository({
-      [INDEX_PATH]: "---\ndescription: 索引\n---\n\n# 手書きの索引\n",
+  describe("an index that is missing while the check only reads", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "reconcile-rule-index-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages/example/src/rules"), { recursive: true });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      writeFileSync(join(root, "packages/example/package.json"), DECLARING_MANIFEST, "utf8");
+      writeFileSync(
+        join(root, "packages/example/src/rules/no-thing--allow-it.ts"),
+        RULE_SOURCE,
+        "utf8",
+      );
+      return lintRuleIndexProblems({ repositoryRoot: root, write: false });
     });
 
-    lintRuleIndexProblems({ repositoryRoot: root, write: true });
-
-    const written = readFileSync(join(root, INDEX_PATH), "utf8");
-    expect(written.startsWith("---\ndescription: 索引\n---\n")).toBe(true);
-    expect(written.indexOf("<!-- BEGIN GENERATED lint-rules -->")).toBeLessThan(
-      written.indexOf("# 手書きの索引"),
-    );
+    it("is reported against the path it should have been written to", ({ report }) => {
+      expect(report).toStrictEqual({
+        problems: [{ file: INDEX_PATH, message: MISSING_INDEX }],
+        scanned: 1,
+      });
+    });
   });
 
-  test("an opening fence that never closes is treated as prose", () => {
-    const root = declaringRepository({ [INDEX_PATH]: "---\nこの行は仕切りではない。\n" });
-
-    lintRuleIndexProblems({ repositoryRoot: root, write: true });
-
-    expect(readFileSync(join(root, INDEX_PATH), "utf8").startsWith("<!-- BEGIN")).toBe(true);
-  });
-
-  test("a stale region is reported until writing refreshes it and keeps the prose around it", () => {
-    const root = declaringRepository({
-      [INDEX_PATH]: `# 索引
-
-前書き。
-
-<!-- BEGIN GENERATED lint-rules -->
-
-古い表
-
-<!-- END GENERATED lint-rules -->
-
-後書き。
-`,
+  describe("an index that is missing while the check may write", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "reconcile-rule-index-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages/example/src/rules"), { recursive: true });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      writeFileSync(join(root, "packages/example/package.json"), DECLARING_MANIFEST, "utf8");
+      writeFileSync(
+        join(root, "packages/example/src/rules/no-thing--allow-it.ts"),
+        RULE_SOURCE,
+        "utf8",
+      );
+      return lintRuleIndexProblems({ repositoryRoot: root, write: true });
     });
 
-    const { problems } = lintRuleIndexProblems({ repositoryRoot: root, write: false });
-    expect(problems[0]?.message).toContain("must not fall behind the rule implementations");
-
-    expect(lintRuleIndexProblems({ repositoryRoot: root, write: true }).problems).toStrictEqual([]);
-    const written = readFileSync(join(root, INDEX_PATH), "utf8");
-    expect(written).toContain("前書き。");
-    expect(written).toContain("後書き。");
-    expect(written).toContain("[no-thing--allow-it](./no-thing--allow-it.md)");
-    expect(written).not.toContain("古い表");
+    it("leaves nothing to report", ({ report }) => {
+      expect(report).toStrictEqual({ problems: [], scanned: 1 });
+    });
   });
 
-  test("a region the formatter padded still counts as fresh", () => {
-    const root = declaringRepository({
-      [INDEX_PATH]: `# 索引
-
-<!-- BEGIN GENERATED lint-rules -->
-
-| ルール                                      | 説明               | ツール | 補足 |
-| ------------------------------------------- | ------------------ | ------ | ---- |
-| [no-thing--allow-it](./no-thing--allow-it.md) | Disallow the thing | -      |      |
-
-<!-- END GENERATED lint-rules -->
-`,
+  describe("the file a scaffolding run leaves behind", () => {
+    const it = test.extend("indexText", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "reconcile-rule-index-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages/example/src/rules"), { recursive: true });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      writeFileSync(join(root, "packages/example/package.json"), DECLARING_MANIFEST, "utf8");
+      writeFileSync(
+        join(root, "packages/example/src/rules/no-thing--allow-it.ts"),
+        RULE_SOURCE,
+        "utf8",
+      );
+      lintRuleIndexProblems({ repositoryRoot: root, write: true });
+      return readFileSync(join(root, INDEX_PATH), "utf8");
     });
 
-    expect(lintRuleIndexProblems({ repositoryRoot: root, write: false }).problems).toStrictEqual(
-      [],
-    );
+    it("carries the generated region and the rule", ({ indexText }) => {
+      expect(indexText).toMatchInlineSnapshot(`
+        "# lint ルール索引
+
+        このワークスペースの自前 lint ルールの一覧。ルール実装から生成される。手で書き換えない。更新は \`vp run guard:fix\` で行う。
+
+        <!-- BEGIN GENERATED lint-rules -->
+
+        | ルール | 説明 | ツール | 補足 |
+        | --- | --- | --- | --- |
+        | [no-thing--allow-it](./no-thing--allow-it.md) | Disallow the thing | - |  |
+
+        <!-- END GENERATED lint-rules -->
+        "
+      `);
+    });
   });
 
-  test("two rules sharing a name are reported in either mode", () => {
-    const root = declaringRepository({
-      "packages/example/src/rules/twin.ts": ruleSource("no-thing--allow-it"),
+  describe("the check that follows a scaffolding run", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "reconcile-rule-index-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages/example/src/rules"), { recursive: true });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      writeFileSync(join(root, "packages/example/package.json"), DECLARING_MANIFEST, "utf8");
+      writeFileSync(
+        join(root, "packages/example/src/rules/no-thing--allow-it.ts"),
+        RULE_SOURCE,
+        "utf8",
+      );
+      lintRuleIndexProblems({ repositoryRoot: root, write: true });
+      return lintRuleIndexProblems({ repositoryRoot: root, write: false });
     });
 
-    const checking = lintRuleIndexProblems({ repositoryRoot: root, write: false });
-    expect(
-      checking.problems.some((problem) => problem.message.includes("must not share the name")),
-    ).toBe(true);
-
-    const writing = lintRuleIndexProblems({ repositoryRoot: root, write: true });
-    expect(
-      writing.problems.some((problem) => problem.message.includes("must not share the name")),
-    ).toBe(true);
+    it("stays silent", ({ report }) => {
+      expect(report).toStrictEqual({ problems: [], scanned: 1 });
+    });
   });
 
-  test("a workspace with no rules yet still gets an index with an empty table", () => {
-    const root = repositoryWith({
-      "pnpm-workspace.yaml": WORKSPACE_DEFINITION,
-      "packages/example/package.json": DECLARING_MANIFEST,
+  describe("an index without the generated region while the check only reads", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "reconcile-rule-index-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages/example/src/rules"), { recursive: true });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      writeFileSync(join(root, "packages/example/package.json"), DECLARING_MANIFEST, "utf8");
+      writeFileSync(
+        join(root, "packages/example/src/rules/no-thing--allow-it.ts"),
+        RULE_SOURCE,
+        "utf8",
+      );
+      mkdirSync(dirname(join(root, INDEX_PATH)), { recursive: true });
+      writeFileSync(join(root, INDEX_PATH), HANDWRITTEN_INDEX, "utf8");
+      return lintRuleIndexProblems({ repositoryRoot: root, write: false });
     });
 
-    expect(lintRuleIndexProblems({ repositoryRoot: root, write: true }).problems).toStrictEqual([]);
-    expect(readFileSync(join(root, INDEX_PATH), "utf8")).toContain(
-      "| ルール | 説明 | ツール | 補足 |",
-    );
+    it("is reported", ({ report }) => {
+      expect(report).toStrictEqual({
+        problems: [{ file: INDEX_PATH, message: MISSING_MARKERS }],
+        scanned: 1,
+      });
+    });
+  });
+
+  describe("an index without the generated region while the check may write", () => {
+    const it = test.extend("indexText", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "reconcile-rule-index-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages/example/src/rules"), { recursive: true });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      writeFileSync(join(root, "packages/example/package.json"), DECLARING_MANIFEST, "utf8");
+      writeFileSync(
+        join(root, "packages/example/src/rules/no-thing--allow-it.ts"),
+        RULE_SOURCE,
+        "utf8",
+      );
+      mkdirSync(dirname(join(root, INDEX_PATH)), { recursive: true });
+      writeFileSync(join(root, INDEX_PATH), HANDWRITTEN_INDEX, "utf8");
+      lintRuleIndexProblems({ repositoryRoot: root, write: true });
+      return readFileSync(join(root, INDEX_PATH), "utf8");
+    });
+
+    it("gets the generated region inserted ahead of the prose", ({ indexText }) => {
+      expect(indexText).toMatchInlineSnapshot(`
+        "<!-- BEGIN GENERATED lint-rules -->
+
+        | ルール | 説明 | ツール | 補足 |
+        | --- | --- | --- | --- |
+        | [no-thing--allow-it](./no-thing--allow-it.md) | Disallow the thing | - |  |
+
+        <!-- END GENERATED lint-rules -->
+
+        # 手書きの索引
+
+        散文だけがある。
+        "
+      `);
+    });
+  });
+
+  describe("a document that opens with frontmatter", () => {
+    const it = test.extend("indexText", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "reconcile-rule-index-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages/example/src/rules"), { recursive: true });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      writeFileSync(join(root, "packages/example/package.json"), DECLARING_MANIFEST, "utf8");
+      writeFileSync(
+        join(root, "packages/example/src/rules/no-thing--allow-it.ts"),
+        RULE_SOURCE,
+        "utf8",
+      );
+      mkdirSync(dirname(join(root, INDEX_PATH)), { recursive: true });
+      writeFileSync(
+        join(root, INDEX_PATH),
+        "---\ndescription: 索引\n---\n\n# 手書きの索引\n",
+        "utf8",
+      );
+      lintRuleIndexProblems({ repositoryRoot: root, write: true });
+      return readFileSync(join(root, INDEX_PATH), "utf8");
+    });
+
+    it("takes the inserted region after the frontmatter", ({ indexText }) => {
+      expect(indexText).toMatchInlineSnapshot(`
+        "---
+        description: 索引
+        ---
+
+        <!-- BEGIN GENERATED lint-rules -->
+
+        | ルール | 説明 | ツール | 補足 |
+        | --- | --- | --- | --- |
+        | [no-thing--allow-it](./no-thing--allow-it.md) | Disallow the thing | - |  |
+
+        <!-- END GENERATED lint-rules -->
+
+
+        # 手書きの索引
+        "
+      `);
+    });
+  });
+
+  describe("an opening fence that never closes", () => {
+    const it = test.extend("indexText", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "reconcile-rule-index-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages/example/src/rules"), { recursive: true });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      writeFileSync(join(root, "packages/example/package.json"), DECLARING_MANIFEST, "utf8");
+      writeFileSync(
+        join(root, "packages/example/src/rules/no-thing--allow-it.ts"),
+        RULE_SOURCE,
+        "utf8",
+      );
+      mkdirSync(dirname(join(root, INDEX_PATH)), { recursive: true });
+      writeFileSync(join(root, INDEX_PATH), "---\nこの行は仕切りではない。\n", "utf8");
+      lintRuleIndexProblems({ repositoryRoot: root, write: true });
+      return readFileSync(join(root, INDEX_PATH), "utf8");
+    });
+
+    it("is treated as prose", ({ indexText }) => {
+      expect(indexText).toMatchInlineSnapshot(`
+        "<!-- BEGIN GENERATED lint-rules -->
+
+        | ルール | 説明 | ツール | 補足 |
+        | --- | --- | --- | --- |
+        | [no-thing--allow-it](./no-thing--allow-it.md) | Disallow the thing | - |  |
+
+        <!-- END GENERATED lint-rules -->
+
+        ---
+        この行は仕切りではない。
+        "
+      `);
+    });
+  });
+
+  describe("a stale region while the check only reads", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "reconcile-rule-index-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages/example/src/rules"), { recursive: true });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      writeFileSync(join(root, "packages/example/package.json"), DECLARING_MANIFEST, "utf8");
+      writeFileSync(
+        join(root, "packages/example/src/rules/no-thing--allow-it.ts"),
+        RULE_SOURCE,
+        "utf8",
+      );
+      mkdirSync(dirname(join(root, INDEX_PATH)), { recursive: true });
+      writeFileSync(join(root, INDEX_PATH), STALE_REGION_INDEX, "utf8");
+      return lintRuleIndexProblems({ repositoryRoot: root, write: false });
+    });
+
+    it("is reported", ({ report }) => {
+      expect(report).toStrictEqual({
+        problems: [{ file: INDEX_PATH, message: STALE_INDEX }],
+        scanned: 1,
+      });
+    });
+  });
+
+  describe("a stale region while the check may write", () => {
+    const it = test.extend("indexText", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "reconcile-rule-index-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages/example/src/rules"), { recursive: true });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      writeFileSync(join(root, "packages/example/package.json"), DECLARING_MANIFEST, "utf8");
+      writeFileSync(
+        join(root, "packages/example/src/rules/no-thing--allow-it.ts"),
+        RULE_SOURCE,
+        "utf8",
+      );
+      mkdirSync(dirname(join(root, INDEX_PATH)), { recursive: true });
+      writeFileSync(join(root, INDEX_PATH), STALE_REGION_INDEX, "utf8");
+      lintRuleIndexProblems({ repositoryRoot: root, write: true });
+      return readFileSync(join(root, INDEX_PATH), "utf8");
+    });
+
+    it("is refreshed while the prose around it stays", ({ indexText }) => {
+      expect(indexText).toMatchInlineSnapshot(`
+        "# 索引
+
+        前書き。
+
+        <!-- BEGIN GENERATED lint-rules -->
+
+        | ルール | 説明 | ツール | 補足 |
+        | --- | --- | --- | --- |
+        | [no-thing--allow-it](./no-thing--allow-it.md) | Disallow the thing | - |  |
+
+        <!-- END GENERATED lint-rules -->
+
+        後書き。
+        "
+      `);
+    });
+  });
+
+  describe("a region the formatter padded", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "reconcile-rule-index-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages/example/src/rules"), { recursive: true });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      writeFileSync(join(root, "packages/example/package.json"), DECLARING_MANIFEST, "utf8");
+      writeFileSync(
+        join(root, "packages/example/src/rules/no-thing--allow-it.ts"),
+        RULE_SOURCE,
+        "utf8",
+      );
+      mkdirSync(dirname(join(root, INDEX_PATH)), { recursive: true });
+      writeFileSync(
+        join(root, INDEX_PATH),
+        `# 索引\n\n<!-- BEGIN GENERATED lint-rules -->\n\n| ルール                                      | 説明               | ツール | 補足 |\n| ------------------------------------------- | ------------------ | ------ | ---- |\n| [no-thing--allow-it](./no-thing--allow-it.md) | Disallow the thing | -      |      |\n\n<!-- END GENERATED lint-rules -->\n`,
+        "utf8",
+      );
+      return lintRuleIndexProblems({ repositoryRoot: root, write: false });
+    });
+
+    it("still counts as fresh", ({ report }) => {
+      expect(report).toStrictEqual({ problems: [], scanned: 1 });
+    });
+  });
+
+  describe("two rules sharing a name while the check only reads", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "reconcile-rule-index-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages/example/src/rules"), { recursive: true });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      writeFileSync(join(root, "packages/example/package.json"), DECLARING_MANIFEST, "utf8");
+      writeFileSync(
+        join(root, "packages/example/src/rules/no-thing--allow-it.ts"),
+        RULE_SOURCE,
+        "utf8",
+      );
+      writeFileSync(join(root, "packages/example/src/rules/twin.ts"), RULE_SOURCE, "utf8");
+      return lintRuleIndexProblems({ repositoryRoot: root, write: false });
+    });
+
+    it("are reported ahead of the missing index", ({ report }) => {
+      expect(report).toStrictEqual({
+        problems: [
+          { file: INDEX_PATH, message: DUPLICATED_RULE_NAME },
+          { file: INDEX_PATH, message: MISSING_INDEX },
+        ],
+        scanned: 1,
+      });
+    });
+  });
+
+  describe("two rules sharing a name while the check may write", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "reconcile-rule-index-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages/example/src/rules"), { recursive: true });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      writeFileSync(join(root, "packages/example/package.json"), DECLARING_MANIFEST, "utf8");
+      writeFileSync(
+        join(root, "packages/example/src/rules/no-thing--allow-it.ts"),
+        RULE_SOURCE,
+        "utf8",
+      );
+      writeFileSync(join(root, "packages/example/src/rules/twin.ts"), RULE_SOURCE, "utf8");
+      return lintRuleIndexProblems({ repositoryRoot: root, write: true });
+    });
+
+    it("are reported even though the index gets written", ({ report }) => {
+      expect(report).toStrictEqual({
+        problems: [{ file: INDEX_PATH, message: DUPLICATED_RULE_NAME }],
+        scanned: 1,
+      });
+    });
+  });
+
+  describe("a workspace with no rules yet while the check may write", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "reconcile-rule-index-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages/example"), { recursive: true });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      writeFileSync(join(root, "packages/example/package.json"), DECLARING_MANIFEST, "utf8");
+      return lintRuleIndexProblems({ repositoryRoot: root, write: true });
+    });
+
+    it("leaves nothing to report", ({ report }) => {
+      expect(report).toStrictEqual({ problems: [], scanned: 1 });
+    });
+  });
+
+  describe("the file a workspace with no rules yet gets", () => {
+    const it = test.extend("indexText", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "reconcile-rule-index-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages/example"), { recursive: true });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      writeFileSync(join(root, "packages/example/package.json"), DECLARING_MANIFEST, "utf8");
+      lintRuleIndexProblems({ repositoryRoot: root, write: true });
+      return readFileSync(join(root, INDEX_PATH), "utf8");
+    });
+
+    it("carries an empty table", ({ indexText }) => {
+      expect(indexText).toMatchInlineSnapshot(`
+        "# lint ルール索引
+
+        このワークスペースの自前 lint ルールの一覧。ルール実装から生成される。手で書き換えない。更新は \`vp run guard:fix\` で行う。
+
+        <!-- BEGIN GENERATED lint-rules -->
+
+        | ルール | 説明 | ツール | 補足 |
+        | --- | --- | --- | --- |
+
+        <!-- END GENERATED lint-rules -->
+        "
+      `);
+    });
+  });
+});
+
+describe("formatLintRuleIndexProblem", () => {
+  describe("a problem naming the index it was found against", () => {
+    const it = test.extend("formattedProblem", () =>
+      formatLintRuleIndexProblem({ file: INDEX_PATH, message: MISSING_INDEX }));
+
+    it("spells the path first and the message after it", ({ formattedProblem }) => {
+      expect(formattedProblem).toBe(`${INDEX_PATH} ${MISSING_INDEX}`);
+    });
   });
 });

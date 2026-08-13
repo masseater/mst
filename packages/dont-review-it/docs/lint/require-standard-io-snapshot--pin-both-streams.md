@@ -2,7 +2,11 @@
 
 ## 何を検出するか
 
-`standardIoTest` からテストを導出しているファイルが、捕捉された 2 ストリームのスナップショットを欠いている状態を検出する。要求は「stdout と stderr のそれぞれに、`expect(stdout.text)` / `expect(stderr.text)` を主語とするスナップショット assertion が最低 1 つある」ことで、`toMatchInlineSnapshot` と `toMatchSnapshot` のどちらでも満たせる。
+`standardIoTest` からテストを導出しているファイルが、捕捉された 2 ストリームのスナップショットを欠いている状態を検出する。要求は「stdout と stderr のそれぞれについて、そのストリームに届く値を主語とするスナップショット assertion が最低 1 つある」ことで、`toMatchInlineSnapshot` と `toMatchSnapshot` のどちらでも満たせる。
+
+ストリームに届くかどうかは、スナップショットの主語の根にある識別子で決める。根がストリームの束縛そのもの（`stdout` / `stderr`）ならそのストリームに届く。根がこのファイルで宣言されたフィクスチャなら、そのフィクスチャが依存として受けた名前を辿り、ストリームに行き着くかを見る。依存の連鎖は段数に上限を置かず、行き着いた時点で届いたものとして数える。
+
+綴りでは決めない。特定のメンバの読み出し（`expect(stdout.text)` のような形）だけを受理すると、フィクスチャが渡す値の射影を禁じている隣のルールと衝突し、どちらの要求も満たせない spec ができる。
 
 導出の判定は import した `standardIoTest`（改名 import を含む）の呼び出しで行い、`standardIoTest.skip` のような修飾呼び出しも導出に数える。`const it = standardIoTest.extend(...)` のように束縛へ導出した形も、その束縛からの呼び出しを含めて追跡する。導出の連鎖（導出した束縛からさらに `extend` した束縛）も同様に数える。欠けているストリームごとに 1 件、最初の導出呼び出しの位置に報告する。
 
@@ -16,22 +20,36 @@ CLI の stdout / stderr はユーザー向けの契約である。`standardIoTes
 
 ## どう直すか
 
-各ストリームを固定するテストを足す。
+各ストリームを固定するテストを足す。実行はフィクスチャに閉じ、`it` はストリームの束縛をそのまま主語に取る。
 
 ```ts
 import { standardIoTest } from "@mst/dont-review-it/vitest";
 
-standardIoTest("matches the stdout snapshot", ({ stdout }) => {
-  process.stdout.write("result\n");
-
-  expect(stdout.text).toMatchInlineSnapshot(`
-    "result
-    "
-  `);
+const it = standardIoTest.extend("theRunOfTheCommand", { auto: true }, () => {
+  runTheCommand(["--help"]);
 });
 
-standardIoTest("matches the stderr snapshot", ({ stderr }) => {
-  expect(stderr.text).toMatchInlineSnapshot(`""`);
+it("pins what the run put on standard output", ({ stdout }) => {
+  expect(stdout).toMatchInlineSnapshot();
+});
+
+it("pins what the run put on standard error", ({ stderr }) => {
+  expect(stderr).toMatchInlineSnapshot();
+});
+```
+
+ストリームの束縛をそのまま主語に取れるのは、束縛が列挙可能な面として書かれたチャンクだけを持つためである。スナップショットに現れるのは書かれた内容で、テキストへの畳み込みと書き込みの受け口は現れない。
+
+テキストの形で固定したい場合は、フィクスチャの中で畳み込んでからその束縛を主語にする。
+
+```ts
+const it = standardIoTest.extend("theStandardOutputOfTheRun", ({ stdout }) => {
+  runTheCommand(["--help"]);
+  return stdout.text();
+});
+
+it("pins what the run put on standard output", ({ theStandardOutputOfTheRun }) => {
+  expect(theStandardOutputOfTheRun).toMatchInlineSnapshot();
 });
 ```
 
@@ -46,8 +64,7 @@ standardIoTest("matches the stderr snapshot", ({ stderr }) => {
 ## 禁じる回避策
 
 - フィクスチャの束縛を別名に付け替えて（`({ stdout: out })`）、主語の静的判定を外す。固定されていない事実は変わらない
-- `stdout.text` を変数に移してからスナップショットし、判定を外す。同上
-- `expect(stdout).toMatchInlineSnapshot()` のように捕捉ハンドルそのものをスナップショットする。捕捉されたテキストではなくオブジェクトの外形が固定され、出力の変化を検出しない
-- 空のテストにスナップショットだけ置いて要求を満たし、実際の実行経路を通さない。固定されるのは空文字列であり、契約は守られない
+- ストリームに届かない値をスナップショットして件数だけ満たす。主語の根を辿るので、依存の連鎖がストリームに行き着かない値では満たせない
+- 空のテストにスナップショットだけ置いて要求を満たし、実際の実行経路を通さない。固定されるのは空の記録であり、契約は守られない
 
 機械検出の範囲と規律の範囲は一致しない。検出は不変条件を守るための下限であって、上限ではない。

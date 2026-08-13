@@ -2,146 +2,81 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { condenseWebhookPayload } from "./condense.ts";
 
-const it = test
-  .extend("condensedReviewRequest", () =>
-    condenseWebhookPayload({
-      eventType: "pull_request",
-      payload: {
-        action: "review_requested",
-        pull_request: {
-          number: 7,
-          body: "A very long description.",
-          diff_url: "https://example.test/diff",
-          user: { login: "octocat", id: 1 },
-          mergeable: "MERGEABLE",
-          merge_state_status: "CLEAN",
-          labels: [{ name: "bug", color: "red" }],
-          requested_reviewers: [{ login: "hubot", id: 2 }],
-        },
-        requested_reviewer: { login: "hubot", id: 2 },
-        sender: { login: "octocat" },
-        repository: { id: 1, full_name: "example-org/example-repo" },
-      },
-    }))
-  .extend("condensedEmptyCollections", () =>
-    condenseWebhookPayload({
-      eventType: "pull_request",
-      payload: {
-        action: "opened",
-        pull_request: {
-          number: 7,
-          user: { login: "octocat" },
-          labels: [],
-          requested_reviewers: [],
-        },
-      },
-    }),
-  )
-  .extend("condensedBaseChange", () =>
-    condenseWebhookPayload({
-      eventType: "pull_request",
-      payload: {
-        action: "edited",
-        changes: { base: { ref: { from: "main" } }, body: { from: "old" } },
-        pull_request: { number: 7 },
-      },
-    }),
-  )
-  .extend("condensedLabeledEvent", () =>
-    condenseWebhookPayload({
-      eventType: "pull_request",
-      payload: {
-        action: "labeled",
-        pull_request: { number: 7 },
-        label: { name: "exclude-auto-develop", color: "black" },
-      },
-    }),
-  )
-  .extend("condensedNamelessLabel", () =>
-    condenseWebhookPayload({
-      eventType: "pull_request",
-      payload: {
-        action: "labeled",
-        pull_request: { number: 7, labels: [{ color: "red" }] },
-      },
-    }),
-  )
-  .extend("condensedAnonymousPull", () =>
-    condenseWebhookPayload({
-      eventType: "pull_request",
-      payload: { action: "opened", pull_request: { user: { id: 1 } } },
-    }),
-  )
-  .extend("condensedPullless", () =>
-    condenseWebhookPayload({ eventType: "pull_request", payload: { action: "opened" } }),
-  )
-  .extend("condensedSubmittedReview", () =>
-    condenseWebhookPayload({
-      eventType: "pull_request_review",
-      payload: {
-        action: "submitted",
-        pull_request: { number: 7, user: { login: "octocat" }, head: { ref: "topic" } },
-        review: {
-          body: "Fix the tests.",
-          state: "changes_requested",
-          html_url: "https://example.test",
-        },
-      },
-    }),
-  )
-  .extend("condensedPullessReview", () =>
-    condenseWebhookPayload({
-      eventType: "pull_request_review",
-      payload: { action: "submitted", review: { body: null, state: "approved" } },
-    }),
-  )
-  .extend("condensedReviewlessPull", () =>
-    condenseWebhookPayload({
-      eventType: "pull_request_review",
-      payload: { action: "submitted", pull_request: { id: 1 } },
-    }),
-  )
-  .extend("condensedCheckSuite", () =>
-    condenseWebhookPayload({
-      eventType: "check_suite",
-      payload: {
-        action: "completed",
-        check_suite: {
-          id: 99,
-          app: { name: "ci" },
-          conclusion: "failure",
-          head_sha: "0a1b2c3",
-          pull_requests: [{ number: 7, url: "https://example.test" }],
-        },
-      },
-    }),
-  )
-  .extend("condensedSuiteless", () =>
-    condenseWebhookPayload({ eventType: "check_suite", payload: { action: "completed" } }),
-  )
-  .extend("condensedNonArrayPullRequests", () =>
-    condenseWebhookPayload({
-      eventType: "check_suite",
-      payload: {
-        action: "completed",
-        check_suite: { conclusion: "failure", head_sha: "0a1b2c3", pull_requests: "none" },
-      },
-    }),
-  )
-  .extend("condensedNumberlessPullRequests", () =>
-    condenseWebhookPayload({
-      eventType: "check_suite",
-      payload: {
-        action: "completed",
-        check_suite: { conclusion: "failure", head_sha: "0a1b2c3", pull_requests: [{ id: 1 }] },
-      },
-    }),
-  )
-  .extend("condensedUnknownEvent", () =>
-    condenseWebhookPayload({ eventType: "push", payload: { ref: "refs/heads/main" } }),
-  );
-
 describe("pull_request の縮約", () => {
+  const it = test
+    .extend("condensedReviewRequest", () =>
+      condenseWebhookPayload({
+        eventType: "pull_request",
+        payload: {
+          action: "review_requested",
+          pull_request: {
+            number: 7,
+            body: "A very long description.",
+            diff_url: "https://example.test/diff",
+            user: { login: "octocat", id: 1 },
+            mergeable: "MERGEABLE",
+            merge_state_status: "CLEAN",
+            labels: [{ name: "bug", color: "red" }],
+            requested_reviewers: [{ login: "hubot", id: 2 }],
+          },
+          requested_reviewer: { login: "hubot", id: 2 },
+          sender: { login: "octocat" },
+          repository: { id: 1, full_name: "example-org/example-repo" },
+        },
+      }))
+    .extend("condensedEmptyCollections", () =>
+      condenseWebhookPayload({
+        eventType: "pull_request",
+        payload: {
+          action: "opened",
+          pull_request: {
+            number: 7,
+            user: { login: "octocat" },
+            labels: [],
+            requested_reviewers: [],
+          },
+        },
+      }),
+    )
+    .extend("condensedBaseChange", () =>
+      condenseWebhookPayload({
+        eventType: "pull_request",
+        payload: {
+          action: "edited",
+          changes: { base: { ref: { from: "main" } }, body: { from: "old" } },
+          pull_request: { number: 7 },
+        },
+      }),
+    )
+    .extend("condensedLabeledEvent", () =>
+      condenseWebhookPayload({
+        eventType: "pull_request",
+        payload: {
+          action: "labeled",
+          pull_request: { number: 7 },
+          label: { name: "exclude-auto-develop", color: "black" },
+        },
+      }),
+    )
+    .extend("condensedNamelessLabel", () =>
+      condenseWebhookPayload({
+        eventType: "pull_request",
+        payload: {
+          action: "labeled",
+          pull_request: { number: 7, labels: [{ color: "red" }] },
+        },
+      }),
+    )
+    .extend("condensedAnonymousPull", () =>
+      condenseWebhookPayload({
+        eventType: "pull_request",
+        payload: { action: "opened", pull_request: { user: { id: 1 } } },
+      }),
+    )
+    .extend("condensedPullless", () =>
+      condenseWebhookPayload({ eventType: "pull_request", payload: { action: "opened" } }),
+    );
+
   it("本文や URL 群は落ち、判定に必要な最小構造だけ残る", ({ condensedReviewRequest }) => {
     expect(condensedReviewRequest).toStrictEqual({
       action: "review_requested",
@@ -197,6 +132,33 @@ describe("pull_request の縮約", () => {
 });
 
 describe("pull_request_review の縮約", () => {
+  const it = test
+    .extend("condensedSubmittedReview", () =>
+      condenseWebhookPayload({
+        eventType: "pull_request_review",
+        payload: {
+          action: "submitted",
+          pull_request: { number: 7, user: { login: "octocat" }, head: { ref: "topic" } },
+          review: {
+            body: "Fix the tests.",
+            state: "changes_requested",
+            html_url: "https://example.test",
+          },
+        },
+      }))
+    .extend("condensedPullessReview", () =>
+      condenseWebhookPayload({
+        eventType: "pull_request_review",
+        payload: { action: "submitted", review: { body: null, state: "approved" } },
+      }),
+    )
+    .extend("condensedReviewlessPull", () =>
+      condenseWebhookPayload({
+        eventType: "pull_request_review",
+        payload: { action: "submitted", pull_request: { id: 1 } },
+      }),
+    );
+
   it("review は body と state だけ残る", ({ condensedSubmittedReview }) => {
     expect(condensedSubmittedReview).toStrictEqual({
       action: "submitted",
@@ -220,6 +182,43 @@ describe("pull_request_review の縮約", () => {
 });
 
 describe("check_suite の縮約", () => {
+  const it = test
+    .extend("condensedCheckSuite", () =>
+      condenseWebhookPayload({
+        eventType: "check_suite",
+        payload: {
+          action: "completed",
+          check_suite: {
+            id: 99,
+            app: { name: "ci" },
+            conclusion: "failure",
+            head_sha: "0a1b2c3",
+            pull_requests: [{ number: 7, url: "https://example.test" }],
+          },
+        },
+      }))
+    .extend("condensedSuiteless", () =>
+      condenseWebhookPayload({ eventType: "check_suite", payload: { action: "completed" } }),
+    )
+    .extend("condensedNonArrayPullRequests", () =>
+      condenseWebhookPayload({
+        eventType: "check_suite",
+        payload: {
+          action: "completed",
+          check_suite: { conclusion: "failure", head_sha: "0a1b2c3", pull_requests: "none" },
+        },
+      }),
+    )
+    .extend("condensedNumberlessPullRequests", () =>
+      condenseWebhookPayload({
+        eventType: "check_suite",
+        payload: {
+          action: "completed",
+          check_suite: { conclusion: "failure", head_sha: "0a1b2c3", pull_requests: [{ id: 1 }] },
+        },
+      }),
+    );
+
   it("conclusion と head_sha と pull_requests だけ残る", ({ condensedCheckSuite }) => {
     expect(condensedCheckSuite).toStrictEqual({
       action: "completed",
@@ -249,6 +248,9 @@ describe("check_suite の縮約", () => {
 });
 
 describe("未知種別の縮約", () => {
+  const it = test.extend("condensedUnknownEvent", () =>
+    condenseWebhookPayload({ eventType: "push", payload: { ref: "refs/heads/main" } }));
+
   it("action だけの縮約になる", ({ condensedUnknownEvent }) => {
     expect(condensedUnknownEvent).toStrictEqual({ action: undefined });
   });

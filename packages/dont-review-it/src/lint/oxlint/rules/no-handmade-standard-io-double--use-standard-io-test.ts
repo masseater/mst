@@ -1,10 +1,12 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { propertyKeyOf } from "../lib/object-literal.ts";
 import { standardIoFixtureLocalNameOf } from "../lib/standard-io-fixture.ts";
 import { staticMemberOf } from "../lib/static-member.ts";
 import { PROCESS_IO_MEMBER } from "./no-logged-and-continued-failure--stop-or-recover.ts";
 
 import type { ESTree } from "@oxlint/plugins";
+import type { NamedReport } from "../lib/named-report.ts";
 
 const CAPTURED_STREAM_NAMES = new Set(["stdout", "stderr"]);
 
@@ -15,15 +17,18 @@ const TEST_FILE_SUFFIXES = [".test.ts", ".test.tsx", ".spec.ts", ".spec.tsx"];
 const isExtendCall = (callee: ESTree.Expression): boolean =>
   staticMemberOf(callee)?.name === "extend";
 
-const isFunctionValued = (held: ESTree.Expression): boolean =>
-  held.type === "FunctionExpression" || held.type === "ArrowFunctionExpression";
+const isFunctionValued = (propertyValue: ESTree.Expression): boolean =>
+  propertyValue.type === "FunctionExpression" || propertyValue.type === "ArrowFunctionExpression";
 
-const isWriteShapedDouble = (held: ESTree.Expression): boolean => {
-  if (held.type === "NewExpression") {
-    return held.callee.type === "Identifier" && STREAM_CLASS_NAMES.has(held.callee.name);
+const isWriteShapedDouble = (propertyValue: ESTree.Expression): boolean => {
+  if (propertyValue.type === "NewExpression") {
+    return (
+      propertyValue.callee.type === "Identifier" &&
+      STREAM_CLASS_NAMES.has(propertyValue.callee.name)
+    );
   }
-  if (held.type !== "ObjectExpression") return false;
-  return held.properties.some(
+  if (propertyValue.type !== "ObjectExpression") return false;
+  return propertyValue.properties.some(
     (property) =>
       property.type === "Property" &&
       propertyKeyOf(property) === PROCESS_IO_MEMBER.write &&
@@ -33,7 +38,7 @@ const isWriteShapedDouble = (held: ESTree.Expression): boolean => {
 
 type NamedStreamProperty = {
   readonly property: ESTree.ObjectProperty;
-  readonly name: string;
+  readonly streamName: string;
 };
 
 const capturedStreamPropertiesOf = (
@@ -41,10 +46,46 @@ const capturedStreamPropertiesOf = (
 ): readonly NamedStreamProperty[] =>
   definition.properties.flatMap((property): readonly NamedStreamProperty[] => {
     if (property.type !== "Property") return [];
-    const spelled = propertyKeyOf(property);
-    if (spelled === null || !CAPTURED_STREAM_NAMES.has(spelled)) return [];
-    return [{ property, name: spelled }];
+    const streamName = propertyKeyOf(property);
+    if (streamName === null || !CAPTURED_STREAM_NAMES.has(streamName)) return [];
+    return [{ property, streamName }];
   });
+
+const ownFixtureReportsOf = (call: ESTree.CallExpression): readonly NamedReport[] => {
+  if (!isExtendCall(call.callee)) return [];
+
+  const [definition] = call.arguments;
+  if (
+    definition?.type === "Literal" &&
+    typeof definition.value === "string" &&
+    CAPTURED_STREAM_NAMES.has(definition.value)
+  ) {
+    return [{ node: definition, messageId: "ownFixture", data: { name: definition.value } }];
+  }
+  if (definition?.type !== "ObjectExpression") return [];
+  return capturedStreamPropertiesOf(definition).map(({ property, streamName }) => ({
+    node: property,
+    messageId: "ownFixture",
+    data: { name: streamName },
+  }));
+};
+
+const directStreamReportOf = (node: ESTree.MemberExpression): NamedReport | null => {
+  const member = staticMemberOf(node);
+  if (member === null) return null;
+  if (member.object.type !== "Identifier" || member.object.name !== "process") return null;
+  if (!CAPTURED_STREAM_NAMES.has(member.name)) return null;
+  return { node, messageId: "directStream", data: { name: member.name } };
+};
+
+const streamShapedDoubleReportsOf = (node: ESTree.ObjectExpression): readonly NamedReport[] =>
+  capturedStreamPropertiesOf(node)
+    .filter(({ property }) => isWriteShapedDouble(property.value))
+    .map(({ property, streamName }) => ({
+      node: property,
+      messageId: "streamShapedDouble",
+      data: { name: streamName },
+    }));
 
 export const noHandmadeStandardIoDouble = createDontReviewItRule({
   name: "no-handmade-standard-io-double--use-standard-io-test",
@@ -68,45 +109,28 @@ export const noHandmadeStandardIoDouble = createDontReviewItRule({
   create(inspection) {
     if (!TEST_FILE_SUFFIXES.some((suffix) => inspection.filename.endsWith(suffix))) return {};
 
-    const fixtureImports = new Set<string>();
-
     return {
-      ImportDeclaration(node: ESTree.ImportDeclaration) {
-        const localName = standardIoFixtureLocalNameOf(node);
-        if (localName !== null) fixtureImports.add(localName);
-      },
-      CallExpression(node: ESTree.CallExpression) {
-        if (!isExtendCall(node.callee)) return;
-        const [definition] = node.arguments;
-        if (
-          definition?.type === "Literal" &&
-          typeof definition.value === "string" &&
-          CAPTURED_STREAM_NAMES.has(definition.value)
-        ) {
-          inspection.report({
-            node: definition,
-            messageId: "ownFixture",
-            data: { name: definition.value },
-          });
-          return;
-        }
-        if (definition?.type !== "ObjectExpression") return;
-        for (const { property, name } of capturedStreamPropertiesOf(definition)) {
-          inspection.report({ node: property, messageId: "ownFixture", data: { name } });
-        }
-      },
-      MemberExpression(node: ESTree.MemberExpression) {
-        if (fixtureImports.size > 0) return;
-        const member = staticMemberOf(node);
-        if (member === null) return;
-        if (member.object.type !== "Identifier" || member.object.name !== "process") return;
-        if (!CAPTURED_STREAM_NAMES.has(member.name)) return;
-        inspection.report({ node, messageId: "directStream", data: { name: member.name } });
-      },
-      ObjectExpression(node: ESTree.ObjectExpression) {
-        for (const { property, name } of capturedStreamPropertiesOf(node)) {
-          if (!isWriteShapedDouble(property.value)) continue;
-          inspection.report({ node: property, messageId: "streamShapedDouble", data: { name } });
+      "Program:exit"(program: ESTree.Program) {
+        const importsFixture = nodesOfType(program, "ImportDeclaration").some(
+          (node) => standardIoFixtureLocalNameOf(node) !== null,
+        );
+
+        const reports = [
+          ...nodesOfType(program, "CallExpression").flatMap((call) => ownFixtureReportsOf(call)),
+          ...(importsFixture
+            ? []
+            : nodesOfType(program, "MemberExpression").flatMap(
+                (node) => directStreamReportOf(node) ?? [],
+              )),
+          ...nodesOfType(program, "ObjectExpression").flatMap((node) =>
+            streamShapedDoubleReportsOf(node),
+          ),
+        ];
+
+        for (const report of reports.toSorted(
+          (first, second) => first.node.start - second.node.start,
+        )) {
+          inspection.report(report);
         }
       },
     };

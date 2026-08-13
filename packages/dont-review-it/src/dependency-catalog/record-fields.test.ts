@@ -1,33 +1,56 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { recordOf, stringEntriesOf } from "./record-fields.ts";
 
 describe("recordOf", () => {
-  it("passes a plain object through", () => {
-    expect(recordOf({ name: "left" })).toStrictEqual({ name: "left" });
+  describe("a plain object", () => {
+    const it = test.extend("dependencyFields", () => recordOf({ name: "left" }));
+
+    it("passes through", ({ dependencyFields }) => {
+      expect(dependencyFields).toStrictEqual({ name: "left" });
+    });
   });
 
-  it("turns null into an empty record", () => {
-    expect(recordOf(null)).toStrictEqual({});
+  describe("nothing", () => {
+    const it = test.extend("dependencyFields", () => recordOf(null));
+
+    it("turns into an empty record", ({ dependencyFields }) => {
+      expect(dependencyFields).toStrictEqual({});
+    });
   });
 
-  it("turns an array into an empty record", () => {
-    expect(recordOf(["name"])).toStrictEqual({});
+  describe("a list", () => {
+    const it = test.extend("dependencyFields", () => recordOf(["name"]));
+
+    it("turns into an empty record", ({ dependencyFields }) => {
+      expect(dependencyFields).toStrictEqual({});
+    });
   });
 
-  it("turns a scalar into an empty record", () => {
-    expect(recordOf("name")).toStrictEqual({});
+  describe("a scalar", () => {
+    const it = test.extend("dependencyFields", () => recordOf("name"));
+
+    it("turns into an empty record", ({ dependencyFields }) => {
+      expect(dependencyFields).toStrictEqual({});
+    });
   });
 });
 
 describe("stringEntriesOf", () => {
-  it("keeps the entries whose declared specifier is a string", () => {
-    expect(stringEntriesOf({ kept: "^1.0.0", dropped: { nested: true } })).toStrictEqual([
-      ["kept", "^1.0.0"],
-    ]);
+  describe("a record holding a nested value beside a specifier", () => {
+    const it = test.extend("specifierPairs", () =>
+      stringEntriesOf({ kept: "^1.0.0", dropped: { nested: true } }));
+
+    it("keeps the entries whose declared specifier is a string", ({ specifierPairs }) => {
+      expect(specifierPairs).toStrictEqual([["kept", "^1.0.0"]]);
+    });
   });
 
-  it("reads anything that is not a record as no entries", () => {
-    expect(stringEntriesOf(undefined)).toStrictEqual([]);
+  describe("something that is not a record", () => {
+    const it = test.extend("specifierPairs", () => stringEntriesOf(undefined));
+
+    it("reads as no entries", ({ specifierPairs }) => {
+      expect(specifierPairs).toStrictEqual([]);
+    });
   });
 });

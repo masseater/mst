@@ -16,15 +16,23 @@ const OUTCOMES: readonly CheckOutcome[] = [
 ];
 
 describe("scanTraceFor", () => {
-  test("a reader that is an agent is handed the flat form", () => {
-    expect(scanTraceFor({ outcomes: OUTCOMES, readByAgent: true, colored: false })).toBe(
-      "checked workflow-definitions 2 definitions 0 problems 0 warnings\n",
-    );
+  describe("a reader that is an agent", () => {
+    const it = test.extend("trace", () =>
+      scanTraceFor({ outcomes: OUTCOMES, readByAgent: true, colored: false }));
+
+    it("is handed the flat form", ({ trace }) => {
+      expect(trace).toBe("checked workflow-definitions 2 definitions 0 problems 0 warnings\n");
+    });
   });
 
-  test("a reader that is a person is handed the marked and aligned form", () => {
-    expect(scanTraceFor({ outcomes: OUTCOMES, readByAgent: false, colored: false })).toBe(
-      "  ✓ workflow-definitions  2 definitions\n\n  1 check ran, nothing to report\n",
-    );
+  describe("a reader that is a person", () => {
+    const it = test.extend("trace", () =>
+      scanTraceFor({ outcomes: OUTCOMES, readByAgent: false, colored: false }));
+
+    it("is handed the marked and aligned form", ({ trace }) => {
+      expect(trace).toBe(
+        "  ✓ workflow-definitions  2 definitions\n\n  1 check ran, nothing to report\n",
+      );
+    });
   });
 });

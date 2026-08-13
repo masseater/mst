@@ -5,7 +5,7 @@ export class UnauthenticatedError extends Error {
 
   readonly category = "unauthenticated";
 
-  constructor(reason: string) {
-    super(reason);
+  constructor(reason: string, ruleOptions?: { readonly cause?: unknown }) {
+    super(reason, ruleOptions);
   }
 }

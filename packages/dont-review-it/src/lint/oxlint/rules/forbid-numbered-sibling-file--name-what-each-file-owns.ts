@@ -1,22 +1,15 @@
 import { readdirSync } from "node:fs";
 import { dirname, resolve, sep } from "node:path";
 
+import { memoize } from "es-toolkit";
+
 import { createDontReviewItRule } from "../../../create-rule.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
 const ORDINAL_NAME_PATTERN = /^(?<prefix>.+[-_])\d+$/u;
 
-const entriesByDirectory = new Map<string, readonly string[]>();
-
-const directoryEntries = (directory: string): readonly string[] => {
-  const remembered = entriesByDirectory.get(directory);
-  if (remembered !== undefined) return remembered;
-
-  const found: readonly string[] = readdirSync(directory);
-  entriesByDirectory.set(directory, found);
-  return found;
-};
+const directoryEntries = memoize((directory: string): readonly string[] => readdirSync(directory));
 
 const baseNameOf = (fileName: string): string => fileName.split(".").slice(0, 1).join("");
 

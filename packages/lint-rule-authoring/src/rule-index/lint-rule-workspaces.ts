@@ -2,7 +2,7 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { readUnlessMissing } from "@mst/repository-checks";
-import { attempt } from "es-toolkit";
+import { attempt, isPlainObject } from "es-toolkit";
 import { parse } from "yaml";
 
 import { textOrNull } from "./read-text.ts";
@@ -69,9 +69,9 @@ const ruleDirectoriesDeclaredAt = ({
   if (manifestText === null) return [];
 
   const manifest: unknown = JSON.parse(manifestText);
-  if (typeof manifest !== "object" || manifest === null) return [];
+  if (!isPlainObject(manifest)) return [];
 
-  const declared = (manifest as Record<string, unknown>)[RULE_DIRECTORIES_FIELD];
+  const declared: unknown = manifest[RULE_DIRECTORIES_FIELD];
   if (!Array.isArray(declared)) return [];
 
   return declared.filter(

@@ -3,9 +3,6 @@ import { describe } from "vite-plus/test";
 
 import { noSharedDoubleState } from "./no-shared-double-state--reset-doubles-between-tests.ts";
 
-const configFor = (testBlock: string): string =>
-  `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: ${testBlock} });\n`;
-
 const RESET_AND_RESTORED = "{ mockReset: true, restoreMocks: true }";
 
 describe("dont-review-it/no-shared-double-state--reset-doubles-between-tests", () => {
@@ -13,14 +10,12 @@ describe("dont-review-it/no-shared-double-state--reset-doubles-between-tests", (
     valid: [
       {
         name: "a test block that takes the doubles down before each test passes",
-        code: configFor(RESET_AND_RESTORED),
+        code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: ${RESET_AND_RESTORED} });\n`,
         filename: "vite.config.ts",
       },
       {
         name: "the settings declared beside the rest of the test options pass",
-        code: configFor(
-          "{ mockReset: true, restoreMocks: true, coverage: { thresholds: { 100: true, perFile: true } } }",
-        ),
+        code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { mockReset: true, restoreMocks: true, coverage: { thresholds: { 100: true, perFile: true } } } });\n`,
         filename: "vite.config.ts",
       },
       {
@@ -75,19 +70,19 @@ describe("dont-review-it/no-shared-double-state--reset-doubles-between-tests", (
       },
       {
         name: "a test block that declares neither setting is reported once for each",
-        code: configFor("{ coverage: {} }"),
+        code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { coverage: {} } });\n`,
         filename: "vite.config.ts",
         errors: [{ messageId: "sharedDoubleState" }, { messageId: "sharedDoubleState" }],
       },
       {
         name: "a setting left out is reported on its own",
-        code: configFor("{ mockReset: true }"),
+        code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { mockReset: true } });\n`,
         filename: "vite.config.ts",
         errors: [{ messageId: "sharedDoubleState" }],
       },
       {
         name: "a setting declared false is reported where it stands",
-        code: configFor("{ mockReset: false, restoreMocks: true }"),
+        code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { mockReset: false, restoreMocks: true } });\n`,
         filename: "vite.config.ts",
         errors: [{ messageId: "sharedDoubleState" }],
       },

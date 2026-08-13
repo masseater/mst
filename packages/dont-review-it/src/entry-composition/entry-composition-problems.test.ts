@@ -1,252 +1,535 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
-import { describe, expect, onTestFinished, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { defaultEntryCompositionConfig } from "./config.ts";
 import { entryCompositionProblems } from "./entry-composition-problems.ts";
-
-const config = defaultEntryCompositionConfig;
 
 const ROOT_PREFIX = "throttle --timeout 1800 -- spool -- ";
 
 const WORKSPACE_PREFIX = "spool -- ";
 
-const repositoryWith = (files: Readonly<Record<string, string>>): string => {
-  const repositoryRoot = mkdtempSync(join(tmpdir(), "entry-composition-problems-"));
-  onTestFinished(() => {
-    rmSync(repositoryRoot, { recursive: true, force: true });
-  });
-  for (const [relativePath, source] of Object.entries(files)) {
-    const absolutePath = join(repositoryRoot, relativePath);
-    mkdirSync(dirname(absolutePath), { recursive: true });
-    writeFileSync(absolutePath, source, "utf8");
-  }
-  return repositoryRoot;
-};
-
 const WORKSPACE_DEFINITION = "packages:\n  - packages/*\n";
 
 describe("entryCompositionProblems", () => {
-  test("says nothing about a repository whose entries all carry their layer prefix", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`,
-      "pnpm-workspace.yaml": WORKSPACE_DEFINITION,
-      "packages/web/package.json": `{ "scripts": { "test": "${WORKSPACE_PREFIX}vp test", "build": "${WORKSPACE_PREFIX}vp pack" } }`,
+  describe("a repository whose entries all carry their layer prefix", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "entry-composition-problems-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      writeFileSync(
+        join(repositoryRoot, "package.json"),
+        `{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`,
+        "utf8",
+      );
+      writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      mkdirSync(join(repositoryRoot, "packages/web"), { recursive: true });
+      writeFileSync(
+        join(repositoryRoot, "packages/web/package.json"),
+        `{ "scripts": { "test": "${WORKSPACE_PREFIX}vp test", "build": "${WORKSPACE_PREFIX}vp pack" } }`,
+        "utf8",
+      );
+      return entryCompositionProblems({ repositoryRoot, config: defaultEntryCompositionConfig });
     });
 
-    const { problems, failures } = entryCompositionProblems({ repositoryRoot, config });
-
-    expect(problems).toStrictEqual([]);
-    expect(failures).toStrictEqual([]);
+    it("says nothing about either layer", ({ report }) => {
+      expect(report).toStrictEqual({ problems: [], failures: [], scanned: 2 });
+    });
   });
 
-  test("reports the required entry that is missing from an existing scripts section", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{\n  "name": "x",\n  "scripts": {\n    "lint": "vp lint"\n  }\n}\n`,
+  describe("a required entry missing from an existing scripts section", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "entry-composition-problems-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      writeFileSync(
+        join(repositoryRoot, "package.json"),
+        `{\n  "name": "x",\n  "scripts": {\n    "lint": "vp lint"\n  }\n}\n`,
+        "utf8",
+      );
+      return entryCompositionProblems({ repositoryRoot, config: defaultEntryCompositionConfig });
     });
 
-    expect(entryCompositionProblems({ repositoryRoot, config }).problems).toStrictEqual([
-      {
-        file: "package.json",
-        line: 3,
-        message: `The required "guard" script must not be missing. Add "guard" with a value that starts with "${ROOT_PREFIX}".`,
-      },
-    ]);
+    it("names the entry at the line the scripts section opens on", ({ report }) => {
+      expect(report).toStrictEqual({
+        problems: [
+          {
+            file: "package.json",
+            line: 3,
+            message: `The required "guard" script must not be missing. Add "guard" with a value that starts with "${ROOT_PREFIX}".`,
+          },
+        ],
+        failures: [],
+        scanned: 1,
+      });
+    });
   });
 
-  test("reports the missing scripts section apart from a missing entry", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{\n  "name": "x"\n}\n`,
+  describe("a manifest holding no scripts section at all", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "entry-composition-problems-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      writeFileSync(join(repositoryRoot, "package.json"), `{\n  "name": "x"\n}\n`, "utf8");
+      return entryCompositionProblems({ repositoryRoot, config: defaultEntryCompositionConfig });
     });
 
-    expect(entryCompositionProblems({ repositoryRoot, config }).problems).toStrictEqual([
-      {
-        file: "package.json",
-        line: null,
-        message: `The scripts section holding the required "guard" entry must not be missing. Add a scripts section whose "guard" value starts with "${ROOT_PREFIX}".`,
-      },
-    ]);
+    it("reports the missing section apart from a missing entry and points at no line", ({
+      report,
+    }) => {
+      expect(report).toStrictEqual({
+        problems: [
+          {
+            file: "package.json",
+            line: null,
+            message: `The scripts section holding the required "guard" entry must not be missing. Add a scripts section whose "guard" value starts with "${ROOT_PREFIX}".`,
+          },
+        ],
+        failures: [],
+        scanned: 1,
+      });
+    });
   });
 
-  test("reports a mismatched head with the required prefix and the actual head", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{\n  "name": "x",\n  "scripts": {\n    "guard": "vp check"\n  }\n}\n`,
+  describe("a required entry whose head is not the required prefix", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "entry-composition-problems-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      writeFileSync(
+        join(repositoryRoot, "package.json"),
+        `{\n  "name": "x",\n  "scripts": {\n    "guard": "vp check"\n  }\n}\n`,
+        "utf8",
+      );
+      return entryCompositionProblems({ repositoryRoot, config: defaultEntryCompositionConfig });
     });
 
-    expect(entryCompositionProblems({ repositoryRoot, config }).problems).toStrictEqual([
-      {
-        file: "package.json",
-        line: 4,
-        message: `The "guard" script must not start with "vp check". Rewrite the value to start with the required prefix "${ROOT_PREFIX}".`,
-      },
-    ]);
+    it("states the actual head beside the required prefix", ({ report }) => {
+      expect(report).toStrictEqual({
+        problems: [
+          {
+            file: "package.json",
+            line: 4,
+            message: `The "guard" script must not start with "vp check". Rewrite the value to start with the required prefix "${ROOT_PREFIX}".`,
+          },
+        ],
+        failures: [],
+        scanned: 1,
+      });
+    });
   });
 
-  test("reports a value whose wrapper column is complete but reversed", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{ "scripts": { "guard": "spool -- throttle --timeout 1800 -- vp check" } }`,
+  describe("a value whose wrapper column is complete but reversed", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "entry-composition-problems-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      writeFileSync(
+        join(repositoryRoot, "package.json"),
+        `{ "scripts": { "guard": "spool -- throttle --timeout 1800 -- vp check" } }`,
+        "utf8",
+      );
+      return entryCompositionProblems({ repositoryRoot, config: defaultEntryCompositionConfig });
     });
 
-    const { problems } = entryCompositionProblems({ repositoryRoot, config });
-    expect(problems).toHaveLength(1);
-    expect(problems[0]?.message).toContain('must not start with "spool -- throttle --timeout 1800');
+    it("reads the reversed column as the head it must not start with", ({ report }) => {
+      expect(report).toStrictEqual({
+        problems: [
+          {
+            file: "package.json",
+            line: 1,
+            message: `The "guard" script must not start with "spool -- throttle --timeout 1800 -- ". Rewrite the value to start with the required prefix "${ROOT_PREFIX}".`,
+          },
+        ],
+        failures: [],
+        scanned: 1,
+      });
+    });
   });
 
-  test("says nothing about a workspace that does not declare the guarded names", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`,
-      "pnpm-workspace.yaml": WORKSPACE_DEFINITION,
-      "packages/web/package.json": `{ "scripts": { "lint": "vp lint" } }`,
+  describe("a workspace manifest that declares none of the guarded names", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "entry-composition-problems-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      writeFileSync(
+        join(repositoryRoot, "package.json"),
+        `{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`,
+        "utf8",
+      );
+      writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      mkdirSync(join(repositoryRoot, "packages/web"), { recursive: true });
+      writeFileSync(
+        join(repositoryRoot, "packages/web/package.json"),
+        `{ "scripts": { "lint": "vp lint" } }`,
+        "utf8",
+      );
+      return entryCompositionProblems({ repositoryRoot, config: defaultEntryCompositionConfig });
     });
 
-    expect(entryCompositionProblems({ repositoryRoot, config }).problems).toStrictEqual([]);
+    it("says nothing about the names it never declared", ({ report }) => {
+      expect(report).toStrictEqual({ problems: [], failures: [], scanned: 2 });
+    });
   });
 
-  test("reports a declared workspace entry that lacks the workspace prefix", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`,
-      "pnpm-workspace.yaml": WORKSPACE_DEFINITION,
-      "packages/web/package.json": `{ "scripts": { "check": "vp check" } }`,
+  describe("a declared workspace entry that lacks the workspace prefix", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "entry-composition-problems-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      writeFileSync(
+        join(repositoryRoot, "package.json"),
+        `{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`,
+        "utf8",
+      );
+      writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      mkdirSync(join(repositoryRoot, "packages/web"), { recursive: true });
+      writeFileSync(
+        join(repositoryRoot, "packages/web/package.json"),
+        `{ "scripts": { "check": "vp check" } }`,
+        "utf8",
+      );
+      return entryCompositionProblems({ repositoryRoot, config: defaultEntryCompositionConfig });
     });
 
-    expect(entryCompositionProblems({ repositoryRoot, config }).problems).toStrictEqual([
-      {
-        file: "packages/web/package.json",
-        line: 1,
-        message: `The "check" script must not start with "vp check". Rewrite the value to start with the required prefix "${WORKSPACE_PREFIX}".`,
-      },
-    ]);
+    it("asks for the workspace prefix rather than the root one", ({ report }) => {
+      expect(report).toStrictEqual({
+        problems: [
+          {
+            file: "packages/web/package.json",
+            line: 1,
+            message: `The "check" script must not start with "vp check". Rewrite the value to start with the required prefix "${WORKSPACE_PREFIX}".`,
+          },
+        ],
+        failures: [],
+        scanned: 2,
+      });
+    });
   });
 
-  test("reports a workspace entry that puts the upper wrapper at its head", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`,
-      "pnpm-workspace.yaml": WORKSPACE_DEFINITION,
-      "packages/web/package.json": `{ "scripts": { "test": "throttle -- spool -- vp test" } }`,
+  describe("a workspace entry that puts the upper wrapper at its head", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "entry-composition-problems-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      writeFileSync(
+        join(repositoryRoot, "package.json"),
+        `{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`,
+        "utf8",
+      );
+      writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      mkdirSync(join(repositoryRoot, "packages/web"), { recursive: true });
+      writeFileSync(
+        join(repositoryRoot, "packages/web/package.json"),
+        `{ "scripts": { "test": "throttle -- spool -- vp test" } }`,
+        "utf8",
+      );
+      return entryCompositionProblems({ repositoryRoot, config: defaultEntryCompositionConfig });
     });
 
-    const { problems } = entryCompositionProblems({ repositoryRoot, config });
-    expect(problems).toHaveLength(1);
-    expect(problems[0]?.file).toBe("packages/web/package.json");
-    expect(problems[0]?.message).toContain('must not start with "throttle "');
+    it("reports that workspace manifest for a head the workspace layer never asked for", ({
+      report,
+    }) => {
+      expect(report).toStrictEqual({
+        problems: [
+          {
+            file: "packages/web/package.json",
+            line: 1,
+            message: `The "test" script must not start with "throttle ". Rewrite the value to start with the required prefix "${WORKSPACE_PREFIX}".`,
+          },
+        ],
+        failures: [],
+        scanned: 2,
+      });
+    });
   });
 
-  test("reports a script whose value is not a string as an empty head", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{ "scripts": { "guard": 1 } }`,
+  describe("a script whose value is not a string", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "entry-composition-problems-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      writeFileSync(join(repositoryRoot, "package.json"), `{ "scripts": { "guard": 1 } }`, "utf8");
+      return entryCompositionProblems({ repositoryRoot, config: defaultEntryCompositionConfig });
     });
 
-    const { problems } = entryCompositionProblems({ repositoryRoot, config });
-    expect(problems).toHaveLength(1);
-    expect(problems[0]?.message).toContain('must not start with ""');
+    it("reads it as an empty head", ({ report }) => {
+      expect(report).toStrictEqual({
+        problems: [
+          {
+            file: "package.json",
+            line: 1,
+            message: `The "guard" script must not start with "". Rewrite the value to start with the required prefix "${ROOT_PREFIX}".`,
+          },
+        ],
+        failures: [],
+        scanned: 1,
+      });
+    });
   });
 
-  test("leaves a missing root manifest out of the enumeration and still walks the workspaces", () => {
-    const repositoryRoot = repositoryWith({
-      "pnpm-workspace.yaml": WORKSPACE_DEFINITION,
-      "packages/web/package.json": `{ "scripts": { "check": "vp check" } }`,
+  describe("a repository holding no root manifest", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "entry-composition-problems-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      mkdirSync(join(repositoryRoot, "packages/web"), { recursive: true });
+      writeFileSync(
+        join(repositoryRoot, "packages/web/package.json"),
+        `{ "scripts": { "check": "vp check" } }`,
+        "utf8",
+      );
+      return entryCompositionProblems({ repositoryRoot, config: defaultEntryCompositionConfig });
     });
 
-    const { problems, failures } = entryCompositionProblems({ repositoryRoot, config });
-    expect(failures).toStrictEqual([]);
-    expect(problems.map((problem) => problem.file)).toStrictEqual(["packages/web/package.json"]);
-  });
-
-  test("leaves definitions outside the manifests and unmatched patterns out of its sight", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`,
-      "pnpm-workspace.yaml": "packages:\n  - packages/*\n  - docs\n  - '!ignored'\n  - .\n  - 1\n",
-      "scripts/heavy.sh": "vp run -r test --coverage\n",
+    it("leaves the absent manifest out of the enumeration and still walks the workspaces", ({
+      report,
+    }) => {
+      expect(report).toStrictEqual({
+        problems: [
+          {
+            file: "packages/web/package.json",
+            line: 1,
+            message: `The "check" script must not start with "vp check". Rewrite the value to start with the required prefix "${WORKSPACE_PREFIX}".`,
+          },
+        ],
+        failures: [],
+        scanned: 1,
+      });
     });
-    mkdirSync(join(repositoryRoot, "packages", "empty"), { recursive: true });
-
-    const { problems, failures } = entryCompositionProblems({ repositoryRoot, config });
-
-    expect(problems).toStrictEqual([]);
-    expect(failures).toStrictEqual([]);
   });
 
-  test("treats a root manifest that does not parse as a failure of the check itself", () => {
-    const repositoryRoot = repositoryWith({ "package.json": "{ oops" });
-
-    const { problems, failures } = entryCompositionProblems({ repositoryRoot, config });
-
-    expect(problems).toStrictEqual([]);
-    expect(failures).toStrictEqual([
-      "package.json exists but does not parse as a JSON object, so the entry composition check did not run.",
-    ]);
-  });
-
-  test("treats an empty manifest and a non-object manifest as failures of the check itself", () => {
-    const empty = entryCompositionProblems({
-      repositoryRoot: repositoryWith({ "package.json": "" }),
-      config,
-    });
-    const nonObject = entryCompositionProblems({
-      repositoryRoot: repositoryWith({ "package.json": "[]" }),
-      config,
-    });
-
-    expect(empty.failures).toHaveLength(1);
-    expect(nonObject.failures).toHaveLength(1);
-  });
-
-  test("treats a manifest that exists but cannot be read as a failure of the check itself", () => {
-    const repositoryRoot = repositoryWith({});
-    mkdirSync(join(repositoryRoot, "package.json"));
-
-    expect(entryCompositionProblems({ repositoryRoot, config }).failures).toStrictEqual([
-      "package.json exists but cannot be read, so the entry composition check did not run.",
-    ]);
-  });
-
-  test("treats a broken workspace manifest as a failure without silencing the other layers", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{ "scripts": { "guard": "vp check" } }`,
-      "pnpm-workspace.yaml": WORKSPACE_DEFINITION,
-      "packages/web/package.json": "{ oops",
+  describe("definitions written outside the manifests and patterns matching nothing", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "entry-composition-problems-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      writeFileSync(
+        join(repositoryRoot, "package.json"),
+        `{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`,
+        "utf8",
+      );
+      writeFileSync(
+        join(repositoryRoot, "pnpm-workspace.yaml"),
+        "packages:\n  - packages/*\n  - docs\n  - '!ignored'\n  - .\n  - 1\n",
+        "utf8",
+      );
+      mkdirSync(join(repositoryRoot, "scripts"), { recursive: true });
+      writeFileSync(
+        join(repositoryRoot, "scripts/heavy.sh"),
+        "vp run -r test --coverage\n",
+        "utf8",
+      );
+      mkdirSync(join(repositoryRoot, "packages/empty"), { recursive: true });
+      return entryCompositionProblems({ repositoryRoot, config: defaultEntryCompositionConfig });
     });
 
-    const { problems, failures } = entryCompositionProblems({ repositoryRoot, config });
-    expect(problems.map((problem) => problem.file)).toStrictEqual(["package.json"]);
-    expect(failures).toStrictEqual([
-      "packages/web/package.json exists but does not parse as a JSON object, so the entry composition check did not run.",
-    ]);
+    it("keeps both of them out of its sight", ({ report }) => {
+      expect(report).toStrictEqual({ problems: [], failures: [], scanned: 1 });
+    });
   });
 
-  test("treats a workspace definition that does not parse as YAML as a failure", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`,
-      "pnpm-workspace.yaml": "packages: [\n",
+  describe("a root manifest that does not parse", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "entry-composition-problems-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      writeFileSync(join(repositoryRoot, "package.json"), "{ oops", "utf8");
+      return entryCompositionProblems({ repositoryRoot, config: defaultEntryCompositionConfig });
     });
 
-    expect(entryCompositionProblems({ repositoryRoot, config }).failures).toStrictEqual([
-      "pnpm-workspace.yaml exists but does not parse as YAML, so the entry composition check did not run.",
-    ]);
+    it("becomes a failure of the check itself rather than a problem", ({ report }) => {
+      expect(report).toStrictEqual({
+        problems: [],
+        failures: [
+          "package.json exists but does not parse as a JSON object, so the entry composition check did not run.",
+        ],
+        scanned: 0,
+      });
+    });
   });
 
-  test("treats a workspace definition that cannot be read as a failure", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`,
+  describe("a root manifest that is empty", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "entry-composition-problems-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      writeFileSync(join(repositoryRoot, "package.json"), "", "utf8");
+      return entryCompositionProblems({ repositoryRoot, config: defaultEntryCompositionConfig });
     });
-    mkdirSync(join(repositoryRoot, "pnpm-workspace.yaml"));
 
-    expect(entryCompositionProblems({ repositoryRoot, config }).failures).toStrictEqual([
-      "pnpm-workspace.yaml exists but cannot be read, so the entry composition check did not run.",
-    ]);
+    it("becomes a failure of the check itself", ({ report }) => {
+      expect(report).toStrictEqual({
+        problems: [],
+        failures: [
+          "package.json exists but does not parse as a JSON object, so the entry composition check did not run.",
+        ],
+        scanned: 0,
+      });
+    });
   });
 
-  test("reads a workspace definition without patterns as an empty workspace layer", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`,
-      "pnpm-workspace.yaml": "catalog: {}\n",
+  describe("a root manifest that parses into something other than an object", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "entry-composition-problems-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      writeFileSync(join(repositoryRoot, "package.json"), "[]", "utf8");
+      return entryCompositionProblems({ repositoryRoot, config: defaultEntryCompositionConfig });
     });
 
-    const { problems, failures } = entryCompositionProblems({ repositoryRoot, config });
+    it("becomes a failure of the check itself", ({ report }) => {
+      expect(report).toStrictEqual({
+        problems: [],
+        failures: [
+          "package.json exists but does not parse as a JSON object, so the entry composition check did not run.",
+        ],
+        scanned: 0,
+      });
+    });
+  });
 
-    expect(problems).toStrictEqual([]);
-    expect(failures).toStrictEqual([]);
+  describe("a root manifest that exists but cannot be read", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "entry-composition-problems-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      mkdirSync(join(repositoryRoot, "package.json"));
+      return entryCompositionProblems({ repositoryRoot, config: defaultEntryCompositionConfig });
+    });
+
+    it("becomes a failure of the check itself", ({ report }) => {
+      expect(report).toStrictEqual({
+        problems: [],
+        failures: [
+          "package.json exists but cannot be read, so the entry composition check did not run.",
+        ],
+        scanned: 0,
+      });
+    });
+  });
+
+  describe("a workspace manifest that does not parse", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "entry-composition-problems-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      writeFileSync(
+        join(repositoryRoot, "package.json"),
+        `{ "scripts": { "guard": "vp check" } }`,
+        "utf8",
+      );
+      writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      mkdirSync(join(repositoryRoot, "packages/web"), { recursive: true });
+      writeFileSync(join(repositoryRoot, "packages/web/package.json"), "{ oops", "utf8");
+      return entryCompositionProblems({ repositoryRoot, config: defaultEntryCompositionConfig });
+    });
+
+    it("becomes a failure without silencing the layer that did parse", ({ report }) => {
+      expect(report).toStrictEqual({
+        problems: [
+          {
+            file: "package.json",
+            line: 1,
+            message: `The "guard" script must not start with "vp check". Rewrite the value to start with the required prefix "${ROOT_PREFIX}".`,
+          },
+        ],
+        failures: [
+          "packages/web/package.json exists but does not parse as a JSON object, so the entry composition check did not run.",
+        ],
+        scanned: 1,
+      });
+    });
+  });
+
+  describe("a workspace definition that does not parse as YAML", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "entry-composition-problems-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      writeFileSync(
+        join(repositoryRoot, "package.json"),
+        `{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`,
+        "utf8",
+      );
+      writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), "packages: [\n", "utf8");
+      return entryCompositionProblems({ repositoryRoot, config: defaultEntryCompositionConfig });
+    });
+
+    it("becomes a failure of the check itself", ({ report }) => {
+      expect(report).toStrictEqual({
+        problems: [],
+        failures: [
+          "pnpm-workspace.yaml exists but does not parse as YAML, so the entry composition check did not run.",
+        ],
+        scanned: 1,
+      });
+    });
+  });
+
+  describe("a workspace definition that cannot be read", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "entry-composition-problems-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      writeFileSync(
+        join(repositoryRoot, "package.json"),
+        `{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`,
+        "utf8",
+      );
+      mkdirSync(join(repositoryRoot, "pnpm-workspace.yaml"));
+      return entryCompositionProblems({ repositoryRoot, config: defaultEntryCompositionConfig });
+    });
+
+    it("becomes a failure of the check itself", ({ report }) => {
+      expect(report).toStrictEqual({
+        problems: [],
+        failures: [
+          "pnpm-workspace.yaml exists but cannot be read, so the entry composition check did not run.",
+        ],
+        scanned: 1,
+      });
+    });
+  });
+
+  describe("a workspace definition carrying no patterns", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "entry-composition-problems-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      writeFileSync(
+        join(repositoryRoot, "package.json"),
+        `{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`,
+        "utf8",
+      );
+      writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), "catalog: {}\n", "utf8");
+      return entryCompositionProblems({ repositoryRoot, config: defaultEntryCompositionConfig });
+    });
+
+    it("reads it as an empty workspace layer", ({ report }) => {
+      expect(report).toStrictEqual({ problems: [], failures: [], scanned: 1 });
+    });
   });
 });

@@ -1,174 +1,585 @@
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
-import { describe, expect, onTestFinished, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { defaultEntryCompositionConfig } from "./config.ts";
 import { entryCompositionProblems } from "./entry-composition-problems.ts";
 import { writeEntryComposition } from "./write-entry-composition.ts";
 
-const config = defaultEntryCompositionConfig;
-
 const ROOT_PREFIX = "throttle --timeout 1800 -- spool -- ";
 
-const repositoryWith = (files: Readonly<Record<string, string>>): string => {
-  const repositoryRoot = mkdtempSync(join(tmpdir(), "write-entry-composition-"));
-  onTestFinished(() => {
-    rmSync(repositoryRoot, { recursive: true, force: true });
-  });
-  for (const [relativePath, source] of Object.entries(files)) {
-    const absolutePath = join(repositoryRoot, relativePath);
-    mkdirSync(dirname(absolutePath), { recursive: true });
-    writeFileSync(absolutePath, source, "utf8");
-  }
-  return repositoryRoot;
-};
+const WORKSPACE_PREFIX = "spool -- ";
 
-const manifestTextIn = (repositoryRoot: string, relativePath: string): string =>
-  readFileSync(join(repositoryRoot, relativePath), "utf8");
+const WORKSPACE_DEFINITION = "packages:\n  - packages/*\n";
 
-const guardValueIn = (repositoryRoot: string): unknown => {
-  const parsedNode: unknown = JSON.parse(manifestTextIn(repositoryRoot, "package.json"));
-  return (parsedNode as { scripts: Record<string, unknown> }).scripts.guard;
-};
+const UNWRITABLE_REPOSITORY_ROOT = join(tmpdir(), "write-entry-composition-unwritable");
 
 describe("writeEntryComposition", () => {
-  test("inserts a missing required entry as the prefix followed by the placeholder body", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{\n  "scripts": {\n    "lint": "vp lint"\n  }\n}\n`,
+  describe("a scripts section that does not hold the required entry", () => {
+    const it = test
+      .extend("writeReportOfTheRun", ({}, { onCleanup }) => {
+        const repositoryRoot = mkdtempSync(join(tmpdir(), "write-entry-composition-"));
+        onCleanup(() => {
+          rmSync(repositoryRoot, { recursive: true, force: true });
+        });
+        writeFileSync(
+          join(repositoryRoot, "package.json"),
+          `{\n  "scripts": {\n    "lint": "vp lint"\n  }\n}\n`,
+          "utf8",
+        );
+        return writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
+      })
+      .extend("manifestTextAfterTheRun", ({}, { onCleanup }) => {
+        const repositoryRoot = mkdtempSync(join(tmpdir(), "write-entry-composition-"));
+        onCleanup(() => {
+          rmSync(repositoryRoot, { recursive: true, force: true });
+        });
+        writeFileSync(
+          join(repositoryRoot, "package.json"),
+          `{\n  "scripts": {\n    "lint": "vp lint"\n  }\n}\n`,
+          "utf8",
+        );
+        writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
+        return readFileSync(join(repositoryRoot, "package.json"), "utf8");
+      })
+      .extend("compositionReportAfterTheRun", ({}, { onCleanup }) => {
+        const repositoryRoot = mkdtempSync(join(tmpdir(), "write-entry-composition-"));
+        onCleanup(() => {
+          rmSync(repositoryRoot, { recursive: true, force: true });
+        });
+        writeFileSync(
+          join(repositoryRoot, "package.json"),
+          `{\n  "scripts": {\n    "lint": "vp lint"\n  }\n}\n`,
+          "utf8",
+        );
+        writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
+        return entryCompositionProblems({
+          repositoryRoot,
+          config: defaultEntryCompositionConfig,
+        });
+      });
+
+    it("is repaired without any failure", ({ writeReportOfTheRun }) => {
+      expect(writeReportOfTheRun).toStrictEqual({ failures: [] });
     });
 
-    expect(writeEntryComposition({ repositoryRoot, config }).failures).toStrictEqual([]);
-    expect(guardValueIn(repositoryRoot)).toBe(`${ROOT_PREFIX}exit 0`);
-    expect(entryCompositionProblems({ repositoryRoot, config }).problems).toStrictEqual([]);
-  });
-
-  test("creates the scripts section before inserting and keeps the surrounding text intact", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{\n  "name": "x"\n}\n`,
+    it("gains the entry as the prefix followed by the placeholder body", ({
+      manifestTextAfterTheRun,
+    }) => {
+      expect(manifestTextAfterTheRun).toBe(
+        `{\n  "scripts": {\n    "lint": "vp lint",\n    "guard": "${ROOT_PREFIX}exit 0"\n  }\n}\n`,
+      );
     });
 
-    writeEntryComposition({ repositoryRoot, config });
-
-    expect(manifestTextIn(repositoryRoot, "package.json")).toBe(
-      `{\n  "name": "x",\n  "scripts": {\n    "guard": "${ROOT_PREFIX}exit 0"\n  }\n}\n`,
-    );
-  });
-
-  test("prepends only the missing part of the wrapper column", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{ "scripts": { "guard": "spool -- vp check" } }`,
-    });
-
-    writeEntryComposition({ repositoryRoot, config });
-
-    expect(guardValueIn(repositoryRoot)).toBe(`${ROOT_PREFIX}vp check`);
-  });
-
-  test("removes a column element by name even when its options differ", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{ "scripts": { "guard": "throttle --timeout 900 -- spool -- vp check" } }`,
-    });
-
-    writeEntryComposition({ repositoryRoot, config });
-
-    expect(guardValueIn(repositoryRoot)).toBe(`${ROOT_PREFIX}vp check`);
-  });
-
-  test("keeps a non-wrapper head that contains the separator and only prepends the prefix", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{ "scripts": { "guard": "vp exec tool -- --flag" } }`,
-    });
-
-    writeEntryComposition({ repositoryRoot, config });
-
-    expect(guardValueIn(repositoryRoot)).toBe(`${ROOT_PREFIX}vp exec tool -- --flag`);
-  });
-
-  test("normalizes a complete column whose order is reversed", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{ "scripts": { "guard": "spool -- throttle --timeout 1800 -- vp check" } }`,
-    });
-
-    writeEntryComposition({ repositoryRoot, config });
-
-    expect(guardValueIn(repositoryRoot)).toBe(`${ROOT_PREFIX}vp check`);
-  });
-
-  test("changes nothing on the second run over what the first run repaired", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{\n  "scripts": {\n    "guard": "spool -- vp check"\n  }\n}\n`,
-      "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
-      "packages/web/package.json": `{ "scripts": { "test": "vp test" } }`,
-    });
-
-    writeEntryComposition({ repositoryRoot, config });
-    const repairedRoot = manifestTextIn(repositoryRoot, "package.json");
-    const repairedWorkspace = manifestTextIn(repositoryRoot, "packages/web/package.json");
-
-    expect(writeEntryComposition({ repositoryRoot, config }).failures).toStrictEqual([]);
-    expect(manifestTextIn(repositoryRoot, "package.json")).toBe(repairedRoot);
-    expect(manifestTextIn(repositoryRoot, "packages/web/package.json")).toBe(repairedWorkspace);
-    expect(entryCompositionProblems({ repositoryRoot, config }).problems).toStrictEqual([]);
-  });
-
-  test("rewrites a declared workspace entry to carry the workspace prefix", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`,
-      "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
-      "packages/web/package.json": `{ "scripts": { "test": "vp test", "check": "spool -- vp check" } }`,
-    });
-
-    writeEntryComposition({ repositoryRoot, config });
-
-    const parsedNode: unknown = JSON.parse(
-      manifestTextIn(repositoryRoot, "packages/web/package.json"),
-    );
-    expect((parsedNode as { scripts: Record<string, unknown> }).scripts).toStrictEqual({
-      test: "spool -- vp test",
-      check: "spool -- vp check",
+    it("has nothing left to report afterwards", ({ compositionReportAfterTheRun }) => {
+      expect(compositionReportAfterTheRun).toStrictEqual({
+        problems: [],
+        failures: [],
+        scanned: 1,
+      });
     });
   });
 
-  test("leaves a foreign wrapper head untouched and keeps its report", () => {
-    const workspaceManifest = `{ "scripts": { "test": "throttle -- spool -- vp test" } }`;
-    const repositoryRoot = repositoryWith({
-      "package.json": `{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`,
-      "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
-      "packages/web/package.json": workspaceManifest,
+  describe("a manifest that carries no scripts section at all", () => {
+    const it = test.extend("manifestTextAfterTheRun", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "write-entry-composition-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      writeFileSync(join(repositoryRoot, "package.json"), `{\n  "name": "x"\n}\n`, "utf8");
+      writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
+      return readFileSync(join(repositoryRoot, "package.json"), "utf8");
     });
 
-    expect(writeEntryComposition({ repositoryRoot, config }).failures).toStrictEqual([]);
-    expect(manifestTextIn(repositoryRoot, "packages/web/package.json")).toBe(workspaceManifest);
-    expect(entryCompositionProblems({ repositoryRoot, config }).problems).toHaveLength(1);
-  });
-
-  test("changes nothing in a repository that already satisfies the composition", () => {
-    const compliant = `{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`;
-    const repositoryRoot = repositoryWith({ "package.json": compliant });
-
-    expect(writeEntryComposition({ repositoryRoot, config }).failures).toStrictEqual([]);
-    expect(manifestTextIn(repositoryRoot, "package.json")).toBe(compliant);
-  });
-
-  test("returns the write failure instead of pretending the repair happened", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{ "scripts": { "guard": "vp check" } }`,
+    it("gains the section around the entry and keeps the surrounding text intact", ({
+      manifestTextAfterTheRun,
+    }) => {
+      expect(manifestTextAfterTheRun).toBe(
+        `{\n  "name": "x",\n  "scripts": {\n    "guard": "${ROOT_PREFIX}exit 0"\n  }\n}\n`,
+      );
     });
-    chmodSync(join(repositoryRoot, "package.json"), 0o444);
-
-    const { failures } = writeEntryComposition({ repositoryRoot, config });
-    expect(failures).toHaveLength(1);
-    expect(failures[0]).toContain("package.json could not be rewritten");
   });
 
-  test("passes a listing failure through without writing anything", () => {
-    const repositoryRoot = repositoryWith({ "package.json": "{ oops" });
+  describe("an entry that carries only part of the wrapper column", () => {
+    const it = test.extend("manifestTextAfterTheRun", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "write-entry-composition-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      writeFileSync(
+        join(repositoryRoot, "package.json"),
+        `{ "scripts": { "guard": "spool -- vp check" } }`,
+        "utf8",
+      );
+      writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
+      return readFileSync(join(repositoryRoot, "package.json"), "utf8");
+    });
 
-    expect(writeEntryComposition({ repositoryRoot, config }).failures).toStrictEqual([
-      "package.json exists but does not parse as a JSON object, so the entry composition check did not run.",
-    ]);
-    expect(manifestTextIn(repositoryRoot, "package.json")).toBe("{ oops");
+    it("gains only the missing part of the column", ({ manifestTextAfterTheRun }) => {
+      expect(manifestTextAfterTheRun).toBe(`{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`);
+    });
+  });
+
+  describe("an entry whose column element carries different options", () => {
+    const it = test.extend("manifestTextAfterTheRun", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "write-entry-composition-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      writeFileSync(
+        join(repositoryRoot, "package.json"),
+        `{ "scripts": { "guard": "throttle --timeout 900 -- spool -- vp check" } }`,
+        "utf8",
+      );
+      writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
+      return readFileSync(join(repositoryRoot, "package.json"), "utf8");
+    });
+
+    it("loses that element by name and gains the required column", ({
+      manifestTextAfterTheRun,
+    }) => {
+      expect(manifestTextAfterTheRun).toBe(`{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`);
+    });
+  });
+
+  describe("an entry whose head is not a wrapper but holds the separator", () => {
+    const it = test.extend("manifestTextAfterTheRun", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "write-entry-composition-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      writeFileSync(
+        join(repositoryRoot, "package.json"),
+        `{ "scripts": { "guard": "vp exec tool -- --flag" } }`,
+        "utf8",
+      );
+      writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
+      return readFileSync(join(repositoryRoot, "package.json"), "utf8");
+    });
+
+    it("keeps that head and only gains the prefix in front of it", ({
+      manifestTextAfterTheRun,
+    }) => {
+      expect(manifestTextAfterTheRun).toBe(
+        `{ "scripts": { "guard": "${ROOT_PREFIX}vp exec tool -- --flag" } }`,
+      );
+    });
+  });
+
+  describe("an entry whose column is complete but ordered the other way", () => {
+    const it = test.extend("manifestTextAfterTheRun", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "write-entry-composition-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      writeFileSync(
+        join(repositoryRoot, "package.json"),
+        `{ "scripts": { "guard": "spool -- throttle --timeout 1800 -- vp check" } }`,
+        "utf8",
+      );
+      writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
+      return readFileSync(join(repositoryRoot, "package.json"), "utf8");
+    });
+
+    it("is normalized to the required order", ({ manifestTextAfterTheRun }) => {
+      expect(manifestTextAfterTheRun).toBe(`{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`);
+    });
+  });
+
+  describe("a repository the first run already repaired", () => {
+    const it = test
+      .extend("writeReportOfTheSecondRun", ({}, { onCleanup }) => {
+        const repositoryRoot = mkdtempSync(join(tmpdir(), "write-entry-composition-"));
+        onCleanup(() => {
+          rmSync(repositoryRoot, { recursive: true, force: true });
+        });
+        mkdirSync(join(repositoryRoot, "packages", "web"), { recursive: true });
+        writeFileSync(
+          join(repositoryRoot, "package.json"),
+          `{\n  "scripts": {\n    "guard": "spool -- vp check"\n  }\n}\n`,
+          "utf8",
+        );
+        writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+        writeFileSync(
+          join(repositoryRoot, "packages", "web", "package.json"),
+          `{ "scripts": { "test": "vp test" } }`,
+          "utf8",
+        );
+        writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
+        return writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
+      })
+      .extend("rootManifestTextAfterTheFirstRun", ({}, { onCleanup }) => {
+        const repositoryRoot = mkdtempSync(join(tmpdir(), "write-entry-composition-"));
+        onCleanup(() => {
+          rmSync(repositoryRoot, { recursive: true, force: true });
+        });
+        mkdirSync(join(repositoryRoot, "packages", "web"), { recursive: true });
+        writeFileSync(
+          join(repositoryRoot, "package.json"),
+          `{\n  "scripts": {\n    "guard": "spool -- vp check"\n  }\n}\n`,
+          "utf8",
+        );
+        writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+        writeFileSync(
+          join(repositoryRoot, "packages", "web", "package.json"),
+          `{ "scripts": { "test": "vp test" } }`,
+          "utf8",
+        );
+        writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
+        return readFileSync(join(repositoryRoot, "package.json"), "utf8");
+      })
+      .extend("rootManifestTextAfterTheSecondRun", ({}, { onCleanup }) => {
+        const repositoryRoot = mkdtempSync(join(tmpdir(), "write-entry-composition-"));
+        onCleanup(() => {
+          rmSync(repositoryRoot, { recursive: true, force: true });
+        });
+        mkdirSync(join(repositoryRoot, "packages", "web"), { recursive: true });
+        writeFileSync(
+          join(repositoryRoot, "package.json"),
+          `{\n  "scripts": {\n    "guard": "spool -- vp check"\n  }\n}\n`,
+          "utf8",
+        );
+        writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+        writeFileSync(
+          join(repositoryRoot, "packages", "web", "package.json"),
+          `{ "scripts": { "test": "vp test" } }`,
+          "utf8",
+        );
+        writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
+        writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
+        return readFileSync(join(repositoryRoot, "package.json"), "utf8");
+      })
+      .extend("workspaceManifestTextAfterTheFirstRun", ({}, { onCleanup }) => {
+        const repositoryRoot = mkdtempSync(join(tmpdir(), "write-entry-composition-"));
+        onCleanup(() => {
+          rmSync(repositoryRoot, { recursive: true, force: true });
+        });
+        mkdirSync(join(repositoryRoot, "packages", "web"), { recursive: true });
+        writeFileSync(
+          join(repositoryRoot, "package.json"),
+          `{\n  "scripts": {\n    "guard": "spool -- vp check"\n  }\n}\n`,
+          "utf8",
+        );
+        writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+        writeFileSync(
+          join(repositoryRoot, "packages", "web", "package.json"),
+          `{ "scripts": { "test": "vp test" } }`,
+          "utf8",
+        );
+        writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
+        return readFileSync(join(repositoryRoot, "packages", "web", "package.json"), "utf8");
+      })
+      .extend("workspaceManifestTextAfterTheSecondRun", ({}, { onCleanup }) => {
+        const repositoryRoot = mkdtempSync(join(tmpdir(), "write-entry-composition-"));
+        onCleanup(() => {
+          rmSync(repositoryRoot, { recursive: true, force: true });
+        });
+        mkdirSync(join(repositoryRoot, "packages", "web"), { recursive: true });
+        writeFileSync(
+          join(repositoryRoot, "package.json"),
+          `{\n  "scripts": {\n    "guard": "spool -- vp check"\n  }\n}\n`,
+          "utf8",
+        );
+        writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+        writeFileSync(
+          join(repositoryRoot, "packages", "web", "package.json"),
+          `{ "scripts": { "test": "vp test" } }`,
+          "utf8",
+        );
+        writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
+        writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
+        return readFileSync(join(repositoryRoot, "packages", "web", "package.json"), "utf8");
+      })
+      .extend("compositionReportAfterTheSecondRun", ({}, { onCleanup }) => {
+        const repositoryRoot = mkdtempSync(join(tmpdir(), "write-entry-composition-"));
+        onCleanup(() => {
+          rmSync(repositoryRoot, { recursive: true, force: true });
+        });
+        mkdirSync(join(repositoryRoot, "packages", "web"), { recursive: true });
+        writeFileSync(
+          join(repositoryRoot, "package.json"),
+          `{\n  "scripts": {\n    "guard": "spool -- vp check"\n  }\n}\n`,
+          "utf8",
+        );
+        writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+        writeFileSync(
+          join(repositoryRoot, "packages", "web", "package.json"),
+          `{ "scripts": { "test": "vp test" } }`,
+          "utf8",
+        );
+        writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
+        writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
+        return entryCompositionProblems({
+          repositoryRoot,
+          config: defaultEntryCompositionConfig,
+        });
+      });
+
+    it("runs a second time without any failure", ({ writeReportOfTheSecondRun }) => {
+      expect(writeReportOfTheSecondRun).toStrictEqual({ failures: [] });
+    });
+
+    it("leaves the root manifest carrying the root column after the first run", ({
+      rootManifestTextAfterTheFirstRun,
+    }) => {
+      expect(rootManifestTextAfterTheFirstRun).toBe(
+        `{\n  "scripts": {\n    "guard": "${ROOT_PREFIX}vp check"\n  }\n}\n`,
+      );
+    });
+
+    it("keeps the root manifest exactly as the first run left it", ({
+      rootManifestTextAfterTheSecondRun,
+    }) => {
+      expect(rootManifestTextAfterTheSecondRun).toBe(
+        `{\n  "scripts": {\n    "guard": "${ROOT_PREFIX}vp check"\n  }\n}\n`,
+      );
+    });
+
+    it("leaves the workspace manifest carrying the workspace prefix after the first run", ({
+      workspaceManifestTextAfterTheFirstRun,
+    }) => {
+      expect(workspaceManifestTextAfterTheFirstRun).toBe(
+        `{ "scripts": { "test": "${WORKSPACE_PREFIX}vp test" } }`,
+      );
+    });
+
+    it("keeps the workspace manifest exactly as the first run left it", ({
+      workspaceManifestTextAfterTheSecondRun,
+    }) => {
+      expect(workspaceManifestTextAfterTheSecondRun).toBe(
+        `{ "scripts": { "test": "${WORKSPACE_PREFIX}vp test" } }`,
+      );
+    });
+
+    it("has nothing left to report afterwards", ({ compositionReportAfterTheSecondRun }) => {
+      expect(compositionReportAfterTheSecondRun).toStrictEqual({
+        problems: [],
+        failures: [],
+        scanned: 2,
+      });
+    });
+  });
+
+  describe("a workspace manifest that declares the guarded names", () => {
+    const it = test.extend("workspaceManifestTextAfterTheRun", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "write-entry-composition-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      mkdirSync(join(repositoryRoot, "packages", "web"), { recursive: true });
+      writeFileSync(
+        join(repositoryRoot, "package.json"),
+        `{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`,
+        "utf8",
+      );
+      writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      writeFileSync(
+        join(repositoryRoot, "packages", "web", "package.json"),
+        `{ "scripts": { "test": "vp test", "check": "${WORKSPACE_PREFIX}vp check" } }`,
+        "utf8",
+      );
+      writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
+      return readFileSync(join(repositoryRoot, "packages", "web", "package.json"), "utf8");
+    });
+
+    it("carries the workspace prefix on every declared entry", ({
+      workspaceManifestTextAfterTheRun,
+    }) => {
+      expect(workspaceManifestTextAfterTheRun).toBe(
+        `{ "scripts": { "test": "${WORKSPACE_PREFIX}vp test", "check": "${WORKSPACE_PREFIX}vp check" } }`,
+      );
+    });
+  });
+
+  describe("a workspace entry headed by a wrapper of another layer", () => {
+    const it = test
+      .extend("writeReportOfTheRun", ({}, { onCleanup }) => {
+        const repositoryRoot = mkdtempSync(join(tmpdir(), "write-entry-composition-"));
+        onCleanup(() => {
+          rmSync(repositoryRoot, { recursive: true, force: true });
+        });
+        mkdirSync(join(repositoryRoot, "packages", "web"), { recursive: true });
+        writeFileSync(
+          join(repositoryRoot, "package.json"),
+          `{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`,
+          "utf8",
+        );
+        writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+        writeFileSync(
+          join(repositoryRoot, "packages", "web", "package.json"),
+          `{ "scripts": { "test": "throttle -- spool -- vp test" } }`,
+          "utf8",
+        );
+        return writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
+      })
+      .extend("workspaceManifestTextAfterTheRun", ({}, { onCleanup }) => {
+        const repositoryRoot = mkdtempSync(join(tmpdir(), "write-entry-composition-"));
+        onCleanup(() => {
+          rmSync(repositoryRoot, { recursive: true, force: true });
+        });
+        mkdirSync(join(repositoryRoot, "packages", "web"), { recursive: true });
+        writeFileSync(
+          join(repositoryRoot, "package.json"),
+          `{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`,
+          "utf8",
+        );
+        writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+        writeFileSync(
+          join(repositoryRoot, "packages", "web", "package.json"),
+          `{ "scripts": { "test": "throttle -- spool -- vp test" } }`,
+          "utf8",
+        );
+        writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
+        return readFileSync(join(repositoryRoot, "packages", "web", "package.json"), "utf8");
+      })
+      .extend("compositionReportAfterTheRun", ({}, { onCleanup }) => {
+        const repositoryRoot = mkdtempSync(join(tmpdir(), "write-entry-composition-"));
+        onCleanup(() => {
+          rmSync(repositoryRoot, { recursive: true, force: true });
+        });
+        mkdirSync(join(repositoryRoot, "packages", "web"), { recursive: true });
+        writeFileSync(
+          join(repositoryRoot, "package.json"),
+          `{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`,
+          "utf8",
+        );
+        writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+        writeFileSync(
+          join(repositoryRoot, "packages", "web", "package.json"),
+          `{ "scripts": { "test": "throttle -- spool -- vp test" } }`,
+          "utf8",
+        );
+        writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
+        return entryCompositionProblems({
+          repositoryRoot,
+          config: defaultEntryCompositionConfig,
+        });
+      });
+
+    it("does not turn into a failure of the run", ({ writeReportOfTheRun }) => {
+      expect(writeReportOfTheRun).toStrictEqual({ failures: [] });
+    });
+
+    it("is left untouched", ({ workspaceManifestTextAfterTheRun }) => {
+      expect(workspaceManifestTextAfterTheRun).toBe(
+        `{ "scripts": { "test": "throttle -- spool -- vp test" } }`,
+      );
+    });
+
+    it("keeps its report standing afterwards", ({ compositionReportAfterTheRun }) => {
+      expect(compositionReportAfterTheRun).toStrictEqual({
+        problems: [
+          {
+            file: "packages/web/package.json",
+            line: 1,
+            message: `The "test" script must not start with "throttle ". Rewrite the value to start with the required prefix "${WORKSPACE_PREFIX}".`,
+          },
+        ],
+        failures: [],
+        scanned: 2,
+      });
+    });
+  });
+
+  describe("a repository that already satisfies the composition", () => {
+    const it = test
+      .extend("writeReportOfTheRun", ({}, { onCleanup }) => {
+        const repositoryRoot = mkdtempSync(join(tmpdir(), "write-entry-composition-"));
+        onCleanup(() => {
+          rmSync(repositoryRoot, { recursive: true, force: true });
+        });
+        writeFileSync(
+          join(repositoryRoot, "package.json"),
+          `{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`,
+          "utf8",
+        );
+        return writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
+      })
+      .extend("manifestTextAfterTheRun", ({}, { onCleanup }) => {
+        const repositoryRoot = mkdtempSync(join(tmpdir(), "write-entry-composition-"));
+        onCleanup(() => {
+          rmSync(repositoryRoot, { recursive: true, force: true });
+        });
+        writeFileSync(
+          join(repositoryRoot, "package.json"),
+          `{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`,
+          "utf8",
+        );
+        writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
+        return readFileSync(join(repositoryRoot, "package.json"), "utf8");
+      });
+
+    it("runs without any failure", ({ writeReportOfTheRun }) => {
+      expect(writeReportOfTheRun).toStrictEqual({ failures: [] });
+    });
+
+    it("is left exactly as it stood", ({ manifestTextAfterTheRun }) => {
+      expect(manifestTextAfterTheRun).toBe(`{ "scripts": { "guard": "${ROOT_PREFIX}vp check" } }`);
+    });
+  });
+
+  describe("a manifest that needs a repair it cannot receive", () => {
+    const it = test.extend("writeReportOfTheRun", ({}, { onCleanup }) => {
+      rmSync(UNWRITABLE_REPOSITORY_ROOT, { recursive: true, force: true });
+      mkdirSync(UNWRITABLE_REPOSITORY_ROOT, { recursive: true });
+      onCleanup(() => {
+        rmSync(UNWRITABLE_REPOSITORY_ROOT, { recursive: true, force: true });
+      });
+      writeFileSync(
+        join(UNWRITABLE_REPOSITORY_ROOT, "package.json"),
+        `{ "scripts": { "guard": "vp check" } }`,
+        "utf8",
+      );
+      chmodSync(join(UNWRITABLE_REPOSITORY_ROOT, "package.json"), 0o444);
+      return writeEntryComposition({
+        repositoryRoot: UNWRITABLE_REPOSITORY_ROOT,
+        config: defaultEntryCompositionConfig,
+      });
+    });
+
+    it("hands back the write failure instead of pretending the repair happened", ({
+      writeReportOfTheRun,
+    }) => {
+      expect(writeReportOfTheRun).toStrictEqual({
+        failures: [
+          `package.json could not be rewritten: EACCES: permission denied, open '${join(UNWRITABLE_REPOSITORY_ROOT, "package.json")}'`,
+        ],
+      });
+    });
+  });
+
+  describe("a manifest the listing could not read", () => {
+    const it = test
+      .extend("writeReportOfTheRun", ({}, { onCleanup }) => {
+        const repositoryRoot = mkdtempSync(join(tmpdir(), "write-entry-composition-"));
+        onCleanup(() => {
+          rmSync(repositoryRoot, { recursive: true, force: true });
+        });
+        writeFileSync(join(repositoryRoot, "package.json"), "{ oops", "utf8");
+        return writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
+      })
+      .extend("manifestTextAfterTheRun", ({}, { onCleanup }) => {
+        const repositoryRoot = mkdtempSync(join(tmpdir(), "write-entry-composition-"));
+        onCleanup(() => {
+          rmSync(repositoryRoot, { recursive: true, force: true });
+        });
+        writeFileSync(join(repositoryRoot, "package.json"), "{ oops", "utf8");
+        writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
+        return readFileSync(join(repositoryRoot, "package.json"), "utf8");
+      });
+
+    it("passes the listing failure through", ({ writeReportOfTheRun }) => {
+      expect(writeReportOfTheRun).toStrictEqual({
+        failures: [
+          "package.json exists but does not parse as a JSON object, so the entry composition check did not run.",
+        ],
+      });
+    });
+
+    it("is left unwritten", ({ manifestTextAfterTheRun }) => {
+      expect(manifestTextAfterTheRun).toBe("{ oops");
+    });
   });
 });

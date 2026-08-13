@@ -4,72 +4,74 @@ import { createGitOperations } from "./git-operations.ts";
 
 import type { GitRunner } from "./git-runner.ts";
 
-const scriptedGit = (
-  producedByCommand: Readonly<
-    Record<string, { readonly stdout?: string; readonly fail?: boolean }>
-  >,
-): { readonly git: GitRunner; readonly calls: () => readonly string[] } => {
-  const recorded = new Map<number, string>();
-  const git: GitRunner = {
-    run: (invocation) => {
-      const named = invocation.args.join(" ");
-      recorded.set(recorded.size, named);
-      const scriptedOutput = producedByCommand[named];
-      if (scriptedOutput?.fail === true) return Promise.reject(new Error(`git failed: ${named}`));
-      return Promise.resolve({ stdout: scriptedOutput?.stdout ?? "", stderr: "" });
-    },
-  };
-  return { git, calls: () => [...recorded.values()] };
-};
-
-const it = test
-  .extend("uncommittedForDirtyStatus", () => {
-    const { git } = scriptedGit({ "status --porcelain": { stdout: " M file.ts\n" } });
-    return createGitOperations({ git, cwd: "/worktree" }).hasUncommittedChanges();
-  })
-  .extend("uncommittedForBlankStatus", () => {
-    const { git } = scriptedGit({ "status --porcelain": { stdout: "  \n" } });
-    return createGitOperations({ git, cwd: "/worktree" }).hasUncommittedChanges();
-  })
-  .extend("rawPorcelainStatus", () => {
-    const { git } = scriptedGit({ "status --porcelain": { stdout: " M file.ts\n?? new.ts\n" } });
-    return createGitOperations({ git, cwd: "/worktree" }).porcelainStatus();
-  })
-  .extend("commitAllCalls", async () => {
-    const { git, calls } = scriptedGit({});
-    await createGitOperations({ git, cwd: "/worktree" }).commitAll("fix the tests");
-    return calls();
-  })
-  .extend("pushCalls", async () => {
-    const { git, calls } = scriptedGit({});
-    await createGitOperations({ git, cwd: "/worktree" }).push();
-    return calls();
-  })
-  .extend("mergeRemoteBranchCalls", async () => {
-    const { git, calls } = scriptedGit({});
-    await createGitOperations({ git, cwd: "/worktree" }).mergeRemoteBranch("topic/x");
-    return calls();
-  })
-  .extend("topLevelFromRelativeOutput", () => {
-    const { git } = scriptedGit({ "rev-parse --show-toplevel": { stdout: ".\n" } });
-    return createGitOperations({ git, cwd: "/worktree" }).topLevelPath();
-  })
-  .extend("sharedGitDirFromBlankOutput", () => {
-    const { git } = scriptedGit({ "rev-parse --git-common-dir": { stdout: "   \n" } });
-    return createGitOperations({ git, cwd: "/worktree" }).sharedGitDirPath();
-  })
-  .extend("topLevelAfterFailure", () => {
-    const failingGit: GitRunner = { run: () => Promise.reject(new Error("git exploded")) };
-    return createGitOperations({ git: failingGit, cwd: "/worktree" }).topLevelPath();
-  })
-  .extend("sharedGitDirFromAbsoluteOutput", () => {
-    const runSpy = vi.fn<GitRunner["run"]>(() =>
-      Promise.resolve({ stdout: "/shared/.git\n", stderr: "" }),
-    );
-    return createGitOperations({ git: { run: runSpy }, cwd: "/worktree" }).sharedGitDirPath();
-  });
-
 describe("createGitOperations", () => {
+  const it = test
+    .extend("uncommittedForDirtyStatus", () =>
+      createGitOperations({
+        git: { run: () => Promise.resolve({ stdout: " M file.ts\n", stderr: "" }) },
+        cwd: "/worktree",
+      }).hasUncommittedChanges())
+    .extend("uncommittedForBlankStatus", () =>
+      createGitOperations({
+        git: { run: () => Promise.resolve({ stdout: "  \n", stderr: "" }) },
+        cwd: "/worktree",
+      }).hasUncommittedChanges(),
+    )
+    .extend("rawPorcelainStatus", () =>
+      createGitOperations({
+        git: { run: () => Promise.resolve({ stdout: " M file.ts\n?? new.ts\n", stderr: "" }) },
+        cwd: "/worktree",
+      }).porcelainStatus(),
+    )
+    .extend("commitAllRunSpy", async () => {
+      const commitAllRun = vi.fn<GitRunner["run"]>(() =>
+        Promise.resolve({ stdout: "", stderr: "" }),
+      );
+      await createGitOperations({ git: { run: commitAllRun }, cwd: "/worktree" }).commitAll(
+        "fix the tests",
+      );
+      return commitAllRun;
+    })
+    .extend("pushRunSpy", async () => {
+      const pushRun = vi.fn<GitRunner["run"]>(() => Promise.resolve({ stdout: "", stderr: "" }));
+      await createGitOperations({ git: { run: pushRun }, cwd: "/worktree" }).push();
+      return pushRun;
+    })
+    .extend("mergeRemoteBranchRunSpy", async () => {
+      const mergeRemoteBranchRun = vi.fn<GitRunner["run"]>(() =>
+        Promise.resolve({ stdout: "", stderr: "" }),
+      );
+      await createGitOperations({
+        git: { run: mergeRemoteBranchRun },
+        cwd: "/worktree",
+      }).mergeRemoteBranch("topic/x");
+      return mergeRemoteBranchRun;
+    })
+    .extend("topLevelFromRelativeOutput", () =>
+      createGitOperations({
+        git: { run: () => Promise.resolve({ stdout: ".\n", stderr: "" }) },
+        cwd: "/worktree",
+      }).topLevelPath(),
+    )
+    .extend("sharedGitDirFromBlankOutput", () =>
+      createGitOperations({
+        git: { run: () => Promise.resolve({ stdout: "   \n", stderr: "" }) },
+        cwd: "/worktree",
+      }).sharedGitDirPath(),
+    )
+    .extend("topLevelAfterFailure", () =>
+      createGitOperations({
+        git: { run: () => Promise.reject(new Error("git exploded")) },
+        cwd: "/worktree",
+      }).topLevelPath(),
+    )
+    .extend("sharedGitDirFromAbsoluteOutput", () =>
+      createGitOperations({
+        git: { run: () => Promise.resolve({ stdout: "/shared/.git\n", stderr: "" }) },
+        cwd: "/worktree",
+      }).sharedGitDirPath(),
+    );
+
   it("porcelain 出力が非空なら未コミット変更ありと判定する", ({ uncommittedForDirtyStatus }) => {
     expect(uncommittedForDirtyStatus).toStrictEqual(true);
   });
@@ -82,19 +84,39 @@ describe("createGitOperations", () => {
     expect(rawPorcelainStatus).toStrictEqual(" M file.ts\n?? new.ts\n");
   });
 
-  it("commitAll は全ステージしてからメッセージ付きコミットする", ({ commitAllCalls }) => {
-    expect(commitAllCalls).toStrictEqual(["add -A", "commit -m fix the tests"]);
+  it("commitAll は最初に作業ツリー全体をステージする", ({ commitAllRunSpy }) => {
+    expect(commitAllRunSpy).toHaveBeenNthCalledWith(1, {
+      args: ["add", "-A"],
+      cwd: "/worktree",
+    });
   });
 
-  it("push は origin へ現在の HEAD を送る", ({ pushCalls }) => {
-    expect(pushCalls).toStrictEqual(["push origin HEAD"]);
+  it("commitAll はステージの次にメッセージ付きでコミットする", ({ commitAllRunSpy }) => {
+    expect(commitAllRunSpy).toHaveBeenNthCalledWith(2, {
+      args: ["commit", "-m", "fix the tests"],
+      cwd: "/worktree",
+    });
   });
 
-  it("mergeRemoteBranch は fetch してから no-ff マージする", ({ mergeRemoteBranchCalls }) => {
-    expect(mergeRemoteBranchCalls).toStrictEqual([
-      "fetch origin topic/x",
-      "merge --no-ff origin/topic/x",
-    ]);
+  it("push は origin へ現在の HEAD を送る", ({ pushRunSpy }) => {
+    expect(pushRunSpy).toHaveBeenCalledExactlyOnceWith({
+      args: ["push", "origin", "HEAD"],
+      cwd: "/worktree",
+    });
+  });
+
+  it("mergeRemoteBranch は最初に対象ブランチを fetch する", ({ mergeRemoteBranchRunSpy }) => {
+    expect(mergeRemoteBranchRunSpy).toHaveBeenNthCalledWith(1, {
+      args: ["fetch", "origin", "topic/x"],
+      cwd: "/worktree",
+    });
+  });
+
+  it("mergeRemoteBranch は fetch の次に no-ff マージする", ({ mergeRemoteBranchRunSpy }) => {
+    expect(mergeRemoteBranchRunSpy).toHaveBeenNthCalledWith(2, {
+      args: ["merge", "--no-ff", "origin/topic/x"],
+      cwd: "/worktree",
+    });
   });
 
   it("topLevelPath は相対出力を cwd 基準で絶対化する", ({ topLevelFromRelativeOutput }) => {

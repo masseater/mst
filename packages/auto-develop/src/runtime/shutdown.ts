@@ -19,15 +19,16 @@ export const registerShutdown = (registration: {
   readonly onSignal: (signal: ShutdownSignal) => void;
   readonly log: Logger;
 }): ShutdownRegistration => {
-  const listeners = new Map<ShutdownSignal, () => void>();
-  for (const signal of SHUTDOWN_SIGNALS) {
-    const listener = (): void => {
-      registration.log.info({ signal }, "shutdown signal received");
-      registration.onSignal(signal);
-    };
-    listeners.set(signal, listener);
-    registration.target.on(signal, listener);
-  }
+  const listeners = new Map<ShutdownSignal, () => void>(
+    SHUTDOWN_SIGNALS.map((signal) => [
+      signal,
+      (): void => {
+        registration.log.info({ signal }, "shutdown signal received");
+        registration.onSignal(signal);
+      },
+    ]),
+  );
+  for (const [signal, listener] of listeners) registration.target.on(signal, listener);
   return {
     release: () => {
       for (const [signal, listener] of listeners) registration.target.off(signal, listener);

@@ -62,9 +62,10 @@ const joinedFromSides = (
 ): string | null => {
   if (node.operator !== CONCATENATION_OPERATOR) return null;
 
-  const spelled = listedFieldsOf([node.left, node.right]).map((side) =>
-    staticSpecifierOf(side, constants),
-  );
+  const spelled = [node.left, node.right].map((side) => {
+    const written = astFieldsOf(side);
+    return written === null ? null : staticSpecifierOf(written, constants);
+  });
   return spelled.includes(null) ? null : spelled.join("");
 };
 

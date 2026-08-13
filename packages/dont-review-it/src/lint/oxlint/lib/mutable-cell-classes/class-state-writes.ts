@@ -1,5 +1,3 @@
-import { uniq } from "es-toolkit";
-
 import { SUGARED_NODE_TYPES } from "../node-kinds.ts";
 import { listedFieldsOf } from "../setup-modules/coupling-edges.ts";
 import { fieldOf, kindAt, nodeVisitsIn } from "./node-visits.ts";
@@ -81,5 +79,5 @@ const fieldsWrittenBy = (member: unknown): readonly string[] => {
   return [];
 };
 
-export const stateFieldsWrittenAfterConstruction = (classNode: unknown): readonly string[] =>
-  uniq(listedFieldsOf(fieldOf(fieldOf(classNode, "body"), "body")).flatMap(fieldsWrittenBy));
+export const stateFieldsWrittenAfterConstruction = (classNode: unknown): ReadonlySet<string> =>
+  new Set(listedFieldsOf(fieldOf(fieldOf(classNode, "body"), "body")).flatMap(fieldsWrittenBy));

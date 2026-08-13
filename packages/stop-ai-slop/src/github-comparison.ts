@@ -1,3 +1,5 @@
+import { isPlainObject } from "es-toolkit";
+
 import {
   comparisonFrom,
   decodedPreviousSource,
@@ -20,11 +22,6 @@ type ComparedFile = Readonly<{
   status: string;
   previous_filename?: string;
   patch?: string;
-}>;
-
-type Compared = Readonly<{
-  merge_base_commit: Readonly<{ sha: string }>;
-  files?: readonly ComparedFile[];
 }>;
 
 const movedFrom = (file: ComparedFile): string => {
@@ -96,14 +93,92 @@ const patchEntryOf = (file: ComparedFile): string => {
   return `${lines.join("\n")}\n`;
 };
 
-const comparedFrom = (carried: unknown): Compared => carried as Compared;
+const fieldsFrom = (held: unknown, refusal: string): Readonly<Record<string, unknown>> => {
+  if (!isPlainObject(held)) {
+    throw new Error(refusal);
+  }
+  return held;
+};
+
+const textFrom = (held: unknown, refusal: string): string => {
+  if (typeof held !== "string") {
+    throw new Error(refusal);
+  }
+  return held;
+};
+
+const optionalTextFrom = (held: unknown, refusal: string): string | undefined =>
+  held === undefined ? undefined : textFrom(held, refusal);
+
+const comparedFileFrom = (held: unknown): ComparedFile => {
+  const fileFields = fieldsFrom(
+    held,
+    "Do not read a changed file the compare answered as something other than an object.",
+  );
+  return {
+    filename: textFrom(
+      fileFields.filename,
+      "Do not read a changed file the compare answered without a path.",
+    ),
+    status: textFrom(
+      fileFields.status,
+      "Do not read a changed file the compare answered without a status.",
+    ),
+    previous_filename: optionalTextFrom(
+      fileFields.previous_filename,
+      "Do not read a former path the compare answered as something other than text.",
+    ),
+    patch: optionalTextFrom(
+      fileFields.patch,
+      "Do not read a patch the compare answered as something other than text.",
+    ),
+  };
+};
+
+const isChangedFileList = (held: unknown): held is readonly unknown[] => Array.isArray(held);
+
+const comparedFilesFrom = (held: unknown): readonly ComparedFile[] => {
+  if (!isChangedFileList(held)) {
+    throw new Error(
+      "Do not read the changed files the compare answered as something other than a list.",
+    );
+  }
+  return held.map(comparedFileFrom);
+};
+
+const comparedFrom = (
+  carried: unknown,
+): Readonly<{ mergeBaseRevision: string; files: readonly ComparedFile[] }> => {
+  const compareFields = fieldsFrom(
+    carried,
+    "Do not read a compare the API answered as something other than an object.",
+  );
+  const mergeBaseFields = fieldsFrom(
+    compareFields.merge_base_commit,
+    "Do not read a compare the API answered without its merge base commit.",
+  );
+  const changedFiles = compareFields.files;
+  return {
+    mergeBaseRevision: textFrom(
+      mergeBaseFields.sha,
+      "Do not read a merge base commit the compare answered without a revision.",
+    ),
+    files: changedFiles === undefined ? [] : comparedFilesFrom(changedFiles),
+  };
+};
 
 const decodedContent = (carried: unknown): Uint8Array => {
-  const { content } = carried as Readonly<{ content?: string }>;
-  if (content === undefined) {
-    throw new Error("Do not read a file the contents API answered without content.");
-  }
-  return Buffer.from(content, "base64");
+  const contentsFields = fieldsFrom(
+    carried,
+    "Do not read a file the contents API answered as something other than an object.",
+  );
+  return Buffer.from(
+    textFrom(
+      contentsFields.content,
+      "Do not read a file the contents API answered without content.",
+    ),
+    "base64",
+  );
 };
 
 export const compareGitHubPullRequest = async ({
@@ -113,11 +188,9 @@ export const compareGitHubPullRequest = async ({
   headRevision,
   request,
 }: GitHubPullRequestComparison): Promise<RepositoryComparison> => {
-  const compared = comparedFrom(
+  const { mergeBaseRevision, files } = comparedFrom(
     await request(`/repos/${repository}/compare/${baseRevision}...${headRevision}`),
   );
-  const files = compared.files ?? [];
-  const mergeBase = compared.merge_base_commit.sha;
   const contentsAt =
     (revision: string, decode: (path: string, sourceBytes: Uint8Array) => string | null) =>
     async (path: string) =>
@@ -130,13 +203,15 @@ export const compareGitHubPullRequest = async ({
 
   return {
     repositoryRoot,
-    baseRevision: mergeBase,
+    baseRevision: mergeBaseRevision,
     headRevision,
     files: await comparisonFrom({
       inventoryOutput: files.map(inventoryEntryOf).join(""),
       diff: files.map(patchEntryOf).join(""),
       sources: {
-        base: contentsAt(mergeBase, (_path, sourceBytes) => decodedPreviousSource(sourceBytes)),
+        base: contentsAt(mergeBaseRevision, (_path, sourceBytes) =>
+          decodedPreviousSource(sourceBytes),
+        ),
         head: contentsAt(headRevision, decodedSource),
       },
     }),

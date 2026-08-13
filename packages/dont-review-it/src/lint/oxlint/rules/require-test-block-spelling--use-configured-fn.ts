@@ -1,27 +1,24 @@
+import { sortBy } from "es-toolkit";
+
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
+import { optionsRecord } from "../lib/rule-options.ts";
 import { FIXTURE_BUILDER_MEMBER } from "../lib/spec-syntax/fixture-declarations.ts";
 import { staticMemberName } from "../lib/spec-syntax/static-names.ts";
 import { unwrapSubject } from "../lib/spec-syntax/subject-expressions.ts";
-import { INJECTED_TEST_BLOCK_SPELLINGS } from "../lib/spec-syntax/test-block-declarations.ts";
+import {
+  INJECTED_TEST_BLOCK_SPELLINGS,
+  RUNNER_MODULES,
+} from "../lib/spec-syntax/test-block-declarations.ts";
 import { testBlockRootIdentifier } from "../lib/spec-syntax/test-block-modifiers.ts";
 
 import type { ESTree, Options, Scope, Variable } from "@oxlint/plugins";
 
 const CANONICAL_BLOCK_SPELLING = "it";
 
-const RUNNER_MODULES: readonly string[] = ["vitest", "vite-plus/test"];
-
 const BLOCK_SPELLING_OPTION = "blockSpelling";
 
 const RUNNER_MODULES_OPTION = "runnerModules";
-
-const optionsRecord = (
-  ruleOptions: Readonly<Options>,
-): Readonly<Record<string, unknown>> | null => {
-  const [first] = ruleOptions;
-  if (typeof first !== "object" || first === null || Array.isArray(first)) return null;
-  return first;
-};
 
 const blockSpellingFrom = (ruleOptions: Readonly<Options>): string => {
   const configured = optionsRecord(ruleOptions)?.[BLOCK_SPELLING_OPTION];
@@ -33,9 +30,9 @@ const runnerModulesFrom = (ruleOptions: Readonly<Options>): readonly string[] =>
   return Array.isArray(configured) ? configured : RUNNER_MODULES;
 };
 
-const boundVariable = (scope: Scope | null, spelled: string): Variable | null => {
+const boundVariable = (scope: Scope | null, identifierName: string): Variable | null => {
   if (scope === null) return null;
-  return scope.set.get(spelled) ?? boundVariable(scope.upper, spelled);
+  return scope.set.get(identifierName) ?? boundVariable(scope.upper, identifierName);
 };
 
 const initializerOf = (variable: Variable): ESTree.Expression | null => {
@@ -55,7 +52,43 @@ const fixtureBuilderBase = (initializer: ESTree.Expression): ESTree.Expression |
 const importedSpelling = (imported: ESTree.ModuleExportName): string =>
   imported.type === "Identifier" ? imported.name : imported.value;
 
+const importedBlockNamesIn = (
+  program: ESTree.Program,
+  runnerModules: readonly string[],
+): ReadonlySet<string> =>
+  new Set(
+    nodesOfType(program, "ImportDeclaration").flatMap((declaration) =>
+      runnerModules.includes(declaration.source.value)
+        ? declaration.specifiers.flatMap((specifier) =>
+            specifier.type === "ImportSpecifier" &&
+            INJECTED_TEST_BLOCK_SPELLINGS.has(importedSpelling(specifier.imported))
+              ? [specifier.local.name]
+              : [],
+          )
+        : [],
+    ),
+  );
+
 const spanKey = (node: ESTree.Node): string => `${String(node.start)}:${String(node.end)}`;
+
+const declaredRootsIn = (program: ESTree.Program): readonly ESTree.IdentifierReference[] => {
+  const declared = [
+    ...nodesOfType(program, "CallExpression").map((call) => call.callee),
+    ...nodesOfType(program, "TaggedTemplateExpression").map((tagged) => tagged.tag),
+  ].flatMap((expression) => {
+    const root = testBlockRootIdentifier(expression);
+    return root === null ? [] : [root];
+  });
+
+  return [
+    ...new Map(
+      sortBy(declared, ["start"]).map((root): readonly [string, ESTree.IdentifierReference] => [
+        spanKey(root),
+        root,
+      ]),
+    ).values(),
+  ];
+};
 
 export const requireTestBlockSpelling = createDontReviewItRule({
   name: "require-test-block-spelling--use-configured-fn",
@@ -87,13 +120,16 @@ export const requireTestBlockSpelling = createDontReviewItRule({
   create(inspection) {
     const required = blockSpellingFrom(inspection.options);
     const runnerModules = runnerModulesFrom(inspection.options);
-    const importedBlocks = new Set<string>();
-    const declaredRoots = new Map<string, ESTree.IdentifierReference>();
 
-    const runnerBlockKind = (
-      root: ESTree.IdentifierReference,
-      seen: ReadonlySet<string>,
-    ): "binding" | "injected" | null => {
+    const runnerBlockKind = ({
+      root,
+      importedBlocks,
+      seen,
+    }: {
+      readonly root: ESTree.IdentifierReference;
+      readonly importedBlocks: ReadonlySet<string>;
+      readonly seen: ReadonlySet<string>;
+    }): "binding" | "injected" | null => {
       if (seen.has(root.name)) return null;
       if (importedBlocks.has(root.name)) return "binding";
 
@@ -106,17 +142,26 @@ export const requireTestBlockSpelling = createDontReviewItRule({
 
       const derived = testBlockRootIdentifier(fixtureBuilderBase(initializer) ?? initializer);
       if (derived === null) return null;
-      return runnerBlockKind(derived, new Set([...seen, root.name])) === null ? null : "binding";
+
+      const reached = runnerBlockKind({
+        root: derived,
+        importedBlocks,
+        seen: new Set([...seen, root.name]),
+      });
+      return reached === null ? null : "binding";
     };
 
-    const reportRoot = (root: ESTree.IdentifierReference): void => {
+    const reportRoot = (
+      root: ESTree.IdentifierReference,
+      importedBlocks: ReadonlySet<string>,
+    ): void => {
       if (root.name === required) return;
 
-      const nodeKind = runnerBlockKind(root, new Set());
-      if (nodeKind === null) return;
+      const blockOrigin = runnerBlockKind({ root, importedBlocks, seen: new Set() });
+      if (blockOrigin === null) return;
 
       const report = { node: root, data: { written: root.name, required } };
-      if (nodeKind === "binding") {
+      if (blockOrigin === "binding") {
         inspection.report({ ...report, messageId: "foreignBlockBinding" });
         return;
       }
@@ -127,29 +172,10 @@ export const requireTestBlockSpelling = createDontReviewItRule({
       });
     };
 
-    const rememberRoot = (declared: ESTree.Expression): void => {
-      const root = testBlockRootIdentifier(declared);
-      if (root === null) return;
-      declaredRoots.set(spanKey(root), root);
-    };
-
     return {
-      ImportDeclaration(node: ESTree.ImportDeclaration) {
-        if (!runnerModules.includes(node.source.value)) return;
-        for (const specifier of node.specifiers) {
-          if (specifier.type !== "ImportSpecifier") continue;
-          if (!INJECTED_TEST_BLOCK_SPELLINGS.has(importedSpelling(specifier.imported))) continue;
-          importedBlocks.add(specifier.local.name);
-        }
-      },
-      CallExpression(node: ESTree.CallExpression) {
-        rememberRoot(node.callee);
-      },
-      TaggedTemplateExpression(node: ESTree.TaggedTemplateExpression) {
-        rememberRoot(node.tag);
-      },
-      "Program:exit"() {
-        for (const root of declaredRoots.values()) reportRoot(root);
+      "Program:exit"(program: ESTree.Program) {
+        const importedBlocks = importedBlockNamesIn(program, runnerModules);
+        for (const root of declaredRootsIn(program)) reportRoot(root, importedBlocks);
       },
     };
   },

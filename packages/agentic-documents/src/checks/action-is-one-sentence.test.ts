@@ -4,34 +4,87 @@ import { defaultConfig } from "../config.ts";
 import { toNormativeDocument } from "../scan/normative-documents.ts";
 import { rationaleOnActionLine } from "./action-is-one-sentence.ts";
 
-const rationaleProblemsIn = (source: string) =>
-  rationaleOnActionLine({
-    document: toNormativeDocument({ file: "AGENTS.md", source, config: defaultConfig }),
-    config: defaultConfig,
-  });
+const RATIONALE_MESSAGE =
+  "行動の行に理由を続けることは禁止されている。行動は 1 文で言い切り、理由はその項目の入れ子へ移す。理由を消すのではなく置き場所を変える。";
 
 describe("rationaleOnActionLine", () => {
-  test("散文で始まらない項目そのものは行動を持たず、入れ子の項目だけが報告される", () => {
-    expect(
-      rationaleProblemsIn("- - MUST: 記録する。記録が無いと辿れない。\n").length,
-    ).toStrictEqual(1);
+  describe("散文で始まらず、理由を続けた入れ子の項目だけを持つ項目", () => {
+    const it = test.extend("problems", () =>
+      rationaleOnActionLine({
+        document: toNormativeDocument({
+          file: "AGENTS.md",
+          source: "- - MUST: 記録する。記録が無いと辿れない。\n",
+          config: defaultConfig,
+        }),
+        config: defaultConfig,
+      }));
+
+    it("行動を持つのは入れ子の項目だけなので、その項目だけを報告する", ({ problems }) => {
+      expect(problems).toStrictEqual([{ file: "AGENTS.md", line: 1, message: RATIONALE_MESSAGE }]);
+    });
   });
 
-  test("行動の行に 2 文目があると報告する", () => {
-    expect(
-      rationaleProblemsIn("- MUST: 記録する。記録が無いと後から辿れないためである。\n").length,
-    ).toStrictEqual(1);
+  describe("行動の行に 2 文目を続けた項目", () => {
+    const it = test.extend("problems", () =>
+      rationaleOnActionLine({
+        document: toNormativeDocument({
+          file: "AGENTS.md",
+          source: "- MUST: 記録する。記録が無いと後から辿れないためである。\n",
+          config: defaultConfig,
+        }),
+        config: defaultConfig,
+      }));
+
+    it("その行を報告する", ({ problems }) => {
+      expect(problems).toStrictEqual([{ file: "AGENTS.md", line: 1, message: RATIONALE_MESSAGE }]);
+    });
   });
 
-  test("行動が 1 文なら報告しない", () => {
-    expect(rationaleProblemsIn("- MUST: 記録する。\n")).toStrictEqual([]);
+  describe("行動が 1 文で終わる項目", () => {
+    const it = test.extend("problems", () =>
+      rationaleOnActionLine({
+        document: toNormativeDocument({
+          file: "AGENTS.md",
+          source: "- MUST: 記録する。\n",
+          config: defaultConfig,
+        }),
+        config: defaultConfig,
+      }));
+
+    it("何も報告しない", ({ problems }) => {
+      expect(problems).toStrictEqual([]);
+    });
   });
 
-  test("条件を持つ項目でも行動が 1 文なら報告しない", () => {
-    expect(rationaleProblemsIn("- IF: 開始する; THEN MUST: 記録する\n")).toStrictEqual([]);
+  describe("条件を持ち、行動が 1 文で終わる項目", () => {
+    const it = test.extend("problems", () =>
+      rationaleOnActionLine({
+        document: toNormativeDocument({
+          file: "AGENTS.md",
+          source: "- IF: 開始する; THEN MUST: 記録する\n",
+          config: defaultConfig,
+        }),
+        config: defaultConfig,
+      }));
+
+    it("何も報告しない", ({ problems }) => {
+      expect(problems).toStrictEqual([]);
+    });
   });
 
-  test("判断キーワードを持たない項目は対象にしない", () => {
-    expect(rationaleProblemsIn("- 記録する。理由はここに書く。\n")).toStrictEqual([]);
+  describe("判断キーワードを持たない項目", () => {
+    const it = test.extend("problems", () =>
+      rationaleOnActionLine({
+        document: toNormativeDocument({
+          file: "AGENTS.md",
+          source: "- 記録する。理由はここに書く。\n",
+          config: defaultConfig,
+        }),
+        config: defaultConfig,
+      }));
+
+    it("検査の対象にならず、何も報告しない", ({ problems }) => {
+      expect(problems).toStrictEqual([]);
+    });
   });
 });

@@ -1,144 +1,433 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import {
-  buildLibraryVocabularyIndex,
-  libraryOwnersOf,
-  type LibraryVocabularyEntry,
-} from "./vocabulary-index.ts";
+import { buildLibraryVocabularyIndex, libraryOwnersOf } from "./vocabulary-index.ts";
 
-describe("vocabulary-index", () => {
-  const harvested = (
-    overrides: Partial<LibraryVocabularyEntry> & Pick<LibraryVocabularyEntry, "typeName">,
-  ): LibraryVocabularyEntry => ({
-    packageName: "oxlint",
-    declarationId: `oxlint/dist/index.d.ts#${overrides.typeName}`,
-    values: ["allow", "deny", "error", "off", "warn"],
-    admitsUnnamedValues: false,
-    ...overrides,
+const SEVERITY_VALUES = ["allow", "deny", "error", "off", "warn"];
+
+describe("libraryOwnersOf", () => {
+  describe("a type whose values are exactly the ones written here", () => {
+    const it = test.extend("owners", () =>
+      libraryOwnersOf(
+        buildLibraryVocabularyIndex([
+          {
+            packageName: "oxlint",
+            typeName: "OrderStatus",
+            declarationId: "oxlint/dist/index.d.ts#OrderStatus",
+            values: ["draft", "published"],
+            admitsUnnamedValues: false,
+          },
+        ]),
+        ["draft", "published"],
+      ));
+
+    it("owns them", ({ owners }) => {
+      expect(owners).toStrictEqual([
+        {
+          packageName: "oxlint",
+          typeName: "OrderStatus",
+          declarationId: "oxlint/dist/index.d.ts#OrderStatus",
+          values: ["draft", "published"],
+          admitsUnnamedValues: false,
+        },
+      ]);
+    });
   });
 
-  const namesOf = (owners: readonly { readonly typeName: string }[]): readonly string[] =>
-    owners.map((owner) => owner.typeName);
+  describe("a type whose values are the ones written here in the opposite order", () => {
+    const it = test.extend("owners", () =>
+      libraryOwnersOf(
+        buildLibraryVocabularyIndex([
+          {
+            packageName: "oxlint",
+            typeName: "OrderStatus",
+            declarationId: "oxlint/dist/index.d.ts#OrderStatus",
+            values: ["draft", "published"],
+            admitsUnnamedValues: false,
+          },
+        ]),
+        ["published", "draft"],
+      ));
 
-  test("a type whose values are exactly the ones written here owns them", () => {
-    const index = buildLibraryVocabularyIndex([
-      harvested({ typeName: "OrderStatus", values: ["draft", "published"] }),
-    ]);
-
-    expect(namesOf(libraryOwnersOf(index, ["draft", "published"]))).toStrictEqual(["OrderStatus"]);
+    it("owns them just the same, so the order they are written in does not decide it", ({
+      owners,
+    }) => {
+      expect(owners).toStrictEqual([
+        {
+          packageName: "oxlint",
+          typeName: "OrderStatus",
+          declarationId: "oxlint/dist/index.d.ts#OrderStatus",
+          values: ["draft", "published"],
+          admitsUnnamedValues: false,
+        },
+      ]);
+    });
   });
 
-  test("the order the values are written in does not decide whether the type owns them", () => {
-    const index = buildLibraryVocabularyIndex([
-      harvested({ typeName: "OrderStatus", values: ["draft", "published"] }),
-    ]);
+  describe("a type that admits more values than are written here", () => {
+    const it = test.extend("owners", () =>
+      libraryOwnersOf(
+        buildLibraryVocabularyIndex([
+          {
+            packageName: "oxlint",
+            typeName: "AllowWarnDeny",
+            declarationId: "oxlint/dist/index.d.ts#AllowWarnDeny",
+            values: SEVERITY_VALUES,
+            admitsUnnamedValues: false,
+          },
+        ]),
+        ["error", "warn", "off"],
+      ));
 
-    expect(namesOf(libraryOwnersOf(index, ["published", "draft"]))).toStrictEqual(["OrderStatus"]);
+    it("still owns them", ({ owners }) => {
+      expect(owners).toStrictEqual([
+        {
+          packageName: "oxlint",
+          typeName: "AllowWarnDeny",
+          declarationId: "oxlint/dist/index.d.ts#AllowWarnDeny",
+          values: SEVERITY_VALUES,
+          admitsUnnamedValues: false,
+        },
+      ]);
+    });
   });
 
-  test("a type that admits more values than are written here still owns them", () => {
-    const index = buildLibraryVocabularyIndex([harvested({ typeName: "AllowWarnDeny" })]);
+  describe("a type that admits fewer values than are written here", () => {
+    const it = test.extend("owners", () =>
+      libraryOwnersOf(
+        buildLibraryVocabularyIndex([
+          {
+            packageName: "oxlint",
+            typeName: "LogType",
+            declarationId: "oxlint/dist/index.d.ts#LogType",
+            values: ["error", "warn"],
+            admitsUnnamedValues: false,
+          },
+        ]),
+        ["error", "warn", "off"],
+      ));
 
-    expect(namesOf(libraryOwnersOf(index, ["error", "warn", "off"]))).toStrictEqual([
-      "AllowWarnDeny",
-    ]);
+    it("does not own them", ({ owners }) => {
+      expect(owners).toStrictEqual([]);
+    });
   });
 
-  test("a type that admits fewer values than are written here does not own them", () => {
-    const index = buildLibraryVocabularyIndex([
-      harvested({ typeName: "LogType", values: ["error", "warn"] }),
-    ]);
+  describe("a type that shares no value with the ones written here", () => {
+    const it = test.extend("owners", () =>
+      libraryOwnersOf(
+        buildLibraryVocabularyIndex([
+          {
+            packageName: "oxlint",
+            typeName: "SSRTarget",
+            declarationId: "oxlint/dist/index.d.ts#SSRTarget",
+            values: ["node", "webworker"],
+            admitsUnnamedValues: false,
+          },
+        ]),
+        ["draft", "published"],
+      ));
 
-    expect(libraryOwnersOf(index, ["error", "warn", "off"])).toStrictEqual([]);
+    it("does not own them", ({ owners }) => {
+      expect(owners).toStrictEqual([]);
+    });
   });
 
-  test("a type that shares no value with the ones written here does not own them", () => {
-    const index = buildLibraryVocabularyIndex([
-      harvested({ typeName: "SSRTarget", values: ["node", "webworker"] }),
-    ]);
+  describe("digits written as text against a type admitting the numbers", () => {
+    const it = test.extend("owners", () =>
+      libraryOwnersOf(
+        buildLibraryVocabularyIndex([
+          {
+            packageName: "oxlint",
+            typeName: "Digits",
+            declarationId: "oxlint/dist/index.d.ts#Digits",
+            values: [1, 2, 3],
+            admitsUnnamedValues: false,
+          },
+        ]),
+        ["1", "2"],
+      ));
 
-    expect(libraryOwnersOf(index, ["draft", "published"])).toStrictEqual([]);
+    it("are not the numbers that type admits", ({ owners }) => {
+      expect(owners).toStrictEqual([]);
+    });
   });
 
-  test("a number and the same digits written as text are different values", () => {
-    const index = buildLibraryVocabularyIndex([
-      harvested({ typeName: "Digits", values: [1, 2, 3] }),
-    ]);
+  describe("digits written as numbers against a type admitting the numbers", () => {
+    const it = test.extend("owners", () =>
+      libraryOwnersOf(
+        buildLibraryVocabularyIndex([
+          {
+            packageName: "oxlint",
+            typeName: "Digits",
+            declarationId: "oxlint/dist/index.d.ts#Digits",
+            values: [1, 2, 3],
+            admitsUnnamedValues: false,
+          },
+        ]),
+        [1, 2],
+      ));
 
-    expect(libraryOwnersOf(index, ["1", "2"])).toStrictEqual([]);
-    expect(namesOf(libraryOwnersOf(index, [1, 2]))).toStrictEqual(["Digits"]);
+    it("are the values that type admits", ({ owners }) => {
+      expect(owners).toStrictEqual([
+        {
+          packageName: "oxlint",
+          typeName: "Digits",
+          declarationId: "oxlint/dist/index.d.ts#Digits",
+          values: [1, 2, 3],
+          admitsUnnamedValues: false,
+        },
+      ]);
+    });
   });
 
-  test("two names that reach one declaration are folded into a single candidate", () => {
-    const index = buildLibraryVocabularyIndex([
-      harvested({ packageName: "oxlint", typeName: "AllowWarnDeny", declarationId: "one" }),
-      harvested({ packageName: "@oxlint/plugins", typeName: "Severity", declarationId: "one" }),
-    ]);
+  describe("two names that reach one declaration", () => {
+    const it = test.extend("owners", () =>
+      libraryOwnersOf(
+        buildLibraryVocabularyIndex([
+          {
+            packageName: "oxlint",
+            typeName: "AllowWarnDeny",
+            declarationId: "one",
+            values: SEVERITY_VALUES,
+            admitsUnnamedValues: false,
+          },
+          {
+            packageName: "@oxlint/plugins",
+            typeName: "Severity",
+            declarationId: "one",
+            values: SEVERITY_VALUES,
+            admitsUnnamedValues: false,
+          },
+        ]),
+        ["error", "warn"],
+      ));
 
-    expect(namesOf(libraryOwnersOf(index, ["error", "warn"]))).toStrictEqual(["Severity"]);
+    it("are folded into a single candidate", ({ owners }) => {
+      expect(owners).toStrictEqual([
+        {
+          packageName: "@oxlint/plugins",
+          typeName: "Severity",
+          declarationId: "one",
+          values: SEVERITY_VALUES,
+          admitsUnnamedValues: false,
+        },
+      ]);
+    });
   });
 
-  test("two declarations that admit the same values are both offered as candidates", () => {
-    const index = buildLibraryVocabularyIndex([
-      harvested({ typeName: "AllowWarnDeny", declarationId: "one" }),
-      harvested({ typeName: "DummyRule", declarationId: "two" }),
-    ]);
+  describe("two declarations that admit the same values", () => {
+    const it = test.extend("owners", () =>
+      libraryOwnersOf(
+        buildLibraryVocabularyIndex([
+          {
+            packageName: "oxlint",
+            typeName: "AllowWarnDeny",
+            declarationId: "one",
+            values: SEVERITY_VALUES,
+            admitsUnnamedValues: false,
+          },
+          {
+            packageName: "oxlint",
+            typeName: "DummyRule",
+            declarationId: "two",
+            values: SEVERITY_VALUES,
+            admitsUnnamedValues: false,
+          },
+        ]),
+        ["error", "warn"],
+      ));
 
-    expect(namesOf(libraryOwnersOf(index, ["error", "warn"]))).toStrictEqual([
-      "AllowWarnDeny",
-      "DummyRule",
-    ]);
+    it("are both offered as candidates", ({ owners }) => {
+      expect(owners).toStrictEqual([
+        {
+          packageName: "oxlint",
+          typeName: "AllowWarnDeny",
+          declarationId: "one",
+          values: SEVERITY_VALUES,
+          admitsUnnamedValues: false,
+        },
+        {
+          packageName: "oxlint",
+          typeName: "DummyRule",
+          declarationId: "two",
+          values: SEVERITY_VALUES,
+          admitsUnnamedValues: false,
+        },
+      ]);
+    });
   });
 
-  test("candidates come back in the same order whichever order they were harvested in", () => {
-    const forward = buildLibraryVocabularyIndex([
-      harvested({ packageName: "vite", typeName: "LogLevel", declarationId: "one" }),
-      harvested({ packageName: "oxlint", typeName: "AllowWarnDeny", declarationId: "two" }),
-    ]);
-    const backward = buildLibraryVocabularyIndex([
-      harvested({ packageName: "oxlint", typeName: "AllowWarnDeny", declarationId: "two" }),
-      harvested({ packageName: "vite", typeName: "LogLevel", declarationId: "one" }),
-    ]);
+  describe("an index harvested with the later package first", () => {
+    const it = test.extend("owners", () =>
+      libraryOwnersOf(
+        buildLibraryVocabularyIndex([
+          {
+            packageName: "vite",
+            typeName: "LogLevel",
+            declarationId: "one",
+            values: SEVERITY_VALUES,
+            admitsUnnamedValues: false,
+          },
+          {
+            packageName: "oxlint",
+            typeName: "AllowWarnDeny",
+            declarationId: "two",
+            values: SEVERITY_VALUES,
+            admitsUnnamedValues: false,
+          },
+        ]),
+        ["error", "warn"],
+      ));
 
-    expect(namesOf(libraryOwnersOf(forward, ["error", "warn"]))).toStrictEqual([
-      "AllowWarnDeny",
-      "LogLevel",
-    ]);
-    expect(namesOf(libraryOwnersOf(backward, ["error", "warn"]))).toStrictEqual(
-      namesOf(libraryOwnersOf(forward, ["error", "warn"])),
-    );
+    it("hands its candidates back sorted by the package and the type that hold them", ({
+      owners,
+    }) => {
+      expect(owners).toStrictEqual([
+        {
+          packageName: "oxlint",
+          typeName: "AllowWarnDeny",
+          declarationId: "two",
+          values: SEVERITY_VALUES,
+          admitsUnnamedValues: false,
+        },
+        {
+          packageName: "vite",
+          typeName: "LogLevel",
+          declarationId: "one",
+          values: SEVERITY_VALUES,
+          admitsUnnamedValues: false,
+        },
+      ]);
+    });
   });
 
-  test("no values written here leaves nothing for a type to own", () => {
-    const index = buildLibraryVocabularyIndex([harvested({ typeName: "AllowWarnDeny" })]);
+  describe("an index harvested with the earlier package first", () => {
+    const it = test.extend("owners", () =>
+      libraryOwnersOf(
+        buildLibraryVocabularyIndex([
+          {
+            packageName: "oxlint",
+            typeName: "AllowWarnDeny",
+            declarationId: "two",
+            values: SEVERITY_VALUES,
+            admitsUnnamedValues: false,
+          },
+          {
+            packageName: "vite",
+            typeName: "LogLevel",
+            declarationId: "one",
+            values: SEVERITY_VALUES,
+            admitsUnnamedValues: false,
+          },
+        ]),
+        ["error", "warn"],
+      ));
 
-    expect(libraryOwnersOf(index, [])).toStrictEqual([]);
+    it("hands its candidates back in that same order, whichever order they were harvested in", ({
+      owners,
+    }) => {
+      expect(owners).toStrictEqual([
+        {
+          packageName: "oxlint",
+          typeName: "AllowWarnDeny",
+          declarationId: "two",
+          values: SEVERITY_VALUES,
+          admitsUnnamedValues: false,
+        },
+        {
+          packageName: "vite",
+          typeName: "LogLevel",
+          declarationId: "one",
+          values: SEVERITY_VALUES,
+          admitsUnnamedValues: false,
+        },
+      ]);
+    });
   });
 
-  test("an index built from nothing owns nothing", () => {
-    expect(libraryOwnersOf(buildLibraryVocabularyIndex([]), ["draft", "published"])).toStrictEqual(
-      [],
-    );
+  describe("no values written here at all", () => {
+    const it = test.extend("owners", () =>
+      libraryOwnersOf(
+        buildLibraryVocabularyIndex([
+          {
+            packageName: "oxlint",
+            typeName: "AllowWarnDeny",
+            declarationId: "oxlint/dist/index.d.ts#AllowWarnDeny",
+            values: SEVERITY_VALUES,
+            admitsUnnamedValues: false,
+          },
+        ]),
+        [],
+      ));
+
+    it("leaves nothing for a type to own", ({ owners }) => {
+      expect(owners).toStrictEqual([]);
+    });
   });
 
-  test("a candidate carries the values it admits beyond the ones written here", () => {
-    const index = buildLibraryVocabularyIndex([harvested({ typeName: "AllowWarnDeny" })]);
+  describe("an index built from nothing", () => {
+    const it = test.extend("owners", () =>
+      libraryOwnersOf(buildLibraryVocabularyIndex([]), ["draft", "published"]));
 
-    const [owner] = libraryOwnersOf(index, ["error", "warn", "off"]);
-    if (owner === undefined) throw new Error("the harvested type must own the severity vocabulary");
-
-    expect(owner.values).toStrictEqual(["allow", "deny", "error", "off", "warn"]);
-    expect(owner.packageName).toBe("oxlint");
+    it("owns nothing", ({ owners }) => {
+      expect(owners).toStrictEqual([]);
+    });
   });
 
-  test("a candidate says when its type also admits values that are not spelled out", () => {
-    const index = buildLibraryVocabularyIndex([
-      harvested({ typeName: "AllowWarnDeny", admitsUnnamedValues: true }),
-    ]);
+  describe("a single severity written against a type admitting five", () => {
+    const it = test.extend("owners", () =>
+      libraryOwnersOf(
+        buildLibraryVocabularyIndex([
+          {
+            packageName: "oxlint",
+            typeName: "AllowWarnDeny",
+            declarationId: "oxlint/dist/index.d.ts#AllowWarnDeny",
+            values: SEVERITY_VALUES,
+            admitsUnnamedValues: false,
+          },
+        ]),
+        ["error"],
+      ));
 
-    const [owner] = libraryOwnersOf(index, ["error", "warn"]);
-    if (owner === undefined) throw new Error("the harvested type must own the severity vocabulary");
+    it("hands back a candidate carrying the values it admits beyond the one written here", ({
+      owners,
+    }) => {
+      expect(owners).toStrictEqual([
+        {
+          packageName: "oxlint",
+          typeName: "AllowWarnDeny",
+          declarationId: "oxlint/dist/index.d.ts#AllowWarnDeny",
+          values: SEVERITY_VALUES,
+          admitsUnnamedValues: false,
+        },
+      ]);
+    });
+  });
 
-    expect(owner.admitsUnnamedValues).toBe(true);
+  describe("a type that also admits values nobody spelled out", () => {
+    const it = test.extend("owners", () =>
+      libraryOwnersOf(
+        buildLibraryVocabularyIndex([
+          {
+            packageName: "oxlint",
+            typeName: "AllowWarnDeny",
+            declarationId: "oxlint/dist/index.d.ts#AllowWarnDeny",
+            values: SEVERITY_VALUES,
+            admitsUnnamedValues: true,
+          },
+        ]),
+        ["error", "warn"],
+      ));
+
+    it("hands back a candidate that says so", ({ owners }) => {
+      expect(owners).toStrictEqual([
+        {
+          packageName: "oxlint",
+          typeName: "AllowWarnDeny",
+          declarationId: "oxlint/dist/index.d.ts#AllowWarnDeny",
+          values: SEVERITY_VALUES,
+          admitsUnnamedValues: true,
+        },
+      ]);
+    });
   });
 });

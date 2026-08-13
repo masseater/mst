@@ -1,59 +1,123 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
+import { runHook } from "cc-hooks-ts";
 import { describe, expect, test, vi } from "vite-plus/test";
 
+import { hook } from "./hook.ts";
 import { denyReasonFor } from "./message.ts";
 
-const { runHookMock } = vi.hoisted(() => ({ runHookMock: vi.fn<() => Promise<void>>() }));
+vi.mock(import("cc-hooks-ts"), { spy: true });
 
-vi.mock(import("cc-hooks-ts"), async (importOriginal) => ({
-  ...(await importOriginal()),
-  runHook: runHookMock,
-}));
+const CLI_PATH = fileURLToPath(new URL("./cli.ts", import.meta.url));
 
-const cliPath = fileURLToPath(new URL("./cli.ts", import.meta.url));
+const SLICING_COMMAND_PAYLOAD = JSON.stringify({
+  cwd: "/repo",
+  hook_event_name: "PreToolUse",
+  session_id: "session",
+  tool_input: { command: "vp test | tail -50" },
+  tool_name: "Bash",
+  tool_use_id: "toolu_1",
+  transcript_path: "/repo/transcript.jsonl",
+});
 
-const payloadFor = (command: string): string =>
-  JSON.stringify({
-    cwd: "/repo",
-    hook_event_name: "PreToolUse",
-    session_id: "session",
-    tool_input: { command },
-    tool_name: "Bash",
-    tool_use_id: "toolu_1",
-    transcript_path: "/repo/transcript.jsonl",
-  });
-
-const runCli = (command: string) =>
-  spawnSync(process.execPath, [cliPath], {
-    encoding: "utf8" as const,
-    input: payloadFor(command),
-  });
+const WHOLE_RECORD_COMMAND_PAYLOAD = JSON.stringify({
+  cwd: "/repo",
+  hook_event_name: "PreToolUse",
+  session_id: "session",
+  tool_input: { command: "git rev-parse HEAD" },
+  tool_name: "Bash",
+  tool_use_id: "toolu_1",
+  transcript_path: "/repo/transcript.jsonl",
+});
 
 describe("unabridged cli", () => {
-  test("エントリは hook 定義を runHook に渡す", async () => {
-    await import("./cli.ts");
-    const { hook } = await import("./hook.ts");
-    expect(runHookMock).toHaveBeenCalledWith(hook);
-  });
+  describe("the entry module", () => {
+    const it = test.extend("theRunnerTheEntryReached", async () => {
+      // mock-factory-exemption no-replaced-double-behaviour--let-the-replaced-module-answer -- whether the runner settles is decided by the standard input it reads inside the boundary this spec replaces, and the entry awaits it
+      vi.mocked(runHook).mockResolvedValue(undefined);
+      await import("./cli.ts");
+      return vi.mocked(runHook);
+    });
 
-  test("標準入力の PreToolUse を読み、拒否の判断を標準出力へ返す", { timeout: 30_000 }, () => {
-    const execution = runCli("vp test | tail -50");
-    expect(execution.status).toBe(0);
-    const decision: unknown = JSON.parse(execution.stdout);
-    expect(decision).toStrictEqual({
-      hookSpecificOutput: {
-        hookEventName: "PreToolUse",
-        permissionDecision: "deny",
-        permissionDecisionReason: denyReasonFor(["tail"]),
-      },
+    it("is handed the hook definition of this package", ({ theRunnerTheEntryReached }) => {
+      expect(theRunnerTheEntryReached).toHaveBeenCalledExactlyOnceWith(hook);
     });
   });
 
-  test("通す判断のときは標準出力に何も出さない", { timeout: 30_000 }, () => {
-    const execution = runCli("git rev-parse HEAD");
-    expect(execution.status).toBe(0);
-    expect(execution.stdout).toBe("");
+  describe("a Bash command slicing the record it reads", () => {
+    const it = test
+      .extend("theRunOverASlicingCommand", () =>
+        spawnSync(process.execPath, [CLI_PATH], {
+          encoding: "utf8",
+          input: SLICING_COMMAND_PAYLOAD,
+        }))
+      .extend("theExitCodeOverASlicingCommand", ({ theRunOverASlicingCommand }) => {
+        const { status } = theRunOverASlicingCommand;
+        return status;
+      })
+      .extend("theDecisionOverASlicingCommand", (): unknown =>
+        JSON.parse(
+          spawnSync(process.execPath, [CLI_PATH], {
+            encoding: "utf8",
+            input: SLICING_COMMAND_PAYLOAD,
+          }).stdout,
+        ),
+      );
+
+    it(
+      "ends on the code of a hook that finished",
+      { timeout: 30_000 },
+      ({ theExitCodeOverASlicingCommand }) => {
+        expect(theExitCodeOverASlicingCommand).toBe(0);
+      },
+    );
+
+    it(
+      "puts the refusal and the way out of it on standard output",
+      { timeout: 30_000 },
+      ({ theDecisionOverASlicingCommand }) => {
+        expect(theDecisionOverASlicingCommand).toStrictEqual({
+          hookSpecificOutput: {
+            hookEventName: "PreToolUse",
+            permissionDecision: "deny",
+            permissionDecisionReason: denyReasonFor(["tail"]),
+          },
+        });
+      },
+    );
+  });
+
+  describe("a Bash command reading the whole record", () => {
+    const it = test
+      .extend("theRunOverAWholeRecordCommand", () =>
+        spawnSync(process.execPath, [CLI_PATH], {
+          encoding: "utf8",
+          input: WHOLE_RECORD_COMMAND_PAYLOAD,
+        }))
+      .extend("theExitCodeOverAWholeRecordCommand", ({ theRunOverAWholeRecordCommand }) => {
+        const { status } = theRunOverAWholeRecordCommand;
+        return status;
+      })
+      .extend("theStandardOutputOverAWholeRecordCommand", ({ theRunOverAWholeRecordCommand }) => {
+        const { stdout } = theRunOverAWholeRecordCommand;
+        return stdout;
+      });
+
+    it(
+      "ends on the code of a hook that finished",
+      { timeout: 30_000 },
+      ({ theExitCodeOverAWholeRecordCommand }) => {
+        expect(theExitCodeOverAWholeRecordCommand).toBe(0);
+      },
+    );
+
+    it(
+      "leaves standard output empty",
+      { timeout: 30_000 },
+      ({ theStandardOutputOverAWholeRecordCommand }) => {
+        expect(theStandardOutputOverAWholeRecordCommand).toBe("");
+      },
+    );
   });
 });

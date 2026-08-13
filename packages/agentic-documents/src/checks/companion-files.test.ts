@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, onTestFinished, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { defaultConfig } from "../config.ts";
 import { toNormativeDocument } from "../scan/normative-documents.ts";
@@ -10,72 +10,199 @@ import { companionFileProblems } from "./companion-files.ts";
 
 const NORMATIVE_SOURCE = "# 規約\n";
 
-const rootWithCompanion = (companion: {
-  readonly kind: string;
-  readonly body?: string;
-}): string => {
-  const root = mkdtempSync(join(tmpdir(), "agentic-documents-companion-"));
-  onTestFinished(() => {
-    rmSync(root, { recursive: true, force: true });
-  });
-
-  writeFileSync(join(root, "AGENTS.md"), NORMATIVE_SOURCE);
-  if (companion.kind === "link") symlinkSync("AGENTS.md", join(root, "CLAUDE.md"));
-  if (companion.kind === "wrong-link") symlinkSync("README.md", join(root, "CLAUDE.md"));
-  if (companion.kind === "file") writeFileSync(join(root, "CLAUDE.md"), companion.body ?? "");
-
-  return root;
-};
-
-const problemsUnder = (repositoryRoot: string) =>
-  companionFileProblems({
-    repositoryRoot,
-    documents: [
-      toNormativeDocument({ file: "AGENTS.md", source: NORMATIVE_SOURCE, config: defaultConfig }),
-    ],
-    config: defaultConfig,
-  });
-
 describe("companionFileProblems", () => {
-  test("入れ子の文書の対応ファイルはその階層で探す", async () => {
-    const problems = await companionFileProblems({
-      repositoryRoot: rootWithCompanion({ kind: "none" }),
-      documents: [
-        toNormativeDocument({
-          file: "packages/example/AGENTS.md",
-          source: NORMATIVE_SOURCE,
-          config: defaultConfig,
-        }),
-      ],
-      config: defaultConfig,
+  describe("入れ子の規範文書に対応ファイルが無い配置", () => {
+    const it = test.extend("problems", async ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "agentic-documents-companion-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "AGENTS.md"), NORMATIVE_SOURCE);
+
+      return companionFileProblems({
+        repositoryRoot: root,
+        documents: [
+          toNormativeDocument({
+            file: "packages/example/AGENTS.md",
+            source: NORMATIVE_SOURCE,
+            config: defaultConfig,
+          }),
+        ],
+        config: defaultConfig,
+      });
     });
 
-    expect(problems[0]?.file).toStrictEqual("packages/example/CLAUDE.md");
+    it("その階層の対応ファイルを名指しで報告する", ({ problems }) => {
+      expect(problems).toStrictEqual([
+        {
+          file: "packages/example/CLAUDE.md",
+          line: null,
+          message:
+            "規範文書の隣に `CLAUDE.md` が無い。この名前を期待して読む主体には指示が届かない。規範文書への結び付きとして作る。",
+        },
+      ]);
+    });
   });
 
-  test("対応ファイルが無いと報告する", async () => {
-    expect((await problemsUnder(rootWithCompanion({ kind: "none" }))).length).toStrictEqual(1);
+  describe("根の規範文書に対応ファイルが無い配置", () => {
+    const it = test.extend("problems", async ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "agentic-documents-companion-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "AGENTS.md"), NORMATIVE_SOURCE);
+
+      return companionFileProblems({
+        repositoryRoot: root,
+        documents: [
+          toNormativeDocument({
+            file: "AGENTS.md",
+            source: NORMATIVE_SOURCE,
+            config: defaultConfig,
+          }),
+        ],
+        config: defaultConfig,
+      });
+    });
+
+    it("対応ファイルが無いと報告する", ({ problems }) => {
+      expect(problems).toStrictEqual([
+        {
+          file: "CLAUDE.md",
+          line: null,
+          message:
+            "規範文書の隣に `CLAUDE.md` が無い。この名前を期待して読む主体には指示が届かない。規範文書への結び付きとして作る。",
+        },
+      ]);
+    });
   });
 
-  test("結び付きが規範文書を指していれば報告しない", async () => {
-    expect(await problemsUnder(rootWithCompanion({ kind: "link" }))).toStrictEqual([]);
+  describe("結び付きが隣の規範文書を指す配置", () => {
+    const it = test.extend("problems", async ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "agentic-documents-companion-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "AGENTS.md"), NORMATIVE_SOURCE);
+      symlinkSync("AGENTS.md", join(root, "CLAUDE.md"));
+
+      return companionFileProblems({
+        repositoryRoot: root,
+        documents: [
+          toNormativeDocument({
+            file: "AGENTS.md",
+            source: NORMATIVE_SOURCE,
+            config: defaultConfig,
+          }),
+        ],
+        config: defaultConfig,
+      });
+    });
+
+    it("何も報告しない", ({ problems }) => {
+      expect(problems).toStrictEqual([]);
+    });
   });
 
-  test("結び付きの指し先が違うと報告する", async () => {
-    expect((await problemsUnder(rootWithCompanion({ kind: "wrong-link" }))).length).toStrictEqual(
-      1,
-    );
+  describe("結び付きが隣の規範文書以外を指す配置", () => {
+    const it = test.extend("problems", async ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "agentic-documents-companion-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "AGENTS.md"), NORMATIVE_SOURCE);
+      symlinkSync("README.md", join(root, "CLAUDE.md"));
+
+      return companionFileProblems({
+        repositoryRoot: root,
+        documents: [
+          toNormativeDocument({
+            file: "AGENTS.md",
+            source: NORMATIVE_SOURCE,
+            config: defaultConfig,
+          }),
+        ],
+        config: defaultConfig,
+      });
+    });
+
+    it("指し先を名指しで報告する", ({ problems }) => {
+      expect(problems).toStrictEqual([
+        {
+          file: "CLAUDE.md",
+          line: null,
+          message:
+            "`CLAUDE.md` の結び付きが `README.md` を指しており、隣の規範文書ではない。同じ場所の規範文書を指すよう作り直す。",
+        },
+      ]);
+    });
   });
 
-  test("中身を持つ通常のファイルを報告する", async () => {
-    const root = rootWithCompanion({ kind: "file", body: "# 別の規約\n\n中身がある。\n" });
+  describe("中身を持つ通常のファイルが対応ファイルの位置にある配置", () => {
+    const it = test.extend("problems", async ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "agentic-documents-companion-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "AGENTS.md"), NORMATIVE_SOURCE);
+      writeFileSync(join(root, "CLAUDE.md"), "# 別の規約\n\n中身がある。\n");
 
-    expect((await problemsUnder(root)).length).toStrictEqual(1);
+      return companionFileProblems({
+        repositoryRoot: root,
+        documents: [
+          toNormativeDocument({
+            file: "AGENTS.md",
+            source: NORMATIVE_SOURCE,
+            config: defaultConfig,
+          }),
+        ],
+        config: defaultConfig,
+      });
+    });
+
+    it("中身を持つ通常のファイルを報告する", ({ problems }) => {
+      expect(problems).toStrictEqual([
+        {
+          file: "CLAUDE.md",
+          line: null,
+          message:
+            "`CLAUDE.md` が通常のファイルとして中身を持っている。同じ指示の実体が 2 つある状態になる。中身を規範文書へ移してから、規範文書への結び付きに置き換える。",
+        },
+      ]);
+    });
   });
 
-  test("参照 1 つだけのファイルも報告する", async () => {
-    const root = rootWithCompanion({ kind: "file", body: "@AGENTS.md\n" });
+  describe("参照 1 つだけを中身に持つ通常のファイルが対応ファイルの位置にある配置", () => {
+    const it = test.extend("problems", async ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "agentic-documents-companion-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "AGENTS.md"), NORMATIVE_SOURCE);
+      writeFileSync(join(root, "CLAUDE.md"), "@AGENTS.md\n");
 
-    expect((await problemsUnder(root)).length).toStrictEqual(1);
+      return companionFileProblems({
+        repositoryRoot: root,
+        documents: [
+          toNormativeDocument({
+            file: "AGENTS.md",
+            source: NORMATIVE_SOURCE,
+            config: defaultConfig,
+          }),
+        ],
+        config: defaultConfig,
+      });
+    });
+
+    it("参照 1 つだけのファイルも報告する", ({ problems }) => {
+      expect(problems).toStrictEqual([
+        {
+          file: "CLAUDE.md",
+          line: null,
+          message:
+            "`CLAUDE.md` が規範文書を指す参照 1 つだけを中身として持っている。読み手によっては参照として解釈されず、その 1 行だけが指示として読まれる。規範文書への結び付きに置き換える。",
+        },
+      ]);
+    });
   });
 });

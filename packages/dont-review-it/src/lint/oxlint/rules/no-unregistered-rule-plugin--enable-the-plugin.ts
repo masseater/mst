@@ -1,4 +1,5 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { propertyKeyOf } from "../lib/object-literal.ts";
 import {
   declaredJsPluginNamesIn,
@@ -20,6 +21,33 @@ const listedPluginsOf = (ruleOptions: readonly unknown[]): readonly string[] => 
     ? listed.filter((named): named is string => typeof named === "string")
     : [];
 };
+
+type NamedRule = {
+  readonly property: ESTree.ObjectProperty;
+  readonly plugin: string;
+  readonly ruleName: string;
+};
+
+const namedRulesIn = (rules: ESTree.ObjectExpression): readonly NamedRule[] =>
+  rules.properties.flatMap<NamedRule>((property) => {
+    if (property.type !== "Property") return [];
+    const ruleName = propertyKeyOf(property);
+    if (ruleName === null || !ruleName.includes(PLUGIN_SEPARATOR)) return [];
+    if (severityLevelOf(property.value) === SILENT_LEVEL) return [];
+    return [{ property, plugin: ruleName.slice(0, ruleName.indexOf(PLUGIN_SEPARATOR)), ruleName }];
+  });
+
+const ruleBlocksIn = (program: ESTree.Program): readonly ESTree.ObjectExpression[] => [
+  ...nodesOfType(program, "ObjectExpression").flatMap((holder) => {
+    const rules = ruleBlockObjectOf(holder);
+    return rules === null ? [] : [rules];
+  }),
+  ...nodesOfType(program, "VariableDeclarator").flatMap((declared) =>
+    declaresRuleRecord(declared) && declared.init?.type === "ObjectExpression"
+      ? [declared.init]
+      : [],
+  ),
+];
 
 export const noUnregisteredRulePlugin = createDontReviewItRule({
   name: "no-unregistered-rule-plugin--enable-the-plugin",
@@ -45,41 +73,20 @@ export const noUnregisteredRulePlugin = createDontReviewItRule({
     ],
   },
   create(inspection) {
-    const enabledPlugins = new Set(listedPluginsOf(inspection.options));
-    const namedRuleByProperty = new Map<
-      ESTree.ObjectProperty,
-      { readonly plugin: string; readonly ruleName: string }
-    >();
-
-    const collectNamedRules = (rules: ESTree.ObjectExpression): void => {
-      for (const property of rules.properties) {
-        if (property.type !== "Property") continue;
-        const ruleName = propertyKeyOf(property);
-        if (ruleName === null || !ruleName.includes(PLUGIN_SEPARATOR)) continue;
-        if (severityLevelOf(property.value) === SILENT_LEVEL) continue;
-        namedRuleByProperty.set(property, {
-          plugin: ruleName.slice(0, ruleName.indexOf(PLUGIN_SEPARATOR)),
-          ruleName,
-        });
-      }
-    };
-
     return {
-      ObjectExpression(node: ESTree.ObjectExpression) {
-        for (const named of declaredPluginNamesIn(node)) enabledPlugins.add(named);
-        for (const named of declaredJsPluginNamesIn(node)) enabledPlugins.add(named);
-        const rules = ruleBlockObjectOf(node);
-        if (rules !== null) collectNamedRules(rules);
-      },
-      VariableDeclarator(node: ESTree.VariableDeclarator) {
-        if (!declaresRuleRecord(node)) return;
-        if (node.init?.type === "ObjectExpression") collectNamedRules(node.init);
-      },
-      "Program:exit"() {
-        for (const [property, named] of namedRuleByProperty) {
+      "Program:exit"(program: ESTree.Program) {
+        const enabledPlugins: ReadonlySet<string> = new Set([
+          ...listedPluginsOf(inspection.options),
+          ...nodesOfType(program, "ObjectExpression").flatMap((holder) => [
+            ...declaredPluginNamesIn(holder),
+            ...declaredJsPluginNamesIn(holder),
+          ]),
+        ]);
+
+        for (const named of ruleBlocksIn(program).flatMap(namedRulesIn)) {
           if (enabledPlugins.has(named.plugin)) continue;
           inspection.report({
-            node: property,
+            node: named.property,
             messageId: "unregisteredRulePlugin",
             data: { plugin: named.plugin, ruleName: named.ruleName },
           });

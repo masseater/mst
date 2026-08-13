@@ -28,13 +28,8 @@ describe("PR ごとのレーンが自動応答の同時実行を 1 件に抑え�
   });
 
   it("同じレーンで実行中の別ジョブは受け付けずに捨てる", async () => {
-    const gate = new Map<string, () => void>();
-    const handled = vi.fn<(payload: unknown) => Promise<void>>(
-      () =>
-        new Promise<void>((resolve) => {
-          gate.set("release", resolve);
-        }),
-    );
+    const firstJobGate = Promise.withResolvers<undefined>();
+    const handled = vi.fn<(payload: unknown) => Promise<void>>(() => firstJobGate.promise);
     const queue = createJobQueue({
       concurrency: 2,
       snapshotPath: snapshotPathIn(),
@@ -54,7 +49,7 @@ describe("PR ごとのレーンが自動応答の同時実行を 1 件に抑え�
       lane: "pr-7",
       label: "second",
     });
-    gate.get("release")?.();
+    firstJobGate.resolve(undefined);
     await queue.drain();
     expect(secondAccepted).toStrictEqual(false);
   });

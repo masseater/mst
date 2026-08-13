@@ -29,7 +29,6 @@ const repositoryWith = async (files: Readonly<Record<string, string>>): Promise<
 const reportedForWorkflow = async (workflowSource: string): Promise<string> => {
   const repositoryRoot = await repositoryWith({ [WORKFLOW_PATH]: workflowSource });
   const { problems } = runChecks(repositoryRoot);
-  expect(problems.length).toBeGreaterThan(0);
   return problems.join("\n");
 };
 

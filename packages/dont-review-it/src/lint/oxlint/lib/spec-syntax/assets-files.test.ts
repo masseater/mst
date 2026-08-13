@@ -2,83 +2,225 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { assetsNameMarkersFrom, assetsStemOf } from "./assets-files.ts";
 
-const markers: ReadonlySet<string> = assetsNameMarkersFrom([]);
+describe("assetsNameMarkersFrom", () => {
+  describe("options that name no markers", () => {
+    const it = test.extend("markers", () => assetsNameMarkersFrom([]));
 
-const replacedMarkers: ReadonlySet<string> = assetsNameMarkersFrom([
-  { assetsNameMarkers: ["fixtures"] },
-]);
-
-const listedMarkers: ReadonlySet<string> = assetsNameMarkersFrom([
-  { assetsNameMarkers: ["assets", "fixtures"] },
-]);
-
-describe("assets-files", () => {
-  test("a name spelled as stem, marker and extension names the stem it belongs to", () => {
-    expect(assetsStemOf("/repo/owner/order.assets.ts", markers)).toBe("order");
+    it("leaves the carried marker in force", ({ markers }) => {
+      expect(markers).toStrictEqual(new Set(["assets"]));
+    });
   });
 
-  test("a stem holding separators of its own stays whole in front of the marker", () => {
-    expect(assetsStemOf("/repo/owner/vite.config.assets.ts", markers)).toBe("vite.config");
+  describe("an entry that names no markers", () => {
+    const it = test.extend("markers", () => assetsNameMarkersFrom([{}]));
+
+    it("leaves the carried marker in force", ({ markers }) => {
+      expect(markers).toStrictEqual(new Set(["assets"]));
+    });
   });
 
-  test("the extension the data is written in takes no part in the stem", () => {
-    expect(assetsStemOf("/repo/owner/order.assets.json", markers)).toBe("order");
-    expect(assetsStemOf("/repo/owner/order.assets.yaml", markers)).toBe("order");
+  describe("options that carry a severity alone", () => {
+    const it = test.extend("markers", () => assetsNameMarkersFrom(["error"]));
+
+    it("leaves the carried marker in force", ({ markers }) => {
+      expect(markers).toStrictEqual(new Set(["assets"]));
+    });
   });
 
-  test("a name written with backslash separators names the same stem", () => {
-    expect(assetsStemOf("C:\\repo\\owner\\order.assets.ts", markers)).toBe("order");
+  describe("options that spell out markers", () => {
+    const it = test.extend("markers", () =>
+      assetsNameMarkersFrom([{ assetsNameMarkers: ["fixtures"] }]));
+
+    it("puts those markers in force", ({ markers }) => {
+      expect(markers).toStrictEqual(new Set(["fixtures"]));
+    });
   });
 
-  test("a name carrying no configured marker names no stem", () => {
-    expect(assetsStemOf("/repo/owner/order.ts", markers)).toBe(null);
-    expect(assetsStemOf("/repo/owner/order.fixtures.ts", markers)).toBe(null);
+  describe("an empty list of markers", () => {
+    const it = test.extend("markers", () => assetsNameMarkersFrom([{ assetsNameMarkers: [] }]));
+
+    it("leaves the carried marker in force", ({ markers }) => {
+      expect(markers).toStrictEqual(new Set(["assets"]));
+    });
   });
 
-  test("a directory named like test data does not make the files inside it test data", () => {
-    expect(assetsStemOf("/repo/owner/order.assets.ts/table.ts", markers)).toBe(null);
+  describe("a spelled out list holding an entry that is not a marker", () => {
+    const it = test.extend("markers", () =>
+      assetsNameMarkersFrom([{ assetsNameMarkers: ["fixtures", 7] }]));
+
+    it("drops that entry from the list", ({ markers }) => {
+      expect(markers).toStrictEqual(new Set(["fixtures"]));
+    });
+  });
+});
+
+describe("assetsStemOf", () => {
+  describe("under the carried marker", () => {
+    describe("a name carrying the marker", () => {
+      const it = test.extend("stem", () =>
+        assetsStemOf("order.assets.ts", assetsNameMarkersFrom([])));
+
+      it("stands for the spec it belongs to", ({ stem }) => {
+        expect(stem).toBe("order");
+      });
+    });
+
+    describe("a name below a directory", () => {
+      const it = test.extend("stem", () =>
+        assetsStemOf("src/checks/order.assets.ts", assetsNameMarkersFrom([])));
+
+      it("is read from its last segment alone", ({ stem }) => {
+        expect(stem).toBe("order");
+      });
+    });
+
+    describe("a stem holding separators of its own", () => {
+      const it = test.extend("stem", () =>
+        assetsStemOf("/repo/owner/vite.config.assets.ts", assetsNameMarkersFrom([])));
+
+      it("stays whole in front of the marker", ({ stem }) => {
+        expect(stem).toBe("vite.config");
+      });
+    });
+
+    describe("a name written as json", () => {
+      const it = test.extend("stem", () =>
+        assetsStemOf("/repo/owner/order.assets.json", assetsNameMarkersFrom([])));
+
+      it("stands for the spec its stem names", ({ stem }) => {
+        expect(stem).toBe("order");
+      });
+    });
+
+    describe("a name written as yaml", () => {
+      const it = test.extend("stem", () =>
+        assetsStemOf("/repo/owner/order.assets.yaml", assetsNameMarkersFrom([])));
+
+      it("stands for the spec its stem names", ({ stem }) => {
+        expect(stem).toBe("order");
+      });
+    });
+
+    describe("a name written with backslash separators", () => {
+      const it = test.extend("stem", () =>
+        assetsStemOf("C:\\repo\\owner\\order.assets.ts", assetsNameMarkersFrom([])));
+
+      it("stands for the same spec", ({ stem }) => {
+        expect(stem).toBe("order");
+      });
+    });
+
+    describe("a name carrying no marker at all", () => {
+      const it = test.extend("stem", () =>
+        assetsStemOf("/repo/owner/order.ts", assetsNameMarkersFrom([])));
+
+      it("stands for no spec", ({ stem }) => {
+        expect(stem).toBe(null);
+      });
+    });
+
+    describe("a name carrying another marker", () => {
+      const it = test.extend("stem", () =>
+        assetsStemOf("order.helpers.ts", assetsNameMarkersFrom([])));
+
+      it("stands for no spec", ({ stem }) => {
+        expect(stem).toBe(null);
+      });
+    });
+
+    describe("a directory carrying the marker", () => {
+      const it = test.extend("stem", () =>
+        assetsStemOf("/repo/owner/order.assets.ts/table.ts", assetsNameMarkersFrom([])));
+
+      it("does not make the names below it stand for a spec", ({ stem }) => {
+        expect(stem).toBe(null);
+      });
+    });
+
+    describe("a name that is the marker and nothing else", () => {
+      const it = test.extend("stem", () => assetsStemOf("assets.ts", assetsNameMarkersFrom([])));
+
+      it("stands for no spec", ({ stem }) => {
+        expect(stem).toBe(null);
+      });
+    });
+
+    describe("a name opening with the marker", () => {
+      const it = test.extend("stem", () =>
+        assetsStemOf("/repo/owner/.assets.ts", assetsNameMarkersFrom([])));
+
+      it("carries no stem in front of it", ({ stem }) => {
+        expect(stem).toBe(null);
+      });
+    });
+
+    describe("a name written without an extension", () => {
+      const it = test.extend("stem", () => assetsStemOf("assets", assetsNameMarkersFrom([])));
+
+      it("stands for no spec", ({ stem }) => {
+        expect(stem).toBe(null);
+      });
+    });
+
+    describe("a name that ends at the separator", () => {
+      const it = test.extend("stem", () =>
+        assetsStemOf("order.assets.", assetsNameMarkersFrom([])));
+
+      it("carries no extension to read", ({ stem }) => {
+        expect(stem).toBe(null);
+      });
+    });
   });
 
-  test("a name holding no separator at all names no stem", () => {
-    expect(assetsStemOf("/repo/owner/assets", markers)).toBe(null);
+  describe("under a marker that replaces the carried one", () => {
+    describe("a name carrying the replacing marker", () => {
+      const it = test.extend("stem", () =>
+        assetsStemOf(
+          "/repo/owner/order.fixtures.ts",
+          assetsNameMarkersFrom([{ assetsNameMarkers: ["fixtures"] }]),
+        ));
+
+      it("stands for the spec its stem names", ({ stem }) => {
+        expect(stem).toBe("order");
+      });
+    });
+
+    describe("a name carrying the marker that was replaced", () => {
+      const it = test.extend("stem", () =>
+        assetsStemOf(
+          "/repo/owner/order.assets.ts",
+          assetsNameMarkersFrom([{ assetsNameMarkers: ["fixtures"] }]),
+        ));
+
+      it("stands for no spec", ({ stem }) => {
+        expect(stem).toBe(null);
+      });
+    });
   });
 
-  test("a name that carries the marker with no stem in front of it names no stem", () => {
-    expect(assetsStemOf("/repo/owner/assets.ts", markers)).toBe(null);
-    expect(assetsStemOf("/repo/owner/.assets.ts", markers)).toBe(null);
-  });
+  describe("under a spelled out list of several markers", () => {
+    describe("a name carrying the first marker on the list", () => {
+      const it = test.extend("stem", () =>
+        assetsStemOf(
+          "/repo/owner/order.assets.ts",
+          assetsNameMarkersFrom([{ assetsNameMarkers: ["assets", "fixtures"] }]),
+        ));
 
-  test("a name ending at the separator carries no extension and names no stem", () => {
-    expect(assetsStemOf("/repo/owner/order.assets.", markers)).toBe(null);
-  });
+      it("stands for its spec", ({ stem }) => {
+        expect(stem).toBe("order");
+      });
+    });
 
-  test("a rule run without settings looks for the marker the rule itself carries", () => {
-    expect(assetsNameMarkersFrom([])).toStrictEqual(new Set(["assets"]));
-    expect(assetsNameMarkersFrom([{}])).toStrictEqual(new Set(["assets"]));
-    expect(assetsNameMarkersFrom(["error"])).toStrictEqual(new Set(["assets"]));
-  });
+    describe("a name carrying the second marker on the list", () => {
+      const it = test.extend("stem", () =>
+        assetsStemOf(
+          "/repo/owner/order.fixtures.ts",
+          assetsNameMarkersFrom([{ assetsNameMarkers: ["assets", "fixtures"] }]),
+        ));
 
-  test("a repository that names its test data differently replaces the marker entirely", () => {
-    expect(replacedMarkers).toStrictEqual(new Set(["fixtures"]));
-  });
-
-  test("the replaced marker names the stem and the default marker stops naming one", () => {
-    expect(assetsStemOf("/repo/owner/order.fixtures.ts", replacedMarkers)).toBe("order");
-    expect(assetsStemOf("/repo/owner/order.assets.ts", replacedMarkers)).toBe(null);
-  });
-
-  test("a name carrying any marker on the configured list names its stem", () => {
-    expect(assetsStemOf("/repo/owner/order.assets.ts", listedMarkers)).toBe("order");
-    expect(assetsStemOf("/repo/owner/order.fixtures.ts", listedMarkers)).toBe("order");
-  });
-
-  test("an empty list of markers leaves the marker the rule carries in place", () => {
-    expect(assetsNameMarkersFrom([{ assetsNameMarkers: [] }])).toStrictEqual(new Set(["assets"]));
-  });
-
-  test("entries that are not markers are dropped from the configured list", () => {
-    expect(assetsNameMarkersFrom([{ assetsNameMarkers: ["fixtures", 7] }])).toStrictEqual(
-      new Set(["fixtures"]),
-    );
+      it("stands for its spec", ({ stem }) => {
+        expect(stem).toBe("order");
+      });
+    });
   });
 });

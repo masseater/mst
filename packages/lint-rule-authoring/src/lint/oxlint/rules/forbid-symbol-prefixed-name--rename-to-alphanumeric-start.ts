@@ -8,7 +8,9 @@ const allowedNamesFrom = (ruleOptions: Readonly<Options>): readonly string[] => 
   if (typeof first !== "object" || first === null || Array.isArray(first)) return [];
   const { allowedNames } = first;
   if (!Array.isArray(allowedNames)) return [];
-  return allowedNames.filter((candidate): candidate is string => typeof candidate === "string");
+  return allowedNames.filter(
+    (allowedName): allowedName is string => typeof allowedName === "string",
+  );
 };
 
 export const forbidSymbolPrefixedName = createLintRuleAuthoringRule({
@@ -47,7 +49,7 @@ export const forbidSymbolPrefixedName = createLintRuleAuthoringRule({
           allowedNames,
         });
 
-        for (const { segment, path } of offending) {
+        for (const [segment, path] of offending) {
           inspection.report({
             node,
             messageId: "symbolPrefixedSegment",

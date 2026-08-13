@@ -1,3 +1,4 @@
+import { memoize } from "es-toolkit";
 import { parseSync } from "oxc-parser";
 
 import { readTextFile } from "../canonical-values/source-files.ts";
@@ -34,18 +35,11 @@ type Walk = {
   readonly relays: readonly string[];
 };
 
-const passThroughsByFile = new Map<string, readonly PassThroughExport<AstFields>[]>();
-
-const passThroughExportsAt = (file: string): readonly PassThroughExport<AstFields>[] => {
-  const remembered = passThroughsByFile.get(file);
-  if (remembered !== undefined) return remembered;
-
+const passThroughExportsAt = memoize((file: string): readonly PassThroughExport<AstFields>[] => {
   const source = readTextFile(file);
   const program = source === null ? null : astFieldsOf(parseSync(file, source).program);
-  const found = program === null ? [] : passThroughExportsIn(statementsOf(program));
-  passThroughsByFile.set(file, found);
-  return found;
-};
+  return program === null ? [] : passThroughExportsIn(statementsOf(program));
+});
 
 const reachedFilesFor = (walk: Walk): readonly string[] => {
   const { specifier, fromFile, policy } = walk;

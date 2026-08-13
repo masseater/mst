@@ -25,12 +25,12 @@ const verifyIdToken = async (verification: {
     });
   } catch (failure) {
     if (failure instanceof IdTokenRejectionError) {
-      throw new UnauthenticatedError("id token was rejected");
+      throw new UnauthenticatedError("id token was rejected", { cause: failure });
     }
     if (failure instanceof IdTokenUnavailableError) {
-      throw new VerifierUnavailableError("id token could not be verified");
+      throw new VerifierUnavailableError("id token could not be verified", { cause: failure });
     }
-    throw new Error("id token verification failed for an unclassified reason");
+    throw new Error("id token verification failed for an unclassified reason", { cause: failure });
   }
 };
 

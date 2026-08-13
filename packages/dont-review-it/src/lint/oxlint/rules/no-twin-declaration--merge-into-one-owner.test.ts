@@ -17,29 +17,33 @@ const subjectFilename = join(repositoryRoot, SUBJECT_PATH);
 
 const NODES_IN_A_SHORT_BODY = 1;
 
-const ruleWith = (subject: { readonly name: string; readonly fingerprint: string }) =>
-  createNoTwinDeclaration({
-    loadIndex: () =>
-      buildBodyIndex([
-        {
-          relativePath: SUBJECT_PATH,
-          bodies: [{ ...subject, line: 1, nodeCount: NODES_IN_A_SHORT_BODY }],
-        },
-        {
-          relativePath: OTHER_PATH,
-          bodies: [
-            {
-              name: "MANIFEST_FILE_NAME",
-              line: 7,
-              fingerprint: "manifest",
-              nodeCount: NODES_IN_A_SHORT_BODY,
-            },
-          ],
-        },
-      ]),
-  });
-
-const twinRule = ruleWith({ name: "MANIFEST_FILE_NAME", fingerprint: "manifest" });
+const twinRule = createNoTwinDeclaration({
+  loadIndex: () =>
+    buildBodyIndex([
+      {
+        relativePath: SUBJECT_PATH,
+        bodies: [
+          {
+            name: "MANIFEST_FILE_NAME",
+            fingerprint: "manifest",
+            line: 1,
+            nodeCount: NODES_IN_A_SHORT_BODY,
+          },
+        ],
+      },
+      {
+        relativePath: OTHER_PATH,
+        bodies: [
+          {
+            name: "MANIFEST_FILE_NAME",
+            line: 7,
+            fingerprint: "manifest",
+            nodeCount: NODES_IN_A_SHORT_BODY,
+          },
+        ],
+      },
+    ]),
+});
 
 const offPageTwinRule = createNoTwinDeclaration({
   loadIndex: () => ({
@@ -89,9 +93,61 @@ const unlistedTwinRule = createNoTwinDeclaration({
   }),
 });
 
-const sameBodyRule = ruleWith({ name: "PACKAGE_FILE_NAME", fingerprint: "manifest" });
+const sameBodyRule = createNoTwinDeclaration({
+  loadIndex: () =>
+    buildBodyIndex([
+      {
+        relativePath: SUBJECT_PATH,
+        bodies: [
+          {
+            name: "PACKAGE_FILE_NAME",
+            fingerprint: "manifest",
+            line: 1,
+            nodeCount: NODES_IN_A_SHORT_BODY,
+          },
+        ],
+      },
+      {
+        relativePath: OTHER_PATH,
+        bodies: [
+          {
+            name: "MANIFEST_FILE_NAME",
+            line: 7,
+            fingerprint: "manifest",
+            nodeCount: NODES_IN_A_SHORT_BODY,
+          },
+        ],
+      },
+    ]),
+});
 
-const sameNameRule = ruleWith({ name: "MANIFEST_FILE_NAME", fingerprint: "workspace" });
+const sameNameRule = createNoTwinDeclaration({
+  loadIndex: () =>
+    buildBodyIndex([
+      {
+        relativePath: SUBJECT_PATH,
+        bodies: [
+          {
+            name: "MANIFEST_FILE_NAME",
+            fingerprint: "workspace",
+            line: 1,
+            nodeCount: NODES_IN_A_SHORT_BODY,
+          },
+        ],
+      },
+      {
+        relativePath: OTHER_PATH,
+        bodies: [
+          {
+            name: "MANIFEST_FILE_NAME",
+            line: 7,
+            fingerprint: "manifest",
+            nodeCount: NODES_IN_A_SHORT_BODY,
+          },
+        ],
+      },
+    ]),
+});
 
 describe("dont-review-it/no-twin-declaration--merge-into-one-owner", () => {
   testLintRule(sameBodyRule, {

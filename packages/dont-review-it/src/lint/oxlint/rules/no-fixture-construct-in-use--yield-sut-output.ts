@@ -1,4 +1,5 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { resolveBinding, type ScopeLookup } from "../lib/resolved-bindings.ts";
 import { assembledShapeOf, isEmptyContainer } from "../lib/spec-syntax/assembled-values.ts";
 import { fixtureDeclarationsOf } from "../lib/spec-syntax/fixture-declarations.ts";
@@ -28,7 +29,7 @@ type Reading = {
   readonly written: ESTree.Expression;
   readonly scopeAt: ScopeLookup;
   readonly walked: ReadonlySet<Variable>;
-  readonly calls: ReadonlySet<ESTree.CallExpression>;
+  readonly calls: readonly ESTree.CallExpression[];
 };
 
 const qualifiedCalleeOf = (call: ESTree.CallExpression): string | null => {
@@ -55,7 +56,7 @@ const declaredValueOf = (bound: Variable): ESTree.Expression | null => {
 };
 
 const filledByCall = (bound: Variable, reading: Reading): boolean =>
-  [...reading.calls].some((call) => {
+  reading.calls.some((call) => {
     const callee = unwrapSubject(call.callee);
     if (callee.type !== "MemberExpression") return false;
 
@@ -103,10 +104,10 @@ const assemblyInMemberRead = (
 };
 
 const assemblyBehindName = (
-  spelled: ESTree.IdentifierReference,
+  identifier: ESTree.IdentifierReference,
   reading: Reading,
 ): Assembly | null => {
-  const bound = resolveBinding(reading.scopeAt(spelled), spelled.name);
+  const bound = resolveBinding(reading.scopeAt(identifier), identifier.name);
   if (bound === null || reading.walked.has(bound)) return null;
 
   const declared = declaredValueOf(bound);
@@ -119,7 +120,7 @@ const assemblyBehindName = (
     walked: new Set([...reading.walked, bound]),
   });
   if (carried === null) return null;
-  return carried.kind === "built" ? { ...carried, boundAs: spelled.name } : carried;
+  return carried.kind === "built" ? { ...carried, boundAs: identifier.name } : carried;
 };
 
 const findingFor = (
@@ -173,15 +174,12 @@ export const noFixtureConstructInUse = createDontReviewItRule({
     if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
     const scopeAt: ScopeLookup = (node: ESTree.Node) => inspection.sourceCode.getScope(node);
-    const fixtures = new Set<ESTree.CallExpression>();
-    const calls = new Set<ESTree.CallExpression>();
 
     return {
-      CallExpression(node: ESTree.CallExpression) {
-        calls.add(node);
-        if (fixtureDeclarationsOf(node).length > 0) fixtures.add(node);
-      },
-      "Program:exit"() {
+      "Program:exit"(program: ESTree.Program) {
+        const calls = nodesOfType(program, "CallExpression");
+        const fixtures = calls.filter((call) => fixtureDeclarationsOf(call).length > 0);
+
         for (const fixture of fixtures) {
           for (const declaration of fixtureDeclarationsOf(fixture)) {
             if (declaration.factory === null) continue;

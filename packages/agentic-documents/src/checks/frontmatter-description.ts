@@ -1,5 +1,6 @@
 import { dirname, join } from "node:path";
 
+import { isPlainObject } from "es-toolkit";
 import { parse } from "yaml";
 
 import { nonEmptyStringOrNull, readJsonObjectOrNull } from "../scan/read-file.ts";
@@ -29,11 +30,8 @@ const frontmatterOf = (document: NormativeDocument): Record<string, unknown> | n
   const [first] = document.tree.children;
   if (first?.type !== "yaml") return null;
 
-  const parsedNode: unknown = parse(first.value);
-  if (typeof parsedNode !== "object" || parsedNode === null || Array.isArray(parsedNode))
-    return null;
-
-  return parsedNode as Record<string, unknown>;
+  const parsedFrontmatter: unknown = parse(first.value);
+  return isPlainObject(parsedFrontmatter) ? parsedFrontmatter : null;
 };
 
 const manifestDescriptionOf = async ({

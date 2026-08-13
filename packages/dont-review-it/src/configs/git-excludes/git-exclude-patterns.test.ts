@@ -1,113 +1,170 @@
-import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, test, vi } from "vite-plus/test";
+import { attempt } from "es-toolkit";
+import { describe, expect, test } from "vite-plus/test";
 
 import { gitExcludePatterns } from "./git-exclude-patterns.ts";
 
-const UNRUNNABLE_CWD = "/mst-git-cannot-be-run";
+describe("gitExcludePatterns", () => {
+  describe("a repository carrying a global excludes file, an info/exclude and a .gitignore", () => {
+    const it = test.extend("patterns", () => {
+      const home = mkdtempSync(join(tmpdir(), "mst-git-excludes-home-"));
+      writeFileSync(join(home, "global-ignore"), "# machine wide\n.agents/\n");
+      writeFileSync(
+        join(home, ".gitconfig"),
+        `[core]\n\texcludesFile = ${join(home, "global-ignore")}\n`,
+      );
+      const env = {
+        HOME: home,
+        PATH: process.env.PATH ?? "",
+      };
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "mst-git-excludes-repository-"));
+      mkdirSync(join(repositoryRoot, ".git", "objects"), { recursive: true });
+      mkdirSync(join(repositoryRoot, ".git", "refs"), { recursive: true });
+      mkdirSync(join(repositoryRoot, ".git", "info"), { recursive: true });
+      writeFileSync(join(repositoryRoot, ".git", "HEAD"), "ref: refs/heads/main\n");
+      writeFileSync(join(repositoryRoot, ".git", "info", "exclude"), "scratch/\n");
+      writeFileSync(join(repositoryRoot, ".gitignore"), "dist/*\n!dist/keep.ts\n");
+      return gitExcludePatterns({ cwd: repositoryRoot, env });
+    });
 
-const ONE_LINE_CWD = "/mst-git-answers-with-one-line";
-
-vi.mock(import("node:child_process"), async (importOriginal) => {
-  const real = await importOriginal();
-  const execFileSync = ((...call: Parameters<typeof real.execFileSync>) => {
-    const [, , ruleOptions] = call;
-    const where = (ruleOptions as { readonly cwd?: string } | undefined)?.cwd;
-    if (where === UNRUNNABLE_CWD) throw new Error("git could not be started at all");
-    if (where === ONE_LINE_CWD) return "/the-only-line\n";
-    return real.execFileSync(...call);
-  }) as typeof real.execFileSync;
-  return { ...real, execFileSync };
-});
-
-describe("git-exclude-patterns", { timeout: 30_000 }, () => {
-  const sandboxDirectory = (spelled: string): string =>
-    mkdtempSync(join(tmpdir(), `mst-${spelled}-`));
-
-  const isolatedEnvironment = (home: string): NodeJS.ProcessEnv => ({
-    HOME: home,
-    PATH: process.env.PATH ?? "",
+    it("gathers all three, global first and the repository .gitignore last", ({ patterns }) => {
+      expect(patterns).toStrictEqual([".agents/", "scratch/", "dist/*", "!dist/keep.ts"]);
+    });
   });
 
-  const initializedRepository = (env: NodeJS.ProcessEnv): string => {
-    const repositoryRoot = sandboxDirectory("git-excludes-repository");
-    execFileSync("git", ["init"], { cwd: repositoryRoot, env, stdio: "ignore" });
-    return repositoryRoot;
-  };
+  describe("core.excludesFile left unset while XDG_CONFIG_HOME names a directory", () => {
+    const it = test.extend("patterns", () => {
+      const home = mkdtempSync(join(tmpdir(), "mst-git-excludes-home-"));
+      const configHome = join(home, "config");
+      mkdirSync(join(configHome, "git"), { recursive: true });
+      writeFileSync(join(configHome, "git", "ignore"), ".serena/\n");
+      return gitExcludePatterns({
+        cwd: home,
+        env: {
+          HOME: home,
+          PATH: process.env.PATH ?? "",
+          XDG_CONFIG_HOME: configHome,
+        },
+      });
+    });
 
-  test("the global excludes file, info/exclude and the repository .gitignore all contribute", () => {
-    const home = sandboxDirectory("git-excludes-home");
-    writeFileSync(join(home, "global-ignore"), "# machine wide\n.agents/\n");
-    writeFileSync(
-      join(home, ".gitconfig"),
-      `[core]\n\texcludesFile = ${join(home, "global-ignore")}\n`,
-    );
-
-    const env = isolatedEnvironment(home);
-    const repositoryRoot = initializedRepository(env);
-    writeFileSync(join(repositoryRoot, ".git", "info", "exclude"), "scratch/\n");
-    writeFileSync(join(repositoryRoot, ".gitignore"), "dist/*\n!dist/keep.ts\n");
-
-    expect(gitExcludePatterns({ cwd: repositoryRoot, env })).toStrictEqual([
-      ".agents/",
-      "scratch/",
-      "dist/*",
-      "!dist/keep.ts",
-    ]);
+    it("falls back to the ignore file under that directory", ({ patterns }) => {
+      expect(patterns).toStrictEqual([".serena/"]);
+    });
   });
 
-  test("core.excludesFile left unset falls back to the XDG location", () => {
-    const home = sandboxDirectory("git-excludes-home");
-    const configHome = join(home, "config");
-    mkdirSync(join(configHome, "git"), { recursive: true });
-    writeFileSync(join(configHome, "git", "ignore"), ".serena/\n");
+  describe("core.excludesFile left unset with no XDG_CONFIG_HOME", () => {
+    const it = test.extend("patterns", () => {
+      const home = mkdtempSync(join(tmpdir(), "mst-git-excludes-home-"));
+      mkdirSync(join(home, ".config", "git"), { recursive: true });
+      writeFileSync(join(home, ".config", "git", "ignore"), ".takt/\n");
+      return gitExcludePatterns({
+        cwd: home,
+        env: {
+          HOME: home,
+          PATH: process.env.PATH ?? "",
+        },
+      });
+    });
 
-    const env = { ...isolatedEnvironment(home), XDG_CONFIG_HOME: configHome };
-
-    expect(gitExcludePatterns({ cwd: home, env })).toStrictEqual([".serena/"]);
+    it("falls back to the ignore file under the home directory", ({ patterns }) => {
+      expect(patterns).toStrictEqual([".takt/"]);
+    });
   });
 
-  test("core.excludesFile left unset without XDG falls back under the home directory", () => {
-    const home = sandboxDirectory("git-excludes-home");
-    mkdirSync(join(home, ".config", "git"), { recursive: true });
-    writeFileSync(join(home, ".config", "git", "ignore"), ".takt/\n");
+  describe("a directory outside any repository holding no exclude file", () => {
+    const it = test.extend("patterns", () => {
+      const home = mkdtempSync(join(tmpdir(), "mst-git-excludes-home-"));
+      return gitExcludePatterns({
+        cwd: home,
+        env: {
+          HOME: home,
+          PATH: process.env.PATH ?? "",
+        },
+      });
+    });
 
-    expect(gitExcludePatterns({ cwd: home, env: isolatedEnvironment(home) })).toStrictEqual([
-      ".takt/",
-    ]);
+    it("yields no patterns", ({ patterns }) => {
+      expect(patterns).toStrictEqual([]);
+    });
   });
 
-  test("a directory outside any repository with no exclude files yields no patterns", () => {
-    const home = sandboxDirectory("git-excludes-home");
+  describe("an environment naming no home at all", () => {
+    const it = test
+      .extend("homelessSandbox", () => mkdtempSync(join(tmpdir(), "mst-git-excludes-home-")))
+      .extend("patternsWithoutHome", ({ homelessSandbox }) =>
+        gitExcludePatterns({
+          cwd: homelessSandbox,
+          env: {
+            PATH: process.env.PATH ?? "",
+          },
+        }),
+      )
+      .extend("patternsWithRuntimeHome", ({ homelessSandbox }) =>
+        gitExcludePatterns({
+          cwd: homelessSandbox,
+          env: {
+            HOME: homedir(),
+            PATH: process.env.PATH ?? "",
+          },
+        }),
+      );
 
-    expect(gitExcludePatterns({ cwd: home, env: isolatedEnvironment(home) })).toStrictEqual([]);
+    it("falls back to the home the runtime reports", ({
+      patternsWithoutHome,
+      patternsWithRuntimeHome,
+    }) => {
+      expect(patternsWithoutHome).toStrictEqual(patternsWithRuntimeHome);
+    });
   });
 
-  test("an environment that names no home falls back to the one the runtime reports", () => {
-    const home = sandboxDirectory("git-excludes-home");
-    const { HOME, ...withoutHome } = isolatedEnvironment(home);
+  describe("a git that cannot be started at all", () => {
+    const it = test.extend("unstartableGitFailure", () => {
+      const home = mkdtempSync(join(tmpdir(), "mst-git-excludes-home-"));
+      const searchPath = mkdtempSync(join(tmpdir(), "mst-git-excludes-path-"));
+      writeFileSync(join(searchPath, "git"), "#!/bin/sh\nkill -TERM $$\n", { mode: 0o755 });
+      const [unaskableGit] = attempt<readonly string[], Error>(() =>
+        gitExcludePatterns({
+          cwd: home,
+          env: {
+            HOME: home,
+            PATH: searchPath,
+          },
+        }),
+      );
+      return unaskableGit;
+    });
 
-    expect(gitExcludePatterns({ cwd: home, env: withoutHome })).toStrictEqual(
-      gitExcludePatterns({ cwd: home, env: { ...withoutHome, HOME: homedir() } }),
-    );
-  }, 20_000);
-
-  test("a git that cannot be started at all is raised rather than read as an absence", () => {
-    const home = sandboxDirectory("git-excludes-home");
-
-    expect(() =>
-      gitExcludePatterns({ cwd: UNRUNNABLE_CWD, env: isolatedEnvironment(home) }),
-    ).toThrow("could not be run");
+    it("is raised rather than read as an absence of patterns", ({ unstartableGitFailure }) => {
+      expect(unstartableGitFailure).toStrictEqual(
+        new Error("git config --type=path --get core.excludesFile could not be run"),
+      );
+    });
   });
 
-  test("a revision answer that names only one path yields no repository exclude files", () => {
-    const home = sandboxDirectory("git-excludes-home");
+  describe("a revision answer naming only one path", () => {
+    const it = test.extend("patterns", () => {
+      const home = mkdtempSync(join(tmpdir(), "mst-git-excludes-home-"));
+      const searchPath = mkdtempSync(join(tmpdir(), "mst-git-excludes-path-"));
+      writeFileSync(
+        join(searchPath, "git"),
+        '#!/bin/sh\n[ "$1" = "rev-parse" ] && echo /the-only-line\nexit 0\n',
+        { mode: 0o755 },
+      );
+      return gitExcludePatterns({
+        cwd: home,
+        env: {
+          HOME: home,
+          PATH: searchPath,
+        },
+      });
+    });
 
-    expect(gitExcludePatterns({ cwd: ONE_LINE_CWD, env: isolatedEnvironment(home) })).toStrictEqual(
-      [],
-    );
+    it("yields no repository exclude files", ({ patterns }) => {
+      expect(patterns).toStrictEqual([]);
+    });
   });
 });

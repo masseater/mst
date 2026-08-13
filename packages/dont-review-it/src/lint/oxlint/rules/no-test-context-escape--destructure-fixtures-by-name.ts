@@ -1,4 +1,5 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { fixtureDeclarationsOf } from "../lib/spec-syntax/fixture-declarations.ts";
 import {
   isHeldContextReach,
@@ -8,7 +9,7 @@ import {
 import { unwrapSubject, type SpecFunction } from "../lib/spec-syntax/subject-expressions.ts";
 import {
   declaresTestBlock,
-  testBlockBindings,
+  testBlockRootNames,
   testCallbacksOf,
 } from "../lib/spec-syntax/test-block-declarations.ts";
 
@@ -106,52 +107,48 @@ export const noTestContextEscape = createDontReviewItRule({
     schema: [],
   },
   create(inspection) {
-    const bindings = testBlockBindings();
-    const calls = new Set<ESTree.CallExpression>();
-    const reaches = new Set<ContextReach>();
-
-    const takeReach = (node: ESTree.Node, written: ESTree.Expression): void => {
+    const reachesTo = (node: ESTree.Node, written: ESTree.Expression): readonly ContextReach[] => {
       const reached = unwrapSubject(written);
-      if (reached.type !== "Identifier") return;
-      reaches.add({ node, name: reached.name });
+      return reached.type === "Identifier" ? [{ node, name: reached.name }] : [];
     };
 
-    const takeHandedArguments = (handed: readonly ESTree.Argument[]): void => {
-      for (const argument of handed) takeReach(argument, argumentValueOf(argument));
-    };
+    const reachesInArguments = (handed: readonly ESTree.Argument[]): readonly ContextReach[] =>
+      handed.flatMap((argument) => reachesTo(argument, argumentValueOf(argument)));
 
     return {
-      ImportDeclaration: bindings.takeImport,
-      VariableDeclarator: bindings.takeLocalBinding,
-      CallExpression(node: ESTree.CallExpression) {
-        calls.add(node);
-        takeHandedArguments(node.arguments);
-      },
-      NewExpression(node: ESTree.NewExpression) {
-        takeHandedArguments(node.arguments);
-      },
-      MemberExpression(node: ESTree.MemberExpression) {
-        if (!node.computed) return;
-        takeReach(node, node.object);
-      },
-      ObjectExpression(node: ESTree.ObjectExpression) {
-        for (const property of node.properties) {
-          if (property.type !== "SpreadElement") continue;
-          takeReach(property, property.argument);
-        }
-      },
-      ForInStatement(node: ESTree.ForInStatement) {
-        takeReach(node.right, node.right);
-      },
-      "Program:exit"() {
-        const rootNames = bindings.rootNames();
-        const takers = new Set([...calls].flatMap((call) => contextTakersOf(call, rootNames)));
+      "Program:exit"(program: ESTree.Program) {
+        const rootNames = testBlockRootNames(program);
+        const takers = new Set(
+          nodesOfType(program, "CallExpression").flatMap((call) =>
+            contextTakersOf(call, rootNames),
+          ),
+        );
 
         for (const taker of takers) {
           for (const fault of contextFaultsOf(taker)) {
             inspection.report({ node: fault.node, messageId: fault.messageId });
           }
         }
+
+        const reaches = [
+          ...nodesOfType(program, "CallExpression").flatMap((node) =>
+            reachesInArguments(node.arguments),
+          ),
+          ...nodesOfType(program, "NewExpression").flatMap((node) =>
+            reachesInArguments(node.arguments),
+          ),
+          ...nodesOfType(program, "MemberExpression").flatMap((node) =>
+            node.computed ? reachesTo(node, node.object) : [],
+          ),
+          ...nodesOfType(program, "ObjectExpression").flatMap((node) =>
+            node.properties.flatMap((property) =>
+              property.type === "SpreadElement" ? reachesTo(property, property.argument) : [],
+            ),
+          ),
+          ...nodesOfType(program, "ForInStatement").flatMap((node) =>
+            reachesTo(node.right, node.right),
+          ),
+        ];
 
         const held = [...takers].flatMap(heldContextOf);
         for (const reach of reaches) {

@@ -20,6 +20,15 @@ export default defineConfig({
         LINT_SEVERITY.ERROR,
         { assignOnlyTargets: ["RuleTester.describe", "RuleTester.it", "RuleTester.itOnly"] },
       ],
+      "dont-review-it/no-array-mutation--derive-new-array": LINT_SEVERITY.ERROR,
+      "dont-review-it/no-receiver-mutation--derive-new-value": LINT_SEVERITY.ERROR,
+      "dont-review-it/no-class-as-mutable-cell--decide-in-an-iife": LINT_SEVERITY.ERROR,
+      "dont-review-it/no-promise-chain--use-async-await": LINT_SEVERITY.ERROR,
+      "dont-review-it/no-floating-promise--await-the-result": LINT_SEVERITY.ERROR,
+      "dont-review-it/no-blanket-suppression--name-and-record": LINT_SEVERITY.ERROR,
+      "dont-review-it/no-partial-rule-set--enable-the-whole-set": LINT_SEVERITY.ERROR,
+      "dont-review-it/no-empty-catch--throw-or-handle": LINT_SEVERITY.ERROR,
+      "dont-review-it/no-silent-catch--rethrow-or-handle": LINT_SEVERITY.ERROR,
       "dont-review-it/no-non-boundary-double--replace-at-the-external-boundary": [
         LINT_SEVERITY.ERROR,
         { externalIoPackages: ["@opentelemetry/exporter-metrics-otlp-http"] },
@@ -51,5 +60,7 @@ export default defineConfig({
     coverage: {
       thresholds: { 100: true, perFile: true },
     },
+    unstubEnvs: true,
+    unstubGlobals: true,
   },
 });

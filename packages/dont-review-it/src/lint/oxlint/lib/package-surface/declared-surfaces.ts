@@ -1,5 +1,8 @@
 import { dirname, join, relative, resolve } from "node:path";
 
+import { memoize } from "es-toolkit";
+
+import { isRecord } from "../../../../dependency-catalog/record-fields.ts";
 import {
   EXPORTS_CONDITION_DEPTH_LIMIT,
   MANIFEST_FILE_NAME,
@@ -30,15 +33,6 @@ const REPOSITORY_ROOT_PACKAGE = ".";
 
 const MANIFEST_SELF_SUBPATH = `./${MANIFEST_FILE_NAME}`;
 
-type DeclaredFields = {
-  readonly packageName: string | null;
-  readonly runnableFields: readonly string[];
-  readonly importableFields: readonly string[];
-};
-
-const isRecord = (declared: unknown): declared is Readonly<Record<string, unknown>> =>
-  declared !== null && typeof declared === "object" && !Array.isArray(declared);
-
 const declaresTarget = (declared: unknown, depth: number): boolean => {
   if (typeof declared === "string") return declared.trim() !== "";
   if (depth > EXPORTS_CONDITION_DEPTH_LIMIT) return false;
@@ -59,27 +53,24 @@ const declaredNameOf = (read: Readonly<Record<string, unknown>>): string | null 
   return typeof name === "string" && name.trim() !== "" ? name : null;
 };
 
-const readDeclaredFields = (packageDirectory: string): DeclaredFields | null => {
-  const read = readJsonFile(join(packageDirectory, MANIFEST_FILE_NAME));
-  if (!isRecord(read)) return null;
+const declaredFieldsAt = memoize(
+  (
+    packageDirectory: string,
+  ): {
+    readonly packageName: string | null;
+    readonly runnableFields: readonly string[];
+    readonly importableFields: readonly string[];
+  } | null => {
+    const read = readJsonFile(join(packageDirectory, MANIFEST_FILE_NAME));
+    if (!isRecord(read)) return null;
 
-  return {
-    packageName: declaredNameOf(read),
-    runnableFields: declaringFieldsOf({ read, fields: RUNNABLE_SURFACE_FIELDS }),
-    importableFields: declaringFieldsOf({ read, fields: IMPORTABLE_SURFACE_FIELDS }),
-  };
-};
-
-const fieldsByPackageDirectory = new Map<string, DeclaredFields | null>();
-
-const declaredFieldsAt = (packageDirectory: string): DeclaredFields | null => {
-  const remembered = fieldsByPackageDirectory.get(packageDirectory);
-  if (remembered !== undefined) return remembered;
-
-  const read = readDeclaredFields(packageDirectory);
-  fieldsByPackageDirectory.set(packageDirectory, read);
-  return read;
-};
+    return {
+      packageName: declaredNameOf(read),
+      runnableFields: declaringFieldsOf({ read, fields: RUNNABLE_SURFACE_FIELDS }),
+      importableFields: declaringFieldsOf({ read, fields: IMPORTABLE_SURFACE_FIELDS }),
+    };
+  },
+);
 
 const withinRepository = (location: {
   readonly repositoryRoot: string;

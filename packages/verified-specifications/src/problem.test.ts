@@ -3,23 +3,29 @@ import { describe, expect, test } from "vite-plus/test";
 import { formatSpecificationProblem } from "./problem.ts";
 
 describe("formatSpecificationProblem", () => {
-  test("spells the file, the line and the message", () => {
-    expect(
+  describe("a problem found on a line", () => {
+    const it = test.extend("spelledProblem", () =>
       formatSpecificationProblem({
         file: "packages/repository-checks/specs/a.spec.ts",
         line: 3,
         message: "m",
-      }),
-    ).toBe("packages/repository-checks/specs/a.spec.ts:3 m");
+      }));
+
+    it("spells the file, the line and the message", ({ spelledProblem }) => {
+      expect(spelledProblem).toBe("packages/repository-checks/specs/a.spec.ts:3 m");
+    });
   });
 
-  test("leaves the line out when the problem has none", () => {
-    expect(
+  describe("a problem found on no line", () => {
+    const it = test.extend("spelledProblem", () =>
       formatSpecificationProblem({
         file: "packages/repository-checks/SPECIFICATIONS.md",
         line: null,
         message: "m",
-      }),
-    ).toBe("packages/repository-checks/SPECIFICATIONS.md m");
+      }));
+
+    it("leaves the line out", ({ spelledProblem }) => {
+      expect(spelledProblem).toBe("packages/repository-checks/SPECIFICATIONS.md m");
+    });
   });
 });

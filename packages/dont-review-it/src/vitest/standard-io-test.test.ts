@@ -3,42 +3,80 @@ import { describe, expect } from "vite-plus/test";
 import { standardIoTest } from "./standard-io-test.ts";
 
 describe("standardIoTest", () => {
-  standardIoTest("hands the subject everything written to stdout", ({ stdout }) => {
-    process.stdout.write("progress line\n");
-    process.stdout.write(new TextEncoder().encode("encoded line\n"));
+  describe("a run that writes a string and an encoded chunk to standard output", () => {
+    const it = standardIoTest.extend("theMixedRun", { auto: true }, () => {
+      process.stdout.write("progress line\n");
+      process.stdout.write(new TextEncoder().encode("encoded line\n"));
+    });
 
-    expect(stdout.text).toBe("progress line\nencoded line\n");
+    it("records both chunks decoded in the order they were written", ({ stdout }) => {
+      expect(stdout).toMatchInlineSnapshot(`
+        {
+          "chunks": [
+            "progress line
+        ",
+            "encoded line
+        ",
+          ],
+        }
+      `);
+    });
+
+    it("leaves the stream the run never wrote to with nothing recorded", ({ stderr }) => {
+      expect(stderr).toMatchInlineSnapshot(`
+        {
+          "chunks": [],
+        }
+      `);
+    });
   });
 
-  standardIoTest("hands the subject everything written to stderr", ({ stderr }) => {
-    process.stderr.write("something failed\n");
+  describe("a run that writes to both streams", () => {
+    const it = standardIoTest.extend("theRunThatWroteToBothStreams", { auto: true }, () => {
+      process.stdout.write("result");
+      process.stderr.write("diagnostic");
+    });
 
-    expect(stderr.text).toBe("something failed\n");
+    it("keeps what went to standard error out of standard output", ({ stdout }) => {
+      expect(stdout).toMatchInlineSnapshot(`
+        {
+          "chunks": [
+            "result",
+          ],
+        }
+      `);
+    });
+
+    it("keeps what went to standard output out of standard error", ({ stderr }) => {
+      expect(stderr).toMatchInlineSnapshot(`
+        {
+          "chunks": [
+            "diagnostic",
+          ],
+        }
+      `);
+    });
   });
 
-  standardIoTest("keeps the two streams apart", ({ stdout, stderr }) => {
-    process.stdout.write("result");
-    process.stderr.write("diagnostic");
+  describe("a run whose chunks are folded into one text", () => {
+    const it = standardIoTest
+      .extend("theFoldedStandardOutput", ({ stdout }) => {
+        process.stdout.write("first ");
+        process.stdout.write("second");
+        return stdout.text();
+      })
+      .extend("theFoldedStandardError", ({ stderr }) => {
+        process.stderr.write("first ");
+        process.stderr.write("second");
+        return stderr.text();
+      });
 
-    expect(stdout.text).toBe("result");
-    expect(stderr.text).toBe("diagnostic");
-  });
+    it("joins what was written to standard output in order", ({ theFoldedStandardOutput }) => {
+      expect(theFoldedStandardOutput).toBe("first second");
+    });
 
-  standardIoTest("matches the stdout snapshot", ({ stdout }) => {
-    process.stdout.write("result\n");
-
-    expect(stdout.text).toMatchInlineSnapshot(`
-      "result
-      "
-    `);
-  });
-
-  standardIoTest("matches the stderr snapshot", ({ stderr }) => {
-    process.stderr.write("diagnostic\n");
-
-    expect(stderr.text).toMatchInlineSnapshot(`
-      "diagnostic
-      "
-    `);
+    it("joins what was written to standard error in order", ({ theFoldedStandardError }) => {
+      expect(theFoldedStandardError).toBe("first second");
+    });
   });
 });

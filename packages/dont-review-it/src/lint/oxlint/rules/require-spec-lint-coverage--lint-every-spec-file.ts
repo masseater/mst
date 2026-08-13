@@ -1,5 +1,7 @@
 import { dirname, resolve } from "node:path";
 
+import { sortBy } from "es-toolkit";
+
 import { createDontReviewItRule } from "../../../create-rule.ts";
 import { findWorkspaceRoot } from "../lib/canonical-values/workspace-root.ts";
 import { spelledNames } from "../lib/declared-coverage/coverage-declarations.ts";
@@ -8,6 +10,7 @@ import {
   lintBlockOf,
   weakenedTargetRulesIn,
 } from "../lib/lint-suppression/lint-config-suppression.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { toPosixPath } from "../lib/posix-path.ts";
 import {
   ignoredSpecFilesIn,
@@ -20,13 +23,25 @@ import {
   RESERVED_SPEC_NAMES,
   reservedIdentifierOf,
 } from "../lib/spec-lint-coverage/reserved-name-bindings.ts";
+import { specDirectoryOf } from "../lib/spec-syntax/spec-directories.ts";
 import { DEFAULT_SPEC_FILE_SUFFIXES, isSpecFile } from "../lib/spec-syntax/spec-files.ts";
-import { testBlockBindings, testBlockBodyOf } from "../lib/spec-syntax/test-block-declarations.ts";
+import { testBlockBodyOf, testBlockRootNames } from "../lib/spec-syntax/test-block-declarations.ts";
 import { testBlockRootIdentifier } from "../lib/spec-syntax/test-block-modifiers.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
 const SPELLED_SPEC_SUFFIXES = spelledNames(DEFAULT_SPEC_FILE_SUFFIXES);
+
+const GUARDED_ELSEWHERE_DIRECTORY_NAMES: ReadonlySet<string> = new Set(["specs"]);
+
+const GUARDED_ELSEWHERE_FILE_SUFFIXES: readonly string[] = [".spec.ts", ".spec.tsx"];
+
+const isGuardedElsewhere = (filename: string): boolean =>
+  isSpecFile(filename, GUARDED_ELSEWHERE_FILE_SUFFIXES) &&
+  specDirectoryOf({
+    relativePath: toPosixPath(filename),
+    names: GUARDED_ELSEWHERE_DIRECTORY_NAMES,
+  }) !== null;
 
 const declaresRunnerBlock = (asked: {
   readonly call: ESTree.CallExpression;
@@ -43,12 +58,39 @@ const importedReservedNames = (declaration: ESTree.ImportDeclaration): readonly 
     RESERVED_SPEC_NAMES.has(specifier.local.name) ? [specifier.local.name] : [],
   );
 
+const reachedNamesIn = (program: ESTree.Program): readonly string[] => [
+  ...nodesOfType(program, "ImportDeclaration").flatMap(importedReservedNames),
+  ...nodesOfType(program, "CallExpression").flatMap((call) => {
+    const reserved = reservedIdentifierOf(call.callee);
+    return reserved === null ? [] : [reserved.name];
+  }),
+];
+
+const foreignNamesIn = (program: ESTree.Program): ReadonlyMap<string, ESTree.Node> => {
+  const declaredNames: readonly (ESTree.Node | null)[] = [
+    ...nodesOfType(program, "VariableDeclarator").flatMap((declarator) =>
+      carriesForeignMeaning(declarator.init) ? [declarator.id] : [],
+    ),
+    ...nodesOfType(program, "FunctionDeclaration").map((declaration) => declaration.id),
+    ...nodesOfType(program, "ClassDeclaration").map((declaration) => declaration.id),
+  ];
+
+  const bound = declaredNames.flatMap((declared) => {
+    const reserved = reservedIdentifierOf(declared);
+    return reserved === null ? [] : [reserved];
+  });
+
+  return new Map(
+    sortBy(bound, ["start"]).map((held): readonly [string, ESTree.Node] => [held.name, held]),
+  );
+};
+
 const runnerBlockRootIn = (held: {
-  readonly blockCalls: ReadonlySet<ESTree.CallExpression>;
+  readonly calls: readonly ESTree.CallExpression[];
   readonly rootNames: ReadonlySet<string>;
   readonly foreignNames: ReadonlyMap<string, ESTree.Node>;
 }): ESTree.IdentifierReference | null => {
-  const declared = [...held.blockCalls].find((call) =>
+  const declared = held.calls.find((call) =>
     declaresRunnerBlock({ call, rootNames: held.rootNames, foreignNames: held.foreignNames }),
   );
   return declared === undefined ? null : testBlockRootIdentifier(declared.callee);
@@ -80,20 +122,12 @@ export const requireSpecLintCoverage = createDontReviewItRule({
     schema: [],
   },
   create(inspection) {
-    const bindings = testBlockBindings();
-    const blockCalls = new Set<ESTree.CallExpression>();
-    const foreignNames = new Map<string, ESTree.Node>();
-    const reachedNames = new Set<string>();
-
-    const rememberForeignName = (declared: ESTree.Node | null): void => {
-      const bound = reservedIdentifierOf(declared);
-      if (bound !== null) foreignNames.set(bound.name, bound);
-    };
-
-    const reportFile = (): void => {
+    const reportFile = (program: ESTree.Program): void => {
+      const foreignNames = foreignNamesIn(program);
+      const reachedNames = reachedNamesIn(program);
       const root = runnerBlockRootIn({
-        blockCalls,
-        rootNames: bindings.rootNames(),
+        calls: nodesOfType(program, "CallExpression"),
+        rootNames: testBlockRootNames(program),
         foreignNames,
       });
       if (!isSpecFile(inspection.filename, DEFAULT_SPEC_FILE_SUFFIXES)) {
@@ -106,7 +140,8 @@ export const requireSpecLintCoverage = createDontReviewItRule({
         return;
       }
 
-      if (root !== null || [...reachedNames].some((spelled) => !foreignNames.has(spelled))) return;
+      if (root !== null || reachedNames.some((reachedName) => !foreignNames.has(reachedName)))
+        return;
       for (const [boundName, node] of foreignNames) {
         inspection.report({
           node,
@@ -156,28 +191,8 @@ export const requireSpecLintCoverage = createDontReviewItRule({
     };
 
     return {
-      ImportDeclaration(node: ESTree.ImportDeclaration) {
-        bindings.takeImport(node);
-        for (const spelled of importedReservedNames(node)) reachedNames.add(spelled);
-      },
-      VariableDeclarator(node: ESTree.VariableDeclarator) {
-        bindings.takeLocalBinding(node);
-        if (carriesForeignMeaning(node.init)) rememberForeignName(node.id);
-      },
-      FunctionDeclaration(node: ESTree.Function) {
-        rememberForeignName(node.id);
-      },
-      ClassDeclaration(node: ESTree.Class) {
-        rememberForeignName(node.id);
-      },
-      CallExpression(node: ESTree.CallExpression) {
-        if (node.callee.type === "Identifier" && RESERVED_SPEC_NAMES.has(node.callee.name)) {
-          reachedNames.add(node.callee.name);
-        }
-        if (testBlockRootIdentifier(node.callee) !== null) blockCalls.add(node);
-      },
       "Program:exit"(node: ESTree.Program) {
-        reportFile();
+        if (!isGuardedElsewhere(inspection.filename)) reportFile(node);
         if (LINT_CONFIGURATION_FILE.test(toPosixPath(inspection.filename)))
           reportConfiguration(node);
       },

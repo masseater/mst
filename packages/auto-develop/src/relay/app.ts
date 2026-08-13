@@ -1,3 +1,4 @@
+import { on } from "node:events";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 
 import {
@@ -20,8 +21,6 @@ import {
   type RelayDependencies,
   type RouteContext,
 } from "./routes.ts";
-
-import type { Socket } from "node:net";
 
 const HEALTH_PATH = "/health";
 
@@ -59,46 +58,58 @@ export type RelayServer = {
 };
 
 export const createRelayServer = (deps: RelayDependencies): RelayServer => {
-  const openSockets = new Set<Socket>();
-  const handleRequest = async (handling: {
+  const serve = async (serving: {
     readonly req: IncomingMessage;
     readonly res: ServerResponse;
   }): Promise<void> => {
     try {
-      await dispatch({ ...handling, deps });
+      await dispatch({ ...serving, deps });
     } catch (failure) {
       deps.log.error(
-        { err: failure, method: handling.req.method, path: handling.req.url },
+        { err: failure, method: serving.req.method, path: serving.req.url },
         "unhandled route failure",
       );
-      if (!handling.res.headersSent) {
-        respondJson({ res: handling.res, status: 500, body: { error: "Internal Server Error" } });
+      if (!serving.res.headersSent) {
+        respondJson({ res: serving.res, status: 500, body: { error: "Internal Server Error" } });
         return;
       }
-      handling.res.end();
+      serving.res.end();
     }
   };
-  const server = createServer((asked, produced) => {
-    void handleRequest({ req: asked, res: produced });
-  });
-  server.on(SOCKET_LIFECYCLE_EVENT.connection, (socket) => {
-    openSockets.add(socket);
-    socket.on(SOCKET_LIFECYCLE_EVENT.close, () => {
-      openSockets.delete(socket);
-    });
+
+  const server = createServer();
+
+  const acceptRequests = async (accepting: {
+    readonly arrivals: AsyncIterator<readonly [IncomingMessage, ServerResponse]>;
+  }): Promise<void> => {
+    const arrived = await accepting.arrivals.next();
+    if (arrived.done === true) return;
+    const [asked, produced] = arrived.value;
+    await Promise.all([serve({ req: asked, res: produced }), acceptRequests(accepting)]);
+  };
+
+  const accepted = acceptRequests({
+    arrivals: on(server, "request", {
+      close: [SOCKET_LIFECYCLE_EVENT.close],
+    }) as AsyncIterator<readonly [IncomingMessage, ServerResponse]>,
   });
 
-  const shutdown = (): Promise<void> =>
+  const closeServer = (): Promise<void> =>
     new Promise((resolve) => {
       deps.log.info({}, "relay server draining connections");
       const forcedClose = setTimeout(() => {
-        for (const socket of openSockets) socket.destroy();
+        server.closeAllConnections();
       }, DRAIN_BUDGET_MS);
       server.close(() => {
         clearTimeout(forcedClose);
         resolve();
       });
     });
+
+  const shutdown = async (): Promise<void> => {
+    await closeServer();
+    await accepted;
+  };
 
   return { server, shutdown };
 };

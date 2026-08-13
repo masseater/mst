@@ -1,155 +1,296 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
-import { describe, expect, onTestFinished, test } from "vite-plus/test";
+import { attempt } from "es-toolkit";
+import { describe, expect, test } from "vite-plus/test";
 
 import { lintRuleWorkspacesIn } from "./lint-rule-workspaces.ts";
 
-const repositoryWith = (files: Readonly<Record<string, string>>): string => {
-  const root = mkdtempSync(join(tmpdir(), "lint-rule-workspaces-"));
-  onTestFinished(() => {
-    rmSync(root, { recursive: true, force: true });
-  });
-  for (const [path, source] of Object.entries(files)) {
-    const absolutePath = join(root, path);
-    mkdirSync(dirname(absolutePath), { recursive: true });
-    writeFileSync(absolutePath, source, "utf8");
-  }
-  return root;
-};
-
-const declaringManifest = JSON.stringify({ name: "example", lintRules: ["src/rules"] });
+const DECLARING_MANIFEST = JSON.stringify({ name: "example", lintRules: ["src/rules"] });
 
 describe("lintRuleWorkspacesIn", () => {
-  test("a repository without a workspace definition declares nothing", () => {
-    expect(lintRuleWorkspacesIn(repositoryWith({}))).toStrictEqual([]);
-  });
-
-  test("a workspace definition that is a bare scalar declares nothing", () => {
-    expect(lintRuleWorkspacesIn(repositoryWith({ "pnpm-workspace.yaml": "42\n" }))).toStrictEqual(
-      [],
-    );
-  });
-
-  test("an empty workspace definition declares nothing", () => {
-    expect(lintRuleWorkspacesIn(repositoryWith({ "pnpm-workspace.yaml": "" }))).toStrictEqual([]);
-  });
-
-  test("a workspace definition that does not parse is raised instead of being skipped", () => {
-    const root = repositoryWith({ "pnpm-workspace.yaml": "packages: [packages/*\n" });
-
-    expect(() => lintRuleWorkspacesIn(root)).toThrow(
-      "pnpm-workspace.yaml exists but does not parse as YAML",
-    );
-  });
-
-  test("a definition whose packages field is not a list declares nothing", () => {
-    expect(
-      lintRuleWorkspacesIn(repositoryWith({ "pnpm-workspace.yaml": "packages: 7\n" })),
-    ).toStrictEqual([]);
-  });
-
-  test("a pattern that is not a word is left out while the others expand", () => {
-    const root = repositoryWith({
-      "pnpm-workspace.yaml": "packages:\n  - 7\n  - packages/*\n",
-      "packages/example/package.json": declaringManifest,
+  describe("a repository without a workspace definition", () => {
+    const it = test.extend("workspaces", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "lint-rule-workspaces-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      return lintRuleWorkspacesIn(root);
     });
 
-    expect(lintRuleWorkspacesIn(root)).toStrictEqual([
-      { workspaceDir: "packages/example", ruleDirectories: ["src/rules"] },
-    ]);
+    it("declares nothing", ({ workspaces }) => {
+      expect(workspaces).toStrictEqual([]);
+    });
   });
 
-  test("a pattern naming one directory is taken as it stands", () => {
-    const root = repositoryWith({
-      "pnpm-workspace.yaml": "packages:\n  - tools/single\n",
-      "tools/single/package.json": declaringManifest,
+  describe("a workspace definition that is a bare scalar", () => {
+    const it = test.extend("workspaces", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "lint-rule-workspaces-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), "42\n", "utf8");
+      return lintRuleWorkspacesIn(root);
     });
 
-    expect(lintRuleWorkspacesIn(root)).toStrictEqual([
-      { workspaceDir: "tools/single", ruleDirectories: ["src/rules"] },
-    ]);
+    it("declares nothing", ({ workspaces }) => {
+      expect(workspaces).toStrictEqual([]);
+    });
   });
 
-  test("a pattern whose parent directory does not exist expands to nothing", () => {
-    const root = repositoryWith({ "pnpm-workspace.yaml": "packages:\n  - missing/*\n" });
-
-    expect(lintRuleWorkspacesIn(root)).toStrictEqual([]);
-  });
-
-  test("a file sitting beside the workspaces is not taken for one", () => {
-    const root = repositoryWith({
-      "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
-      "packages/stray.txt": "not a workspace",
-      "packages/example/package.json": declaringManifest,
+  describe("an empty workspace definition", () => {
+    const it = test.extend("workspaces", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "lint-rule-workspaces-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), "", "utf8");
+      return lintRuleWorkspacesIn(root);
     });
 
-    expect(lintRuleWorkspacesIn(root)).toStrictEqual([
-      { workspaceDir: "packages/example", ruleDirectories: ["src/rules"] },
-    ]);
+    it("declares nothing", ({ workspaces }) => {
+      expect(workspaces).toStrictEqual([]);
+    });
   });
 
-  test("a workspace without a manifest declares nothing", () => {
-    const root = repositoryWith({
-      "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
-      "packages/example/readme.md": "no manifest here",
+  describe("a workspace definition that does not parse", () => {
+    const it = test.extend("failureMessage", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "lint-rule-workspaces-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), "packages: [packages/*\n", "utf8");
+      const [failure] = attempt<unknown, Error>(() => lintRuleWorkspacesIn(root));
+      return failure === null ? null : failure.message;
     });
 
-    expect(lintRuleWorkspacesIn(root)).toStrictEqual([]);
+    it("is raised instead of being skipped", ({ failureMessage }) => {
+      expect(failureMessage).toBe("pnpm-workspace.yaml exists but does not parse as YAML");
+    });
   });
 
-  test("a manifest that is not an object declares nothing", () => {
-    const root = repositoryWith({
-      "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
-      "packages/scalar/package.json": "42",
-      "packages/nothing/package.json": "null",
+  describe("a definition whose packages field is not a list", () => {
+    const it = test.extend("workspaces", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "lint-rule-workspaces-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), "packages: 7\n", "utf8");
+      return lintRuleWorkspacesIn(root);
     });
 
-    expect(lintRuleWorkspacesIn(root)).toStrictEqual([]);
+    it("declares nothing", ({ workspaces }) => {
+      expect(workspaces).toStrictEqual([]);
+    });
   });
 
-  test("a manifest that cannot be parsed is raised instead of being skipped", () => {
-    const root = repositoryWith({
-      "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
-      "packages/broken/package.json": "{ not json",
+  describe("a pattern that is not a word standing beside one that is", () => {
+    const it = test.extend("workspaces", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "lint-rule-workspaces-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages/example"), { recursive: true });
+      writeFileSync(
+        join(root, "pnpm-workspace.yaml"),
+        "packages:\n  - 7\n  - packages/*\n",
+        "utf8",
+      );
+      writeFileSync(join(root, "packages/example/package.json"), DECLARING_MANIFEST, "utf8");
+      return lintRuleWorkspacesIn(root);
     });
 
-    expect(() => lintRuleWorkspacesIn(root)).toThrow(SyntaxError);
+    it("is left out while the others expand", ({ workspaces }) => {
+      expect(workspaces).toStrictEqual([
+        { workspaceDir: "packages/example", ruleDirectories: ["src/rules"] },
+      ]);
+    });
   });
 
-  test("a manifest without a lintRules list declares nothing", () => {
-    const root = repositoryWith({
-      "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
-      "packages/plain/package.json": JSON.stringify({ name: "plain" }),
-      "packages/wrong/package.json": JSON.stringify({ name: "wrong", lintRules: "src/rules" }),
+  describe("a pattern naming one directory", () => {
+    const it = test.extend("workspaces", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "lint-rule-workspaces-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "tools/single"), { recursive: true });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), "packages:\n  - tools/single\n", "utf8");
+      writeFileSync(join(root, "tools/single/package.json"), DECLARING_MANIFEST, "utf8");
+      return lintRuleWorkspacesIn(root);
     });
 
-    expect(lintRuleWorkspacesIn(root)).toStrictEqual([]);
+    it("is taken as it stands", ({ workspaces }) => {
+      expect(workspaces).toStrictEqual([
+        { workspaceDir: "tools/single", ruleDirectories: ["src/rules"] },
+      ]);
+    });
   });
 
-  test("entries that are not words are dropped from the declared directories", () => {
-    const root = repositoryWith({
-      "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
-      "packages/mixed/package.json": JSON.stringify({ lintRules: [7, "src/rules"] }),
-      "packages/hollow/package.json": JSON.stringify({ lintRules: [7] }),
+  describe("a pattern whose parent directory does not exist", () => {
+    const it = test.extend("workspaces", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "lint-rule-workspaces-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), "packages:\n  - missing/*\n", "utf8");
+      return lintRuleWorkspacesIn(root);
     });
 
-    expect(lintRuleWorkspacesIn(root)).toStrictEqual([
-      { workspaceDir: "packages/mixed", ruleDirectories: ["src/rules"] },
-    ]);
+    it("expands to nothing", ({ workspaces }) => {
+      expect(workspaces).toStrictEqual([]);
+    });
   });
 
-  test("workspaces come back sorted by their directory", () => {
-    const root = repositoryWith({
-      "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
-      "packages/zebra/package.json": declaringManifest,
-      "packages/alpha/package.json": declaringManifest,
+  describe("a file sitting beside the workspaces", () => {
+    const it = test.extend("workspaces", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "lint-rule-workspaces-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages/example"), { recursive: true });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), "packages:\n  - packages/*\n", "utf8");
+      writeFileSync(join(root, "packages/stray.txt"), "not a workspace", "utf8");
+      writeFileSync(join(root, "packages/example/package.json"), DECLARING_MANIFEST, "utf8");
+      return lintRuleWorkspacesIn(root);
     });
 
-    expect(lintRuleWorkspacesIn(root).map((workspace) => workspace.workspaceDir)).toStrictEqual([
-      "packages/alpha",
-      "packages/zebra",
-    ]);
+    it("is not taken for one", ({ workspaces }) => {
+      expect(workspaces).toStrictEqual([
+        { workspaceDir: "packages/example", ruleDirectories: ["src/rules"] },
+      ]);
+    });
+  });
+
+  describe("a workspace without a manifest", () => {
+    const it = test.extend("workspaces", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "lint-rule-workspaces-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages/example"), { recursive: true });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), "packages:\n  - packages/*\n", "utf8");
+      writeFileSync(join(root, "packages/example/readme.md"), "no manifest here", "utf8");
+      return lintRuleWorkspacesIn(root);
+    });
+
+    it("declares nothing", ({ workspaces }) => {
+      expect(workspaces).toStrictEqual([]);
+    });
+  });
+
+  describe("a manifest that is not an object", () => {
+    const it = test.extend("workspaces", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "lint-rule-workspaces-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages/scalar"), { recursive: true });
+      mkdirSync(join(root, "packages/nothing"), { recursive: true });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), "packages:\n  - packages/*\n", "utf8");
+      writeFileSync(join(root, "packages/scalar/package.json"), "42", "utf8");
+      writeFileSync(join(root, "packages/nothing/package.json"), "null", "utf8");
+      return lintRuleWorkspacesIn(root);
+    });
+
+    it("declares nothing", ({ workspaces }) => {
+      expect(workspaces).toStrictEqual([]);
+    });
+  });
+
+  describe("a manifest that cannot be parsed", () => {
+    const it = test.extend("failureName", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "lint-rule-workspaces-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages/broken"), { recursive: true });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), "packages:\n  - packages/*\n", "utf8");
+      writeFileSync(join(root, "packages/broken/package.json"), "{ not json", "utf8");
+      const [failure] = attempt<unknown, Error>(() => lintRuleWorkspacesIn(root));
+      return failure === null ? null : failure.name;
+    });
+
+    it("is raised instead of being skipped", ({ failureName }) => {
+      expect(failureName).toBe("SyntaxError");
+    });
+  });
+
+  describe("a manifest without a lintRules list", () => {
+    const it = test.extend("workspaces", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "lint-rule-workspaces-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages/plain"), { recursive: true });
+      mkdirSync(join(root, "packages/wrong"), { recursive: true });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), "packages:\n  - packages/*\n", "utf8");
+      writeFileSync(
+        join(root, "packages/plain/package.json"),
+        JSON.stringify({ name: "plain" }),
+        "utf8",
+      );
+      writeFileSync(
+        join(root, "packages/wrong/package.json"),
+        JSON.stringify({ name: "wrong", lintRules: "src/rules" }),
+        "utf8",
+      );
+      return lintRuleWorkspacesIn(root);
+    });
+
+    it("declares nothing", ({ workspaces }) => {
+      expect(workspaces).toStrictEqual([]);
+    });
+  });
+
+  describe("declared directories holding an entry that is not a word", () => {
+    const it = test.extend("workspaces", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "lint-rule-workspaces-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages/mixed"), { recursive: true });
+      mkdirSync(join(root, "packages/hollow"), { recursive: true });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), "packages:\n  - packages/*\n", "utf8");
+      writeFileSync(
+        join(root, "packages/mixed/package.json"),
+        JSON.stringify({ lintRules: [7, "src/rules"] }),
+        "utf8",
+      );
+      writeFileSync(
+        join(root, "packages/hollow/package.json"),
+        JSON.stringify({ lintRules: [7] }),
+        "utf8",
+      );
+      return lintRuleWorkspacesIn(root);
+    });
+
+    it("drops that entry and keeps the workspace that has words left", ({ workspaces }) => {
+      expect(workspaces).toStrictEqual([
+        { workspaceDir: "packages/mixed", ruleDirectories: ["src/rules"] },
+      ]);
+    });
+  });
+
+  describe("two workspaces declared out of order", () => {
+    const it = test.extend("workspaces", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "lint-rule-workspaces-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages/zebra"), { recursive: true });
+      mkdirSync(join(root, "packages/alpha"), { recursive: true });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), "packages:\n  - packages/*\n", "utf8");
+      writeFileSync(join(root, "packages/zebra/package.json"), DECLARING_MANIFEST, "utf8");
+      writeFileSync(join(root, "packages/alpha/package.json"), DECLARING_MANIFEST, "utf8");
+      return lintRuleWorkspacesIn(root);
+    });
+
+    it("come back sorted by their directory", ({ workspaces }) => {
+      expect(workspaces).toStrictEqual([
+        { workspaceDir: "packages/alpha", ruleDirectories: ["src/rules"] },
+        { workspaceDir: "packages/zebra", ruleDirectories: ["src/rules"] },
+      ]);
+    });
   });
 });

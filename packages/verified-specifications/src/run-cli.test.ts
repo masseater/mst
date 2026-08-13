@@ -1,80 +1,141 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 import { EXIT_MISUSE, EXIT_PROBLEMS_FOUND, EXIT_SUCCESS } from "@mst/repository-checks";
-import { describe, expect, onTestFinished, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { runVerifiedSpecifications } from "./run-cli.ts";
 
-const repositoryWith = async (files: Readonly<Record<string, string>>): Promise<string> => {
-  const repositoryRoot = await mkdtemp(join(tmpdir(), "verified-specifications-"));
-  onTestFinished(async () => rm(repositoryRoot, { recursive: true, force: true }));
+const STANDALONE_MANIFEST = '{ "name": "standalone" }';
 
-  await Promise.all(
-    Object.entries(files).map(async ([fileName, source]) => {
-      const absolutePath = join(repositoryRoot, fileName);
-      await mkdir(dirname(absolutePath), { recursive: true });
-      await writeFile(absolutePath, source, "utf-8");
-    }),
-  );
-  return repositoryRoot;
-};
+const SPEC_SOURCE = 'describe("s", () => {\n  it("c", () => {});\n});\n';
+
+const USAGE = `Usage: verified-specifications <command> [options]
+
+Commands:
+  check   Extract the claims of every specification test and report each place where the structure cannot be read or a SPECIFICATIONS.md disagrees with them.
+
+Options:
+  --repository-root <path>  Root of the repository to scan. Defaults to the current working directory.
+  --write                   Rewrite each SPECIFICATIONS.md instead of reporting it as stale.
+`;
+
+const UNKNOWN_OPTION_REFUSAL = `Unknown option '--unknown-option'. To specify a positional argument starting with a '-', place it at the end of the command after '--', as in '-- "--unknown-option"\n`;
+
+const MISSING_LIST_REPORT =
+  "SPECIFICATIONS.md A specification list must not fall behind the tests it is extracted from, because a reader would review claims the code no longer makes. Run `verified-specifications check --write` (wired as `vp run guard:fix`) to regenerate SPECIFICATIONS.md.\n";
 
 describe("runVerifiedSpecifications", () => {
-  test("prints the usage for a command it does not know", async () => {
-    const finished = await runVerifiedSpecifications(["deploy"]);
-    expect(finished.exitCode).toBe(EXIT_MISUSE);
-    expect(finished.error).toContain("Usage:");
-  });
+  describe("a command it does not know", () => {
+    const it = test.extend("theRunOfAnUnknownCommand", async () =>
+      runVerifiedSpecifications(["deploy"]));
 
-  test("prints the usage when no command is given", async () => {
-    const finished = await runVerifiedSpecifications([]);
-    expect(finished.exitCode).toBe(EXIT_MISUSE);
-  });
-
-  test("exits clean when every workspace agrees with its list", async () => {
-    const repositoryRoot = await repositoryWith({
-      "package.json": '{ "name": "standalone" }',
+    it("refuses it as a misuse and spells the usage on the error stream", ({
+      theRunOfAnUnknownCommand,
+    }) => {
+      expect(theRunOfAnUnknownCommand).toStrictEqual({
+        exitCode: EXIT_MISUSE,
+        out: "",
+        error: USAGE,
+      });
     });
-    const finished = await runVerifiedSpecifications([
-      "check",
-      "--repository-root",
-      repositoryRoot,
-    ]);
-    expect(finished).toStrictEqual({ exitCode: EXIT_SUCCESS, out: "", error: "" });
   });
 
-  test("exits non-zero and prints each problem when a list is missing", async () => {
-    const repositoryRoot = await repositoryWith({
-      "package.json": '{ "name": "standalone" }',
-      "specs/joining.spec.ts": 'describe("s", () => {\n  it("c", () => {});\n});\n',
+  describe("no command at all", () => {
+    const it = test.extend("theRunWithoutACommand", async () => runVerifiedSpecifications([]));
+
+    it("refuses it as a misuse and spells the usage on the error stream", ({
+      theRunWithoutACommand,
+    }) => {
+      expect(theRunWithoutACommand).toStrictEqual({
+        exitCode: EXIT_MISUSE,
+        out: "",
+        error: USAGE,
+      });
     });
-    const finished = await runVerifiedSpecifications([
-      "check",
-      "--repository-root",
-      repositoryRoot,
-    ]);
-    expect(finished.exitCode).toBe(EXIT_PROBLEMS_FOUND);
-    expect(finished.out).toContain("SPECIFICATIONS.md");
   });
 
-  test("scans the working directory when no root is named", async () => {
-    const repositoryRoot = await repositoryWith({
-      "package.json": '{ "name": "standalone" }',
+  describe("an option it does not know", () => {
+    const it = test.extend("theRunOfAnUnknownOption", async () =>
+      runVerifiedSpecifications(["check", "--unknown-option"]));
+
+    it("refuses it as a misuse and names the option it could not read", ({
+      theRunOfAnUnknownOption,
+    }) => {
+      expect(theRunOfAnUnknownOption).toStrictEqual({
+        exitCode: EXIT_MISUSE,
+        out: "",
+        error: UNKNOWN_OPTION_REFUSAL,
+      });
     });
-    const launchDirectory = process.cwd();
-    onTestFinished(() => {
-      process.chdir(launchDirectory);
-    });
-    process.chdir(repositoryRoot);
-    const finished = await runVerifiedSpecifications(["check"]);
-    expect(finished.exitCode).toBe(EXIT_SUCCESS);
   });
 
-  test("reports an option it does not know as misuse", async () => {
-    const finished = await runVerifiedSpecifications(["check", "--unknown-option"]);
-    expect(finished.exitCode).toBe(EXIT_MISUSE);
-    expect(finished.error).toContain("--unknown-option");
+  describe("a repository whose workspace agrees with its list", () => {
+    const it = test.extend("theRunOfAnAgreeingRepository", async ({}, { onCleanup }) => {
+      const repositoryRoot = await mkdtemp(join(tmpdir(), "verified-specifications-"));
+      onCleanup(async () => rm(repositoryRoot, { recursive: true, force: true }));
+      await writeFile(join(repositoryRoot, "package.json"), STANDALONE_MANIFEST, "utf-8");
+      return runVerifiedSpecifications(["check", "--repository-root", repositoryRoot]);
+    });
+
+    it("exits clean and says nothing on either stream", ({ theRunOfAnAgreeingRepository }) => {
+      expect(theRunOfAnAgreeingRepository).toStrictEqual({
+        exitCode: EXIT_SUCCESS,
+        out: "",
+        error: "",
+      });
+    });
+  });
+
+  describe("a repository whose list is missing", () => {
+    const it = test.extend("theRunOfARepositoryWithoutItsList", async ({}, { onCleanup }) => {
+      const repositoryRoot = await mkdtemp(join(tmpdir(), "verified-specifications-"));
+      onCleanup(async () => rm(repositoryRoot, { recursive: true, force: true }));
+      await writeFile(join(repositoryRoot, "package.json"), STANDALONE_MANIFEST, "utf-8");
+      await mkdir(join(repositoryRoot, "specs"), { recursive: true });
+      await writeFile(join(repositoryRoot, "specs/joining.spec.ts"), SPEC_SOURCE, "utf-8");
+      return runVerifiedSpecifications(["check", "--repository-root", repositoryRoot]);
+    });
+
+    it("exits non-zero and prints the problem it found", ({
+      theRunOfARepositoryWithoutItsList,
+    }) => {
+      expect(theRunOfARepositoryWithoutItsList).toStrictEqual({
+        exitCode: EXIT_PROBLEMS_FOUND,
+        out: MISSING_LIST_REPORT,
+        error: "",
+      });
+    });
+  });
+
+  describe("no repository root named", () => {
+    const it = test
+      .extend("repositoryRoot", async ({}, { onCleanup }) => {
+        const standaloneRepositoryRoot = await mkdtemp(join(tmpdir(), "verified-specifications-"));
+        onCleanup(async () => rm(standaloneRepositoryRoot, { recursive: true, force: true }));
+        await writeFile(
+          join(standaloneRepositoryRoot, "package.json"),
+          STANDALONE_MANIFEST,
+          "utf-8",
+        );
+        return standaloneRepositoryRoot;
+      })
+      .extend("theRunFromTheWorkingDirectory", async ({ repositoryRoot }, { onCleanup }) => {
+        const launchDirectory = process.cwd();
+        onCleanup(() => {
+          process.chdir(launchDirectory);
+        });
+        process.chdir(repositoryRoot);
+        return runVerifiedSpecifications(["check"]);
+      });
+
+    it("scans the working directory and exits clean", ({ theRunFromTheWorkingDirectory }) => {
+      expect(theRunFromTheWorkingDirectory).toStrictEqual({
+        exitCode: EXIT_SUCCESS,
+        out: "",
+        error: "",
+      });
+    });
   });
 });

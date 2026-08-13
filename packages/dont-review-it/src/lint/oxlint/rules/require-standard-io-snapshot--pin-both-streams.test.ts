@@ -23,6 +23,76 @@ ${STDOUT_SNAPSHOT}
 ${STDERR_SNAPSHOT}`,
       },
       {
+        name: "the stream bindings standing as the subjects pin both streams",
+        code: `${FIXTURE_IMPORT}
+const it = standardIoTest.extend("theRun", { auto: true }, () => {
+  runTheCli();
+});
+it("pins stdout", ({ stdout }) => {
+  expect(stdout).toMatchInlineSnapshot();
+});
+it("pins stderr", ({ stderr }) => {
+  expect(stderr).toMatchInlineSnapshot();
+});`,
+      },
+      {
+        name: "a fixture reading from a stream carries that stream to its own snapshot",
+        code: `${FIXTURE_IMPORT}
+const it = standardIoTest
+  .extend("theStandardOutputOfARun", ({ stdout }) => {
+    runTheCli();
+    return stdout.text();
+  })
+  .extend("theStandardErrorOfARun", ({ stderr }) => {
+    runTheCli();
+    return stderr.text();
+  });
+it("pins stdout", ({ theStandardOutputOfARun }) => {
+  expect(theStandardOutputOfARun).toMatchInlineSnapshot();
+});
+it("pins stderr", ({ theStandardErrorOfARun }) => {
+  expect(theStandardErrorOfARun).toMatchInlineSnapshot();
+});`,
+      },
+      {
+        name: "a fixture declared with a value rather than a factory carries no stream with it",
+        code: `${FIXTURE_IMPORT}
+const it = standardIoTest.extend("seed", 1);
+it("pins stdout", ({ stdout }) => {
+  expect(stdout).toMatchInlineSnapshot();
+});
+it("pins stderr", ({ stderr }) => {
+  expect(stderr).toMatchInlineSnapshot();
+});`,
+      },
+      {
+        name: "a snapshot taken of a call rooted at a stream pins that stream",
+        code: `${FIXTURE_IMPORT}
+standardIoTest("pins stdout", ({ stdout }) => {
+  expect(stdout.text()).toMatchInlineSnapshot();
+});
+standardIoTest("pins stderr", ({ stderr }) => {
+  expect(stderr.text()).toMatchInlineSnapshot();
+});`,
+      },
+      {
+        name: "a stream reached through a chain of fixtures still counts as pinned",
+        code: `${FIXTURE_IMPORT}
+const it = standardIoTest
+  .extend("theRun", ({ stdout }) => runTheCli(stdout))
+  .extend("theOutcomeOfTheRun", ({ theRun }) => theRun.settle())
+  .extend("theStandardErrorOfARun", ({ stderr }) => {
+    runTheCli();
+    return stderr.text();
+  });
+it("pins stdout through the chain", ({ theOutcomeOfTheRun }) => {
+  expect(theOutcomeOfTheRun).toMatchInlineSnapshot();
+});
+it("pins stderr", ({ theStandardErrorOfARun }) => {
+  expect(theStandardErrorOfARun).toMatchInlineSnapshot();
+});`,
+      },
+      {
         name: "external snapshots pin the streams just as well",
         code: `${FIXTURE_IMPORT}
 standardIoTest("pins both", ({ stdout, stderr }) => {
@@ -155,15 +225,6 @@ standardIoTest("uses a wrapped assertion", ({ stdout, stderr }) => {
         errors: [{ messageId: "missingSnapshot" }, { messageId: "missingSnapshot" }],
       },
       {
-        name: "snapshotting something other than the captured text pins nothing",
-        code: `${FIXTURE_IMPORT}
-standardIoTest("snapshots the wrong subject", ({ stdout, stderr }) => {
-  expect(stdout).toMatchInlineSnapshot();
-  expect(stderr).toMatchInlineSnapshot();
-});`,
-        errors: [{ messageId: "missingSnapshot" }, { messageId: "missingSnapshot" }],
-      },
-      {
         name: "a snapshot on a plain result object pins neither stream",
         code: `${FIXTURE_IMPORT}
 standardIoTest("snapshots a result", ({ stdout }) => {
@@ -182,12 +243,18 @@ standardIoTest("loses the subjects", ({ stdout, stderr }) => {
         errors: [{ messageId: "missingSnapshot" }, { messageId: "missingSnapshot" }],
       },
       {
-        name: "a member other than the captured text is not the stream contract",
+        name: "a snapshot rooted at a binding unrelated to the streams pins neither of them",
         code: `${FIXTURE_IMPORT}
-standardIoTest("snapshots the wrong members", ({ stdout, stderr }) => {
-  expect(stdout.raw).toMatchInlineSnapshot();
-  expect(stderr["text"]).toMatchInlineSnapshot();
+standardIoTest("snapshots an unrelated subject", ({ stdout, stderr }) => {
   expect(buffer.text).toMatchInlineSnapshot();
+});`,
+        errors: [{ messageId: "missingSnapshot" }, { messageId: "missingSnapshot" }],
+      },
+      {
+        name: "a snapshot of a subject with no name at its root pins neither stream",
+        code: `${FIXTURE_IMPORT}
+standardIoTest("snapshots a written out value", ({ stdout, stderr }) => {
+  expect("result").toMatchInlineSnapshot();
 });`,
         errors: [{ messageId: "missingSnapshot" }, { messageId: "missingSnapshot" }],
       },

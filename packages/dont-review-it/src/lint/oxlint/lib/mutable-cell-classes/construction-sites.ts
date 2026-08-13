@@ -51,17 +51,17 @@ const scopeNameOf = (visit: NodeVisit): string | null =>
       .slice(-1)
       .filter((parent) => parent.value === visit.node)
       .flatMap((parent) => (parent.computed === true ? [] : [identifierNameOf(parent.key)]))
-      .flatMap((spelled) => (spelled === null ? [] : [spelled])),
+      .flatMap((holderSpelling) => (holderSpelling === null ? [] : [holderSpelling])),
   ][0] ?? null;
 
 const isDivertedUnder = (parent: AstFields, node: AstFields): boolean => {
-  const nodeKind = nodeTypeOf(parent);
-  if (IMPORT_BINDING_NODE_TYPES.has(nodeKind)) return false;
+  const parentNodeType = nodeTypeOf(parent);
+  if (IMPORT_BINDING_NODE_TYPES.has(parentNodeType)) return false;
 
-  const spelling = OWN_SPELLING_FIELD.get(nodeKind);
+  const spelling = OWN_SPELLING_FIELD.get(parentNodeType);
   if (spelling !== undefined) return parent.computed === true || parent[spelling] !== node;
 
-  const named = OWN_NAME_FIELD.get(nodeKind);
+  const named = OWN_NAME_FIELD.get(parentNodeType);
   return named === undefined || parent[named] !== node;
 };
 
@@ -72,13 +72,13 @@ const declaredClassesIn = (visits: readonly NodeVisit[]): readonly DeclaredClass
   visits
     .filter((visit) => nodeTypeOf(visit.node) === "ClassDeclaration")
     .flatMap((visit) => {
-      const spelled = identifierNameOf(visit.node.id);
-      if (spelled === null) return [];
+      const declaredClassName = identifierNameOf(visit.node.id);
+      if (declaredClassName === null) return [];
 
       return [
         {
-          name: spelled,
-          fields: stateFieldsWrittenAfterConstruction(visit.node),
+          name: declaredClassName,
+          fields: [...stateFieldsWrittenAfterConstruction(visit.node)],
           shared: visit.ancestors
             .slice(-1)
             .some((parent) => SHARED_PARENT_KINDS.has(nodeTypeOf(parent))),
@@ -90,16 +90,16 @@ const constructionsIn = (visits: readonly NodeVisit[]): readonly ConstructionSit
   visits
     .filter((visit) => nodeTypeOf(visit.node) === "NewExpression")
     .flatMap((visit): readonly ConstructionSite[] => {
-      const spelled = identifierNameOf(visit.node.callee);
-      if (spelled === null) return [];
+      const constructedClassName = identifierNameOf(visit.node.callee);
+      if (constructedClassName === null) return [];
 
       const scope = innermostOf(visit.ancestors, FUNCTION_NODE_TYPES);
       if (scope === null)
-        return [{ name: spelled, scopeKey: null, scopeName: null, escapes: true }];
+        return [{ name: constructedClassName, scopeKey: null, scopeName: null, escapes: true }];
 
       return [
         {
-          name: spelled,
+          name: constructedClassName,
           scopeKey: String(scope.start),
           scopeName: scopeNameOf(visitAt(visit, scope)),
           escapes: constructedValueEscapes({ visits, scope }, visit),
@@ -110,8 +110,8 @@ const constructionsIn = (visits: readonly NodeVisit[]): readonly ConstructionSit
 const divertedNamesIn = (visits: readonly NodeVisit[]): ReadonlySet<string> =>
   new Set(
     visits.flatMap((visit) => {
-      const spelled = identifierNameOf(visit.node);
-      return spelled === null || !isDivertedReference(visit) ? [] : [spelled];
+      const referencedSpelling = identifierNameOf(visit.node);
+      return referencedSpelling === null || !isDivertedReference(visit) ? [] : [referencedSpelling];
     }),
   );
 

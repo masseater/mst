@@ -17,6 +17,8 @@ export type RelayCredentialConfig = {
   readonly log: Logger;
 };
 
+type RelaySession = { readonly token: string; readonly expiresAtMs: number };
+
 const assertAllowedOrigin = (check: {
   readonly url: string;
   readonly allowedOrigin: string;
@@ -28,36 +30,48 @@ const assertAllowedOrigin = (check: {
   );
 };
 
-export const createRelayCredentialProvider = (
-  config: RelayCredentialConfig,
-): CredentialProvider => {
-  const cache = new Map<string, { readonly token: string; readonly expiresAtMs: number }>();
-  const issue = async (): Promise<string> => {
-    const githubToken = await config.resolveGithubToken();
-    if (githubToken === null) {
-      throw new CredentialTerminalError("no GitHub token is available to prove the relay session");
-    }
-    const session = await config.issueSession({ githubToken });
-    const expiresAtMs = Date.parse(session.expiresAt);
-    if (Number.isNaN(expiresAtMs)) {
-      throw new CredentialTerminalError("the relay returned a session without a usable expiry");
-    }
-    cache.set("session", { token: session.token, expiresAtMs });
-    config.log.info({ expiresAt: session.expiresAt }, "relay session issued");
-    return session.token;
-  };
-  return {
-    authorizationFor: async (asked) => {
-      assertAllowedOrigin({ url: asked.url, allowedOrigin: config.allowedOrigin });
-      const cached = cache.get("session");
-      if (cached !== undefined && cached.expiresAtMs - config.now() > RENEW_BEFORE_MS) {
-        return `Bearer ${cached.token}`;
-      }
-      return `Bearer ${await issue()}`;
-    },
-    invalidate: () => {
-      cache.delete("session");
-      config.log.info({}, "relay session invalidated; it will be re-issued on the next attempt");
-    },
-  };
+const issueRelaySession = async (config: RelayCredentialConfig): Promise<RelaySession> => {
+  const githubToken = await config.resolveGithubToken();
+  if (githubToken === null) {
+    throw new CredentialTerminalError("no GitHub token is available to prove the relay session");
+  }
+  const issued = await config.issueSession({ githubToken });
+  const expiresAtMs = Date.parse(issued.expiresAt);
+  if (Number.isNaN(expiresAtMs)) {
+    throw new CredentialTerminalError("the relay returned a session without a usable expiry");
+  }
+  config.log.info({ expiresAt: issued.expiresAt }, "relay session issued");
+  return { token: issued.token, expiresAtMs };
 };
+
+class RelayCredentials implements CredentialProvider {
+  readonly #config: RelayCredentialConfig;
+
+  #heldSession: RelaySession | null = null;
+
+  constructor(config: RelayCredentialConfig) {
+    this.#config = config;
+  }
+
+  readonly authorizationFor = async (asked: { readonly url: string }): Promise<string> => {
+    assertAllowedOrigin({ url: asked.url, allowedOrigin: this.#config.allowedOrigin });
+    const heldSession = this.#heldSession;
+    if (heldSession !== null && heldSession.expiresAtMs - this.#config.now() > RENEW_BEFORE_MS) {
+      return `Bearer ${heldSession.token}`;
+    }
+    const issuedSession = await issueRelaySession(this.#config);
+    this.#heldSession = issuedSession;
+    return `Bearer ${issuedSession.token}`;
+  };
+
+  readonly invalidate = (): void => {
+    this.#heldSession = null;
+    this.#config.log.info(
+      {},
+      "relay session invalidated; it will be re-issued on the next attempt",
+    );
+  };
+}
+
+export const createRelayCredentialProvider = (config: RelayCredentialConfig): CredentialProvider =>
+  new RelayCredentials(config);

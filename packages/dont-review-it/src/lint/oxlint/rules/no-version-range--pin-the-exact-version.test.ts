@@ -13,73 +13,88 @@ const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-no-version-range-"
 
 const MODULE_SOURCE = "export const shipped = true;\n";
 
-const writeFixture = (spelled: string, source: string): string => {
-  const path = join(fixtureDir, spelled);
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, source);
-  return path;
+const SOURCE_BY_FIXTURE_PATH: Readonly<Record<string, string>> = {
+  "ranged/pnpm-workspace.yaml":
+    "packages:\n  - packages/*\ncatalog:\n  react: ^19.0.0\n  typescript: 7.0.2\n",
+  "ranged/package.json": `${JSON.stringify(
+    { name: "root", devDependencies: { knip: "^6.32.0", citty: "0.2.2" } },
+    null,
+    2,
+  )}\n`,
+  "ranged/packages/alpha/package.json": `${JSON.stringify(
+    {
+      name: "alpha",
+      dependencies: {
+        "es-toolkit": "catalog:",
+        "@fixture/utils": "workspace:*",
+        linked: "link:../shared-lib",
+        filed: "file:../shared-lib",
+        pad: "npm:left-pad@^1.0.0",
+        aliased: "npm:right-pad@2.0.0",
+        tagged: "latest",
+        hosted: "github:owner/repo",
+      },
+      peerDependencies: { "peer-only": "^1.0.0" },
+    },
+    null,
+    2,
+  )}\n`,
+  "ranged/packages/beta/package.json": `${JSON.stringify(
+    {
+      name: "beta",
+      dependencies: { solid: "1.9.9" },
+      optionalDependencies: { opt: "~4.0.0" },
+    },
+    null,
+    2,
+  )}\n`,
+  "ranged/entry.ts": MODULE_SOURCE,
+  "ranged/packages/alpha/entry.ts": MODULE_SOURCE,
+  "ranged/packages/beta/entry.ts": MODULE_SOURCE,
+  "exact/pnpm-workspace.yaml":
+    "packages:\n  - packages/*\ncatalog:\n  typescript: 7.0.2\n  oxfmt: 0.61.0-beta.1\n",
+  "exact/package.json": `${JSON.stringify(
+    { name: "exact-root", devDependencies: { citty: "0.2.2" } },
+    null,
+    2,
+  )}\n`,
+  "exact/packages/one/package.json": `${JSON.stringify(
+    { name: "one", dependencies: { "es-toolkit": "1.50.0", yaml: "2.9.0" } },
+    null,
+    2,
+  )}\n`,
+  "exact/entry.ts": MODULE_SOURCE,
+  "exact/packages/one/entry.ts": MODULE_SOURCE,
+  "no-definition/package.json": `${JSON.stringify(
+    { name: "definitionless", workspaces: [], devDependencies: { citty: "0.2.2" } },
+    null,
+    2,
+  )}\n`,
+  "no-definition/entry.ts": MODULE_SOURCE,
+  "unparsable/pnpm-workspace.yaml": "packages: [packages/*\n",
+  "unparsable/package.json": `${JSON.stringify(
+    { name: "unparsable-root", devDependencies: { citty: "0.2.2" } },
+    null,
+    2,
+  )}\n`,
+  "unparsable/entry.ts": MODULE_SOURCE,
+  "manifestless/pnpm-workspace.yaml": "packages: []\n",
+  "manifestless/loose.ts": MODULE_SOURCE,
 };
 
-const writeManifest = (spelled: string, manifest: unknown): void => {
-  writeFixture(`${spelled}/package.json`, `${JSON.stringify(manifest, null, 2)}\n`);
-};
+for (const [fixturePath, fixtureSource] of Object.entries(SOURCE_BY_FIXTURE_PATH)) {
+  mkdirSync(dirname(join(fixtureDir, fixturePath)), { recursive: true });
+  writeFileSync(join(fixtureDir, fixturePath), fixtureSource);
+}
 
-writeFixture(
-  "ranged/pnpm-workspace.yaml",
-  "packages:\n  - packages/*\ncatalog:\n  react: ^19.0.0\n  typescript: 7.0.2\n",
-);
-writeManifest("ranged", {
-  name: "root",
-  devDependencies: { knip: "^6.32.0", citty: "0.2.2" },
-});
-writeManifest("ranged/packages/alpha", {
-  name: "alpha",
-  dependencies: {
-    "es-toolkit": "catalog:",
-    "@fixture/utils": "workspace:*",
-    linked: "link:../shared-lib",
-    filed: "file:../shared-lib",
-    pad: "npm:left-pad@^1.0.0",
-    aliased: "npm:right-pad@2.0.0",
-    tagged: "latest",
-    hosted: "github:owner/repo",
-  },
-  peerDependencies: { "peer-only": "^1.0.0" },
-});
-writeManifest("ranged/packages/beta", {
-  name: "beta",
-  dependencies: { solid: "1.9.9" },
-  optionalDependencies: { opt: "~4.0.0" },
-});
-
-const rangedRootEntry = writeFixture("ranged/entry.ts", MODULE_SOURCE);
-const alphaEntry = writeFixture("ranged/packages/alpha/entry.ts", MODULE_SOURCE);
-const betaEntry = writeFixture("ranged/packages/beta/entry.ts", MODULE_SOURCE);
-
-writeFixture(
-  "exact/pnpm-workspace.yaml",
-  "packages:\n  - packages/*\ncatalog:\n  typescript: 7.0.2\n  oxfmt: 0.61.0-beta.1\n",
-);
-writeManifest("exact", { name: "exact-root", devDependencies: { citty: "0.2.2" } });
-writeManifest("exact/packages/one", {
-  name: "one",
-  dependencies: { "es-toolkit": "1.50.0", yaml: "2.9.0" },
-});
-const exactRootEntry = writeFixture("exact/entry.ts", MODULE_SOURCE);
-
-writeManifest("no-definition", {
-  name: "definitionless",
-  workspaces: [],
-  devDependencies: { citty: "0.2.2" },
-});
-const definitionlessEntry = writeFixture("no-definition/entry.ts", MODULE_SOURCE);
-
-writeFixture("unparsable/pnpm-workspace.yaml", "packages: [packages/*\n");
-writeManifest("unparsable", { name: "unparsable-root", devDependencies: { citty: "0.2.2" } });
-const unparsableEntry = writeFixture("unparsable/entry.ts", MODULE_SOURCE);
-
-writeFixture("manifestless/pnpm-workspace.yaml", "packages: []\n");
-const manifestlessEntry = writeFixture("manifestless/loose.ts", MODULE_SOURCE);
+const rangedRootEntry = join(fixtureDir, "ranged/entry.ts");
+const alphaEntry = join(fixtureDir, "ranged/packages/alpha/entry.ts");
+const betaEntry = join(fixtureDir, "ranged/packages/beta/entry.ts");
+const exactRootEntry = join(fixtureDir, "exact/entry.ts");
+const exactMemberEntry = join(fixtureDir, "exact/packages/one/entry.ts");
+const definitionlessEntry = join(fixtureDir, "no-definition/entry.ts");
+const unparsableEntry = join(fixtureDir, "unparsable/entry.ts");
+const manifestlessEntry = join(fixtureDir, "manifestless/loose.ts");
 
 const INTENTIONAL = [{ intentionalRanges: ["knip", "react"] }];
 
@@ -99,7 +114,7 @@ describe("dont-review-it/no-version-range--pin-the-exact-version", () => {
       {
         name: "a workspace declaring references, an exact alias, a tag and a host passes",
         code: MODULE_SOURCE,
-        filename: writeFixture("exact/packages/one/entry.ts", MODULE_SOURCE),
+        filename: exactMemberEntry,
       },
       {
         name: "names registered as intentional ranges are not asked to be pinned",

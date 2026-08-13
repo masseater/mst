@@ -40,6 +40,11 @@ export const THROW_EXPECTING_MODIFIERS: ReadonlySet<string> = new Set(["rejects"
 
 export const DERIVED_ASSERTION_RECEIVERS: ReadonlySet<string> = new Set(["poll", "soft"]);
 
+export const ASSERTION_COUNT_DECLARATIONS: ReadonlySet<string> = new Set([
+  "assertions",
+  "hasAssertions",
+]);
+
 const MATCHER_FAMILIES = [
   "containment",
   "loose-structure",

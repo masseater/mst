@@ -2,6 +2,7 @@ import { realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
 import { readUnlessMissing } from "@mst/repository-checks";
+import { memoize } from "es-toolkit";
 
 import { isDirectory, isFile } from "../canonical-values/source-files.ts";
 import { segmentsOf } from "../path-segments.ts";
@@ -119,16 +120,7 @@ export type CouplingRequest = {
   readonly workspaceRoot: string;
 };
 
-const indexByPackageDirectory = new Map<string, ReadonlyMap<string, string>>();
-
-const rememberedIndexOf = (packageDirectory: string): ReadonlyMap<string, string> => {
-  const remembered = indexByPackageDirectory.get(packageDirectory);
-  if (remembered !== undefined) return remembered;
-
-  const built = buildSetupExportSpecifierIndex(packageDirectory);
-  indexByPackageDirectory.set(packageDirectory, built);
-  return built;
-};
+const rememberedIndexOf = memoize(buildSetupExportSpecifierIndex);
 
 const entryFilesUnder = (packageDirectory: string, specifier: string): readonly string[] =>
   [...rememberedIndexOf(packageDirectory)]

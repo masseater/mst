@@ -1,6 +1,6 @@
 import { mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 import { testLintRule } from "@mst/lint-rule-authoring";
 import { describe } from "vite-plus/test";
@@ -11,97 +11,87 @@ const workspaceDir = join(realpathSync(tmpdir()), "dont-review-it-no-dry-test-se
 
 rmSync(workspaceDir, { recursive: true, force: true });
 
-const workspacePath = (relativePath: string): string => join(workspaceDir, relativePath);
+const widgetDir = join(workspaceDir, "packages/widget");
+const entrylessDir = join(workspaceDir, "packages/entryless");
+const sharedFixturesDir = join(workspaceDir, "packages/shared-fixtures");
+const toolkitDir = join(workspaceDir, "packages/toolkit");
+const appDir = join(workspaceDir, "packages/app");
 
-const writeWorkspaceFile = (relativePath: string, writtenContent: string): void => {
-  const path = workspacePath(relativePath);
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, writtenContent);
-};
+mkdirSync(join(widgetDir, "src"), { recursive: true });
+mkdirSync(join(entrylessDir, "src"), { recursive: true });
+mkdirSync(join(sharedFixturesDir, "src"), { recursive: true });
+mkdirSync(join(toolkitDir, "src"), { recursive: true });
+mkdirSync(join(appDir, "src"), { recursive: true });
+mkdirSync(join(workspaceDir, "node_modules/@fixture"), { recursive: true });
 
-const writeManifest = (
-  packageDirectory: string,
-  manifest: Readonly<Record<string, unknown>>,
-): void => {
-  writeWorkspaceFile(`${packageDirectory}/package.json`, JSON.stringify(manifest));
-};
+writeFileSync(join(workspaceDir, "pnpm-workspace.yaml"), "packages:\n  - packages/*\n");
 
-const installPackage = (spelled: string, packageDirectory: string): void => {
-  const link = workspacePath(join("node_modules", spelled));
-  mkdirSync(dirname(link), { recursive: true });
-  symlinkSync(workspacePath(packageDirectory), link, "dir");
-};
-
-writeWorkspaceFile("pnpm-workspace.yaml", "packages:\n  - packages/*\n");
-
-writeManifest("packages/widget", {
-  name: "@fixture/widget",
-  exports: { ".": "./src/index.ts" },
-});
-writeWorkspaceFile(
-  "packages/widget/src/index.ts",
+writeFileSync(
+  join(widgetDir, "package.json"),
+  JSON.stringify({ name: "@fixture/widget", exports: { ".": "./src/index.ts" } }),
+);
+writeFileSync(
+  join(widgetDir, "src/index.ts"),
   'export * from "./widget.ts";\nexport * from "./widget-helper.ts";\n',
 );
-writeWorkspaceFile("packages/widget/src/widget.ts", "export const widget = 1;\n");
-writeWorkspaceFile("packages/widget/src/widget-helper.ts", "export const shaped = 2;\n");
-writeWorkspaceFile("packages/widget/src/helpers.ts", "export const build = () => 3;\n");
-writeWorkspaceFile("packages/widget/src/prepared.ts", "export const prepared = () => 4;\n");
-writeWorkspaceFile("packages/widget/src/relay.ts", 'export * from "./prepared.ts";\n');
-writeWorkspaceFile(
-  "packages/widget/src/shapes.ts",
-  "export type Shape = { readonly size: number };\n",
-);
-writeWorkspaceFile("packages/widget/src/widget.assets.ts", "export const rows = [1, 2];\n");
-writeWorkspaceFile("packages/widget/src/widget.rows.ts", "export const counted = [3, 4];\n");
-writeWorkspaceFile("packages/widget/src/other.test.ts", "export const other = 5;\n");
-
-writeWorkspaceFile("packages/widget/src/declared.ts", "declare const configured: number;\n");
-writeWorkspaceFile(
-  "packages/widget/src/typed-view.ts",
+writeFileSync(join(widgetDir, "src/widget.ts"), "export const widget = 1;\n");
+writeFileSync(join(widgetDir, "src/widget-helper.ts"), "export const shaped = 2;\n");
+writeFileSync(join(widgetDir, "src/helpers.ts"), "export const build = () => 3;\n");
+writeFileSync(join(widgetDir, "src/prepared.ts"), "export const prepared = () => 4;\n");
+writeFileSync(join(widgetDir, "src/relay.ts"), 'export * from "./prepared.ts";\n');
+writeFileSync(join(widgetDir, "src/shapes.ts"), "export type Shape = { readonly size: number };\n");
+writeFileSync(join(widgetDir, "src/widget.assets.ts"), "export const rows = [1, 2];\n");
+writeFileSync(join(widgetDir, "src/widget.rows.ts"), "export const counted = [3, 4];\n");
+writeFileSync(join(widgetDir, "src/other.test.ts"), "export const other = 5;\n");
+writeFileSync(join(widgetDir, "src/declared.ts"), "declare const configured: number;\n");
+writeFileSync(
+  join(widgetDir, "src/typed-view.ts"),
   'import type { Shape } from "./shapes.ts";\n\nexport type Sized = Shape;\n',
 );
 
-writeManifest("packages/entryless", { name: "@fixture/entryless" });
-writeWorkspaceFile("packages/entryless/src/helpers.ts", "export const build = () => 6;\n");
-writeWorkspaceFile("packages/entryless/src/neutral.ts", "export const neutral = () => 7;\n");
-writeWorkspaceFile("packages/entryless/src/relay.ts", 'export * from "./helpers.ts";\n');
-writeWorkspaceFile("packages/entryless/src/ring-one.ts", 'export * from "./ring-two.ts";\n');
-writeWorkspaceFile("packages/entryless/src/ring-two.ts", 'export * from "./ring-one.ts";\n');
-writeWorkspaceFile("packages/entryless/src/chain-one.ts", 'export * from "./chain-two.ts";\n');
-writeWorkspaceFile("packages/entryless/src/chain-two.ts", 'export * from "./chain-three.ts";\n');
-writeWorkspaceFile("packages/entryless/src/chain-three.ts", 'export * from "./chain-four.ts";\n');
-writeWorkspaceFile("packages/entryless/src/chain-four.ts", 'export * from "./chain-five.ts";\n');
-writeWorkspaceFile("packages/entryless/src/chain-five.ts", 'export * from "./helpers.ts";\n');
+writeFileSync(join(entrylessDir, "package.json"), JSON.stringify({ name: "@fixture/entryless" }));
+writeFileSync(join(entrylessDir, "src/helpers.ts"), "export const build = () => 6;\n");
+writeFileSync(join(entrylessDir, "src/neutral.ts"), "export const neutral = () => 7;\n");
+writeFileSync(join(entrylessDir, "src/relay.ts"), 'export * from "./helpers.ts";\n');
+writeFileSync(join(entrylessDir, "src/ring-one.ts"), 'export * from "./ring-two.ts";\n');
+writeFileSync(join(entrylessDir, "src/ring-two.ts"), 'export * from "./ring-one.ts";\n');
+writeFileSync(join(entrylessDir, "src/chain-one.ts"), 'export * from "./chain-two.ts";\n');
+writeFileSync(join(entrylessDir, "src/chain-two.ts"), 'export * from "./chain-three.ts";\n');
+writeFileSync(join(entrylessDir, "src/chain-three.ts"), 'export * from "./chain-four.ts";\n');
+writeFileSync(join(entrylessDir, "src/chain-four.ts"), 'export * from "./chain-five.ts";\n');
+writeFileSync(join(entrylessDir, "src/chain-five.ts"), 'export * from "./helpers.ts";\n');
 
-writeManifest("packages/shared-fixtures", {
-  name: "@fixture/shared-fixtures",
-  exports: { ".": "./src/index.ts" },
-});
-writeWorkspaceFile("packages/shared-fixtures/src/index.ts", "export const shared = 8;\n");
+writeFileSync(
+  join(sharedFixturesDir, "package.json"),
+  JSON.stringify({ name: "@fixture/shared-fixtures", exports: { ".": "./src/index.ts" } }),
+);
+writeFileSync(join(sharedFixturesDir, "src/index.ts"), "export const shared = 8;\n");
 
-writeManifest("packages/toolkit", {
-  name: "@fixture/toolkit",
-  exports: { ".": "./src/index.ts" },
-});
-writeWorkspaceFile("packages/toolkit/src/index.ts", "export const tool = 9;\n");
+writeFileSync(
+  join(toolkitDir, "package.json"),
+  JSON.stringify({ name: "@fixture/toolkit", exports: { ".": "./src/index.ts" } }),
+);
+writeFileSync(join(toolkitDir, "src/index.ts"), "export const tool = 9;\n");
 
-writeManifest("packages/app", { name: "@fixture/app", main: "./src/main.ts" });
-writeWorkspaceFile(
-  "packages/app/src/main.ts",
+writeFileSync(
+  join(appDir, "package.json"),
+  JSON.stringify({ name: "@fixture/app", main: "./src/main.ts" }),
+);
+writeFileSync(
+  join(appDir, "src/main.ts"),
   'import { tool } from "@fixture/toolkit";\n\nexport const started = tool;\n',
 );
 
-installPackage("@fixture/shared-fixtures", "packages/shared-fixtures");
-installPackage("@fixture/toolkit", "packages/toolkit");
+const fixtureModules = join(workspaceDir, "node_modules/@fixture");
+symlinkSync(sharedFixturesDir, join(fixtureModules, "shared-fixtures"), "dir");
+symlinkSync(toolkitDir, join(fixtureModules, "toolkit"), "dir");
 
-const widgetSpec = workspacePath("packages/widget/src/widget.test.ts");
+const widgetSpec = join(widgetDir, "src/widget.test.ts");
 
-const entrylessSpec = workspacePath("packages/entryless/src/thing.test.ts");
+const entrylessSpec = join(entrylessDir, "src/thing.test.ts");
 
-const couplingTo = (path: string) => [{ messageId: "setupModuleCoupling", data: { path } }];
-
-const allowlistNaming = (listed: string) => [
-  { messageId: "misplacedFixturePackage", data: { entry: listed } },
+const COUPLED_TO_WIDGET_HELPERS = [
+  { messageId: "setupModuleCoupling", data: { path: "packages/widget/src/helpers.ts" } },
 ];
 
 describe("dont-review-it/no-dry-test-setup--inline-owned-setup", () => {
@@ -110,7 +100,7 @@ describe("dont-review-it/no-dry-test-setup--inline-owned-setup", () => {
       {
         name: "a file that is not a spec is never inspected",
         code: 'import { build } from "./helpers.ts";\n\nexport const used = build;\n',
-        filename: workspacePath("packages/widget/src/plain.ts"),
+        filename: join(widgetDir, "src/plain.ts"),
       },
       {
         name: "the module a spec tests is reachable from the public entry, so it is the subject",
@@ -118,7 +108,7 @@ describe("dont-review-it/no-dry-test-setup--inline-owned-setup", () => {
         filename: widgetSpec,
       },
       {
-        name: "a subject the public entry reaches keeps its spelled even when the spelled is forbidden",
+        name: "a subject the public entry reaches keeps its name even when the name is forbidden",
         code: 'import { shaped } from "./widget-helper.ts";\n\nexport const under = shaped;\n',
         filename: widgetSpec,
       },
@@ -206,7 +196,7 @@ describe("dont-review-it/no-dry-test-setup--inline-owned-setup", () => {
         filename: widgetSpec,
       },
       {
-        name: "a constant that binds no spelled of its own is not a specifier",
+        name: "a constant that binds no name of its own is not a specifier",
         code: "const { picked } = globalThis;\n\nexport const used = picked;\n",
         filename: widgetSpec,
       },
@@ -264,79 +254,92 @@ describe("dont-review-it/no-dry-test-setup--inline-owned-setup", () => {
         name: "a static import of a module named as shared setup is reported",
         code: 'import { build } from "./helpers.ts";\n\nexport const used = build;\n',
         filename: widgetSpec,
-        errors: couplingTo("packages/widget/src/helpers.ts"),
+        errors: COUPLED_TO_WIDGET_HELPERS,
       },
       {
         name: "an import that binds nothing still couples to the module",
         code: 'import "./helpers.ts";\n',
         filename: widgetSpec,
-        errors: couplingTo("packages/widget/src/helpers.ts"),
+        errors: COUPLED_TO_WIDGET_HELPERS,
       },
       {
         name: "a named re-export couples to the module it forwards",
         code: 'export { build } from "./helpers.ts";\n',
         filename: widgetSpec,
-        errors: couplingTo("packages/widget/src/helpers.ts"),
+        errors: COUPLED_TO_WIDGET_HELPERS,
       },
       {
         name: "a whole re-export couples to the module it forwards",
         code: 'export * from "./helpers.ts";\n',
         filename: widgetSpec,
-        errors: couplingTo("packages/widget/src/helpers.ts"),
+        errors: COUPLED_TO_WIDGET_HELPERS,
       },
       {
         name: "a dynamic import written with a literal is the same coupling as a static one",
         code: 'export const load = async () => import("./helpers.ts");\n',
         filename: widgetSpec,
-        errors: couplingTo("packages/widget/src/helpers.ts"),
+        errors: COUPLED_TO_WIDGET_HELPERS,
       },
       {
         name: "a dynamic import through a constant of this file resolves to the same module",
         code: 'const SETUP = "./helpers.ts";\n\nexport const load = async () => import(SETUP);\n',
         filename: widgetSpec,
-        errors: couplingTo("packages/widget/src/helpers.ts"),
+        errors: COUPLED_TO_WIDGET_HELPERS,
       },
       {
         name: "a template assembled only from static parts resolves to the same module",
         code: 'const STEM = "helpers";\n\nexport const load = async () => import(`./${STEM}.ts`);\n',
         filename: widgetSpec,
-        errors: couplingTo("packages/widget/src/helpers.ts"),
+        errors: COUPLED_TO_WIDGET_HELPERS,
       },
       {
         name: "a require call is the same coupling as an import",
         code: 'export const setup = require("./helpers.ts");\n',
         filename: widgetSpec,
-        errors: couplingTo("packages/widget/src/helpers.ts"),
+        errors: COUPLED_TO_WIDGET_HELPERS,
       },
       {
-        name: "a file the assets vocabulary does not spelled is judged like every other module",
+        name: "a file the assets vocabulary does not name is judged like every other module",
         code: 'import { counted } from "./widget.rows.ts";\n\nexport const data = counted;\n',
         filename: widgetSpec,
-        errors: couplingTo("packages/widget/src/widget.rows.ts"),
+        errors: [
+          {
+            messageId: "setupModuleCoupling",
+            data: { path: "packages/widget/src/widget.rows.ts" },
+          },
+        ],
       },
       {
         name: "a module the public entry cannot reach is setup whatever it is named",
         code: 'import { prepared } from "./prepared.ts";\n\nexport const used = prepared;\n',
         filename: widgetSpec,
-        errors: couplingTo("packages/widget/src/prepared.ts"),
+        errors: [
+          { messageId: "setupModuleCoupling", data: { path: "packages/widget/src/prepared.ts" } },
+        ],
       },
       {
         name: "a relay in the same package is itself out of reach of the public entry",
         code: 'import { prepared } from "./relay.ts";\n\nexport const used = prepared;\n',
         filename: widgetSpec,
-        errors: couplingTo("packages/widget/src/relay.ts"),
+        errors: [
+          { messageId: "setupModuleCoupling", data: { path: "packages/widget/src/relay.ts" } },
+        ],
       },
       {
         name: "another spec read as setup is a setup module",
         code: 'import { other } from "./other.test.ts";\n\nexport const used = other;\n',
         filename: widgetSpec,
-        errors: couplingTo("packages/widget/src/other.test.ts"),
+        errors: [
+          { messageId: "setupModuleCoupling", data: { path: "packages/widget/src/other.test.ts" } },
+        ],
       },
       {
         name: "a module named as shared setup is reported where no public entry is declared",
         code: 'import { build } from "./helpers.ts";\n\nexport const used = build;\n',
         filename: entrylessSpec,
-        errors: couplingTo("packages/entryless/src/helpers.ts"),
+        errors: [
+          { messageId: "setupModuleCoupling", data: { path: "packages/entryless/src/helpers.ts" } },
+        ],
       },
       {
         name: "a relay is followed to the setup module behind it",
@@ -356,28 +359,38 @@ describe("dont-review-it/no-dry-test-setup--inline-owned-setup", () => {
         name: "a package nothing but specs reaches is a setup module",
         code: 'import { shared } from "@fixture/shared-fixtures";\n\nexport const used = shared;\n',
         filename: widgetSpec,
-        errors: couplingTo("packages/shared-fixtures"),
+        errors: [{ messageId: "setupModuleCoupling", data: { path: "packages/shared-fixtures" } }],
       },
       {
         name: "an allowed fixture package written as a path in this repository is reported",
         code: "export const total = 1;\n",
         filename: widgetSpec,
         options: [{ allowedFixturePackages: ["./helpers.ts"] }],
-        errors: allowlistNaming("./helpers.ts"),
+        errors: [{ messageId: "misplacedFixturePackage", data: { entry: "./helpers.ts" } }],
       },
       {
         name: "an allowed fixture package written as a file inside a package is reported",
         code: "export const total = 1;\n",
         filename: widgetSpec,
         options: [{ allowedFixturePackages: ["@fixture/shared-fixtures/src/index.ts"] }],
-        errors: allowlistNaming("@fixture/shared-fixtures/src/index.ts"),
+        errors: [
+          {
+            messageId: "misplacedFixturePackage",
+            data: { entry: "@fixture/shared-fixtures/src/index.ts" },
+          },
+        ],
       },
       {
         name: "an allowed fixture package written as a subpath the package does not export is reported",
         code: "export const total = 1;\n",
         filename: widgetSpec,
         options: [{ allowedFixturePackages: ["@fixture/shared-fixtures/internal"] }],
-        errors: allowlistNaming("@fixture/shared-fixtures/internal"),
+        errors: [
+          {
+            messageId: "misplacedFixturePackage",
+            data: { entry: "@fixture/shared-fixtures/internal" },
+          },
+        ],
       },
     ],
   });

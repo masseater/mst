@@ -2,166 +2,54 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { filterPullRequestEvent } from "./filter-pull-request.ts";
 
-const it = test
-  .extend("closedForAuthorVerdict", () =>
-    filterPullRequestEvent(
-      { action: "closed", pull_request: { number: 7 }, delivery_id: "delivery-1" },
-      "author",
-    ))
-  .extend("closedForReviewerVerdict", () =>
-    filterPullRequestEvent({ action: "closed", pull_request: { number: 7 } }, "reviewer"),
-  )
-  .extend("excludeLabelAddedVerdict", () =>
-    filterPullRequestEvent(
-      {
-        action: "labeled",
-        pull_request: { number: 7 },
-        label: { name: "exclude-auto-develop" },
-        delivery_id: "delivery-1",
-      },
-      "reviewer",
-    ),
-  )
-  .extend("otherLabelAddedVerdict", () =>
-    filterPullRequestEvent(
-      { action: "labeled", pull_request: { number: 7 }, label: { name: "bug" } },
-      "reviewer",
-    ),
-  )
-  .extend("excludeLabelledSynchronizeVerdict", () =>
-    filterPullRequestEvent(
-      {
-        action: "synchronize",
-        pull_request: { number: 7 },
-        label: { name: "exclude-auto-develop" },
-      },
-      "reviewer",
-    ),
-  )
-  .extend("otherLabelWithDirtyStateVerdict", () =>
-    filterPullRequestEvent(
-      {
-        action: "labeled",
-        pull_request: { number: 7, merge_state_status: "DIRTY" },
-        label: { name: "bug" },
-      },
-      "author",
-    ),
-  )
-  .extend("excludeLabelRemovedVerdict", () =>
-    filterPullRequestEvent(
-      {
-        action: "unlabeled",
-        pull_request: { number: 7, title: "Add retry", draft: false },
-        label: { name: "exclude-auto-develop" },
-      },
-      "reviewer",
-    ),
-  )
-  .extend("bareExcludeLabelRemovedVerdict", () =>
-    filterPullRequestEvent(
-      {
-        action: "unlabeled",
-        pull_request: { number: 7 },
-        label: { name: "exclude-auto-develop" },
-      },
-      "reviewer",
-    ),
-  )
-  .extend("excludeLabelRemovedForAuthorVerdict", () =>
-    filterPullRequestEvent(
-      {
-        action: "unlabeled",
-        pull_request: { number: 7 },
-        label: { name: "exclude-auto-develop" },
-      },
-      "author",
-    ),
-  )
-  .extend("otherLabelRemovedVerdict", () =>
-    filterPullRequestEvent(
-      { action: "unlabeled", pull_request: { number: 7 }, label: { name: "bug" } },
-      "reviewer",
-    ),
-  )
-  .extend("synchronizeForReviewerVerdict", () =>
-    filterPullRequestEvent(
-      { action: "synchronize", pull_request: { number: 7 }, delivery_id: "delivery-1" },
-      "reviewer",
-    ),
-  )
-  .extend("baseChangedEditVerdict", () =>
-    filterPullRequestEvent(
-      { action: "edited", changes: { base: {} }, pull_request: { number: 7 } },
-      "reviewer",
-    ),
-  )
-  .extend("titleChangedEditVerdict", () =>
-    filterPullRequestEvent(
-      { action: "edited", changes: { title: { from: "Old" } }, pull_request: { number: 7 } },
-      "reviewer",
-    ),
-  )
-  .extend("changelessEditVerdict", () =>
-    filterPullRequestEvent({ action: "edited", pull_request: { number: 7 } }, "reviewer"),
-  )
-  .extend("detailedReviewRequestVerdict", () =>
-    filterPullRequestEvent(
-      {
-        action: "review_requested",
-        pull_request: { number: 7, title: "Add retry", draft: true },
-        requested_reviewer: { login: "octocat" },
-      },
-      "reviewer",
-    ),
-  )
-  .extend("bareReviewRequestVerdict", () =>
-    filterPullRequestEvent({ action: "review_requested", pull_request: { number: 7 } }, "reviewer"),
-  )
-  .extend("booleanMergeableReviewRequestVerdict", () =>
-    filterPullRequestEvent(
-      { action: "review_requested", pull_request: { number: 7, mergeable: true } },
-      "reviewer",
-    ),
-  )
-  .extend("openedForReviewerVerdict", () =>
-    filterPullRequestEvent({ action: "opened", pull_request: { number: 7 } }, "reviewer"),
-  )
-  .extend("reviewRequestForAuthorVerdict", () =>
-    filterPullRequestEvent({ action: "review_requested", pull_request: { number: 7 } }, "author"),
-  )
-  .extend("conflictingSynchronizeVerdict", () =>
-    filterPullRequestEvent(
-      {
-        action: "synchronize",
-        pull_request: { number: 7, mergeable: "CONFLICTING", merge_state_status: "DIRTY" },
-      },
-      "author",
-    ),
-  )
-  .extend("behindSynchronizeVerdict", () =>
-    filterPullRequestEvent(
-      {
-        action: "synchronize",
-        pull_request: { number: 7, mergeable: "MERGEABLE", merge_state_status: "BEHIND" },
-      },
-      "author",
-    ),
-  )
-  .extend("neutralMergeStateVerdict", () =>
-    filterPullRequestEvent({ action: "opened", pull_request: { number: 7 } }, "author"),
-  )
-  .extend("nullPullRequestVerdict", () =>
-    filterPullRequestEvent({ action: "closed", pull_request: null }, "reviewer"),
-  )
-  .extend("unnumberedPullRequestVerdict", () =>
-    filterPullRequestEvent({ action: "closed", pull_request: { title: "Add retry" } }, "reviewer"),
-  )
-  .extend("actionlessEventVerdict", () =>
-    filterPullRequestEvent({ pull_request: { number: 7 } }, "reviewer"),
-  );
-
 describe("モード非依存の選別", () => {
+  const it = test
+    .extend("closedForAuthorVerdict", () =>
+      filterPullRequestEvent(
+        { action: "closed", pull_request: { number: 7 }, delivery_id: "delivery-1" },
+        "author",
+      ))
+    .extend("closedForReviewerVerdict", () =>
+      filterPullRequestEvent({ action: "closed", pull_request: { number: 7 } }, "reviewer"),
+    )
+    .extend("excludeLabelAddedVerdict", () =>
+      filterPullRequestEvent(
+        {
+          action: "labeled",
+          pull_request: { number: 7 },
+          label: { name: "exclude-auto-develop" },
+          delivery_id: "delivery-1",
+        },
+        "reviewer",
+      ),
+    )
+    .extend("otherLabelAddedVerdict", () =>
+      filterPullRequestEvent(
+        { action: "labeled", pull_request: { number: 7 }, label: { name: "bug" } },
+        "reviewer",
+      ),
+    )
+    .extend("excludeLabelledSynchronizeVerdict", () =>
+      filterPullRequestEvent(
+        {
+          action: "synchronize",
+          pull_request: { number: 7 },
+          label: { name: "exclude-auto-develop" },
+        },
+        "reviewer",
+      ),
+    )
+    .extend("otherLabelWithDirtyStateVerdict", () =>
+      filterPullRequestEvent(
+        {
+          action: "labeled",
+          pull_request: { number: 7, merge_state_status: "DIRTY" },
+          label: { name: "bug" },
+        },
+        "author",
+      ),
+    );
+
   it("closed は pr-closed になり delivery_id を引き継ぐ", ({ closedForAuthorVerdict }) => {
     expect(closedForAuthorVerdict).toStrictEqual({
       kind: "pr-closed",
@@ -207,6 +95,43 @@ describe("モード非依存の選別", () => {
 });
 
 describe("除外ラベルの解除", () => {
+  const it = test
+    .extend("excludeLabelRemovedVerdict", () =>
+      filterPullRequestEvent(
+        {
+          action: "unlabeled",
+          pull_request: { number: 7, title: "Add retry", draft: false },
+          label: { name: "exclude-auto-develop" },
+        },
+        "reviewer",
+      ))
+    .extend("bareExcludeLabelRemovedVerdict", () =>
+      filterPullRequestEvent(
+        {
+          action: "unlabeled",
+          pull_request: { number: 7 },
+          label: { name: "exclude-auto-develop" },
+        },
+        "reviewer",
+      ),
+    )
+    .extend("excludeLabelRemovedForAuthorVerdict", () =>
+      filterPullRequestEvent(
+        {
+          action: "unlabeled",
+          pull_request: { number: 7 },
+          label: { name: "exclude-auto-develop" },
+        },
+        "author",
+      ),
+    )
+    .extend("otherLabelRemovedVerdict", () =>
+      filterPullRequestEvent(
+        { action: "unlabeled", pull_request: { number: 7 }, label: { name: "bug" } },
+        "reviewer",
+      ),
+    );
+
   it("reviewer では review-requested を合成し title と draft を引き継ぐ", ({
     excludeLabelRemovedVerdict,
   }) => {
@@ -237,6 +162,53 @@ describe("除外ラベルの解除", () => {
 });
 
 describe("reviewer モードの選別", () => {
+  const it = test
+    .extend("synchronizeForReviewerVerdict", () =>
+      filterPullRequestEvent(
+        { action: "synchronize", pull_request: { number: 7 }, delivery_id: "delivery-1" },
+        "reviewer",
+      ))
+    .extend("baseChangedEditVerdict", () =>
+      filterPullRequestEvent(
+        { action: "edited", changes: { base: {} }, pull_request: { number: 7 } },
+        "reviewer",
+      ),
+    )
+    .extend("titleChangedEditVerdict", () =>
+      filterPullRequestEvent(
+        { action: "edited", changes: { title: { from: "Old" } }, pull_request: { number: 7 } },
+        "reviewer",
+      ),
+    )
+    .extend("changelessEditVerdict", () =>
+      filterPullRequestEvent({ action: "edited", pull_request: { number: 7 } }, "reviewer"),
+    )
+    .extend("detailedReviewRequestVerdict", () =>
+      filterPullRequestEvent(
+        {
+          action: "review_requested",
+          pull_request: { number: 7, title: "Add retry", draft: true },
+          requested_reviewer: { login: "octocat" },
+        },
+        "reviewer",
+      ),
+    )
+    .extend("bareReviewRequestVerdict", () =>
+      filterPullRequestEvent(
+        { action: "review_requested", pull_request: { number: 7 } },
+        "reviewer",
+      ),
+    )
+    .extend("booleanMergeableReviewRequestVerdict", () =>
+      filterPullRequestEvent(
+        { action: "review_requested", pull_request: { number: 7, mergeable: true } },
+        "reviewer",
+      ),
+    )
+    .extend("openedForReviewerVerdict", () =>
+      filterPullRequestEvent({ action: "opened", pull_request: { number: 7 } }, "reviewer"),
+    );
+
   it("synchronize は head 側の入力変更になる", ({ synchronizeForReviewerVerdict }) => {
     expect(synchronizeForReviewerVerdict).toStrictEqual({
       kind: "review-input-changed",
@@ -293,6 +265,31 @@ describe("reviewer モードの選別", () => {
 });
 
 describe("author モードの選別", () => {
+  const it = test
+    .extend("reviewRequestForAuthorVerdict", () =>
+      filterPullRequestEvent({ action: "review_requested", pull_request: { number: 7 } }, "author"))
+    .extend("conflictingSynchronizeVerdict", () =>
+      filterPullRequestEvent(
+        {
+          action: "synchronize",
+          pull_request: { number: 7, mergeable: "CONFLICTING", merge_state_status: "DIRTY" },
+        },
+        "author",
+      ),
+    )
+    .extend("behindSynchronizeVerdict", () =>
+      filterPullRequestEvent(
+        {
+          action: "synchronize",
+          pull_request: { number: 7, mergeable: "MERGEABLE", merge_state_status: "BEHIND" },
+        },
+        "author",
+      ),
+    )
+    .extend("neutralMergeStateVerdict", () =>
+      filterPullRequestEvent({ action: "opened", pull_request: { number: 7 } }, "author"),
+    );
+
   it("review_requested は不採用になる", ({ reviewRequestForAuthorVerdict }) => {
     expect(reviewRequestForAuthorVerdict).toStrictEqual(null);
   });
@@ -313,6 +310,19 @@ describe("author モードの選別", () => {
 });
 
 describe("構造要件", () => {
+  const it = test
+    .extend("nullPullRequestVerdict", () =>
+      filterPullRequestEvent({ action: "closed", pull_request: null }, "reviewer"))
+    .extend("unnumberedPullRequestVerdict", () =>
+      filterPullRequestEvent(
+        { action: "closed", pull_request: { title: "Add retry" } },
+        "reviewer",
+      ),
+    )
+    .extend("actionlessEventVerdict", () =>
+      filterPullRequestEvent({ pull_request: { number: 7 } }, "reviewer"),
+    );
+
   it("pull_request が null なら不採用になる", ({ nullPullRequestVerdict }) => {
     expect(nullPullRequestVerdict).toStrictEqual(null);
   });

@@ -1,5 +1,5 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
-import { resolveBinding, type ScopeLookup } from "../lib/resolved-bindings.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { isAssertionEntryCall } from "../lib/spec-syntax/assertion-entries.ts";
 import {
   fixtureDeclarationsOf,
@@ -22,11 +22,12 @@ import {
 } from "../lib/spec-syntax/subject-expressions.ts";
 import {
   declaresTestBlock,
-  testBlockBindings,
+  testBlockRootNames,
   testCallbacksOf,
 } from "../lib/spec-syntax/test-block-declarations.ts";
 
-import type { ESTree, Options } from "@oxlint/plugins";
+import type { ESTree, Options, Reference, Scope } from "@oxlint/plugins";
+import type { ScopeLookup } from "../lib/resolved-bindings.ts";
 
 const THROW_EXPECTING_MATCHERS_OPTION = "throwExpectingMatchers";
 
@@ -111,21 +112,22 @@ const handedBackFunctionOf = (input: {
     : handedBackFunctionOf({ subject: initializer, body, reached });
 };
 
+const referencesTo = (scope: Scope, spelled: string): readonly Reference[] =>
+  scope.variables.filter((bound) => bound.name === spelled).flatMap((bound) => bound.references);
+
 const readsOnlyDemandFailure = (dependency: FixtureDependency, reading: ThunkReading): boolean => {
   const { boundAs, property } = dependency;
   if (boundAs === null) return false;
 
-  return (
-    resolveBinding(reading.scopeAt(property.value), boundAs)?.references.every(
-      (reference) => !reference.isWrite() && reading.throwSubjects.has(reference.identifier),
-    ) === true
+  return referencesTo(reading.scopeAt(property.value), boundAs).every(
+    (reference) => !reference.isWrite() && reading.throwSubjects.has(reference.identifier),
   );
 };
 
-const isDemandedFailureThunk = (spelled: string, reading: ThunkReading): boolean =>
-  !reading.handedOn.has(spelled) &&
+const isDemandedFailureThunk = (fixtureName: string, reading: ThunkReading): boolean =>
+  !reading.handedOn.has(fixtureName) &&
   reading.takenApart
-    .filter((dependency) => dependency.name === spelled)
+    .filter((dependency) => dependency.name === fixtureName)
     .every((dependency) => readsOnlyDemandFailure(dependency, reading));
 
 const reportForSubject = (input: {
@@ -134,7 +136,7 @@ const reportForSubject = (input: {
   readonly reading: ThunkReading;
 }): FactoryReport | null => {
   const { declaration, subject, reading } = input;
-  const { name: spelled, factory } = declaration;
+  const { name, factory } = declaration;
   if (factory === null) return null;
 
   const handedBack = handedBackFunctionOf({
@@ -145,11 +147,11 @@ const reportForSubject = (input: {
   if (handedBack === null) return null;
 
   if (handedBack.params.length > 0) {
-    return { node: subject, messageId: "parameterisedFactory", data: { fixture: spelled } };
+    return { node: subject, messageId: "parameterisedFactory", data: { fixture: name } };
   }
-  return isDemandedFailureThunk(spelled, reading)
+  return isDemandedFailureThunk(name, reading)
     ? null
-    : { node: subject, messageId: "handedBackFunction", data: { fixture: spelled } };
+    : { node: subject, messageId: "handedBackFunction", data: { fixture: name } };
 };
 
 const reportsFor = (
@@ -176,7 +178,7 @@ export const noFixtureFactoryFunction = createDontReviewItRule({
       parameterisedFactory:
         "A fixture must not hand back a function that declares parameters. `{{fixture}}` hands one back, leaving every test block to pick the arguments its own subject is built from. Move the setup into this fixture, return the subject the scenario produces, and declare one fixture per scenario, repeating the setup the scenarios share. Renaming the fixture leaves the same function standing, and dropping the parameters to pass it off as a thunk leaves it reported.",
       handedBackFunction:
-        "A fixture must not hand back a function as its subject. `{{fixture}}` hands one back, and the test blocks reading it ask for something other than a thrown value. Move the setup into this fixture, return the subject the scenario produces, and declare one fixture per scenario, repeating the setup the scenarios share. Wrapping the function in a type assertion, binding it to a spelled inside the fixture first, and handing it to the older `use` callback are all read the same way. Keep a thunk that takes no parameters only for assertions demanding a thrown value.",
+        "A fixture must not hand back a function as its subject. `{{fixture}}` hands one back, and the test blocks reading it ask for something other than a thrown value. Move the setup into this fixture, return the subject the scenario produces, and declare one fixture per scenario, repeating the setup the scenarios share. Wrapping the function in a type assertion, binding it to a name inside the fixture first, and handing it to the older `use` callback are all read the same way. Keep a thunk that takes no parameters only for assertions demanding a thrown value.",
     },
     schema: [
       {
@@ -193,36 +195,28 @@ export const noFixtureFactoryFunction = createDontReviewItRule({
     if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
     const matchers = throwExpectingMatchersFrom(inspection.options);
-    const bindings = testBlockBindings();
-    const calls = new Set<ESTree.CallExpression>();
 
     return {
-      ImportDeclaration(node: ESTree.ImportDeclaration) {
-        bindings.takeImport(node);
-      },
-      VariableDeclarator(node: ESTree.VariableDeclarator) {
-        bindings.takeLocalBinding(node);
-      },
-      CallExpression(node: ESTree.CallExpression) {
-        calls.add(node);
-      },
-      "Program:exit"() {
-        const rootNames = bindings.rootNames();
-        const declarations = [...calls].flatMap((call) => fixtureDeclarationsOf(call));
+      "Program:exit"(program: ESTree.Program) {
+        const rootNames = testBlockRootNames(program);
+        const calls = nodesOfType(program, "CallExpression");
+        const declarations = calls.flatMap((call) => fixtureDeclarationsOf(call));
         const factories = declarations.flatMap(({ factory }) => factory ?? []);
-        const takenCallbacks = [...calls]
+        const testCallbacks = calls
           .filter((call) => declaresTestBlock(call, rootNames))
           .flatMap((call) => testCallbacksOf(call));
 
         const reading: ThunkReading = {
           handedOn: new Set(
             factories.flatMap((factory) =>
-              (fixtureDependenciesOf(factory) ?? []).map(({ name: spelled }) => spelled),
+              (fixtureDependenciesOf(factory) ?? []).map(({ name }) => name),
             ),
           ),
-          takenApart: takenCallbacks.flatMap((taken) => fixtureDependenciesOf(taken) ?? []),
+          takenApart: testCallbacks.flatMap(
+            (testCallback) => fixtureDependenciesOf(testCallback) ?? [],
+          ),
           throwSubjects: new Set(
-            [...calls]
+            calls
               .flatMap((call) => assertedChainOf(call) ?? [])
               .filter((chain) => demandsFailure(chain, matchers))
               .flatMap((chain) => (chain.subject.type === "Identifier" ? [chain.subject] : [])),

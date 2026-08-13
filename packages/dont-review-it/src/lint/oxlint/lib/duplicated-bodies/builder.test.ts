@@ -1,30 +1,15 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
-import { describe, expect, onTestFinished, test, vi } from "vite-plus/test";
+import { describe, expect, test, vi } from "vite-plus/test";
 
+import { readTextFile } from "../canonical-values/source-files.ts";
 import { buildRepositoryBodyIndex, loadRepositoryBodyIndex } from "./builder.ts";
 
+vi.mock(import("../canonical-values/source-files.ts"), { spy: true });
+
 const VANISHED_FILE_NAME = "vanished.ts";
-
-class MissingPathError extends Error {
-  readonly code = "ENOENT";
-
-  constructor() {
-    super("the path is gone");
-  }
-}
-
-vi.mock(import("node:fs"), async (importOriginal) => {
-  const real = await importOriginal();
-  const readFileSync = ((...call: Parameters<typeof real.readFileSync>) => {
-    const [path] = call;
-    if (String(path).endsWith(VANISHED_FILE_NAME)) throw new MissingPathError();
-    return real.readFileSync(...call);
-  }) as typeof real.readFileSync;
-  return { ...real, readFileSync };
-});
 
 const TWICE = `export const twice = (value: number): number => {
   const doubled = value * 2;
@@ -33,58 +18,95 @@ const TWICE = `export const twice = (value: number): number => {
 `;
 
 describe("buildRepositoryBodyIndex", () => {
-  const repositoryWith = (files: Readonly<Record<string, string>>): string => {
-    const root = mkdtempSync(join(tmpdir(), "duplicated-bodies-builder-"));
-    onTestFinished(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    for (const [path, source] of Object.entries(files)) {
-      const absolutePath = join(root, path);
-      mkdirSync(dirname(absolutePath), { recursive: true });
-      writeFileSync(absolutePath, source, "utf8");
-    }
-    return root;
-  };
-
-  const pathsIn = (repositoryRoot: string): readonly string[] => [
-    ...buildRepositoryBodyIndex({ repositoryRoot }).bodiesByPath.keys(),
-  ];
-
-  test("a body spelled in two files is reachable through one fingerprint", () => {
-    const repositoryRoot = repositoryWith({ "src/a.ts": TWICE, "src/b.ts": TWICE });
-
-    expect(pathsIn(repositoryRoot)).toStrictEqual(["src/a.ts", "src/b.ts"]);
-  });
-
-  test("a repository whose sources are all out of scope is indexed as empty", () => {
-    const repositoryRoot = repositoryWith({ "src/a.test.ts": TWICE });
-
-    expect(pathsIn(repositoryRoot)).toStrictEqual([]);
-  });
-
-  test("a source that declares no body of its own is left out of the index", () => {
-    const repositoryRoot = repositoryWith({
-      "src/a.ts": TWICE,
-      "src/b.ts": "export {};\n",
+  describe("a body spelled in two files of a repository", () => {
+    const it = test.extend("indexedPaths", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "duplicated-bodies-builder-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      mkdirSync(join(repositoryRoot, "src"), { recursive: true });
+      writeFileSync(join(repositoryRoot, "src", "a.ts"), TWICE, "utf8");
+      writeFileSync(join(repositoryRoot, "src", "b.ts"), TWICE, "utf8");
+      return Array.from(buildRepositoryBodyIndex({ repositoryRoot }).bodiesByPath.keys());
     });
 
-    expect(pathsIn(repositoryRoot)).toStrictEqual(["src/a.ts"]);
+    it("places both of those files in the index", ({ indexedPaths }) => {
+      expect(indexedPaths).toStrictEqual(["src/a.ts", "src/b.ts"]);
+    });
   });
 
-  test("a source that vanished after the listing is left out of the index", () => {
-    const repositoryRoot = repositoryWith({
-      "src/a.ts": TWICE,
-      [`src/${VANISHED_FILE_NAME}`]: TWICE,
+  describe("a repository whose sources are all out of scope", () => {
+    const it = test.extend("indexedPaths", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "duplicated-bodies-builder-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      mkdirSync(join(repositoryRoot, "src"), { recursive: true });
+      writeFileSync(join(repositoryRoot, "src", "a.test.ts"), TWICE, "utf8");
+      return Array.from(buildRepositoryBodyIndex({ repositoryRoot }).bodiesByPath.keys());
     });
 
-    expect(pathsIn(repositoryRoot)).toStrictEqual(["src/a.ts"]);
+    it("is indexed as empty", ({ indexedPaths }) => {
+      expect(indexedPaths).toStrictEqual([]);
+    });
   });
 
-  test("the index of a repository is built once and handed back on every later ask", () => {
-    const repositoryRoot = repositoryWith({ "src/a.ts": TWICE, "src/b.ts": TWICE });
+  describe("a repository holding a source that declares no body of its own", () => {
+    const it = test.extend("indexedPaths", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "duplicated-bodies-builder-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      mkdirSync(join(repositoryRoot, "src"), { recursive: true });
+      writeFileSync(join(repositoryRoot, "src", "a.ts"), TWICE, "utf8");
+      writeFileSync(join(repositoryRoot, "src", "b.ts"), "export {};\n", "utf8");
+      return Array.from(buildRepositoryBodyIndex({ repositoryRoot }).bodiesByPath.keys());
+    });
 
-    expect(loadRepositoryBodyIndex({ repositoryRoot })).toBe(
-      loadRepositoryBodyIndex({ repositoryRoot }),
-    );
+    it("leaves that source out of the index", ({ indexedPaths }) => {
+      expect(indexedPaths).toStrictEqual(["src/a.ts"]);
+    });
+  });
+
+  describe("a repository holding a source that vanished after the listing", () => {
+    const it = test.extend("indexedPaths", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "duplicated-bodies-builder-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      mkdirSync(join(repositoryRoot, "src"), { recursive: true });
+      writeFileSync(join(repositoryRoot, "src", "a.ts"), TWICE, "utf8");
+      writeFileSync(join(repositoryRoot, "src", VANISHED_FILE_NAME), TWICE, "utf8");
+      // mock-factory-exemption no-replaced-double-behaviour--let-the-replaced-module-answer -- whether a listed source is still readable is settled by the file system between the listing and the read, and that window is inside the boundary this spec replaces
+      vi.mocked(readTextFile).mockImplementation((path) =>
+        path.endsWith(VANISHED_FILE_NAME) ? null : readFileSync(path, "utf8"),
+      );
+      return Array.from(buildRepositoryBodyIndex({ repositoryRoot }).bodiesByPath.keys());
+    });
+
+    it("leaves that source out of the index", ({ indexedPaths }) => {
+      expect(indexedPaths).toStrictEqual(["src/a.ts"]);
+    });
+  });
+});
+
+describe("loadRepositoryBodyIndex", () => {
+  describe("a repository asked for its index a second time", () => {
+    const it = test.extend("sameIndexHandedBack", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "duplicated-bodies-builder-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      mkdirSync(join(repositoryRoot, "src"), { recursive: true });
+      writeFileSync(join(repositoryRoot, "src", "a.ts"), TWICE, "utf8");
+      writeFileSync(join(repositoryRoot, "src", "b.ts"), TWICE, "utf8");
+      return (
+        loadRepositoryBodyIndex({ repositoryRoot }) === loadRepositoryBodyIndex({ repositoryRoot })
+      );
+    });
+
+    it("is handed the index built on the first ask", ({ sameIndexHandedBack }) => {
+      expect(sameIndexHandedBack).toBe(true);
+    });
   });
 });

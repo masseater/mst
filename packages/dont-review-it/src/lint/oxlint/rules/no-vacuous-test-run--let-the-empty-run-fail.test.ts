@@ -3,20 +3,17 @@ import { describe } from "vite-plus/test";
 
 import { noVacuousTestRun } from "./no-vacuous-test-run--let-the-empty-run-fail.ts";
 
-const configFor = (testBlock: string): string =>
-  `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: ${testBlock} });\n`;
-
 describe("dont-review-it/no-vacuous-test-run--let-the-empty-run-fail", () => {
   testLintRule(noVacuousTestRun, {
     valid: [
       {
         name: "a test config that says nothing about an empty run passes",
-        code: configFor("{ coverage: { thresholds: { 100: true, perFile: true } } }"),
+        code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { coverage: { thresholds: { 100: true, perFile: true } } } });\n`,
         filename: "vite.config.ts",
       },
       {
         name: "an empty run spelled out as a failure passes",
-        code: configFor("{ passWithNoTests: false }"),
+        code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { passWithNoTests: false } });\n`,
         filename: "vite.config.ts",
       },
       {
@@ -63,7 +60,7 @@ describe("dont-review-it/no-vacuous-test-run--let-the-empty-run-fail", () => {
     invalid: [
       {
         name: "a run told to pass when it found no test file is reported",
-        code: configFor("{ passWithNoTests: true }"),
+        code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { passWithNoTests: true } });\n`,
         filename: "vite.config.ts",
         errors: [{ messageId: "vacuousTestRun" }],
       },

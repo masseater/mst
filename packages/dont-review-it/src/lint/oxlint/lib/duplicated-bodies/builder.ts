@@ -1,5 +1,7 @@
 import { resolve } from "node:path";
 
+import { memoize } from "es-toolkit";
+
 import {
   listRepositoryFiles,
   readTextFile,
@@ -18,15 +20,15 @@ const indexedFileAt = (file: ScannedFile): IndexedFile | null => {
   const source = readTextFile(file.absolutePath);
   if (source === null) return null;
 
-  const writtenBodies = declarationsIn(source).map((declaration) => ({
+  const declarationFingerprints = declarationsIn(source).map((declaration) => ({
     name: declaration.name,
     line: declaration.line,
     fingerprint: declaration.structure,
     nodeCount: declaration.nodeCount,
   }));
-  return writtenBodies.length === 0
+  return declarationFingerprints.length === 0
     ? null
-    : { relativePath: file.relativePath, bodies: writtenBodies };
+    : { relativePath: file.relativePath, bodies: declarationFingerprints };
 };
 
 export const buildRepositoryBodyIndex = ({
@@ -42,18 +44,12 @@ export const buildRepositoryBodyIndex = ({
   return buildBodyIndex(scanned.map(indexedFileAt).filter((file) => file !== null));
 };
 
-const indexByRepositoryRoot = new Map<string, BodyIndex>();
+const bodyIndexUnder = memoize(
+  (repositoryRoot: string): BodyIndex => buildRepositoryBodyIndex({ repositoryRoot }),
+);
 
 export const loadRepositoryBodyIndex = ({
   repositoryRoot,
 }: {
   readonly repositoryRoot: string;
-}): BodyIndex => {
-  const root = resolve(repositoryRoot);
-  const memoized = indexByRepositoryRoot.get(root);
-  if (memoized !== undefined) return memoized;
-
-  const built = buildRepositoryBodyIndex({ repositoryRoot: root });
-  indexByRepositoryRoot.set(root, built);
-  return built;
-};
+}): BodyIndex => bodyIndexUnder(resolve(repositoryRoot));

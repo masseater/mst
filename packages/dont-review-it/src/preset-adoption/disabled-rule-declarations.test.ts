@@ -3,14 +3,11 @@ import { describe, expect, test } from "vite-plus/test";
 import { defaultPresetAdoptionConfig } from "./config.ts";
 import { disabledRuleDeclarationsIn } from "./disabled-rule-declarations.ts";
 
-const config = defaultPresetAdoptionConfig;
-
-const declarationsIn = (source: string) => disabledRuleDeclarationsIn({ source, config });
-
 describe("disabledRuleDeclarationsIn", () => {
-  test("finds a preset rule switched off for the paths an override names", () => {
-    const declarations = declarationsIn(
-      `export default defineConfig({
+  describe("an override that names two paths and switches a preset rule off", () => {
+    const it = test.extend("declarations", () =>
+      disabledRuleDeclarationsIn({
+        source: `export default defineConfig({
   lint: dontReviewItPreset.lint({
     overrides: [
       {
@@ -20,120 +17,188 @@ describe("disabledRuleDeclarationsIn", () => {
     ],
   }),
 });`,
-    );
+        config: defaultPresetAdoptionConfig,
+      }));
 
-    expect(declarations).toStrictEqual([
-      {
-        ruleId: "dont-review-it/no-handmade-standard-io-double--use-standard-io-test",
-        line: 6,
-        filePatterns: ["packages/ai-native/**", "packages/lint-rule-authoring/**"],
-      },
-    ]);
+    it("finds a preset rule switched off for the paths an override names", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        {
+          ruleId: "dont-review-it/no-handmade-standard-io-double--use-standard-io-test",
+          line: 6,
+          filePatterns: ["packages/ai-native/**", "packages/lint-rule-authoring/**"],
+        },
+      ]);
+    });
   });
 
-  test("leaves a rule switched off everywhere without any path to narrow it", () => {
-    const declarations = declarationsIn(
-      `export default defineConfig({
+  describe("a rule switched off at the root of the lint block", () => {
+    const it = test.extend("declarations", () =>
+      disabledRuleDeclarationsIn({
+        source: `export default defineConfig({
   lint: { rules: { "dont-review-it/no-reassign--use-spread-or-iife": "off" } },
 });`,
-    );
+        config: defaultPresetAdoptionConfig,
+      }));
 
-    expect(declarations).toStrictEqual([
-      {
-        ruleId: "dont-review-it/no-reassign--use-spread-or-iife",
-        line: 2,
-        filePatterns: [],
-      },
-    ]);
+    it("leaves a rule switched off everywhere without any path to narrow it", ({
+      declarations,
+    }) => {
+      expect(declarations).toStrictEqual([
+        {
+          ruleId: "dont-review-it/no-reassign--use-spread-or-iife",
+          line: 2,
+          filePatterns: [],
+        },
+      ]);
+    });
   });
 
-  test("says nothing about a rule the configuration switches on", () => {
-    expect(
-      declarationsIn(
-        `export default defineConfig({
+  describe("a preset rule the configuration switches on", () => {
+    const it = test.extend("declarations", () =>
+      disabledRuleDeclarationsIn({
+        source: `export default defineConfig({
   lint: { rules: { "dont-review-it/no-reassign--use-spread-or-iife": "error" } },
 });`,
-      ),
-    ).toStrictEqual([]);
+        config: defaultPresetAdoptionConfig,
+      }));
+
+    it("says nothing about a rule the configuration switches on", ({ declarations }) => {
+      expect(declarations).toStrictEqual([]);
+    });
   });
 
-  test("says nothing about a rule that belongs to another plugin", () => {
-    expect(
-      declarationsIn(
-        `export default defineConfig({
+  describe("a rule of another plugin switched off", () => {
+    const it = test.extend("declarations", () =>
+      disabledRuleDeclarationsIn({
+        source: `export default defineConfig({
   lint: { rules: { "vitest/consistent-test-filename": "off" } },
 });`,
-      ),
-    ).toStrictEqual([]);
+        config: defaultPresetAdoptionConfig,
+      }));
+
+    it("says nothing about a rule that belongs to another plugin", ({ declarations }) => {
+      expect(declarations).toStrictEqual([]);
+    });
   });
 
-  test("says nothing about a rule whose severity is not written as a plain value", () => {
-    expect(
-      declarationsIn(
-        `export default defineConfig({
+  describe("a preset rule whose severity is written as a tuple", () => {
+    const it = test.extend("declarations", () =>
+      disabledRuleDeclarationsIn({
+        source: `export default defineConfig({
   lint: { rules: { "dont-review-it/no-reassign--use-spread-or-iife": ["off", {}] } },
 });`,
-      ),
-    ).toStrictEqual([]);
+        config: defaultPresetAdoptionConfig,
+      }));
+
+    it("says nothing about a rule whose severity is not written as a plain value", ({
+      declarations,
+    }) => {
+      expect(declarations).toStrictEqual([]);
+    });
   });
 
-  test("says nothing about a rule whose name is computed at run time", () => {
-    expect(
-      declarationsIn(
-        `export default defineConfig({
+  describe("a rule entry whose key is computed at run time", () => {
+    const it = test.extend("declarations", () =>
+      disabledRuleDeclarationsIn({
+        source: `export default defineConfig({
   lint: { rules: { [ruleId]: "off" } },
 });`,
-      ),
-    ).toStrictEqual([]);
+        config: defaultPresetAdoptionConfig,
+      }));
+
+    it("says nothing about a rule whose name is computed at run time", ({ declarations }) => {
+      expect(declarations).toStrictEqual([]);
+    });
   });
 
-  test("reads the identifier form of a field name", () => {
-    expect(
-      declarationsIn(
-        `export default defineConfig({
+  describe("a lint block whose rules field is spelled as a string literal", () => {
+    const it = test.extend("declarations", () =>
+      disabledRuleDeclarationsIn({
+        source: `export default defineConfig({
   lint: { "rules": { "dont-review-it/no-reassign--use-spread-or-iife": "off" } },
 });`,
-      ),
-    ).toHaveLength(1);
+        config: defaultPresetAdoptionConfig,
+      }));
+
+    it("reads the identifier form of a field name", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        {
+          ruleId: "dont-review-it/no-reassign--use-spread-or-iife",
+          line: 2,
+          filePatterns: [],
+        },
+      ]);
+    });
   });
 
-  test("says nothing about a configuration that exports nothing by default", () => {
-    expect(declarationsIn(`export const config = { lint: {} };`)).toStrictEqual([]);
+  describe("a configuration bound to a named export", () => {
+    const it = test.extend("declarations", () =>
+      disabledRuleDeclarationsIn({
+        source: `export const config = { lint: {} };`,
+        config: defaultPresetAdoptionConfig,
+      }));
+
+    it("says nothing about a configuration that exports nothing by default", ({ declarations }) => {
+      expect(declarations).toStrictEqual([]);
+    });
   });
 
-  test("says nothing about a lint block that is not written as a literal", () => {
-    expect(declarationsIn(`export default defineConfig({ lint: sharedLint });`)).toStrictEqual([]);
+  describe("a lint block handed over as an identifier", () => {
+    const it = test.extend("declarations", () =>
+      disabledRuleDeclarationsIn({
+        source: `export default defineConfig({ lint: sharedLint });`,
+        config: defaultPresetAdoptionConfig,
+      }));
+
+    it("says nothing about a lint block that is not written as a literal", ({ declarations }) => {
+      expect(declarations).toStrictEqual([]);
+    });
   });
 
-  test("says nothing about an override list that is not written as a literal", () => {
-    expect(
-      declarationsIn(`export default defineConfig({ lint: { overrides: sharedOverrides } });`),
-    ).toStrictEqual([]);
+  describe("an override list handed over as an identifier", () => {
+    const it = test.extend("declarations", () =>
+      disabledRuleDeclarationsIn({
+        source: `export default defineConfig({ lint: { overrides: sharedOverrides } });`,
+        config: defaultPresetAdoptionConfig,
+      }));
+
+    it("says nothing about an override list that is not written as a literal", ({
+      declarations,
+    }) => {
+      expect(declarations).toStrictEqual([]);
+    });
   });
 
-  test("keeps the paths of an override that spells them outside a list as empty", () => {
-    const declarations = declarationsIn(
-      `export default defineConfig({
+  describe("an override whose files field is handed over as an identifier", () => {
+    const it = test.extend("declarations", () =>
+      disabledRuleDeclarationsIn({
+        source: `export default defineConfig({
   lint: {
     overrides: [
       { files: sharedFiles, rules: { "dont-review-it/no-promise-chain--use-async-await": "off" } },
     ],
   },
 });`,
-    );
+        config: defaultPresetAdoptionConfig,
+      }));
 
-    expect(declarations).toStrictEqual([
-      {
-        ruleId: "dont-review-it/no-promise-chain--use-async-await",
-        line: 4,
-        filePatterns: [],
-      },
-    ]);
+    it("keeps the paths of an override that spells them outside a list as empty", ({
+      declarations,
+    }) => {
+      expect(declarations).toStrictEqual([
+        {
+          ruleId: "dont-review-it/no-promise-chain--use-async-await",
+          line: 4,
+          filePatterns: [],
+        },
+      ]);
+    });
   });
 
-  test("drops a path that is not spelled as a plain value", () => {
-    const declarations = declarationsIn(
-      `export default defineConfig({
+  describe("an override whose files list mixes a literal and an identifier", () => {
+    const it = test.extend("declarations", () =>
+      disabledRuleDeclarationsIn({
+        source: `export default defineConfig({
   lint: {
     overrides: [
       {
@@ -143,8 +208,17 @@ describe("disabledRuleDeclarationsIn", () => {
     ],
   },
 });`,
-    );
+        config: defaultPresetAdoptionConfig,
+      }));
 
-    expect(declarations[0]?.filePatterns).toStrictEqual(["packages/web/**"]);
+    it("drops a path that is not spelled as a plain value", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        {
+          ruleId: "dont-review-it/no-promise-chain--use-async-await",
+          line: 6,
+          filePatterns: ["packages/web/**"],
+        },
+      ]);
+    });
   });
 });

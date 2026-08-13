@@ -2,7 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, onTestFinished, test } from "vite-plus/test";
+import { attemptAsync } from "es-toolkit";
+import { describe, expect, test } from "vite-plus/test";
 
 import {
   directoryNamesIn,
@@ -14,109 +15,262 @@ import {
 
 const UNREADABLE_PATH = "\0";
 
-describe("read-file", () => {
-  const sandbox = (): string => {
-    const root = mkdtempSync(join(tmpdir(), "read-file-"));
-    onTestFinished(() => {
-      rmSync(root, { recursive: true, force: true });
+describe("statOrNull", () => {
+  describe("a path that is there", () => {
+    const it = test.extend("fileVerdict", async ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "read-file-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      const documentPath = join(root, "AGENTS.md");
+      writeFileSync(documentPath, "# root\n", "utf8");
+      const described = await statOrNull(documentPath);
+      return described?.isFile();
     });
-    return root;
-  };
 
-  const fileIn = (
-    root: string,
-    { name, text }: { readonly name: string; readonly text: string },
-  ): string => {
-    const path = join(root, name);
-    writeFileSync(path, text, "utf8");
-    return path;
-  };
-
-  test("a path that is there is described", async () => {
-    const root = sandbox();
-
-    expect(
-      (await statOrNull(fileIn(root, { name: "AGENTS.md", text: "# root\n" })))?.isFile(),
-    ).toBe(true);
+    it("is described", ({ fileVerdict }) => {
+      expect(fileVerdict).toBe(true);
+    });
   });
 
-  test("a path that is not there is an absence", async () => {
-    expect(await statOrNull(join(sandbox(), "missing.md"))).toBe(null);
+  describe("a path that is not there", () => {
+    const it = test.extend("description", async ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "read-file-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      return statOrNull(join(root, "missing.md"));
+    });
+
+    it("is an absence", ({ description }) => {
+      expect(description).toBe(null);
+    });
   });
 
-  test("a path routed through a file instead of a directory is an absence as well", async () => {
-    const root = sandbox();
-    const path = fileIn(root, { name: "AGENTS.md", text: "# root\n" });
+  describe("a path routed through a file instead of a directory", () => {
+    const it = test.extend("description", async ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "read-file-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      const documentPath = join(root, "AGENTS.md");
+      writeFileSync(documentPath, "# root\n", "utf8");
+      return statOrNull(join(documentPath, "below.md"));
+    });
 
-    expect(await statOrNull(join(path, "below.md"))).toBe(null);
+    it("is an absence as well", ({ description }) => {
+      expect(description).toBe(null);
+    });
   });
 
-  test("a path the runtime refuses outright is raised", async () => {
-    await expect(statOrNull(UNREADABLE_PATH)).rejects.toThrow("null bytes");
+  describe("a path the runtime refuses outright", () => {
+    const it = test.extend("failureMessage", async () => {
+      const [failure] = await attemptAsync<unknown, Error>(() => statOrNull(UNREADABLE_PATH));
+      return failure === null ? null : failure.message;
+    });
+
+    it("is raised", ({ failureMessage }) => {
+      expect(failureMessage).toBe(
+        "The argument 'path' must be a string, Uint8Array, or URL without null bytes. Received '\\x00'",
+      );
+    });
+  });
+});
+
+describe("readTextOrNull", () => {
+  describe("a file that is there", () => {
+    const it = test.extend("documentText", async ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "read-file-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      const documentPath = join(root, "AGENTS.md");
+      writeFileSync(documentPath, "# root\n", "utf8");
+      return readTextOrNull(documentPath);
+    });
+
+    it("is read", ({ documentText }) => {
+      expect(documentText).toBe("# root\n");
+    });
   });
 
-  test("a file that is there is read", async () => {
-    const root = sandbox();
+  describe("a file that is not there", () => {
+    const it = test.extend("missingDocumentText", async ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "read-file-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      return readTextOrNull(join(root, "missing.md"));
+    });
 
-    expect(await readTextOrNull(fileIn(root, { name: "AGENTS.md", text: "# root\n" }))).toBe(
-      "# root\n",
-    );
+    it("reads as an absence", ({ missingDocumentText }) => {
+      expect(missingDocumentText).toBe(null);
+    });
   });
 
-  test("a file that is not there reads as an absence", async () => {
-    expect(await readTextOrNull(join(sandbox(), "missing.md"))).toBe(null);
+  describe("a read the runtime refuses outright", () => {
+    const it = test.extend("failureMessage", async ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "read-file-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      const [failure] = await attemptAsync<unknown, Error>(() => readTextOrNull(root));
+      return failure === null ? null : failure.message;
+    });
+
+    it("is raised", ({ failureMessage }) => {
+      expect(failureMessage).toBe("EISDIR: illegal operation on a directory, read");
+    });
+  });
+});
+
+describe("directoryNamesIn", () => {
+  describe("a directory holding a directory beside a file", () => {
+    const it = test.extend("directoryNames", async ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "read-file-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages"));
+      writeFileSync(join(root, "AGENTS.md"), "# root\n", "utf8");
+      return directoryNamesIn(root);
+    });
+
+    it("names the directories alone", ({ directoryNames }) => {
+      expect(directoryNames).toStrictEqual(["packages"]);
+    });
   });
 
-  test("a read the runtime refuses outright is raised", async () => {
-    await expect(readTextOrNull(sandbox())).rejects.toThrow("illegal operation on a directory");
+  describe("a directory that is not there", () => {
+    const it = test.extend("directoryNamesUnderMissingRoot", async ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "read-file-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      return directoryNamesIn(join(root, "missing"));
+    });
+
+    it("names nothing", ({ directoryNamesUnderMissingRoot }) => {
+      expect(directoryNamesUnderMissingRoot).toStrictEqual([]);
+    });
   });
 
-  test("the directories of a directory are named", async () => {
-    const root = sandbox();
-    mkdirSync(join(root, "packages"));
-    fileIn(root, { name: "AGENTS.md", text: "# root\n" });
+  describe("a listing the runtime refuses outright", () => {
+    const it = test.extend("failureMessage", async () => {
+      const [failure] = await attemptAsync<unknown, Error>(() => directoryNamesIn(UNREADABLE_PATH));
+      return failure === null ? null : failure.message;
+    });
 
-    expect(await directoryNamesIn(root)).toStrictEqual(["packages"]);
+    it("is raised", ({ failureMessage }) => {
+      expect(failureMessage).toBe(
+        "The argument 'path' must be a string, Uint8Array, or URL without null bytes. Received '\\x00'",
+      );
+    });
+  });
+});
+
+describe("readJsonObjectOrNull", () => {
+  describe("a manifest that parses into an object", () => {
+    const it = test.extend("manifest", async ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "read-file-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      const manifestPath = join(root, "package.json");
+      writeFileSync(manifestPath, '{"name":"user"}', "utf8");
+      return readJsonObjectOrNull(manifestPath);
+    });
+
+    it("is read as that object", ({ manifest }) => {
+      expect(manifest).toStrictEqual({ name: "user" });
+    });
   });
 
-  test("a directory that is not there names nothing", async () => {
-    expect(await directoryNamesIn(join(sandbox(), "missing"))).toStrictEqual([]);
+  describe("a manifest that is not there", () => {
+    const it = test.extend("manifest", async ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "read-file-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      return readJsonObjectOrNull(join(root, "package.json"));
+    });
+
+    it("is an absence", ({ manifest }) => {
+      expect(manifest).toBe(null);
+    });
   });
 
-  test("a listing the runtime refuses outright is raised", async () => {
-    await expect(directoryNamesIn(UNREADABLE_PATH)).rejects.toThrow("null bytes");
+  describe("a manifest that parses into a list", () => {
+    const it = test.extend("manifest", async ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "read-file-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      const manifestPath = join(root, "list.json");
+      writeFileSync(manifestPath, "[1]", "utf8");
+      return readJsonObjectOrNull(manifestPath);
+    });
+
+    it("is an absence", ({ manifest }) => {
+      expect(manifest).toBe(null);
+    });
   });
 
-  test("a manifest that parses into an object is read as that object", async () => {
-    const root = sandbox();
+  describe("a manifest that parses into nothing at all", () => {
+    const it = test.extend("manifest", async ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "read-file-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      const manifestPath = join(root, "null.json");
+      writeFileSync(manifestPath, "null", "utf8");
+      return readJsonObjectOrNull(manifestPath);
+    });
 
-    expect(
-      await readJsonObjectOrNull(fileIn(root, { name: "package.json", text: '{"name":"user"}' })),
-    ).toStrictEqual({ name: "user" });
+    it("is an absence", ({ manifest }) => {
+      expect(manifest).toBe(null);
+    });
   });
 
-  test("a manifest that is not there is an absence", async () => {
-    expect(await readJsonObjectOrNull(join(sandbox(), "package.json"))).toBe(null);
+  describe("a manifest that parses into a word", () => {
+    const it = test.extend("manifest", async ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "read-file-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      const manifestPath = join(root, "name.json");
+      writeFileSync(manifestPath, '"user"', "utf8");
+      return readJsonObjectOrNull(manifestPath);
+    });
+
+    it("is an absence", ({ manifest }) => {
+      expect(manifest).toBe(null);
+    });
+  });
+});
+
+describe("nonEmptyStringOrNull", () => {
+  describe("a word carrying spaces around it", () => {
+    const it = test.extend("word", () => nonEmptyStringOrNull("  user  "));
+
+    it("is handed back trimmed", ({ word }) => {
+      expect(word).toBe("user");
+    });
   });
 
-  test("a manifest that parses into something other than an object is an absence", async () => {
-    const root = sandbox();
+  describe("a value that is not a word", () => {
+    const it = test.extend("word", () => nonEmptyStringOrNull(1));
 
-    expect(await readJsonObjectOrNull(fileIn(root, { name: "list.json", text: "[1]" }))).toBe(null);
-    expect(await readJsonObjectOrNull(fileIn(root, { name: "null.json", text: "null" }))).toBe(
-      null,
-    );
-    expect(await readJsonObjectOrNull(fileIn(root, { name: "name.json", text: '"user"' }))).toBe(
-      null,
-    );
+    it("is an absence", ({ word }) => {
+      expect(word).toBe(null);
+    });
   });
 
-  test("a value that is a word is handed back trimmed", () => {
-    expect(nonEmptyStringOrNull("  user  ")).toBe("user");
-  });
+  describe("a value that is only spaces", () => {
+    const it = test.extend("word", () => nonEmptyStringOrNull("   "));
 
-  test("a value that is not a word, or is only spaces, is an absence", () => {
-    expect(nonEmptyStringOrNull(1)).toBe(null);
-    expect(nonEmptyStringOrNull("   ")).toBe(null);
+    it("is an absence", ({ word }) => {
+      expect(word).toBe(null);
+    });
   });
 });

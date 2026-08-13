@@ -1,148 +1,187 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
-import { describe, expect, it, onTestFinished } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { defaultDependencyCatalogChecksConfig } from "./config.ts";
 import { readWorkspaceManifests } from "./manifest-files.ts";
 
-const config = defaultDependencyCatalogChecksConfig;
-
-const repositoryWith = (files: Readonly<Record<string, string>>): string => {
-  const root = mkdtempSync(join(tmpdir(), "dont-review-it-manifests-"));
-  onTestFinished(() => {
-    rmSync(root, { recursive: true, force: true });
-  });
-  for (const [path, source] of Object.entries(files)) {
-    const absolutePath = join(root, path);
-    mkdirSync(dirname(absolutePath), { recursive: true });
-    writeFileSync(absolutePath, source, "utf8");
-  }
-  return root;
-};
-
 describe("readWorkspaceManifests", () => {
-  it("reads the root manifest and every manifest a star pattern reaches", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{"name": "root"}`,
-      "packages/left/package.json": `{"name": "left"}`,
-      "packages/right/package.json": `{"name": "right"}`,
+  describe("a star pattern over a directory that holds two packages", () => {
+    const it = test.extend("manifestsOfTheRootAndBothPackages", () => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "dont-review-it-manifest-files-"));
+      writeFileSync(join(repositoryRoot, "package.json"), `{"name": "root"}`, "utf8");
+      mkdirSync(join(repositoryRoot, "packages", "left"), { recursive: true });
+      writeFileSync(
+        join(repositoryRoot, "packages", "left", "package.json"),
+        `{"name": "left"}`,
+        "utf8",
+      );
+      mkdirSync(join(repositoryRoot, "packages", "right"), { recursive: true });
+      writeFileSync(
+        join(repositoryRoot, "packages", "right", "package.json"),
+        `{"name": "right"}`,
+        "utf8",
+      );
+      return readWorkspaceManifests({
+        repositoryRoot,
+        packagePatterns: ["packages/*"],
+        config: defaultDependencyCatalogChecksConfig,
+      });
     });
 
-    const manifests = readWorkspaceManifests({
-      repositoryRoot,
-      packagePatterns: ["packages/*"],
-      config,
+    it("reads the root manifest and every manifest the pattern reaches", ({
+      manifestsOfTheRootAndBothPackages,
+    }) => {
+      expect(manifestsOfTheRootAndBothPackages).toStrictEqual([
+        { relativePath: "package.json", manifest: { name: "root" } },
+        { relativePath: "packages/left/package.json", manifest: { name: "left" } },
+        { relativePath: "packages/right/package.json", manifest: { name: "right" } },
+      ]);
     });
-
-    expect(manifests.map((workspaceManifest) => workspaceManifest.relativePath)).toStrictEqual([
-      "package.json",
-      "packages/left/package.json",
-      "packages/right/package.json",
-    ]);
   });
 
-  it("reads a pattern without a star as a directory name", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{"name": "root"}`,
-      "docs/package.json": `{"name": "docs"}`,
+  describe("a pattern that carries no star", () => {
+    const it = test.extend("manifestsOfTheRootAndTheNamedDirectory", () => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "dont-review-it-manifest-files-"));
+      writeFileSync(join(repositoryRoot, "package.json"), `{"name": "root"}`, "utf8");
+      mkdirSync(join(repositoryRoot, "docs"), { recursive: true });
+      writeFileSync(join(repositoryRoot, "docs", "package.json"), `{"name": "docs"}`, "utf8");
+      return readWorkspaceManifests({
+        repositoryRoot,
+        packagePatterns: ["docs"],
+        config: defaultDependencyCatalogChecksConfig,
+      });
     });
 
-    const manifests = readWorkspaceManifests({
-      repositoryRoot,
-      packagePatterns: ["docs"],
-      config,
+    it("reads it as a directory name", ({ manifestsOfTheRootAndTheNamedDirectory }) => {
+      expect(manifestsOfTheRootAndTheNamedDirectory).toStrictEqual([
+        { relativePath: "package.json", manifest: { name: "root" } },
+        { relativePath: "docs/package.json", manifest: { name: "docs" } },
+      ]);
     });
-
-    expect(manifests.map((workspaceManifest) => workspaceManifest.relativePath)).toStrictEqual([
-      "package.json",
-      "docs/package.json",
-    ]);
   });
 
-  it("skips a negated pattern instead of guessing what it removes", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{"name": "root"}`,
-      "packages/left/package.json": `{"name": "left"}`,
+  describe("a negated pattern", () => {
+    const it = test.extend("manifestsLeftBesideTheNegatedPackage", () => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "dont-review-it-manifest-files-"));
+      writeFileSync(join(repositoryRoot, "package.json"), `{"name": "root"}`, "utf8");
+      mkdirSync(join(repositoryRoot, "packages", "left"), { recursive: true });
+      writeFileSync(
+        join(repositoryRoot, "packages", "left", "package.json"),
+        `{"name": "left"}`,
+        "utf8",
+      );
+      return readWorkspaceManifests({
+        repositoryRoot,
+        packagePatterns: ["!packages/left"],
+        config: defaultDependencyCatalogChecksConfig,
+      });
     });
 
-    const manifests = readWorkspaceManifests({
-      repositoryRoot,
-      packagePatterns: ["!packages/left"],
-      config,
+    it("skips it instead of guessing what it removes", ({
+      manifestsLeftBesideTheNegatedPackage,
+    }) => {
+      expect(manifestsLeftBesideTheNegatedPackage).toStrictEqual([
+        { relativePath: "package.json", manifest: { name: "root" } },
+      ]);
     });
-
-    expect(manifests.map((workspaceManifest) => workspaceManifest.relativePath)).toStrictEqual([
-      "package.json",
-    ]);
   });
 
-  it("reads a star pattern whose parent directory is missing as no manifests", () => {
-    const repositoryRoot = repositoryWith({ "package.json": `{"name": "root"}` });
-
-    const manifests = readWorkspaceManifests({
-      repositoryRoot,
-      packagePatterns: ["packages/*"],
-      config,
+  describe("a star pattern whose parent directory is missing", () => {
+    const it = test.extend("manifestsOfARepositoryWithoutThatParentDirectory", () => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "dont-review-it-manifest-files-"));
+      writeFileSync(join(repositoryRoot, "package.json"), `{"name": "root"}`, "utf8");
+      return readWorkspaceManifests({
+        repositoryRoot,
+        packagePatterns: ["packages/*"],
+        config: defaultDependencyCatalogChecksConfig,
+      });
     });
 
-    expect(manifests.map((workspaceManifest) => workspaceManifest.relativePath)).toStrictEqual([
-      "package.json",
-    ]);
+    it("reads no manifest beyond the root", ({
+      manifestsOfARepositoryWithoutThatParentDirectory,
+    }) => {
+      expect(manifestsOfARepositoryWithoutThatParentDirectory).toStrictEqual([
+        { relativePath: "package.json", manifest: { name: "root" } },
+      ]);
+    });
   });
 
-  it("leaves the files sitting between the package directories alone", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{"name": "root"}`,
-      "packages/README.md": "packages",
-      "packages/left/package.json": `{"name": "left"}`,
+  describe("a file sitting between the package directories", () => {
+    const it = test.extend("manifestsBesideThatFile", () => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "dont-review-it-manifest-files-"));
+      writeFileSync(join(repositoryRoot, "package.json"), `{"name": "root"}`, "utf8");
+      mkdirSync(join(repositoryRoot, "packages", "left"), { recursive: true });
+      writeFileSync(join(repositoryRoot, "packages", "README.md"), "packages", "utf8");
+      writeFileSync(
+        join(repositoryRoot, "packages", "left", "package.json"),
+        `{"name": "left"}`,
+        "utf8",
+      );
+      return readWorkspaceManifests({
+        repositoryRoot,
+        packagePatterns: ["packages/*"],
+        config: defaultDependencyCatalogChecksConfig,
+      });
     });
 
-    const manifests = readWorkspaceManifests({
-      repositoryRoot,
-      packagePatterns: ["packages/*"],
-      config,
+    it("leaves it alone", ({ manifestsBesideThatFile }) => {
+      expect(manifestsBesideThatFile).toStrictEqual([
+        { relativePath: "package.json", manifest: { name: "root" } },
+        { relativePath: "packages/left/package.json", manifest: { name: "left" } },
+      ]);
     });
-
-    expect(manifests.map((workspaceManifest) => workspaceManifest.relativePath)).toStrictEqual([
-      "package.json",
-      "packages/left/package.json",
-    ]);
   });
 
-  it("counts the root manifest once when a pattern names the root itself", () => {
-    const repositoryRoot = repositoryWith({
-      "package.json": `{"name": "root"}`,
-      "packages/left/package.json": `{"name": "left"}`,
+  describe("a pattern that names the repository root itself", () => {
+    const it = test.extend("manifestsOfTheRootNamedTwice", () => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "dont-review-it-manifest-files-"));
+      writeFileSync(join(repositoryRoot, "package.json"), `{"name": "root"}`, "utf8");
+      mkdirSync(join(repositoryRoot, "packages", "left"), { recursive: true });
+      writeFileSync(
+        join(repositoryRoot, "packages", "left", "package.json"),
+        `{"name": "left"}`,
+        "utf8",
+      );
+      return readWorkspaceManifests({
+        repositoryRoot,
+        packagePatterns: [".", "packages/*"],
+        config: defaultDependencyCatalogChecksConfig,
+      });
     });
 
-    const manifests = readWorkspaceManifests({
-      repositoryRoot,
-      packagePatterns: [".", "packages/*"],
-      config,
+    it("counts the root manifest once", ({ manifestsOfTheRootNamedTwice }) => {
+      expect(manifestsOfTheRootNamedTwice).toStrictEqual([
+        { relativePath: "package.json", manifest: { name: "root" } },
+        { relativePath: "packages/left/package.json", manifest: { name: "left" } },
+      ]);
     });
-
-    expect(manifests.map((workspaceManifest) => workspaceManifest.relativePath)).toStrictEqual([
-      "package.json",
-      "packages/left/package.json",
-    ]);
   });
 
-  it("skips a package directory that carries no manifest", () => {
-    const repositoryRoot = repositoryWith({
-      "packages/empty/.gitkeep": "",
-      "packages/left/package.json": `{"name": "left"}`,
+  describe("a package directory that carries no manifest", () => {
+    const it = test.extend("manifestsBesideTheDirectoryWithoutAManifest", () => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "dont-review-it-manifest-files-"));
+      mkdirSync(join(repositoryRoot, "packages", "empty"), { recursive: true });
+      writeFileSync(join(repositoryRoot, "packages", "empty", ".gitkeep"), "", "utf8");
+      mkdirSync(join(repositoryRoot, "packages", "left"), { recursive: true });
+      writeFileSync(
+        join(repositoryRoot, "packages", "left", "package.json"),
+        `{"name": "left"}`,
+        "utf8",
+      );
+      return readWorkspaceManifests({
+        repositoryRoot,
+        packagePatterns: ["packages/*"],
+        config: defaultDependencyCatalogChecksConfig,
+      });
     });
 
-    const manifests = readWorkspaceManifests({
-      repositoryRoot,
-      packagePatterns: ["packages/*"],
-      config,
+    it("skips it", ({ manifestsBesideTheDirectoryWithoutAManifest }) => {
+      expect(manifestsBesideTheDirectoryWithoutAManifest).toStrictEqual([
+        { relativePath: "packages/left/package.json", manifest: { name: "left" } },
+      ]);
     });
-
-    expect(manifests.map((workspaceManifest) => workspaceManifest.relativePath)).toStrictEqual([
-      "packages/left/package.json",
-    ]);
   });
 });

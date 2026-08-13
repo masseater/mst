@@ -2,26 +2,20 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { defaultWorkflowChecksConfig } from "./config.ts";
 import { runWorkflowChecks } from "./run-workflow-checks.ts";
 
-const config = defaultWorkflowChecksConfig;
-
-const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-run-workflow-checks-"));
-
-const repositoryWith = (spelled: string, files: Readonly<Record<string, string>>): string => {
-  const repositoryRoot = join(fixtureDir, spelled);
-  const directory = join(repositoryRoot, config.workflowDirectory);
-  mkdirSync(directory, { recursive: true });
-  Object.entries(files).forEach(([fileName, source]) => {
-    writeFileSync(join(directory, fileName), source);
-  });
-  return repositoryRoot;
-};
-
-const GATED = `name: CI
+describe("runWorkflowChecks", () => {
+  describe("a definition that keeps every discipline", () => {
+    const it = test.extend("scan", () => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "dont-review-it-run-workflow-checks-"));
+      const directory = join(repositoryRoot, defaultWorkflowChecksConfig.workflowDirectory);
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(
+        join(directory, "ci.yml"),
+        `name: CI
 on:
   push:
     branches: [main]
@@ -33,53 +27,77 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: vp run guard
-`;
-
-describe("runWorkflowChecks", () => {
-  it("says nothing about a definition that keeps every discipline", () => {
-    expect(
-      runWorkflowChecks({ repositoryRoot: repositoryWith("gated", { "ci.yml": GATED }), config })
-        .problems,
-    ).toStrictEqual([]);
-  });
-
-  it("reports the problems of one definition in the order they were written", () => {
-    const repositoryRoot = repositoryWith("broken", {
-      "ci.yml": `on:
-  pull_request:
-    paths: [src/**]
-jobs:
-  build:
-    steps:
-      - run: npm test || true
 `,
+      );
+
+      return runWorkflowChecks({ repositoryRoot, config: defaultWorkflowChecksConfig });
     });
 
-    expect(
-      runWorkflowChecks({ repositoryRoot, config }).problems.map((problem) => problem.line),
-    ).toStrictEqual([3, 5, 7, 7]);
+    it("says nothing about it and counts the one definition it read", ({ scan }) => {
+      expect(scan).toStrictEqual({ problems: [], scanned: 1 });
+    });
   });
 
-  it("reports only that a definition cannot be read when its syntax is broken", () => {
-    const repositoryRoot = repositoryWith("unreadable", {
-      "ci.yml": "jobs:\n build:\n   x: 1\n  y: 2\n",
+  describe("one definition that breaks several disciplines", () => {
+    const it = test.extend("linesOfTheProblems", () => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "dont-review-it-run-workflow-checks-"));
+      const directory = join(repositoryRoot, defaultWorkflowChecksConfig.workflowDirectory);
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(
+        join(directory, "ci.yml"),
+        "on:\n  pull_request:\n    paths: [src/**]\njobs:\n  build:\n    steps:\n      - run: npm test || true\n",
+      );
+
+      return runWorkflowChecks({
+        repositoryRoot,
+        config: defaultWorkflowChecksConfig,
+      }).problems.map((problem) => problem.line);
     });
 
-    expect(
-      runWorkflowChecks({ repositoryRoot, config }).problems.map((problem) => problem.message),
-    ).toStrictEqual([
-      "A workflow definition that does not parse must not stay in the repository, because every check below reads it as an empty file and reports nothing. Fix the YAML here so the definition can be read.",
-    ]);
+    it("reports them in the order they were written", ({ linesOfTheProblems }) => {
+      expect(linesOfTheProblems).toStrictEqual([3, 5, 7, 7]);
+    });
   });
 
-  it("orders the problems by the file they were found in", () => {
-    const repositoryRoot = repositoryWith("several", {
-      "ci.yml": "jobs:\n  build:\n    steps: []\n",
-      "release.yml": "jobs:\n  publish:\n    steps: []\n",
+  describe("a definition whose syntax is broken", () => {
+    const it = test.extend("messagesOfTheProblems", () => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "dont-review-it-run-workflow-checks-"));
+      const directory = join(repositoryRoot, defaultWorkflowChecksConfig.workflowDirectory);
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(join(directory, "ci.yml"), "jobs:\n build:\n   x: 1\n  y: 2\n");
+
+      return runWorkflowChecks({
+        repositoryRoot,
+        config: defaultWorkflowChecksConfig,
+      }).problems.map((problem) => problem.message);
     });
 
-    expect(
-      runWorkflowChecks({ repositoryRoot, config }).problems.map((problem) => problem.file),
-    ).toStrictEqual([".github/workflows/ci.yml", ".github/workflows/release.yml"]);
+    it("reports only that the definition cannot be read", ({ messagesOfTheProblems }) => {
+      expect(messagesOfTheProblems).toStrictEqual([
+        "A workflow definition that does not parse must not stay in the repository, because every check below reads it as an empty file and reports nothing. Fix the YAML here so the definition can be read.",
+      ]);
+    });
+  });
+
+  describe("several definitions that each break a discipline", () => {
+    const it = test.extend("filesOfTheProblems", () => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "dont-review-it-run-workflow-checks-"));
+      const directory = join(repositoryRoot, defaultWorkflowChecksConfig.workflowDirectory);
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(join(directory, "ci.yml"), "jobs:\n  build:\n    steps: []\n");
+      writeFileSync(join(directory, "release.yml"), "jobs:\n  publish:\n    steps: []\n");
+
+      return runWorkflowChecks({
+        repositoryRoot,
+        config: defaultWorkflowChecksConfig,
+      }).problems.map((problem) => problem.file);
+    });
+
+    it("orders the problems by the file they were found in", ({ filesOfTheProblems }) => {
+      expect(filesOfTheProblems).toStrictEqual([
+        ".github/workflows/ci.yml",
+        ".github/workflows/release.yml",
+      ]);
+    });
   });
 });

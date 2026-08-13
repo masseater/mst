@@ -1,4 +1,5 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { resolveBinding, type ScopeLookup } from "../lib/resolved-bindings.ts";
 import { fixtureDeclarationsOf } from "../lib/spec-syntax/fixture-declarations.ts";
 import { isSpecFile, specFileSuffixesFrom } from "../lib/spec-syntax/spec-files.ts";
@@ -10,23 +11,18 @@ import {
 } from "../lib/spec-syntax/subject-expressions.ts";
 import {
   declaresTestBlock,
-  groupingBlockBindings,
+  groupingBlockRootNames,
   testCallbacksOf,
 } from "../lib/spec-syntax/test-block-declarations.ts";
 
 import type { ESTree } from "@oxlint/plugins";
+import type { NamedReport } from "../lib/named-report.ts";
 
 const ANONYMOUS_DECLARATION_NAME = "default";
 
 type ScopeReading = {
   readonly functions: readonly ESTree.Node[];
   readonly groupingBodies: readonly ESTree.Node[];
-};
-
-type HelperReport = {
-  readonly node: ESTree.Node;
-  readonly messageId: string;
-  readonly data: { readonly name: string };
 };
 
 type BindingReading = {
@@ -46,11 +42,14 @@ const innermostHolderOf = (
     .toSorted((first, second) => second.start - first.start)
     .at(0) ?? null;
 
+const standsAtModuleScope = (held: ESTree.Node, reading: ScopeReading): boolean =>
+  innermostHolderOf(held, reading.functions) === null;
+
 const standsInHelperScope = (held: ESTree.Node, reading: ScopeReading): boolean => {
   const holder = innermostHolderOf(held, reading.functions);
   if (holder === null) return true;
   return reading.groupingBodies.some(
-    (writtenBody) => writtenBody.start === holder.start && writtenBody.end === holder.end,
+    (groupingBody) => groupingBody.start === holder.start && groupingBody.end === holder.end,
   );
 };
 
@@ -66,8 +65,8 @@ const functionsInLiteral = (written: ESTree.Expression): readonly ESTree.Express
     );
   }
   if (written.type !== "ArrayExpression") return [];
-  return written.elements.flatMap((held) =>
-    held === null || held.type === "SpreadElement" ? [] : heldFunctionsIn(held),
+  return written.elements.flatMap((listed) =>
+    listed === null || listed.type === "SpreadElement" ? [] : heldFunctionsIn(listed),
   );
 };
 
@@ -77,14 +76,14 @@ const functionsHeldByLiteral = (initializer: ESTree.Expression): readonly ESTree
   return functionsInLiteral(written);
 };
 
-const functionsHandedBack = (takenFunction: SpecFunction): readonly ESTree.Expression[] =>
-  returnedExpressionsOf(takenFunction).flatMap((handed) => {
+const functionsHandedBack = (specFunction: SpecFunction): readonly ESTree.Expression[] =>
+  returnedExpressionsOf(specFunction).flatMap((handed) => {
     const written = unwrapSubject(handed);
     return asSpecFunction(written) === null ? [] : [written];
   });
 
-const anythingHandedBack = (takenFunction: SpecFunction): readonly ESTree.Expression[] =>
-  returnedExpressionsOf(takenFunction).flatMap((handed) => heldFunctionsIn(handed));
+const anythingHandedBack = (specFunction: SpecFunction): readonly ESTree.Expression[] =>
+  returnedExpressionsOf(specFunction).flatMap((handed) => heldFunctionsIn(handed));
 
 const declaredFunctionOf = (declared: ESTree.Node): SpecFunction | null => {
   if (declared.type === "FunctionDeclaration") return declared;
@@ -119,13 +118,15 @@ const disguisedYieldOf = (
   return factory === null ? [] : functionsHandedBack(factory);
 };
 
-const boundNameOf = (checked: ESTree.VariableDeclarator["id"], source: string): string =>
-  checked.type === "Identifier" ? checked.name : source.slice(checked.start, checked.end);
+const boundNameOf = (declaredId: ESTree.VariableDeclarator["id"], source: string): string =>
+  declaredId.type === "Identifier"
+    ? declaredId.name
+    : source.slice(declaredId.start, declaredId.end);
 
 const bindingReportOf = (
   declarator: ESTree.VariableDeclarator,
   reading: BindingReading,
-): HelperReport | null => {
+): NamedReport | null => {
   const { init } = declarator;
   if (init === null) return null;
 
@@ -142,7 +143,25 @@ const bindingReportOf = (
   return null;
 };
 
-const fixtureReportsOf = (call: ESTree.CallExpression): readonly HelperReport[] =>
+const fixtureBindingReportOf = (
+  declarator: ESTree.VariableDeclarator,
+  source: string,
+): NamedReport | null => {
+  const { init } = declarator;
+  if (init === null) return null;
+
+  const written = unwrapSubject(init);
+  if (written.type !== "CallExpression") return null;
+  if (fixtureDeclarationsOf(written).length === 0) return null;
+
+  return {
+    node: declarator,
+    messageId: "moduleScopeFixtureBinding",
+    data: { name: boundNameOf(declarator.id, source) },
+  };
+};
+
+const fixtureReportsOf = (call: ESTree.CallExpression): readonly NamedReport[] =>
   fixtureDeclarationsOf(call).flatMap((declaration) =>
     declaration.subjects.flatMap((subject) => {
       const handed = asSpecFunction(subject);
@@ -157,13 +176,54 @@ const fixtureReportsOf = (call: ESTree.CallExpression): readonly HelperReport[] 
     }),
   );
 
+const scopeReadingIn = (program: ESTree.Program, rootNames: ReadonlySet<string>): ScopeReading => ({
+  functions: [
+    ...nodesOfType(program, "FunctionDeclaration"),
+    ...nodesOfType(program, "FunctionExpression"),
+    ...nodesOfType(program, "ArrowFunctionExpression"),
+  ],
+  groupingBodies: nodesOfType(program, "CallExpression")
+    .filter((call) => declaresTestBlock(call, rootNames))
+    .flatMap((call) => testCallbacksOf(call)),
+});
+
+const declarationReportsIn = (
+  program: ESTree.Program,
+  reading: ScopeReading,
+): readonly NamedReport[] =>
+  nodesOfType(program, "FunctionDeclaration")
+    .filter((declared) => standsInHelperScope(declared, reading))
+    .map((declared) => ({
+      node: declared,
+      messageId: "scopedHelperDeclaration",
+      data: { name: declared.id?.name ?? ANONYMOUS_DECLARATION_NAME },
+    }));
+
+const bindingReportsIn = (read: {
+  readonly program: ESTree.Program;
+  readonly reading: ScopeReading;
+  readonly binding: BindingReading;
+}): readonly NamedReport[] =>
+  nodesOfType(read.program, "VariableDeclarator")
+    .filter((declarator) => standsInHelperScope(declarator, read.reading))
+    .flatMap((declarator) => bindingReportOf(declarator, read.binding) ?? []);
+
+const fixtureBindingReportsIn = (read: {
+  readonly program: ESTree.Program;
+  readonly reading: ScopeReading;
+  readonly binding: BindingReading;
+}): readonly NamedReport[] =>
+  nodesOfType(read.program, "VariableDeclarator")
+    .filter((declarator) => standsAtModuleScope(declarator, read.reading))
+    .flatMap((declarator) => fixtureBindingReportOf(declarator, read.binding.source) ?? []);
+
 export const noSpecFileHelperFunction = createDontReviewItRule({
   name: "no-spec-file-helper-function--inline-or-use-fixture",
   meta: {
     type: "problem",
     docs: {
       description:
-        "Disallow a helper function standing at module scope or in the body of a grouping block of a spec file, and a fixture handing back a function written in place, so the block that names a behaviour also spells out the work that behaviour runs",
+        "Disallow a helper function standing at module scope or in the body of a grouping block of a spec file, a fixture builder standing at module scope, and a fixture handing back a function written in place, so the block that names a behaviour also spells out the work that behaviour runs",
       relatedGuidelines: [],
     },
     messages: {
@@ -175,6 +235,8 @@ export const noSpecFileHelperFunction = createDontReviewItRule({
         "A binding must not take its value from a call that hands back a function. Inline the body of `{{name}}` into the test block that uses it, or have a base fixture run that behaviour and hand back the subject it built. An immediately invoked call, a return written inside a branch, a loop, a `switch` or a `try`, and a factory declared in this file are read the same way.",
       containedHelperBinding:
         "A binding must not carry functions inside an object or an array literal at module scope or in the body of a grouping block. Inline each function `{{name}}` carries into the test block that uses it, or have a base fixture run those behaviours and hand back the subjects they built. Nesting the literal deeper keeps the functions in the same scope.",
+      moduleScopeFixtureBinding:
+        "A fixture builder must not stand at module scope. Move `{{name}}` into the body of the grouping block whose test blocks read it, so the block that names a behaviour also stands beside the subject it reads. A builder derived from another builder and a builder carrying several fixtures are read the same way.",
       handedHelperFixture:
         "A fixture must not hand back a function written in place. Rewrite `{{name}}` to run that behaviour itself and hand back the subject it built, and leave the assertions against that subject standing in the test block. A fixture named anything at all is read the same way.",
     },
@@ -195,60 +257,18 @@ export const noSpecFileHelperFunction = createDontReviewItRule({
       lookup: (node) => inspection.sourceCode.getScope(node),
       source: inspection.sourceCode.text,
     };
-    const bindings = groupingBlockBindings();
-    const functions = new Set<ESTree.Node>();
-    const calls = new Set<ESTree.CallExpression>();
-    const declarations = new Set<ESTree.Function>();
-    const declarators = new Set<ESTree.VariableDeclarator>();
-
-    const takeFunction = (node: ESTree.Function | ESTree.ArrowFunctionExpression): void => {
-      functions.add(node);
-    };
-
-    const scopeReadingOf = (): ScopeReading => {
-      const rootNames = bindings.rootNames();
-      return {
-        functions: [...functions],
-        groupingBodies: [...calls]
-          .filter((call) => declaresTestBlock(call, rootNames))
-          .flatMap((call) => testCallbacksOf(call)),
-      };
-    };
 
     return {
-      ImportDeclaration: bindings.takeImport,
-      FunctionDeclaration(node: ESTree.Function) {
-        takeFunction(node);
-        declarations.add(node);
-      },
-      FunctionExpression: takeFunction,
-      ArrowFunctionExpression: takeFunction,
-      VariableDeclarator(node: ESTree.VariableDeclarator) {
-        bindings.takeLocalBinding(node);
-        declarators.add(node);
-      },
-      CallExpression(node: ESTree.CallExpression) {
-        calls.add(node);
-      },
-      "Program:exit"() {
-        const reading = scopeReadingOf();
+      "Program:exit"(program: ESTree.Program) {
+        const reading = scopeReadingIn(program, groupingBlockRootNames(program));
+        const reports = [
+          ...declarationReportsIn(program, reading),
+          ...bindingReportsIn({ program, reading, binding }),
+          ...fixtureBindingReportsIn({ program, reading, binding }),
+          ...nodesOfType(program, "CallExpression").flatMap((call) => fixtureReportsOf(call)),
+        ];
 
-        for (const declared of declarations) {
-          if (!standsInHelperScope(declared, reading)) continue;
-          inspection.report({
-            node: declared,
-            messageId: "scopedHelperDeclaration",
-            data: { name: declared.id?.name ?? ANONYMOUS_DECLARATION_NAME },
-          });
-        }
-        for (const declarator of declarators) {
-          if (!standsInHelperScope(declarator, reading)) continue;
-          const report = bindingReportOf(declarator, binding);
-          if (report !== null) inspection.report(report);
-        }
-        for (const call of calls) {
-          for (const report of fixtureReportsOf(call)) inspection.report(report);
-        }
+        for (const report of reports) inspection.report(report);
       },
     };
   },

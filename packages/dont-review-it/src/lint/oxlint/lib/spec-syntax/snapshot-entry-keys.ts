@@ -1,4 +1,4 @@
-import { zip } from "es-toolkit";
+import { groupBy, zip } from "es-toolkit";
 
 import { isFunctionNodeType } from "../node-kinds.ts";
 import { isAssertionChain } from "./assertion-entries.ts";
@@ -201,14 +201,12 @@ const bucketKeyOf = (titles: readonly string[]): string => JSON.stringify(titles
 
 const bucketedPlacements = (
   sites: readonly SnapshotMatcherSite[],
-): ReadonlyMap<string, readonly Placement[]> => {
-  const bucketed = new Map<string, readonly Placement[]>();
-  for (const placement of sites.flatMap(placementsOf)) {
-    const bucket = bucketKeyOf(placement.titles);
-    bucketed.set(bucket, [...(bucketed.get(bucket) ?? []), placement]);
-  }
-  return bucketed;
-};
+): ReadonlyMap<string, readonly Placement[]> =>
+  new Map(
+    Object.entries(
+      groupBy(sites.flatMap(placementsOf), (placement) => bucketKeyOf(placement.titles)),
+    ),
+  );
 
 type Ordinals = Map<string, number>;
 

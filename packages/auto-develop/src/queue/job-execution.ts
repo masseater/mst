@@ -16,7 +16,27 @@ export type JobExecution = {
   readonly pump: () => void;
   readonly isDrained: () => boolean;
   readonly notifyDrain: () => void;
+  readonly settleStartedJobs: () => Promise<void>;
 };
+
+class TrackedStartedJobs {
+  #settling: readonly Promise<void>[] = [];
+
+  track(settlingJob: Promise<void>): void {
+    this.#settling = [...this.#settling, settlingJob];
+  }
+
+  async settleAll(): Promise<void> {
+    const settlingJobs = this.#settling;
+    this.#settling = [];
+    await Promise.all(settlingJobs);
+  }
+}
+
+const createStartedJobs = (): {
+  readonly track: (settlingJob: Promise<void>) => void;
+  readonly settleAll: () => Promise<void>;
+} => new TrackedStartedJobs();
 
 const logSettled = (
   log: Logger,
@@ -30,6 +50,51 @@ const logSettled = (
     { label: settling.record.label, err: settling.failure },
     "job failed; written consumed",
   );
+};
+
+const createJobStarter = (starting: {
+  readonly state: QueueSharedState;
+  readonly snapshotNow: () => void;
+  readonly log: Logger;
+  readonly settleConsumed: (settling: { readonly record: JobRecord }) => void;
+  readonly settleFailure: (failing: {
+    readonly record: JobRecord;
+    readonly failure: unknown;
+  }) => void;
+}): {
+  readonly startJob: (written: JobRecord) => void;
+  readonly settleStartedJobs: () => Promise<void>;
+} => {
+  const { state, snapshotNow, log } = starting;
+  const startedJobs = createStartedJobs();
+
+  const runJob = async (written: JobRecord): Promise<void> => {
+    const takenHandler = state.handlerTable.get(written.type);
+    if (takenHandler === undefined) {
+      log.error(
+        { key: written.key, type: written.type, label: written.label },
+        "no job takenHandler is registered for this type",
+      );
+      starting.settleConsumed({ record: written });
+      return;
+    }
+    try {
+      await takenHandler(written.payload);
+      starting.settleConsumed({ record: written });
+    } catch (jobFailure) {
+      starting.settleFailure({ record: written, failure: jobFailure });
+    }
+  };
+
+  const startJob = (written: JobRecord): void => {
+    state.ledger.put({ ...written, state: "running" });
+    snapshotNow();
+    log.info({ lane: written.lane, label: written.label }, "job started");
+    const settlingJob = runJob(written);
+    startedJobs.track(settlingJob);
+  };
+
+  return { startJob, settleStartedJobs: () => startedJobs.settleAll() };
 };
 
 export const createJobExecution = (execution: {
@@ -95,30 +160,7 @@ export const createJobExecution = (execution: {
     settleConsumed(failing);
   };
 
-  const runJob = async (written: JobRecord): Promise<void> => {
-    const takenHandler = state.handlerTable.get(written.type);
-    if (takenHandler === undefined) {
-      log.error(
-        { key: written.key, type: written.type, label: written.label },
-        "no job takenHandler is registered for this type",
-      );
-      settleConsumed({ record: written });
-      return;
-    }
-    try {
-      await takenHandler(written.payload);
-      settleConsumed({ record: written });
-    } catch (jobFailure) {
-      settleFailure({ record: written, failure: jobFailure });
-    }
-  };
-
-  const startJob = (written: JobRecord): void => {
-    state.ledger.put({ ...written, state: "running" });
-    snapshotNow();
-    log.info({ lane: written.lane, label: written.label }, "job started");
-    void runJob(written);
-  };
+  const starter = createJobStarter({ state, snapshotNow, log, settleConsumed, settleFailure });
 
   const pump = (): void => {
     if (state.flags.get("halted") === true) return;
@@ -133,9 +175,14 @@ export const createJobExecution = (execution: {
             !state.reservedLanes.has(written.lane),
         );
       if (nextJob === undefined) return;
-      startJob(nextJob);
+      starter.startJob(nextJob);
     }
   };
 
-  return { pump, isDrained, notifyDrain };
+  return {
+    pump,
+    isDrained,
+    notifyDrain,
+    settleStartedJobs: starter.settleStartedJobs,
+  };
 };

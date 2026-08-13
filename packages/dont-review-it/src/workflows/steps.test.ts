@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { defaultWorkflowChecksConfig } from "./config.ts";
 import {
@@ -18,12 +18,13 @@ import {
   valueOf,
 } from "./workflow-document.ts";
 
-const config = defaultWorkflowChecksConfig;
-
-const documentOf = (source: string) =>
-  parseWorkflowDocument({ relativePath: ".github/workflows/ci.yml", source });
-
-const TWO_JOBS = `jobs:
+describe("jobEntriesOf", () => {
+  describe("a workflow declaring more than one job", () => {
+    const it = test.extend("jobNames", () =>
+      jobEntriesOf({
+        document: parseWorkflowDocument({
+          relativePath: ".github/workflows/ci.yml",
+          source: `jobs:
   build:
     steps:
       - run: vp run build
@@ -31,101 +32,273 @@ const TWO_JOBS = `jobs:
   test:
     steps:
       - run: vp run test
-`;
+`,
+        }),
+        config: defaultWorkflowChecksConfig,
+      }).map(keyOf));
 
-describe("jobEntriesOf", () => {
-  it("lists every job the workflow declares", () => {
-    expect(jobEntriesOf({ document: documentOf(TWO_JOBS), config }).map(keyOf)).toStrictEqual([
-      "build",
-      "test",
-    ]);
+    it("lists every job the workflow declares", ({ jobNames }) => {
+      expect(jobNames).toStrictEqual(["build", "test"]);
+    });
   });
 
-  it("lists nothing when the workflow declares no jobs", () => {
-    expect(jobEntriesOf({ document: documentOf("name: CI\n"), config })).toStrictEqual([]);
+  describe("a workflow declaring no jobs", () => {
+    const it = test.extend("jobEntries", () =>
+      jobEntriesOf({
+        document: parseWorkflowDocument({
+          relativePath: ".github/workflows/ci.yml",
+          source: "name: CI\n",
+        }),
+        config: defaultWorkflowChecksConfig,
+      }));
+
+    it("lists nothing at all", ({ jobEntries }) => {
+      expect(jobEntries).toStrictEqual([]);
+    });
   });
 });
 
 describe("stepsOf", () => {
-  it("lists the steps of a job", () => {
-    const [build] = jobEntriesOf({ document: documentOf(TWO_JOBS), config });
+  describe("a job declaring more than one step", () => {
+    const it = test.extend("stepKeys", () => {
+      const [buildJob] = jobEntriesOf({
+        document: parseWorkflowDocument({
+          relativePath: ".github/workflows/ci.yml",
+          source: `jobs:
+  build:
+    steps:
+      - run: vp run build
+      - uses: actions/checkout@v5
+  test:
+    steps:
+      - run: vp run test
+`,
+        }),
+        config: defaultWorkflowChecksConfig,
+      });
 
-    expect(stepsOf({ job: build?.value, config }).length).toBe(2);
+      return stepsOf({ job: buildJob?.value, config: defaultWorkflowChecksConfig }).map(keysOf);
+    });
+
+    it("lists the steps of the job", ({ stepKeys }) => {
+      expect(stepKeys).toStrictEqual([["run"], ["uses"]]);
+    });
   });
 });
 
 describe("entriesNamedInSteps", () => {
-  it("collects the named entry from the steps of every job", () => {
-    expect(
-      entriesNamedInSteps({ document: documentOf(TWO_JOBS), config, key: config.runKey }).map(
-        (listed) => scalarText(listed.value),
-      ),
-    ).toStrictEqual(["vp run build", "vp run test"]);
+  describe("a key that a step of every job declares", () => {
+    const it = test.extend("commands", () =>
+      entriesNamedInSteps({
+        document: parseWorkflowDocument({
+          relativePath: ".github/workflows/ci.yml",
+          source: `jobs:
+  build:
+    steps:
+      - run: vp run build
+      - uses: actions/checkout@v5
+  test:
+    steps:
+      - run: vp run test
+`,
+        }),
+        config: defaultWorkflowChecksConfig,
+        key: defaultWorkflowChecksConfig.runKey,
+      }).map((runEntry) => scalarText(runEntry.value)));
+
+    it("collects the named entry from the steps of every job", ({ commands }) => {
+      expect(commands).toStrictEqual(["vp run build", "vp run test"]);
+    });
   });
 
-  it("skips the steps that do not declare the entry", () => {
-    expect(
-      entriesNamedInSteps({ document: documentOf(TWO_JOBS), config, key: "uses" }).length,
-    ).toBe(1);
+  describe("a key that only one step declares", () => {
+    const it = test.extend("actions", () =>
+      entriesNamedInSteps({
+        document: parseWorkflowDocument({
+          relativePath: ".github/workflows/ci.yml",
+          source: `jobs:
+  build:
+    steps:
+      - run: vp run build
+      - uses: actions/checkout@v5
+  test:
+    steps:
+      - run: vp run test
+`,
+        }),
+        config: defaultWorkflowChecksConfig,
+        key: "uses",
+      }).map((usesEntry) => scalarText(usesEntry.value)));
+
+    it("skips the steps that do not declare the entry", ({ actions }) => {
+      expect(actions).toStrictEqual(["actions/checkout@v5"]);
+    });
   });
 });
 
 describe("triggersOf", () => {
-  it("reads the triggers the workflow declares", () => {
-    expect(keysOf(triggersOf({ document: documentOf("on:\n  push:\n"), config }))).toStrictEqual([
-      "push",
-    ]);
+  describe("a workflow declaring its triggers", () => {
+    const it = test.extend("triggerKeys", () =>
+      keysOf(
+        triggersOf({
+          document: parseWorkflowDocument({
+            relativePath: ".github/workflows/ci.yml",
+            source: "on:\n  push:\n",
+          }),
+          config: defaultWorkflowChecksConfig,
+        }),
+      ));
+
+    it("reads the triggers the workflow declares", ({ triggerKeys }) => {
+      expect(triggerKeys).toStrictEqual(["push"]);
+    });
   });
 
-  it("reads nothing from a workflow that declares no triggers", () => {
-    expect(triggersOf({ document: documentOf("name: CI\n"), config })).toBeNull();
+  describe("a workflow declaring no triggers", () => {
+    const it = test.extend("triggers", () =>
+      triggersOf({
+        document: parseWorkflowDocument({
+          relativePath: ".github/workflows/ci.yml",
+          source: "name: CI\n",
+        }),
+        config: defaultWorkflowChecksConfig,
+      }));
+
+    it("reads nothing at all", ({ triggers }) => {
+      expect(triggers).toBe(null);
+    });
   });
 
-  it("does not confuse the triggers with another key", () => {
-    expect(
-      valueOf(triggersOf({ document: documentOf("on:\n  push:\n"), config }), "jobs"),
-    ).toBeNull();
+  describe("a name the triggers do not declare", () => {
+    const it = test.extend("jobsUnderTriggers", () =>
+      valueOf(
+        triggersOf({
+          document: parseWorkflowDocument({
+            relativePath: ".github/workflows/ci.yml",
+            source: "on:\n  push:\n",
+          }),
+          config: defaultWorkflowChecksConfig,
+        }),
+        "jobs",
+      ));
+
+    it("does not confuse the triggers with another key", ({ jobsUnderTriggers }) => {
+      expect(jobsUnderTriggers).toBe(null);
+    });
   });
 });
 
 describe("triggerNamesOf", () => {
-  it("names the triggers written as a mapping", () => {
-    expect(
-      triggerNamesOf({ document: documentOf("on:\n  push:\n  pull_request:\n"), config }),
-    ).toStrictEqual(["push", "pull_request"]);
+  describe("triggers written as a mapping", () => {
+    const it = test.extend("triggerNames", () =>
+      triggerNamesOf({
+        document: parseWorkflowDocument({
+          relativePath: ".github/workflows/ci.yml",
+          source: "on:\n  push:\n  pull_request:\n",
+        }),
+        config: defaultWorkflowChecksConfig,
+      }));
+
+    it("names every trigger the mapping declares", ({ triggerNames }) => {
+      expect(triggerNames).toStrictEqual(["push", "pull_request"]);
+    });
   });
 
-  it("names the triggers written as a list", () => {
-    expect(
-      triggerNamesOf({ document: documentOf("on: [push, workflow_call]\n"), config }),
-    ).toStrictEqual(["push", "workflow_call"]);
+  describe("triggers written as a list", () => {
+    const it = test.extend("triggerNames", () =>
+      triggerNamesOf({
+        document: parseWorkflowDocument({
+          relativePath: ".github/workflows/ci.yml",
+          source: "on: [push, workflow_call]\n",
+        }),
+        config: defaultWorkflowChecksConfig,
+      }));
+
+    it("names every trigger the list declares", ({ triggerNames }) => {
+      expect(triggerNames).toStrictEqual(["push", "workflow_call"]);
+    });
   });
 
-  it("names the single trigger written on its own", () => {
-    expect(triggerNamesOf({ document: documentOf("on: push\n"), config })).toStrictEqual(["push"]);
+  describe("a single trigger written on its own", () => {
+    const it = test.extend("triggerNames", () =>
+      triggerNamesOf({
+        document: parseWorkflowDocument({
+          relativePath: ".github/workflows/ci.yml",
+          source: "on: push\n",
+        }),
+        config: defaultWorkflowChecksConfig,
+      }));
+
+    it("names the trigger written on its own", ({ triggerNames }) => {
+      expect(triggerNames).toStrictEqual(["push"]);
+    });
   });
 
-  it("drops the items of a list that are not plain values", () => {
-    expect(
-      triggerNamesOf({ document: documentOf("on: [push, [nested]]\n"), config }),
-    ).toStrictEqual(["push"]);
+  describe("a list holding an item that is not a plain value", () => {
+    const it = test.extend("triggerNames", () =>
+      triggerNamesOf({
+        document: parseWorkflowDocument({
+          relativePath: ".github/workflows/ci.yml",
+          source: "on: [push, [nested]]\n",
+        }),
+        config: defaultWorkflowChecksConfig,
+      }));
+
+    it("drops the items of a list that are not plain values", ({ triggerNames }) => {
+      expect(triggerNames).toStrictEqual(["push"]);
+    });
   });
 
-  it("names nothing when the workflow declares no triggers", () => {
-    expect(triggerNamesOf({ document: documentOf("name: CI\n"), config })).toStrictEqual([]);
+  describe("a workflow declaring no triggers", () => {
+    const it = test.extend("triggerNames", () =>
+      triggerNamesOf({
+        document: parseWorkflowDocument({
+          relativePath: ".github/workflows/ci.yml",
+          source: "name: CI\n",
+        }),
+        config: defaultWorkflowChecksConfig,
+      }));
+
+    it("names nothing at all", ({ triggerNames }) => {
+      expect(triggerNames).toStrictEqual([]);
+    });
   });
 });
 
 describe("triggerKeyNodeOf", () => {
-  it("points at the trigger itself when it was written as a mapping", () => {
-    const document = documentOf("name: CI\non:\n  push:\n  workflow_call:\n");
+  describe("a trigger written as a mapping", () => {
+    const it = test.extend("line", () => {
+      const document = parseWorkflowDocument({
+        relativePath: ".github/workflows/ci.yml",
+        source: "name: CI\non:\n  push:\n  workflow_call:\n",
+      });
 
-    expect(lineOf(document, triggerKeyNodeOf({ document, config, name: "workflow_call" }))).toBe(4);
+      return lineOf(
+        document,
+        triggerKeyNodeOf({ document, config: defaultWorkflowChecksConfig, name: "workflow_call" }),
+      );
+    });
+
+    it("points at the trigger itself", ({ line }) => {
+      expect(line).toBe(4);
+    });
   });
 
-  it("points at the declaration of the triggers when they were written as a list", () => {
-    const document = documentOf("name: CI\non: [push, workflow_call]\n");
+  describe("a trigger written inside a list", () => {
+    const it = test.extend("line", () => {
+      const document = parseWorkflowDocument({
+        relativePath: ".github/workflows/ci.yml",
+        source: "name: CI\non: [push, workflow_call]\n",
+      });
 
-    expect(lineOf(document, triggerKeyNodeOf({ document, config, name: "workflow_call" }))).toBe(2);
+      return lineOf(
+        document,
+        triggerKeyNodeOf({ document, config: defaultWorkflowChecksConfig, name: "workflow_call" }),
+      );
+    });
+
+    it("points at the declaration of the triggers", ({ line }) => {
+      expect(line).toBe(2);
+    });
   });
 });

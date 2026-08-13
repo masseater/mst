@@ -1,7 +1,7 @@
 import { glob } from "node:fs/promises";
 import { join } from "node:path";
 
-import { attemptAsync } from "es-toolkit";
+import { attemptAsync, isPlainObject } from "es-toolkit";
 import { parse } from "yaml";
 
 import { fileTextOrNull } from "../file-text.ts";
@@ -24,15 +24,15 @@ const NAMELESS_PACKAGE =
 
 const packageNameOf = (manifestSource: string): string | null => {
   const manifest: unknown = JSON.parse(manifestSource);
-  if (typeof manifest !== "object" || manifest === null || Array.isArray(manifest)) return null;
-  const { name } = manifest as Readonly<Record<string, unknown>>;
+  if (!isPlainObject(manifest)) return null;
+  const { name }: { readonly name?: unknown } = manifest;
   return typeof name === "string" && name.length > 0 ? name : null;
 };
 
 const workspaceGlobsOf = (manifestSource: string): readonly string[] => {
   const manifest: unknown = parse(manifestSource);
-  if (typeof manifest !== "object" || manifest === null || Array.isArray(manifest)) return [];
-  const { packages } = manifest as Readonly<Record<string, unknown>>;
+  if (!isPlainObject(manifest)) return [];
+  const { packages }: { readonly packages?: unknown } = manifest;
   if (!Array.isArray(packages)) return [];
   return packages.filter((candidate): candidate is string => typeof candidate === "string");
 };

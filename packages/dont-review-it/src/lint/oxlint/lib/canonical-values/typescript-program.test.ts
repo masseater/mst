@@ -1,7 +1,8 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { attempt } from "es-toolkit";
 import * as ts from "typescript-6";
 import { describe, expect, test } from "vite-plus/test";
 
@@ -10,215 +11,298 @@ import {
   createCanonicalValuesTypeScriptProgram,
 } from "./typescript-program.ts";
 
-const repository = (): string => {
-  const root = mkdtempSync(join(tmpdir(), "canonical-values-typescript-program-"));
-  mkdirSync(join(root, "src"), { recursive: true });
-  return root;
-};
-
-const write = (input: {
-  readonly contents: string;
-  readonly path: string;
-  readonly root: string;
-}): string => {
-  const absolutePath = join(input.root, input.path);
-  mkdirSync(join(absolutePath, ".."), { recursive: true });
-  writeFileSync(absolutePath, input.contents);
-  return absolutePath;
-};
-
-const bindingType = (program: ts.Program, ownerPath: string): string => {
-  const source = program.getSourceFile(ownerPath);
-  const statement = source?.statements[1];
-  if (statement === undefined || !ts.isVariableStatement(statement)) return "missing";
-  const declaration = statement.declarationList.declarations[0];
-  if (declaration === undefined) return "missing";
-  return program
-    .getTypeChecker()
-    .typeToString(program.getTypeChecker().getTypeAtLocation(declaration.name));
-};
+const BASE_SOURCE = 'export const BASE = ["draft"] as const;\n';
+const OWNER_SOURCE =
+  'import { BASE } from "@internal/base";\nexport const OWNER = [...BASE, "published"] as const;\n';
 
 describe("createCanonicalValuesTypeScriptProgram", () => {
-  test("uses one configuration identity for sibling source directories", () => {
-    const root = repository();
-    const configPath = write({ root, path: "tsconfig.json", contents: "{}" });
+  describe("sibling source directories under one repository configuration", () => {
+    const siblingRoot = join(tmpdir(), "canonical-values-typescript-program-sibling");
 
-    expect(
-      ["src/first", "src/second"].map((searchDirectory) =>
-        canonicalValuesTypeScriptConfigPath({
-          repositoryRoot: root,
-          searchDirectory: join(root, searchDirectory),
-        }),
-      ),
-    ).toStrictEqual([configPath, configPath]);
-    rmSync(root, { force: true, recursive: true });
-  });
-
-  test("keeps nested TypeScript configurations as distinct program identities", () => {
-    const root = repository();
-    const rootConfig = write({ root, path: "tsconfig.json", contents: "{}" });
-    const nestedConfig = write({ root, path: "packages/nested/tsconfig.json", contents: "{}" });
-
-    expect(
-      ["src", "packages/nested/src"].map((searchDirectory) =>
-        canonicalValuesTypeScriptConfigPath({
-          repositoryRoot: root,
-          searchDirectory: join(root, searchDirectory),
-        }),
-      ),
-    ).toStrictEqual([rootConfig, nestedConfig]);
-    rmSync(root, { force: true, recursive: true });
-  });
-
-  test("uses the nearest repository tsconfig paths mapping", () => {
-    const root = repository();
-    write({
-      root,
-      path: "tsconfig.json",
-      contents: JSON.stringify({
-        compilerOptions: { baseUrl: ".", paths: { "@internal/base": ["src/base.ts"] } },
-      }),
-    });
-    write({ root, path: "src/base.ts", contents: 'export const BASE = ["draft"] as const;\n' });
-    const ownerPath = write({
-      root,
-      path: "src/owner.ts",
-      contents:
-        'import { BASE } from "@internal/base";\nexport const OWNER = [...BASE, "published"] as const;\n',
-    });
-    const program = createCanonicalValuesTypeScriptProgram({
-      repositoryRoot: root,
-      rootNames: [ownerPath],
-      searchDirectory: join(root, "src"),
-    });
-
-    expect(bindingType(program, ownerPath)).toBe('readonly ["draft", "published"]');
-    rmSync(root, { force: true, recursive: true });
-  });
-
-  test("does not load a tsconfig above the repository root", () => {
-    const outer = repository();
-    const root = join(outer, "nested");
-    mkdirSync(join(root, "src"), { recursive: true });
-    write({
-      root: outer,
-      path: "tsconfig.json",
-      contents: JSON.stringify({
-        compilerOptions: { baseUrl: ".", paths: { "@internal/base": ["base.ts"] } },
-      }),
-    });
-    write({ root: outer, path: "base.ts", contents: 'export const BASE = ["draft"] as const;\n' });
-    const ownerPath = write({
-      root,
-      path: "src/owner.ts",
-      contents:
-        'import { BASE } from "@internal/base";\nexport const OWNER = [...BASE, "published"] as const;\n',
-    });
-    const program = createCanonicalValuesTypeScriptProgram({
-      repositoryRoot: root,
-      rootNames: [ownerPath],
-      searchDirectory: join(root, "src"),
-    });
-
-    expect(bindingType(program, ownerPath)).toBe('readonly [...any[], "published"]');
-    rmSync(outer, { force: true, recursive: true });
-  });
-
-  test("rejects a config that extends an arbitrary file outside the repository", () => {
-    const outer = repository();
-    const root = join(outer, "nested");
-    mkdirSync(join(root, "src"), { recursive: true });
-    write({ root: outer, path: "base.json", contents: JSON.stringify({ compilerOptions: {} }) });
-    write({ root, path: "tsconfig.json", contents: JSON.stringify({ extends: "../base.json" }) });
-    const ownerPath = write({
-      root,
-      path: "src/owner.ts",
-      contents: 'export const OWNER = ["draft", "published"] as const;\n',
-    });
-
-    expect(() =>
-      createCanonicalValuesTypeScriptProgram({
-        repositoryRoot: root,
-        rootNames: [ownerPath],
-        searchDirectory: join(root, "src"),
-      }),
-    ).toThrow("TypeScript config extends outside the repository");
-    rmSync(outer, { force: true, recursive: true });
-  });
-
-  test("rejects a paths target outside the cache-bounded repository", () => {
-    const outer = repository();
-    const root = join(outer, "nested");
-    mkdirSync(join(root, "src"), { recursive: true });
-    write({ root: outer, path: "base.ts", contents: 'export const BASE = ["draft"] as const;\n' });
-    write({
-      root,
-      path: "tsconfig.json",
-      contents: JSON.stringify({
-        compilerOptions: { baseUrl: ".", paths: { "@external/base": ["../base.ts"] } },
-      }),
-    });
-    const ownerPath = write({
-      root,
-      path: "src/owner.ts",
-      contents:
-        'import { BASE } from "@external/base";\nexport const OWNER = [...BASE, "published"] as const;\n',
-    });
-
-    expect(() =>
-      createCanonicalValuesTypeScriptProgram({
-        repositoryRoot: root,
-        rootNames: [ownerPath],
-        searchDirectory: join(root, "src"),
-      }),
-    ).toThrow("TypeScript dependency is outside the repository");
-    rmSync(outer, { force: true, recursive: true });
-  });
-
-  test("reports the first malformed TypeScript configuration diagnostic", () => {
-    const root = repository();
-    write({ root, path: "tsconfig.json", contents: '{ "compilerOptions": { "module": 1 }' });
-    const ownerPath = write({
-      root,
-      path: "src/owner.ts",
-      contents: 'export const OWNER = ["draft", "published"] as const;\n',
-    });
-
-    expect(() =>
-      createCanonicalValuesTypeScriptProgram({
-        repositoryRoot: root,
-        rootNames: [ownerPath],
-        searchDirectory: join(root, "src"),
-      }),
-    ).toThrow("Compiler option 'module' requires a value of type string.");
-    rmSync(root, { force: true, recursive: true });
-  });
-
-  test.each([
-    {
-      extension: "tsx",
-      languageVariant: ts.LanguageVariant.JSX,
-      source: "export const view = <main />;\n",
-    },
-    {
-      extension: "ts",
-      languageVariant: ts.LanguageVariant.Standard,
-      source: "export const value = 1;\n",
-    },
-  ] as const)(
-    "parses a $extension source override with its script kind",
-    ({ extension, languageVariant, source }) => {
-      const root = repository();
-      const sourcePath = join(root, `src/owner.${extension}`);
-      const program = createCanonicalValuesTypeScriptProgram({
-        repositoryRoot: root,
-        rootNames: [sourcePath],
-        searchDirectory: join(root, "src"),
-        sourceOverrides: new Map([[sourcePath, source]]),
+    const it = test.extend("siblingConfigPaths", ({}, { onCleanup }) => {
+      rmSync(siblingRoot, { force: true, recursive: true });
+      mkdirSync(join(siblingRoot, "src"), { recursive: true });
+      onCleanup(() => {
+        rmSync(siblingRoot, { force: true, recursive: true });
       });
+      writeFileSync(join(siblingRoot, "tsconfig.json"), "{}");
+      return ["src/first", "src/second"].map((searchDirectory) =>
+        canonicalValuesTypeScriptConfigPath({
+          repositoryRoot: siblingRoot,
+          searchDirectory: join(siblingRoot, searchDirectory),
+        }),
+      );
+    });
 
-      expect(program.getSourceFile(sourcePath)?.languageVariant).toBe(languageVariant);
-      rmSync(root, { force: true, recursive: true });
-    },
-  );
+    it("resolve to one configuration identity", ({ siblingConfigPaths }) => {
+      expect(siblingConfigPaths).toStrictEqual([
+        join(siblingRoot, "tsconfig.json"),
+        join(siblingRoot, "tsconfig.json"),
+      ]);
+    });
+  });
+
+  describe("a nested configuration standing beside the repository configuration", () => {
+    const nestedRoot = join(tmpdir(), "canonical-values-typescript-program-nested");
+
+    const it = test.extend("nestedConfigPaths", ({}, { onCleanup }) => {
+      rmSync(nestedRoot, { force: true, recursive: true });
+      mkdirSync(join(nestedRoot, "src"), { recursive: true });
+      mkdirSync(join(nestedRoot, "packages/nested/src"), { recursive: true });
+      onCleanup(() => {
+        rmSync(nestedRoot, { force: true, recursive: true });
+      });
+      writeFileSync(join(nestedRoot, "tsconfig.json"), "{}");
+      writeFileSync(join(nestedRoot, "packages/nested/tsconfig.json"), "{}");
+      return ["src", "packages/nested/src"].map((searchDirectory) =>
+        canonicalValuesTypeScriptConfigPath({
+          repositoryRoot: nestedRoot,
+          searchDirectory: join(nestedRoot, searchDirectory),
+        }),
+      );
+    });
+
+    it("stay distinct program identities", ({ nestedConfigPaths }) => {
+      expect(nestedConfigPaths).toStrictEqual([
+        join(nestedRoot, "tsconfig.json"),
+        join(nestedRoot, "packages/nested/tsconfig.json"),
+      ]);
+    });
+  });
+
+  describe("a paths mapping declared by the nearest repository configuration", () => {
+    const mappingRoot = join(tmpdir(), "canonical-values-typescript-program-mapping");
+
+    const it = test.extend("mappedOwnerType", ({}, { onCleanup }) => {
+      rmSync(mappingRoot, { force: true, recursive: true });
+      mkdirSync(join(mappingRoot, "src"), { recursive: true });
+      onCleanup(() => {
+        rmSync(mappingRoot, { force: true, recursive: true });
+      });
+      writeFileSync(
+        join(mappingRoot, "tsconfig.json"),
+        JSON.stringify({
+          compilerOptions: { baseUrl: ".", paths: { "@internal/base": ["src/base.ts"] } },
+        }),
+      );
+      writeFileSync(join(mappingRoot, "src/base.ts"), BASE_SOURCE);
+      const ownerPath = join(mappingRoot, "src/owner.ts");
+      writeFileSync(ownerPath, OWNER_SOURCE);
+      const program = createCanonicalValuesTypeScriptProgram({
+        repositoryRoot: mappingRoot,
+        rootNames: [ownerPath],
+        searchDirectory: join(mappingRoot, "src"),
+      });
+      const [, ownerStatement] = program.getSourceFile(ownerPath)?.statements ?? [];
+      if (ownerStatement === undefined || !ts.isVariableStatement(ownerStatement)) {
+        throw new Error("owner.ts did not parse into a variable statement");
+      }
+      const [ownerDeclaration] = ownerStatement.declarationList.declarations;
+      if (ownerDeclaration === undefined) throw new Error("owner.ts declared no binding");
+      return program
+        .getTypeChecker()
+        .typeToString(program.getTypeChecker().getTypeAtLocation(ownerDeclaration.name));
+    });
+
+    it("widens the owner to the mapped tuple", ({ mappedOwnerType }) => {
+      expect(mappedOwnerType).toBe('readonly ["draft", "published"]');
+    });
+  });
+
+  describe("a configuration sitting above the repository root", () => {
+    const outsideConfigRoot = join(tmpdir(), "canonical-values-typescript-program-above");
+
+    const it = test.extend("unmappedOwnerType", ({}, { onCleanup }) => {
+      rmSync(outsideConfigRoot, { force: true, recursive: true });
+      mkdirSync(join(outsideConfigRoot, "nested/src"), { recursive: true });
+      onCleanup(() => {
+        rmSync(outsideConfigRoot, { force: true, recursive: true });
+      });
+      writeFileSync(
+        join(outsideConfigRoot, "tsconfig.json"),
+        JSON.stringify({
+          compilerOptions: { baseUrl: ".", paths: { "@internal/base": ["base.ts"] } },
+        }),
+      );
+      writeFileSync(join(outsideConfigRoot, "base.ts"), BASE_SOURCE);
+      const ownerPath = join(outsideConfigRoot, "nested/src/owner.ts");
+      writeFileSync(ownerPath, OWNER_SOURCE);
+      const program = createCanonicalValuesTypeScriptProgram({
+        repositoryRoot: join(outsideConfigRoot, "nested"),
+        rootNames: [ownerPath],
+        searchDirectory: join(outsideConfigRoot, "nested/src"),
+      });
+      const [, ownerStatement] = program.getSourceFile(ownerPath)?.statements ?? [];
+      if (ownerStatement === undefined || !ts.isVariableStatement(ownerStatement)) {
+        throw new Error("owner.ts did not parse into a variable statement");
+      }
+      const [ownerDeclaration] = ownerStatement.declarationList.declarations;
+      if (ownerDeclaration === undefined) throw new Error("owner.ts declared no binding");
+      return program
+        .getTypeChecker()
+        .typeToString(program.getTypeChecker().getTypeAtLocation(ownerDeclaration.name));
+    });
+
+    it("is left out of the program", ({ unmappedOwnerType }) => {
+      expect(unmappedOwnerType).toBe('readonly [...any[], "published"]');
+    });
+  });
+
+  describe("a configuration extending a file outside the repository", () => {
+    const outsideExtendsRoot = join(tmpdir(), "canonical-values-typescript-program-extends");
+
+    const it = test.extend("outsideExtendsFailure", ({}, { onCleanup }) => {
+      rmSync(outsideExtendsRoot, { force: true, recursive: true });
+      mkdirSync(join(outsideExtendsRoot, "nested/src"), { recursive: true });
+      onCleanup(() => {
+        rmSync(outsideExtendsRoot, { force: true, recursive: true });
+      });
+      writeFileSync(join(outsideExtendsRoot, "base.json"), JSON.stringify({ compilerOptions: {} }));
+      writeFileSync(
+        join(outsideExtendsRoot, "nested/tsconfig.json"),
+        JSON.stringify({ extends: "../base.json" }),
+      );
+      const ownerPath = join(outsideExtendsRoot, "nested/src/owner.ts");
+      writeFileSync(ownerPath, 'export const OWNER = ["draft", "published"] as const;\n');
+      const [failure] = attempt<ts.Program, Error>(() =>
+        createCanonicalValuesTypeScriptProgram({
+          repositoryRoot: join(outsideExtendsRoot, "nested"),
+          rootNames: [ownerPath],
+          searchDirectory: join(outsideExtendsRoot, "nested/src"),
+        }),
+      );
+      return failure === null ? null : failure.message;
+    });
+
+    it("is refused by name", ({ outsideExtendsFailure }) => {
+      expect(outsideExtendsFailure).toBe(
+        `TypeScript config extends outside the repository: ${join(outsideExtendsRoot, "base.json")}`,
+      );
+    });
+  });
+
+  describe("a paths target sitting outside the cache-bounded repository", () => {
+    const outsideTargetRoot = join(tmpdir(), "canonical-values-typescript-program-target");
+
+    const it = test.extend("outsideTargetFailure", ({}, { onCleanup }) => {
+      rmSync(outsideTargetRoot, { force: true, recursive: true });
+      mkdirSync(join(outsideTargetRoot, "nested/src"), { recursive: true });
+      onCleanup(() => {
+        rmSync(outsideTargetRoot, { force: true, recursive: true });
+      });
+      writeFileSync(join(outsideTargetRoot, "base.ts"), BASE_SOURCE);
+      writeFileSync(
+        join(outsideTargetRoot, "nested/tsconfig.json"),
+        JSON.stringify({
+          compilerOptions: { baseUrl: ".", paths: { "@external/base": ["../base.ts"] } },
+        }),
+      );
+      const ownerPath = join(outsideTargetRoot, "nested/src/owner.ts");
+      writeFileSync(
+        ownerPath,
+        'import { BASE } from "@external/base";\nexport const OWNER = [...BASE, "published"] as const;\n',
+      );
+      const [failure] = attempt<ts.Program, Error>(() =>
+        createCanonicalValuesTypeScriptProgram({
+          repositoryRoot: join(outsideTargetRoot, "nested"),
+          rootNames: [ownerPath],
+          searchDirectory: join(outsideTargetRoot, "nested/src"),
+        }),
+      );
+      return failure === null ? null : failure.message;
+    });
+
+    it("is refused by name", ({ outsideTargetFailure }) => {
+      expect(outsideTargetFailure).toBe(
+        `TypeScript dependency is outside the repository: ${join(outsideTargetRoot, "base.ts")}`,
+      );
+    });
+  });
+
+  describe("a malformed TypeScript configuration", () => {
+    const malformedRoot = join(tmpdir(), "canonical-values-typescript-program-malformed");
+
+    const it = test.extend("malformedConfigFailure", ({}, { onCleanup }) => {
+      rmSync(malformedRoot, { force: true, recursive: true });
+      mkdirSync(join(malformedRoot, "src"), { recursive: true });
+      onCleanup(() => {
+        rmSync(malformedRoot, { force: true, recursive: true });
+      });
+      writeFileSync(join(malformedRoot, "tsconfig.json"), '{ "compilerOptions": { "module": 1 }');
+      const ownerPath = join(malformedRoot, "src/owner.ts");
+      writeFileSync(ownerPath, 'export const OWNER = ["draft", "published"] as const;\n');
+      const [failure] = attempt<ts.Program, Error>(() =>
+        createCanonicalValuesTypeScriptProgram({
+          repositoryRoot: malformedRoot,
+          rootNames: [ownerPath],
+          searchDirectory: join(malformedRoot, "src"),
+        }),
+      );
+      return failure === null ? null : failure.message;
+    });
+
+    it("surfaces its first diagnostic", ({ malformedConfigFailure }) => {
+      expect(malformedConfigFailure).toBe(
+        "Compiler option 'module' requires a value of type string.",
+      );
+    });
+  });
+
+  describe("a tsx source override", () => {
+    const tsxRoot = join(tmpdir(), "canonical-values-typescript-program-tsx");
+
+    const it = test.extend("tsxOverrideSyntaxErrors", ({}, { onCleanup }) => {
+      rmSync(tsxRoot, { force: true, recursive: true });
+      mkdirSync(join(tsxRoot, "src"), { recursive: true });
+      onCleanup(() => {
+        rmSync(tsxRoot, { force: true, recursive: true });
+      });
+      const sourcePath = join(tsxRoot, "src/owner.tsx");
+      const program = createCanonicalValuesTypeScriptProgram({
+        repositoryRoot: tsxRoot,
+        rootNames: [sourcePath],
+        searchDirectory: join(tsxRoot, "src"),
+        sourceOverrides: new Map([[sourcePath, "export const view = <main />;\n"]]),
+      });
+      const overriddenSource = program.getSourceFile(sourcePath);
+      if (overriddenSource === undefined) throw new Error("the source override was not parsed");
+      return program
+        .getSyntacticDiagnostics(overriddenSource)
+        .map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"));
+    });
+
+    it("carries jsx that only the jsx script kind accepts", ({ tsxOverrideSyntaxErrors }) => {
+      expect(tsxOverrideSyntaxErrors).toStrictEqual([]);
+    });
+  });
+
+  describe("a ts source override", () => {
+    const tsRoot = join(tmpdir(), "canonical-values-typescript-program-ts");
+
+    const it = test.extend("tsOverrideSyntaxErrors", ({}, { onCleanup }) => {
+      rmSync(tsRoot, { force: true, recursive: true });
+      mkdirSync(join(tsRoot, "src"), { recursive: true });
+      onCleanup(() => {
+        rmSync(tsRoot, { force: true, recursive: true });
+      });
+      const sourcePath = join(tsRoot, "src/owner.ts");
+      const program = createCanonicalValuesTypeScriptProgram({
+        repositoryRoot: tsRoot,
+        rootNames: [sourcePath],
+        searchDirectory: join(tsRoot, "src"),
+        sourceOverrides: new Map([[sourcePath, 'export const label = <string>"draft";\n']]),
+      });
+      const overriddenSource = program.getSourceFile(sourcePath);
+      if (overriddenSource === undefined) throw new Error("the source override was not parsed");
+      return program
+        .getSyntacticDiagnostics(overriddenSource)
+        .map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"));
+    });
+
+    it("carries an assertion that only the standard script kind accepts", ({
+      tsOverrideSyntaxErrors,
+    }) => {
+      expect(tsOverrideSyntaxErrors).toStrictEqual([]);
+    });
+  });
 });

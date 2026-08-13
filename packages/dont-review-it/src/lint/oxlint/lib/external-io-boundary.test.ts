@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { describe, expect, onTestFinished, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { replacedModuleAt } from "./external-io-boundary.ts";
 
@@ -39,71 +39,166 @@ const VOCABULARY = {
   packages: new Set(["undici"]),
 };
 
-const workspaceRoot = (): string => {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "external-io-boundary-")));
-  onTestFinished(() => {
-    rmSync(root, { recursive: true, force: true });
-  });
-
-  for (const [relativePath, writtenContent] of Object.entries(WORKSPACE_FILES)) {
-    const path = join(root, relativePath);
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, writtenContent);
-  }
-  for (const [linkPath, linkedDirectory] of Object.entries(LINKED_PACKAGES)) {
-    const link = join(root, linkPath);
-    mkdirSync(dirname(link), { recursive: true });
-    symlinkSync(join(root, linkedDirectory), link);
-  }
-  return root;
-};
-
-const replacedFrom = (specifier: string) =>
-  replacedModuleAt({
-    specifier,
-    fromFile: join(workspaceRoot(), "packages/mailer/src/send.test.ts"),
-    vocabulary: VOCABULARY,
-  });
+const IMPORTING_FILE = "packages/mailer/src/send.test.ts";
 
 describe("external-io-boundary", () => {
-  test("a module this repository does not hold is a boundary of its own", () => {
-    expect(replacedFrom("node:fs")).toStrictEqual({ kind: "outsideTheRepository" });
+  const workspaceTest = test.extend("workspaceRoot", ({}, { onCleanup }) => {
+    const workspaceRoot = realpathSync(mkdtempSync(join(tmpdir(), "external-io-boundary-")));
+    onCleanup(() => {
+      rmSync(workspaceRoot, { recursive: true, force: true });
+    });
+
+    for (const [relativePath, writtenContent] of Object.entries(WORKSPACE_FILES)) {
+      const writtenFile = join(workspaceRoot, relativePath);
+      mkdirSync(dirname(writtenFile), { recursive: true });
+      writeFileSync(writtenFile, writtenContent);
+    }
+    for (const [linkPath, linkedDirectory] of Object.entries(LINKED_PACKAGES)) {
+      const link = join(workspaceRoot, linkPath);
+      mkdirSync(dirname(link), { recursive: true });
+      symlinkSync(join(workspaceRoot, linkedDirectory), link);
+    }
+    return workspaceRoot;
   });
 
-  test("a module that reaches a named module itself owns the boundary", () => {
-    expect(replacedFrom("./transport.ts")).toStrictEqual({ kind: "ownsExternalIo" });
-  });
+  describe("a module this repository does not hold", () => {
+    const it = workspaceTest.extend("replacementOfAnUnheldModule", ({ workspaceRoot }) =>
+      replacedModuleAt({
+        specifier: "node:fs",
+        fromFile: join(workspaceRoot, IMPORTING_FILE),
+        vocabulary: VOCABULARY,
+      }),
+    );
 
-  test("a module that reaches a named package itself owns the boundary", () => {
-    expect(replacedFrom("./client.ts")).toStrictEqual({ kind: "ownsExternalIo" });
-  });
-
-  test("a module that reaches the outside through another one stands in front of it", () => {
-    expect(replacedFrom("./send.ts")).toStrictEqual({
-      kind: "behindOwnModules",
-      boundary: "packages/mailer/src/transport.ts",
+    it("is a boundary of its own", ({ replacementOfAnUnheldModule }) => {
+      expect(replacementOfAnUnheldModule).toStrictEqual({ kind: "outsideTheRepository" });
     });
   });
 
-  test("a module two steps in front of the boundary is read the same way as one", () => {
-    expect(replacedFrom("./queue.ts")).toStrictEqual({
-      kind: "behindOwnModules",
-      boundary: "packages/mailer/src/transport.ts",
+  describe("a module that reaches a named module", () => {
+    const it = workspaceTest.extend(
+      "replacementOfAModuleReachingANamedModule",
+      ({ workspaceRoot }) =>
+        replacedModuleAt({
+          specifier: "./transport.ts",
+          fromFile: join(workspaceRoot, IMPORTING_FILE),
+          vocabulary: VOCABULARY,
+        }),
+    );
+
+    it("owns the boundary itself", ({ replacementOfAModuleReachingANamedModule }) => {
+      expect(replacementOfAModuleReachingANamedModule).toStrictEqual({ kind: "ownsExternalIo" });
     });
   });
 
-  test("a module that reaches nothing outside is determined by what it is handed", () => {
-    expect(replacedFrom("./compose.ts")).toStrictEqual({ kind: "determinedByItsInput" });
-  });
+  describe("a module that reaches a named package", () => {
+    const it = workspaceTest.extend(
+      "replacementOfAModuleReachingANamedPackage",
+      ({ workspaceRoot }) =>
+        replacedModuleAt({
+          specifier: "./client.ts",
+          fromFile: join(workspaceRoot, IMPORTING_FILE),
+          vocabulary: VOCABULARY,
+        }),
+    );
 
-  test("a package named by its own name is read through the entries it publishes", () => {
-    expect(replacedFrom("@fixture/mailer")).toStrictEqual({
-      kind: "behindOwnModules",
-      boundary: "packages/mailer/src/transport.ts",
+    it("owns the boundary the same way a named module does", ({
+      replacementOfAModuleReachingANamedPackage,
+    }) => {
+      expect(replacementOfAModuleReachingANamedPackage).toStrictEqual({ kind: "ownsExternalIo" });
     });
   });
 
-  test("a package whose published entry is absent reaches nothing", () => {
-    expect(replacedFrom("@fixture/silent")).toStrictEqual({ kind: "determinedByItsInput" });
+  describe("a module that reaches the outside through another one", () => {
+    const it = workspaceTest.extend(
+      "replacementOfAModuleOneStepInFrontOfTheBoundary",
+      ({ workspaceRoot }) =>
+        replacedModuleAt({
+          specifier: "./send.ts",
+          fromFile: join(workspaceRoot, IMPORTING_FILE),
+          vocabulary: VOCABULARY,
+        }),
+    );
+
+    it("stands in front of the module that holds the boundary", ({
+      replacementOfAModuleOneStepInFrontOfTheBoundary,
+    }) => {
+      expect(replacementOfAModuleOneStepInFrontOfTheBoundary).toStrictEqual({
+        kind: "behindOwnModules",
+        boundary: "packages/mailer/src/transport.ts",
+      });
+    });
+  });
+
+  describe("a module two steps in front of the boundary", () => {
+    const it = workspaceTest.extend(
+      "replacementOfAModuleTwoStepsInFrontOfTheBoundary",
+      ({ workspaceRoot }) =>
+        replacedModuleAt({
+          specifier: "./queue.ts",
+          fromFile: join(workspaceRoot, IMPORTING_FILE),
+          vocabulary: VOCABULARY,
+        }),
+    );
+
+    it("is read the same way as one step in front", ({
+      replacementOfAModuleTwoStepsInFrontOfTheBoundary,
+    }) => {
+      expect(replacementOfAModuleTwoStepsInFrontOfTheBoundary).toStrictEqual({
+        kind: "behindOwnModules",
+        boundary: "packages/mailer/src/transport.ts",
+      });
+    });
+  });
+
+  describe("a module that reaches nothing outside", () => {
+    const it = workspaceTest.extend(
+      "replacementOfAModuleReachingNothingOutside",
+      ({ workspaceRoot }) =>
+        replacedModuleAt({
+          specifier: "./compose.ts",
+          fromFile: join(workspaceRoot, IMPORTING_FILE),
+          vocabulary: VOCABULARY,
+        }),
+    );
+
+    it("is determined by what it is handed", ({ replacementOfAModuleReachingNothingOutside }) => {
+      expect(replacementOfAModuleReachingNothingOutside).toStrictEqual({
+        kind: "determinedByItsInput",
+      });
+    });
+  });
+
+  describe("a package named by its own name", () => {
+    const it = workspaceTest.extend("replacementOfAPackageNamedByItsOwnName", ({ workspaceRoot }) =>
+      replacedModuleAt({
+        specifier: "@fixture/mailer",
+        fromFile: join(workspaceRoot, IMPORTING_FILE),
+        vocabulary: VOCABULARY,
+      }),
+    );
+
+    it("is read through the entries it publishes", ({ replacementOfAPackageNamedByItsOwnName }) => {
+      expect(replacementOfAPackageNamedByItsOwnName).toStrictEqual({
+        kind: "behindOwnModules",
+        boundary: "packages/mailer/src/transport.ts",
+      });
+    });
+  });
+
+  describe("a package whose published entry is absent", () => {
+    const it = workspaceTest.extend("replacementOfAPackageWithAnAbsentEntry", ({ workspaceRoot }) =>
+      replacedModuleAt({
+        specifier: "@fixture/silent",
+        fromFile: join(workspaceRoot, IMPORTING_FILE),
+        vocabulary: VOCABULARY,
+      }),
+    );
+
+    it("reaches nothing", ({ replacementOfAPackageWithAnAbsentEntry }) => {
+      expect(replacementOfAPackageWithAnAbsentEntry).toStrictEqual({
+        kind: "determinedByItsInput",
+      });
+    });
   });
 });

@@ -5,104 +5,250 @@ import { handedValues, partsOf } from "./expression-parts.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
-const writtenIn = (source: string): ESTree.Expression => {
-  const statement = parseSync("spec.ts", `${source};`).program.body[0] as ESTree.Statement;
-  return (statement as ESTree.ExpressionStatement).expression;
-};
+describe("partsOf", () => {
+  describe("a call on a member", () => {
+    const it = test.extend("handedOverTypes", () => {
+      const statement = parseSync("spec.ts", "summarise(input).sort(order);").program
+        .body[0] as ESTree.ExpressionStatement;
+      return partsOf(statement.expression).map((part) => part.type);
+    });
 
-const expressionIn = (source: string): ESTree.Expression => {
-  const written = writtenIn(source);
-  return written.type === "ParenthesizedExpression" ? written.expression : written;
-};
-
-const spellingsIn = (source: string): readonly string[] =>
-  partsOf(expressionIn(source)).map((part) => part.type);
-
-describe("expression parts", () => {
-  test("a call hands over its receiver and its arguments", () => {
-    expect(spellingsIn("summarise(input).sort(order)")).toStrictEqual([
-      "CallExpression",
-      "Identifier",
-    ]);
+    it("hands over its receiver and its arguments", ({ handedOverTypes }) => {
+      expect(handedOverTypes).toStrictEqual(["CallExpression", "Identifier"]);
+    });
   });
 
-  test("a call on a bare name hands over its arguments alone", () => {
-    expect(spellingsIn("summarise(input)")).toStrictEqual(["Identifier"]);
+  describe("a call on a bare name", () => {
+    const it = test.extend("handedOverTypes", () => {
+      const statement = parseSync("spec.ts", "summarise(input);").program
+        .body[0] as ESTree.ExpressionStatement;
+      return partsOf(statement.expression).map((part) => part.type);
+    });
+
+    it("hands over its arguments alone", ({ handedOverTypes }) => {
+      expect(handedOverTypes).toStrictEqual(["Identifier"]);
+    });
   });
 
-  test("a construction hands over its arguments", () => {
-    expect(spellingsIn("new Report(input)")).toStrictEqual(["Identifier"]);
+  describe("a construction", () => {
+    const it = test.extend("handedOverTypes", () => {
+      const statement = parseSync("spec.ts", "new Report(input);").program
+        .body[0] as ESTree.ExpressionStatement;
+      return partsOf(statement.expression).map((part) => part.type);
+    });
+
+    it("hands over its arguments", ({ handedOverTypes }) => {
+      expect(handedOverTypes).toStrictEqual(["Identifier"]);
+    });
   });
 
-  test("a member access hands over what it reads through", () => {
-    expect(spellingsIn("summarise(input).rows")).toStrictEqual(["CallExpression"]);
-    expect(spellingsIn("summarise(input)[key]")).toStrictEqual(["CallExpression"]);
+  describe("a member access written with a dot", () => {
+    const it = test.extend("handedOverTypes", () => {
+      const statement = parseSync("spec.ts", "summarise(input).rows;").program
+        .body[0] as ESTree.ExpressionStatement;
+      return partsOf(statement.expression).map((part) => part.type);
+    });
+
+    it("hands over what it reads through", ({ handedOverTypes }) => {
+      expect(handedOverTypes).toStrictEqual(["CallExpression"]);
+    });
   });
 
-  test("a tagged template hands over its tag and its substitutions", () => {
-    expect(spellingsIn("sql`${input}`")).toStrictEqual(["Identifier", "Identifier"]);
+  describe("a member access written as a subscript", () => {
+    const it = test.extend("handedOverTypes", () => {
+      const statement = parseSync("spec.ts", "summarise(input)[key];").program
+        .body[0] as ESTree.ExpressionStatement;
+      return partsOf(statement.expression).map((part) => part.type);
+    });
+
+    it("hands over what it reads through", ({ handedOverTypes }) => {
+      expect(handedOverTypes).toStrictEqual(["CallExpression"]);
+    });
   });
 
-  test("a template hands over its substitutions", () => {
-    expect(spellingsIn("`${input}`")).toStrictEqual(["Identifier"]);
+  describe("a tagged template", () => {
+    const it = test.extend("handedOverTypes", () => {
+      const statement = parseSync("spec.ts", "sql`${input}`;").program
+        .body[0] as ESTree.ExpressionStatement;
+      return partsOf(statement.expression).map((part) => part.type);
+    });
+
+    it("hands over its tag and its substitutions", ({ handedOverTypes }) => {
+      expect(handedOverTypes).toStrictEqual(["Identifier", "Identifier"]);
+    });
   });
 
-  test("a collection hands over its elements, spreads included and holes dropped", () => {
-    expect(spellingsIn("[, input, ...rest]")).toStrictEqual(["Identifier", "Identifier"]);
+  describe("a template", () => {
+    const it = test.extend("handedOverTypes", () => {
+      const statement = parseSync("spec.ts", "`${input}`;").program
+        .body[0] as ESTree.ExpressionStatement;
+      return partsOf(statement.expression).map((part) => part.type);
+    });
+
+    it("hands over its substitutions", ({ handedOverTypes }) => {
+      expect(handedOverTypes).toStrictEqual(["Identifier"]);
+    });
   });
 
-  test("an object hands over its values, spreads included", () => {
-    expect(spellingsIn("({ rows: input, ...rest })")).toStrictEqual(["Identifier", "Identifier"]);
+  describe("a collection", () => {
+    const it = test.extend("handedOverTypes", () => {
+      const statement = parseSync("spec.ts", "[, input, ...rest];").program
+        .body[0] as ESTree.ExpressionStatement;
+      return partsOf(statement.expression).map((part) => part.type);
+    });
+
+    it("hands over its elements, spreads included and holes dropped", ({ handedOverTypes }) => {
+      expect(handedOverTypes).toStrictEqual(["Identifier", "Identifier"]);
+    });
   });
 
-  test("a choice hands over the question and both answers", () => {
-    expect(spellingsIn("empty ? left : right")).toStrictEqual([
-      "Identifier",
-      "Identifier",
-      "Identifier",
-    ]);
+  describe("an object", () => {
+    const it = test.extend("handedOverTypes", () => {
+      const statement = parseSync("spec.ts", "({ rows: input, ...rest });").program
+        .body[0] as ESTree.ExpressionStatement;
+      const bare = statement.expression;
+      const written = bare.type === "ParenthesizedExpression" ? bare.expression : bare;
+      return partsOf(written).map((part) => part.type);
+    });
+
+    it("hands over its values, spreads included", ({ handedOverTypes }) => {
+      expect(handedOverTypes).toStrictEqual(["Identifier", "Identifier"]);
+    });
   });
 
-  test("a comparison hands over both sides", () => {
-    expect(spellingsIn("left + right")).toStrictEqual(["Identifier", "Identifier"]);
+  describe("a choice", () => {
+    const it = test.extend("handedOverTypes", () => {
+      const statement = parseSync("spec.ts", "empty ? left : right;").program
+        .body[0] as ESTree.ExpressionStatement;
+      return partsOf(statement.expression).map((part) => part.type);
+    });
+
+    it("hands over the question and both answers", ({ handedOverTypes }) => {
+      expect(handedOverTypes).toStrictEqual(["Identifier", "Identifier", "Identifier"]);
+    });
   });
 
-  test("a comparison against a private name hands over the side that holds a value", () => {
-    const held = parseSync("spec.ts", "class Reports {\n  #brand;\n  held = #brand in input;\n}")
-      .program.body[0] as ESTree.Statement;
-    const declared = (held as ESTree.Class).body.body[1] as ESTree.PropertyDefinition;
+  describe("a comparison", () => {
+    const it = test.extend("handedOverTypes", () => {
+      const statement = parseSync("spec.ts", "left + right;").program
+        .body[0] as ESTree.ExpressionStatement;
+      return partsOf(statement.expression).map((part) => part.type);
+    });
 
-    expect(partsOf(declared.value as ESTree.Expression).map((part) => part.type)).toStrictEqual([
-      "Identifier",
-    ]);
+    it("hands over both sides", ({ handedOverTypes }) => {
+      expect(handedOverTypes).toStrictEqual(["Identifier", "Identifier"]);
+    });
   });
 
-  test("a fallback hands over both sides", () => {
-    expect(spellingsIn("cached ?? produced")).toStrictEqual(["Identifier", "Identifier"]);
+  describe("a comparison against a private name", () => {
+    const it = test.extend("handedOverTypes", () => {
+      const declared = parseSync(
+        "spec.ts",
+        "class Reports {\n  #brand;\n  held = #brand in input;\n}",
+      ).program.body[0] as ESTree.Class;
+      const written = declared.body.body[1] as ESTree.PropertyDefinition;
+      return partsOf(written.value as ESTree.Expression).map((part) => part.type);
+    });
+
+    it("hands over the side that holds a value", ({ handedOverTypes }) => {
+      expect(handedOverTypes).toStrictEqual(["Identifier"]);
+    });
   });
 
-  test("a sequence hands over every step", () => {
-    expect(spellingsIn("(record(), produced)")).toStrictEqual(["CallExpression", "Identifier"]);
+  describe("a fallback", () => {
+    const it = test.extend("handedOverTypes", () => {
+      const statement = parseSync("spec.ts", "cached ?? produced;").program
+        .body[0] as ESTree.ExpressionStatement;
+      return partsOf(statement.expression).map((part) => part.type);
+    });
+
+    it("hands over both sides", ({ handedOverTypes }) => {
+      expect(handedOverTypes).toStrictEqual(["Identifier", "Identifier"]);
+    });
   });
 
-  test("an operator applied to one value hands that value over", () => {
-    expect(spellingsIn("-produced")).toStrictEqual(["Identifier"]);
+  describe("a sequence", () => {
+    const it = test.extend("handedOverTypes", () => {
+      const statement = parseSync("spec.ts", "(record(), produced);").program
+        .body[0] as ESTree.ExpressionStatement;
+      const bare = statement.expression;
+      const written = bare.type === "ParenthesizedExpression" ? bare.expression : bare;
+      return partsOf(written).map((part) => part.type);
+    });
+
+    it("hands over every step", ({ handedOverTypes }) => {
+      expect(handedOverTypes).toStrictEqual(["CallExpression", "Identifier"]);
+    });
   });
 
-  test("an assignment hands over what is being written", () => {
-    expect(spellingsIn("(carried = produced)")).toStrictEqual(["Identifier"]);
+  describe("an operator applied to one value", () => {
+    const it = test.extend("handedOverTypes", () => {
+      const statement = parseSync("spec.ts", "-produced;").program
+        .body[0] as ESTree.ExpressionStatement;
+      return partsOf(statement.expression).map((part) => part.type);
+    });
+
+    it("hands that value over", ({ handedOverTypes }) => {
+      expect(handedOverTypes).toStrictEqual(["Identifier"]);
+    });
   });
 
-  test("a pair of parentheses hands over what it wraps", () => {
-    expect(partsOf(writtenIn("(produced)")).map((part) => part.type)).toStrictEqual(["Identifier"]);
+  describe("an assignment", () => {
+    const it = test.extend("handedOverTypes", () => {
+      const statement = parseSync("spec.ts", "(carried = produced);").program
+        .body[0] as ESTree.ExpressionStatement;
+      const bare = statement.expression;
+      const written = bare.type === "ParenthesizedExpression" ? bare.expression : bare;
+      return partsOf(written).map((part) => part.type);
+    });
+
+    it("hands over what is being written", ({ handedOverTypes }) => {
+      expect(handedOverTypes).toStrictEqual(["Identifier"]);
+    });
   });
 
-  test("a value that carries nothing further hands over nothing", () => {
-    expect(spellingsIn('"a"')).toStrictEqual([]);
-    expect(spellingsIn("produced")).toStrictEqual([]);
+  describe("a pair of parentheses", () => {
+    const it = test.extend("handedOverTypes", () => {
+      const statement = parseSync("spec.ts", "(produced);").program
+        .body[0] as ESTree.ExpressionStatement;
+      return partsOf(statement.expression).map((part) => part.type);
+    });
+
+    it("hands over what it wraps", ({ handedOverTypes }) => {
+      expect(handedOverTypes).toStrictEqual(["Identifier"]);
+    });
   });
 
-  test("a list of handed values drops holes and unwraps spreads", () => {
-    expect(handedValues([])).toStrictEqual([]);
+  describe("a string written out", () => {
+    const it = test.extend("handedOverTypes", () => {
+      const statement = parseSync("spec.ts", '"a";').program.body[0] as ESTree.ExpressionStatement;
+      return partsOf(statement.expression).map((part) => part.type);
+    });
+
+    it("carries nothing further and hands over nothing", ({ handedOverTypes }) => {
+      expect(handedOverTypes).toStrictEqual([]);
+    });
+  });
+
+  describe("a bare name", () => {
+    const it = test.extend("handedOverTypes", () => {
+      const statement = parseSync("spec.ts", "produced;").program
+        .body[0] as ESTree.ExpressionStatement;
+      return partsOf(statement.expression).map((part) => part.type);
+    });
+
+    it("carries nothing further and hands over nothing", ({ handedOverTypes }) => {
+      expect(handedOverTypes).toStrictEqual([]);
+    });
+  });
+});
+
+describe("handedValues", () => {
+  describe("a list holding no element", () => {
+    const it = test.extend("handedOverValues", () => handedValues([]));
+
+    it("drops holes and unwraps spreads and hands over nothing", ({ handedOverValues }) => {
+      expect(handedOverValues).toStrictEqual([]);
+    });
   });
 });

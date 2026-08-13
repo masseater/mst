@@ -1,7 +1,7 @@
 import { accessSync, constants } from "node:fs";
 import { delimiter, join } from "node:path";
 
-import { attempt } from "es-toolkit";
+import { attempt, memoize } from "es-toolkit";
 
 const GIT_FILE_NAMES: readonly string[] = ["git.exe", "git"];
 
@@ -13,19 +13,12 @@ const gitFileIn = (directory: string): string | null =>
     return unreachableFile === null;
   }) ?? null;
 
-const gitPathBySearchPath = new Map<string, string>();
-
-export const gitExecutablePath = (searchPath: string | undefined): string => {
-  const searchedPath = searchPath ?? "";
-  const knownGitPath = gitPathBySearchPath.get(searchedPath);
-  if (knownGitPath !== undefined) return knownGitPath;
-
-  const discoveredGitPath =
-    searchedPath
+export const gitExecutablePath: (searchPath: string | undefined) => string = memoize(
+  (searchPath: string | undefined): string =>
+    (searchPath ?? "")
       .split(delimiter)
       .filter((directory) => directory !== "")
       .reduce<string | null>((discovered, directory) => discovered ?? gitFileIn(directory), null) ??
-    "git";
-  gitPathBySearchPath.set(searchedPath, discoveredGitPath);
-  return discoveredGitPath;
-};
+    "git",
+  { getCacheKey: (searchPath: string | undefined) => searchPath ?? "" },
+);

@@ -1,5 +1,6 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
 import { ancestorsOf } from "../lib/ast-node.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { resolveBinding, type ScopeLookup } from "../lib/resolved-bindings.ts";
 import {
   isAssertionEntryCall,
@@ -172,12 +173,15 @@ const inlineRecordOf = (call: ESTree.CallExpression): string | null => {
   return staticSpelling(last);
 };
 
-const runtimeImportsOf = (asked: {
+const runtimeImportsOf = ({
+  program,
+  modules,
+}: {
   readonly program: ESTree.Program;
   readonly modules: ReadonlySet<string>;
 }): RuntimeImports => {
-  const specifiers = asked.program.body.flatMap((statement) =>
-    statement.type === "ImportDeclaration" && asked.modules.has(statement.source.value)
+  const specifiers = program.body.flatMap((statement) =>
+    statement.type === "ImportDeclaration" && modules.has(statement.source.value)
       ? statement.specifiers
       : [],
   );
@@ -204,27 +208,32 @@ const runtimeImportsOf = (asked: {
   };
 };
 
-const lookupOf = (asked: {
+const lookupOf = ({
+  imports,
+  hostTypes,
+  scopeAt,
+}: {
   readonly imports: RuntimeImports;
   readonly hostTypes: ReadonlySet<string>;
   readonly scopeAt: ScopeLookup;
 }): HostTypeLookup => ({
-  named: (spelledName, at) => {
-    const imported = asked.imports.names.get(spelledName);
-    if (imported !== undefined) return asked.hostTypes.has(imported) ? imported : null;
-    if (!asked.hostTypes.has(spelledName)) return null;
-    return resolveBinding(asked.scopeAt(at), spelledName) === null ? spelledName : null;
+  named: (spelling, at) => {
+    const imported = imports.names.get(spelling);
+    if (imported !== undefined) return hostTypes.has(imported) ? imported : null;
+    if (!hostTypes.has(spelling)) return null;
+    return resolveBinding(scopeAt(at), spelling) === null ? spelling : null;
   },
   qualified: (namespace, member) =>
-    asked.imports.namespaces.has(namespace) && asked.hostTypes.has(member) ? member : null,
+    imports.namespaces.has(namespace) && hostTypes.has(member) ? member : null,
 });
 
-const specReaderOf = (asked: {
+const specReaderOf = ({
+  lookup,
+  scopeAt,
+}: {
   readonly lookup: HostTypeLookup;
   readonly scopeAt: ScopeLookup;
 }): SpecReader => {
-  const { lookup, scopeAt } = asked;
-
   const settledInitializerOf = (
     identifier: ESTree.IdentifierReference,
   ): ESTree.Expression | null => {
@@ -312,20 +321,23 @@ const namedFileRecordOf = (call: ESTree.CallExpression, filename: string): reado
   return fileRecord === null ? [] : [fileRecord];
 };
 
-const recordsAt = (asked: {
+const recordsAt = ({
+  site,
+  keys,
+  filename,
+}: {
   readonly site: SnapshotMatcherSite;
   readonly keys: SnapshotEntryKeys | undefined;
   readonly filename: string;
 }): readonly string[] => {
-  const { site, keys, filename } = asked;
   if (site.matcher === FILE_RECORD_MATCHER) return namedFileRecordOf(site.node, filename);
   if (!INLINE_SPELLING_BY_EXTERNAL.has(site.matcher)) {
     const inlineRecord = inlineRecordOf(site.node);
     return inlineRecord === null ? [] : [inlineRecord];
   }
   if (keys?.kind !== "spelled") return [];
-  return keys.keys.flatMap((entryKey) => {
-    const externalRecord = externalRecordOf(filename, entryKey);
+  return keys.keys.flatMap((snapshotKey) => {
+    const externalRecord = externalRecordOf(filename, snapshotKey);
     return externalRecord === null ? [] : [externalRecord];
   });
 };
@@ -370,7 +382,6 @@ export const noVacuousHostObjectEquality = createDontReviewItRule({
       modules: runtimeModulesFrom(inspection.options),
     });
     const reader = specReaderOf({ lookup: lookupOf({ imports, hostTypes, scopeAt }), scopeAt });
-    const recordings = new Set<SnapshotRecording>();
     const matcher = parsedValueMatcherFrom(inspection.options);
 
     const reportComparison = (site: ComparisonSite): void => {
@@ -386,11 +397,13 @@ export const noVacuousHostObjectEquality = createDontReviewItRule({
 
     const reportSnapshot = (
       recording: SnapshotRecording,
-      writtenRecords: readonly string[],
+      snapshotRecords: readonly string[],
     ): void => {
-      const [found] = writtenRecords.flatMap((written) => {
-        const hostType = emptyBodyConstructorOf(written);
-        return hostType === null || !hostTypes.has(hostType) ? [] : [[written, hostType] as const];
+      const [found] = snapshotRecords.flatMap((snapshotRecord) => {
+        const hostType = emptyBodyConstructorOf(snapshotRecord);
+        return hostType === null || !hostTypes.has(hostType)
+          ? []
+          : [[snapshotRecord, hostType] as const];
       });
       if (found === undefined) return;
 
@@ -405,24 +418,23 @@ export const noVacuousHostObjectEquality = createDontReviewItRule({
 
     return {
       CallExpression(node: ESTree.CallExpression) {
-        const recorded = snapshotRecordingOf(node);
-        if (recorded !== null) {
-          recordings.add(recorded);
-          return;
-        }
+        if (snapshotRecordingOf(node) !== null) return;
+
         const site = comparisonSiteOf(node);
         if (site !== null) reportComparison(site);
       },
-      "Program:exit"() {
-        const taken = [...recordings];
+      "Program:exit"(program: ESTree.Program) {
+        const taken = nodesOfType(program, "CallExpression").flatMap(
+          (node) => snapshotRecordingOf(node) ?? [],
+        );
         const resolved = entryKeysOf(taken.map((recording) => recording.site));
         for (const [index, recording] of taken.entries()) {
-          const writtenRecords = recordsAt({
+          const snapshotRecords = recordsAt({
             site: recording.site,
             keys: resolved[index],
             filename: inspection.filename,
           });
-          reportSnapshot(recording, writtenRecords);
+          reportSnapshot(recording, snapshotRecords);
         }
       },
     };

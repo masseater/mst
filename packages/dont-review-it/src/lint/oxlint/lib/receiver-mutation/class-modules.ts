@@ -1,7 +1,7 @@
 import { readTextFile } from "../canonical-values/source-files.ts";
 import { repositoryFilesFor } from "../setup-modules/specifier-resolution.ts";
 
-import type { ImportedName } from "./receiver-types.ts";
+import type { ImportedName } from "../spec-syntax/module-declarations.ts";
 
 export type ClassModule = {
   readonly path: string;

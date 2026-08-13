@@ -1,11 +1,12 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { isSpecFile, specFileSuffixesFrom } from "../lib/spec-syntax/spec-files.ts";
 import { unwrapSubject } from "../lib/spec-syntax/subject-expressions.ts";
 import { TABLE_DRIVEN_MEMBERS } from "../lib/spec-syntax/table-driven-titles.ts";
 import {
   declaresTestBlock,
-  groupingBlockBindings,
-  testBlockBindings,
+  groupingBlockRootNames,
+  testBlockRootNames,
   testCallbacksOf,
 } from "../lib/spec-syntax/test-block-declarations.ts";
 import {
@@ -73,6 +74,22 @@ type NameOrigins = {
   readonly imported: ReadonlySet<string>;
   readonly initializers: ReadonlyMap<string, ESTree.Expression>;
 };
+
+const originsIn = (program: ESTree.Program): NameOrigins => ({
+  imported: new Set(
+    nodesOfType(program, "ImportDeclaration").flatMap((declaration) =>
+      declaration.specifiers.map((specifier) => specifier.local.name),
+    ),
+  ),
+  initializers: new Map(
+    nodesOfType(program, "VariableDeclarator").flatMap(
+      (declarator): readonly (readonly [string, ESTree.Expression])[] =>
+        declarator.id.type === "Identifier" && declarator.init !== null
+          ? [[declarator.id.name, declarator.init]]
+          : [],
+    ),
+  ),
+});
 
 const isImportBound = ({
   name,
@@ -185,34 +202,13 @@ export const requireTestBlockForSpecFile = createDontReviewItRule({
   create(inspection) {
     if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
-    const blockBindings = testBlockBindings();
-    const groupBindings = groupingBlockBindings();
-    const calls = new Set<ESTree.CallExpression>();
-    const imported = new Set<string>();
-    const initializers = new Map<string, ESTree.Expression>();
-
     return {
-      ImportDeclaration(node: ESTree.ImportDeclaration) {
-        blockBindings.takeImport(node);
-        groupBindings.takeImport(node);
-        for (const specifier of node.specifiers) imported.add(specifier.local.name);
-      },
-      VariableDeclarator(node: ESTree.VariableDeclarator) {
-        blockBindings.takeLocalBinding(node);
-        groupBindings.takeLocalBinding(node);
-        if (node.id.type === "Identifier" && node.init !== null) {
-          initializers.set(node.id.name, node.init);
-        }
-      },
-      CallExpression(node: ESTree.CallExpression) {
-        calls.add(node);
-      },
       "Program:exit"(node: ESTree.Program) {
         const messageId = messageIdFor({
-          calls: [...calls],
-          blockNames: blockBindings.rootNames(),
-          groupNames: groupBindings.rootNames(),
-          origins: { imported, initializers },
+          calls: nodesOfType(node, "CallExpression"),
+          blockNames: testBlockRootNames(node),
+          groupNames: groupingBlockRootNames(node),
+          origins: originsIn(node),
         });
         if (messageId === null) return;
         inspection.report({ node, messageId });

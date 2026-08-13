@@ -1,6 +1,8 @@
 import { existsSync } from "node:fs";
 import { resolve, sep } from "node:path";
 
+import { memoize } from "es-toolkit";
+
 import { createDontReviewItRule } from "../../../create-rule.ts";
 import { segmentsOf } from "../lib/path-segments.ts";
 
@@ -10,15 +12,7 @@ const DEFAULT_TEST_FILE_SUFFIXES = [".test.ts", ".test.tsx", ".spec.ts", ".spec.
 
 const TEST_ONLY_DIRECTORY_NAMES = new Set(["test", "tests", "__tests__", "spec"]);
 
-const existenceByPath = new Map<string, boolean>();
-
-const pathExists = (path: string): boolean => {
-  const remembered = existenceByPath.get(path);
-  if (remembered !== undefined) return remembered;
-  const present = existsSync(path);
-  existenceByPath.set(path, present);
-  return present;
-};
+const pathExists = memoize((path: string): boolean => existsSync(path));
 
 const stringsFrom = (
   ruleOptions: Readonly<Options>,

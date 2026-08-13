@@ -7,56 +7,19 @@ import {
   requestedReviewerLogins,
 } from "./extract.ts";
 
-const it = test
-  .extend("nestedAuthorLogin", () =>
-    pullRequestAuthorLogin({ pull_request: { user: { login: "octocat" } } }))
-  .extend("authorLoginWithoutPullRequest", () => pullRequestAuthorLogin({}))
-  .extend("authorLoginWithoutUser", () => pullRequestAuthorLogin({ pull_request: { number: 7 } }))
-  .extend("authorLoginFromBrokenPullRequest", () =>
-    pullRequestAuthorLogin({ pull_request: "broken" }),
-  )
-  .extend("authorLoginFromNumericLogin", () =>
-    pullRequestAuthorLogin({ pull_request: { user: { login: 7 } } }),
-  )
-  .extend("nestedRequestedReviewerLogin", () =>
-    requestedReviewerLogin({ requested_reviewer: { login: "octocat" } }),
-  )
-  .extend("requestedReviewerLoginWhenAbsent", () => requestedReviewerLogin({}))
-  .extend("allRequestedReviewerLogins", () =>
-    requestedReviewerLogins({
-      pull_request: { requested_reviewers: [{ login: "octocat" }, { login: "hubot" }] },
-    }),
-  )
-  .extend("reviewerLoginsFromNonArray", () =>
-    requestedReviewerLogins({ pull_request: { requested_reviewers: "all" } }),
-  )
-  .extend("reviewerLoginsFromBarePayload", () => requestedReviewerLogins({}))
-  .extend("reviewerLoginsSkippingUnnamed", () =>
-    requestedReviewerLogins({
-      pull_request: { requested_reviewers: [{ login: "octocat" }, { id: 2 }] },
-    }),
-  )
-  .extend("soleMentionedPullNumber", () => mentionedPullNumbers({ pull_request: { number: 7 } }))
-  .extend("checkSuitePullNumbers", () =>
-    mentionedPullNumbers({ check_suite: { pull_requests: [{ number: 7 }, { number: 8 }] } }),
-  )
-  .extend("preferredPullRequestNumber", () =>
-    mentionedPullNumbers({
-      pull_request: { number: 7 },
-      check_suite: { pull_requests: [{ number: 8 }] },
-    }),
-  )
-  .extend("pullNumbersFromEmptyCheckSuite", () =>
-    mentionedPullNumbers({ check_suite: { pull_requests: [] } }),
-  )
-  .extend("pullNumbersFromUnrelatedPayload", () =>
-    mentionedPullNumbers({ zen: "Design for failure." }),
-  )
-  .extend("pullNumbersSkippingUnnumbered", () =>
-    mentionedPullNumbers({ check_suite: { pull_requests: [{ number: 7 }, { url: "elsewhere" }] } }),
-  );
-
 describe("pullRequestAuthorLogin", () => {
+  const it = test
+    .extend("nestedAuthorLogin", () =>
+      pullRequestAuthorLogin({ pull_request: { user: { login: "octocat" } } }))
+    .extend("authorLoginWithoutPullRequest", () => pullRequestAuthorLogin({}))
+    .extend("authorLoginWithoutUser", () => pullRequestAuthorLogin({ pull_request: { number: 7 } }))
+    .extend("authorLoginFromBrokenPullRequest", () =>
+      pullRequestAuthorLogin({ pull_request: "broken" }),
+    )
+    .extend("authorLoginFromNumericLogin", () =>
+      pullRequestAuthorLogin({ pull_request: { user: { login: 7 } } }),
+    );
+
   it("pull_request.user.login を返す", ({ nestedAuthorLogin }) => {
     expect(nestedAuthorLogin).toStrictEqual("octocat");
   });
@@ -81,6 +44,11 @@ describe("pullRequestAuthorLogin", () => {
 });
 
 describe("requestedReviewerLogin", () => {
+  const it = test
+    .extend("nestedRequestedReviewerLogin", () =>
+      requestedReviewerLogin({ requested_reviewer: { login: "octocat" } }))
+    .extend("requestedReviewerLoginWhenAbsent", () => requestedReviewerLogin({}));
+
   it("requested_reviewer.login を返す", ({ nestedRequestedReviewerLogin }) => {
     expect(nestedRequestedReviewerLogin).toStrictEqual("octocat");
   });
@@ -91,6 +59,21 @@ describe("requestedReviewerLogin", () => {
 });
 
 describe("requestedReviewerLogins", () => {
+  const it = test
+    .extend("allRequestedReviewerLogins", () =>
+      requestedReviewerLogins({
+        pull_request: { requested_reviewers: [{ login: "octocat" }, { login: "hubot" }] },
+      }))
+    .extend("reviewerLoginsFromNonArray", () =>
+      requestedReviewerLogins({ pull_request: { requested_reviewers: "all" } }),
+    )
+    .extend("reviewerLoginsFromBarePayload", () => requestedReviewerLogins({}))
+    .extend("reviewerLoginsSkippingUnnamed", () =>
+      requestedReviewerLogins({
+        pull_request: { requested_reviewers: [{ login: "octocat" }, { id: 2 }] },
+      }),
+    );
+
   it("現任レビュアー全員のログインを返す", ({ allRequestedReviewerLogins }) => {
     expect(allRequestedReviewerLogins).toStrictEqual(["octocat", "hubot"]);
   });
@@ -109,6 +92,29 @@ describe("requestedReviewerLogins", () => {
 });
 
 describe("mentionedPullNumbers", () => {
+  const it = test
+    .extend("soleMentionedPullNumber", () => mentionedPullNumbers({ pull_request: { number: 7 } }))
+    .extend("checkSuitePullNumbers", () =>
+      mentionedPullNumbers({ check_suite: { pull_requests: [{ number: 7 }, { number: 8 }] } }),
+    )
+    .extend("preferredPullRequestNumber", () =>
+      mentionedPullNumbers({
+        pull_request: { number: 7 },
+        check_suite: { pull_requests: [{ number: 8 }] },
+      }),
+    )
+    .extend("pullNumbersFromEmptyCheckSuite", () =>
+      mentionedPullNumbers({ check_suite: { pull_requests: [] } }),
+    )
+    .extend("pullNumbersFromUnrelatedPayload", () =>
+      mentionedPullNumbers({ zen: "Design for failure." }),
+    )
+    .extend("pullNumbersSkippingUnnumbered", () =>
+      mentionedPullNumbers({
+        check_suite: { pull_requests: [{ number: 7 }, { url: "elsewhere" }] },
+      }),
+    );
+
   it("pull_request.number 単独ならその 1 件", ({ soleMentionedPullNumber }) => {
     expect(soleMentionedPullNumber).toStrictEqual([7]);
   });

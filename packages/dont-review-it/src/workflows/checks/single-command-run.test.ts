@@ -1,64 +1,156 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { defaultWorkflowChecksConfig } from "../config.ts";
 import { parseWorkflowDocument } from "../workflow-document.ts";
 import { multiCommandRuns } from "./single-command-run.ts";
 
-const config = defaultWorkflowChecksConfig;
-
-const problemsFor = (source: string) =>
-  multiCommandRuns({
-    document: parseWorkflowDocument({ relativePath: ".github/workflows/ci.yml", source }),
-    config,
-  });
-
-const stepRunning = (script: string): string =>
-  `jobs:\n  build:\n    steps:\n      - run: ${script}\n`;
-
-const stepRunningBlock = (script: string): string =>
-  `jobs:\n  build:\n    steps:\n      - run: |\n${script
-    .split("\n")
-    .map((line) => `          ${line}`)
-    .join("\n")}\n`;
+const MORE_THAN_ONE_CALL = `A run block must not hold more than one command call, because branching, retrying, looping and target discovery placed here run only inside this file and carry neither types nor tests. Move the logic into a command in this repository, and call that command once from here.`;
 
 describe("multiCommandRuns", () => {
-  it("leaves a run block that holds one call alone", () => {
-    expect(problemsFor(stepRunning("vp run guard"))).toStrictEqual([]);
+  describe("a run block that holds one call", () => {
+    const it = test.extend("problems", () =>
+      multiCommandRuns({
+        document: parseWorkflowDocument({
+          relativePath: ".github/workflows/ci.yml",
+          source: "jobs:\n  build:\n    steps:\n      - run: vp run guard\n",
+        }),
+        config: defaultWorkflowChecksConfig,
+      }));
+
+    it("is left alone", ({ problems }) => {
+      expect(problems).toStrictEqual([]);
+    });
   });
 
-  it("reports two calls written on their own lines", () => {
-    expect(problemsFor(stepRunningBlock("vp run build\nvp run test")).length).toBe(1);
+  describe("two calls written on their own lines", () => {
+    const it = test.extend("problems", () =>
+      multiCommandRuns({
+        document: parseWorkflowDocument({
+          relativePath: ".github/workflows/ci.yml",
+          source:
+            "jobs:\n  build:\n    steps:\n      - run: |\n          vp run build\n          vp run test\n",
+        }),
+        config: defaultWorkflowChecksConfig,
+      }));
+
+    it("are reported once, beside the line the script was declared on", ({ problems }) => {
+      expect(problems).toStrictEqual([
+        { file: ".github/workflows/ci.yml", line: 4, message: MORE_THAN_ONE_CALL },
+      ]);
+    });
   });
 
-  it("reports two calls joined by an operator", () => {
-    expect(problemsFor(stepRunning("vp run build && vp run test")).length).toBe(1);
+  describe("two calls joined by an operator", () => {
+    const it = test.extend("problems", () =>
+      multiCommandRuns({
+        document: parseWorkflowDocument({
+          relativePath: ".github/workflows/ci.yml",
+          source: "jobs:\n  build:\n    steps:\n      - run: vp run build && vp run test\n",
+        }),
+        config: defaultWorkflowChecksConfig,
+      }));
+
+    it("are reported once, beside the line the script was declared on", ({ problems }) => {
+      expect(problems).toStrictEqual([
+        { file: ".github/workflows/ci.yml", line: 4, message: MORE_THAN_ONE_CALL },
+      ]);
+    });
   });
 
-  it("reports a loop", () => {
-    expect(problemsFor(stepRunning("for name in one two; do echo $name; done")).length).toBe(1);
+  describe("a loop", () => {
+    const it = test.extend("problems", () =>
+      multiCommandRuns({
+        document: parseWorkflowDocument({
+          relativePath: ".github/workflows/ci.yml",
+          source:
+            "jobs:\n  build:\n    steps:\n      - run: for name in one two; do echo $name; done\n",
+        }),
+        config: defaultWorkflowChecksConfig,
+      }));
+
+    it("is reported once, beside the line the script was declared on", ({ problems }) => {
+      expect(problems).toStrictEqual([
+        { file: ".github/workflows/ci.yml", line: 4, message: MORE_THAN_ONE_CALL },
+      ]);
+    });
   });
 
-  it("reports a control keyword standing on its own", () => {
-    expect(problemsFor(stepRunning("if")).length).toBe(1);
+  describe("a control keyword standing on its own", () => {
+    const it = test.extend("problems", () =>
+      multiCommandRuns({
+        document: parseWorkflowDocument({
+          relativePath: ".github/workflows/ci.yml",
+          source: "jobs:\n  build:\n    steps:\n      - run: if\n",
+        }),
+        config: defaultWorkflowChecksConfig,
+      }));
+
+    it("is reported once, beside the line the script was declared on", ({ problems }) => {
+      expect(problems).toStrictEqual([
+        { file: ".github/workflows/ci.yml", line: 4, message: MORE_THAN_ONE_CALL },
+      ]);
+    });
   });
 
-  it("leaves a call whose name merely starts with a control keyword alone", () => {
-    expect(problemsFor(stepRunning("iffy-command --run"))).toStrictEqual([]);
+  describe("a call whose name merely starts with a control keyword", () => {
+    const it = test.extend("problems", () =>
+      multiCommandRuns({
+        document: parseWorkflowDocument({
+          relativePath: ".github/workflows/ci.yml",
+          source: "jobs:\n  build:\n    steps:\n      - run: iffy-command --run\n",
+        }),
+        config: defaultWorkflowChecksConfig,
+      }));
+
+    it("is left alone", ({ problems }) => {
+      expect(problems).toStrictEqual([]);
+    });
   });
 
-  it("leaves a call that was wrapped across lines alone", () => {
-    expect(problemsFor(stepRunningBlock("vp run \\\n  guard"))).toStrictEqual([]);
+  describe("a call that was wrapped across lines", () => {
+    const it = test.extend("problems", () =>
+      multiCommandRuns({
+        document: parseWorkflowDocument({
+          relativePath: ".github/workflows/ci.yml",
+          source:
+            "jobs:\n  build:\n    steps:\n      - run: |\n          vp run \\\n            guard\n",
+        }),
+        config: defaultWorkflowChecksConfig,
+      }));
+
+    it("is left alone", ({ problems }) => {
+      expect(problems).toStrictEqual([]);
+    });
   });
 
-  it("leaves the blank lines and the comments around a call alone", () => {
-    expect(problemsFor(stepRunningBlock("# explain\n\nvp run guard"))).toStrictEqual([]);
+  describe("the blank lines and the comments around a call", () => {
+    const it = test.extend("problems", () =>
+      multiCommandRuns({
+        document: parseWorkflowDocument({
+          relativePath: ".github/workflows/ci.yml",
+          source:
+            "jobs:\n  build:\n    steps:\n      - run: |\n          # explain\n          \n          vp run guard\n",
+        }),
+        config: defaultWorkflowChecksConfig,
+      }));
+
+    it("are left alone", ({ problems }) => {
+      expect(problems).toStrictEqual([]);
+    });
   });
 
-  it("leaves a step that declares no script alone", () => {
-    expect(problemsFor("jobs:\n  build:\n    steps:\n      - run:\n")).toStrictEqual([]);
-  });
+  describe("a step that declares no script", () => {
+    const it = test.extend("problems", () =>
+      multiCommandRuns({
+        document: parseWorkflowDocument({
+          relativePath: ".github/workflows/ci.yml",
+          source: "jobs:\n  build:\n    steps:\n      - run:\n",
+        }),
+        config: defaultWorkflowChecksConfig,
+      }));
 
-  it("names the line the script was declared on", () => {
-    expect(problemsFor(stepRunning("vp run build && vp run test"))[0]?.line).toBe(4);
+    it("is left alone", ({ problems }) => {
+      expect(problems).toStrictEqual([]);
+    });
   });
 });

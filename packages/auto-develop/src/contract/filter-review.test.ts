@@ -2,128 +2,49 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { filterReviewEvent } from "./filter-review.ts";
 
-const it = test
-  .extend("changesRequestedVerdict", () =>
-    filterReviewEvent(
-      {
-        action: "submitted",
-        pull_request: { number: 7 },
-        review: { state: "changes_requested", body: "Fix the failing test." },
-        delivery_id: "delivery-1",
-      },
-      "author",
-    ))
-  .extend("upperCaseStateVerdict", () =>
-    filterReviewEvent(
-      {
-        action: "submitted",
-        pull_request: { number: 7 },
-        review: { state: "CHANGES_REQUESTED", body: "Fix the failing test." },
-      },
-      "author",
-    ),
-  )
-  .extend("nullBodyVerdict", () =>
-    filterReviewEvent(
-      {
-        action: "submitted",
-        pull_request: { number: 7 },
-        review: { state: "changes_requested", body: null },
-      },
-      "author",
-    ),
-  )
-  .extend("headRefBearingVerdict", () =>
-    filterReviewEvent(
-      {
-        action: "submitted",
-        pull_request: { number: 7, head: { ref: "topic/retry" } },
-        review: { state: "changes_requested", body: "" },
-      },
-      "author",
-    ),
-  )
-  .extend("approvedVerdict", () =>
-    filterReviewEvent(
-      {
-        action: "submitted",
-        pull_request: { number: 7 },
-        review: { state: "approved", body: null },
-      },
-      "author",
-    ),
-  )
-  .extend("commentedVerdict", () =>
-    filterReviewEvent(
-      {
-        action: "submitted",
-        pull_request: { number: 7 },
-        review: { state: "commented", body: null },
-      },
-      "author",
-    ),
-  )
-  .extend("reviewerModeVerdict", () =>
-    filterReviewEvent(
-      {
-        action: "submitted",
-        pull_request: { number: 7 },
-        review: { state: "changes_requested", body: null },
-      },
-      "reviewer",
-    ),
-  )
-  .extend("dismissedStateVerdict", () =>
-    filterReviewEvent(
-      {
-        action: "submitted",
-        pull_request: { number: 7 },
-        review: { state: "dismissed", body: null },
-      },
-      "author",
-    ),
-  )
-  .extend("dismissedActionVerdict", () =>
-    filterReviewEvent(
-      {
-        action: "dismissed",
-        pull_request: { number: 7 },
-        review: { state: "changes_requested", body: null },
-      },
-      "author",
-    ),
-  )
-  .extend("nullReviewVerdict", () =>
-    filterReviewEvent({ action: "submitted", pull_request: { number: 7 }, review: null }, "author"),
-  )
-  .extend("numericStateVerdict", () =>
-    filterReviewEvent(
-      { action: "submitted", pull_request: { number: 7 }, review: { state: 7, body: null } },
-      "author",
-    ),
-  )
-  .extend("numericBodyVerdict", () =>
-    filterReviewEvent(
-      {
-        action: "submitted",
-        pull_request: { number: 7 },
-        review: { state: "changes_requested", body: 7 },
-      },
-      "author",
-    ),
-  )
-  .extend("unnumberedPullVerdict", () =>
-    filterReviewEvent(
-      {
-        action: "submitted",
-        pull_request: {},
-        review: { state: "changes_requested", body: null },
-      },
-      "author",
-    ),
-  );
-
 describe("採用される形", () => {
+  const it = test
+    .extend("changesRequestedVerdict", () =>
+      filterReviewEvent(
+        {
+          action: "submitted",
+          pull_request: { number: 7 },
+          review: { state: "changes_requested", body: "Fix the failing test." },
+          delivery_id: "delivery-1",
+        },
+        "author",
+      ))
+    .extend("upperCaseStateVerdict", () =>
+      filterReviewEvent(
+        {
+          action: "submitted",
+          pull_request: { number: 7 },
+          review: { state: "CHANGES_REQUESTED", body: "Fix the failing test." },
+        },
+        "author",
+      ),
+    )
+    .extend("nullBodyVerdict", () =>
+      filterReviewEvent(
+        {
+          action: "submitted",
+          pull_request: { number: 7 },
+          review: { state: "changes_requested", body: null },
+        },
+        "author",
+      ),
+    )
+    .extend("headRefBearingVerdict", () =>
+      filterReviewEvent(
+        {
+          action: "submitted",
+          pull_request: { number: 7, head: { ref: "topic/retry" } },
+          review: { state: "changes_requested", body: "" },
+        },
+        "author",
+      ),
+    );
+
   it("submitted と changes_requested は source-review-submitted になる", ({
     changesRequestedVerdict,
   }) => {
@@ -165,6 +86,89 @@ describe("採用される形", () => {
 });
 
 describe("不採用になる形", () => {
+  const it = test
+    .extend("approvedVerdict", () =>
+      filterReviewEvent(
+        {
+          action: "submitted",
+          pull_request: { number: 7 },
+          review: { state: "approved", body: null },
+        },
+        "author",
+      ))
+    .extend("commentedVerdict", () =>
+      filterReviewEvent(
+        {
+          action: "submitted",
+          pull_request: { number: 7 },
+          review: { state: "commented", body: null },
+        },
+        "author",
+      ),
+    )
+    .extend("reviewerModeVerdict", () =>
+      filterReviewEvent(
+        {
+          action: "submitted",
+          pull_request: { number: 7 },
+          review: { state: "changes_requested", body: null },
+        },
+        "reviewer",
+      ),
+    )
+    .extend("dismissedStateVerdict", () =>
+      filterReviewEvent(
+        {
+          action: "submitted",
+          pull_request: { number: 7 },
+          review: { state: "dismissed", body: null },
+        },
+        "author",
+      ),
+    )
+    .extend("dismissedActionVerdict", () =>
+      filterReviewEvent(
+        {
+          action: "dismissed",
+          pull_request: { number: 7 },
+          review: { state: "changes_requested", body: null },
+        },
+        "author",
+      ),
+    )
+    .extend("nullReviewVerdict", () =>
+      filterReviewEvent(
+        { action: "submitted", pull_request: { number: 7 }, review: null },
+        "author",
+      ),
+    )
+    .extend("numericStateVerdict", () =>
+      filterReviewEvent(
+        { action: "submitted", pull_request: { number: 7 }, review: { state: 7, body: null } },
+        "author",
+      ),
+    )
+    .extend("numericBodyVerdict", () =>
+      filterReviewEvent(
+        {
+          action: "submitted",
+          pull_request: { number: 7 },
+          review: { state: "changes_requested", body: 7 },
+        },
+        "author",
+      ),
+    )
+    .extend("unnumberedPullVerdict", () =>
+      filterReviewEvent(
+        {
+          action: "submitted",
+          pull_request: {},
+          review: { state: "changes_requested", body: null },
+        },
+        "author",
+      ),
+    );
+
   it("approved は著者作業を起動しない", ({ approvedVerdict }) => {
     expect(approvedVerdict).toStrictEqual(null);
   });

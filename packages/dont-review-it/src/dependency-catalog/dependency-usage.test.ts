@@ -1,70 +1,110 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { defaultDependencyCatalogChecksConfig } from "./config.ts";
 import { dependencyUsagesIn } from "./dependency-usage.ts";
 
-import type { DependencyReference } from "./manifest-dependencies.ts";
-
-const config = defaultDependencyCatalogChecksConfig;
-
-const usagesFor = (references: readonly DependencyReference[]) =>
-  dependencyUsagesIn({ references, config });
-
 describe("dependencyUsagesIn", () => {
-  it("separates the catalog references from the direct ones", () => {
-    const [usage] = usagesFor([
-      { manifestPath: "package.json", dependencyName: "react", specifier: "catalog:" },
-      { manifestPath: "apps/web/package.json", dependencyName: "react", specifier: "^19.0.0" },
-    ]);
+  describe("a catalog reference standing beside a direct one", () => {
+    const it = test.extend("usages", () =>
+      dependencyUsagesIn({
+        references: [
+          { manifestPath: "package.json", dependencyName: "react", specifier: "catalog:" },
+          { manifestPath: "apps/web/package.json", dependencyName: "react", specifier: "^19.0.0" },
+        ],
+        config: defaultDependencyCatalogChecksConfig,
+      }));
 
-    expect(usage).toStrictEqual({
-      dependencyName: "react",
-      catalogReferences: [{ manifestPath: "package.json", catalogName: "" }],
-      directReferences: [{ manifestPath: "apps/web/package.json", specifier: "^19.0.0" }],
+    it("separates the catalog references from the direct ones", ({ usages }) => {
+      expect(usages).toStrictEqual([
+        {
+          dependencyName: "react",
+          catalogReferences: [{ manifestPath: "package.json", catalogName: "" }],
+          directReferences: [{ manifestPath: "apps/web/package.json", specifier: "^19.0.0" }],
+        },
+      ]);
     });
   });
 
-  it("reads the catalog name that follows the protocol", () => {
-    const [usage] = usagesFor([
-      { manifestPath: "package.json", dependencyName: "react", specifier: "catalog:legacy" },
-    ]);
+  describe("a reference to a named catalog", () => {
+    const it = test.extend("usages", () =>
+      dependencyUsagesIn({
+        references: [
+          { manifestPath: "package.json", dependencyName: "react", specifier: "catalog:legacy" },
+        ],
+        config: defaultDependencyCatalogChecksConfig,
+      }));
 
-    expect(usage?.catalogReferences).toStrictEqual([
-      { manifestPath: "package.json", catalogName: "legacy" },
-    ]);
-  });
-
-  it("leaves the specifiers that a catalog cannot hold out of the usage", () => {
-    const [usage] = usagesFor([
-      { manifestPath: "package.json", dependencyName: "utils", specifier: "workspace:*" },
-      { manifestPath: "package.json", dependencyName: "utils", specifier: "link:../utils" },
-      { manifestPath: "package.json", dependencyName: "utils", specifier: "file:../utils" },
-    ]);
-
-    expect(usage).toStrictEqual({
-      dependencyName: "utils",
-      catalogReferences: [],
-      directReferences: [],
+    it("reads the catalog name that follows the protocol", ({ usages }) => {
+      expect(usages).toStrictEqual([
+        {
+          dependencyName: "react",
+          catalogReferences: [{ manifestPath: "package.json", catalogName: "legacy" }],
+          directReferences: [],
+        },
+      ]);
     });
   });
 
-  it("counts a manifest that repeats the same reference in two fields once", () => {
-    const [usage] = usagesFor([
-      { manifestPath: "package.json", dependencyName: "react", specifier: "^19.0.0" },
-      { manifestPath: "package.json", dependencyName: "react", specifier: "^19.0.0" },
-    ]);
+  describe("the specifiers that a catalog cannot hold", () => {
+    const it = test.extend("usages", () =>
+      dependencyUsagesIn({
+        references: [
+          { manifestPath: "package.json", dependencyName: "utils", specifier: "workspace:*" },
+          { manifestPath: "package.json", dependencyName: "utils", specifier: "link:../utils" },
+          { manifestPath: "package.json", dependencyName: "utils", specifier: "file:../utils" },
+        ],
+        config: defaultDependencyCatalogChecksConfig,
+      }));
 
-    expect(usage?.directReferences).toStrictEqual([
-      { manifestPath: "package.json", specifier: "^19.0.0" },
-    ]);
+    it("leaves them out of the usage", ({ usages }) => {
+      expect(usages).toStrictEqual([
+        { dependencyName: "utils", catalogReferences: [], directReferences: [] },
+      ]);
+    });
   });
 
-  it("keeps a manifest that declares two different specifiers as two references", () => {
-    const [usage] = usagesFor([
-      { manifestPath: "package.json", dependencyName: "react", specifier: "^19.0.0" },
-      { manifestPath: "package.json", dependencyName: "react", specifier: "^18.0.0" },
-    ]);
+  describe("a manifest repeating the same reference in two fields", () => {
+    const it = test.extend("usages", () =>
+      dependencyUsagesIn({
+        references: [
+          { manifestPath: "package.json", dependencyName: "react", specifier: "^19.0.0" },
+          { manifestPath: "package.json", dependencyName: "react", specifier: "^19.0.0" },
+        ],
+        config: defaultDependencyCatalogChecksConfig,
+      }));
 
-    expect(usage?.directReferences.length).toBe(2);
+    it("counts it once", ({ usages }) => {
+      expect(usages).toStrictEqual([
+        {
+          dependencyName: "react",
+          catalogReferences: [],
+          directReferences: [{ manifestPath: "package.json", specifier: "^19.0.0" }],
+        },
+      ]);
+    });
+  });
+
+  describe("a manifest declaring two different specifiers for one dependency", () => {
+    const it = test.extend("usages", () =>
+      dependencyUsagesIn({
+        references: [
+          { manifestPath: "package.json", dependencyName: "react", specifier: "^19.0.0" },
+          { manifestPath: "package.json", dependencyName: "react", specifier: "^18.0.0" },
+        ],
+        config: defaultDependencyCatalogChecksConfig,
+      }));
+
+    it("keeps them as two references", ({ usages }) => {
+      expect(usages).toStrictEqual([
+        {
+          dependencyName: "react",
+          catalogReferences: [],
+          directReferences: [
+            { manifestPath: "package.json", specifier: "^19.0.0" },
+            { manifestPath: "package.json", specifier: "^18.0.0" },
+          ],
+        },
+      ]);
+    });
   });
 });

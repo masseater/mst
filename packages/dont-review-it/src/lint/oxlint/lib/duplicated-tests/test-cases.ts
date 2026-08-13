@@ -8,7 +8,10 @@ import {
   type BodyDeclaration,
 } from "../duplicated-bodies/declarations.ts";
 import { FIXTURE_BUILDER_MEMBER } from "../spec-syntax/fixture-declarations.ts";
-import { INJECTED_TEST_BLOCK_SPELLINGS } from "../spec-syntax/test-block-declarations.ts";
+import {
+  INJECTED_GROUPING_BLOCK_SPELLINGS,
+  INJECTED_TEST_BLOCK_SPELLINGS,
+} from "../spec-syntax/test-block-declarations.ts";
 
 const RUNNER_BODY_TYPES: ReadonlySet<string> = new Set([
   "ArrowFunctionExpression",
@@ -55,30 +58,50 @@ const testCaseOf = (call: AstFields, source: string): BodyDeclaration | null => 
   };
 };
 
-const callExpressionsIn = (syntaxField: unknown): readonly AstFields[] => {
-  if (Array.isArray(syntaxField)) return syntaxField.flatMap(callExpressionsIn);
-  if (!isAstFields(syntaxField)) return [];
+const testCaseIn = (syntaxField: AstFields, source: string): BodyDeclaration | null =>
+  syntaxField[NODE_TYPE_FIELD] === "CallExpression" ? testCaseOf(syntaxField, source) : null;
 
-  const nested = Object.values(syntaxField).flatMap(callExpressionsIn);
-  return syntaxField[NODE_TYPE_FIELD] === "CallExpression" ? [syntaxField, ...nested] : nested;
+const situationBelow = (
+  syntaxField: AstFields,
+  situation: readonly string[],
+): readonly string[] => {
+  if (syntaxField[NODE_TYPE_FIELD] !== "CallExpression") return situation;
+
+  const rootName = calleeRootName(syntaxField.callee);
+  if (rootName === null || !INJECTED_GROUPING_BLOCK_SPELLINGS.has(rootName)) return situation;
+
+  const groupTitle = titleOf((syntaxField.arguments as readonly unknown[])[0]);
+  return groupTitle === null ? situation : [...situation, groupTitle];
 };
 
-const testCasesIn = (source: string): readonly BodyDeclaration[] => {
-  const parsedSource = parseSync(DEFAULT_SOURCE_NAME, source);
-  return callExpressionsIn(parsedSource.program.body).flatMap((call) => {
-    const testCase = testCaseOf(call, source);
-    return testCase === null ? [] : [testCase];
-  });
+const situatedTestCasesIn = (
+  syntaxField: unknown,
+  { situation, source }: { readonly situation: readonly string[]; readonly source: string },
+): readonly { readonly declaration: BodyDeclaration; readonly situation: readonly string[] }[] => {
+  if (Array.isArray(syntaxField))
+    return syntaxField.flatMap((part) => situatedTestCasesIn(part, { situation, source }));
+  if (!isAstFields(syntaxField)) return [];
+
+  const testCase = testCaseIn(syntaxField, source);
+  if (testCase !== null) return [{ declaration: testCase, situation }];
+
+  const grouped = situationBelow(syntaxField, situation);
+  return Object.values(syntaxField).flatMap((part) =>
+    situatedTestCasesIn(part, { situation: grouped, source }),
+  );
 };
 
 export const repeatedTestCasesIn = (source: string): readonly BodyDeclaration[] => {
-  const testCases = testCasesIn(source);
+  const parsedSource = parseSync(DEFAULT_SOURCE_NAME, source);
+  const testCases = situatedTestCasesIn(parsedSource.program.body, { situation: [], source });
   const spellings = testCases.map((testCase) =>
-    JSON.stringify([testCase.name, testCase.structure]),
+    JSON.stringify([testCase.situation, testCase.declaration.name, testCase.declaration.structure]),
   );
-  return testCases.filter((_, index) =>
-    spellings.some(
-      (spelling, comparedIndex) => comparedIndex !== index && spelling === spellings[index],
-    ),
-  );
+  return testCases
+    .filter((_, index) =>
+      spellings.some(
+        (spelling, comparedIndex) => comparedIndex !== index && spelling === spellings[index],
+      ),
+    )
+    .map((testCase) => testCase.declaration);
 };

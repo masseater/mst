@@ -1,6 +1,6 @@
 import { dirname, join } from "node:path";
 
-import { groupBy } from "es-toolkit";
+import { groupBy, memoize } from "es-toolkit";
 
 import { nearestPackageDirectory } from "../canonical-values/source-files.ts";
 import {
@@ -85,16 +85,4 @@ const keyOf = (reconciled: CoverageReconciliation): string =>
     ...[...reconciled.unscannedDirectoryNames].toSorted(),
   ].join("\n");
 
-const findingsByReconciliation = new Map<string, ReadonlyMap<string, readonly CoverageFinding[]>>();
-
-export const coverageFindingsIn = (
-  reconciled: CoverageReconciliation,
-): ReadonlyMap<string, readonly CoverageFinding[]> => {
-  const named = keyOf(reconciled);
-  const memoized = findingsByReconciliation.get(named);
-  if (memoized !== undefined) return memoized;
-
-  const read = readReconciliation(reconciled);
-  findingsByReconciliation.set(named, read);
-  return read;
-};
+export const coverageFindingsIn = memoize(readReconciliation, { getCacheKey: keyOf });

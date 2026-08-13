@@ -1,3 +1,5 @@
+import { memoize } from "es-toolkit";
+
 import { listRepositoryFiles } from "../canonical-values/source-files.ts";
 import { couplingEdgesOf } from "./entry-reachability.ts";
 import { isInsideDirectory } from "./package-entries.ts";
@@ -14,14 +16,14 @@ const packagesReferencedFrom = (fromFile: string, workspaceRoot: string): readon
         : [found.directory],
     );
 
-const referencedByRunningCode = (workspaceRoot: string): ReadonlySet<string> =>
-  new Set(
-    listRepositoryFiles(workspaceRoot).declarationSources.flatMap((file) =>
-      packagesReferencedFrom(file.absolutePath, workspaceRoot),
+const referencedByRunningCode = memoize(
+  (workspaceRoot: string): ReadonlySet<string> =>
+    new Set(
+      listRepositoryFiles(workspaceRoot).declarationSources.flatMap((file) =>
+        packagesReferencedFrom(file.absolutePath, workspaceRoot),
+      ),
     ),
-  );
-
-const referencedByWorkspaceRoot = new Map<string, ReadonlySet<string>>();
+);
 
 export const isReachedOnlyFromSpecs = ({
   packageDirectory,
@@ -29,9 +31,4 @@ export const isReachedOnlyFromSpecs = ({
 }: {
   readonly packageDirectory: string;
   readonly workspaceRoot: string;
-}): boolean => {
-  const remembered = referencedByWorkspaceRoot.get(workspaceRoot);
-  const referenced = remembered ?? referencedByRunningCode(workspaceRoot);
-  referencedByWorkspaceRoot.set(workspaceRoot, referenced);
-  return !referenced.has(packageDirectory);
-};
+}): boolean => !referencedByRunningCode(workspaceRoot).has(packageDirectory);

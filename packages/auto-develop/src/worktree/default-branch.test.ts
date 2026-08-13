@@ -4,87 +4,35 @@ import { silentLogger } from "../logging/logger.ts";
 import { resolveCurrentBranch, resolveDefaultBranch } from "./default-branch.ts";
 import { UNKNOWN_BRANCH_MARKER } from "./protected-branch.ts";
 
-import type { GitRunner } from "./git-runner.ts";
-
-const gitReturning = (stdout: string): GitRunner => ({
-  run: () => Promise.resolve({ stdout, stderr: "" }),
-});
-
-const gitFailing = (complaint: string): GitRunner => ({
-  run: () => Promise.reject(new Error(complaint)),
-});
-
-class GitStderrError extends Error {
-  readonly stderr: string;
-
-  constructor(stderr: string) {
-    super("git failed");
-    this.stderr = stderr;
-  }
-}
-
-const gitFailingWithStderr = (stderr: string): GitRunner => ({
-  run: () => Promise.reject(new GitStderrError(stderr)),
-});
-
-const it = test
-  .extend("defaultBranchFromSymbolicRef", () =>
-    resolveDefaultBranch({
-      git: gitReturning("refs/remotes/origin/develop\n"),
-      repoDir: "/repo",
-      log: silentLogger,
-    }))
-  .extend("defaultBranchFromBlankOutput", () =>
-    resolveDefaultBranch({
-      git: gitReturning("  \n"),
-      repoDir: "/repo",
-      log: silentLogger,
-    }),
-  )
-  .extend("defaultBranchAfterFailure", () =>
-    resolveDefaultBranch({
-      git: gitFailing("no origin/HEAD"),
-      repoDir: "/repo",
-      log: silentLogger,
-    }),
-  )
-  .extend("currentBranchFromSymbolicRef", () =>
-    resolveCurrentBranch({
-      git: gitReturning("topic/x\n"),
-      worktreePath: "/worktree",
-      log: silentLogger,
-    }),
-  )
-  .extend("currentBranchFromBlankOutput", () =>
-    resolveCurrentBranch({
-      git: gitReturning("  \n"),
-      worktreePath: "/worktree",
-      log: silentLogger,
-    }),
-  )
-  .extend("currentBranchAfterDetachedFailure", () =>
-    resolveCurrentBranch({
-      git: gitFailing("fatal: ref HEAD is not a symbolic ref"),
-      worktreePath: "/worktree",
-      log: silentLogger,
-    }),
-  )
-  .extend("currentBranchAfterDetachedStderr", () =>
-    resolveCurrentBranch({
-      git: gitFailingWithStderr("fatal: ref HEAD is not a symbolic ref"),
-      worktreePath: "/worktree",
-      log: silentLogger,
-    }),
-  )
-  .extend("currentBranchAfterUnexpectedFailure", () =>
-    resolveCurrentBranch({
-      git: gitFailing("unexpected git failure"),
-      worktreePath: "/worktree",
-      log: silentLogger,
-    }),
-  );
-
 describe("resolveDefaultBranch", () => {
+  const it = test
+    .extend("defaultBranchFromSymbolicRef", () =>
+      resolveDefaultBranch({
+        git: {
+          run: () => Promise.resolve({ stdout: "refs/remotes/origin/develop\n", stderr: "" }),
+        },
+        repoDir: "/repo",
+        log: silentLogger,
+      }))
+    .extend("defaultBranchFromBlankOutput", () =>
+      resolveDefaultBranch({
+        git: {
+          run: () => Promise.resolve({ stdout: "  \n", stderr: "" }),
+        },
+        repoDir: "/repo",
+        log: silentLogger,
+      }),
+    )
+    .extend("defaultBranchAfterFailure", () =>
+      resolveDefaultBranch({
+        git: {
+          run: () => Promise.reject(new Error("no origin/HEAD")),
+        },
+        repoDir: "/repo",
+        log: silentLogger,
+      }),
+    );
+
   it("origin/HEAD の symbolic-ref から接頭辞を剥がして返す", ({ defaultBranchFromSymbolicRef }) => {
     expect(defaultBranchFromSymbolicRef).toStrictEqual("develop");
   });
@@ -99,6 +47,56 @@ describe("resolveDefaultBranch", () => {
 });
 
 describe("resolveCurrentBranch", () => {
+  const it = test
+    .extend("currentBranchFromSymbolicRef", () =>
+      resolveCurrentBranch({
+        git: {
+          run: () => Promise.resolve({ stdout: "topic/x\n", stderr: "" }),
+        },
+        worktreePath: "/worktree",
+        log: silentLogger,
+      }))
+    .extend("currentBranchFromBlankOutput", () =>
+      resolveCurrentBranch({
+        git: {
+          run: () => Promise.resolve({ stdout: "  \n", stderr: "" }),
+        },
+        worktreePath: "/worktree",
+        log: silentLogger,
+      }),
+    )
+    .extend("currentBranchAfterDetachedFailure", () =>
+      resolveCurrentBranch({
+        git: {
+          run: () => Promise.reject(new Error("fatal: ref HEAD is not a symbolic ref")),
+        },
+        worktreePath: "/worktree",
+        log: silentLogger,
+      }),
+    )
+    .extend("currentBranchAfterDetachedStderr", () => {
+      class GitFailureCarryingStderr extends Error {
+        readonly stderr = "fatal: ref HEAD is not a symbolic ref";
+      }
+
+      return resolveCurrentBranch({
+        git: {
+          run: () => Promise.reject(new GitFailureCarryingStderr("git failed")),
+        },
+        worktreePath: "/worktree",
+        log: silentLogger,
+      });
+    })
+    .extend("currentBranchAfterUnexpectedFailure", () =>
+      resolveCurrentBranch({
+        git: {
+          run: () => Promise.reject(new Error("unexpected git failure")),
+        },
+        worktreePath: "/worktree",
+        log: silentLogger,
+      }),
+    );
+
   it("symbolic-ref の出力をそのまま現在ブランチにする", ({ currentBranchFromSymbolicRef }) => {
     expect(currentBranchFromSymbolicRef).toStrictEqual("topic/x");
   });

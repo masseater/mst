@@ -1,7 +1,8 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { isAssertionCall } from "../lib/spec-syntax/assertion-entries.ts";
 import { isSpecFile, specFileSuffixesFrom } from "../lib/spec-syntax/spec-files.ts";
-import { testBlockBindings, testBlockBodyOf } from "../lib/spec-syntax/test-block-declarations.ts";
+import { testBlockBodyOf, testBlockRootNames } from "../lib/spec-syntax/test-block-declarations.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
@@ -17,7 +18,7 @@ const innermostAround = (
 ): Block | null =>
   blocks
     .filter((block) => block.start <= assertion.start && assertion.end <= block.end)
-    .toSorted((held, later) => later.start - held.start)
+    .toSorted((heldBlock, comparedBlock) => comparedBlock.start - heldBlock.start)
     .at(0) ?? null;
 
 const claimlessAmong = (
@@ -59,24 +60,17 @@ export const forbidExpectlessIt = createDontReviewItRule({
   create(inspection) {
     if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
-    const bindings = testBlockBindings();
-    const calls = new Set<ESTree.CallExpression>();
-
     return {
-      ImportDeclaration: bindings.takeImport,
-      VariableDeclarator: bindings.takeLocalBinding,
-      CallExpression(node: ESTree.CallExpression) {
-        calls.add(node);
-      },
-      "Program:exit"() {
-        const rootNames = bindings.rootNames();
-        const blocks = [...calls].flatMap((call): readonly Block[] => {
-          const writtenBody = testBlockBodyOf(call, rootNames);
-          return writtenBody === null
+      "Program:exit"(program: ESTree.Program) {
+        const rootNames = testBlockRootNames(program);
+        const calls = nodesOfType(program, "CallExpression");
+        const blocks = calls.flatMap((call): readonly Block[] => {
+          const testBlockBody = testBlockBodyOf(call, rootNames);
+          return testBlockBody === null
             ? []
-            : [{ call, start: writtenBody.start, end: writtenBody.end }];
+            : [{ call, start: testBlockBody.start, end: testBlockBody.end }];
         });
-        const assertions = [...calls].filter((call) => isAssertionCall(call));
+        const assertions = calls.filter((call) => isAssertionCall(call));
 
         for (const claimless of claimlessAmong(blocks, assertions)) {
           inspection.report({ node: claimless, messageId: "expectlessIt" });

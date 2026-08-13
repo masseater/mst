@@ -6,99 +6,171 @@ import { createStatusWriter } from "./status-writer.ts";
 
 import type { HandlerGithubClient } from "./github-client.ts";
 
-const recordingGithub = (): {
-  readonly github: HandlerGithubClient;
-  readonly created: ReturnType<typeof vi.fn<HandlerGithubClient["createCommitStatus"]>>;
-} => {
-  const createdOne = vi.fn<HandlerGithubClient["createCommitStatus"]>(() => Promise.resolve());
-  return {
-    github: {
-      prSnapshot: () => Promise.reject(new Error("not used")),
-      createCommitStatus: createdOne,
-      listReviews: () => Promise.resolve([]),
-      requestReviewers: () => Promise.resolve(),
-    },
-    created: createdOne,
-  };
-};
-
-const it = test
-  .extend("ungatedWrite", async () => {
-    const { github, created } = recordingGithub();
-    const writer = createStatusWriter({ github, context: "ctx", log: silentLogger });
-    const wrote = await writer.write({ sha: "abc", state: "pending", description: "reviewing" });
-    return { wrote, calls: created.mock.calls };
-  })
-  .extend("staleGenerationWrite", async () => {
-    const { github, created } = recordingGithub();
-    const gate = createLifecycleGate();
-    gate.interruptForInputChange(7);
-    const writer = createStatusWriter({
-      github,
-      context: "ctx",
-      log: silentLogger,
-      guard: { gate, prNumber: 7, generation: 0 },
-    });
-    const wrote = await writer.write({ sha: "abc", state: "success", description: "done" });
-    return { wrote, calls: created.mock.calls };
-  })
-  .extend("currentGenerationWrite", async () => {
-    const { github, created } = recordingGithub();
-    const gate = createLifecycleGate();
-    const writer = createStatusWriter({
-      github,
-      context: "ctx",
-      log: silentLogger,
-      guard: { gate, prNumber: 7, generation: 0 },
-    });
-    const wrote = await writer.write({ sha: "abc", state: "success", description: "done" });
-    return { wrote, calls: created.mock.calls };
-  })
-  .extend("failingApiWrite", async () => {
-    const github: HandlerGithubClient = {
-      prSnapshot: () => Promise.reject(new Error("not used")),
-      createCommitStatus: () => Promise.reject(new Error("GitHub is down")),
-      listReviews: () => Promise.resolve([]),
-      requestReviewers: () => Promise.resolve(),
-    };
-    const warn = vi.fn<(fields: Readonly<Record<string, unknown>>, message: string) => void>();
-    const writer = createStatusWriter({
-      github,
-      context: "ctx",
-      log: { ...silentLogger, warn },
-    });
-    const wrote = await writer.write({ sha: "abc", state: "failure", description: "failed" });
-    return { wrote, warnings: warn.mock.calls.length };
-  });
-
 describe("createStatusWriter", () => {
-  it("世代ゲートなしの書き込みは GitHub へ渡る", ({ ungatedWrite }) => {
-    expect(ungatedWrite.calls).toStrictEqual([
-      [{ sha: "abc", state: "pending", context: "ctx", description: "reviewing" }],
-    ]);
+  describe("世代ゲートを持たない writer", () => {
+    const it = test
+      .extend("commitStatusCreatorAfterUngatedWrite", async () => {
+        const createCommitStatus = vi.fn<HandlerGithubClient["createCommitStatus"]>(() =>
+          Promise.resolve(),
+        );
+        const writer = createStatusWriter({
+          github: {
+            prSnapshot: () => Promise.reject(new Error("not used")),
+            createCommitStatus,
+            listReviews: () => Promise.resolve([]),
+            requestReviewers: () => Promise.resolve(),
+          },
+          context: "ctx",
+          log: silentLogger,
+        });
+        await writer.write({ sha: "abc", state: "pending", description: "reviewing" });
+        return createCommitStatus;
+      })
+      .extend("ungatedStatusWasWritten", async () => {
+        const createCommitStatus = vi.fn<HandlerGithubClient["createCommitStatus"]>(() =>
+          Promise.resolve(),
+        );
+        const writer = createStatusWriter({
+          github: {
+            prSnapshot: () => Promise.reject(new Error("not used")),
+            createCommitStatus,
+            listReviews: () => Promise.resolve([]),
+            requestReviewers: () => Promise.resolve(),
+          },
+          context: "ctx",
+          log: silentLogger,
+        });
+        return writer.write({ sha: "abc", state: "pending", description: "reviewing" });
+      });
+
+    it("書き込みは GitHub へ渡る", ({ commitStatusCreatorAfterUngatedWrite }) => {
+      expect(commitStatusCreatorAfterUngatedWrite).toHaveBeenCalledWith({
+        sha: "abc",
+        state: "pending",
+        context: "ctx",
+        description: "reviewing",
+      });
+    });
+
+    it("書き込みは書けたことを返す", ({ ungatedStatusWasWritten }) => {
+      expect(ungatedStatusWasWritten).toBe(true);
+    });
   });
 
-  it("世代ゲートなしの書き込みは書けたことを返す", ({ ungatedWrite }) => {
-    expect(ungatedWrite.wrote).toStrictEqual(true);
+  describe("世代が進んだ writer", () => {
+    const it = test
+      .extend("commitStatusCreatorAfterStaleWrite", async () => {
+        const createCommitStatus = vi.fn<HandlerGithubClient["createCommitStatus"]>(() =>
+          Promise.resolve(),
+        );
+        const gate = createLifecycleGate();
+        gate.interruptForInputChange(7);
+        const writer = createStatusWriter({
+          github: {
+            prSnapshot: () => Promise.reject(new Error("not used")),
+            createCommitStatus,
+            listReviews: () => Promise.resolve([]),
+            requestReviewers: () => Promise.resolve(),
+          },
+          context: "ctx",
+          log: silentLogger,
+          guard: { gate, prNumber: 7, generation: 0 },
+        });
+        await writer.write({ sha: "abc", state: "success", description: "done" });
+        return createCommitStatus;
+      })
+      .extend("staleGenerationStatusWasWritten", async () => {
+        const createCommitStatus = vi.fn<HandlerGithubClient["createCommitStatus"]>(() =>
+          Promise.resolve(),
+        );
+        const gate = createLifecycleGate();
+        gate.interruptForInputChange(7);
+        const writer = createStatusWriter({
+          github: {
+            prSnapshot: () => Promise.reject(new Error("not used")),
+            createCommitStatus,
+            listReviews: () => Promise.resolve([]),
+            requestReviewers: () => Promise.resolve(),
+          },
+          context: "ctx",
+          log: silentLogger,
+          guard: { gate, prNumber: 7, generation: 0 },
+        });
+        return writer.write({ sha: "abc", state: "success", description: "done" });
+      });
+
+    it("GitHub を呼ばない", ({ commitStatusCreatorAfterStaleWrite }) => {
+      expect(commitStatusCreatorAfterStaleWrite).not.toHaveBeenCalled();
+    });
+
+    it("書かなかったことを返す", ({ staleGenerationStatusWasWritten }) => {
+      expect(staleGenerationStatusWasWritten).toBe(false);
+    });
   });
 
-  it("世代が進んでいれば GitHub を呼ばない", ({ staleGenerationWrite }) => {
-    expect(staleGenerationWrite.calls).toStrictEqual([]);
+  describe("世代が現在のままの writer", () => {
+    const it = test.extend("commitStatusCreatorAfterCurrentWrite", async () => {
+      const createCommitStatus = vi.fn<HandlerGithubClient["createCommitStatus"]>(() =>
+        Promise.resolve(),
+      );
+      const gate = createLifecycleGate();
+      const writer = createStatusWriter({
+        github: {
+          prSnapshot: () => Promise.reject(new Error("not used")),
+          createCommitStatus,
+          listReviews: () => Promise.resolve([]),
+          requestReviewers: () => Promise.resolve(),
+        },
+        context: "ctx",
+        log: silentLogger,
+        guard: { gate, prNumber: 7, generation: 0 },
+      });
+      await writer.write({ sha: "abc", state: "success", description: "done" });
+      return createCommitStatus;
+    });
+
+    it("GitHub へ書く", ({ commitStatusCreatorAfterCurrentWrite }) => {
+      expect(commitStatusCreatorAfterCurrentWrite).toHaveBeenCalledTimes(1);
+    });
   });
 
-  it("世代が進んでいれば書かなかったことを返す", ({ staleGenerationWrite }) => {
-    expect(staleGenerationWrite.wrote).toStrictEqual(false);
-  });
+  describe("GitHub API が落ちている writer", () => {
+    const it = test
+      .extend("failingApiStatusWasWritten", async () => {
+        const writer = createStatusWriter({
+          github: {
+            prSnapshot: () => Promise.reject(new Error("not used")),
+            createCommitStatus: () => Promise.reject(new Error("GitHub is down")),
+            listReviews: () => Promise.resolve([]),
+            requestReviewers: () => Promise.resolve(),
+          },
+          context: "ctx",
+          log: silentLogger,
+        });
+        return writer.write({ sha: "abc", state: "failure", description: "failed" });
+      })
+      .extend("warningLoggerAfterFailingApiWrite", async () => {
+        const warn = vi.fn<(fields: Readonly<Record<string, unknown>>, message: string) => void>();
+        const writer = createStatusWriter({
+          github: {
+            prSnapshot: () => Promise.reject(new Error("not used")),
+            createCommitStatus: () => Promise.reject(new Error("GitHub is down")),
+            listReviews: () => Promise.resolve([]),
+            requestReviewers: () => Promise.resolve(),
+          },
+          context: "ctx",
+          log: { ...silentLogger, warn },
+        });
+        await writer.write({ sha: "abc", state: "failure", description: "failed" });
+        return warn;
+      });
 
-  it("世代が現在のままなら GitHub へ書く", ({ currentGenerationWrite }) => {
-    expect(currentGenerationWrite.calls.length).toStrictEqual(1);
-  });
+    it("警告のみで書けた扱いにする", ({ failingApiStatusWasWritten }) => {
+      expect(failingApiStatusWasWritten).toBe(true);
+    });
 
-  it("API 失敗は警告のみで書けた扱いにする", ({ failingApiWrite }) => {
-    expect(failingApiWrite.wrote).toStrictEqual(true);
-  });
-
-  it("API 失敗は警告ログを 1 本残す", ({ failingApiWrite }) => {
-    expect(failingApiWrite.warnings).toStrictEqual(1);
+    it("警告ログを 1 本残す", ({ warningLoggerAfterFailingApiWrite }) => {
+      expect(warningLoggerAfterFailingApiWrite).toHaveBeenCalledTimes(1);
+    });
   });
 });

@@ -1,127 +1,164 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { singleUseCatalogEntryFindings } from "./single-use-catalog-entry.ts";
 
-import type { DependencyUsage } from "../dependency-usage.ts";
-import type { CatalogEntry, OverrideCatalogReference } from "../workspace-definition.ts";
-
-const DEFINITION_PATH = "pnpm-workspace.yaml";
-
-const REACT_ENTRY: CatalogEntry = {
-  catalogName: "",
-  dependencyName: "react",
-  version: "^19.0.0",
-};
-
-const findingsFor = ({
-  usages,
-  overrideReferences = [],
-}: {
-  readonly usages: readonly DependencyUsage[];
-  readonly overrideReferences?: readonly OverrideCatalogReference[];
-}) =>
-  singleUseCatalogEntryFindings({
-    catalogEntries: [REACT_ENTRY],
-    definitionPath: DEFINITION_PATH,
-    usages,
-    overrideReferences,
-  });
-
 describe("singleUseCatalogEntryFindings", () => {
-  it("reports the entry that only one manifest references", () => {
-    const findings = findingsFor({
-      usages: [
-        {
-          dependencyName: "react",
-          catalogReferences: [{ manifestPath: "apps/web/package.json", catalogName: "" }],
-          directReferences: [],
-        },
-      ],
-    });
+  describe("an entry that only one manifest references", () => {
+    const it = test.extend("findings", () =>
+      singleUseCatalogEntryFindings({
+        catalogEntries: [{ catalogName: "", dependencyName: "react", version: "^19.0.0" }],
+        definitionPath: "pnpm-workspace.yaml",
+        usages: [
+          {
+            dependencyName: "react",
+            catalogReferences: [{ manifestPath: "apps/web/package.json", catalogName: "" }],
+            directReferences: [],
+          },
+        ],
+        overrideReferences: [],
+      }));
 
-    expect(findings.length).toBe(1);
-    expect(findings[0]?.entry).toBe(REACT_ENTRY);
-    expect(findings[0]?.problem.file).toBe(DEFINITION_PATH);
-    expect(findings[0]?.problem.message).toContain("apps/web/package.json");
-    expect(findings[0]?.problem.message).toContain("^19.0.0");
+    it("reports it against the definition, naming the manifest and the version to write there", ({
+      findings,
+    }) => {
+      expect(findings).toStrictEqual([
+        {
+          entry: { catalogName: "", dependencyName: "react", version: "^19.0.0" },
+          problem: {
+            file: "pnpm-workspace.yaml",
+            line: null,
+            message:
+              "The catalog must not hold react while apps/web/package.json is the only manifest that uses it, because a catalog entry exists to share one version between manifests. Write ^19.0.0 into that manifest and delete the entry.",
+          },
+        },
+      ]);
+    });
   });
 
-  it("counts a direct pin of the same version as a second user", () => {
-    const findings = findingsFor({
-      usages: [
-        {
-          dependencyName: "react",
-          catalogReferences: [{ manifestPath: "apps/web/package.json", catalogName: "" }],
-          directReferences: [{ manifestPath: "package.json", specifier: "^19.0.0" }],
-        },
-      ],
-    });
+  describe("a direct pin of the same version beside the one catalog reference", () => {
+    const it = test.extend("findings", () =>
+      singleUseCatalogEntryFindings({
+        catalogEntries: [{ catalogName: "", dependencyName: "react", version: "^19.0.0" }],
+        definitionPath: "pnpm-workspace.yaml",
+        usages: [
+          {
+            dependencyName: "react",
+            catalogReferences: [{ manifestPath: "apps/web/package.json", catalogName: "" }],
+            directReferences: [{ manifestPath: "package.json", specifier: "^19.0.0" }],
+          },
+        ],
+        overrideReferences: [],
+      }));
 
-    expect(findings).toStrictEqual([]);
+    it("counts that pin as a second user and leaves the entry alone", ({ findings }) => {
+      expect(findings).toStrictEqual([]);
+    });
   });
 
-  it("leaves an entry alone when a reference points at another catalog", () => {
-    const findings = findingsFor({
-      usages: [
-        {
-          dependencyName: "react",
-          catalogReferences: [{ manifestPath: "apps/web/package.json", catalogName: "legacy" }],
-          directReferences: [],
-        },
-      ],
-    });
+  describe("a reference that points at another catalog", () => {
+    const it = test.extend("findings", () =>
+      singleUseCatalogEntryFindings({
+        catalogEntries: [{ catalogName: "", dependencyName: "react", version: "^19.0.0" }],
+        definitionPath: "pnpm-workspace.yaml",
+        usages: [
+          {
+            dependencyName: "react",
+            catalogReferences: [{ manifestPath: "apps/web/package.json", catalogName: "legacy" }],
+            directReferences: [],
+          },
+        ],
+        overrideReferences: [],
+      }));
 
-    expect(findings).toStrictEqual([]);
+    it("leaves the entry alone", ({ findings }) => {
+      expect(findings).toStrictEqual([]);
+    });
   });
 
-  it("leaves an entry that nothing references to the unused-dependency tooling", () => {
-    expect(findingsFor({ usages: [] })).toStrictEqual([]);
+  describe("an entry that nothing references", () => {
+    const it = test.extend("findings", () =>
+      singleUseCatalogEntryFindings({
+        catalogEntries: [{ catalogName: "", dependencyName: "react", version: "^19.0.0" }],
+        definitionPath: "pnpm-workspace.yaml",
+        usages: [],
+        overrideReferences: [],
+      }));
+
+    it("leaves it to the unused-dependency tooling", ({ findings }) => {
+      expect(findings).toStrictEqual([]);
+    });
   });
 
-  it("leaves an entry alone when an override references the catalog for it", () => {
-    const findings = findingsFor({
-      usages: [
-        {
-          dependencyName: "react",
-          catalogReferences: [{ manifestPath: "apps/web/package.json", catalogName: "" }],
-          directReferences: [],
-        },
-      ],
-      overrideReferences: [{ catalogName: "", dependencyName: "react" }],
-    });
+  describe("an override that references the catalog holding the entry", () => {
+    const it = test.extend("findings", () =>
+      singleUseCatalogEntryFindings({
+        catalogEntries: [{ catalogName: "", dependencyName: "react", version: "^19.0.0" }],
+        definitionPath: "pnpm-workspace.yaml",
+        usages: [
+          {
+            dependencyName: "react",
+            catalogReferences: [{ manifestPath: "apps/web/package.json", catalogName: "" }],
+            directReferences: [],
+          },
+        ],
+        overrideReferences: [{ catalogName: "", dependencyName: "react" }],
+      }));
 
-    expect(findings).toStrictEqual([]);
+    it("leaves the entry alone", ({ findings }) => {
+      expect(findings).toStrictEqual([]);
+    });
   });
 
-  it("reports an entry whose name an override references from another catalog", () => {
-    const findings = findingsFor({
-      usages: [
-        {
-          dependencyName: "react",
-          catalogReferences: [{ manifestPath: "apps/web/package.json", catalogName: "" }],
-          directReferences: [],
-        },
-      ],
-      overrideReferences: [{ catalogName: "legacy", dependencyName: "react" }],
-    });
+  describe("an override that references the same name from another catalog", () => {
+    const it = test.extend("findings", () =>
+      singleUseCatalogEntryFindings({
+        catalogEntries: [{ catalogName: "", dependencyName: "react", version: "^19.0.0" }],
+        definitionPath: "pnpm-workspace.yaml",
+        usages: [
+          {
+            dependencyName: "react",
+            catalogReferences: [{ manifestPath: "apps/web/package.json", catalogName: "" }],
+            directReferences: [],
+          },
+        ],
+        overrideReferences: [{ catalogName: "legacy", dependencyName: "react" }],
+      }));
 
-    expect(findings.length).toBe(1);
+    it("reports the entry that override does not reach", ({ findings }) => {
+      expect(findings).toStrictEqual([
+        {
+          entry: { catalogName: "", dependencyName: "react", version: "^19.0.0" },
+          problem: {
+            file: "pnpm-workspace.yaml",
+            line: null,
+            message:
+              "The catalog must not hold react while apps/web/package.json is the only manifest that uses it, because a catalog entry exists to share one version between manifests. Write ^19.0.0 into that manifest and delete the entry.",
+          },
+        },
+      ]);
+    });
   });
 
-  it("leaves an entry alone when a second manifest also references it", () => {
-    const findings = findingsFor({
-      usages: [
-        {
-          dependencyName: "react",
-          catalogReferences: [
-            { manifestPath: "apps/web/package.json", catalogName: "" },
-            { manifestPath: "package.json", catalogName: "" },
-          ],
-          directReferences: [],
-        },
-      ],
-    });
+  describe("a second manifest that also references the entry", () => {
+    const it = test.extend("findings", () =>
+      singleUseCatalogEntryFindings({
+        catalogEntries: [{ catalogName: "", dependencyName: "react", version: "^19.0.0" }],
+        definitionPath: "pnpm-workspace.yaml",
+        usages: [
+          {
+            dependencyName: "react",
+            catalogReferences: [
+              { manifestPath: "apps/web/package.json", catalogName: "" },
+              { manifestPath: "package.json", catalogName: "" },
+            ],
+            directReferences: [],
+          },
+        ],
+        overrideReferences: [],
+      }));
 
-    expect(findings).toStrictEqual([]);
+    it("leaves the entry alone", ({ findings }) => {
+      expect(findings).toStrictEqual([]);
+    });
   });
 });

@@ -7,6 +7,8 @@ export default defineConfig({
     coverage: {
       thresholds: { 100: true, perFile: true },
     },
+    unstubEnvs: true,
+    unstubGlobals: true,
   },
   pack: {
     entry: ["src/cli.ts", "src/server.ts"],

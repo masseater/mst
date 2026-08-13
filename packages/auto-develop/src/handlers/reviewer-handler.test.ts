@@ -5,250 +5,955 @@ import { ReviewInputChangedError } from "../lifecycle/review-input-changed-error
 import { silentLogger } from "../logging/logger.ts";
 import { createReviewerHandler, type ReviewerHandlerConfig } from "./reviewer-handler.ts";
 
-import type { Review } from "../lifecycle/review-verdict.ts";
-import type { HandlerGithubClient, PrSnapshot } from "./github-client.ts";
-
-type RunOutcome = {
-  readonly statuses: readonly { readonly sha: string; readonly state: string }[];
-  readonly followUps: readonly unknown[][];
-  readonly sessionCalls: number;
-  readonly failure: unknown;
-  readonly failureMessage: string | null;
-};
-
-const snapshot = (overrides: Partial<PrSnapshot> = {}): PrSnapshot => ({
-  prNumber: 7,
-  title: "title",
-  body: "body",
-  state: "OPEN",
-  headRefName: "topic/x",
-  headRefOid: "sha-1",
-  baseRefName: "main",
-  draft: false,
-  requestedReviewerLogins: [],
-  ...overrides,
-});
-
-const failureMessageOf = (failure: unknown): string | null =>
-  failure instanceof Error ? failure.message : null;
-
-const runHandler = async (setup: {
-  readonly snapshots: readonly PrSnapshot[];
-  readonly reviews?: readonly Review[];
-  readonly sessionFailure?: Error;
-  readonly dryRun?: boolean;
-  readonly proxyLogin?: string | null;
-  readonly staleGeneration?: boolean;
-  readonly staleAfterSession?: boolean;
-}): Promise<RunOutcome> => {
-  const statusBySha = new Map<number, { readonly sha: string; readonly state: string }>();
-  const snapshotIndex = new Map([["next", 0]]);
-  const gate = createLifecycleGate();
-  const github: HandlerGithubClient = {
-    prSnapshot: () => {
-      const index = snapshotIndex.get("next") ?? 0;
-      snapshotIndex.set("next", index + 1);
-      if (setup.staleGeneration === true && index === 0) gate.interruptForInputChange(7);
-      if (setup.staleAfterSession === true && index === 1) gate.interruptForInputChange(7);
-      return Promise.resolve(
-        setup.snapshots[Math.min(index, setup.snapshots.length - 1)] as PrSnapshot,
-      );
-    },
-    createCommitStatus: (asked) => {
-      statusBySha.set(statusBySha.size, { sha: asked.sha, state: asked.state });
-      return Promise.resolve();
-    },
-    listReviews: () => Promise.resolve(setup.reviews ?? []),
-    requestReviewers: () => Promise.resolve(),
-  };
-  const requestFollowUpReview = vi.fn<ReviewerHandlerConfig["requestFollowUpReview"]>();
-  const runSession = vi.fn<ReviewerHandlerConfig["runSession"]>(() =>
-    setup.sessionFailure === undefined ? Promise.resolve() : Promise.reject(setup.sessionFailure),
-  );
-  const takenHandler = createReviewerHandler({
-    github,
-    gate,
-    runSession,
-    requestFollowUpReview,
-    dryRun: setup.dryRun ?? false,
-    ...(setup.proxyLogin === null ? {} : { proxyLogin: setup.proxyLogin ?? "review-bot" }),
-    log: silentLogger,
-  });
-  try {
-    await takenHandler(7);
-    return {
-      statuses: [...statusBySha.values()],
-      followUps: requestFollowUpReview.mock.calls,
-      sessionCalls: runSession.mock.calls.length,
-      failure: null,
-      failureMessage: null,
-    };
-  } catch (handlerFailure) {
-    return {
-      statuses: [...statusBySha.values()],
-      followUps: requestFollowUpReview.mock.calls,
-      sessionCalls: runSession.mock.calls.length,
-      failure: handlerFailure,
-      failureMessage: failureMessageOf(handlerFailure),
-    };
-  }
-};
-
-const review = (overrides: Partial<Review>): Review => ({
-  state: "APPROVED",
-  body: "",
-  submittedAt: "2026-08-11T00:00:00.000Z",
-  commitSha: "sha-1",
-  authorLogin: "review-bot",
-  ...overrides,
-});
-
-const it = test
-  .extend("cleanRun", () => runHandler({ snapshots: [snapshot(), snapshot()] }))
-  .extend("changesRequestedRun", () =>
-    runHandler({
-      snapshots: [snapshot(), snapshot()],
-      reviews: [review({ state: "CHANGES_REQUESTED" })],
-    }),
-  )
-  .extend("noEffectiveReviewRun", () =>
-    runHandler({ snapshots: [snapshot(), snapshot()], reviews: [] }),
-  )
-  .extend("dryRun", () => runHandler({ snapshots: [snapshot()], dryRun: true }))
-  .extend("missingProxyLoginRun", () =>
-    runHandler({ snapshots: [snapshot(), snapshot()], proxyLogin: null }),
-  )
-  .extend("baseChangedRun", () =>
-    runHandler({ snapshots: [snapshot(), snapshot({ baseRefName: "develop" })] }),
-  )
-  .extend("headChangedRun", () =>
-    runHandler({ snapshots: [snapshot(), snapshot({ headRefOid: "sha-2" })] }),
-  )
-  .extend("staleBeforeStartRun", () =>
-    runHandler({ snapshots: [snapshot(), snapshot()], staleGeneration: true }),
-  )
-  .extend("sessionFailedRun", () =>
-    runHandler({ snapshots: [snapshot(), snapshot()], sessionFailure: new Error("engine broke") }),
-  )
-  .extend("interruptedRun", () =>
-    runHandler({
-      snapshots: [snapshot(), snapshot()],
-      sessionFailure: new ReviewInputChangedError(7),
-    }),
-  )
-  .extend("failedAndBaseChangedRun", () =>
-    runHandler({
-      snapshots: [snapshot(), snapshot({ baseRefName: "develop" })],
-      sessionFailure: new Error("engine broke"),
-    }),
-  )
-  .extend("failedAfterGenerationMovedRun", () =>
-    runHandler({
-      snapshots: [snapshot(), snapshot()],
-      sessionFailure: new Error("engine broke"),
-      staleAfterSession: true,
-    }),
-  );
+import type { HandlerGithubClient } from "./github-client.ts";
 
 describe("createReviewerHandler の正常系", () => {
-  it("正常完了は pending と success の 2 つのステータスを残す", ({ cleanRun }) => {
-    expect(cleanRun.statuses).toStrictEqual([
-      { sha: "sha-1", state: "pending" },
-      { sha: "sha-1", state: "success" },
-    ]);
+  const it = test
+    .extend("cleanRunStatusWrites", async () => {
+      const statusWrites = vi.fn<HandlerGithubClient["createCommitStatus"]>(() =>
+        Promise.resolve(),
+      );
+      await createReviewerHandler({
+        github: {
+          prSnapshot: () =>
+            Promise.resolve({
+              prNumber: 7,
+              title: "title",
+              body: "body",
+              state: "OPEN",
+              headRefName: "topic/x",
+              headRefOid: "sha-1",
+              baseRefName: "main",
+              draft: false,
+              requestedReviewerLogins: [],
+            }),
+          createCommitStatus: statusWrites,
+          listReviews: () => Promise.resolve([]),
+          requestReviewers: () => Promise.resolve(),
+        },
+        gate: createLifecycleGate(),
+        runSession: () => Promise.resolve(),
+        requestFollowUpReview: () => undefined,
+        dryRun: false,
+        proxyLogin: "review-bot",
+        log: silentLogger,
+      })(7);
+      return statusWrites;
+    })
+    .extend("changesRequestedStatusWrites", async () => {
+      const statusWrites = vi.fn<HandlerGithubClient["createCommitStatus"]>(() =>
+        Promise.resolve(),
+      );
+      await createReviewerHandler({
+        github: {
+          prSnapshot: () =>
+            Promise.resolve({
+              prNumber: 7,
+              title: "title",
+              body: "body",
+              state: "OPEN",
+              headRefName: "topic/x",
+              headRefOid: "sha-1",
+              baseRefName: "main",
+              draft: false,
+              requestedReviewerLogins: [],
+            }),
+          createCommitStatus: statusWrites,
+          listReviews: () =>
+            Promise.resolve([
+              {
+                state: "CHANGES_REQUESTED",
+                body: "",
+                submittedAt: "2026-08-11T00:00:00.000Z",
+                commitSha: "sha-1",
+                authorLogin: "review-bot",
+              },
+            ]),
+          requestReviewers: () => Promise.resolve(),
+        },
+        gate: createLifecycleGate(),
+        runSession: () => Promise.resolve(),
+        requestFollowUpReview: () => undefined,
+        dryRun: false,
+        proxyLogin: "review-bot",
+        log: silentLogger,
+      })(7);
+      return statusWrites;
+    })
+    .extend("noEffectiveReviewStatusWrites", async () => {
+      const statusWrites = vi.fn<HandlerGithubClient["createCommitStatus"]>(() =>
+        Promise.resolve(),
+      );
+      await createReviewerHandler({
+        github: {
+          prSnapshot: () =>
+            Promise.resolve({
+              prNumber: 7,
+              title: "title",
+              body: "body",
+              state: "OPEN",
+              headRefName: "topic/x",
+              headRefOid: "sha-1",
+              baseRefName: "main",
+              draft: false,
+              requestedReviewerLogins: [],
+            }),
+          createCommitStatus: statusWrites,
+          listReviews: () => Promise.resolve([]),
+          requestReviewers: () => Promise.resolve(),
+        },
+        gate: createLifecycleGate(),
+        runSession: () => Promise.resolve(),
+        requestFollowUpReview: () => undefined,
+        dryRun: false,
+        proxyLogin: "review-bot",
+        log: silentLogger,
+      })(7);
+      return statusWrites;
+    })
+    .extend("missingProxyLoginStatusWrites", async () => {
+      const statusWrites = vi.fn<HandlerGithubClient["createCommitStatus"]>(() =>
+        Promise.resolve(),
+      );
+      await createReviewerHandler({
+        github: {
+          prSnapshot: () =>
+            Promise.resolve({
+              prNumber: 7,
+              title: "title",
+              body: "body",
+              state: "OPEN",
+              headRefName: "topic/x",
+              headRefOid: "sha-1",
+              baseRefName: "main",
+              draft: false,
+              requestedReviewerLogins: [],
+            }),
+          createCommitStatus: statusWrites,
+          listReviews: () => Promise.resolve([]),
+          requestReviewers: () => Promise.resolve(),
+        },
+        gate: createLifecycleGate(),
+        runSession: () => Promise.resolve(),
+        requestFollowUpReview: () => undefined,
+        dryRun: false,
+        log: silentLogger,
+      })(7);
+      return statusWrites;
+    })
+    .extend("missingProxyLoginReviewLookups", async () => {
+      const reviewLookups = vi.fn<HandlerGithubClient["listReviews"]>(() => Promise.resolve([]));
+      await createReviewerHandler({
+        github: {
+          prSnapshot: () =>
+            Promise.resolve({
+              prNumber: 7,
+              title: "title",
+              body: "body",
+              state: "OPEN",
+              headRefName: "topic/x",
+              headRefOid: "sha-1",
+              baseRefName: "main",
+              draft: false,
+              requestedReviewerLogins: [],
+            }),
+          createCommitStatus: () => Promise.resolve(),
+          listReviews: reviewLookups,
+          requestReviewers: () => Promise.resolve(),
+        },
+        gate: createLifecycleGate(),
+        runSession: () => Promise.resolve(),
+        requestFollowUpReview: () => undefined,
+        dryRun: false,
+        log: silentLogger,
+      })(7);
+      return reviewLookups;
+    });
+
+  it("正常完了はステータスを 2 つだけ残す", ({ cleanRunStatusWrites }) => {
+    expect(cleanRunStatusWrites).toHaveBeenCalledTimes(2);
   });
 
-  it("変更要求のレビューがあれば最終ステータスは error になる", ({ changesRequestedRun }) => {
-    expect(changesRequestedRun.statuses).toStrictEqual([
-      { sha: "sha-1", state: "pending" },
-      { sha: "sha-1", state: "error" },
-    ]);
+  it("正常完了は最初に pending を書く", ({ cleanRunStatusWrites }) => {
+    expect(cleanRunStatusWrites).toHaveBeenNthCalledWith(1, {
+      sha: "sha-1",
+      state: "pending",
+      context: "auto-develop/reviewer",
+      description: "reviewing",
+    });
   });
 
-  it("実効レビューが無くても最終ステータスは success になる", ({ noEffectiveReviewRun }) => {
-    expect(noEffectiveReviewRun.statuses).toStrictEqual([
-      { sha: "sha-1", state: "pending" },
-      { sha: "sha-1", state: "success" },
-    ]);
+  it("正常完了は最後に success を書く", ({ cleanRunStatusWrites }) => {
+    expect(cleanRunStatusWrites).toHaveBeenNthCalledWith(2, {
+      sha: "sha-1",
+      state: "success",
+      context: "auto-develop/reviewer",
+      description: "review completed",
+    });
   });
 
-  it("代理ログイン未設定なら判定を取りに行かず failure を書く", ({ missingProxyLoginRun }) => {
-    expect(missingProxyLoginRun.statuses).toStrictEqual([
-      { sha: "sha-1", state: "pending" },
-      { sha: "sha-1", state: "failure" },
-    ]);
+  it("変更要求のレビューがあってもステータスは 2 つだけ残る", ({
+    changesRequestedStatusWrites,
+  }) => {
+    expect(changesRequestedStatusWrites).toHaveBeenCalledTimes(2);
+  });
+
+  it("変更要求のレビューがあっても最初は pending を書く", ({ changesRequestedStatusWrites }) => {
+    expect(changesRequestedStatusWrites).toHaveBeenNthCalledWith(1, {
+      sha: "sha-1",
+      state: "pending",
+      context: "auto-develop/reviewer",
+      description: "reviewing",
+    });
+  });
+
+  it("変更要求のレビューがあれば最終ステータスは error になる", ({
+    changesRequestedStatusWrites,
+  }) => {
+    expect(changesRequestedStatusWrites).toHaveBeenNthCalledWith(2, {
+      sha: "sha-1",
+      state: "error",
+      context: "auto-develop/reviewer",
+      description: "review completed with changes requested",
+    });
+  });
+
+  it("実効レビューが無くてもステータスは 2 つだけ残る", ({ noEffectiveReviewStatusWrites }) => {
+    expect(noEffectiveReviewStatusWrites).toHaveBeenCalledTimes(2);
+  });
+
+  it("実効レビューが無くても最初は pending を書く", ({ noEffectiveReviewStatusWrites }) => {
+    expect(noEffectiveReviewStatusWrites).toHaveBeenNthCalledWith(1, {
+      sha: "sha-1",
+      state: "pending",
+      context: "auto-develop/reviewer",
+      description: "reviewing",
+    });
+  });
+
+  it("実効レビューが無くても最終ステータスは success になる", ({
+    noEffectiveReviewStatusWrites,
+  }) => {
+    expect(noEffectiveReviewStatusWrites).toHaveBeenNthCalledWith(2, {
+      sha: "sha-1",
+      state: "success",
+      context: "auto-develop/reviewer",
+      description: "review completed",
+    });
+  });
+
+  it("代理ログイン未設定でもステータスは 2 つだけ残る", ({ missingProxyLoginStatusWrites }) => {
+    expect(missingProxyLoginStatusWrites).toHaveBeenCalledTimes(2);
+  });
+
+  it("代理ログイン未設定でも最初は pending を書く", ({ missingProxyLoginStatusWrites }) => {
+    expect(missingProxyLoginStatusWrites).toHaveBeenNthCalledWith(1, {
+      sha: "sha-1",
+      state: "pending",
+      context: "auto-develop/reviewer",
+      description: "reviewing",
+    });
+  });
+
+  it("代理ログイン未設定なら最終ステータスは failure になる", ({
+    missingProxyLoginStatusWrites,
+  }) => {
+    expect(missingProxyLoginStatusWrites).toHaveBeenNthCalledWith(2, {
+      sha: "sha-1",
+      state: "failure",
+      context: "auto-develop/reviewer",
+      description: "review failed; the reviewer login is unknown",
+    });
+  });
+
+  it("代理ログイン未設定ならレビュー判定を取りに行かない", ({ missingProxyLoginReviewLookups }) => {
+    expect(missingProxyLoginReviewLookups).toHaveBeenCalledTimes(0);
   });
 });
 
 describe("createReviewerHandler の dry run", () => {
-  it("dry run はステータスを 1 つも書かない", ({ dryRun }) => {
-    expect(dryRun.statuses).toStrictEqual([]);
+  const it = test
+    .extend("dryRunStatusWrites", async () => {
+      const statusWrites = vi.fn<HandlerGithubClient["createCommitStatus"]>(() =>
+        Promise.resolve(),
+      );
+      await createReviewerHandler({
+        github: {
+          prSnapshot: () =>
+            Promise.resolve({
+              prNumber: 7,
+              title: "title",
+              body: "body",
+              state: "OPEN",
+              headRefName: "topic/x",
+              headRefOid: "sha-1",
+              baseRefName: "main",
+              draft: false,
+              requestedReviewerLogins: [],
+            }),
+          createCommitStatus: statusWrites,
+          listReviews: () => Promise.resolve([]),
+          requestReviewers: () => Promise.resolve(),
+        },
+        gate: createLifecycleGate(),
+        runSession: () => Promise.resolve(),
+        requestFollowUpReview: () => undefined,
+        dryRun: true,
+        proxyLogin: "review-bot",
+        log: silentLogger,
+      })(7);
+      return statusWrites;
+    })
+    .extend("dryRunSessions", async () => {
+      const sessionRuns = vi.fn<ReviewerHandlerConfig["runSession"]>(() => Promise.resolve());
+      await createReviewerHandler({
+        github: {
+          prSnapshot: () =>
+            Promise.resolve({
+              prNumber: 7,
+              title: "title",
+              body: "body",
+              state: "OPEN",
+              headRefName: "topic/x",
+              headRefOid: "sha-1",
+              baseRefName: "main",
+              draft: false,
+              requestedReviewerLogins: [],
+            }),
+          createCommitStatus: () => Promise.resolve(),
+          listReviews: () => Promise.resolve([]),
+          requestReviewers: () => Promise.resolve(),
+        },
+        gate: createLifecycleGate(),
+        runSession: sessionRuns,
+        requestFollowUpReview: () => undefined,
+        dryRun: true,
+        proxyLogin: "review-bot",
+        log: silentLogger,
+      })(7);
+      return sessionRuns;
+    });
+
+  it("dry run はステータスを 1 つも書かない", ({ dryRunStatusWrites }) => {
+    expect(dryRunStatusWrites).toHaveBeenCalledTimes(0);
   });
 
-  it("dry run はセッションを起動しない", ({ dryRun }) => {
-    expect(dryRun.sessionCalls).toStrictEqual(0);
+  it("dry run はセッションを起動しない", ({ dryRunSessions }) => {
+    expect(dryRunSessions).toHaveBeenCalledTimes(0);
   });
 });
 
 describe("createReviewerHandler の入力変更", () => {
-  it("base が変われば後続レビューを base 側で 1 回要求する", ({ baseChangedRun }) => {
-    expect(baseChangedRun.followUps).toStrictEqual([[{ prNumber: 7, endpoint: "base" }]]);
+  const it = test
+    .extend("baseChangedFollowUpRequests", async () => {
+      const followUpRequests = vi.fn<ReviewerHandlerConfig["requestFollowUpReview"]>();
+      await createReviewerHandler({
+        github: {
+          prSnapshot: vi
+            .fn<HandlerGithubClient["prSnapshot"]>()
+            .mockResolvedValueOnce({
+              prNumber: 7,
+              title: "title",
+              body: "body",
+              state: "OPEN",
+              headRefName: "topic/x",
+              headRefOid: "sha-1",
+              baseRefName: "main",
+              draft: false,
+              requestedReviewerLogins: [],
+            })
+            .mockResolvedValueOnce({
+              prNumber: 7,
+              title: "title",
+              body: "body",
+              state: "OPEN",
+              headRefName: "topic/x",
+              headRefOid: "sha-1",
+              baseRefName: "develop",
+              draft: false,
+              requestedReviewerLogins: [],
+            }),
+          createCommitStatus: () => Promise.resolve(),
+          listReviews: () => Promise.resolve([]),
+          requestReviewers: () => Promise.resolve(),
+        },
+        gate: createLifecycleGate(),
+        runSession: () => Promise.resolve(),
+        requestFollowUpReview: followUpRequests,
+        dryRun: false,
+        proxyLogin: "review-bot",
+        log: silentLogger,
+      })(7);
+      return followUpRequests;
+    })
+    .extend("baseChangedStatusWrites", async () => {
+      const statusWrites = vi.fn<HandlerGithubClient["createCommitStatus"]>(() =>
+        Promise.resolve(),
+      );
+      await createReviewerHandler({
+        github: {
+          prSnapshot: vi
+            .fn<HandlerGithubClient["prSnapshot"]>()
+            .mockResolvedValueOnce({
+              prNumber: 7,
+              title: "title",
+              body: "body",
+              state: "OPEN",
+              headRefName: "topic/x",
+              headRefOid: "sha-1",
+              baseRefName: "main",
+              draft: false,
+              requestedReviewerLogins: [],
+            })
+            .mockResolvedValueOnce({
+              prNumber: 7,
+              title: "title",
+              body: "body",
+              state: "OPEN",
+              headRefName: "topic/x",
+              headRefOid: "sha-1",
+              baseRefName: "develop",
+              draft: false,
+              requestedReviewerLogins: [],
+            }),
+          createCommitStatus: statusWrites,
+          listReviews: () => Promise.resolve([]),
+          requestReviewers: () => Promise.resolve(),
+        },
+        gate: createLifecycleGate(),
+        runSession: () => Promise.resolve(),
+        requestFollowUpReview: () => undefined,
+        dryRun: false,
+        proxyLogin: "review-bot",
+        log: silentLogger,
+      })(7);
+      return statusWrites;
+    })
+    .extend("headChangedFollowUpRequests", async () => {
+      const followUpRequests = vi.fn<ReviewerHandlerConfig["requestFollowUpReview"]>();
+      await createReviewerHandler({
+        github: {
+          prSnapshot: vi
+            .fn<HandlerGithubClient["prSnapshot"]>()
+            .mockResolvedValueOnce({
+              prNumber: 7,
+              title: "title",
+              body: "body",
+              state: "OPEN",
+              headRefName: "topic/x",
+              headRefOid: "sha-1",
+              baseRefName: "main",
+              draft: false,
+              requestedReviewerLogins: [],
+            })
+            .mockResolvedValueOnce({
+              prNumber: 7,
+              title: "title",
+              body: "body",
+              state: "OPEN",
+              headRefName: "topic/x",
+              headRefOid: "sha-2",
+              baseRefName: "main",
+              draft: false,
+              requestedReviewerLogins: [],
+            }),
+          createCommitStatus: () => Promise.resolve(),
+          listReviews: () => Promise.resolve([]),
+          requestReviewers: () => Promise.resolve(),
+        },
+        gate: createLifecycleGate(),
+        runSession: () => Promise.resolve(),
+        requestFollowUpReview: followUpRequests,
+        dryRun: false,
+        proxyLogin: "review-bot",
+        log: silentLogger,
+      })(7);
+      return followUpRequests;
+    })
+    .extend("staleBeforeStartStatusWrites", async () => {
+      const reviewGate = createLifecycleGate();
+      const statusWrites = vi.fn<HandlerGithubClient["createCommitStatus"]>(() =>
+        Promise.resolve(),
+      );
+      await createReviewerHandler({
+        github: {
+          prSnapshot: () => {
+            reviewGate.interruptForInputChange(7);
+            return Promise.resolve({
+              prNumber: 7,
+              title: "title",
+              body: "body",
+              state: "OPEN",
+              headRefName: "topic/x",
+              headRefOid: "sha-1",
+              baseRefName: "main",
+              draft: false,
+              requestedReviewerLogins: [],
+            });
+          },
+          createCommitStatus: statusWrites,
+          listReviews: () => Promise.resolve([]),
+          requestReviewers: () => Promise.resolve(),
+        },
+        gate: reviewGate,
+        runSession: () => Promise.resolve(),
+        requestFollowUpReview: () => undefined,
+        dryRun: false,
+        proxyLogin: "review-bot",
+        log: silentLogger,
+      })(7);
+      return statusWrites;
+    })
+    .extend("staleBeforeStartSessions", async () => {
+      const reviewGate = createLifecycleGate();
+      const sessionRuns = vi.fn<ReviewerHandlerConfig["runSession"]>(() => Promise.resolve());
+      await createReviewerHandler({
+        github: {
+          prSnapshot: () => {
+            reviewGate.interruptForInputChange(7);
+            return Promise.resolve({
+              prNumber: 7,
+              title: "title",
+              body: "body",
+              state: "OPEN",
+              headRefName: "topic/x",
+              headRefOid: "sha-1",
+              baseRefName: "main",
+              draft: false,
+              requestedReviewerLogins: [],
+            });
+          },
+          createCommitStatus: () => Promise.resolve(),
+          listReviews: () => Promise.resolve([]),
+          requestReviewers: () => Promise.resolve(),
+        },
+        gate: reviewGate,
+        runSession: sessionRuns,
+        requestFollowUpReview: () => undefined,
+        dryRun: false,
+        proxyLogin: "review-bot",
+        log: silentLogger,
+      })(7);
+      return sessionRuns;
+    });
+
+  it("base が変われば後続レビューを base 側で 1 回だけ要求する", ({
+    baseChangedFollowUpRequests,
+  }) => {
+    expect(baseChangedFollowUpRequests).toHaveBeenCalledExactlyOnceWith({
+      prNumber: 7,
+      endpoint: "base",
+    });
   });
 
-  it("base が変われば最終ステータスを書かない", ({ baseChangedRun }) => {
-    expect(baseChangedRun.statuses).toStrictEqual([{ sha: "sha-1", state: "pending" }]);
+  it("base が変われば pending の 1 つだけを残し最終ステータスを書かない", ({
+    baseChangedStatusWrites,
+  }) => {
+    expect(baseChangedStatusWrites).toHaveBeenCalledExactlyOnceWith({
+      sha: "sha-1",
+      state: "pending",
+      context: "auto-develop/reviewer",
+      description: "reviewing",
+    });
   });
 
-  it("head が変われば後続レビューを head 側で 1 回要求する", ({ headChangedRun }) => {
-    expect(headChangedRun.followUps).toStrictEqual([[{ prNumber: 7, endpoint: "head" }]]);
+  it("head が変われば後続レビューを head 側で 1 回だけ要求する", ({
+    headChangedFollowUpRequests,
+  }) => {
+    expect(headChangedFollowUpRequests).toHaveBeenCalledExactlyOnceWith({
+      prNumber: 7,
+      endpoint: "head",
+    });
   });
 
   it("スナップショット取得中に世代が変わればステータスを 1 つも書かない", ({
-    staleBeforeStartRun,
+    staleBeforeStartStatusWrites,
   }) => {
-    expect(staleBeforeStartRun.statuses).toStrictEqual([]);
+    expect(staleBeforeStartStatusWrites).toHaveBeenCalledTimes(0);
   });
 
-  it("スナップショット取得中に世代が変わればエンジンを起動しない", ({ staleBeforeStartRun }) => {
-    expect(staleBeforeStartRun.sessionCalls).toStrictEqual(0);
+  it("スナップショット取得中に世代が変わればエンジンを起動しない", ({
+    staleBeforeStartSessions,
+  }) => {
+    expect(staleBeforeStartSessions).toHaveBeenCalledTimes(0);
   });
 });
 
 describe("createReviewerHandler の失敗", () => {
-  it("セッション失敗は failure ステータスを残す", ({ sessionFailedRun }) => {
-    expect(sessionFailedRun.statuses).toStrictEqual([
-      { sha: "sha-1", state: "pending" },
-      { sha: "sha-1", state: "failure" },
-    ]);
+  const it = test
+    .extend("sessionFailedStatusWrites", async () => {
+      const statusWrites = vi.fn<HandlerGithubClient["createCommitStatus"]>(() =>
+        Promise.resolve(),
+      );
+      try {
+        await createReviewerHandler({
+          github: {
+            prSnapshot: () =>
+              Promise.resolve({
+                prNumber: 7,
+                title: "title",
+                body: "body",
+                state: "OPEN",
+                headRefName: "topic/x",
+                headRefOid: "sha-1",
+                baseRefName: "main",
+                draft: false,
+                requestedReviewerLogins: [],
+              }),
+            createCommitStatus: statusWrites,
+            listReviews: () => Promise.resolve([]),
+            requestReviewers: () => Promise.resolve(),
+          },
+          gate: createLifecycleGate(),
+          runSession: () => Promise.reject(new Error("engine broke")),
+          requestFollowUpReview: () => undefined,
+          dryRun: false,
+          proxyLogin: "review-bot",
+          log: silentLogger,
+        })(7);
+      } catch (reviewRejection) {
+        if (!(reviewRejection instanceof Error)) throw reviewRejection;
+        return statusWrites;
+      }
+      throw new Error("the reviewer handler swallowed the session failure");
+    })
+    .extend("sessionFailedRejection", async () => {
+      try {
+        await createReviewerHandler({
+          github: {
+            prSnapshot: () =>
+              Promise.resolve({
+                prNumber: 7,
+                title: "title",
+                body: "body",
+                state: "OPEN",
+                headRefName: "topic/x",
+                headRefOid: "sha-1",
+                baseRefName: "main",
+                draft: false,
+                requestedReviewerLogins: [],
+              }),
+            createCommitStatus: () => Promise.resolve(),
+            listReviews: () => Promise.resolve([]),
+            requestReviewers: () => Promise.resolve(),
+          },
+          gate: createLifecycleGate(),
+          runSession: () => Promise.reject(new Error("engine broke")),
+          requestFollowUpReview: () => undefined,
+          dryRun: false,
+          proxyLogin: "review-bot",
+          log: silentLogger,
+        })(7);
+      } catch (reviewRejection) {
+        return reviewRejection;
+      }
+      throw new Error("the reviewer handler swallowed the session failure");
+    })
+    .extend("interruptedStatusWrites", async () => {
+      const statusWrites = vi.fn<HandlerGithubClient["createCommitStatus"]>(() =>
+        Promise.resolve(),
+      );
+      await createReviewerHandler({
+        github: {
+          prSnapshot: () =>
+            Promise.resolve({
+              prNumber: 7,
+              title: "title",
+              body: "body",
+              state: "OPEN",
+              headRefName: "topic/x",
+              headRefOid: "sha-1",
+              baseRefName: "main",
+              draft: false,
+              requestedReviewerLogins: [],
+            }),
+          createCommitStatus: statusWrites,
+          listReviews: () => Promise.resolve([]),
+          requestReviewers: () => Promise.resolve(),
+        },
+        gate: createLifecycleGate(),
+        runSession: () => Promise.reject(new ReviewInputChangedError(7)),
+        requestFollowUpReview: () => undefined,
+        dryRun: false,
+        proxyLogin: "review-bot",
+        log: silentLogger,
+      })(7);
+      return statusWrites;
+    })
+    .extend("interruptedFollowUpRequests", async () => {
+      const followUpRequests = vi.fn<ReviewerHandlerConfig["requestFollowUpReview"]>();
+      await createReviewerHandler({
+        github: {
+          prSnapshot: () =>
+            Promise.resolve({
+              prNumber: 7,
+              title: "title",
+              body: "body",
+              state: "OPEN",
+              headRefName: "topic/x",
+              headRefOid: "sha-1",
+              baseRefName: "main",
+              draft: false,
+              requestedReviewerLogins: [],
+            }),
+          createCommitStatus: () => Promise.resolve(),
+          listReviews: () => Promise.resolve([]),
+          requestReviewers: () => Promise.resolve(),
+        },
+        gate: createLifecycleGate(),
+        runSession: () => Promise.reject(new ReviewInputChangedError(7)),
+        requestFollowUpReview: followUpRequests,
+        dryRun: false,
+        proxyLogin: "review-bot",
+        log: silentLogger,
+      })(7);
+      return followUpRequests;
+    })
+    .extend("generationMovedStatusWrites", async () => {
+      const reviewGate = createLifecycleGate();
+      const statusWrites = vi.fn<HandlerGithubClient["createCommitStatus"]>(() =>
+        Promise.resolve(),
+      );
+      await createReviewerHandler({
+        github: {
+          prSnapshot: vi
+            .fn<HandlerGithubClient["prSnapshot"]>()
+            .mockResolvedValueOnce({
+              prNumber: 7,
+              title: "title",
+              body: "body",
+              state: "OPEN",
+              headRefName: "topic/x",
+              headRefOid: "sha-1",
+              baseRefName: "main",
+              draft: false,
+              requestedReviewerLogins: [],
+            })
+            .mockImplementationOnce(() => {
+              reviewGate.interruptForInputChange(7);
+              return Promise.resolve({
+                prNumber: 7,
+                title: "title",
+                body: "body",
+                state: "OPEN",
+                headRefName: "topic/x",
+                headRefOid: "sha-1",
+                baseRefName: "main",
+                draft: false,
+                requestedReviewerLogins: [],
+              });
+            }),
+          createCommitStatus: statusWrites,
+          listReviews: () => Promise.resolve([]),
+          requestReviewers: () => Promise.resolve(),
+        },
+        gate: reviewGate,
+        runSession: () => Promise.reject(new Error("engine broke")),
+        requestFollowUpReview: () => undefined,
+        dryRun: false,
+        proxyLogin: "review-bot",
+        log: silentLogger,
+      })(7);
+      return statusWrites;
+    })
+    .extend("generationMovedReviewRuns", async () => {
+      const reviewGate = createLifecycleGate();
+      const reviewRuns = vi.fn<(prNumber: number) => Promise<void>>(
+        createReviewerHandler({
+          github: {
+            prSnapshot: vi
+              .fn<HandlerGithubClient["prSnapshot"]>()
+              .mockResolvedValueOnce({
+                prNumber: 7,
+                title: "title",
+                body: "body",
+                state: "OPEN",
+                headRefName: "topic/x",
+                headRefOid: "sha-1",
+                baseRefName: "main",
+                draft: false,
+                requestedReviewerLogins: [],
+              })
+              .mockImplementationOnce(() => {
+                reviewGate.interruptForInputChange(7);
+                return Promise.resolve({
+                  prNumber: 7,
+                  title: "title",
+                  body: "body",
+                  state: "OPEN",
+                  headRefName: "topic/x",
+                  headRefOid: "sha-1",
+                  baseRefName: "main",
+                  draft: false,
+                  requestedReviewerLogins: [],
+                });
+              }),
+            createCommitStatus: () => Promise.resolve(),
+            listReviews: () => Promise.resolve([]),
+            requestReviewers: () => Promise.resolve(),
+          },
+          gate: reviewGate,
+          runSession: () => Promise.reject(new Error("engine broke")),
+          requestFollowUpReview: () => undefined,
+          dryRun: false,
+          proxyLogin: "review-bot",
+          log: silentLogger,
+        }),
+      );
+      await reviewRuns(7);
+      return reviewRuns;
+    })
+    .extend("failedAndBaseChangedFollowUpRequests", async () => {
+      const followUpRequests = vi.fn<ReviewerHandlerConfig["requestFollowUpReview"]>();
+      await createReviewerHandler({
+        github: {
+          prSnapshot: vi
+            .fn<HandlerGithubClient["prSnapshot"]>()
+            .mockResolvedValueOnce({
+              prNumber: 7,
+              title: "title",
+              body: "body",
+              state: "OPEN",
+              headRefName: "topic/x",
+              headRefOid: "sha-1",
+              baseRefName: "main",
+              draft: false,
+              requestedReviewerLogins: [],
+            })
+            .mockResolvedValueOnce({
+              prNumber: 7,
+              title: "title",
+              body: "body",
+              state: "OPEN",
+              headRefName: "topic/x",
+              headRefOid: "sha-1",
+              baseRefName: "develop",
+              draft: false,
+              requestedReviewerLogins: [],
+            }),
+          createCommitStatus: () => Promise.resolve(),
+          listReviews: () => Promise.resolve([]),
+          requestReviewers: () => Promise.resolve(),
+        },
+        gate: createLifecycleGate(),
+        runSession: () => Promise.reject(new Error("engine broke")),
+        requestFollowUpReview: followUpRequests,
+        dryRun: false,
+        proxyLogin: "review-bot",
+        log: silentLogger,
+      })(7);
+      return followUpRequests;
+    })
+    .extend("failedAndBaseChangedReviewRuns", async () => {
+      const reviewRuns = vi.fn<(prNumber: number) => Promise<void>>(
+        createReviewerHandler({
+          github: {
+            prSnapshot: vi
+              .fn<HandlerGithubClient["prSnapshot"]>()
+              .mockResolvedValueOnce({
+                prNumber: 7,
+                title: "title",
+                body: "body",
+                state: "OPEN",
+                headRefName: "topic/x",
+                headRefOid: "sha-1",
+                baseRefName: "main",
+                draft: false,
+                requestedReviewerLogins: [],
+              })
+              .mockResolvedValueOnce({
+                prNumber: 7,
+                title: "title",
+                body: "body",
+                state: "OPEN",
+                headRefName: "topic/x",
+                headRefOid: "sha-1",
+                baseRefName: "develop",
+                draft: false,
+                requestedReviewerLogins: [],
+              }),
+            createCommitStatus: () => Promise.resolve(),
+            listReviews: () => Promise.resolve([]),
+            requestReviewers: () => Promise.resolve(),
+          },
+          gate: createLifecycleGate(),
+          runSession: () => Promise.reject(new Error("engine broke")),
+          requestFollowUpReview: () => undefined,
+          dryRun: false,
+          proxyLogin: "review-bot",
+          log: silentLogger,
+        }),
+      );
+      await reviewRuns(7);
+      return reviewRuns;
+    });
+
+  it("セッション失敗はステータスを 2 つ残す", ({ sessionFailedStatusWrites }) => {
+    expect(sessionFailedStatusWrites).toHaveBeenCalledTimes(2);
   });
 
-  it("セッション失敗の例外はそのまま伝播する", ({ sessionFailedRun }) => {
-    expect(sessionFailedRun.failureMessage).toStrictEqual("engine broke");
+  it("セッション失敗でも最初は pending を書く", ({ sessionFailedStatusWrites }) => {
+    expect(sessionFailedStatusWrites).toHaveBeenNthCalledWith(1, {
+      sha: "sha-1",
+      state: "pending",
+      context: "auto-develop/reviewer",
+      description: "reviewing",
+    });
   });
 
-  it("入力変更による中断は静かに終わりステータスを増やさない", ({ interruptedRun }) => {
-    expect(interruptedRun.statuses).toStrictEqual([{ sha: "sha-1", state: "pending" }]);
+  it("セッション失敗は最後に failure を書く", ({ sessionFailedStatusWrites }) => {
+    expect(sessionFailedStatusWrites).toHaveBeenNthCalledWith(2, {
+      sha: "sha-1",
+      state: "failure",
+      context: "auto-develop/reviewer",
+      description: "review failed",
+    });
   });
 
-  it("入力変更による中断は後続要求もしない", ({ interruptedRun }) => {
-    expect(interruptedRun.followUps).toStrictEqual([]);
+  it("セッション失敗の例外はそのまま伝播する", ({ sessionFailedRejection }) => {
+    expect(sessionFailedRejection).toStrictEqual(new Error("engine broke"));
   });
 
-  it("失敗の直後に世代が進んでいたら failure を書かない", ({ failedAfterGenerationMovedRun }) => {
-    expect(failedAfterGenerationMovedRun.statuses).toStrictEqual([
-      { sha: "sha-1", state: "pending" },
-    ]);
+  it("入力変更による中断は pending の 1 つを残したまま静かに終わる", ({
+    interruptedStatusWrites,
+  }) => {
+    expect(interruptedStatusWrites).toHaveBeenCalledExactlyOnceWith({
+      sha: "sha-1",
+      state: "pending",
+      context: "auto-develop/reviewer",
+      description: "reviewing",
+    });
   });
 
-  it("失敗の直後に世代が進んでいたら例外も伝播しない", ({ failedAfterGenerationMovedRun }) => {
-    expect(failedAfterGenerationMovedRun.failure).toStrictEqual(null);
+  it("入力変更による中断は後続要求もしない", ({ interruptedFollowUpRequests }) => {
+    expect(interruptedFollowUpRequests).toHaveBeenCalledTimes(0);
   });
 
-  it("失敗しつつ base も変わっていたら後続要求だけを行う", ({ failedAndBaseChangedRun }) => {
-    expect(failedAndBaseChangedRun.followUps).toStrictEqual([[{ prNumber: 7, endpoint: "base" }]]);
+  it("失敗の直後に世代が進んでいたら pending の 1 つだけを残す", ({
+    generationMovedStatusWrites,
+  }) => {
+    expect(generationMovedStatusWrites).toHaveBeenCalledExactlyOnceWith({
+      sha: "sha-1",
+      state: "pending",
+      context: "auto-develop/reviewer",
+      description: "reviewing",
+    });
   });
 
-  it("失敗しつつ base も変わっていたら例外を伝播しない", ({ failedAndBaseChangedRun }) => {
-    expect(failedAndBaseChangedRun.failure).toStrictEqual(null);
+  it("失敗の直後に世代が進んでいたら例外も伝播しない", ({ generationMovedReviewRuns }) => {
+    expect(generationMovedReviewRuns).toHaveResolvedTimes(1);
+  });
+
+  it("失敗しつつ base も変わっていたら後続要求だけを 1 回行う", ({
+    failedAndBaseChangedFollowUpRequests,
+  }) => {
+    expect(failedAndBaseChangedFollowUpRequests).toHaveBeenCalledExactlyOnceWith({
+      prNumber: 7,
+      endpoint: "base",
+    });
+  });
+
+  it("失敗しつつ base も変わっていたら例外を伝播しない", ({ failedAndBaseChangedReviewRuns }) => {
+    expect(failedAndBaseChangedReviewRuns).toHaveResolvedTimes(1);
   });
 });

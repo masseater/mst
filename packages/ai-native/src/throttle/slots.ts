@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { tryLock, unlock } from "fs-native-extensions";
 
 import { tryAcquireFileLock } from "./acquire-file-lock.ts";
+import { failedWithCode, failureSpelling } from "./failure-codes.ts";
 
 export type SlotHold = { release: () => Promise<void> };
 
@@ -68,7 +69,7 @@ const generationIdentity = (marker: string): string => {
   try {
     return readFileSync(marker, "utf8") || "unused";
   } catch (unreadableGeneration) {
-    return `unreadable:${(unreadableGeneration as { code: string }).code}`;
+    return `unreadable:${failureSpelling(unreadableGeneration)}`;
   }
 };
 
@@ -92,21 +93,26 @@ export const removeWaiter = (entryPath: string): void => {
   rmSync(entryPath, { force: true, recursive: true });
 };
 
+const OWNED_BY_ANOTHER_USER_CODES: ReadonlySet<string> = new Set(["EPERM"]);
+
 const isAlive = (pid: number): boolean => {
   try {
     process.kill(pid, 0);
     return true;
   } catch (failure) {
-    return (failure as { code?: string }).code === "EPERM";
+    return failedWithCode(failure, OWNED_BY_ANOTHER_USER_CODES);
   }
 };
+
+const UNREADABLE_ENTRY_CODES: ReadonlySet<string> = new Set(["ENOENT", "ENOTDIR", "EISDIR"]);
 
 const recordedPid = (entryPath: string): number | null => {
   try {
     const written = readFileSync(entryPath, "utf8").trim();
     return /^[0-9]+$/.test(written) ? Number(written) : null;
   } catch (unreadableEntry) {
-    return null;
+    if (failedWithCode(unreadableEntry, UNREADABLE_ENTRY_CODES)) return null;
+    throw unreadableEntry;
   }
 };
 

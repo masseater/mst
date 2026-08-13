@@ -8,35 +8,29 @@ import { isManagedWorktreePath, resolveRealPath, worktreePathFor } from "./paths
 
 const managedRoot = dirname(worktreePathFor(7));
 
-const it = test
-  .extend("managedDirectoryName", () => basename(worktreePathFor(7)))
-  .extend("managedRootName", () => basename(managedRoot))
-  .extend("managedRootParent", () => dirname(managedRoot))
-  .extend("realTmpDir", () => resolveRealPath(tmpdir()))
-  .extend("zeroPrNumberFailure", (): Error | null => {
-    try {
-      worktreePathFor(0);
-      return null;
-    } catch (failure) {
-      return failure instanceof Error ? failure : null;
-    }
-  })
-  .extend("fractionalPrNumberFailure", (): Error | null => {
-    try {
-      worktreePathFor(1.5);
-      return null;
-    } catch (failure) {
-      return failure instanceof Error ? failure : null;
-    }
-  })
-  .extend("managedPathVerdict", () => isManagedWorktreePath(worktreePathFor(7)))
-  .extend("strayPathVerdict", () =>
-    isManagedWorktreePath(join(mkdtempSync(join(tmpdir(), "auto-develop-stray-")), "pr-7")),
-  )
-  .extend("zeroPrNameVerdict", () => isManagedWorktreePath(join(managedRoot, "pr-0")))
-  .extend("nonPrNameVerdict", () => isManagedWorktreePath(join(managedRoot, "system")));
-
 describe("worktreePathFor", () => {
+  const it = test
+    .extend("managedDirectoryName", () => basename(worktreePathFor(7)))
+    .extend("managedRootName", () => basename(managedRoot))
+    .extend("managedRootParent", () => dirname(managedRoot))
+    .extend("realTmpDir", () => resolveRealPath(tmpdir()))
+    .extend("zeroPrNumberRejection", () => {
+      try {
+        worktreePathFor(0);
+      } catch (rejection) {
+        return rejection;
+      }
+      throw new Error("worktreePathFor accepted the PR number 0");
+    })
+    .extend("fractionalPrNumberRejection", () => {
+      try {
+        worktreePathFor(1.5);
+      } catch (rejection) {
+        return rejection;
+      }
+      throw new Error("worktreePathFor accepted the PR number 1.5");
+    });
+
   it("PR 番号から pr- 固定名のディレクトリ名を導く", ({ managedDirectoryName }) => {
     expect(managedDirectoryName).toStrictEqual("pr-7");
   });
@@ -52,20 +46,28 @@ describe("worktreePathFor", () => {
     expect(managedRootParent).toStrictEqual(realTmpDir);
   });
 
-  it("正の安全整数でない PR 番号は即座に拒否される", ({ zeroPrNumberFailure }) => {
-    expect(zeroPrNumberFailure?.message).toStrictEqual(
-      "Invalid PR number for auto-develop worktree",
+  it("正の安全整数でない PR 番号は即座に拒否される", ({ zeroPrNumberRejection }) => {
+    expect(zeroPrNumberRejection).toStrictEqual(
+      new Error("Invalid PR number for auto-develop worktree"),
     );
   });
 
-  it("小数の PR 番号も拒否される", ({ fractionalPrNumberFailure }) => {
-    expect(fractionalPrNumberFailure?.message).toStrictEqual(
-      "Invalid PR number for auto-develop worktree",
+  it("小数の PR 番号も拒否される", ({ fractionalPrNumberRejection }) => {
+    expect(fractionalPrNumberRejection).toStrictEqual(
+      new Error("Invalid PR number for auto-develop worktree"),
     );
   });
 });
 
 describe("isManagedWorktreePath", () => {
+  const it = test
+    .extend("managedPathVerdict", () => isManagedWorktreePath(worktreePathFor(7)))
+    .extend("strayPathVerdict", () =>
+      isManagedWorktreePath(join(mkdtempSync(join(tmpdir(), "auto-develop-stray-")), "pr-7")),
+    )
+    .extend("zeroPrNameVerdict", () => isManagedWorktreePath(join(managedRoot, "pr-0")))
+    .extend("nonPrNameVerdict", () => isManagedWorktreePath(join(managedRoot, "system")));
+
   it("専用ルート直下の pr- ディレクトリだけを管理対象と認める", ({ managedPathVerdict }) => {
     expect(managedPathVerdict).toStrictEqual(true);
   });

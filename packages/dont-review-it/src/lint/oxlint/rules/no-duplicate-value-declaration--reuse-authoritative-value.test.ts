@@ -26,48 +26,65 @@ const EXPORTED_MANIFEST: ValueDeclaration = {
   fingerprint: MANIFEST_BODY,
 };
 
-const ruleWith = (input: {
-  readonly subject: ValueDeclaration;
-  readonly other: ValueDeclaration;
-}) =>
-  createNoDuplicateValueDeclaration({
-    loadIndex: () =>
-      buildValueDeclarationIndex([
-        { relativePath: SUBJECT_PATH, declarations: [input.subject] },
-        { relativePath: OTHER_PATH, declarations: [{ ...input.other, line: 7 }] },
-      ]),
-  });
+const OTHER_MANIFEST: ValueDeclaration = { ...EXPORTED_MANIFEST, line: 7 };
 
-const copiedExportRule = ruleWith({ subject: EXPORTED_MANIFEST, other: EXPORTED_MANIFEST });
-
-const hiddenExportRule = ruleWith({
-  subject: { ...EXPORTED_MANIFEST, exported: false },
-  other: EXPORTED_MANIFEST,
+const copiedExportRule = createNoDuplicateValueDeclaration({
+  loadIndex: () =>
+    buildValueDeclarationIndex([
+      { relativePath: SUBJECT_PATH, declarations: [EXPORTED_MANIFEST] },
+      { relativePath: OTHER_PATH, declarations: [OTHER_MANIFEST] },
+    ]),
 });
 
-const copiedIntoLocalRule = ruleWith({
-  subject: EXPORTED_MANIFEST,
-  other: { ...EXPORTED_MANIFEST, exported: false },
+const hiddenExportRule = createNoDuplicateValueDeclaration({
+  loadIndex: () =>
+    buildValueDeclarationIndex([
+      { relativePath: SUBJECT_PATH, declarations: [{ ...EXPORTED_MANIFEST, exported: false }] },
+      { relativePath: OTHER_PATH, declarations: [OTHER_MANIFEST] },
+    ]),
 });
 
-const bothLocalRule = ruleWith({
-  subject: { ...EXPORTED_MANIFEST, exported: false },
-  other: { ...EXPORTED_MANIFEST, exported: false },
+const copiedIntoLocalRule = createNoDuplicateValueDeclaration({
+  loadIndex: () =>
+    buildValueDeclarationIndex([
+      { relativePath: SUBJECT_PATH, declarations: [EXPORTED_MANIFEST] },
+      { relativePath: OTHER_PATH, declarations: [{ ...OTHER_MANIFEST, exported: false }] },
+    ]),
 });
 
-const otherBodyRule = ruleWith({
-  subject: EXPORTED_MANIFEST,
-  other: { ...EXPORTED_MANIFEST, fingerprint: "workspace" },
+const bothLocalRule = createNoDuplicateValueDeclaration({
+  loadIndex: () =>
+    buildValueDeclarationIndex([
+      { relativePath: SUBJECT_PATH, declarations: [{ ...EXPORTED_MANIFEST, exported: false }] },
+      { relativePath: OTHER_PATH, declarations: [{ ...OTHER_MANIFEST, exported: false }] },
+    ]),
 });
 
-const otherNameRule = ruleWith({
-  subject: EXPORTED_MANIFEST,
-  other: { ...EXPORTED_MANIFEST, name: "PACKAGE_FILE_NAME" },
+const otherBodyRule = createNoDuplicateValueDeclaration({
+  loadIndex: () =>
+    buildValueDeclarationIndex([
+      { relativePath: SUBJECT_PATH, declarations: [EXPORTED_MANIFEST] },
+      { relativePath: OTHER_PATH, declarations: [{ ...OTHER_MANIFEST, fingerprint: "workspace" }] },
+    ]),
 });
 
-const offPageRule = ruleWith({
-  subject: { ...EXPORTED_MANIFEST, line: 99 },
-  other: EXPORTED_MANIFEST,
+const otherNameRule = createNoDuplicateValueDeclaration({
+  loadIndex: () =>
+    buildValueDeclarationIndex([
+      { relativePath: SUBJECT_PATH, declarations: [EXPORTED_MANIFEST] },
+      {
+        relativePath: OTHER_PATH,
+        declarations: [{ ...OTHER_MANIFEST, name: "PACKAGE_FILE_NAME" }],
+      },
+    ]),
+});
+
+const offPageRule = createNoDuplicateValueDeclaration({
+  loadIndex: () =>
+    buildValueDeclarationIndex([
+      { relativePath: SUBJECT_PATH, declarations: [{ ...EXPORTED_MANIFEST, line: 99 }] },
+      { relativePath: OTHER_PATH, declarations: [OTHER_MANIFEST] },
+    ]),
 });
 
 const MANIFEST_SOURCE = `const MANIFEST_FILE_NAME = "package.json";`;

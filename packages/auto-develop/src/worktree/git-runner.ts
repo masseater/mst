@@ -10,10 +10,15 @@ const DETACHED_HEAD_MARKER = "is not a symbolic ref";
 
 const NOT_A_WORKING_TREE_MARKER = "is not a working tree";
 
+const carriesStderr = (failure: unknown): failure is { readonly stderr: string } =>
+  typeof failure === "object" &&
+  failure !== null &&
+  "stderr" in failure &&
+  typeof failure.stderr === "string";
+
 const gitFailureText = (failure: unknown): string => {
   if (!(failure instanceof Error)) return "";
-  const stderr = Object.hasOwn(failure, "stderr") ? (failure as { stderr?: unknown }).stderr : "";
-  return `${typeof stderr === "string" ? stderr : ""}\n${failure.message}`;
+  return `${carriesStderr(failure) ? failure.stderr : ""}\n${failure.message}`;
 };
 
 export const indicatesDetachedHead = (failure: unknown): boolean =>

@@ -11,21 +11,51 @@ const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-no-unchecked-autho
 
 const MODULE_SOURCE = "export const shipped = true;\n";
 
-const writeFixture = (fixtureName: string, source: string): string => {
-  const path = join(fixtureDir, fixtureName);
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, source);
-  return path;
+const WORKSPACE_MANIFEST = "packages:\n  - packages/*\n";
+
+const ROOT_PACKAGE_MANIFEST = '{ "name": "@fixture/root" }\n';
+
+const LEGACY_SOURCE = "module.exports = {};\n";
+
+const GUIDE_TEXT = "read me\n";
+
+const REACHING_SOURCE = 'import { helped } from "./helper.ts";\n\nexport const started = helped;\n';
+
+const REACHED_SOURCE = "export const helped = true;\n";
+
+const HELD_BY_REPOSITORY: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  covered: {},
+  declared: { "docs/guide.txt": GUIDE_TEXT },
+  outside: {
+    "dist/bundle.js": "export const built = true;\n",
+    "node_modules/vendor/index.js": LEGACY_SOURCE,
+  },
+  "quiet-row": {},
+  undeclared: { "src/legacy.js": LEGACY_SOURCE },
+  hole: { "src/legacy.js": LEGACY_SOURCE },
+  broad: { "docs/guide.txt": GUIDE_TEXT },
+  dead: {},
+  excluded: { "types/shipped.d.ts": "export declare const shipped: boolean;\n" },
+  unopened: { "config/settings.json": "{}\n" },
+  receiver: {},
+  "settled-scope": { "setup/entry.ts": REACHING_SOURCE, "setup/helper.ts": REACHED_SOURCE },
+  "open-scope": { "setup/entry.ts": REACHING_SOURCE, "setup/helper.ts": REACHED_SOURCE },
+  workspaces: {
+    "packages/tool/package.json": '{ "name": "@fixture/tool" }\n',
+    "packages/tool/legacy.js": LEGACY_SOURCE,
+  },
 };
 
-const writeRepository = (fixtureName: string, held: Readonly<Record<string, string>>): string => {
-  writeFixture(`${fixtureName}/pnpm-workspace.yaml`, "packages:\n  - packages/*\n");
-  writeFixture(`${fixtureName}/package.json`, '{ "name": "@fixture/root" }\n');
-  for (const [path, source] of Object.entries(held)) {
-    writeFixture(`${fixtureName}/${path}`, source);
+for (const [repositoryName, held] of Object.entries(HELD_BY_REPOSITORY)) {
+  mkdirSync(join(fixtureDir, repositoryName, "src"), { recursive: true });
+  writeFileSync(join(fixtureDir, repositoryName, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST);
+  writeFileSync(join(fixtureDir, repositoryName, "package.json"), ROOT_PACKAGE_MANIFEST);
+  for (const [heldPath, heldSource] of Object.entries(held)) {
+    mkdirSync(dirname(join(fixtureDir, repositoryName, heldPath)), { recursive: true });
+    writeFileSync(join(fixtureDir, repositoryName, heldPath), heldSource);
   }
-  return writeFixture(`${fixtureName}/src/app.ts`, MODULE_SOURCE);
-};
+  writeFileSync(join(fixtureDir, repositoryName, "src/app.ts"), MODULE_SOURCE);
+}
 
 const MANIFEST_READER = {
   name: "the package manager",
@@ -44,46 +74,29 @@ const DECLARED_CHECKS = [MANIFEST_READER, ANALYSER];
 
 const SPELLED_CHECKS = "`the package manager`, `the analyser`";
 
-const coveredEntry = writeRepository("covered", {});
-const declaredEntry = writeRepository("declared", { "docs/guide.txt": "read me\n" });
-const outsideEntry = writeRepository("outside", {
-  "dist/bundle.js": "export const built = true;\n",
-  "node_modules/vendor/index.js": "module.exports = {};\n",
-});
-const quietRowEntry = writeRepository("quiet-row", {});
-const undeclaredEntry = writeRepository("undeclared", {
-  "src/legacy.js": "module.exports = {};\n",
-});
-const holeEntry = writeRepository("hole", { "src/legacy.js": "module.exports = {};\n" });
-const broadEntry = writeRepository("broad", { "docs/guide.txt": "read me\n" });
-const deadEntry = writeRepository("dead", {});
-const excludedEntry = writeRepository("excluded", {
-  "types/shipped.d.ts": "export declare const shipped: boolean;\n",
-});
-const unopenedEntry = writeRepository("unopened", { "config/settings.json": "{}\n" });
-const receiverEntry = writeRepository("receiver", {});
-
-const REACHING_SOURCE = 'import { helped } from "./helper.ts";\n\nexport const started = helped;\n';
-
-const settledScopeEntry = writeRepository("settled-scope", {
-  "setup/entry.ts": REACHING_SOURCE,
-  "setup/helper.ts": "export const helped = true;\n",
-});
-const openScopeEntry = writeRepository("open-scope", {
-  "setup/entry.ts": REACHING_SOURCE,
-  "setup/helper.ts": "export const helped = true;\n",
-});
-
-writeRepository("workspaces", {
-  "packages/tool/package.json": '{ "name": "@fixture/tool" }\n',
-  "packages/tool/legacy.js": "module.exports = {};\n",
-});
+const coveredEntry = join(fixtureDir, "covered/src/app.ts");
+const declaredEntry = join(fixtureDir, "declared/src/app.ts");
+const outsideEntry = join(fixtureDir, "outside/src/app.ts");
+const quietRowEntry = join(fixtureDir, "quiet-row/src/app.ts");
+const undeclaredEntry = join(fixtureDir, "undeclared/src/app.ts");
+const holeEntry = join(fixtureDir, "hole/src/app.ts");
+const broadEntry = join(fixtureDir, "broad/src/app.ts");
+const deadEntry = join(fixtureDir, "dead/src/app.ts");
+const excludedEntry = join(fixtureDir, "excluded/src/app.ts");
+const unopenedEntry = join(fixtureDir, "unopened/src/app.ts");
+const receiverEntry = join(fixtureDir, "receiver/src/app.ts");
+const settledScopeEntry = join(fixtureDir, "settled-scope/src/app.ts");
+const openScopeEntry = join(fixtureDir, "open-scope/src/app.ts");
 const rootEntry = join(fixtureDir, "workspaces/src/app.ts");
-const toolEntry = writeFixture("workspaces/packages/tool/entry.ts", MODULE_SOURCE);
 
-writeFixture("loose/pnpm-workspace.yaml", "packages: []\n");
-writeFixture("loose/src/legacy.js", "module.exports = {};\n");
-const looseEntry = writeFixture("loose/src/app.ts", MODULE_SOURCE);
+const toolEntry = join(fixtureDir, "workspaces/packages/tool/entry.ts");
+writeFileSync(toolEntry, MODULE_SOURCE);
+
+mkdirSync(join(fixtureDir, "loose/src"), { recursive: true });
+writeFileSync(join(fixtureDir, "loose/pnpm-workspace.yaml"), "packages: []\n");
+writeFileSync(join(fixtureDir, "loose/src/legacy.js"), LEGACY_SOURCE);
+const looseEntry = join(fixtureDir, "loose/src/app.ts");
+writeFileSync(looseEntry, MODULE_SOURCE);
 
 const READ_TEXT = [{ pattern: "**/*.txt", reason: "the guide is read by people" }];
 

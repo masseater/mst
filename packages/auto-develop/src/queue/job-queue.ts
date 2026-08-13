@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { silentLogger, type Logger } from "../logging/logger.ts";
 import { createJobExecution, type QueueSharedState } from "./job-execution.ts";
 import { createJobIntakeDesk, type CoalesceTable, type JobIntake } from "./job-intake.ts";
@@ -41,13 +43,7 @@ export type JobQueue = {
   ) => Promise<TaskResult | null>;
 };
 
-const moduleCounters = new Map([["nextJobId", 1]]);
-
-const nextDefaultJobId = (): string => {
-  const jobNumber = moduleCounters.get("nextJobId") as number;
-  moduleCounters.set("nextJobId", jobNumber + 1);
-  return `job-${jobNumber}`;
-};
+const nextDefaultJobId = (): string => `job-${randomUUID()}`;
 
 const sortedUniqueLanes = (lanes: readonly string[]): readonly string[] =>
   [...new Set(lanes)].toSorted();
@@ -133,10 +129,12 @@ export const createJobQueue = (config: JobQueueConfig): JobQueue => {
       execution.notifyDrain();
       return canceledRecords.length;
     },
-    drain: () => {
+    drain: async () => {
       execution.pump();
-      if (execution.isDrained()) return Promise.resolve();
-      return new Promise((resolve) => heldState.drainWaiters.add(resolve));
+      if (!execution.isDrained()) {
+        await new Promise<void>((resolve) => heldState.drainWaiters.add(resolve));
+      }
+      await execution.settleStartedJobs();
     },
     reserveLane: async (lane, task) => {
       const laneBusy =

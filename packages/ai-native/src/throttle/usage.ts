@@ -1,6 +1,6 @@
 import { parseArgs } from "node:util";
 
-const USAGE = `Usage: throttle [--timeout <seconds>] -- <command> [handedArgs...]
+const USAGE = `Usage: throttle [--timeout <seconds>] -- <command> [args...]
 
 Runs the command while keeping the number of simultaneous executions that
 share this host and namespace at or below the limit. When every slot is held

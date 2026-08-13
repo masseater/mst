@@ -14,15 +14,11 @@ export const createDailyLogFileSink = (sink: {
   readonly nowIso: () => string;
   readonly onFailure: (failure: unknown) => void;
 }): LogFileSink => {
-  const prepared = new Set<string>();
   return {
     append: (line) => {
       const fileName = dailyLogFileName(sink.name, sink.nowIso());
       try {
-        if (!prepared.has(fileName)) {
-          mkdirSync(sink.directory, { recursive: true });
-          prepared.add(fileName);
-        }
+        mkdirSync(sink.directory, { recursive: true });
         appendFileSync(join(sink.directory, fileName), line);
       } catch (appendFailure) {
         sink.onFailure(appendFailure);

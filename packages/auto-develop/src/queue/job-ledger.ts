@@ -27,31 +27,63 @@ export type JobLedger = {
   readonly hasKey: (key: string) => boolean;
 };
 
-export const createJobLedger = (): JobLedger => {
-  const recordsById = new Map<string, JobRecord>();
-  const writtenRecords = (): readonly JobRecord[] => [...recordsById.values()];
-  return {
-    records: writtenRecords,
-    get: (identity) => recordsById.get(identity),
-    has: (identity) => recordsById.has(identity),
-    put: (written) => {
-      recordsById.set(written.id, written);
-    },
-    remove: (identity) => recordsById.delete(identity),
-    runningCount: () => writtenRecords().filter((written) => written.state === "running").length,
-    waitingCount: () => writtenRecords().filter((written) => written.state === "waiting").length,
-    laneRunning: (lane) =>
-      writtenRecords().some((written) => written.lane === lane && written.state === "running"),
-    laneWaiting: (lane) =>
-      writtenRecords().some((written) => written.lane === lane && written.state === "waiting"),
-    laneOccupied: (lane) => writtenRecords().some((written) => written.lane === lane),
-    findWaiting: (search) =>
-      writtenRecords().find(
-        (written) =>
-          written.type === search.type &&
-          written.lane === search.lane &&
-          written.state === "waiting",
-      ),
-    hasKey: (named) => writtenRecords().some((written) => written.key === named),
-  };
-};
+class RecordedJobs implements JobLedger {
+  #recordsById: ReadonlyMap<string, JobRecord> = new Map();
+
+  records(): readonly JobRecord[] {
+    return [...this.#recordsById.values()];
+  }
+
+  get(identity: string): JobRecord | undefined {
+    return this.#recordsById.get(identity);
+  }
+
+  has(identity: string): boolean {
+    return this.#recordsById.has(identity);
+  }
+
+  put(written: JobRecord): void {
+    this.#recordsById = new Map<string, JobRecord>([...this.#recordsById, [written.id, written]]);
+  }
+
+  remove(identity: string): boolean {
+    if (!this.#recordsById.has(identity)) return false;
+    this.#recordsById = new Map<string, JobRecord>(
+      [...this.#recordsById].filter(([heldId]) => heldId !== identity),
+    );
+    return true;
+  }
+
+  runningCount(): number {
+    return this.records().filter((written) => written.state === "running").length;
+  }
+
+  waitingCount(): number {
+    return this.records().filter((written) => written.state === "waiting").length;
+  }
+
+  laneRunning(lane: string): boolean {
+    return this.records().some((written) => written.lane === lane && written.state === "running");
+  }
+
+  laneWaiting(lane: string): boolean {
+    return this.records().some((written) => written.lane === lane && written.state === "waiting");
+  }
+
+  laneOccupied(lane: string): boolean {
+    return this.records().some((written) => written.lane === lane);
+  }
+
+  findWaiting(search: { readonly type: string; readonly lane: string }): JobRecord | undefined {
+    return this.records().find(
+      (written) =>
+        written.type === search.type && written.lane === search.lane && written.state === "waiting",
+    );
+  }
+
+  hasKey(named: string): boolean {
+    return this.records().some((written) => written.key === named);
+  }
+}
+
+export const createJobLedger = (): JobLedger => new RecordedJobs();

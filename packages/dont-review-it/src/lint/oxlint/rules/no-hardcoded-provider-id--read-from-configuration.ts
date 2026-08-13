@@ -1,4 +1,5 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { staticMemberOf } from "../lib/static-member.ts";
 import { hasWrittenOutText } from "../lib/written-out-text.ts";
 
@@ -50,8 +51,8 @@ const identityKeyNameOf = (property: ESTree.ObjectProperty): string | null => {
 };
 
 const writtenOutIdentityOf = (property: ESTree.ObjectProperty): ESTree.Expression | null => {
-  const spelled = identityKeyNameOf(property);
-  if (spelled === null || !PROVIDER_IDENTITY_KEYS.has(spelled)) return null;
+  const identityKeyName = identityKeyNameOf(property);
+  if (identityKeyName === null || !PROVIDER_IDENTITY_KEYS.has(identityKeyName)) return null;
   return hasWrittenOutText(property.value) ? property.value : null;
 };
 
@@ -102,16 +103,15 @@ export const noHardcodedProviderId = createDontReviewItRule({
     schema: [],
   },
   create(inspection) {
-    const providerBindings = new Set<string>();
-
     return {
-      Program(node: ESTree.Program) {
-        for (const spelled of providerBindingNamesIn(node)) providerBindings.add(spelled);
-      },
-      NewExpression(node: ESTree.NewExpression) {
-        if (!isProviderConstructor(node.callee, providerBindings)) return;
-        for (const identity of writtenOutIdentitiesOf(node)) {
-          inspection.report({ node: identity, messageId: "hardcodedProviderId" });
+      "Program:exit"(program: ESTree.Program) {
+        const providerBindings: ReadonlySet<string> = new Set(providerBindingNamesIn(program));
+
+        for (const node of nodesOfType(program, "NewExpression")) {
+          if (!isProviderConstructor(node.callee, providerBindings)) continue;
+          for (const identity of writtenOutIdentitiesOf(node)) {
+            inspection.report({ node: identity, messageId: "hardcodedProviderId" });
+          }
         }
       },
     };

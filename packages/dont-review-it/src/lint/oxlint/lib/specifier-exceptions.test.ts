@@ -8,72 +8,111 @@ import {
 
 const REPOSITORY_ROOT = "/repo";
 
-const pathsCovering = (
-  exceptions: readonly { readonly path: string; readonly reason: string }[],
-  pathSegments: readonly string[],
-): readonly string[] =>
-  exceptionsCovering({ exceptions, pathSegments, cwd: REPOSITORY_ROOT }).map(
-    (exception) => exception.path,
-  );
+const HOST_PATH = "apps/host/**";
 
-describe("specifier-exceptions", () => {
-  test("an listed names the path it covers and the grounds it carries", () => {
-    expect(
-      specifierExceptionsIn([
-        { exceptions: [{ path: "apps/host/**", reason: "the candidates arrive as settings" }] },
-      ]),
-    ).toStrictEqual([{ path: "apps/host/**", reason: "the candidates arrive as settings" }]);
+const HOST_REASON = "the candidates arrive as settings";
+
+describe("specifierExceptionsIn", () => {
+  describe("an entry written with a path and grounds", () => {
+    const it = test.extend("exceptions", () =>
+      specifierExceptionsIn([{ exceptions: [{ path: HOST_PATH, reason: HOST_REASON }] }]));
+
+    it("registers the path it covers and the grounds it carries", ({ exceptions }) => {
+      expect(exceptions).toStrictEqual([{ path: HOST_PATH, reason: HOST_REASON }]);
+    });
   });
 
-  test("an listed whose grounds are only spacing carries no grounds", () => {
-    const [listed] = specifierExceptionsIn([
-      { exceptions: [{ path: "apps/host/**", reason: "  " }] },
-    ]);
-    expect(listed === undefined ? null : carriesGrounds(listed)).toBe(false);
+  describe("an entry that names no path", () => {
+    const it = test.extend("exceptions", () =>
+      specifierExceptionsIn([{ exceptions: [{ reason: HOST_REASON }] }]));
+
+    it("registers nothing", ({ exceptions }) => {
+      expect(exceptions).toStrictEqual([]);
+    });
   });
 
-  test("an listed written without grounds at all carries no grounds", () => {
-    const [listed] = specifierExceptionsIn([{ exceptions: [{ path: "apps/host/**" }] }]);
-    expect(listed === undefined ? null : carriesGrounds(listed)).toBe(false);
+  describe("entries that are not written as records", () => {
+    const it = test.extend("exceptions", () =>
+      specifierExceptionsIn([{ exceptions: [HOST_PATH, null, []] }]));
+
+    it("registers nothing", ({ exceptions }) => {
+      expect(exceptions).toStrictEqual([]);
+    });
   });
 
-  test("an listed that names no path registers nothing", () => {
-    expect(
-      specifierExceptionsIn([{ exceptions: [{ reason: "the candidates arrive as settings" }] }]),
-    ).toStrictEqual([]);
+  describe("options that hold no exception list", () => {
+    const it = test.extend("exceptions", () => specifierExceptionsIn([{ exceptions: HOST_PATH }]));
+
+    it("registers nothing", ({ exceptions }) => {
+      expect(exceptions).toStrictEqual([]);
+    });
   });
 
-  test("an listed that is not written as a record registers nothing", () => {
-    expect(specifierExceptionsIn([{ exceptions: ["apps/host/**", null, []] }])).toStrictEqual([]);
+  describe("options written as something other than a record", () => {
+    const it = test.extend("exceptions", () => specifierExceptionsIn([[HOST_PATH]]));
+
+    it("registers nothing", ({ exceptions }) => {
+      expect(exceptions).toStrictEqual([]);
+    });
   });
 
-  test("options that hold no exception list register nothing", () => {
-    expect(specifierExceptionsIn([{ exceptions: "apps/host/**" }])).toStrictEqual([]);
+  describe("options left out altogether", () => {
+    const it = test.extend("exceptions", () => specifierExceptionsIn([]));
+
+    it("registers nothing", ({ exceptions }) => {
+      expect(exceptions).toStrictEqual([]);
+    });
+  });
+});
+
+describe("carriesGrounds", () => {
+  describe("an entry whose grounds are only spacing", () => {
+    const it = test.extend("grounds", () =>
+      specifierExceptionsIn([{ exceptions: [{ path: HOST_PATH, reason: "  " }] }]).map(
+        (exception) => carriesGrounds(exception),
+      ));
+
+    it("carries no grounds", ({ grounds }) => {
+      expect(grounds).toStrictEqual([false]);
+    });
   });
 
-  test("options written as something other than a record register nothing", () => {
-    expect(specifierExceptionsIn([["apps/host/**"]])).toStrictEqual([]);
+  describe("an entry written without grounds at all", () => {
+    const it = test.extend("grounds", () =>
+      specifierExceptionsIn([{ exceptions: [{ path: HOST_PATH }] }]).map((exception) =>
+        carriesGrounds(exception),
+      ));
+
+    it("carries no grounds", ({ grounds }) => {
+      expect(grounds).toStrictEqual([false]);
+    });
+  });
+});
+
+describe("exceptionsCovering", () => {
+  describe("a file the pattern of an entry reaches", () => {
+    const it = test.extend("coveringExceptions", () =>
+      exceptionsCovering({
+        exceptions: [{ path: HOST_PATH, reason: HOST_REASON }],
+        pathSegments: ["repo", "apps", "host", "loader.ts"],
+        cwd: REPOSITORY_ROOT,
+      }));
+
+    it("is covered by that entry", ({ coveringExceptions }) => {
+      expect(coveringExceptions).toStrictEqual([{ path: HOST_PATH, reason: HOST_REASON }]);
+    });
   });
 
-  test("options left out register nothing", () => {
-    expect(specifierExceptionsIn([])).toStrictEqual([]);
-  });
+  describe("a file the pattern of an entry misses", () => {
+    const it = test.extend("coveringExceptions", () =>
+      exceptionsCovering({
+        exceptions: [{ path: HOST_PATH, reason: HOST_REASON }],
+        pathSegments: ["repo", "apps", "site", "loader.ts"],
+        cwd: REPOSITORY_ROOT,
+      }));
 
-  test("an listed covers the files its pattern reaches", () => {
-    expect(
-      pathsCovering(
-        [{ path: "apps/host/**", reason: "the candidates arrive as settings" }],
-        ["repo", "apps", "host", "loader.ts"],
-      ),
-    ).toStrictEqual(["apps/host/**"]);
-  });
-
-  test("an listed covers no file its pattern misses", () => {
-    expect(
-      pathsCovering(
-        [{ path: "apps/host/**", reason: "the candidates arrive as settings" }],
-        ["repo", "apps", "site", "loader.ts"],
-      ),
-    ).toStrictEqual([]);
+    it("is covered by nothing", ({ coveringExceptions }) => {
+      expect(coveringExceptions).toStrictEqual([]);
+    });
   });
 });

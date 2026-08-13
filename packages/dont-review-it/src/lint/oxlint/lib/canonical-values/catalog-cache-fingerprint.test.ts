@@ -1,65 +1,65 @@
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
-import { describe, expect, onTestFinished, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { cacheInputFingerprint } from "./catalog-cache-fingerprint.ts";
 import { listRepositoryFiles } from "./source-files.ts";
 
-const createCanonicalValuesTestRepository = (): string => {
-  const repositoryRoot = mkdtempSync(join(tmpdir(), "canonical-values-"));
-  onTestFinished(() => {
-    rmSync(repositoryRoot, { recursive: true, force: true });
-  });
-  return repositoryRoot;
-};
+const LINKED_SOURCE_TEXT = 'export const status = "draft";\n';
 
-const writeCanonicalValuesTestFile = ({
-  repositoryRoot,
-  relativePath,
-  contents: fileText,
-}: {
-  readonly repositoryRoot: string;
-  readonly relativePath: string;
-  readonly contents: string;
-}): void => {
-  const absolutePath = join(repositoryRoot, relativePath);
-  mkdirSync(dirname(absolutePath), { recursive: true });
-  writeFileSync(absolutePath, fileText, "utf8");
-};
+describe("cacheInputFingerprint", () => {
+  describe("a cache input problem beside a scan that reported none", () => {
+    const it = test
+      .extend("fingerprintOfAScanWithoutProblems", () => cacheInputFingerprint([]))
+      .extend("fingerprintOfAnUnsafeSymbolicLinkProblem", () =>
+        cacheInputFingerprint(
+          [],
+          [{ filePath: "src/link.ts", kind: "unsafe-symbolic-link", line: 1 }],
+        ),
+      );
 
-describe("catalog cache fingerprint", () => {
-  test("cache input problems participate in the fingerprint", () => {
-    expect(
-      cacheInputFingerprint(
-        [],
-        [{ filePath: "src/link.ts", kind: "unsafe-symbolic-link", line: 1 }],
-      ),
-    ).not.toBe(cacheInputFingerprint([]));
+    it("gets a different fingerprint, because problems participate in it", ({
+      fingerprintOfAnUnsafeSymbolicLinkProblem,
+      fingerprintOfAScanWithoutProblems,
+    }) => {
+      expect(fingerprintOfAnUnsafeSymbolicLinkProblem).not.toBe(fingerprintOfAScanWithoutProblems);
+    });
   });
 
-  test("a retargeted source symlink invalidates identical cache contents", () => {
-    const repositoryRoot = createCanonicalValuesTestRepository();
-    const firstTarget = join(repositoryRoot, "src/first.ts");
-    const secondTarget = join(repositoryRoot, "src/second.ts");
-    const link = join(repositoryRoot, "src/public.ts");
-    const fileText = 'export const value = "draft";\n';
-    writeCanonicalValuesTestFile({
-      repositoryRoot,
-      relativePath: "src/first.ts",
-      contents: fileText,
-    });
-    writeCanonicalValuesTestFile({
-      repositoryRoot,
-      relativePath: "src/second.ts",
-      contents: fileText,
-    });
-    symlinkSync(firstTarget, link);
-    const first = cacheInputFingerprint(listRepositoryFiles(repositoryRoot).cacheInputs);
-    rmSync(link);
-    symlinkSync(secondTarget, link);
+  describe("a source symlink aimed at the second of two files holding identical text", () => {
+    const it = test
+      .extend("fingerprintOfTheTreeAimingAtTheFirstFile", ({}, { onCleanup }) => {
+        const repositoryRoot = mkdtempSync(join(tmpdir(), "canonical-values-"));
+        onCleanup(() => {
+          rmSync(repositoryRoot, { recursive: true, force: true });
+        });
+        mkdirSync(join(repositoryRoot, "src"), { recursive: true });
+        writeFileSync(join(repositoryRoot, "src", "first.ts"), LINKED_SOURCE_TEXT, "utf8");
+        writeFileSync(join(repositoryRoot, "src", "second.ts"), LINKED_SOURCE_TEXT, "utf8");
+        symlinkSync("first.ts", join(repositoryRoot, "src", "public.ts"));
+        return cacheInputFingerprint(listRepositoryFiles(repositoryRoot).cacheInputs);
+      })
+      .extend("fingerprintOfTheTreeAimingAtTheSecondFile", ({}, { onCleanup }) => {
+        const repositoryRoot = mkdtempSync(join(tmpdir(), "canonical-values-"));
+        onCleanup(() => {
+          rmSync(repositoryRoot, { recursive: true, force: true });
+        });
+        mkdirSync(join(repositoryRoot, "src"), { recursive: true });
+        writeFileSync(join(repositoryRoot, "src", "first.ts"), LINKED_SOURCE_TEXT, "utf8");
+        writeFileSync(join(repositoryRoot, "src", "second.ts"), LINKED_SOURCE_TEXT, "utf8");
+        symlinkSync("second.ts", join(repositoryRoot, "src", "public.ts"));
+        return cacheInputFingerprint(listRepositoryFiles(repositoryRoot).cacheInputs);
+      });
 
-    expect(cacheInputFingerprint(listRepositoryFiles(repositoryRoot).cacheInputs)).not.toBe(first);
+    it("gets a different fingerprint from the tree aimed at the first file", ({
+      fingerprintOfTheTreeAimingAtTheSecondFile,
+      fingerprintOfTheTreeAimingAtTheFirstFile,
+    }) => {
+      expect(fingerprintOfTheTreeAimingAtTheSecondFile).not.toBe(
+        fingerprintOfTheTreeAimingAtTheFirstFile,
+      );
+    });
   });
 });

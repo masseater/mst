@@ -1,3 +1,4 @@
+import { memoize } from "es-toolkit";
 import { parseSync } from "oxc-parser";
 
 import { readTextFile } from "../canonical-values/source-files.ts";
@@ -30,22 +31,14 @@ const forwardingSpecifiersIn = (writtenBody: readonly SpecStatement[]): readonly
     return [];
   });
 
-const forwardedByFile = new Map<string, readonly string[]>();
-
-const forwardedSpecifiersOf = (file: string): readonly string[] => {
-  const remembered = forwardedByFile.get(file);
-  if (remembered !== undefined) return remembered;
-
+const forwardedSpecifiersOf = memoize((file: string): readonly string[] => {
   const source = readTextFile(file);
-  const found =
-    source === null
-      ? []
-      : forwardingSpecifiersIn(
-          parseSync(file, source).program.body.map((statement) => statement as SpecStatement),
-        );
-  forwardedByFile.set(file, found);
-  return found;
-};
+  return source === null
+    ? []
+    : forwardingSpecifiersIn(
+        parseSync(file, source).program.body.map((statement) => statement as SpecStatement),
+      );
+});
 
 const assetsFrom = (file: string, reading: Reading): string | null => {
   if (reading.visited.has(file)) return null;

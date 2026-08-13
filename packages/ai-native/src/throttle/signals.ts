@@ -27,26 +27,39 @@ export const makeWaitingInterruptHandler = (dependencies: {
 type HeldDependencies = {
   release: () => Promise<void>;
   raise: (signal: NodeJS.Signals) => void;
+  onUnreleased: (failure: Error) => void;
 };
 
-const releaseThenRaise = async (
+const raiseAfterRelease = async (
   dependencies: HeldDependencies,
-  signal: NodeJS.Signals,
+  arrival: Promise<NodeJS.Signals | null>,
 ): Promise<void> => {
+  const signal = await arrival;
+  if (signal === null) return;
   try {
     await dependencies.release();
   } catch (staleLease) {
-    dependencies.raise(signal);
-    return;
+    dependencies.onUnreleased(
+      new Error(`releasing the slot before re-raising ${signal} failed`, { cause: staleLease }),
+    );
   }
   dependencies.raise(signal);
 };
 
-export const makeHeldInterruptHandler = (
+export const makeHeldInterrupt = (
   dependencies: HeldDependencies,
-): ((signal: NodeJS.Signals) => void) => {
-  return (signal) => {
-    void releaseThenRaise(dependencies, signal);
+): {
+  readonly handler: (signal: NodeJS.Signals) => void;
+  readonly standDown: () => void;
+  readonly settled: Promise<void>;
+} => {
+  const arrival = Promise.withResolvers<NodeJS.Signals | null>();
+  return {
+    handler: arrival.resolve,
+    standDown: (): void => {
+      arrival.resolve(null);
+    },
+    settled: raiseAfterRelease(dependencies, arrival.promise),
   };
 };
 

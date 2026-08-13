@@ -1,4 +1,5 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { isAssertionEntryCall } from "../lib/spec-syntax/assertion-entries.ts";
 import { fixtureDependenciesOf } from "../lib/spec-syntax/fixture-declarations.ts";
 import {
@@ -10,7 +11,7 @@ import { staticMemberName } from "../lib/spec-syntax/static-names.ts";
 import { memberRootOf, unwrapSubject } from "../lib/spec-syntax/subject-expressions.ts";
 import {
   declaresTestBlock,
-  testBlockBindings,
+  testBlockRootNames,
   testCallbacksOf,
 } from "../lib/spec-syntax/test-block-declarations.ts";
 
@@ -59,7 +60,9 @@ const snapshotMatchersFrom = (ruleOptions: Readonly<Options>): ReadonlySet<strin
   const configured = first[SNAPSHOT_MATCHERS_OPTION];
   if (!Array.isArray(configured)) return SNAPSHOT_MATCHERS;
   return new Set(
-    configured.filter((candidate): candidate is string => typeof candidate === "string"),
+    configured.filter(
+      (configuredMatcher): configuredMatcher is string => typeof configuredMatcher === "string",
+    ),
   );
 };
 
@@ -100,7 +103,7 @@ const blockSiteAround = (node: ESTree.Node, rootNames: ReadonlySet<string>): Blo
 
 const fixtureBoundName = (block: ESTree.CallExpression, local: string): string | null =>
   testCallbacksOf(block)
-    .flatMap((taken) => fixtureDependenciesOf(taken) ?? [])
+    .flatMap((testCallback) => fixtureDependenciesOf(testCallback) ?? [])
     .find((dependency) => dependency.boundAs === local)?.name ?? null;
 
 const fixtureRootOf = (subject: ESTree.Expression, site: BlockSite | null): string | null => {
@@ -179,8 +182,6 @@ export const noExpectProjectedSubject = createDontReviewItRule({
     if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
     const snapshotMatchers = snapshotMatchersFrom(inspection.options);
-    const bindings = testBlockBindings();
-    const listedEntries = new Set<ESTree.CallExpression>();
 
     const pinOf = (
       assertionEntry: ESTree.CallExpression,
@@ -203,24 +204,18 @@ export const noExpectProjectedSubject = createDontReviewItRule({
     };
 
     return {
-      ImportDeclaration(node: ESTree.ImportDeclaration) {
-        bindings.takeImport(node);
-      },
-      VariableDeclarator(node: ESTree.VariableDeclarator) {
-        bindings.takeLocalBinding(node);
-      },
-      CallExpression(node: ESTree.CallExpression) {
-        if (isAssertionEntryCall(node)) listedEntries.add(node);
-      },
-      "Program:exit"() {
-        const rootNames = bindings.rootNames();
-        const pins = [...listedEntries].flatMap((listed) => {
-          const pin = pinOf(listed, rootNames);
+      "Program:exit"(program: ESTree.Program) {
+        const rootNames = testBlockRootNames(program);
+        const assertionEntries = nodesOfType(program, "CallExpression").filter((call) =>
+          isAssertionEntryCall(call),
+        );
+        const pins = assertionEntries.flatMap((assertionEntry) => {
+          const pin = pinOf(assertionEntry, rootNames);
           return pin === null ? [] : [pin];
         });
 
-        for (const listed of listedEntries) {
-          const projection = projectionOf(listed, rootNames);
+        for (const assertionEntry of assertionEntries) {
+          const projection = projectionOf(assertionEntry, rootNames);
           if (projection === null) continue;
           if (pins.some((pin) => excusedBy(pin, projection))) continue;
           inspection.report({ node: projection.at, messageId: projection.messageId });

@@ -1,122 +1,347 @@
-import { describe, expect, test } from "vite-plus/test";
+import { describe, expect, test, vi } from "vite-plus/test";
 
-import { collectPrContext, type PrContextGit, type PrContextGithub } from "./collect-pr-context.ts";
-
-import type { PrContext } from "./pr-context.ts";
-
-const emptyGithub: PrContextGithub = {
-  commentContext: () =>
-    Promise.resolve({ reviews: [], prComments: [], inlineComments: [], threads: [] }),
-  ciContext: () => Promise.resolve({ checks: [], failedLogPaths: [] }),
-};
-
-const gitWith = (overrides: Partial<PrContextGit>): PrContextGit => ({
-  nameStatusDiff: () => Promise.resolve(""),
-  unifiedDiff: () => Promise.resolve("diff text"),
-  treeEntryMode: () => Promise.resolve("100644"),
-  showFile: () => Promise.resolve("file content"),
-  ...overrides,
-});
-
-const collectWith = (git: PrContextGit): Promise<PrContext> =>
-  collectPrContext({
-    git,
-    github: emptyGithub,
-    prNumber: 7,
-    base: "main",
-    head: "topic/x",
-    failedLogsDir: "/logs",
-  });
-
-const collectTrackingShow = async (
-  overrides: Partial<PrContextGit>,
-): Promise<{ readonly context: PrContext; readonly shownCount: number }> => {
-  const shownPaths = new Map<number, string>();
-  const git = gitWith(overrides);
-  const carried = await collectWith({
-    ...git,
-    showFile: (listed) => {
-      shownPaths.set(shownPaths.size, listed.path);
-      return git.showFile(listed);
-    },
-  });
-  return { context: carried, shownCount: shownPaths.size };
-};
-
-const it = test
-  .extend("deletedFileCollection", () =>
-    collectTrackingShow({ nameStatusDiff: () => Promise.resolve("D\tsrc/gone.ts") }))
-  .extend("submoduleCollection", () =>
-    collectTrackingShow({
-      nameStatusDiff: () => Promise.resolve("M\tvendored/sub"),
-      treeEntryMode: () => Promise.resolve("160000"),
-    }),
-  )
-  .extend("oversizedFile", async () => {
-    const carried = await collectWith(
-      gitWith({
-        nameStatusDiff: () => Promise.resolve("M\tbig.ts"),
-        showFile: () => Promise.resolve("x".repeat(1_000_001)),
-      }),
-    );
-    return carried.changedFiles[0];
-  })
-  .extend("smallFile", async () => {
-    const carried = await collectWith(
-      gitWith({
-        nameStatusDiff: () => Promise.resolve("M\tsmall.ts"),
-        showFile: () => Promise.resolve("hello"),
-      }),
-    );
-    return carried.changedFiles[0];
-  })
-  .extend("emptyDiffCollection", () => collectWith(gitWith({})));
+import { collectPrContext, type PrContextGit } from "./collect-pr-context.ts";
 
 describe("collectPrContext", () => {
-  it("削除ファイルは理由 deleted になる", ({ deletedFileCollection }) => {
-    expect(deletedFileCollection.context.changedFiles[0]?.omissionReason).toStrictEqual("deleted");
+  const it = test
+    .extend("deletedFileContext", () =>
+      collectPrContext({
+        git: {
+          nameStatusDiff: () => Promise.resolve("D\tsrc/gone.ts"),
+          unifiedDiff: () => Promise.resolve("diff text"),
+          treeEntryMode: () => Promise.resolve("100644"),
+          showFile: () => Promise.resolve("file content"),
+        },
+        github: {
+          commentContext: () =>
+            Promise.resolve({ reviews: [], prComments: [], inlineComments: [], threads: [] }),
+          ciContext: () => Promise.resolve({ checks: [], failedLogPaths: [] }),
+        },
+        prNumber: 7,
+        base: "main",
+        head: "topic/x",
+        failedLogsDir: "/logs",
+      }))
+    .extend("showFileSpyForDeletion", async () => {
+      const showFileSpy = vi.fn<PrContextGit["showFile"]>(() => Promise.resolve("file content"));
+      await collectPrContext({
+        git: {
+          nameStatusDiff: () => Promise.resolve("D\tsrc/gone.ts"),
+          unifiedDiff: () => Promise.resolve("diff text"),
+          treeEntryMode: () => Promise.resolve("100644"),
+          showFile: showFileSpy,
+        },
+        github: {
+          commentContext: () =>
+            Promise.resolve({ reviews: [], prComments: [], inlineComments: [], threads: [] }),
+          ciContext: () => Promise.resolve({ checks: [], failedLogPaths: [] }),
+        },
+        prNumber: 7,
+        base: "main",
+        head: "topic/x",
+        failedLogsDir: "/logs",
+      });
+      return showFileSpy;
+    })
+    .extend("submoduleContext", () =>
+      collectPrContext({
+        git: {
+          nameStatusDiff: () => Promise.resolve("M\tvendored/sub"),
+          unifiedDiff: () => Promise.resolve("diff text"),
+          treeEntryMode: () => Promise.resolve("160000"),
+          showFile: () => Promise.resolve("file content"),
+        },
+        github: {
+          commentContext: () =>
+            Promise.resolve({ reviews: [], prComments: [], inlineComments: [], threads: [] }),
+          ciContext: () => Promise.resolve({ checks: [], failedLogPaths: [] }),
+        },
+        prNumber: 7,
+        base: "main",
+        head: "topic/x",
+        failedLogsDir: "/logs",
+      }),
+    )
+    .extend("showFileSpyForSubmodule", async () => {
+      const showFileSpy = vi.fn<PrContextGit["showFile"]>(() => Promise.resolve("file content"));
+      await collectPrContext({
+        git: {
+          nameStatusDiff: () => Promise.resolve("M\tvendored/sub"),
+          unifiedDiff: () => Promise.resolve("diff text"),
+          treeEntryMode: () => Promise.resolve("160000"),
+          showFile: showFileSpy,
+        },
+        github: {
+          commentContext: () =>
+            Promise.resolve({ reviews: [], prComments: [], inlineComments: [], threads: [] }),
+          ciContext: () => Promise.resolve({ checks: [], failedLogPaths: [] }),
+        },
+        prNumber: 7,
+        base: "main",
+        head: "topic/x",
+        failedLogsDir: "/logs",
+      });
+      return showFileSpy;
+    })
+    .extend("oversizedFileContext", () =>
+      collectPrContext({
+        git: {
+          nameStatusDiff: () => Promise.resolve("M\tbig.ts"),
+          unifiedDiff: () => Promise.resolve("diff text"),
+          treeEntryMode: () => Promise.resolve("100644"),
+          showFile: () => Promise.resolve("x".repeat(1_000_001)),
+        },
+        github: {
+          commentContext: () =>
+            Promise.resolve({ reviews: [], prComments: [], inlineComments: [], threads: [] }),
+          ciContext: () => Promise.resolve({ checks: [], failedLogPaths: [] }),
+        },
+        prNumber: 7,
+        base: "main",
+        head: "topic/x",
+        failedLogsDir: "/logs",
+      }),
+    )
+    .extend("showFileSpyForOversizedFile", async () => {
+      const showFileSpy = vi.fn<PrContextGit["showFile"]>(() =>
+        Promise.resolve("x".repeat(1_000_001)),
+      );
+      await collectPrContext({
+        git: {
+          nameStatusDiff: () => Promise.resolve("M\tbig.ts"),
+          unifiedDiff: () => Promise.resolve("diff text"),
+          treeEntryMode: () => Promise.resolve("100644"),
+          showFile: showFileSpy,
+        },
+        github: {
+          commentContext: () =>
+            Promise.resolve({ reviews: [], prComments: [], inlineComments: [], threads: [] }),
+          ciContext: () => Promise.resolve({ checks: [], failedLogPaths: [] }),
+        },
+        prNumber: 7,
+        base: "main",
+        head: "topic/x",
+        failedLogsDir: "/logs",
+      });
+      return showFileSpy;
+    })
+    .extend("smallFileContext", () =>
+      collectPrContext({
+        git: {
+          nameStatusDiff: () => Promise.resolve("M\tsmall.ts"),
+          unifiedDiff: () => Promise.resolve("diff text"),
+          treeEntryMode: () => Promise.resolve("100644"),
+          showFile: () => Promise.resolve("hello"),
+        },
+        github: {
+          commentContext: () =>
+            Promise.resolve({ reviews: [], prComments: [], inlineComments: [], threads: [] }),
+          ciContext: () => Promise.resolve({ checks: [], failedLogPaths: [] }),
+        },
+        prNumber: 7,
+        base: "main",
+        head: "topic/x",
+        failedLogsDir: "/logs",
+      }),
+    )
+    .extend("showFileSpyForSmallFile", async () => {
+      const showFileSpy = vi.fn<PrContextGit["showFile"]>(() => Promise.resolve("hello"));
+      await collectPrContext({
+        git: {
+          nameStatusDiff: () => Promise.resolve("M\tsmall.ts"),
+          unifiedDiff: () => Promise.resolve("diff text"),
+          treeEntryMode: () => Promise.resolve("100644"),
+          showFile: showFileSpy,
+        },
+        github: {
+          commentContext: () =>
+            Promise.resolve({ reviews: [], prComments: [], inlineComments: [], threads: [] }),
+          ciContext: () => Promise.resolve({ checks: [], failedLogPaths: [] }),
+        },
+        prNumber: 7,
+        base: "main",
+        head: "topic/x",
+        failedLogsDir: "/logs",
+      });
+      return showFileSpy;
+    })
+    .extend("emptyDiffContext", () =>
+      collectPrContext({
+        git: {
+          nameStatusDiff: () => Promise.resolve(""),
+          unifiedDiff: () => Promise.resolve("diff text"),
+          treeEntryMode: () => Promise.resolve("100644"),
+          showFile: () => Promise.resolve("file content"),
+        },
+        github: {
+          commentContext: () =>
+            Promise.resolve({ reviews: [], prComments: [], inlineComments: [], threads: [] }),
+          ciContext: () => Promise.resolve({ checks: [], failedLogPaths: [] }),
+        },
+        prNumber: 7,
+        base: "main",
+        head: "topic/x",
+        failedLogsDir: "/logs",
+      }),
+    )
+    .extend("unifiedDiffSpyForEmptyDiff", async () => {
+      const unifiedDiffSpy = vi.fn<PrContextGit["unifiedDiff"]>(() => Promise.resolve("diff text"));
+      await collectPrContext({
+        git: {
+          nameStatusDiff: () => Promise.resolve(""),
+          unifiedDiff: unifiedDiffSpy,
+          treeEntryMode: () => Promise.resolve("100644"),
+          showFile: () => Promise.resolve("file content"),
+        },
+        github: {
+          commentContext: () =>
+            Promise.resolve({ reviews: [], prComments: [], inlineComments: [], threads: [] }),
+          ciContext: () => Promise.resolve({ checks: [], failedLogPaths: [] }),
+        },
+        prNumber: 7,
+        base: "main",
+        head: "topic/x",
+        failedLogsDir: "/logs",
+      });
+      return unifiedDiffSpy;
+    })
+    .extend("nameStatusFailure", async () => {
+      try {
+        return await collectPrContext({
+          git: {
+            nameStatusDiff: () => Promise.reject(new Error("git blew up")),
+            unifiedDiff: () => Promise.resolve("diff text"),
+            treeEntryMode: () => Promise.resolve("100644"),
+            showFile: () => Promise.resolve("file content"),
+          },
+          github: {
+            commentContext: () =>
+              Promise.resolve({ reviews: [], prComments: [], inlineComments: [], threads: [] }),
+            ciContext: () => Promise.resolve({ checks: [], failedLogPaths: [] }),
+          },
+          prNumber: 7,
+          base: "main",
+          head: "topic/x",
+          failedLogsDir: "/logs",
+        });
+      } catch (thrown) {
+        return thrown;
+      }
+    });
+
+  it("削除ファイルは理由 deleted になり本文を持たない", ({ deletedFileContext }) => {
+    expect(deletedFileContext).toStrictEqual({
+      prNumber: 7,
+      base: "main",
+      head: "topic/x",
+      diff: "diff text",
+      changedFiles: [
+        {
+          statusCode: "D",
+          path: "src/gone.ts",
+          previousPath: null,
+          content: null,
+          omissionReason: "deleted",
+        },
+      ],
+      comments: { reviews: [], prComments: [], inlineComments: [], threads: [] },
+      ci: { checks: [], failedLogPaths: [] },
+    });
   });
 
-  it("削除ファイルは git show を呼ばない", ({ deletedFileCollection }) => {
-    expect(deletedFileCollection.shownCount).toStrictEqual(0);
+  it("削除ファイルは git show を呼ばない", ({ showFileSpyForDeletion }) => {
+    expect(showFileSpyForDeletion).not.toHaveBeenCalled();
   });
 
-  it("gitlink モードは理由 submodule になる", ({ submoduleCollection }) => {
-    expect(submoduleCollection.context.changedFiles[0]?.omissionReason).toStrictEqual("submodule");
+  it("gitlink モードは理由 submodule になり本文を持たない", ({ submoduleContext }) => {
+    expect(submoduleContext).toStrictEqual({
+      prNumber: 7,
+      base: "main",
+      head: "topic/x",
+      diff: "diff text",
+      changedFiles: [
+        {
+          statusCode: "M",
+          path: "vendored/sub",
+          previousPath: null,
+          content: null,
+          omissionReason: "submodule",
+        },
+      ],
+      comments: { reviews: [], prComments: [], inlineComments: [], threads: [] },
+      ci: { checks: [], failedLogPaths: [] },
+    });
   });
 
-  it("gitlink モードは git show を呼ばない", ({ submoduleCollection }) => {
-    expect(submoduleCollection.shownCount).toStrictEqual(0);
+  it("gitlink モードは git show を呼ばない", ({ showFileSpyForSubmodule }) => {
+    expect(showFileSpyForSubmodule).not.toHaveBeenCalled();
   });
 
-  it("1,000,000 バイト超は理由 too-large になる", ({ oversizedFile }) => {
-    expect(oversizedFile?.omissionReason).toStrictEqual("too-large");
+  it("1,000,000 バイト超は理由 too-large になり本文を持たない", ({ oversizedFileContext }) => {
+    expect(oversizedFileContext).toStrictEqual({
+      prNumber: 7,
+      base: "main",
+      head: "topic/x",
+      diff: "diff text",
+      changedFiles: [
+        {
+          statusCode: "M",
+          path: "big.ts",
+          previousPath: null,
+          content: null,
+          omissionReason: "too-large",
+        },
+      ],
+      comments: { reviews: [], prComments: [], inlineComments: [], threads: [] },
+      ci: { checks: [], failedLogPaths: [] },
+    });
   });
 
-  it("1,000,000 バイト超は本文を持たない", ({ oversizedFile }) => {
-    expect(oversizedFile?.content).toStrictEqual(null);
+  it("1,000,000 バイト超でも本文は head から取得される", ({ showFileSpyForOversizedFile }) => {
+    expect(showFileSpyForOversizedFile).toHaveBeenCalledWith({ ref: "topic/x", path: "big.ts" });
   });
 
-  it("閾値以下は本文を保持する", ({ smallFile }) => {
-    expect(smallFile?.content).toStrictEqual("hello");
+  it("閾値以下は本文を保持し省略理由を持たない", ({ smallFileContext }) => {
+    expect(smallFileContext).toStrictEqual({
+      prNumber: 7,
+      base: "main",
+      head: "topic/x",
+      diff: "diff text",
+      changedFiles: [
+        {
+          statusCode: "M",
+          path: "small.ts",
+          previousPath: null,
+          content: "hello",
+          omissionReason: null,
+        },
+      ],
+      comments: { reviews: [], prComments: [], inlineComments: [], threads: [] },
+      ci: { checks: [], failedLogPaths: [] },
+    });
   });
 
-  it("閾値以下は省略理由を持たない", ({ smallFile }) => {
-    expect(smallFile?.omissionReason).toStrictEqual(null);
+  it("閾値以下の本文は head から取得される", ({ showFileSpyForSmallFile }) => {
+    expect(showFileSpyForSmallFile).toHaveBeenCalledWith({ ref: "topic/x", path: "small.ts" });
   });
 
-  it("統合 diff をそのまま持つ", ({ emptyDiffCollection }) => {
-    expect(emptyDiffCollection.diff).toStrictEqual("diff text");
+  it("変更が無ければ統合 diff と PR 番号だけを持つ", ({ emptyDiffContext }) => {
+    expect(emptyDiffContext).toStrictEqual({
+      prNumber: 7,
+      base: "main",
+      head: "topic/x",
+      diff: "diff text",
+      changedFiles: [],
+      comments: { reviews: [], prComments: [], inlineComments: [], threads: [] },
+      ci: { checks: [], failedLogPaths: [] },
+    });
   });
 
-  it("PR 番号をそのまま持つ", ({ emptyDiffCollection }) => {
-    expect(emptyDiffCollection.prNumber).toStrictEqual(7);
+  it("統合 diff は base と head の組で取得される", ({ unifiedDiffSpyForEmptyDiff }) => {
+    expect(unifiedDiffSpyForEmptyDiff).toHaveBeenCalledWith({ base: "main", head: "topic/x" });
   });
 
-  it("name-status 取得の失敗はそのまま伝播する", async () => {
-    const collecting = collectWith(
-      gitWith({ nameStatusDiff: () => Promise.reject(new Error("git blew up")) }),
-    );
-    await expect(collecting).rejects.toThrow("git blew up");
+  it("name-status 取得の失敗はそのまま伝播する", ({ nameStatusFailure }) => {
+    expect(nameStatusFailure).toStrictEqual(new Error("git blew up"));
   });
 });

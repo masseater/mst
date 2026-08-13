@@ -1,7 +1,7 @@
 import { zip } from "es-toolkit";
 
 import { createDontReviewItRule } from "../../../create-rule.ts";
-import { ancestorsOf } from "../lib/ast-node.ts";
+import { nodeVisitsOfType } from "../lib/nodes-of-type.ts";
 import {
   entryKeysOf,
   INLINE_SPELLING_BY_EXTERNAL,
@@ -31,10 +31,10 @@ const maxLinesFrom = (ruleOptions: Readonly<Options>): number => {
   return typeof configured === "number" ? configured : MAX_INLINE_RECORD_LINES;
 };
 
-const spelledKeys = (namedKeys: readonly string[]): string =>
-  namedKeys.length <= REPORTED_KEY_LIMIT
-    ? namedKeys.join("`, `")
-    : `${namedKeys.slice(0, REPORTED_KEY_LIMIT).join("`, `")}\` and ${String(namedKeys.length - REPORTED_KEY_LIMIT)} more\``;
+const spelledKeys = (externalRecordKeys: readonly string[]): string =>
+  externalRecordKeys.length <= REPORTED_KEY_LIMIT
+    ? externalRecordKeys.join("`, `")
+    : `${externalRecordKeys.slice(0, REPORTED_KEY_LIMIT).join("`, `")}\` and ${String(externalRecordKeys.length - REPORTED_KEY_LIMIT)} more\``;
 
 export const noUndersizedExternalSnapshot = createDontReviewItRule({
   name: "no-undersized-external-snapshot--use-inline-snapshot",
@@ -70,11 +70,13 @@ export const noUndersizedExternalSnapshot = createDontReviewItRule({
 
     const maxLines = maxLinesFrom(inspection.options);
 
-    const recordedLinesOf = (namedKeys: readonly string[]): number | null => {
-      const recorded = namedKeys.map((named) => externalRecordOf(inspection.filename, named));
-      const found = recorded.flatMap((written) => (written === null ? [] : [written]));
-      if (found.length === 0 || found.length !== recorded.length) return null;
-      return Math.max(...found.map(recordLineCountOf));
+    const recordedLinesOf = (externalRecordKeys: readonly string[]): number | null => {
+      const recorded = externalRecordKeys.map((externalRecordKey) =>
+        externalRecordOf(inspection.filename, externalRecordKey),
+      );
+      const snapshots = recorded.flatMap((snapshot) => (snapshot === null ? [] : [snapshot]));
+      if (snapshots.length === 0 || snapshots.length !== recorded.length) return null;
+      return Math.max(...snapshots.map(recordLineCountOf));
     };
 
     const replacementOf = (
@@ -90,14 +92,14 @@ export const noUndersizedExternalSnapshot = createDontReviewItRule({
 
     const reportUndersized = ({
       site,
-      keys: namedKeys,
       inlineSpelling,
+      externalRecordKeys,
     }: {
       readonly site: SnapshotMatcherSite;
-      readonly keys: readonly string[];
       readonly inlineSpelling: string;
+      readonly externalRecordKeys: readonly string[];
     }): void => {
-      const recordedLines = recordedLinesOf(namedKeys);
+      const recordedLines = recordedLinesOf(externalRecordKeys);
       if (recordedLines === null || recordedLines > maxLines) return;
 
       const measured = {
@@ -105,9 +107,9 @@ export const noUndersizedExternalSnapshot = createDontReviewItRule({
         maxLines,
         matcher: site.matcher,
         inlineSpelling,
-        key: spelledKeys(namedKeys),
+        key: spelledKeys(externalRecordKeys),
       };
-      if (namedKeys.length > 1) {
+      if (externalRecordKeys.length > 1) {
         inspection.report({
           node: site.matcherNode,
           messageId: "undersizedTableDrivenSnapshot",
@@ -128,29 +130,25 @@ export const noUndersizedExternalSnapshot = createDontReviewItRule({
       });
     };
 
-    const reportSite = (site: SnapshotMatcherSite, listedEntries: SnapshotEntryKeys): void => {
+    const reportSite = (site: SnapshotMatcherSite, entryKeys: SnapshotEntryKeys): void => {
       const inlineSpelling = INLINE_SPELLING_BY_EXTERNAL.get(site.matcher);
       if (inlineSpelling === undefined) return;
-      if (listedEntries.kind === "unreadable") return;
-      if (listedEntries.kind === "unresolvable") {
+      if (entryKeys.kind === "unreadable") return;
+      if (entryKeys.kind === "unresolvable") {
         inspection.report({ node: site.matcherNode, messageId: "unresolvableExternalSnapshot" });
         return;
       }
-      if (listedEntries.keys.length === 0) return;
-      reportUndersized({ site, keys: listedEntries.keys, inlineSpelling });
+      if (entryKeys.keys.length === 0) return;
+      reportUndersized({ site, inlineSpelling, externalRecordKeys: entryKeys.keys });
     };
 
-    const collected = new Set<SnapshotMatcherSite>();
-
     return {
-      CallExpression(node: ESTree.CallExpression) {
-        const site = snapshotMatcherSiteOf(node, ancestorsOf(node));
-        if (site !== null) collected.add(site);
-      },
-      "Program:exit"() {
-        const sites = [...collected];
-        for (const [site, listedEntries] of zip(sites, entryKeysOf(sites))) {
-          reportSite(site, listedEntries);
+      "Program:exit"(program: ESTree.Program) {
+        const sites = nodeVisitsOfType(program, "CallExpression").flatMap(
+          (visit) => snapshotMatcherSiteOf(visit.node, visit.ancestors) ?? [],
+        );
+        for (const [site, entryKeys] of zip(sites, entryKeysOf(sites))) {
+          reportSite(site, entryKeys);
         }
       },
     };

@@ -1,8 +1,6 @@
 import packageManifest from "../package.json" with { type: "json" };
 
-const REPOSITORY_BLOB_BASE_URL = `${packageManifest.repository.url
-  .replace(/^git\+/u, "")
-  .replace(/\.git$/u, "")}/blob/main`;
+const REPOSITORY_BLOB_BASE_URL = `${packageManifest.homepage}/blob/main`;
 
 export type WorkspaceLintRuleIdentity = {
   readonly workspaceDir: string;

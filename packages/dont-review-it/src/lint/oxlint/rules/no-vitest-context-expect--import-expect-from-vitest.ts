@@ -1,4 +1,5 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { fixtureContextParameterName } from "../lib/spec-syntax/fixture-declarations.ts";
 import {
   isHeldContextReach,
@@ -9,7 +10,7 @@ import { staticMemberName, staticPropertyName } from "../lib/spec-syntax/static-
 import { unwrapSubject, type SpecFunction } from "../lib/spec-syntax/subject-expressions.ts";
 import {
   declaresTestBlock,
-  testBlockBindings,
+  testBlockRootNames,
   testCallbacksOf,
 } from "../lib/spec-syntax/test-block-declarations.ts";
 
@@ -17,8 +18,8 @@ import type { ESTree } from "@oxlint/plugins";
 
 const ASSERTION_ENTRY = "expect";
 
-const contextPatternOf = (specCallback: SpecFunction): ESTree.ObjectPattern | null => {
-  const [parameter] = specCallback.params;
+const contextPatternOf = (taker: SpecFunction): ESTree.ObjectPattern | null => {
+  const [parameter] = taker.params;
   if (parameter === undefined) return null;
 
   const written = parameter.type === "AssignmentPattern" ? parameter.left : parameter;
@@ -37,12 +38,21 @@ const takenAssertionEntry = (pattern: ESTree.ObjectPattern): ESTree.BindingPrope
   return taken[0] ?? null;
 };
 
-const contextBindingsOf = (specCallback: SpecFunction): readonly HeldContext[] => {
-  const parameterName = fixtureContextParameterName(specCallback);
-  return parameterName === null
+const contextBindingsOf = (taker: SpecFunction): readonly HeldContext[] => {
+  const contextParameterName = fixtureContextParameterName(taker);
+  return contextParameterName === null
     ? []
-    : [{ name: parameterName, start: specCallback.start, end: specCallback.end }];
+    : [{ name: contextParameterName, start: taker.start, end: taker.end }];
 };
+
+const contextReachesIn = (program: ESTree.Program): readonly ContextReach[] =>
+  nodesOfType(program, "MemberExpression").flatMap((node) => {
+    if (node.computed) return [];
+    if (staticMemberName(node) !== ASSERTION_ENTRY) return [];
+
+    const receiver = unwrapSubject(node.object);
+    return receiver.type === "Identifier" ? [{ node, name: receiver.name }] : [];
+  });
 
 export const noVitestContextExpect = createDontReviewItRule({
   name: "no-vitest-context-expect--import-expect-from-vitest",
@@ -62,12 +72,8 @@ export const noVitestContextExpect = createDontReviewItRule({
     schema: [],
   },
   create(inspection) {
-    const bindings = testBlockBindings();
-    const calls = new Set<ESTree.CallExpression>();
-    const accesses = new Set<ContextReach>();
-
-    const reportTakenEntry = (specCallback: SpecFunction): void => {
-      const pattern = contextPatternOf(specCallback);
+    const reportTakenEntry = (taker: SpecFunction): void => {
+      const pattern = contextPatternOf(taker);
       if (pattern === null) return;
 
       const taken = takenAssertionEntry(pattern);
@@ -76,29 +82,16 @@ export const noVitestContextExpect = createDontReviewItRule({
     };
 
     return {
-      ImportDeclaration: bindings.takeImport,
-      VariableDeclarator: bindings.takeLocalBinding,
-      CallExpression(node: ESTree.CallExpression) {
-        calls.add(node);
-      },
-      MemberExpression(node: ESTree.MemberExpression) {
-        if (node.computed) return;
-        if (staticMemberName(node) !== ASSERTION_ENTRY) return;
-
-        const receiver = unwrapSubject(node.object);
-        if (receiver.type !== "Identifier") return;
-        accesses.add({ node, name: receiver.name });
-      },
-      "Program:exit"() {
-        const rootNames = bindings.rootNames();
-        const specCallbacks = [...calls]
+      "Program:exit"(program: ESTree.Program) {
+        const rootNames = testBlockRootNames(program);
+        const takers = nodesOfType(program, "CallExpression")
           .filter((call) => declaresTestBlock(call, rootNames))
           .flatMap((call) => testCallbacksOf(call));
 
-        for (const specCallback of specCallbacks) reportTakenEntry(specCallback);
+        for (const taker of takers) reportTakenEntry(taker);
 
-        const held = specCallbacks.flatMap((specCallback) => contextBindingsOf(specCallback));
-        for (const access of accesses) {
+        const held = takers.flatMap((taker) => contextBindingsOf(taker));
+        for (const access of contextReachesIn(program)) {
           if (isHeldContextReach(access, held)) {
             inspection.report({ node: access.node, messageId: "reachedContextExpect" });
           }

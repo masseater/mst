@@ -37,6 +37,7 @@ import { noDryTestSetup } from "./lint/oxlint/rules/no-dry-test-setup--inline-ow
 import { createNoDuplicateValueDeclaration } from "./lint/oxlint/rules/no-duplicate-value-declaration--reuse-authoritative-value.ts";
 import { createNoDuplicatedBody } from "./lint/oxlint/rules/no-duplicated-body--import-the-existing-declaration.ts";
 import { noDuplicatedTest } from "./lint/oxlint/rules/no-duplicated-test--delete-the-copy.ts";
+import { noEmptyCatch } from "./lint/oxlint/rules/no-empty-catch--throw-or-handle.ts";
 import { noExpectCallExpression } from "./lint/oxlint/rules/no-expect-call-expression--yield-from-fixture.ts";
 import { noExpectForbiddenSubjectName } from "./lint/oxlint/rules/no-expect-forbidden-subject-name--rename-to-concrete-subject.ts";
 import { noExpectMemberSubject } from "./lint/oxlint/rules/no-expect-member-subject--yield-subject-from-fixture.ts";
@@ -76,6 +77,7 @@ import { noRedundantMockReset } from "./lint/oxlint/rules/no-redundant-mock-rese
 import { noReplacedDoubleBehaviour } from "./lint/oxlint/rules/no-replaced-double-behaviour--let-the-replaced-module-answer.ts";
 import { noRuleSuppression } from "./lint/oxlint/rules/no-rule-suppression--fix-the-violation.ts";
 import { noSharedDoubleState } from "./lint/oxlint/rules/no-shared-double-state--reset-doubles-between-tests.ts";
+import { noSilentCatch } from "./lint/oxlint/rules/no-silent-catch--rethrow-or-handle.ts";
 import { noSilentSuppression } from "./lint/oxlint/rules/no-silent-suppression--fix-or-justify-inline.ts";
 import { noSingleUseLocalType } from "./lint/oxlint/rules/no-single-use-local-type--inline-at-the-use-site.ts";
 import { noSpecFileHelperFunction } from "./lint/oxlint/rules/no-spec-file-helper-function--inline-or-use-fixture.ts";
@@ -132,19 +134,19 @@ export const noNonBoundaryDouble = createNoNonBoundaryDouble({ readBoundary: rep
 
 export const noUnusedStyleClass = createNoUnusedStyleClass({ loadIndex: loadStyleClassIndex });
 
-const noClassAsMutableCell = createNoClassAsMutableCell({
+export const noClassAsMutableCell = createNoClassAsMutableCell({
   loadIndex: loadRepositoryCellClassIndex,
 });
 
-const noDuplicateValueDeclaration = createNoDuplicateValueDeclaration({
+export const noDuplicateValueDeclaration = createNoDuplicateValueDeclaration({
   loadIndex: loadRepositoryValueDeclarationIndex,
 });
 
-const noSplitTypeAuthority = createNoSplitTypeAuthority({
+export const noSplitTypeAuthority = createNoSplitTypeAuthority({
   loadIndex: loadRepositoryTypeAuthorityIndex,
 });
 
-const requireCatalogEntry = createRequireCatalogEntry({
+export const requireCatalogEntry = createRequireCatalogEntry({
   loadWorkspaces: loadWorkspaceDependencies,
 });
 
@@ -185,6 +187,7 @@ const plugin: Plugin = {
     [noDuplicateValueDeclaration.name]: noDuplicateValueDeclaration,
     [noDuplicatedBody.name]: noDuplicatedBody,
     [noDuplicatedTest.name]: noDuplicatedTest,
+    [noEmptyCatch.name]: noEmptyCatch,
     [noExpectCallExpression.name]: noExpectCallExpression,
     [noExpectForbiddenSubjectName.name]: noExpectForbiddenSubjectName,
     [noExpectMemberSubject.name]: noExpectMemberSubject,
@@ -224,6 +227,7 @@ const plugin: Plugin = {
     [noReplacedDoubleBehaviour.name]: noReplacedDoubleBehaviour,
     [noRuleSuppression.name]: noRuleSuppression,
     [noSharedDoubleState.name]: noSharedDoubleState,
+    [noSilentCatch.name]: noSilentCatch,
     [noSilentSuppression.name]: noSilentSuppression,
     [noSingleUseLocalType.name]: noSingleUseLocalType,
     [noSpecFileHelperFunction.name]: noSpecFileHelperFunction,

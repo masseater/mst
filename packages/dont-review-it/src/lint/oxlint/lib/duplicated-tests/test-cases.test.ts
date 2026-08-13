@@ -2,123 +2,211 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { repeatedTestCasesIn } from "./test-cases.ts";
 
-const repeatedTitlesIn = (source: string): readonly string[] =>
-  repeatedTestCasesIn(source).map((testCase) => testCase.name);
-
 describe("repeatedTestCasesIn", () => {
-  test("a title and body spelled twice yields both places", () => {
-    expect(
-      repeatedTitlesIn(`test("counts one", () => {
+  describe("a title and body spelled twice under the two runner spellings", () => {
+    const it = test.extend("repeatedTitles", () =>
+      repeatedTestCasesIn(`test("counts one", () => {
   expect(total).toBe(1);
 });
 it("counts one", () => {
   expect(total).toBe(1);
 });
-`),
-    ).toStrictEqual(["counts one", "counts one"]);
+`).map((repeatedTestCase) => repeatedTestCase.name));
+
+    it("yields both places the title was spelled", ({ repeatedTitles }) => {
+      expect(repeatedTitles).toStrictEqual(["counts one", "counts one"]);
+    });
   });
 
-  test("both runner spellings are compared wherever they are nested", () => {
-    expect(
-      repeatedTitlesIn(`describe("suite", () => {
+  describe("the two runner spellings nested inside a grouping block", () => {
+    const it = test.extend("repeatedTitles", () =>
+      repeatedTestCasesIn(`describe("suite", () => {
   test("counts one", function () {});
   it("counts one", function () {});
 });
-`),
-    ).toStrictEqual(["counts one", "counts one"]);
+`).map((repeatedTestCase) => repeatedTestCase.name));
+
+    it("compares them wherever they are nested", ({ repeatedTitles }) => {
+      expect(repeatedTitles).toStrictEqual(["counts one", "counts one"]);
+    });
   });
 
-  test("a runner reached through a modifier is compared under its root name", () => {
-    expect(
-      repeatedTitlesIn(`test.each([1])("counts %i", () => {});
+  describe("a runner reached through a modifier", () => {
+    const it = test.extend("repeatedTitles", () =>
+      repeatedTestCasesIn(`test.each([1])("counts %i", () => {});
 test.each([1])("counts %i", () => {});
-`),
-    ).toStrictEqual(["counts %i", "counts %i"]);
+`).map((repeatedTestCase) => repeatedTestCase.name));
+
+    it("compares it under its root name", ({ repeatedTitles }) => {
+      expect(repeatedTitles).toStrictEqual(["counts %i", "counts %i"]);
+    });
   });
 
-  test("each reported place carries the line its runner starts on", () => {
-    expect(
+  describe("a repeated title spelled on two separated lines", () => {
+    const it = test.extend("repeatedLines", () =>
       repeatedTestCasesIn(`
 test("counts one", () => {});
 
 test("counts one", () => {});
-`).map((testCase) => testCase.line),
-    ).toStrictEqual([2, 4]);
+`).map((repeatedTestCase) => repeatedTestCase.line));
+
+    it("carries the line each runner starts on", ({ repeatedLines }) => {
+      expect(repeatedLines).toStrictEqual([2, 4]);
+    });
   });
 
-  test("a fixture declared through the builder is not a test", () => {
-    expect(
-      repeatedTitlesIn(`const it = test.extend("cleanRun", () => run());
+  describe("a fixture declared twice through the builder", () => {
+    const it = test.extend("repeatedTestCases", () =>
+      repeatedTestCasesIn(`const it = test.extend("cleanRun", () => run());
 const test_ = test.extend("cleanRun", () => run());
-`),
-    ).toStrictEqual([]);
+`));
+
+    it("reads neither declaration as a test", ({ repeatedTestCases }) => {
+      expect(repeatedTestCases).toStrictEqual([]);
+    });
   });
 
-  test("a call that is not a runner is left out", () => {
-    expect(
-      repeatedTitlesIn(`describe("suite", () => {});
+  describe("a repeated call that is not a runner", () => {
+    const it = test.extend("repeatedTestCases", () =>
+      repeatedTestCasesIn(`describe("suite", () => {});
 describe("suite", () => {});
-`),
-    ).toStrictEqual([]);
+`));
+
+    it("leaves that call out", ({ repeatedTestCases }) => {
+      expect(repeatedTestCases).toStrictEqual([]);
+    });
   });
 
-  test("a runner whose callee is not a name is left out", () => {
-    expect(
-      repeatedTitlesIn(`runners[0]("counts one", () => {});
+  describe("a repeated runner whose callee is not a name", () => {
+    const it = test.extend("repeatedTestCases", () =>
+      repeatedTestCasesIn(`runners[0]("counts one", () => {});
 runners[0]("counts one", () => {});
-`),
-    ).toStrictEqual([]);
+`));
+
+    it("leaves that runner out", ({ repeatedTestCases }) => {
+      expect(repeatedTestCases).toStrictEqual([]);
+    });
   });
 
-  test("a runner reached through an immediately invoked function is left out", () => {
-    expect(
-      repeatedTitlesIn(`(() => test)("counts one", () => {});
+  describe("a repeated runner reached through an immediately invoked function", () => {
+    const it = test.extend("repeatedTestCases", () =>
+      repeatedTestCasesIn(`(() => test)("counts one", () => {});
 (() => test)("counts one", () => {});
-`),
-    ).toStrictEqual([]);
+`));
+
+    it("leaves that runner out", ({ repeatedTestCases }) => {
+      expect(repeatedTestCases).toStrictEqual([]);
+    });
   });
 
-  test("a runner without a spelled title is left out", () => {
-    expect(
-      repeatedTitlesIn(`test(title, () => {});
+  describe("repeated runners without a spelled title", () => {
+    const it = test.extend("repeatedTestCases", () =>
+      repeatedTestCasesIn(`test(title, () => {});
 test(title, () => {});
 test(1, () => {});
 test(1, () => {});
-`),
-    ).toStrictEqual([]);
+`));
+
+    it("leaves every untitled runner out", ({ repeatedTestCases }) => {
+      expect(repeatedTestCases).toStrictEqual([]);
+    });
   });
 
-  test("a runner without a body is left out", () => {
-    expect(
-      repeatedTitlesIn(`test("counts one");
+  describe("repeated runners without a body", () => {
+    const it = test.extend("repeatedTestCases", () =>
+      repeatedTestCasesIn(`test("counts one");
 test("counts one");
 test("counts two", handler);
 test("counts two", handler);
-`),
-    ).toStrictEqual([]);
+`));
+
+    it("leaves every bodyless runner out", ({ repeatedTestCases }) => {
+      expect(repeatedTestCases).toStrictEqual([]);
+    });
   });
 
-  test("a shared body under different titles is not a repeat", () => {
-    expect(
-      repeatedTitlesIn(`test("counts one", () => {
+  describe("a shared body under different titles", () => {
+    const it = test.extend("repeatedTestCases", () =>
+      repeatedTestCasesIn(`test("counts one", () => {
   expect(total).toBe(1);
 });
 test("counts the same total", () => {
   expect(total).toBe(1);
 });
-`),
-    ).toStrictEqual([]);
+`));
+
+    it("reads that pair as no repeat", ({ repeatedTestCases }) => {
+      expect(repeatedTestCases).toStrictEqual([]);
+    });
   });
 
-  test("a shared title over different bodies is not a repeat", () => {
-    expect(
-      repeatedTitlesIn(`test("counts one", () => {
+  describe("a shared title over different bodies", () => {
+    const it = test.extend("repeatedTestCases", () =>
+      repeatedTestCasesIn(`test("counts one", () => {
   expect(total).toBe(1);
 });
 test("counts one", () => {
   expect(other).toBe(1);
 });
-`),
-    ).toStrictEqual([]);
+`));
+
+    it("reads that pair as no repeat", ({ repeatedTestCases }) => {
+      expect(repeatedTestCases).toStrictEqual([]);
+    });
+  });
+
+  describe("a shared title and body under two named situations", () => {
+    const it = test.extend("repeatedTestCases", () =>
+      repeatedTestCasesIn(`describe("a tally that was never added to", () => {
+  test("counts one", () => {
+    expect(total).toBe(1);
+  });
+});
+describe("a tally added to once", () => {
+  test("counts one", () => {
+    expect(total).toBe(1);
+  });
+});
+`));
+
+    it("reads them as separate claims", ({ repeatedTestCases }) => {
+      expect(repeatedTestCases).toStrictEqual([]);
+    });
+  });
+
+  describe("a shared title and body under one named situation", () => {
+    const it = test.extend("repeatedTestCaseTitles", () =>
+      repeatedTestCasesIn(`describe("a tally that was never added to", () => {
+  test("counts one", () => {
+    expect(total).toBe(1);
+  });
+  test("counts one", () => {
+    expect(total).toBe(1);
+  });
+});
+`).map((repeated) => repeated.name));
+
+    it("reads them as a repeat", ({ repeatedTestCaseTitles }) => {
+      expect(repeatedTestCaseTitles).toStrictEqual(["counts one", "counts one"]);
+    });
+  });
+
+  describe("a shared title and body under situations nobody spelled out", () => {
+    const it = test.extend("repeatedTestCaseTitles", () =>
+      repeatedTestCasesIn(`describe(namedElsewhere, () => {
+  test("counts one", () => {
+    expect(total).toBe(1);
+  });
+});
+describe(namedElsewhere, () => {
+  test("counts one", () => {
+    expect(total).toBe(1);
+  });
+});
+`).map((repeated) => repeated.name));
+
+    it("reads them as a repeat", ({ repeatedTestCaseTitles }) => {
+      expect(repeatedTestCaseTitles).toStrictEqual(["counts one", "counts one"]);
+    });
   });
 });

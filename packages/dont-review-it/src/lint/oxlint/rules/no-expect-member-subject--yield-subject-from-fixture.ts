@@ -1,4 +1,5 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { resolveBinding, type ScopeLookup } from "../lib/resolved-bindings.ts";
 import { isAssertionEntryCall } from "../lib/spec-syntax/assertion-entries.ts";
 import { destructuredBindingsOf } from "../lib/spec-syntax/destructured-bindings.ts";
@@ -7,7 +8,7 @@ import { unwrapSubject, type SpecFunction } from "../lib/spec-syntax/subject-exp
 import { TABLE_DRIVEN_MEMBERS } from "../lib/spec-syntax/table-driven-titles.ts";
 import {
   declaresTestBlock,
-  testBlockBindings,
+  testBlockRootNames,
   testCallbacksOf,
 } from "../lib/spec-syntax/test-block-declarations.ts";
 import { testBlockModifiersOf } from "../lib/spec-syntax/test-block-modifiers.ts";
@@ -48,8 +49,8 @@ type Reading = {
 const handsRowsToCallback = (call: ESTree.CallExpression): boolean =>
   testBlockModifiersOf(call.callee).some((modifier) => TABLE_DRIVEN_MEMBERS.has(modifier.name));
 
-const contextSitesOf = (taken: SpecFunction): readonly HandedSite[] => {
-  const [parameter] = taken.params;
+const contextSitesOf = (specFunction: SpecFunction): readonly HandedSite[] => {
+  const [parameter] = specFunction.params;
   if (parameter === undefined) return [];
   return destructuredBindingsOf(parameter).map((binding) => ({
     name: binding.name,
@@ -112,10 +113,10 @@ const readingOfSubject = (subject: ESTree.Expression, lookup: Lookup): SubjectRe
 };
 
 const reportedSubjectIn = (
-  assertionEntry: ESTree.CallExpression,
+  assertionCall: ESTree.CallExpression,
   lookup: Lookup,
 ): { readonly node: ESTree.Expression; readonly messageId: string } | null => {
-  const [handed] = assertionEntry.arguments;
+  const [handed] = assertionCall.arguments;
   if (handed === undefined || handed.type === "SpreadElement") return null;
 
   const subject = unwrapSubject(handed);
@@ -139,7 +140,7 @@ export const noExpectMemberSubject = createDontReviewItRule({
       boundMemberSubject:
         "The subject of an assertion must not be a binding that holds a member reached off the value a fixture handed over. `{{subject}}` arrives at that member through the bindings this spec declares, and every face left unnamed here passes unread. Split the fixture into one fixture per face, or assert the whole value the fixture hands over with an exact matcher.",
       destructuredMemberSubject:
-        "The subject of an assertion must not be a binding taken out of a pattern nested inside the test context. `{{subject}}` names one face of the value a fixture handed over, and every face left unnamed here passes unread. Take the fixture value whole in the taken parameter, and split the fixture into one fixture per face or assert the whole value with an exact matcher. Renaming the binding in the pattern leaves the face it names unchanged.",
+        "The subject of an assertion must not be a binding taken out of a pattern nested inside the test context. `{{subject}}` names one face of the value a fixture handed over, and every face left unnamed here passes unread. Take the fixture value whole in the callback parameter, and split the fixture into one fixture per face or assert the whole value with an exact matcher. Renaming the binding in the pattern leaves the face it names unchanged.",
     },
     schema: [
       {
@@ -154,37 +155,26 @@ export const noExpectMemberSubject = createDontReviewItRule({
   create(inspection) {
     if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
-    const blockBindings = testBlockBindings();
-    const calls = new Set<ESTree.CallExpression>();
-    const listedEntries = new Set<ESTree.CallExpression>();
-    const declarators = new Set<ESTree.VariableDeclarator>();
-
     return {
-      ImportDeclaration: blockBindings.takeImport,
-      VariableDeclarator(node: ESTree.VariableDeclarator) {
-        blockBindings.takeLocalBinding(node);
-        declarators.add(node);
-      },
-      CallExpression(node: ESTree.CallExpression) {
-        calls.add(node);
-        if (isAssertionEntryCall(node)) listedEntries.add(node);
-      },
-      "Program:exit"() {
-        const rootNames = blockBindings.rootNames();
-        const specCallbacks = [...calls]
+      "Program:exit"(program: ESTree.Program) {
+        const rootNames = testBlockRootNames(program);
+        const calls = nodesOfType(program, "CallExpression");
+        const specFunctions = calls
           .filter((call) => declaresTestBlock(call, rootNames) && !handsRowsToCallback(call))
           .flatMap((call) => testCallbacksOf(call));
 
         const lookup: Lookup = {
           sites: [
-            ...specCallbacks.flatMap((taken: SpecFunction) => contextSitesOf(taken)),
-            ...[...declarators].flatMap((declarator) => declaredSitesOf(declarator)),
+            ...specFunctions.flatMap((specFunction) => contextSitesOf(specFunction)),
+            ...nodesOfType(program, "VariableDeclarator").flatMap((declarator) =>
+              declaredSitesOf(declarator),
+            ),
           ],
           scopeAt: (node: ESTree.Node) => inspection.sourceCode.getScope(node),
         };
 
-        for (const assertionEntry of listedEntries) {
-          const reported = reportedSubjectIn(assertionEntry, lookup);
+        for (const assertionCall of calls.filter((call) => isAssertionEntryCall(call))) {
+          const reported = reportedSubjectIn(assertionCall, lookup);
           if (reported === null) continue;
           inspection.report({
             node: reported.node,

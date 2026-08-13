@@ -4,75 +4,189 @@ import { sealEnvelope, unwrapEnvelope } from "./envelope.ts";
 import { filterEvent } from "./filter.ts";
 import { toWebhookShape } from "./webhook-shape.ts";
 
-import type { FilteredEvent } from "./filtered-event.ts";
-import type { Mode } from "./vocabulary.ts";
-
-const roundTrip = (webhookEvent: FilteredEvent, spelledMode: Mode): FilteredEvent | null => {
-  const shape = toWebhookShape(webhookEvent);
-  const flattened = unwrapEnvelope(
-    sealEnvelope({ eventType: shape.eventType, deliveryId: "delivery-1", payload: shape.payload }),
-  );
-  return filterEvent(flattened, spelledMode);
-};
-
-const it = test
-  .extend("detailedReviewRequestRoundTrip", () =>
-    roundTrip(
-      {
+describe("封筒の往復不変条件", () => {
+  const it = test
+    .extend("detailedReviewRequestRoundTrip", () => {
+      const detailedReviewRequestShape = toWebhookShape({
         kind: "review-requested",
         pullNumber: 7,
         reviewerLogin: "octocat",
         title: "Add retry",
         draft: false,
-      },
-      "reviewer",
-    ))
-  .extend("bareReviewRequestRoundTrip", () =>
-    roundTrip({ kind: "review-requested", pullNumber: 7 }, "reviewer"),
-  )
-  .extend("headInputChangeRoundTrip", () =>
-    roundTrip({ kind: "review-input-changed", changedInput: "head", pullNumber: 7 }, "reviewer"),
-  )
-  .extend("baseInputChangeRoundTrip", () =>
-    roundTrip({ kind: "review-input-changed", changedInput: "base", pullNumber: 7 }, "reviewer"),
-  )
-  .extend("sourceReviewRoundTrip", () =>
-    roundTrip(
-      {
+      });
+      return filterEvent(
+        unwrapEnvelope(
+          sealEnvelope({
+            eventType: detailedReviewRequestShape.eventType,
+            deliveryId: "delivery-1",
+            payload: detailedReviewRequestShape.payload,
+          }),
+        ),
+        "reviewer",
+      );
+    })
+    .extend("bareReviewRequestRoundTrip", () => {
+      const bareReviewRequestShape = toWebhookShape({ kind: "review-requested", pullNumber: 7 });
+      return filterEvent(
+        unwrapEnvelope(
+          sealEnvelope({
+            eventType: bareReviewRequestShape.eventType,
+            deliveryId: "delivery-1",
+            payload: bareReviewRequestShape.payload,
+          }),
+        ),
+        "reviewer",
+      );
+    })
+    .extend("headInputChangeRoundTrip", () => {
+      const headInputChangeShape = toWebhookShape({
+        kind: "review-input-changed",
+        changedInput: "head",
+        pullNumber: 7,
+      });
+      return filterEvent(
+        unwrapEnvelope(
+          sealEnvelope({
+            eventType: headInputChangeShape.eventType,
+            deliveryId: "delivery-1",
+            payload: headInputChangeShape.payload,
+          }),
+        ),
+        "reviewer",
+      );
+    })
+    .extend("baseInputChangeRoundTrip", () => {
+      const baseInputChangeShape = toWebhookShape({
+        kind: "review-input-changed",
+        changedInput: "base",
+        pullNumber: 7,
+      });
+      return filterEvent(
+        unwrapEnvelope(
+          sealEnvelope({
+            eventType: baseInputChangeShape.eventType,
+            deliveryId: "delivery-1",
+            payload: baseInputChangeShape.payload,
+          }),
+        ),
+        "reviewer",
+      );
+    })
+    .extend("sourceReviewRoundTrip", () => {
+      const sourceReviewShape = toWebhookShape({
         kind: "source-review-submitted",
         pullNumber: 7,
         state: "changes_requested",
         body: "Fix the failing test.",
-      },
-      "author",
-    ),
-  )
-  .extend("ciCompletionRoundTrip", () =>
-    roundTrip(
-      { kind: "ci-completed", pullNumber: 7, conclusion: "failure", headSha: "0a1b2c3" },
-      "author",
-    ),
-  )
-  .extend("mergeConflictRoundTrip", () =>
-    roundTrip({ kind: "merge-conflict", pullNumber: 7 }, "author"),
-  )
-  .extend("baseUpdateRoundTrip", () => roundTrip({ kind: "base-update", pullNumber: 7 }, "author"))
-  .extend("closureRoundTripForAuthor", () =>
-    roundTrip({ kind: "pr-closed", pullNumber: 7 }, "author"),
-  )
-  .extend("closureRoundTripForReviewer", () =>
-    roundTrip({ kind: "pr-closed", pullNumber: 7 }, "reviewer"),
-  )
-  .extend("exclusionRoundTripForAuthor", () =>
-    roundTrip({ kind: "pr-excluded", pullNumber: 7 }, "author"),
-  )
-  .extend("exclusionRoundTripForReviewer", () =>
-    roundTrip({ kind: "pr-excluded", pullNumber: 7 }, "reviewer"),
-  )
-  .extend("exclusionWebhookShape", () => toWebhookShape({ kind: "pr-excluded", pullNumber: 7 }))
-  .extend("baseUpdateWebhookShape", () => toWebhookShape({ kind: "base-update", pullNumber: 7 }));
+      });
+      return filterEvent(
+        unwrapEnvelope(
+          sealEnvelope({
+            eventType: sourceReviewShape.eventType,
+            deliveryId: "delivery-1",
+            payload: sourceReviewShape.payload,
+          }),
+        ),
+        "author",
+      );
+    })
+    .extend("ciCompletionRoundTrip", () => {
+      const ciCompletionShape = toWebhookShape({
+        kind: "ci-completed",
+        pullNumber: 7,
+        conclusion: "failure",
+        headSha: "0a1b2c3",
+      });
+      return filterEvent(
+        unwrapEnvelope(
+          sealEnvelope({
+            eventType: ciCompletionShape.eventType,
+            deliveryId: "delivery-1",
+            payload: ciCompletionShape.payload,
+          }),
+        ),
+        "author",
+      );
+    })
+    .extend("mergeConflictRoundTrip", () => {
+      const mergeConflictShape = toWebhookShape({ kind: "merge-conflict", pullNumber: 7 });
+      return filterEvent(
+        unwrapEnvelope(
+          sealEnvelope({
+            eventType: mergeConflictShape.eventType,
+            deliveryId: "delivery-1",
+            payload: mergeConflictShape.payload,
+          }),
+        ),
+        "author",
+      );
+    })
+    .extend("baseUpdateRoundTrip", () => {
+      const baseUpdateShape = toWebhookShape({ kind: "base-update", pullNumber: 7 });
+      return filterEvent(
+        unwrapEnvelope(
+          sealEnvelope({
+            eventType: baseUpdateShape.eventType,
+            deliveryId: "delivery-1",
+            payload: baseUpdateShape.payload,
+          }),
+        ),
+        "author",
+      );
+    })
+    .extend("closureRoundTripForAuthor", () => {
+      const closureShapeForAuthor = toWebhookShape({ kind: "pr-closed", pullNumber: 7 });
+      return filterEvent(
+        unwrapEnvelope(
+          sealEnvelope({
+            eventType: closureShapeForAuthor.eventType,
+            deliveryId: "delivery-1",
+            payload: closureShapeForAuthor.payload,
+          }),
+        ),
+        "author",
+      );
+    })
+    .extend("closureRoundTripForReviewer", () => {
+      const closureShapeForReviewer = toWebhookShape({ kind: "pr-closed", pullNumber: 7 });
+      return filterEvent(
+        unwrapEnvelope(
+          sealEnvelope({
+            eventType: closureShapeForReviewer.eventType,
+            deliveryId: "delivery-1",
+            payload: closureShapeForReviewer.payload,
+          }),
+        ),
+        "reviewer",
+      );
+    })
+    .extend("exclusionRoundTripForAuthor", () => {
+      const exclusionShapeForAuthor = toWebhookShape({ kind: "pr-excluded", pullNumber: 7 });
+      return filterEvent(
+        unwrapEnvelope(
+          sealEnvelope({
+            eventType: exclusionShapeForAuthor.eventType,
+            deliveryId: "delivery-1",
+            payload: exclusionShapeForAuthor.payload,
+          }),
+        ),
+        "author",
+      );
+    })
+    .extend("exclusionRoundTripForReviewer", () => {
+      const exclusionShapeForReviewer = toWebhookShape({ kind: "pr-excluded", pullNumber: 7 });
+      return filterEvent(
+        unwrapEnvelope(
+          sealEnvelope({
+            eventType: exclusionShapeForReviewer.eventType,
+            deliveryId: "delivery-1",
+            payload: exclusionShapeForReviewer.payload,
+          }),
+        ),
+        "reviewer",
+      );
+    });
 
-describe("封筒の往復不変条件", () => {
   it("review-requested の全フィールドが reviewer で元に戻る", ({
     detailedReviewRequestRoundTrip,
   }) => {
@@ -182,6 +296,10 @@ describe("封筒の往復不変条件", () => {
 });
 
 describe("合成ペイロードの形", () => {
+  const it = test
+    .extend("exclusionWebhookShape", () => toWebhookShape({ kind: "pr-excluded", pullNumber: 7 }))
+    .extend("baseUpdateWebhookShape", () => toWebhookShape({ kind: "base-update", pullNumber: 7 }));
+
   it("pr-excluded は除外ラベル名を label.name に載せる", ({ exclusionWebhookShape }) => {
     expect(exclusionWebhookShape).toStrictEqual({
       eventType: "pull_request",

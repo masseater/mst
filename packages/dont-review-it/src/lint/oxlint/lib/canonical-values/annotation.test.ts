@@ -7,60 +7,100 @@ import {
   RETIRED_ANNOTATION_TAGS,
 } from "./annotation.ts";
 
-describe("annotation", () => {
-  const CANONICAL_VALUES_TAG = "@canonical-values";
+const CANONICAL_VALUES_TAG = "@canonical-values";
 
-  test("an annotation on its own line yields the concept it declares", () => {
-    expect(
-      parseCanonicalValuesAnnotation(`*\n * ${CANONICAL_VALUES_TAG} order.status\n `),
-    ).toStrictEqual({ conceptId: "order.status" });
+describe("parseCanonicalValuesAnnotation", () => {
+  describe("an annotation on its own line", () => {
+    const it = test.extend("annotationOnItsOwnLine", () =>
+      parseCanonicalValuesAnnotation(`*\n * ${CANONICAL_VALUES_TAG} order.status\n `));
+
+    it("yields the concept it declares", ({ annotationOnItsOwnLine }) => {
+      expect(annotationOnItsOwnLine).toStrictEqual({ conceptId: "order.status" });
+    });
   });
 
-  test("an annotation written on a single line block yields the concept", () => {
-    expect(parseCanonicalValuesAnnotation(`* ${CANONICAL_VALUES_TAG} order-status `)).toStrictEqual(
-      {
-        conceptId: "order-status",
-      },
-    );
+  describe("an annotation written on a single line block", () => {
+    const it = test.extend("annotationOnASingleLineBlock", () =>
+      parseCanonicalValuesAnnotation(`* ${CANONICAL_VALUES_TAG} order-status `));
+
+    it("yields the concept", ({ annotationOnASingleLineBlock }) => {
+      expect(annotationOnASingleLineBlock).toStrictEqual({ conceptId: "order-status" });
+    });
   });
 
-  test("a comment without the tag declares nothing", () => {
-    expect(parseCanonicalValuesAnnotation("* @returns the order status")).toBeNull();
+  describe("a comment without the tag", () => {
+    const it = test.extend("annotationInACommentWithoutTheTag", () =>
+      parseCanonicalValuesAnnotation("* @returns the order status"));
+
+    it("declares nothing", ({ annotationInACommentWithoutTheTag }) => {
+      expect(annotationInACommentWithoutTheTag).toBe(null);
+    });
   });
 
-  test("a tag without a concept declares nothing", () => {
-    expect(parseCanonicalValuesAnnotation(`* ${CANONICAL_VALUES_TAG}`)).toBeNull();
+  describe("a tag without a concept", () => {
+    const it = test.extend("annotationWithoutAConcept", () =>
+      parseCanonicalValuesAnnotation(`* ${CANONICAL_VALUES_TAG}`));
+
+    it("declares nothing", ({ annotationWithoutAConcept }) => {
+      expect(annotationWithoutAConcept).toBe(null);
+    });
   });
 
-  test("a concept written with characters outside the vocabulary declares nothing", () => {
-    expect(parseCanonicalValuesAnnotation(`* ${CANONICAL_VALUES_TAG} Order Status`)).toBeNull();
+  describe("a concept written with characters outside the vocabulary", () => {
+    const it = test.extend("annotationWithAConceptOutsideTheVocabulary", () =>
+      parseCanonicalValuesAnnotation(`* ${CANONICAL_VALUES_TAG} Order Status`));
+
+    it("declares nothing", ({ annotationWithAConceptOutsideTheVocabulary }) => {
+      expect(annotationWithAConceptOutsideTheVocabulary).toBe(null);
+    });
   });
 
-  test("a tag that only shares a prefix with the annotation declares nothing", () => {
-    expect(
-      parseCanonicalValuesAnnotation(`* ${CANONICAL_VALUES_TAG}-exempt order.status`),
-    ).toBeNull();
+  describe("a tag that only shares a prefix with the annotation", () => {
+    const it = test.extend("annotationBehindATagSharingThePrefix", () =>
+      parseCanonicalValuesAnnotation(`* ${CANONICAL_VALUES_TAG}-exempt order.status`));
+
+    it("declares nothing", ({ annotationBehindATagSharingThePrefix }) => {
+      expect(annotationBehindATagSharingThePrefix).toBe(null);
+    });
+  });
+});
+
+describe("containsCanonicalValuesAnnotation", () => {
+  describe("a source that mentions the tag", () => {
+    const it = test.extend("prefilterOnASourceMentioningTheTag", () =>
+      containsCanonicalValuesAnnotation(`/** ${CANONICAL_VALUES_TAG} order.status */`));
+
+    it("is accepted by the prefilter", ({ prefilterOnASourceMentioningTheTag }) => {
+      expect(prefilterOnASourceMentioningTheTag).toBe(true);
+    });
   });
 
-  test("the prefilter accepts any source that mentions the tag", () => {
-    expect(containsCanonicalValuesAnnotation(`/** ${CANONICAL_VALUES_TAG} order.status */`)).toBe(
-      true,
-    );
+  describe("a source that never mentions the tag", () => {
+    const it = test.extend("prefilterOnASourceWithoutTheTag", () =>
+      containsCanonicalValuesAnnotation("export const status = 1;"));
+
+    it("is rejected by the prefilter", ({ prefilterOnASourceWithoutTheTag }) => {
+      expect(prefilterOnASourceWithoutTheTag).toBe(false);
+    });
+  });
+});
+
+describe("findRetiredAnnotationTags", () => {
+  describe("a retired tag left in the source", () => {
+    const it = test.extend("retiredTagsInASourceCarryingOne", () =>
+      findRetiredAnnotationTags(`/** ${RETIRED_ANNOTATION_TAGS[0]} */`));
+
+    it("is reported by name", ({ retiredTagsInASourceCarryingOne }) => {
+      expect(retiredTagsInASourceCarryingOne).toStrictEqual([RETIRED_ANNOTATION_TAGS[0]]);
+    });
   });
 
-  test("the prefilter rejects a source that never mentions the tag", () => {
-    expect(containsCanonicalValuesAnnotation("export const status = 1;")).toBe(false);
-  });
+  describe("a source without retired tags", () => {
+    const it = test.extend("retiredTagsInASourceCarryingNone", () =>
+      findRetiredAnnotationTags(`/** ${CANONICAL_VALUES_TAG} order.status */`));
 
-  test("a retired tag left in the source is reported by name", () => {
-    const retired = RETIRED_ANNOTATION_TAGS[0];
-
-    expect(findRetiredAnnotationTags(`/** ${retired} */`)).toStrictEqual([retired]);
-  });
-
-  test("a source without retired tags reports none", () => {
-    expect(findRetiredAnnotationTags(`/** ${CANONICAL_VALUES_TAG} order.status */`)).toStrictEqual(
-      [],
-    );
+    it("reports none", ({ retiredTagsInASourceCarryingNone }) => {
+      expect(retiredTagsInASourceCarryingNone).toStrictEqual([]);
+    });
   });
 });

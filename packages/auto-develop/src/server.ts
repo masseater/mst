@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { once } from "node:events";
+
 import { readEnvVar } from "./config/env.ts";
 import { resolveLogDirectory } from "./config/log-directory.ts";
 import { resolveRepositoryRoot } from "./config/repository-root.ts";
@@ -7,13 +9,11 @@ import { createDailyLogFileSink } from "./logging/daily-log-file.ts";
 import { createRelayServer } from "./relay/app.ts";
 import { createGithubFetchReader, octokitAccessFor } from "./relay/github-fetch-reader.ts";
 import { IdTokenRejectionError } from "./relay/id-token-rejection-error.ts";
-import {
-  createMemoryCursorStore,
-  createMemoryEventStore,
-  createMemorySessionStore,
-} from "./relay/memory-store.ts";
+import { createMemoryCursorStore } from "./relay/memory-cursor-store.ts";
+import { createMemoryEventStore } from "./relay/memory-event-store.ts";
+import { createMemorySessionStore } from "./relay/memory-session-store.ts";
 import { relayConfigFromEnv } from "./relay/relay-config.ts";
-import { SHUTDOWN_SIGNALS } from "./runtime/shutdown.ts";
+import { SHUTDOWN_SIGNALS, type ShutdownSignal } from "./runtime/shutdown.ts";
 
 const log = createConsoleLogger("auto-develop-relay", {
   fileSink: createDailyLogFileSink({
@@ -46,18 +46,18 @@ const relay = createRelayServer({
   log,
 });
 
-const shutdownAndExit = async (signalName: string): Promise<void> => {
-  log.info({ signal: signalName }, "shutting down relay server");
-  await relay.shutdown();
-  process.exit(0);
-};
-
-for (const shutdownSignal of SHUTDOWN_SIGNALS) {
-  process.on(shutdownSignal, () => {
-    void shutdownAndExit(shutdownSignal);
-  });
-}
-
 relay.server.listen(relayConfig.port, () => {
   log.info({ port: relayConfig.port }, "relay server listening");
 });
+
+const nextOccurrenceOf = async (shutdownSignal: ShutdownSignal): Promise<ShutdownSignal> => {
+  await once(process, shutdownSignal);
+  return shutdownSignal;
+};
+
+const receivedSignal = await Promise.race(
+  SHUTDOWN_SIGNALS.map((shutdownSignal) => nextOccurrenceOf(shutdownSignal)),
+);
+log.info({ signal: receivedSignal }, "shutting down relay server");
+await relay.shutdown();
+process.exit(0);

@@ -3,20 +3,23 @@ import { describe } from "vite-plus/test";
 
 import { createNoNonBoundaryDouble } from "./no-non-boundary-double--replace-at-the-external-boundary.ts";
 
-import type { ReplacedModule } from "../lib/external-io-boundary.ts";
+const outsideRule = createNoNonBoundaryDouble({
+  readBoundary: () => ({ kind: "outsideTheRepository" }),
+});
 
-const ruleReading = (replaced: ReplacedModule) =>
-  createNoNonBoundaryDouble({ readBoundary: () => replaced });
+const boundaryRule = createNoNonBoundaryDouble({
+  readBoundary: () => ({ kind: "ownsExternalIo" }),
+});
 
-const outsideRule = ruleReading({ kind: "outsideTheRepository" });
+const determinedRule = createNoNonBoundaryDouble({
+  readBoundary: () => ({ kind: "determinedByItsInput" }),
+});
 
-const boundaryRule = ruleReading({ kind: "ownsExternalIo" });
-
-const determinedRule = ruleReading({ kind: "determinedByItsInput" });
-
-const insideRule = ruleReading({
-  kind: "behindOwnModules",
-  boundary: "packages/mailer/src/transport.ts",
+const insideRule = createNoNonBoundaryDouble({
+  readBoundary: () => ({
+    kind: "behindOwnModules",
+    boundary: "packages/mailer/src/transport.ts",
+  }),
 });
 
 const SPEC_FILE = "packages/mailer/src/send.test.ts";

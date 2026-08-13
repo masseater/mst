@@ -2,89 +2,171 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { runConfigSchema } from "./run-config.ts";
 
-const failureMessageFrom = (parse: () => unknown): string => {
-  try {
-    parse();
-    return "";
-  } catch (parseFailure) {
-    return parseFailure instanceof Error ? parseFailure.message : String(parseFailure);
-  }
-};
-
-const parseTargetPrsTwice = (): {
-  readonly parsedTargetPrs: readonly number[];
-  readonly sharesInputInstance: boolean;
-} => {
-  const targetPrs = [7, 8];
-  const parsedNode = runConfigSchema.parse({ targetPrs });
-  return {
-    parsedTargetPrs: parsedNode.targetPrs,
-    sharesInputInstance: parsedNode.targetPrs === targetPrs,
-  };
-};
-
-const it = test
-  .extend("defaultedConfig", () => runConfigSchema.parse({}))
-  .extend("concurrencyFromString", () => runConfigSchema.parse({ concurrency: "3" }).concurrency)
-  .extend("concurrencyFromNumber", () => runConfigSchema.parse({ concurrency: 7 }).concurrency)
-  .extend("zeroConcurrencyFailureMessage", () =>
-    failureMessageFrom(() => runConfigSchema.parse({ concurrency: 0 })),
-  )
-  .extend(
-    "engineOverrideFromInput",
-    () => runConfigSchema.parse({ engineOverride: "runner profile" }).engineOverride,
-  )
-  .extend("unknownEngineFailureMessage", () =>
-    failureMessageFrom(() => runConfigSchema.parse({ engine: "unknown-engine" })),
-  )
-  .extend("emptyGhUserFailureMessage", () =>
-    failureMessageFrom(() => runConfigSchema.parse({ ghUser: "" })),
-  )
-  .extend("targetPrsRoundTrip", () => parseTargetPrsTwice());
-
 describe("runConfigSchema", () => {
-  it("デフォルトのみで解決される", ({ defaultedConfig }) => {
-    expect(defaultedConfig).toStrictEqual({
-      engine: "claude",
-      concurrency: 3,
-      dryRun: false,
-      targetPrs: [],
-      excludedPrs: [],
-      dangerouslySkipPermissions: false,
+  describe("キーを 1 つも持たない入力", () => {
+    const it = test.extend("defaultedRunConfig", () => runConfigSchema.parse({}));
+
+    it("既定値だけで埋まった設定に解決される", ({ defaultedRunConfig }) => {
+      expect(defaultedRunConfig).toStrictEqual({
+        engine: "claude",
+        concurrency: 3,
+        dryRun: false,
+        targetPrs: [],
+        excludedPrs: [],
+        dangerouslySkipPermissions: false,
+      });
     });
   });
 
-  it("concurrency は文字列でも数値化して保持する", ({ concurrencyFromString }) => {
-    expect(concurrencyFromString).toStrictEqual(3);
+  describe("concurrency に数字の文字列を置いた入力", () => {
+    const it = test.extend("stringConcurrencyRunConfig", () =>
+      runConfigSchema.parse({ concurrency: "3" }));
+
+    it("concurrency が数値に変換された設定に解決される", ({ stringConcurrencyRunConfig }) => {
+      expect(stringConcurrencyRunConfig).toStrictEqual({
+        engine: "claude",
+        concurrency: 3,
+        dryRun: false,
+        targetPrs: [],
+        excludedPrs: [],
+        dangerouslySkipPermissions: false,
+      });
+    });
   });
 
-  it("concurrency は数値をそのまま受ける", ({ concurrencyFromNumber }) => {
-    expect(concurrencyFromNumber).toStrictEqual(7);
+  describe("concurrency に数値を置いた入力", () => {
+    const it = test.extend("numberConcurrencyRunConfig", () =>
+      runConfigSchema.parse({ concurrency: 7 }));
+
+    it("concurrency がそのまま載った設定に解決される", ({ numberConcurrencyRunConfig }) => {
+      expect(numberConcurrencyRunConfig).toStrictEqual({
+        engine: "claude",
+        concurrency: 7,
+        dryRun: false,
+        targetPrs: [],
+        excludedPrs: [],
+        dangerouslySkipPermissions: false,
+      });
+    });
   });
 
-  it("concurrency 0 は検証時に拒否される", ({ zeroConcurrencyFailureMessage }) => {
-    expect(zeroConcurrencyFailureMessage).toContain("Too small: expected number to be >=1");
+  describe("concurrency に 0 を置いた入力", () => {
+    const it = test.extend("zeroConcurrencyRejection", () => {
+      try {
+        runConfigSchema.parse({ concurrency: 0 });
+      } catch (zeroConcurrencyFailure) {
+        return String(zeroConcurrencyFailure);
+      }
+      throw new Error("concurrency に 0 を置いた入力が拒否されなかった");
+    });
+
+    it("下限に届かないことを述べて拒否される", ({ zeroConcurrencyRejection }) => {
+      expect(zeroConcurrencyRejection).toBe(`[
+  {
+    "origin": "number",
+    "code": "too_small",
+    "minimum": 1,
+    "inclusive": true,
+    "path": [
+      "concurrency"
+    ],
+    "message": "Too small: expected number to be >=1"
+  }
+]`);
+    });
   });
 
-  it("engineOverride は解決結果にそのまま現れる", ({ engineOverrideFromInput }) => {
-    expect(engineOverrideFromInput).toStrictEqual("runner profile");
+  describe("engineOverride に任意の文字列を置いた入力", () => {
+    const it = test.extend("engineOverrideRunConfig", () =>
+      runConfigSchema.parse({ engineOverride: "runner profile" }));
+
+    it("engineOverride がそのまま載った設定に解決される", ({ engineOverrideRunConfig }) => {
+      expect(engineOverrideRunConfig).toStrictEqual({
+        engine: "claude",
+        engineOverride: "runner profile",
+        concurrency: 3,
+        dryRun: false,
+        targetPrs: [],
+        excludedPrs: [],
+        dangerouslySkipPermissions: false,
+      });
+    });
   });
 
-  it("列挙外のエンジンは拒否される", ({ unknownEngineFailureMessage }) => {
-    expect(unknownEngineFailureMessage).toContain("invalid_value");
+  describe("engine に列挙外の綴りを置いた入力", () => {
+    const it = test.extend("unknownEngineRejection", () => {
+      try {
+        runConfigSchema.parse({ engine: "unknown-engine" });
+      } catch (unknownEngineFailure) {
+        return String(unknownEngineFailure);
+      }
+      throw new Error("engine に列挙外の綴りを置いた入力が拒否されなかった");
+    });
+
+    it("選べる綴りを並べて拒否される", ({ unknownEngineRejection }) => {
+      expect(unknownEngineRejection).toBe(`[
+  {
+    "code": "invalid_value",
+    "values": [
+      "claude",
+      "codex"
+    ],
+    "path": [
+      "engine"
+    ],
+    "message": "Invalid option: expected one of \\"claude\\"|\\"codex\\""
+  }
+]`);
+    });
   });
 
-  it("空文字列の ghUser は拒否される", ({ emptyGhUserFailureMessage }) => {
-    expect(emptyGhUserFailureMessage).toContain(
-      "Too small: expected string to have >=1 characters",
-    );
+  describe("ghUser に空文字列を置いた入力", () => {
+    const it = test.extend("emptyGhUserRejection", () => {
+      try {
+        runConfigSchema.parse({ ghUser: "" });
+      } catch (emptyGhUserFailure) {
+        return String(emptyGhUserFailure);
+      }
+      throw new Error("ghUser に空文字列を置いた入力が拒否されなかった");
+    });
+
+    it("最短の長さに届かないことを述べて拒否される", ({ emptyGhUserRejection }) => {
+      expect(emptyGhUserRejection).toBe(`[
+  {
+    "origin": "string",
+    "code": "too_small",
+    "minimum": 1,
+    "inclusive": true,
+    "path": [
+      "ghUser"
+    ],
+    "message": "Too small: expected string to have >=1 characters"
+  }
+]`);
+    });
   });
 
-  it("配列の中身は入力どおりに解決される", ({ targetPrsRoundTrip }) => {
-    expect(targetPrsRoundTrip.parsedTargetPrs).toStrictEqual([7, 8]);
-  });
+  describe("targetPrs に番号の配列を置いた入力", () => {
+    const it = test
+      .extend("targetPrsRunConfig", () => runConfigSchema.parse({ targetPrs: [7, 8] }))
+      .extend("targetPrsSharesInputArray", () => {
+        const targetPrs = [7, 8];
+        return runConfigSchema.parse({ targetPrs }).targetPrs === targetPrs;
+      });
 
-  it("配列はコピーされ入力と別のインスタンスになる", ({ targetPrsRoundTrip }) => {
-    expect(targetPrsRoundTrip.sharesInputInstance).toStrictEqual(false);
+    it("番号が入力の並びどおりに載った設定に解決される", ({ targetPrsRunConfig }) => {
+      expect(targetPrsRunConfig).toStrictEqual({
+        engine: "claude",
+        concurrency: 3,
+        dryRun: false,
+        targetPrs: [7, 8],
+        excludedPrs: [],
+        dangerouslySkipPermissions: false,
+      });
+    });
+
+    it("解決された配列は入力と別のインスタンスになる", ({ targetPrsSharesInputArray }) => {
+      expect(targetPrsSharesInputArray).toBe(false);
+    });
   });
 });

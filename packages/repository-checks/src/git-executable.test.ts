@@ -1,62 +1,113 @@
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 
-import { describe, expect, onTestFinished, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { gitExecutablePath } from "./git-executable.ts";
 
-const directoryHolding = (fileNames: readonly string[]): string => {
-  const directory = mkdtempSync(join(tmpdir(), "git-executable-"));
-  onTestFinished(() => {
-    rmSync(directory, { force: true, recursive: true });
-  });
-  for (const fileName of fileNames) {
-    const filePath = join(directory, fileName);
-    writeFileSync(filePath, "");
-    chmodSync(filePath, 0o755);
-  }
-  return directory;
-};
+const LEADING_EMPTY_DIRECTORY = join(tmpdir(), "git-executable-leading-empty");
+const TRAILING_GIT_DIRECTORY = join(tmpdir(), "git-executable-trailing-git");
+const WINDOWS_GIT_DIRECTORY = join(tmpdir(), "git-executable-windows-git");
+const UNRUNNABLE_GIT_DIRECTORY = join(tmpdir(), "git-executable-unrunnable-git");
+const NOTHING_CARRIED_DIRECTORY = join(tmpdir(), "git-executable-nothing-carried");
+const REPEATED_SEARCH_DIRECTORY = join(tmpdir(), "git-executable-repeated-search");
 
 describe("gitExecutablePath", () => {
-  test("the earliest directory carrying an executable git answers the search", () => {
-    const withoutGit = directoryHolding([]);
-    const withGit = directoryHolding(["git"]);
+  describe("a search path whose later directory carries an executable git", () => {
+    const it = test.extend("gitPathAcrossDirectories", ({}, { onCleanup }) => {
+      mkdirSync(LEADING_EMPTY_DIRECTORY, { recursive: true });
+      mkdirSync(TRAILING_GIT_DIRECTORY, { recursive: true });
+      onCleanup(() => {
+        rmSync(LEADING_EMPTY_DIRECTORY, { force: true, recursive: true });
+        rmSync(TRAILING_GIT_DIRECTORY, { force: true, recursive: true });
+      });
+      writeFileSync(join(TRAILING_GIT_DIRECTORY, "git"), "");
+      chmodSync(join(TRAILING_GIT_DIRECTORY, "git"), 0o755);
 
-    expect(gitExecutablePath([withoutGit, withGit].join(delimiter))).toBe(join(withGit, "git"));
-  });
-
-  test("a windows executable answers where the plain name is absent", () => {
-    const withWindowsGit = directoryHolding(["git.exe"]);
-
-    expect(gitExecutablePath(withWindowsGit)).toBe(join(withWindowsGit, "git.exe"));
-  });
-
-  test("a file that cannot be executed does not answer the search", () => {
-    const withUnrunnableGit = mkdtempSync(join(tmpdir(), "git-executable-"));
-    onTestFinished(() => {
-      rmSync(withUnrunnableGit, { force: true, recursive: true });
+      return gitExecutablePath([LEADING_EMPTY_DIRECTORY, TRAILING_GIT_DIRECTORY].join(delimiter));
     });
-    writeFileSync(join(withUnrunnableGit, "git"), "");
-    chmodSync(join(withUnrunnableGit, "git"), 0o644);
 
-    expect(gitExecutablePath(withUnrunnableGit)).toBe("git");
+    it("answers with the git of the earliest directory carrying one", ({
+      gitPathAcrossDirectories,
+    }) => {
+      expect(gitPathAcrossDirectories).toBe(join(TRAILING_GIT_DIRECTORY, "git"));
+    });
   });
 
-  test("a search path carrying nothing leaves the plain name to the operating system", () => {
-    expect(gitExecutablePath(directoryHolding([]))).toBe("git");
+  describe("a directory carrying a windows executable and no plain name", () => {
+    const it = test.extend("windowsGitPath", ({}, { onCleanup }) => {
+      mkdirSync(WINDOWS_GIT_DIRECTORY, { recursive: true });
+      onCleanup(() => {
+        rmSync(WINDOWS_GIT_DIRECTORY, { force: true, recursive: true });
+      });
+      writeFileSync(join(WINDOWS_GIT_DIRECTORY, "git.exe"), "");
+      chmodSync(join(WINDOWS_GIT_DIRECTORY, "git.exe"), 0o755);
+
+      return gitExecutablePath(WINDOWS_GIT_DIRECTORY);
+    });
+
+    it("answers with the windows executable", ({ windowsGitPath }) => {
+      expect(windowsGitPath).toBe(join(WINDOWS_GIT_DIRECTORY, "git.exe"));
+    });
   });
 
-  test("an absent search path leaves the plain name to the operating system", () => {
-    expect(gitExecutablePath(undefined)).toBe("git");
+  describe("a directory carrying a git file that cannot be executed", () => {
+    const it = test.extend("unrunnableGitPath", ({}, { onCleanup }) => {
+      mkdirSync(UNRUNNABLE_GIT_DIRECTORY, { recursive: true });
+      onCleanup(() => {
+        rmSync(UNRUNNABLE_GIT_DIRECTORY, { force: true, recursive: true });
+      });
+      writeFileSync(join(UNRUNNABLE_GIT_DIRECTORY, "git"), "");
+      chmodSync(join(UNRUNNABLE_GIT_DIRECTORY, "git"), 0o644);
+
+      return gitExecutablePath(UNRUNNABLE_GIT_DIRECTORY);
+    });
+
+    it("leaves the plain name to the operating system", ({ unrunnableGitPath }) => {
+      expect(unrunnableGitPath).toBe("git");
+    });
   });
 
-  test("a repeated search path answers with what the first search located", () => {
-    const withGit = directoryHolding(["git"]);
-    const locatedFirst = gitExecutablePath(withGit);
-    rmSync(join(withGit, "git"));
+  describe("a search path carrying nothing", () => {
+    const it = test.extend("gitPathWithoutCandidates", ({}, { onCleanup }) => {
+      mkdirSync(NOTHING_CARRIED_DIRECTORY, { recursive: true });
+      onCleanup(() => {
+        rmSync(NOTHING_CARRIED_DIRECTORY, { force: true, recursive: true });
+      });
 
-    expect(gitExecutablePath(withGit)).toBe(locatedFirst);
+      return gitExecutablePath(NOTHING_CARRIED_DIRECTORY);
+    });
+
+    it("leaves the plain name to the operating system", ({ gitPathWithoutCandidates }) => {
+      expect(gitPathWithoutCandidates).toBe("git");
+    });
+  });
+
+  describe("an absent search path", () => {
+    const it = test.extend("gitPathWithoutSearchPath", () => gitExecutablePath(undefined));
+
+    it("leaves the plain name to the operating system", ({ gitPathWithoutSearchPath }) => {
+      expect(gitPathWithoutSearchPath).toBe("git");
+    });
+  });
+
+  describe("a search path handed over a second time after its git file went away", () => {
+    const it = test.extend("gitPathFromRepeatedSearch", ({}, { onCleanup }) => {
+      mkdirSync(REPEATED_SEARCH_DIRECTORY, { recursive: true });
+      onCleanup(() => {
+        rmSync(REPEATED_SEARCH_DIRECTORY, { force: true, recursive: true });
+      });
+      writeFileSync(join(REPEATED_SEARCH_DIRECTORY, "git"), "");
+      chmodSync(join(REPEATED_SEARCH_DIRECTORY, "git"), 0o755);
+      gitExecutablePath(REPEATED_SEARCH_DIRECTORY);
+      rmSync(join(REPEATED_SEARCH_DIRECTORY, "git"));
+
+      return gitExecutablePath(REPEATED_SEARCH_DIRECTORY);
+    });
+
+    it("answers with what the first search located", ({ gitPathFromRepeatedSearch }) => {
+      expect(gitPathFromRepeatedSearch).toBe(join(REPEATED_SEARCH_DIRECTORY, "git"));
+    });
   });
 });

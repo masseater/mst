@@ -1,7 +1,9 @@
 import { testLintRule } from "@mst/lint-rule-authoring";
-import { describe, expect, test } from "vite-plus/test";
+import { describe, expect, it } from "vite-plus/test";
 
 import { forbidTestAdjacentFile } from "./forbid-test-adjacent-file--inline-its-setup-into-the-test.ts";
+
+const optionsSchema = forbidTestAdjacentFile.meta.schema;
 
 describe("dont-review-it/forbid-test-adjacent-file--inline-its-setup-into-the-test", () => {
   testLintRule(forbidTestAdjacentFile, {
@@ -71,7 +73,7 @@ describe("dont-review-it/forbid-test-adjacent-file--inline-its-setup-into-the-te
     ],
   });
 
-  test("the rule takes no options, so no deployment can widen the accepted spellings", () => {
-    expect(forbidTestAdjacentFile.meta.schema).toStrictEqual([]);
+  it("the rule takes no options, so no deployment can widen the accepted spellings", () => {
+    expect(optionsSchema).toStrictEqual([]);
   });
 });

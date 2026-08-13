@@ -103,7 +103,10 @@ const preparedReport = (input: {
   return { node: diagnostic.node, ...report };
 };
 
-export const createNoLocalFiniteValueSet = (input: {
+export const createNoLocalFiniteValueSet = ({
+  loadCatalog,
+  loadLibraryVocabulary,
+}: {
   readonly loadCatalog: CanonicalValuesCatalogLoader;
   readonly loadLibraryVocabulary: LibraryVocabularyLoader;
 }): WorkspaceLintRule =>
@@ -132,21 +135,21 @@ export const createNoLocalFiniteValueSet = (input: {
       },
       schema: OWNERSHIP_POLICY_SCHEMA,
     },
-    create(ruleContext) {
-      const repositoryRoot = findWorkspaceRoot(ruleContext.cwd);
-      if (isOutOfScopeLintSource(ruleContext.filename, repositoryRoot)) return {};
-      const catalog = input.loadCatalog({ repositoryRoot });
-      const ownershipPolicy = ownershipPolicyOf(ruleContext.options);
+    create(inspection) {
+      const repositoryRoot = findWorkspaceRoot(inspection.cwd);
+      if (isOutOfScopeLintSource(inspection.filename, repositoryRoot)) return {};
+      const catalog = loadCatalog({ repositoryRoot });
+      const ownershipPolicy = ownershipPolicyOf(inspection.options);
       const reports = analyzeLocalFiniteValues({
         catalog,
-        filename: ruleContext.filename,
+        filename: inspection.filename,
         repositoryRoot,
-        sourceCode: ruleContext.sourceCode,
+        sourceCode: inspection.sourceCode,
       }).map((diagnostic) =>
         preparedReport({
           diagnostic,
-          filename: ruleContext.filename,
-          loadLibraryVocabulary: input.loadLibraryVocabulary,
+          filename: inspection.filename,
+          loadLibraryVocabulary,
           ownershipPolicy,
           repositoryRoot,
         }),
@@ -154,7 +157,7 @@ export const createNoLocalFiniteValueSet = (input: {
       return {
         Program() {
           for (const report of reports) {
-            ruleContext.report({
+            inspection.report({
               node: report.node,
               messageId: report.messageId,
               data: report.data,

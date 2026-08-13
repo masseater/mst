@@ -5,55 +5,98 @@ import { sourceNodes } from "./source-analysis.ts";
 import type { ESTree, SourceCode } from "@oxlint/plugins";
 
 describe("source analysis", () => {
-  test("the pre-analysis traverses scalar and array visitor fields and ignores non-nodes", () => {
-    const location = {
-      start: { line: 1, column: 0 },
-      end: { line: 1, column: 3 },
-    };
+  const it = test.extend("traversedSourceNodes", () => {
     const program = {
       type: "Program",
       start: 0,
       end: 3,
       range: [0, 3] as [number, number],
-      loc: location,
+      loc: { start: { line: 1, column: 0 }, end: { line: 1, column: 3 } },
       body: [],
       comments: [],
       tokens: [],
       parent: null,
       sourceType: "module",
     } satisfies ESTree.Program;
-    const literal = {
-      type: "Literal",
-      start: 0,
-      end: 1,
-      range: [0, 1] as [number, number],
-      loc: location,
-      parent: program,
-      raw: "1",
-      value: 1,
-    } satisfies ESTree.NumericLiteral;
-    const identifier = {
-      type: "Identifier",
-      start: 2,
-      end: 3,
-      range: [2, 3] as [number, number],
-      loc: location,
-      parent: program,
-      name: "value",
-    } satisfies ESTree.IdentifierReference;
-    const ast = { ...program, items: [literal], extra: identifier, ignored: "value" };
+    const ast = {
+      ...program,
+      arrayField: [{ type: "Literal" }],
+      scalarField: { type: "Identifier" },
+      textField: "not a node",
+    };
     const sourceCode: Pick<SourceCode, "ast" | "visitorKeys"> = {
       ast,
       visitorKeys: {
-        Program: ["items", "extra", "ignored"],
+        Program: ["arrayField", "scalarField", "textField"],
         Literal: [],
       },
     };
 
-    expect(sourceNodes(sourceCode).map(({ node }) => node.type)).toStrictEqual([
-      "Program",
-      "Literal",
-      "Identifier",
+    return sourceNodes(sourceCode);
+  });
+
+  it("the traversal yields the program, the node inside the array field and the node in the scalar field, and skips the field that holds no node", ({
+    traversedSourceNodes,
+  }) => {
+    expect(traversedSourceNodes).toStrictEqual([
+      {
+        ancestors: [],
+        node: {
+          type: "Program",
+          start: 0,
+          end: 3,
+          range: [0, 3],
+          loc: { start: { line: 1, column: 0 }, end: { line: 1, column: 3 } },
+          body: [],
+          comments: [],
+          tokens: [],
+          parent: null,
+          sourceType: "module",
+          arrayField: [{ type: "Literal" }],
+          scalarField: { type: "Identifier" },
+          textField: "not a node",
+        },
+      },
+      {
+        ancestors: [
+          {
+            type: "Program",
+            start: 0,
+            end: 3,
+            range: [0, 3],
+            loc: { start: { line: 1, column: 0 }, end: { line: 1, column: 3 } },
+            body: [],
+            comments: [],
+            tokens: [],
+            parent: null,
+            sourceType: "module",
+            arrayField: [{ type: "Literal" }],
+            scalarField: { type: "Identifier" },
+            textField: "not a node",
+          },
+        ],
+        node: { type: "Literal" },
+      },
+      {
+        ancestors: [
+          {
+            type: "Program",
+            start: 0,
+            end: 3,
+            range: [0, 3],
+            loc: { start: { line: 1, column: 0 }, end: { line: 1, column: 3 } },
+            body: [],
+            comments: [],
+            tokens: [],
+            parent: null,
+            sourceType: "module",
+            arrayField: [{ type: "Literal" }],
+            scalarField: { type: "Identifier" },
+            textField: "not a node",
+          },
+        ],
+        node: { type: "Identifier" },
+      },
     ]);
   });
 });

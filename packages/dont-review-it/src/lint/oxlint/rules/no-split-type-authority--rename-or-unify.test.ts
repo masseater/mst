@@ -23,8 +23,8 @@ const SUBJECT: Placement = {
   workspacePath: "packages/dont-review-it",
 };
 
-const OTHER_PLACEMENT: Placement = {
-  relativePath: "packages/dont-review-it/src/other.ts",
+const SIBLING: Placement = {
+  relativePath: "packages/dont-review-it/src/sibling.ts",
   workspacePath: "packages/dont-review-it",
 };
 
@@ -39,41 +39,49 @@ const THREE_NAMED_MEMBERS = "{ readonly a: string; readonly b: number; readonly 
 
 const SUBJECT_CODE = `export type Shape = ${THREE_NAMED_MEMBERS};`;
 
-const OTHER_SHAPE_CODE = "export type Shape = { readonly a: string };";
+const SIBLING_SHAPE_CODE = "export type Shape = { readonly a: string };";
 
 const FAR_NAME_CODE = `export type Basket = ${THREE_NAMED_MEMBERS};`;
 
-const fileAt = (placement: Placement, source: string): ScannedTypeFile => ({
-  relativePath: placement.relativePath,
-  workspacePath: placement.workspacePath,
-  declarations: typeDeclarationsIn(source),
+const SUBJECT_FILE: ScannedTypeFile = {
+  ...SUBJECT,
+  declarations: typeDeclarationsIn(SUBJECT_CODE),
+};
+
+const SIBLING_SHAPE_FILE: ScannedTypeFile = {
+  ...SIBLING,
+  declarations: typeDeclarationsIn(SIBLING_SHAPE_CODE),
+};
+
+const FAR_NAME_FILE: ScannedTypeFile = { ...FAR, declarations: typeDeclarationsIn(FAR_NAME_CODE) };
+
+const splitShapeRule = createNoSplitTypeAuthority({
+  loadIndex: () => buildTypeAuthorityIndex([SUBJECT_FILE, SIBLING_SHAPE_FILE]),
 });
 
-const ruleOver = (files: readonly ScannedTypeFile[]) =>
-  createNoSplitTypeAuthority({ loadIndex: () => buildTypeAuthorityIndex(files) });
+const splitNameRule = createNoSplitTypeAuthority({
+  loadIndex: () => buildTypeAuthorityIndex([SUBJECT_FILE, FAR_NAME_FILE]),
+});
 
-const splitShapeRule = ruleOver([
-  fileAt(SUBJECT, SUBJECT_CODE),
-  fileAt(OTHER_PLACEMENT, OTHER_SHAPE_CODE),
-]);
+const splitBothWaysRule = createNoSplitTypeAuthority({
+  loadIndex: () => buildTypeAuthorityIndex([SUBJECT_FILE, SIBLING_SHAPE_FILE, FAR_NAME_FILE]),
+});
 
-const splitNameRule = ruleOver([fileAt(SUBJECT, SUBJECT_CODE), fileAt(FAR, FAR_NAME_CODE)]);
+const settledRule = createNoSplitTypeAuthority({
+  loadIndex: () =>
+    buildTypeAuthorityIndex([
+      SUBJECT_FILE,
+      { ...SIBLING, declarations: typeDeclarationsIn(SUBJECT_CODE) },
+    ]),
+});
 
-const splitBothWaysRule = ruleOver([
-  fileAt(SUBJECT, SUBJECT_CODE),
-  fileAt(OTHER_PLACEMENT, OTHER_SHAPE_CODE),
-  fileAt(FAR, FAR_NAME_CODE),
-]);
-
-const settledRule = ruleOver([
-  fileAt(SUBJECT, SUBJECT_CODE),
-  fileAt(OTHER_PLACEMENT, SUBJECT_CODE),
-]);
-
-const offPageRule = ruleOver([
-  fileAt(SUBJECT, `\n\n\n\n\n${SUBJECT_CODE}`),
-  fileAt(OTHER_PLACEMENT, OTHER_SHAPE_CODE),
-]);
+const offPageRule = createNoSplitTypeAuthority({
+  loadIndex: () =>
+    buildTypeAuthorityIndex([
+      { ...SUBJECT, declarations: typeDeclarationsIn(`\n\n\n\n\n${SUBJECT_CODE}`) },
+      SIBLING_SHAPE_FILE,
+    ]),
+});
 
 describe("dont-review-it/no-split-type-authority--rename-or-unify", () => {
   testLintRule(splitShapeRule, {

@@ -1,92 +1,123 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
-import { describe, expect, onTestFinished, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { classModulesFor } from "./class-modules.ts";
 
-const createFixtureDirectory = (): string => {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "class-modules-")));
-  onTestFinished(() => {
-    rmSync(root, { recursive: true, force: true });
+describe("classModulesFor", () => {
+  const testInARepository = test.extend("root", ({}, { onCleanup }) => {
+    const repositoryDirectory = realpathSync(mkdtempSync(join(tmpdir(), "class-modules-")));
+    onCleanup(() => {
+      rmSync(repositoryDirectory, { recursive: true, force: true });
+    });
+    return repositoryDirectory;
   });
-  return root;
-};
 
-const installedUnder = ({
-  workspaceRoot,
-  name,
-  directory,
-}: {
-  readonly workspaceRoot: string;
-  readonly name: string;
-  readonly directory: string;
-}): void => {
-  const link = join(workspaceRoot, "node_modules", name);
-  mkdirSync(dirname(link), { recursive: true });
-  symlinkSync(join(workspaceRoot, directory), link, "dir");
-};
-
-describe("class-modules", () => {
-  test("a class this file declares itself is read out of the text at hand", () => {
-    expect(
+  describe("a class this file declares itself", () => {
+    const it = test.extend("modulesOfOwnClass", () =>
       classModulesFor({
         file: "/repository/use.ts",
         source: "class Bag {}",
         workspaceRoot: "/repository",
         imported: null,
-      }),
-    ).toStrictEqual([{ path: "/repository/use.ts", source: "class Bag {}" }]);
+      }));
+
+    it("is read out of the text at hand", ({ modulesOfOwnClass }) => {
+      expect(modulesOfOwnClass).toStrictEqual([
+        { path: "/repository/use.ts", source: "class Bag {}" },
+      ]);
+    });
   });
 
-  test("a class taken from a neighbouring file is read out of that file", () => {
-    const root = createFixtureDirectory();
-    writeFileSync(join(root, "bag.ts"), "export class Bag {}", "utf8");
-
-    expect(
-      classModulesFor({
+  describe("a class taken from a neighbouring file", () => {
+    const it = testInARepository.extend("modulesOfNeighbourClass", ({ root }) => {
+      writeFileSync(join(root, "bag.ts"), "export class Bag {}", "utf8");
+      return classModulesFor({
         file: join(root, "use.ts"),
         source: "import { Bag } from './bag.ts';",
         workspaceRoot: root,
-        imported: { specifier: "./bag.ts", name: "Bag" },
-      }),
-    ).toStrictEqual([{ path: join(root, "bag.ts"), source: "export class Bag {}" }]);
+        imported: { specifier: "./bag.ts", exported: "Bag" },
+      });
+    });
+
+    it("is read out of that file", ({ modulesOfNeighbourClass, root }) => {
+      expect(modulesOfNeighbourClass).toStrictEqual([
+        { path: join(root, "bag.ts"), source: "export class Bag {}" },
+      ]);
+    });
   });
 
-  test("a class taken from a package this repository does not carry is nowhere to read", () => {
-    const root = createFixtureDirectory();
-
-    expect(
+  describe("a class taken from a package this repository does not carry", () => {
+    const it = testInARepository.extend("modulesOfAbsentPackageClass", ({ root }) =>
       classModulesFor({
         file: join(root, "use.ts"),
         source: "import { Headers } from 'undici';",
         workspaceRoot: root,
-        imported: { specifier: "undici", name: "Headers" },
+        imported: { specifier: "undici", exported: "Headers" },
       }),
-    ).toStrictEqual([]);
+    );
+
+    it("is nowhere to read", ({ modulesOfAbsentPackageClass }) => {
+      expect(modulesOfAbsentPackageClass).toStrictEqual([]);
+    });
   });
 
-  test("a public entry a package declares but does not carry drops out of the modules to read", () => {
-    const root = createFixtureDirectory();
-    mkdirSync(join(root, "packages", "bag"), { recursive: true });
-    writeFileSync(
-      join(root, "packages", "bag", "package.json"),
-      '{"name":"@fixture/bag","exports":{".":{"import":"./built.ts","default":"./bag.ts"}}}',
-      "utf8",
-    );
-    writeFileSync(join(root, "packages", "bag", "bag.ts"), "export class Bag {}", "utf8");
-    installedUnder({ workspaceRoot: root, name: "@fixture/bag", directory: "packages/bag" });
+  describe("a path that leads to no file", () => {
+    const it = testInARepository.extend("modulesOfPackageEntryThatIsNotThere", ({ root }) => {
+      mkdirSync(join(root, "packages", "bag"), { recursive: true });
+      writeFileSync(
+        join(root, "packages", "bag", "package.json"),
+        '{ "name": "@fixture/bag", "exports": { ".": "./missing.ts" } }\n',
+        "utf8",
+      );
+      mkdirSync(join(root, "node_modules", "@fixture"), { recursive: true });
+      symlinkSync(
+        join(root, "packages", "bag"),
+        join(root, "node_modules", "@fixture", "bag"),
+        "dir",
+      );
+      return classModulesFor({
+        file: join(root, "use.ts"),
+        source: "import { Bag } from '@fixture/bag';",
+        workspaceRoot: root,
+        imported: { specifier: "@fixture/bag", exported: "Bag" },
+      });
+    });
 
-    expect(
-      classModulesFor({
+    it("drops out of the modules to read", ({ modulesOfPackageEntryThatIsNotThere }) => {
+      expect(modulesOfPackageEntryThatIsNotThere).toStrictEqual([]);
+    });
+  });
+
+  describe("a public entry a package declares but does not carry", () => {
+    const it = testInARepository.extend("modulesOfPackageEntryPartlyCarried", ({ root }) => {
+      mkdirSync(join(root, "packages", "bag"), { recursive: true });
+      writeFileSync(
+        join(root, "packages", "bag", "package.json"),
+        '{"name":"@fixture/bag","exports":{".":{"import":"./built.ts","default":"./bag.ts"}}}',
+        "utf8",
+      );
+      writeFileSync(join(root, "packages", "bag", "bag.ts"), "export class Bag {}", "utf8");
+      mkdirSync(join(root, "node_modules", "@fixture"), { recursive: true });
+      symlinkSync(
+        join(root, "packages", "bag"),
+        join(root, "node_modules", "@fixture", "bag"),
+        "dir",
+      );
+      return classModulesFor({
         file: join(root, "src", "use.ts"),
         source: "import { Bag } from '@fixture/bag';",
         workspaceRoot: root,
-        imported: { specifier: "@fixture/bag", name: "Bag" },
-      }),
-    ).toStrictEqual([
-      { path: join(root, "packages", "bag", "bag.ts"), source: "export class Bag {}" },
-    ]);
+        imported: { specifier: "@fixture/bag", exported: "Bag" },
+      });
+    });
+
+    it("drops out of the modules to read", ({ modulesOfPackageEntryPartlyCarried, root }) => {
+      expect(modulesOfPackageEntryPartlyCarried).toStrictEqual([
+        { path: join(root, "packages", "bag", "bag.ts"), source: "export class Bag {}" },
+      ]);
+    });
   });
 });

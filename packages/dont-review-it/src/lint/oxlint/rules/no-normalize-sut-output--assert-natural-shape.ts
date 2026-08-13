@@ -1,4 +1,5 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { handedValues, partsOf } from "../lib/spec-syntax/expression-parts.ts";
 import {
   fixtureDeclarationsOf,
@@ -73,12 +74,12 @@ const asFunction = (node: ESTree.Expression): SpecFunction | null => {
   return written.type === "FunctionDeclaration" ? written : null;
 };
 
-const parameterNamesOf = (specFunction: SpecFunction): ReadonlySet<string> =>
+const parameterNamesOf = (takenFunction: SpecFunction): ReadonlySet<string> =>
   new Set([
-    ...specFunction.params.flatMap((parameter) =>
+    ...takenFunction.params.flatMap((parameter) =>
       parameter.type === "Identifier" ? [parameter.name] : [],
     ),
-    ...(fixtureDependenciesOf(specFunction) ?? []).flatMap((dependency) =>
+    ...(fixtureDependenciesOf(takenFunction) ?? []).flatMap((dependency) =>
       dependency.boundAs === null ? [] : [dependency.boundAs],
     ),
   ]);
@@ -88,13 +89,13 @@ const readingIn = (input: {
   readonly factory: SpecFunction | null;
   readonly visitedModules: ReadonlySet<string>;
 }): Reading => {
-  const factoryBody = input.factory === null ? null : blockBodyOf(input.factory);
+  const writtenBody = input.factory === null ? null : blockBodyOf(input.factory);
   return {
     ...input,
     locals:
-      factoryBody === null
+      writtenBody === null
         ? new Map()
-        : moduleDeclarationsOf(input.module.filename, factoryBody.body).initializerByName,
+        : moduleDeclarationsOf(input.module.filename, writtenBody.body).initializerByName,
     bound: input.factory === null ? new Set() : parameterNamesOf(input.factory),
   };
 };
@@ -154,17 +155,32 @@ const findingsIn = (walk: Walk): readonly Finding[] => {
   return bare.type === "CallExpression" ? [...beside, ...findingsInCall(bare, walk)] : beside;
 };
 
-const findingsBehindName = (named: ESTree.IdentifierReference, walk: Walk): readonly Finding[] => {
-  const resolved = resolvedName(named.name, walk.reading);
+const findingsBehindName = (bare: ESTree.IdentifierReference, walk: Walk): readonly Finding[] => {
+  const resolved = resolvedName(bare.name, walk.reading);
   if (resolved === null) return [];
+  if (resolved.reading.module.filename !== walk.reading.module.filename) return [];
 
-  const crossed = resolved.reading.module.filename !== walk.reading.module.filename;
-  return findingsIn({
-    ...walk,
-    written: resolved.declared,
-    reading: resolved.reading,
-    origin: walk.origin ?? (crossed ? { node: named, name: named.name } : null),
-  });
+  return findingsIn({ ...walk, written: resolved.declared, reading: resolved.reading });
+};
+
+const findingsBehindCalledName = (
+  called: { readonly call: ESTree.CallExpression; readonly name: string },
+  walk: Walk,
+): readonly Finding[] => {
+  const { call, name } = called;
+  const resolved = resolvedName(name, walk.reading);
+  const declared = resolved === null ? null : asFunction(resolved.declared);
+  if (resolved === null || declared === null) return [];
+  if (resolved.reading.module.filename !== walk.reading.module.filename) return [];
+
+  return returnedExpressionsOf(declared).flatMap((returned) =>
+    findingsIn({
+      ...walk,
+      written: returned,
+      reading: readingIn({ ...resolved.reading, factory: declared }),
+      origin: walk.origin ?? { node: call, name },
+    }),
+  );
 };
 
 const findingsInCall = (call: ESTree.CallExpression, walk: Walk): readonly Finding[] => {
@@ -172,24 +188,13 @@ const findingsInCall = (call: ESTree.CallExpression, walk: Walk): readonly Findi
     return [operationFinding({ node: call, operation: SPREADING_WRITE, origin: walk.origin })];
   }
 
-  const calleeName = staticCalleeName(call);
-  if (calleeName === null) return [];
-  if (walk.vocabulary.has(calleeName)) {
-    return [operationFinding({ node: call, operation: calleeName, origin: walk.origin })];
+  const spelling = staticCalleeName(call);
+  if (spelling === null) return [];
+  if (walk.vocabulary.has(spelling)) {
+    return [operationFinding({ node: call, operation: spelling, origin: walk.origin })];
   }
 
-  const resolved = resolvedName(calleeName, walk.reading);
-  const declared = resolved === null ? null : asFunction(resolved.declared);
-  if (resolved === null || declared === null) return [];
-
-  return returnedExpressionsOf(declared).flatMap((returned) =>
-    findingsIn({
-      ...walk,
-      written: returned,
-      reading: readingIn({ ...resolved.reading, factory: declared }),
-      origin: walk.origin ?? { node: call, name: calleeName },
-    }),
-  );
+  return findingsBehindCalledName({ call, name: spelling }, walk);
 };
 
 const rootName = (node: ESTree.Expression): string | null => {
@@ -226,6 +231,30 @@ const mutationInCall = (call: ESTree.CallExpression): Mutation | null => {
   return root === null ? null : { node: call, root, operation: `\`${member}\`` };
 };
 
+const propertyWriteIn = (node: ESTree.AssignmentExpression): readonly Mutation[] => {
+  if (node.left.type !== "MemberExpression") return [];
+
+  const root = rootName(node.left.object);
+  return root === null ? [] : [{ node, root, operation: PROPERTY_WRITE }];
+};
+
+const propertyRemovalIn = (node: ESTree.UnaryExpression): readonly Mutation[] => {
+  if (node.operator !== "delete") return [];
+
+  const written = unwrapSubject(node.argument);
+  if (written.type !== "MemberExpression") return [];
+
+  const root = rootName(written.object);
+  return root === null ? [] : [{ node, root, operation: PROPERTY_REMOVAL }];
+};
+
+const mutationsIn = (program: ESTree.Program): readonly Mutation[] =>
+  [
+    ...nodesOfType(program, "AssignmentExpression").flatMap((node) => propertyWriteIn(node)),
+    ...nodesOfType(program, "CallExpression").flatMap((node) => mutationInCall(node) ?? []),
+    ...nodesOfType(program, "UnaryExpression").flatMap((node) => propertyRemovalIn(node)),
+  ].toSorted((first, second) => first.node.start - second.node.start);
+
 const boundNamesOf = (named: {
   readonly subject: ESTree.Expression;
   readonly reading: Reading;
@@ -242,7 +271,7 @@ const boundNamesOf = (named: {
 const mutationFindingsOf = (input: {
   readonly subject: ESTree.Expression;
   readonly reading: Reading;
-  readonly mutations: ReadonlySet<Mutation>;
+  readonly mutations: readonly Mutation[];
 }): readonly Finding[] => {
   const { factory } = input.reading;
   if (factory === null) return [];
@@ -252,7 +281,7 @@ const mutationFindingsOf = (input: {
     reading: input.reading,
     reached: new Set(),
   });
-  return [...input.mutations]
+  return input.mutations
     .filter((mutation) => guarded.has(mutation.root))
     .filter((mutation) => mutation.node.start >= factory.start && mutation.node.end <= factory.end)
     .filter((mutation) => mutation.node.start < input.subject.start)
@@ -298,58 +327,32 @@ export const noNormalizeSutOutput = createDontReviewItRule({
       ...NORMALIZING_METHODS,
       ...normalizingFunctionsFrom(inspection.options),
     ]);
-    const fixtures = new Set<ESTree.CallExpression>();
-    const mutations = new Set<Mutation>();
-
-    const readMutation = (mutation: Mutation | null): void => {
-      if (mutation !== null) mutations.add(mutation);
-    };
-
     return {
-      AssignmentExpression(node: ESTree.AssignmentExpression) {
-        if (node.left.type !== "MemberExpression") return;
-        const root = rootName(node.left.object);
-        readMutation(root === null ? null : { node, root, operation: PROPERTY_WRITE });
-      },
-      CallExpression(node: ESTree.CallExpression) {
-        if (fixtureDeclarationsOf(node).length > 0) fixtures.add(node);
-        readMutation(mutationInCall(node));
-      },
-      UnaryExpression(node: ESTree.UnaryExpression) {
-        if (node.operator !== "delete") return;
-        const written = unwrapSubject(node.argument);
-        if (written.type !== "MemberExpression") return;
-        const root = rootName(written.object);
-        readMutation(root === null ? null : { node, root, operation: PROPERTY_REMOVAL });
-      },
-      "Program:exit"(node: ESTree.Program) {
-        const module = moduleDeclarationsOf(inspection.filename, node.body);
-        const reported = new Map<string, Finding>();
-
-        for (const fixture of fixtures) {
-          for (const declaration of fixtureDeclarationsOf(fixture)) {
+      "Program:exit"(program: ESTree.Program) {
+        const module = moduleDeclarationsOf(inspection.filename, program.body);
+        const mutations = mutationsIn(program);
+        const found = nodesOfType(program, "CallExpression")
+          .flatMap((call) => fixtureDeclarationsOf(call))
+          .flatMap((declaration) => {
             const reading = readingIn({
               module,
               factory: declaration.factory,
               visitedModules: new Set([inspection.filename]),
             });
-            for (const subject of declaration.subjects) {
-              const found = [
-                ...findingsIn({
-                  written: subject,
-                  reading,
-                  vocabulary,
-                  origin: null,
-                  seen: new Set(),
-                }),
-                ...mutationFindingsOf({ subject, reading, mutations }),
-              ];
-              for (const finding of found) {
-                reported.set(`${finding.messageId}:${finding.node.start}`, finding);
-              }
-            }
-          }
-        }
+            return declaration.subjects.flatMap((subject) => [
+              ...findingsIn({
+                written: subject,
+                reading,
+                vocabulary,
+                origin: null,
+                seen: new Set(),
+              }),
+              ...mutationFindingsOf({ subject, reading, mutations }),
+            ]);
+          });
+        const reported = new Map(
+          found.map((finding) => [`${finding.messageId}:${finding.node.start}`, finding] as const),
+        );
 
         for (const finding of reported.values()) inspection.report(finding);
       },

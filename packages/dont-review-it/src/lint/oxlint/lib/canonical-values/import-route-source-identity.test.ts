@@ -1,66 +1,97 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
-import { describe, expect, onTestFinished, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { repositoryModuleLocation } from "./import-route-source-identity.ts";
 
-const createCanonicalValuesTestRepository = (): string => {
-  const repositoryRoot = mkdtempSync(join(tmpdir(), "canonical-values-"));
-  onTestFinished(() => {
-    rmSync(repositoryRoot, { recursive: true, force: true });
+describe("repositoryModuleLocation", () => {
+  describe("a symlink standing outside the repository and pointing into it", () => {
+    const it = test
+      .extend("theRootHoldingAnExternalSymlink", ({}, { onCleanup }) => {
+        const fixtureRoot = mkdtempSync(join(tmpdir(), "canonical-values-"));
+        onCleanup(() => {
+          rmSync(fixtureRoot, { recursive: true, force: true });
+        });
+        mkdirSync(join(fixtureRoot, "repository", "src"), { recursive: true });
+        writeFileSync(
+          join(fixtureRoot, "repository", "src", "status.ts"),
+          "export const status = 1;\n",
+          "utf8",
+        );
+        symlinkSync(
+          join(fixtureRoot, "repository", "src", "status.ts"),
+          join(fixtureRoot, "status.ts"),
+        );
+        return fixtureRoot;
+      })
+      .extend("theLocationOfAnExternalSymlink", ({ theRootHoldingAnExternalSymlink }) =>
+        repositoryModuleLocation({
+          repositoryRoot: join(theRootHoldingAnExternalSymlink, "repository"),
+          resolvedPath: join(theRootHoldingAnExternalSymlink, "status.ts"),
+        }),
+      );
+
+    it("keeps the physical repository identity of the module", ({
+      theRootHoldingAnExternalSymlink,
+      theLocationOfAnExternalSymlink,
+    }) => {
+      expect(theLocationOfAnExternalSymlink).toStrictEqual({
+        kind: "repository",
+        path: join(
+          realpathSync.native(theRootHoldingAnExternalSymlink),
+          "repository",
+          "src",
+          "status.ts",
+        ),
+        sourcePaths: [
+          join(
+            realpathSync.native(theRootHoldingAnExternalSymlink),
+            "repository",
+            "src",
+            "status.ts",
+          ),
+        ],
+      });
+    });
   });
-  return repositoryRoot;
-};
 
-const writeCanonicalValuesTestFiles = ({
-  repositoryRoot,
-  files,
-}: {
-  readonly repositoryRoot: string;
-  readonly files: Readonly<Record<string, string>>;
-}): void => {
-  for (const [relativePath, fileText] of Object.entries(files)) {
-    const absolutePath = join(repositoryRoot, relativePath);
-    mkdirSync(dirname(absolutePath), { recursive: true });
-    writeFileSync(absolutePath, fileText, "utf8");
-  }
-};
+  describe("a symlink standing inside the repository and pointing into it", () => {
+    const it = test
+      .extend("theRootHoldingALexicalSymlink", ({}, { onCleanup }) => {
+        const repositoryRoot = mkdtempSync(join(tmpdir(), "canonical-values-"));
+        onCleanup(() => {
+          rmSync(repositoryRoot, { recursive: true, force: true });
+        });
+        mkdirSync(join(repositoryRoot, "src"), { recursive: true });
+        writeFileSync(
+          join(repositoryRoot, "src", "status.ts"),
+          "export const status = 1;\n",
+          "utf8",
+        );
+        symlinkSync(join(repositoryRoot, "src", "status.ts"), join(repositoryRoot, "status.ts"));
+        return repositoryRoot;
+      })
+      .extend("theLocationOfALexicalSymlink", ({ theRootHoldingALexicalSymlink }) =>
+        repositoryModuleLocation({
+          repositoryRoot: theRootHoldingALexicalSymlink,
+          resolvedPath: join(theRootHoldingALexicalSymlink, "status.ts"),
+        }),
+      );
 
-describe("import route source identity", () => {
-  test("an external lexical symlink keeps its physical repository identity", () => {
-    const fixtureRoot = createCanonicalValuesTestRepository();
-    const repositoryRoot = join(fixtureRoot, "repository");
-    writeCanonicalValuesTestFiles({
-      repositoryRoot,
-      files: { "src/status.ts": "export const status = 1;\n" },
-    });
-    const physicalPath = join(repositoryRoot, "src/status.ts");
-    const externalPath = join(fixtureRoot, "status.ts");
-    symlinkSync(physicalPath, externalPath);
-
-    expect(repositoryModuleLocation({ repositoryRoot, resolvedPath: externalPath })).toStrictEqual({
-      kind: "repository",
-      path: realpathSync.native(physicalPath),
-      sourcePaths: [realpathSync.native(physicalPath)],
-    });
-  });
-
-  test("a lexical repository symlink keeps both source identities", () => {
-    const repositoryRoot = createCanonicalValuesTestRepository();
-    writeCanonicalValuesTestFiles({
-      repositoryRoot,
-      files: { "src/status.ts": "export const status = 1;\n" },
-    });
-    const physicalPath = join(repositoryRoot, "src/status.ts");
-    const lexicalPath = join(repositoryRoot, "status.ts");
-    symlinkSync(physicalPath, lexicalPath);
-
-    expect(repositoryModuleLocation({ repositoryRoot, resolvedPath: lexicalPath })).toStrictEqual({
-      kind: "repository",
-      path: realpathSync.native(physicalPath),
-      sourcePaths: [realpathSync.native(physicalPath), lexicalPath],
+    it("keeps both the physical and the lexical source identity", ({
+      theRootHoldingALexicalSymlink,
+      theLocationOfALexicalSymlink,
+    }) => {
+      expect(theLocationOfALexicalSymlink).toStrictEqual({
+        kind: "repository",
+        path: join(realpathSync.native(theRootHoldingALexicalSymlink), "src", "status.ts"),
+        sourcePaths: [
+          join(realpathSync.native(theRootHoldingALexicalSymlink), "src", "status.ts"),
+          join(theRootHoldingALexicalSymlink, "status.ts"),
+        ],
+      });
     });
   });
 });

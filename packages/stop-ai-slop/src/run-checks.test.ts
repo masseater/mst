@@ -1,18 +1,16 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { runChecks } from "./run-checks.ts";
 
 describe("runChecks", () => {
-  it("runs every registered check in definition order", () => {
-    const comparison = {
-      repositoryRoot: "/repository",
-      baseRevision: "base",
-      headRevision: "head",
-      files: [],
-    };
-
-    const problems = runChecks({
-      comparison,
+  const it = test.extend("problemsFromTwoRegisteredChecks", () =>
+    runChecks({
+      comparison: {
+        repositoryRoot: "/repository",
+        baseRevision: "base",
+        headRevision: "head",
+        files: [],
+      },
       checks: [
         {
           id: "first-check",
@@ -23,9 +21,10 @@ describe("runChecks", () => {
           run: () => [{ file: "a.ts", line: 1, message: "second result" }],
         },
       ],
-    });
+    }));
 
-    expect(problems).toStrictEqual([
+  it("runs every registered check in definition order", ({ problemsFromTwoRegisteredChecks }) => {
+    expect(problemsFromTwoRegisteredChecks).toStrictEqual([
       { checkId: "first-check", file: "z.ts", line: 2, message: "first result" },
       { checkId: "second-check", file: "a.ts", line: 1, message: "second result" },
     ]);

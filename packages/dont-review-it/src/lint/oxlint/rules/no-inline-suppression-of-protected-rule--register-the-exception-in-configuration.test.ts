@@ -14,11 +14,6 @@ const DECLARATION = "export const total = 1;";
 
 const CONFIG_FILE = "vite.config.ts";
 
-const configFor = (lint: string): string => `export default { lint: ${lint} };`;
-
-const overrideFor = (files: string, severity: string): string =>
-  configFor(`{ overrides: [{ files: ${files}, rules: { "${PROTECTED_RULE}": ${severity} } }] }`);
-
 describe("dont-review-it/no-inline-suppression-of-protected-rule--register-the-exception-in-configuration", () => {
   testLintRule(noInlineSuppressionOfProtectedRule, {
     valid: [
@@ -64,17 +59,17 @@ describe("dont-review-it/no-inline-suppression-of-protected-rule--register-the-e
       },
       {
         name: "a protected rule held at the level that fails a run passes",
-        code: configFor(`{ rules: { "dont-review-it/${PROTECTED_RULE}": "error" } }`),
+        code: `export default { lint: { rules: { "dont-review-it/${PROTECTED_RULE}": "error" } } };`,
         filename: CONFIG_FILE,
       },
       {
         name: "a rule outside the protected set may sit at any level",
-        code: configFor(`{ rules: { "no-console": "off" } }`),
+        code: `export default { lint: { rules: { "no-console": "off" } } };`,
         filename: CONFIG_FILE,
       },
       {
         name: "an override listing the complete path of every file it covers is the registered exception",
-        code: overrideFor(`["packages/cart/src/settings.ts", "apps/site/src/entry.ts"]`, `"off"`),
+        code: `export default { lint: { overrides: [{ files: ["packages/cart/src/settings.ts", "apps/site/src/entry.ts"], rules: { "${PROTECTED_RULE}": "off" } }] } };`,
         filename: CONFIG_FILE,
       },
       {
@@ -84,12 +79,12 @@ describe("dont-review-it/no-inline-suppression-of-protected-rule--register-the-e
       },
       {
         name: "a file that is not the lint configuration is read for its comments alone",
-        code: configFor(`{ rules: { "${PROTECTED_RULE}": "off" } }`),
+        code: `export default { lint: { rules: { "${PROTECTED_RULE}": "off" } } };`,
         filename: "rules-snapshot.ts",
       },
       {
         name: "a deviation carrying grounds is a registration this rule leaves standing",
-        code: configFor(`{ rules: {} }`),
+        code: `export default { lint: { rules: {} } };`,
         filename: CONFIG_FILE,
         options: [
           { unprotected: [{ rule: PROTECTED_RULE, reason: "the registry owns this path list" }] },
@@ -197,7 +192,7 @@ describe("dont-review-it/no-inline-suppression-of-protected-rule--register-the-e
       },
       {
         name: "a protected rule turned off in the configuration is reported",
-        code: configFor(`{ rules: { "dont-review-it/${PROTECTED_RULE}": "off" } }`),
+        code: `export default { lint: { rules: { "dont-review-it/${PROTECTED_RULE}": "off" } } };`,
         filename: CONFIG_FILE,
         errors: [
           {
@@ -208,7 +203,7 @@ describe("dont-review-it/no-inline-suppression-of-protected-rule--register-the-e
       },
       {
         name: "an exception scoped by a pattern is not a registered exception",
-        code: overrideFor(`["packages/*/dist/**"]`, `"warn"`),
+        code: `export default { lint: { overrides: [{ files: ["packages/*/dist/**"], rules: { "${PROTECTED_RULE}": "warn" } }] } };`,
         filename: CONFIG_FILE,
         errors: [
           {
@@ -219,25 +214,25 @@ describe("dont-review-it/no-inline-suppression-of-protected-rule--register-the-e
       },
       {
         name: "an override that names no file it covers is not a registered exception",
-        code: configFor(`{ overrides: [{ rules: { "${PROTECTED_RULE}": "off" } }] }`),
+        code: `export default { lint: { overrides: [{ rules: { "${PROTECTED_RULE}": "off" } }] } };`,
         filename: CONFIG_FILE,
         errors: [{ messageId: "weakenedProtectedRule" }],
       },
       {
         name: "an override whose files this rule cannot read is not a registered exception",
-        code: overrideFor(`[chosenPath]`, `"off"`),
+        code: `export default { lint: { overrides: [{ files: [chosenPath], rules: { "${PROTECTED_RULE}": "off" } }] } };`,
         filename: CONFIG_FILE,
         errors: [{ messageId: "weakenedProtectedRule" }],
       },
       {
         name: "an override that keeps its file list elsewhere is not a registered exception",
-        code: overrideFor(`chosenPaths`, `"off"`),
+        code: `export default { lint: { overrides: [{ files: chosenPaths, rules: { "${PROTECTED_RULE}": "off" } }] } };`,
         filename: CONFIG_FILE,
         errors: [{ messageId: "weakenedProtectedRule" }],
       },
       {
         name: "a deviation without grounds is reported where the configuration stands",
-        code: configFor(`{ rules: {} }`),
+        code: `export default { lint: { rules: {} } };`,
         filename: CONFIG_FILE,
         options: [{ unprotected: [{ rule: PROTECTED_RULE, reason: "  " }] }],
         errors: [{ messageId: "groundlessDeviation", data: { ruleName: PROTECTED_RULE } }],

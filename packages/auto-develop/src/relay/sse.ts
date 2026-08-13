@@ -4,7 +4,7 @@ import { readResumableEvents, toEnvelope } from "./poll.ts";
 
 import type { Logger } from "../logging/logger.ts";
 import type { OwnerFilter } from "./owner-filter.ts";
-import type { CursorStore, EventStore, EventSubscription, StoredEvent } from "./store.ts";
+import type { CursorStore, EventStore, StoredEvent } from "./store.ts";
 
 export type SseSink = {
   readonly writeEvent: (frame: {
@@ -49,12 +49,11 @@ type StreamLifecycle = {
   readonly halted: AbortSignal;
   readonly stop: () => void;
   readonly closed: Promise<void>;
-  readonly onStop: (name: string, cleanup: () => void) => void;
+  readonly onStop: (cleanup: () => void) => void;
 };
 
 const createStreamLifecycle = (stream: EventStreamRequest): StreamLifecycle => {
   const halt = new AbortController();
-  const cleanups = new Map<string, () => void>();
   const closed = new Promise<void>((resolve) => {
     halt.signal.addEventListener(
       ABORT_SIGNAL_EVENT.abort,
@@ -64,13 +63,6 @@ const createStreamLifecycle = (stream: EventStreamRequest): StreamLifecycle => {
       { once: true },
     );
   });
-  halt.signal.addEventListener(
-    ABORT_SIGNAL_EVENT.abort,
-    () => {
-      for (const cleanup of cleanups.values()) cleanup();
-    },
-    { once: true },
-  );
   stream.clientAbort.addEventListener(
     ABORT_SIGNAL_EVENT.abort,
     () => {
@@ -85,172 +77,123 @@ const createStreamLifecycle = (stream: EventStreamRequest): StreamLifecycle => {
       halt.abort();
     },
     closed,
-    onStop: (spelled, cleanup) => {
-      cleanups.set(spelled, cleanup);
+    onStop: (cleanup) => {
+      halt.signal.addEventListener(ABORT_SIGNAL_EVENT.abort, cleanup, { once: true });
     },
   };
 };
 
-type DeliveryEngine = {
-  readonly replayBacklog: (backlog: readonly StoredEvent[]) => Promise<boolean>;
-  readonly enqueueLiveEvent: (added: StoredEvent) => void;
-};
-
-const createLiveQueue = (
-  deliver: (added: StoredEvent) => Promise<void>,
-): { readonly enqueue: (added: StoredEvent) => void } => {
-  const pendingEvents = new Map<number, StoredEvent>();
-  const queueCounters = new Map<string, number>([
-    ["head", 0],
-    ["tail", 0],
-    ["running", 0],
-  ]);
-
-  const takeNextLiveEvent = (): StoredEvent | null => {
-    const head = queueCounters.get("head") as number;
-    if (head >= (queueCounters.get("tail") as number)) return null;
-    const takenEvent = pendingEvents.get(head) as StoredEvent;
-    pendingEvents.delete(head);
-    queueCounters.set("head", head + 1);
-    return takenEvent;
-  };
-
-  const drainLiveQueue = async (): Promise<void> => {
-    if (queueCounters.get("running") === 1) return;
-    queueCounters.set("running", 1);
-    try {
-      for (;;) {
-        const takenEvent = takeNextLiveEvent();
-        if (takenEvent === null) break;
-        await deliver(takenEvent);
-      }
-    } finally {
-      queueCounters.set("running", 0);
-    }
-  };
-
-  return {
-    enqueue: (added) => {
-      const tail = queueCounters.get("tail") as number;
-      pendingEvents.set(tail, added);
-      queueCounters.set("tail", tail + 1);
-      void drainLiveQueue();
-    },
-  };
-};
-
-const createDeliveryEngine = (engine: {
+const deliverStoredEvent = async (delivery: {
   readonly stream: EventStreamRequest;
   readonly lifecycle: StreamLifecycle;
-}): DeliveryEngine => {
-  const { stream, lifecycle } = engine;
-  const knownIds = new Set<string>();
-  const knownIdLimit = stream.knownIdLimit ?? KNOWN_ID_LIMIT;
-
-  const rememberKnownId = (eventId: string): void => {
-    knownIds.add(eventId);
-    for (const oldestId of knownIds) {
-      if (knownIds.size <= knownIdLimit) break;
-      knownIds.delete(oldestId);
-    }
-  };
-
-  const deliverStoredEvent = async (sent: StoredEvent): Promise<void> => {
-    const owned = await stream.ownerFilter.owns({
-      stored: sent,
-      subscriberLogin: stream.subscriberLogin,
-    });
-    if (!owned || lifecycle.halted.aborted) return;
-    stream.sink.writeEvent({
-      eventType: sent.eventType,
-      eventId: sent.id,
-      envelopeJson: JSON.stringify(toEnvelope(sent)),
-    });
-    stream.log.info(
-      { clientId: stream.clientId, eventId: sent.id, deliveryId: sent.deliveryId },
-      "delivered sent event",
-    );
-    await stream.cursors.write({ clientId: stream.clientId, eventId: sent.id });
-  };
-
-  const deliverOrStop = async (sent: StoredEvent): Promise<boolean> => {
-    try {
-      await deliverStoredEvent(sent);
-      return true;
-    } catch (failure) {
-      stream.log.warn(
-        { clientId: stream.clientId, eventId: sent.id, err: failure },
-        "backlog delivery failed; stopping stream",
-      );
-      lifecycle.stop();
-      return false;
-    }
-  };
-
-  const deliverLiveEvent = async (added: StoredEvent): Promise<void> => {
-    if (lifecycle.halted.aborted || knownIds.has(added.id)) return;
-    rememberKnownId(added.id);
-    stream.ownerFilter.remember(added);
-    stream.ownerFilter.discardIfClosed(added);
-    await deliverStoredEvent(added);
-  };
-
-  const deliverLiveEventSafely = async (added: StoredEvent): Promise<void> => {
-    try {
-      await deliverLiveEvent(added);
-    } catch (failure) {
-      stream.log.warn(
-        { clientId: stream.clientId, eventId: added.id, err: failure },
-        "live delivery failed; stopping stream",
-      );
-      lifecycle.stop();
-    }
-  };
-
-  const liveQueue = createLiveQueue(deliverLiveEventSafely);
-
-  return {
-    replayBacklog: async (backlog) => {
-      for (const sent of backlog) {
-        stream.ownerFilter.remember(sent);
-        rememberKnownId(sent.id);
-      }
-      for (const sent of backlog) {
-        if (lifecycle.halted.aborted) return false;
-        const delivered = await deliverOrStop(sent);
-        if (!delivered) return false;
-      }
-      return true;
-    },
-    enqueueLiveEvent: liveQueue.enqueue,
-  };
-};
-
-const startLiveWatch = (watch: {
-  readonly stream: EventStreamRequest;
-  readonly lifecycle: StreamLifecycle;
-  readonly engine: DeliveryEngine;
-  readonly backlog: readonly StoredEvent[];
-  readonly resumeAfterId: string | null;
-  readonly sinceMs: number;
-}): void => {
-  const watchAfterId = watch.backlog.at(-1)?.id ?? watch.resumeAfterId;
-  const fromId =
-    watchAfterId === null
-      ? null
-      : watch.stream.events.subscribeAfterId({
-          eventId: watchAfterId,
-          onAdd: watch.engine.enqueueLiveEvent,
-        });
-  const subscription: EventSubscription =
-    fromId ??
-    watch.stream.events.subscribeSince({
-      sinceMs: watch.sinceMs,
-      onAdd: watch.engine.enqueueLiveEvent,
-    });
-  watch.lifecycle.onStop("subscription", () => {
-    subscription.unsubscribe();
+  readonly sent: StoredEvent;
+}): Promise<void> => {
+  const owned = await delivery.stream.ownerFilter.owns({
+    stored: delivery.sent,
+    subscriberLogin: delivery.stream.subscriberLogin,
   });
+  if (!owned || delivery.lifecycle.halted.aborted) return;
+  delivery.stream.sink.writeEvent({
+    eventType: delivery.sent.eventType,
+    eventId: delivery.sent.id,
+    envelopeJson: JSON.stringify(toEnvelope(delivery.sent)),
+  });
+  delivery.stream.log.info(
+    {
+      clientId: delivery.stream.clientId,
+      eventId: delivery.sent.id,
+      deliveryId: delivery.sent.deliveryId,
+    },
+    "delivered sent event",
+  );
+  await delivery.stream.cursors.write({
+    clientId: delivery.stream.clientId,
+    eventId: delivery.sent.id,
+  });
+};
+
+const deliverInOrder = async (run: {
+  readonly stream: EventStreamRequest;
+  readonly lifecycle: StreamLifecycle;
+  readonly queued: readonly StoredEvent[];
+  readonly failureNote: string;
+}): Promise<boolean> => {
+  const [sent, ...following] = run.queued;
+  if (sent === undefined) return true;
+  if (run.lifecycle.halted.aborted) return false;
+  try {
+    await deliverStoredEvent({ stream: run.stream, lifecycle: run.lifecycle, sent });
+  } catch (failure) {
+    run.stream.log.warn(
+      { clientId: run.stream.clientId, eventId: sent.id, err: failure },
+      run.failureNote,
+    );
+    run.lifecycle.stop();
+    return false;
+  }
+  return deliverInOrder({ ...run, queued: following });
+};
+
+const boundedKnownIds = (remembered: readonly string[], knownIdLimit: number): readonly string[] =>
+  remembered.slice(remembered.length - knownIdLimit);
+
+const readOnArrival = async (waiting: {
+  readonly stream: EventStreamRequest;
+  readonly lifecycle: StreamLifecycle;
+  readonly sinceMs: number;
+  readonly afterId: string | null;
+  readonly knownIds: readonly string[];
+}): Promise<readonly StoredEvent[]> => {
+  const wakeup = Promise.withResolvers<undefined>();
+  const subscription = waiting.stream.events.subscribeSince({
+    sinceMs: waiting.sinceMs,
+    onAdd: () => {
+      wakeup.resolve(undefined);
+    },
+  });
+  const arrived = await readResumableEvents({
+    events: waiting.stream.events,
+    resumeAfterId: waiting.afterId,
+    nowMs: waiting.sinceMs,
+  });
+  if (!arrived.some((added) => !waiting.knownIds.includes(added.id))) {
+    await Promise.race([wakeup.promise, waiting.lifecycle.closed]);
+  }
+  subscription.unsubscribe();
+  return arrived;
+};
+
+const runLiveWatch = async (watch: {
+  readonly stream: EventStreamRequest;
+  readonly lifecycle: StreamLifecycle;
+  readonly sinceMs: number;
+  readonly knownIdLimit: number;
+  readonly afterId: string | null;
+  readonly knownIds: readonly string[];
+}): Promise<void> => {
+  if (watch.lifecycle.halted.aborted) return;
+  const arrived = await readOnArrival(watch);
+  const unseen = arrived.filter((added) => !watch.knownIds.includes(added.id));
+  const advanced = {
+    ...watch,
+    afterId: arrived.at(-1)?.id ?? watch.afterId,
+    knownIds: boundedKnownIds(
+      [...watch.knownIds, ...unseen.map((added) => added.id)],
+      watch.knownIdLimit,
+    ),
+  };
+  for (const added of unseen) {
+    watch.stream.ownerFilter.remember(added);
+    watch.stream.ownerFilter.discardIfClosed(added);
+  }
+  const delivered = await deliverInOrder({
+    stream: watch.stream,
+    lifecycle: watch.lifecycle,
+    queued: unseen,
+    failureNote: "live delivery failed; stopping stream",
+  });
+  if (!delivered) return;
+  return runLiveWatch(advanced);
 };
 
 const startKeepalive = (keepalive: {
@@ -268,7 +211,7 @@ const startKeepalive = (keepalive: {
       keepalive.lifecycle.stop();
     }
   }, keepalive.stream.keepaliveMs ?? KEEPALIVE_INTERVAL_MS);
-  keepalive.lifecycle.onStop("keepalive", () => {
+  keepalive.lifecycle.onStop(() => {
     clearInterval(keepaliveTimer);
   });
 };
@@ -290,18 +233,40 @@ const logConnected = (connection: {
   );
 };
 
-const openDelivery = async (opened: {
+const replayBacklog = (replay: {
+  readonly stream: EventStreamRequest;
+  readonly lifecycle: StreamLifecycle;
+  readonly backlog: readonly StoredEvent[];
+}): Promise<boolean> => {
+  for (const sent of replay.backlog) replay.stream.ownerFilter.remember(sent);
+  return deliverInOrder({
+    stream: replay.stream,
+    lifecycle: replay.lifecycle,
+    queued: replay.backlog,
+    failureNote: "backlog delivery failed; stopping stream",
+  });
+};
+
+const openDelivery = (opened: {
   readonly stream: EventStreamRequest;
   readonly lifecycle: StreamLifecycle;
   readonly backlog: readonly StoredEvent[];
   readonly resumeAfterId: string | null;
   readonly sinceMs: number;
 }): Promise<void> => {
-  const engine = createDeliveryEngine({ stream: opened.stream, lifecycle: opened.lifecycle });
-  const replayed = await engine.replayBacklog(opened.backlog);
-  if (!replayed) return;
-  startLiveWatch({ ...opened, engine });
   startKeepalive({ stream: opened.stream, lifecycle: opened.lifecycle });
+  const knownIdLimit = opened.stream.knownIdLimit ?? KNOWN_ID_LIMIT;
+  return runLiveWatch({
+    stream: opened.stream,
+    lifecycle: opened.lifecycle,
+    sinceMs: opened.sinceMs,
+    knownIdLimit,
+    afterId: opened.backlog.at(-1)?.id ?? opened.resumeAfterId,
+    knownIds: boundedKnownIds(
+      opened.backlog.map((sent) => sent.id),
+      knownIdLimit,
+    ),
+  });
 };
 
 export const runEventStream = async (stream: EventStreamRequest): Promise<void> => {
@@ -314,6 +279,8 @@ export const runEventStream = async (stream: EventStreamRequest): Promise<void> 
   const backlog = await readResumableEvents({ events: stream.events, resumeAfterId, nowMs });
   logConnected({ stream, resumeAfterId, backlogCount: backlog.length });
   const lifecycle = createStreamLifecycle(stream);
+  const replayed = await replayBacklog({ stream, lifecycle, backlog });
+  if (!replayed) return lifecycle.closed;
   await openDelivery({ stream, lifecycle, backlog, resumeAfterId, sinceMs: nowMs });
   return lifecycle.closed;
 };

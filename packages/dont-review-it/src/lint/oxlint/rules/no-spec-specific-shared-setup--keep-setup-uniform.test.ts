@@ -1,6 +1,6 @@
 import { mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 import { testLintRule } from "@mst/lint-rule-authoring";
 import { describe } from "vite-plus/test";
@@ -10,24 +10,20 @@ import { noSpecSpecificSharedSetup } from "./no-spec-specific-shared-setup--keep
 const fixtureDir = join(realpathSync(tmpdir()), "dont-review-it-no-spec-specific-shared-setup");
 rmSync(fixtureDir, { recursive: true, force: true });
 
-const writeFixture = (fixtureName: string, source: string): string => {
-  const path = join(fixtureDir, fixtureName);
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, source);
-  return path;
-};
+mkdirSync(join(fixtureDir, "setup"), { recursive: true });
+mkdirSync(join(fixtureDir, "src/legacy"), { recursive: true });
 
-writeFixture("pnpm-workspace.yaml", "packages:\n  - packages/*\n");
-writeFixture("package.json", '{ "name": "@fixture/root" }\n');
-writeFixture(
-  "vite.config.ts",
+writeFileSync(join(fixtureDir, "pnpm-workspace.yaml"), "packages:\n  - packages/*\n");
+writeFileSync(join(fixtureDir, "package.json"), '{ "name": "@fixture/root" }\n');
+writeFileSync(
+  join(fixtureDir, "vite.config.ts"),
   'export default defineConfig({ test: { setupFiles: ["./setup/shared.setup.ts"] } });\n',
 );
-writeFixture("setup/shared.setup.ts", 'import "./reached.ts";\n');
-writeFixture("setup/reached.ts", "export const seeded = 1;\n");
-writeFixture("setup/declared.ts", "export const seeded = 2;\n");
-writeFixture("src/order.test.ts", "export const asserted = 1;\n");
-writeFixture("src/legacy/old.test.ts", "export const asserted = 2;\n");
+writeFileSync(join(fixtureDir, "setup/shared.setup.ts"), 'import "./reached.ts";\n');
+writeFileSync(join(fixtureDir, "setup/reached.ts"), "export const seeded = 1;\n");
+writeFileSync(join(fixtureDir, "setup/declared.ts"), "export const seeded = 2;\n");
+writeFileSync(join(fixtureDir, "src/order.test.ts"), "export const asserted = 1;\n");
+writeFileSync(join(fixtureDir, "src/legacy/old.test.ts"), "export const asserted = 2;\n");
 
 const SETUP_FILE = join(fixtureDir, "setup/shared.setup.ts");
 
@@ -35,11 +31,10 @@ const REACHED_FILE = join(fixtureDir, "setup/reached.ts");
 
 const DECLARED_FILE = join(fixtureDir, "setup/declared.ts");
 
-const PLAIN_FILE = writeFixture("plain.ts", "export const total = 1;\n");
+const PLAIN_FILE = join(fixtureDir, "plain.ts");
+writeFileSync(PLAIN_FILE, "export const total = 1;\n");
 
 const RUNNER_CONFIG_FILE = join(fixtureDir, "vite.config.ts");
-
-const configHolding = (block: string): string => `export default defineConfig({ test: ${block} });`;
 
 describe("dont-review-it/no-spec-specific-shared-setup--keep-setup-uniform", () => {
   testLintRule(noSpecSpecificSharedSetup, {
@@ -148,7 +143,7 @@ describe("dont-review-it/no-spec-specific-shared-setup--keep-setup-uniform", () 
       {
         name: "a runner configuration handing every spec the same setting passes",
         filename: RUNNER_CONFIG_FILE,
-        code: configHolding(`{ include: ["**/*.test.ts"], retry: 2 }`),
+        code: `export default defineConfig({ test: { include: ["**/*.test.ts"], retry: 2 } });`,
       },
       {
         name: "a configuration exporting no runner block holds nothing to read",
@@ -291,9 +286,7 @@ describe("dont-review-it/no-spec-specific-shared-setup--keep-setup-uniform", () 
       {
         name: "a runner configuration naming one spec file is reported at that entry",
         filename: RUNNER_CONFIG_FILE,
-        code: configHolding(
-          `{ setupFiles: ["./setup/shared.setup.ts"], environmentMatchGlobs: [["src/order.test.ts", "jsdom"]] }`,
-        ),
+        code: `export default defineConfig({ test: { setupFiles: ["./setup/shared.setup.ts"], environmentMatchGlobs: [["src/order.test.ts", "jsdom"]] } });`,
         errors: [
           { messageId: "specSpecificRunnerSetting", data: { spelled: "src/order.test.ts" } },
         ],

@@ -2,14 +2,14 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { parseLaunchOverride } from "./launch-override.ts";
 
-const it = test
-  .extend("overrideFromUndefined", () => parseLaunchOverride(undefined))
-  .extend("overrideFromEmptyString", () => parseLaunchOverride(""))
-  .extend("overrideFromBlankString", () => parseLaunchOverride("  \t "))
-  .extend("overrideFromSingleToken", () => parseLaunchOverride("wrapper"))
-  .extend("overrideFromMultipleTokens", () => parseLaunchOverride("  wrapper   sub  "));
-
 describe("parseLaunchOverride", () => {
+  const it = test
+    .extend("overrideFromUndefined", () => parseLaunchOverride(undefined))
+    .extend("overrideFromEmptyString", () => parseLaunchOverride(""))
+    .extend("overrideFromBlankString", () => parseLaunchOverride("  \t "))
+    .extend("overrideFromSingleToken", () => parseLaunchOverride("wrapper"))
+    .extend("overrideFromMultipleTokens", () => parseLaunchOverride("  wrapper   sub  "));
+
   it("undefined は上書きなしになる", ({ overrideFromUndefined }) => {
     expect(overrideFromUndefined).toStrictEqual(null);
   });

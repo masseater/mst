@@ -1,4 +1,13 @@
-import { isMap, isScalar, isSeq, LineCounter, parseDocument, type Node, type Pair } from "yaml";
+import {
+  isMap,
+  isNode,
+  isScalar,
+  isSeq,
+  LineCounter,
+  parseDocument,
+  type Node,
+  type Pair,
+} from "yaml";
 
 export type WorkflowDocument = {
   readonly relativePath: string;
@@ -29,8 +38,8 @@ export const lineAtOffset = (document: WorkflowDocument, offset: number): number
   document.lineCounter.linePos(offset).line;
 
 export const lineOf = (document: WorkflowDocument, node: unknown): number => {
-  const range = (node as { readonly range?: readonly [number, number, number] } | null)?.range;
-  return range === undefined ? 1 : lineAtOffset(document, range[0]);
+  const range = isNode(node) ? node.range : undefined;
+  return range === undefined || range === null ? 1 : lineAtOffset(document, range[0]);
 };
 
 export const entriesOf = (node: unknown): readonly Pair[] => (isMap(node) ? node.items : []);

@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 import { testLintRule } from "@mst/lint-rule-authoring";
 import { describe } from "vite-plus/test";
@@ -23,24 +23,14 @@ const OUTSIDE_RULE = "no-console";
 
 const DECLARATION = "export const total = 1;";
 
-const configFor = (lint: string): string => `export default { lint: ${lint} };`;
-
-const rulesHolding = (listedEntries: string): string =>
-  configFor(`{ rules: { ${listedEntries} } }`);
-
 const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-no-rule-suppression-"));
+mkdirSync(join(fixtureDir, "src/legacy"), { recursive: true });
 
-const writeFixture = (fixtureName: string, source: string): string => {
-  const path = join(fixtureDir, fixtureName);
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, source);
-  return path;
-};
-
-writeFixture("pnpm-workspace.yaml", "packages:\n  - packages/*\n");
-writeFixture("package.json", '{ "name": "@fixture/root" }\n');
-writeFixture("src/legacy/basket.test.ts", 'it("counts", () => {});\n');
-const ignoringConfig = writeFixture(CONFIG_FILE, DECLARATION);
+writeFileSync(join(fixtureDir, "pnpm-workspace.yaml"), "packages:\n  - packages/*\n");
+writeFileSync(join(fixtureDir, "package.json"), '{ "name": "@fixture/root" }\n');
+writeFileSync(join(fixtureDir, "src/legacy/basket.test.ts"), 'it("counts", () => {});\n');
+const ignoringConfig = join(fixtureDir, CONFIG_FILE);
+writeFileSync(ignoringConfig, DECLARATION);
 
 const EVERY_RULE_REACHING_HERE = "every rule reaching this file (this gate among them)";
 
@@ -48,6 +38,17 @@ describe("dont-review-it/no-rule-suppression--fix-the-violation", () => {
   testLintRule(noRuleSuppression, {
     valid: [
       { name: "a spec file carrying no comment passes", code: DECLARATION, filename: SPEC_FILE },
+      {
+        name: "options that spell out no target rule leave the gate rules in force",
+        code: DECLARATION,
+        filename: SPEC_FILE,
+        options: [{}],
+      },
+      {
+        name: "a configuration that declares no lint block ignores no spec file",
+        code: DECLARATION,
+        filename: ignoringConfig,
+      },
       {
         name: "a comment that opens with no suppression spelling passes",
         code: `// this line holds the running total\n${DECLARATION}`,
@@ -80,17 +81,22 @@ describe("dont-review-it/no-rule-suppression--fix-the-violation", () => {
       },
       {
         name: "a configuration holding a gate rule at error passes",
-        code: rulesHolding(`"${PREFIXED_GATE_RULE}": "error"`),
+        code: `export default { lint: { rules: { "${PREFIXED_GATE_RULE}": "error" } } };`,
         filename: CONFIG_FILE,
       },
       {
         name: "a configuration holding a gate rule at error with options passes",
-        code: rulesHolding(`"${GATE_RULE}": ["error", { specFileSuffixes: [".spec.ts"] }]`),
+        code: `export default { lint: { rules: { "${GATE_RULE}": ["error", { specFileSuffixes: [".spec.ts"] }] } } };`,
         filename: CONFIG_FILE,
       },
       {
         name: "a configuration turning a rule outside this gate off passes",
-        code: rulesHolding(`"${OUTSIDE_RULE}": "off"`),
+        code: `export default { lint: { rules: { "${OUTSIDE_RULE}": "off" } } };`,
+        filename: CONFIG_FILE,
+      },
+      {
+        name: "a rules block that pulls its entries in from elsewhere spells out no severity to read",
+        code: `export default { lint: { rules: { ...sharedSeverities } } };`,
         filename: CONFIG_FILE,
       },
       {
@@ -100,7 +106,7 @@ describe("dont-review-it/no-rule-suppression--fix-the-violation", () => {
       },
       {
         name: "a configuration that keeps suppression comments powerless passes",
-        code: configFor(`{ options: { respectEslintDisableDirectives: false } }`),
+        code: `export default { lint: { options: { respectEslintDisableDirectives: false } } };`,
         filename: CONFIG_FILE,
       },
       {
@@ -196,7 +202,7 @@ describe("dont-review-it/no-rule-suppression--fix-the-violation", () => {
       },
       {
         name: "a configuration turning a gate rule off is reported",
-        code: rulesHolding(`"${PREFIXED_GATE_RULE}": "off"`),
+        code: `export default { lint: { rules: { "${PREFIXED_GATE_RULE}": "off" } } };`,
         filename: CONFIG_FILE,
         errors: [
           {
@@ -207,21 +213,25 @@ describe("dont-review-it/no-rule-suppression--fix-the-violation", () => {
       },
       {
         name: "a configuration lowering a gate rule to a warning is reported",
-        code: rulesHolding(`"${GATE_RULE}": "warn"`),
+        code: `export default { lint: { rules: { "${GATE_RULE}": "warn" } } };`,
         filename: CONFIG_FILE,
         errors: [{ messageId: "weakenedRule", data: { ruleName: GATE_RULE, severity: "warn" } }],
       },
       {
         name: "a numbered severity below failing is read as the level it stands for",
-        code: rulesHolding(`"${GATE_RULE}": 0`),
+        code: `export default { lint: { rules: { "${GATE_RULE}": 0 } } };`,
+        filename: CONFIG_FILE,
+        errors: [{ messageId: "weakenedRule", data: { ruleName: GATE_RULE, severity: "off" } }],
+      },
+      {
+        name: "a gate rule taken down beside a spread entry is reported all the same",
+        code: `export default { lint: { rules: { ...sharedSeverities, "${GATE_RULE}": "off" } } };`,
         filename: CONFIG_FILE,
         errors: [{ messageId: "weakenedRule", data: { ruleName: GATE_RULE, severity: "off" } }],
       },
       {
         name: "an override taking a gate rule down over a path is reported",
-        code: configFor(
-          `{ overrides: [{ files: ["src/legacy/**"], rules: { "${GATE_RULE}": "off" } }] }`,
-        ),
+        code: `export default { lint: { overrides: [{ files: ["src/legacy/**"], rules: { "${GATE_RULE}": "off" } }] } };`,
         filename: CONFIG_FILE,
         errors: [
           {
@@ -232,13 +242,13 @@ describe("dont-review-it/no-rule-suppression--fix-the-violation", () => {
       },
       {
         name: "an entry standing beside a spread this rule cannot read is reported",
-        code: rulesHolding(`...sharedRules, "${GATE_RULE}": "off"`),
+        code: `export default { lint: { rules: { ...sharedRules, "${GATE_RULE}": "off" } } };`,
         filename: CONFIG_FILE,
         errors: [{ messageId: "weakenedRule", data: { ruleName: GATE_RULE, severity: "off" } }],
       },
       {
         name: "a severity assembled elsewhere is reported",
-        code: rulesHolding(`"${GATE_RULE}": chosenSeverity`),
+        code: `export default { lint: { rules: { "${GATE_RULE}": chosenSeverity } } };`,
         filename: CONFIG_FILE,
         errors: [{ messageId: "unreadableSeverity", data: { ruleName: GATE_RULE } }],
       },
@@ -250,13 +260,13 @@ describe("dont-review-it/no-rule-suppression--fix-the-violation", () => {
       },
       {
         name: "a configuration that gives suppression comments back their force is reported",
-        code: configFor(`{ options: { respectEslintDisableDirectives: true } }`),
+        code: `export default { lint: { options: { respectEslintDisableDirectives: true } } };`,
         filename: CONFIG_FILE,
         errors: [{ messageId: "respectedDisableDirectives" }],
       },
       {
         name: "an ignore entry that covers an authored spec file is reported",
-        code: configFor(`{ ignorePatterns: ["**/legacy/**", "docs/**"] }`),
+        code: `export default { lint: { ignorePatterns: ["**/legacy/**", "docs/**"] } };`,
         filename: ignoringConfig,
         errors: [
           {
@@ -289,6 +299,18 @@ describe("dont-review-it/no-rule-suppression--fix-the-violation", () => {
           {
             messageId: "lineScopedSuppression",
             data: { spelling: "eslint-disable-next-line", silenced: `\`${GATE_RULE}\`` },
+          },
+        ],
+      },
+      {
+        name: "options that name no list of rules at all leave the gate carrying its own rules",
+        code: `/* oxlint-disable ${SELF_RULE} */\n${DECLARATION}`,
+        filename: SPEC_FILE,
+        options: [{}],
+        errors: [
+          {
+            messageId: "fileScopedSuppression",
+            data: { spelling: "oxlint-disable", silenced: `\`${SELF_RULE}\`` },
           },
         ],
       },

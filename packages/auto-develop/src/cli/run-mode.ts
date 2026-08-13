@@ -263,7 +263,7 @@ const startedSchedulers = (starting: {
   readonly restart: RestartRequest;
   readonly idleMonitor: IdleMonitor;
   readonly baseline: Map<string, string>;
-}): { readonly stop: () => void } => {
+}): { readonly stop: () => Promise<void> } => {
   const startedAtMs = Date.now();
   const statusBar = createPeriodicScheduler({
     checkRestart: () => {
@@ -272,18 +272,15 @@ const startedSchedulers = (starting: {
     },
     cleanup: { run: () => reclaimIdleWorktrees({ runtime: starting.runtime }) },
     log: starting.runtime.log,
-  });
+  }).start();
   const updateChecker = createPeriodicScheduler({
     checkRestart: () => void requestRestartWhenCodeMovedOn(starting),
     restartCheckIntervalMs: UPDATE_CHECK_INTERVAL_MS,
     log: starting.runtime.log,
-  });
-  statusBar.start();
-  updateChecker.start();
+  }).start();
   return {
-    stop: () => {
-      statusBar.stop();
-      updateChecker.stop();
+    stop: async () => {
+      await Promise.all([statusBar.stop(), updateChecker.stop()]);
     },
   };
 };
@@ -318,6 +315,6 @@ export const runMode = async (asked: ModeRunRequest): Promise<void> => {
   try {
     await cycleUntilStopped({ mode: asked.mode, runtime, restart, idleMonitor, baseline });
   } finally {
-    schedulers.stop();
+    await schedulers.stop();
   }
 };

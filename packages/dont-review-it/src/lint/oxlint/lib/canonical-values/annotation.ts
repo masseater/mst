@@ -10,19 +10,16 @@ export type CanonicalValuesAnnotation = {
   readonly conceptId: string;
 };
 
-const CONCEPT_ID_PATTERN = /^[a-z0-9]+(?:[-.][a-z0-9]+)*$/u;
+const ANNOTATED_CONCEPT_PATTERN = new RegExp(
+  String.raw`(?<=(?:^|\n)[^\S\n]*\*?[^\S\n]*${CANONICAL_VALUES_TAG}[^\S\n]+)[a-z0-9]+(?:[-.][a-z0-9]+)*(?=[^\S\n]*(?:\n|$))`,
+  "u",
+);
 
 export const parseCanonicalValuesAnnotation = (
   commentValue: string,
 ): CanonicalValuesAnnotation | null => {
-  const line = commentValue
-    .split("\n")
-    .map((each) => each.replace(/^\s*\*?\s?/u, "").trim())
-    .find((each) => each.startsWith(`${CANONICAL_VALUES_TAG} `) || each === CANONICAL_VALUES_TAG);
-  if (line === undefined) return null;
-
-  const conceptId = line.slice(CANONICAL_VALUES_TAG.length).trim();
-  return CONCEPT_ID_PATTERN.test(conceptId) ? { conceptId } : null;
+  const annotated = ANNOTATED_CONCEPT_PATTERN.exec(commentValue);
+  return annotated === null ? null : { conceptId: annotated[0] };
 };
 
 export const containsCanonicalValuesAnnotation = (sourceText: string): boolean =>

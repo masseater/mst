@@ -5,33 +5,18 @@ import { CredentialTerminalError } from "../transport/credential-provider.ts";
 import { SseRequestRejectedError } from "../transport/sse-request-rejected-error.ts";
 import { backoffAfterFailures, needsOperatorIntervention } from "./cycle-backoff.ts";
 
-const it = test
-  .extend("verdictForCredentialRefusal", () =>
-    needsOperatorIntervention(new CredentialTerminalError("refused")))
-  .extend("verdictForSseRefusal", () => needsOperatorIntervention(new SseRequestRejectedError()))
-  .extend("verdictForHaltDisposition", () =>
-    needsOperatorIntervention(new HaltQueueKeepJobError("authentication expired")),
-  )
-  .extend("verdictForTransientFailure", () =>
-    needsOperatorIntervention(new Error("the relay is briefly unavailable")),
-  )
-  .extend("firstFailureFloor", () =>
-    backoffAfterFailures({ consecutiveFailures: 1, random: () => 0 }),
-  )
-  .extend("firstFailureCeiling", () =>
-    backoffAfterFailures({ consecutiveFailures: 1, random: () => 1 }),
-  )
-  .extend("thirdFailureCentre", () =>
-    backoffAfterFailures({ consecutiveFailures: 3, random: () => 0.5 }),
-  )
-  .extend("cappedFailureCentre", () =>
-    backoffAfterFailures({ consecutiveFailures: 30, random: () => 0.5 }),
-  )
-  .extend("neverZeroDelay", () =>
-    backoffAfterFailures({ consecutiveFailures: -100, random: () => 0 }),
-  );
-
 describe("needsOperatorIntervention", () => {
+  const it = test
+    .extend("verdictForCredentialRefusal", () =>
+      needsOperatorIntervention(new CredentialTerminalError("refused")))
+    .extend("verdictForSseRefusal", () => needsOperatorIntervention(new SseRequestRejectedError()))
+    .extend("verdictForHaltDisposition", () =>
+      needsOperatorIntervention(new HaltQueueKeepJobError("authentication expired")),
+    )
+    .extend("verdictForTransientFailure", () =>
+      needsOperatorIntervention(new Error("the relay is briefly unavailable")),
+    );
+
   it("credential の恒久拒否はループごと終える", ({ verdictForCredentialRefusal }) => {
     expect(verdictForCredentialRefusal).toStrictEqual(true);
   });
@@ -50,6 +35,22 @@ describe("needsOperatorIntervention", () => {
 });
 
 describe("backoffAfterFailures", () => {
+  const it = test
+    .extend("firstFailureFloor", () =>
+      backoffAfterFailures({ consecutiveFailures: 1, random: () => 0 }))
+    .extend("firstFailureCeiling", () =>
+      backoffAfterFailures({ consecutiveFailures: 1, random: () => 1 }),
+    )
+    .extend("thirdFailureCentre", () =>
+      backoffAfterFailures({ consecutiveFailures: 3, random: () => 0.5 }),
+    )
+    .extend("cappedFailureCentre", () =>
+      backoffAfterFailures({ consecutiveFailures: 30, random: () => 0.5 }),
+    )
+    .extend("neverZeroDelay", () =>
+      backoffAfterFailures({ consecutiveFailures: -100, random: () => 0 }),
+    );
+
   it("初回失敗のジッター下限は基準遅延の半分になる", ({ firstFailureFloor }) => {
     expect(firstFailureFloor).toStrictEqual(1500);
   });

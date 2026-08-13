@@ -1,3 +1,5 @@
+import { namedFieldsOf } from "../named-fields.ts";
+
 import type { Options, RuleMeta } from "@oxlint/plugins";
 
 export type GroundedPattern = {
@@ -73,14 +75,9 @@ const DEFAULT_FORBIDDEN_TRACKED_PATHS: readonly ForbiddenTrackedPath[] = [
   },
 ];
 
-const namedFieldsOf = (held: unknown): Readonly<Record<string, unknown>> | null =>
-  typeof held !== "object" || held === null || Array.isArray(held)
-    ? null
-    : (held as Readonly<Record<string, unknown>>);
-
-const listedUnder = (ruleOptions: Readonly<Options>, named: string): readonly unknown[] => {
+const listedUnder = (ruleOptions: Readonly<Options>, fieldName: string): readonly unknown[] => {
   const fields = namedFieldsOf(ruleOptions[0]);
-  const held = fields === null ? null : fields[named];
+  const held = fields === null ? null : fields[fieldName];
   return Array.isArray(held) ? held : [];
 };
 

@@ -1,5 +1,6 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
 import { exemptionsWrittenAbove } from "../lib/directive-comments.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import {
   DEFAULT_MOCK_CREATION_MEMBERS,
   DEFAULT_MOCK_NAMESPACE_SPELLINGS,
@@ -116,6 +117,29 @@ const yieldsImportedBinding = (
     .map((expression) => unwrapSubject(expression))
     .some((written) => written.type === "Identifier" && spellsImportedBinding(written, scopeAt));
 
+const enclosingFactoryOf = (
+  call: ESTree.CallExpression,
+  factories: readonly SpecFunction[],
+): SpecFunction | null =>
+  factories.find((factory) => call.start >= factory.start && call.end <= factory.end) ?? null;
+
+const settlesBehaviour = (call: ESTree.CallExpression, lookup: NamespaceLookup): boolean =>
+  setsMockBehaviour(call) ||
+  createsMockWithImplementation(call, lookup) ||
+  callsImportedBinding(call, lookup.scopeAt);
+
+const behavesInside = (read: {
+  readonly factory: SpecFunction;
+  readonly factories: readonly SpecFunction[];
+  readonly calls: readonly ESTree.CallExpression[];
+  readonly lookup: NamespaceLookup;
+}): boolean =>
+  read.calls.some(
+    (call) =>
+      enclosingFactoryOf(call, read.factories) === read.factory &&
+      settlesBehaviour(call, read.lookup),
+  );
+
 export const noViMockFactoryBehavior = createDontReviewItRule({
   name: RULE_NAME,
   meta: {
@@ -150,18 +174,6 @@ export const noViMockFactoryBehavior = createDontReviewItRule({
       seenBindings: new Set(),
     };
     const builtinPrefixes = builtinModulePrefixesFrom(inspection.options);
-    const factories = new Set<SpecFunction>();
-    const settled = new Set<SpecFunction>();
-
-    const reportBehaviour = (factory: SpecFunction): void => {
-      if (settled.has(factory)) return;
-      settled.add(factory);
-      inspection.report({ node: factory, messageId: "factoryBehaviour" });
-    };
-
-    const enclosingFactory = (node: ESTree.Node): SpecFunction | null =>
-      [...factories].find((factory) => node.start >= factory.start && node.end <= factory.end) ??
-      null;
 
     const grantsExemption = (call: ESTree.CallExpression): boolean => {
       const written = exemptionsWrittenAbove({
@@ -176,35 +188,39 @@ export const noViMockFactoryBehavior = createDontReviewItRule({
       return written.some((exemption) => exemption.grounds !== "");
     };
 
-    const takeDeclaration = (call: ESTree.CallExpression, replacement: ModuleReplacement): void => {
-      factories.add(replacement.factory);
-      if (yieldsImportedBinding(replacement.factory, lookup.scopeAt)) {
-        reportBehaviour(replacement.factory);
+    const reportDeclaration = (declared: {
+      readonly call: ESTree.CallExpression;
+      readonly replacement: ModuleReplacement;
+    }): void => {
+      const { factory, specifier } = declared.replacement;
+      if (yieldsImportedBinding(factory, lookup.scopeAt)) {
+        inspection.report({ node: factory, messageId: "factoryBehaviour" });
       }
 
-      const exempted = grantsExemption(call);
-      if (namesBuiltinModule(replacement.specifier, builtinPrefixes)) return;
-      if (yieldsEmptyObjectOnly(replacement.factory)) return;
+      const exempted = grantsExemption(declared.call);
+      if (namesBuiltinModule(specifier, builtinPrefixes)) return;
+      if (yieldsEmptyObjectOnly(factory)) return;
       if (exempted) return;
-      inspection.report({ node: replacement.factory, messageId: "factoryShape" });
+      inspection.report({ node: factory, messageId: "factoryShape" });
     };
 
     return {
-      CallExpression(node: ESTree.CallExpression) {
-        const replacement = moduleReplacementOf(node, lookup);
-        if (replacement !== null) {
-          takeDeclaration(node, replacement);
-          return;
-        }
+      "Program:exit"(program: ESTree.Program) {
+        const calls = nodesOfType(program, "CallExpression");
+        const declarations = calls.flatMap((call) => {
+          const replacement = moduleReplacementOf(call, lookup);
+          return replacement === null ? [] : [{ call, replacement }];
+        });
+        const factories = declarations.map((declared) => declared.replacement.factory);
+        const inner = calls.filter(
+          (call) => !declarations.some((declared) => declared.call === call),
+        );
 
-        const factory = enclosingFactory(node);
-        if (factory === null) return;
-        if (
-          setsMockBehaviour(node) ||
-          createsMockWithImplementation(node, lookup) ||
-          callsImportedBinding(node, lookup.scopeAt)
-        ) {
-          reportBehaviour(factory);
+        for (const declared of declarations) reportDeclaration(declared);
+        for (const factory of factories) {
+          if (yieldsImportedBinding(factory, lookup.scopeAt)) continue;
+          if (!behavesInside({ factory, factories, calls: inner, lookup })) continue;
+          inspection.report({ node: factory, messageId: "factoryBehaviour" });
         }
       },
     };

@@ -7,7 +7,7 @@ metadata:
   library: "@mst/dont-review-it"
   library_version: "0.0.0"
 sources:
-  - "masseater/mst:packages/dont-review-it/src/run-cli.ts"
+  - "masseater/mst:packages/dont-review-it/src/check-command.ts"
   - "masseater/mst:packages/dont-review-it/src/run-checks.ts"
   - "masseater/mst:packages/dont-review-it/src/workflows/run-workflow-checks.ts"
   - "masseater/mst:packages/dont-review-it/src/intent-skills/shipped-skills.ts"

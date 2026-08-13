@@ -95,17 +95,17 @@ const repeatCycles = async (
 
 export const cycleUntilStopped = async (cycling: CycleLoop): Promise<void> => {
   const { runtime } = cycling;
-  const stopped = new Map([["signalled", false]]);
+  const stopping = new AbortController();
   const shutdown = registerShutdown({
     target: process,
     onSignal: () => {
-      stopped.set("signalled", true);
+      stopping.abort();
       runtime.disconnect();
     },
     log: runtime.log,
   });
   try {
-    await repeatCycles({ ...cycling, signalled: () => stopped.get("signalled") === true });
+    await repeatCycles({ ...cycling, signalled: () => stopping.signal.aborted });
   } finally {
     shutdown.release();
   }

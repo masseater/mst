@@ -1,3 +1,5 @@
+import { memoize } from "es-toolkit";
+
 import { isAstFields, NODE_TYPE_FIELD, type AstFields } from "../ast-node.ts";
 import { boundNamesIn } from "./bound-names.ts";
 
@@ -19,7 +21,7 @@ const NAME_FIELD = "name";
 
 const PLACEHOLDER_PREFIX = "$";
 
-const asWritten: Spelling = (spelled) => spelled;
+const asWritten: Spelling = (identifierName) => identifierName;
 
 const jsonTextOf: (held: unknown) => string = JSON.stringify;
 
@@ -27,7 +29,7 @@ const namesAMember = (node: AstFields, field: string): boolean =>
   MEMBER_NAME_FIELDS.has(field) && node.computed === false;
 
 const structureOf = (held: unknown, spell: Spelling): string => {
-  if (Array.isArray(held)) return `[${held.map((member) => structureOf(member, spell)).join(",")}]`;
+  if (Array.isArray(held)) return `[${held.map((child) => structureOf(child, spell)).join(",")}]`;
   if (!isAstFields(held)) return jsonTextOf(held);
 
   const namesABinding = held[NODE_TYPE_FIELD] === "Identifier";
@@ -47,17 +49,16 @@ export const normalizedBodyOf = (input: {
 }): string => {
   const bound = boundNamesIn(input.body);
   const placeholderByName = new Map<string, string>();
+  const placeholderFor = memoize(
+    (boundName: string): string =>
+      `${PLACEHOLDER_PREFIX}${[...placeholderByName.keys(), boundName].indexOf(boundName)}`,
+    { cache: placeholderByName },
+  );
 
-  const spell: Spelling = (spelled) => {
-    if (!bound.has(spelled)) return input.routes.get(spelled) ?? spelled;
-
-    const held = placeholderByName.get(spelled);
-    if (held !== undefined) return held;
-
-    const minted = `${PLACEHOLDER_PREFIX}${placeholderByName.size}`;
-    placeholderByName.set(spelled, minted);
-    return minted;
-  };
+  const spell: Spelling = (identifierName) =>
+    bound.has(identifierName)
+      ? placeholderFor(identifierName)
+      : (input.routes.get(identifierName) ?? identifierName);
 
   return structureOf(input.body, spell);
 };

@@ -1,3 +1,5 @@
+import { maxBy } from "es-toolkit";
+
 import type { Options } from "@oxlint/plugins";
 
 export const baseNameOf = (filename: string): string =>
@@ -7,12 +9,10 @@ export const longestMatchingSuffix = (
   filename: string,
   suffixes: readonly string[],
 ): string | null =>
-  suffixes
-    .filter((suffix) => baseNameOf(filename).endsWith(suffix))
-    .reduce<string | null>(
-      (longest, suffix) => (longest === null || suffix.length > longest.length ? suffix : longest),
-      null,
-    );
+  maxBy(
+    suffixes.filter((suffix) => baseNameOf(filename).endsWith(suffix)),
+    (suffix) => suffix.length,
+  ) ?? null;
 
 export const stemBefore = (filename: string, suffix: string): string => {
   const base = baseNameOf(filename);

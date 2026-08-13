@@ -2,29 +2,10 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { parseAuthSession, serializeAuthSession } from "./auth-session.ts";
 
-const rejectionNameOf = (produced: unknown): string => {
-  try {
-    parseAuthSession(produced);
-    return "no rejection";
-  } catch (rejection) {
-    return rejection instanceof Error ? rejection.name : typeof rejection;
-  }
-};
-
-const it = test
-  .extend("roundTrippedSession", () =>
-    parseAuthSession(serializeAuthSession("session-token", new Date("2030-01-02T03:04:05.000Z"))))
-  .extend("tokenlessRejection", () => rejectionNameOf({ expiresAt: "2030-01-02T03:04:05.000Z" }))
-  .extend("emptyTokenRejection", () =>
-    rejectionNameOf({ token: "", expiresAt: "2030-01-02T03:04:05.000Z" }),
-  )
-  .extend("expiryLessRejection", () => rejectionNameOf({ token: "session-token" }))
-  .extend("unreadableExpiryRejection", () =>
-    rejectionNameOf({ token: "session-token", expiresAt: "someday" }),
-  )
-  .extend("nonObjectRejection", () => rejectionNameOf("session-token"));
-
 describe("serializeAuthSession と parseAuthSession", () => {
+  const it = test.extend("roundTrippedSession", () =>
+    parseAuthSession(serializeAuthSession("session-token", new Date("2030-01-02T03:04:05.000Z"))));
+
   it("producer が作った応答は consumer の検証をそのまま往復する", ({ roundTrippedSession }) => {
     expect(roundTrippedSession).toStrictEqual({
       token: "session-token",
@@ -34,6 +15,48 @@ describe("serializeAuthSession と parseAuthSession", () => {
 });
 
 describe("parseAuthSession の拒否", () => {
+  const it = test
+    .extend("tokenlessRejection", () => {
+      try {
+        parseAuthSession({ expiresAt: "2030-01-02T03:04:05.000Z" });
+      } catch (rejection) {
+        return rejection instanceof Error ? rejection.name : typeof rejection;
+      }
+      throw new Error("parseAuthSession accepted a payload without a token");
+    })
+    .extend("emptyTokenRejection", () => {
+      try {
+        parseAuthSession({ token: "", expiresAt: "2030-01-02T03:04:05.000Z" });
+      } catch (rejection) {
+        return rejection instanceof Error ? rejection.name : typeof rejection;
+      }
+      throw new Error("parseAuthSession accepted a payload whose token is empty");
+    })
+    .extend("expiryLessRejection", () => {
+      try {
+        parseAuthSession({ token: "session-token" });
+      } catch (rejection) {
+        return rejection instanceof Error ? rejection.name : typeof rejection;
+      }
+      throw new Error("parseAuthSession accepted a payload without an expiresAt");
+    })
+    .extend("unreadableExpiryRejection", () => {
+      try {
+        parseAuthSession({ token: "session-token", expiresAt: "someday" });
+      } catch (rejection) {
+        return rejection instanceof Error ? rejection.name : typeof rejection;
+      }
+      throw new Error("parseAuthSession accepted a payload whose expiresAt is unreadable");
+    })
+    .extend("nonObjectRejection", () => {
+      try {
+        parseAuthSession("session-token");
+      } catch (rejection) {
+        return rejection instanceof Error ? rejection.name : typeof rejection;
+      }
+      throw new Error("parseAuthSession accepted a payload that is not an object");
+    });
+
   it("token が欠けていれば拒否する", ({ tokenlessRejection }) => {
     expect(tokenlessRejection).toStrictEqual("InvalidAuthSessionError");
   });

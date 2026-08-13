@@ -5,13 +5,15 @@ import { attemptAsync } from "es-toolkit";
 
 import { CHILD_PROCESS_EVENT } from "../node-event-names.ts";
 import { signalProcessTree, TREE_TERMINATION_SIGNAL } from "./process-tree.ts";
+import { DELAY_ENDING, settledDelay } from "./settled-delay.ts";
 import {
   dropInterruptHandler,
   installInterruptHandler,
-  makeHeldInterruptHandler,
+  makeHeldInterrupt,
   makeRunningInterruptHandler,
   raiseSignal,
 } from "./signals.ts";
+import { warnUnreleased } from "./unreleased-warning.ts";
 
 import type { SlotHold } from "./slots.ts";
 import type { Invocation } from "./usage.ts";
@@ -25,14 +27,6 @@ type Settled =
       exitCode: number | null;
       bySignal: NodeJS.Signals | null;
     };
-
-/** @canonical-values ai-native.delay-ending */
-const DELAY_ENDINGS = ["elapsed", "cancelled"] as const;
-
-const DELAY_ENDING = {
-  elapsed: DELAY_ENDINGS[0],
-  cancelled: DELAY_ENDINGS[1],
-} as const;
 
 type Verdict = { settled: Settled; timedOut: boolean };
 
@@ -51,18 +45,6 @@ const settledChild = (child: ChildProcess): Promise<Settled> =>
       resolve({ kind: CHILD_PROCESS_EVENT.exit, exitCode: code, bySignal: signal });
     });
   });
-
-const settledDelay = async (
-  ms: number,
-  cancel: AbortSignal,
-): Promise<(typeof DELAY_ENDINGS)[number]> => {
-  try {
-    await delay(ms, undefined, { signal: cancel });
-    return DELAY_ENDING.elapsed;
-  } catch (cancelledDelay) {
-    return DELAY_ENDING.cancelled;
-  }
-};
 
 const timeoutFired = async (parameters: {
   childPid: number;
@@ -98,13 +80,13 @@ const reportTreeTerminationFailure = (failure: Error): void => {
 };
 
 const guardChild = async (input: {
-  child: ChildProcess;
+  childPid: number;
+  settling: Promise<Settled>;
   invocation: Invocation;
   dependencies: RunCommandDependencies;
 }): Promise<Verdict & { terminationFailure: Error | null }> => {
-  const childPid = input.child.pid ?? 0;
   const runningHandler = makeRunningInterruptHandler({
-    childPid,
+    childPid: input.childPid,
     signalTree: input.dependencies.signalTree,
     reportFailure: reportTreeTerminationFailure,
   });
@@ -114,12 +96,12 @@ const guardChild = async (input: {
     input.invocation.timeoutSec === 0
       ? Promise.resolve({ fired: false, terminationFailure: null })
       : timeoutFired({
-          childPid,
+          childPid: input.childPid,
           timeoutMs: input.invocation.timeoutSec * 1000,
           cancel: canceller.signal,
           dependencies: input.dependencies,
         });
-  const settled = await settledChild(input.child);
+  const settled = await input.settling;
   canceller.abort();
   const timeout = await fired;
   dropInterruptHandler(runningHandler);
@@ -184,6 +166,29 @@ const reportRunEnd = (input: {
   return input.releaseFailure === null ? verdictCode : reportReleaseFailure(input.releaseFailure);
 };
 
+const spawnUnderHeldInterrupt = async (input: {
+  invocation: Invocation;
+  hold: SlotHold;
+  dependencies: RunCommandDependencies;
+}): Promise<{ childPid: number; settling: Promise<Settled> }> => {
+  const held = makeHeldInterrupt({
+    release: input.hold.release,
+    raise: raiseSignal,
+    onUnreleased: warnUnreleased,
+  });
+  installInterruptHandler(held.handler);
+  process.stderr.write(`throttle: run ${input.invocation.commandLine}\n`);
+  const child = input.dependencies.spawnChild({
+    executable: input.invocation.executable,
+    args: input.invocation.args,
+  });
+  const settling = settledChild(child);
+  dropInterruptHandler(held.handler);
+  held.standDown();
+  await held.settled;
+  return { childPid: child.pid ?? 0, settling };
+};
+
 export const runWithSlot = async (input: {
   invocation: Invocation;
   hold: SlotHold;
@@ -200,15 +205,17 @@ export const runWithSlot = async (input: {
           stdio: "inherit",
         })),
   };
-  const heldHandler = makeHeldInterruptHandler({ release: input.hold.release, raise: raiseSignal });
-  installInterruptHandler(heldHandler);
-  process.stderr.write(`throttle: run ${input.invocation.commandLine}\n`);
-  const child = dependencies.spawnChild({
-    executable: input.invocation.executable,
-    args: input.invocation.args,
+  const startedCommand = await spawnUnderHeldInterrupt({
+    invocation: input.invocation,
+    hold: input.hold,
+    dependencies,
   });
-  dropInterruptHandler(heldHandler);
-  const verdict = await guardChild({ child, invocation: input.invocation, dependencies });
+  const verdict = await guardChild({
+    childPid: startedCommand.childPid,
+    settling: startedCommand.settling,
+    invocation: input.invocation,
+    dependencies,
+  });
   const releaseFailure = await releaseFailureOf(input.hold);
   return reportRunEnd({ invocation: input.invocation, verdict, releaseFailure });
 };

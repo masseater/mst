@@ -3,16 +3,31 @@ import { describe, expect, test } from "vite-plus/test";
 import { denyReasonFor } from "./message.ts";
 
 describe("denyReasonFor", () => {
-  test("見つかった名前を挙げ、禁止の理由を述べてから直し方を並べる", () => {
-    const reason = denyReasonFor(["tail"]);
-    expect(reason.split("\n")[0]).toBe("unabridged: the command runs `tail`.");
-    expect(reason).toContain("vp exec spool -- <command>");
-    expect(reason).toContain("Read tool, which takes offset and limit");
+  const it = test
+    .extend("theDenyReasonForTail", () => denyReasonFor(["tail"]))
+    .extend("theDenyReasonForHeadAndTail", () => denyReasonFor(["head", "tail"]));
+
+  it("names the one slicing command, states why it is refused, and lists the ways to read the whole record", ({
+    theDenyReasonForTail,
+  }) => {
+    expect(theDenyReasonForTail).toBe(`unabridged: the command runs \`tail\`.
+A slice drops the rest of the record, the failure is often in the part that was dropped, and re-running with a filter pays the cost twice while missing non-deterministic failures.
+
+Read the whole record instead:
+- output of a command: record it with \`spool -- <command>\`, then open the log file the summary points to with the Read tool. Where \`spool\` is not on PATH, \`vp exec spool -- <command>\` reaches it
+- a file already on disk: open it with the Read tool, which takes offset and limit
+- a record still being written: read it again with the Read tool, which sees whatever has been written so far`);
   });
 
-  test("名前が複数あるときは両方を挙げる", () => {
-    expect(denyReasonFor(["head", "tail"]).split("\n")[0]).toBe(
-      "unabridged: the command runs `head` and `tail`.",
-    );
+  it("names both slicing commands when two of them were found", ({
+    theDenyReasonForHeadAndTail,
+  }) => {
+    expect(theDenyReasonForHeadAndTail).toBe(`unabridged: the command runs \`head\` and \`tail\`.
+A slice drops the rest of the record, the failure is often in the part that was dropped, and re-running with a filter pays the cost twice while missing non-deterministic failures.
+
+Read the whole record instead:
+- output of a command: record it with \`spool -- <command>\`, then open the log file the summary points to with the Read tool. Where \`spool\` is not on PATH, \`vp exec spool -- <command>\` reaches it
+- a file already on disk: open it with the Read tool, which takes offset and limit
+- a record still being written: read it again with the Read tool, which sees whatever has been written so far`);
   });
 });

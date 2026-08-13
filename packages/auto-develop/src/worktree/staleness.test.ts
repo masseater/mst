@@ -2,32 +2,25 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { remoteBranchPresentIn, shouldReclaim } from "./staleness.ts";
 
-const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
-
-const it = test
-  .extend("reclaimWithUnknownRemote", () =>
-    shouldReclaim({ remoteBranchExists: null, lastUsedMtimeMs: 0, nowMs: threeDaysMs * 10 }))
-  .extend("reclaimWithVanishedRemote", () =>
-    shouldReclaim({ remoteBranchExists: false, lastUsedMtimeMs: Date.now(), nowMs: Date.now() }),
-  )
-  .extend("reclaimWithUnreadableMarker", () =>
-    shouldReclaim({ remoteBranchExists: true, lastUsedMtimeMs: null, nowMs: Date.now() }),
-  )
-  .extend("reclaimAtExactlyThreeDays", () =>
-    shouldReclaim({ remoteBranchExists: true, lastUsedMtimeMs: 0, nowMs: threeDaysMs }),
-  )
-  .extend("reclaimJustUnderThreeDays", () =>
-    shouldReclaim({ remoteBranchExists: true, lastUsedMtimeMs: 0, nowMs: threeDaysMs - 1 }),
-  )
-  .extend("presenceForExactRef", () =>
-    remoteBranchPresentIn("abc123\trefs/heads/feature/x\n", "feature/x"),
-  )
-  .extend("presenceForPrefixOnlyRef", () =>
-    remoteBranchPresentIn("abc123\trefs/heads/feature/x-extra\n", "feature/x"),
-  )
-  .extend("presenceForEmptyOutput", () => remoteBranchPresentIn("", "feature/x"));
-
 describe("shouldReclaim", () => {
+  const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
+
+  const it = test
+    .extend("reclaimWithUnknownRemote", () =>
+      shouldReclaim({ remoteBranchExists: null, lastUsedMtimeMs: 0, nowMs: threeDaysMs * 10 }))
+    .extend("reclaimWithVanishedRemote", () =>
+      shouldReclaim({ remoteBranchExists: false, lastUsedMtimeMs: Date.now(), nowMs: Date.now() }),
+    )
+    .extend("reclaimWithUnreadableMarker", () =>
+      shouldReclaim({ remoteBranchExists: true, lastUsedMtimeMs: null, nowMs: Date.now() }),
+    )
+    .extend("reclaimAtExactlyThreeDays", () =>
+      shouldReclaim({ remoteBranchExists: true, lastUsedMtimeMs: 0, nowMs: threeDaysMs }),
+    )
+    .extend("reclaimJustUnderThreeDays", () =>
+      shouldReclaim({ remoteBranchExists: true, lastUsedMtimeMs: 0, nowMs: threeDaysMs - 1 }),
+    );
+
   it("リモート存在確認に失敗したら保守側で回収しない", ({ reclaimWithUnknownRemote }) => {
     expect(reclaimWithUnknownRemote).toStrictEqual(false);
   });
@@ -50,6 +43,14 @@ describe("shouldReclaim", () => {
 });
 
 describe("remoteBranchPresentIn", () => {
+  const it = test
+    .extend("presenceForExactRef", () =>
+      remoteBranchPresentIn("abc123\trefs/heads/feature/x\n", "feature/x"))
+    .extend("presenceForPrefixOnlyRef", () =>
+      remoteBranchPresentIn("abc123\trefs/heads/feature/x-extra\n", "feature/x"),
+    )
+    .extend("presenceForEmptyOutput", () => remoteBranchPresentIn("", "feature/x"));
+
   it("タブ区切りの完全修飾 ref の末尾一致で存在を判定する", ({ presenceForExactRef }) => {
     expect(presenceForExactRef).toStrictEqual(true);
   });

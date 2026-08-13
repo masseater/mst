@@ -25,11 +25,11 @@ import type { ESTree } from "@oxlint/plugins";
 const NUMBER_TYPE_NODE = "TSNumberKeyword";
 
 const namesNumberKey = (node: ESTree.MemberExpression, scopeAt: ScopeLookup): boolean => {
-  const named = node.property;
-  if (named.type === "Literal") return typeof named.value === "number";
-  if (named.type !== "Identifier") return false;
+  const propertyNode = node.property;
+  if (propertyNode.type === "Literal") return typeof propertyNode.value === "number";
+  if (propertyNode.type !== "Identifier") return false;
 
-  const binding = resolveBinding(scopeAt(named), named.name);
+  const binding = resolveBinding(scopeAt(propertyNode), propertyNode.name);
   return (
     binding?.defs.some((definition) => {
       if (definition.name.typeAnnotation?.typeAnnotation.type === NUMBER_TYPE_NODE) return true;
@@ -79,48 +79,48 @@ export const noReceiverMutation = createDontReviewItRule({
         ]),
     );
 
-    const mutatingNamesOf = memoize((nodeType: string): ReadonlySet<string> | null => {
-      const imported = importedNames().get(nodeType) ?? null;
-      const className = imported === null ? nodeType : imported.name;
+    const mutatingNamesOf = memoize((typeName: string): ReadonlySet<string> | null => {
+      const imported = importedNames().get(typeName) ?? null;
+      const className = imported === null ? typeName : imported.exported;
       const found = classModulesFor({
         file,
         source: inspection.sourceCode.text,
         workspaceRoot: findWorkspaceRoot(dirname(file)),
         imported,
       }).flatMap((module) => {
-        const spelledNames = mutatingMethodNamesIn({ ...module, className });
-        return spelledNames === null ? [] : [...spelledNames];
+        const mutatingNames = mutatingMethodNamesIn({ ...module, className });
+        return mutatingNames === null ? [] : [...mutatingNames];
       });
       return found.length === 0 ? null : new Set(found);
     });
 
-    const writesReceiverThrough = (nodeType: string): boolean =>
-      ownedNames().has(nodeType)
-        ? (mutatingNamesOf(nodeType)?.size ?? 0) > 0
-        : MUTATING_BUILTIN_TYPE_NAMES.has(nodeType);
+    const writesReceiverThrough = (typeName: string): boolean =>
+      ownedNames().has(typeName)
+        ? (mutatingNamesOf(typeName)?.size ?? 0) > 0
+        : MUTATING_BUILTIN_TYPE_NAMES.has(typeName);
 
-    const reportNamedReceiver = (asked: {
+    const reportNamedReceiver = (namedReceiver: {
       readonly node: ESTree.MemberExpression;
       readonly type: string;
       readonly method: string;
     }): void => {
-      const { node, type: nodeType, method } = asked;
-      if (ownedNames().has(nodeType)) {
-        if (mutatingNamesOf(nodeType)?.has(method) !== true) return;
+      const { node, type, method } = namedReceiver;
+      if (ownedNames().has(type)) {
+        if (mutatingNamesOf(type)?.has(method) !== true) return;
         inspection.report({
           node: node.property,
           messageId: "declaredClassMutation",
-          data: { type: nodeType, method },
+          data: { type, method },
         });
         return;
       }
 
-      const member = mutatingBuiltinMemberOf({ type: nodeType, method });
+      const member = mutatingBuiltinMemberOf({ type, method });
       if (member === null) return;
       inspection.report({
         node: node.property,
         messageId: member.sink ? "sinkReceiverMutation" : "builtinReceiverMutation",
-        data: { type: nodeType, method, derivation: member.derivation },
+        data: { type, method, derivation: member.derivation },
       });
     };
 

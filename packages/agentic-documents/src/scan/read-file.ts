@@ -1,5 +1,7 @@
 import { readdir, readFile, lstat } from "node:fs/promises";
 
+import { isPlainObject } from "es-toolkit";
+
 import type { Stats } from "node:fs";
 
 const NOT_FOUND_CODE = "ENOENT";
@@ -34,8 +36,10 @@ export const readTextOrNull = async (absolutePath: string): Promise<string | nul
 
 export const directoryNamesIn = async (absolutePath: string): Promise<readonly string[]> => {
   try {
-    const listedEntries = await readdir(absolutePath, { withFileTypes: true });
-    return listedEntries.filter((listed) => listed.isDirectory()).map((listed) => listed.name);
+    const directoryChildren = await readdir(absolutePath, { withFileTypes: true });
+    return directoryChildren
+      .filter((directoryChild) => directoryChild.isDirectory())
+      .map((subdirectory) => subdirectory.name);
   } catch (failure) {
     if (isAbsent(failure)) return [];
     throw failure;
@@ -48,16 +52,13 @@ export const readJsonObjectOrNull = async (
   const raw = await readTextOrNull(absolutePath);
   if (raw === null) return null;
 
-  const parsedNode: unknown = JSON.parse(raw);
-  if (typeof parsedNode !== "object" || parsedNode === null || Array.isArray(parsedNode))
-    return null;
-
-  return parsedNode as Record<string, unknown>;
+  const parsedJson: unknown = JSON.parse(raw);
+  return isPlainObject(parsedJson) ? parsedJson : null;
 };
 
-export const nonEmptyStringOrNull = (held: unknown): string | null => {
-  if (typeof held !== "string") return null;
+export const nonEmptyStringOrNull = (candidateString: unknown): string | null => {
+  if (typeof candidateString !== "string") return null;
 
-  const trimmed = held.trim();
+  const trimmed = candidateString.trim();
   return trimmed === "" ? null : trimmed;
 };

@@ -1,4 +1,4 @@
-import { isJsonObject } from "../restricted-targets/restricted-entries.ts";
+import { isNamedFields } from "../named-fields.ts";
 
 const DEPENDENCY_SECTIONS: readonly string[] = [
   "dependencies",
@@ -47,7 +47,7 @@ const packageNameOf = (declaration: {
 };
 
 const sectionDependencies = (section: unknown): readonly DeclaredDependency[] => {
-  if (!isJsonObject(section)) return [];
+  if (!isNamedFields(section)) return [];
 
   return Object.entries(section).flatMap(([declaredName, declaredValue]) => {
     if (typeof declaredValue !== "string") return [];
@@ -57,6 +57,6 @@ const sectionDependencies = (section: unknown): readonly DeclaredDependency[] =>
 };
 
 export const declaredDependenciesIn = (manifest: unknown): readonly DeclaredDependency[] =>
-  isJsonObject(manifest)
+  isNamedFields(manifest)
     ? DEPENDENCY_SECTIONS.flatMap((section) => sectionDependencies(manifest[section]))
     : [];

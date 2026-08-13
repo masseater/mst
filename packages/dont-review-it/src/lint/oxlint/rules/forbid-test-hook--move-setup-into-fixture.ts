@@ -1,6 +1,7 @@
 import { uniq, uniqBy } from "es-toolkit";
 
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { resolveBinding, type ScopeLookup } from "../lib/resolved-bindings.ts";
 import {
   moduleDeclarationsOf,
@@ -168,10 +169,10 @@ const boundReports = (reached: {
   );
 
 const namespaceReports = (
-  members: ReadonlySet<ESTree.MemberExpression>,
+  members: readonly ESTree.MemberExpression[],
   reading: HookReading & { readonly namespaces: ReadonlySet<Variable> },
 ): readonly Report[] =>
-  [...members].flatMap((member) => {
+  members.flatMap((member) => {
     const named = namespaceHookOf(member, reading);
     if (named === null) return [];
     return [{ node: member, messageId: "namespaceTestHook", data: { hook: named } }];
@@ -194,10 +195,10 @@ const reachesHookThrough = (reading: {
 };
 
 const calleeReports = (
-  calls: ReadonlySet<ESTree.CallExpression>,
+  calls: readonly ESTree.CallExpression[],
   reading: { readonly module: ModuleDeclarations; readonly hookNames: ReadonlySet<string> },
 ): readonly Report[] => {
-  const called = [...calls].flatMap((call) => {
+  const called = calls.flatMap((call) => {
     const callee = unwrapSubject(call.callee);
     return callee.type === "Identifier" ? [{ call, name: callee.name }] : [];
   });
@@ -251,16 +252,8 @@ export const forbidTestHook = createDontReviewItRule({
     const hookNames = hookNamesFrom(inspection.options);
     const scopeAt: ScopeLookup = (node) => inspection.sourceCode.getScope(node);
     const reading = { hookNames, scopeAt };
-    const members = new Set<ESTree.MemberExpression>();
-    const calls = new Set<ESTree.CallExpression>();
 
     return {
-      MemberExpression(node: ESTree.MemberExpression) {
-        members.add(node);
-      },
-      CallExpression(node: ESTree.CallExpression) {
-        calls.add(node);
-      },
       "Program:exit"(node: ESTree.Program) {
         const outermost = scopeAt(node);
         const variables = scopesUnder(outermost).flatMap((scope) => scope.variables);
@@ -270,8 +263,8 @@ export const forbidTestHook = createDontReviewItRule({
         const reports = [
           ...injectedReports(outermost, hookNames),
           ...boundReports({ imported, aliased }),
-          ...namespaceReports(members, { ...reading, namespaces }),
-          ...calleeReports(calls, {
+          ...namespaceReports(nodesOfType(node, "MemberExpression"), { ...reading, namespaces }),
+          ...calleeReports(nodesOfType(node, "CallExpression"), {
             hookNames,
             module: moduleDeclarationsOf(inspection.filename, node.body),
           }),

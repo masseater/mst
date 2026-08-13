@@ -2,6 +2,9 @@ const RESTART_REASONS = ["code-updated", "idle"] as const;
 
 type RestartReason = (typeof RESTART_REASONS)[number];
 
+const restartReasonOf = (aborted: unknown): RestartReason | null =>
+  RESTART_REASONS.find((known) => known === aborted) ?? null;
+
 export type RestartRequest = {
   readonly request: (reason: RestartReason) => void;
   readonly requested: () => RestartReason | null;
@@ -10,14 +13,14 @@ export type RestartRequest = {
 export const createRestartRequest = (latch: {
   readonly onRequest: (reason: RestartReason) => void;
 }): RestartRequest => {
-  const heldState = new Map<string, RestartReason>();
+  const heldLatch = new AbortController();
   return {
     request: (reason) => {
-      if (heldState.has("reason")) return;
-      heldState.set("reason", reason);
+      if (heldLatch.signal.aborted) return;
+      heldLatch.abort(reason);
       latch.onRequest(reason);
     },
-    requested: () => heldState.get("reason") ?? null,
+    requested: () => restartReasonOf(heldLatch.signal.reason),
   };
 };
 
