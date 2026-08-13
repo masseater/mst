@@ -1,14 +1,11 @@
-import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { attempt } from "es-toolkit";
-import { describe, expect, test, vi } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { gitExcludePatterns } from "./git-exclude-patterns.ts";
-
-vi.mock(import("node:child_process"), { spy: true });
 
 describe("gitExcludePatterns", () => {
   describe("a repository carrying a global excludes file, an info/exclude and a .gitignore", () => {
@@ -16,12 +13,10 @@ describe("gitExcludePatterns", () => {
       const home = mkdtempSync(join(tmpdir(), "mst-git-excludes-home-"));
       writeFileSync(join(home, "global-ignore"), "# machine wide\n.agents/\n");
       writeFileSync(
-        join(home, "gitconfig"),
+        join(home, ".gitconfig"),
         `[core]\n\texcludesFile = ${join(home, "global-ignore")}\n`,
       );
       const env = {
-        GIT_CONFIG_GLOBAL: join(home, "gitconfig"),
-        GIT_CONFIG_SYSTEM: "/dev/null",
         HOME: home,
         PATH: process.env.PATH ?? "",
       };
@@ -49,8 +44,6 @@ describe("gitExcludePatterns", () => {
       return gitExcludePatterns({
         cwd: home,
         env: {
-          GIT_CONFIG_GLOBAL: join(home, "gitconfig"),
-          GIT_CONFIG_SYSTEM: "/dev/null",
           HOME: home,
           PATH: process.env.PATH ?? "",
           XDG_CONFIG_HOME: configHome,
@@ -71,8 +64,6 @@ describe("gitExcludePatterns", () => {
       return gitExcludePatterns({
         cwd: home,
         env: {
-          GIT_CONFIG_GLOBAL: join(home, "gitconfig"),
-          GIT_CONFIG_SYSTEM: "/dev/null",
           HOME: home,
           PATH: process.env.PATH ?? "",
         },
@@ -90,8 +81,6 @@ describe("gitExcludePatterns", () => {
       return gitExcludePatterns({
         cwd: home,
         env: {
-          GIT_CONFIG_GLOBAL: join(home, "gitconfig"),
-          GIT_CONFIG_SYSTEM: "/dev/null",
           HOME: home,
           PATH: process.env.PATH ?? "",
         },
@@ -110,8 +99,6 @@ describe("gitExcludePatterns", () => {
         gitExcludePatterns({
           cwd: homelessSandbox,
           env: {
-            GIT_CONFIG_GLOBAL: join(homelessSandbox, "gitconfig"),
-            GIT_CONFIG_SYSTEM: "/dev/null",
             PATH: process.env.PATH ?? "",
           },
         }),
@@ -120,8 +107,6 @@ describe("gitExcludePatterns", () => {
         gitExcludePatterns({
           cwd: homelessSandbox,
           env: {
-            GIT_CONFIG_GLOBAL: join(homelessSandbox, "gitconfig"),
-            GIT_CONFIG_SYSTEM: "/dev/null",
             HOME: homedir(),
             PATH: process.env.PATH ?? "",
           },
@@ -139,17 +124,14 @@ describe("gitExcludePatterns", () => {
   describe("a git that cannot be started at all", () => {
     const it = test.extend("unstartableGitFailure", () => {
       const home = mkdtempSync(join(tmpdir(), "mst-git-excludes-home-"));
-      vi.mocked(execFileSync).mockImplementationOnce(() => {
-        throw new Error("git could not be started at all");
-      });
+      const searchPath = mkdtempSync(join(tmpdir(), "mst-git-excludes-path-"));
+      writeFileSync(join(searchPath, "git"), "#!/bin/sh\nkill -TERM $$\n", { mode: 0o755 });
       const [unaskableGit] = attempt<readonly string[], Error>(() =>
         gitExcludePatterns({
           cwd: home,
           env: {
-            GIT_CONFIG_GLOBAL: join(home, "gitconfig"),
-            GIT_CONFIG_SYSTEM: "/dev/null",
             HOME: home,
-            PATH: process.env.PATH ?? "",
+            PATH: searchPath,
           },
         }),
       );
@@ -166,14 +148,17 @@ describe("gitExcludePatterns", () => {
   describe("a revision answer naming only one path", () => {
     const it = test.extend("patterns", () => {
       const home = mkdtempSync(join(tmpdir(), "mst-git-excludes-home-"));
-      vi.mocked(execFileSync).mockReturnValueOnce("").mockReturnValueOnce("/the-only-line\n");
+      const searchPath = mkdtempSync(join(tmpdir(), "mst-git-excludes-path-"));
+      writeFileSync(
+        join(searchPath, "git"),
+        '#!/bin/sh\n[ "$1" = "rev-parse" ] && echo /the-only-line\nexit 0\n',
+        { mode: 0o755 },
+      );
       return gitExcludePatterns({
         cwd: home,
         env: {
-          GIT_CONFIG_GLOBAL: join(home, "gitconfig"),
-          GIT_CONFIG_SYSTEM: "/dev/null",
           HOME: home,
-          PATH: process.env.PATH ?? "",
+          PATH: searchPath,
         },
       });
     });

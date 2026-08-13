@@ -1,5 +1,6 @@
 import { dirname, resolve } from "node:path";
 
+import { LINT_SEVERITY } from "@mst/lint-rule-authoring";
 import { uniq } from "es-toolkit";
 
 import { createDontReviewItRule } from "../../../create-rule.ts";
@@ -39,7 +40,7 @@ const DETERMINISM_GATE_RULES: readonly string[] = [
 
 const RANGE_REOPENING_SPELLINGS: readonly string[] = ["eslint-enable", "oxlint-enable"];
 
-const SILENCED_LEVELS: ReadonlySet<string> = new Set(["off", "warn"]);
+const SILENCED_LEVELS: ReadonlySet<string> = new Set([LINT_SEVERITY.OFF, LINT_SEVERITY.WARN]);
 
 const EVERY_RULE_REACHING_HERE = "every rule reaching this file (this gate among them)";
 

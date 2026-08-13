@@ -2,7 +2,6 @@ import { parseSync } from "oxc-parser";
 import { describe, expect, test } from "vite-plus/test";
 
 import {
-  ASSERTION_ENTRY_NAME,
   assertionEntryCallOf,
   isAssertionCall,
   isAssertionChain,
@@ -11,16 +10,6 @@ import {
 } from "./assertion-entries.ts";
 
 import type { ESTree } from "@oxlint/plugins";
-
-describe("ASSERTION_ENTRY_NAME", () => {
-  describe("the name the assertion entry is reached under", () => {
-    const it = test.extend("entryName", () => ASSERTION_ENTRY_NAME);
-
-    it("spells the entry the way the runner injects it", ({ entryName }) => {
-      expect(entryName).toBe("expect");
-    });
-  });
-});
 
 describe("isAssertionEntryReference", () => {
   describe("the entry standing on its own", () => {

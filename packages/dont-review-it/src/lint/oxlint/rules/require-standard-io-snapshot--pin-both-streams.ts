@@ -1,6 +1,6 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
 import { nodesOfType } from "../lib/nodes-of-type.ts";
-import { ASSERTION_ENTRY_NAME } from "../lib/spec-syntax/assertion-entries.ts";
+import { isAssertionEntryReference } from "../lib/spec-syntax/assertion-entries.ts";
 import {
   fixtureDeclarationsOf,
   fixtureDependenciesOf,
@@ -45,12 +45,7 @@ const snapshotSubjectOf = (node: ESTree.CallExpression): ESTree.Expression | nul
   if (callee.type !== "MemberExpression" || callee.property.type !== "Identifier") return null;
   if (!SNAPSHOT_MATCHER_NAMES.has(callee.property.name)) return null;
   if (callee.object.type !== "CallExpression") return null;
-  if (
-    callee.object.callee.type !== "Identifier" ||
-    callee.object.callee.name !== ASSERTION_ENTRY_NAME
-  ) {
-    return null;
-  }
+  if (!isAssertionEntryReference(callee.object.callee)) return null;
   const [subject] = callee.object.arguments;
   if (subject === undefined || subject.type === "SpreadElement") return null;
   return subject;

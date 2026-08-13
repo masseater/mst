@@ -2,6 +2,7 @@ import { isPlainObject } from "es-toolkit";
 
 import {
   comparisonFrom,
+  decodedPreviousSource,
   decodedSource,
   type RepositoryComparison,
 } from "./repository-comparison.ts";
@@ -190,13 +191,15 @@ export const compareGitHubPullRequest = async ({
   const { mergeBaseRevision, files } = comparedFrom(
     await request(`/repos/${repository}/compare/${baseRevision}...${headRevision}`),
   );
-  const contentsAt = (revision: string) => async (path: string) =>
-    decodedSource(
-      path,
-      decodedContent(
-        await request(`/repos/${repository}/contents/${encodeURI(path)}?ref=${revision}`),
-      ),
-    );
+  const contentsAt =
+    (revision: string, decode: (path: string, sourceBytes: Uint8Array) => string | null) =>
+    async (path: string) =>
+      decode(
+        path,
+        decodedContent(
+          await request(`/repos/${repository}/contents/${encodeURI(path)}?ref=${revision}`),
+        ),
+      );
 
   return {
     repositoryRoot,
@@ -205,7 +208,12 @@ export const compareGitHubPullRequest = async ({
     files: await comparisonFrom({
       inventoryOutput: files.map(inventoryEntryOf).join(""),
       diff: files.map(patchEntryOf).join(""),
-      sources: { base: contentsAt(mergeBaseRevision), head: contentsAt(headRevision) },
+      sources: {
+        base: contentsAt(mergeBaseRevision, (_path, sourceBytes) =>
+          decodedPreviousSource(sourceBytes),
+        ),
+        head: contentsAt(headRevision, decodedSource),
+      },
     }),
   };
 };

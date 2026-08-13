@@ -226,6 +226,114 @@ describe("startLintTelemetry", () => {
   });
 });
 
+describe("measureStage", () => {
+  describe("a stage measured in an environment that never asked for durations", () => {
+    describe("what the measured stage produced", () => {
+      const it = test.extend("stageProductWithoutDurations", async () => {
+        vi.stubEnv("MST_LINT_RULE_DURATION", undefined);
+        vi.stubEnv("OTEL_SDK_DISABLED", undefined);
+        onTestFinished(() => {
+          process.exitCode = undefined;
+          process.removeAllListeners("beforeExit");
+          metrics.disable();
+        });
+        vi.resetModules();
+        const telemetry = await import("./lint-telemetry.ts");
+        return telemetry.measureStage("canonical.scope", () => 41 + 1);
+      });
+
+      it("comes back to whoever measured it", ({ stageProductWithoutDurations }) => {
+        expect(stageProductWithoutDurations).toBe(42);
+      });
+    });
+
+    describe("the exporter behind a stage nobody asked to measure", () => {
+      const it = test.extend("exportsWithoutDurations", async () => {
+        vi.stubEnv("MST_LINT_RULE_DURATION", undefined);
+        vi.stubEnv("OTEL_SDK_DISABLED", undefined);
+        onTestFinished(() => {
+          process.exitCode = undefined;
+          process.removeAllListeners("beforeExit");
+          metrics.disable();
+        });
+        vi.resetModules();
+        const exporterModule = await import("@opentelemetry/exporter-metrics-otlp-http");
+        const exported = vi.spyOn(exporterModule.OTLPMetricExporter.prototype, "export");
+        const telemetry = await import("./lint-telemetry.ts");
+        telemetry.measureStage("canonical.scope", () => 41 + 1);
+        return exported;
+      });
+
+      it("is handed nothing at all", ({ exportsWithoutDurations }) => {
+        expect(exportsWithoutDurations).toHaveBeenCalledTimes(0);
+      });
+    });
+  });
+
+  describe("a stage measured in an environment that asked for durations", () => {
+    describe("what the measured stage produced", () => {
+      const it = test.extend("stageProductWithDurations", async () => {
+        vi.stubEnv("MST_LINT_RULE_DURATION", "1");
+        vi.stubEnv("OTEL_SDK_DISABLED", undefined);
+        onTestFinished(() => {
+          process.exitCode = undefined;
+          process.removeAllListeners("beforeExit");
+          metrics.disable();
+        });
+        vi.resetModules();
+        const telemetry = await import("./lint-telemetry.ts");
+        return telemetry.measureStage("canonical.scope", () => 41 + 1);
+      });
+
+      it("comes back to whoever measured it", ({ stageProductWithDurations }) => {
+        expect(stageProductWithDurations).toBe(42);
+      });
+    });
+
+    describe("the metrics the exporter was handed as the process wound down", () => {
+      const it = test.extend("windDownStageMetricNames", async () => {
+        vi.stubEnv("MST_LINT_RULE_DURATION", "1");
+        vi.stubEnv("OTEL_SDK_DISABLED", undefined);
+        onTestFinished(() => {
+          process.exitCode = undefined;
+          process.removeAllListeners("beforeExit");
+          metrics.disable();
+        });
+        vi.resetModules();
+        const exporterModule = await import("@opentelemetry/exporter-metrics-otlp-http");
+        const exported = vi.fn<(metricNames: readonly string[]) => void>();
+        vi.spyOn(exporterModule.OTLPMetricExporter.prototype, "export").mockImplementation(
+          (batch, resultCallback) => {
+            exported(
+              batch.scopeMetrics.flatMap((scope) =>
+                scope.metrics.map((metric) => metric.descriptor.name),
+              ),
+            );
+            resultCallback({ code: 0 });
+          },
+        );
+        const stopped = vi
+          .spyOn(exporterModule.OTLPMetricExporter.prototype, "shutdown")
+          .mockResolvedValue();
+        const telemetry = await import("./lint-telemetry.ts");
+        telemetry.measureStage("canonical.scope", () => 41 + 1);
+        process.emit("beforeExit", 0);
+        await vi.waitUntil(() => stopped.mock.calls.length > 0);
+        return exported;
+      });
+
+      it("carry the stage under its own name alongside the run it belonged to", ({
+        windDownStageMetricNames,
+      }) => {
+        expect(windDownStageMetricNames).toHaveBeenCalledExactlyOnceWith([
+          "lint.stage.duration",
+          "lint.run.duration",
+        ]);
+      });
+    });
+  });
+});
+
 describe("ruleDuration", () => {
   describe("the histogram behind a second call", () => {
     const it = test

@@ -1,3 +1,4 @@
+import { ABORT_SIGNAL_EVENT } from "../runtime/event-names.ts";
 import { splitFrames } from "./sse-frames.ts";
 
 import type { FrameSink } from "./frame-sink.ts";
@@ -20,7 +21,7 @@ export const createStreamReader = (reading: {
         reject(new Error("SSE read timeout"));
       }, reading.readTimeoutMs);
       timeoutHalt.signal.addEventListener(
-        "abort",
+        ABORT_SIGNAL_EVENT.abort,
         () => {
           clearTimeout(timer);
         },

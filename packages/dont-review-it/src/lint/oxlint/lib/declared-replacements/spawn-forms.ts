@@ -2,6 +2,13 @@ import { listedUnder } from "./option-lists.ts";
 
 import type { Options } from "@oxlint/plugins";
 
+/** @canonical-values dont-review-it.child-process-export */
+const CHILD_PROCESS_EXPORTS = ["spawn"] as const;
+
+const CHILD_PROCESS_EXPORT = {
+  spawn: CHILD_PROCESS_EXPORTS[0],
+} as const;
+
 export const SPAWN_TARGET_NAME = "name";
 
 export const SPAWN_TARGET_LINE = "commandLine";
@@ -21,7 +28,12 @@ export const SPAWN_FORM_SCHEMA = {
       specifier: { type: "string" },
       exported: { type: "string" },
       position: { type: "integer", minimum: 0 },
-      carries: { type: "string", enum: [SPAWN_TARGET_NAME, SPAWN_TARGET_LINE] },
+      carries: {
+        oneOf: [
+          { type: "string", const: SPAWN_TARGET_NAME },
+          { type: "string", const: SPAWN_TARGET_LINE },
+        ],
+      },
     },
     required: ["specifier", "exported", "carries"],
     additionalProperties: false,
@@ -52,7 +64,12 @@ export const DEFAULT_SPAWN_FORMS: readonly SpawnForm[] = [
     position: 0,
     carries: SPAWN_TARGET_NAME,
   },
-  { specifier: "node:child_process", exported: "spawn", position: 0, carries: SPAWN_TARGET_NAME },
+  {
+    specifier: "node:child_process",
+    exported: CHILD_PROCESS_EXPORT.spawn,
+    position: 0,
+    carries: SPAWN_TARGET_NAME,
+  },
   {
     specifier: "node:child_process",
     exported: "spawnSync",

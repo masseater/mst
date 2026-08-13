@@ -1,6 +1,6 @@
 import { groupBy, zip } from "es-toolkit";
 
-import { FUNCTION_NODE_TYPES } from "../node-kinds.ts";
+import { isFunctionNodeType } from "../node-kinds.ts";
 import { isAssertionChain } from "./assertion-entries.ts";
 import { SNAPSHOT_MATCHERS } from "./matcher-vocabulary.ts";
 import { externalRecordKeyOf } from "./snapshot-records.ts";
@@ -37,7 +37,6 @@ export type SnapshotMatcherSite = {
 };
 
 const ORDER_BREAKING_TYPES: ReadonlySet<string> = new Set([
-  ...FUNCTION_NODE_TYPES,
   "ConditionalExpression",
   "DoWhileStatement",
   "ForInStatement",
@@ -131,9 +130,10 @@ const breaksOrder = (ancestors: readonly ESTree.Node[]): boolean => {
 
   const inside = ancestors.slice(scopeAt + 1);
   const [head] = inside;
-  const writtenBody =
-    head !== undefined && FUNCTION_NODE_TYPES.has(head.type) ? inside.slice(1) : inside;
-  return writtenBody.some((node) => ORDER_BREAKING_TYPES.has(node.type));
+  const scopeNodes = head !== undefined && isFunctionNodeType(head.type) ? inside.slice(1) : inside;
+  return scopeNodes.some(
+    (node) => isFunctionNodeType(node.type) || ORDER_BREAKING_TYPES.has(node.type),
+  );
 };
 
 export const snapshotMatcherSiteOf = (
@@ -270,9 +270,9 @@ export const entryKeysOf = (
     if (site.scopes.some((scope) => scope.kind === "runtime")) return { kind: "unresolvable" };
     if (site.scopes.some((scope) => scope.kind === "unreadable")) return { kind: "unreadable" };
 
-    const namedKeys = spelled.get(site) ?? [];
-    return namedKeys.length === placementsOf(site).length
-      ? { kind: "spelled", keys: namedKeys }
+    const snapshotKeys = spelled.get(site) ?? [];
+    return snapshotKeys.length === placementsOf(site).length
+      ? { kind: "spelled", keys: snapshotKeys }
       : { kind: "unresolvable" };
   });
 };

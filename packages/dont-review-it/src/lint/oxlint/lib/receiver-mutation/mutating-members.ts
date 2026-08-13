@@ -76,25 +76,37 @@ const DERIVED_VALUE_GROUPS: readonly MemberGroup[] = [
 const SINK_DERIVATION =
   "A write to a sink leaves the program, so there is no new value to derive here.";
 
+/** @canonical-values dont-review-it.stream-sink-member */
+const STREAM_SINK_MEMBERS = ["abort", "close", "write", "enqueue", "error", "terminate"] as const;
+
+const STREAM_SINK_MEMBER = {
+  abort: STREAM_SINK_MEMBERS[0],
+  close: STREAM_SINK_MEMBERS[1],
+  write: STREAM_SINK_MEMBERS[2],
+  enqueue: STREAM_SINK_MEMBERS[3],
+  error: STREAM_SINK_MEMBERS[4],
+  terminate: STREAM_SINK_MEMBERS[5],
+} as const;
+
 const SINK_GROUPS: readonly MemberGroup[] = [
   {
     type: "WritableStreamDefaultWriter",
-    methods: ["abort", "close", "write"],
+    methods: [STREAM_SINK_MEMBER.abort, STREAM_SINK_MEMBER.close, STREAM_SINK_MEMBER.write],
     derivation: SINK_DERIVATION,
   },
   {
     type: "ReadableStreamDefaultController",
-    methods: ["close", "enqueue", "error"],
+    methods: [STREAM_SINK_MEMBER.close, STREAM_SINK_MEMBER.enqueue, STREAM_SINK_MEMBER.error],
     derivation: SINK_DERIVATION,
   },
   {
     type: "ReadableByteStreamController",
-    methods: ["close", "enqueue", "error"],
+    methods: [STREAM_SINK_MEMBER.close, STREAM_SINK_MEMBER.enqueue, STREAM_SINK_MEMBER.error],
     derivation: SINK_DERIVATION,
   },
   {
     type: "TransformStreamDefaultController",
-    methods: ["enqueue", "error", "terminate"],
+    methods: [STREAM_SINK_MEMBER.enqueue, STREAM_SINK_MEMBER.error, STREAM_SINK_MEMBER.terminate],
     derivation: SINK_DERIVATION,
   },
 ];

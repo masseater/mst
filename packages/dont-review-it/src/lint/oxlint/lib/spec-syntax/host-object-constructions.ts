@@ -7,8 +7,11 @@ const DEFAULT_HOST_OBJECT_TYPES: readonly string[] = ["Request", "Response"];
 
 const DEFAULT_RUNTIME_MODULES: readonly string[] = ["undici"];
 
+/** @canonical-values dont-review-it.response-factory-member */
+const RESPONSE_FACTORY_MEMBERS = ["error", "json", "redirect"] as const;
+
 const HOST_OBJECT_FACTORY_MEMBERS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
-  ["Response", new Set(["error", "json", "redirect"])],
+  ["Response", new Set(RESPONSE_FACTORY_MEMBERS)],
 ]);
 
 const HOST_OBJECT_TYPES_OPTION = "hostObjectTypes";

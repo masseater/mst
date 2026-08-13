@@ -11,9 +11,6 @@ export type LiteralNode =
   | ESTree.RegExpLiteral
   | ESTree.StringLiteral;
 
-export const ancestorsOf = (node: ESTree.Node): readonly ESTree.Node[] =>
-  node.parent === null ? [] : [...ancestorsOf(node.parent), node.parent];
-
 export const literalValue = (node: LiteralNode): CanonicalValue | null => {
   const spelling = node.value;
   if (
@@ -78,6 +75,8 @@ const isModuleSourcePosition = (parent: ESTree.Node, node: ESTree.Node): boolean
     case "ImportExpression":
     case "TSImportType":
       return parent.source === node;
+    case "TSExternalModuleReference":
+      return parent.expression === node;
     case "ExportAllDeclaration":
       return parent.source === node || parent.exported === node;
     default:
@@ -103,11 +102,14 @@ const isModuleNamePosition = (parent: ESTree.Node, node: ESTree.Node): boolean |
 export const isModuleSyntaxPosition = (parent: ESTree.Node, node: ESTree.Node): boolean =>
   isModuleSourcePosition(parent, node) ?? isModuleNamePosition(parent, node) ?? false;
 
+const isKeySelectionTypeName = (typeName: string): boolean =>
+  KEY_SELECTION_TYPE_NAMES.has(typeName);
+
 export const isKeySelectorArgument = (ancestors: readonly ESTree.Node[]): boolean => {
   for (const [index, ancestor] of ancestors.entries()) {
     if (ancestor.type !== "TSTypeReference") continue;
     if (ancestor.typeName.type !== "Identifier") continue;
-    if (!KEY_SELECTION_TYPE_NAMES.has(ancestor.typeName.name)) continue;
+    if (!isKeySelectionTypeName(ancestor.typeName.name)) continue;
     const instantiation = ancestors[index + 1] as ESTree.TSTypeParameterInstantiation;
     if (instantiation.params[1] === ancestors[index + 2]) return true;
   }

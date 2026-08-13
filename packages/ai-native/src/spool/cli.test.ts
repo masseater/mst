@@ -42,21 +42,22 @@ const PASSTHROUGH_SCRIPT = 'console.log("raw through"); process.exit(4);';
 
 describe("spool cli", () => {
   describe("the entry module", () => {
-    const it = test.extend("theExitCodeTheEntryLeftBehind", async ({}, { onCleanup }) => {
+    const it = test.extend("theCallTheEntryMadeToRunSpool", async ({}, { onCleanup }) => {
       const inheritedCode = process.exitCode;
       onCleanup(() => {
         process.exitCode = inheritedCode;
       });
-      vi.mocked(runSpool).mockResolvedValue(7);
       await import("./cli.ts");
-      const { exitCode } = process;
-      return exitCode;
+      return vi.mocked(runSpool);
     });
 
-    it("carries the code runSpool resolved into the exit code of the process", ({
-      theExitCodeTheEntryLeftBehind,
+    it("hands runSpool the arguments and the streams of the process it runs in", ({
+      theCallTheEntryMadeToRunSpool,
     }) => {
-      expect(theExitCodeTheEntryLeftBehind).toBe(7);
+      expect(theCallTheEntryMadeToRunSpool).toHaveBeenCalledExactlyOnceWith(process.argv.slice(2), {
+        stdout: process.stdout,
+        stderr: process.stderr,
+      });
     });
   });
 

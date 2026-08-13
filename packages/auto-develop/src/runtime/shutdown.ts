@@ -1,6 +1,7 @@
 import type { Logger } from "../logging/logger.ts";
 
-const SHUTDOWN_SIGNALS = ["SIGINT", "SIGTERM"] as const;
+/** @canonical-values auto-develop.shutdown-signal */
+export const SHUTDOWN_SIGNALS = ["SIGINT", "SIGTERM"] as const;
 
 export type ShutdownSignal = (typeof SHUTDOWN_SIGNALS)[number];
 

@@ -70,6 +70,133 @@ describe("resolvedComparison", () => {
     });
   });
 
+  describe("a checkout with a merge in progress", () => {
+    const it = test
+      .extend("mergeInProgressComparison", async ({}, { onCleanup }) => {
+        const repositoryRoot = join(tmpdir(), "stop-ai-slop-resolved-comparison-merge-in-progress");
+        rmSync(repositoryRoot, { recursive: true, force: true });
+        mkdirSync(join(repositoryRoot, "src"), { recursive: true });
+        onCleanup(() => {
+          rmSync(repositoryRoot, { recursive: true, force: true });
+        });
+        const git = (gitArguments: readonly string[]): string =>
+          execFileSync("git", [...gitArguments], {
+            cwd: repositoryRoot,
+            encoding: "utf8",
+            env: {
+              GIT_AUTHOR_DATE: "1700000000 +0000",
+              GIT_AUTHOR_EMAIL: "stop-ai-slop@example.test",
+              GIT_AUTHOR_NAME: "Stop AI Slop",
+              GIT_COMMITTER_DATE: "1700000000 +0000",
+              GIT_COMMITTER_EMAIL: "stop-ai-slop@example.test",
+              GIT_COMMITTER_NAME: "Stop AI Slop",
+              GIT_CONFIG_GLOBAL: "/dev/null",
+              GIT_CONFIG_SYSTEM: "/dev/null",
+              HOME: repositoryRoot,
+              PATH: process.env.PATH,
+            },
+          });
+
+        git(["init", "--quiet", "--initial-branch=main"]);
+        writeFileSync(join(repositoryRoot, "src/current.ts"), "export const current = true;\n");
+        git(["add", "--all"]);
+        git(["commit", "--quiet", "--message", "snapshot"]);
+        git(["switch", "--quiet", "--create", "feature"]);
+        writeFileSync(join(repositoryRoot, "src/repaired.ts"), "\0binary\0");
+        git(["add", "--all"]);
+        git(["commit", "--quiet", "--message", "snapshot"]);
+        git(["switch", "--quiet", "main"]);
+        writeFileSync(join(repositoryRoot, "src/main-only.ts"), "export const mainOnly = true;\n");
+        git(["add", "--all"]);
+        git(["commit", "--quiet", "--message", "snapshot"]);
+        git(["merge", "--quiet", "--no-commit", "--no-ff", "feature"]);
+        writeFileSync(join(repositoryRoot, "src/repaired.ts"), "export const repaired = true;\n");
+        git(["add", "src/repaired.ts"]);
+
+        return resolvedComparison(repositoryRoot, { repository: undefined, request: null });
+      })
+      .extend("mergeInProgressFeatureTip", async ({}, { onCleanup }) => {
+        const repositoryRoot = join(
+          tmpdir(),
+          "stop-ai-slop-resolved-comparison-merge-in-progress-feature",
+        );
+        rmSync(repositoryRoot, { recursive: true, force: true });
+        mkdirSync(join(repositoryRoot, "src"), { recursive: true });
+        onCleanup(() => {
+          rmSync(repositoryRoot, { recursive: true, force: true });
+        });
+        const git = (gitArguments: readonly string[]): string =>
+          execFileSync("git", [...gitArguments], {
+            cwd: repositoryRoot,
+            encoding: "utf8",
+            env: {
+              GIT_AUTHOR_DATE: "1700000000 +0000",
+              GIT_AUTHOR_EMAIL: "stop-ai-slop@example.test",
+              GIT_AUTHOR_NAME: "Stop AI Slop",
+              GIT_COMMITTER_DATE: "1700000000 +0000",
+              GIT_COMMITTER_EMAIL: "stop-ai-slop@example.test",
+              GIT_COMMITTER_NAME: "Stop AI Slop",
+              GIT_CONFIG_GLOBAL: "/dev/null",
+              GIT_CONFIG_SYSTEM: "/dev/null",
+              HOME: repositoryRoot,
+              PATH: process.env.PATH,
+            },
+          });
+
+        git(["init", "--quiet", "--initial-branch=main"]);
+        writeFileSync(join(repositoryRoot, "src/current.ts"), "export const current = true;\n");
+        git(["add", "--all"]);
+        git(["commit", "--quiet", "--message", "snapshot"]);
+        git(["switch", "--quiet", "--create", "feature"]);
+        writeFileSync(join(repositoryRoot, "src/repaired.ts"), "\0binary\0");
+        git(["add", "--all"]);
+        git(["commit", "--quiet", "--message", "snapshot"]);
+        git(["switch", "--quiet", "main"]);
+        writeFileSync(join(repositoryRoot, "src/main-only.ts"), "export const mainOnly = true;\n");
+        git(["add", "--all"]);
+        git(["commit", "--quiet", "--message", "snapshot"]);
+        git(["merge", "--quiet", "--no-commit", "--no-ff", "feature"]);
+        writeFileSync(join(repositoryRoot, "src/repaired.ts"), "export const repaired = true;\n");
+        git(["add", "src/repaired.ts"]);
+
+        return git(["rev-parse", "feature"]);
+      });
+
+    it("reads the resolved index while a merge is in progress", ({ mergeInProgressComparison }) => {
+      expect(mergeInProgressComparison).toStrictEqual({
+        repositoryRoot: join(tmpdir(), "stop-ai-slop-resolved-comparison-merge-in-progress"),
+        baseRevision: "2f9ca1284d91be6c277f0b4baf015234f3bfc8d1",
+        headRevision: "2efaee1d31f0187056e65c845e898a617d530942",
+        files: [
+          {
+            kind: "added",
+            beforePath: null,
+            afterPath: "src/main-only.ts",
+            beforeSource: null,
+            afterSource: "export const mainOnly = true;\n",
+            addedLines: [1],
+            firstAddedLine: 1,
+          },
+          {
+            kind: "added",
+            beforePath: null,
+            afterPath: "src/repaired.ts",
+            beforeSource: null,
+            afterSource: "export const repaired = true;\n",
+            addedLines: [1],
+            firstAddedLine: 1,
+          },
+        ],
+      });
+    });
+
+    it("does not read the merged branch tip as the compared head", ({
+      mergeInProgressFeatureTip,
+    }) => {
+      expect(mergeInProgressFeatureTip).not.toBe("2efaee1d31f0187056e65c845e898a617d530942\n");
+    });
+  });
+
   describe("a checkout that holds only the merge of a pull request", () => {
     const it = test
       .extend("pullRequestComparison", async ({}, { onCleanup }) => {

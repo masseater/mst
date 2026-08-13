@@ -1,68 +1,48 @@
-import { parseCanonicalValuesAnnotation } from "./annotation.ts";
+import { declarationEntriesAt } from "./declaration-path.ts";
+import { scanCanonicalValuesText } from "./declarations.ts";
+
+import type { CanonicalValuesCatalog } from "./catalog.ts";
+import type { CanonicalValue } from "./fingerprint.ts";
 
 export type AnnotatedDeclarationRange = {
+  readonly binding: string;
   readonly conceptId: string;
+  readonly fingerprint: string;
   readonly start: number;
   readonly end: number;
+  readonly values: readonly CanonicalValue[];
 };
 
-type SourceSpan = {
-  readonly start: number;
-  readonly end: number;
-};
-
-type SourceComment = SourceSpan & {
-  readonly type: string;
-  readonly value: string;
-};
-
-type AnnotatedProgram = {
-  readonly body: readonly SourceSpan[];
-  readonly comments: readonly SourceComment[];
-};
-
-type ParsedSource = {
-  readonly program: AnnotatedProgram;
+export const registeredDeclarationRanges = (input: {
+  readonly catalog: CanonicalValuesCatalog;
+  readonly filename: string;
+  readonly repositoryRoot: string;
   readonly sourceText: string;
+}): readonly AnnotatedDeclarationRange[] => {
+  const declarations = scanCanonicalValuesText(input.sourceText, input.filename).declarations;
+  return declarationEntriesAt(input.catalog, {
+    path: input.filename,
+    repositoryRoot: input.repositoryRoot,
+  }).flatMap((catalogDeclaration) => {
+    const matchesCurrentSource = declarations.some(
+      (declaration) =>
+        declaration.annotationStart === catalogDeclaration.annotationStart &&
+        declaration.binding === catalogDeclaration.binding &&
+        declaration.bindingStart === catalogDeclaration.bindingStart &&
+        declaration.conceptId === catalogDeclaration.conceptId &&
+        declaration.declarationStart === catalogDeclaration.declarationStart &&
+        declaration.declarationEnd === catalogDeclaration.declarationEnd,
+    );
+    if (!matchesCurrentSource) return [];
+    return [
+      {
+        binding: catalogDeclaration.binding,
+        conceptId: catalogDeclaration.conceptId,
+        fingerprint: catalogDeclaration.fingerprint,
+        start: catalogDeclaration.declarationStart,
+        end: catalogDeclaration.declarationEnd,
+        values: catalogDeclaration.values,
+      },
+    ];
+  });
 };
-
-const JSDOC_COMMENT_VALUE_PREFIX = "*";
-
-const isJsDocComment = (comment: SourceComment): boolean =>
-  comment.type === "Block" && comment.value.startsWith(JSDOC_COMMENT_VALUE_PREFIX);
-
-const annotatedDeclarationRange = (
-  { program, sourceText }: ParsedSource,
-  comment: SourceComment,
-): AnnotatedDeclarationRange | null => {
-  if (!isJsDocComment(comment)) return null;
-
-  const annotation = parseCanonicalValuesAnnotation(comment.value);
-  if (annotation === null) return null;
-
-  const nested = program.body.some(
-    (statement) => statement.start <= comment.start && comment.end <= statement.end,
-  );
-  if (nested) return null;
-
-  const owner = program.body.find((statement) => statement.start >= comment.end);
-  if (owner === undefined) return null;
-  if (sourceText.slice(comment.end, owner.start).trim() !== "") return null;
-
-  return { conceptId: annotation.conceptId, start: owner.start, end: owner.end };
-};
-
-export const annotatedDeclarationRanges = (
-  program: AnnotatedProgram,
-  sourceText: string,
-): readonly AnnotatedDeclarationRange[] => {
-  const source: ParsedSource = { program, sourceText };
-  return program.comments
-    .map((comment) => annotatedDeclarationRange(source, comment))
-    .filter((range) => range !== null);
-};
-
-export const isInsideAnnotatedDeclaration = (
-  ranges: readonly AnnotatedDeclarationRange[],
-  node: SourceSpan,
-): boolean => ranges.some((range) => node.start >= range.start && node.end <= range.end);

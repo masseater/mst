@@ -15,7 +15,7 @@ const CLEAN_ENVIRONMENT: NodeJS.ProcessEnv = {
 };
 
 describe("gitOutput", () => {
-  describe("a question asked under a hook environment that names another repository", () => {
+  describe("a question asked under a hook environment that names another repository and carries an unusable config count", () => {
     const it = test
       .extend("repositoryRoot", () => {
         const temporaryDirectory = mkdtempSync(join(tmpdir(), "dont-review-it-git-output-"));
@@ -31,6 +31,7 @@ describe("gitOutput", () => {
           cwd: repositoryRoot,
           env: {
             ...CLEAN_ENVIRONMENT,
+            GIT_CONFIG_COUNT: "not-a-number",
             GIT_DIR: join(repositoryRoot, "elsewhere", ".git"),
             GIT_INDEX_FILE: join(repositoryRoot, "elsewhere", "index"),
           },

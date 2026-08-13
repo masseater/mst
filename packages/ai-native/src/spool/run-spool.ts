@@ -5,6 +5,7 @@ import { createWriteStream, type WriteStream } from "node:fs";
 import { mkdir, unlink } from "node:fs/promises";
 import { join } from "node:path";
 
+import { STREAM_EVENT } from "../node-event-names.ts";
 import {
   exitCodeOf,
   startFailureSummary,
@@ -91,11 +92,11 @@ class SpoolRecording {
   constructor(fileStream: WriteStream) {
     this.fileStream = fileStream;
     this.strippers = [createEscapeStripper(), createEscapeStripper()];
-    fileStream.on("error", (streamError: Error) => {
+    fileStream.on(STREAM_EVENT.failure, (streamError: Error) => {
       this.abort(streamError);
     });
     for (const stripper of this.strippers) {
-      stripper.on("data", (part: Buffer) => {
+      stripper.on(STREAM_EVENT.data, (part: Buffer) => {
         this.observe(part);
       });
     }

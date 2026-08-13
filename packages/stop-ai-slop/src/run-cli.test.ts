@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
+import { gitExecutablePath } from "@mst/repository-checks";
 import { describe, expect, test, vi } from "vite-plus/test";
 
 import { runStopAiSlop } from "./run-cli.ts";
@@ -28,7 +29,7 @@ Options:
   --repository-root <path>  Root of the Git repository. Defaults to the current working directory.
 
 Without --base and --head the change on its way into the integration branch is compared:
-the branch being merged when a merge is in progress, and the history since it left
+the staged merge result when a merge is in progress, and the history since it left
 origin/main otherwise.
 `;
 
@@ -359,8 +360,7 @@ describe("runStopAiSlop", () => {
       expect(missingBaseRefusal).toStrictEqual({
         exitCode: 2,
         out: "",
-        error:
-          "Command failed: git rev-parse --verify --end-of-options missing-revision^{commit}\nfatal: Needed a single revision\n\n",
+        error: `Command failed: ${gitExecutablePath(process.env.PATH)} rev-parse --verify --end-of-options missing-revision^{tree}\nfatal: Needed a single revision\n\n`,
       });
     });
   });

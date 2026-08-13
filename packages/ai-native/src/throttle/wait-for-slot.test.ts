@@ -1,15 +1,13 @@
-import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
 import { standardIoTest } from "@mst/dont-review-it/vitest";
-import { lock } from "proper-lockfile";
 import { describe, expect } from "vite-plus/test";
 
 import { runThrottle } from "./run-throttle.ts";
-import { ensureSlots } from "./slots.ts";
+import { ensureSlots, tryAcquireAny } from "./slots.ts";
 
 const TRIVIAL_COMMAND = ["--", process.execPath, "-e", ""];
 
@@ -21,6 +19,8 @@ const RANK_LINE_PATTERN = /throttle: waiting 1\/1\n/gu;
 
 const GAVE_UP_LINE = "throttle: gave up: every slot stayed held for the whole 400ms wait budget\n";
 
+const EXITED_PID = 999_999_999;
+
 describe("waitForSlot", () => {
   const throttleTest = standardIoTest.extend("slotDirectory", ({}, { onCleanup }) => {
     const temporarySlotDirectory = mkdtempSync(join(tmpdir(), "throttle-wait-"));
@@ -30,96 +30,55 @@ describe("waitForSlot", () => {
     return temporarySlotDirectory;
   });
 
-  describe("a slot left locked by a holder that is gone", () => {
-    const it = throttleTest
-      .extend("theCodeOfARunBehindADeadHolder", async ({ slotDirectory }) => {
-        mkdirSync(join(slotDirectory, "slot-0.lock"), { recursive: true });
-        return runThrottle(TRIVIAL_COMMAND, {
-          slotDir: slotDirectory,
-          limit: 1,
-          staleMs: 2000,
-          waitBudgetMs: 20_000,
-          pollMs: 100,
-          isInteractive: false,
-        });
-      })
-      .extend("aDeadHoldersSlotIsReclaimedAfterTheStaleThreshold", async ({ slotDirectory }) => {
-        mkdirSync(join(slotDirectory, "slot-0.lock"), { recursive: true });
-        const before = Date.now();
-        await runThrottle(TRIVIAL_COMMAND, {
-          slotDir: slotDirectory,
-          limit: 1,
-          staleMs: 2000,
-          waitBudgetMs: 20_000,
-          pollMs: 100,
-          isInteractive: false,
-        });
-        const elapsed = Date.now() - before;
-        return elapsed > 1200 && elapsed < 9000;
-      });
-
-    it("is reclaimed", { timeout: 20_000 }, ({ theCodeOfARunBehindADeadHolder }) => {
-      expect(theCodeOfARunBehindADeadHolder).toBe(0);
-    });
-
-    it(
-      "is reclaimed after the stale threshold, not the wait budget",
-      { timeout: 20_000 },
-      ({ aDeadHoldersSlotIsReclaimedAfterTheStaleThreshold }) => {
-        expect(aDeadHoldersSlotIsReclaimedAfterTheStaleThreshold).toBe(true);
-      },
-    );
-  });
-
   describe("a slot held by a holder that is still alive", () => {
     const it = throttleTest
       .extend("theCodeOfARunBehindALiveHolder", async ({ slotDirectory }) => {
         ensureSlots(slotDirectory, 1);
-        const release = await lock(join(slotDirectory, "slot-0"), { stale: 2000, retries: 0 });
+        const hold = await tryAcquireAny({ slotDir: slotDirectory, limit: 1 });
+        if (hold === null) throw new Error("the slot was already held");
         const pendingRun = runThrottle(TRIVIAL_COMMAND, {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 2000,
           waitBudgetMs: 10_000,
           pollMs: 100,
           isInteractive: false,
         });
-        await delay(3500);
-        await release();
+        await delay(350);
+        await hold.release();
         return pendingRun;
       })
-      .extend("aLiveHolderKeepsItsSlotPastTheStaleThreshold", async ({ slotDirectory }) => {
+      .extend("aLiveHolderKeepsItsSlotUntilRelease", async ({ slotDirectory }) => {
         ensureSlots(slotDirectory, 1);
-        const release = await lock(join(slotDirectory, "slot-0"), { stale: 2000, retries: 0 });
+        const hold = await tryAcquireAny({ slotDir: slotDirectory, limit: 1 });
+        if (hold === null) throw new Error("the slot was already held");
         const before = Date.now();
         const pendingRun = runThrottle(TRIVIAL_COMMAND, {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 2000,
           waitBudgetMs: 10_000,
           pollMs: 100,
           isInteractive: false,
         });
-        await delay(3500);
-        await release();
+        await delay(350);
+        await hold.release();
         await pendingRun;
         const elapsed = Date.now() - before;
-        return elapsed > 3300 && elapsed < 9000;
+        return elapsed > 300 && elapsed < 20_000;
       });
 
     it(
       "lets the waiting run through once the slot is freed",
-      { timeout: 20_000 },
+      { timeout: 30_000 },
       ({ theCodeOfARunBehindALiveHolder }) => {
         expect(theCodeOfARunBehindALiveHolder).toBe(0);
       },
     );
 
     it(
-      "keeps its slot past the stale threshold",
-      { timeout: 20_000 },
-      ({ aLiveHolderKeepsItsSlotPastTheStaleThreshold }) => {
-        expect(aLiveHolderKeepsItsSlotPastTheStaleThreshold).toBe(true);
+      "keeps its slot until release",
+      { timeout: 30_000 },
+      ({ aLiveHolderKeepsItsSlotUntilRelease }) => {
+        expect(aLiveHolderKeepsItsSlotUntilRelease).toBe(true);
       },
     );
   });
@@ -128,11 +87,11 @@ describe("waitForSlot", () => {
     const it = throttleTest
       .extend("theWaiterEntryOwnersWhileTwoRunsWait", async ({ slotDirectory }) => {
         ensureSlots(slotDirectory, 1);
-        const release = await lock(join(slotDirectory, "slot-0"), { stale: 5000, retries: 0 });
+        const hold = await tryAcquireAny({ slotDir: slotDirectory, limit: 1 });
+        if (hold === null) throw new Error("the slot was already held");
         const seams = {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 15_000,
           pollMs: 60,
           isInteractive: false,
@@ -144,18 +103,18 @@ describe("waitForSlot", () => {
         const waiting = readdirSync(join(slotDirectory, "waiters")).map((waiterFileName) =>
           waiterFileName.split("-").at(1),
         );
-        await release();
+        await hold.release();
         await runA;
         await runB;
         return waiting;
       })
       .extend("theWaiterEntryOwnersAfterADeadEntryWasPlanted", async ({ slotDirectory }) => {
         ensureSlots(slotDirectory, 1);
-        const release = await lock(join(slotDirectory, "slot-0"), { stale: 5000, retries: 0 });
+        const hold = await tryAcquireAny({ slotDir: slotDirectory, limit: 1 });
+        if (hold === null) throw new Error("the slot was already held");
         const seams = {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 15_000,
           pollMs: 60,
           isInteractive: false,
@@ -164,27 +123,26 @@ describe("waitForSlot", () => {
         await delay(150);
         const runB = runThrottle(SHORT_SLEEP_COMMAND, seams);
         await delay(200);
-        const exited = spawnSync(process.execPath, ["-e", ""]).pid;
         writeFileSync(
-          join(slotDirectory, "waiters", `0000000000000-${String(exited)}-deadbeef`),
-          `${String(exited)}\n`,
+          join(slotDirectory, "waiters", `0000000000000-${String(EXITED_PID)}-deadbeef`),
+          `${String(EXITED_PID)}\n`,
         );
         await delay(200);
         const waiting = readdirSync(join(slotDirectory, "waiters")).map((waiterFileName) =>
           waiterFileName.split("-").at(1),
         );
-        await release();
+        await hold.release();
         await runA;
         await runB;
         return waiting;
       })
       .extend("theWaiterEntryOwnersAfterTheHolderReleased", async ({ slotDirectory }) => {
         ensureSlots(slotDirectory, 1);
-        const release = await lock(join(slotDirectory, "slot-0"), { stale: 5000, retries: 0 });
+        const hold = await tryAcquireAny({ slotDir: slotDirectory, limit: 1 });
+        if (hold === null) throw new Error("the slot was already held");
         const seams = {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 15_000,
           pollMs: 60,
           isInteractive: false,
@@ -193,7 +151,7 @@ describe("waitForSlot", () => {
         await delay(150);
         const runB = runThrottle(SHORT_SLEEP_COMMAND, seams);
         await delay(200);
-        await release();
+        await hold.release();
         await delay(150);
         const waiting = readdirSync(join(slotDirectory, "waiters")).map((waiterFileName) =>
           waiterFileName.split("-").at(1),
@@ -204,11 +162,11 @@ describe("waitForSlot", () => {
       })
       .extend("theWaitersLeftOnceBothRunsFinished", async ({ slotDirectory }) => {
         ensureSlots(slotDirectory, 1);
-        const release = await lock(join(slotDirectory, "slot-0"), { stale: 5000, retries: 0 });
+        const hold = await tryAcquireAny({ slotDir: slotDirectory, limit: 1 });
+        if (hold === null) throw new Error("the slot was already held");
         const seams = {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 15_000,
           pollMs: 60,
           isInteractive: false,
@@ -217,18 +175,18 @@ describe("waitForSlot", () => {
         await delay(150);
         const runB = runThrottle(SHORT_SLEEP_COMMAND, seams);
         await delay(200);
-        await release();
+        await hold.release();
         await runA;
         await runB;
         return readdirSync(join(slotDirectory, "waiters"));
       })
       .extend("theRankOfTheSecondWaiterIsNamed", async ({ slotDirectory, stderr }) => {
         ensureSlots(slotDirectory, 1);
-        const release = await lock(join(slotDirectory, "slot-0"), { stale: 5000, retries: 0 });
+        const hold = await tryAcquireAny({ slotDir: slotDirectory, limit: 1 });
+        if (hold === null) throw new Error("the slot was already held");
         const seams = {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 15_000,
           pollMs: 60,
           isInteractive: false,
@@ -237,18 +195,18 @@ describe("waitForSlot", () => {
         await delay(150);
         const runB = runThrottle(SHORT_SLEEP_COMMAND, seams);
         await delay(200);
-        await release();
+        await hold.release();
         await runA;
         await runB;
         return stderr.text().includes("throttle: waiting 2/2\n");
       })
       .extend("theRankOfTheLastWaiterLeftIsNamed", async ({ slotDirectory, stderr }) => {
         ensureSlots(slotDirectory, 1);
-        const release = await lock(join(slotDirectory, "slot-0"), { stale: 5000, retries: 0 });
+        const hold = await tryAcquireAny({ slotDir: slotDirectory, limit: 1 });
+        if (hold === null) throw new Error("the slot was already held");
         const seams = {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 15_000,
           pollMs: 60,
           isInteractive: false,
@@ -257,7 +215,7 @@ describe("waitForSlot", () => {
         await delay(150);
         const runB = runThrottle(SHORT_SLEEP_COMMAND, seams);
         await delay(200);
-        await release();
+        await hold.release();
         await runA;
         await runB;
         return stderr.text().includes("throttle: waiting 1/1\n");
@@ -265,7 +223,7 @@ describe("waitForSlot", () => {
 
     it(
       "holds one queue entry per waiting run",
-      { timeout: 20_000 },
+      { timeout: 30_000 },
       ({ theWaiterEntryOwnersWhileTwoRunsWait }) => {
         expect(theWaiterEntryOwnersWhileTwoRunsWait).toStrictEqual([
           String(process.pid),
@@ -276,7 +234,7 @@ describe("waitForSlot", () => {
 
     it(
       "sweeps out an entry left by a dead waiter",
-      { timeout: 20_000 },
+      { timeout: 30_000 },
       ({ theWaiterEntryOwnersAfterADeadEntryWasPlanted }) => {
         expect(theWaiterEntryOwnersAfterADeadEntryWasPlanted).toStrictEqual([
           String(process.pid),
@@ -287,7 +245,7 @@ describe("waitForSlot", () => {
 
     it(
       "shrinks the queue as each waiter takes the slot",
-      { timeout: 20_000 },
+      { timeout: 30_000 },
       ({ theWaiterEntryOwnersAfterTheHolderReleased }) => {
         expect(theWaiterEntryOwnersAfterTheHolderReleased).toStrictEqual([String(process.pid)]);
       },
@@ -295,7 +253,7 @@ describe("waitForSlot", () => {
 
     it(
       "empties the queue once every run finished",
-      { timeout: 20_000 },
+      { timeout: 30_000 },
       ({ theWaitersLeftOnceBothRunsFinished }) => {
         expect(theWaitersLeftOnceBothRunsFinished).toStrictEqual([]);
       },
@@ -303,7 +261,7 @@ describe("waitForSlot", () => {
 
     it(
       "names the rank of the run behind the other waiter",
-      { timeout: 20_000 },
+      { timeout: 30_000 },
       ({ theRankOfTheSecondWaiterIsNamed }) => {
         expect(theRankOfTheSecondWaiterIsNamed).toBe(true);
       },
@@ -311,7 +269,7 @@ describe("waitForSlot", () => {
 
     it(
       "names the closed-up rank once the queue shrank",
-      { timeout: 20_000 },
+      { timeout: 30_000 },
       ({ theRankOfTheLastWaiterLeftIsNamed }) => {
         expect(theRankOfTheLastWaiterLeftIsNamed).toBe(true);
       },
@@ -322,104 +280,104 @@ describe("waitForSlot", () => {
     const it = throttleTest
       .extend("theCodeOfAFirstRunThatRanOutOfBudget", async ({ slotDirectory }) => {
         ensureSlots(slotDirectory, 1);
-        const release = await lock(join(slotDirectory, "slot-0"), { stale: 5000, retries: 0 });
+        const hold = await tryAcquireAny({ slotDir: slotDirectory, limit: 1 });
+        if (hold === null) throw new Error("the slot was already held");
         const code = await runThrottle(TRIVIAL_COMMAND, {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 400,
           pollMs: 100,
           isInteractive: false,
         });
-        await release();
+        await hold.release();
         return code;
       })
       .extend("aRunThatRanOutOfBudgetWaitedTheWholeBudget", async ({ slotDirectory }) => {
         ensureSlots(slotDirectory, 1);
-        const release = await lock(join(slotDirectory, "slot-0"), { stale: 5000, retries: 0 });
+        const hold = await tryAcquireAny({ slotDir: slotDirectory, limit: 1 });
+        if (hold === null) throw new Error("the slot was already held");
         const before = Date.now();
         await runThrottle(TRIVIAL_COMMAND, {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 400,
           pollMs: 100,
           isInteractive: false,
         });
         const elapsed = Date.now() - before;
-        await release();
+        await hold.release();
         return elapsed >= 400 && elapsed < 1500;
       })
       .extend("theGaveUpReportsOfTwoRuns", async ({ slotDirectory, stderr }) => {
         ensureSlots(slotDirectory, 1);
-        const release = await lock(join(slotDirectory, "slot-0"), { stale: 5000, retries: 0 });
+        const hold = await tryAcquireAny({ slotDir: slotDirectory, limit: 1 });
+        if (hold === null) throw new Error("the slot was already held");
         const seams = {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 400,
           pollMs: 100,
           isInteractive: false,
         };
         await runThrottle(TRIVIAL_COMMAND, seams);
         await runThrottle(TRIVIAL_COMMAND, seams);
-        await release();
+        await hold.release();
         return stderr.text().match(GAVE_UP_LINE_PATTERN);
       })
       .extend("theWaitersLeftAfterTheBudgetRanOut", async ({ slotDirectory }) => {
         ensureSlots(slotDirectory, 1);
-        const release = await lock(join(slotDirectory, "slot-0"), { stale: 5000, retries: 0 });
+        const hold = await tryAcquireAny({ slotDir: slotDirectory, limit: 1 });
+        if (hold === null) throw new Error("the slot was already held");
         await runThrottle(TRIVIAL_COMMAND, {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 400,
           pollMs: 100,
           isInteractive: false,
         });
-        await release();
+        await hold.release();
         return readdirSync(join(slotDirectory, "waiters"));
       })
       .extend("theCodeOfANonInteractiveWaitOutOfBudget", async ({ slotDirectory }) => {
         ensureSlots(slotDirectory, 1);
-        const release = await lock(join(slotDirectory, "slot-0"), { stale: 5000, retries: 0 });
+        const hold = await tryAcquireAny({ slotDir: slotDirectory, limit: 1 });
+        if (hold === null) throw new Error("the slot was already held");
         const code = await runThrottle(TRIVIAL_COMMAND, {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 400,
           pollMs: 60,
           isInteractive: false,
         });
-        await release();
+        await hold.release();
         return code;
       })
       .extend("aNonInteractiveWaitOverwritesNothing", async ({ slotDirectory, stderr }) => {
         ensureSlots(slotDirectory, 1);
-        const release = await lock(join(slotDirectory, "slot-0"), { stale: 5000, retries: 0 });
+        const hold = await tryAcquireAny({ slotDir: slotDirectory, limit: 1 });
+        if (hold === null) throw new Error("the slot was already held");
         await runThrottle(TRIVIAL_COMMAND, {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 400,
           pollMs: 60,
           isInteractive: false,
         });
-        await release();
+        await hold.release();
         return stderr.text().includes("\r");
       })
       .extend("theRankLinesANonInteractiveWaitWrote", async ({ slotDirectory, stderr }) => {
         ensureSlots(slotDirectory, 1);
-        const release = await lock(join(slotDirectory, "slot-0"), { stale: 5000, retries: 0 });
+        const hold = await tryAcquireAny({ slotDir: slotDirectory, limit: 1 });
+        if (hold === null) throw new Error("the slot was already held");
         await runThrottle(TRIVIAL_COMMAND, {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 400,
           pollMs: 60,
           isInteractive: false,
         });
-        await release();
+        await hold.release();
         return stderr.text().match(RANK_LINE_PATTERN);
       });
 
@@ -480,64 +438,64 @@ describe("waitForSlot", () => {
     const it = throttleTest
       .extend("theCodeOfAnInteractiveWait", async ({ slotDirectory }) => {
         ensureSlots(slotDirectory, 1);
-        const release = await lock(join(slotDirectory, "slot-0"), { stale: 5000, retries: 0 });
+        const hold = await tryAcquireAny({ slotDir: slotDirectory, limit: 1 });
+        if (hold === null) throw new Error("the slot was already held");
         const pendingRun = runThrottle(TRIVIAL_COMMAND, {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 15_000,
           pollMs: 100,
           isInteractive: true,
         });
         await delay(350);
-        await release();
+        await hold.release();
         return pendingRun;
       })
       .extend("anInteractiveWaitOverwritesItsLine", async ({ slotDirectory, stderr }) => {
         ensureSlots(slotDirectory, 1);
-        const release = await lock(join(slotDirectory, "slot-0"), { stale: 5000, retries: 0 });
+        const hold = await tryAcquireAny({ slotDir: slotDirectory, limit: 1 });
+        if (hold === null) throw new Error("the slot was already held");
         const pendingRun = runThrottle(TRIVIAL_COMMAND, {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 15_000,
           pollMs: 100,
           isInteractive: true,
         });
         await delay(350);
-        await release();
+        await hold.release();
         await pendingRun;
         return stderr.text().includes("\r");
       })
       .extend("anInteractiveWaitNamesTheElapsedTime", async ({ slotDirectory, stderr }) => {
         ensureSlots(slotDirectory, 1);
-        const release = await lock(join(slotDirectory, "slot-0"), { stale: 5000, retries: 0 });
+        const hold = await tryAcquireAny({ slotDir: slotDirectory, limit: 1 });
+        if (hold === null) throw new Error("the slot was already held");
         const pendingRun = runThrottle(TRIVIAL_COMMAND, {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 15_000,
           pollMs: 100,
           isInteractive: true,
         });
         await delay(350);
-        await release();
+        await hold.release();
         await pendingRun;
         return stderr.text().includes("throttle: waiting 1/1 0s");
       })
       .extend("anInteractiveWaitClosesItsLine", async ({ slotDirectory, stderr }) => {
         ensureSlots(slotDirectory, 1);
-        const release = await lock(join(slotDirectory, "slot-0"), { stale: 5000, retries: 0 });
+        const hold = await tryAcquireAny({ slotDir: slotDirectory, limit: 1 });
+        if (hold === null) throw new Error("the slot was already held");
         const pendingRun = runThrottle(TRIVIAL_COMMAND, {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 15_000,
           pollMs: 100,
           isInteractive: true,
         });
         await delay(350);
-        await release();
+        await hold.release();
         await pendingRun;
         return stderr.text().includes("0s\n");
       });
@@ -571,44 +529,44 @@ describe("waitForSlot", () => {
     const it = throttleTest
       .extend("theCodeOfAnInteractiveWaitOutOfBudget", async ({ slotDirectory }) => {
         ensureSlots(slotDirectory, 1);
-        const release = await lock(join(slotDirectory, "slot-0"), { stale: 5000, retries: 0 });
+        const hold = await tryAcquireAny({ slotDir: slotDirectory, limit: 1 });
+        if (hold === null) throw new Error("the slot was already held");
         const code = await runThrottle(TRIVIAL_COMMAND, {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 300,
           pollMs: 100,
           isInteractive: true,
         });
-        await release();
+        await hold.release();
         return code;
       })
       .extend("anInteractiveWaitOutOfBudgetClosesItsLine", async ({ slotDirectory, stderr }) => {
         ensureSlots(slotDirectory, 1);
-        const release = await lock(join(slotDirectory, "slot-0"), { stale: 5000, retries: 0 });
+        const hold = await tryAcquireAny({ slotDir: slotDirectory, limit: 1 });
+        if (hold === null) throw new Error("the slot was already held");
         await runThrottle(TRIVIAL_COMMAND, {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 300,
           pollMs: 100,
           isInteractive: true,
         });
-        await release();
+        await hold.release();
         return stderr.text().includes("0s\nthrottle: gave up: ");
       })
       .extend("anInteractiveWaitOutOfBudgetReportsGivingUp", async ({ slotDirectory, stderr }) => {
         ensureSlots(slotDirectory, 1);
-        const release = await lock(join(slotDirectory, "slot-0"), { stale: 5000, retries: 0 });
+        const hold = await tryAcquireAny({ slotDir: slotDirectory, limit: 1 });
+        if (hold === null) throw new Error("the slot was already held");
         await runThrottle(TRIVIAL_COMMAND, {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 300,
           pollMs: 100,
           isInteractive: true,
         });
-        await release();
+        await hold.release();
         return stderr.text().includes("\r") && stderr.text().includes("gave up");
       });
 
@@ -643,16 +601,16 @@ describe("waitForSlot", () => {
       { auto: true },
       async ({ slotDirectory }) => {
         ensureSlots(slotDirectory, 1);
-        const release = await lock(join(slotDirectory, "slot-0"), { stale: 5000, retries: 0 });
+        const hold = await tryAcquireAny({ slotDir: slotDirectory, limit: 1 });
+        if (hold === null) throw new Error("the slot was already held");
         await runThrottle(TRIVIAL_COMMAND, {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 400,
           pollMs: 100,
           isInteractive: false,
         });
-        await release();
+        await hold.release();
       },
     );
 

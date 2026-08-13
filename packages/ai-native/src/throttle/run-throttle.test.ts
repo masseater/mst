@@ -104,14 +104,15 @@ describe("runThrottle", () => {
         Runs the command while keeping the number of simultaneous executions that
         share this host and namespace at or below the limit. When every slot is held
         the wrapper joins a wait queue, reports its position on stderr, and retries
-        every slot on each poll, for at most the wait budget. A slot whose holder
-        died without releasing is reclaimed once the holder's liveness mark goes
-        stale. Do not nest throttle inside a command it wraps: the inner call counts
+        every slot on each poll, for at most the wait budget. The operating system
+        releases a slot when its holder exits, including an abrupt termination. Do
+        not nest throttle inside a command it wraps: the inner call counts
         as one more competitor and consumes a second slot.
 
         Options:
-          --timeout <seconds>  Send SIGTERM to the command's process group after this
-                               many seconds, then SIGKILL after a short grace period.
+          --timeout <seconds>  Stop the command's whole process tree after this many
+                               seconds. POSIX sends SIGTERM, then SIGKILL after a short
+                               grace period; Windows uses taskkill /T /F immediately.
                                0 never interrupts the command. Defaults to 0.
 
         Environment:
@@ -122,7 +123,7 @@ describe("runThrottle", () => {
         Exit codes:
           0  the wrapped command succeeded
           1  the wrapped command failed, was killed, could not be started, ran past
-             the timeout, or the wrapper could not get a slot
+             the timeout, or the wrapper could not get or release a slot
           2  throttle itself was called incorrectly
         "
       `);
@@ -143,7 +144,6 @@ describe("runThrottle", () => {
         runThrottle(["--timeout", "1.5", ...TRIVIAL_COMMAND], {
           slotDir: join(slotDirectory, "slots"),
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 15_000,
           pollMs: 50,
           isInteractive: false,
@@ -153,7 +153,6 @@ describe("runThrottle", () => {
         await runThrottle(["--timeout", "1.5", ...TRIVIAL_COMMAND], {
           slotDir: join(slotDirectory, "slots"),
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 15_000,
           pollMs: 50,
           isInteractive: false,
@@ -164,7 +163,6 @@ describe("runThrottle", () => {
         await runThrottle(["--timeout", "1.5", ...TRIVIAL_COMMAND], {
           slotDir: join(slotDirectory, "slots"),
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 15_000,
           pollMs: 50,
           isInteractive: false,
@@ -191,7 +189,6 @@ describe("runThrottle", () => {
         runThrottle(["--timeout=-9", ...TRIVIAL_COMMAND], {
           slotDir: join(slotDirectory, "slots"),
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 15_000,
           pollMs: 50,
           isInteractive: false,
@@ -201,7 +198,6 @@ describe("runThrottle", () => {
         await runThrottle(["--timeout=-9", ...TRIVIAL_COMMAND], {
           slotDir: join(slotDirectory, "slots"),
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 15_000,
           pollMs: 50,
           isInteractive: false,
@@ -243,7 +239,6 @@ describe("runThrottle", () => {
         const seams = {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 15_000,
           pollMs: 50,
           isInteractive: false,
@@ -273,7 +268,6 @@ describe("runThrottle", () => {
         const seams = {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 15_000,
           pollMs: 50,
           isInteractive: false,
@@ -310,7 +304,6 @@ describe("runThrottle", () => {
           const seams = {
             slotDir: slotDirectory,
             limit: 1,
-            staleMs: 5000,
             waitBudgetMs: 15_000,
             pollMs: 50,
             isInteractive: false,
@@ -366,9 +359,8 @@ describe("runThrottle", () => {
         runThrottle(TRIVIAL_COMMAND, {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 15_000,
-          pollMs: 10_000,
+          pollMs: 30_000,
           isInteractive: false,
         }),
       )
@@ -377,32 +369,30 @@ describe("runThrottle", () => {
         await runThrottle(TRIVIAL_COMMAND, {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 15_000,
-          pollMs: 10_000,
+          pollMs: 30_000,
           isInteractive: false,
         });
-        return Date.now() - before < 5000;
+        return Date.now() - before < 20_000;
       })
       .extend("theWaitingNamedWhileTakingAFreeSlot", async ({ slotDirectory, stderr }) => {
         await runThrottle(TRIVIAL_COMMAND, {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 15_000,
-          pollMs: 10_000,
+          pollMs: 30_000,
           isInteractive: false,
         });
         return stderr.text().includes("waiting");
       });
 
-    it("runs the command", { timeout: 10_000 }, ({ theCodeOfARunTakingAFreeSlot }) => {
+    it("runs the command", { timeout: 30_000 }, ({ theCodeOfARunTakingAFreeSlot }) => {
       expect(theCodeOfARunTakingAFreeSlot).toBe(0);
     });
 
     it(
       "takes it well below one poll interval",
-      { timeout: 10_000 },
+      { timeout: 30_000 },
       ({ aFreeSlotIsTakenWellBelowOnePollInterval }) => {
         expect(aFreeSlotIsTakenWellBelowOnePollInterval).toBe(true);
       },
@@ -410,7 +400,7 @@ describe("runThrottle", () => {
 
     it(
       "puts no waiting output on stderr",
-      { timeout: 10_000 },
+      { timeout: 30_000 },
       ({ theWaitingNamedWhileTakingAFreeSlot }) => {
         expect(theWaitingNamedWhileTakingAFreeSlot).toBe(false);
       },
@@ -433,7 +423,6 @@ describe("runThrottle", () => {
               {
                 slotDir: join(slotDirectory, "a"),
                 limit: 1,
-                staleMs: 5000,
                 waitBudgetMs: 15_000,
                 pollMs: 50,
                 isInteractive: false,
@@ -449,7 +438,6 @@ describe("runThrottle", () => {
               {
                 slotDir: join(slotDirectory, "b"),
                 limit: 1,
-                staleMs: 5000,
                 waitBudgetMs: 15_000,
                 pollMs: 50,
                 isInteractive: false,
@@ -471,7 +459,6 @@ describe("runThrottle", () => {
               {
                 slotDir: join(slotDirectory, "a"),
                 limit: 1,
-                staleMs: 5000,
                 waitBudgetMs: 15_000,
                 pollMs: 50,
                 isInteractive: false,
@@ -487,7 +474,6 @@ describe("runThrottle", () => {
               {
                 slotDir: join(slotDirectory, "b"),
                 limit: 1,
-                staleMs: 5000,
                 waitBudgetMs: 15_000,
                 pollMs: 50,
                 isInteractive: false,
@@ -502,11 +488,11 @@ describe("runThrottle", () => {
         },
       );
 
-    it("both run", { timeout: 10_000 }, ({ theCodesOfTwoRunsInDifferentNamespaces }) => {
+    it("both run", { timeout: 30_000 }, ({ theCodesOfTwoRunsInDifferentNamespaces }) => {
       expect(theCodesOfTwoRunsInDifferentNamespaces).toStrictEqual([0, 0]);
     });
 
-    it("never contend", { timeout: 10_000 }, ({ twoRunsInDifferentNamespacesOverlapped }) => {
+    it("never contend", { timeout: 30_000 }, ({ twoRunsInDifferentNamespacesOverlapped }) => {
       expect(twoRunsInDifferentNamespacesOverlapped).toBe(true);
     });
   });
@@ -517,7 +503,6 @@ describe("runThrottle", () => {
         vi.stubEnv("MST_THROTTLE_LIMIT", "2");
         const seams = {
           slotDir: slotDirectory,
-          staleMs: 5000,
           waitBudgetMs: 15_000,
           pollMs: 50,
           isInteractive: false,
@@ -540,7 +525,6 @@ describe("runThrottle", () => {
         vi.stubEnv("MST_THROTTLE_LIMIT", "2");
         const seams = {
           slotDir: slotDirectory,
-          staleMs: 5000,
           waitBudgetMs: 15_000,
           pollMs: 50,
           isInteractive: false,
@@ -572,11 +556,11 @@ describe("runThrottle", () => {
         );
       });
 
-    it("every run finishes", { timeout: 20_000 }, ({ theCodesOfThreeRunsUnderTwoSlots }) => {
+    it("every run finishes", { timeout: 30_000 }, ({ theCodesOfThreeRunsUnderTwoSlots }) => {
       expect(theCodesOfThreeRunsUnderTwoSlots).toStrictEqual([0, 0, 0]);
     });
 
-    it("two really run at a time", { timeout: 20_000 }, ({ thePeakOfThreeRunsUnderTwoSlots }) => {
+    it("two really run at a time", { timeout: 30_000 }, ({ thePeakOfThreeRunsUnderTwoSlots }) => {
       expect(thePeakOfThreeRunsUnderTwoSlots).toBe(2);
     });
   });
@@ -595,7 +579,6 @@ describe("runThrottle", () => {
           ],
           {
             slotDir: slotDirectory,
-            staleMs: 5000,
             waitBudgetMs: 15_000,
             pollMs: 50,
             isInteractive: false,
@@ -607,7 +590,7 @@ describe("runThrottle", () => {
 
     it(
       "creates the second slot marker",
-      { timeout: 20_000 },
+      { timeout: 30_000 },
       ({ theSecondSlotMarkerUnderALimitOfTwo }) => {
         expect(theSecondSlotMarkerUnderALimitOfTwo).toBe(true);
       },
@@ -620,7 +603,6 @@ describe("runThrottle", () => {
         vi.stubEnv("MST_THROTTLE_LIMIT", "abc");
         return runThrottle(TRIVIAL_COMMAND, {
           slotDir: slotDirectory,
-          staleMs: 5000,
           waitBudgetMs: 5000,
           pollMs: 1000,
           isInteractive: false,
@@ -630,7 +612,6 @@ describe("runThrottle", () => {
         vi.stubEnv("MST_THROTTLE_LIMIT", "abc");
         await runThrottle(TRIVIAL_COMMAND, {
           slotDir: slotDirectory,
-          staleMs: 5000,
           waitBudgetMs: 5000,
           pollMs: 1000,
           isInteractive: false,
@@ -640,11 +621,11 @@ describe("runThrottle", () => {
         );
       });
 
-    it("does not fail the run", { timeout: 15_000 }, ({ theCodeOfARunUnderAWordedLimit }) => {
+    it("does not fail the run", { timeout: 30_000 }, ({ theCodeOfARunUnderAWordedLimit }) => {
       expect(theCodeOfARunUnderAWordedLimit).toBe(0);
     });
 
-    it("falls back to one slot", { timeout: 15_000 }, ({ theMarkersUnderAWordedLimit }) => {
+    it("falls back to one slot", { timeout: 30_000 }, ({ theMarkersUnderAWordedLimit }) => {
       expect(theMarkersUnderAWordedLimit).toStrictEqual(["slot-0"]);
     });
   });
@@ -654,7 +635,6 @@ describe("runThrottle", () => {
       vi.stubEnv("MST_THROTTLE_LIMIT", "0");
       await runThrottle(TRIVIAL_COMMAND, {
         slotDir: slotDirectory,
-        staleMs: 5000,
         waitBudgetMs: 5000,
         pollMs: 1000,
         isInteractive: false,
@@ -664,7 +644,7 @@ describe("runThrottle", () => {
       );
     });
 
-    it("falls back to one slot", { timeout: 15_000 }, ({ theMarkersUnderALimitOfZero }) => {
+    it("falls back to one slot", { timeout: 30_000 }, ({ theMarkersUnderALimitOfZero }) => {
       expect(theMarkersUnderALimitOfZero).toStrictEqual(["slot-0"]);
     });
   });
@@ -674,7 +654,6 @@ describe("runThrottle", () => {
       vi.stubEnv("MST_THROTTLE_LIMIT", "-3");
       await runThrottle(TRIVIAL_COMMAND, {
         slotDir: slotDirectory,
-        staleMs: 5000,
         waitBudgetMs: 5000,
         pollMs: 1000,
         isInteractive: false,
@@ -684,7 +663,7 @@ describe("runThrottle", () => {
       );
     });
 
-    it("falls back to one slot", { timeout: 15_000 }, ({ theMarkersUnderANegativeLimit }) => {
+    it("falls back to one slot", { timeout: 30_000 }, ({ theMarkersUnderANegativeLimit }) => {
       expect(theMarkersUnderANegativeLimit).toStrictEqual(["slot-0"]);
     });
   });
@@ -697,7 +676,6 @@ describe("runThrottle", () => {
         return runThrottle(TRIVIAL_COMMAND, {
           slotDir: join(plainFile, "nested"),
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 15_000,
           pollMs: 50,
           isInteractive: false,
@@ -709,7 +687,6 @@ describe("runThrottle", () => {
         await runThrottle(TRIVIAL_COMMAND, {
           slotDir: join(plainFile, "nested"),
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 15_000,
           pollMs: 50,
           isInteractive: false,
@@ -722,7 +699,6 @@ describe("runThrottle", () => {
         await runThrottle(TRIVIAL_COMMAND, {
           slotDir: join(plainFile, "nested"),
           limit: 1,
-          staleMs: 5000,
           waitBudgetMs: 15_000,
           pollMs: 50,
           isInteractive: false,

@@ -117,6 +117,19 @@ describe("declarationsIn", () => {
     });
   });
 
+  describe("two bindings differing only in a bigint literal", () => {
+    const it = test
+      .extend("declarationsHoldingOneBigint", () => declarationsIn("const amount = 1n;"))
+      .extend("declarationsHoldingTwoBigint", () => declarationsIn("const amount = 2n;"));
+
+    it("are kept apart because the bigint is written into the structure", ({
+      declarationsHoldingOneBigint,
+      declarationsHoldingTwoBigint,
+    }) => {
+      expect(declarationsHoldingOneBigint).not.toStrictEqual(declarationsHoldingTwoBigint);
+    });
+  });
+
   describe("two bindings annotated with a different type", () => {
     const it = test
       .extend("declarationsAnnotatedAsUnknown", () =>

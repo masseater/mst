@@ -94,6 +94,7 @@ describe("loadRepositoryTypeAuthorityIndex", () => {
       mkdirSync(join(root, "src"), { recursive: true });
       writeFileSync(join(root, "src", "a-unreadable.ts"), SHAPE, "utf8");
       writeFileSync(join(root, "src", "b-present.ts"), SHAPE, "utf8");
+      // mock-factory-exemption no-replaced-double-behaviour--let-the-replaced-module-answer -- whether a source that the scan already found can still be opened is settled by the file system inside the boundary this spec replaces, and every source this spec can write is readable
       vi.mocked(readTextFile).mockReturnValueOnce(null);
       return Array.from(
         loadRepositoryTypeAuthorityIndex({ repositoryRoot: root }).typesByPath.keys(),

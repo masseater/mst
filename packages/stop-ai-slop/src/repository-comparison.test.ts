@@ -14,7 +14,7 @@ import { dirname, join } from "node:path";
 import { attempt } from "es-toolkit";
 import { describe, expect, test, vi } from "vite-plus/test";
 
-import { compareRevisions, decodedSource } from "./repository-comparison.ts";
+import { compareRevisions, decodedPreviousSource, decodedSource } from "./repository-comparison.ts";
 
 const GIT_ENVIRONMENT = {
   GIT_AUTHOR_EMAIL: "stop-ai-slop@example.test",
@@ -681,15 +681,17 @@ describe("compareRevisions", () => {
             headRevision: "HEAD",
           });
         } catch (refusal) {
-          return refusal instanceof Error ? refusal.message : null;
+          return refusal instanceof Error
+            ? refusal.message.includes(
+                "rev-parse --verify --end-of-options missing-revision^{tree}\nfatal: Needed a single revision\n",
+              )
+            : null;
         }
         throw new Error("compareRevisions accepted a revision the repository does not carry");
       });
 
     it("refuses the comparison with the failed command", ({ missingRevisionRefusal }) => {
-      expect(missingRevisionRefusal).toBe(
-        "Command failed: git rev-parse --verify --end-of-options missing-revision^{commit}\nfatal: Needed a single revision\n",
-      );
+      expect(missingRevisionRefusal).toBe(true);
     });
   });
 });
@@ -707,6 +709,17 @@ describe("decodedSource", () => {
       expect(undecodableRefusal).toStrictEqual(
         new Error("Source blob does not decode as UTF-8: src/binary.ts"),
       );
+    });
+  });
+});
+
+describe("decodedPreviousSource", () => {
+  describe("a blob that does not decode as UTF-8", () => {
+    const it = test.extend("undecodablePreviousSource", () =>
+      decodedPreviousSource(Uint8Array.from([0xff, 0xfe, 0xff])));
+
+    it("reads the blob as an absent source", ({ undecodablePreviousSource }) => {
+      expect(undecodablePreviousSource).toBe(null);
     });
   });
 });

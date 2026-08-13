@@ -1,3 +1,4 @@
+import { ABORT_SIGNAL_EVENT } from "../runtime/event-names.ts";
 import { createConnectionLoop, type ConnectionRuntime } from "./connection-loop.ts";
 import { createEventQueue } from "./event-queue.ts";
 import { createFrameSink } from "./frame-sink.ts";
@@ -47,7 +48,7 @@ const defaultSleep = (delayMs: number, signal: AbortSignal): Promise<void> =>
       resolve();
     }, delayMs);
     signal.addEventListener(
-      "abort",
+      ABORT_SIGNAL_EVENT.abort,
       () => {
         clearTimeout(timer);
         reject(new SleepAbortedError());

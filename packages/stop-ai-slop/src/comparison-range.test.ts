@@ -10,6 +10,7 @@ import { comparisonRangeIn } from "./comparison-range.ts";
 describe("comparisonRangeIn", () => {
   const sharedCommitRevision = "2bd9e78c8de105cae8f7e2ee2626041c397fe893";
   const featureTipCommitRevision = "6558ebc69c85f6fe83d0f6324945fe524f5c9ba8";
+  const mergedIndexTreeRevision = "34ce6086051fdb587dc8ecac255c7a02b7375c4d";
 
   describe("a repository holding a merge that has not been committed", () => {
     const it = test.extend("comparisonRangeOfTheMergingRepository", async ({}, { onCleanup }) => {
@@ -54,6 +55,57 @@ describe("comparisonRangeIn", () => {
       comparisonRangeOfTheMergingRepository,
     }) => {
       expect(comparisonRangeOfTheMergingRepository).toStrictEqual({
+        baseRevision: sharedCommitRevision,
+        headRevision: mergedIndexTreeRevision,
+      });
+    });
+  });
+
+  describe("a repository whose merge holds a tree the merged branch never carried", () => {
+    const it = test.extend("comparisonRangeOfTheRepositoryMergingTheFeatureTip", async ({}, {
+      onCleanup,
+    }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "comparison-range-merge-tip-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      const runGit = (gitArguments: readonly string[]): string =>
+        execFileSync("git", [...gitArguments], {
+          cwd: repositoryRoot,
+          encoding: "utf8",
+          env: {
+            GIT_AUTHOR_DATE: "@946684800 +0000",
+            GIT_AUTHOR_EMAIL: "comparison-range@example.test",
+            GIT_AUTHOR_NAME: "Comparison Range",
+            GIT_COMMITTER_DATE: "@946684800 +0000",
+            GIT_COMMITTER_EMAIL: "comparison-range@example.test",
+            GIT_COMMITTER_NAME: "Comparison Range",
+            GIT_CONFIG_GLOBAL: "/dev/null",
+            GIT_CONFIG_SYSTEM: "/dev/null",
+            HOME: repositoryRoot,
+            PATH: process.env.PATH,
+          },
+        });
+      runGit(["init", "--quiet", "--initial-branch=main"]);
+      writeFileSync(join(repositoryRoot, "shared.ts"), "export const shared = true;\n");
+      runGit(["add", "--all"]);
+      runGit(["commit", "--quiet", "--message", "shared"]);
+      runGit(["switch", "--quiet", "--create", "feature"]);
+      writeFileSync(join(repositoryRoot, "feature.ts"), "export const feature = true;\n");
+      runGit(["add", "--all"]);
+      runGit(["commit", "--quiet", "--message", "feature"]);
+      runGit(["switch", "--quiet", "main"]);
+      writeFileSync(join(repositoryRoot, "main-only.ts"), "export const mainOnly = true;\n");
+      runGit(["add", "--all"]);
+      runGit(["commit", "--quiet", "--message", "main only"]);
+      runGit(["merge", "--quiet", "--no-commit", "--no-ff", "feature"]);
+      return comparisonRangeIn(repositoryRoot);
+    });
+
+    it("refuses the tip of the branch being merged as the head revision", ({
+      comparisonRangeOfTheRepositoryMergingTheFeatureTip,
+    }) => {
+      expect(comparisonRangeOfTheRepositoryMergingTheFeatureTip).not.toStrictEqual({
         baseRevision: sharedCommitRevision,
         headRevision: featureTipCommitRevision,
       });

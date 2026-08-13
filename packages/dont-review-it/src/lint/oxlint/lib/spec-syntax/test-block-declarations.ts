@@ -1,5 +1,4 @@
 import { nodesOfType } from "../nodes-of-type.ts";
-import { ASSERTION_ENTRY_NAME } from "./assertion-entries.ts";
 import { staticMemberName } from "./static-names.ts";
 import { unwrapSubject, type SpecFunction } from "./subject-expressions.ts";
 import { testBlockRootName } from "./test-block-modifiers.ts";
@@ -8,9 +7,7 @@ import type { ESTree } from "@oxlint/plugins";
 
 export const INJECTED_TEST_BLOCK_SPELLINGS: ReadonlySet<string> = new Set(["it", "test"]);
 
-const INJECTED_GROUPING_BLOCK_SPELLINGS: ReadonlySet<string> = new Set(["describe"]);
-
-const INJECTED_ASSERTION_ENTRY_SPELLINGS: ReadonlySet<string> = new Set([ASSERTION_ENTRY_NAME]);
+export const INJECTED_GROUPING_BLOCK_SPELLINGS: ReadonlySet<string> = new Set(["describe"]);
 
 const DERIVED_BUILDER_MEMBER = "extend";
 
@@ -80,7 +77,7 @@ export const groupingBlockRootNames = (program: ESTree.Program): ReadonlySet<str
   rootNamesIn(program, INJECTED_GROUPING_BLOCK_SPELLINGS);
 
 export const assertionEntryRootNames = (program: ESTree.Program): ReadonlySet<string> =>
-  rootNamesIn(program, INJECTED_ASSERTION_ENTRY_SPELLINGS);
+  rootNamesIn(program, new Set(["expect"]));
 
 const shadowedNamesIn = (program: ESTree.Program): ReadonlySet<string> =>
   new Set([

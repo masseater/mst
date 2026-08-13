@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "vite-plus/test";
 
+import { buildSetupExportSpecifierIndex } from "./export-specifier-index.ts";
 import {
   packageDirectoryInWorkspace,
   packageReferenceOf,
@@ -220,6 +221,84 @@ describe("resolveCoupling", () => {
         kind: "repositoryFile",
         path: join(workspaceRoot, "held", "index.ts"),
       });
+    });
+  });
+});
+
+describe("buildSetupExportSpecifierIndex", () => {
+  describe("a package whose export entry re-exports further modules", () => {
+    const it = test
+      .extend("workspaceRoot", ({}, { onCleanup }) => {
+        const root = mkdtempSync(join(tmpdir(), WORKSPACE_STEM));
+        onCleanup(() => {
+          rmSync(root, { recursive: true, force: true });
+        });
+        return root;
+      })
+      .extend("exportIndexOfReExportingPackage", ({ workspaceRoot }) => {
+        const packageDirectory = join(workspaceRoot, "shared");
+        mkdirSync(join(packageDirectory, "src", "nested"), { recursive: true });
+        writeFileSync(
+          join(packageDirectory, "package.json"),
+          JSON.stringify({
+            name: "@fixture/shared",
+            exports: {
+              ".": {
+                types: "./src/index.d.ts",
+                import: "./src/index.ts",
+                require: ["../outside.cjs", "./src/index.ts"],
+              },
+              "./package.json": "./package.json",
+            },
+          }),
+        );
+        writeFileSync(
+          join(packageDirectory, "src", "index.ts"),
+          'export * from "./nested/one";\nexport * from "external";\n',
+        );
+        writeFileSync(
+          join(packageDirectory, "src", "nested", "one.ts"),
+          'export { value } from "./two.mjs";\n',
+        );
+        writeFileSync(
+          join(packageDirectory, "src", "nested", "two.mts"),
+          'export * from "../index.ts";\n',
+        );
+        return buildSetupExportSpecifierIndex(packageDirectory);
+      });
+
+    it("indexes every file reachable through those re-exports", ({
+      exportIndexOfReExportingPackage,
+      workspaceRoot,
+    }) => {
+      expect(exportIndexOfReExportingPackage).toStrictEqual(
+        new Map([
+          [join(workspaceRoot, "shared", "src", "index.ts"), "@fixture/shared"],
+          [join(workspaceRoot, "shared", "src", "nested", "one.ts"), "@fixture/shared"],
+          [join(workspaceRoot, "shared", "src", "nested", "two.mts"), "@fixture/shared"],
+        ]),
+      );
+    });
+  });
+
+  describe("a package whose manifest names nothing", () => {
+    const it = test
+      .extend("workspaceRoot", ({}, { onCleanup }) => {
+        const root = mkdtempSync(join(tmpdir(), WORKSPACE_STEM));
+        onCleanup(() => {
+          rmSync(root, { recursive: true, force: true });
+        });
+        return root;
+      })
+      .extend("exportIndexOfNamelessManifest", ({ workspaceRoot }) => {
+        const packageDirectory = join(workspaceRoot, "shared");
+        mkdirSync(packageDirectory, { recursive: true });
+        writeFileSync(join(packageDirectory, "package.json"), "{}");
+        return buildSetupExportSpecifierIndex(packageDirectory);
+      });
+
+    it("contributes no exported repository file", ({ exportIndexOfNamelessManifest }) => {
+      expect(exportIndexOfNamelessManifest).toStrictEqual(new Map());
     });
   });
 });

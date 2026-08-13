@@ -1,6 +1,4 @@
-import { spawn } from "node:child_process";
-import { once } from "node:events";
-
+import { attempt } from "es-toolkit";
 import { describe, expect, test, vi } from "vite-plus/test";
 
 import {
@@ -10,10 +8,7 @@ import {
   makeRunningInterruptHandler,
   makeWaitingInterruptHandler,
   raiseSignal,
-  safeKill,
 } from "./signals.ts";
-
-const LINGERING_COMMAND = ["-e", "setInterval(() => {}, 1000);"];
 
 describe("installInterruptHandler", () => {
   describe("a handler installed on this process", () => {
@@ -217,87 +212,70 @@ describe("makeHeldInterrupt", () => {
 
 describe("makeRunningInterruptHandler", () => {
   describe("an interrupt handed to a handler watching a child", () => {
-    const it = test.extend("theKillCallOfARunningInterrupt", () => {
-      const kill = vi.fn<(pid: number, signal: NodeJS.Signals) => boolean>(() => true);
-      makeRunningInterruptHandler({ childPid: 4321, kill })("SIGINT");
-      return kill;
-    });
-
-    it("forwards the signal to the child's process group", ({ theKillCallOfARunningInterrupt }) => {
-      expect(theKillCallOfARunningInterrupt).toHaveBeenCalledWith(-4321, "SIGINT");
-    });
-  });
-});
-
-describe("safeKill", () => {
-  describe("a termination signal sent to a live process", () => {
     const it = test
-      .extend("theAnswerOfKillingALiveProcess", () => {
-        const child = spawn(process.execPath, LINGERING_COMMAND);
-        const delivered = safeKill(child.pid ?? 0, "SIGTERM");
-        child.kill("SIGKILL");
-        return delivered;
+      .extend("theSignalTreeCallOfARunningInterrupt", () => {
+        const signalTree = vi.fn<(input: { pid: number; signal: NodeJS.Signals }) => Error | null>(
+          () => null,
+        );
+        const reportFailure = vi.fn<(failure: Error) => void>();
+        makeRunningInterruptHandler({ childPid: 4321, signalTree, reportFailure })("SIGINT");
+        return signalTree;
       })
-      .extend("theExitOfALiveProcessThatWasSignalled", async () => {
-        const child = spawn(process.execPath, LINGERING_COMMAND);
-        const childDeath = once(child, "exit");
-        safeKill(child.pid ?? 0, "SIGTERM");
-        return childDeath;
+      .extend("theFailureReportOfASignalledProcessTree", () => {
+        const signalTree = vi.fn<(input: { pid: number; signal: NodeJS.Signals }) => Error | null>(
+          () => null,
+        );
+        const reportFailure = vi.fn<(failure: Error) => void>();
+        makeRunningInterruptHandler({ childPid: 4321, signalTree, reportFailure })("SIGINT");
+        return reportFailure;
       });
 
-    it("reports the signal as delivered", ({ theAnswerOfKillingALiveProcess }) => {
-      expect(theAnswerOfKillingALiveProcess).toBe(true);
-    });
-
-    it("is the signal the process dies of", ({ theExitOfALiveProcessThatWasSignalled }) => {
-      expect(theExitOfALiveProcessThatWasSignalled).toStrictEqual([null, "SIGTERM"]);
-    });
-  });
-
-  describe("a termination signal sent to a process that is already gone", () => {
-    const it = test.extend("theAnswerOfKillingADeadProcess", async () => {
-      const child = spawn(process.execPath, LINGERING_COMMAND);
-      const childDeath = once(child, "exit");
-      safeKill(child.pid ?? 0, "SIGTERM");
-      await childDeath;
-      return safeKill(child.pid ?? 0, "SIGTERM");
-    });
-
-    it("swallows the miss", ({ theAnswerOfKillingADeadProcess }) => {
-      expect(theAnswerOfKillingADeadProcess).toBe(false);
-    });
-  });
-
-  describe("a signal this platform has no name for", () => {
-    const it = test.extend("theRefusalOfAnUnknownSignal", () => {
-      try {
-        return safeKill(process.pid, "SIGNOTREAL" as NodeJS.Signals);
-      } catch (refused) {
-        return refused instanceof Error ? refused.message : String(refused);
-      }
-    });
-
-    it("hands the refusal on rather than reading it as a missing process", ({
-      theRefusalOfAnUnknownSignal,
+    it("forwards the signal to the child's process tree", ({
+      theSignalTreeCallOfARunningInterrupt,
     }) => {
-      expect(theRefusalOfAnUnknownSignal).toBe("Unknown signal: SIGNOTREAL");
+      expect(theSignalTreeCallOfARunningInterrupt).toHaveBeenCalledWith({
+        pid: 4321,
+        signal: "SIGINT",
+      });
+    });
+
+    it("reports nothing when the tree took the signal", ({
+      theFailureReportOfASignalledProcessTree,
+    }) => {
+      expect(theFailureReportOfASignalledProcessTree).toHaveBeenCalledTimes(0);
+    });
+  });
+
+  describe("a termination signal the child's process tree refuses", () => {
+    const it = test.extend("theRefusalOfTheProcessTreeIsHandedOn", () => {
+      const refusal = new Error("signalling the process tree failed");
+      const reportFailure = vi.fn<(reported: Error) => void>();
+      makeRunningInterruptHandler({
+        childPid: 4321,
+        signalTree: () => refusal,
+        reportFailure,
+      })("SIGTERM");
+      return reportFailure.mock.calls[0]?.[0] === refusal;
+    });
+
+    it("hands the refusal on", ({ theRefusalOfTheProcessTreeIsHandedOn }) => {
+      expect(theRefusalOfTheProcessTreeIsHandedOn).toBe(true);
     });
   });
 });
 
 describe("raiseSignal", () => {
   describe("a window change raised on this process", () => {
-    const it = test.extend("theSignalNamedByTheWindowChangeThisProcessReceived", async () => {
-      const received = once(process, "SIGWINCH");
-      raiseSignal("SIGWINCH");
-      const delivered: unknown[] = await received;
-      return delivered.slice(0, 1);
+    const it = test.extend("theRefusalOfRaisingAWindowChange", () => {
+      const [refusal] = attempt<true, Error>(() => {
+        raiseSignal("SIGWINCH");
+        return true;
+      });
+      return refusal;
     });
 
-    it("sends the signal to the wrapper's own process", ({
-      theSignalNamedByTheWindowChangeThisProcessReceived,
-    }) => {
-      expect(theSignalNamedByTheWindowChangeThisProcessReceived).toStrictEqual(["SIGWINCH"]);
+    it("sends the signal to the wrapper's own process", ({ theRefusalOfRaisingAWindowChange }) => {
+      expect(theRefusalOfRaisingAWindowChange).toBe(null);
     });
   });
 });

@@ -76,6 +76,138 @@ describe("compareGitHubPullRequest", () => {
     });
   });
 
+  describe("a pull request whose previous source the API answered as undecodable bytes", () => {
+    const it = test.extend("undecodablePreviousSourceComparison", () =>
+      compareGitHubPullRequest({
+        repositoryRoot: "/checkout",
+        repository: "owner/name",
+        baseRevision: "basetip",
+        headRevision: "headsha",
+        request: async (path: string) => {
+          if (path.startsWith("/repos/owner/name/compare/")) {
+            return {
+              merge_base_commit: { sha: "basesha" },
+              files: [
+                {
+                  filename: "src/legacy.ts",
+                  status: "modified",
+                  patch: "@@ -1,2 +1,1 @@\n-export const legacyMode = true;\n",
+                },
+                {
+                  filename: "src/legacy-api.test.ts",
+                  status: "added",
+                  patch: '@@ -0,0 +1,1 @@\n+expect(legacy).not.toHaveProperty("legacyMode");\n',
+                },
+              ],
+            };
+          }
+          const writtenContents: Readonly<Record<string, Uint8Array>> = {
+            "/repos/owner/name/contents/src/legacy.ts?ref=basesha": Uint8Array.from([
+              0xff, 0xfe, 0xff,
+            ]),
+            "/repos/owner/name/contents/src/legacy.ts?ref=headsha": Buffer.from(
+              LEGACY_AFTER,
+              "utf8",
+            ),
+            "/repos/owner/name/contents/src/legacy-api.test.ts?ref=headsha": Buffer.from(
+              "const added = true;\n",
+              "utf8",
+            ),
+          };
+          const writtenContent = writtenContents[path];
+          if (writtenContent === undefined) throw new Error(`unexpected request ${path}`);
+          return { content: Buffer.from(writtenContent).toString("base64") };
+        },
+      }));
+
+    it("compares a previous source the API answered as undecodable bytes as no source", ({
+      undecodablePreviousSourceComparison,
+    }) => {
+      expect(undecodablePreviousSourceComparison).toStrictEqual({
+        repositoryRoot: "/checkout",
+        baseRevision: "basesha",
+        headRevision: "headsha",
+        files: [
+          {
+            kind: "changed",
+            beforePath: "src/legacy.ts",
+            afterPath: "src/legacy.ts",
+            beforeSource: null,
+            afterSource: LEGACY_AFTER,
+            addedLines: [],
+            firstAddedLine: null,
+          },
+          {
+            kind: "added",
+            beforePath: null,
+            afterPath: "src/legacy-api.test.ts",
+            beforeSource: null,
+            afterSource: "const added = true;\n",
+            addedLines: [1],
+            firstAddedLine: 1,
+          },
+        ],
+      });
+    });
+  });
+
+  describe("a pull request whose head source the API answered as undecodable bytes", () => {
+    const it = test.extend("failureFromReadingAnUndecodableHeadSource", async () => {
+      const [failure] = await attemptAsync<unknown, Error>(() =>
+        compareGitHubPullRequest({
+          repositoryRoot: "/checkout",
+          repository: "owner/name",
+          baseRevision: "basetip",
+          headRevision: "headsha",
+          request: async (path: string) => {
+            if (path.startsWith("/repos/owner/name/compare/")) {
+              return {
+                merge_base_commit: { sha: "basesha" },
+                files: [
+                  {
+                    filename: "src/legacy.ts",
+                    status: "modified",
+                    patch: "@@ -1,2 +1,1 @@\n-export const legacyMode = true;\n",
+                  },
+                  {
+                    filename: "src/legacy-api.test.ts",
+                    status: "added",
+                    patch: '@@ -0,0 +1,1 @@\n+expect(legacy).not.toHaveProperty("legacyMode");\n',
+                  },
+                ],
+              };
+            }
+            const writtenContents: Readonly<Record<string, Uint8Array>> = {
+              "/repos/owner/name/contents/src/legacy.ts?ref=basesha": Buffer.from(
+                LEGACY_BEFORE,
+                "utf8",
+              ),
+              "/repos/owner/name/contents/src/legacy.ts?ref=headsha": Uint8Array.from([
+                0xff, 0xfe, 0xff,
+              ]),
+              "/repos/owner/name/contents/src/legacy-api.test.ts?ref=headsha": Buffer.from(
+                "const added = true;\n",
+                "utf8",
+              ),
+            };
+            const writtenContent = writtenContents[path];
+            if (writtenContent === undefined) throw new Error(`unexpected request ${path}`);
+            return { content: Buffer.from(writtenContent).toString("base64") };
+          },
+        }),
+      );
+      return failure === null ? null : failure.message;
+    });
+
+    it("refuses a head source the API answered as undecodable bytes", ({
+      failureFromReadingAnUndecodableHeadSource,
+    }) => {
+      expect(failureFromReadingAnUndecodableHeadSource).toBe(
+        "Source blob does not decode as UTF-8: src/legacy.ts",
+      );
+    });
+  });
+
   describe("a compare reporting a removal, a rename and a copy", () => {
     const it = test.extend("movedFilesComparison", () =>
       compareGitHubPullRequest({

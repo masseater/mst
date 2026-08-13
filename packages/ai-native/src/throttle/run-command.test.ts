@@ -1,11 +1,14 @@
+import { ChildProcess } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
 import { standardIoTest } from "@mst/dont-review-it/vitest";
-import { describe, expect } from "vite-plus/test";
+import { describe, expect, vi } from "vite-plus/test";
 
+import { CHILD_PROCESS_EVENT } from "../node-event-names.ts";
+import { TREE_TERMINATION_SIGNAL } from "./process-tree.ts";
 import { runWithSlot } from "./run-command.ts";
 import { runThrottle } from "./run-throttle.ts";
 
@@ -31,14 +34,20 @@ const SLEEPING_COMMAND = [
   "setTimeout(() => {}, 30000);",
 ];
 
-const STALE_MS = 5000;
-
 const WAIT_BUDGET_MS = 30_000;
 
 const POLL_MS = 10_000;
 
+const KNOWN_CHILD_PID = 314_159;
+
+const LINGERING_ARGUMENTS = ["-e", "setInterval(() => {}, 1000);"];
+
+class ChildProcessWithKnownPid extends ChildProcess {
+  override readonly pid = KNOWN_CHILD_PID;
+}
+
 describe("runWithSlot", () => {
-  const throttleTest = standardIoTest.extend("slotDirectory", ({}, { onCleanup }) => {
+  const test = standardIoTest.extend("slotDirectory", ({}, { onCleanup }) => {
     const madeSlotDirectory = mkdtempSync(join(tmpdir(), "throttle-command-"));
     onCleanup(() => {
       rmSync(madeSlotDirectory, { recursive: true, force: true });
@@ -47,16 +56,14 @@ describe("runWithSlot", () => {
   });
 
   describe("a command that exits zero", () => {
-    const it = throttleTest.extend("theCodeOfATrivialCommand", async ({ slotDirectory }) =>
+    const it = test.extend("theCodeOfATrivialCommand", async ({ slotDirectory }) =>
       runThrottle(TRIVIAL_COMMAND, {
         slotDir: slotDirectory,
         limit: 1,
-        staleMs: STALE_MS,
         waitBudgetMs: WAIT_BUDGET_MS,
         pollMs: POLL_MS,
         isInteractive: false,
-      }),
-    );
+      }));
 
     it("is reported as a pass", { timeout: 30_000 }, ({ theCodeOfATrivialCommand }) => {
       expect(theCodeOfATrivialCommand).toBe(0);
@@ -64,21 +71,17 @@ describe("runWithSlot", () => {
   });
 
   describe("a command that runs after a failed one", () => {
-    const it = throttleTest.extend(
-      "theCodeOfARunFollowingAFailedOne",
-      async ({ slotDirectory }) => {
-        const seams = {
-          slotDir: slotDirectory,
-          limit: 1,
-          staleMs: STALE_MS,
-          waitBudgetMs: WAIT_BUDGET_MS,
-          pollMs: POLL_MS,
-          isInteractive: false,
-        };
-        await runThrottle(FAILING_COMMAND, seams);
-        return runThrottle(TRIVIAL_COMMAND, seams);
-      },
-    );
+    const it = test.extend("theCodeOfARunFollowingAFailedOne", async ({ slotDirectory }) => {
+      const seams = {
+        slotDir: slotDirectory,
+        limit: 1,
+        waitBudgetMs: WAIT_BUDGET_MS,
+        pollMs: POLL_MS,
+        isInteractive: false,
+      };
+      await runThrottle(FAILING_COMMAND, seams);
+      return runThrottle(TRIVIAL_COMMAND, seams);
+    });
 
     it(
       "takes the slot the failed run released",
@@ -90,22 +93,19 @@ describe("runWithSlot", () => {
   });
 
   describe("a command that exits non-zero", () => {
-    const it = throttleTest
+    const it = test
       .extend("theCodeOfACommandThatExitedNonZero", async ({ slotDirectory }) =>
         runThrottle(FAILING_COMMAND, {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: STALE_MS,
           waitBudgetMs: WAIT_BUDGET_MS,
           pollMs: POLL_MS,
           isInteractive: false,
-        }),
-      )
+        }))
       .extend("theExitCodeIsNamedOnStderr", async ({ slotDirectory, stderr }) => {
         await runThrottle(FAILING_COMMAND, {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: STALE_MS,
           waitBudgetMs: WAIT_BUDGET_MS,
           pollMs: POLL_MS,
           isInteractive: false,
@@ -127,22 +127,19 @@ describe("runWithSlot", () => {
   });
 
   describe("a command killed by a signal", () => {
-    const it = throttleTest
+    const it = test
       .extend("theCodeOfACommandThatWasKilled", async ({ slotDirectory }) =>
         runThrottle(SELF_KILLING_COMMAND, {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: STALE_MS,
           waitBudgetMs: WAIT_BUDGET_MS,
           pollMs: POLL_MS,
           isInteractive: false,
-        }),
-      )
+        }))
       .extend("theSignalIsNamedOnStderr", async ({ slotDirectory, stderr }) => {
         await runThrottle(SELF_KILLING_COMMAND, {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: STALE_MS,
           waitBudgetMs: WAIT_BUDGET_MS,
           pollMs: POLL_MS,
           isInteractive: false,
@@ -160,22 +157,19 @@ describe("runWithSlot", () => {
   });
 
   describe("a command that cannot start", () => {
-    const it = throttleTest
+    const it = test
       .extend("theCodeOfACommandThatCouldNotStart", async ({ slotDirectory }) =>
         runThrottle(["--", MISSING_EXECUTABLE], {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: STALE_MS,
           waitBudgetMs: WAIT_BUDGET_MS,
           pollMs: POLL_MS,
           isInteractive: false,
-        }),
-      )
+        }))
       .extend("theUnstartableCommandIsNamedOnStderr", async ({ slotDirectory, stderr }) => {
         await runThrottle(["--", MISSING_EXECUTABLE], {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: STALE_MS,
           waitBudgetMs: WAIT_BUDGET_MS,
           pollMs: POLL_MS,
           isInteractive: false,
@@ -201,27 +195,34 @@ describe("runWithSlot", () => {
   });
 
   describe("a command that runs past its timeout", () => {
-    const it = throttleTest
+    const it = test
       .extend("theCodeOfACommandThatRanPastItsTimeout", async ({ slotDirectory }) =>
         runThrottle(SLEEPING_COMMAND, {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: STALE_MS,
           waitBudgetMs: WAIT_BUDGET_MS,
           pollMs: POLL_MS,
           isInteractive: false,
-        }),
-      )
+        }))
       .extend("theTimeoutIsNamedOnStderr", async ({ slotDirectory, stderr }) => {
         await runThrottle(SLEEPING_COMMAND, {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: STALE_MS,
           waitBudgetMs: WAIT_BUDGET_MS,
           pollMs: POLL_MS,
           isInteractive: false,
         });
         return stderr.text().includes("ran past the 1s timeout");
+      })
+      .extend("theTreeTerminationFailureIsNamedOnStderr", async ({ slotDirectory, stderr }) => {
+        await runThrottle(SLEEPING_COMMAND, {
+          slotDir: slotDirectory,
+          limit: 1,
+          waitBudgetMs: WAIT_BUDGET_MS,
+          pollMs: POLL_MS,
+          isInteractive: false,
+        });
+        return stderr.text().includes("could not terminate the whole command tree");
       });
 
     it(
@@ -235,52 +236,123 @@ describe("runWithSlot", () => {
     it("names the timeout on stderr", { timeout: 30_000 }, ({ theTimeoutIsNamedOnStderr }) => {
       expect(theTimeoutIsNamedOnStderr).toBe(true);
     });
+
+    it(
+      "says nothing about a tree it could not terminate",
+      { timeout: 30_000 },
+      ({ theTreeTerminationFailureIsNamedOnStderr }) => {
+        expect(theTreeTerminationFailureIsNamedOnStderr).toBe(false);
+      },
+    );
   });
 
   describe("a fast command under a long timeout", () => {
-    const it = throttleTest
-      .extend("theCodeOfAFastCommandUnderALongTimeout", async ({ slotDirectory }) =>
-        runThrottle(["--timeout", "30", ...TRIVIAL_COMMAND], {
-          slotDir: slotDirectory,
-          limit: 1,
-          staleMs: STALE_MS,
-          waitBudgetMs: WAIT_BUDGET_MS,
-          pollMs: POLL_MS,
-          isInteractive: false,
-        }),
-      )
-      .extend("theFastCommandReturnedAtOnce", async ({ slotDirectory }) => {
-        const before = Date.now();
-        await runThrottle(["--timeout", "30", ...TRIVIAL_COMMAND], {
-          slotDir: slotDirectory,
-          limit: 1,
-          staleMs: STALE_MS,
-          waitBudgetMs: WAIT_BUDGET_MS,
-          pollMs: POLL_MS,
-          isInteractive: false,
+    const it = test
+      .extend("theCodeOfAFastCommandUnderALongTimeout", async () => {
+        const settledChild = new ChildProcessWithKnownPid();
+        return runWithSlot({
+          invocation: {
+            timeoutSec: 30,
+            executable: process.execPath,
+            args: ["-e", ""],
+            commandLine: `${process.execPath} -e `,
+          },
+          hold: { release: () => Promise.resolve() },
+          dependencies: {
+            spawnChild: () => {
+              queueMicrotask(() => settledChild.emit(CHILD_PROCESS_EVENT.exit, 0, null));
+              return settledChild;
+            },
+            signalTree: () => null,
+          },
         });
-        return Date.now() - before < 5000;
+      })
+      .extend("theSpawnOfAFastCommandUnderALongTimeout", async () => {
+        const settledChild = new ChildProcessWithKnownPid();
+        const spawnChild = vi.fn<
+          (spawned: { executable: string; args: readonly string[] }) => ChildProcess
+        >(() => {
+          queueMicrotask(() => settledChild.emit(CHILD_PROCESS_EVENT.exit, 0, null));
+          return settledChild;
+        });
+        await runWithSlot({
+          invocation: {
+            timeoutSec: 30,
+            executable: process.execPath,
+            args: ["-e", ""],
+            commandLine: `${process.execPath} -e `,
+          },
+          hold: { release: () => Promise.resolve() },
+          dependencies: { spawnChild, signalTree: () => null },
+        });
+        return spawnChild;
+      })
+      .extend("theSlotReleaseOfAFastCommandUnderALongTimeout", async () => {
+        const settledChild = new ChildProcessWithKnownPid();
+        const release = vi.fn<() => Promise<void>>(() => Promise.resolve());
+        await runWithSlot({
+          invocation: {
+            timeoutSec: 30,
+            executable: process.execPath,
+            args: ["-e", ""],
+            commandLine: `${process.execPath} -e `,
+          },
+          hold: { release },
+          dependencies: {
+            spawnChild: () => {
+              queueMicrotask(() => settledChild.emit(CHILD_PROCESS_EVENT.exit, 0, null));
+              return settledChild;
+            },
+            signalTree: () => null,
+          },
+        });
+        return release;
+      })
+      .extend("theTreeSignalOfAFastCommandUnderALongTimeout", async () => {
+        const settledChild = new ChildProcessWithKnownPid();
+        const signalTree = vi.fn<
+          (signalled: { pid: number; signal: NodeJS.Signals }) => Error | null
+        >(() => null);
+        await runWithSlot({
+          invocation: {
+            timeoutSec: 30,
+            executable: process.execPath,
+            args: ["-e", ""],
+            commandLine: `${process.execPath} -e `,
+          },
+          hold: { release: () => Promise.resolve() },
+          dependencies: {
+            spawnChild: () => {
+              queueMicrotask(() => settledChild.emit(CHILD_PROCESS_EVENT.exit, 0, null));
+              return settledChild;
+            },
+            signalTree,
+          },
+        });
+        return signalTree;
       });
 
-    it(
-      "is reported as a pass",
-      { timeout: 10_000 },
-      ({ theCodeOfAFastCommandUnderALongTimeout }) => {
-        expect(theCodeOfAFastCommandUnderALongTimeout).toBe(0);
-      },
-    );
+    it("is reported as a pass", ({ theCodeOfAFastCommandUnderALongTimeout }) => {
+      expect(theCodeOfAFastCommandUnderALongTimeout).toBe(0);
+    });
 
-    it(
-      "returns without waiting for the timeout that never fires",
-      { timeout: 10_000 },
-      ({ theFastCommandReturnedAtOnce }) => {
-        expect(theFastCommandReturnedAtOnce).toBe(true);
-      },
-    );
+    it("starts the command once", ({ theSpawnOfAFastCommandUnderALongTimeout }) => {
+      expect(theSpawnOfAFastCommandUnderALongTimeout).toHaveBeenCalledOnce();
+    });
+
+    it("gives the slot back once", ({ theSlotReleaseOfAFastCommandUnderALongTimeout }) => {
+      expect(theSlotReleaseOfAFastCommandUnderALongTimeout).toHaveBeenCalledOnce();
+    });
+
+    it("returns without the timeout that never fires reaching the tree", ({
+      theTreeSignalOfAFastCommandUnderALongTimeout,
+    }) => {
+      expect(theTreeSignalOfAFastCommandUnderALongTimeout).toHaveBeenCalledTimes(0);
+    });
   });
 
-  describe("a stubborn process tree that ignores SIGTERM", () => {
-    const it = throttleTest
+  describe("a grandchild that survives SIGTERM after the root exits", () => {
+    const it = test
       .extend("stampsDirectory", ({}, { onCleanup }) => {
         const madeStampsDirectory = mkdtempSync(join(tmpdir(), "throttle-tree-stamps-"));
         onCleanup(() => {
@@ -288,87 +360,89 @@ describe("runWithSlot", () => {
         });
         return madeStampsDirectory;
       })
-      .extend("theCodeOfAStubbornProcessTree", async ({ slotDirectory, stampsDirectory }) =>
-        runThrottle(
-          [
-            "--timeout",
-            "5",
-            "--",
-            "sh",
-            "-c",
-            `trap "" TERM; sleep 30 & echo $! > "${join(stampsDirectory, "grandchild-pid")}"; wait`,
-          ],
-          {
-            slotDir: slotDirectory,
-            limit: 1,
-            staleMs: STALE_MS,
-            waitBudgetMs: WAIT_BUDGET_MS,
-            pollMs: POLL_MS,
-            isInteractive: false,
-          },
-        ),
-      )
       .extend(
-        "theStubbornTimeoutIsNamedOnStderr",
-        async ({ slotDirectory, stampsDirectory, stderr }) => {
-          await runThrottle(
+        "theCodeOfARunWithASurvivingGrandchild",
+        async ({ slotDirectory, stampsDirectory }) => {
+          const pidFile = join(stampsDirectory, "grandchild-pid");
+          return runThrottle(
             [
               "--timeout",
-              "5",
+              "10",
               "--",
-              "sh",
-              "-c",
-              `trap "" TERM; sleep 30 & echo $! > "${join(stampsDirectory, "grandchild-pid")}"; wait`,
+              process.execPath,
+              "-e",
+              `const { spawn } = require("node:child_process"); const { writeFileSync } = require("node:fs"); const grandchild = spawn(process.execPath, ["-e", "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000);"], { stdio: "ignore" }); writeFileSync(${JSON.stringify(pidFile)}, String(grandchild.pid)); setInterval(() => {}, 1000);`,
             ],
             {
               slotDir: slotDirectory,
               limit: 1,
-              staleMs: STALE_MS,
               waitBudgetMs: WAIT_BUDGET_MS,
               pollMs: POLL_MS,
               isInteractive: false,
             },
           );
-          return stderr.text().includes("ran past the 5s timeout");
+        },
+      )
+      .extend(
+        "theSurvivingGrandchildTimeoutIsNamedOnStderr",
+        async ({ slotDirectory, stampsDirectory, stderr }) => {
+          const pidFile = join(stampsDirectory, "grandchild-pid");
+          await runThrottle(
+            [
+              "--timeout",
+              "10",
+              "--",
+              process.execPath,
+              "-e",
+              `const { spawn } = require("node:child_process"); const { writeFileSync } = require("node:fs"); const grandchild = spawn(process.execPath, ["-e", "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000);"], { stdio: "ignore" }); writeFileSync(${JSON.stringify(pidFile)}, String(grandchild.pid)); setInterval(() => {}, 1000);`,
+            ],
+            {
+              slotDir: slotDirectory,
+              limit: 1,
+              waitBudgetMs: WAIT_BUDGET_MS,
+              pollMs: POLL_MS,
+              isInteractive: false,
+            },
+          );
+          return stderr.text().includes("ran past the 10s timeout");
         },
       )
       .extend("theEscalationOutlastedTheTimeout", async ({ slotDirectory, stampsDirectory }) => {
+        const pidFile = join(stampsDirectory, "grandchild-pid");
         const before = Date.now();
         await runThrottle(
           [
             "--timeout",
-            "5",
+            "10",
             "--",
-            "sh",
-            "-c",
-            `trap "" TERM; sleep 30 & echo $! > "${join(stampsDirectory, "grandchild-pid")}"; wait`,
+            process.execPath,
+            "-e",
+            `const { spawn } = require("node:child_process"); const { writeFileSync } = require("node:fs"); const grandchild = spawn(process.execPath, ["-e", "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000);"], { stdio: "ignore" }); writeFileSync(${JSON.stringify(pidFile)}, String(grandchild.pid)); setInterval(() => {}, 1000);`,
           ],
           {
             slotDir: slotDirectory,
             limit: 1,
-            staleMs: STALE_MS,
             waitBudgetMs: WAIT_BUDGET_MS,
             pollMs: POLL_MS,
             isInteractive: false,
           },
         );
-        return Date.now() - before > 9500;
+        return Date.now() - before > 14_500;
       })
       .extend("theProbeOfTheGrandchild", async ({ slotDirectory, stampsDirectory }) => {
         const pidFile = join(stampsDirectory, "grandchild-pid");
         await runThrottle(
           [
             "--timeout",
-            "5",
+            "10",
             "--",
-            "sh",
-            "-c",
-            `trap "" TERM; sleep 30 & echo $! > "${pidFile}"; wait`,
+            process.execPath,
+            "-e",
+            `const { spawn } = require("node:child_process"); const { writeFileSync } = require("node:fs"); const grandchild = spawn(process.execPath, ["-e", "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000);"], { stdio: "ignore" }); writeFileSync(${JSON.stringify(pidFile)}, String(grandchild.pid)); setInterval(() => {}, 1000);`,
           ],
           {
             slotDir: slotDirectory,
             limit: 1,
-            staleMs: STALE_MS,
             waitBudgetMs: WAIT_BUDGET_MS,
             pollMs: POLL_MS,
             isInteractive: false,
@@ -385,115 +459,392 @@ describe("runWithSlot", () => {
         }
       });
 
-    it("is reported as a failure", { timeout: 25_000 }, ({ theCodeOfAStubbornProcessTree }) => {
-      expect(theCodeOfAStubbornProcessTree).toBe(1);
-    });
+    it(
+      "is reported as a failure",
+      { timeout: 50_000 },
+      ({ theCodeOfARunWithASurvivingGrandchild }) => {
+        expect(theCodeOfARunWithASurvivingGrandchild).toBe(1);
+      },
+    );
 
     it(
       "names the timeout on stderr",
-      { timeout: 25_000 },
-      ({ theStubbornTimeoutIsNamedOnStderr }) => {
-        expect(theStubbornTimeoutIsNamedOnStderr).toBe(true);
+      { timeout: 50_000 },
+      ({ theSurvivingGrandchildTimeoutIsNamedOnStderr }) => {
+        expect(theSurvivingGrandchildTimeoutIsNamedOnStderr).toBe(true);
       },
     );
 
     it(
       "waits past the timeout before escalating to SIGKILL",
-      { timeout: 25_000 },
+      { timeout: 50_000 },
       ({ theEscalationOutlastedTheTimeout }) => {
         expect(theEscalationOutlastedTheTimeout).toBe(true);
       },
     );
 
-    it("leaves no grandchild behind", { timeout: 25_000 }, ({ theProbeOfTheGrandchild }) => {
+    it("leaves no grandchild behind", { timeout: 50_000 }, ({ theProbeOfTheGrandchild }) => {
       expect(theProbeOfTheGrandchild).toBe("kill ESRCH");
     });
   });
 
-  describe("a run whose slot lease was compromised", () => {
-    const it = throttleTest
-      .extend("theCodeOfARunWhoseLeaseWasCompromised", async ({ slotDirectory }) => {
-        const pendingRun = runThrottle(
-          ["--", process.execPath, "-e", "setTimeout(() => {}, 2600);"],
-          {
-            slotDir: slotDirectory,
-            limit: 1,
-            staleMs: 2000,
-            waitBudgetMs: WAIT_BUDGET_MS,
-            pollMs: POLL_MS,
-            isInteractive: false,
+  describe("a timeout on a platform whose tree dies without a grace period", () => {
+    const it = test
+      .extend("theCodeOfARunTimedOutWithoutAGracePeriod", async () => {
+        const lingeringChild = new ChildProcessWithKnownPid();
+        return runWithSlot({
+          invocation: {
+            timeoutSec: 1,
+            executable: process.execPath,
+            args: LINGERING_ARGUMENTS,
+            commandLine: `${process.execPath} -e setInterval`,
           },
-        );
-        await delay(500);
-        rmSync(join(slotDirectory, "slot-0.lock"), { recursive: true, force: true });
-        return pendingRun;
+          hold: { release: () => Promise.resolve() },
+          dependencies: {
+            platform: "win32",
+            spawnChild: () => lingeringChild,
+            signalTree: () => {
+              lingeringChild.emit(CHILD_PROCESS_EVENT.exit, null, TREE_TERMINATION_SIGNAL.forced);
+              return null;
+            },
+          },
+        });
       })
-      .extend("theCompromisedLeaseIsNamedOnStderr", async ({ slotDirectory, stderr }) => {
-        const pendingRun = runThrottle(
-          ["--", process.execPath, "-e", "setTimeout(() => {}, 2600);"],
-          {
-            slotDir: slotDirectory,
-            limit: 1,
-            staleMs: 2000,
-            waitBudgetMs: WAIT_BUDGET_MS,
-            pollMs: POLL_MS,
-            isInteractive: false,
+      .extend("theTreeSignalOfARunTimedOutWithoutAGracePeriod", async () => {
+        const lingeringChild = new ChildProcessWithKnownPid();
+        const signalTree = vi.fn<
+          (signalled: { pid: number; signal: NodeJS.Signals }) => Error | null
+        >(() => {
+          lingeringChild.emit(CHILD_PROCESS_EVENT.exit, null, TREE_TERMINATION_SIGNAL.forced);
+          return null;
+        });
+        await runWithSlot({
+          invocation: {
+            timeoutSec: 1,
+            executable: process.execPath,
+            args: LINGERING_ARGUMENTS,
+            commandLine: `${process.execPath} -e setInterval`,
           },
-        );
-        await delay(500);
-        rmSync(join(slotDirectory, "slot-0.lock"), { recursive: true, force: true });
-        await pendingRun;
-        return stderr.text().includes("slot lease compromised");
+          hold: { release: () => Promise.resolve() },
+          dependencies: {
+            platform: "win32",
+            spawnChild: () => lingeringChild,
+            signalTree,
+          },
+        });
+        return signalTree;
+      })
+      .extend("theRunTimedOutWithoutAGracePeriodEndedPromptly", async () => {
+        const lingeringChild = new ChildProcessWithKnownPid();
+        const before = Date.now();
+        await runWithSlot({
+          invocation: {
+            timeoutSec: 1,
+            executable: process.execPath,
+            args: LINGERING_ARGUMENTS,
+            commandLine: `${process.execPath} -e setInterval`,
+          },
+          hold: { release: () => Promise.resolve() },
+          dependencies: {
+            platform: "win32",
+            spawnChild: () => lingeringChild,
+            signalTree: () => {
+              lingeringChild.emit(CHILD_PROCESS_EVENT.exit, null, TREE_TERMINATION_SIGNAL.forced);
+              return null;
+            },
+          },
+        });
+        return Date.now() - before < 10_000;
+      })
+      .extend("theTimeoutWithoutAGracePeriodIsNamedOnStderr", async ({ stderr }) => {
+        const lingeringChild = new ChildProcessWithKnownPid();
+        await runWithSlot({
+          invocation: {
+            timeoutSec: 1,
+            executable: process.execPath,
+            args: LINGERING_ARGUMENTS,
+            commandLine: `${process.execPath} -e setInterval`,
+          },
+          hold: { release: () => Promise.resolve() },
+          dependencies: {
+            platform: "win32",
+            spawnChild: () => lingeringChild,
+            signalTree: () => {
+              lingeringChild.emit(CHILD_PROCESS_EVENT.exit, null, TREE_TERMINATION_SIGNAL.forced);
+              return null;
+            },
+          },
+        });
+        return stderr.text().includes("ran past the 1s timeout");
       });
 
-    it(
-      "leaves the running command alone",
-      { timeout: 10_000 },
-      ({ theCodeOfARunWhoseLeaseWasCompromised }) => {
-        expect(theCodeOfARunWhoseLeaseWasCompromised).toBe(0);
-      },
-    );
+    it("is reported as a failure", ({ theCodeOfARunTimedOutWithoutAGracePeriod }) => {
+      expect(theCodeOfARunTimedOutWithoutAGracePeriod).toBe(1);
+    });
 
-    it("is reported on stderr", { timeout: 10_000 }, ({ theCompromisedLeaseIsNamedOnStderr }) => {
-      expect(theCompromisedLeaseIsNamedOnStderr).toBe(true);
+    it("forces the whole tree down in a single signal", ({
+      theTreeSignalOfARunTimedOutWithoutAGracePeriod,
+    }) => {
+      expect(theTreeSignalOfARunTimedOutWithoutAGracePeriod).toHaveBeenCalledExactlyOnceWith({
+        pid: KNOWN_CHILD_PID,
+        signal: TREE_TERMINATION_SIGNAL.forced,
+      });
+    });
+
+    it("ends without waiting out a grace period", ({
+      theRunTimedOutWithoutAGracePeriodEndedPromptly,
+    }) => {
+      expect(theRunTimedOutWithoutAGracePeriodEndedPromptly).toBe(true);
+    });
+
+    it("names the timeout on stderr", ({ theTimeoutWithoutAGracePeriodIsNamedOnStderr }) => {
+      expect(theTimeoutWithoutAGracePeriodIsNamedOnStderr).toBe(true);
     });
   });
 
-  describe("a hold that refuses to be released for a reason of its own", () => {
-    const it = throttleTest.extend("theRefusalOfAnUnreleasableHold", async () => {
-      try {
-        return await runWithSlot(
-          {
+  describe("a process tree that could not be terminated while its root stopped", () => {
+    const it = test
+      .extend("theCodeOfARunWhoseTreeSurvived", async () => {
+        const lingeringChild = new ChildProcessWithKnownPid();
+        return runWithSlot({
+          invocation: {
+            timeoutSec: 1,
+            executable: process.execPath,
+            args: LINGERING_ARGUMENTS,
+            commandLine: `${process.execPath} -e setInterval`,
+          },
+          hold: { release: () => Promise.resolve() },
+          dependencies: {
+            platform: "win32",
+            spawnChild: () => lingeringChild,
+            signalTree: () => {
+              lingeringChild.emit(CHILD_PROCESS_EVENT.exit, null, TREE_TERMINATION_SIGNAL.forced);
+              return new Error("taskkill denied");
+            },
+          },
+        });
+      })
+      .extend("theSurvivingTreeIsNamedOnStderr", async ({ stderr }) => {
+        const lingeringChild = new ChildProcessWithKnownPid();
+        await runWithSlot({
+          invocation: {
+            timeoutSec: 1,
+            executable: process.execPath,
+            args: LINGERING_ARGUMENTS,
+            commandLine: `${process.execPath} -e setInterval`,
+          },
+          hold: { release: () => Promise.resolve() },
+          dependencies: {
+            platform: "win32",
+            spawnChild: () => lingeringChild,
+            signalTree: () => {
+              lingeringChild.emit(CHILD_PROCESS_EVENT.exit, null, TREE_TERMINATION_SIGNAL.forced);
+              return new Error("taskkill denied");
+            },
+          },
+        });
+        return stderr
+          .text()
+          .includes("could not terminate the whole command tree: taskkill denied");
+      })
+      .extend("theTimeoutBehindTheSurvivingTreeIsNamedOnStderr", async ({ stderr }) => {
+        const lingeringChild = new ChildProcessWithKnownPid();
+        await runWithSlot({
+          invocation: {
+            timeoutSec: 1,
+            executable: process.execPath,
+            args: LINGERING_ARGUMENTS,
+            commandLine: `${process.execPath} -e setInterval`,
+          },
+          hold: { release: () => Promise.resolve() },
+          dependencies: {
+            platform: "win32",
+            spawnChild: () => lingeringChild,
+            signalTree: () => {
+              lingeringChild.emit(CHILD_PROCESS_EVENT.exit, null, TREE_TERMINATION_SIGNAL.forced);
+              return new Error("taskkill denied");
+            },
+          },
+        });
+        return stderr.text().includes("ran past the 1s timeout");
+      });
+
+    it("is reported as a failure", ({ theCodeOfARunWhoseTreeSurvived }) => {
+      expect(theCodeOfARunWhoseTreeSurvived).toBe(1);
+    });
+
+    it("names the tree it could not terminate", ({ theSurvivingTreeIsNamedOnStderr }) => {
+      expect(theSurvivingTreeIsNamedOnStderr).toBe(true);
+    });
+
+    it("still names the timeout that started the termination", ({
+      theTimeoutBehindTheSurvivingTreeIsNamedOnStderr,
+    }) => {
+      expect(theTimeoutBehindTheSurvivingTreeIsNamedOnStderr).toBe(true);
+    });
+  });
+
+  describe("a slot that refuses to be given back after a command that passed", () => {
+    const it = test
+      .extend("theCodeOfAPassingRunWhoseSlotStuck", async () =>
+        runWithSlot({
+          invocation: {
             timeoutSec: 0,
             executable: process.execPath,
             args: ["-e", ""],
             commandLine: `${process.execPath} -e `,
           },
-          {
-            release: () => Promise.reject(new Error("the lock store went away")),
-          },
+          hold: { release: () => Promise.reject(new Error("unlock failed")) },
+        }))
+      .extend("theSlotReleaseOfAPassingRunWhoseSlotStuck", async () => {
+        const release = vi.fn<() => Promise<void>>(() =>
+          Promise.reject(new Error("unlock failed")),
         );
-      } catch (refused) {
-        return refused instanceof Error ? refused.message : String(refused);
-      }
+        await runWithSlot({
+          invocation: {
+            timeoutSec: 0,
+            executable: process.execPath,
+            args: ["-e", ""],
+            commandLine: `${process.execPath} -e `,
+          },
+          hold: { release },
+        });
+        return release;
+      })
+      .extend("theStuckSlotIsNamedOnStderr", async ({ stderr }) => {
+        await runWithSlot({
+          invocation: {
+            timeoutSec: 0,
+            executable: process.execPath,
+            args: ["-e", ""],
+            commandLine: `${process.execPath} -e `,
+          },
+          hold: { release: () => Promise.reject(new Error("unlock failed")) },
+        });
+        return stderr.text().includes("could not release the slot: unlock failed");
+      });
+
+    it("turns a passing command into a failure", ({ theCodeOfAPassingRunWhoseSlotStuck }) => {
+      expect(theCodeOfAPassingRunWhoseSlotStuck).toBe(1);
     });
 
-    it("hands the refusal on rather than reading it as a lease already given up", ({
-      theRefusalOfAnUnreleasableHold,
+    it("asks for the slot back once", ({ theSlotReleaseOfAPassingRunWhoseSlotStuck }) => {
+      expect(theSlotReleaseOfAPassingRunWhoseSlotStuck).toHaveBeenCalledOnce();
+    });
+
+    it("names the refusal on stderr", ({ theStuckSlotIsNamedOnStderr }) => {
+      expect(theStuckSlotIsNamedOnStderr).toBe(true);
+    });
+  });
+
+  describe("a slot that refuses to be given back after a command that failed", () => {
+    const it = test
+      .extend("theCodeOfAFailingRunWhoseSlotStuck", async () =>
+        runWithSlot({
+          invocation: {
+            timeoutSec: 0,
+            executable: process.execPath,
+            args: ["-e", "process.exit(3);"],
+            commandLine: `${process.execPath} -e process.exit(3);`,
+          },
+          hold: { release: () => Promise.reject(new Error("close failed")) },
+        }))
+      .extend("theExitCodeBehindAStuckSlotIsNamedOnStderr", async ({ stderr }) => {
+        await runWithSlot({
+          invocation: {
+            timeoutSec: 0,
+            executable: process.execPath,
+            args: ["-e", "process.exit(3);"],
+            commandLine: `${process.execPath} -e process.exit(3);`,
+          },
+          hold: { release: () => Promise.reject(new Error("close failed")) },
+        });
+        return stderr.text().includes("command failed with exit code 3");
+      })
+      .extend("theStuckSlotBehindAFailedCommandIsNamedOnStderr", async ({ stderr }) => {
+        await runWithSlot({
+          invocation: {
+            timeoutSec: 0,
+            executable: process.execPath,
+            args: ["-e", "process.exit(3);"],
+            commandLine: `${process.execPath} -e process.exit(3);`,
+          },
+          hold: { release: () => Promise.reject(new Error("close failed")) },
+        });
+        return stderr.text().includes("could not release the slot: close failed");
+      });
+
+    it("is reported as a failure", ({ theCodeOfAFailingRunWhoseSlotStuck }) => {
+      expect(theCodeOfAFailingRunWhoseSlotStuck).toBe(1);
+    });
+
+    it("still names the exit code of the command", ({
+      theExitCodeBehindAStuckSlotIsNamedOnStderr,
     }) => {
-      expect(theRefusalOfAnUnreleasableHold).toBe("the lock store went away");
+      expect(theExitCodeBehindAStuckSlotIsNamedOnStderr).toBe(true);
+    });
+
+    it("names the refusal beside the command failure", ({
+      theStuckSlotBehindAFailedCommandIsNamedOnStderr,
+    }) => {
+      expect(theStuckSlotBehindAFailedCommandIsNamedOnStderr).toBe(true);
+    });
+  });
+
+  describe("a slot whose refusal is not an error", () => {
+    const it = test
+      .extend("theCodeOfARunRefusedWithoutAnError", async () =>
+        runWithSlot({
+          invocation: {
+            timeoutSec: 0,
+            executable: process.execPath,
+            args: ["-e", ""],
+            commandLine: `${process.execPath} -e `,
+          },
+          hold: {
+            release: () => {
+              const pending = Promise.withResolvers<undefined>();
+              Reflect.apply(pending.reject, undefined, ["unlock failed"]);
+              return pending.promise;
+            },
+          },
+        }))
+      .extend("theRefusalWithoutAnErrorIsNamedOnStderr", async ({ stderr }) => {
+        await runWithSlot({
+          invocation: {
+            timeoutSec: 0,
+            executable: process.execPath,
+            args: ["-e", ""],
+            commandLine: `${process.execPath} -e `,
+          },
+          hold: {
+            release: () => {
+              const pending = Promise.withResolvers<undefined>();
+              Reflect.apply(pending.reject, undefined, ["unlock failed"]);
+              return pending.promise;
+            },
+          },
+        });
+        return stderr.text().includes("could not release the slot: unlock failed");
+      });
+
+    it("is reported as a failure", ({ theCodeOfARunRefusedWithoutAnError }) => {
+      expect(theCodeOfARunRefusedWithoutAnError).toBe(1);
+    });
+
+    it("renders the thrown value on stderr", ({ theRefusalWithoutAnErrorIsNamedOnStderr }) => {
+      expect(theRefusalWithoutAnErrorIsNamedOnStderr).toBe(true);
     });
   });
 
   describe("everything a run of an unstartable command says", () => {
-    const it = throttleTest.extend(
+    const it = test.extend(
       "theRunOfAnUnstartableCommand",
       { auto: true },
       async ({ slotDirectory }) => {
         await runThrottle(["--", MISSING_EXECUTABLE], {
           slotDir: slotDirectory,
           limit: 1,
-          staleMs: STALE_MS,
           waitBudgetMs: WAIT_BUDGET_MS,
           pollMs: POLL_MS,
           isInteractive: false,

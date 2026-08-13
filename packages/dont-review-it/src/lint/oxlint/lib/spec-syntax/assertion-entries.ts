@@ -4,7 +4,7 @@ import { unwrapSubject } from "./subject-expressions.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
-export const ASSERTION_ENTRY_NAME = "expect";
+const ASSERTION_ENTRY_NAME = "expect";
 
 export const isAssertionEntryReference = (node: ESTree.Expression): boolean => {
   const receiver = unwrapSubject(node);

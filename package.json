@@ -9,7 +9,7 @@
   "type": "module",
   "scripts": {
     "guard": "throttle --timeout 1800 -- spool -- vp run guard:all",
-    "guard:all": "vp check && vp run -r typecheck && vp run -r test --coverage && vp run -r build && vp run knip && vp run knip --production && vp exec dont-review-it check && vp exec agentic-documents check && vp exec verified-specifications check && vp exec stop-ai-slop check && vp run -r check:skills",
+    "guard:all": "vp check && vp run -r typecheck && vp run -r build && vp run knip && vp run knip --production && vp exec dont-review-it check && vp exec agentic-documents check && vp exec verified-specifications check && vp exec stop-ai-slop check && vp run -r check:skills && vp run -r test --coverage",
     "guard:fix": "vp exec lint-rule-authoring check --write && vp check --fix && vp exec agentic-documents check --write && vp exec verified-specifications check --write && vp exec dont-review-it check --write",
     "dev": "vp run website#dev",
     "knip": "knip",

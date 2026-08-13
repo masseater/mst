@@ -73,6 +73,19 @@ describe("検査の走査証跡", () => {
     ]);
   });
 
+  it("設定を持つリポジトリでは preset adoption を走査済みとして残す", async () => {
+    const repositoryRoot = await repositoryWith({
+      "package.json": `{"name": "solo"}`,
+      "vite.config.ts": "export default defineConfig({ lint: { rules: {} } });\n",
+    });
+
+    const presetAdoption = runChecks(repositoryRoot).outcomes.find(
+      (presetAdoptionRun) => presetAdoptionRun.check === "preset-adoption",
+    );
+
+    expect(presetAdoption?.skippedReason).toBeNull();
+  });
+
   it("人間が読む形では、状態の記号と対象の規模を観点ごとに桁で揃えて並べる", async () => {
     const repositoryRoot = await repositoryWith({
       "renovate.json": `{}\n`,

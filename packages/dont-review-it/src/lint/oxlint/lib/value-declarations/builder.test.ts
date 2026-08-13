@@ -236,6 +236,7 @@ describe("loadRepositoryValueDeclarationIndex", () => {
       mkdirSync(join(repositoryRoot, "src"), { recursive: true });
       writeFileSync(join(repositoryRoot, "src", "a.ts"), SEED, "utf8");
       writeFileSync(join(repositoryRoot, "src", REMOVED_FILE_NAME), SEED, "utf8");
+      // mock-factory-exemption no-replaced-double-behaviour--let-the-replaced-module-answer -- whether a listed source is still there by the time it is read is settled inside the boundary this spec replaces, and both the listing and the read happen inside one synchronous call
       vi.mocked(readTextFile).mockImplementation((path) =>
         path.endsWith(REMOVED_FILE_NAME) ? null : readFileSync(path, "utf8"),
       );

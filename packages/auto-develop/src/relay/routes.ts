@@ -1,5 +1,6 @@
 import { connectionCursorId } from "../contract/cursor.ts";
 import { isMode, type Mode } from "../contract/vocabulary.ts";
+import { SOCKET_LIFECYCLE_EVENT } from "../runtime/event-names.ts";
 import { authFailureStatus } from "./auth-status.ts";
 import { runBaseUpdateCheck } from "./base-update-checker.ts";
 import { extractBearer } from "./bearer.ts";
@@ -184,7 +185,7 @@ export const handleStreamRoute = async (carried: RouteContext): Promise<void> =>
   });
   carried.res.flushHeaders();
   const clientHangup = new AbortController();
-  carried.req.on("close", () => {
+  carried.req.on(SOCKET_LIFECYCLE_EVENT.close, () => {
     clientHangup.abort();
   });
   await runEventStream({

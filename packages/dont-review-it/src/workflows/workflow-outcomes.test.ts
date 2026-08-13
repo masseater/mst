@@ -70,7 +70,7 @@ describe("workflowOutcomesOf", () => {
   describe("a repository holding no workflow definition", () => {
     const it = test.extend("outcomesOfRepositoryWithoutDefinition", () => {
       const repositoryRoot = mkdtempSync(join(tmpdir(), "dont-review-it-workflow-outcomes-"));
-      writeFileSync(join(repositoryRoot, "package.json"), `{"scenario": "solo"}`);
+      writeFileSync(join(repositoryRoot, "package.json"), `{"name": "solo"}`);
       return workflowOutcomesOf({ repositoryRoot, config: defaultWorkflowChecksConfig });
     });
 

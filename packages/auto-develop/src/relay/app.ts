@@ -8,6 +8,7 @@ import {
   EVENT_STREAM_PATH,
   STARTUP_DRAIN_PATH,
 } from "../contract/endpoints.ts";
+import { SOCKET_LIFECYCLE_EVENT } from "../runtime/event-names.ts";
 import {
   handleCheckBaseUpdatesRoute,
   handleHealthRoute,
@@ -88,9 +89,9 @@ export const createRelayServer = (deps: RelayDependencies): RelayServer => {
   };
 
   const accepted = acceptRequests({
-    arrivals: on(server, "request", { close: ["close"] }) as AsyncIterator<
-      readonly [IncomingMessage, ServerResponse]
-    >,
+    arrivals: on(server, "request", {
+      close: [SOCKET_LIFECYCLE_EVENT.close],
+    }) as AsyncIterator<readonly [IncomingMessage, ServerResponse]>,
   });
 
   const closeServer = (): Promise<void> =>

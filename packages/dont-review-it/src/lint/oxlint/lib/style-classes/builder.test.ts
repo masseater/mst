@@ -65,6 +65,7 @@ describe("loadStyleClassIndex", () => {
         ".ghost {\n  color: red;\n}\n",
         "utf8",
       );
+      // mock-factory-exemption no-replaced-double-behaviour--let-the-replaced-module-answer -- whether a style sheet is still there when the boundary reads it is settled between the listing and the read, both of which happen inside the boundary this spec replaces
       vi.mocked(readTextFile).mockImplementation((path) =>
         path.endsWith(VANISHED_FILE_NAME) ? null : readFileSync(path, "utf8"),
       );

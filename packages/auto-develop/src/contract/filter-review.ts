@@ -1,6 +1,6 @@
 import { carriedDeliveryId } from "./delivery-id.ts";
 import { asRecord } from "./unknown-record.ts";
-import { isAuthorWorkReviewState, isReviewState, type Mode } from "./vocabulary.ts";
+import { DECLARED_MODE, isAuthorWorkReviewState, isReviewState, type Mode } from "./vocabulary.ts";
 
 import type { FilteredEvent } from "./filtered-event.ts";
 
@@ -20,7 +20,7 @@ export const filterReviewEvent = (
   delivered: Readonly<Record<string, unknown>>,
   spelledMode: Mode,
 ): FilteredEvent | null => {
-  if (spelledMode === "reviewer") return null;
+  if (spelledMode === DECLARED_MODE.reviewer) return null;
   const review = submittedReviewShape(delivered);
   if (review === null || delivered.action !== "submitted") return null;
   const normalizedState = review.state.toLowerCase();

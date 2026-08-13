@@ -1,21 +1,8 @@
-import { failedWithCode } from "./failure-codes.ts";
-
+/** @canonical-values ai-native.interrupt-signal */
 const INTERRUPT_SIGNALS = ["SIGINT", "SIGTERM"] as const;
 
 export const raiseSignal = (signal: NodeJS.Signals): void => {
   process.kill(process.pid, signal);
-};
-
-const UNREACHABLE_PROCESS_CODES: ReadonlySet<string> = new Set(["ESRCH", "EPERM"]);
-
-export const safeKill = (pid: number, signal: NodeJS.Signals): boolean => {
-  try {
-    process.kill(pid, signal);
-    return true;
-  } catch (undeliverableSignal) {
-    if (failedWithCode(undeliverableSignal, UNREACHABLE_PROCESS_CODES)) return false;
-    throw undeliverableSignal;
-  }
 };
 
 export const installInterruptHandler = (takenHandler: (signal: NodeJS.Signals) => void): void => {
@@ -78,9 +65,11 @@ export const makeHeldInterrupt = (
 
 export const makeRunningInterruptHandler = (dependencies: {
   childPid: number;
-  kill: (pid: number, signal: NodeJS.Signals) => boolean;
+  signalTree: (input: { pid: number; signal: NodeJS.Signals }) => Error | null;
+  reportFailure: (failure: Error) => void;
 }): ((signal: NodeJS.Signals) => void) => {
   return (signal) => {
-    dependencies.kill(-dependencies.childPid, signal);
+    const failure = dependencies.signalTree({ pid: dependencies.childPid, signal });
+    if (failure !== null) dependencies.reportFailure(failure);
   };
 };

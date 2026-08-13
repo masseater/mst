@@ -34,10 +34,10 @@ const WHOLE_RECORD_COMMAND_PAYLOAD = JSON.stringify({
 describe("unabridged cli", () => {
   describe("the entry module", () => {
     const it = test.extend("theRunnerTheEntryReached", async () => {
-      const runner = vi.mocked(runHook);
-      runner.mockResolvedValue(undefined);
+      // mock-factory-exemption no-replaced-double-behaviour--let-the-replaced-module-answer -- whether the runner settles is decided by the standard input it reads inside the boundary this spec replaces, and the entry awaits it
+      vi.mocked(runHook).mockResolvedValue(undefined);
       await import("./cli.ts");
-      return runner;
+      return vi.mocked(runHook);
     });
 
     it("is handed the hook definition of this package", ({ theRunnerTheEntryReached }) => {

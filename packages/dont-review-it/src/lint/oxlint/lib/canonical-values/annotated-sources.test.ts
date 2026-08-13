@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "vite-plus/test";
 
-import { readAnnotatedSources, readDeclarationSources } from "./annotated-sources.ts";
+import { readAnnotatedSources } from "./annotated-sources.ts";
 import { listRepositoryFiles } from "./source-files.ts";
 
 const ANNOTATED_USER_STATUS = `/** @canonical-values user.status */
@@ -65,24 +65,6 @@ describe("readAnnotatedSources", () => {
 
     it("carries its problems but declares no concept", ({ declarations }) => {
       expect(declarations).toStrictEqual([[]]);
-    });
-  });
-});
-
-describe("readDeclarationSources", () => {
-  describe("an annotated test file", () => {
-    const it = test.extend("sources", ({}, { onCleanup }) => {
-      const root = mkdtempSync(join(tmpdir(), "annotated-sources-"));
-      onCleanup(() => {
-        rmSync(root, { recursive: true, force: true });
-      });
-      mkdirSync(join(root, "src"), { recursive: true });
-      writeFileSync(join(root, "src/user.test.ts"), ANNOTATED_USER_STATUS, "utf8");
-      return readDeclarationSources(listRepositoryFiles(root));
-    });
-
-    it("is no source of a declaration", ({ sources }) => {
-      expect(sources).toStrictEqual([]);
     });
   });
 });

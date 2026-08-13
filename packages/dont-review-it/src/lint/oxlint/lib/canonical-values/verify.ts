@@ -1,63 +1,16 @@
-import { resolve } from "node:path";
+import { analyzeCanonicalValuesRepository } from "./builder.ts";
+import { buildCatalog, type CanonicalValuesCatalog, type CanonicalValuesEntry } from "./catalog.ts";
 
-import { readAnnotatedSources, type AnnotatedSource } from "./annotated-sources.ts";
-import { buildCatalog, type CanonicalValuesEntry } from "./catalog.ts";
-import { listRepositoryFiles } from "./source-files.ts";
-
-import type { CanonicalValuesTextProblem } from "./declarations.ts";
-
-export type CanonicalValuesProblem =
-  | (CanonicalValuesTextProblem & { readonly filePath: string })
-  | {
-      readonly kind: "duplicate-concept";
-      readonly filePath: string;
-      readonly line: number;
-      readonly conceptId: string;
-      readonly declaredFilePath: string;
-      readonly declaredLine: number;
-    };
-
-type DeclarationSite = {
-  readonly conceptId: string;
-  readonly filePath: string;
-  readonly line: number;
+export type CanonicalValuesInspection = {
+  readonly catalog: CanonicalValuesCatalog;
+  readonly problems: ReturnType<typeof analyzeCanonicalValuesRepository>["problems"];
 };
 
-const declarationSitesIn = (source: AnnotatedSource): readonly DeclarationSite[] =>
-  source.declarations.map((declaration) => ({
-    conceptId: declaration.conceptId,
-    filePath: source.relativePath,
-    line: declaration.line,
-  }));
-
-const duplicateConceptProblem = (
-  first: DeclarationSite,
-  site: DeclarationSite,
-): CanonicalValuesProblem => ({
-  kind: "duplicate-concept",
-  filePath: site.filePath,
-  line: site.line,
-  conceptId: site.conceptId,
-  declaredFilePath: first.filePath,
-  declaredLine: first.line,
-});
-
-export const verifyCanonicalValues = ({
-  repositoryRoot,
-}: {
+export const inspectCanonicalValues = (inspectionRequest: {
   readonly repositoryRoot: string;
-}): readonly CanonicalValuesProblem[] => {
-  const sources = readAnnotatedSources(listRepositoryFiles(resolve(repositoryRoot)));
-  const sites = sources.flatMap(declarationSitesIn);
-  const duplicates = sites.flatMap((site, order) => {
-    const declared = sites.slice(0, order).find((held) => held.conceptId === site.conceptId);
-    return declared === undefined ? [] : [duplicateConceptProblem(declared, site)];
-  });
-
-  return sources.flatMap((source) => [
-    ...source.problems.map((problem) => ({ ...problem, filePath: source.relativePath })),
-    ...duplicates.filter((problem) => problem.filePath === source.relativePath),
-  ]);
+}): CanonicalValuesInspection => {
+  const analyzed = analyzeCanonicalValuesRepository(inspectionRequest);
+  return { catalog: analyzed.catalog, problems: analyzed.problems };
 };
 
 export const findEquivalentConcepts = (
@@ -66,3 +19,5 @@ export const findEquivalentConcepts = (
   [...buildCatalog(declarations).entriesByFingerprint.values()].filter(
     (grouped) => new Set(grouped.map((declaration) => declaration.conceptId)).size > 1,
   );
+
+export { formatCanonicalValuesProblem, formatEquivalentConceptGroup } from "./verify-format.ts";

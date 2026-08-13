@@ -52,9 +52,7 @@ type Reading = {
 };
 
 const writtenOut = (node: ESTree.Expression): ESTree.Expression => {
-  const written = unwrapExpression(node);
-  if (written.type === "TSNonNullExpression") return writtenOut(written.expression);
-  return written;
+  return unwrapExpression(node);
 };
 
 const firstFinding = (found: readonly (AssetsFinding | null)[]): AssetsFinding | null =>

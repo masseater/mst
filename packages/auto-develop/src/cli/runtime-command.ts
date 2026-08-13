@@ -3,10 +3,9 @@ import { defineCommand } from "citty";
 
 import { readEnvVar } from "../config/env.ts";
 import { runConfigSchema } from "../config/run-config.ts";
+import { DECLARED_MODE, type Mode } from "../contract/vocabulary.ts";
 import { buildContextCommand } from "./build-context-command.ts";
 import { runMode } from "./run-mode.ts";
-
-import type { Mode } from "../contract/vocabulary.ts";
 
 const DEFAULT_CONCURRENCY = "3";
 
@@ -99,15 +98,21 @@ const startRuntime = async (start: {
 };
 
 const reviewerCommand = defineCommand({
-  meta: { name: "reviewer", description: "Review pull requests as they are requested." },
+  meta: {
+    name: DECLARED_MODE.reviewer,
+    description: "Review pull requests as they are requested.",
+  },
   args: runtimeArgs,
-  run: ({ args }) => startRuntime({ mode: "reviewer", args }),
+  run: ({ args }) => startRuntime({ mode: DECLARED_MODE.reviewer, args }),
 });
 
 const authorCommand = defineCommand({
-  meta: { name: "author", description: "Answer review feedback, CI failures and base updates." },
+  meta: {
+    name: DECLARED_MODE.author,
+    description: "Answer review feedback, CI failures and base updates.",
+  },
   args: runtimeArgs,
-  run: ({ args }) => startRuntime({ mode: "author", args }),
+  run: ({ args }) => startRuntime({ mode: DECLARED_MODE.author, args }),
 });
 
 export const autoDevelopCommand = defineCommand({

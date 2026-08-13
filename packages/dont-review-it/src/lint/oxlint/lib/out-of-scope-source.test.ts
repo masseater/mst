@@ -1,6 +1,12 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, test } from "vite-plus/test";
 
-import { isOutOfScopeSource } from "./out-of-scope-source.ts";
+import { isOutOfScopeLintSource, isOutOfScopeSource } from "./out-of-scope-source.ts";
+
+const CHECKOUT_UNDER_A_TESTS_DIRECTORY = "/private/tmp/tests/canonical-values-checkout";
 
 describe("isOutOfScopeSource", () => {
   describe("a name carrying a suffix the runner claims", () => {
@@ -31,6 +37,24 @@ describe("isOutOfScopeSource", () => {
       });
     });
 
+    describe("a test source carrying a further word after the claimed suffix", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/order/src/order-status.test.helper.ts"));
+
+      it("is out of scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(true);
+      });
+    });
+
+    describe("a type test source spelled with a dash", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/order/src/order-status.test-d.ts"));
+
+      it("is out of scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(true);
+      });
+    });
+
     describe("a story spelled in the plural", () => {
       const it = test.extend("outOfScope", () =>
         isOutOfScopeSource("packages/order/src/order-status.stories.tsx"));
@@ -43,6 +67,42 @@ describe("isOutOfScopeSource", () => {
     describe("a story spelled in the singular", () => {
       const it = test.extend("outOfScope", () =>
         isOutOfScopeSource("packages/order/src/order-status.story.tsx"));
+
+      it("is out of scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(true);
+      });
+    });
+
+    describe("a story followed by a fixture word", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/order/src/Owner.stories.fixture.ts"));
+
+      it("is out of scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(true);
+      });
+    });
+
+    describe("a fixture source", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/order/src/order-status.fixture.ts"));
+
+      it("is out of scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(true);
+      });
+    });
+
+    describe("a mock source carrying the component extension", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/order/src/order-status.mock.tsx"));
+
+      it("is out of scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(true);
+      });
+    });
+
+    describe("a fixture source carrying a further word after the claimed suffix", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/order/src/order-status.fixture.helper.ts"));
 
       it("is out of scope", ({ outOfScope }) => {
         expect(outOfScope).toBe(true);
@@ -115,6 +175,73 @@ describe("isOutOfScopeSource", () => {
     });
   });
 
+  describe("a path holding a directory the build writes", () => {
+    describe("a file under a dist directory", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/order/dist/order-status.ts"));
+
+      it("is out of scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(true);
+      });
+    });
+
+    describe("a file under a server-rendered dist directory", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/order/dist-ssr/order-status.ts"));
+
+      it("is out of scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(true);
+      });
+    });
+
+    describe("a file under a coverage directory", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/order/coverage/order-status.ts"));
+
+      it("is out of scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(true);
+      });
+    });
+
+    describe("a file under a cache directory", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/order/.cache/order-status.ts"));
+
+      it("is out of scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(true);
+      });
+    });
+
+    describe("a file under the agent scratch directory", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/order/.local-agents/order-status.ts"));
+
+      it("is out of scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(true);
+      });
+    });
+  });
+
+  describe("a path reaching inside an installed dependency", () => {
+    describe("a dependency file under a dist directory", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("node_modules/library/dist/index.d.ts"));
+
+      it("stays external rather than out of scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(false);
+      });
+    });
+
+    describe("a dependency file under a fixtures directory", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("node_modules/library/fixtures/index.d.ts"));
+
+      it("stays external rather than out of scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(false);
+      });
+    });
+  });
+
   describe("a path written on the windows separator", () => {
     describe("a path holding a fixtures directory", () => {
       const it = test.extend("outOfScope", () =>
@@ -156,6 +283,15 @@ describe("isOutOfScopeSource", () => {
       });
     });
 
+    describe("a source whose first word ends in the word test", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/order/src/contest.helper.ts"));
+
+      it("stays in scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(false);
+      });
+    });
+
     describe("a source whose name ends in the word test", () => {
       const it = test.extend("outOfScope", () =>
         isOutOfScopeSource("packages/order/src/latest.ts"));
@@ -172,6 +308,65 @@ describe("isOutOfScopeSource", () => {
       it("stays in scope", ({ outOfScope }) => {
         expect(outOfScope).toBe(false);
       });
+    });
+  });
+
+  describe("a repository root whose own path carries a claimed word", () => {
+    describe("a production source below that root", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource(
+          `${CHECKOUT_UNDER_A_TESTS_DIRECTORY}/packages/order/src/order-status.ts`,
+          CHECKOUT_UNDER_A_TESTS_DIRECTORY,
+        ));
+
+      it("stays in scope, because the words above the root are not read", ({ outOfScope }) => {
+        expect(outOfScope).toBe(false);
+      });
+    });
+
+    describe("a fixtures directory below that root", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource(
+          `${CHECKOUT_UNDER_A_TESTS_DIRECTORY}/packages/order/fixtures/order-status.ts`,
+          CHECKOUT_UNDER_A_TESTS_DIRECTORY,
+        ));
+
+      it("is out of scope on the words below the root", ({ outOfScope }) => {
+        expect(outOfScope).toBe(true);
+      });
+    });
+  });
+});
+
+describe("isOutOfScopeLintSource", () => {
+  describe("a source that exists below the repository root", () => {
+    const it = test.extend("outOfScopeForLint", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "out-of-scope-source-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      mkdirSync(join(repositoryRoot, "src"));
+      const writtenSource = join(repositoryRoot, "src/status.ts");
+      writeFileSync(writtenSource, "export {};\n");
+      return isOutOfScopeLintSource(writtenSource, repositoryRoot);
+    });
+
+    it("reads it against the root and keeps it in scope", ({ outOfScopeForLint }) => {
+      expect(outOfScopeForLint).toBe(false);
+    });
+  });
+
+  describe("a source that does not exist", () => {
+    const it = test.extend("outOfScopeForLint", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "out-of-scope-source-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      return isOutOfScopeLintSource("tests/missing.ts", repositoryRoot);
+    });
+
+    it("reads it on its written path alone and falls out of scope", ({ outOfScopeForLint }) => {
+      expect(outOfScopeForLint).toBe(true);
     });
   });
 });

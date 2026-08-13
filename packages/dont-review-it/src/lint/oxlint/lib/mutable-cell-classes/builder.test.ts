@@ -85,6 +85,7 @@ describe("loadRepositoryCellClassIndex", () => {
       });
       mkdirSync(join(root, "src"), { recursive: true });
       writeFileSync(join(root, "src", "vanished.ts"), TALLY, "utf8");
+      // mock-factory-exemption no-replaced-double-behaviour--let-the-replaced-module-answer -- whether the source still exists between the listing and the read is settled inside the boundary this spec replaces
       vi.mocked(readTextFile).mockReturnValueOnce(null);
       return loadRepositoryCellClassIndex({ repositoryRoot: root });
     });

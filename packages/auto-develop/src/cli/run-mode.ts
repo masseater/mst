@@ -6,7 +6,8 @@ import { prepareRunContext } from "../context/prepare-run-context.ts";
 import { buildPrompt } from "../context/prompt.ts";
 import { LAUNCH_AUTO } from "../context/run-context.ts";
 import { asRecord } from "../contract/unknown-record.ts";
-import { createAuthorHandler } from "../handlers/author-handler.ts";
+import { DECLARED_MODE, type Mode } from "../contract/vocabulary.ts";
+import { AUTHOR_REASON, createAuthorHandler } from "../handlers/author-handler.ts";
 import { createGithubApiClient } from "../handlers/github-api-client.ts";
 import { createReviewInputCoordinator } from "../handlers/review-input-coordinator.ts";
 import { createReviewerHandler } from "../handlers/reviewer-handler.ts";
@@ -26,7 +27,6 @@ import { worktreePathFor } from "../worktree/paths.ts";
 import { cycleUntilStopped } from "./cycle-loop.ts";
 import { runContextFsOnDisk } from "./run-context-fs.ts";
 
-import type { Mode } from "../contract/vocabulary.ts";
 import type { HandlerGithubClient } from "../handlers/github-client.ts";
 
 const UPDATE_CHECK_INTERVAL_MS = 15 * 60_000;
@@ -173,11 +173,11 @@ const attachHandlers = (attaching: {
           mode: asked.mode,
           prNumber,
           run: async () => {
-            if (asked.mode === "reviewer") {
+            if (asked.mode === DECLARED_MODE.reviewer) {
               await reviewer(prNumber);
               return;
             }
-            await author({ prNumber, reason: "request_changes" });
+            await author({ prNumber, reason: AUTHOR_REASON.requestChanges });
           },
         });
       },

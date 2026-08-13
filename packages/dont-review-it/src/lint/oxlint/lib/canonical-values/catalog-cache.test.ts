@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -5,381 +6,356 @@ import { dirname, join } from "node:path";
 import { attempt } from "es-toolkit";
 import { describe, expect, test } from "vite-plus/test";
 
-import { cacheInputFingerprint, readCachedEntries, writeCachedEntries } from "./catalog-cache.ts";
+import { readCachedEntries, writeCachedEntries } from "./catalog-cache.ts";
+import { fingerprintValues } from "./fingerprint.ts";
 
 const CACHE_SEGMENTS = ["node_modules", ".cache", "mst-dont-review-it", "canonical-values.json"];
 
-const USER_STATUS_CATALOG_ENTRY = {
-  conceptId: "user.status",
-  declarationPath: "src/user.ts",
-  exportPath: null,
-  values: ["draft", "published"],
-  fingerprint: "vocabulary",
+const ORDER_STATUS_CATALOG_ENTRY = {
+  annotationStart: 0,
+  binding: "VALUES",
+  bindingStart: 2,
+  conceptId: "order.status",
+  declarationEnd: 3,
+  declarationPath: "src/status.ts",
+  declarationStart: 1,
+  fingerprint: fingerprintValues(["draft"]),
+  importRoutes: [
+    {
+      exportName: "VALUES",
+      resolvedSourcePaths: ["src/index.ts"],
+      specifier: "@fixture/vocabulary",
+    },
+  ],
+  packageName: null,
+  values: ["draft"],
 };
 
-const UNSERIALIZABLE_CACHE_ROOT = join(tmpdir(), "catalog-cache-unserializable");
-
 describe("readCachedEntries", () => {
-  describe("a cache written for the same input", () => {
-    const it = test.extend("catalogReadBackForTheSameInput", ({}, { onCleanup }) => {
+  describe("a current cache sealed for its own repository fingerprint", () => {
+    const it = test.extend("catalogReadBackForItsOwnFingerprint", ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
       });
-      writeCachedEntries(root, { fingerprint: "input", entries: [USER_STATUS_CATALOG_ENTRY] });
-      return readCachedEntries(root, "input");
+      const cachePath = join(root, ...CACHE_SEGMENTS);
+      mkdirSync(dirname(cachePath), { recursive: true });
+      const cacheDocument = {
+        version: 5,
+        fingerprint: "repository-fingerprint",
+        entries: [ORDER_STATUS_CATALOG_ENTRY],
+      };
+      const integrity = createHash("sha256").update(JSON.stringify(cacheDocument)).digest("hex");
+      writeFileSync(cachePath, JSON.stringify({ ...cacheDocument, integrity }), "utf8");
+      return readCachedEntries(root, "repository-fingerprint");
     });
 
-    it("is read back", ({ catalogReadBackForTheSameInput }) => {
-      expect(catalogReadBackForTheSameInput).toStrictEqual([USER_STATUS_CATALOG_ENTRY]);
+    it("is read back", ({ catalogReadBackForItsOwnFingerprint }) => {
+      expect(catalogReadBackForItsOwnFingerprint).toStrictEqual([ORDER_STATUS_CATALOG_ENTRY]);
     });
   });
 
-  describe("a cache written for a different input", () => {
-    const it = test.extend("catalogReadBackForADifferentInput", ({}, { onCleanup }) => {
+  describe("a current cache read under a repository fingerprint that is not its own", () => {
+    const it = test.extend("catalogReadBackForAForeignFingerprint", ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
       });
-      writeCachedEntries(root, { fingerprint: "other", entries: [USER_STATUS_CATALOG_ENTRY] });
-      return readCachedEntries(root, "input");
+      const cachePath = join(root, ...CACHE_SEGMENTS);
+      mkdirSync(dirname(cachePath), { recursive: true });
+      const cacheDocument = {
+        version: 5,
+        fingerprint: "repository-fingerprint",
+        entries: [ORDER_STATUS_CATALOG_ENTRY],
+      };
+      const integrity = createHash("sha256").update(JSON.stringify(cacheDocument)).digest("hex");
+      writeFileSync(cachePath, JSON.stringify({ ...cacheDocument, integrity }), "utf8");
+      return readCachedEntries(root, "foreign-fingerprint");
     });
 
-    it("is not read back", ({ catalogReadBackForADifferentInput }) => {
-      expect(catalogReadBackForADifferentInput).toBe(null);
-    });
-  });
-
-  describe("no cache at all", () => {
-    const it = test.extend("catalogReadBackWithoutACache", ({}, { onCleanup }) => {
-      const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
-      onCleanup(() => {
-        rmSync(root, { recursive: true, force: true });
-      });
-      return readCachedEntries(root, "input");
-    });
-
-    it("is not read back", ({ catalogReadBackWithoutACache }) => {
-      expect(catalogReadBackWithoutACache).toBe(null);
-    });
-  });
-
-  describe("a cache that is not json", () => {
-    const it = test.extend("catalogReadBackFromANonJsonCache", ({}, { onCleanup }) => {
-      const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
-      onCleanup(() => {
-        rmSync(root, { recursive: true, force: true });
-      });
-      mkdirSync(dirname(join(root, ...CACHE_SEGMENTS)), { recursive: true });
-      writeFileSync(join(root, ...CACHE_SEGMENTS), "{ this is not json");
-      return readCachedEntries(root, "input");
-    });
-
-    it("is not read back", ({ catalogReadBackFromANonJsonCache }) => {
-      expect(catalogReadBackFromANonJsonCache).toBe(null);
-    });
-  });
-
-  describe("a cache holding something other than an object", () => {
-    const it = test.extend("catalogReadBackFromACacheHoldingASpelling", ({}, { onCleanup }) => {
-      const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
-      onCleanup(() => {
-        rmSync(root, { recursive: true, force: true });
-      });
-      mkdirSync(dirname(join(root, ...CACHE_SEGMENTS)), { recursive: true });
-      writeFileSync(join(root, ...CACHE_SEGMENTS), JSON.stringify("a catalog"));
-      return readCachedEntries(root, "input");
-    });
-
-    it("is not read back", ({ catalogReadBackFromACacheHoldingASpelling }) => {
-      expect(catalogReadBackFromACacheHoldingASpelling).toBe(null);
-    });
-  });
-
-  describe("a cache missing the fields that name it", () => {
-    const it = test.extend("catalogReadBackFromACacheWithoutItsNamingFields", ({}, {
-      onCleanup,
+    it("is not read back under another fingerprint", ({
+      catalogReadBackForAForeignFingerprint,
     }) => {
-      const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
-      onCleanup(() => {
-        rmSync(root, { recursive: true, force: true });
-      });
-      mkdirSync(dirname(join(root, ...CACHE_SEGMENTS)), { recursive: true });
-      writeFileSync(
-        join(root, ...CACHE_SEGMENTS),
-        JSON.stringify({ fingerprint: "input", entries: [] }),
-      );
-      return readCachedEntries(root, "input");
-    });
-
-    it("is not read back", ({ catalogReadBackFromACacheWithoutItsNamingFields }) => {
-      expect(catalogReadBackFromACacheWithoutItsNamingFields).toBe(null);
+      expect(catalogReadBackForAForeignFingerprint).toBe(null);
     });
   });
 
-  describe("a cache written by an older format", () => {
-    const it = test.extend("catalogReadBackFromAnOlderFormatCache", ({}, { onCleanup }) => {
+  describe("a cache the reader cannot parse", () => {
+    const it = test.extend("catalogReadBackFromAnUnreadableCache", ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
       });
-      mkdirSync(dirname(join(root, ...CACHE_SEGMENTS)), { recursive: true });
-      writeFileSync(
-        join(root, ...CACHE_SEGMENTS),
-        JSON.stringify({ version: 1, fingerprint: "input", entries: [] }),
-      );
-      return readCachedEntries(root, "input");
+      const cachePath = join(root, ...CACHE_SEGMENTS);
+      mkdirSync(dirname(cachePath), { recursive: true });
+      writeFileSync(cachePath, "{ this is not json", "utf8");
+      return readCachedEntries(root, "repository-fingerprint");
     });
 
-    it("is not read back", ({ catalogReadBackFromAnOlderFormatCache }) => {
-      expect(catalogReadBackFromAnOlderFormatCache).toBe(null);
+    it("is treated as a cache miss", ({ catalogReadBackFromAnUnreadableCache }) => {
+      expect(catalogReadBackFromAnUnreadableCache).toBe(null);
     });
   });
 
-  describe("a cache whose entries are not a list", () => {
-    const it = test.extend("catalogReadBackFromACacheWhoseEntriesAreASpelling", ({}, {
-      onCleanup,
-    }) => {
+  describe("cache envelopes that are not the current sealed shape", () => {
+    const it = test.extend("catalogsReadBackFromRejectedEnvelopes", ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
       });
-      mkdirSync(dirname(join(root, ...CACHE_SEGMENTS)), { recursive: true });
-      writeFileSync(
-        join(root, ...CACHE_SEGMENTS),
-        JSON.stringify({ version: 3, fingerprint: "input", entries: "none" }),
-      );
-      return readCachedEntries(root, "input");
+      const cachePath = join(root, ...CACHE_SEGMENTS);
+      mkdirSync(dirname(cachePath), { recursive: true });
+      const currentCacheDocument = {
+        version: 5,
+        fingerprint: "repository-fingerprint",
+        entries: [ORDER_STATUS_CATALOG_ENTRY],
+      };
+      const sealedCacheDocument = {
+        ...currentCacheDocument,
+        integrity: createHash("sha256").update(JSON.stringify(currentCacheDocument)).digest("hex"),
+      };
+      return [
+        null,
+        "cache",
+        {},
+        { ...sealedCacheDocument, version: 4 },
+        { ...sealedCacheDocument, fingerprint: 1 },
+        { ...sealedCacheDocument, integrity: 1 },
+        { ...sealedCacheDocument, entries: "entries" },
+        { ...sealedCacheDocument, integrity: "forged" },
+      ].map((cacheDocument) => {
+        writeFileSync(cachePath, JSON.stringify(cacheDocument), "utf8");
+        return readCachedEntries(root, "repository-fingerprint");
+      });
     });
 
-    it("is not read back", ({ catalogReadBackFromACacheWhoseEntriesAreASpelling }) => {
-      expect(catalogReadBackFromACacheWhoseEntriesAreASpelling).toBe(null);
+    it("are each rejected", ({ catalogsReadBackFromRejectedEnvelopes }) => {
+      expect(catalogsReadBackFromRejectedEnvelopes).toStrictEqual([
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+      ]);
     });
   });
 
-  describe("a cache holding an entry that is not an object", () => {
-    const it = test.extend("catalogReadBackFromACacheHoldingANullEntry", ({}, { onCleanup }) => {
+  describe("entries whose identity or declaration offsets are broken", () => {
+    const it = test.extend("catalogsReadBackFromBrokenIdentities", ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
       });
-      mkdirSync(dirname(join(root, ...CACHE_SEGMENTS)), { recursive: true });
-      writeFileSync(
-        join(root, ...CACHE_SEGMENTS),
-        JSON.stringify({ version: 3, fingerprint: "input", entries: [null] }),
-      );
-      return readCachedEntries(root, "input");
+      const cachePath = join(root, ...CACHE_SEGMENTS);
+      mkdirSync(dirname(cachePath), { recursive: true });
+      return [
+        null,
+        "an entry",
+        {},
+        { ...ORDER_STATUS_CATALOG_ENTRY, annotationStart: 0.5 },
+        { ...ORDER_STATUS_CATALOG_ENTRY, bindingStart: 0.5 },
+        { ...ORDER_STATUS_CATALOG_ENTRY, declarationEnd: 0.5 },
+        { ...ORDER_STATUS_CATALOG_ENTRY, declarationStart: 0.5 },
+        { ...ORDER_STATUS_CATALOG_ENTRY, annotationStart: -1 },
+        { ...ORDER_STATUS_CATALOG_ENTRY, declarationStart: -1 },
+        { ...ORDER_STATUS_CATALOG_ENTRY, annotationStart: 1 },
+        { ...ORDER_STATUS_CATALOG_ENTRY, bindingStart: 0 },
+        { ...ORDER_STATUS_CATALOG_ENTRY, bindingStart: 3 },
+        { ...ORDER_STATUS_CATALOG_ENTRY, declarationEnd: 1 },
+        { ...ORDER_STATUS_CATALOG_ENTRY, binding: 1 },
+        { ...ORDER_STATUS_CATALOG_ENTRY, binding: "" },
+        { ...ORDER_STATUS_CATALOG_ENTRY, conceptId: 1 },
+        { ...ORDER_STATUS_CATALOG_ENTRY, conceptId: "Order Status" },
+        { ...ORDER_STATUS_CATALOG_ENTRY, declarationPath: 1 },
+        { ...ORDER_STATUS_CATALOG_ENTRY, declarationPath: "" },
+        { ...ORDER_STATUS_CATALOG_ENTRY, fingerprint: 1 },
+        { ...ORDER_STATUS_CATALOG_ENTRY, fingerprint: "not-a-fingerprint" },
+        { ...ORDER_STATUS_CATALOG_ENTRY, packageName: 1 },
+        { ...ORDER_STATUS_CATALOG_ENTRY, packageName: "" },
+      ].map((candidateEntry) => {
+        const cacheDocument = {
+          version: 5,
+          fingerprint: "repository-fingerprint",
+          entries: [candidateEntry],
+        };
+        const integrity = createHash("sha256").update(JSON.stringify(cacheDocument)).digest("hex");
+        writeFileSync(cachePath, JSON.stringify({ ...cacheDocument, integrity }), "utf8");
+        return readCachedEntries(root, "repository-fingerprint");
+      });
     });
 
-    it("is not read back", ({ catalogReadBackFromACacheHoldingANullEntry }) => {
-      expect(catalogReadBackFromACacheHoldingANullEntry).toBe(null);
+    it("are each rejected", ({ catalogsReadBackFromBrokenIdentities }) => {
+      expect(catalogsReadBackFromBrokenIdentities).toStrictEqual([
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+      ]);
     });
   });
 
-  describe("a cache holding an entry that is missing a field", () => {
-    const it = test.extend("catalogReadBackFromACacheHoldingAnEntryWithoutAFingerprint", ({}, {
-      onCleanup,
-    }) => {
+  describe("entries whose import routes are broken", () => {
+    const it = test.extend("catalogsReadBackFromBrokenImportRoutes", ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
       });
-      mkdirSync(dirname(join(root, ...CACHE_SEGMENTS)), { recursive: true });
-      writeFileSync(
-        join(root, ...CACHE_SEGMENTS),
-        JSON.stringify({
-          version: 3,
-          fingerprint: "input",
-          entries: [
-            {
-              conceptId: "user.status",
-              declarationPath: "src/user.ts",
-              exportPath: null,
-              values: ["draft", "published"],
-            },
+      const cachePath = join(root, ...CACHE_SEGMENTS);
+      mkdirSync(dirname(cachePath), { recursive: true });
+      const declaredRoute = ORDER_STATUS_CATALOG_ENTRY.importRoutes[0];
+      return [
+        { ...ORDER_STATUS_CATALOG_ENTRY, importRoutes: null },
+        { ...ORDER_STATUS_CATALOG_ENTRY, importRoutes: [null] },
+        { ...ORDER_STATUS_CATALOG_ENTRY, importRoutes: [{}] },
+        { ...ORDER_STATUS_CATALOG_ENTRY, importRoutes: [{ ...declaredRoute, exportName: "" }] },
+        { ...ORDER_STATUS_CATALOG_ENTRY, importRoutes: [{ ...declaredRoute, specifier: "" }] },
+        {
+          ...ORDER_STATUS_CATALOG_ENTRY,
+          importRoutes: [{ exportName: "VALUES", specifier: "@fixture/vocabulary" }],
+        },
+        {
+          ...ORDER_STATUS_CATALOG_ENTRY,
+          importRoutes: [{ ...declaredRoute, resolvedSourcePaths: "src/index.ts" }],
+        },
+        {
+          ...ORDER_STATUS_CATALOG_ENTRY,
+          importRoutes: [{ ...declaredRoute, resolvedSourcePaths: [] }],
+        },
+        ...[
+          "",
+          ".",
+          "src\0index.ts",
+          "src\\index.ts",
+          "src/../index.ts",
+          "../index.ts",
+          "/src/index.ts",
+          "C:/src/index.ts",
+        ].map((sourcePath) => ({
+          ...ORDER_STATUS_CATALOG_ENTRY,
+          importRoutes: [{ ...declaredRoute, resolvedSourcePaths: [sourcePath] }],
+        })),
+        {
+          ...ORDER_STATUS_CATALOG_ENTRY,
+          importRoutes: [
+            { ...declaredRoute, resolvedSourcePaths: ["src/index.ts", "src/index.ts"] },
           ],
-        }),
-      );
-      return readCachedEntries(root, "input");
+        },
+      ].map((candidateEntry) => {
+        const cacheDocument = {
+          version: 5,
+          fingerprint: "repository-fingerprint",
+          entries: [candidateEntry],
+        };
+        const integrity = createHash("sha256").update(JSON.stringify(cacheDocument)).digest("hex");
+        writeFileSync(cachePath, JSON.stringify({ ...cacheDocument, integrity }), "utf8");
+        return readCachedEntries(root, "repository-fingerprint");
+      });
     });
 
-    it("is not read back", ({ catalogReadBackFromACacheHoldingAnEntryWithoutAFingerprint }) => {
-      expect(catalogReadBackFromACacheHoldingAnEntryWithoutAFingerprint).toBe(null);
+    it("are each rejected", ({ catalogsReadBackFromBrokenImportRoutes }) => {
+      expect(catalogsReadBackFromBrokenImportRoutes).toStrictEqual([
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+      ]);
     });
   });
 
-  describe("a cache holding an entry whose concept is not a word", () => {
-    const it = test.extend("catalogReadBackFromACacheHoldingANumberForAConceptId", ({}, {
-      onCleanup,
-    }) => {
+  describe("entries whose canonical domain is broken", () => {
+    const it = test.extend("catalogsReadBackFromBrokenCanonicalDomains", ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
       });
-      mkdirSync(dirname(join(root, ...CACHE_SEGMENTS)), { recursive: true });
-      writeFileSync(
-        join(root, ...CACHE_SEGMENTS),
-        JSON.stringify({
-          version: 3,
-          fingerprint: "input",
-          entries: [{ ...USER_STATUS_CATALOG_ENTRY, conceptId: 1 }],
-        }),
-      );
-      return readCachedEntries(root, "input");
-    });
-
-    it("is not read back", ({ catalogReadBackFromACacheHoldingANumberForAConceptId }) => {
-      expect(catalogReadBackFromACacheHoldingANumberForAConceptId).toBe(null);
-    });
-  });
-
-  describe("a cache holding an entry whose export path is neither absent nor a word", () => {
-    const it = test.extend("catalogReadBackFromACacheHoldingANumberForAnExportPath", ({}, {
-      onCleanup,
-    }) => {
-      const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
-      onCleanup(() => {
-        rmSync(root, { recursive: true, force: true });
+      const cachePath = join(root, ...CACHE_SEGMENTS);
+      mkdirSync(dirname(cachePath), { recursive: true });
+      return [
+        { ...ORDER_STATUS_CATALOG_ENTRY, values: null },
+        { ...ORDER_STATUS_CATALOG_ENTRY, values: [] },
+        { ...ORDER_STATUS_CATALOG_ENTRY, values: [{}] },
+        { ...ORDER_STATUS_CATALOG_ENTRY, values: ["draft", "draft"] },
+        {
+          ...ORDER_STATUS_CATALOG_ENTRY,
+          values: ["draft"],
+          fingerprint: fingerprintValues(["other"]),
+        },
+      ].map((candidateEntry) => {
+        const cacheDocument = {
+          version: 5,
+          fingerprint: "repository-fingerprint",
+          entries: [candidateEntry],
+        };
+        const integrity = createHash("sha256").update(JSON.stringify(cacheDocument)).digest("hex");
+        writeFileSync(cachePath, JSON.stringify({ ...cacheDocument, integrity }), "utf8");
+        return readCachedEntries(root, "repository-fingerprint");
       });
-      mkdirSync(dirname(join(root, ...CACHE_SEGMENTS)), { recursive: true });
-      writeFileSync(
-        join(root, ...CACHE_SEGMENTS),
-        JSON.stringify({
-          version: 3,
-          fingerprint: "input",
-          entries: [{ ...USER_STATUS_CATALOG_ENTRY, exportPath: 1 }],
-        }),
-      );
-      return readCachedEntries(root, "input");
     });
 
-    it("is not read back", ({ catalogReadBackFromACacheHoldingANumberForAnExportPath }) => {
-      expect(catalogReadBackFromACacheHoldingANumberForAnExportPath).toBe(null);
-    });
-  });
-
-  describe("a cache holding an entry whose values are not a list", () => {
-    const it = test.extend("catalogReadBackFromACacheHoldingANumberForTheCanonicalValues", ({}, {
-      onCleanup,
-    }) => {
-      const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
-      onCleanup(() => {
-        rmSync(root, { recursive: true, force: true });
-      });
-      mkdirSync(dirname(join(root, ...CACHE_SEGMENTS)), { recursive: true });
-      writeFileSync(
-        join(root, ...CACHE_SEGMENTS),
-        JSON.stringify({
-          version: 3,
-          fingerprint: "input",
-          entries: [{ ...USER_STATUS_CATALOG_ENTRY, values: 1 }],
-        }),
-      );
-      return readCachedEntries(root, "input");
-    });
-
-    it("is not read back", ({ catalogReadBackFromACacheHoldingANumberForTheCanonicalValues }) => {
-      expect(catalogReadBackFromACacheHoldingANumberForTheCanonicalValues).toBe(null);
-    });
-  });
-
-  describe("a cache holding a value that is not a spelling", () => {
-    const it = test.extend("catalogReadBackFromACacheHoldingAnObjectAsACanonicalValue", ({}, {
-      onCleanup,
-    }) => {
-      const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
-      onCleanup(() => {
-        rmSync(root, { recursive: true, force: true });
-      });
-      mkdirSync(dirname(join(root, ...CACHE_SEGMENTS)), { recursive: true });
-      writeFileSync(
-        join(root, ...CACHE_SEGMENTS),
-        JSON.stringify({
-          version: 3,
-          fingerprint: "input",
-          entries: [{ ...USER_STATUS_CATALOG_ENTRY, values: [{}] }],
-        }),
-      );
-      return readCachedEntries(root, "input");
-    });
-
-    it("is not read back", ({ catalogReadBackFromACacheHoldingAnObjectAsACanonicalValue }) => {
-      expect(catalogReadBackFromACacheHoldingAnObjectAsACanonicalValue).toBe(null);
+    it("are each rejected", ({ catalogsReadBackFromBrokenCanonicalDomains }) => {
+      expect(catalogsReadBackFromBrokenCanonicalDomains).toStrictEqual([
+        null,
+        null,
+        null,
+        null,
+        null,
+      ]);
     });
   });
 });
 
 describe("writeCachedEntries", () => {
-  describe("a cache that cannot be written for a reason the runtime named", () => {
+  describe("a repository root the file system refuses to hold a cache under", () => {
     const it = test.extend("failure", ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
       });
-      mkdirSync(join(root, ...CACHE_SEGMENTS), { recursive: true });
+      const occupiedRoot = join(root, "not-a-directory");
+      writeFileSync(occupiedRoot, "occupied", "utf8");
       const [failure] = attempt<unknown, Error>(() => {
-        writeCachedEntries(root, { fingerprint: "input", entries: [USER_STATUS_CATALOG_ENTRY] });
+        writeCachedEntries(occupiedRoot, { fingerprint: "repository-fingerprint", entries: [] });
       });
       return failure;
     });
 
-    it("is left unwritten", ({ failure }) => {
+    it("is left unwritten without raising", ({ failure }) => {
       expect(failure).toBe(null);
-    });
-  });
-
-  describe("a cache that cannot be written for a reason the runtime did not name", () => {
-    const it = test.extend("failureMessage", ({}, { onCleanup }) => {
-      rmSync(UNSERIALIZABLE_CACHE_ROOT, { recursive: true, force: true });
-      mkdirSync(UNSERIALIZABLE_CACHE_ROOT, { recursive: true });
-      onCleanup(() => {
-        rmSync(UNSERIALIZABLE_CACHE_ROOT, { recursive: true, force: true });
-      });
-      const refusingEntry = {
-        conceptId: "user.status",
-        declarationPath: "src/user.ts",
-        exportPath: null,
-        values: ["draft", "published"],
-        fingerprint: "vocabulary",
-        toJSON: () => {
-          throw new TypeError("this entry refuses to be written");
-        },
-      };
-      const [failure] = attempt<unknown, Error>(() => {
-        writeCachedEntries(UNSERIALIZABLE_CACHE_ROOT, {
-          fingerprint: "input",
-          entries: [refusingEntry],
-        });
-      });
-      return failure === null ? null : failure.message;
-    });
-
-    it("is raised", ({ failureMessage }) => {
-      expect(failureMessage).toBe(
-        `the derived catalog cache at ${join(UNSERIALIZABLE_CACHE_ROOT, ...CACHE_SEGMENTS)} could not be written`,
-      );
-    });
-  });
-});
-
-describe("cacheInputFingerprint", () => {
-  describe("the same file grown by one byte", () => {
-    const it = test
-      .extend("fingerprintOfAFileOfOneByte", () =>
-        cacheInputFingerprint([
-          { absolutePath: "/repo/src/user.ts", relativePath: "src/user.ts", size: 1, mtimeMs: 1 },
-        ]))
-      .extend("fingerprintOfTheSameFileGrownByOneByte", () =>
-        cacheInputFingerprint([
-          { absolutePath: "/repo/src/user.ts", relativePath: "src/user.ts", size: 2, mtimeMs: 1 },
-        ]),
-      );
-
-    it("changes the fingerprint of the inputs", ({
-      fingerprintOfAFileOfOneByte,
-      fingerprintOfTheSameFileGrownByOneByte,
-    }) => {
-      expect(fingerprintOfAFileOfOneByte).not.toBe(fingerprintOfTheSameFileGrownByOneByte);
     });
   });
 });

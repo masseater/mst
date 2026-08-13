@@ -66,6 +66,23 @@ CLI が持つコマンドは `check` の 1 つで、そこが全部の検査を�
   - MUST: `warning:` を先頭に付けて報告し、終了コードに数えない
     - 直し方が複数ある問いで落とすと、どれを選ぶかの迷いがレビューに戻る。これはルールの境界と同じ判断で、警告は検出できることを伝えるためだけに出す
 
+## 語彙カタログの検査
+
+`check` が `@canonical-values` の注釈を持つ宣言を読み、カタログを組む。守っているのは「有限個の値からなる語彙はリポジトリのどこか 1 箇所で宣言され、他の全箇所はそこから導出する」という規範で、強制の本体は [no-local-finite-value-set--use-or-register-canonical-values](docs/lint/no-local-finite-value-set--use-or-register-canonical-values.md) と [no-strict-canonical-literal-use--use-canonical-import](docs/lint/no-strict-canonical-literal-use--use-canonical-import.md) の 2 本が持つ。
+
+注釈と宣言の対が壊れている、概念 id が重複している、廃止されたタグが残っている、といった事象は落とす。直し方が 1 つに決まるため。
+
+値集合が同一の概念が複数あることは落とさず、警告として並べる。
+
+- IF: 値集合が同じ概念が 2 つ以上ある; THEN
+  - MUST: 警告として全部を並べる
+  - PROHIBIT: 落とす
+    - 同じ値集合を持つ概念が並ぶことは正当な状態である。所有者も変更理由も違う語彙がたまたま同じ綴りを持つことがあり、畳むべきかどうかは周囲の振る舞いを見なければ決まらない。落とすと、片方を登録しないことで報告を消す動機が生まれ、消費側の強制がそこだけ効かなくなる
+- IF: 同じ綴りが複数の概念に属する; THEN
+  - MUST: 全部を所有者として登録する
+  - PROHIBIT: 片方の登録を見送って報告を減らす
+    - その概念でない綴りは、それ自身が別の概念である
+
 ## ワークフロー定義の検査
 
 `check` が `.github/workflows/` の定義も読む。守っているのは [強制の機構](../../docs/guidelines/enforcement.md) と [秘密と権限](../../docs/guidelines/secrets-and-permissions.md) に既に書かれている規範で、この検査はその強制側にあたる。

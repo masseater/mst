@@ -4,11 +4,11 @@ import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { readUnlessMissing } from "@mst/repository-checks";
 import { memoize } from "es-toolkit";
 
-import { buildExportSpecifierIndex } from "../canonical-values/export-specifier-index.ts";
 import { isDirectory, isFile } from "../canonical-values/source-files.ts";
 import { segmentsOf } from "../path-segments.ts";
 import { toPosixPath } from "../posix-path.ts";
 import { aliasedPathsFor } from "../tsconfig-path-aliases.ts";
+import { buildSetupExportSpecifierIndex } from "./export-specifier-index.ts";
 import { declaresPublicSubpath, isInsideDirectory } from "./package-entries.ts";
 
 const SCOPE_PREFIX = "@";
@@ -120,7 +120,7 @@ export type CouplingRequest = {
   readonly workspaceRoot: string;
 };
 
-const rememberedIndexOf = memoize(buildExportSpecifierIndex);
+const rememberedIndexOf = memoize(buildSetupExportSpecifierIndex);
 
 const entryFilesUnder = (packageDirectory: string, specifier: string): readonly string[] =>
   [...rememberedIndexOf(packageDirectory)]

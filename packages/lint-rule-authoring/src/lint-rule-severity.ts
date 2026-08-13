@@ -1,5 +1,6 @@
 import type { AllowWarnDeny } from "oxlint";
 
+/** @canonical-values lint-rule-authoring.rule-severity */
 const LINT_RULE_SEVERITIES = ["error", "warn", "off"] as const satisfies readonly Extract<
   AllowWarnDeny,
   "error" | "warn" | "off"

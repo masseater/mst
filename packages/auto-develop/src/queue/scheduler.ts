@@ -1,3 +1,5 @@
+import { ABORT_SIGNAL_EVENT } from "../runtime/event-names.ts";
+
 import type { Logger } from "../logging/logger.ts";
 
 const DEFAULT_RESTART_CHECK_INTERVAL_MS = 60_000;
@@ -31,7 +33,7 @@ const nextCleanupRoundReached = (waiting: {
       resolve(true);
     }, waiting.intervalMs);
     waiting.halted.addEventListener(
-      "abort",
+      ABORT_SIGNAL_EVENT.abort,
       () => {
         clearTimeout(roundTimer);
         resolve(false);

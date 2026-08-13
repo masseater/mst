@@ -77,6 +77,7 @@ describe("buildRepositoryBodyIndex", () => {
       mkdirSync(join(repositoryRoot, "src"), { recursive: true });
       writeFileSync(join(repositoryRoot, "src", "a.ts"), TWICE, "utf8");
       writeFileSync(join(repositoryRoot, "src", VANISHED_FILE_NAME), TWICE, "utf8");
+      // mock-factory-exemption no-replaced-double-behaviour--let-the-replaced-module-answer -- whether a listed source is still readable is settled by the file system between the listing and the read, and that window is inside the boundary this spec replaces
       vi.mocked(readTextFile).mockImplementation((path) =>
         path.endsWith(VANISHED_FILE_NAME) ? null : readFileSync(path, "utf8"),
       );

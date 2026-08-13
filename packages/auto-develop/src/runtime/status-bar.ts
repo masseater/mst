@@ -1,3 +1,5 @@
+import { ABSENT_VALUE_PLACEHOLDER } from "./absent-value-placeholder.ts";
+
 export type StatusSnapshot = {
   readonly mode: string;
   readonly engineCommand: string;
@@ -25,7 +27,7 @@ export const renderStatusBar = (render: {
 }): readonly string[] => {
   const { snapshot } = render;
   const lanes = (spelledLabels: readonly string[]): string =>
-    spelledLabels.length === 0 ? "none" : spelledLabels.join(" ");
+    spelledLabels.length === 0 ? ABSENT_VALUE_PLACEHOLDER.none : spelledLabels.join(" ");
   return [
     `[${snapshot.mode}] ${snapshot.engineCommand} — ${snapshot.connected ? "connected" : "reconnecting"} — up ${formatUptime(snapshot.uptimeMs)}`,
     `running: ${lanes(snapshot.runningLanes)}`,

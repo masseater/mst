@@ -7,10 +7,9 @@ import { text } from "node:stream/consumers";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
-import { lock } from "proper-lockfile";
 import { describe, expect, test } from "vite-plus/test";
 
-import { ensureSlots } from "./slots.ts";
+import { ensureSlots, tryAcquireAny } from "./slots.ts";
 
 const CLI_PATH = fileURLToPath(new URL("./cli.ts", import.meta.url));
 
@@ -49,14 +48,15 @@ describe("cli", () => {
           Runs the command while keeping the number of simultaneous executions that
           share this host and namespace at or below the limit. When every slot is held
           the wrapper joins a wait queue, reports its position on stderr, and retries
-          every slot on each poll, for at most the wait budget. A slot whose holder
-          died without releasing is reclaimed once the holder's liveness mark goes
-          stale. Do not nest throttle inside a command it wraps: the inner call counts
+          every slot on each poll, for at most the wait budget. The operating system
+          releases a slot when its holder exits, including an abrupt termination. Do
+          not nest throttle inside a command it wraps: the inner call counts
           as one more competitor and consumes a second slot.
 
           Options:
-            --timeout <seconds>  Send SIGTERM to the command's process group after this
-                                 many seconds, then SIGKILL after a short grace period.
+            --timeout <seconds>  Stop the command's whole process tree after this many
+                                 seconds. POSIX sends SIGTERM, then SIGKILL after a short
+                                 grace period; Windows uses taskkill /T /F immediately.
                                  0 never interrupts the command. Defaults to 0.
 
           Environment:
@@ -67,7 +67,7 @@ describe("cli", () => {
           Exit codes:
             0  the wrapped command succeeded
             1  the wrapped command failed, was killed, could not be started, ran past
-               the timeout, or the wrapper could not get a slot
+               the timeout, or the wrapper could not get or release a slot
             2  throttle itself was called incorrectly
           ",
           ]
@@ -135,7 +135,13 @@ describe("cli", () => {
         const tmpRoot = mkdtempSync(join(tmpdir(), "throttle-cli-tmp-"));
         const slotDir = join(tmpRoot, "mst-throttle", "mst");
         ensureSlots(slotDir, 1);
-        const release = await lock(join(slotDir, "slot-0"), { stale: 60_000, retries: 0 });
+        const holdTheOnlySlot = async (): Promise<() => Promise<void>> => {
+          const held = await tryAcquireAny({ slotDir, limit: 1 });
+          if (held !== null) return held.release;
+          await delay(200);
+          return holdTheOnlySlot();
+        };
+        const release = await holdTheOnlySlot();
         onCleanup(async () => {
           await release();
           rmSync(tmpRoot, { recursive: true, force: true });
@@ -173,7 +179,13 @@ describe("cli", () => {
         const tmpRoot = mkdtempSync(join(tmpdir(), "throttle-cli-tmp-"));
         const slotDir = join(tmpRoot, "mst-throttle", "mst");
         ensureSlots(slotDir, 1);
-        const release = await lock(join(slotDir, "slot-0"), { stale: 60_000, retries: 0 });
+        const holdTheOnlySlot = async (): Promise<() => Promise<void>> => {
+          const held = await tryAcquireAny({ slotDir, limit: 1 });
+          if (held !== null) return held.release;
+          await delay(200);
+          return holdTheOnlySlot();
+        };
+        const release = await holdTheOnlySlot();
         onCleanup(async () => {
           await release();
           rmSync(tmpRoot, { recursive: true, force: true });

@@ -1,3 +1,5 @@
+import { LINT_SEVERITY } from "@mst/lint-rule-authoring";
+
 import {
   defaultExportedObject,
   objectExpressionOf,
@@ -11,9 +13,13 @@ import type { ESTree } from "@oxlint/plugins";
 
 export const LINT_CONFIGURATION_FILE = /(?:^|\/)vite\.config\.[cm]?[jt]s$/u;
 
-const FAILING_SPELLINGS: ReadonlySet<string> = new Set(["error", "deny"]);
+const FAILING_SPELLINGS: ReadonlySet<string> = new Set([LINT_SEVERITY.ERROR, "deny"]);
 
-const PASSING_SPELLINGS: ReadonlySet<string> = new Set(["off", "allow", "warn"]);
+const PASSING_SPELLINGS: ReadonlySet<string> = new Set([
+  LINT_SEVERITY.OFF,
+  "allow",
+  LINT_SEVERITY.WARN,
+]);
 
 const LOWEST_FAILING_NUMBER = 2;
 

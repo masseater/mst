@@ -1,8 +1,8 @@
 import { testLintRule } from "@mst/lint-rule-authoring";
 import { describe } from "vite-plus/test";
 
+import { ancestorsOf } from "../ast-node.ts";
 import {
-  ancestorsOf,
   isKeySelectorArgument,
   isModuleSyntaxPosition,
   isStructuralKeyPosition,
@@ -237,6 +237,11 @@ describe("literal-position", () => {
         {
           name: 'const a = import("draft"); reads as false true false',
           code: 'const a = import("draft");',
+          errors: [{ messageId: "read", data: { text: MODULE } }],
+        },
+        {
+          name: 'import A = require("draft"); reads as false true false',
+          code: 'import A = require("draft");',
           errors: [{ messageId: "read", data: { text: MODULE } }],
         },
         {

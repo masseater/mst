@@ -87,19 +87,72 @@ describe("dontReviewItCommand", () => {
 
   describe("a check given no repository root", () => {
     const it = standardIoTest
-      .extend("theWorkspaceOfTheWorkingDirectoryIsScanned", async ({ stderr }) => {
+      .extend("theExitCodeWithoutARepositoryRoot", async ({}, { onCleanup }) => {
+        const workingDirectory = mkdtempSync(join(tmpdir(), "dont-review-it-cli-"));
+        const previousWorkingDirectory = process.cwd();
+        onCleanup(() => {
+          process.chdir(previousWorkingDirectory);
+          rmSync(workingDirectory, { recursive: true, force: true });
+        });
+        writeFileSync(join(workingDirectory, "package.json"), "{}", "utf8");
+        process.chdir(workingDirectory);
+        await runCommand(dontReviewItCommand, { rawArgs: ["check"] });
+        const settled = process.exitCode;
+        process.exitCode = 0;
+        return typeof settled === "number" ? settled : 0;
+      })
+      .extend("theMissingGuardEntryIsNamedOnStandardOutput", async ({ stdout }, { onCleanup }) => {
+        const workingDirectory = mkdtempSync(join(tmpdir(), "dont-review-it-cli-"));
+        const previousWorkingDirectory = process.cwd();
+        onCleanup(() => {
+          process.chdir(previousWorkingDirectory);
+          rmSync(workingDirectory, { recursive: true, force: true });
+        });
+        writeFileSync(join(workingDirectory, "package.json"), "{}", "utf8");
+        process.chdir(workingDirectory);
+        await runCommand(dontReviewItCommand, { rawArgs: ["check"] });
+        process.exitCode = 0;
+        return stdout.text().includes('required "guard" entry must not be missing');
+      })
+      .extend("theWorkspaceOfTheWorkingDirectoryIsScanned", async ({ stderr }, { onCleanup }) => {
+        const workingDirectory = mkdtempSync(join(tmpdir(), "dont-review-it-cli-"));
+        const previousWorkingDirectory = process.cwd();
+        onCleanup(() => {
+          process.chdir(previousWorkingDirectory);
+          rmSync(workingDirectory, { recursive: true, force: true });
+        });
+        writeFileSync(join(workingDirectory, "package.json"), "{}", "utf8");
+        process.chdir(workingDirectory);
         await runCommand(dontReviewItCommand, { rawArgs: ["check"] });
         process.exitCode = 0;
         return stderr.text().includes("canonical-values");
       })
       .extend(
         "theEntryCompositionCheckIsNamedOnStandardErrorWithoutARepositoryRoot",
-        async ({ stderr }) => {
+        async ({ stderr }, { onCleanup }) => {
+          const workingDirectory = mkdtempSync(join(tmpdir(), "dont-review-it-cli-"));
+          const previousWorkingDirectory = process.cwd();
+          onCleanup(() => {
+            process.chdir(previousWorkingDirectory);
+            rmSync(workingDirectory, { recursive: true, force: true });
+          });
+          writeFileSync(join(workingDirectory, "package.json"), "{}", "utf8");
+          process.chdir(workingDirectory);
           await runCommand(dontReviewItCommand, { rawArgs: ["check"] });
           process.exitCode = 0;
           return stderr.text().includes("entry-composition");
         },
       );
+
+    it("exits one", ({ theExitCodeWithoutARepositoryRoot }) => {
+      expect(theExitCodeWithoutARepositoryRoot).toBe(1);
+    });
+
+    it("names the guard entry the working directory is missing on standard output", ({
+      theMissingGuardEntryIsNamedOnStandardOutput,
+    }) => {
+      expect(theMissingGuardEntryIsNamedOnStandardOutput).toBe(true);
+    });
 
     it("scans the workspace the working directory holds", ({
       theWorkspaceOfTheWorkingDirectoryIsScanned,
@@ -111,6 +164,87 @@ describe("dontReviewItCommand", () => {
       theEntryCompositionCheckIsNamedOnStandardErrorWithoutARepositoryRoot,
     }) => {
       expect(theEntryCompositionCheckIsNamedOnStandardErrorWithoutARepositoryRoot).toBe(true);
+    });
+  });
+
+  describe("an annotation that names no concept in the working directory", () => {
+    const it = standardIoTest
+      .extend("theExitCodeOfAnAnnotationInTheWorkingDirectory", async ({}, { onCleanup }) => {
+        const workingDirectory = mkdtempSync(join(tmpdir(), "dont-review-it-cli-"));
+        const previousWorkingDirectory = process.cwd();
+        onCleanup(() => {
+          process.chdir(previousWorkingDirectory);
+          rmSync(workingDirectory, { recursive: true, force: true });
+        });
+        mkdirSync(join(workingDirectory, "src"), { recursive: true });
+        writeFileSync(
+          join(workingDirectory, "src/order.ts"),
+          `/** ${CANONICAL_VALUES_TAG} */\nexport const ORDER_STATUSES = ["draft"] as const;\n`,
+          "utf8",
+        );
+        process.chdir(workingDirectory);
+        await runCommand(dontReviewItCommand, { rawArgs: ["check"] });
+        const settled = process.exitCode;
+        process.exitCode = 0;
+        return typeof settled === "number" ? settled : 0;
+      })
+      .extend(
+        "theDeclarationSiteInTheWorkingDirectoryIsNamedOnStandardOutput",
+        async ({ stdout }, { onCleanup }) => {
+          const workingDirectory = mkdtempSync(join(tmpdir(), "dont-review-it-cli-"));
+          const previousWorkingDirectory = process.cwd();
+          onCleanup(() => {
+            process.chdir(previousWorkingDirectory);
+            rmSync(workingDirectory, { recursive: true, force: true });
+          });
+          mkdirSync(join(workingDirectory, "src"), { recursive: true });
+          writeFileSync(
+            join(workingDirectory, "src/order.ts"),
+            `/** ${CANONICAL_VALUES_TAG} */\nexport const ORDER_STATUSES = ["draft"] as const;\n`,
+            "utf8",
+          );
+          process.chdir(workingDirectory);
+          await runCommand(dontReviewItCommand, { rawArgs: ["check"] });
+          process.exitCode = 0;
+          return stdout.text().includes("src/order.ts:1");
+        },
+      )
+      .extend(
+        "theEntryCompositionCheckIsNamedOnStandardErrorForTheWorkingDirectory",
+        async ({ stderr }, { onCleanup }) => {
+          const workingDirectory = mkdtempSync(join(tmpdir(), "dont-review-it-cli-"));
+          const previousWorkingDirectory = process.cwd();
+          onCleanup(() => {
+            process.chdir(previousWorkingDirectory);
+            rmSync(workingDirectory, { recursive: true, force: true });
+          });
+          mkdirSync(join(workingDirectory, "src"), { recursive: true });
+          writeFileSync(
+            join(workingDirectory, "src/order.ts"),
+            `/** ${CANONICAL_VALUES_TAG} */\nexport const ORDER_STATUSES = ["draft"] as const;\n`,
+            "utf8",
+          );
+          process.chdir(workingDirectory);
+          await runCommand(dontReviewItCommand, { rawArgs: ["check"] });
+          process.exitCode = 0;
+          return stderr.text().includes("entry-composition");
+        },
+      );
+
+    it("fails the check", ({ theExitCodeOfAnAnnotationInTheWorkingDirectory }) => {
+      expect(theExitCodeOfAnAnnotationInTheWorkingDirectory).toBe(1);
+    });
+
+    it("names the declaration site the working directory holds", ({
+      theDeclarationSiteInTheWorkingDirectoryIsNamedOnStandardOutput,
+    }) => {
+      expect(theDeclarationSiteInTheWorkingDirectoryIsNamedOnStandardOutput).toBe(true);
+    });
+
+    it("names the entry-composition check on standard error", ({
+      theEntryCompositionCheckIsNamedOnStandardErrorForTheWorkingDirectory,
+    }) => {
+      expect(theEntryCompositionCheckIsNamedOnStandardErrorForTheWorkingDirectory).toBe(true);
     });
   });
 
@@ -476,7 +610,7 @@ describe("dontReviewItCommand", () => {
         mkdirSync(join(root, "src"), { recursive: true });
         writeFileSync(
           join(root, "src/order.test.ts"),
-          `/** ${CANONICAL_VALUES_TAG} order.status */\nconst FIXTURE_STATUSES = ["draft"] as const;\n`,
+          'const FIXTURE_STATUSES = ["draft"] as const;\n',
           "utf8",
         );
         writeFileSync(
@@ -497,7 +631,7 @@ describe("dontReviewItCommand", () => {
         mkdirSync(join(root, "src"), { recursive: true });
         writeFileSync(
           join(root, "src/order.test.ts"),
-          `/** ${CANONICAL_VALUES_TAG} order.status */\nconst FIXTURE_STATUSES = ["draft"] as const;\n`,
+          'const FIXTURE_STATUSES = ["draft"] as const;\n',
           "utf8",
         );
         writeFileSync(
@@ -519,7 +653,7 @@ describe("dontReviewItCommand", () => {
           mkdirSync(join(root, "src"), { recursive: true });
           writeFileSync(
             join(root, "src/order.test.ts"),
-            `/** ${CANONICAL_VALUES_TAG} order.status */\nconst FIXTURE_STATUSES = ["draft"] as const;\n`,
+            'const FIXTURE_STATUSES = ["draft"] as const;\n',
             "utf8",
           );
           writeFileSync(
@@ -614,8 +748,8 @@ describe("dontReviewItCommand", () => {
         return stdout.text().includes("order.status");
       });
 
-    it("fails the check", ({ theExitCodeOfASharedValueSet }) => {
-      expect(theExitCodeOfASharedValueSet).toBe(1);
+    it("is warned about without failing the check", ({ theExitCodeOfASharedValueSet }) => {
+      expect(theExitCodeOfASharedValueSet).toBe(0);
     });
 
     it("names the first concept that declares it", ({

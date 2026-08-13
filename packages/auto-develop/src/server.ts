@@ -13,6 +13,7 @@ import { createMemoryCursorStore } from "./relay/memory-cursor-store.ts";
 import { createMemoryEventStore } from "./relay/memory-event-store.ts";
 import { createMemorySessionStore } from "./relay/memory-session-store.ts";
 import { relayConfigFromEnv } from "./relay/relay-config.ts";
+import { SHUTDOWN_SIGNALS, type ShutdownSignal } from "./runtime/shutdown.ts";
 
 const log = createConsoleLogger("auto-develop-relay", {
   fileSink: createDailyLogFileSink({
@@ -49,15 +50,14 @@ relay.server.listen(relayConfig.port, () => {
   log.info({ port: relayConfig.port }, "relay server listening");
 });
 
-const nextOccurrenceOf = async (shutdownSignal: NodeJS.Signals): Promise<NodeJS.Signals> => {
+const nextOccurrenceOf = async (shutdownSignal: ShutdownSignal): Promise<ShutdownSignal> => {
   await once(process, shutdownSignal);
   return shutdownSignal;
 };
 
-const receivedSignal = await Promise.race([
-  nextOccurrenceOf("SIGINT"),
-  nextOccurrenceOf("SIGTERM"),
-]);
+const receivedSignal = await Promise.race(
+  SHUTDOWN_SIGNALS.map((shutdownSignal) => nextOccurrenceOf(shutdownSignal)),
+);
 log.info({ signal: receivedSignal }, "shutting down relay server");
 await relay.shutdown();
 process.exit(0);

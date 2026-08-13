@@ -1,10 +1,5 @@
-import { firstToken } from "@mst/lint-rule-authoring";
-
 import { createDontReviewItRule } from "../../../create-rule.ts";
-import {
-  DIRECTIVE_GROUNDS_SEPARATOR,
-  MOCK_FACTORY_EXEMPTION_DIRECTIVE,
-} from "../lib/directive-comments.ts";
+import { exemptionsWrittenAbove } from "../lib/directive-comments.ts";
 import { nodesOfType } from "../lib/nodes-of-type.ts";
 import {
   DEFAULT_MOCK_CREATION_MEMBERS,
@@ -23,17 +18,13 @@ import {
   type SpecFunction,
 } from "../lib/spec-syntax/subject-expressions.ts";
 
-import type { Comment, ESTree, Options, Scope } from "@oxlint/plugins";
+import type { ESTree, Options, Scope } from "@oxlint/plugins";
 
 const RULE_NAME = "no-vi-mock-factory-behavior--use-spy-true-and-fixture";
 
 const BUILTIN_MODULE_PREFIXES_OPTION = "builtinModulePrefixes";
 
 const DEFAULT_BUILTIN_MODULE_PREFIXES: readonly string[] = ["node:"];
-
-const CREATION_MEMBERS: ReadonlySet<string> = new Set(DEFAULT_MOCK_CREATION_MEMBERS);
-
-const WHITESPACE = /\s+/u;
 
 const builtinModulePrefixesFrom = (ruleOptions: Readonly<Options>): readonly string[] => {
   const [first] = ruleOptions;
@@ -105,7 +96,7 @@ const createsMockWithImplementation = (
   if (callee.type !== "MemberExpression") return false;
 
   const member = staticMemberName(callee);
-  if (member === null || !CREATION_MEMBERS.has(member)) return false;
+  if (member === null || !DEFAULT_MOCK_CREATION_MEMBERS.includes(member)) return false;
   if (call.arguments.length === 0) return false;
   return spellsMockNamespace(callee.object, lookup);
 };
@@ -149,27 +140,6 @@ const behavesInside = (read: {
       settlesBehaviour(call, read.lookup),
   );
 
-const commentBlockAbove = (comments: readonly Comment[], line: number): readonly Comment[] => {
-  const adjacent = comments.find((comment) => comment.loc.end.line === line - 1);
-  if (adjacent === undefined) return [];
-  return [...commentBlockAbove(comments, adjacent.loc.start.line), adjacent];
-};
-
-const exemptionIn = (
-  comment: Comment,
-): { readonly comment: Comment; readonly grounds: string } | null => {
-  const spelled = comment.value.trim();
-  if (firstToken(spelled) !== MOCK_FACTORY_EXEMPTION_DIRECTIVE) return null;
-
-  const written = spelled.slice(MOCK_FACTORY_EXEMPTION_DIRECTIVE.length);
-  const separated = DIRECTIVE_GROUNDS_SEPARATOR.exec(written);
-  const named = separated === null ? written : written.slice(0, separated.index);
-  if (!named.split(WHITESPACE).includes(RULE_NAME)) return null;
-
-  const grounds = separated === null ? "" : written.slice(separated.index + separated[0].length);
-  return { comment, grounds: grounds.trim() };
-};
-
 export const noViMockFactoryBehavior = createDontReviewItRule({
   name: RULE_NAME,
   meta: {
@@ -181,9 +151,9 @@ export const noViMockFactoryBehavior = createDontReviewItRule({
     },
     messages: {
       factoryShape:
-        "A module replacement declaration must not hand over a factory. Pass `{ spy: true }` as the second argument, and declare the values a test needs inside the fixture that test receives.",
+        "A module replacement declaration must not hand over a factory. Pass `{ spy: true }` as the second argument and let the replaced module answer, so the replacement records how it was called and settles nothing.",
       factoryBehaviour:
-        "The body of a module replacement factory must not settle what a mock hands back. Move every return value, resolved value, rejected value and implementation into the fixture that hands the mock to the test, and leave the factory holding bare mock containers.",
+        "The body of a module replacement factory must not settle what a mock hands back. Delete every return value, resolved value, rejected value and implementation written here, and leave the replacement a pass-through that only records how it was called.",
       unreasonedExemption:
         "An exemption comment must not stand without grounds. Write the grounds for this exemption after `--`, and name there the boundary this spec replaces by hand.",
     },
@@ -206,9 +176,11 @@ export const noViMockFactoryBehavior = createDontReviewItRule({
     const builtinPrefixes = builtinModulePrefixesFrom(inspection.options);
 
     const grantsExemption = (call: ESTree.CallExpression): boolean => {
-      const written = commentBlockAbove(inspection.sourceCode.ast.comments, call.loc.start.line)
-        .map((comment) => exemptionIn(comment))
-        .filter((exemption) => exemption !== null);
+      const written = exemptionsWrittenAbove({
+        comments: inspection.sourceCode.ast.comments,
+        line: call.loc.start.line,
+        ruleName: RULE_NAME,
+      });
 
       for (const exemption of written.filter((carried) => carried.grounds === "")) {
         inspection.report({ loc: exemption.comment.loc, messageId: "unreasonedExemption" });

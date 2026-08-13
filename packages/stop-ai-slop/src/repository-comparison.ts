@@ -64,30 +64,39 @@ export type RepositoryComparison = Readonly<{
   files: readonly ComparisonFile[];
 }>;
 
-const resolveCommit = async (repositoryRoot: string, revision: string): Promise<string> =>
-  (
+const resolveRevisionObject = async (repositoryRoot: string, revision: string): Promise<string> => {
+  return (
     await runGitText({
       repositoryRoot,
-      args: ["rev-parse", "--verify", "--end-of-options", `${revision}^{commit}`],
+      args: ["rev-parse", "--verify", "--end-of-options", `${revision}^{tree}`],
     })
   ).trim();
+};
 
 const sourceExtensions = [".cjs", ".cts", ".js", ".jsx", ".mjs", ".mts", ".ts", ".tsx"];
 
-export const decodedSource = (path: string, writtenBlob: Uint8Array): string => {
+const utf8SourceOf = (sourceBytes: Uint8Array): string | null => {
   const [undecodable, decoded] = attempt<string, Error>(() =>
-    new TextDecoder("utf-8", { fatal: true }).decode(writtenBlob),
+    new TextDecoder("utf-8", { fatal: true }).decode(sourceBytes),
   );
-  if (undecodable !== null) {
+  return undecodable === null ? decoded : null;
+};
+
+export const decodedSource = (path: string, sourceBytes: Uint8Array): string => {
+  const decoded = utf8SourceOf(sourceBytes);
+  if (decoded === null) {
     throw new Error(`Source blob does not decode as UTF-8: ${path}`);
   }
 
   return decoded;
 };
 
+export const decodedPreviousSource = (sourceBytes: Uint8Array): string | null =>
+  utf8SourceOf(sourceBytes);
+
 export type SideSources = Readonly<{
-  base: (path: string) => Promise<string>;
-  head: (path: string) => Promise<string>;
+  base: (path: string) => Promise<string | null>;
+  head: (path: string) => Promise<string | null>;
 }>;
 
 const readSource = async ({
@@ -191,12 +200,12 @@ export const comparisonFrom = async ({
   );
 
 const diffArguments = ({
-  baseCommit,
-  headCommit,
+  baseObject,
+  headObject,
   presentation,
 }: Readonly<{
-  baseCommit: string;
-  headCommit: string;
+  baseObject: string;
+  headObject: string;
   presentation: readonly string[];
 }>): readonly string[] => [
   "-c",
@@ -210,8 +219,8 @@ const diffArguments = ({
   "--no-color",
   "--no-textconv",
   ...presentation,
-  baseCommit,
-  headCommit,
+  baseObject,
+  headObject,
   "--",
 ];
 
@@ -220,28 +229,27 @@ export const compareRevisions = async ({
   baseRevision,
   headRevision,
 }: CompareRevisionsOptions): Promise<RepositoryComparison> => {
-  const [baseCommit, headCommit] = await Promise.all([
-    resolveCommit(repositoryRoot, baseRevision),
-    resolveCommit(repositoryRoot, headRevision),
+  const [baseObject, headObject] = await Promise.all([
+    resolveRevisionObject(repositoryRoot, baseRevision),
+    resolveRevisionObject(repositoryRoot, headRevision),
   ]);
   const [inventoryOutput, diff] = await Promise.all([
     runGitText({
       repositoryRoot,
-      args: diffArguments({ baseCommit, headCommit, presentation: ["--name-status", "-z"] }),
+      args: diffArguments({ baseObject, headObject, presentation: ["--name-status", "-z"] }),
     }),
     runGitText({
       repositoryRoot,
-      args: diffArguments({ baseCommit, headCommit, presentation: ["--unified=0"] }),
+      args: diffArguments({ baseObject, headObject, presentation: ["--unified=0"] }),
     }),
   ]);
-  const blobAt = (revision: string) => async (path: string) =>
-    decodedSource(
-      path,
-      await runGitBuffer({
-        repositoryRoot,
-        args: ["cat-file", "blob", `${revision}:${path}`],
-      }),
-    );
+  const blobAt =
+    (revision: string, decode: (path: string, sourceBytes: Uint8Array) => string | null) =>
+    async (path: string) =>
+      decode(
+        path,
+        await runGitBuffer({ repositoryRoot, args: ["cat-file", "blob", `${revision}:${path}`] }),
+      );
 
   return {
     repositoryRoot,
@@ -250,7 +258,10 @@ export const compareRevisions = async ({
     files: await comparisonFrom({
       inventoryOutput,
       diff,
-      sources: { base: blobAt(baseCommit), head: blobAt(headCommit) },
+      sources: {
+        base: blobAt(baseObject, (_path, sourceBytes) => decodedPreviousSource(sourceBytes)),
+        head: blobAt(headObject, decodedSource),
+      },
     }),
   };
 };

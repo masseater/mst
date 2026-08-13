@@ -9,15 +9,12 @@ import { defaultEntryCompositionConfig } from "./entry-composition/config.ts";
 import { entryCompositionProblems } from "./entry-composition/entry-composition-problems.ts";
 import { defaultIntentSkillsConfig } from "./intent-skills/config.ts";
 import { shippedSkillsProblems } from "./intent-skills/shipped-skills.ts";
-import { buildCanonicalValuesCatalog } from "./lint/oxlint/lib/canonical-values/builder.ts";
-import {
-  formatCanonicalValuesProblem,
-  formatEquivalentConceptGroup,
-} from "./lint/oxlint/lib/canonical-values/problem-message.ts";
 import { listRepositoryFiles } from "./lint/oxlint/lib/canonical-values/source-files.ts";
 import {
   findEquivalentConcepts,
-  verifyCanonicalValues,
+  formatCanonicalValuesProblem,
+  formatEquivalentConceptGroup,
+  inspectCanonicalValues,
 } from "./lint/oxlint/lib/canonical-values/verify.ts";
 import { duplicatedClustersIn } from "./lint/oxlint/lib/duplicated-bodies/body-index.ts";
 import { buildRepositoryBodyIndex } from "./lint/oxlint/lib/duplicated-bodies/builder.ts";
@@ -49,7 +46,7 @@ const UNREADABLE_WORKSPACE_DEFINITION = "workspace definition does not parse";
 
 const sourceScanOutcomes = (repositoryRoot: string): readonly CheckOutcome[] => {
   const repositoryFiles = listRepositoryFiles(resolve(repositoryRoot));
-  const catalog = buildCanonicalValuesCatalog({ repositoryRoot });
+  const canonicalValues = inspectCanonicalValues({ repositoryRoot });
 
   return [
     {
@@ -57,20 +54,21 @@ const sourceScanOutcomes = (repositoryRoot: string): readonly CheckOutcome[] => 
       unit: "source file",
       count: repositoryFiles.commentSources.length,
       skippedReason: null,
-      problems: verifyCanonicalValues({ repositoryRoot })
-        .map(formatCanonicalValuesProblem)
-        .toSorted(),
+      problems: canonicalValues.problems.map(formatCanonicalValuesProblem).toSorted(),
       warnings: [],
     },
     {
       check: "equivalent-concepts",
       unit: "concept",
-      count: catalog.entries.length,
+      count: canonicalValues.catalog.entries.length,
       skippedReason: null,
-      problems: findEquivalentConcepts(catalog.entries)
-        .map(formatEquivalentConceptGroup)
-        .toSorted(),
-      warnings: [],
+      problems: [],
+      warnings:
+        canonicalValues.problems.length === 0
+          ? findEquivalentConcepts(canonicalValues.catalog.entries)
+              .map(formatEquivalentConceptGroup)
+              .toSorted()
+          : [],
     },
     {
       check: "duplicated-bodies",

@@ -9,6 +9,7 @@ import { forbidMultiExpectIt } from "../lint/oxlint/rules/forbid-multi-expect-it
 import { forbidNumberedSiblingFile } from "../lint/oxlint/rules/forbid-numbered-sibling-file--name-what-each-file-owns.ts";
 import { forbidOversizedFile } from "../lint/oxlint/rules/forbid-oversized-file--split-by-responsibility.ts";
 import { forbidRestrictedTargetRelay } from "../lint/oxlint/rules/forbid-restricted-target-relay--delete-the-relay.ts";
+import { forbidTestAdjacentFile } from "../lint/oxlint/rules/forbid-test-adjacent-file--inline-its-setup-into-the-test.ts";
 import { forbidTestHook } from "../lint/oxlint/rules/forbid-test-hook--move-setup-into-fixture.ts";
 import { forbidTrackedPath } from "../lint/oxlint/rules/forbid-tracked-path--untrack-and-ignore.ts";
 import { forbidUnresolvableModuleSpecifier } from "../lint/oxlint/rules/forbid-unresolvable-module-specifier--write-a-statically-resolvable-specifier.ts";
@@ -25,6 +26,7 @@ import { noDetachedTestFile } from "../lint/oxlint/rules/no-detached-test-file--
 import { noDiscardedFailure } from "../lint/oxlint/rules/no-discarded-failure--receive-and-surface-it.ts";
 import { noDoubleTypeAssertion } from "../lint/oxlint/rules/no-double-type-assertion--declare-the-real-type.ts";
 import { noDryTestSetup } from "../lint/oxlint/rules/no-dry-test-setup--inline-owned-setup.ts";
+import { noDuplicatedTest } from "../lint/oxlint/rules/no-duplicated-test--delete-the-copy.ts";
 import { noEmptyCatch } from "../lint/oxlint/rules/no-empty-catch--throw-or-handle.ts";
 import { noExpectCallExpression } from "../lint/oxlint/rules/no-expect-call-expression--yield-from-fixture.ts";
 import { noExpectForbiddenSubjectName } from "../lint/oxlint/rules/no-expect-forbidden-subject-name--rename-to-concrete-subject.ts";
@@ -59,7 +61,9 @@ import { noPromiseChain } from "../lint/oxlint/rules/no-promise-chain--use-async
 import { noReassign } from "../lint/oxlint/rules/no-reassign--use-spread-or-iife.ts";
 import { noReceiverMutation } from "../lint/oxlint/rules/no-receiver-mutation--derive-new-value.ts";
 import { noRedundantMockReset } from "../lint/oxlint/rules/no-redundant-mock-reset--lift-mocks-into-fixture.ts";
+import { noReplacedDoubleBehaviour } from "../lint/oxlint/rules/no-replaced-double-behaviour--let-the-replaced-module-answer.ts";
 import { noRuleSuppression } from "../lint/oxlint/rules/no-rule-suppression--fix-the-violation.ts";
+import { noSharedDoubleState } from "../lint/oxlint/rules/no-shared-double-state--reset-doubles-between-tests.ts";
 import { noSilentCatch } from "../lint/oxlint/rules/no-silent-catch--rethrow-or-handle.ts";
 import { noSilentSuppression } from "../lint/oxlint/rules/no-silent-suppression--fix-or-justify-inline.ts";
 import { noSingleUseLocalType } from "../lint/oxlint/rules/no-single-use-local-type--inline-at-the-use-site.ts";
@@ -73,6 +77,7 @@ import { noUncheckedAuthoredPath } from "../lint/oxlint/rules/no-unchecked-autho
 import { noUncheckedCast } from "../lint/oxlint/rules/no-unchecked-cast--parse-at-boundary.ts";
 import { noUndersizedExternalSnapshot } from "../lint/oxlint/rules/no-undersized-external-snapshot--use-inline-snapshot.ts";
 import { noUnorderedImport } from "../lint/oxlint/rules/no-unordered-import--group-by-origin-then-sort-by-specifier.ts";
+import { noUnregisteredRulePlugin } from "../lint/oxlint/rules/no-unregistered-rule-plugin--enable-the-plugin.ts";
 import { noUnwrappedToolchainConfig } from "../lint/oxlint/rules/no-unwrapped-toolchain-config--call-the-preset-for-the-block.ts";
 import { noVacuousHostObjectEquality } from "../lint/oxlint/rules/no-vacuous-host-object-equality--assert-parsed-value.ts";
 import { noVacuousTestRun } from "../lint/oxlint/rules/no-vacuous-test-run--let-the-empty-run-fail.ts";
@@ -94,6 +99,7 @@ import {
   noDuplicatedBody,
   noDuplicateValueDeclaration,
   noLocalFiniteValueSet,
+  noNonBoundaryDouble,
   noSplitTypeAuthority,
   noStrictCanonicalLiteralUse,
   noTwinDeclaration,
@@ -155,6 +161,7 @@ export const oxlint: OxlintConfig = defineConfig({
     [`${PLUGIN_NAME}/${forbidNumberedSiblingFile.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${forbidOversizedFile.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${forbidRestrictedTargetRelay.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${forbidTestAdjacentFile.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${forbidTestHook.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${forbidTrackedPath.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${forbidUnresolvableModuleSpecifier.name}`]: LINT_SEVERITY.ERROR,
@@ -174,6 +181,7 @@ export const oxlint: OxlintConfig = defineConfig({
     [`${PLUGIN_NAME}/${noDryTestSetup.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noDuplicateValueDeclaration.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noDuplicatedBody.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noDuplicatedTest.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noEmptyCatch.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noExpectCallExpression.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noExpectForbiddenSubjectName.name}`]: LINT_SEVERITY.ERROR,
@@ -203,13 +211,16 @@ export const oxlint: OxlintConfig = defineConfig({
     [`${PLUGIN_NAME}/${noModuleScopeMockConfig.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noModuleScopeMutableState.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noMultiBindingDeclaration.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noNonBoundaryDouble.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noNormalizeSutOutput.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noPartialRuleSet.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noPromiseChain.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noReassign.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noReceiverMutation.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noRedundantMockReset.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noReplacedDoubleBehaviour.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noRuleSuppression.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noSharedDoubleState.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noSilentCatch.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noSilentSuppression.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noSingleUseLocalType.name}`]: LINT_SEVERITY.ERROR,
@@ -229,6 +240,10 @@ export const oxlint: OxlintConfig = defineConfig({
     [`${PLUGIN_NAME}/${noUncheckedCast.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noUndersizedExternalSnapshot.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noUnorderedImport.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noUnregisteredRulePlugin.name}`]: [
+      LINT_SEVERITY.ERROR,
+      { plugins: [...UPSTREAM_PLUGINS, PLUGIN_NAME] },
+    ],
     [`${PLUGIN_NAME}/${noUnusedStyleClass.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noUnwrappedToolchainConfig.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noVacuousHostObjectEquality.name}`]: LINT_SEVERITY.ERROR,

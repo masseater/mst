@@ -3,39 +3,51 @@ import { createDontReviewItRule } from "../../../create-rule.ts";
 import type { ESTree } from "@oxlint/plugins";
 import type { RuleMessage } from "../lib/rule-message.ts";
 
-const IMPORT_ORIGIN = {
-  builtin: 0,
-  installed: 1,
-  repository: 2,
-  typeOnly: 3,
-} as const;
+const BUILTIN_ORIGIN = Symbol("builtin");
 
-type ImportOrigin = (typeof IMPORT_ORIGIN)[keyof typeof IMPORT_ORIGIN];
+const INSTALLED_ORIGIN = Symbol("installed");
+
+const REPOSITORY_ORIGIN = Symbol("repository");
+
+const TYPE_ONLY_ORIGIN = Symbol("typeOnly");
+
+type ImportOrigin =
+  | typeof BUILTIN_ORIGIN
+  | typeof INSTALLED_ORIGIN
+  | typeof REPOSITORY_ORIGIN
+  | typeof TYPE_ONLY_ORIGIN;
 
 const distanceOf = (specifier: string): ImportOrigin => {
-  if (specifier.startsWith("node:")) return IMPORT_ORIGIN.builtin;
-  return specifier.startsWith(".") ? IMPORT_ORIGIN.repository : IMPORT_ORIGIN.installed;
+  if (specifier.startsWith("node:")) return BUILTIN_ORIGIN;
+  return specifier.startsWith(".") ? REPOSITORY_ORIGIN : INSTALLED_ORIGIN;
 };
 
 const originOf = (declaration: ESTree.ImportDeclaration): ImportOrigin =>
-  declaration.importKind === "type" ? IMPORT_ORIGIN.typeOnly : distanceOf(declaration.source.value);
+  declaration.importKind === "type" ? TYPE_ONLY_ORIGIN : distanceOf(declaration.source.value);
+
+const originRank = (origin: ImportOrigin): number => {
+  if (origin === BUILTIN_ORIGIN) return 0;
+  if (origin === INSTALLED_ORIGIN) return 1;
+  if (origin === REPOSITORY_ORIGIN) return 2;
+  return 3;
+};
 
 const sortKeyOf = (declaration: ESTree.ImportDeclaration): string => {
   const specifier = declaration.source.value.toLowerCase();
   return declaration.importKind === "type"
-    ? `${String(distanceOf(specifier))}\u0000${specifier}`
+    ? `${String(originRank(distanceOf(specifier)))}\0${specifier}`
     : specifier;
 };
 
 const originNameOf = (origin: ImportOrigin): string => {
   switch (origin) {
-    case IMPORT_ORIGIN.builtin:
+    case BUILTIN_ORIGIN:
       return "the runtime built-ins";
-    case IMPORT_ORIGIN.installed:
+    case INSTALLED_ORIGIN:
       return "the installed packages";
-    case IMPORT_ORIGIN.repository:
+    case REPOSITORY_ORIGIN:
       return "this repository";
-    case IMPORT_ORIGIN.typeOnly:
+    case TYPE_ONLY_ORIGIN:
       return "the type-only imports";
   }
 };
@@ -46,8 +58,8 @@ type PlacedImport = {
   readonly sortKey: string;
 };
 
-const placedImportsOf = (writtenBody: readonly ESTree.Statement[]): readonly PlacedImport[] =>
-  writtenBody.flatMap((statement) =>
+const placedImportsOf = (statements: readonly ESTree.Statement[]): readonly PlacedImport[] =>
+  statements.flatMap((statement) =>
     statement.type === "ImportDeclaration" && statement.specifiers.length > 0
       ? [
           {
@@ -59,35 +71,38 @@ const placedImportsOf = (writtenBody: readonly ESTree.Statement[]): readonly Pla
       : [],
   );
 
-const blankLinesBetween = (preceding: PlacedImport, reached: PlacedImport): number =>
-  reached.declaration.loc.start.line - preceding.declaration.loc.end.line - 1;
+const blankLinesBetween = (preceding: PlacedImport, placedImport: PlacedImport): number =>
+  placedImport.declaration.loc.start.line - preceding.declaration.loc.end.line - 1;
 
 const crossOriginMisplacement = (
   preceding: PlacedImport,
-  reached: PlacedImport,
+  placedImport: PlacedImport,
 ): RuleMessage | null => {
-  const origin = originNameOf(reached.origin);
+  const origin = originNameOf(placedImport.origin);
   const precedingOrigin = originNameOf(preceding.origin);
-  if (reached.origin < preceding.origin) {
+  if (originRank(placedImport.origin) < originRank(preceding.origin)) {
     return { messageId: "originOutOfOrder", data: { origin, precedingOrigin } };
   }
-  return blankLinesBetween(preceding, reached) < 1
+  return blankLinesBetween(preceding, placedImport) < 1
     ? { messageId: "missingBlankLineBetweenOrigins", data: { origin, precedingOrigin } }
     : null;
 };
 
 const sameOriginMisplacement = (
   preceding: PlacedImport,
-  reached: PlacedImport,
+  placedImport: PlacedImport,
 ): RuleMessage | null => {
-  if (blankLinesBetween(preceding, reached) > 0) {
-    return { messageId: "blankLineInsideOrigin", data: { origin: originNameOf(reached.origin) } };
+  if (blankLinesBetween(preceding, placedImport) > 0) {
+    return {
+      messageId: "blankLineInsideOrigin",
+      data: { origin: originNameOf(placedImport.origin) },
+    };
   }
-  if (reached.sortKey >= preceding.sortKey) return null;
+  if (placedImport.sortKey >= preceding.sortKey) return null;
   return {
     messageId: "specifierOutOfOrder",
     data: {
-      specifier: reached.declaration.source.value,
+      specifier: placedImport.declaration.source.value,
       precedingSpecifier: preceding.declaration.source.value,
     },
   };
@@ -95,12 +110,12 @@ const sameOriginMisplacement = (
 
 const misplacementBetween = (
   preceding: PlacedImport | undefined,
-  reached: PlacedImport,
+  placedImport: PlacedImport,
 ): RuleMessage | null => {
   if (preceding === undefined) return null;
-  return reached.origin === preceding.origin
-    ? sameOriginMisplacement(preceding, reached)
-    : crossOriginMisplacement(preceding, reached);
+  return placedImport.origin === preceding.origin
+    ? sameOriginMisplacement(preceding, placedImport)
+    : crossOriginMisplacement(preceding, placedImport);
 };
 
 export const noUnorderedImport = createDontReviewItRule({
@@ -124,14 +139,14 @@ export const noUnorderedImport = createDontReviewItRule({
     },
     schema: [],
   },
-  create(inspection) {
+  create(ruleContext) {
     return {
       Program(node: ESTree.Program) {
         const placed = placedImportsOf(node.body);
-        for (const [index, reached] of placed.entries()) {
-          const misplacement = misplacementBetween(placed[index - 1], reached);
+        for (const [index, placedImport] of placed.entries()) {
+          const misplacement = misplacementBetween(placed[index - 1], placedImport);
           if (misplacement === null) continue;
-          inspection.report({ node: reached.declaration, ...misplacement });
+          ruleContext.report({ node: placedImport.declaration, ...misplacement });
         }
       },
     };
