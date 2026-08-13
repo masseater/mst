@@ -2,6 +2,7 @@ import { loadCanonicalValuesCatalog } from "./lint/oxlint/lib/canonical-values/b
 import { loadCatalogEntries } from "./lint/oxlint/lib/dependency-catalog/catalog-entries.ts";
 import { loadWorkspaceDependencies } from "./lint/oxlint/lib/dependency-catalog/workspace-manifests.ts";
 import { loadRepositoryBodyIndex } from "./lint/oxlint/lib/duplicated-bodies/builder.ts";
+import { replacedModuleAt } from "./lint/oxlint/lib/external-io-boundary.ts";
 import { loadLibraryVocabulary } from "./lint/oxlint/lib/library-vocabulary/harvester.ts";
 import { loadRepositoryCellClassIndex } from "./lint/oxlint/lib/mutable-cell-classes/builder.ts";
 import { loadRepositoryTypeAuthorityIndex } from "./lint/oxlint/lib/split-type-authority/builder.ts";
@@ -63,6 +64,7 @@ import { noMixedPackageSurface } from "./lint/oxlint/rules/no-mixed-package-surf
 import { noModuleScopeMockConfig } from "./lint/oxlint/rules/no-module-scope-mock-config--lift-into-fixture.ts";
 import { noModuleScopeMutableState } from "./lint/oxlint/rules/no-module-scope-mutable-state--lift-into-fixture.ts";
 import { noMultiBindingDeclaration } from "./lint/oxlint/rules/no-multi-binding-declaration--declare-one-binding-per-statement.ts";
+import { createNoNonBoundaryDouble } from "./lint/oxlint/rules/no-non-boundary-double--replace-at-the-external-boundary.ts";
 import { noNormalizeSutOutput } from "./lint/oxlint/rules/no-normalize-sut-output--assert-natural-shape.ts";
 import { noPartialRuleSet } from "./lint/oxlint/rules/no-partial-rule-set--enable-the-whole-set.ts";
 import { noPromiseChain } from "./lint/oxlint/rules/no-promise-chain--use-async-await.ts";
@@ -70,6 +72,7 @@ import { noReassign } from "./lint/oxlint/rules/no-reassign--use-spread-or-iife.
 import { noReceiverMutation } from "./lint/oxlint/rules/no-receiver-mutation--derive-new-value.ts";
 import { noRedundantMockReset } from "./lint/oxlint/rules/no-redundant-mock-reset--lift-mocks-into-fixture.ts";
 import { noRuleSuppression } from "./lint/oxlint/rules/no-rule-suppression--fix-the-violation.ts";
+import { noSharedDoubleState } from "./lint/oxlint/rules/no-shared-double-state--reset-doubles-between-tests.ts";
 import { noSilentSuppression } from "./lint/oxlint/rules/no-silent-suppression--fix-or-justify-inline.ts";
 import { noSingleUseLocalType } from "./lint/oxlint/rules/no-single-use-local-type--inline-at-the-use-site.ts";
 import { noSpecFileHelperFunction } from "./lint/oxlint/rules/no-spec-file-helper-function--inline-or-use-fixture.ts";
@@ -120,6 +123,8 @@ export const noStrictCanonicalLiteralUse = createNoStrictCanonicalLiteralUseRule
 export const noDuplicatedBody = createNoDuplicatedBody({ loadIndex: loadRepositoryBodyIndex });
 
 export const noTwinDeclaration = createNoTwinDeclaration({ loadIndex: loadRepositoryBodyIndex });
+
+export const noNonBoundaryDouble = createNoNonBoundaryDouble({ readBoundary: replacedModuleAt });
 
 export const noUnusedStyleClass = createNoUnusedStyleClass({ loadIndex: loadStyleClassIndex });
 
@@ -203,6 +208,7 @@ const plugin: Plugin = {
     [noModuleScopeMockConfig.name]: noModuleScopeMockConfig,
     [noModuleScopeMutableState.name]: noModuleScopeMutableState,
     [noMultiBindingDeclaration.name]: noMultiBindingDeclaration,
+    [noNonBoundaryDouble.name]: noNonBoundaryDouble,
     [noNormalizeSutOutput.name]: noNormalizeSutOutput,
     [noPartialRuleSet.name]: noPartialRuleSet,
     [noPromiseChain.name]: noPromiseChain,
@@ -210,6 +216,7 @@ const plugin: Plugin = {
     [noReceiverMutation.name]: noReceiverMutation,
     [noRedundantMockReset.name]: noRedundantMockReset,
     [noRuleSuppression.name]: noRuleSuppression,
+    [noSharedDoubleState.name]: noSharedDoubleState,
     [noSilentSuppression.name]: noSilentSuppression,
     [noSingleUseLocalType.name]: noSingleUseLocalType,
     [noSpecFileHelperFunction.name]: noSpecFileHelperFunction,

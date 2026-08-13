@@ -2,6 +2,8 @@ import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   test: {
+    mockReset: true,
+    restoreMocks: true,
     fileParallelism: false,
     testTimeout: 60_000,
     coverage: {

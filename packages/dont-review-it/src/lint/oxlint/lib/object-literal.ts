@@ -22,6 +22,11 @@ export const objectValueOf = (lookup: ObjectLookup): ESTree.Expression | null =>
   return property === null ? null : property.value;
 };
 
+export const declaresTrueAt = (lookup: ObjectLookup): boolean => {
+  const declared = objectValueOf(lookup);
+  return declared?.type === "Literal" && declared.value === true;
+};
+
 export const nestedObjectAt = ({
   object,
   path,

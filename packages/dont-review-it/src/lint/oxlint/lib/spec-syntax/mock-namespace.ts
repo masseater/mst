@@ -1,7 +1,7 @@
 import { IMPORT_BINDING_NODE_TYPES } from "../node-kinds.ts";
 import { resolveBinding } from "../resolved-bindings.ts";
 import { moduleExportSpelling } from "./module-declarations.ts";
-import { staticMemberName } from "./static-names.ts";
+import { staticMemberName, staticSpelling } from "./static-names.ts";
 import { unwrapSubject } from "./subject-expressions.ts";
 
 import type { Definition, ESTree, Scope, Variable } from "@oxlint/plugins";
@@ -11,6 +11,10 @@ export const DEFAULT_MOCK_NAMESPACE_SPELLINGS: readonly string[] = ["vi"];
 export const DEFAULT_MOCK_CREATION_MEMBERS: readonly string[] = ["fn"];
 
 export const MODULE_REPLACEMENT_MEMBER = "mock";
+
+export const DEFAULT_MODULE_REPLACEMENT_MEMBERS: readonly string[] = ["doMock", "mock"];
+
+export const MODULE_REPLACEMENT_MEMBERS_OPTION = "moduleReplacementMembers";
 
 export const MOCK_BEHAVIOUR_SETTERS: ReadonlySet<string> = new Set([
   "mockImplementation",
@@ -70,6 +74,24 @@ export const spellsMockNamespace = (node: ESTree.Expression, lookup: NamespaceLo
   const binding = resolveBinding(lookup.scopeAt(written), written.name);
   if (binding === null) return lookup.spellings.has(written.name);
   return bindingSpellsNamespace(binding, lookup);
+};
+
+export const replacedModuleSpecifier = (
+  call: ESTree.CallExpression,
+  reading: { readonly lookup: NamespaceLookup; readonly members: ReadonlySet<string> },
+): string | null => {
+  const callee = unwrapSubject(call.callee);
+  if (callee.type !== "MemberExpression") return null;
+
+  const member = staticMemberName(callee);
+  if (member === null || !reading.members.has(member)) return null;
+  if (!spellsMockNamespace(callee.object, reading.lookup)) return null;
+
+  const [named] = call.arguments;
+  if (named === undefined || named.type === "SpreadElement") return null;
+
+  const written = unwrapSubject(named);
+  return staticSpelling(written.type === "ImportExpression" ? written.source : written);
 };
 
 export const spellsImportedBinding = (

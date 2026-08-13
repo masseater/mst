@@ -1,3 +1,5 @@
+export const SUBPATH_SEPARATOR = "/";
+
 export const segmentsOf = ({
   path,
   separator,

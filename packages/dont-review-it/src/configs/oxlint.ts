@@ -21,6 +21,7 @@ import { noLoggedAndContinuedFailure } from "../lint/oxlint/rules/no-logged-and-
 import { noMultiBindingDeclaration } from "../lint/oxlint/rules/no-multi-binding-declaration--declare-one-binding-per-statement.ts";
 import { noPromiseChain } from "../lint/oxlint/rules/no-promise-chain--use-async-await.ts";
 import { noReassign } from "../lint/oxlint/rules/no-reassign--use-spread-or-iife.ts";
+import { noSharedDoubleState } from "../lint/oxlint/rules/no-shared-double-state--reset-doubles-between-tests.ts";
 import { noSingleUseLocalType } from "../lint/oxlint/rules/no-single-use-local-type--inline-at-the-use-site.ts";
 import { noStandaloneTsconfig } from "../lint/oxlint/rules/no-standalone-tsconfig--extend-shared-preset.ts";
 import { noTautologicalAssertion } from "../lint/oxlint/rules/no-tautological-assertion--assert-on-a-computed-value.ts";
@@ -32,6 +33,7 @@ import { requireStandardIoSnapshot } from "../lint/oxlint/rules/require-standard
 import {
   noDuplicatedBody,
   noLocalFiniteValueSet,
+  noNonBoundaryDouble,
   noStrictCanonicalLiteralUse,
   noTwinDeclaration,
   noUnusedStyleClass,
@@ -108,8 +110,10 @@ export const oxlint: OxlintConfig = defineConfig({
     [`${PLUGIN_NAME}/${noLocalFiniteValueSet.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noLoggedAndContinuedFailure.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noMultiBindingDeclaration.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noNonBoundaryDouble.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noPromiseChain.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noReassign.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noSharedDoubleState.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noSingleUseLocalType.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noStandaloneTsconfig.name}`]: [
       LINT_SEVERITY.ERROR,
