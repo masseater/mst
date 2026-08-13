@@ -429,6 +429,9 @@ importers:
       '@mst/repository-checks':
         specifier: workspace:*
         version: link:../repository-checks
+      '@mst/verified-specifications':
+        specifier: workspace:*
+        version: link:../verified-specifications
       '@oxlint/plugins':
         specifier: 'catalog:'
         version: 1.73.0

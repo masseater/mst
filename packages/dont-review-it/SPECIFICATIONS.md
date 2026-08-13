@@ -38,13 +38,6 @@
 - 同じ本体を綴る宣言を、繰り返しているすべての場所を挙げて報告する
 - テストファイルが繰り返す本体を重複と数えない
 
-## 設定への git 除外の注入
-
-[`specs/git-excludes.spec.ts`](specs/git-excludes.spec.ts)
-
-- 呼び手が書いた除外パターンを、git 由来の除外の後ろに残す
-- 除外を書いていない呼び手の設定にも、除外パターンの配列を与える
-
 ## preset の適用範囲の検査
 
 [`specs/preset-adoption.spec.ts`](specs/preset-adoption.spec.ts)
@@ -93,6 +86,14 @@
 - changelog が版を書き、skill が同じ版を名乗っていれば何も報告しない
 - 公開しないパッケージが skill の隣に changelog を持てば報告する
 - 自動修正は skill の版を宣言へ揃え、changelog には触れない
+
+## ツールチェーン設定の preset
+
+[`specs/toolchain-preset.spec.ts`](specs/toolchain-preset.spec.ts)
+
+- 呼び手が書いた除外パターンを、git 由来の除外の後ろに残す
+- 除外を書いていない呼び手の設定にも、除外パターンの配列を与える
+- markdown の段落を折り返さない整形を、呼び手が書かなくても与える
 
 ## ワークフロー定義の検査
 

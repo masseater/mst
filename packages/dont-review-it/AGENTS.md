@@ -29,7 +29,20 @@ description: Machine-enforced answers to the writing questions that would otherw
 
 ## 公開する config
 
-公開する oxlint の config は `oxlint` の 1 枚だけである。対象種別による出し分けはしない。ルートの `lint` が `extends` した時点でリポジトリ全体に効き、採用の判断は残らない。CLI に固有の規律もこの中にあり、対象を絞るのはルールの側である。判断は [EDR 0042](../../docs/engineering-decision-logs/0042-apply-one-preset-at-the-root-and-report-the-exception-the-toolchain-forces.md) にある。
+公開する config は `dontReviewItPreset` の 1 つだけである。`fmt` と `lint` の 2 つの関数を持ち、ルートの `vite.config.ts` はそれぞれのブロックで対応する関数を呼ぶ。呼び出し側が足したいものは引数に渡し、preset が返した値へ後ろから重なる。呼び忘れは [no-unwrapped-toolchain-config--call-the-preset-for-the-block](docs/lint/no-unwrapped-toolchain-config--call-the-preset-for-the-block.md) が報告する。
+
+`lint` が配るルール集合は 1 枚だけである。対象種別による出し分けはしない。ルートの `lint` が呼んだ時点でリポジトリ全体に効き、採用の判断は残らない。CLI に固有の規律もこの中にあり、対象を絞るのはルールの側である。判断は [EDR 0042](../../docs/engineering-decision-logs/0042-apply-one-preset-at-the-root-and-report-the-exception-the-toolchain-forces.md) にある。
+
+`fmt` が決めているのは、整形結果が読み手に届く見た目を変えず、差分にだけ現れる書き方である。markdown の段落を 1 行に畳むこと、import の並び順がこれにあたる。判断は [EDR 0046](../../docs/engineering-decision-logs/0046-let-the-formatter-own-where-markdown-lines-break.md) と [EDR 0047](../../docs/engineering-decision-logs/0047-hand-every-toolchain-block-one-preset-function.md) にある。
+
+- IF: 整形の選択を `fmt` に足したい; THEN
+  - MUST: レンダリングされた結果が変わらないことを確かめる
+  - PROHIBIT: 読み手に届く見た目を変える選択を入れる
+    - 見た目が変わる選択は書き手の判断であり、機械が一律に決めると表現を奪う
+- IF: 公開する config を増やしたくなった; THEN
+  - MUST: `dontReviewItPreset` の中へ入れる
+  - PROHIBIT: 2 つ目の export を作る
+    - 入口が複数あると、どれを配線したかで効いている範囲が変わり、採用の判断が呼び出し側に戻る
 
 lint で検出できない CLI の規範は [CLI の作り方](docs/cli.md) が持つ。
 
@@ -147,11 +160,19 @@ npm へ公開できるパッケージには、あることを要求する。
 
 `version` を持たないマニフェストには、版に関する 2 点を要求しない。
 
+changelog の中身は読まない。項目が実態と合っているかは機械が判定しないので、次の規範は人が守る。
+
 - IF: SKILL.md の中身の構造を検査したくなった; THEN MUST: この検査に足さず、上流の `intent validate`（各パッケージの `check:skills`）に任せる
   - 不変条件の分担は [EDR 0030](../../docs/engineering-decision-logs/0030-ship-agent-skills-with-published-packages-and-gate-the-shipping-ourselves.md) が決めている
 - IF: 公開パッケージの `version` を上げる; THEN
   - MUST: 同じ変更で `skills/CHANGELOG.md` にその版の見出しを書く
   - PROHIBIT: `metadata.library_version` を手で書き換える
     - マニフェストから一意に決まる値なので `check --write` が揃える
+- IF: 既に書いた版の項目と実態が食い違った; THEN
+  - IF: その版をまだ publish していない; THEN MUST: その項目を実態に合わせて書き直す
+  - IF: その版を publish 済み; THEN
+    - PROHIBIT: その項目を書き直す
+    - MUST: 版を上げ、新しい項目に書く
+      - 配った tarball の中身は変わらない。過去の項目を今の姿へ寄せると、版ごとの差分という changelog の役目が消える
 - IF: 版を上げた変更で SKILL.md の差分も要求したくなった; THEN PROHIBIT: 足す
   - 書くことが無いのに本文をいじる操作が生まれる。線の引き方は [EDR 0044](../../docs/engineering-decision-logs/0044-ship-a-changelog-beside-the-skills-and-check-it-against-the-manifest.md) が決めている

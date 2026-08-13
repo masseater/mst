@@ -30,12 +30,14 @@ export const collectBinding = (node: ESTree.ImportDeclaration, checked: Imported
   }
 };
 
-export const isCallOf = (callee: ESTree.Expression, checked: ImportedTarget): boolean => {
-  if (callee.type === "Identifier") return checked.binding.directNames.has(callee.name);
-  if (callee.type !== "MemberExpression" || callee.computed) return false;
-  if (callee.object.type !== "Identifier" || callee.property.type !== "Identifier") return false;
+export const isReferenceTo = (expression: ESTree.Expression, checked: ImportedTarget): boolean => {
+  if (expression.type === "Identifier") return checked.binding.directNames.has(expression.name);
+  if (expression.type !== "MemberExpression" || expression.computed) return false;
+  if (expression.object.type !== "Identifier" || expression.property.type !== "Identifier") {
+    return false;
+  }
   return (
-    checked.binding.namespaceNames.has(callee.object.name) &&
-    callee.property.name === checked.exportedName
+    checked.binding.namespaceNames.has(expression.object.name) &&
+    expression.property.name === checked.exportedName
   );
 };
