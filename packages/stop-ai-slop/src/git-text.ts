@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
+import { gitExecutablePath } from "@mst/repository-checks";
 import { omitBy } from "es-toolkit";
 
 type GitCommandExecutor = (
@@ -19,13 +20,15 @@ const environmentOutsideAnyRepository = (): Readonly<Record<string, string | und
 
 const executeFile = promisify(execFile);
 
-const executeGitCommand: GitCommandExecutor = async (repositoryRoot, handedArgs) =>
-  executeFile("git", [...handedArgs], {
+const executeGitCommand: GitCommandExecutor = async (repositoryRoot, handedArgs) => {
+  const repositoryAgnosticEnv = environmentOutsideAnyRepository();
+  return executeFile(gitExecutablePath(repositoryAgnosticEnv.PATH), [...handedArgs], {
     cwd: repositoryRoot,
     encoding: "buffer",
-    env: environmentOutsideAnyRepository(),
+    env: repositoryAgnosticEnv,
     maxBuffer: 100 * 1024 * 1024,
   });
+};
 
 export const runGitBuffer = async ({
   repositoryRoot,

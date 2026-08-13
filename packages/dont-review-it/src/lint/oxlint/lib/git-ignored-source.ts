@@ -1,6 +1,7 @@
-import { lstatSync, realpathSync } from "node:fs";
-import { join, relative, resolve, sep } from "node:path";
+import { existsSync, lstatSync, realpathSync } from "node:fs";
+import { dirname, join, relative, resolve, sep } from "node:path";
 
+import { measureStage } from "@mst/lint-rule-authoring";
 import { attempt } from "es-toolkit";
 
 import { gitOutput } from "./git-output.ts";
@@ -36,10 +37,20 @@ const firstSymbolicPath = (repositoryRoot: string, repositoryPath: string): stri
   return null;
 };
 
+const carriesRepositoryLink = (directory: string): boolean => {
+  if (existsSync(join(directory, ".git"))) return true;
+  const parent = dirname(directory);
+  return parent !== directory && carriesRepositoryLink(parent);
+};
+
 const ignoredRepositoryPaths = (repositoryRoot: string): ReadonlySet<string> => {
-  const ignoredPathOutput = gitOutput(
-    ["ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z"],
-    { cwd: repositoryRoot, env: process.env },
+  if (!carriesRepositoryLink(repositoryRoot)) return new Set();
+
+  const ignoredPathOutput = measureStage("canonical.scope.git", () =>
+    gitOutput(["ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z"], {
+      cwd: repositoryRoot,
+      env: process.env,
+    }),
   );
   return ignoredPathOutput !== null
     ? new Set(ignoredPathOutput.split("\0").filter((path) => path !== ""))

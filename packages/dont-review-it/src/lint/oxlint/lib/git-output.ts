@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 
+import { gitExecutablePath } from "@mst/repository-checks";
 import { attempt, omitBy } from "es-toolkit";
 
 import { isEnvironmentFailure } from "./path-failure.ts";
@@ -23,7 +24,7 @@ export const gitOutput = (
     String(environmentName).startsWith("GIT_"),
   );
   const [unaskableGit, gitStdout] = attempt<string, Error>(() =>
-    execFileSync("git", [...gitArguments], {
+    execFileSync(gitExecutablePath(repositoryAgnosticEnv.PATH), [...gitArguments], {
       cwd: environment.cwd,
       encoding: "utf8",
       env: repositoryAgnosticEnv,

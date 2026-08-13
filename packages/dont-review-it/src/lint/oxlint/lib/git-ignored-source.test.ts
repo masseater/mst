@@ -7,6 +7,19 @@ import { describe, expect, test, vi } from "vite-plus/test";
 import { readGitSourceScope } from "./git-ignored-source.ts";
 import { gitOutput } from "./git-output.ts";
 
+const gitInvocations = new Set<string>();
+
+vi.mock(import("./git-output.ts"), async (importOriginal) => {
+  const real = await importOriginal();
+  return {
+    ...real,
+    gitOutput: (...call: Parameters<typeof real.gitOutput>) => {
+      gitInvocations.add(call[0].join(" "));
+      return real.gitOutput(...call);
+    },
+  };
+});
+
 describe("git-ignored-source", () => {
   const isGitIgnoredSource = (sourcePath: string, repositoryRoot: string): boolean =>
     readGitSourceScope(repositoryRoot).isIgnored(sourcePath);
@@ -115,6 +128,29 @@ describe("git-ignored-source", () => {
     const root = join(tmpdir(), "missing-git-source-scope");
 
     expect(isGitIgnoredSource(join(root, "dist/status.ts"), root)).toBe(false);
+  });
+
+  test("a root that no repository encloses is never handed to Git", () => {
+    const root = mkdtempSync(join(tmpdir(), "git-unenclosed-root-"));
+    try {
+      gitInvocations.clear();
+
+      expect(isGitIgnoredSource(join(root, "dist/status.ts"), root)).toBe(false);
+      expect(gitInvocations).toStrictEqual(new Set());
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  test("a repository link that resolves to nothing leaves every source unignored", () => {
+    const root = mkdtempSync(join(tmpdir(), "git-unresolvable-link-"));
+    try {
+      writeFileSync(join(root, ".git"), "gitdir: /nonexistent/git-directory\n");
+
+      expect(isGitIgnoredSource(join(root, "dist/status.ts"), root)).toBe(false);
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
   });
 
   test("a repository reached through a symbolic root uses its physical source paths", () => {
