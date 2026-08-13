@@ -13,7 +13,7 @@ description: Command wrappers that keep parallel heavy commands within the host'
 - `throttle [--timeout <seconds>]` — 同一ホスト × 同一名前空間で、包んだコマンドの同時実行数を上限以下に保つ。上限の既定は 1 で、`MST_THROTTLE_LIMIT` から上書きできる。空きが無ければ待ち、待機は有界。保持者が解放せず消えても失効閾値で自動回収される。`--timeout` はプロセスグループ全体を穏当な終了要求 → 猶予 → 強制終了の順で打ち切る。0 は打ち切らない
 - `spool` — 包んだコマンドの出力を全量ログファイルへ逃がし、呼び出し元には固定行数の要約だけを返す。記録は package.json を目印にした上方探索で決まる `.spool/` に置かれ、端末制御のエスケープ列は除去される。CI（環境変数 `CI`）ではジョブログ自体が耐久的な記録なので素通しに切り替わる
 
-3 つ目の `unabridged` は包まない。Claude Code の `PreToolUse` hook として標準入力から JSON を読み、Bash に渡されたコマンド行のコマンド位置に `head` / `tail` があれば `deny` を返す。通す判断のときは何も出さない。配線はリポジトリの `.claude/settings.json` が `matcher` を `Bash` にして行う。
+3 つ目の `unabridged` は包まない。Claude Code の `PreToolUse` hook として標準入力から JSON を読み、Bash に渡されたコマンド行のコマンド位置に `head` / `tail` があれば `deny` を返す。通す判断のときは何も出さない。配線はリポジトリの `.claude/settings.json` が `matcher` を `Bash` にして行う。hook を書くときの規律は [hook の書き方](docs/hooks.md) が持つ。
 
 実行可能な契約は各コマンドのヘルプ本文とテストの 2 つである。振る舞いを変えるときは両方を同時に変える。
 
@@ -30,5 +30,3 @@ description: Command wrappers that keep parallel heavy commands within the host'
 ## 読み手の規律
 
 要約が指す記録ファイルを開くこと。同じコマンドをフィルタ付きで再実行しない。再実行はコストを二重に払う上に、非決定的な失敗を取り逃がす。
-
-この規律は案内では守られない。破っても破った当人の実行は成功し、代償は出力を読む側にしか現れないからである。`unabridged` はこの規律を実行の直前に置き直したもので、拒否と同時に、コマンド出力・ディスク上のファイル・書かれている最中の記録のそれぞれについて全量を読む手順を返す。

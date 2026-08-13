@@ -34,7 +34,8 @@
     "dev": "vp pack --watch",
     "test": "spool -- vp test",
     "check": "spool -- vp check",
-    "check:skills": "intent validate"
+    "check:skills": "intent validate",
+    "typecheck": "spool -- tsc -p ."
   },
   "dependencies": {
     "cc-hooks-ts": "2.1.220",
