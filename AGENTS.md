@@ -22,6 +22,14 @@ mst は、リポジトリ運用の仕組みを再利用可能な単位として�
 - IF: ツールの設定を書く; THEN
   - MUST: `vite.config.ts` に集約する
   - PROHIBIT: `oxlint.config.ts` / `.oxlintrc.json` / `.oxfmtrc.json` / `vitest.config.ts` を作る
+- IF: `vite.config.ts` に集約できない道具の設定を書く; THEN
+  - MUST: その道具が読む TypeScript の綴りに置く
+    - knip なら `knip.ts` になる
+  - PROHIBIT: JSON / JSONC / JavaScript の綴りに置く
+    - 型検査もフォーマッタも lint も届かない設定になる
+- IF: AI 向けの指示を置く; THEN
+  - MUST: `AGENTS.md` を実体とし、`CLAUDE.md` を同じディレクトリの `AGENTS.md` を指すシンボリックリンクにする
+  - PROHIBIT: `CLAUDE.md` に中身を書く
 - IF: lint の重大度を読む; THEN MUST: warn を人間に確認せず無視してよいもの、error を基本的にすべて解消するものとして扱う
 - IF: lint ルールを追加する; THEN
   - MUST: error で追加する
@@ -57,7 +65,7 @@ mst は、リポジトリ運用の仕組みを再利用可能な単位として�
   - PROHIBIT: `mise.toml` に node を書く
 - IF: `vite` の依存を整理する; THEN
   - PROHIBIT: ルートと `packages/repository-checks` の `vite` 直接依存を削除する
-  - PROHIBIT: `knip.json` の `ignoreDependencies` から `vite` を外す
+  - PROHIBIT: `knip.ts` の `ignoreDependencies` から `vite` を外す
 - IF: カバレッジ担保のテストを置く; THEN
   - MUST: 対象ソースと同じディレクトリに `<ソース名>.test.ts` として置く
   - PROHIBIT: `tests/` `test/` `__tests__/` `spec/` を作る

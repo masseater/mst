@@ -152,7 +152,7 @@ Correct:
 
 `fmt` sets `proseWrap: "never"`, so a blockquote whose marker and body form one paragraph is joined into `> [!IMPORTANT] Install through...`, which GitHub renders as a plain blockquote with the marker as literal text. A `>`-only line makes the marker its own paragraph, which survives the join and still renders as an alert.
 
-Source: masseater/mst:docs/engineering-decision-logs/0045-let-the-formatter-own-where-markdown-lines-break.md
+Source: masseater/mst:docs/engineering-decision-logs/0046-let-the-formatter-own-where-markdown-lines-break.md
 
 ### [MEDIUM] tsconfig written from scratch
 

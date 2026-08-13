@@ -33,7 +33,7 @@ description: Machine-enforced answers to the writing questions that would otherw
 
 `lint` が配るルール集合は 1 枚だけである。対象種別による出し分けはしない。ルートの `lint` が呼んだ時点でリポジトリ全体に効き、採用の判断は残らない。CLI に固有の規律もこの中にあり、対象を絞るのはルールの側である。判断は [EDR 0042](../../docs/engineering-decision-logs/0042-apply-one-preset-at-the-root-and-report-the-exception-the-toolchain-forces.md) にある。
 
-`fmt` が決めているのは、整形結果が読み手に届く見た目を変えず、差分にだけ現れる書き方である。markdown の段落を 1 行に畳むこと、import の並び順がこれにあたる。判断は [EDR 0045](../../docs/engineering-decision-logs/0045-let-the-formatter-own-where-markdown-lines-break.md) と [EDR 0046](../../docs/engineering-decision-logs/0046-hand-every-toolchain-block-one-preset-function.md) にある。
+`fmt` が決めているのは、整形結果が読み手に届く見た目を変えず、差分にだけ現れる書き方である。markdown の段落を 1 行に畳むこと、import の並び順がこれにあたる。判断は [EDR 0046](../../docs/engineering-decision-logs/0046-let-the-formatter-own-where-markdown-lines-break.md) と [EDR 0047](../../docs/engineering-decision-logs/0047-hand-every-toolchain-block-one-preset-function.md) にある。
 
 - IF: 整形の選択を `fmt` に足したい; THEN
   - MUST: レンダリングされた結果が変わらないことを確かめる
@@ -108,6 +108,28 @@ CLI が持つコマンドは `check` の 1 つで、そこが全部の検査を�
 - バージョンが食い違う宣言は警告として出す。どちらへ揃えるかは判断なので落とさない
 - 何も使っていない catalog エントリは報告しない。未使用の検出は knip が持つ
 
+## 必須ファイルの形の検査
+
+`check` が、リポジトリの根と `package.json` を持つディレクトリを開き、そこに置かれていなければならないファイルが要求された形で存在しているかを読む。ファイルの中身は読まない。判断は [EDR 0045](../../docs/engineering-decision-logs/0045-require-the-form-of-the-files-a-repository-cannot-do-without.md) にある。
+
+道具の設定が TypeScript の外に置かれていないことを見る。対象は knip・oxlint・eslint・vite で、それぞれの道具自身が読む綴りのうち、型検査が届かないものを名指しする。報告には移し先の綴りを載せる。oxlint と vite の移し先は `vite.config.ts` で、knip は `knip.ts`、eslint は `eslint.config.ts` になる。
+
+AI 向けの指示が 1 か所にしかないことを見る。`AGENTS.md` が実体で、`CLAUDE.md` はそこを指すシンボリックリンクである。
+
+- `AGENTS.md` を持つディレクトリに `CLAUDE.md` がある
+- `CLAUDE.md` が実体ファイルではない
+- `CLAUDE.md` が `AGENTS.md` 以外を指していない
+- `CLAUDE.md` だけがあって `AGENTS.md` が無い状態になっていない
+
+- IF: 道具の設定を TypeScript 以外の綴りで置きたくなった; THEN PROHIBIT: 置く
+  - 型検査もフォーマッタも lint も届かない設定は、それが支配しているコードから静かにずれていく
+- IF: 道具が TypeScript の設定を読めない; THEN MUST: その道具を使わない判断から始める
+  - 綴りを増やす前に、ツールチェーンを一本化する規約（[AGENTS.md](../../AGENTS.md)）に戻る
+- IF: 検査対象の綴りを増やす; THEN MUST: その道具自身が読む綴りの一覧を一次情報で確かめてから足す
+  - 道具が読まない綴りを足すと、直しようのない報告が出る
+- IF: `CLAUDE.md` に `AGENTS.md` と違うことを書きたくなった; THEN PROHIBIT: 書く
+  - 読み手ごとに違う規範を配ると、どちらが正なのかを人間が毎回決めることになる
+
 ## preset の適用範囲の検査
 
 `check` が、ルートのツールチェーン設定とワークスペースの一覧を突き合わせる。preset を `extends` した時点で全体に効くという前提が、実際に成り立っているかを見る。
@@ -138,11 +160,19 @@ npm へ公開できるパッケージには、あることを要求する。
 
 `version` を持たないマニフェストには、版に関する 2 点を要求しない。
 
+changelog の中身は読まない。項目が実態と合っているかは機械が判定しないので、次の規範は人が守る。
+
 - IF: SKILL.md の中身の構造を検査したくなった; THEN MUST: この検査に足さず、上流の `intent validate`（各パッケージの `check:skills`）に任せる
   - 不変条件の分担は [EDR 0030](../../docs/engineering-decision-logs/0030-ship-agent-skills-with-published-packages-and-gate-the-shipping-ourselves.md) が決めている
 - IF: 公開パッケージの `version` を上げる; THEN
   - MUST: 同じ変更で `skills/CHANGELOG.md` にその版の見出しを書く
   - PROHIBIT: `metadata.library_version` を手で書き換える
     - マニフェストから一意に決まる値なので `check --write` が揃える
+- IF: 既に書いた版の項目と実態が食い違った; THEN
+  - IF: その版をまだ publish していない; THEN MUST: その項目を実態に合わせて書き直す
+  - IF: その版を publish 済み; THEN
+    - PROHIBIT: その項目を書き直す
+    - MUST: 版を上げ、新しい項目に書く
+      - 配った tarball の中身は変わらない。過去の項目を今の姿へ寄せると、版ごとの差分という changelog の役目が消える
 - IF: 版を上げた変更で SKILL.md の差分も要求したくなった; THEN PROHIBIT: 足す
   - 書くことが無いのに本文をいじる操作が生まれる。線の引き方は [EDR 0044](../../docs/engineering-decision-logs/0044-ship-a-changelog-beside-the-skills-and-check-it-against-the-manifest.md) が決めている

@@ -1,11 +1,11 @@
-# 0046. ツールチェーンの各ブロックに preset の関数を 1 つずつ渡す
+# 0047. ツールチェーンの各ブロックに preset の関数を 1 つずつ渡す
 
 - ステータス: Accepted
 - 日付: 2026-08-13
 
 ## 文脈
 
-`@mst/dont-review-it` は `oxlint`、`withGitExcludes`、そして [0045](0045-let-the-formatter-own-where-markdown-lines-break.md) が足した整形の選択という 3 つのものを公開面に並べていた。利用者の `vite.config.ts` は、`lint` に `withGitExcludes({ extends: [oxlint, ...] })` を書き、`fmt` に `withGitExcludes({ ...整形の選択 })` を書く。どれをどのブロックへどう組むかは呼び出し側の作業であり、組み方を間違えても lint は緑のまま通る。
+`@mst/dont-review-it` は `oxlint`、`withGitExcludes`、そして [0046](0046-let-the-formatter-own-where-markdown-lines-break.md) が足した整形の選択という 3 つのものを公開面に並べていた。利用者の `vite.config.ts` は、`lint` に `withGitExcludes({ extends: [oxlint, ...] })` を書き、`fmt` に `withGitExcludes({ ...整形の選択 })` を書く。どれをどのブロックへどう組むかは呼び出し側の作業であり、組み方を間違えても lint は緑のまま通る。
 
 組み合わせを呼び出し側に持たせている理由は、道具の側の制約にあった。oxlint は `extends` で名指しした設定の `ignorePatterns` を捨てるため、除外パターンは `defineConfig` に直接渡すオブジェクト自身が持つしかない。oxfmt には `extends` が無く、整形の選択も同じく直接渡すオブジェクトが持つしかない。つまりどちらのブロックも、preset を「参照する」形では配れない。
 
