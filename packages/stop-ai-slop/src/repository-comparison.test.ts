@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { range } from "es-toolkit";
 import { describe, expect, it, vi } from "vite-plus/test";
 
-import { compareRevisions } from "./repository-comparison.ts";
+import { compareRevisions, decodedSource } from "./repository-comparison.ts";
 import { withTestRepository } from "./test-repository.ts";
 
 const renameSource = (prefix: string, changed = false): string =>
@@ -194,23 +194,29 @@ describe("compareRevisions", () => {
     });
   });
 
-  it("rejects a NUL-bearing source-extension blob", async () => {
+  it("reads a source that carries a NUL as a character of its own", async () => {
     await withTestRepository(async (repository) => {
       const base = repository.commit({
         files: { "src/current.ts": "export const current = true;\n" },
       });
       const head = repository.commit({
-        files: { "src/binary.ts": "\0binary\0" },
+        files: { "src/current.ts": 'export const separator = "\0";\n' },
       });
 
-      await expect(
-        compareRevisions({
-          repositoryRoot: repository.root,
-          baseRevision: base,
-          headRevision: head,
-        }),
-      ).rejects.toThrow("Source blob contains NUL bytes: src/binary.ts");
+      const comparison = await compareRevisions({
+        repositoryRoot: repository.root,
+        baseRevision: base,
+        headRevision: head,
+      });
+
+      expect(comparison.files[0]?.afterSource).toBe('export const separator = "\0";\n');
     });
+  });
+
+  it("rejects a source-extension blob that does not decode as UTF-8", () => {
+    expect(() => decodedSource("src/binary.ts", Uint8Array.from([0xff, 0xfe, 0xff]))).toThrow(
+      "Source blob does not decode as UTF-8: src/binary.ts",
+    );
   });
 
   it("classifies a regular file changed to a symbolic link as changed", async () => {
