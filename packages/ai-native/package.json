@@ -31,7 +31,7 @@
   "scripts": {
     "build": "spool -- vp pack",
     "dev": "vp pack --watch",
-    "test": "spool -- vp test --maxWorkers 1",
+    "test": "spool -- vp test --pool threads --maxWorkers 1",
     "check": "spool -- vp check",
     "check:skills": "intent validate"
   },

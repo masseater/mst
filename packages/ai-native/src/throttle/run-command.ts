@@ -26,6 +26,7 @@ type Verdict = { settled: Settled; timedOut: boolean };
 type RunCommandDependencies = {
   platform: NodeJS.Platform;
   signalTree: (input: { pid: number; signal: NodeJS.Signals }) => Error | null;
+  spawnChild: (input: { executable: string; args: readonly string[] }) => ChildProcess;
 };
 
 const settledChild = (child: ChildProcess): Promise<Settled> =>
@@ -165,18 +166,25 @@ const reportRunEnd = (input: {
 export const runWithSlot = async (input: {
   invocation: Invocation;
   hold: SlotHold;
-  dependencies?: RunCommandDependencies;
+  dependencies?: Partial<RunCommandDependencies>;
 }): Promise<number> => {
-  const dependencies = input.dependencies ?? {
-    platform: process.platform,
-    signalTree: signalProcessTree,
+  const dependencies: RunCommandDependencies = {
+    platform: input.dependencies?.platform ?? process.platform,
+    signalTree: input.dependencies?.signalTree ?? signalProcessTree,
+    spawnChild:
+      input.dependencies?.spawnChild ??
+      ((invocation) =>
+        spawn(invocation.executable, [...invocation.args], {
+          detached: true,
+          stdio: "inherit",
+        })),
   };
   const heldHandler = makeHeldInterruptHandler({ release: input.hold.release, raise: raiseSignal });
   installInterruptHandler(heldHandler);
   process.stderr.write(`throttle: run ${input.invocation.commandLine}\n`);
-  const child = spawn(input.invocation.executable, [...input.invocation.args], {
-    detached: true,
-    stdio: "inherit",
+  const child = dependencies.spawnChild({
+    executable: input.invocation.executable,
+    args: input.invocation.args,
   });
   dropInterruptHandler(heldHandler);
   const verdict = await guardChild({ child, invocation: input.invocation, dependencies });

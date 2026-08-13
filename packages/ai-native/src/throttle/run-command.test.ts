@@ -1,3 +1,4 @@
+import { ChildProcess } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -34,6 +35,10 @@ const quickSeams = (slotDir: string): ThrottleSeams => ({
   pollMs: 10_000,
   isInteractive: false,
 });
+
+class ImmediateChildProcess extends ChildProcess {
+  override readonly pid = 314_159;
+}
 
 describe("run-command", () => {
   test("every outcome of the wrapped command releases the slot", { timeout: 60_000 }, async () => {
@@ -77,21 +82,36 @@ describe("run-command", () => {
     await probe();
   });
 
-  test(
-    "a timeout that never fires does not delay a fast command",
-    { timeout: 30_000 },
-    async () => {
-      const slotDir = temporaryDirectory("throttle-fast-");
-      captureStderr();
-      const before = Date.now();
+  test("a timeout that never fires does not delay a fast command", async () => {
+    captureStderr();
+    const child = new ImmediateChildProcess();
+    const spawnChild = vi.fn<
+      (input: { executable: string; args: readonly string[] }) => ChildProcess
+    >(() => {
+      queueMicrotask(() => child.emit("exit", 0, null));
+      return child;
+    });
+    const release = vi.fn<() => Promise<void>>(() => Promise.resolve());
+    const signalTree = vi.fn<(input: { pid: number; signal: NodeJS.Signals }) => Error | null>(
+      () => null,
+    );
 
-      expect(await runThrottle(["--timeout", "30", ...trivialCommand], quickSeams(slotDir))).toBe(
-        0,
-      );
-
-      expect(Date.now() - before).toBeLessThan(20_000);
-    },
-  );
+    expect(
+      await runWithSlot({
+        invocation: {
+          timeoutSec: 30,
+          executable: process.execPath,
+          args: ["-e", ""],
+          commandLine: `${process.execPath} -e `,
+        },
+        hold: { release },
+        dependencies: { spawnChild, signalTree },
+      }),
+    ).toBe(0);
+    expect(spawnChild).toHaveBeenCalledOnce();
+    expect(release).toHaveBeenCalledOnce();
+    expect(signalTree).not.toHaveBeenCalled();
+  });
 
   test("a release failure makes a successful command fail observably", async () => {
     const stderrText = captureStderr();
