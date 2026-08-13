@@ -4,11 +4,10 @@ import {
   isAssertionEntryReference,
 } from "../lib/spec-syntax/assertion-entries.ts";
 import {
+  CANONICAL_SPELLING_BY_REDUNDANT_MATCHER,
   EXACT_MATCHERS,
-  REDUNDANT_MATCHERS,
-  WEAK_ASYMMETRIC_MATCHERS,
-  WEAK_MATCHERS,
-  type WeakMatcher,
+  UNVERIFIED_REGION_BY_WEAK_ASYMMETRIC_MATCHER,
+  UNVERIFIED_REGION_BY_WEAK_MATCHER,
 } from "../lib/spec-syntax/matcher-vocabulary.ts";
 import { isSpecFile, specFileSuffixesFrom } from "../lib/spec-syntax/spec-files.ts";
 import { staticMemberName } from "../lib/spec-syntax/static-names.ts";
@@ -19,19 +18,12 @@ import type { RuleMessage } from "../lib/rule-message.ts";
 
 const ALLOWED_MATCHERS_OPTION = "allowedMatchers";
 
-const unverifiedRegionsOf = (matchers: readonly WeakMatcher[]): ReadonlyMap<string, string> =>
-  new Map(matchers.map((matcher): [string, string] => [matcher.name, matcher.unverified]));
-
-const chainRegions = unverifiedRegionsOf(WEAK_MATCHERS);
-
-const asymmetricRegions = unverifiedRegionsOf(WEAK_ASYMMETRIC_MATCHERS);
-
 const spelledMatcherOf = (call: string): string => call.slice(0, call.indexOf("("));
 
 const exactRestatements: ReadonlyMap<string, string> = new Map(
-  REDUNDANT_MATCHERS.filter((matcher) =>
-    EXACT_MATCHERS.has(spelledMatcherOf(matcher.writeInstead)),
-  ).map((matcher): [string, string] => [matcher.name, matcher.writeInstead]),
+  [...CANONICAL_SPELLING_BY_REDUNDANT_MATCHER].filter(([, writeInstead]) =>
+    EXACT_MATCHERS.has(spelledMatcherOf(writeInstead)),
+  ),
 );
 
 const allowedMatchersFrom = (options: Readonly<Options>): ReadonlySet<string> => {
@@ -44,13 +36,13 @@ const allowedMatchersFrom = (options: Readonly<Options>): ReadonlySet<string> =>
 };
 
 const asymmetricReportFor = (matcher: string): RuleMessage | null => {
-  const unverified = asymmetricRegions.get(matcher);
+  const unverified = UNVERIFIED_REGION_BY_WEAK_ASYMMETRIC_MATCHER.get(matcher);
   if (unverified === undefined) return null;
   return { messageId: "weakAsymmetricMatcher", data: { matcher, unverified } };
 };
 
 const chainReportFor = (matcher: string): RuleMessage | null => {
-  const unverified = chainRegions.get(matcher);
+  const unverified = UNVERIFIED_REGION_BY_WEAK_MATCHER.get(matcher);
   if (unverified !== undefined) return { messageId: "weakMatcher", data: { matcher, unverified } };
 
   const writeInstead = exactRestatements.get(matcher);

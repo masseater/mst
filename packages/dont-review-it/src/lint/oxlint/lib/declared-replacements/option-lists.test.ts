@@ -2,50 +2,70 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { listedUnder } from "./option-lists.ts";
 
-const it = test
-  .extend("entriesOfEmptyOptions", () => listedUnder([], "declared"))
-  .extend("entriesOfTextOption", () => listedUnder(["declared"], "declared"))
-  .extend("entriesOfMissingOption", () => listedUnder([null], "declared"))
-  .extend("entriesOfListedOption", () => listedUnder([[]], "declared"))
-  .extend("entriesOfTextKey", () => listedUnder([{ declared: "lerna" }], "declared"))
-  .extend("entriesOfUnwrittenKey", () => listedUnder([{ withdrawn: [] }], "declared"))
-  .extend("entriesOfObjectRows", () => listedUnder([{ declared: [{ name: "lerna" }] }], "declared"))
-  .extend("entriesOfMixedRows", () =>
-    listedUnder([{ declared: ["lerna", null, [], { name: "gulp" }] }], "declared"),
-  );
+describe("listedUnder", () => {
+  describe("options nobody wrote", () => {
+    const it = test.extend("entries", () => listedUnder([], "declared"));
 
-describe("declared-replacements/option-lists", () => {
-  it("options nobody wrote carry no entries", ({ entriesOfEmptyOptions }) => {
-    expect(entriesOfEmptyOptions).toStrictEqual([]);
+    it("carries no entries", ({ entries }) => {
+      expect(entries).toStrictEqual([]);
+    });
   });
 
-  it("an option written as something other than an object carries no entries", ({
-    entriesOfTextOption,
-  }) => {
-    expect(entriesOfTextOption).toStrictEqual([]);
+  describe("an option written as something other than an object", () => {
+    const it = test.extend("entries", () => listedUnder(["declared"], "declared"));
+
+    it("carries no entries", ({ entries }) => {
+      expect(entries).toStrictEqual([]);
+    });
   });
 
-  it("an option written as nothing carries no entries", ({ entriesOfMissingOption }) => {
-    expect(entriesOfMissingOption).toStrictEqual([]);
+  describe("an option written as nothing", () => {
+    const it = test.extend("entries", () => listedUnder([null], "declared"));
+
+    it("carries no entries", ({ entries }) => {
+      expect(entries).toStrictEqual([]);
+    });
   });
 
-  it("an option written as a list carries no entries under a key", ({ entriesOfListedOption }) => {
-    expect(entriesOfListedOption).toStrictEqual([]);
+  describe("an option written as a list", () => {
+    const it = test.extend("entries", () => listedUnder([[]], "declared"));
+
+    it("carries no entries under a key", ({ entries }) => {
+      expect(entries).toStrictEqual([]);
+    });
   });
 
-  it("a key written as something other than a list carries no entries", ({ entriesOfTextKey }) => {
-    expect(entriesOfTextKey).toStrictEqual([]);
+  describe("a key written as something other than a list", () => {
+    const it = test.extend("entries", () => listedUnder([{ declared: "lerna" }], "declared"));
+
+    it("carries no entries", ({ entries }) => {
+      expect(entries).toStrictEqual([]);
+    });
   });
 
-  it("a key nobody wrote carries no entries", ({ entriesOfUnwrittenKey }) => {
-    expect(entriesOfUnwrittenKey).toStrictEqual([]);
+  describe("a key nobody wrote", () => {
+    const it = test.extend("entries", () => listedUnder([{ withdrawn: [] }], "declared"));
+
+    it("carries no entries", ({ entries }) => {
+      expect(entries).toStrictEqual([]);
+    });
   });
 
-  it("entries written as objects come back as they stand", ({ entriesOfObjectRows }) => {
-    expect(entriesOfObjectRows).toStrictEqual([{ name: "lerna" }]);
+  describe("entries written as objects", () => {
+    const it = test.extend("entries", () =>
+      listedUnder([{ declared: [{ name: "lerna" }] }], "declared"));
+
+    it("comes back as they stand", ({ entries }) => {
+      expect(entries).toStrictEqual([{ name: "lerna" }]);
+    });
   });
 
-  it("entries written as anything but an object are left out", ({ entriesOfMixedRows }) => {
-    expect(entriesOfMixedRows).toStrictEqual([{ name: "gulp" }]);
+  describe("entries written as anything but an object", () => {
+    const it = test.extend("entries", () =>
+      listedUnder([{ declared: ["lerna", null, [], { name: "gulp" }] }], "declared"));
+
+    it("leaves out everything that is not an object", ({ entries }) => {
+      expect(entries).toStrictEqual([{ name: "gulp" }]);
+    });
   });
 });

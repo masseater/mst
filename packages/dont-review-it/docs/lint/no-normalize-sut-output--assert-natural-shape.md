@@ -101,7 +101,9 @@ test("keeps the configured suffixes in the order they were written", ({ suffixes
 const test = baseTest.extend("names", () => normalizingFunctionsFrom([]));
 
 test("carries every function name the vocabulary starts with", ({ names }) => {
-  expect(names).toStrictEqual(new Set(DEFAULT_NORMALIZING_FUNCTIONS));
+  expect(names).toStrictEqual(
+    new Set(["orderBy", "reduceAsync", "sortBy", "uniq", "uniqBy", "uniqWith"]),
+  );
 });
 ```
 

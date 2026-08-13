@@ -17,20 +17,40 @@ const isNodeOfType = <T extends ESTree.Node["type"]>(
   type: T,
 ): held is NodeOfType<T> => isAstFields(held) && held[NODE_TYPE_FIELD] === type;
 
-const nodesWithin = <T extends ESTree.Node["type"]>(
+type TypedNodeVisit<T extends ESTree.Node["type"]> = {
+  readonly node: NodeOfType<T>;
+  readonly ancestors: readonly ESTree.Node[];
+};
+
+const isNode = (held: unknown): held is ESTree.Node =>
+  isAstFields(held) && typeof held[NODE_TYPE_FIELD] === "string";
+
+const visitsWithin = <T extends ESTree.Node["type"]>(
   held: unknown,
-  type: T,
-): readonly NodeOfType<T>[] => {
-  if (Array.isArray(held)) return held.flatMap((listed) => nodesWithin(listed, type));
+  walk: { readonly type: T; readonly ancestors: readonly ESTree.Node[] },
+): readonly TypedNodeVisit<T>[] => {
+  if (Array.isArray(held)) return held.flatMap((listed) => visitsWithin(listed, walk));
   if (!isAstFields(held)) return [];
 
   const nested = Object.entries(held)
     .filter(([field]) => field !== BACK_REFERENCE_FIELD)
-    .flatMap(([, carried]) => nodesWithin(carried, type));
-  return isNodeOfType(held, type) ? [held, ...nested] : nested;
+    .flatMap(([, carried]) =>
+      visitsWithin(carried, {
+        type: walk.type,
+        ancestors: isNode(held) ? [...walk.ancestors, held] : walk.ancestors,
+      }),
+    );
+  return isNodeOfType(held, walk.type)
+    ? [{ node: held, ancestors: walk.ancestors }, ...nested]
+    : nested;
 };
+
+export const nodeVisitsOfType = <T extends ESTree.Node["type"]>(
+  root: ESTree.Node,
+  type: T,
+): readonly TypedNodeVisit<T>[] => visitsWithin(root, { type, ancestors: [] });
 
 export const nodesOfType = <T extends ESTree.Node["type"]>(
   root: ESTree.Node,
   type: T,
-): readonly NodeOfType<T>[] => nodesWithin(root, type);
+): readonly NodeOfType<T>[] => nodeVisitsOfType(root, type).map((visit) => visit.node);

@@ -1,4 +1,3 @@
-import { lineAtOffset } from "@mst/utils";
 import { parseSync } from "oxc-parser";
 
 import { isAstFields, NODE_TYPE_FIELD, type AstFields } from "../ast-node.ts";
@@ -90,7 +89,7 @@ const valueDeclarationAt = (node: AstFields, reading: Reading): ValueDeclaration
 
   return {
     name,
-    line: lineAtOffset(reading.source, Number(node.start)),
+    line: reading.source.slice(0, Number(node.start)).split("\n").length,
     exported: reading.exportedNodes.has(node),
     fingerprint: normalizedBodyOf({ body: bodyOf(node), routes: reading.routes }),
   };

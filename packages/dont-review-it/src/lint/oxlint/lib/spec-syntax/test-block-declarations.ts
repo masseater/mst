@@ -91,14 +91,41 @@ const shadowedNamesIn = (program: ESTree.Program): ReadonlySet<string> =>
     ),
   ]);
 
+const importedNamesIn = (program: ESTree.Program): ReadonlySet<string> =>
+  new Set(
+    nodesOfType(program, "ImportDeclaration").flatMap((declaration) =>
+      declaration.specifiers.flatMap((specifier) =>
+        specifier.type === "ImportSpecifier" ? [specifier.local.name] : [],
+      ),
+    ),
+  );
+
+const derivedRootName = (initializer: ESTree.Expression): string | null => {
+  const written = unwrapSubject(initializer);
+  if (written.type !== "CallExpression") return null;
+
+  const builder = unwrapSubject(written.callee);
+  if (builder.type !== "MemberExpression") return null;
+  if (staticMemberName(builder) !== DERIVED_BUILDER_MEMBER) return null;
+  return boundRootName(builder.object);
+};
+
+const namesDerivedFromImports = (program: ESTree.Program): readonly string[] => {
+  const imported = importedNamesIn(program);
+  return [...initializersIn(program)].flatMap(([name, initializer]) =>
+    imported.has(derivedRootName(initializer) ?? "") ? [name] : [],
+  );
+};
+
 export const runnerRootedTestBlockRootNames = (program: ESTree.Program): ReadonlySet<string> => {
   const shadowed = shadowedNamesIn(program);
   const imported = nodesOfType(program, "ImportDeclaration")
     .filter((declaration) => RUNNER_MODULES.includes(declaration.source.value))
     .flatMap((declaration) => importedBlockNames(declaration, INJECTED_TEST_BLOCK_SPELLINGS));
   const injected = [...INJECTED_TEST_BLOCK_SPELLINGS].filter((name) => !shadowed.has(name));
+  const handedOn = namesDerivedFromImports(program);
 
-  return settledNames(new Set([...injected, ...imported]), initializersIn(program));
+  return settledNames(new Set([...injected, ...imported, ...handedOn]), initializersIn(program));
 };
 
 export const declaresTestBlock = (

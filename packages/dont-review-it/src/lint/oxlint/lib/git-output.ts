@@ -16,11 +16,20 @@ const answeredWithoutValue = (failure: unknown): boolean =>
   typeof failure.status === "number";
 
 export const gitOutput = (args: readonly string[], environment: GitEnvironment): string | null => {
+  const {
+    GIT_COMMON_DIR,
+    GIT_DIR,
+    GIT_INDEX_FILE,
+    GIT_OBJECT_DIRECTORY,
+    GIT_PREFIX,
+    GIT_WORK_TREE,
+    ...repositoryAgnosticEnv
+  } = environment.env;
   const [unaskableGit, answer] = attempt<string, Error>(() =>
     execFileSync("git", [...args], {
       cwd: environment.cwd,
       encoding: "utf8",
-      env: environment.env,
+      env: repositoryAgnosticEnv,
       stdio: ["ignore", "pipe", "ignore"],
     }),
   );

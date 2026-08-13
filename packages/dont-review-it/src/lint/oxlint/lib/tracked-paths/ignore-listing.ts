@@ -5,7 +5,7 @@ import { readTextFile } from "../canonical-values/source-files.ts";
 
 export const IGNORE_SETTINGS_FILE_NAME = ".gitignore";
 
-const NEGATION_PREFIX = "!";
+export const NEGATION_PREFIX = "!";
 
 const LEADING_REACH = /^(?:\/|\*\*\/)+/u;
 

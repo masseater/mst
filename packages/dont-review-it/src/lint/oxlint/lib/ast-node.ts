@@ -1,8 +1,9 @@
+import type { UnknownFields } from "@mst/lint-rule-authoring";
 import type { ESTree } from "@oxlint/plugins";
 
 export const NODE_TYPE_FIELD = "type";
 
-export type AstFields = Readonly<Record<string, unknown>>;
+export type AstFields = UnknownFields;
 
 export const isAstFields = (held: unknown): held is AstFields =>
   typeof held === "object" && held !== null && !Array.isArray(held);

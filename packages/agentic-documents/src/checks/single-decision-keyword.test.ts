@@ -7,85 +7,88 @@ import { multipleDecisionKeywords } from "./single-decision-keyword.ts";
 const TWO_KEYWORD_MESSAGE =
   "1 つの項目に判断キーワードを 2 個置くことは禁止されている。条件を親の項目へ上げ、判断ごとに入れ子の項目を作る。";
 
-const it = test
-  .extend("keywordProblemsOfAnItemThatOnlyHoldsANestedItem", () =>
-    multipleDecisionKeywords({
-      document: toNormativeDocument({
-        file: "AGENTS.md",
-        source: "- - MUST: 記録する PROHIBIT: 省略する\n",
-        config: defaultConfig,
-      }),
-      config: defaultConfig,
-    }))
-  .extend("keywordProblemsOfTwoKeywordsInOneItem", () =>
-    multipleDecisionKeywords({
-      document: toNormativeDocument({
-        file: "AGENTS.md",
-        source: "- MUST: 記録する PROHIBIT: 省略する\n",
-        config: defaultConfig,
-      }),
-      config: defaultConfig,
-    }),
-  )
-  .extend("keywordProblemsOfOneKeywordInOneItem", () =>
-    multipleDecisionKeywords({
-      document: toNormativeDocument({
-        file: "AGENTS.md",
-        source: "- MUST: 記録する\n",
-        config: defaultConfig,
-      }),
-      config: defaultConfig,
-    }),
-  )
-  .extend("keywordProblemsOfKeywordsSplitIntoNestedItems", () =>
-    multipleDecisionKeywords({
-      document: toNormativeDocument({
-        file: "AGENTS.md",
-        source: "- IF: 開始する; THEN\n  - MUST: 記録する\n  - PROHIBIT: 省略する\n",
-        config: defaultConfig,
-      }),
-      config: defaultConfig,
-    }),
-  )
-  .extend("keywordProblemsOfAQuotedSpelling", () =>
-    multipleDecisionKeywords({
-      document: toNormativeDocument({
-        file: "AGENTS.md",
-        source: "- MUST: `PROHIBIT:` の綴りを説明する\n",
-        config: defaultConfig,
-      }),
-      config: defaultConfig,
-    }),
-  );
-
 describe("multipleDecisionKeywords", () => {
-  it("散文で始まらない項目そのものは判断を持たず、入れ子の項目だけが報告される", ({
-    keywordProblemsOfAnItemThatOnlyHoldsANestedItem,
-  }) => {
-    expect(keywordProblemsOfAnItemThatOnlyHoldsANestedItem).toStrictEqual([
-      { file: "AGENTS.md", line: 1, message: TWO_KEYWORD_MESSAGE },
-    ]);
+  describe("散文で始まらず、判断キーワードを 2 つ持つ入れ子の項目だけを持つ項目", () => {
+    const it = test.extend("problems", () =>
+      multipleDecisionKeywords({
+        document: toNormativeDocument({
+          file: "AGENTS.md",
+          source: "- - MUST: 記録する PROHIBIT: 省略する\n",
+          config: defaultConfig,
+        }),
+        config: defaultConfig,
+      }));
+
+    it("判断を持つのは入れ子の項目だけなので、その項目だけを報告する", ({ problems }) => {
+      expect(problems).toStrictEqual([
+        { file: "AGENTS.md", line: 1, message: TWO_KEYWORD_MESSAGE },
+      ]);
+    });
   });
 
-  it("1 つの項目に判断キーワードが 2 つあると報告する", ({
-    keywordProblemsOfTwoKeywordsInOneItem,
-  }) => {
-    expect(keywordProblemsOfTwoKeywordsInOneItem).toStrictEqual([
-      { file: "AGENTS.md", line: 1, message: TWO_KEYWORD_MESSAGE },
-    ]);
+  describe("1 つの項目に判断キーワードを 2 つ置いた項目", () => {
+    const it = test.extend("problems", () =>
+      multipleDecisionKeywords({
+        document: toNormativeDocument({
+          file: "AGENTS.md",
+          source: "- MUST: 記録する PROHIBIT: 省略する\n",
+          config: defaultConfig,
+        }),
+        config: defaultConfig,
+      }));
+
+    it("その項目を報告する", ({ problems }) => {
+      expect(problems).toStrictEqual([
+        { file: "AGENTS.md", line: 1, message: TWO_KEYWORD_MESSAGE },
+      ]);
+    });
   });
 
-  it("判断キーワードが 1 つなら報告しない", ({ keywordProblemsOfOneKeywordInOneItem }) => {
-    expect(keywordProblemsOfOneKeywordInOneItem).toStrictEqual([]);
+  describe("判断キーワードが 1 つだけの項目", () => {
+    const it = test.extend("problems", () =>
+      multipleDecisionKeywords({
+        document: toNormativeDocument({
+          file: "AGENTS.md",
+          source: "- MUST: 記録する\n",
+          config: defaultConfig,
+        }),
+        config: defaultConfig,
+      }));
+
+    it("何も報告しない", ({ problems }) => {
+      expect(problems).toStrictEqual([]);
+    });
   });
 
-  it("入れ子に置かれた判断キーワードは親の数に含めない", ({
-    keywordProblemsOfKeywordsSplitIntoNestedItems,
-  }) => {
-    expect(keywordProblemsOfKeywordsSplitIntoNestedItems).toStrictEqual([]);
+  describe("判断キーワードを入れ子の項目へ分けた項目", () => {
+    const it = test.extend("problems", () =>
+      multipleDecisionKeywords({
+        document: toNormativeDocument({
+          file: "AGENTS.md",
+          source: "- IF: 開始する; THEN\n  - MUST: 記録する\n  - PROHIBIT: 省略する\n",
+          config: defaultConfig,
+        }),
+        config: defaultConfig,
+      }));
+
+    it("入れ子の判断を親の数に含めず、何も報告しない", ({ problems }) => {
+      expect(problems).toStrictEqual([]);
+    });
   });
 
-  it("引用で囲まれた綴りは判断として数えない", ({ keywordProblemsOfAQuotedSpelling }) => {
-    expect(keywordProblemsOfAQuotedSpelling).toStrictEqual([]);
+  describe("引用で囲んだ綴りを本文に持つ項目", () => {
+    const it = test.extend("problems", () =>
+      multipleDecisionKeywords({
+        document: toNormativeDocument({
+          file: "AGENTS.md",
+          source: "- MUST: `PROHIBIT:` の綴りを説明する\n",
+          config: defaultConfig,
+        }),
+        config: defaultConfig,
+      }));
+
+    it("引用の綴りを判断として数えず、何も報告しない", ({ problems }) => {
+      expect(problems).toStrictEqual([]);
+    });
   });
 });

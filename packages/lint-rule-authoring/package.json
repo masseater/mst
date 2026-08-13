@@ -2,6 +2,9 @@
   "name": "@mst/lint-rule-authoring",
   "version": "0.0.0",
   "description": "Materials for authoring lint rules that keep working after they are written.",
+  "keywords": [
+    "tanstack-intent"
+  ],
   "homepage": "https://github.com/masseater/mst",
   "license": "MIT",
   "repository": {
@@ -9,8 +12,12 @@
     "url": "git+https://github.com/masseater/mst.git",
     "directory": "packages/lint-rule-authoring"
   },
+  "bin": {
+    "lint-rule-authoring": "./src/cli.ts"
+  },
   "files": [
     "dist",
+    "skills",
     "src"
   ],
   "type": "module",
@@ -24,22 +31,28 @@
     "access": "public"
   },
   "scripts": {
-    "build": "vp pack",
+    "build": "spool -- vp pack",
     "dev": "vp pack --watch",
-    "test": "vp test",
-    "check": "vp check"
+    "test": "spool -- vp test",
+    "check": "spool -- vp check",
+    "check:skills": "intent validate"
   },
   "dependencies": {
-    "@opentelemetry/api": "catalog:",
-    "@opentelemetry/core": "catalog:",
-    "@opentelemetry/exporter-metrics-otlp-http": "catalog:",
-    "@opentelemetry/resources": "catalog:",
-    "@opentelemetry/sdk-metrics": "catalog:",
+    "@mst/repository-checks": "workspace:*",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/core": "^2.10.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.221.0",
+    "@opentelemetry/resources": "^2.10.0",
+    "@opentelemetry/sdk-metrics": "^2.10.0",
     "@oxlint/plugins": "catalog:",
     "es-toolkit": "catalog:",
-    "oxlint": "catalog:"
+    "oxc-parser": "catalog:",
+    "oxlint": "catalog:",
+    "yaml": "catalog:"
   },
   "devDependencies": {
+    "@mst/ai-native": "workspace:*",
+    "@tanstack/intent": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "typescript": "catalog:",

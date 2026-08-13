@@ -120,6 +120,13 @@ writeFileSync(
   `${RECORD_HEADER}exports[\`outer > scalar 1 1\`] = \`${SCALAR_RECORD}\`;\n\nexports[\`outer > scalar 2 1\`] = \`${SCALAR_RECORD}\`;\n\nexports[\`outer > scalar 3 1\`] = \`${SCALAR_RECORD}\`;\n\nexports[\`outer > scalar 4 1\`] = \`${SCALAR_RECORD}\`;\n`,
 );
 
+const namedSuffixSpec = join(fixtureDir, "named-suffix", "subject.spec.ts");
+mkdirSync(join(fixtureDir, "named-suffix", "__snapshots__"), { recursive: true });
+writeFileSync(
+  join(fixtureDir, "named-suffix", "__snapshots__", "subject.spec.ts.snap"),
+  `${RECORD_HEADER}exports[\`outer > names a behaviour 1\`] = \`${RECORD_OF_THREE_LINES}\`;\n`,
+);
+
 const withoutRecordFile = join(fixtureDir, "no-record-file", SPEC_FILE_NAME);
 mkdirSync(join(fixtureDir, "no-record-file"), { recursive: true });
 
@@ -229,6 +236,23 @@ describe("dont-review-it/no-undersized-external-snapshot--use-inline-snapshot", 
         code: 'describe("outer", () => {\n  it("names a behaviour", () => {\n    expect(subject).toMatchSnapshot({ id: expect.any(String) });\n  });\n});',
         filename: smallRecord,
         errors: [{ messageId: "undersizedExternalSnapshot" }],
+        output: null,
+      },
+      {
+        name: "a property matcher beside a hint is reported without a repair as well",
+        code: 'describe("outer", () => {\n  it("names a behaviour", () => {\n    expect(subject).toMatchSnapshot({ createdAt: expect.any(Date) }, "the hint");\n  });\n});',
+        filename: hintedRecord,
+        errors: [{ messageId: "undersizedExternalSnapshot" }],
+        output: null,
+      },
+      {
+        name: "naming the spec suffix leaves the shared budget where it was",
+        code: 'describe("outer", () => {\n  it("names a behaviour", () => {\n    expect(subject).toMatchSnapshot();\n  });\n});',
+        filename: namedSuffixSpec,
+        options: [{ specFileSuffixes: [".spec.ts"] }],
+        errors: [{ messageId: "undersizedExternalSnapshot" }],
+        output:
+          'describe("outer", () => {\n  it("names a behaviour", () => {\n    expect(subject).toMatchInlineSnapshot();\n  });\n});',
       },
       {
         name: "a spread hint cannot be measured and is reported as such",

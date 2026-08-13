@@ -1,0 +1,56 @@
+{
+  "name": "@mst/verified-specifications",
+  "version": "0.0.0",
+  "description": "Specifications extracted from the tests that verify them, so a human can read what the AI believes the code promises.",
+  "keywords": [
+    "tanstack-intent"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/masseater/mst.git",
+    "directory": "packages/verified-specifications"
+  },
+  "bin": {
+    "verified-specifications": "./src/cli.ts"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "src"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "spool -- vp pack",
+    "dev": "vp pack --watch",
+    "test": "spool -- vp test",
+    "check": "spool -- vp check",
+    "check:skills": "intent validate"
+  },
+  "dependencies": {
+    "@mst/lint-rule-authoring": "workspace:*",
+    "@mst/repository-checks": "workspace:*",
+    "es-toolkit": "catalog:",
+    "jsonc-parser": "catalog:",
+    "oxc-parser": "catalog:",
+    "oxlint": "catalog:",
+    "yaml": "catalog:"
+  },
+  "devDependencies": {
+    "@mst/ai-native": "workspace:*",
+    "@tanstack/intent": "catalog:",
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

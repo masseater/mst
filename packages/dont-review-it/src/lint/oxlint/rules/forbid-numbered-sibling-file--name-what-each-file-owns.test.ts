@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -7,9 +7,7 @@ import { describe } from "vite-plus/test";
 
 import { forbidNumberedSiblingFile } from "./forbid-numbered-sibling-file--name-what-each-file-owns.ts";
 
-const fixtureDir = join(tmpdir(), "dont-review-it-forbid-numbered-sibling-file");
-rmSync(fixtureDir, { recursive: true, force: true });
-mkdirSync(fixtureDir, { recursive: true });
+const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-forbid-numbered-sibling-file-"));
 
 const SOURCE_CONTENT = "export const total = 1;\n";
 

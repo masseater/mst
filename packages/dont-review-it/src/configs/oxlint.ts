@@ -94,17 +94,18 @@ import {
   noSplitTypeAuthority,
   noStrictCanonicalLiteralUse,
   noTwinDeclaration,
+  noUnusedStyleClass,
   requireCatalogEntry,
 } from "../plugin.ts";
 import { UPSTREAM_PLUGINS, UPSTREAM_RULES, UPSTREAM_TEST_RULES } from "./upstream-rules.ts";
 
-const PLUGIN_NAME = "dont-review-it";
+export const PLUGIN_NAME = "dont-review-it";
 
 const MAX_LINES_PER_FUNCTION = 200;
 
 const SOURCE_FILES = ["**/*.ts", "**/*.tsx"];
 
-const TEST_FILES = ["**/*.test.ts", "**/*.test.tsx"];
+const TEST_FILES = ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx"];
 
 const SHARED_TSCONFIG_PRESETS = [
   "dont-review-it/tsconfig/library.json",
@@ -227,6 +228,7 @@ export const oxlint: OxlintConfig = defineConfig({
     [`${PLUGIN_NAME}/${noUncheckedCast.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noUndersizedExternalSnapshot.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noUnorderedImport.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noUnusedStyleClass.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noUnwrappedToolchainConfig.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noVacuousHostObjectEquality.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noViMockFactoryBehavior.name}`]: LINT_SEVERITY.ERROR,

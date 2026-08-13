@@ -60,8 +60,8 @@ export const gapIn = (approval: SuppressionApproval): string | null => {
 
 const COMMENTS = /\/\/[^\n]*|\/\*[\s\S]*?\*\//gu;
 
-const bodyOf = (comment: string): string =>
-  comment.startsWith("//") ? comment.slice(2) : comment.slice(2, -2);
+const commentBodyOf = (written: string): string =>
+  written.startsWith("//") ? written.slice(2) : written.slice(2, -2);
 
 export const holdsDirectiveNaming = ({
   text,
@@ -71,6 +71,6 @@ export const holdsDirectiveNaming = ({
   readonly ruleName: string;
 }): boolean =>
   [...text.matchAll(COMMENTS)].some((match) => {
-    const directive = suppressionDirectiveOf({ value: bodyOf(match[0]) });
+    const directive = suppressionDirectiveOf({ value: commentBodyOf(match[0]) });
     return directive !== null && namesRule({ directive, ruleName });
   });

@@ -44,17 +44,7 @@ vp install
 
 ## Development Commands
 
-| コマンド          | 説明                                 |
-| ----------------- | ------------------------------------ |
-| `vp check`        | format・lint・型検査をまとめて実行   |
-| `vp check --fix`  | 自動修正込みで実行                   |
-| `vp run -r test`  | 全ワークスペースのテスト             |
-| `vp run -r build` | 全ワークスペースのビルド             |
-| `vp run knip`     | 未使用の依存・export・ファイルの検出 |
-| `vp run dev`      | 開発サーバー起動（`apps/website`）   |
-| `vp run guard`    | check → test → build をまとめて実行  |
-
-> Development commands last updated: 2026-08-09
+開発コマンドの一覧は [AGENTS.md](./AGENTS.md) にあります。
 
 ## License
 

@@ -12,340 +12,392 @@ import {
 
 import type { ESTree } from "@oxlint/plugins";
 
-const it = test
-  .extend("entryReferenceReadingOfTheEntryStandingOnItsOwn", () => {
-    const written = parseSync("spec.ts", "expect;").program.body[0] as ESTree.ExpressionStatement;
-    return isAssertionEntryReference(written.expression);
-  })
-  .extend("entryReferenceReadingOfAnotherNameInTheSamePosition", () => {
-    const written = parseSync("spec.ts", "assert;").program.body[0] as ESTree.ExpressionStatement;
-    return isAssertionEntryReference(written.expression);
-  })
-  .extend("entryReferenceReadingOfAReceiverThatIsNotAName", () => {
-    const written = parseSync("spec.ts", "makeExpect();").program
-      .body[0] as ESTree.ExpressionStatement;
-    return isAssertionEntryReference(written.expression);
-  })
-  .extend("entryCallReadingOfACallOnTheEntry", () => {
-    const written = parseSync("spec.ts", "expect(subject);").program
-      .body[0] as ESTree.ExpressionStatement;
-    return isAssertionEntryCall(written.expression as ESTree.CallExpression);
-  })
-  .extend("entryCallReadingOfACallOnAnotherName", () => {
-    const written = parseSync("spec.ts", "assert(subject);").program
-      .body[0] as ESTree.ExpressionStatement;
-    return isAssertionEntryCall(written.expression as ESTree.CallExpression);
-  })
-  .extend("entryCallReadingOfTheSoftReceiver", () => {
-    const written = parseSync("spec.ts", "expect.soft(subject);").program
-      .body[0] as ESTree.ExpressionStatement;
-    return isAssertionEntryCall(written.expression as ESTree.CallExpression);
-  })
-  .extend("entryCallReadingOfThePollReceiver", () => {
-    const written = parseSync("spec.ts", "expect.poll(read);").program
-      .body[0] as ESTree.ExpressionStatement;
-    return isAssertionEntryCall(written.expression as ESTree.CallExpression);
-  })
-  .extend("entryCallReadingOfAnotherMemberOfTheEntryNamespace", () => {
-    const written = parseSync("spec.ts", "expect.extend(matchers);").program
-      .body[0] as ESTree.ExpressionStatement;
-    return isAssertionEntryCall(written.expression as ESTree.CallExpression);
-  })
-  .extend("entryCallReadingOfADerivedSpellingCarriedByAnotherReceiver", () => {
-    const written = parseSync("spec.ts", "runner.soft(subject);").program
-      .body[0] as ESTree.ExpressionStatement;
-    return isAssertionEntryCall(written.expression as ESTree.CallExpression);
-  })
-  .extend("entryCallReadingOfAMemberChosenAtRunTime", () => {
-    const written = parseSync("spec.ts", "expect[chosen](subject);").program
-      .body[0] as ESTree.ExpressionStatement;
-    return isAssertionEntryCall(written.expression as ESTree.CallExpression);
-  })
-  .extend("entryCallReadingOfAnEntryHandedBackByAnotherCall", () => {
-    const written = parseSync("spec.ts", "makeExpect()(subject);").program
-      .body[0] as ESTree.ExpressionStatement;
-    return isAssertionEntryCall(written.expression as ESTree.CallExpression);
-  })
-  .extend("chainReadingOfABareEntryCall", () => {
-    const written = parseSync("spec.ts", "expect(subject);").program
-      .body[0] as ESTree.ExpressionStatement;
-    return isAssertionChain(written.expression);
-  })
-  .extend("chainReadingOfTheNegationModifier", () => {
-    const written = parseSync("spec.ts", "expect(subject).not;").program
-      .body[0] as ESTree.ExpressionStatement;
-    return isAssertionChain(written.expression);
-  })
-  .extend("chainReadingOfARunOfSettlementAndNegationModifiers", () => {
-    const written = parseSync("spec.ts", "expect(pending).resolves.not;").program
-      .body[0] as ESTree.ExpressionStatement;
-    return isAssertionChain(written.expression);
-  })
-  .extend("chainReadingOfTheRejectionModifier", () => {
-    const written = parseSync("spec.ts", "expect(pending).rejects;").program
-      .body[0] as ESTree.ExpressionStatement;
-    return isAssertionChain(written.expression);
-  })
-  .extend("chainReadingOfANonNullAssertionAroundTheRoot", () => {
-    const written = parseSync("spec.ts", "expect(subject)!;").program
-      .body[0] as ESTree.ExpressionStatement;
-    return isAssertionChain(written.expression);
-  })
-  .extend("chainReadingOfATypeAssertionAroundTheRoot", () => {
-    const written = parseSync("spec.ts", "expect(subject) as Assertion;").program
-      .body[0] as ESTree.ExpressionStatement;
-    return isAssertionChain(written.expression);
-  })
-  .extend("chainReadingOfAMemberThatIsNotAModifier", () => {
-    const written = parseSync("spec.ts", "expect(subject).value;").program
-      .body[0] as ESTree.ExpressionStatement;
-    return isAssertionChain(written.expression);
-  })
-  .extend("chainReadingOfALinkChosenAtRunTime", () => {
-    const written = parseSync("spec.ts", "expect(subject)[modifier];").program
-      .body[0] as ESTree.ExpressionStatement;
-    return isAssertionChain(written.expression);
-  })
-  .extend("chainReadingOfABareName", () => {
-    const written = parseSync("spec.ts", "checker;").program.body[0] as ESTree.ExpressionStatement;
-    return isAssertionChain(written.expression);
-  })
-  .extend("chainReadingOfAModifierChainRootedInAnotherName", () => {
-    const written = parseSync("spec.ts", "checker.not;").program
-      .body[0] as ESTree.ExpressionStatement;
-    return isAssertionChain(written.expression);
-  })
-  .extend("assertionCallReadingOfAChainThatReachedAMatcher", () => {
-    const written = parseSync("spec.ts", "expect(subject).toStrictEqual(expected);").program
-      .body[0] as ESTree.ExpressionStatement;
-    return isAssertionCall(written.expression as ESTree.CallExpression);
-  })
-  .extend("assertionCallReadingOfAMatcherBehindAModifier", () => {
-    const written = parseSync("spec.ts", "expect(pending).rejects.toThrow(failure);").program
-      .body[0] as ESTree.ExpressionStatement;
-    return isAssertionCall(written.expression as ESTree.CallExpression);
-  })
-  .extend("assertionCallReadingOfAMatcherChosenAtRunTime", () => {
-    const written = parseSync("spec.ts", "expect(subject)[chosen](expected);").program
-      .body[0] as ESTree.ExpressionStatement;
-    return isAssertionCall(written.expression as ESTree.CallExpression);
-  })
-  .extend("assertionCallReadingOfAChainThatStoppedBeforeAMatcher", () => {
-    const written = parseSync("spec.ts", "expect(subject);").program
-      .body[0] as ESTree.ExpressionStatement;
-    return isAssertionCall(written.expression as ESTree.CallExpression);
-  })
-  .extend("assertionCallReadingOfAUtilityOfTheEntryNamespace", () => {
-    const written = parseSync("spec.ts", "expect.assertions(1);").program
-      .body[0] as ESTree.ExpressionStatement;
-    return isAssertionCall(written.expression as ESTree.CallExpression);
-  })
-  .extend("assertionCallReadingOfAMatcherCarriedByAnotherReceiver", () => {
-    const written = parseSync("spec.ts", "checker.toBe(expected);").program
-      .body[0] as ESTree.ExpressionStatement;
-    return isAssertionCall(written.expression as ESTree.CallExpression);
-  })
-  .extend("argumentCountOfTheEntryCallABareChainStandsOn", () => {
-    const written = parseSync("spec.ts", "expect(subject);").program
-      .body[0] as ESTree.ExpressionStatement;
-    return assertionEntryCallOf(written.expression)?.arguments.length ?? null;
-  })
-  .extend("spellingOfTheEntryCallUnderARunOfModifiers", () => {
-    const written = parseSync("spec.ts", "expect(pending).resolves.not;").program
-      .body[0] as ESTree.ExpressionStatement;
-    return assertionEntryCallOf(written.expression)?.type ?? null;
-  })
-  .extend("entryCallUnderAChainRootedInAnotherName", () => {
-    const written = parseSync("spec.ts", "checker.not;").program
-      .body[0] as ESTree.ExpressionStatement;
-    return assertionEntryCallOf(written.expression);
-  })
-  .extend("entryCallUnderAMemberThatIsNotAModifier", () => {
-    const written = parseSync("spec.ts", "expect(subject).value;").program
-      .body[0] as ESTree.ExpressionStatement;
-    return assertionEntryCallOf(written.expression);
-  });
-
 describe("ASSERTION_ENTRY_NAME", () => {
-  it("spells the entry the way the runner injects it", () => {
-    expect(ASSERTION_ENTRY_NAME).toBe("expect");
+  describe("the name the assertion entry is reached under", () => {
+    const it = test.extend("entryName", () => ASSERTION_ENTRY_NAME);
+
+    it("spells the entry the way the runner injects it", ({ entryName }) => {
+      expect(entryName).toBe("expect");
+    });
   });
 });
 
 describe("isAssertionEntryReference", () => {
-  it("recognises the entry standing on its own", ({
-    entryReferenceReadingOfTheEntryStandingOnItsOwn,
-  }) => {
-    expect(entryReferenceReadingOfTheEntryStandingOnItsOwn).toBe(true);
+  describe("the entry standing on its own", () => {
+    const it = test.extend("entryReferenceReading", () => {
+      const written = parseSync("spec.ts", "expect;").program.body[0] as ESTree.ExpressionStatement;
+      return isAssertionEntryReference(written.expression);
+    });
+
+    it("is recognised as the entry", ({ entryReferenceReading }) => {
+      expect(entryReferenceReading).toBe(true);
+    });
   });
 
-  it("leaves another name standing in the same position", ({
-    entryReferenceReadingOfAnotherNameInTheSamePosition,
-  }) => {
-    expect(entryReferenceReadingOfAnotherNameInTheSamePosition).toBe(false);
+  describe("another name standing in the same position", () => {
+    const it = test.extend("entryReferenceReading", () => {
+      const written = parseSync("spec.ts", "assert;").program.body[0] as ESTree.ExpressionStatement;
+      return isAssertionEntryReference(written.expression);
+    });
+
+    it("is left where it stands", ({ entryReferenceReading }) => {
+      expect(entryReferenceReading).toBe(false);
+    });
   });
 
-  it("leaves a receiver that is not a name at all", ({
-    entryReferenceReadingOfAReceiverThatIsNotAName,
-  }) => {
-    expect(entryReferenceReadingOfAReceiverThatIsNotAName).toBe(false);
+  describe("a receiver that is not a name at all", () => {
+    const it = test.extend("entryReferenceReading", () => {
+      const written = parseSync("spec.ts", "makeExpect();").program
+        .body[0] as ESTree.ExpressionStatement;
+      return isAssertionEntryReference(written.expression);
+    });
+
+    it("is left where it stands", ({ entryReferenceReading }) => {
+      expect(entryReferenceReading).toBe(false);
+    });
   });
 });
 
 describe("isAssertionEntryCall", () => {
-  it("reads a call on the entry as the opening of an assertion", ({
-    entryCallReadingOfACallOnTheEntry,
-  }) => {
-    expect(entryCallReadingOfACallOnTheEntry).toBe(true);
+  describe("a call on the entry", () => {
+    const it = test.extend("entryCallReading", () => {
+      const written = parseSync("spec.ts", "expect(subject);").program
+        .body[0] as ESTree.ExpressionStatement;
+      return isAssertionEntryCall(written.expression as ESTree.CallExpression);
+    });
+
+    it("is read as the opening of an assertion", ({ entryCallReading }) => {
+      expect(entryCallReading).toBe(true);
+    });
   });
 
-  it("leaves a call on another name", ({ entryCallReadingOfACallOnAnotherName }) => {
-    expect(entryCallReadingOfACallOnAnotherName).toBe(false);
+  describe("a call on another name", () => {
+    const it = test.extend("entryCallReading", () => {
+      const written = parseSync("spec.ts", "assert(subject);").program
+        .body[0] as ESTree.ExpressionStatement;
+      return isAssertionEntryCall(written.expression as ESTree.CallExpression);
+    });
+
+    it("is left where it stands", ({ entryCallReading }) => {
+      expect(entryCallReading).toBe(false);
+    });
   });
 
-  it("reads the soft receiver as the same opening", ({ entryCallReadingOfTheSoftReceiver }) => {
-    expect(entryCallReadingOfTheSoftReceiver).toBe(true);
+  describe("the soft receiver", () => {
+    const it = test.extend("entryCallReading", () => {
+      const written = parseSync("spec.ts", "expect.soft(subject);").program
+        .body[0] as ESTree.ExpressionStatement;
+      return isAssertionEntryCall(written.expression as ESTree.CallExpression);
+    });
+
+    it("is read as the same opening", ({ entryCallReading }) => {
+      expect(entryCallReading).toBe(true);
+    });
   });
 
-  it("reads the poll receiver as the same opening", ({ entryCallReadingOfThePollReceiver }) => {
-    expect(entryCallReadingOfThePollReceiver).toBe(true);
+  describe("the poll receiver", () => {
+    const it = test.extend("entryCallReading", () => {
+      const written = parseSync("spec.ts", "expect.poll(read);").program
+        .body[0] as ESTree.ExpressionStatement;
+      return isAssertionEntryCall(written.expression as ESTree.CallExpression);
+    });
+
+    it("is read as the same opening", ({ entryCallReading }) => {
+      expect(entryCallReading).toBe(true);
+    });
   });
 
-  it("leaves another member of the entry namespace", ({
-    entryCallReadingOfAnotherMemberOfTheEntryNamespace,
-  }) => {
-    expect(entryCallReadingOfAnotherMemberOfTheEntryNamespace).toBe(false);
+  describe("another member of the entry namespace", () => {
+    const it = test.extend("entryCallReading", () => {
+      const written = parseSync("spec.ts", "expect.extend(matchers);").program
+        .body[0] as ESTree.ExpressionStatement;
+      return isAssertionEntryCall(written.expression as ESTree.CallExpression);
+    });
+
+    it("is left where it stands", ({ entryCallReading }) => {
+      expect(entryCallReading).toBe(false);
+    });
   });
 
-  it("leaves a derived spelling carried by another receiver", ({
-    entryCallReadingOfADerivedSpellingCarriedByAnotherReceiver,
-  }) => {
-    expect(entryCallReadingOfADerivedSpellingCarriedByAnotherReceiver).toBe(false);
+  describe("a derived spelling carried by another receiver", () => {
+    const it = test.extend("entryCallReading", () => {
+      const written = parseSync("spec.ts", "runner.soft(subject);").program
+        .body[0] as ESTree.ExpressionStatement;
+      return isAssertionEntryCall(written.expression as ESTree.CallExpression);
+    });
+
+    it("is left where it stands", ({ entryCallReading }) => {
+      expect(entryCallReading).toBe(false);
+    });
   });
 
-  it("leaves a member of the entry chosen at run time", ({
-    entryCallReadingOfAMemberChosenAtRunTime,
-  }) => {
-    expect(entryCallReadingOfAMemberChosenAtRunTime).toBe(false);
+  describe("a member of the entry chosen at run time", () => {
+    const it = test.extend("entryCallReading", () => {
+      const written = parseSync("spec.ts", "expect[chosen](subject);").program
+        .body[0] as ESTree.ExpressionStatement;
+      return isAssertionEntryCall(written.expression as ESTree.CallExpression);
+    });
+
+    it("is left where it stands", ({ entryCallReading }) => {
+      expect(entryCallReading).toBe(false);
+    });
   });
 
-  it("leaves an entry handed back by another call", ({
-    entryCallReadingOfAnEntryHandedBackByAnotherCall,
-  }) => {
-    expect(entryCallReadingOfAnEntryHandedBackByAnotherCall).toBe(false);
+  describe("an entry handed back by another call", () => {
+    const it = test.extend("entryCallReading", () => {
+      const written = parseSync("spec.ts", "makeExpect()(subject);").program
+        .body[0] as ESTree.ExpressionStatement;
+      return isAssertionEntryCall(written.expression as ESTree.CallExpression);
+    });
+
+    it("is left where it stands", ({ entryCallReading }) => {
+      expect(entryCallReading).toBe(false);
+    });
   });
 });
 
 describe("isAssertionChain", () => {
-  it("reads a chain whose root is the entry call", ({ chainReadingOfABareEntryCall }) => {
-    expect(chainReadingOfABareEntryCall).toBe(true);
+  describe("a chain whose root is the entry call", () => {
+    const it = test.extend("chainReading", () => {
+      const written = parseSync("spec.ts", "expect(subject);").program
+        .body[0] as ESTree.ExpressionStatement;
+      return isAssertionChain(written.expression);
+    });
+
+    it("is read as a chain", ({ chainReading }) => {
+      expect(chainReading).toBe(true);
+    });
   });
 
-  it("keeps the negation modifier inside the chain", ({ chainReadingOfTheNegationModifier }) => {
-    expect(chainReadingOfTheNegationModifier).toBe(true);
+  describe("the negation modifier", () => {
+    const it = test.extend("chainReading", () => {
+      const written = parseSync("spec.ts", "expect(subject).not;").program
+        .body[0] as ESTree.ExpressionStatement;
+      return isAssertionChain(written.expression);
+    });
+
+    it("is kept inside the chain", ({ chainReading }) => {
+      expect(chainReading).toBe(true);
+    });
   });
 
-  it("keeps a run of settlement and negation modifiers inside the chain", ({
-    chainReadingOfARunOfSettlementAndNegationModifiers,
-  }) => {
-    expect(chainReadingOfARunOfSettlementAndNegationModifiers).toBe(true);
+  describe("a run of settlement and negation modifiers", () => {
+    const it = test.extend("chainReading", () => {
+      const written = parseSync("spec.ts", "expect(pending).resolves.not;").program
+        .body[0] as ESTree.ExpressionStatement;
+      return isAssertionChain(written.expression);
+    });
+
+    it("is kept inside the chain", ({ chainReading }) => {
+      expect(chainReading).toBe(true);
+    });
   });
 
-  it("keeps the rejection modifier inside the chain", ({ chainReadingOfTheRejectionModifier }) => {
-    expect(chainReadingOfTheRejectionModifier).toBe(true);
+  describe("the rejection modifier", () => {
+    const it = test.extend("chainReading", () => {
+      const written = parseSync("spec.ts", "expect(pending).rejects;").program
+        .body[0] as ESTree.ExpressionStatement;
+      return isAssertionChain(written.expression);
+    });
+
+    it("is kept inside the chain", ({ chainReading }) => {
+      expect(chainReading).toBe(true);
+    });
   });
 
-  it("sees through a non-null assertion written around the root", ({
-    chainReadingOfANonNullAssertionAroundTheRoot,
-  }) => {
-    expect(chainReadingOfANonNullAssertionAroundTheRoot).toBe(true);
+  describe("a non-null assertion written around the root", () => {
+    const it = test.extend("chainReading", () => {
+      const written = parseSync("spec.ts", "expect(subject)!;").program
+        .body[0] as ESTree.ExpressionStatement;
+      return isAssertionChain(written.expression);
+    });
+
+    it("is seen through", ({ chainReading }) => {
+      expect(chainReading).toBe(true);
+    });
   });
 
-  it("sees through a type assertion written around the root", ({
-    chainReadingOfATypeAssertionAroundTheRoot,
-  }) => {
-    expect(chainReadingOfATypeAssertionAroundTheRoot).toBe(true);
+  describe("a type assertion written around the root", () => {
+    const it = test.extend("chainReading", () => {
+      const written = parseSync("spec.ts", "expect(subject) as Assertion;").program
+        .body[0] as ESTree.ExpressionStatement;
+      return isAssertionChain(written.expression);
+    });
+
+    it("is seen through", ({ chainReading }) => {
+      expect(chainReading).toBe(true);
+    });
   });
 
-  it("leaves a member that is not a modifier", ({ chainReadingOfAMemberThatIsNotAModifier }) => {
-    expect(chainReadingOfAMemberThatIsNotAModifier).toBe(false);
+  describe("a member that is not a modifier", () => {
+    const it = test.extend("chainReading", () => {
+      const written = parseSync("spec.ts", "expect(subject).value;").program
+        .body[0] as ESTree.ExpressionStatement;
+      return isAssertionChain(written.expression);
+    });
+
+    it("is left outside the chain", ({ chainReading }) => {
+      expect(chainReading).toBe(false);
+    });
   });
 
-  it("leaves a link chosen at run time", ({ chainReadingOfALinkChosenAtRunTime }) => {
-    expect(chainReadingOfALinkChosenAtRunTime).toBe(false);
+  describe("a link chosen at run time", () => {
+    const it = test.extend("chainReading", () => {
+      const written = parseSync("spec.ts", "expect(subject)[modifier];").program
+        .body[0] as ESTree.ExpressionStatement;
+      return isAssertionChain(written.expression);
+    });
+
+    it("is left outside the chain", ({ chainReading }) => {
+      expect(chainReading).toBe(false);
+    });
   });
 
-  it("leaves a bare name", ({ chainReadingOfABareName }) => {
-    expect(chainReadingOfABareName).toBe(false);
+  describe("a bare name", () => {
+    const it = test.extend("chainReading", () => {
+      const written = parseSync("spec.ts", "checker;").program
+        .body[0] as ESTree.ExpressionStatement;
+      return isAssertionChain(written.expression);
+    });
+
+    it("is left outside the chain", ({ chainReading }) => {
+      expect(chainReading).toBe(false);
+    });
   });
 
-  it("leaves a modifier chain whose root is another name", ({
-    chainReadingOfAModifierChainRootedInAnotherName,
-  }) => {
-    expect(chainReadingOfAModifierChainRootedInAnotherName).toBe(false);
+  describe("a modifier chain whose root is another name", () => {
+    const it = test.extend("chainReading", () => {
+      const written = parseSync("spec.ts", "checker.not;").program
+        .body[0] as ESTree.ExpressionStatement;
+      return isAssertionChain(written.expression);
+    });
+
+    it("is left outside the chain", ({ chainReading }) => {
+      expect(chainReading).toBe(false);
+    });
   });
 });
 
 describe("isAssertionCall", () => {
-  it("counts a chain that reached a matcher as one assertion", ({
-    assertionCallReadingOfAChainThatReachedAMatcher,
-  }) => {
-    expect(assertionCallReadingOfAChainThatReachedAMatcher).toBe(true);
+  describe("a chain that reached a matcher", () => {
+    const it = test.extend("assertionCallReading", () => {
+      const written = parseSync("spec.ts", "expect(subject).toStrictEqual(expected);").program
+        .body[0] as ESTree.ExpressionStatement;
+      return isAssertionCall(written.expression as ESTree.CallExpression);
+    });
+
+    it("counts as one assertion", ({ assertionCallReading }) => {
+      expect(assertionCallReading).toBe(true);
+    });
   });
 
-  it("counts a chain that reached a matcher behind a modifier as one assertion", ({
-    assertionCallReadingOfAMatcherBehindAModifier,
-  }) => {
-    expect(assertionCallReadingOfAMatcherBehindAModifier).toBe(true);
+  describe("a chain that reached a matcher behind a modifier", () => {
+    const it = test.extend("assertionCallReading", () => {
+      const written = parseSync("spec.ts", "expect(pending).rejects.toThrow(failure);").program
+        .body[0] as ESTree.ExpressionStatement;
+      return isAssertionCall(written.expression as ESTree.CallExpression);
+    });
+
+    it("counts as one assertion", ({ assertionCallReading }) => {
+      expect(assertionCallReading).toBe(true);
+    });
   });
 
-  it("counts a matcher chosen at run time as one assertion", ({
-    assertionCallReadingOfAMatcherChosenAtRunTime,
-  }) => {
-    expect(assertionCallReadingOfAMatcherChosenAtRunTime).toBe(true);
+  describe("a matcher chosen at run time", () => {
+    const it = test.extend("assertionCallReading", () => {
+      const written = parseSync("spec.ts", "expect(subject)[chosen](expected);").program
+        .body[0] as ESTree.ExpressionStatement;
+      return isAssertionCall(written.expression as ESTree.CallExpression);
+    });
+
+    it("counts as one assertion", ({ assertionCallReading }) => {
+      expect(assertionCallReading).toBe(true);
+    });
   });
 
-  it("leaves a chain that stopped before a matcher", ({
-    assertionCallReadingOfAChainThatStoppedBeforeAMatcher,
-  }) => {
-    expect(assertionCallReadingOfAChainThatStoppedBeforeAMatcher).toBe(false);
+  describe("a chain that stopped before a matcher", () => {
+    const it = test.extend("assertionCallReading", () => {
+      const written = parseSync("spec.ts", "expect(subject);").program
+        .body[0] as ESTree.ExpressionStatement;
+      return isAssertionCall(written.expression as ESTree.CallExpression);
+    });
+
+    it("counts as no assertion", ({ assertionCallReading }) => {
+      expect(assertionCallReading).toBe(false);
+    });
   });
 
-  it("leaves a utility of the entry namespace", ({
-    assertionCallReadingOfAUtilityOfTheEntryNamespace,
-  }) => {
-    expect(assertionCallReadingOfAUtilityOfTheEntryNamespace).toBe(false);
+  describe("a utility of the entry namespace", () => {
+    const it = test.extend("assertionCallReading", () => {
+      const written = parseSync("spec.ts", "expect.assertions(1);").program
+        .body[0] as ESTree.ExpressionStatement;
+      return isAssertionCall(written.expression as ESTree.CallExpression);
+    });
+
+    it("counts as no assertion", ({ assertionCallReading }) => {
+      expect(assertionCallReading).toBe(false);
+    });
   });
 
-  it("leaves a matcher carried by another receiver", ({
-    assertionCallReadingOfAMatcherCarriedByAnotherReceiver,
-  }) => {
-    expect(assertionCallReadingOfAMatcherCarriedByAnotherReceiver).toBe(false);
+  describe("a matcher carried by another receiver", () => {
+    const it = test.extend("assertionCallReading", () => {
+      const written = parseSync("spec.ts", "checker.toBe(expected);").program
+        .body[0] as ESTree.ExpressionStatement;
+      return isAssertionCall(written.expression as ESTree.CallExpression);
+    });
+
+    it("counts as no assertion", ({ assertionCallReading }) => {
+      expect(assertionCallReading).toBe(false);
+    });
   });
 });
 
 describe("assertionEntryCallOf", () => {
-  it("hands back the entry call a bare chain stands on", ({
-    argumentCountOfTheEntryCallABareChainStandsOn,
-  }) => {
-    expect(argumentCountOfTheEntryCallABareChainStandsOn).toBe(1);
+  describe("a bare chain", () => {
+    const it = test.extend("argumentCountOfTheEntryCall", () => {
+      const written = parseSync("spec.ts", "expect(subject);").program
+        .body[0] as ESTree.ExpressionStatement;
+      return assertionEntryCallOf(written.expression)?.arguments.length ?? null;
+    });
+
+    it("hands back the entry call it stands on", ({ argumentCountOfTheEntryCall }) => {
+      expect(argumentCountOfTheEntryCall).toBe(1);
+    });
   });
 
-  it("hands back the entry call standing under a run of modifiers", ({
-    spellingOfTheEntryCallUnderARunOfModifiers,
-  }) => {
-    expect(spellingOfTheEntryCallUnderARunOfModifiers).toBe("CallExpression");
+  describe("a run of modifiers", () => {
+    const it = test.extend("spellingOfTheEntryCall", () => {
+      const written = parseSync("spec.ts", "expect(pending).resolves.not;").program
+        .body[0] as ESTree.ExpressionStatement;
+      return assertionEntryCallOf(written.expression)?.type ?? null;
+    });
+
+    it("hands back the entry call standing under it", ({ spellingOfTheEntryCall }) => {
+      expect(spellingOfTheEntryCall).toBe("CallExpression");
+    });
   });
 
-  it("hands back nothing for a chain rooted in another name", ({
-    entryCallUnderAChainRootedInAnotherName,
-  }) => {
-    expect(entryCallUnderAChainRootedInAnotherName).toBe(null);
+  describe("a chain rooted in another name", () => {
+    const it = test.extend("entryCall", () => {
+      const written = parseSync("spec.ts", "checker.not;").program
+        .body[0] as ESTree.ExpressionStatement;
+      return assertionEntryCallOf(written.expression);
+    });
+
+    it("hands back nothing", ({ entryCall }) => {
+      expect(entryCall).toBe(null);
+    });
   });
 
-  it("hands back nothing for a member that is not a modifier", ({
-    entryCallUnderAMemberThatIsNotAModifier,
-  }) => {
-    expect(entryCallUnderAMemberThatIsNotAModifier).toBe(null);
+  describe("a member that is not a modifier", () => {
+    const it = test.extend("entryCall", () => {
+      const written = parseSync("spec.ts", "expect(subject).value;").program
+        .body[0] as ESTree.ExpressionStatement;
+      return assertionEntryCallOf(written.expression);
+    });
+
+    it("hands back nothing", ({ entryCall }) => {
+      expect(entryCall).toBe(null);
+    });
   });
 });

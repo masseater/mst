@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -11,6 +11,10 @@ const SOURCE_FILE = "packages/cart/src/basket.ts";
 
 const SPEC_FILE = "packages/cart/src/basket.test.ts";
 
+const GUARDED_ELSEWHERE_FILE = "packages/cart/specs/basket.spec.ts";
+
+const MISPLACED_SPECIFICATION_FILE = "packages/cart/src/basket.spec.ts";
+
 const CONFIG_FILE = "vite.config.ts";
 
 const BUNDLE_RULE = "dont-review-it/require-test-block-spelling--use-configured-fn";
@@ -19,8 +23,7 @@ const SPELLED_SUFFIXES = "`.test.ts`, `.test.tsx`";
 
 const DECLARATION = "export const total = 1;";
 
-const fixtureDir = join(tmpdir(), "dont-review-it-require-spec-lint-coverage");
-rmSync(fixtureDir, { recursive: true, force: true });
+const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-require-spec-lint-coverage-"));
 mkdirSync(join(fixtureDir, "src/legacy"), { recursive: true });
 
 writeFileSync(join(fixtureDir, "pnpm-workspace.yaml"), "packages:\n  - packages/*\n");
@@ -122,8 +125,24 @@ describe("dont-review-it/require-spec-lint-coverage--lint-every-spec-file", () =
         code: `function held(): number { return 1; }\nexport const value = held();`,
         filename: SOURCE_FILE,
       },
+      {
+        name: "a specification test in the specs directory is guarded by the bundle that owns it",
+        code: `it("counts the basket", () => { expect(1).toBe(1); });`,
+        filename: GUARDED_ELSEWHERE_FILE,
+      },
     ],
     invalid: [
+      {
+        name: "the specification file name outside the specs directory reaches no bundle",
+        code: `it("counts the basket", () => { expect(1).toBe(1); });`,
+        filename: MISPLACED_SPECIFICATION_FILE,
+        errors: [
+          {
+            messageId: "uncoveredSpecFile",
+            data: { blockName: "it", specSuffixes: SPELLED_SUFFIXES },
+          },
+        ],
+      },
       {
         name: "a source file that declares a test block sits outside the reach of this bundle",
         code: `it("counts the basket", () => { expect(1).toBe(1); });`,

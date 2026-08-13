@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -7,9 +7,7 @@ import { describe } from "vite-plus/test";
 
 import { requireSpecFileForAssets } from "./require-spec-file-for-assets--create-matching-spec.ts";
 
-const fixtureDir = join(tmpdir(), "dont-review-it-require-spec-file-for-assets");
-rmSync(fixtureDir, { recursive: true, force: true });
-mkdirSync(fixtureDir, { recursive: true });
+const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-require-spec-file-for-assets-"));
 
 const ASSETS_SOURCE = "export const orderTotals = [1, 2];\n";
 

@@ -2,7 +2,7 @@
 
 ## 何を検出するか
 
-spec ファイルの中で、module スコープと grouping ブロック（`describe`）の本体に置かれた関数の束縛。あわせて、fixture がその場に書かれた関数式を提供値として渡している形。
+spec ファイルの中で、module スコープと grouping ブロック（`describe`）の本体に置かれた関数の束縛。module スコープに置かれた fixture ビルダの束縛。あわせて、fixture がその場に書かれた関数式を提供値として渡している形。
 
 対象のファイルはファイル名の接尾辞で決める。既定は `.test.ts` と `.test.tsx` で、`specFileSuffixes` で差し替えられる。
 
@@ -16,17 +16,28 @@ spec ファイルの中で、module スコープと grouping ブロック（`des
 | grouping ブロックのコールバック                     | 対象   |
 | `it` のコールバック、fixture の本体、その内側の関数 | 対象外 |
 
+fixture ビルダの束縛だけは尺度が 1 段違う。関数の束縛は grouping ブロックの本体に置かれた時点で対象だが、fixture ビルダは grouping ブロックの本体こそが置き場であり、囲む関数がまったく無い形（module スコープ）だけを対象にする。
+
+| 囲む最も内側の関数              | fixture ビルダの判定 |
+| ------------------------------- | -------------------- |
+| 無し（module スコープ）         | 対象                 |
+| grouping ブロックのコールバック | 対象外               |
+| `it` のコールバック、その内側   | 対象外               |
+
 grouping ブロックかどうかは、呼び出しの根にある識別子の綴りではなく、その識別子が何に束縛されているかで判定する。ランナーがグローバルへ注入した名前、明示 import で持ち込んだ名前、`import ... as` で別名に束縛した名前、ローカルに再束縛した名前、再輸出を経由して届いた名前を、束縛を辿って同じものとして扱う。`describe.each(rows)(...)` のような修飾子付きの呼び出しも同じ根に行き着くので、そのコールバックは grouping ブロックの本体である。
 
-### 報告する 5 つの形
+### 報告する 6 つの形
 
-| messageId                 | 何を見るか                                                                                            |
-| ------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `scopedHelperDeclaration` | 対象スコープの関数宣言。名前を持たない default export の関数宣言も含む                                |
-| `scopedHelperBinding`     | 対象スコープの束縛のうち、初期化子が arrow function または function expression であるもの             |
-| `disguisedHelperBinding`  | 対象スコープの束縛のうち、初期化子が呼び出し式で、その呼び出しが構文上の関数を返すもの                |
-| `containedHelperBinding`  | 対象スコープの束縛のうち、初期化子そのものがオブジェクト / 配列リテラルで、その中に関数式が現れるもの |
-| `handedHelperFixture`     | fixture の提供値が、その場に書かれた関数式であるもの                                                  |
+| messageId                   | 何を見るか                                                                                            |
+| --------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `scopedHelperDeclaration`   | 対象スコープの関数宣言。名前を持たない default export の関数宣言も含む                                |
+| `scopedHelperBinding`       | 対象スコープの束縛のうち、初期化子が arrow function または function expression であるもの             |
+| `disguisedHelperBinding`    | 対象スコープの束縛のうち、初期化子が呼び出し式で、その呼び出しが構文上の関数を返すもの                |
+| `containedHelperBinding`    | 対象スコープの束縛のうち、初期化子そのものがオブジェクト / 配列リテラルで、その中に関数式が現れるもの |
+| `moduleScopeFixtureBinding` | module スコープの束縛のうち、初期化子が fixture を宣言する `extend` 呼び出しであるもの                |
+| `handedHelperFixture`       | fixture の提供値が、その場に書かれた関数式であるもの                                                  |
+
+`moduleScopeFixtureBinding` は束縛 1 つにつき 1 件報告する。`test.extend(...).extend(...)` と連ねた形も、1 回の `extend` に複数の fixture を書いた形も、束縛されている名前は 1 つなのでまとめて 1 件になる。別の束縛から派生させた `base.extend(...)` は、派生元と派生先がそれぞれ束縛なので 2 件になる。この形と `handedHelperFixture` は独立しているので、module スコープに立っていて提供値も関数である fixture は 2 件を同時に受ける。
 
 `disguisedHelperBinding` が呼び出しの中を読む経路は 2 つある。
 
@@ -39,18 +50,20 @@ grouping ブロックかどうかは、呼び出しの根にある識別子の�
 
 ### 意図的に広げていない範囲
 
-| 形                                                      | 対象にしない理由                                                                                     |
-| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| callee が同一ファイル内の関数へ解決できない呼び出し     | 呼び先の中を読めない。fixture ビルダ `test.extend(...)` とその派生はここで外れる                     |
-| 呼び先が別ファイルにある factory                        | そのファイル自体が `no-dry-test-setup--inline-owned-setup` の言う setup モジュールに当たる           |
-| 関数以外の値を返す即時実行                              | 設定オブジェクトや定数の組み立てである。返るリテラルの中に関数式が現れる場合だけ入れ物として報告する |
-| `new` 式による束縛                                      | 関数の束縛ではない                                                                                   |
-| クラス宣言、型エイリアス                                | 関数の束縛ではない                                                                                   |
-| 関数式を含まない module スコープの `const`              | テストデータの定数である                                                                             |
-| 初期化子を持たない宣言                                  | 読む初期化子が無い                                                                                   |
-| `it` の中、fixture の本体、それらの内側で宣言された関数 | 1 つのテスト、1 つの fixture の内側に閉じている                                                      |
-| fixture が既存の束縛や import した識別子を提供する形    | SUT が関数であるときにそれを渡す形であり、helper の隠し場所ではない                                  |
-| 呼び出しの引数として書かれたリテラル                    | 束縛の初期化子ではない。fixture へ渡すリテラルは `handedHelperFixture` の側が読む                    |
+| 形                                                      | 対象にしない理由                                                                                                                            |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| callee が同一ファイル内の関数へ解決できない呼び出し     | 呼び先の中を読めない。fixture ビルダ `test.extend(...)` とその派生は中を読まれないが、置かれた位置は `moduleScopeFixtureBinding` が別に見る |
+| grouping ブロックの本体に置かれた fixture ビルダ        | 読む側が求めている置き場そのものである                                                                                                      |
+| spec ファイル以外で宣言された fixture ビルダ            | 複数の spec が共有する土台であり、このルールが読むのは spec ファイルだけである                                                              |
+| 呼び先が別ファイルにある factory                        | そのファイル自体が `no-dry-test-setup--inline-owned-setup` の言う setup モジュールに当たる                                                  |
+| 関数以外の値を返す即時実行                              | 設定オブジェクトや定数の組み立てである。返るリテラルの中に関数式が現れる場合だけ入れ物として報告する                                        |
+| `new` 式による束縛                                      | 関数の束縛ではない                                                                                                                          |
+| クラス宣言、型エイリアス                                | 関数の束縛ではない                                                                                                                          |
+| 関数式を含まない module スコープの `const`              | テストデータの定数である                                                                                                                    |
+| 初期化子を持たない宣言                                  | 読む初期化子が無い                                                                                                                          |
+| `it` の中、fixture の本体、それらの内側で宣言された関数 | 1 つのテスト、1 つの fixture の内側に閉じている                                                                                             |
+| fixture が既存の束縛や import した識別子を提供する形    | SUT が関数であるときにそれを渡す形であり、helper の隠し場所ではない                                                                         |
+| 呼び出しの引数として書かれたリテラル                    | 束縛の初期化子ではない。fixture へ渡すリテラルは `handedHelperFixture` の側が読む                                                           |
 
 ## なぜそれが要るか
 
@@ -62,19 +75,25 @@ grouping ブロックかどうかは、呼び出しの根にある識別子の�
 
 3 層目は、直し方の行き先を自分で塞いでいることである。このルールが推奨する直し方は helper を base fixture へ移すことなので、移した先で helper がそのまま関数として渡されるなら失敗モードは何も動いていない。fixture の中身を見る別の群は fixture 名に対する名前ゲートを持つが、こちらは名前を見ない。両方を有効にしても推奨する形が「結果を渡す」の 1 つに収束するのはこのためである。
 
+fixture ビルダの置き場を module スコープから外すのも同じ不変条件の側面である。fixture は helper の代わりに置ける唯一の逃し先なので、これを封じることはできない。封じるのは距離のほうである。ファイルの先頭に立った fixture は、その下にあるすべての grouping ブロックから届く。読む側は `it` の引数に現れた名前から宣言まで戻る距離が、ファイルが伸びるだけ伸びる。どの grouping ブロックのための subject なのかも、名前以外に手掛かりが無くなる。grouping ブロックの本体に置けば、振る舞いの名前とその subject の組み立てが同じ入れ子の中に並ぶ。複数の grouping ブロックが同じ土台を要る場合も、それらを囲む grouping ブロックが置き場として残っているので、表現できなくなる形は無い。
+
 この群では DRY より単独可読性が優先される。独立した spec の間で setup が重複することは、削減すべき負債ではなく受け入れた対価である。
 
 ## どう直す
 
 1 つのテストだけが使うなら、その `it` の中へ展開する。複数の grouping ブロックが同じ振る舞いを必要とするなら、共通の base fixture にその振る舞いを**実行させて**、組み上がった subject を渡す fixture を作り、各 grouping ブロックの fixture をそこから派生させる。base fixture が渡すのは subject であって、subject を組み立てる手続きではない。
 
-```ts
-const test = baseTest.extend("stem", () =>
-  specStemOf("report.test.ts", DEFAULT_SPEC_FILE_SUFFIXES),
-);
+fixture の宣言は、それを読む `it` を抱えている grouping ブロックの本体に置く。派生元の base fixture は、派生先の grouping ブロックを囲む grouping ブロックの本体に置く。
 
-test("drops the longest matching suffix from the base name", ({ stem }) => {
-  expect(stem).toBe("report");
+```ts
+describe("specStemOf", () => {
+  describe("a name carrying a spec suffix", () => {
+    const it = test.extend("stem", () => specStemOf("report.test.ts", DEFAULT_SPEC_FILE_SUFFIXES));
+
+    it("drops the longest matching suffix from the base name", ({ stem }) => {
+      expect(stem).toBe("report");
+    });
+  });
 });
 ```
 
@@ -88,6 +107,9 @@ test("drops the longest matching suffix from the base name", ({ stem }) => {
 - **helper を base fixture へ移し、関数のまま渡す。** 移し先が fixture でも、渡しているものが手続きなら報告する
 - **grouping ブロックを明示 import して別名へ束縛し、スコープの判定を外す。** 綴りではなく束縛の解決で判定する
 - **helper を残したまま名前だけ変える。** 名前ではなく置かれたスコープと束縛の形で判定する
+- **fixture をファイルの先頭に置いて全 grouping ブロックから使い回す。** module スコープの fixture ビルダの束縛を報告する
+- **`extend` を連ねて 1 つの束縛に畳み、宣言の数を減らして見せる。** 数ではなく束縛が立っている位置で判定する
+- **fixture を括弧や型アサーションで包んで束縛の形を変える。** 包みを剥がしてから `extend` 呼び出しかどうかを読む
 - **factory を別ファイルへ出して呼び出しの結果に見せる。** この読みからは消えるが、束縛されるものは関数のままである
 - **抑制ディレクティブ**
 

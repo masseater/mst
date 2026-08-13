@@ -23,6 +23,7 @@ import {
   RESERVED_SPEC_NAMES,
   reservedIdentifierOf,
 } from "../lib/spec-lint-coverage/reserved-name-bindings.ts";
+import { specDirectoryOf } from "../lib/spec-syntax/spec-directories.ts";
 import { DEFAULT_SPEC_FILE_SUFFIXES, isSpecFile } from "../lib/spec-syntax/spec-files.ts";
 import { testBlockBodyOf, testBlockRootNames } from "../lib/spec-syntax/test-block-declarations.ts";
 import { testBlockRootIdentifier } from "../lib/spec-syntax/test-block-modifiers.ts";
@@ -30,6 +31,17 @@ import { testBlockRootIdentifier } from "../lib/spec-syntax/test-block-modifiers
 import type { ESTree } from "@oxlint/plugins";
 
 const SPELLED_SPEC_SUFFIXES = spelledNames(DEFAULT_SPEC_FILE_SUFFIXES);
+
+const GUARDED_ELSEWHERE_DIRECTORY_NAMES: ReadonlySet<string> = new Set(["specs"]);
+
+const GUARDED_ELSEWHERE_FILE_SUFFIXES: readonly string[] = [".spec.ts", ".spec.tsx"];
+
+const isGuardedElsewhere = (filename: string): boolean =>
+  isSpecFile(filename, GUARDED_ELSEWHERE_FILE_SUFFIXES) &&
+  specDirectoryOf({
+    relativePath: toPosixPath(filename),
+    names: GUARDED_ELSEWHERE_DIRECTORY_NAMES,
+  }) !== null;
 
 const declaresRunnerBlock = (asked: {
   readonly call: ESTree.CallExpression;
@@ -177,7 +189,7 @@ export const requireSpecLintCoverage = createDontReviewItRule({
 
     return {
       "Program:exit"(node: ESTree.Program) {
-        reportFile(node);
+        if (!isGuardedElsewhere(context.filename)) reportFile(node);
         if (LINT_CONFIGURATION_FILE.test(toPosixPath(context.filename))) reportConfiguration(node);
       },
     };

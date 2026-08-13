@@ -11,68 +11,72 @@ const CARRIED_FUNCTIONS: ReadonlySet<string> = new Set([
   "uniqWith",
 ]);
 
-const it = test
-  .extend("vocabularyOfEmptyOptions", () => normalizingFunctionsFrom([]))
-  .extend("vocabularyOfSeverityOnlyOptions", () => normalizingFunctionsFrom(["error"]))
-  .extend("vocabularyOfListedOptions", () => normalizingFunctionsFrom([["orderBy"]]))
-  .extend("vocabularyOfMissingOptions", () => normalizingFunctionsFrom([null]))
-  .extend("vocabularyOfForeignSettings", () =>
-    normalizingFunctionsFrom([{ specFileSuffixes: [".spec.ts"] }]),
-  )
-  .extend("vocabularyOfListedNames", () =>
-    normalizingFunctionsFrom([{ normalizingFunctions: ["reshape"] }]),
-  )
-  .extend("vocabularyOfPartlyNamedEntries", () =>
-    normalizingFunctionsFrom([{ normalizingFunctions: ["reshape", 7] }]),
-  )
-  .extend("vocabularyOfEmptiedNames", () =>
-    normalizingFunctionsFrom([{ normalizingFunctions: [] }]),
-  );
+describe("normalizingFunctionsFrom", () => {
+  describe("a rule configured with nothing", () => {
+    const it = test.extend("vocabulary", () => normalizingFunctionsFrom([]));
 
-describe("normalizing operations", () => {
-  it("a rule configured with nothing reads the vocabulary the rule carries", ({
-    vocabularyOfEmptyOptions,
-  }) => {
-    expect(vocabularyOfEmptyOptions).toStrictEqual(CARRIED_FUNCTIONS);
+    it("reads the vocabulary the rule carries", ({ vocabulary }) => {
+      expect(vocabulary).toStrictEqual(CARRIED_FUNCTIONS);
+    });
   });
 
-  it("a configuration that is not a settings object leaves the carried vocabulary standing", ({
-    vocabularyOfSeverityOnlyOptions,
-  }) => {
-    expect(vocabularyOfSeverityOnlyOptions).toStrictEqual(CARRIED_FUNCTIONS);
+  describe("a configuration that is not a settings object", () => {
+    const it = test.extend("vocabulary", () => normalizingFunctionsFrom(["error"]));
+
+    it("leaves the carried vocabulary standing", ({ vocabulary }) => {
+      expect(vocabulary).toStrictEqual(CARRIED_FUNCTIONS);
+    });
   });
 
-  it("a configuration spelled as a list leaves the carried vocabulary standing", ({
-    vocabularyOfListedOptions,
-  }) => {
-    expect(vocabularyOfListedOptions).toStrictEqual(CARRIED_FUNCTIONS);
+  describe("a configuration spelled as a list", () => {
+    const it = test.extend("vocabulary", () => normalizingFunctionsFrom([["orderBy"]]));
+
+    it("leaves the carried vocabulary standing", ({ vocabulary }) => {
+      expect(vocabulary).toStrictEqual(CARRIED_FUNCTIONS);
+    });
   });
 
-  it("a configuration spelled as nothing leaves the carried vocabulary standing", ({
-    vocabularyOfMissingOptions,
-  }) => {
-    expect(vocabularyOfMissingOptions).toStrictEqual(CARRIED_FUNCTIONS);
+  describe("a configuration spelled as nothing", () => {
+    const it = test.extend("vocabulary", () => normalizingFunctionsFrom([null]));
+
+    it("leaves the carried vocabulary standing", ({ vocabulary }) => {
+      expect(vocabulary).toStrictEqual(CARRIED_FUNCTIONS);
+    });
   });
 
-  it("a settings object without the entry leaves the carried vocabulary standing", ({
-    vocabularyOfForeignSettings,
-  }) => {
-    expect(vocabularyOfForeignSettings).toStrictEqual(CARRIED_FUNCTIONS);
+  describe("a settings object without the entry", () => {
+    const it = test.extend("vocabulary", () =>
+      normalizingFunctionsFrom([{ specFileSuffixes: [".spec.ts"] }]));
+
+    it("leaves the carried vocabulary standing", ({ vocabulary }) => {
+      expect(vocabulary).toStrictEqual(CARRIED_FUNCTIONS);
+    });
   });
 
-  it("a listed vocabulary replaces the one the rule carries", ({ vocabularyOfListedNames }) => {
-    expect(vocabularyOfListedNames).toStrictEqual(new Set(["reshape"]));
+  describe("a listed vocabulary", () => {
+    const it = test.extend("vocabulary", () =>
+      normalizingFunctionsFrom([{ normalizingFunctions: ["reshape"] }]));
+
+    it("replaces the one the rule carries", ({ vocabulary }) => {
+      expect(vocabulary).toStrictEqual(new Set(["reshape"]));
+    });
   });
 
-  it("an entry that is not a name is not a name this reading can use", ({
-    vocabularyOfPartlyNamedEntries,
-  }) => {
-    expect(vocabularyOfPartlyNamedEntries).toStrictEqual(new Set(["reshape"]));
+  describe("an entry that is not a name", () => {
+    const it = test.extend("vocabulary", () =>
+      normalizingFunctionsFrom([{ normalizingFunctions: ["reshape", 7] }]));
+
+    it("is not a name this reading can use", ({ vocabulary }) => {
+      expect(vocabulary).toStrictEqual(new Set(["reshape"]));
+    });
   });
 
-  it("an emptied vocabulary leaves only the operations the language spells out", ({
-    vocabularyOfEmptiedNames,
-  }) => {
-    expect(vocabularyOfEmptiedNames).toStrictEqual(new Set());
+  describe("an emptied vocabulary", () => {
+    const it = test.extend("vocabulary", () =>
+      normalizingFunctionsFrom([{ normalizingFunctions: [] }]));
+
+    it("leaves only the operations the language spells out", ({ vocabulary }) => {
+      expect(vocabulary).toStrictEqual(new Set());
+    });
   });
 });

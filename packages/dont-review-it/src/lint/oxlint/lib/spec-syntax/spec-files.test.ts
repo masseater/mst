@@ -7,126 +7,149 @@ import {
   specStemOf,
 } from "./spec-files.ts";
 
-const it = test
-  .extend("verdictOnSuffixedFile", () =>
-    isSpecFile("/repo/src/order.test.ts", DEFAULT_SPEC_FILE_SUFFIXES))
-  .extend("verdictOnComponentSuffixedFile", () =>
-    isSpecFile("/repo/src/order.test.tsx", DEFAULT_SPEC_FILE_SUFFIXES),
-  )
-  .extend("verdictOnPlainSource", () =>
-    isSpecFile("/repo/src/order.ts", DEFAULT_SPEC_FILE_SUFFIXES),
-  )
-  .extend("verdictOnForeignSuffix", () =>
-    isSpecFile("/repo/src/order.spec.ts", DEFAULT_SPEC_FILE_SUFFIXES),
-  )
-  .extend("verdictOnFileUnderSuffixedDirectory", () =>
-    isSpecFile("/repo/order.test.ts/order.ts", DEFAULT_SPEC_FILE_SUFFIXES),
-  )
-  .extend("stemOfPosixSpec", () =>
-    specStemOf("/repo/src/order.test.ts", DEFAULT_SPEC_FILE_SUFFIXES),
-  )
-  .extend("stemOfWindowsSpec", () =>
-    specStemOf("C:\\repo\\src\\order.test.tsx", DEFAULT_SPEC_FILE_SUFFIXES),
-  )
-  .extend("stemOfPlainSource", () => specStemOf("/repo/src/order.ts", DEFAULT_SPEC_FILE_SUFFIXES))
-  .extend("stemUnderLongestMatchingSuffix", () =>
-    specStemOf("/repo/src/order.browser.test.ts", [".test.ts", ".browser.test.ts"]),
-  )
-  .extend("suffixesReadWithoutSettings", () => specFileSuffixesFrom([]))
-  .extend("suffixesReadFromEmptySettings", () => specFileSuffixesFrom([{}]))
-  .extend("suffixesReadFromSeverityOnly", () => specFileSuffixesFrom(["error"]))
-  .extend("suffixesReadFromReplacedSpelling", () =>
-    specFileSuffixesFrom([{ specFileSuffixes: [".spec.ts"] }]),
-  )
-  .extend("suffixesReadFromEmptyList", () => specFileSuffixesFrom([{ specFileSuffixes: [] }]))
-  .extend("suffixesReadFromMixedList", () =>
-    specFileSuffixesFrom([{ specFileSuffixes: [".spec.ts", 7] }]),
-  );
+describe("DEFAULT_SPEC_FILE_SUFFIXES", () => {
+  describe("the spelling the rule carries when the repository says nothing", () => {
+    const it = test.extend("carriedSuffixes", () => DEFAULT_SPEC_FILE_SUFFIXES);
 
-describe("spec-files", () => {
-  it("the spelling a spec file carries by default is the one the repository already enforces", () => {
-    expect(DEFAULT_SPEC_FILE_SUFFIXES).toStrictEqual([".test.ts", ".test.tsx"]);
+    it("is the one the repository already enforces", ({ carriedSuffixes }) => {
+      expect(carriedSuffixes).toStrictEqual([".test.ts", ".test.tsx"]);
+    });
+  });
+});
+
+describe("isSpecFile", () => {
+  describe("a file carrying the spec suffix", () => {
+    const it = test.extend("verdict", () =>
+      isSpecFile("/repo/src/order.test.ts", DEFAULT_SPEC_FILE_SUFFIXES));
+
+    it("is a spec", ({ verdict }) => {
+      expect(verdict).toBe(true);
+    });
   });
 
-  it("a file carrying the spec suffix is a spec", ({ verdictOnSuffixedFile }) => {
-    expect(verdictOnSuffixedFile).toBe(true);
+  describe("a file carrying the component spec suffix", () => {
+    const it = test.extend("verdict", () =>
+      isSpecFile("/repo/src/order.test.tsx", DEFAULT_SPEC_FILE_SUFFIXES));
+
+    it("is a spec", ({ verdict }) => {
+      expect(verdict).toBe(true);
+    });
   });
 
-  it("a file carrying the component spec suffix is a spec", ({
-    verdictOnComponentSuffixedFile,
-  }) => {
-    expect(verdictOnComponentSuffixedFile).toBe(true);
+  describe("a file carrying no spec suffix", () => {
+    const it = test.extend("verdict", () =>
+      isSpecFile("/repo/src/order.ts", DEFAULT_SPEC_FILE_SUFFIXES));
+
+    it("is not a spec", ({ verdict }) => {
+      expect(verdict).toBe(false);
+    });
   });
 
-  it("a file carrying no spec suffix is not a spec", ({ verdictOnPlainSource }) => {
-    expect(verdictOnPlainSource).toBe(false);
+  describe("a file carrying a suffix the repository does not spell", () => {
+    const it = test.extend("verdict", () =>
+      isSpecFile("/repo/src/order.spec.ts", DEFAULT_SPEC_FILE_SUFFIXES));
+
+    it("is not a spec", ({ verdict }) => {
+      expect(verdict).toBe(false);
+    });
   });
 
-  it("a file carrying a suffix the repository does not spell is not a spec", ({
-    verdictOnForeignSuffix,
-  }) => {
-    expect(verdictOnForeignSuffix).toBe(false);
+  describe("a directory named like a spec suffix", () => {
+    const it = test.extend("verdict", () =>
+      isSpecFile("/repo/order.test.ts/order.ts", DEFAULT_SPEC_FILE_SUFFIXES));
+
+    it("does not make the files below it specs", ({ verdict }) => {
+      expect(verdict).toBe(false);
+    });
+  });
+});
+
+describe("specStemOf", () => {
+  describe("a spec addressed with forward slashes", () => {
+    const it = test.extend("stem", () =>
+      specStemOf("/repo/src/order.test.ts", DEFAULT_SPEC_FILE_SUFFIXES));
+
+    it("names the source it belongs to through the stem in front of its suffix", ({ stem }) => {
+      expect(stem).toBe("order");
+    });
   });
 
-  it("a directory named like a spec suffix does not make its files specs", ({
-    verdictOnFileUnderSuffixedDirectory,
-  }) => {
-    expect(verdictOnFileUnderSuffixedDirectory).toBe(false);
+  describe("a spec addressed with backslashes", () => {
+    const it = test.extend("stem", () =>
+      specStemOf("C:\\repo\\src\\order.test.tsx", DEFAULT_SPEC_FILE_SUFFIXES));
+
+    it("names the same stem", ({ stem }) => {
+      expect(stem).toBe("order");
+    });
   });
 
-  it("a spec names the source it belongs to through the stem in front of its suffix", ({
-    stemOfPosixSpec,
-  }) => {
-    expect(stemOfPosixSpec).toBe("order");
+  describe("a file that is not a spec", () => {
+    const it = test.extend("stem", () =>
+      specStemOf("/repo/src/order.ts", DEFAULT_SPEC_FILE_SUFFIXES));
+
+    it("names no stem", ({ stem }) => {
+      expect(stem).toBe(null);
+    });
   });
 
-  it("a spec addressed with backslashes names the same stem", ({ stemOfWindowsSpec }) => {
-    expect(stemOfWindowsSpec).toBe("order");
+  describe("a name that two of the spelled suffixes both fit", () => {
+    const it = test.extend("stem", () =>
+      specStemOf("/repo/src/order.browser.test.ts", [".test.ts", ".browser.test.ts"]));
+
+    it("ends the stem where the longest suffix that fits begins", ({ stem }) => {
+      expect(stem).toBe("order");
+    });
+  });
+});
+
+describe("specFileSuffixesFrom", () => {
+  describe("a rule run without settings", () => {
+    const it = test.extend("suffixes", () => specFileSuffixesFrom([]));
+
+    it("reads the spelling the rule itself carries", ({ suffixes }) => {
+      expect(suffixes).toStrictEqual(DEFAULT_SPEC_FILE_SUFFIXES);
+    });
   });
 
-  it("a file that is not a spec names no stem", ({ stemOfPlainSource }) => {
-    expect(stemOfPlainSource).toBe(null);
+  describe("a rule run with settings that spell nothing", () => {
+    const it = test.extend("suffixes", () => specFileSuffixesFrom([{}]));
+
+    it("keeps the rule's own spelling", ({ suffixes }) => {
+      expect(suffixes).toStrictEqual(DEFAULT_SPEC_FILE_SUFFIXES);
+    });
   });
 
-  it("the longest suffix that fits decides where the stem ends", ({
-    stemUnderLongestMatchingSuffix,
-  }) => {
-    expect(stemUnderLongestMatchingSuffix).toBe("order");
+  describe("a rule run with a severity alone", () => {
+    const it = test.extend("suffixes", () => specFileSuffixesFrom(["error"]));
+
+    it("keeps the rule's own spelling", ({ suffixes }) => {
+      expect(suffixes).toStrictEqual(DEFAULT_SPEC_FILE_SUFFIXES);
+    });
   });
 
-  it("a rule run without settings reads the spelling the rule itself carries", ({
-    suffixesReadWithoutSettings,
-  }) => {
-    expect(suffixesReadWithoutSettings).toStrictEqual(DEFAULT_SPEC_FILE_SUFFIXES);
+  describe("a repository that spells its specs differently", () => {
+    const it = test.extend("suffixes", () =>
+      specFileSuffixesFrom([{ specFileSuffixes: [".spec.ts"] }]));
+
+    it("replaces the spelling entirely", ({ suffixes }) => {
+      expect(suffixes).toStrictEqual([".spec.ts"]);
+    });
   });
 
-  it("a rule run with settings that spell nothing keeps the rule's own spelling", ({
-    suffixesReadFromEmptySettings,
-  }) => {
-    expect(suffixesReadFromEmptySettings).toStrictEqual(DEFAULT_SPEC_FILE_SUFFIXES);
+  describe("an empty spelling list", () => {
+    const it = test.extend("suffixes", () => specFileSuffixesFrom([{ specFileSuffixes: [] }]));
+
+    it("leaves the rule's own spelling in place", ({ suffixes }) => {
+      expect(suffixes).toStrictEqual(DEFAULT_SPEC_FILE_SUFFIXES);
+    });
   });
 
-  it("a rule run with a severity alone keeps the rule's own spelling", ({
-    suffixesReadFromSeverityOnly,
-  }) => {
-    expect(suffixesReadFromSeverityOnly).toStrictEqual(DEFAULT_SPEC_FILE_SUFFIXES);
-  });
+  describe("a spelling list holding entries that are not spellings", () => {
+    const it = test.extend("suffixes", () =>
+      specFileSuffixesFrom([{ specFileSuffixes: [".spec.ts", 7] }]));
 
-  it("a repository that spells its specs differently replaces the spelling entirely", ({
-    suffixesReadFromReplacedSpelling,
-  }) => {
-    expect(suffixesReadFromReplacedSpelling).toStrictEqual([".spec.ts"]);
-  });
-
-  it("an empty spelling list leaves the rule's own spelling in place", ({
-    suffixesReadFromEmptyList,
-  }) => {
-    expect(suffixesReadFromEmptyList).toStrictEqual(DEFAULT_SPEC_FILE_SUFFIXES);
-  });
-
-  it("entries that are not spellings are dropped from the configured list", ({
-    suffixesReadFromMixedList,
-  }) => {
-    expect(suffixesReadFromMixedList).toStrictEqual([".spec.ts"]);
+    it("drops those entries from the configured list", ({ suffixes }) => {
+      expect(suffixes).toStrictEqual([".spec.ts"]);
+    });
   });
 });

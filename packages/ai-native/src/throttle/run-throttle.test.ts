@@ -1,0 +1,694 @@
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { standardIoTest } from "@mst/dont-review-it/vitest";
+import { describe, expect, vi } from "vite-plus/test";
+
+import { runThrottle } from "./run-throttle.ts";
+
+const TRIVIAL_COMMAND = ["--", process.execPath, "-e", ""];
+
+const SLOT_MARKER_PATTERN = /^slot-\d+$/u;
+
+describe("runThrottle", () => {
+  const throttleTest = standardIoTest
+    .extend("slotDirectory", ({}, { onCleanup }) => {
+      const created = mkdtempSync(join(tmpdir(), "throttle-run-"));
+      onCleanup(() => {
+        rmSync(created, { recursive: true, force: true });
+      });
+      return created;
+    })
+    .extend("stampsDirectory", ({}, { onCleanup }) => {
+      const created = mkdtempSync(join(tmpdir(), "throttle-stamps-"));
+      onCleanup(() => {
+        rmSync(created, { recursive: true, force: true });
+      });
+      return created;
+    });
+
+  describe("a run under every default", () => {
+    const it = throttleTest
+      .extend("theCodeOfARunUnderEveryDefault", async ({ slotDirectory }) => {
+        vi.stubEnv("MST_THROTTLE_LIMIT", undefined);
+        vi.stubEnv("TMPDIR", slotDirectory);
+        return runThrottle(TRIVIAL_COMMAND);
+      })
+      .extend("theAcquisitionNamedUnderEveryDefault", async ({ slotDirectory, stderr }) => {
+        vi.stubEnv("MST_THROTTLE_LIMIT", undefined);
+        vi.stubEnv("TMPDIR", slotDirectory);
+        await runThrottle(TRIVIAL_COMMAND);
+        return stderr.text().includes("throttle: acquiring a slot (limit 1)");
+      })
+      .extend("theCommandLineNamedUnderEveryDefault", async ({ slotDirectory, stderr }) => {
+        vi.stubEnv("MST_THROTTLE_LIMIT", undefined);
+        vi.stubEnv("TMPDIR", slotDirectory);
+        await runThrottle(TRIVIAL_COMMAND);
+        return stderr.text().includes(`throttle: run ${process.execPath} -e `);
+      });
+
+    it("succeeds", { timeout: 30_000 }, ({ theCodeOfARunUnderEveryDefault }) => {
+      expect(theCodeOfARunUnderEveryDefault).toBe(0);
+    });
+
+    it(
+      "announces the acquisition on stderr",
+      { timeout: 30_000 },
+      ({ theAcquisitionNamedUnderEveryDefault }) => {
+        expect(theAcquisitionNamedUnderEveryDefault).toBe(true);
+      },
+    );
+
+    it(
+      "announces the command line on stderr",
+      { timeout: 30_000 },
+      ({ theCommandLineNamedUnderEveryDefault }) => {
+        expect(theCommandLineNamedUnderEveryDefault).toBe(true);
+      },
+    );
+  });
+
+  describe("no command at all", () => {
+    const it = throttleTest
+      .extend("theCodeOfNoCommandAtAll", async () => runThrottle([]))
+      .extend("theUsageNamedForNoCommand", async ({ stderr }) => {
+        await runThrottle([]);
+        return stderr.text().includes("Usage: throttle");
+      });
+
+    it("is refused", ({ theCodeOfNoCommandAtAll }) => {
+      expect(theCodeOfNoCommandAtAll).toBe(2);
+    });
+
+    it("puts the usage on stderr", ({ theUsageNamedForNoCommand }) => {
+      expect(theUsageNamedForNoCommand).toBe(true);
+    });
+  });
+
+  describe("a separator with nothing behind it", () => {
+    const it = throttleTest.extend("theCodeOfASeparatorAlone", async () => runThrottle(["--"]));
+
+    it("is refused", ({ theCodeOfASeparatorAlone }) => {
+      expect(theCodeOfASeparatorAlone).toBe(2);
+    });
+  });
+
+  describe("a fractional timeout", () => {
+    const it = throttleTest
+      .extend("theCodeOfAFractionalTimeout", async ({ slotDirectory }) =>
+        runThrottle(["--timeout", "1.5", ...TRIVIAL_COMMAND], {
+          slotDir: join(slotDirectory, "slots"),
+          limit: 1,
+          staleMs: 5000,
+          waitBudgetMs: 15_000,
+          pollMs: 50,
+          isInteractive: false,
+        }),
+      )
+      .extend("theFractionalTimeoutIsNamedBack", async ({ slotDirectory, stderr }) => {
+        await runThrottle(["--timeout", "1.5", ...TRIVIAL_COMMAND], {
+          slotDir: join(slotDirectory, "slots"),
+          limit: 1,
+          staleMs: 5000,
+          waitBudgetMs: 15_000,
+          pollMs: 50,
+          isInteractive: false,
+        });
+        return stderr.text().includes('got "1.5"');
+      })
+      .extend("theSlotAreaAfterARefusedTimeout", async ({ slotDirectory }) => {
+        await runThrottle(["--timeout", "1.5", ...TRIVIAL_COMMAND], {
+          slotDir: join(slotDirectory, "slots"),
+          limit: 1,
+          staleMs: 5000,
+          waitBudgetMs: 15_000,
+          pollMs: 50,
+          isInteractive: false,
+        });
+        return existsSync(join(slotDirectory, "slots"));
+      });
+
+    it("is refused", ({ theCodeOfAFractionalTimeout }) => {
+      expect(theCodeOfAFractionalTimeout).toBe(2);
+    });
+
+    it("is named back on stderr", ({ theFractionalTimeoutIsNamedBack }) => {
+      expect(theFractionalTimeoutIsNamedBack).toBe(true);
+    });
+
+    it("leaves no slot area behind", ({ theSlotAreaAfterARefusedTimeout }) => {
+      expect(theSlotAreaAfterARefusedTimeout).toBe(false);
+    });
+  });
+
+  describe("a negative timeout", () => {
+    const it = throttleTest
+      .extend("theCodeOfANegativeTimeout", async ({ slotDirectory }) =>
+        runThrottle(["--timeout=-9", ...TRIVIAL_COMMAND], {
+          slotDir: join(slotDirectory, "slots"),
+          limit: 1,
+          staleMs: 5000,
+          waitBudgetMs: 15_000,
+          pollMs: 50,
+          isInteractive: false,
+        }),
+      )
+      .extend("theNegativeTimeoutIsNamedBack", async ({ slotDirectory, stderr }) => {
+        await runThrottle(["--timeout=-9", ...TRIVIAL_COMMAND], {
+          slotDir: join(slotDirectory, "slots"),
+          limit: 1,
+          staleMs: 5000,
+          waitBudgetMs: 15_000,
+          pollMs: 50,
+          isInteractive: false,
+        });
+        return stderr.text().includes('got "-9"');
+      });
+
+    it("is refused", ({ theCodeOfANegativeTimeout }) => {
+      expect(theCodeOfANegativeTimeout).toBe(2);
+    });
+
+    it("is named back on stderr", ({ theNegativeTimeoutIsNamedBack }) => {
+      expect(theNegativeTimeoutIsNamedBack).toBe(true);
+    });
+  });
+
+  describe("an unknown option", () => {
+    const it = throttleTest
+      .extend("theCodeOfAnUnknownOption", async () =>
+        runThrottle(["--limit", "3", ...TRIVIAL_COMMAND]),
+      )
+      .extend("theUsageNamedForAnUnknownOption", async ({ stderr }) => {
+        await runThrottle(["--limit", "3", ...TRIVIAL_COMMAND]);
+        return stderr.text().includes("Usage: throttle");
+      });
+
+    it("is refused", ({ theCodeOfAnUnknownOption }) => {
+      expect(theCodeOfAnUnknownOption).toBe(2);
+    });
+
+    it("puts the usage on stderr", ({ theUsageNamedForAnUnknownOption }) => {
+      expect(theUsageNamedForAnUnknownOption).toBe(true);
+    });
+  });
+
+  describe("two runs sharing one slot", () => {
+    const it = throttleTest
+      .extend("theCodesOfTwoRunsUnderOneSlot", async ({ slotDirectory, stampsDirectory }) => {
+        const seams = {
+          slotDir: slotDirectory,
+          limit: 1,
+          staleMs: 5000,
+          waitBudgetMs: 15_000,
+          pollMs: 50,
+          isInteractive: false,
+        };
+        return Promise.all([
+          runThrottle(
+            [
+              "--",
+              process.execPath,
+              "-e",
+              `const { writeFileSync } = require("node:fs"); writeFileSync(${JSON.stringify(join(stampsDirectory, "a-start"))}, String(Date.now())); setTimeout(() => { writeFileSync(${JSON.stringify(join(stampsDirectory, "a-end"))}, String(Date.now())); }, 400);`,
+            ],
+            seams,
+          ),
+          runThrottle(
+            [
+              "--",
+              process.execPath,
+              "-e",
+              `const { writeFileSync } = require("node:fs"); writeFileSync(${JSON.stringify(join(stampsDirectory, "b-start"))}, String(Date.now())); setTimeout(() => { writeFileSync(${JSON.stringify(join(stampsDirectory, "b-end"))}, String(Date.now())); }, 400);`,
+            ],
+            seams,
+          ),
+        ]);
+      })
+      .extend("twoRunsUnderOneSlotNeverOverlapped", async ({ slotDirectory, stampsDirectory }) => {
+        const seams = {
+          slotDir: slotDirectory,
+          limit: 1,
+          staleMs: 5000,
+          waitBudgetMs: 15_000,
+          pollMs: 50,
+          isInteractive: false,
+        };
+        await Promise.all([
+          runThrottle(
+            [
+              "--",
+              process.execPath,
+              "-e",
+              `const { writeFileSync } = require("node:fs"); writeFileSync(${JSON.stringify(join(stampsDirectory, "a-start"))}, String(Date.now())); setTimeout(() => { writeFileSync(${JSON.stringify(join(stampsDirectory, "a-end"))}, String(Date.now())); }, 400);`,
+            ],
+            seams,
+          ),
+          runThrottle(
+            [
+              "--",
+              process.execPath,
+              "-e",
+              `const { writeFileSync } = require("node:fs"); writeFileSync(${JSON.stringify(join(stampsDirectory, "b-start"))}, String(Date.now())); setTimeout(() => { writeFileSync(${JSON.stringify(join(stampsDirectory, "b-end"))}, String(Date.now())); }, 400);`,
+            ],
+            seams,
+          ),
+        ]);
+        const aStart = Number(readFileSync(join(stampsDirectory, "a-start"), "utf8"));
+        const aEnd = Number(readFileSync(join(stampsDirectory, "a-end"), "utf8"));
+        const bStart = Number(readFileSync(join(stampsDirectory, "b-start"), "utf8"));
+        const bEnd = Number(readFileSync(join(stampsDirectory, "b-end"), "utf8"));
+        return aStart <= bStart ? bStart >= aEnd : aStart >= bEnd;
+      })
+      .extend(
+        "theRankNamedWhileTwoRunsShareOneSlot",
+        async ({ slotDirectory, stampsDirectory, stderr }) => {
+          const seams = {
+            slotDir: slotDirectory,
+            limit: 1,
+            staleMs: 5000,
+            waitBudgetMs: 15_000,
+            pollMs: 50,
+            isInteractive: false,
+          };
+          await Promise.all([
+            runThrottle(
+              [
+                "--",
+                process.execPath,
+                "-e",
+                `const { writeFileSync } = require("node:fs"); writeFileSync(${JSON.stringify(join(stampsDirectory, "a-start"))}, String(Date.now())); setTimeout(() => { writeFileSync(${JSON.stringify(join(stampsDirectory, "a-end"))}, String(Date.now())); }, 400);`,
+              ],
+              seams,
+            ),
+            runThrottle(
+              [
+                "--",
+                process.execPath,
+                "-e",
+                `const { writeFileSync } = require("node:fs"); writeFileSync(${JSON.stringify(join(stampsDirectory, "b-start"))}, String(Date.now())); setTimeout(() => { writeFileSync(${JSON.stringify(join(stampsDirectory, "b-end"))}, String(Date.now())); }, 400);`,
+              ],
+              seams,
+            ),
+          ]);
+          return stderr.text().includes("throttle: waiting 1/1");
+        },
+      );
+
+    it("both run", { timeout: 20_000 }, ({ theCodesOfTwoRunsUnderOneSlot }) => {
+      expect(theCodesOfTwoRunsUnderOneSlot).toStrictEqual([0, 0]);
+    });
+
+    it(
+      "never run at the same time",
+      { timeout: 20_000 },
+      ({ twoRunsUnderOneSlotNeverOverlapped }) => {
+        expect(twoRunsUnderOneSlotNeverOverlapped).toBe(true);
+      },
+    );
+
+    it(
+      "the one that waited names its rank on stderr",
+      { timeout: 20_000 },
+      ({ theRankNamedWhileTwoRunsShareOneSlot }) => {
+        expect(theRankNamedWhileTwoRunsShareOneSlot).toBe(true);
+      },
+    );
+  });
+
+  describe("a run finding a free slot", () => {
+    const it = throttleTest
+      .extend("theCodeOfARunTakingAFreeSlot", async ({ slotDirectory }) =>
+        runThrottle(TRIVIAL_COMMAND, {
+          slotDir: slotDirectory,
+          limit: 1,
+          staleMs: 5000,
+          waitBudgetMs: 15_000,
+          pollMs: 10_000,
+          isInteractive: false,
+        }),
+      )
+      .extend("aFreeSlotIsTakenWellBelowOnePollInterval", async ({ slotDirectory }) => {
+        const before = Date.now();
+        await runThrottle(TRIVIAL_COMMAND, {
+          slotDir: slotDirectory,
+          limit: 1,
+          staleMs: 5000,
+          waitBudgetMs: 15_000,
+          pollMs: 10_000,
+          isInteractive: false,
+        });
+        return Date.now() - before < 5000;
+      })
+      .extend("theWaitingNamedWhileTakingAFreeSlot", async ({ slotDirectory, stderr }) => {
+        await runThrottle(TRIVIAL_COMMAND, {
+          slotDir: slotDirectory,
+          limit: 1,
+          staleMs: 5000,
+          waitBudgetMs: 15_000,
+          pollMs: 10_000,
+          isInteractive: false,
+        });
+        return stderr.text().includes("waiting");
+      });
+
+    it("runs the command", { timeout: 10_000 }, ({ theCodeOfARunTakingAFreeSlot }) => {
+      expect(theCodeOfARunTakingAFreeSlot).toBe(0);
+    });
+
+    it(
+      "takes it well below one poll interval",
+      { timeout: 10_000 },
+      ({ aFreeSlotIsTakenWellBelowOnePollInterval }) => {
+        expect(aFreeSlotIsTakenWellBelowOnePollInterval).toBe(true);
+      },
+    );
+
+    it(
+      "puts no waiting output on stderr",
+      { timeout: 10_000 },
+      ({ theWaitingNamedWhileTakingAFreeSlot }) => {
+        expect(theWaitingNamedWhileTakingAFreeSlot).toBe(false);
+      },
+    );
+  });
+
+  describe("two runs in different namespaces", () => {
+    const it = throttleTest
+      .extend(
+        "theCodesOfTwoRunsInDifferentNamespaces",
+        async ({ slotDirectory, stampsDirectory }) =>
+          Promise.all([
+            runThrottle(
+              [
+                "--",
+                process.execPath,
+                "-e",
+                `const { writeFileSync } = require("node:fs"); writeFileSync(${JSON.stringify(join(stampsDirectory, "a-start"))}, String(Date.now())); setTimeout(() => { writeFileSync(${JSON.stringify(join(stampsDirectory, "a-end"))}, String(Date.now())); }, 400);`,
+              ],
+              {
+                slotDir: join(slotDirectory, "a"),
+                limit: 1,
+                staleMs: 5000,
+                waitBudgetMs: 15_000,
+                pollMs: 50,
+                isInteractive: false,
+              },
+            ),
+            runThrottle(
+              [
+                "--",
+                process.execPath,
+                "-e",
+                `const { writeFileSync } = require("node:fs"); writeFileSync(${JSON.stringify(join(stampsDirectory, "b-start"))}, String(Date.now())); setTimeout(() => { writeFileSync(${JSON.stringify(join(stampsDirectory, "b-end"))}, String(Date.now())); }, 400);`,
+              ],
+              {
+                slotDir: join(slotDirectory, "b"),
+                limit: 1,
+                staleMs: 5000,
+                waitBudgetMs: 15_000,
+                pollMs: 50,
+                isInteractive: false,
+              },
+            ),
+          ]),
+      )
+      .extend(
+        "twoRunsInDifferentNamespacesOverlapped",
+        async ({ slotDirectory, stampsDirectory }) => {
+          await Promise.all([
+            runThrottle(
+              [
+                "--",
+                process.execPath,
+                "-e",
+                `const { writeFileSync } = require("node:fs"); writeFileSync(${JSON.stringify(join(stampsDirectory, "a-start"))}, String(Date.now())); setTimeout(() => { writeFileSync(${JSON.stringify(join(stampsDirectory, "a-end"))}, String(Date.now())); }, 400);`,
+              ],
+              {
+                slotDir: join(slotDirectory, "a"),
+                limit: 1,
+                staleMs: 5000,
+                waitBudgetMs: 15_000,
+                pollMs: 50,
+                isInteractive: false,
+              },
+            ),
+            runThrottle(
+              [
+                "--",
+                process.execPath,
+                "-e",
+                `const { writeFileSync } = require("node:fs"); writeFileSync(${JSON.stringify(join(stampsDirectory, "b-start"))}, String(Date.now())); setTimeout(() => { writeFileSync(${JSON.stringify(join(stampsDirectory, "b-end"))}, String(Date.now())); }, 400);`,
+              ],
+              {
+                slotDir: join(slotDirectory, "b"),
+                limit: 1,
+                staleMs: 5000,
+                waitBudgetMs: 15_000,
+                pollMs: 50,
+                isInteractive: false,
+              },
+            ),
+          ]);
+          const aStart = Number(readFileSync(join(stampsDirectory, "a-start"), "utf8"));
+          const aEnd = Number(readFileSync(join(stampsDirectory, "a-end"), "utf8"));
+          const bStart = Number(readFileSync(join(stampsDirectory, "b-start"), "utf8"));
+          const bEnd = Number(readFileSync(join(stampsDirectory, "b-end"), "utf8"));
+          return aStart < bEnd && bStart < aEnd;
+        },
+      );
+
+    it("both run", { timeout: 10_000 }, ({ theCodesOfTwoRunsInDifferentNamespaces }) => {
+      expect(theCodesOfTwoRunsInDifferentNamespaces).toStrictEqual([0, 0]);
+    });
+
+    it("never contend", { timeout: 10_000 }, ({ twoRunsInDifferentNamespacesOverlapped }) => {
+      expect(twoRunsInDifferentNamespacesOverlapped).toBe(true);
+    });
+  });
+
+  describe("three runs under an environment limit of two", () => {
+    const it = throttleTest
+      .extend("theCodesOfThreeRunsUnderTwoSlots", async ({ slotDirectory, stampsDirectory }) => {
+        vi.stubEnv("MST_THROTTLE_LIMIT", "2");
+        const seams = {
+          slotDir: slotDirectory,
+          staleMs: 5000,
+          waitBudgetMs: 15_000,
+          pollMs: 50,
+          isInteractive: false,
+        };
+        return Promise.all(
+          ["a", "b", "c"].map(async (name) =>
+            runThrottle(
+              [
+                "--",
+                process.execPath,
+                "-e",
+                `const { writeFileSync } = require("node:fs"); writeFileSync(${JSON.stringify(join(stampsDirectory, `${name}-start`))}, String(Date.now())); setTimeout(() => { writeFileSync(${JSON.stringify(join(stampsDirectory, `${name}-end`))}, String(Date.now())); }, 1500);`,
+              ],
+              seams,
+            ),
+          ),
+        );
+      })
+      .extend("thePeakOfThreeRunsUnderTwoSlots", async ({ slotDirectory, stampsDirectory }) => {
+        vi.stubEnv("MST_THROTTLE_LIMIT", "2");
+        const seams = {
+          slotDir: slotDirectory,
+          staleMs: 5000,
+          waitBudgetMs: 15_000,
+          pollMs: 50,
+          isInteractive: false,
+        };
+        await Promise.all(
+          ["a", "b", "c"].map(async (name) =>
+            runThrottle(
+              [
+                "--",
+                process.execPath,
+                "-e",
+                `const { writeFileSync } = require("node:fs"); writeFileSync(${JSON.stringify(join(stampsDirectory, `${name}-start`))}, String(Date.now())); setTimeout(() => { writeFileSync(${JSON.stringify(join(stampsDirectory, `${name}-end`))}, String(Date.now())); }, 1500);`,
+              ],
+              seams,
+            ),
+          ),
+        );
+        const spans = ["a", "b", "c"].map((name) => ({
+          start: Number(readFileSync(join(stampsDirectory, `${name}-start`), "utf8")),
+          end: Number(readFileSync(join(stampsDirectory, `${name}-end`), "utf8")),
+        }));
+        return Math.max(
+          ...spans.map(
+            ({ start }) =>
+              spans.filter((other) => other.start <= start && start < other.end).length,
+          ),
+        );
+      });
+
+    it("every run finishes", { timeout: 20_000 }, ({ theCodesOfThreeRunsUnderTwoSlots }) => {
+      expect(theCodesOfThreeRunsUnderTwoSlots).toStrictEqual([0, 0, 0]);
+    });
+
+    it("two really run at a time", { timeout: 20_000 }, ({ thePeakOfThreeRunsUnderTwoSlots }) => {
+      expect(thePeakOfThreeRunsUnderTwoSlots).toBe(2);
+    });
+  });
+
+  describe("an environment limit of two", () => {
+    const it = throttleTest.extend(
+      "theSecondSlotMarkerUnderALimitOfTwo",
+      async ({ slotDirectory, stampsDirectory }) => {
+        vi.stubEnv("MST_THROTTLE_LIMIT", "2");
+        await runThrottle(
+          [
+            "--",
+            process.execPath,
+            "-e",
+            `const { writeFileSync } = require("node:fs"); writeFileSync(${JSON.stringify(join(stampsDirectory, "a-start"))}, String(Date.now()));`,
+          ],
+          {
+            slotDir: slotDirectory,
+            staleMs: 5000,
+            waitBudgetMs: 15_000,
+            pollMs: 50,
+            isInteractive: false,
+          },
+        );
+        return existsSync(join(slotDirectory, "slot-1"));
+      },
+    );
+
+    it(
+      "creates the second slot marker",
+      { timeout: 20_000 },
+      ({ theSecondSlotMarkerUnderALimitOfTwo }) => {
+        expect(theSecondSlotMarkerUnderALimitOfTwo).toBe(true);
+      },
+    );
+  });
+
+  describe("a worded environment limit", () => {
+    const it = throttleTest
+      .extend("theCodeOfARunUnderAWordedLimit", async ({ slotDirectory }) => {
+        vi.stubEnv("MST_THROTTLE_LIMIT", "abc");
+        return runThrottle(TRIVIAL_COMMAND, {
+          slotDir: slotDirectory,
+          staleMs: 5000,
+          waitBudgetMs: 5000,
+          pollMs: 1000,
+          isInteractive: false,
+        });
+      })
+      .extend("theMarkersUnderAWordedLimit", async ({ slotDirectory }) => {
+        vi.stubEnv("MST_THROTTLE_LIMIT", "abc");
+        await runThrottle(TRIVIAL_COMMAND, {
+          slotDir: slotDirectory,
+          staleMs: 5000,
+          waitBudgetMs: 5000,
+          pollMs: 1000,
+          isInteractive: false,
+        });
+        return readdirSync(slotDirectory).filter((name) => SLOT_MARKER_PATTERN.test(name));
+      });
+
+    it("does not fail the run", { timeout: 15_000 }, ({ theCodeOfARunUnderAWordedLimit }) => {
+      expect(theCodeOfARunUnderAWordedLimit).toBe(0);
+    });
+
+    it("falls back to one slot", { timeout: 15_000 }, ({ theMarkersUnderAWordedLimit }) => {
+      expect(theMarkersUnderAWordedLimit).toStrictEqual(["slot-0"]);
+    });
+  });
+
+  describe("an environment limit of zero", () => {
+    const it = throttleTest.extend("theMarkersUnderALimitOfZero", async ({ slotDirectory }) => {
+      vi.stubEnv("MST_THROTTLE_LIMIT", "0");
+      await runThrottle(TRIVIAL_COMMAND, {
+        slotDir: slotDirectory,
+        staleMs: 5000,
+        waitBudgetMs: 5000,
+        pollMs: 1000,
+        isInteractive: false,
+      });
+      return readdirSync(slotDirectory).filter((name) => SLOT_MARKER_PATTERN.test(name));
+    });
+
+    it("falls back to one slot", { timeout: 15_000 }, ({ theMarkersUnderALimitOfZero }) => {
+      expect(theMarkersUnderALimitOfZero).toStrictEqual(["slot-0"]);
+    });
+  });
+
+  describe("a negative environment limit", () => {
+    const it = throttleTest.extend("theMarkersUnderANegativeLimit", async ({ slotDirectory }) => {
+      vi.stubEnv("MST_THROTTLE_LIMIT", "-3");
+      await runThrottle(TRIVIAL_COMMAND, {
+        slotDir: slotDirectory,
+        staleMs: 5000,
+        waitBudgetMs: 5000,
+        pollMs: 1000,
+        isInteractive: false,
+      });
+      return readdirSync(slotDirectory).filter((name) => SLOT_MARKER_PATTERN.test(name));
+    });
+
+    it("falls back to one slot", { timeout: 15_000 }, ({ theMarkersUnderANegativeLimit }) => {
+      expect(theMarkersUnderANegativeLimit).toStrictEqual(["slot-0"]);
+    });
+  });
+
+  describe("an unusable slot area", () => {
+    const it = throttleTest
+      .extend("theCodeOfAnUnusableSlotArea", async ({ slotDirectory }) => {
+        const plainFile = join(slotDirectory, "plain-file");
+        writeFileSync(plainFile, "");
+        return runThrottle(TRIVIAL_COMMAND, {
+          slotDir: join(plainFile, "nested"),
+          limit: 1,
+          staleMs: 5000,
+          waitBudgetMs: 15_000,
+          pollMs: 50,
+          isInteractive: false,
+        });
+      })
+      .extend("theFailureNamedForAnUnusableSlotArea", async ({ slotDirectory, stderr }) => {
+        const plainFile = join(slotDirectory, "plain-file");
+        writeFileSync(plainFile, "");
+        await runThrottle(TRIVIAL_COMMAND, {
+          slotDir: join(plainFile, "nested"),
+          limit: 1,
+          staleMs: 5000,
+          waitBudgetMs: 15_000,
+          pollMs: 50,
+          isInteractive: false,
+        });
+        return stderr.text().includes("throttle: ");
+      })
+      .extend("theUsageNamedForAnUnusableSlotArea", async ({ slotDirectory, stderr }) => {
+        const plainFile = join(slotDirectory, "plain-file");
+        writeFileSync(plainFile, "");
+        await runThrottle(TRIVIAL_COMMAND, {
+          slotDir: join(plainFile, "nested"),
+          limit: 1,
+          staleMs: 5000,
+          waitBudgetMs: 15_000,
+          pollMs: 50,
+          isInteractive: false,
+        });
+        return stderr.text().includes("Usage: throttle");
+      });
+
+    it("fails the run", ({ theCodeOfAnUnusableSlotArea }) => {
+      expect(theCodeOfAnUnusableSlotArea).toBe(1);
+    });
+
+    it("is reported as a throttle failure", ({ theFailureNamedForAnUnusableSlotArea }) => {
+      expect(theFailureNamedForAnUnusableSlotArea).toBe(true);
+    });
+
+    it("is not reported as misuse", ({ theUsageNamedForAnUnusableSlotArea }) => {
+      expect(theUsageNamedForAnUnusableSlotArea).toBe(false);
+    });
+  });
+});

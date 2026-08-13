@@ -1,0 +1,51 @@
+{
+  "name": "@mst/ai-native",
+  "version": "0.0.0",
+  "description": "Command wrappers that keep parallel heavy commands within the host's capacity and their output out of the caller's context window.",
+  "keywords": [
+    "tanstack-intent"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/masseater/mst.git",
+    "directory": "packages/ai-native"
+  },
+  "bin": {
+    "spool": "./src/spool/cli.ts",
+    "throttle": "./src/throttle/cli.ts"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "src"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "spool -- vp pack",
+    "dev": "vp pack --watch",
+    "test": "spool -- vp test",
+    "check": "spool -- vp check",
+    "check:skills": "intent validate"
+  },
+  "dependencies": {
+    "proper-lockfile": "4.1.2"
+  },
+  "devDependencies": {
+    "@mst/ai-native": "workspace:*",
+    "@tanstack/intent": "catalog:",
+    "@types/node": "catalog:",
+    "@types/proper-lockfile": "4.1.4",
+    "@vitest/coverage-v8": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

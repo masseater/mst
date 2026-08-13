@@ -17,73 +17,76 @@ const CATALOG = buildCatalog([
   },
 ]);
 
-const it = test
-  .extend("declaredAtAbsolutePath", () =>
-    declaresConceptAt(CATALOG, {
-      conceptId: "order.status",
-      path: "/repo/packages/order/src/status.ts",
-    }))
-  .extend("declaredAtRelativePath", () =>
-    declaresConceptAt(CATALOG, {
-      conceptId: "order.status",
-      path: "packages/order/src/status.ts",
-    }),
-  )
-  .extend("declaredAtWindowsPath", () =>
-    declaresConceptAt(CATALOG, {
-      conceptId: "order.status",
-      path: String.raw`C:\repo\packages\order\src\status.ts`,
-    }),
-  )
-  .extend("declaredAtPathMatchingInsideASegment", () =>
-    declaresConceptAt(CATALOG, {
-      conceptId: "order.status",
-      path: "/repo/vendored-packages/order/src/status.ts",
-    }),
-  )
-  .extend("declaredAtNeighbouringFile", () =>
-    declaresConceptAt(CATALOG, {
-      conceptId: "order.status",
-      path: "/repo/packages/order/src/order.ts",
-    }),
-  )
-  .extend("declaredForUnknownConcept", () =>
-    declaresConceptAt(CATALOG, {
-      conceptId: "totally.unrelated",
-      path: "/repo/packages/order/src/status.ts",
-    }),
-  );
+describe("declaresConceptAt", () => {
+  describe("the declaring file named by an absolute path", () => {
+    const it = test.extend("declares", () =>
+      declaresConceptAt(CATALOG, {
+        conceptId: "order.status",
+        path: "/repo/packages/order/src/status.ts",
+      }));
 
-describe("declaration-path", () => {
-  it("the declaring file declares the concept the annotation names", ({
-    declaredAtAbsolutePath,
-  }) => {
-    expect(declaredAtAbsolutePath).toBe(true);
+    it("declares the concept the annotation names", ({ declares }) => {
+      expect(declares).toBe(true);
+    });
   });
 
-  it("the declaring file is recognized through a repository relative path", ({
-    declaredAtRelativePath,
-  }) => {
-    expect(declaredAtRelativePath).toBe(true);
+  describe("the declaring file named by a repository relative path", () => {
+    const it = test.extend("declares", () =>
+      declaresConceptAt(CATALOG, {
+        conceptId: "order.status",
+        path: "packages/order/src/status.ts",
+      }));
+
+    it("is recognized as the declaring file", ({ declares }) => {
+      expect(declares).toBe(true);
+    });
   });
 
-  it("the declaring file is recognized through a windows path", ({ declaredAtWindowsPath }) => {
-    expect(declaredAtWindowsPath).toBe(true);
+  describe("the declaring file named by a windows path", () => {
+    const it = test.extend("declares", () =>
+      declaresConceptAt(CATALOG, {
+        conceptId: "order.status",
+        path: String.raw`C:\repo\packages\order\src\status.ts`,
+      }));
+
+    it("is recognized as the declaring file", ({ declares }) => {
+      expect(declares).toBe(true);
+    });
   });
 
-  it("a path whose suffix starts inside a segment declares nothing", ({
-    declaredAtPathMatchingInsideASegment,
-  }) => {
-    expect(declaredAtPathMatchingInsideASegment).toBe(false);
+  describe("a path whose suffix starts inside a segment", () => {
+    const it = test.extend("declares", () =>
+      declaresConceptAt(CATALOG, {
+        conceptId: "order.status",
+        path: "/repo/vendored-packages/order/src/status.ts",
+      }));
+
+    it("declares nothing", ({ declares }) => {
+      expect(declares).toBe(false);
+    });
   });
 
-  it("another file in the same package does not declare the concept", ({
-    declaredAtNeighbouringFile,
-  }) => {
-    expect(declaredAtNeighbouringFile).toBe(false);
+  describe("another file in the same package", () => {
+    const it = test.extend("declares", () =>
+      declaresConceptAt(CATALOG, {
+        conceptId: "order.status",
+        path: "/repo/packages/order/src/order.ts",
+      }));
+
+    it("does not declare the concept", ({ declares }) => {
+      expect(declares).toBe(false);
+    });
   });
 
-  it("a concept the catalog does not know is declared nowhere", ({ declaredForUnknownConcept }) => {
-    expect(declaredForUnknownConcept).toBe(false);
+  describe("a concept the catalog does not know", () => {
+    const it = test.extend("declares", () =>
+      declaresConceptAt(CATALOG, {
+        conceptId: "totally.unrelated",
+        path: "/repo/packages/order/src/status.ts",
+      }));
+
+    it("is declared nowhere", ({ declares }) => {
+      expect(declares).toBe(false);
+    });
   });
 });

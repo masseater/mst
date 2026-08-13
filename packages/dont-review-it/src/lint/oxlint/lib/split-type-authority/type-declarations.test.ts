@@ -29,401 +29,401 @@ const READ_OR_WRITE_ANNOTATION =
 const ONE_TYPE_PARAMETER =
   '{type:"TSTypeParameterDeclaration",params:[param|#0|null|null|[false,false,false]]}';
 
-const it = test
-  .extend("declarationsOfAnAliasOverTwoMembers", () =>
-    typeDeclarationsIn("export type Shape = { readonly a: string; readonly b: number };"))
-  .extend("declarationsOfAnAliasOverOneMember", () =>
-    typeDeclarationsIn("export type Shape = { readonly a: string };"),
-  )
-  .extend("declarationsOfAnAliasOverAUnion", () =>
-    typeDeclarationsIn(`export type Mode = "read" | "write";`),
-  )
-  .extend("declarationsOfAnInterface", () =>
-    typeDeclarationsIn("export interface Shape { readonly a: string }"),
-  )
-  .extend("declarationsOfAnInterfaceExtendingAnother", () =>
-    typeDeclarationsIn("export interface Shape extends Base { readonly a: string }"),
-  )
-  .extend("declarationsOfAnAliasBelowABinding", () =>
-    typeDeclarationsIn("const held = 1;\n\nexport type Shape = { readonly a: string };\n"),
-  )
-  .extend("declarationsOfAnAliasTakingATypeParameter", () =>
-    typeDeclarationsIn("export type Held<T> = { readonly held: T };"),
-  )
-  .extend("declarationsOfAnAliasHoldingAString", () =>
-    typeDeclarationsIn("export type Held = { readonly held: string };"),
-  )
-  .extend("declarationsOfAnAliasReachingANamedType", () =>
-    typeDeclarationsIn("export type Shape = { readonly a: Named };"),
-  )
-  .extend("declarationsOfAnAliasMixingAParameterWithANamedType", () =>
-    typeDeclarationsIn("export type Held<T> = { readonly held: T; readonly named: Named };"),
-  )
-  .extend("declarationsOfAnUnexportedAlias", () =>
-    typeDeclarationsIn("type Shape = { readonly a: string };"),
-  )
-  .extend("declarationsOfAnExportStatement", () =>
-    typeDeclarationsIn("const held = 1;\nexport { held };\n"),
-  )
-  .extend("declarationsOfAnExportedBinding", () => typeDeclarationsIn("export const held = 1;\n"))
-  .extend("declarationsOfAModuleAugmentation", () =>
-    typeDeclarationsIn(`declare module "held" { export interface Shape { readonly a: string } }`),
-  )
-  .extend("declarationsOfTwoInterfacesOfOneName", () =>
-    typeDeclarationsIn(
-      "export interface Shape { readonly a: string }\nexport interface Shape { readonly b: number }\n",
-    ),
-  );
-
 describe("typeDeclarationsIn", () => {
-  it("an exported type alias over an object literal is read as a member list", ({
-    declarationsOfAnAliasOverTwoMembers,
-  }) => {
-    expect(declarationsOfAnAliasOverTwoMembers).toStrictEqual([
-      {
-        name: "Shape",
-        line: 1,
-        kind: "TSTypeAliasDeclaration",
-        structure: {
-          parameters: [],
-          heritage: [],
-          members: [READONLY_A_STRING_MEMBER, READONLY_B_NUMBER_MEMBER],
-          annotation: [],
+  describe("an exported type alias over an object literal of two members", () => {
+    const it = test.extend("declarations", () =>
+      typeDeclarationsIn("export type Shape = { readonly a: string; readonly b: number };"));
+
+    it("is read as a member list", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        {
+          name: "Shape",
+          line: 1,
+          kind: "TSTypeAliasDeclaration",
+          structure: {
+            parameters: [],
+            heritage: [],
+            members: [READONLY_A_STRING_MEMBER, READONLY_B_NUMBER_MEMBER],
+            annotation: [],
+          },
+          referencesNamedType: false,
+          referencedNames: [],
         },
-        referencesNamedType: false,
-        referencedNames: [],
-      },
-    ]);
+      ]);
+    });
   });
 
-  it("an exported type alias over an object literal holds no separate annotation", ({
-    declarationsOfAnAliasOverOneMember,
-  }) => {
-    expect(declarationsOfAnAliasOverOneMember).toStrictEqual([
-      {
-        name: "Shape",
-        line: 1,
-        kind: "TSTypeAliasDeclaration",
-        structure: {
-          parameters: [],
-          heritage: [],
-          members: [READONLY_A_STRING_MEMBER],
-          annotation: [],
+  describe("an exported type alias over an object literal of one primitive member", () => {
+    const it = test.extend("declarations", () =>
+      typeDeclarationsIn("export type Shape = { readonly a: string };"));
+
+    it("holds no separate annotation", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        {
+          name: "Shape",
+          line: 1,
+          kind: "TSTypeAliasDeclaration",
+          structure: {
+            parameters: [],
+            heritage: [],
+            members: [READONLY_A_STRING_MEMBER],
+            annotation: [],
+          },
+          referencesNamedType: false,
+          referencedNames: [],
         },
-        referencesNamedType: false,
-        referencedNames: [],
-      },
-    ]);
-  });
+      ]);
+    });
 
-  it("an exported type alias over anything else is read as one annotation", ({
-    declarationsOfAnAliasOverAUnion,
-  }) => {
-    expect(declarationsOfAnAliasOverAUnion).toStrictEqual([
-      {
-        name: "Mode",
-        line: 1,
-        kind: "TSTypeAliasDeclaration",
-        structure: {
-          parameters: [],
-          heritage: [],
-          members: [],
-          annotation: [READ_OR_WRITE_ANNOTATION],
+    it("carries the type alias kind", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        {
+          name: "Shape",
+          line: 1,
+          kind: "TSTypeAliasDeclaration",
+          structure: {
+            parameters: [],
+            heritage: [],
+            members: [READONLY_A_STRING_MEMBER],
+            annotation: [],
+          },
+          referencesNamedType: false,
+          referencedNames: [],
         },
-        referencesNamedType: false,
-        referencedNames: [],
-      },
-    ]);
-  });
+      ]);
+    });
 
-  it("an exported type alias over anything else carries no members", ({
-    declarationsOfAnAliasOverAUnion,
-  }) => {
-    expect(declarationsOfAnAliasOverAUnion).toStrictEqual([
-      {
-        name: "Mode",
-        line: 1,
-        kind: "TSTypeAliasDeclaration",
-        structure: {
-          parameters: [],
-          heritage: [],
-          members: [],
-          annotation: [READ_OR_WRITE_ANNOTATION],
+    it("is not recorded as reaching a named type", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        {
+          name: "Shape",
+          line: 1,
+          kind: "TSTypeAliasDeclaration",
+          structure: {
+            parameters: [],
+            heritage: [],
+            members: [READONLY_A_STRING_MEMBER],
+            annotation: [],
+          },
+          referencesNamedType: false,
+          referencedNames: [],
         },
-        referencesNamedType: false,
-        referencedNames: [],
-      },
-    ]);
+      ]);
+    });
   });
 
-  it("an exported interface is read as a member list", ({ declarationsOfAnInterface }) => {
-    expect(declarationsOfAnInterface).toStrictEqual([
-      {
-        name: "Shape",
-        line: 1,
-        kind: "TSInterfaceDeclaration",
-        structure: {
-          parameters: [],
-          heritage: [],
-          members: [READONLY_A_STRING_MEMBER],
-          annotation: [],
+  describe("an exported type alias over anything else", () => {
+    const it = test.extend("declarations", () =>
+      typeDeclarationsIn(`export type Mode = "read" | "write";`));
+
+    it("is read as one annotation", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        {
+          name: "Mode",
+          line: 1,
+          kind: "TSTypeAliasDeclaration",
+          structure: {
+            parameters: [],
+            heritage: [],
+            members: [],
+            annotation: [READ_OR_WRITE_ANNOTATION],
+          },
+          referencesNamedType: false,
+          referencedNames: [],
         },
-        referencesNamedType: false,
-        referencedNames: [],
-      },
-    ]);
-  });
+      ]);
+    });
 
-  it("what an exported interface extends is read as its heritage", ({
-    declarationsOfAnInterfaceExtendingAnother,
-  }) => {
-    expect(declarationsOfAnInterfaceExtendingAnother).toStrictEqual([
-      {
-        name: "Shape",
-        line: 1,
-        kind: "TSInterfaceDeclaration",
-        structure: {
-          parameters: [],
-          heritage: [BASE_HERITAGE],
-          members: [READONLY_A_STRING_MEMBER],
-          annotation: [],
+    it("carries no members", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        {
+          name: "Mode",
+          line: 1,
+          kind: "TSTypeAliasDeclaration",
+          structure: {
+            parameters: [],
+            heritage: [],
+            members: [],
+            annotation: [READ_OR_WRITE_ANNOTATION],
+          },
+          referencesNamedType: false,
+          referencedNames: [],
         },
-        referencesNamedType: false,
-        referencedNames: [],
-      },
-    ]);
+      ]);
+    });
   });
 
-  it("an exported interface carries the interface kind", ({ declarationsOfAnInterface }) => {
-    expect(declarationsOfAnInterface).toStrictEqual([
-      {
-        name: "Shape",
-        line: 1,
-        kind: "TSInterfaceDeclaration",
-        structure: {
-          parameters: [],
-          heritage: [],
-          members: [READONLY_A_STRING_MEMBER],
-          annotation: [],
+  describe("an exported interface", () => {
+    const it = test.extend("declarations", () =>
+      typeDeclarationsIn("export interface Shape { readonly a: string }"));
+
+    it("is read as a member list", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        {
+          name: "Shape",
+          line: 1,
+          kind: "TSInterfaceDeclaration",
+          structure: {
+            parameters: [],
+            heritage: [],
+            members: [READONLY_A_STRING_MEMBER],
+            annotation: [],
+          },
+          referencesNamedType: false,
+          referencedNames: [],
         },
-        referencesNamedType: false,
-        referencedNames: [],
-      },
-    ]);
-  });
+      ]);
+    });
 
-  it("an exported type alias carries the type alias kind", ({
-    declarationsOfAnAliasOverOneMember,
-  }) => {
-    expect(declarationsOfAnAliasOverOneMember).toStrictEqual([
-      {
-        name: "Shape",
-        line: 1,
-        kind: "TSTypeAliasDeclaration",
-        structure: {
-          parameters: [],
-          heritage: [],
-          members: [READONLY_A_STRING_MEMBER],
-          annotation: [],
+    it("carries the interface kind", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        {
+          name: "Shape",
+          line: 1,
+          kind: "TSInterfaceDeclaration",
+          structure: {
+            parameters: [],
+            heritage: [],
+            members: [READONLY_A_STRING_MEMBER],
+            annotation: [],
+          },
+          referencesNamedType: false,
+          referencedNames: [],
         },
-        referencesNamedType: false,
-        referencedNames: [],
-      },
-    ]);
+      ]);
+    });
   });
 
-  it("a declaration is placed at the line its own keyword stands on", ({
-    declarationsOfAnAliasBelowABinding,
-  }) => {
-    expect(declarationsOfAnAliasBelowABinding).toStrictEqual([
-      {
-        name: "Shape",
-        line: 3,
-        kind: "TSTypeAliasDeclaration",
-        structure: {
-          parameters: [],
-          heritage: [],
-          members: [READONLY_A_STRING_MEMBER],
-          annotation: [],
+  describe("an exported interface extending another", () => {
+    const it = test.extend("declarations", () =>
+      typeDeclarationsIn("export interface Shape extends Base { readonly a: string }"));
+
+    it("is read with what it extends as its heritage", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        {
+          name: "Shape",
+          line: 1,
+          kind: "TSInterfaceDeclaration",
+          structure: {
+            parameters: [],
+            heritage: [BASE_HERITAGE],
+            members: [READONLY_A_STRING_MEMBER],
+            annotation: [],
+          },
+          referencesNamedType: false,
+          referencedNames: [],
         },
-        referencesNamedType: false,
-        referencedNames: [],
-      },
-    ]);
+      ]);
+    });
   });
 
-  it("declared type parameters are part of the structure", ({
-    declarationsOfAnAliasTakingATypeParameter,
-  }) => {
-    expect(declarationsOfAnAliasTakingATypeParameter).toStrictEqual([
-      {
-        name: "Held",
-        line: 1,
-        kind: "TSTypeAliasDeclaration",
-        structure: {
-          parameters: [ONE_TYPE_PARAMETER],
-          heritage: [],
-          members: [READONLY_HELD_PLACEHOLDER_MEMBER],
-          annotation: [],
+  describe("an exported type alias standing below a binding", () => {
+    const it = test.extend("declarations", () =>
+      typeDeclarationsIn("const held = 1;\n\nexport type Shape = { readonly a: string };\n"));
+
+    it("is placed at the line its own keyword stands on", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        {
+          name: "Shape",
+          line: 3,
+          kind: "TSTypeAliasDeclaration",
+          structure: {
+            parameters: [],
+            heritage: [],
+            members: [READONLY_A_STRING_MEMBER],
+            annotation: [],
+          },
+          referencesNamedType: false,
+          referencedNames: [],
         },
-        referencesNamedType: false,
-        referencedNames: [],
-      },
-    ]);
+      ]);
+    });
   });
 
-  it("a declaration without type parameters carries none", ({
-    declarationsOfAnAliasHoldingAString,
-  }) => {
-    expect(declarationsOfAnAliasHoldingAString).toStrictEqual([
-      {
-        name: "Held",
-        line: 1,
-        kind: "TSTypeAliasDeclaration",
-        structure: {
-          parameters: [],
-          heritage: [],
-          members: [READONLY_HELD_STRING_MEMBER],
-          annotation: [],
+  describe("an exported type alias taking a type parameter", () => {
+    const it = test.extend("declarations", () =>
+      typeDeclarationsIn("export type Held<T> = { readonly held: T };"));
+
+    it("carries the declared type parameters as part of the structure", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        {
+          name: "Held",
+          line: 1,
+          kind: "TSTypeAliasDeclaration",
+          structure: {
+            parameters: [ONE_TYPE_PARAMETER],
+            heritage: [],
+            members: [READONLY_HELD_PLACEHOLDER_MEMBER],
+            annotation: [],
+          },
+          referencesNamedType: false,
+          referencedNames: [],
         },
-        referencesNamedType: false,
-        referencedNames: [],
-      },
-    ]);
-  });
+      ]);
+    });
 
-  it("a member annotated with a named type is recorded as reaching one", ({
-    declarationsOfAnAliasReachingANamedType,
-  }) => {
-    expect(declarationsOfAnAliasReachingANamedType).toStrictEqual([
-      {
-        name: "Shape",
-        line: 1,
-        kind: "TSTypeAliasDeclaration",
-        structure: {
-          parameters: [],
-          heritage: [],
-          members: [READONLY_A_NAMED_MEMBER],
-          annotation: [],
+    it("reaches no named type through the member annotated with that parameter", ({
+      declarations,
+    }) => {
+      expect(declarations).toStrictEqual([
+        {
+          name: "Held",
+          line: 1,
+          kind: "TSTypeAliasDeclaration",
+          structure: {
+            parameters: [ONE_TYPE_PARAMETER],
+            heritage: [],
+            members: [READONLY_HELD_PLACEHOLDER_MEMBER],
+            annotation: [],
+          },
+          referencesNamedType: false,
+          referencedNames: [],
         },
-        referencesNamedType: true,
-        referencedNames: ["Named"],
-      },
-    ]);
+      ]);
+    });
   });
 
-  it("a member annotated with a primitive alone is not recorded as reaching a named type", ({
-    declarationsOfAnAliasOverOneMember,
-  }) => {
-    expect(declarationsOfAnAliasOverOneMember).toStrictEqual([
-      {
-        name: "Shape",
-        line: 1,
-        kind: "TSTypeAliasDeclaration",
-        structure: {
-          parameters: [],
-          heritage: [],
-          members: [READONLY_A_STRING_MEMBER],
-          annotation: [],
+  describe("an exported type alias holding a string", () => {
+    const it = test.extend("declarations", () =>
+      typeDeclarationsIn("export type Held = { readonly held: string };"));
+
+    it("carries no type parameters", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        {
+          name: "Held",
+          line: 1,
+          kind: "TSTypeAliasDeclaration",
+          structure: {
+            parameters: [],
+            heritage: [],
+            members: [READONLY_HELD_STRING_MEMBER],
+            annotation: [],
+          },
+          referencesNamedType: false,
+          referencedNames: [],
         },
-        referencesNamedType: false,
-        referencedNames: [],
-      },
-    ]);
+      ]);
+    });
   });
 
-  it("a member annotated with the declaration's own type parameter reaches no named type", ({
-    declarationsOfAnAliasTakingATypeParameter,
-  }) => {
-    expect(declarationsOfAnAliasTakingATypeParameter).toStrictEqual([
-      {
-        name: "Held",
-        line: 1,
-        kind: "TSTypeAliasDeclaration",
-        structure: {
-          parameters: [ONE_TYPE_PARAMETER],
-          heritage: [],
-          members: [READONLY_HELD_PLACEHOLDER_MEMBER],
-          annotation: [],
+  describe("an exported type alias whose member is annotated with a named type", () => {
+    const it = test.extend("declarations", () =>
+      typeDeclarationsIn("export type Shape = { readonly a: Named };"));
+
+    it("is recorded as reaching a named type", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        {
+          name: "Shape",
+          line: 1,
+          kind: "TSTypeAliasDeclaration",
+          structure: {
+            parameters: [],
+            heritage: [],
+            members: [READONLY_A_NAMED_MEMBER],
+            annotation: [],
+          },
+          referencesNamedType: true,
+          referencedNames: ["Named"],
         },
-        referencesNamedType: false,
-        referencedNames: [],
-      },
-    ]);
+      ]);
+    });
   });
 
-  it("the names a declaration refers to are collected without its own type parameters", ({
-    declarationsOfAnAliasMixingAParameterWithANamedType,
-  }) => {
-    expect(declarationsOfAnAliasMixingAParameterWithANamedType).toStrictEqual([
-      {
-        name: "Held",
-        line: 1,
-        kind: "TSTypeAliasDeclaration",
-        structure: {
-          parameters: [ONE_TYPE_PARAMETER],
-          heritage: [],
-          members: [READONLY_HELD_PLACEHOLDER_MEMBER, READONLY_NAMED_NAMED_MEMBER],
-          annotation: [],
+  describe("an exported type alias mixing a type parameter with a named type", () => {
+    const it = test.extend("declarations", () =>
+      typeDeclarationsIn("export type Held<T> = { readonly held: T; readonly named: Named };"));
+
+    it("collects the names it refers to without its own type parameters", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        {
+          name: "Held",
+          line: 1,
+          kind: "TSTypeAliasDeclaration",
+          structure: {
+            parameters: [ONE_TYPE_PARAMETER],
+            heritage: [],
+            members: [READONLY_HELD_PLACEHOLDER_MEMBER, READONLY_NAMED_NAMED_MEMBER],
+            annotation: [],
+          },
+          referencesNamedType: true,
+          referencedNames: ["Named"],
         },
-        referencesNamedType: true,
-        referencedNames: ["Named"],
-      },
-    ]);
+      ]);
+    });
   });
 
-  it("a type that is not exported is left out", ({ declarationsOfAnUnexportedAlias }) => {
-    expect(declarationsOfAnUnexportedAlias).toStrictEqual([]);
+  describe("a type alias that is not exported", () => {
+    const it = test.extend("declarations", () =>
+      typeDeclarationsIn("type Shape = { readonly a: string };"));
+
+    it("is left out", ({ declarations }) => {
+      expect(declarations).toStrictEqual([]);
+    });
   });
 
-  it("an export statement that carries no declaration is left out", ({
-    declarationsOfAnExportStatement,
-  }) => {
-    expect(declarationsOfAnExportStatement).toStrictEqual([]);
+  describe("an export statement that carries no declaration", () => {
+    const it = test.extend("declarations", () =>
+      typeDeclarationsIn("const held = 1;\nexport { held };\n"));
+
+    it("is left out", ({ declarations }) => {
+      expect(declarations).toStrictEqual([]);
+    });
   });
 
-  it("an exported binding that declares no type is left out", ({
-    declarationsOfAnExportedBinding,
-  }) => {
-    expect(declarationsOfAnExportedBinding).toStrictEqual([]);
+  describe("an exported binding that declares no type", () => {
+    const it = test.extend("declarations", () => typeDeclarationsIn("export const held = 1;\n"));
+
+    it("is left out", ({ declarations }) => {
+      expect(declarations).toStrictEqual([]);
+    });
   });
 
-  it("a type exported from inside a module augmentation is left out", ({
-    declarationsOfAModuleAugmentation,
-  }) => {
-    expect(declarationsOfAModuleAugmentation).toStrictEqual([]);
+  describe("a type exported from inside a module augmentation", () => {
+    const it = test.extend("declarations", () =>
+      typeDeclarationsIn(
+        `declare module "held" { export interface Shape { readonly a: string } }`,
+      ));
+
+    it("is left out", ({ declarations }) => {
+      expect(declarations).toStrictEqual([]);
+    });
   });
 
-  it("two declarations of one interface name are read one by one", ({
-    declarationsOfTwoInterfacesOfOneName,
-  }) => {
-    expect(declarationsOfTwoInterfacesOfOneName).toStrictEqual([
-      {
-        name: "Shape",
-        line: 1,
-        kind: "TSInterfaceDeclaration",
-        structure: {
-          parameters: [],
-          heritage: [],
-          members: [READONLY_A_STRING_MEMBER],
-          annotation: [],
+  describe("two declarations of one interface name", () => {
+    const it = test.extend("declarations", () =>
+      typeDeclarationsIn(
+        "export interface Shape { readonly a: string }\nexport interface Shape { readonly b: number }\n",
+      ));
+
+    it("are read one by one", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        {
+          name: "Shape",
+          line: 1,
+          kind: "TSInterfaceDeclaration",
+          structure: {
+            parameters: [],
+            heritage: [],
+            members: [READONLY_A_STRING_MEMBER],
+            annotation: [],
+          },
+          referencesNamedType: false,
+          referencedNames: [],
         },
-        referencesNamedType: false,
-        referencedNames: [],
-      },
-      {
-        name: "Shape",
-        line: 2,
-        kind: "TSInterfaceDeclaration",
-        structure: {
-          parameters: [],
-          heritage: [],
-          members: [READONLY_B_NUMBER_MEMBER],
-          annotation: [],
+        {
+          name: "Shape",
+          line: 2,
+          kind: "TSInterfaceDeclaration",
+          structure: {
+            parameters: [],
+            heritage: [],
+            members: [READONLY_B_NUMBER_MEMBER],
+            annotation: [],
+          },
+          referencesNamedType: false,
+          referencedNames: [],
         },
-        referencesNamedType: false,
-        referencedNames: [],
-      },
-    ]);
+      ]);
+    });
   });
 });

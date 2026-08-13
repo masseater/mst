@@ -12,69 +12,67 @@ const ORDER_STATUS = `/**\n * ${TAG} order.status\n */\nexport const ORDER_STATU
 
 const ARTICLE_STATUS = `/**\n * ${TAG} article.status\n */\nexport const ARTICLE_STATUSES = ["published"] as const;\n`;
 
-const it = test
-  .extend("verdictThatTheSecondLoadIsTheFirstCatalog", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
+describe("loadCanonicalValuesCatalog", () => {
+  describe("a repository root whose source changed after the first load", () => {
+    const it = test
+      .extend("secondLoadVerdict", ({}, { onCleanup }) => {
+        const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+        onCleanup(() => {
+          rmSync(root, { recursive: true, force: true });
+        });
+        writeFileSync(join(root, "order-status.ts"), ORDER_STATUS);
+        const firstlyLoaded = loadCanonicalValuesCatalog({ repositoryRoot: root });
+        writeFileSync(join(root, "order-status.ts"), ARTICLE_STATUS);
+        return loadCanonicalValuesCatalog({ repositoryRoot: root }) === firstlyLoaded;
+      })
+      .extend("conceptIds", ({}, { onCleanup }) => {
+        const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+        onCleanup(() => {
+          rmSync(root, { recursive: true, force: true });
+        });
+        writeFileSync(join(root, "order-status.ts"), ORDER_STATUS);
+        loadCanonicalValuesCatalog({ repositoryRoot: root });
+        writeFileSync(join(root, "order-status.ts"), ARTICLE_STATUS);
+        return loadCanonicalValuesCatalog({ repositoryRoot: root }).entries.map(
+          (entry) => entry.conceptId,
+        );
+      });
+
+    it("is built once per repository root within a process", ({ secondLoadVerdict }) => {
+      expect(secondLoadVerdict).toBe(true);
     });
-    writeFileSync(join(root, "order-status.ts"), ORDER_STATUS);
-    const firstlyLoaded = loadCanonicalValuesCatalog({ repositoryRoot: root });
-    writeFileSync(join(root, "order-status.ts"), ARTICLE_STATUS);
-    return loadCanonicalValuesCatalog({ repositoryRoot: root }) === firstlyLoaded;
-  })
-  .extend("conceptIdsLoadedAfterAChangedSource", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
+
+    it("still carries what the first load read", ({ conceptIds }) => {
+      expect(conceptIds).toStrictEqual(["order.status"]);
     });
-    writeFileSync(join(root, "order-status.ts"), ORDER_STATUS);
-    loadCanonicalValuesCatalog({ repositoryRoot: root });
-    writeFileSync(join(root, "order-status.ts"), ARTICLE_STATUS);
-    return loadCanonicalValuesCatalog({ repositoryRoot: root }).entries.map(
-      (entry) => entry.conceptId,
-    );
-  })
-  .extend("conceptIdsOfARootThatIsNotOnDisk", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    return loadCanonicalValuesCatalog({
-      repositoryRoot: join(root, "pruned-checkout"),
-    }).entries.map((entry) => entry.conceptId);
-  })
-  .extend("existenceOfARootThatWasOnlyLoaded", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    loadCanonicalValuesCatalog({ repositoryRoot: join(root, "pruned-checkout") });
-    return existsSync(join(root, "pruned-checkout"));
   });
 
-describe("loaded-catalog", () => {
-  it("the catalog is built once per repository root within a process", ({
-    verdictThatTheSecondLoadIsTheFirstCatalog,
-  }) => {
-    expect(verdictThatTheSecondLoadIsTheFirstCatalog).toBe(true);
-  });
+  describe("a repository root that is not on disk", () => {
+    const it = test
+      .extend("conceptIds", ({}, { onCleanup }) => {
+        const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+        onCleanup(() => {
+          rmSync(root, { recursive: true, force: true });
+        });
+        return loadCanonicalValuesCatalog({
+          repositoryRoot: join(root, "pruned-checkout"),
+        }).entries.map((entry) => entry.conceptId);
+      })
+      .extend("rootExistsAfterLoading", ({}, { onCleanup }) => {
+        const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+        onCleanup(() => {
+          rmSync(root, { recursive: true, force: true });
+        });
+        loadCanonicalValuesCatalog({ repositoryRoot: join(root, "pruned-checkout") });
+        return existsSync(join(root, "pruned-checkout"));
+      });
 
-  it("the catalog loaded a second time still carries what the first load read", ({
-    conceptIdsLoadedAfterAChangedSource,
-  }) => {
-    expect(conceptIdsLoadedAfterAChangedSource).toStrictEqual(["order.status"]);
-  });
+    it("yields an empty catalog", ({ conceptIds }) => {
+      expect(conceptIds).toStrictEqual([]);
+    });
 
-  it("a repository root that is not on disk yields an empty catalog", ({
-    conceptIdsOfARootThatIsNotOnDisk,
-  }) => {
-    expect(conceptIdsOfARootThatIsNotOnDisk).toStrictEqual([]);
-  });
-
-  it("a repository root that is not on disk is not created by loading it", ({
-    existenceOfARootThatWasOnlyLoaded,
-  }) => {
-    expect(existenceOfARootThatWasOnlyLoaded).toBe(false);
+    it("is not created by loading it", ({ rootExistsAfterLoading }) => {
+      expect(rootExistsAfterLoading).toBe(false);
+    });
   });
 });

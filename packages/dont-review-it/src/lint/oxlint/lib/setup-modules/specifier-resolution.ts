@@ -1,11 +1,11 @@
 import { realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
+import { readUnlessMissing } from "@mst/repository-checks";
 import { memoize } from "es-toolkit";
 
 import { buildExportSpecifierIndex } from "../canonical-values/export-specifier-index.ts";
 import { isDirectory, isFile } from "../canonical-values/source-files.ts";
-import { readUnlessMissing } from "../path-failure.ts";
 import { segmentsOf } from "../path-segments.ts";
 import { toPosixPath } from "../posix-path.ts";
 import { aliasedPathsFor } from "../tsconfig-path-aliases.ts";

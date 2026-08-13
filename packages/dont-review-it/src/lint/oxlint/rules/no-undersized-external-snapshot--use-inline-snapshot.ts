@@ -1,8 +1,7 @@
 import { zip } from "es-toolkit";
 
 import { createDontReviewItRule } from "../../../create-rule.ts";
-import { ancestorsOf } from "../lib/ast-node.ts";
-import { nodesOfType } from "../lib/nodes-of-type.ts";
+import { nodeVisitsOfType } from "../lib/nodes-of-type.ts";
 import {
   entryKeysOf,
   INLINE_SPELLING_BY_EXTERNAL,
@@ -143,8 +142,8 @@ export const noUndersizedExternalSnapshot = createDontReviewItRule({
 
     return {
       "Program:exit"(program: ESTree.Program) {
-        const sites = nodesOfType(program, "CallExpression").flatMap(
-          (node) => snapshotMatcherSiteOf(node, ancestorsOf(node)) ?? [],
+        const sites = nodeVisitsOfType(program, "CallExpression").flatMap(
+          (visit) => snapshotMatcherSiteOf(visit.node, visit.ancestors) ?? [],
         );
         for (const [site, entries] of zip(sites, entryKeysOf(sites))) {
           reportSite(site, entries);

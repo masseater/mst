@@ -115,8 +115,26 @@ describe("dont-review-it/no-expect-outside-it--move-into-it-block", () => {
         name: "export forms the rule scans do not disturb an assertion standing in a canonical block",
         code: "export function helper() {}\nexport const { seed } = totals;\nexport { 'subject' as fixture } from './fixtures.ts';\nit('adds', () => { expect(seed).toBe(3); });",
       },
+      {
+        name: "the canonical spelling derived from an imported factory reaches the runner",
+        code: "import { standardIoTest } from './vitest/standard-io-test.ts';\nconst it = standardIoTest.extend('sum', () => 3);\nit('adds', ({ sum }) => { expect(sum).toBe(3); });",
+      },
+      {
+        name: "a chain of extends on an imported factory reaches the runner the same way",
+        code: "import { standardIoTest } from './vitest/standard-io-test.ts';\nconst it = standardIoTest.extend('a', () => 1).extend('sum', () => 3);\nit('adds', ({ sum }) => { expect(sum).toBe(3); });",
+      },
     ],
     invalid: [
+      {
+        name: "an imported factory used as the block itself answers for its own spelling",
+        code: "import { standardIoTest } from './vitest/standard-io-test.ts';\nstandardIoTest('adds', () => { expect(sum).toBe(3); });",
+        errors: [{ messageId: "groupingBlockAssertion" }],
+      },
+      {
+        name: "an imported name filled into the canonical spelling by a plain call reaches no runner",
+        code: "import { buildRunner } from './runner.ts';\nconst it = buildRunner();\nit('adds', () => { expect(sum).toBe(3); });",
+        errors: [{ messageId: "shadowedTestBlockAssertion" }],
+      },
       {
         name: "the alternate runner spelling is rewritten to the canonical one",
         code: "test('adds', () => { expect(sum).toBe(3); });",

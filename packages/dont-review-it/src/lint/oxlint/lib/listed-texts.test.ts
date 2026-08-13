@@ -2,31 +2,45 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { listedTexts } from "./listed-texts.ts";
 
-const it = test
-  .extend("textsOfWrittenList", () => listedTexts(["src", "test"]))
-  .extend("textsOfMixedList", () => listedTexts(["src", 7, null, { path: "test" }, ["test"]]))
-  .extend("textsOfEmptyList", () => listedTexts([]))
-  .extend("textsOfWrittenText", () => listedTexts("src"))
-  .extend("textsOfNothing", () => listedTexts(undefined));
+describe("listedTexts", () => {
+  describe("a list holding written texts", () => {
+    const it = test.extend("texts", () => listedTexts(["src", "test"]));
 
-describe("listed-texts", () => {
-  it("a list hands back every text written in it", ({ textsOfWrittenList }) => {
-    expect(textsOfWrittenList).toStrictEqual(["src", "test"]);
+    it("hands back every text written in it", ({ texts }) => {
+      expect(texts).toStrictEqual(["src", "test"]);
+    });
   });
 
-  it("an entry that is not a text is left out of what the list carries", ({ textsOfMixedList }) => {
-    expect(textsOfMixedList).toStrictEqual(["src"]);
+  describe("a list holding entries that are not texts", () => {
+    const it = test.extend("texts", () =>
+      listedTexts(["src", 7, null, { path: "test" }, ["test"]]));
+
+    it("leaves every entry that is not a text out of what the list carries", ({ texts }) => {
+      expect(texts).toStrictEqual(["src"]);
+    });
   });
 
-  it("an empty list carries no text", ({ textsOfEmptyList }) => {
-    expect(textsOfEmptyList).toStrictEqual([]);
+  describe("an empty list", () => {
+    const it = test.extend("texts", () => listedTexts([]));
+
+    it("carries no text", ({ texts }) => {
+      expect(texts).toStrictEqual([]);
+    });
   });
 
-  it("a text written on its own carries no text", ({ textsOfWrittenText }) => {
-    expect(textsOfWrittenText).toStrictEqual([]);
+  describe("a text written on its own", () => {
+    const it = test.extend("texts", () => listedTexts("src"));
+
+    it("carries no text", ({ texts }) => {
+      expect(texts).toStrictEqual([]);
+    });
   });
 
-  it("a missing value carries no text", ({ textsOfNothing }) => {
-    expect(textsOfNothing).toStrictEqual([]);
+  describe("a missing value", () => {
+    const it = test.extend("texts", () => listedTexts(undefined));
+
+    it("carries no text", ({ texts }) => {
+      expect(texts).toStrictEqual([]);
+    });
   });
 });

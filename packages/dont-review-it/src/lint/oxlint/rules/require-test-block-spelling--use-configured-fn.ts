@@ -2,6 +2,7 @@ import { sortBy } from "es-toolkit";
 
 import { createDontReviewItRule } from "../../../create-rule.ts";
 import { nodesOfType } from "../lib/nodes-of-type.ts";
+import { optionsRecord } from "../lib/rule-options.ts";
 import { FIXTURE_BUILDER_MEMBER } from "../lib/spec-syntax/fixture-declarations.ts";
 import { staticMemberName } from "../lib/spec-syntax/static-names.ts";
 import { unwrapSubject } from "../lib/spec-syntax/subject-expressions.ts";
@@ -18,12 +19,6 @@ const CANONICAL_BLOCK_SPELLING = "it";
 const BLOCK_SPELLING_OPTION = "blockSpelling";
 
 const RUNNER_MODULES_OPTION = "runnerModules";
-
-const optionsRecord = (options: Readonly<Options>): Readonly<Record<string, unknown>> | null => {
-  const [first] = options;
-  if (typeof first !== "object" || first === null || Array.isArray(first)) return null;
-  return first;
-};
 
 const blockSpellingFrom = (options: Readonly<Options>): string => {
   const configured = optionsRecord(options)?.[BLOCK_SPELLING_OPTION];

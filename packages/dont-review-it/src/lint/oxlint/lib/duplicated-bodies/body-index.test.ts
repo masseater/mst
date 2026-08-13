@@ -4,231 +4,254 @@ import { buildBodyIndex, duplicatedClustersIn } from "./body-index.ts";
 
 const ENOUGH_NODES = 8;
 
-const it = test
-  .extend("sitesSharingAFingerprint", () => {
-    const index = buildBodyIndex([
-      {
-        relativePath: "a.ts",
-        bodies: [{ name: "declaration1", line: 1, fingerprint: "shared", nodeCount: ENOUGH_NODES }],
-      },
-      {
-        relativePath: "b.ts",
-        bodies: [{ name: "declaration2", line: 2, fingerprint: "shared", nodeCount: ENOUGH_NODES }],
-      },
-    ]);
-    return index.sitesByFingerprint.get("shared");
-  })
-  .extend("bodiesOfAFileReachedByItsPath", () => {
-    const index = buildBodyIndex([
-      {
-        relativePath: "a.ts",
-        bodies: [{ name: "declaration1", line: 1, fingerprint: "alone", nodeCount: ENOUGH_NODES }],
-      },
-    ]);
-    return index.bodiesByPath.get("a.ts");
-  })
-  .extend("sitesOfAClusterSpreadAcrossFilesAndLines", () => {
-    const index = buildBodyIndex([
-      {
-        relativePath: "b.ts",
-        bodies: [{ name: "declaration9", line: 9, fingerprint: "shared", nodeCount: ENOUGH_NODES }],
-      },
-      {
-        relativePath: "a.ts",
-        bodies: [
-          { name: "declaration4", line: 4, fingerprint: "shared", nodeCount: ENOUGH_NODES },
-          { name: "declaration1", line: 1, fingerprint: "shared", nodeCount: ENOUGH_NODES },
-        ],
-      },
-    ]);
-    return index.sitesByFingerprint.get("shared");
-  })
-  .extend("sitesOfAFingerprintCarriedOnlyByBodiesWithTooFewNodes", () => {
-    const index = buildBodyIndex([
-      {
-        relativePath: "a.ts",
-        bodies: [{ name: "declaration1", line: 1, fingerprint: "shared", nodeCount: 1 }],
-      },
-      {
-        relativePath: "b.ts",
-        bodies: [{ name: "declaration2", line: 2, fingerprint: "shared", nodeCount: 1 }],
-      },
-    ]);
-    return index.sitesByFingerprint.get("shared");
-  })
-  .extend("bodiesOfAFileWhoseOnlyBodyHasTooFewNodes", () => {
-    const index = buildBodyIndex([
-      {
-        relativePath: "a.ts",
-        bodies: [{ name: "declaration1", line: 1, fingerprint: "shared", nodeCount: 1 }],
-      },
-    ]);
-    return index.bodiesByPath.get("a.ts");
-  })
-  .extend("clustersOfAFingerprintOnlyOneDeclarationCarries", () => {
-    const index = buildBodyIndex([
-      {
-        relativePath: "a.ts",
-        bodies: [{ name: "declaration1", line: 1, fingerprint: "alone", nodeCount: ENOUGH_NODES }],
-      },
-    ]);
-    return duplicatedClustersIn(index);
-  })
-  .extend("clustersOfFilesIndexedFromTheLaterFingerprint", () => {
-    const index = buildBodyIndex([
-      {
-        relativePath: "z.ts",
-        bodies: [{ name: "declaration1", line: 1, fingerprint: "later", nodeCount: ENOUGH_NODES }],
-      },
-      {
-        relativePath: "y.ts",
-        bodies: [{ name: "declaration2", line: 2, fingerprint: "later", nodeCount: ENOUGH_NODES }],
-      },
-      {
-        relativePath: "a.ts",
-        bodies: [
-          { name: "declaration3", line: 3, fingerprint: "earlier", nodeCount: ENOUGH_NODES },
-        ],
-      },
-      {
-        relativePath: "b.ts",
-        bodies: [
-          { name: "declaration4", line: 4, fingerprint: "earlier", nodeCount: ENOUGH_NODES },
-        ],
-      },
-    ]);
-    return duplicatedClustersIn(index);
-  })
-  .extend("clustersOfTheSameFilesIndexedFromTheEarlierFingerprint", () => {
-    const index = buildBodyIndex([
-      {
-        relativePath: "a.ts",
-        bodies: [
-          { name: "declaration3", line: 3, fingerprint: "earlier", nodeCount: ENOUGH_NODES },
-        ],
-      },
-      {
-        relativePath: "b.ts",
-        bodies: [
-          { name: "declaration4", line: 4, fingerprint: "earlier", nodeCount: ENOUGH_NODES },
-        ],
-      },
-      {
-        relativePath: "z.ts",
-        bodies: [{ name: "declaration1", line: 1, fingerprint: "later", nodeCount: ENOUGH_NODES }],
-      },
-      {
-        relativePath: "y.ts",
-        bodies: [{ name: "declaration2", line: 2, fingerprint: "later", nodeCount: ENOUGH_NODES }],
-      },
-    ]);
-    return duplicatedClustersIn(index);
-  })
-  .extend("clustersOfAFingerprintThreeDeclarationsCarry", () => {
-    const index = buildBodyIndex([
-      {
-        relativePath: "a.ts",
-        bodies: [{ name: "declaration1", line: 1, fingerprint: "shared", nodeCount: ENOUGH_NODES }],
-      },
-      {
-        relativePath: "b.ts",
-        bodies: [{ name: "declaration2", line: 2, fingerprint: "shared", nodeCount: ENOUGH_NODES }],
-      },
-      {
-        relativePath: "c.ts",
-        bodies: [{ name: "declaration3", line: 3, fingerprint: "shared", nodeCount: ENOUGH_NODES }],
-      },
-    ]);
-    return duplicatedClustersIn(index);
-  });
-
 describe("buildBodyIndex", () => {
-  it("gathers the sites that share a fingerprint", ({ sitesSharingAFingerprint }) => {
-    expect(sitesSharingAFingerprint).toStrictEqual([
-      { relativePath: "a.ts", name: "declaration1", line: 1 },
-      { relativePath: "b.ts", name: "declaration2", line: 2 },
-    ]);
+  describe("two files declaring a body under the same fingerprint", () => {
+    const it = test.extend("sites", () =>
+      buildBodyIndex([
+        {
+          relativePath: "a.ts",
+          bodies: [
+            { name: "declaration1", line: 1, fingerprint: "shared", nodeCount: ENOUGH_NODES },
+          ],
+        },
+        {
+          relativePath: "b.ts",
+          bodies: [
+            { name: "declaration2", line: 2, fingerprint: "shared", nodeCount: ENOUGH_NODES },
+          ],
+        },
+      ]).sitesByFingerprint.get("shared"));
+
+    it("are gathered as the sites that fingerprint reaches", ({ sites }) => {
+      expect(sites).toStrictEqual([
+        { relativePath: "a.ts", name: "declaration1", line: 1 },
+        { relativePath: "b.ts", name: "declaration2", line: 2 },
+      ]);
+    });
   });
 
-  it("keeps the declarations of a file reachable by its path", ({
-    bodiesOfAFileReachedByItsPath,
-  }) => {
-    expect(bodiesOfAFileReachedByItsPath).toStrictEqual([
-      { name: "declaration1", line: 1, fingerprint: "alone", nodeCount: ENOUGH_NODES },
-    ]);
+  describe("a file declaring one body", () => {
+    const it = test.extend("bodies", () =>
+      buildBodyIndex([
+        {
+          relativePath: "a.ts",
+          bodies: [
+            { name: "declaration1", line: 1, fingerprint: "alone", nodeCount: ENOUGH_NODES },
+          ],
+        },
+      ]).bodiesByPath.get("a.ts"));
+
+    it("keeps that declaration reachable by the path of the file", ({ bodies }) => {
+      expect(bodies).toStrictEqual([
+        { name: "declaration1", line: 1, fingerprint: "alone", nodeCount: ENOUGH_NODES },
+      ]);
+    });
   });
 
-  it("orders the sites of a cluster by path and line", ({
-    sitesOfAClusterSpreadAcrossFilesAndLines,
-  }) => {
-    expect(sitesOfAClusterSpreadAcrossFilesAndLines).toStrictEqual([
-      { relativePath: "a.ts", name: "declaration1", line: 1 },
-      { relativePath: "a.ts", name: "declaration4", line: 4 },
-      { relativePath: "b.ts", name: "declaration9", line: 9 },
-    ]);
+  describe("bodies sharing a fingerprint across several files and lines", () => {
+    const it = test.extend("sites", () =>
+      buildBodyIndex([
+        {
+          relativePath: "b.ts",
+          bodies: [
+            { name: "declaration9", line: 9, fingerprint: "shared", nodeCount: ENOUGH_NODES },
+          ],
+        },
+        {
+          relativePath: "a.ts",
+          bodies: [
+            { name: "declaration4", line: 4, fingerprint: "shared", nodeCount: ENOUGH_NODES },
+            { name: "declaration1", line: 1, fingerprint: "shared", nodeCount: ENOUGH_NODES },
+          ],
+        },
+      ]).sitesByFingerprint.get("shared"));
+
+    it("are ordered by path and then by line", ({ sites }) => {
+      expect(sites).toStrictEqual([
+        { relativePath: "a.ts", name: "declaration1", line: 1 },
+        { relativePath: "a.ts", name: "declaration4", line: 4 },
+        { relativePath: "b.ts", name: "declaration9", line: 9 },
+      ]);
+    });
   });
 
-  it("leaves a body with too few nodes out of the fingerprint route", ({
-    sitesOfAFingerprintCarriedOnlyByBodiesWithTooFewNodes,
-  }) => {
-    expect(sitesOfAFingerprintCarriedOnlyByBodiesWithTooFewNodes).toBe(undefined);
+  describe("a fingerprint carried only by bodies with too few nodes", () => {
+    const it = test.extend("sites", () =>
+      buildBodyIndex([
+        {
+          relativePath: "a.ts",
+          bodies: [{ name: "declaration1", line: 1, fingerprint: "shared", nodeCount: 1 }],
+        },
+        {
+          relativePath: "b.ts",
+          bodies: [{ name: "declaration2", line: 2, fingerprint: "shared", nodeCount: 1 }],
+        },
+      ]).sitesByFingerprint.get("shared"));
+
+    it("reaches no site at all", ({ sites }) => {
+      expect(sites).toBe(undefined);
+    });
   });
 
-  it("keeps a body with too few nodes reachable by its path", ({
-    bodiesOfAFileWhoseOnlyBodyHasTooFewNodes,
-  }) => {
-    expect(bodiesOfAFileWhoseOnlyBodyHasTooFewNodes).toStrictEqual([
-      { name: "declaration1", line: 1, fingerprint: "shared", nodeCount: 1 },
-    ]);
+  describe("a file whose only body has too few nodes", () => {
+    const it = test.extend("bodies", () =>
+      buildBodyIndex([
+        {
+          relativePath: "a.ts",
+          bodies: [{ name: "declaration1", line: 1, fingerprint: "shared", nodeCount: 1 }],
+        },
+      ]).bodiesByPath.get("a.ts"));
+
+    it("keeps that body reachable by the path of the file", ({ bodies }) => {
+      expect(bodies).toStrictEqual([
+        { name: "declaration1", line: 1, fingerprint: "shared", nodeCount: 1 },
+      ]);
+    });
   });
 });
 
 describe("duplicatedClustersIn", () => {
-  it("leaves out a fingerprint that only one declaration carries", ({
-    clustersOfAFingerprintOnlyOneDeclarationCarries,
-  }) => {
-    expect(clustersOfAFingerprintOnlyOneDeclarationCarries).toStrictEqual([]);
+  describe("a fingerprint only one declaration carries", () => {
+    const it = test.extend("clusters", () =>
+      duplicatedClustersIn(
+        buildBodyIndex([
+          {
+            relativePath: "a.ts",
+            bodies: [
+              { name: "declaration1", line: 1, fingerprint: "alone", nodeCount: ENOUGH_NODES },
+            ],
+          },
+        ]),
+      ));
+
+    it("is left out of the clusters", ({ clusters }) => {
+      expect(clusters).toStrictEqual([]);
+    });
   });
 
-  it("orders the clusters by the site each of them starts at", ({
-    clustersOfFilesIndexedFromTheLaterFingerprint,
-  }) => {
-    expect(clustersOfFilesIndexedFromTheLaterFingerprint).toStrictEqual([
-      [
-        { relativePath: "a.ts", name: "declaration3", line: 3 },
-        { relativePath: "b.ts", name: "declaration4", line: 4 },
-      ],
-      [
-        { relativePath: "y.ts", name: "declaration2", line: 2 },
-        { relativePath: "z.ts", name: "declaration1", line: 1 },
-      ],
-    ]);
+  describe("two fingerprints whose files were indexed from the later one", () => {
+    const it = test.extend("clusters", () =>
+      duplicatedClustersIn(
+        buildBodyIndex([
+          {
+            relativePath: "z.ts",
+            bodies: [
+              { name: "declaration1", line: 1, fingerprint: "later", nodeCount: ENOUGH_NODES },
+            ],
+          },
+          {
+            relativePath: "y.ts",
+            bodies: [
+              { name: "declaration2", line: 2, fingerprint: "later", nodeCount: ENOUGH_NODES },
+            ],
+          },
+          {
+            relativePath: "a.ts",
+            bodies: [
+              { name: "declaration3", line: 3, fingerprint: "earlier", nodeCount: ENOUGH_NODES },
+            ],
+          },
+          {
+            relativePath: "b.ts",
+            bodies: [
+              { name: "declaration4", line: 4, fingerprint: "earlier", nodeCount: ENOUGH_NODES },
+            ],
+          },
+        ]),
+      ));
+
+    it("come back ordered by the site each cluster starts at", ({ clusters }) => {
+      expect(clusters).toStrictEqual([
+        [
+          { relativePath: "a.ts", name: "declaration3", line: 3 },
+          { relativePath: "b.ts", name: "declaration4", line: 4 },
+        ],
+        [
+          { relativePath: "y.ts", name: "declaration2", line: 2 },
+          { relativePath: "z.ts", name: "declaration1", line: 1 },
+        ],
+      ]);
+    });
   });
 
-  it("the ordering does not depend on the order the files were indexed in", ({
-    clustersOfTheSameFilesIndexedFromTheEarlierFingerprint,
-  }) => {
-    expect(clustersOfTheSameFilesIndexedFromTheEarlierFingerprint).toStrictEqual([
-      [
-        { relativePath: "a.ts", name: "declaration3", line: 3 },
-        { relativePath: "b.ts", name: "declaration4", line: 4 },
-      ],
-      [
-        { relativePath: "y.ts", name: "declaration2", line: 2 },
-        { relativePath: "z.ts", name: "declaration1", line: 1 },
-      ],
-    ]);
+  describe("the same two fingerprints whose files were indexed from the earlier one", () => {
+    const it = test.extend("clusters", () =>
+      duplicatedClustersIn(
+        buildBodyIndex([
+          {
+            relativePath: "a.ts",
+            bodies: [
+              { name: "declaration3", line: 3, fingerprint: "earlier", nodeCount: ENOUGH_NODES },
+            ],
+          },
+          {
+            relativePath: "b.ts",
+            bodies: [
+              { name: "declaration4", line: 4, fingerprint: "earlier", nodeCount: ENOUGH_NODES },
+            ],
+          },
+          {
+            relativePath: "z.ts",
+            bodies: [
+              { name: "declaration1", line: 1, fingerprint: "later", nodeCount: ENOUGH_NODES },
+            ],
+          },
+          {
+            relativePath: "y.ts",
+            bodies: [
+              { name: "declaration2", line: 2, fingerprint: "later", nodeCount: ENOUGH_NODES },
+            ],
+          },
+        ]),
+      ));
+
+    it("come back in that same order", ({ clusters }) => {
+      expect(clusters).toStrictEqual([
+        [
+          { relativePath: "a.ts", name: "declaration3", line: 3 },
+          { relativePath: "b.ts", name: "declaration4", line: 4 },
+        ],
+        [
+          { relativePath: "y.ts", name: "declaration2", line: 2 },
+          { relativePath: "z.ts", name: "declaration1", line: 1 },
+        ],
+      ]);
+    });
   });
 
-  it("reports a cluster once, with every site in it", ({
-    clustersOfAFingerprintThreeDeclarationsCarry,
-  }) => {
-    expect(clustersOfAFingerprintThreeDeclarationsCarry).toStrictEqual([
-      [
-        { relativePath: "a.ts", name: "declaration1", line: 1 },
-        { relativePath: "b.ts", name: "declaration2", line: 2 },
-        { relativePath: "c.ts", name: "declaration3", line: 3 },
-      ],
-    ]);
+  describe("a fingerprint three declarations carry", () => {
+    const it = test.extend("clusters", () =>
+      duplicatedClustersIn(
+        buildBodyIndex([
+          {
+            relativePath: "a.ts",
+            bodies: [
+              { name: "declaration1", line: 1, fingerprint: "shared", nodeCount: ENOUGH_NODES },
+            ],
+          },
+          {
+            relativePath: "b.ts",
+            bodies: [
+              { name: "declaration2", line: 2, fingerprint: "shared", nodeCount: ENOUGH_NODES },
+            ],
+          },
+          {
+            relativePath: "c.ts",
+            bodies: [
+              { name: "declaration3", line: 3, fingerprint: "shared", nodeCount: ENOUGH_NODES },
+            ],
+          },
+        ]),
+      ));
+
+    it("comes back once, carrying every site of it", ({ clusters }) => {
+      expect(clusters).toStrictEqual([
+        [
+          { relativePath: "a.ts", name: "declaration1", line: 1 },
+          { relativePath: "b.ts", name: "declaration2", line: 2 },
+          { relativePath: "c.ts", name: "declaration3", line: 3 },
+        ],
+      ]);
+    });
   });
 });

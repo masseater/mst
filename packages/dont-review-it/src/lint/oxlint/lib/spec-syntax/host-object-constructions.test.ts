@@ -9,365 +9,397 @@ import {
 
 import type { ESTree } from "@oxlint/plugins";
 
-const it = test
-  .extend("hostTypeOfAConstructionOfARuntimeName", () => {
-    const declared = parseSync("spec.ts", "const written = new Response('a');").program
-      .body[0] as ESTree.Statement;
-    const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
-    return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-      named: (name) => (name === "Request" || name === "Response" ? name : null),
-      qualified: (namespace, member) =>
-        namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+describe("constructedHostTypeOf", () => {
+  describe("a construction of a name the runtime declares", () => {
+    const it = test.extend("hostType", () => {
+      const declared = parseSync("spec.ts", "const written = new Response('a');").program
+        .body[0] as ESTree.Statement;
+      const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
+      return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
+        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        qualified: (namespace, member) =>
+          namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+      });
     });
-  })
-  .extend("hostTypeOfAConstructionOfTheOtherRuntimeName", () => {
-    const declared = parseSync("spec.ts", "const written = new Request('https://example.test/');")
-      .program.body[0] as ESTree.Statement;
-    const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
-    return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-      named: (name) => (name === "Request" || name === "Response" ? name : null),
-      qualified: (namespace, member) =>
-        namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+
+    it("is that host type", ({ hostType }) => {
+      expect(hostType).toBe("Response");
     });
-  })
-  .extend("hostTypeOfAConstructionOfANameTheCallerDeclares", () => {
-    const declared = parseSync("spec.ts", "const written = new Response('a');").program
-      .body[0] as ESTree.Statement;
-    const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
-    return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-      named: () => null,
-      qualified: () => null,
+  });
+
+  describe("a construction of the other name the runtime declares", () => {
+    const it = test.extend("hostType", () => {
+      const declared = parseSync("spec.ts", "const written = new Request('https://example.test/');")
+        .program.body[0] as ESTree.Statement;
+      const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
+      return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
+        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        qualified: (namespace, member) =>
+          namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+      });
     });
-  })
-  .extend("hostTypeOfAConstructionOfAnUnrelatedName", () => {
-    const declared = parseSync("spec.ts", "const written = new Date(0);").program
-      .body[0] as ESTree.Statement;
-    const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
-    return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-      named: (name) => (name === "Request" || name === "Response" ? name : null),
-      qualified: (namespace, member) =>
-        namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+
+    it("is that host type too", ({ hostType }) => {
+      expect(hostType).toBe("Request");
     });
-  })
-  .extend("hostTypeOfAConstructionReachedThroughARuntimeNamespace", () => {
-    const declared = parseSync("spec.ts", "const written = new undici.Response('a');").program
-      .body[0] as ESTree.Statement;
-    const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
-    return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-      named: (name) => (name === "Request" || name === "Response" ? name : null),
-      qualified: (namespace, member) =>
-        namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+  });
+
+  describe("a construction of a name the caller declares", () => {
+    const it = test.extend("hostType", () => {
+      const declared = parseSync("spec.ts", "const written = new Response('a');").program
+        .body[0] as ESTree.Statement;
+      const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
+      return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
+        named: () => null,
+        qualified: () => null,
+      });
     });
-  })
-  .extend("hostTypeOfAConstructionReachedThroughAnUnrelatedNamespace", () => {
-    const declared = parseSync("spec.ts", "const written = new helpers.Response('a');").program
-      .body[0] as ESTree.Statement;
-    const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
-    return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-      named: (name) => (name === "Request" || name === "Response" ? name : null),
-      qualified: (namespace, member) =>
-        namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+
+    it("is not a host type", ({ hostType }) => {
+      expect(hostType).toBe(null);
     });
-  })
-  .extend("hostTypeOfAConstructorReadOffANameAtRunTime", () => {
-    const declared = parseSync("spec.ts", "const written = new globalThis[name]('a');").program
-      .body[0] as ESTree.Statement;
-    const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
-    return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-      named: (name) => (name === "Request" || name === "Response" ? name : null),
-      qualified: (namespace, member) =>
-        namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+  });
+
+  describe("a construction of an unrelated name", () => {
+    const it = test.extend("hostType", () => {
+      const declared = parseSync("spec.ts", "const written = new Date(0);").program
+        .body[0] as ESTree.Statement;
+      const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
+      return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
+        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        qualified: (namespace, member) =>
+          namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+      });
     });
-  })
-  .extend("hostTypeOfAConstructorHandedBackByACall", () => {
-    const declared = parseSync("spec.ts", "const written = new (build())('a');").program
-      .body[0] as ESTree.Statement;
-    const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
-    return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-      named: (name) => (name === "Request" || name === "Response" ? name : null),
-      qualified: (namespace, member) =>
-        namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+
+    it("is not a host type", ({ hostType }) => {
+      expect(hostType).toBe(null);
     });
-  })
-  .extend("hostTypeOfTheJsonFactoryCall", () => {
-    const declared = parseSync("spec.ts", "const written = Response.json({ id: 1 });").program
-      .body[0] as ESTree.Statement;
-    const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
-    return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-      named: (name) => (name === "Request" || name === "Response" ? name : null),
-      qualified: (namespace, member) =>
-        namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+  });
+
+  describe("a construction reached through a runtime namespace", () => {
+    const it = test.extend("hostType", () => {
+      const declared = parseSync("spec.ts", "const written = new undici.Response('a');").program
+        .body[0] as ESTree.Statement;
+      const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
+      return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
+        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        qualified: (namespace, member) =>
+          namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+      });
     });
-  })
-  .extend("hostTypeOfTheRedirectFactoryCall", () => {
-    const declared = parseSync("spec.ts", "const written = Response.redirect('/next');").program
-      .body[0] as ESTree.Statement;
-    const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
-    return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-      named: (name) => (name === "Request" || name === "Response" ? name : null),
-      qualified: (namespace, member) =>
-        namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+
+    it("is that host type", ({ hostType }) => {
+      expect(hostType).toBe("Response");
     });
-  })
-  .extend("hostTypeOfTheErrorFactoryCall", () => {
-    const declared = parseSync("spec.ts", "const written = Response.error();").program
-      .body[0] as ESTree.Statement;
-    const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
-    return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-      named: (name) => (name === "Request" || name === "Response" ? name : null),
-      qualified: (namespace, member) =>
-        namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+  });
+
+  describe("a construction reached through an unrelated namespace", () => {
+    const it = test.extend("hostType", () => {
+      const declared = parseSync("spec.ts", "const written = new helpers.Response('a');").program
+        .body[0] as ESTree.Statement;
+      const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
+      return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
+        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        qualified: (namespace, member) =>
+          namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+      });
     });
-  })
-  .extend("hostTypeOfAFactoryCallReachedThroughARuntimeNamespace", () => {
-    const declared = parseSync("spec.ts", "const written = undici.Response.json({ id: 1 });")
-      .program.body[0] as ESTree.Statement;
-    const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
-    return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-      named: (name) => (name === "Request" || name === "Response" ? name : null),
-      qualified: (namespace, member) =>
-        namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+
+    it("is not a host type", ({ hostType }) => {
+      expect(hostType).toBe(null);
     });
-  })
-  .extend("hostTypeOfAMethodThatIsNotOneOfTheStandardFactories", () => {
-    const declared = parseSync("spec.ts", "const written = Response.clone();").program
-      .body[0] as ESTree.Statement;
-    const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
-    return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-      named: (name) => (name === "Request" || name === "Response" ? name : null),
-      qualified: (namespace, member) =>
-        namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+  });
+
+  describe("a constructor read off a name at run time", () => {
+    const it = test.extend("hostType", () => {
+      const declared = parseSync("spec.ts", "const written = new globalThis[name]('a');").program
+        .body[0] as ESTree.Statement;
+      const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
+      return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
+        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        qualified: (namespace, member) =>
+          namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+      });
     });
-  })
-  .extend("hostTypeOfAFactoryCallOnAHostTypeThatHasNoFactory", () => {
-    const declared = parseSync("spec.ts", "const written = Request.json({ id: 1 });").program
-      .body[0] as ESTree.Statement;
-    const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
-    return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-      named: (name) => (name === "Request" || name === "Response" ? name : null),
-      qualified: (namespace, member) =>
-        namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+
+    it("is not a host type", ({ hostType }) => {
+      expect(hostType).toBe(null);
     });
-  })
-  .extend("hostTypeOfAMethodNamedAtRunTime", () => {
-    const declared = parseSync("spec.ts", "const written = Response[member]();").program
-      .body[0] as ESTree.Statement;
-    const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
-    return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-      named: (name) => (name === "Request" || name === "Response" ? name : null),
-      qualified: (namespace, member) =>
-        namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+  });
+
+  describe("a constructor handed back by a call", () => {
+    const it = test.extend("hostType", () => {
+      const declared = parseSync("spec.ts", "const written = new (build())('a');").program
+        .body[0] as ESTree.Statement;
+      const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
+      return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
+        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        qualified: (namespace, member) =>
+          namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+      });
     });
-  })
-  .extend("hostTypeOfAFactoryCallOnTheValueACallHandedBack", () => {
-    const declared = parseSync("spec.ts", "const written = build().json({ id: 1 });").program
-      .body[0] as ESTree.Statement;
-    const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
-    return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-      named: (name) => (name === "Request" || name === "Response" ? name : null),
-      qualified: (namespace, member) =>
-        namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+
+    it("is not a host type", ({ hostType }) => {
+      expect(hostType).toBe(null);
     });
-  })
-  .extend("hostTypeOfABareCallOnAName", () => {
-    const declared = parseSync("spec.ts", "const written = read();").program
-      .body[0] as ESTree.Statement;
-    const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
-    return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-      named: (name) => (name === "Request" || name === "Response" ? name : null),
-      qualified: (namespace, member) =>
-        namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+  });
+
+  describe("the json factory", () => {
+    const it = test.extend("hostType", () => {
+      const declared = parseSync("spec.ts", "const written = Response.json({ id: 1 });").program
+        .body[0] as ESTree.Statement;
+      const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
+      return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
+        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        qualified: (namespace, member) =>
+          namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+      });
     });
-  })
-  .extend("hostTypeOfABareName", () => {
-    const declared = parseSync("spec.ts", "const written = subject;").program
-      .body[0] as ESTree.Statement;
-    const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
-    return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-      named: (name) => (name === "Request" || name === "Response" ? name : null),
-      qualified: (namespace, member) =>
-        namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+
+    it("hands back the same host type a construction does", ({ hostType }) => {
+      expect(hostType).toBe("Response");
     });
-  })
-  .extend("hostTypeOfAnObjectWrittenOutInPlace", () => {
-    const declared = parseSync("spec.ts", "const written = { status: 200 };").program
-      .body[0] as ESTree.Statement;
-    const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
-    return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-      named: (name) => (name === "Request" || name === "Response" ? name : null),
-      qualified: (namespace, member) =>
-        namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+  });
+
+  describe("the redirect factory", () => {
+    const it = test.extend("hostType", () => {
+      const declared = parseSync("spec.ts", "const written = Response.redirect('/next');").program
+        .body[0] as ESTree.Statement;
+      const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
+      return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
+        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        qualified: (namespace, member) =>
+          namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+      });
     });
-  })
-  .extend("hostTypesReadWithoutOptions", () => hostObjectTypesFrom([]))
-  .extend("runtimeModulesReadWithoutOptions", () => runtimeModulesFrom([]))
-  .extend("hostTypesReadFromASeverityAlone", () => hostObjectTypesFrom(["error"]))
-  .extend("hostTypesReadFromASingleSpelling", () =>
-    hostObjectTypesFrom([{ hostObjectTypes: "Response" }]),
-  )
-  .extend("hostTypesReadFromAnEmptyRoster", () => hostObjectTypesFrom([{ hostObjectTypes: [] }]))
-  .extend("hostTypesReadFromARosterHoldingNoSpelling", () =>
-    hostObjectTypesFrom([{ hostObjectTypes: [1] }]),
-  )
-  .extend("hostTypesReadFromASpelledOutRoster", () =>
-    hostObjectTypesFrom([{ hostObjectTypes: ["Headers"] }]),
-  )
-  .extend("runtimeModulesReadFromASpelledOutList", () =>
-    runtimeModulesFrom([{ runtimeModules: ["@internal/http"] }]),
-  );
 
-describe("host-object-constructions", () => {
-  it("a construction of a name the runtime declares is that host type", ({
-    hostTypeOfAConstructionOfARuntimeName,
-  }) => {
-    expect(hostTypeOfAConstructionOfARuntimeName).toBe("Response");
+    it("hands back the same host type a construction does", ({ hostType }) => {
+      expect(hostType).toBe("Response");
+    });
   });
 
-  it("a construction of the other name the runtime declares is that host type too", ({
-    hostTypeOfAConstructionOfTheOtherRuntimeName,
-  }) => {
-    expect(hostTypeOfAConstructionOfTheOtherRuntimeName).toBe("Request");
+  describe("the error factory", () => {
+    const it = test.extend("hostType", () => {
+      const declared = parseSync("spec.ts", "const written = Response.error();").program
+        .body[0] as ESTree.Statement;
+      const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
+      return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
+        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        qualified: (namespace, member) =>
+          namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+      });
+    });
+
+    it("hands back the same host type a construction does", ({ hostType }) => {
+      expect(hostType).toBe("Response");
+    });
   });
 
-  it("a construction of a name the caller declares is not a host type", ({
-    hostTypeOfAConstructionOfANameTheCallerDeclares,
-  }) => {
-    expect(hostTypeOfAConstructionOfANameTheCallerDeclares).toBe(null);
+  describe("a factory reached through a runtime namespace", () => {
+    const it = test.extend("hostType", () => {
+      const declared = parseSync("spec.ts", "const written = undici.Response.json({ id: 1 });")
+        .program.body[0] as ESTree.Statement;
+      const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
+      return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
+        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        qualified: (namespace, member) =>
+          namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+      });
+    });
+
+    it("hands back the same host type", ({ hostType }) => {
+      expect(hostType).toBe("Response");
+    });
   });
 
-  it("a construction of an unrelated name is not a host type", ({
-    hostTypeOfAConstructionOfAnUnrelatedName,
-  }) => {
-    expect(hostTypeOfAConstructionOfAnUnrelatedName).toBe(null);
+  describe("a method that is not one of the standard factories", () => {
+    const it = test.extend("hostType", () => {
+      const declared = parseSync("spec.ts", "const written = Response.clone();").program
+        .body[0] as ESTree.Statement;
+      const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
+      return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
+        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        qualified: (namespace, member) =>
+          namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+      });
+    });
+
+    it("is not a construction", ({ hostType }) => {
+      expect(hostType).toBe(null);
+    });
   });
 
-  it("a construction reached through a runtime namespace is that host type", ({
-    hostTypeOfAConstructionReachedThroughARuntimeNamespace,
-  }) => {
-    expect(hostTypeOfAConstructionReachedThroughARuntimeNamespace).toBe("Response");
+  describe("a host type the runtime gives no factory to", () => {
+    const it = test.extend("hostType", () => {
+      const declared = parseSync("spec.ts", "const written = Request.json({ id: 1 });").program
+        .body[0] as ESTree.Statement;
+      const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
+      return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
+        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        qualified: (namespace, member) =>
+          namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+      });
+    });
+
+    it("has no factory call to read", ({ hostType }) => {
+      expect(hostType).toBe(null);
+    });
   });
 
-  it("a construction reached through an unrelated namespace is not a host type", ({
-    hostTypeOfAConstructionReachedThroughAnUnrelatedNamespace,
-  }) => {
-    expect(hostTypeOfAConstructionReachedThroughAnUnrelatedNamespace).toBe(null);
+  describe("a method named at run time", () => {
+    const it = test.extend("hostType", () => {
+      const declared = parseSync("spec.ts", "const written = Response[member]();").program
+        .body[0] as ESTree.Statement;
+      const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
+      return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
+        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        qualified: (namespace, member) =>
+          namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+      });
+    });
+
+    it("is not a factory call", ({ hostType }) => {
+      expect(hostType).toBe(null);
+    });
   });
 
-  it("a constructor read off a name at run time is not a host type", ({
-    hostTypeOfAConstructorReadOffANameAtRunTime,
-  }) => {
-    expect(hostTypeOfAConstructorReadOffANameAtRunTime).toBe(null);
+  describe("a factory call on the value a call handed back", () => {
+    const it = test.extend("hostType", () => {
+      const declared = parseSync("spec.ts", "const written = build().json({ id: 1 });").program
+        .body[0] as ESTree.Statement;
+      const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
+      return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
+        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        qualified: (namespace, member) =>
+          namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+      });
+    });
+
+    it("is not a factory call", ({ hostType }) => {
+      expect(hostType).toBe(null);
+    });
   });
 
-  it("a constructor handed back by a call is not a host type", ({
-    hostTypeOfAConstructorHandedBackByACall,
-  }) => {
-    expect(hostTypeOfAConstructorHandedBackByACall).toBe(null);
+  describe("a bare call on a name", () => {
+    const it = test.extend("hostType", () => {
+      const declared = parseSync("spec.ts", "const written = read();").program
+        .body[0] as ESTree.Statement;
+      const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
+      return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
+        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        qualified: (namespace, member) =>
+          namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+      });
+    });
+
+    it("is not a factory call", ({ hostType }) => {
+      expect(hostType).toBe(null);
+    });
   });
 
-  it("the json factory hands back the same host type a construction does", ({
-    hostTypeOfTheJsonFactoryCall,
-  }) => {
-    expect(hostTypeOfTheJsonFactoryCall).toBe("Response");
+  describe("a bare name", () => {
+    const it = test.extend("hostType", () => {
+      const declared = parseSync("spec.ts", "const written = subject;").program
+        .body[0] as ESTree.Statement;
+      const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
+      return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
+        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        qualified: (namespace, member) =>
+          namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+      });
+    });
+
+    it("is neither a construction nor a factory call", ({ hostType }) => {
+      expect(hostType).toBe(null);
+    });
   });
 
-  it("the redirect factory hands back the same host type a construction does", ({
-    hostTypeOfTheRedirectFactoryCall,
-  }) => {
-    expect(hostTypeOfTheRedirectFactoryCall).toBe("Response");
+  describe("an object written out in place", () => {
+    const it = test.extend("hostType", () => {
+      const declared = parseSync("spec.ts", "const written = { status: 200 };").program
+        .body[0] as ESTree.Statement;
+      const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
+      return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
+        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        qualified: (namespace, member) =>
+          namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
+      });
+    });
+
+    it("is neither a construction nor a factory call", ({ hostType }) => {
+      expect(hostType).toBe(null);
+    });
+  });
+});
+
+describe("hostObjectTypesFrom", () => {
+  describe("the roster", () => {
+    const it = test.extend("hostTypes", () => hostObjectTypesFrom([]));
+
+    it("stands until the repository replaces it", ({ hostTypes }) => {
+      expect(hostTypes).toStrictEqual(new Set(["Request", "Response"]));
+    });
   });
 
-  it("the error factory hands back the same host type a construction does", ({
-    hostTypeOfTheErrorFactoryCall,
-  }) => {
-    expect(hostTypeOfTheErrorFactoryCall).toBe("Response");
+  describe("a rule run with a severity alone", () => {
+    const it = test.extend("hostTypes", () => hostObjectTypesFrom(["error"]));
+
+    it("keeps the roster the rule carries", ({ hostTypes }) => {
+      expect(hostTypes).toStrictEqual(new Set(["Request", "Response"]));
+    });
   });
 
-  it("a factory reached through a runtime namespace hands back the same host type", ({
-    hostTypeOfAFactoryCallReachedThroughARuntimeNamespace,
-  }) => {
-    expect(hostTypeOfAFactoryCallReachedThroughARuntimeNamespace).toBe("Response");
+  describe("a roster written as a single spelling rather than a list", () => {
+    const it = test.extend("hostTypes", () =>
+      hostObjectTypesFrom([{ hostObjectTypes: "Response" }]));
+
+    it("keeps the carried roster", ({ hostTypes }) => {
+      expect(hostTypes).toStrictEqual(new Set(["Request", "Response"]));
+    });
   });
 
-  it("a method that is not one of the standard factories is not a construction", ({
-    hostTypeOfAMethodThatIsNotOneOfTheStandardFactories,
-  }) => {
-    expect(hostTypeOfAMethodThatIsNotOneOfTheStandardFactories).toBe(null);
+  describe("an empty roster", () => {
+    const it = test.extend("hostTypes", () => hostObjectTypesFrom([{ hostObjectTypes: [] }]));
+
+    it("keeps the carried roster", ({ hostTypes }) => {
+      expect(hostTypes).toStrictEqual(new Set(["Request", "Response"]));
+    });
   });
 
-  it("a host type the runtime gives no factory to has no factory call to read", ({
-    hostTypeOfAFactoryCallOnAHostTypeThatHasNoFactory,
-  }) => {
-    expect(hostTypeOfAFactoryCallOnAHostTypeThatHasNoFactory).toBe(null);
+  describe("a roster holding nothing that reads as a spelling", () => {
+    const it = test.extend("hostTypes", () => hostObjectTypesFrom([{ hostObjectTypes: [1] }]));
+
+    it("keeps the carried roster", ({ hostTypes }) => {
+      expect(hostTypes).toStrictEqual(new Set(["Request", "Response"]));
+    });
   });
 
-  it("a method named at run time is not a factory call", ({ hostTypeOfAMethodNamedAtRunTime }) => {
-    expect(hostTypeOfAMethodNamedAtRunTime).toBe(null);
+  describe("a repository that names its own roster", () => {
+    const it = test.extend("hostTypes", () =>
+      hostObjectTypesFrom([{ hostObjectTypes: ["Headers"] }]));
+
+    it("is taken at its word", ({ hostTypes }) => {
+      expect(hostTypes).toStrictEqual(new Set(["Headers"]));
+    });
+  });
+});
+
+describe("runtimeModulesFrom", () => {
+  describe("the runtime module list", () => {
+    const it = test.extend("runtimeModules", () => runtimeModulesFrom([]));
+
+    it("stands until the repository replaces it", ({ runtimeModules }) => {
+      expect(runtimeModules).toStrictEqual(new Set(["undici"]));
+    });
   });
 
-  it("a factory call on the value a call handed back is not a factory call", ({
-    hostTypeOfAFactoryCallOnTheValueACallHandedBack,
-  }) => {
-    expect(hostTypeOfAFactoryCallOnTheValueACallHandedBack).toBe(null);
-  });
+  describe("a repository that names its own runtime modules", () => {
+    const it = test.extend("runtimeModules", () =>
+      runtimeModulesFrom([{ runtimeModules: ["@internal/http"] }]));
 
-  it("a bare call on a name is not a factory call", ({ hostTypeOfABareCallOnAName }) => {
-    expect(hostTypeOfABareCallOnAName).toBe(null);
-  });
-
-  it("a bare name is neither a construction nor a factory call", ({ hostTypeOfABareName }) => {
-    expect(hostTypeOfABareName).toBe(null);
-  });
-
-  it("an object written out in place is neither a construction nor a factory call", ({
-    hostTypeOfAnObjectWrittenOutInPlace,
-  }) => {
-    expect(hostTypeOfAnObjectWrittenOutInPlace).toBe(null);
-  });
-
-  it("the roster stands until the repository replaces it", ({ hostTypesReadWithoutOptions }) => {
-    expect(hostTypesReadWithoutOptions).toStrictEqual(new Set(["Request", "Response"]));
-  });
-
-  it("the runtime module list stands until the repository replaces it", ({
-    runtimeModulesReadWithoutOptions,
-  }) => {
-    expect(runtimeModulesReadWithoutOptions).toStrictEqual(new Set(["undici"]));
-  });
-
-  it("a rule run with a severity alone keeps the roster the rule carries", ({
-    hostTypesReadFromASeverityAlone,
-  }) => {
-    expect(hostTypesReadFromASeverityAlone).toStrictEqual(new Set(["Request", "Response"]));
-  });
-
-  it("a roster written as a single spelling rather than a list keeps the carried roster", ({
-    hostTypesReadFromASingleSpelling,
-  }) => {
-    expect(hostTypesReadFromASingleSpelling).toStrictEqual(new Set(["Request", "Response"]));
-  });
-
-  it("an empty roster keeps the carried roster", ({ hostTypesReadFromAnEmptyRoster }) => {
-    expect(hostTypesReadFromAnEmptyRoster).toStrictEqual(new Set(["Request", "Response"]));
-  });
-
-  it("a roster holding nothing that reads as a spelling keeps the carried roster", ({
-    hostTypesReadFromARosterHoldingNoSpelling,
-  }) => {
-    expect(hostTypesReadFromARosterHoldingNoSpelling).toStrictEqual(
-      new Set(["Request", "Response"]),
-    );
-  });
-
-  it("a repository that names its own roster is taken at its word", ({
-    hostTypesReadFromASpelledOutRoster,
-  }) => {
-    expect(hostTypesReadFromASpelledOutRoster).toStrictEqual(new Set(["Headers"]));
-  });
-
-  it("a repository that names its own runtime modules is taken at its word", ({
-    runtimeModulesReadFromASpelledOutList,
-  }) => {
-    expect(runtimeModulesReadFromASpelledOutList).toStrictEqual(new Set(["@internal/http"]));
+    it("is taken at its word", ({ runtimeModules }) => {
+      expect(runtimeModules).toStrictEqual(new Set(["@internal/http"]));
+    });
   });
 });

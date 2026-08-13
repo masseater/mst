@@ -5,9 +5,12 @@ export default defineConfig({
     coverage: {
       thresholds: { 100: true, perFile: true },
     },
+    restoreMocks: true,
+    unstubEnvs: true,
+    unstubGlobals: true,
   },
   pack: {
-    entry: ["src/index.ts", "src/plugin.ts"],
+    entry: ["src/cli.ts", "src/index.ts", "src/plugin.ts"],
     dts: {
       tsgo: true,
     },

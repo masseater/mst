@@ -1,24 +1,3 @@
-const MATCHER_FAMILIES = [
-  "containment",
-  "loose-structure",
-  "magnitude",
-  "partial-shape",
-  "runtime-type",
-  "thrown-value",
-  "truthiness",
-] as const;
-
-export type WeakMatcher = {
-  readonly name: string;
-  readonly family: (typeof MATCHER_FAMILIES)[number];
-  readonly unverified: string;
-};
-
-export type RedundantMatcher = {
-  readonly name: string;
-  readonly writeInstead: string;
-};
-
 export const EXACT_MATCHERS: ReadonlySet<string> = new Set(["toBe", "toStrictEqual"]);
 
 export const STRUCTURAL_MATCHERS: ReadonlySet<string> = new Set(["toEqual", "toStrictEqual"]);
@@ -66,7 +45,23 @@ export const ASSERTION_COUNT_DECLARATIONS: ReadonlySet<string> = new Set([
   "hasAssertions",
 ]);
 
-export const WEAK_MATCHERS: readonly WeakMatcher[] = [
+const MATCHER_FAMILIES = [
+  "containment",
+  "loose-structure",
+  "magnitude",
+  "partial-shape",
+  "runtime-type",
+  "thrown-value",
+  "truthiness",
+] as const;
+
+type WeakMatcher = {
+  readonly name: string;
+  readonly family: (typeof MATCHER_FAMILIES)[number];
+  readonly unverified: string;
+};
+
+const WEAK_MATCHERS: readonly WeakMatcher[] = [
   {
     name: "toBeTruthy",
     family: "truthiness",
@@ -184,7 +179,7 @@ export const WEAK_MATCHERS: readonly WeakMatcher[] = [
   },
 ];
 
-export const WEAK_ASYMMETRIC_MATCHERS: readonly WeakMatcher[] = [
+const WEAK_ASYMMETRIC_MATCHERS: readonly WeakMatcher[] = [
   {
     name: "anything",
     family: "runtime-type",
@@ -238,12 +233,21 @@ export const WEAK_ASYMMETRIC_MATCHERS: readonly WeakMatcher[] = [
   },
 ];
 
-export const REDUNDANT_MATCHERS: readonly RedundantMatcher[] = [
-  { name: "toBeNull", writeInstead: "toBe(null)" },
-  { name: "toBeUndefined", writeInstead: "toBe(undefined)" },
-  { name: "toBeNaN", writeInstead: "toBe(Number.NaN)" },
-  { name: "toBeCalled", writeInstead: "toHaveBeenCalled()" },
-  { name: "toBeCalledTimes", writeInstead: "toHaveBeenCalledTimes()" },
-  { name: "toBeCalledWith", writeInstead: "toHaveBeenCalledWith()" },
-  { name: "matchSnapshot", writeInstead: "toMatchSnapshot()" },
-];
+const unverifiedRegionsOf = (matchers: readonly WeakMatcher[]): ReadonlyMap<string, string> =>
+  new Map(matchers.map((matcher): [string, string] => [matcher.name, matcher.unverified]));
+
+export const UNVERIFIED_REGION_BY_WEAK_MATCHER: ReadonlyMap<string, string> =
+  unverifiedRegionsOf(WEAK_MATCHERS);
+
+export const UNVERIFIED_REGION_BY_WEAK_ASYMMETRIC_MATCHER: ReadonlyMap<string, string> =
+  unverifiedRegionsOf(WEAK_ASYMMETRIC_MATCHERS);
+
+export const CANONICAL_SPELLING_BY_REDUNDANT_MATCHER: ReadonlyMap<string, string> = new Map([
+  ["toBeNull", "toBe(null)"],
+  ["toBeUndefined", "toBe(undefined)"],
+  ["toBeNaN", "toBe(Number.NaN)"],
+  ["toBeCalled", "toHaveBeenCalled()"],
+  ["toBeCalledTimes", "toHaveBeenCalledTimes()"],
+  ["toBeCalledWith", "toHaveBeenCalledWith()"],
+  ["matchSnapshot", "toMatchSnapshot()"],
+]);

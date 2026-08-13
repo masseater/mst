@@ -22,7 +22,12 @@ describe("dont-review-it/no-spec-file-helper-function--inline-or-use-fixture", (
       },
       {
         name: "a function declared in the body of a fixture stays inside that fixture",
-        code: 'const it = test.extend("report", () => {\n  const build = () => 1;\n  return build();\n});',
+        code: 'describe("a report", () => {\n  const it = test.extend("report", () => {\n    const build = () => 1;\n    return build();\n  });\n});',
+        filename: SPEC_FILENAME,
+      },
+      {
+        name: "a fixture builder declared in the body of a grouping block stands beside the tests that read it",
+        code: 'describe("a report", () => {\n  const it = test.extend("report", () => summarise(rows));\n});',
         filename: SPEC_FILENAME,
       },
       {
@@ -47,7 +52,7 @@ describe("dont-review-it/no-spec-file-helper-function--inline-or-use-fixture", (
       },
       {
         name: "a fixture builder hands back a builder rather than a function of its own",
-        code: "const it = test.extend({ port: 3000 });",
+        code: 'describe("a report", () => {\n  const it = test.extend({ port: 3000 });\n});',
         filename: SPEC_FILENAME,
       },
       {
@@ -77,12 +82,12 @@ describe("dont-review-it/no-spec-file-helper-function--inline-or-use-fixture", (
       },
       {
         name: "a fixture handing back an imported binding hands back the code under test",
-        code: 'import { summarise } from "./summarise.ts";\nconst it = test.extend("summarise", () => summarise);',
+        code: 'import { summarise } from "./summarise.ts";\ndescribe("a report", () => {\n  const it = test.extend("summarise", () => summarise);\n});',
         filename: SPEC_FILENAME,
       },
       {
         name: "a fixture handing back the value a call produced hands back a subject",
-        code: 'const it = test.extend("report", () => summarise(rows));',
+        code: 'describe("a report", () => {\n  const it = test.extend("total", () => summarise(rows, DEFAULTS));\n});',
         filename: SPEC_FILENAME,
       },
       {
@@ -92,7 +97,7 @@ describe("dont-review-it/no-spec-file-helper-function--inline-or-use-fixture", (
       },
       {
         name: "a literal handed to a call is not the initialiser of a binding",
-        code: "const it = test.extend({ report: { build: () => 1 } });",
+        code: 'describe("a report", () => {\n  const it = test.extend({ report: { build: () => 1 } });\n});',
         filename: SPEC_FILENAME,
       },
       {
@@ -272,35 +277,71 @@ describe("dont-review-it/no-spec-file-helper-function--inline-or-use-fixture", (
       },
       {
         name: "a fixture handing back a function written in place hands back a procedure",
-        code: 'const it = test.extend("build", () => () => 1);',
+        code: 'describe("a report", () => {\n  const it = test.extend("build", () => () => 1);\n});',
         filename: SPEC_FILENAME,
         errors: [{ messageId: "handedHelperFixture", data: { name: "build" } }],
       },
       {
         name: "the handoff form hands the function to the callback all the same",
-        code: "const it = test.extend({\n  build: async ({}, use) => {\n    await use(() => 1);\n  },\n});",
+        code: 'describe("a report", () => {\n  const it = test.extend({\n    build: async ({}, use) => {\n      await use(() => 1);\n    },\n  });\n});',
         filename: SPEC_FILENAME,
         errors: [{ messageId: "handedHelperFixture", data: { name: "build" } }],
       },
       {
         name: "a fixture carrying a name that passes any other gate is read by its shape",
-        code: 'const it = test.extend("summarisedReportSubject", () => () => 1);',
+        code: 'describe("a report", () => {\n  const it = test.extend("summarisedReportSubject", () => () => 1);\n});',
         filename: SPEC_FILENAME,
         errors: [{ messageId: "handedHelperFixture", data: { name: "summarisedReportSubject" } }],
       },
       {
         name: "a fixture derived from another fixture hands back a function the same way",
-        code: 'const base = test.extend("rows", () => rows);\nconst it = base.extend("build", () => () => 1);',
+        code: 'describe("a report", () => {\n  const base = test.extend("rows", () => rows);\n  const it = base.extend("build", () => () => 1);\n});',
         filename: SPEC_FILENAME,
         errors: [{ messageId: "handedHelperFixture", data: { name: "build" } }],
       },
       {
         name: "every fixture a map declares is read on its own",
-        code: "const it = test.extend({\n  build: async ({}, use) => {\n    await use(() => 1);\n  },\n  settle: async ({}, use) => {\n    await use(() => 2);\n  },\n});",
+        code: 'describe("a report", () => {\n  const it = test.extend({\n    build: async ({}, use) => {\n      await use(() => 1);\n    },\n    settle: async ({}, use) => {\n      await use(() => 2);\n    },\n  });\n});',
         filename: SPEC_FILENAME,
         errors: [
           { messageId: "handedHelperFixture", data: { name: "build" } },
           { messageId: "handedHelperFixture", data: { name: "settle" } },
+        ],
+      },
+      {
+        name: "a fixture builder at module scope is reached by every test in the file",
+        code: 'const it = test.extend("report", () => summarise(rows));',
+        filename: SPEC_FILENAME,
+        errors: [{ messageId: "moduleScopeFixtureBinding", data: { name: "it" } }],
+      },
+      {
+        name: "a builder derived from another builder at module scope stands there just the same",
+        code: 'const base = test.extend("rows", () => rows);\nconst it = base.extend("report", () => summarise(rows));',
+        filename: SPEC_FILENAME,
+        errors: [
+          { messageId: "moduleScopeFixtureBinding", data: { name: "base" } },
+          { messageId: "moduleScopeFixtureBinding", data: { name: "it" } },
+        ],
+      },
+      {
+        name: "a chain of extends bound to one name is the one binding it stands in",
+        code: 'const it = test.extend("rows", () => rows).extend("report", () => summarise(rows));',
+        filename: SPEC_FILENAME,
+        errors: [{ messageId: "moduleScopeFixtureBinding", data: { name: "it" } }],
+      },
+      {
+        name: "a builder carrying a map of fixtures at module scope is named by the binding that holds it",
+        code: "const it = test.extend({ rows: () => rows, report: () => summarise(rows) });",
+        filename: SPEC_FILENAME,
+        errors: [{ messageId: "moduleScopeFixtureBinding", data: { name: "it" } }],
+      },
+      {
+        name: "a fixture standing at module scope and handing back a function carries both defects",
+        code: 'const it = test.extend("build", () => () => 1);',
+        filename: SPEC_FILENAME,
+        errors: [
+          { messageId: "moduleScopeFixtureBinding", data: { name: "it" } },
+          { messageId: "handedHelperFixture", data: { name: "build" } },
         ],
       },
     ],

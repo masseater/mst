@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -8,9 +8,7 @@ import { describe } from "vite-plus/test";
 import { loadWorkspaceDependencies } from "../lib/dependency-catalog/workspace-manifests.ts";
 import { createRequireCatalogEntry } from "./require-catalog-entry--register-shared-dependency.ts";
 
-const fixtureDir = join(tmpdir(), "dont-review-it-require-catalog-entry");
-rmSync(fixtureDir, { recursive: true, force: true });
-mkdirSync(fixtureDir, { recursive: true });
+const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-require-catalog-entry-"));
 
 const MODULE_SOURCE = "export const shipped = true;\n";
 

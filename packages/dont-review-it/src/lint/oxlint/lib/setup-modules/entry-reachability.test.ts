@@ -6,28 +6,34 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { couplingEdgesOf, parsedProgramAt } from "./entry-reachability.ts";
 
-const it = test
-  .extend("parsedProgram", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "setup-modules-entry-reachability-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
+describe("parsedProgramAt", () => {
+  describe("a path holding no file", () => {
+    const it = test.extend("parsedProgram", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "setup-modules-entry-reachability-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      return parsedProgramAt(join(root, "never-written.ts"));
     });
-    return parsedProgramAt(join(root, "never-written.ts"));
-  })
-  .extend("couplingEdges", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "setup-modules-entry-reachability-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
+
+    it("parses into no program", ({ parsedProgram }) => {
+      expect(parsedProgram).toBe(null);
     });
-    return couplingEdgesOf(join(root, "never-written.ts"));
   });
+});
 
-describe("setup-modules/entry-reachability", () => {
-  it("a path holding no file parses into no program", ({ parsedProgram }) => {
-    expect(parsedProgram).toBe(null);
-  });
+describe("couplingEdgesOf", () => {
+  describe("a path holding no file", () => {
+    const it = test.extend("couplingEdges", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "setup-modules-entry-reachability-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      return couplingEdgesOf(join(root, "never-written.ts"));
+    });
 
-  it("a path holding no file couples to nothing", ({ couplingEdges }) => {
-    expect(couplingEdges).toStrictEqual([]);
+    it("couples to nothing", ({ couplingEdges }) => {
+      expect(couplingEdges).toStrictEqual([]);
+    });
   });
 });

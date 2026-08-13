@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -9,9 +9,7 @@ import { noNormalizeSutOutput } from "./no-normalize-sut-output--assert-natural-
 
 const SPEC_FILE = "report.test.ts";
 
-const importingDir = join(tmpdir(), "dont-review-it-no-normalize-sut-output");
-rmSync(importingDir, { recursive: true, force: true });
-mkdirSync(importingDir, { recursive: true });
+const importingDir = mkdtempSync(join(tmpdir(), "dont-review-it-no-normalize-sut-output-"));
 writeFileSync(join(importingDir, "shape.ts"), "export const ordered = (rows) => rows.sort();\n");
 writeFileSync(join(importingDir, "widen.ts"), "export const widen = (rows) => rows.map(toRow);\n");
 writeFileSync(join(importingDir, "held.ts"), "export const held = summarise(input).sort();\n");

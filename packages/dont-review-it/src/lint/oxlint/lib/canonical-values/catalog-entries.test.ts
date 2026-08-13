@@ -41,322 +41,331 @@ const ORDER_STATUS_BEHIND_A_SECOND_DOC_BLOCK = `/**\n * ${TAG} order.status\n */
 
 const TAG_INSIDE_A_TEMPLATE_LITERAL = `export const EXAMPLE = \`\n/** ${TAG} doc.example */\nexport const STATUSES = ["alpha", "beta"];\n\`;\n`;
 
-const it = test
-  .extend("entriesOfAnAnnotatedArray", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
+describe("canonicalValuesEntriesIn", () => {
+  describe("an annotated array declaration", () => {
+    const it = test.extend("entryRows", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_ARRAY);
+      return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
+        (entry) => [
+          entry.conceptId,
+          entry.declarationPath,
+          entry.exportPath,
+          entry.values,
+          entry.fingerprint,
+        ],
+      );
     });
-    writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_ARRAY);
-    return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-      (entry) => [
-        entry.conceptId,
-        entry.declarationPath,
-        entry.exportPath,
-        entry.values,
-        entry.fingerprint,
-      ],
-    );
-  })
-  .extend("valuesOfAnAnnotatedObject", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
+
+    it("becomes the catalog entry for its concept", ({ entryRows }) => {
+      expect(entryRows).toStrictEqual([
+        [
+          "order.status",
+          "order-status.ts",
+          null,
+          ["draft", "published"],
+          fingerprintValues(["draft", "published"]),
+        ],
+      ]);
     });
-    writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_OBJECT);
-    return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-      (entry) => entry.values,
-    );
-  })
-  .extend("valuesOfAnAnnotatedTypeAlias", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_TYPE_ALIAS);
-    return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-      (entry) => entry.values,
-    );
-  })
-  .extend("exportPathsAnExportMapReaches", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    mkdirSync(join(root, "packages", "vocabulary", "src"), { recursive: true });
-    writeFileSync(
-      join(root, "packages", "vocabulary", "package.json"),
-      '{ "name": "@fixture/vocabulary", "exports": { ".": "./src/index.ts" } }',
-    );
-    writeFileSync(
-      join(root, "packages", "vocabulary", "src", "index.ts"),
-      'export { ORDER_STATUSES } from "./order-status.ts";\n',
-    );
-    writeFileSync(
-      join(root, "packages", "vocabulary", "src", "order-status.ts"),
-      ORDER_STATUS_DRAFT_ONLY,
-    );
-    return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-      (entry) => entry.exportPath,
-    );
-  })
-  .extend("exportPathsNoExportMapReaches", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    mkdirSync(join(root, "packages", "vocabulary", "src"), { recursive: true });
-    writeFileSync(
-      join(root, "packages", "vocabulary", "package.json"),
-      '{ "name": "@fixture/vocabulary", "exports": { ".": "./src/index.ts" } }',
-    );
-    writeFileSync(
-      join(root, "packages", "vocabulary", "src", "index.ts"),
-      "export const marker = 1;\n",
-    );
-    writeFileSync(
-      join(root, "packages", "vocabulary", "src", "order-status.ts"),
-      ORDER_STATUS_DRAFT_ONLY,
-    );
-    return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-      (entry) => entry.exportPath,
-    );
-  })
-  .extend("conceptIdsOfAConceptOutsideTheVocabulary", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    writeFileSync(join(root, "order-status.ts"), CONCEPT_OUTSIDE_THE_VOCABULARY);
-    return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-      (entry) => entry.conceptId,
-    );
-  })
-  .extend("conceptIdsOfADeclarationWithoutLiterals", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    writeFileSync(join(root, "order-status.ts"), DECLARATION_WITHOUT_LITERALS);
-    return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-      (entry) => entry.conceptId,
-    );
-  })
-  .extend("conceptIdsOfATagOutsideADocumentationBlock", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    writeFileSync(join(root, "order-status.ts"), TAG_OUTSIDE_A_DOC_BLOCK);
-    return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-      (entry) => entry.conceptId,
-    );
-  })
-  .extend("rowsOfADocumentationBlockAnnotation", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_ARRAY);
-    return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-      (entry) => [entry.conceptId, entry.values],
-    );
-  })
-  .extend("rowsOfALineCommentAnnotation", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_LINE_COMMENT);
-    return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-      (entry) => [entry.conceptId, entry.values],
-    );
-  })
-  .extend("rowsOfAnEnumBehindADocumentationBlock", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_ENUM_DOC_BLOCK);
-    return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-      (entry) => [entry.conceptId, entry.values],
-    );
-  })
-  .extend("rowsOfAnEnumBehindALineComment", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_ENUM_LINE_COMMENT);
-    return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-      (entry) => [entry.conceptId, entry.values],
-    );
-  })
-  .extend("valuesOfATypedDeclaration", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_TYPED_ARRAY);
-    return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-      (entry) => entry.values,
-    );
-  })
-  .extend("valuesOfQuotedObjectKeys", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_QUOTED_KEYS);
-    return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-      (entry) => entry.values,
-    );
-  })
-  .extend("rowsOfASingleValueDeclaration", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    writeFileSync(join(root, "payment-method.ts"), PAYMENT_METHOD_SINGLE_VALUE);
-    return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-      (entry) => [entry.conceptId, entry.values],
-    );
-  })
-  .extend("conceptIdsBehindASecondDocumentationBlock", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_BEHIND_A_SECOND_DOC_BLOCK);
-    return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-      (entry) => entry.conceptId,
-    );
-  })
-  .extend("conceptIdsInsideATemplateLiteral", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    writeFileSync(join(root, "documentation.ts"), TAG_INSIDE_A_TEMPLATE_LITERAL);
-    return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-      (entry) => entry.conceptId,
-    );
   });
 
-describe("catalog-entries", () => {
-  it("an annotated array declaration becomes the catalog entry for its concept", ({
-    entriesOfAnAnnotatedArray,
-  }) => {
-    expect(entriesOfAnAnnotatedArray).toStrictEqual([
-      [
-        "order.status",
-        "order-status.ts",
-        null,
-        ["draft", "published"],
-        fingerprintValues(["draft", "published"]),
-      ],
-    ]);
+  describe("an annotated object declaration", () => {
+    const it = test.extend("declaredValues", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_OBJECT);
+      return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
+        (entry) => entry.values,
+      );
+    });
+
+    it("takes the values its keys point at", ({ declaredValues }) => {
+      expect(declaredValues).toStrictEqual([["draft", "published"]]);
+    });
   });
 
-  it("an annotated object declaration takes the values its keys point at", ({
-    valuesOfAnAnnotatedObject,
-  }) => {
-    expect(valuesOfAnAnnotatedObject).toStrictEqual([["draft", "published"]]);
+  describe("an annotated type alias", () => {
+    const it = test.extend("declaredValues", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_TYPE_ALIAS);
+      return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
+        (entry) => entry.values,
+      );
+    });
+
+    it("takes the members of its union", ({ declaredValues }) => {
+      expect(declaredValues).toStrictEqual([["draft", "published"]]);
+    });
   });
 
-  it("an annotated type alias takes the members of its union", ({
-    valuesOfAnAnnotatedTypeAlias,
-  }) => {
-    expect(valuesOfAnAnnotatedTypeAlias).toStrictEqual([["draft", "published"]]);
+  describe("a declaration the package export map reaches", () => {
+    const it = test.extend("exportPaths", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages", "vocabulary", "src"), { recursive: true });
+      writeFileSync(
+        join(root, "packages", "vocabulary", "package.json"),
+        '{ "name": "@fixture/vocabulary", "exports": { ".": "./src/index.ts" } }',
+      );
+      writeFileSync(
+        join(root, "packages", "vocabulary", "src", "index.ts"),
+        'export { ORDER_STATUSES } from "./order-status.ts";\n',
+      );
+      writeFileSync(
+        join(root, "packages", "vocabulary", "src", "order-status.ts"),
+        ORDER_STATUS_DRAFT_ONLY,
+      );
+      return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
+        (entry) => entry.exportPath,
+      );
+    });
+
+    it("carries the specifier that reaches it", ({ exportPaths }) => {
+      expect(exportPaths).toStrictEqual(["@fixture/vocabulary"]);
+    });
   });
 
-  it("a declaration the package export map reaches carries the specifier that reaches it", ({
-    exportPathsAnExportMapReaches,
-  }) => {
-    expect(exportPathsAnExportMapReaches).toStrictEqual(["@fixture/vocabulary"]);
+  describe("a declaration no export map reaches", () => {
+    const it = test.extend("exportPaths", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages", "vocabulary", "src"), { recursive: true });
+      writeFileSync(
+        join(root, "packages", "vocabulary", "package.json"),
+        '{ "name": "@fixture/vocabulary", "exports": { ".": "./src/index.ts" } }',
+      );
+      writeFileSync(
+        join(root, "packages", "vocabulary", "src", "index.ts"),
+        "export const marker = 1;\n",
+      );
+      writeFileSync(
+        join(root, "packages", "vocabulary", "src", "order-status.ts"),
+        ORDER_STATUS_DRAFT_ONLY,
+      );
+      return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
+        (entry) => entry.exportPath,
+      );
+    });
+
+    it("carries no specifier", ({ exportPaths }) => {
+      expect(exportPaths).toStrictEqual([null]);
+    });
   });
 
-  it("a declaration no export map reaches carries no specifier", ({
-    exportPathsNoExportMapReaches,
-  }) => {
-    expect(exportPathsNoExportMapReaches).toStrictEqual([null]);
+  describe("a concept written outside the vocabulary", () => {
+    const it = test.extend("conceptIds", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "order-status.ts"), CONCEPT_OUTSIDE_THE_VOCABULARY);
+      return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
+        (entry) => entry.conceptId,
+      );
+    });
+
+    it("drops the hint instead of failing the build", ({ conceptIds }) => {
+      expect(conceptIds).toStrictEqual([]);
+    });
   });
 
-  it("a concept written outside the vocabulary drops the hint instead of failing the build", ({
-    conceptIdsOfAConceptOutsideTheVocabulary,
-  }) => {
-    expect(conceptIdsOfAConceptOutsideTheVocabulary).toStrictEqual([]);
+  describe("an annotation on a declaration that holds no literals", () => {
+    const it = test.extend("conceptIds", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "order-status.ts"), DECLARATION_WITHOUT_LITERALS);
+      return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
+        (entry) => entry.conceptId,
+      );
+    });
+
+    it("drops the hint", ({ conceptIds }) => {
+      expect(conceptIds).toStrictEqual([]);
+    });
   });
 
-  it("an annotation on a declaration that holds no literals drops the hint", ({
-    conceptIdsOfADeclarationWithoutLiterals,
-  }) => {
-    expect(conceptIdsOfADeclarationWithoutLiterals).toStrictEqual([]);
+  describe("the tag written outside a documentation block", () => {
+    const it = test.extend("conceptIds", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "order-status.ts"), TAG_OUTSIDE_A_DOC_BLOCK);
+      return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
+        (entry) => entry.conceptId,
+      );
+    });
+
+    it("declares nothing", ({ conceptIds }) => {
+      expect(conceptIds).toStrictEqual([]);
+    });
   });
 
-  it("the tag written outside a documentation block declares nothing", ({
-    conceptIdsOfATagOutsideADocumentationBlock,
-  }) => {
-    expect(conceptIdsOfATagOutsideADocumentationBlock).toStrictEqual([]);
+  describe("an annotation written as a documentation block", () => {
+    const it = test.extend("conceptRows", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_ARRAY);
+      return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
+        (entry) => [entry.conceptId, entry.values],
+      );
+    });
+
+    it("declares its concept", ({ conceptRows }) => {
+      expect(conceptRows).toStrictEqual([["order.status", ["draft", "published"]]]);
+    });
   });
 
-  it("an annotation written as a documentation block declares its concept", ({
-    rowsOfADocumentationBlockAnnotation,
-  }) => {
-    expect(rowsOfADocumentationBlockAnnotation).toStrictEqual([
-      ["order.status", ["draft", "published"]],
-    ]);
+  describe("an annotation written as a line comment", () => {
+    const it = test.extend("conceptRows", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_LINE_COMMENT);
+      return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
+        (entry) => [entry.conceptId, entry.values],
+      );
+    });
+
+    it("declares its concept", ({ conceptRows }) => {
+      expect(conceptRows).toStrictEqual([["order.status", ["draft", "published"]]]);
+    });
   });
 
-  it("an annotation written as a line comment declares its concept", ({
-    rowsOfALineCommentAnnotation,
-  }) => {
-    expect(rowsOfALineCommentAnnotation).toStrictEqual([["order.status", ["draft", "published"]]]);
+  describe("an enum annotated with a documentation block", () => {
+    const it = test.extend("conceptRows", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_ENUM_DOC_BLOCK);
+      return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
+        (entry) => [entry.conceptId, entry.values],
+      );
+    });
+
+    it("declares the values of its members", ({ conceptRows }) => {
+      expect(conceptRows).toStrictEqual([["order.status", ["draft", "published"]]]);
+    });
   });
 
-  it("an enum annotated with a documentation block declares the values of its members", ({
-    rowsOfAnEnumBehindADocumentationBlock,
-  }) => {
-    expect(rowsOfAnEnumBehindADocumentationBlock).toStrictEqual([
-      ["order.status", ["draft", "published"]],
-    ]);
+  describe("an enum annotated with a line comment", () => {
+    const it = test.extend("conceptRows", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_ENUM_LINE_COMMENT);
+      return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
+        (entry) => [entry.conceptId, entry.values],
+      );
+    });
+
+    it("declares the values of its members", ({ conceptRows }) => {
+      expect(conceptRows).toStrictEqual([["order.status", ["draft", "published"]]]);
+    });
   });
 
-  it("an enum annotated with a line comment declares the values of its members", ({
-    rowsOfAnEnumBehindALineComment,
-  }) => {
-    expect(rowsOfAnEnumBehindALineComment).toStrictEqual([
-      ["order.status", ["draft", "published"]],
-    ]);
+  describe("a declaration that spells its type before its values", () => {
+    const it = test.extend("declaredValues", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_TYPED_ARRAY);
+      return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
+        (entry) => entry.values,
+      );
+    });
+
+    it("keeps both", ({ declaredValues }) => {
+      expect(declaredValues).toStrictEqual([["draft", "published"]]);
+    });
   });
 
-  it("a declaration that spells its type before its values keeps both", ({
-    valuesOfATypedDeclaration,
-  }) => {
-    expect(valuesOfATypedDeclaration).toStrictEqual([["draft", "published"]]);
+  describe("the quoted keys of an annotated object", () => {
+    const it = test.extend("declaredValues", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_QUOTED_KEYS);
+      return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
+        (entry) => entry.values,
+      );
+    });
+
+    it("stay out of its vocabulary", ({ declaredValues }) => {
+      expect(declaredValues).toStrictEqual([["draft", "published"]]);
+    });
   });
 
-  it("the quoted keys of an annotated object stay out of its vocabulary", ({
-    valuesOfQuotedObjectKeys,
-  }) => {
-    expect(valuesOfQuotedObjectKeys).toStrictEqual([["draft", "published"]]);
+  describe("a declaration that holds a single value", () => {
+    const it = test.extend("conceptRows", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "payment-method.ts"), PAYMENT_METHOD_SINGLE_VALUE);
+      return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
+        (entry) => [entry.conceptId, entry.values],
+      );
+    });
+
+    it("is declared like any other", ({ conceptRows }) => {
+      expect(conceptRows).toStrictEqual([["payment.method", ["card"]]]);
+    });
   });
 
-  it("a declaration that holds a single value is declared like any other", ({
-    rowsOfASingleValueDeclaration,
-  }) => {
-    expect(rowsOfASingleValueDeclaration).toStrictEqual([["payment.method", ["card"]]]);
+  describe("a second documentation block between the annotation and the declaration", () => {
+    const it = test.extend("conceptIds", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_BEHIND_A_SECOND_DOC_BLOCK);
+      return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
+        (entry) => entry.conceptId,
+      );
+    });
+
+    it("keeps it", ({ conceptIds }) => {
+      expect(conceptIds).toStrictEqual(["order.status"]);
+    });
   });
 
-  it("a second documentation block between the annotation and the declaration keeps it", ({
-    conceptIdsBehindASecondDocumentationBlock,
-  }) => {
-    expect(conceptIdsBehindASecondDocumentationBlock).toStrictEqual(["order.status"]);
-  });
+  describe("an annotation written inside a template literal", () => {
+    const it = test.extend("conceptIds", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "documentation.ts"), TAG_INSIDE_A_TEMPLATE_LITERAL);
+      return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
+        (entry) => entry.conceptId,
+      );
+    });
 
-  it("an annotation written inside a template literal declares nothing", ({
-    conceptIdsInsideATemplateLiteral,
-  }) => {
-    expect(conceptIdsInsideATemplateLiteral).toStrictEqual([]);
+    it("declares nothing", ({ conceptIds }) => {
+      expect(conceptIds).toStrictEqual([]);
+    });
   });
 });

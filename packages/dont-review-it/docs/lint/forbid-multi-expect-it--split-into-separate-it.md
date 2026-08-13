@@ -52,7 +52,7 @@
 
 `packages/dont-review-it/src/lint/oxlint/lib/spec-syntax/test-block-modifiers.test.ts` の「a name the runner does not chain onto a block is not a modifier」は、`extend` / `override` / `scoped` の 3 つについて別々の事実を 1 つの名前の下で主張している。3 つは独立しているので、3 つのブロックに分かれる。
 
-分けようとして「複数の主張が同じ 1 つの返り値について語っている」と気付いたら、それは分割ではなく統合の合図である。同じファイルの「every modifier the runner chains onto a block is named as a modifier」は、集合の中身という 1 つの返り値を 1 本の `toStrictEqual` で固定していて、これが着地点の形である。fixture にその値を返させ、完全一致 1 本で固定する。
+分けようとして「複数の主張が同じ 1 つの返り値について語っている」と気付いたら、それは分割ではなく統合の合図である。同じファイルの「every modifier the runner chains onto a block is named as a modifier」は、修飾を全部繋いだブロック 1 つから読み取った並びという 1 つの返り値を 1 本の `toStrictEqual` で固定していて、これが着地点の形である。fixture にその値を返させ、完全一致 1 本で固定する。
 
 呼び先から本数が来ている場合、直し方は同じである。呼び先に置いたアサーションはブロックが走るときに走り、ブロックの名前の下で落ちる。置き場所を変えても、1 つの名前が複数の事実を抱えている状態は変わらない。
 

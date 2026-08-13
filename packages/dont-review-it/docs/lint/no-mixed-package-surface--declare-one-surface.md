@@ -84,6 +84,6 @@
 | `@mst/agentic-documents`   | `bin`        | 無し            |
 | `@mst/dont-review-it`      | `bin`        | `exports`       |
 | `@mst/lint-rule-authoring` | 無し         | `exports`       |
-| `@mst/utils`               | 無し         | `exports`       |
+| `@mst/repository-checks`   | 無し         | `exports`       |
 
 `@mst/agentic-documents` が報告されないのは、`exports` がマニフェスト自身にしか届いていないからである。`@mst/dont-review-it` は実行可能エントリと公開エントリを両方宣言しているため報告される。有効化するときは、割るか、期限付きの理由を書いて例外に登録するかを先に決めることになる。

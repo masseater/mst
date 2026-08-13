@@ -29,8 +29,8 @@ const OTHER: Placement = {
 };
 
 const FAR: Placement = {
-  relativePath: "packages/utils/src/far.ts",
-  workspacePath: "packages/utils",
+  relativePath: "packages/repository-checks/src/far.ts",
+  workspacePath: "packages/repository-checks",
 };
 
 const subjectFilename = join(repositoryRoot, SUBJECT.relativePath);

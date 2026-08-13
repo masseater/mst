@@ -7,6 +7,8 @@ const SPEC_FILENAME = "mailer.test.ts";
 
 const SOURCE_FILENAME = "mailer.ts";
 
+const RENAMED_NAMESPACE = { mockNamespaceSpellings: ["mocker"] };
+
 describe("dont-review-it/no-module-scope-mock-config--lift-into-fixture", () => {
   testLintRule(noModuleScopeMockConfig, {
     valid: [
@@ -170,6 +172,57 @@ describe("dont-review-it/no-module-scope-mock-config--lift-into-fixture", () => 
         code: "const sendMail = vi.fn();",
         filename: SPEC_FILENAME,
         options: [{ mockCreationMembers: ["build"] }],
+      },
+      {
+        name: "a fixture handed a ready value opens no body, and the fixture beside it still holds the mock",
+        code: "const it = test.extend('mailer', mailer);\nconst check = it.extend('sendMail', () => vi.fn());",
+        filename: SPEC_FILENAME,
+      },
+      {
+        name: "the namespace spelling on a name this file never binds is not the namespace",
+        code: "const sendMail = runner.vi.fn();",
+        filename: SPEC_FILENAME,
+      },
+      {
+        name: "a local object carrying the namespace spelling is not the whole module import",
+        code: "const runner = { vi: mailer };\nconst sendMail = runner.vi.fn();",
+        filename: SPEC_FILENAME,
+      },
+      {
+        name: "the namespace spelling reached through a chain of members is not the whole module import",
+        code: "const sendMail = helpers.runner.vi.fn();",
+        filename: SPEC_FILENAME,
+      },
+      {
+        name: "a subscript on a member chain that never touches the runner names nothing this rule reads",
+        code: "mailer.transport[member](1);",
+        filename: SPEC_FILENAME,
+      },
+      {
+        name: "a subscript on an import other than the namespace names nothing either",
+        code: "import { mailer } from './mailer.ts';\nmailer[member](1);",
+        filename: SPEC_FILENAME,
+      },
+      {
+        name: "a name that leads back to itself is followed once and then let go",
+        code: "const runner = alias;\nconst alias = runner;\nconst sendMail = runner.fn();",
+        filename: SPEC_FILENAME,
+      },
+      {
+        name: "a subscript on what another API's creation member handed back reaches no mock",
+        code: "const stub = helpers.fn();\nstub[member](1);",
+        filename: SPEC_FILENAME,
+      },
+      {
+        name: "a subscript on what an ordinary call handed back reaches no mock",
+        code: "const built = mailer.build();\nbuilt[member](1);",
+        filename: SPEC_FILENAME,
+      },
+      {
+        name: "the namespace named in the configuration takes the place of the default spelling",
+        code: "const sendMail = vi.fn();",
+        filename: SPEC_FILENAME,
+        options: [RENAMED_NAMESPACE],
       },
     ],
     invalid: [
@@ -377,6 +430,74 @@ describe("dont-review-it/no-module-scope-mock-config--lift-into-fixture", () => 
         code: "const sendMail = vi.fn();",
         filename: SPEC_FILENAME,
         options: [{ mockCreationMembers: [] }],
+        errors: [{ messageId: "mockCreationOutsideFixture" }],
+      },
+      {
+        name: "a replacement member on a receiver other than the namespace opens no factory",
+        code: "queue.mock('./mailer.ts', () => ({ send: vi.fn() }));",
+        filename: SPEC_FILENAME,
+        errors: [{ messageId: "mockCreationOutsideFixture" }],
+      },
+      {
+        name: "a mock taken apart by destructuring is reported where it was stood up",
+        code: "const { send } = vi.mocked(mailer);\nsend[member](1);",
+        filename: SPEC_FILENAME,
+        errors: [{ messageId: "mockCreationOutsideFixture" }],
+      },
+      {
+        name: "a subscript on a member of the mocked module is reached through the mock",
+        code: "const mailerMock = vi.mocked(mailer);\nmailerMock.send[member](1);",
+        filename: SPEC_FILENAME,
+        errors: [
+          { messageId: "mockCreationOutsideFixture" },
+          { messageId: "subscriptedMockWriting" },
+        ],
+      },
+      {
+        name: "a subscript on a binding holding a settled mock is reported as well",
+        code: "const settled = vi.fn().mockReturnValue(1);\nsettled[member](2);",
+        filename: SPEC_FILENAME,
+        errors: [
+          { messageId: "mockBehaviorOutsideFixture" },
+          { messageId: "subscriptedMockWriting" },
+        ],
+      },
+      {
+        name: "a setting on a receiver this rule cannot follow hands no mock to the subscript beside it",
+        code: "const chained = sendMail.mockReturnValue(1);\nchained[member](2);",
+        filename: SPEC_FILENAME,
+        errors: [{ messageId: "mockBehaviorOutsideFixture" }],
+      },
+      {
+        name: "a setting written on what a factory call handed back is a setting all the same",
+        code: "buildMailer().mockReturnValue(1);",
+        filename: SPEC_FILENAME,
+        errors: [{ messageId: "mockBehaviorOutsideFixture" }],
+      },
+      {
+        name: "a builder reached through a member chain that binds no test block opens no fixture body",
+        code: "const check = mailerHelpers.stubs.extend('sendMail', () => vi.fn());",
+        filename: SPEC_FILENAME,
+        errors: [{ messageId: "mockCreationOutsideFixture" }],
+      },
+      {
+        name: "a builder chosen at run time carries no name to root the fixture at",
+        code: "const check = (isSlow ? test : base).extend('sendMail', () => vi.fn());",
+        filename: SPEC_FILENAME,
+        errors: [{ messageId: "mockCreationOutsideFixture" }],
+      },
+      {
+        name: "an empty list in the configuration leaves the settings this rule knows standing",
+        code: "sendMail.mockReturnValue(1);",
+        filename: SPEC_FILENAME,
+        options: [{ mockBehaviorMembers: [] }],
+        errors: [{ messageId: "mockBehaviorOutsideFixture" }],
+      },
+      {
+        name: "the namespace named in the configuration is the namespace this rule reads",
+        code: "const sendMail = mocker.fn();",
+        filename: SPEC_FILENAME,
+        options: [RENAMED_NAMESPACE],
         errors: [{ messageId: "mockCreationOutsideFixture" }],
       },
     ],

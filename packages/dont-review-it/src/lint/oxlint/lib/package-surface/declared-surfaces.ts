@@ -2,6 +2,7 @@ import { dirname, join, relative, resolve } from "node:path";
 
 import { memoize } from "es-toolkit";
 
+import { isRecord } from "../../../../dependency-catalog/record-fields.ts";
 import {
   EXPORTS_CONDITION_DEPTH_LIMIT,
   MANIFEST_FILE_NAME,
@@ -31,9 +32,6 @@ const IMPORTABLE_SURFACE_FIELDS: readonly string[] = [
 const REPOSITORY_ROOT_PACKAGE = ".";
 
 const MANIFEST_SELF_SUBPATH = `./${MANIFEST_FILE_NAME}`;
-
-const isRecord = (declared: unknown): declared is Readonly<Record<string, unknown>> =>
-  declared !== null && typeof declared === "object" && !Array.isArray(declared);
 
 const declaresTarget = (declared: unknown, depth: number): boolean => {
   if (typeof declared === "string") return declared.trim() !== "";

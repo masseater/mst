@@ -33,157 +33,176 @@ const STALE_REGION_MESSAGE =
 const INCOMPLETE_WORKSPACE_MESSAGE =
   "ワークスペース `packages/example` の一覧を生成できない: マニフェストに説明が無い。空欄や欠落した行を出すと、存在するものが見えなくなったまま固定される。";
 
-const it = test
-  .extend("listProblemsWithoutAListConfiguration", async ({}, { onCleanup }) => {
-    const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-workspaces-"));
-    onCleanup(() => {
-      rmSync(repositoryRoot, { recursive: true, force: true });
-    });
-    return workspaceListProblems({
-      repositoryRoot,
-      config: { ...defaultConfig, workspaceList: null },
-      write: false,
-    });
-  })
-  .extend("listProblemsWithoutTheListDocument", async ({}, { onCleanup }) => {
-    const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-workspaces-"));
-    onCleanup(() => {
-      rmSync(repositoryRoot, { recursive: true, force: true });
-    });
-    mkdirSync(join(repositoryRoot, "packages", "example"), { recursive: true });
-    writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
-    writeFileSync(
-      join(repositoryRoot, "packages", "example", "package.json"),
-      DESCRIBED_MANIFEST,
-      "utf8",
-    );
-    return workspaceListProblems({ repositoryRoot, config: defaultConfig, write: false });
-  })
-  .extend("listProblemsWithoutAGeneratedRegion", async ({}, { onCleanup }) => {
-    const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-workspaces-"));
-    onCleanup(() => {
-      rmSync(repositoryRoot, { recursive: true, force: true });
-    });
-    mkdirSync(join(repositoryRoot, "packages", "example"), { recursive: true });
-    mkdirSync(join(repositoryRoot, "docs"), { recursive: true });
-    writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
-    writeFileSync(
-      join(repositoryRoot, "packages", "example", "package.json"),
-      DESCRIBED_MANIFEST,
-      "utf8",
-    );
-    writeFileSync(join(repositoryRoot, "docs", "workspaces.md"), "# ワークスペース\n", "utf8");
-    return workspaceListProblems({ repositoryRoot, config: defaultConfig, write: false });
-  })
-  .extend("listProblemsOfAStaleRegion", async ({}, { onCleanup }) => {
-    const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-workspaces-"));
-    onCleanup(() => {
-      rmSync(repositoryRoot, { recursive: true, force: true });
-    });
-    mkdirSync(join(repositoryRoot, "packages", "example"), { recursive: true });
-    mkdirSync(join(repositoryRoot, "docs"), { recursive: true });
-    writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
-    writeFileSync(
-      join(repositoryRoot, "packages", "example", "package.json"),
-      DESCRIBED_MANIFEST,
-      "utf8",
-    );
-    writeFileSync(join(repositoryRoot, "docs", "workspaces.md"), STALE_DOCUMENT, "utf8");
-    return workspaceListProblems({ repositoryRoot, config: defaultConfig, write: false });
-  })
-  .extend("listDocumentAfterWriting", async ({}, { onCleanup }) => {
-    const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-workspaces-"));
-    onCleanup(() => {
-      rmSync(repositoryRoot, { recursive: true, force: true });
-    });
-    mkdirSync(join(repositoryRoot, "packages", "example"), { recursive: true });
-    mkdirSync(join(repositoryRoot, "docs"), { recursive: true });
-    writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
-    writeFileSync(
-      join(repositoryRoot, "packages", "example", "package.json"),
-      DESCRIBED_MANIFEST,
-      "utf8",
-    );
-    writeFileSync(join(repositoryRoot, "docs", "workspaces.md"), STALE_DOCUMENT, "utf8");
-    await workspaceListProblems({ repositoryRoot, config: defaultConfig, write: true });
-    return readFileSync(join(repositoryRoot, "docs", "workspaces.md"), "utf8");
-  })
-  .extend("listProblemsAfterWriting", async ({}, { onCleanup }) => {
-    const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-workspaces-"));
-    onCleanup(() => {
-      rmSync(repositoryRoot, { recursive: true, force: true });
-    });
-    mkdirSync(join(repositoryRoot, "packages", "example"), { recursive: true });
-    mkdirSync(join(repositoryRoot, "docs"), { recursive: true });
-    writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
-    writeFileSync(
-      join(repositoryRoot, "packages", "example", "package.json"),
-      DESCRIBED_MANIFEST,
-      "utf8",
-    );
-    writeFileSync(join(repositoryRoot, "docs", "workspaces.md"), STALE_DOCUMENT, "utf8");
-    await workspaceListProblems({ repositoryRoot, config: defaultConfig, write: true });
-    return workspaceListProblems({ repositoryRoot, config: defaultConfig, write: false });
-  })
-  .extend("listProblemsOfAWorkspaceWithoutADescription", async ({}, { onCleanup }) => {
-    const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-workspaces-"));
-    onCleanup(() => {
-      rmSync(repositoryRoot, { recursive: true, force: true });
-    });
-    mkdirSync(join(repositoryRoot, "packages", "example"), { recursive: true });
-    mkdirSync(join(repositoryRoot, "docs"), { recursive: true });
-    writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
-    writeFileSync(
-      join(repositoryRoot, "packages", "example", "package.json"),
-      UNDESCRIBED_MANIFEST,
-      "utf8",
-    );
-    writeFileSync(
-      join(repositoryRoot, "docs", "workspaces.md"),
-      `# ワークスペース\n\n${BEGIN}\n\n${END}\n`,
-      "utf8",
-    );
-    return workspaceListProblems({ repositoryRoot, config: defaultConfig, write: false });
-  });
-
 describe("workspaceListProblems", () => {
-  it("一覧の設定が無い配置では何も要求しない", ({ listProblemsWithoutAListConfiguration }) => {
-    expect(listProblemsWithoutAListConfiguration).toStrictEqual([]);
+  describe("一覧の設定が無い配置", () => {
+    const it = test.extend("problems", async ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-workspaces-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      return workspaceListProblems({
+        repositoryRoot,
+        config: { ...defaultConfig, workspaceList: null },
+        write: false,
+      });
+    });
+
+    it("何も要求しない", ({ problems }) => {
+      expect(problems).toStrictEqual([]);
+    });
   });
 
-  it("一覧の文書が無いと報告する", ({ listProblemsWithoutTheListDocument }) => {
-    expect(listProblemsWithoutTheListDocument).toStrictEqual([
-      { file: "docs/workspaces.md", line: null, message: MISSING_DOCUMENT_MESSAGE },
-    ]);
+  describe("一覧の文書が無い配置", () => {
+    const it = test.extend("problems", async ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-workspaces-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      mkdirSync(join(repositoryRoot, "packages", "example"), { recursive: true });
+      writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      writeFileSync(
+        join(repositoryRoot, "packages", "example", "package.json"),
+        DESCRIBED_MANIFEST,
+        "utf8",
+      );
+      return workspaceListProblems({ repositoryRoot, config: defaultConfig, write: false });
+    });
+
+    it("一覧の文書が無いと報告する", ({ problems }) => {
+      expect(problems).toStrictEqual([
+        { file: "docs/workspaces.md", line: null, message: MISSING_DOCUMENT_MESSAGE },
+      ]);
+    });
   });
 
-  it("生成の境界が無いと報告する", ({ listProblemsWithoutAGeneratedRegion }) => {
-    expect(listProblemsWithoutAGeneratedRegion).toStrictEqual([
-      { file: "docs/workspaces.md", line: null, message: MISSING_REGION_MESSAGE },
-    ]);
+  describe("生成の境界を持たない一覧の文書", () => {
+    const it = test.extend("problems", async ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-workspaces-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      mkdirSync(join(repositoryRoot, "packages", "example"), { recursive: true });
+      mkdirSync(join(repositoryRoot, "docs"), { recursive: true });
+      writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      writeFileSync(
+        join(repositoryRoot, "packages", "example", "package.json"),
+        DESCRIBED_MANIFEST,
+        "utf8",
+      );
+      writeFileSync(join(repositoryRoot, "docs", "workspaces.md"), "# ワークスペース\n", "utf8");
+      return workspaceListProblems({ repositoryRoot, config: defaultConfig, write: false });
+    });
+
+    it("生成の境界が無いと報告する", ({ problems }) => {
+      expect(problems).toStrictEqual([
+        { file: "docs/workspaces.md", line: null, message: MISSING_REGION_MESSAGE },
+      ]);
+    });
   });
 
-  it("境界の内側が古いと報告する", ({ listProblemsOfAStaleRegion }) => {
-    expect(listProblemsOfAStaleRegion).toStrictEqual([
-      { file: "docs/workspaces.md", line: null, message: STALE_REGION_MESSAGE },
-    ]);
+  describe("境界の内側が古い一覧の文書", () => {
+    const it = test.extend("problems", async ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-workspaces-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      mkdirSync(join(repositoryRoot, "packages", "example"), { recursive: true });
+      mkdirSync(join(repositoryRoot, "docs"), { recursive: true });
+      writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      writeFileSync(
+        join(repositoryRoot, "packages", "example", "package.json"),
+        DESCRIBED_MANIFEST,
+        "utf8",
+      );
+      writeFileSync(join(repositoryRoot, "docs", "workspaces.md"), STALE_DOCUMENT, "utf8");
+      return workspaceListProblems({ repositoryRoot, config: defaultConfig, write: false });
+    });
+
+    it("境界の内側が古いと報告する", ({ problems }) => {
+      expect(problems).toStrictEqual([
+        { file: "docs/workspaces.md", line: null, message: STALE_REGION_MESSAGE },
+      ]);
+    });
   });
 
-  it("書き込む様態では境界の内側が生成結果になる", ({ listDocumentAfterWriting }) => {
-    expect(listDocumentAfterWriting).toBe(
-      `# ワークスペース\n\n${BEGIN}\n\n- \`packages/example\` — 説明\n\n${END}\n`,
-    );
+  describe("古い一覧の文書を書き込む様態で走らせた後", () => {
+    const it = test
+      .extend("listDocument", async ({}, { onCleanup }) => {
+        const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-workspaces-"));
+        onCleanup(() => {
+          rmSync(repositoryRoot, { recursive: true, force: true });
+        });
+        mkdirSync(join(repositoryRoot, "packages", "example"), { recursive: true });
+        mkdirSync(join(repositoryRoot, "docs"), { recursive: true });
+        writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+        writeFileSync(
+          join(repositoryRoot, "packages", "example", "package.json"),
+          DESCRIBED_MANIFEST,
+          "utf8",
+        );
+        writeFileSync(join(repositoryRoot, "docs", "workspaces.md"), STALE_DOCUMENT, "utf8");
+        await workspaceListProblems({ repositoryRoot, config: defaultConfig, write: true });
+        return readFileSync(join(repositoryRoot, "docs", "workspaces.md"), "utf8");
+      })
+      .extend("problems", async ({}, { onCleanup }) => {
+        const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-workspaces-"));
+        onCleanup(() => {
+          rmSync(repositoryRoot, { recursive: true, force: true });
+        });
+        mkdirSync(join(repositoryRoot, "packages", "example"), { recursive: true });
+        mkdirSync(join(repositoryRoot, "docs"), { recursive: true });
+        writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+        writeFileSync(
+          join(repositoryRoot, "packages", "example", "package.json"),
+          DESCRIBED_MANIFEST,
+          "utf8",
+        );
+        writeFileSync(join(repositoryRoot, "docs", "workspaces.md"), STALE_DOCUMENT, "utf8");
+        await workspaceListProblems({ repositoryRoot, config: defaultConfig, write: true });
+        return workspaceListProblems({ repositoryRoot, config: defaultConfig, write: false });
+      });
+
+    it("境界の内側が生成結果になる", ({ listDocument }) => {
+      expect(listDocument).toBe(
+        `# ワークスペース\n\n${BEGIN}\n\n- \`packages/example\` — 説明\n\n${END}\n`,
+      );
+    });
+
+    it("境界の内側が生成結果と一致するので報告しない", ({ problems }) => {
+      expect(problems).toStrictEqual([]);
+    });
   });
 
-  it("境界の内側が生成結果と一致していれば報告しない", ({ listProblemsAfterWriting }) => {
-    expect(listProblemsAfterWriting).toStrictEqual([]);
-  });
+  describe("説明の無いワークスペースを持つ配置", () => {
+    const it = test.extend("problems", async ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-workspaces-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      mkdirSync(join(repositoryRoot, "packages", "example"), { recursive: true });
+      mkdirSync(join(repositoryRoot, "docs"), { recursive: true });
+      writeFileSync(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      writeFileSync(
+        join(repositoryRoot, "packages", "example", "package.json"),
+        UNDESCRIBED_MANIFEST,
+        "utf8",
+      );
+      writeFileSync(
+        join(repositoryRoot, "docs", "workspaces.md"),
+        `# ワークスペース\n\n${BEGIN}\n\n${END}\n`,
+        "utf8",
+      );
+      return workspaceListProblems({ repositoryRoot, config: defaultConfig, write: false });
+    });
 
-  it("説明の無いワークスペースがあると生成の失敗として報告する", ({
-    listProblemsOfAWorkspaceWithoutADescription,
-  }) => {
-    expect(listProblemsOfAWorkspaceWithoutADescription).toStrictEqual([
-      { file: "packages/example/package.json", line: null, message: INCOMPLETE_WORKSPACE_MESSAGE },
-    ]);
+    it("生成の失敗として報告する", ({ problems }) => {
+      expect(problems).toStrictEqual([
+        {
+          file: "packages/example/package.json",
+          line: null,
+          message: INCOMPLETE_WORKSPACE_MESSAGE,
+        },
+      ]);
+    });
   });
 });

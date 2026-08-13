@@ -1,4 +1,5 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { collectBinding, isCallOf, newBinding } from "../lib/imported-binding.ts";
 import { propertyKeyOf } from "../lib/object-literal.ts";
 
 import type { ESTree } from "@oxlint/plugins";
@@ -10,47 +11,6 @@ const CONFIG_FACTORY_NAME = "defineConfig";
 const WRAPPER_SPECIFIER = "@mst/dont-review-it";
 
 const WRAPPER_NAME = "withGitExcludes";
-
-type ImportedBinding = {
-  readonly directNames: Set<string>;
-  readonly namespaceNames: Set<string>;
-};
-
-const newBinding = (): ImportedBinding => ({
-  directNames: new Set<string>(),
-  namespaceNames: new Set<string>(),
-});
-
-const importedNameOf = (specifier: ESTree.ImportSpecifier): string =>
-  specifier.imported.type === "Literal" ? specifier.imported.value : specifier.imported.name;
-
-const collectBinding = (
-  node: ESTree.ImportDeclaration,
-  target: { readonly exportedName: string; readonly binding: ImportedBinding },
-): void => {
-  for (const specifier of node.specifiers) {
-    if (specifier.type === "ImportNamespaceSpecifier") {
-      target.binding.namespaceNames.add(specifier.local.name);
-      continue;
-    }
-    if (specifier.type !== "ImportSpecifier") continue;
-    if (importedNameOf(specifier) !== target.exportedName) continue;
-    target.binding.directNames.add(specifier.local.name);
-  }
-};
-
-const isCallOf = (
-  callee: ESTree.Expression,
-  target: { readonly exportedName: string; readonly binding: ImportedBinding },
-): boolean => {
-  if (callee.type === "Identifier") return target.binding.directNames.has(callee.name);
-  if (callee.type !== "MemberExpression" || callee.computed) return false;
-  if (callee.object.type !== "Identifier" || callee.property.type !== "Identifier") return false;
-  return (
-    target.binding.namespaceNames.has(callee.object.name) &&
-    callee.property.name === target.exportedName
-  );
-};
 
 export const noUnwrappedToolchainConfig = createDontReviewItRule({
   name: "no-unwrapped-toolchain-config--wrap-with-git-excludes",

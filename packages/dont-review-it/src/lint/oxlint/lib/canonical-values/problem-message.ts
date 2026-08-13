@@ -23,5 +23,5 @@ export const formatEquivalentConceptGroup = (group: readonly CanonicalValuesEntr
   const declarations = group
     .map((entry) => `${entry.conceptId} (${entry.declarationPath})`)
     .join(", ");
-  return `${formatValues(group.flatMap((entry) => entry.values))} is declared by more than one concept: ${declarations}`;
+  return `${group.map((entry) => entry.declarationPath).join(" ")} One set of values must belong to one concept, because two names for the same set let each of them drift on its own. ${formatValues(group.flatMap((entry) => entry.values))} is declared by ${declarations}. Keep one of the concepts, and derive the others from the declaration that stays.`;
 };

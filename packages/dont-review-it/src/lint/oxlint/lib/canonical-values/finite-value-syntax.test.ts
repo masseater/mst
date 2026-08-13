@@ -19,45 +19,57 @@ const PROBE_META = {
   schema: [],
 };
 
-const it = test
-  .extend("verdictForTwoDistinctSpellings", () => isFiniteVocabulary(["draft", "published"]))
-  .extend("verdictForOneSpelling", () => isFiniteVocabulary(["draft"]))
-  .extend("verdictForTheSameSpellingTwice", () => isFiniteVocabulary(["draft", "draft"]))
-  .extend("verdictForBothBooleans", () => isFiniteVocabulary([true, false]))
-  .extend("verdictForABooleanBesideASpelling", () => isFiniteVocabulary([true, "draft"]))
-  .extend("verdictForANumberBesideTheSameDigits", () => isFiniteVocabulary([1, "1"]));
+describe("isFiniteVocabulary", () => {
+  describe("two distinct spellings", () => {
+    const it = test.extend("verdict", () => isFiniteVocabulary(["draft", "published"]));
 
-describe("finite-value-syntax", () => {
-  it("two distinct spellings are a vocabulary", ({ verdictForTwoDistinctSpellings }) => {
-    expect(verdictForTwoDistinctSpellings).toBe(true);
+    it("are a vocabulary", ({ verdict }) => {
+      expect(verdict).toBe(true);
+    });
   });
 
-  it("one spelling names a single value rather than a vocabulary", ({ verdictForOneSpelling }) => {
-    expect(verdictForOneSpelling).toBe(false);
+  describe("one spelling", () => {
+    const it = test.extend("verdict", () => isFiniteVocabulary(["draft"]));
+
+    it("names a single value rather than a vocabulary", ({ verdict }) => {
+      expect(verdict).toBe(false);
+    });
   });
 
-  it("the same spelling repeated is still one value", ({ verdictForTheSameSpellingTwice }) => {
-    expect(verdictForTheSameSpellingTwice).toBe(false);
+  describe("the same spelling repeated", () => {
+    const it = test.extend("verdict", () => isFiniteVocabulary(["draft", "draft"]));
+
+    it("is still one value", ({ verdict }) => {
+      expect(verdict).toBe(false);
+    });
   });
 
-  it("both booleans spelled out are the two sides of a flag, not a vocabulary", ({
-    verdictForBothBooleans,
-  }) => {
-    expect(verdictForBothBooleans).toBe(false);
+  describe("both booleans spelled out", () => {
+    const it = test.extend("verdict", () => isFiniteVocabulary([true, false]));
+
+    it("are the two sides of a flag, not a vocabulary", ({ verdict }) => {
+      expect(verdict).toBe(false);
+    });
   });
 
-  it("a boolean beside a spelling is a vocabulary because the flag is not the whole set", ({
-    verdictForABooleanBesideASpelling,
-  }) => {
-    expect(verdictForABooleanBesideASpelling).toBe(true);
+  describe("a boolean beside a spelling", () => {
+    const it = test.extend("verdict", () => isFiniteVocabulary([true, "draft"]));
+
+    it("is a vocabulary because the flag is not the whole set", ({ verdict }) => {
+      expect(verdict).toBe(true);
+    });
   });
 
-  it("a number and the same digits written as text are two values", ({
-    verdictForANumberBesideTheSameDigits,
-  }) => {
-    expect(verdictForANumberBesideTheSameDigits).toBe(true);
-  });
+  describe("a number and the same digits written as text", () => {
+    const it = test.extend("verdict", () => isFiniteVocabulary([1, "1"]));
 
+    it("are two values", ({ verdict }) => {
+      expect(verdict).toBe(true);
+    });
+  });
+});
+
+describe("staticArrayValues", () => {
   testLintRule(
     {
       name: "probe-static-array-values",
@@ -140,7 +152,9 @@ describe("finite-value-syntax", () => {
       ],
     },
   );
+});
 
+describe("literalUnionValues", () => {
   testLintRule(
     {
       name: "probe-literal-union-values",
@@ -198,7 +212,9 @@ describe("finite-value-syntax", () => {
       ],
     },
   );
+});
 
+describe("schemaUnionLiterals", () => {
   testLintRule(
     {
       name: "probe-schema-union-literals",
@@ -281,7 +297,9 @@ describe("finite-value-syntax", () => {
       ],
     },
   );
+});
 
+describe("propertyKeyName", () => {
   testLintRule(
     {
       name: "probe-property-key-name",

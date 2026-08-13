@@ -10,6 +10,8 @@ mst は、リポジトリ運用の仕組みを再利用可能な単位として�
 
 規範の書き方は `docs/normative-notation.md` に従う。
 
+この文書はリポジトリの運用規約を持つ。実装とレビューで個々の判断をどう下すかは `docs/guidelines/` が持つ。
+
 ## 規約
 
 - IF: ツールチェーンに関わる道具を選ぶ; THEN MUST: Vite+（vite-plus）に一本化する
@@ -26,9 +28,22 @@ mst は、リポジトリ運用の仕組みを再利用可能な単位として�
   - MUST: 追加した時点で出た error をすべて解消してから merge する
   - PROHIBIT: 自分の判断で warn にする
     - warn にするかは人間が決める
-- IF: 依存のバージョンを宣言する; THEN
-  - MUST: `pnpm-workspace.yaml` の catalog に集約する
-  - MUST: 各ワークスペースから `catalog:` で参照する
+- IF: 守りたい不変条件に対してルールを用意する; THEN
+  - MUST: 同じ不変条件を守る公式ルール（oxlint の組み込みと同梱プラグイン）を先に探す
+  - MUST: 組み込みのルール、同梱プラグインのルール、自前のルールの順に検討する
+  - PROHIBIT: 公式ルールで守れる不変条件を自前ルールとして書く
+- IF: 公式ルールの報告文を読んでも、何を直せばよいかが決まらない; THEN
+  - MAY: その不変条件だけ自前ルールとして書く
+    - 判定の精度ではなく報告文で決める。精度は上流が上げるが、報告文は上流が上げない
+  - MUST: 書いたら、同じ不変条件を見ている公式ルールを off にする
+    - 権威が 2 つあると同じ違反が 2 回報告され、どちらを黙らせるかを書き手が選べてしまう
+- IF: 複数のワークスペースが同じ依存を使う; THEN
+  - MUST: バージョンを `pnpm-workspace.yaml` の catalog に集約し、各ワークスペースから `catalog:` で参照する
+- IF: 依存を使うワークスペースが 1 つだけ; THEN
+  - MUST: そのワークスペースの `package.json` にバージョンを直接書く
+  - PROHIBIT: catalog に載せる
+    - 共有していないバージョンが catalog に混ざると、どの依存を揃えるべきかが catalog から読めなくなる
+  - 例外は overrides が `catalog:` で参照する依存（`vite` など）で、使用箇所の数に関わらず catalog に置く
 - IF: Node のバージョンを固定する; THEN
   - MUST: `package.json` の `devEngines.runtime` に置き、`onFail` を `error` にする
   - PROHIBIT: `.node-version` や `.tool-versions` を置く
@@ -36,15 +51,21 @@ mst は、リポジトリ運用の仕組みを再利用可能な単位として�
   - MUST: `mise.toml` を追加する
   - PROHIBIT: `mise.toml` に node を書く
 - IF: `vite` の依存を整理する; THEN
-  - PROHIBIT: ルートと `packages/utils` の `vite` 直接依存を削除する
+  - PROHIBIT: ルートと `packages/repository-checks` の `vite` 直接依存を削除する
   - PROHIBIT: `knip.json` の `ignoreDependencies` から `vite` を外す
-- IF: テストを置く; THEN
+- IF: カバレッジ担保のテストを置く; THEN
   - MUST: 対象ソースと同じディレクトリに `<ソース名>.test.ts` として置く
   - PROHIBIT: `tests/` `test/` `__tests__/` `spec/` を作る
-  - PROHIBIT: `.spec.ts` を使う
-- IF: テストの実行経路を決める; THEN
-  - MUST: CI で実行する
-  - PROHIBIT: pre-push に含める
+- IF: 仕様担保のテストを置く; THEN
+  - MUST: パッケージ直下の `specs/` に `<機能名>.spec.ts` として置く
+  - MUST: 書き方を `packages/verified-specifications/AGENTS.md` に従わせる
+- IF: テストの実行経路を決める; THEN MUST: main に入るすべての経路が通るまとまりに含める
+- IF: main への merge を判断する; THEN
+  - MUST: 各パッケージの `SPECIFICATIONS.md` の diff を何よりも先に読み、主張の変化をすべて承認してから merge する
+    - この diff がリポジトリの約束の変化そのものであり、ここを読み飛ばした merge は仕様の変更を無審査で通す
+  - PROHIBIT: `SPECIFICATIONS.md` に diff が出ているのに読まずに merge する
+  - MAY: それ以外のテストの diff は読まない
+    - カバレッジ担保テストの中身は guard が守るもので、merge の判断材料ではない
 - IF: `package.json` の依存や `devEngines` を変更した; THEN MUST: コミット前に `vp install --frozen-lockfile` が通ることを確認する
 - IF: `.github/workflows/ci.yml` の `voidzero-dev/setup-vp` を書く; THEN
   - MUST: commit SHA で固定する
@@ -71,7 +92,7 @@ mst は、リポジトリ運用の仕組みを再利用可能な単位として�
 - `vp run -r build` — 全ワークスペースのビルド
 - `vp run knip` — 未使用の依存・export・ファイルの検出
 - `vp run dev` — 開発サーバー（`apps/website`）
-- `vp run guard` — check → test → build → knip → 規範文書の検査。CI とフックが呼ぶ唯一のゲート
+- `vp run guard` — CI とフックが呼ぶ唯一のゲート。何を実行するかは `package.json` の `guard` が持つ
 - `vp run guard:fix` — 自動で直せるものを直し、生成部分を更新する
 
 ## 自作 lint ルールの実行時間を見る

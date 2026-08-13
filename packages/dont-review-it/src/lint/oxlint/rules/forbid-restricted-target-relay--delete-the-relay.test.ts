@@ -99,6 +99,12 @@ describe("dont-review-it/forbid-restricted-target-relay--delete-the-relay", () =
         options: restrictedRetiredLib,
       },
       {
+        name: "forwarding the vocabulary a boundary publishes keeps the target off this surface",
+        code: 'export { read } from "./boundary.ts";',
+        filename: join(fixtureDir, "relay/reader.ts"),
+        options: restrictedRetiredLib,
+      },
+      {
         name: "reading a module that holds the target inside itself reaches nothing",
         code: 'import { anything } from "./inner-only.ts";',
         filename: join(fixtureDir, "relay/reader.ts"),

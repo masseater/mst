@@ -27,6 +27,7 @@ export const UPSTREAM_RULES: NonNullable<OxlintConfig["rules"]> = {
   "no-dupe-else-if": LINT_SEVERITY.ERROR,
   "no-duplicate-case": LINT_SEVERITY.ERROR,
   "no-empty-character-class": LINT_SEVERITY.ERROR,
+  "no-empty-pattern": [LINT_SEVERITY.ERROR, { allowObjectPatternsAsParameters: true }],
   "no-ex-assign": LINT_SEVERITY.ERROR,
   "no-extra-boolean-cast": LINT_SEVERITY.ERROR,
   "no-fallthrough": LINT_SEVERITY.ERROR,
@@ -55,6 +56,10 @@ export const UPSTREAM_RULES: NonNullable<OxlintConfig["rules"]> = {
   "prefer-rest-params": LINT_SEVERITY.ERROR,
   "prefer-spread": LINT_SEVERITY.ERROR,
   "import/default": LINT_SEVERITY.ERROR,
+  "import/export": LINT_SEVERITY.ERROR,
+  "import/namespace": LINT_SEVERITY.ERROR,
+  "import/no-named-as-default": LINT_SEVERITY.ERROR,
+  "import/no-named-as-default-member": LINT_SEVERITY.ERROR,
   "jsx-a11y/alt-text": LINT_SEVERITY.ERROR,
   "jsx-a11y/anchor-has-content": LINT_SEVERITY.ERROR,
   "jsx-a11y/anchor-is-valid": LINT_SEVERITY.ERROR,
@@ -82,13 +87,8 @@ export const UPSTREAM_RULES: NonNullable<OxlintConfig["rules"]> = {
   "jsx-a11y/role-supports-aria-props": LINT_SEVERITY.ERROR,
   "jsx-a11y/scope": LINT_SEVERITY.ERROR,
   "jsx-a11y/tabindex-no-positive": LINT_SEVERITY.ERROR,
-  "import/export": LINT_SEVERITY.ERROR,
-  "import/namespace": LINT_SEVERITY.ERROR,
-  "import/no-named-as-default": LINT_SEVERITY.ERROR,
-  "import/no-named-as-default-member": LINT_SEVERITY.ERROR,
   "promise/no-callback-in-promise": LINT_SEVERITY.ERROR,
   "promise/no-new-statics": LINT_SEVERITY.ERROR,
-  "promise/prefer-await-to-then": LINT_SEVERITY.ERROR,
   "promise/valid-params": LINT_SEVERITY.ERROR,
   "typescript/adjacent-overload-signatures": LINT_SEVERITY.ERROR,
   "typescript/array-type": LINT_SEVERITY.ERROR,
@@ -178,7 +178,7 @@ export const UPSTREAM_RULES: NonNullable<OxlintConfig["rules"]> = {
   "typescript/use-unknown-in-catch-callback-variable": LINT_SEVERITY.ERROR,
 };
 
-const MAX_NESTED_DESCRIBE = 2;
+const MAX_NESTED_DESCRIBE = 4;
 
 export const UPSTREAM_TEST_RULES: NonNullable<OxlintConfig["rules"]> = {
   "no-empty-pattern": LINT_SEVERITY.OFF,

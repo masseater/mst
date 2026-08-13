@@ -64,6 +64,11 @@ describe("dont-review-it/no-sut-independent-assertion--assert-fixture-subject", 
         code: 'test("carries the id", () => {\n  expect(report).toBe("a");\n});',
       },
       {
+        name: "a name the spec wrote over with the code's output still turns on the code",
+        filename: SPEC_FILE,
+        code: 'let id = "a";\nid = summarise(input);\ntest("carries the id", () => {\n  expect(id).toBe("a");\n});',
+      },
+      {
         name: "two names holding the same written-out value are still two bindings",
         filename: SPEC_FILE,
         code: 'test("carries the id", ({ report }) => {\n  expect(report).toStrictEqual({ ...report, id: "b" });\n});',

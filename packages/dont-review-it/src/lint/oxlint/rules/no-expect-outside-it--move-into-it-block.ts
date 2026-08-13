@@ -3,6 +3,7 @@ import { uniqBy } from "es-toolkit";
 import { createDontReviewItRule } from "../../../create-rule.ts";
 import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { resolveBinding } from "../lib/resolved-bindings.ts";
+import { optionsRecord } from "../lib/rule-options.ts";
 import { isFixtureBuilderCall } from "../lib/spec-syntax/fixture-declarations.ts";
 import {
   ASSERTION_COUNT_DECLARATIONS,
@@ -22,11 +23,8 @@ import { testBlockRootIdentifier } from "../lib/spec-syntax/test-block-modifiers
 import type { ESTree, FixFn, Options, Variable } from "@oxlint/plugins";
 
 const blockSpellingFrom = (options: Readonly<Options>): string => {
-  const [first] = options;
-  if (typeof first !== "object" || first === null || Array.isArray(first)) return "it";
-
-  const { blockSpelling } = first;
-  return typeof blockSpelling === "string" ? blockSpelling : "it";
+  const configured = optionsRecord(options)?.blockSpelling;
+  return typeof configured === "string" ? configured : "it";
 };
 
 type BlockBody = {

@@ -60,6 +60,12 @@ describe("dont-review-it/forbid-generic-restriction-rule--use-the-declared-rule"
         code: `const { "no-restricted-imports": held } = carried;`,
       },
       {
+        name: "an added entry naming no rule adds no ban",
+        code: `export default { lint: { rules: { "no-restricted-html-elements": "error" } } };`,
+        filename: CONFIG_FILE,
+        options: [{ restrictionRules: [{ rule: "", substitute: MODULE_IMPORT_RULE }] }],
+      },
+      {
         name: "a registered exception carrying grounds is the path this rule leaves open",
         code: `export default { lint: { rules: { "no-restricted-syntax": "error" } } };`,
         filename: CONFIG_FILE,
@@ -211,6 +217,18 @@ describe("dont-review-it/forbid-generic-restriction-rule--use-the-declared-rule"
         filename: CONFIG_FILE,
         options: [{ restrictionRules: [{ rule: "no-restricted-html-elements" }] }],
         errors: [{ messageId: "undelegatedRestrictionRule" }],
+      },
+      {
+        name: "an exception naming no rule grants no exemption",
+        code: `export default { lint: { rules: { "no-restricted-syntax": "error" } } };`,
+        filename: CONFIG_FILE,
+        options: [{ exceptions: [{ rule: "", reason: "the shape has no rule of its own yet" }] }],
+        errors: [
+          {
+            messageId: "undelegatedRestrictionRule",
+            data: { ruleName: "no-restricted-syntax", substitute: "" },
+          },
+        ],
       },
     ],
   });

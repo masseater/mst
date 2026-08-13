@@ -5,221 +5,286 @@ import { rankOfLevel, severityLevelOf, strongestLevelAmong } from "./severity-le
 
 import type { ESTree } from "@oxlint/plugins";
 
-const it = test
-  .extend("levelsOfTheWordError", () =>
-    parseSync("severity.ts", `const severity = "error";`)
-      .program.body.map((parsed) => parsed as ESTree.Statement)
-      .flatMap((declared) => (declared.type === "VariableDeclaration" ? declared.declarations : []))
-      .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
-      .map((spelled) => severityLevelOf(spelled)))
-  .extend("levelsOfTheWordDeny", () =>
-    parseSync("severity.ts", `const severity = "deny";`)
-      .program.body.map((parsed) => parsed as ESTree.Statement)
-      .flatMap((declared) => (declared.type === "VariableDeclaration" ? declared.declarations : []))
-      .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
-      .map((spelled) => severityLevelOf(spelled)),
-  )
-  .extend("levelsOfTheLoudestDigit", () =>
-    parseSync("severity.ts", "const severity = 2;")
-      .program.body.map((parsed) => parsed as ESTree.Statement)
-      .flatMap((declared) => (declared.type === "VariableDeclaration" ? declared.declarations : []))
-      .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
-      .map((spelled) => severityLevelOf(spelled)),
-  )
-  .extend("levelsOfAListOpenedByTheFailingWord", () =>
-    parseSync("severity.ts", `const severity = ["error", { max: 1 }];`)
-      .program.body.map((parsed) => parsed as ESTree.Statement)
-      .flatMap((declared) => (declared.type === "VariableDeclaration" ? declared.declarations : []))
-      .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
-      .map((spelled) => severityLevelOf(spelled)),
-  )
-  .extend("levelsOfANamedConstantSpellingTheLoudest", () =>
-    parseSync("severity.ts", "const severity = LINT_SEVERITY.ERROR;")
-      .program.body.map((parsed) => parsed as ESTree.Statement)
-      .flatMap((declared) => (declared.type === "VariableDeclaration" ? declared.declarations : []))
-      .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
-      .map((spelled) => severityLevelOf(spelled)),
-  )
-  .extend("levelsOfTheWordWarn", () =>
-    parseSync("severity.ts", `const severity = "warn";`)
-      .program.body.map((parsed) => parsed as ESTree.Statement)
-      .flatMap((declared) => (declared.type === "VariableDeclaration" ? declared.declarations : []))
-      .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
-      .map((spelled) => severityLevelOf(spelled)),
-  )
-  .extend("levelsOfTheWarningDigit", () =>
-    parseSync("severity.ts", "const severity = 1;")
-      .program.body.map((parsed) => parsed as ESTree.Statement)
-      .flatMap((declared) => (declared.type === "VariableDeclaration" ? declared.declarations : []))
-      .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
-      .map((spelled) => severityLevelOf(spelled)),
-  )
-  .extend("levelsOfTheWordOff", () =>
-    parseSync("severity.ts", `const severity = "off";`)
-      .program.body.map((parsed) => parsed as ESTree.Statement)
-      .flatMap((declared) => (declared.type === "VariableDeclaration" ? declared.declarations : []))
-      .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
-      .map((spelled) => severityLevelOf(spelled)),
-  )
-  .extend("levelsOfTheWordAllow", () =>
-    parseSync("severity.ts", `const severity = "allow";`)
-      .program.body.map((parsed) => parsed as ESTree.Statement)
-      .flatMap((declared) => (declared.type === "VariableDeclaration" ? declared.declarations : []))
-      .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
-      .map((spelled) => severityLevelOf(spelled)),
-  )
-  .extend("levelsOfTheSilentDigit", () =>
-    parseSync("severity.ts", "const severity = 0;")
-      .program.body.map((parsed) => parsed as ESTree.Statement)
-      .flatMap((declared) => (declared.type === "VariableDeclaration" ? declared.declarations : []))
-      .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
-      .map((spelled) => severityLevelOf(spelled)),
-  )
-  .extend("levelsOfAName", () =>
-    parseSync("severity.ts", "const severity = chosenSeverity;")
-      .program.body.map((parsed) => parsed as ESTree.Statement)
-      .flatMap((declared) => (declared.type === "VariableDeclaration" ? declared.declarations : []))
-      .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
-      .map((spelled) => severityLevelOf(spelled)),
-  )
-  .extend("levelsOfAWordOutsideTheVocabulary", () =>
-    parseSync("severity.ts", `const severity = "quiet";`)
-      .program.body.map((parsed) => parsed as ESTree.Statement)
-      .flatMap((declared) => (declared.type === "VariableDeclaration" ? declared.declarations : []))
-      .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
-      .map((spelled) => severityLevelOf(spelled)),
-  )
-  .extend("levelsOfADigitOutsideTheVocabulary", () =>
-    parseSync("severity.ts", "const severity = 3;")
-      .program.body.map((parsed) => parsed as ESTree.Statement)
-      .flatMap((declared) => (declared.type === "VariableDeclaration" ? declared.declarations : []))
-      .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
-      .map((spelled) => severityLevelOf(spelled)),
-  )
-  .extend("levelsOfAnEmptyList", () =>
-    parseSync("severity.ts", "const severity = [];")
-      .program.body.map((parsed) => parsed as ESTree.Statement)
-      .flatMap((declared) => (declared.type === "VariableDeclaration" ? declared.declarations : []))
-      .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
-      .map((spelled) => severityLevelOf(spelled)),
-  )
-  .extend("rankOfTheSilentLevel", () => rankOfLevel("off"))
-  .extend("rankOfTheWarningLevel", () => rankOfLevel("warn"))
-  .extend("rankOfTheFailingLevel", () => rankOfLevel("error"))
-  .extend("rankOfALevelOutsideTheVocabulary", () => rankOfLevel("chosen"))
-  .extend("strongestLevelsAmongSilentFailingAndWarning", () =>
-    [["off", "error", "warn"]].map((levels) => strongestLevelAmong(levels)),
-  )
-  .extend("strongestLevelsAmongSilentAndWarning", () =>
-    [["off", "warn"]].map((levels) => strongestLevelAmong(levels)),
-  )
-  .extend("strongestLevelsAmongSilentAlone", () =>
-    [["off"]].map((levels) => strongestLevelAmong(levels)),
-  )
-  .extend("strongestLevelsAmongNothing", () =>
-    [[]].map((levels: readonly string[]) => strongestLevelAmong(levels)),
-  );
+describe("severityLevelOf", () => {
+  describe("the word a run fails on", () => {
+    const it = test.extend("levels", () =>
+      parseSync("severity.ts", `const severity = "error";`)
+        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .flatMap((declared) =>
+          declared.type === "VariableDeclaration" ? declared.declarations : [],
+        )
+        .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
+        .map((spelled) => severityLevelOf(spelled)));
 
-describe("severity-levels", () => {
-  it("the word a run fails on lands on the error level", ({ levelsOfTheWordError }) => {
-    expect(levelsOfTheWordError).toStrictEqual(["error"]);
+    it("lands on the error level", ({ levels }) => {
+      expect(levels).toStrictEqual(["error"]);
+    });
   });
 
-  it("the word a run denies on lands on the error level", ({ levelsOfTheWordDeny }) => {
-    expect(levelsOfTheWordDeny).toStrictEqual(["error"]);
+  describe("the word a run denies on", () => {
+    const it = test.extend("levels", () =>
+      parseSync("severity.ts", `const severity = "deny";`)
+        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .flatMap((declared) =>
+          declared.type === "VariableDeclaration" ? declared.declarations : [],
+        )
+        .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
+        .map((spelled) => severityLevelOf(spelled)));
+
+    it("lands on the error level", ({ levels }) => {
+      expect(levels).toStrictEqual(["error"]);
+    });
   });
 
-  it("the loudest digit lands on the error level", ({ levelsOfTheLoudestDigit }) => {
-    expect(levelsOfTheLoudestDigit).toStrictEqual(["error"]);
+  describe("the loudest digit", () => {
+    const it = test.extend("levels", () =>
+      parseSync("severity.ts", "const severity = 2;")
+        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .flatMap((declared) =>
+          declared.type === "VariableDeclaration" ? declared.declarations : [],
+        )
+        .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
+        .map((spelled) => severityLevelOf(spelled)));
+
+    it("lands on the error level", ({ levels }) => {
+      expect(levels).toStrictEqual(["error"]);
+    });
   });
 
-  it("a list opened by the failing word lands on the error level", ({
-    levelsOfAListOpenedByTheFailingWord,
-  }) => {
-    expect(levelsOfAListOpenedByTheFailingWord).toStrictEqual(["error"]);
+  describe("a list opened by the failing word", () => {
+    const it = test.extend("levels", () =>
+      parseSync("severity.ts", `const severity = ["error", { max: 1 }];`)
+        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .flatMap((declared) =>
+          declared.type === "VariableDeclaration" ? declared.declarations : [],
+        )
+        .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
+        .map((spelled) => severityLevelOf(spelled)));
+
+    it("lands on the error level", ({ levels }) => {
+      expect(levels).toStrictEqual(["error"]);
+    });
   });
 
-  it("a named constant spelling the loudest lands on the error level", ({
-    levelsOfANamedConstantSpellingTheLoudest,
-  }) => {
-    expect(levelsOfANamedConstantSpellingTheLoudest).toStrictEqual(["error"]);
+  describe("a named constant spelling the loudest", () => {
+    const it = test.extend("levels", () =>
+      parseSync("severity.ts", "const severity = LINT_SEVERITY.ERROR;")
+        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .flatMap((declared) =>
+          declared.type === "VariableDeclaration" ? declared.declarations : [],
+        )
+        .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
+        .map((spelled) => severityLevelOf(spelled)));
+
+    it("lands on the error level", ({ levels }) => {
+      expect(levels).toStrictEqual(["error"]);
+    });
   });
 
-  it("the word a run warns on lands on the warn level", ({ levelsOfTheWordWarn }) => {
-    expect(levelsOfTheWordWarn).toStrictEqual(["warn"]);
+  describe("the word a run warns on", () => {
+    const it = test.extend("levels", () =>
+      parseSync("severity.ts", `const severity = "warn";`)
+        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .flatMap((declared) =>
+          declared.type === "VariableDeclaration" ? declared.declarations : [],
+        )
+        .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
+        .map((spelled) => severityLevelOf(spelled)));
+
+    it("lands on the warn level", ({ levels }) => {
+      expect(levels).toStrictEqual(["warn"]);
+    });
   });
 
-  it("the warning digit lands on the warn level", ({ levelsOfTheWarningDigit }) => {
-    expect(levelsOfTheWarningDigit).toStrictEqual(["warn"]);
+  describe("the warning digit", () => {
+    const it = test.extend("levels", () =>
+      parseSync("severity.ts", "const severity = 1;")
+        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .flatMap((declared) =>
+          declared.type === "VariableDeclaration" ? declared.declarations : [],
+        )
+        .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
+        .map((spelled) => severityLevelOf(spelled)));
+
+    it("lands on the warn level", ({ levels }) => {
+      expect(levels).toStrictEqual(["warn"]);
+    });
   });
 
-  it("the word a run stays silent on lands on the off level", ({ levelsOfTheWordOff }) => {
-    expect(levelsOfTheWordOff).toStrictEqual(["off"]);
+  describe("the word a run stays silent on", () => {
+    const it = test.extend("levels", () =>
+      parseSync("severity.ts", `const severity = "off";`)
+        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .flatMap((declared) =>
+          declared.type === "VariableDeclaration" ? declared.declarations : [],
+        )
+        .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
+        .map((spelled) => severityLevelOf(spelled)));
+
+    it("lands on the off level", ({ levels }) => {
+      expect(levels).toStrictEqual(["off"]);
+    });
   });
 
-  it("the word a run allows lands on the off level", ({ levelsOfTheWordAllow }) => {
-    expect(levelsOfTheWordAllow).toStrictEqual(["off"]);
+  describe("the word a run allows", () => {
+    const it = test.extend("levels", () =>
+      parseSync("severity.ts", `const severity = "allow";`)
+        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .flatMap((declared) =>
+          declared.type === "VariableDeclaration" ? declared.declarations : [],
+        )
+        .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
+        .map((spelled) => severityLevelOf(spelled)));
+
+    it("lands on the off level", ({ levels }) => {
+      expect(levels).toStrictEqual(["off"]);
+    });
   });
 
-  it("the silent digit lands on the off level", ({ levelsOfTheSilentDigit }) => {
-    expect(levelsOfTheSilentDigit).toStrictEqual(["off"]);
+  describe("the silent digit", () => {
+    const it = test.extend("levels", () =>
+      parseSync("severity.ts", "const severity = 0;")
+        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .flatMap((declared) =>
+          declared.type === "VariableDeclaration" ? declared.declarations : [],
+        )
+        .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
+        .map((spelled) => severityLevelOf(spelled)));
+
+    it("lands on the off level", ({ levels }) => {
+      expect(levels).toStrictEqual(["off"]);
+    });
   });
 
-  it("a name this reader cannot resolve has no level", ({ levelsOfAName }) => {
-    expect(levelsOfAName).toStrictEqual([null]);
+  describe("a name this reader cannot resolve", () => {
+    const it = test.extend("levels", () =>
+      parseSync("severity.ts", "const severity = chosenSeverity;")
+        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .flatMap((declared) =>
+          declared.type === "VariableDeclaration" ? declared.declarations : [],
+        )
+        .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
+        .map((spelled) => severityLevelOf(spelled)));
+
+    it("has no level", ({ levels }) => {
+      expect(levels).toStrictEqual([null]);
+    });
   });
 
-  it("a word outside the vocabulary has no level", ({ levelsOfAWordOutsideTheVocabulary }) => {
-    expect(levelsOfAWordOutsideTheVocabulary).toStrictEqual([null]);
+  describe("a word outside the vocabulary", () => {
+    const it = test.extend("levels", () =>
+      parseSync("severity.ts", `const severity = "quiet";`)
+        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .flatMap((declared) =>
+          declared.type === "VariableDeclaration" ? declared.declarations : [],
+        )
+        .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
+        .map((spelled) => severityLevelOf(spelled)));
+
+    it("has no level", ({ levels }) => {
+      expect(levels).toStrictEqual([null]);
+    });
   });
 
-  it("a digit outside the vocabulary has no level", ({ levelsOfADigitOutsideTheVocabulary }) => {
-    expect(levelsOfADigitOutsideTheVocabulary).toStrictEqual([null]);
+  describe("a digit outside the vocabulary", () => {
+    const it = test.extend("levels", () =>
+      parseSync("severity.ts", "const severity = 3;")
+        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .flatMap((declared) =>
+          declared.type === "VariableDeclaration" ? declared.declarations : [],
+        )
+        .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
+        .map((spelled) => severityLevelOf(spelled)));
+
+    it("has no level", ({ levels }) => {
+      expect(levels).toStrictEqual([null]);
+    });
   });
 
-  it("an empty list has no level", ({ levelsOfAnEmptyList }) => {
-    expect(levelsOfAnEmptyList).toStrictEqual([null]);
+  describe("an empty list", () => {
+    const it = test.extend("levels", () =>
+      parseSync("severity.ts", "const severity = [];")
+        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .flatMap((declared) =>
+          declared.type === "VariableDeclaration" ? declared.declarations : [],
+        )
+        .flatMap((binding) => (binding.init === null ? [] : [binding.init]))
+        .map((spelled) => severityLevelOf(spelled)));
+
+    it("has no level", ({ levels }) => {
+      expect(levels).toStrictEqual([null]);
+    });
+  });
+});
+
+describe("rankOfLevel", () => {
+  describe("the silent level", () => {
+    const it = test.extend("rank", () => rankOfLevel("off"));
+
+    it("ranks at the bottom", ({ rank }) => {
+      expect(rank).toBe(0);
+    });
   });
 
-  it("the silent level ranks at the bottom", ({ rankOfTheSilentLevel }) => {
-    expect(rankOfTheSilentLevel).toBe(0);
+  describe("the warning level", () => {
+    const it = test.extend("rank", () => rankOfLevel("warn"));
+
+    it("ranks above the silent one", ({ rank }) => {
+      expect(rank).toBe(1);
+    });
   });
 
-  it("the warning level ranks above the silent one", ({ rankOfTheWarningLevel }) => {
-    expect(rankOfTheWarningLevel).toBe(1);
+  describe("the failing level", () => {
+    const it = test.extend("rank", () => rankOfLevel("error"));
+
+    it("ranks above the warning one", ({ rank }) => {
+      expect(rank).toBe(2);
+    });
   });
 
-  it("the failing level ranks above the warning one", ({ rankOfTheFailingLevel }) => {
-    expect(rankOfTheFailingLevel).toBe(2);
+  describe("a level outside the vocabulary", () => {
+    const it = test.extend("rank", () => rankOfLevel("chosen"));
+
+    it("ranks at the bottom", ({ rank }) => {
+      expect(rank).toBe(0);
+    });
+  });
+});
+
+describe("strongestLevelAmong", () => {
+  describe("a block spelling the silent, the failing, and the warning level", () => {
+    const it = test.extend("strongestLevels", () =>
+      [["off", "error", "warn"]].map((levels) => strongestLevelAmong(levels)));
+
+    it("holds the failing level as the strongest one", ({ strongestLevels }) => {
+      expect(strongestLevels).toStrictEqual(["error"]);
+    });
   });
 
-  it("a level outside the vocabulary ranks at the bottom", ({
-    rankOfALevelOutsideTheVocabulary,
-  }) => {
-    expect(rankOfALevelOutsideTheVocabulary).toBe(0);
+  describe("a block spelling the silent and the warning level", () => {
+    const it = test.extend("strongestLevels", () =>
+      [["off", "warn"]].map((levels) => strongestLevelAmong(levels)));
+
+    it("holds the warning level as the strongest one when nothing fails", ({ strongestLevels }) => {
+      expect(strongestLevels).toStrictEqual(["warn"]);
+    });
   });
 
-  it("the failing level is the strongest one a block spells", ({
-    strongestLevelsAmongSilentFailingAndWarning,
-  }) => {
-    expect(strongestLevelsAmongSilentFailingAndWarning).toStrictEqual(["error"]);
+  describe("a block spelling the silent level alone", () => {
+    const it = test.extend("strongestLevels", () =>
+      [["off"]].map((levels) => strongestLevelAmong(levels)));
+
+    it("holds the silent level as the strongest one", ({ strongestLevels }) => {
+      expect(strongestLevels).toStrictEqual(["off"]);
+    });
   });
 
-  it("the warning level is the strongest one when nothing fails", ({
-    strongestLevelsAmongSilentAndWarning,
-  }) => {
-    expect(strongestLevelsAmongSilentAndWarning).toStrictEqual(["warn"]);
-  });
+  describe("a block spelling no level at all", () => {
+    const it = test.extend("strongestLevels", () =>
+      [[]].map((levels: readonly string[]) => strongestLevelAmong(levels)));
 
-  it("the silent level is the strongest one when nothing else is spelled", ({
-    strongestLevelsAmongSilentAlone,
-  }) => {
-    expect(strongestLevelsAmongSilentAlone).toStrictEqual(["off"]);
-  });
-
-  it("a block spelling no level at all is held at the silent one", ({
-    strongestLevelsAmongNothing,
-  }) => {
-    expect(strongestLevelsAmongNothing).toStrictEqual(["off"]);
+    it("is held at the silent one", ({ strongestLevels }) => {
+      expect(strongestLevels).toStrictEqual(["off"]);
+    });
   });
 });

@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -17,9 +17,8 @@ const PARTIAL_SHAPE = { messageId: "vacuousPartialShape" };
 
 const RECORD = { messageId: "vacuousSnapshotRecord" };
 
-const recordedDir = join(tmpdir(), "dont-review-it-no-vacuous-host-object-equality");
+const recordedDir = mkdtempSync(join(tmpdir(), "dont-review-it-no-vacuous-host-object-equality-"));
 
-rmSync(recordedDir, { recursive: true, force: true });
 mkdirSync(join(recordedDir, "__snapshots__"), { recursive: true });
 
 const recordedSpec = join(recordedDir, SPEC_FILENAME);

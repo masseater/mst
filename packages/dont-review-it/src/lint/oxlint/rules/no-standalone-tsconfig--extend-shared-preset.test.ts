@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -9,9 +9,7 @@ import { noStandaloneTsconfig } from "./no-standalone-tsconfig--extend-shared-pr
 
 const sharedPresets = ["dont-review-it/tsconfig/library.json", "dont-review-it/tsconfig/app.json"];
 
-const fixtureDir = join(tmpdir(), "dont-review-it-no-standalone-tsconfig");
-rmSync(fixtureDir, { recursive: true, force: true });
-mkdirSync(fixtureDir, { recursive: true });
+const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-no-standalone-tsconfig-"));
 
 mkdirSync(join(fixtureDir, "extends-library"), { recursive: true });
 writeFileSync(

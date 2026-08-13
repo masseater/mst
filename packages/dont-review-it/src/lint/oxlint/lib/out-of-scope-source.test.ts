@@ -2,145 +2,176 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { isOutOfScopeSource } from "./out-of-scope-source.ts";
 
-const it = test
-  .extend("verdictOnTypeScriptTest", () =>
-    isOutOfScopeSource("packages/order/src/order-status.test.ts"))
-  .extend("verdictOnComponentSpec", () =>
-    isOutOfScopeSource("packages/order/src/order-status.spec.tsx"),
-  )
-  .extend("verdictOnModuleTest", () =>
-    isOutOfScopeSource("packages/order/src/order-status.test.mjs"),
-  )
-  .extend("verdictOnPluralStory", () =>
-    isOutOfScopeSource("packages/order/src/order-status.stories.tsx"),
-  )
-  .extend("verdictOnSingularStory", () =>
-    isOutOfScopeSource("packages/order/src/order-status.story.tsx"),
-  )
-  .extend("verdictOnFixturesDirectory", () =>
-    isOutOfScopeSource("packages/order/fixtures/order-status.ts"),
-  )
-  .extend("verdictOnUnderscoredFixturesDirectory", () =>
-    isOutOfScopeSource("packages/order/__fixtures__/order-status.ts"),
-  )
-  .extend("verdictOnUnderscoredMocksDirectory", () =>
-    isOutOfScopeSource("packages/order/__mocks__/order-status.ts"),
-  )
-  .extend("verdictOnUnderscoredStoriesDirectory", () =>
-    isOutOfScopeSource("packages/order/__stories__/order-status.ts"),
-  )
-  .extend("verdictOnUnderscoredTestsDirectory", () =>
-    isOutOfScopeSource("packages/order/__tests__/order-status.ts"),
-  )
-  .extend("verdictOnTestDirectory", () => isOutOfScopeSource("packages/order/test/order-status.ts"))
-  .extend("verdictOnTestsDirectory", () =>
-    isOutOfScopeSource("packages/order/tests/order-status.ts"),
-  )
-  .extend("verdictOnWindowsFixturesDirectory", () =>
-    isOutOfScopeSource("packages\\order\\fixtures\\order-status.ts"),
-  )
-  .extend("verdictOnWindowsTestFile", () =>
-    isOutOfScopeSource("packages\\order\\src\\order-status.test.ts"),
-  )
-  .extend("verdictOnProductionSource", () =>
-    isOutOfScopeSource("packages/order/src/order-status.ts"),
-  )
-  .extend("verdictOnSourceNamedAfterTests", () =>
-    isOutOfScopeSource("packages/order/src/test-helpers.ts"),
-  )
-  .extend("verdictOnSourceEndingInTest", () => isOutOfScopeSource("packages/order/src/latest.ts"))
-  .extend("verdictOnPackageNamedAfterTesting", () =>
-    isOutOfScopeSource("packages/testing-library/src/order-status.ts"),
-  );
+describe("isOutOfScopeSource", () => {
+  describe("a name carrying a suffix the runner claims", () => {
+    describe("a test source", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/order/src/order-status.test.ts"));
 
-describe("out-of-scope-source", () => {
-  it("a test source is out of scope", ({ verdictOnTypeScriptTest }) => {
-    expect(verdictOnTypeScriptTest).toBe(true);
+      it("is out of scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(true);
+      });
+    });
+
+    describe("a spec source carrying the component extension", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/order/src/order-status.spec.tsx"));
+
+      it("is out of scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(true);
+      });
+    });
+
+    describe("a test source carrying the module extension", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/order/src/order-status.test.mjs"));
+
+      it("is out of scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(true);
+      });
+    });
+
+    describe("a story spelled in the plural", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/order/src/order-status.stories.tsx"));
+
+      it("is out of scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(true);
+      });
+    });
+
+    describe("a story spelled in the singular", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/order/src/order-status.story.tsx"));
+
+      it("is out of scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(true);
+      });
+    });
   });
 
-  it("a spec source carrying the component extension is out of scope", ({
-    verdictOnComponentSpec,
-  }) => {
-    expect(verdictOnComponentSpec).toBe(true);
+  describe("a path holding a directory the runner claims", () => {
+    describe("a file under a fixtures directory", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/order/fixtures/order-status.ts"));
+
+      it("is out of scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(true);
+      });
+    });
+
+    describe("a file under an underscored fixtures directory", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/order/__fixtures__/order-status.ts"));
+
+      it("is out of scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(true);
+      });
+    });
+
+    describe("a file under an underscored mocks directory", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/order/__mocks__/order-status.ts"));
+
+      it("is out of scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(true);
+      });
+    });
+
+    describe("a file under an underscored stories directory", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/order/__stories__/order-status.ts"));
+
+      it("is out of scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(true);
+      });
+    });
+
+    describe("a file under an underscored tests directory", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/order/__tests__/order-status.ts"));
+
+      it("is out of scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(true);
+      });
+    });
+
+    describe("a file under a test directory", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/order/test/order-status.ts"));
+
+      it("is out of scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(true);
+      });
+    });
+
+    describe("a file under a tests directory", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/order/tests/order-status.ts"));
+
+      it("is out of scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(true);
+      });
+    });
   });
 
-  it("a test source carrying the module extension is out of scope", ({ verdictOnModuleTest }) => {
-    expect(verdictOnModuleTest).toBe(true);
+  describe("a path written on the windows separator", () => {
+    describe("a path holding a fixtures directory", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages\\order\\fixtures\\order-status.ts"));
+
+      it("names its fixtures directory on its own separator and falls out of scope", ({
+        outOfScope,
+      }) => {
+        expect(outOfScope).toBe(true);
+      });
+    });
+
+    describe("a path naming a test file", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages\\order\\src\\order-status.test.ts"));
+
+      it("names its test file on its own separator and falls out of scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(true);
+      });
+    });
   });
 
-  it("a story spelled in the plural is out of scope", ({ verdictOnPluralStory }) => {
-    expect(verdictOnPluralStory).toBe(true);
-  });
+  describe("a path the runner claims nothing of", () => {
+    describe("a production source", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/order/src/order-status.ts"));
 
-  it("a story spelled in the singular is out of scope", ({ verdictOnSingularStory }) => {
-    expect(verdictOnSingularStory).toBe(true);
-  });
+      it("stays in scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(false);
+      });
+    });
 
-  it("a file under a fixtures directory is out of scope", ({ verdictOnFixturesDirectory }) => {
-    expect(verdictOnFixturesDirectory).toBe(true);
-  });
+    describe("a source whose name opens with the word test", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/order/src/test-helpers.ts"));
 
-  it("a file under an underscored fixtures directory is out of scope", ({
-    verdictOnUnderscoredFixturesDirectory,
-  }) => {
-    expect(verdictOnUnderscoredFixturesDirectory).toBe(true);
-  });
+      it("stays in scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(false);
+      });
+    });
 
-  it("a file under an underscored mocks directory is out of scope", ({
-    verdictOnUnderscoredMocksDirectory,
-  }) => {
-    expect(verdictOnUnderscoredMocksDirectory).toBe(true);
-  });
+    describe("a source whose name ends in the word test", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/order/src/latest.ts"));
 
-  it("a file under an underscored stories directory is out of scope", ({
-    verdictOnUnderscoredStoriesDirectory,
-  }) => {
-    expect(verdictOnUnderscoredStoriesDirectory).toBe(true);
-  });
+      it("stays in scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(false);
+      });
+    });
 
-  it("a file under an underscored tests directory is out of scope", ({
-    verdictOnUnderscoredTestsDirectory,
-  }) => {
-    expect(verdictOnUnderscoredTestsDirectory).toBe(true);
-  });
+    describe("a package whose name carries the word testing", () => {
+      const it = test.extend("outOfScope", () =>
+        isOutOfScopeSource("packages/testing-library/src/order-status.ts"));
 
-  it("a file under a test directory is out of scope", ({ verdictOnTestDirectory }) => {
-    expect(verdictOnTestDirectory).toBe(true);
-  });
-
-  it("a file under a tests directory is out of scope", ({ verdictOnTestsDirectory }) => {
-    expect(verdictOnTestsDirectory).toBe(true);
-  });
-
-  it("a windows path names its fixtures directory on its own separator", ({
-    verdictOnWindowsFixturesDirectory,
-  }) => {
-    expect(verdictOnWindowsFixturesDirectory).toBe(true);
-  });
-
-  it("a windows path names its test file on its own separator", ({ verdictOnWindowsTestFile }) => {
-    expect(verdictOnWindowsTestFile).toBe(true);
-  });
-
-  it("a production source stays in scope", ({ verdictOnProductionSource }) => {
-    expect(verdictOnProductionSource).toBe(false);
-  });
-
-  it("a source whose name opens with the word test stays in scope", ({
-    verdictOnSourceNamedAfterTests,
-  }) => {
-    expect(verdictOnSourceNamedAfterTests).toBe(false);
-  });
-
-  it("a source whose name ends in the word test stays in scope", ({
-    verdictOnSourceEndingInTest,
-  }) => {
-    expect(verdictOnSourceEndingInTest).toBe(false);
-  });
-
-  it("a package whose name carries the word testing stays in scope", ({
-    verdictOnPackageNamedAfterTesting,
-  }) => {
-    expect(verdictOnPackageNamedAfterTesting).toBe(false);
+      it("stays in scope", ({ outOfScope }) => {
+        expect(outOfScope).toBe(false);
+      });
+    });
   });
 });

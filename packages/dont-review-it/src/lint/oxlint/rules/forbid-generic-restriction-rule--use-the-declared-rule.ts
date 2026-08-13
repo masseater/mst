@@ -59,37 +59,28 @@ const holdsEnabledRule = (value: ESTree.Expression): boolean => {
   return ENABLED_SEVERITIES.has(spelled);
 };
 
-const textAt = ({
-  held,
-  key,
-}: {
-  readonly held: Readonly<Record<string, unknown>>;
-  readonly key: string;
-}): string => {
-  const written = held[key];
-  return typeof written === "string" ? written : "";
-};
-
 const restrictionRulesIn = (options: Readonly<Options>): ReadonlyMap<string, string> => {
-  const declared = listedUnder(options, RESTRICTION_RULES_OPTION).map((held) => ({
-    rule: textAt({ held, key: "rule" }),
-    substitute: textAt({ held, key: "substitute" }),
-  }));
+  const declared = listedUnder(options, RESTRICTION_RULES_OPTION).flatMap(({ rule, substitute }) =>
+    typeof rule === "string" && rule !== ""
+      ? [{ rule, substitute: typeof substitute === "string" ? substitute : "" }]
+      : [],
+  );
   return new Map(
-    [...RESTRICTION_RULES, ...declared]
-      .filter((entry) => entry.rule !== "")
-      .map((entry): readonly [string, string] => [bareRuleNameOf(entry.rule), entry.substitute]),
+    [...RESTRICTION_RULES, ...declared].map((entry): readonly [string, string] => [
+      bareRuleNameOf(entry.rule),
+      entry.substitute,
+    ]),
   );
 };
 
 const exceptionGroundsIn = (options: Readonly<Options>): ReadonlyMap<string, string> =>
   new Map(
-    listedUnder(options, EXCEPTIONS_OPTION)
-      .map((held): readonly [string, string] => [
-        bareRuleNameOf(textAt({ held, key: "rule" })),
-        textAt({ held, key: "reason" }).trim(),
-      ])
-      .filter(([rule]) => rule !== ""),
+    listedUnder(options, EXCEPTIONS_OPTION).flatMap(
+      ({ rule, reason }): readonly (readonly [string, string])[] =>
+        typeof rule === "string" && rule !== ""
+          ? [[bareRuleNameOf(rule), typeof reason === "string" ? reason.trim() : ""]]
+          : [],
+    ),
   );
 
 export const forbidGenericRestrictionRule = createDontReviewItRule({

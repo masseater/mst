@@ -143,7 +143,7 @@ describe("dont-review-it/no-discarded-failure--receive-and-surface-it", () => {
       {
         name: "a dropped pair in a test file carries no exemption",
         code: "const [, parsed] = attempt(() => parse(text));",
-        filename: "/repo/packages/utils/src/parse.test.ts",
+        filename: "/repo/packages/repository-checks/src/parse.test.ts",
         errors: [{ messageId: "discardedFailurePair" }],
       },
       {
@@ -169,7 +169,7 @@ describe("dont-review-it/no-discarded-failure--receive-and-surface-it", () => {
       {
         name: "a catch clause that binds nothing in a test file carries no exemption",
         code: "try {\n  run();\n} catch {\n  recover();\n}",
-        filename: "/repo/packages/utils/src/parse.test.ts",
+        filename: "/repo/packages/repository-checks/src/parse.test.ts",
         errors: [{ messageId: "unnamedCatchFailure" }],
       },
     ],

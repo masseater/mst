@@ -3,75 +3,84 @@ import { describe, expect, test } from "vite-plus/test";
 import { FORBIDDEN_AMBIGUOUS_NAMES } from "../forbidden-ambiguous-names.ts";
 import { forbiddenSubjectNamesFrom } from "./forbidden-subject-names.ts";
 
-const it = test
-  .extend("vocabularyReadWithoutSettings", () => forbiddenSubjectNamesFrom([]))
-  .extend("vocabularyReadFromEmptySettings", () => forbiddenSubjectNamesFrom([{}]))
-  .extend("vocabularyReadFromSeverityOnly", () => forbiddenSubjectNamesFrom(["error"]))
-  .extend("vocabularyReadFromListedSettings", () =>
-    forbiddenSubjectNamesFrom([[{ pattern: "^data$" }]]),
-  )
-  .extend("vocabularyReadFromInjectedPatterns", () =>
-    forbiddenSubjectNamesFrom([{ forbiddenSubjectNames: [{ pattern: "^data$" }] }]),
-  )
-  .extend("vocabularyReadFromTheSharedList", () =>
-    forbiddenSubjectNamesFrom([{ forbiddenSubjectNames: [...FORBIDDEN_AMBIGUOUS_NAMES] }]),
-  )
-  .extend("vocabularyReadFromEmptyList", () =>
-    forbiddenSubjectNamesFrom([{ forbiddenSubjectNames: [] }]),
-  )
-  .extend("vocabularyReadFromUnlistedPatterns", () =>
-    forbiddenSubjectNamesFrom([{ forbiddenSubjectNames: "^data$" }]),
-  )
-  .extend("vocabularyReadFromMixedEntries", () =>
-    forbiddenSubjectNamesFrom([
-      { forbiddenSubjectNames: [{ pattern: "^data$" }, { pattern: 7 }, "result$", null] },
-    ]),
-  );
+describe("forbiddenSubjectNamesFrom", () => {
+  describe("a rule run without settings", () => {
+    const it = test.extend("vocabulary", () => forbiddenSubjectNamesFrom([]));
 
-describe("forbidden-subject-names", () => {
-  it("a rule run without settings carries no vocabulary of its own", ({
-    vocabularyReadWithoutSettings,
-  }) => {
-    expect(vocabularyReadWithoutSettings).toStrictEqual([]);
+    it("carries no vocabulary of its own", ({ vocabulary }) => {
+      expect(vocabulary).toStrictEqual([]);
+    });
   });
 
-  it("settings that spell nothing carry no vocabulary", ({ vocabularyReadFromEmptySettings }) => {
-    expect(vocabularyReadFromEmptySettings).toStrictEqual([]);
+  describe("settings that spell nothing", () => {
+    const it = test.extend("vocabulary", () => forbiddenSubjectNamesFrom([{}]));
+
+    it("carry no vocabulary", ({ vocabulary }) => {
+      expect(vocabulary).toStrictEqual([]);
+    });
   });
 
-  it("a severity alone carries no vocabulary", ({ vocabularyReadFromSeverityOnly }) => {
-    expect(vocabularyReadFromSeverityOnly).toStrictEqual([]);
+  describe("a severity alone", () => {
+    const it = test.extend("vocabulary", () => forbiddenSubjectNamesFrom(["error"]));
+
+    it("carries no vocabulary", ({ vocabulary }) => {
+      expect(vocabulary).toStrictEqual([]);
+    });
   });
 
-  it("settings written as a list carry no vocabulary", ({ vocabularyReadFromListedSettings }) => {
-    expect(vocabularyReadFromListedSettings).toStrictEqual([]);
+  describe("settings written as a list", () => {
+    const it = test.extend("vocabulary", () =>
+      forbiddenSubjectNamesFrom([[{ pattern: "^data$" }]]));
+
+    it("carry no vocabulary", ({ vocabulary }) => {
+      expect(vocabulary).toStrictEqual([]);
+    });
   });
 
-  it("the vocabulary the deployment injects is the vocabulary the rule reads", ({
-    vocabularyReadFromInjectedPatterns,
-  }) => {
-    expect(vocabularyReadFromInjectedPatterns).toStrictEqual([{ pattern: "^data$" }]);
+  describe("the vocabulary the deployment injects", () => {
+    const it = test.extend("vocabulary", () =>
+      forbiddenSubjectNamesFrom([{ forbiddenSubjectNames: [{ pattern: "^data$" }] }]));
+
+    it("is the vocabulary the rule reads", ({ vocabulary }) => {
+      expect(vocabulary).toStrictEqual([{ pattern: "^data$" }]);
+    });
   });
 
-  it("the list every naming rule shares is read back whole", ({
-    vocabularyReadFromTheSharedList,
-  }) => {
-    expect(vocabularyReadFromTheSharedList).toStrictEqual([...FORBIDDEN_AMBIGUOUS_NAMES]);
+  describe("the list every naming rule shares", () => {
+    const it = test.extend("vocabulary", () =>
+      forbiddenSubjectNamesFrom([{ forbiddenSubjectNames: [...FORBIDDEN_AMBIGUOUS_NAMES] }]));
+
+    it("is read back whole", ({ vocabulary }) => {
+      expect(vocabulary).toStrictEqual([...FORBIDDEN_AMBIGUOUS_NAMES]);
+    });
   });
 
-  it("an empty vocabulary stays empty", ({ vocabularyReadFromEmptyList }) => {
-    expect(vocabularyReadFromEmptyList).toStrictEqual([]);
+  describe("an empty vocabulary", () => {
+    const it = test.extend("vocabulary", () =>
+      forbiddenSubjectNamesFrom([{ forbiddenSubjectNames: [] }]));
+
+    it("stays empty", ({ vocabulary }) => {
+      expect(vocabulary).toStrictEqual([]);
+    });
   });
 
-  it("a vocabulary spelled as something other than a list is read as no vocabulary", ({
-    vocabularyReadFromUnlistedPatterns,
-  }) => {
-    expect(vocabularyReadFromUnlistedPatterns).toStrictEqual([]);
+  describe("a vocabulary spelled as something other than a list", () => {
+    const it = test.extend("vocabulary", () =>
+      forbiddenSubjectNamesFrom([{ forbiddenSubjectNames: "^data$" }]));
+
+    it("is read as no vocabulary", ({ vocabulary }) => {
+      expect(vocabulary).toStrictEqual([]);
+    });
   });
 
-  it("entries that spell no pattern are dropped from the configured vocabulary", ({
-    vocabularyReadFromMixedEntries,
-  }) => {
-    expect(vocabularyReadFromMixedEntries).toStrictEqual([{ pattern: "^data$" }]);
+  describe("entries that spell no pattern", () => {
+    const it = test.extend("vocabulary", () =>
+      forbiddenSubjectNamesFrom([
+        { forbiddenSubjectNames: [{ pattern: "^data$" }, { pattern: 7 }, "result$", null] },
+      ]));
+
+    it("are dropped from the configured vocabulary", ({ vocabulary }) => {
+      expect(vocabulary).toStrictEqual([{ pattern: "^data$" }]);
+    });
   });
 });

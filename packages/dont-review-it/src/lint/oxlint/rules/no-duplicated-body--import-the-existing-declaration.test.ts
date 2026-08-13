@@ -11,7 +11,7 @@ const repositoryRoot = findWorkspaceRoot(process.cwd());
 
 const SUBJECT_PATH = "packages/dont-review-it/src/subject.ts";
 
-const OTHER_PATH = "packages/utils/src/other.ts";
+const OTHER_PATH = "packages/repository-checks/src/other.ts";
 
 const subjectFilename = join(repositoryRoot, SUBJECT_PATH);
 

@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -23,8 +23,7 @@ const OUTSIDE_RULE = "no-console";
 
 const DECLARATION = "export const total = 1;";
 
-const fixtureDir = join(tmpdir(), "dont-review-it-no-rule-suppression");
-rmSync(fixtureDir, { recursive: true, force: true });
+const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-no-rule-suppression-"));
 mkdirSync(join(fixtureDir, "src/legacy"), { recursive: true });
 
 writeFileSync(join(fixtureDir, "pnpm-workspace.yaml"), "packages:\n  - packages/*\n");
@@ -108,6 +107,11 @@ describe("dont-review-it/no-rule-suppression--fix-the-violation", () => {
       {
         name: "a configuration that keeps suppression comments powerless passes",
         code: `export default { lint: { options: { respectEslintDisableDirectives: false } } };`,
+        filename: CONFIG_FILE,
+      },
+      {
+        name: "a runner configuration holding no lint block has no ignore entry to read",
+        code: `export default { pack: { entry: ["src/index.ts"] } };`,
         filename: CONFIG_FILE,
       },
     ],
@@ -237,6 +241,12 @@ describe("dont-review-it/no-rule-suppression--fix-the-violation", () => {
         ],
       },
       {
+        name: "an entry standing beside a spread this rule cannot read is reported",
+        code: `export default { lint: { rules: { ...sharedRules, "${GATE_RULE}": "off" } } };`,
+        filename: CONFIG_FILE,
+        errors: [{ messageId: "weakenedRule", data: { ruleName: GATE_RULE, severity: "off" } }],
+      },
+      {
         name: "a severity assembled elsewhere is reported",
         code: `export default { lint: { rules: { "${GATE_RULE}": chosenSeverity } } };`,
         filename: CONFIG_FILE,
@@ -301,6 +311,18 @@ describe("dont-review-it/no-rule-suppression--fix-the-violation", () => {
           {
             messageId: "fileScopedSuppression",
             data: { spelling: "oxlint-disable", silenced: `\`${SELF_RULE}\`` },
+          },
+        ],
+      },
+      {
+        name: "an option naming no rule list leaves every rule of the gate in place",
+        code: `// eslint-disable-next-line ${GATE_RULE}\n${DECLARATION}`,
+        filename: SPEC_FILE,
+        options: [{}],
+        errors: [
+          {
+            messageId: "lineScopedSuppression",
+            data: { spelling: "eslint-disable-next-line", silenced: `\`${GATE_RULE}\`` },
           },
         ],
       },

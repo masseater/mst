@@ -25,92 +25,91 @@ const sum = (rows: readonly number[]): number => {
 export const total = sum([1, 2]);
 `;
 
-const it = test
-  .extend("indexOfASourceHoldingAClassStandingInForALocalVariable", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "mutable-cell-classes-builder-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    mkdirSync(join(root, "src"), { recursive: true });
-    writeFileSync(join(root, "src", "a.ts"), TALLY, "utf8");
-    return loadRepositoryCellClassIndex({ repositoryRoot: root });
-  })
-  .extend("indexOfARepositoryWhoseSourcesAreAllOutOfScope", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "mutable-cell-classes-builder-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    mkdirSync(join(root, "src"), { recursive: true });
-    writeFileSync(join(root, "src", "a.test.ts"), TALLY, "utf8");
-    return loadRepositoryCellClassIndex({ repositoryRoot: root });
-  })
-  .extend("indexOfARepositoryHoldingNoSourceAtAll", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "mutable-cell-classes-builder-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    writeFileSync(join(root, "notes.md"), "nothing to read\n", "utf8");
-    return loadRepositoryCellClassIndex({ repositoryRoot: root });
-  })
-  .extend("indexOfARepositoryWhoseSourceVanishedAfterTheListing", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "mutable-cell-classes-builder-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    mkdirSync(join(root, "src"), { recursive: true });
-    writeFileSync(join(root, "src", "vanished.ts"), TALLY, "utf8");
-    vi.mocked(readTextFile).mockReturnValueOnce(null);
-    return loadRepositoryCellClassIndex({ repositoryRoot: root });
-  })
-  .extend("sameIndexOnASecondAsk", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "mutable-cell-classes-builder-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    mkdirSync(join(root, "src"), { recursive: true });
-    writeFileSync(join(root, "src", "a.ts"), TALLY, "utf8");
-    return (
-      loadRepositoryCellClassIndex({ repositoryRoot: root }) ===
-      loadRepositoryCellClassIndex({ repositoryRoot: root })
-    );
-  });
-
 describe("loadRepositoryCellClassIndex", () => {
-  it("a class standing in for a local variable is found at its own path", ({
-    indexOfASourceHoldingAClassStandingInForALocalVariable,
-  }) => {
-    expect(indexOfASourceHoldingAClassStandingInForALocalVariable).toStrictEqual({
-      findingsByPath: new Map([
-        ["src/a.ts", [{ className: "Tally", fields: ["total"], scopeName: "sum" }]],
-      ]),
+  describe("a source holding a class standing in for a local variable", () => {
+    const it = test.extend("cellClassIndex", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "mutable-cell-classes-builder-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "src"), { recursive: true });
+      writeFileSync(join(root, "src", "a.ts"), TALLY, "utf8");
+      return loadRepositoryCellClassIndex({ repositoryRoot: root });
+    });
+
+    it("is found at its own path", ({ cellClassIndex }) => {
+      expect(cellClassIndex).toStrictEqual({
+        findingsByPath: new Map([
+          ["src/a.ts", [{ className: "Tally", fields: ["total"], scopeName: "sum" }]],
+        ]),
+      });
     });
   });
 
-  it("a repository whose sources are all out of scope is indexed as empty", ({
-    indexOfARepositoryWhoseSourcesAreAllOutOfScope,
-  }) => {
-    expect(indexOfARepositoryWhoseSourcesAreAllOutOfScope).toStrictEqual({
-      findingsByPath: new Map(),
+  describe("a repository whose sources are all out of scope", () => {
+    const it = test.extend("cellClassIndex", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "mutable-cell-classes-builder-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "src"), { recursive: true });
+      writeFileSync(join(root, "src", "a.test.ts"), TALLY, "utf8");
+      return loadRepositoryCellClassIndex({ repositoryRoot: root });
+    });
+
+    it("is indexed as empty", ({ cellClassIndex }) => {
+      expect(cellClassIndex).toStrictEqual({ findingsByPath: new Map() });
     });
   });
 
-  it("a repository holding no source at all is indexed as empty", ({
-    indexOfARepositoryHoldingNoSourceAtAll,
-  }) => {
-    expect(indexOfARepositoryHoldingNoSourceAtAll).toStrictEqual({ findingsByPath: new Map() });
-  });
+  describe("a repository holding no source at all", () => {
+    const it = test.extend("cellClassIndex", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "mutable-cell-classes-builder-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "notes.md"), "nothing to read\n", "utf8");
+      return loadRepositoryCellClassIndex({ repositoryRoot: root });
+    });
 
-  it("a source that vanished after the listing is left out of the index", ({
-    indexOfARepositoryWhoseSourceVanishedAfterTheListing,
-  }) => {
-    expect(indexOfARepositoryWhoseSourceVanishedAfterTheListing).toStrictEqual({
-      findingsByPath: new Map(),
+    it("is indexed as empty", ({ cellClassIndex }) => {
+      expect(cellClassIndex).toStrictEqual({ findingsByPath: new Map() });
     });
   });
 
-  it("the index of a repository is built once and handed back on every later ask", ({
-    sameIndexOnASecondAsk,
-  }) => {
-    expect(sameIndexOnASecondAsk).toBe(true);
+  describe("a source that vanished after the listing", () => {
+    const it = test.extend("cellClassIndex", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "mutable-cell-classes-builder-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "src"), { recursive: true });
+      writeFileSync(join(root, "src", "vanished.ts"), TALLY, "utf8");
+      vi.mocked(readTextFile).mockReturnValueOnce(null);
+      return loadRepositoryCellClassIndex({ repositoryRoot: root });
+    });
+
+    it("is left out of the index", ({ cellClassIndex }) => {
+      expect(cellClassIndex).toStrictEqual({ findingsByPath: new Map() });
+    });
+  });
+
+  describe("the index of a repository", () => {
+    const it = test.extend("sameIndexOnASecondAsk", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "mutable-cell-classes-builder-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "src"), { recursive: true });
+      writeFileSync(join(root, "src", "a.ts"), TALLY, "utf8");
+      return (
+        loadRepositoryCellClassIndex({ repositoryRoot: root }) ===
+        loadRepositoryCellClassIndex({ repositoryRoot: root })
+      );
+    });
+
+    it("is built once and handed back on every later ask", ({ sameIndexOnASecondAsk }) => {
+      expect(sameIndexOnASecondAsk).toBe(true);
+    });
   });
 });

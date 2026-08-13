@@ -158,7 +158,6 @@ export const snapshotMatcherSiteOf = (
 
 type Placement = {
   readonly site: SnapshotMatcherSite;
-  readonly siteIndex: number;
   readonly titles: readonly string[];
   readonly order: readonly number[];
 };
@@ -168,32 +167,24 @@ type Combination = {
   readonly order: readonly number[];
 };
 
-type SpelledScope = Extract<TableDrivenTitles, { kind: "spelled" }>;
-
-const spelledScopesOf = (scopes: readonly TableDrivenTitles[]): readonly SpelledScope[] | null => {
-  const spelled = scopes.flatMap((scope) => (scope.kind === "spelled" ? [scope] : []));
-  return spelled.length === scopes.length ? spelled : null;
-};
-
-const extendedBy = (prefix: Combination, scope: SpelledScope): readonly Combination[] =>
-  scope.titles.map((title, index) => ({
+const extendedBy = (prefix: Combination, titles: readonly string[]): readonly Combination[] =>
+  titles.map((title, index) => ({
     titles: [...prefix.titles, title],
     order: [...prefix.order, index],
   }));
 
-const combinationsOf = (scopes: readonly SpelledScope[]): readonly Combination[] =>
-  scopes.reduce<readonly Combination[]>(
-    (carried, scope) => carried.flatMap((prefix) => extendedBy(prefix, scope)),
+const combinationsOf = (titlesByScope: readonly (readonly string[])[]): readonly Combination[] =>
+  titlesByScope.reduce<readonly Combination[]>(
+    (carried, titles) => carried.flatMap((prefix) => extendedBy(prefix, titles)),
     [{ titles: [], order: [] }],
   );
 
-const placementsOf = (site: SnapshotMatcherSite, siteIndex: number): readonly Placement[] => {
-  const spelled = spelledScopesOf(site.scopes);
-  if (spelled === null) return [];
+const placementsOf = (site: SnapshotMatcherSite): readonly Placement[] => {
+  const spelled = site.scopes.flatMap((scope) => (scope.kind === "spelled" ? [scope.titles] : []));
+  if (spelled.length !== site.scopes.length) return [];
 
   return combinationsOf(spelled).map((combination) => ({
     site,
-    siteIndex,
     titles: combination.titles,
     order: [...combination.order, site.node.start],
   }));
@@ -201,8 +192,7 @@ const placementsOf = (site: SnapshotMatcherSite, siteIndex: number): readonly Pl
 
 const byExecutionOrder = (left: Placement, right: Placement): number =>
   zip(left.order, right.order).reduce(
-    (carried, [leftReached, rightReached]) =>
-      carried === 0 ? leftReached - rightReached : carried,
+    (carried, [taken, rival]) => (carried === 0 ? taken - rival : carried),
     0,
   );
 
@@ -225,8 +215,12 @@ const takeOrdinal = (ordinals: Ordinals, bucket: string): number => {
   return ordinal;
 };
 
-const keyedTitlesOf = ({ site, titles }: Placement): readonly string[] =>
-  site.hintText === null ? titles : [...titles, site.hintText];
+const keyedTitlesOf = (placement: Placement): readonly string[] =>
+  placement.site.hintText === null
+    ? placement.titles
+    : [...placement.titles, placement.site.hintText];
+
+type SpelledKeys = Map<SnapshotMatcherSite, readonly string[]>;
 
 const bucketKeysIn = ({
   placements,
@@ -235,7 +229,7 @@ const bucketKeysIn = ({
 }: {
   readonly placements: readonly Placement[];
   readonly ordinals: Ordinals;
-  readonly spelled: Map<number, readonly string[]>;
+  readonly spelled: SpelledKeys;
 }): void => {
   const ordered = placements.toSorted(byExecutionOrder);
   const brokenAt = ordered.findIndex((placement) => placement.site.orderBroken);
@@ -245,8 +239,8 @@ const bucketKeysIn = ({
     const ordinal = takeOrdinal(ordinals, bucketKeyOf(titles));
     if (brokenAt >= 0 && position >= brokenAt) continue;
 
-    spelled.set(placement.siteIndex, [
-      ...(spelled.get(placement.siteIndex) ?? []),
+    spelled.set(placement.site, [
+      ...(spelled.get(placement.site) ?? []),
       externalRecordKeyOf(titles, ordinal),
     ]);
   }
@@ -254,9 +248,9 @@ const bucketKeysIn = ({
 
 const spelledKeysBySite = (
   sites: readonly SnapshotMatcherSite[],
-): ReadonlyMap<number, readonly string[]> => {
+): ReadonlyMap<SnapshotMatcherSite, readonly string[]> => {
   const ordinals: Ordinals = new Map();
-  const spelled = new Map<number, readonly string[]>();
+  const spelled: SpelledKeys = new Map();
 
   for (const placements of bucketedPlacements(sites).values()) {
     bucketKeysIn({ placements, ordinals, spelled });
@@ -269,14 +263,14 @@ export const entryKeysOf = (
 ): readonly SnapshotEntryKeys[] => {
   const spelled = spelledKeysBySite(sites);
 
-  return sites.map((site, siteIndex) => {
+  return sites.map((site) => {
     if (site.hintRuntime) return { kind: "unresolvable" };
     if (site.scopes.length === 0) return { kind: "unreadable" };
     if (site.scopes.some((scope) => scope.kind === "runtime")) return { kind: "unresolvable" };
     if (site.scopes.some((scope) => scope.kind === "unreadable")) return { kind: "unreadable" };
 
-    const keys = spelled.get(siteIndex) ?? [];
-    return keys.length === placementsOf(site, siteIndex).length
+    const keys = spelled.get(site) ?? [];
+    return keys.length === placementsOf(site).length
       ? { kind: "spelled", keys }
       : { kind: "unresolvable" };
   });

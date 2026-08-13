@@ -82,7 +82,7 @@
 
 ```ts
 expect(specStemOf("src/order.test.ts", DEFAULT_SPEC_FILE_SUFFIXES)).toBe("order");
-expect(unverifiedRegionOf("toStrictEqual")).toBe(null);
+expect(UNVERIFIED_REGION_BY_WEAK_MATCHER.get("toStrictEqual")).toBe(undefined);
 ```
 
 **構造なら、subject をそのまま完全一致で比較する。** 期待側には、コードが返すべき値の全体を書く。

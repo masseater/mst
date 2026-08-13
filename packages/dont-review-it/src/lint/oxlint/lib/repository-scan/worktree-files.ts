@@ -1,9 +1,9 @@
 import { readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
+import { readUnlessMissing } from "@mst/repository-checks";
 import { memoize } from "es-toolkit";
 
-import { readUnlessMissing } from "../path-failure.ts";
 import { toPosixPath } from "../posix-path.ts";
 
 import type { Context } from "@oxlint/plugins";

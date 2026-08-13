@@ -31,6 +31,11 @@ describe("dont-review-it/no-fixture-forward-subject--yield-sut-output", () => {
         code: 'const test = baseTest.extend("record", async ({ store }) => store.load());',
       },
       {
+        name: "a binding declared outside this fixture is not one the fixture was given",
+        filename: SPEC_FILE,
+        code: 'const test = baseTest.extend("report", async ({ store }) => {\n  await store.reset();\n  return defaultReport;\n});',
+      },
+      {
         name: "an object literal that names no dependency is read by the rule against built subjects",
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("report", async ({ store }) => ({ id: "a", total: 2 }));',
@@ -135,6 +140,12 @@ describe("dont-review-it/no-fixture-forward-subject--yield-sut-output", () => {
         errors: [{ messageId: "forwardedSubject", data: { subject: "produced" } }],
       },
       {
+        name: "a dependency taken apart in the parameter list leaves its siblings readable",
+        filename: SPEC_FILE,
+        code: 'const test = baseTest.extend("report", async ({ lockOptions: { lockPath }, summarised }) => summarised);',
+        errors: [{ messageId: "forwardedSubject", data: { subject: "summarised" } }],
+      },
+      {
         name: "a member read off a dependency drops the rest of that dependency",
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("path", async ({ lockOptions }) => lockOptions.lockPath);',
@@ -230,6 +241,20 @@ describe("dont-review-it/no-fixture-forward-subject--yield-sut-output", () => {
         filename: SPEC_FILE,
         options: SCOPING_WRAPPERS,
         code: 'const test = baseTest.extend("path", async ({ lockOptions }) => {\n  const lockPath = lockOptions.lockPath;\n  return scopeHandlers(() => lockPath);\n});',
+        errors: [{ messageId: "projectedSubject", data: { subject: "lockOptions" } }],
+      },
+      {
+        name: "a named wrapper handed a spread stays a call over its own arguments",
+        filename: SPEC_FILE,
+        options: SCOPING_WRAPPERS,
+        code: 'const test = baseTest.extend("report", async ({ handlers }) => scopeHandlers(...handlers));',
+        errors: [{ messageId: "derivedSubject", data: { subject: "handlers" } }],
+      },
+      {
+        name: "a configuration that names only spec suffixes still reads the file it marked",
+        filename: "report.spec.ts",
+        options: [{ specFileSuffixes: [".spec.ts"] }],
+        code: 'const test = baseTest.extend("path", async ({ lockOptions }) => lockOptions.lockPath);',
         errors: [{ messageId: "projectedSubject", data: { subject: "lockOptions" } }],
       },
       {

@@ -4,54 +4,71 @@ import { ownershipPolicyOf } from "./ownership-policy.ts";
 
 const UNCONFIGURED = "not configured (set the ownershipPolicy option of this rule)";
 
-const it = test
-  .extend("policyOfEmptyOptions", () => ownershipPolicyOf([]))
-  .extend("policyOfWrittenPolicy", () =>
-    ownershipPolicyOf([{ ownershipPolicy: "Operational vocabularies live in the service." }]),
-  )
-  .extend("policyOfBlankPolicy", () => ownershipPolicyOf([{ ownershipPolicy: "   " }]))
-  .extend("policyOfForeignSettings", () => ownershipPolicyOf([{ maxLines: 10 }]))
-  .extend("policyOfNumberedPolicy", () => ownershipPolicyOf([{ ownershipPolicy: 3 }]))
-  .extend("policyOfTextOption", () =>
-    ownershipPolicyOf(["Operational vocabularies live in the service."]),
-  )
-  .extend("policyOfListedOption", () =>
-    ownershipPolicyOf([["Operational vocabularies live in the service."]]),
-  )
-  .extend("policyOfMissingOption", () => ownershipPolicyOf([null]));
+describe("ownershipPolicyOf", () => {
+  describe("no options at all", () => {
+    const it = test.extend("policy", () => ownershipPolicyOf([]));
 
-describe("ownership-policy", () => {
-  it("no options at all says the policy is unset and names the option to set", ({
-    policyOfEmptyOptions,
-  }) => {
-    expect(policyOfEmptyOptions).toBe(UNCONFIGURED);
+    it("says the policy is unset and names the option to set", ({ policy }) => {
+      expect(policy).toBe(UNCONFIGURED);
+    });
   });
 
-  it("a configured policy is passed through as written", ({ policyOfWrittenPolicy }) => {
-    expect(policyOfWrittenPolicy).toBe("Operational vocabularies live in the service.");
+  describe("a written policy", () => {
+    const it = test.extend("policy", () =>
+      ownershipPolicyOf([{ ownershipPolicy: "Operational vocabularies live in the service." }]));
+
+    it("is passed through as written", ({ policy }) => {
+      expect(policy).toBe("Operational vocabularies live in the service.");
+    });
   });
 
-  it("a blank policy is the same as leaving it unset", ({ policyOfBlankPolicy }) => {
-    expect(policyOfBlankPolicy).toBe(UNCONFIGURED);
+  describe("a blank policy", () => {
+    const it = test.extend("policy", () => ownershipPolicyOf([{ ownershipPolicy: "   " }]));
+
+    it("is the same as leaving it unset", ({ policy }) => {
+      expect(policy).toBe(UNCONFIGURED);
+    });
   });
 
-  it("an option object without the key leaves the policy unset", ({ policyOfForeignSettings }) => {
-    expect(policyOfForeignSettings).toBe(UNCONFIGURED);
+  describe("an option object without the key", () => {
+    const it = test.extend("policy", () => ownershipPolicyOf([{ maxLines: 10 }]));
+
+    it("leaves the policy unset", ({ policy }) => {
+      expect(policy).toBe(UNCONFIGURED);
+    });
   });
 
-  it("a policy that is not a string leaves it unset", ({ policyOfNumberedPolicy }) => {
-    expect(policyOfNumberedPolicy).toBe(UNCONFIGURED);
+  describe("a policy that is not a string", () => {
+    const it = test.extend("policy", () => ownershipPolicyOf([{ ownershipPolicy: 3 }]));
+
+    it("leaves the policy unset", ({ policy }) => {
+      expect(policy).toBe(UNCONFIGURED);
+    });
   });
 
-  it("an option written as a text leaves the policy unset", ({ policyOfTextOption }) => {
-    expect(policyOfTextOption).toBe(UNCONFIGURED);
+  describe("an option written as a text", () => {
+    const it = test.extend("policy", () =>
+      ownershipPolicyOf(["Operational vocabularies live in the service."]));
+
+    it("leaves the policy unset", ({ policy }) => {
+      expect(policy).toBe(UNCONFIGURED);
+    });
   });
 
-  it("an option written as a list leaves the policy unset", ({ policyOfListedOption }) => {
-    expect(policyOfListedOption).toBe(UNCONFIGURED);
+  describe("an option written as a list", () => {
+    const it = test.extend("policy", () =>
+      ownershipPolicyOf([["Operational vocabularies live in the service."]]));
+
+    it("leaves the policy unset", ({ policy }) => {
+      expect(policy).toBe(UNCONFIGURED);
+    });
   });
 
-  it("an option written as nothing leaves the policy unset", ({ policyOfMissingOption }) => {
-    expect(policyOfMissingOption).toBe(UNCONFIGURED);
+  describe("an option written as nothing", () => {
+    const it = test.extend("policy", () => ownershipPolicyOf([null]));
+
+    it("leaves the policy unset", ({ policy }) => {
+      expect(policy).toBe(UNCONFIGURED);
+    });
   });
 });

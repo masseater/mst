@@ -39,199 +39,212 @@ const DECLARATION_FORMS: readonly { readonly conceptId: string; readonly declara
   { conceptId: "empty.form", declaration: "export const EMPTY_FORM = buildStatuses();" },
 ];
 
-const it = test
-  .extend("conceptIdsFromACacheLeftBehind", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_DRAFT_ONLY);
-    buildCanonicalValuesCatalog({ repositoryRoot: root });
-    const written = JSON.parse(readFileSync(join(root, ...CACHE_SEGMENTS), "utf8")) as {
-      readonly version: number;
-      readonly fingerprint: string;
-    };
-    writeFileSync(
-      join(root, ...CACHE_SEGMENTS),
-      JSON.stringify({
-        version: written.version,
-        fingerprint: written.fingerprint,
-        entries: [
-          {
-            conceptId: "left.behind.by.the.cache",
-            declarationPath: "order-status.ts",
-            exportPath: null,
-            values: ["cached"],
-            fingerprint: "fingerprint-of-cached",
-          },
-        ],
-      }),
-    );
-    return buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map(
-      (entry) => entry.conceptId,
-    );
-  })
-  .extend("valuesAfterAChangedInput", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_DRAFT_ONLY);
-    buildCanonicalValuesCatalog({ repositoryRoot: root });
-    writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_WITH_ARCHIVED);
-    return buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map(
-      (entry) => entry.values,
-    );
-  })
-  .extend("conceptIdsOfTwoWorkspaces", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    mkdirSync(join(root, "packages", "kept", "src"), { recursive: true });
-    mkdirSync(join(root, "packages", "pruned", "src"), { recursive: true });
-    writeFileSync(join(root, "packages", "kept", "src", "order.ts"), ORDER_STATUS_DRAFT_ONLY);
-    writeFileSync(
-      join(root, "packages", "pruned", "src", "article.ts"),
-      ARTICLE_STATUS_PUBLISHED_ONLY,
-    );
-    return buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map(
-      (entry) => entry.conceptId,
-    );
-  })
-  .extend("conceptIdsAfterAWorkspaceIsPruned", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    mkdirSync(join(root, "packages", "kept", "src"), { recursive: true });
-    mkdirSync(join(root, "packages", "pruned", "src"), { recursive: true });
-    writeFileSync(join(root, "packages", "kept", "src", "order.ts"), ORDER_STATUS_DRAFT_ONLY);
-    writeFileSync(
-      join(root, "packages", "pruned", "src", "article.ts"),
-      ARTICLE_STATUS_PUBLISHED_ONLY,
-    );
-    buildCanonicalValuesCatalog({ repositoryRoot: root });
-    rmSync(join(root, "packages", "pruned"), { recursive: true, force: true });
-    return buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map(
-      (entry) => entry.conceptId,
-    );
-  })
-  .extend("commentSourcePathsOfATestFile", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    writeFileSync(join(root, "order-status.test.ts"), ORDER_STATUS_ARRAY);
-    return listRepositoryFiles(root).commentSources.map((file) => file.relativePath);
-  })
-  .extend("declarationSourcePathsOfATestFile", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    writeFileSync(join(root, "order-status.test.ts"), ORDER_STATUS_ARRAY);
-    return listRepositoryFiles(root).declarationSources.map((file) => file.relativePath);
-  })
-  .extend("conceptIdsOfATestFile", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    writeFileSync(join(root, "order-status.test.ts"), ORDER_STATUS_ARRAY);
-    return buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map(
-      (entry) => entry.conceptId,
-    );
-  })
-  .extend("catalogRowsOfEveryDeclarationForm", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    for (const { conceptId, declaration } of sortBy(DECLARATION_FORMS, ["conceptId"])) {
+describe("buildCanonicalValuesCatalog", () => {
+  describe("a catalog left behind by an earlier process", () => {
+    const it = test.extend("conceptIdsFromACacheLeftBehind", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_DRAFT_ONLY);
+      buildCanonicalValuesCatalog({ repositoryRoot: root });
+      const written = JSON.parse(readFileSync(join(root, ...CACHE_SEGMENTS), "utf8")) as {
+        readonly version: number;
+        readonly fingerprint: string;
+      };
       writeFileSync(
-        join(root, `${conceptId}.ts`),
-        `/**\n * ${TAG} ${conceptId}\n */\n${declaration}\n`,
+        join(root, ...CACHE_SEGMENTS),
+        JSON.stringify({
+          version: written.version,
+          fingerprint: written.fingerprint,
+          entries: [
+            {
+              conceptId: "left.behind.by.the.cache",
+              declarationPath: "order-status.ts",
+              exportPath: null,
+              values: ["cached"],
+              fingerprint: "fingerprint-of-cached",
+            },
+          ],
+        }),
       );
-    }
-    return buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map((entry) => [
-      entry.conceptId,
-      entry.values,
-    ]);
-  })
-  .extend("conceptIdsOfEveryDeclarationForm", ({}, { onCleanup }) => {
-    const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
-    onCleanup(() => {
-      rmSync(root, { recursive: true, force: true });
+      return buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map(
+        (entry) => entry.conceptId,
+      );
     });
-    for (const { conceptId, declaration } of sortBy(DECLARATION_FORMS, ["conceptId"])) {
-      writeFileSync(
-        join(root, `${conceptId}.ts`),
-        `/**\n * ${TAG} ${conceptId}\n */\n${declaration}\n`,
+
+    it("is reused while the inputs are unchanged", ({ conceptIdsFromACacheLeftBehind }) => {
+      expect(conceptIdsFromACacheLeftBehind).toStrictEqual(["left.behind.by.the.cache"]);
+    });
+  });
+
+  describe("a changed input", () => {
+    const it = test.extend("valuesAfterAChangedInput", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_DRAFT_ONLY);
+      buildCanonicalValuesCatalog({ repositoryRoot: root });
+      writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_WITH_ARCHIVED);
+      return buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map(
+        (entry) => entry.values,
       );
-    }
-    return buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map(
-      (entry) => entry.conceptId,
-    );
+    });
+
+    it("rebuilds the catalog without anyone clearing the cache", ({ valuesAfterAChangedInput }) => {
+      expect(valuesAfterAChangedInput).toStrictEqual([["draft", "archived"]]);
+    });
   });
 
-describe("builder", () => {
-  it("a catalog left behind by an earlier process is reused while the inputs are unchanged", ({
-    conceptIdsFromACacheLeftBehind,
-  }) => {
-    expect(conceptIdsFromACacheLeftBehind).toStrictEqual(["left.behind.by.the.cache"]);
+  describe("every workspace in the checkout", () => {
+    const it = test.extend("conceptIdsOfTwoWorkspaces", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages", "kept", "src"), { recursive: true });
+      mkdirSync(join(root, "packages", "pruned", "src"), { recursive: true });
+      writeFileSync(join(root, "packages", "kept", "src", "order.ts"), ORDER_STATUS_DRAFT_ONLY);
+      writeFileSync(
+        join(root, "packages", "pruned", "src", "article.ts"),
+        ARTICLE_STATUS_PUBLISHED_ONLY,
+      );
+      return buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map(
+        (entry) => entry.conceptId,
+      );
+    });
+
+    it("contributes the hints it owns", ({ conceptIdsOfTwoWorkspaces }) => {
+      expect(conceptIdsOfTwoWorkspaces).toStrictEqual(["order.status", "article.status"]);
+    });
   });
 
-  it("a changed input rebuilds the catalog without anyone clearing the cache", ({
-    valuesAfterAChangedInput,
-  }) => {
-    expect(valuesAfterAChangedInput).toStrictEqual([["draft", "archived"]]);
+  describe("a workspace missing from the checkout", () => {
+    const it = test.extend("conceptIdsAfterAWorkspaceIsPruned", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages", "kept", "src"), { recursive: true });
+      mkdirSync(join(root, "packages", "pruned", "src"), { recursive: true });
+      writeFileSync(join(root, "packages", "kept", "src", "order.ts"), ORDER_STATUS_DRAFT_ONLY);
+      writeFileSync(
+        join(root, "packages", "pruned", "src", "article.ts"),
+        ARTICLE_STATUS_PUBLISHED_ONLY,
+      );
+      buildCanonicalValuesCatalog({ repositoryRoot: root });
+      rmSync(join(root, "packages", "pruned"), { recursive: true, force: true });
+      return buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map(
+        (entry) => entry.conceptId,
+      );
+    });
+
+    it("costs only the hints that workspace owned", ({ conceptIdsAfterAWorkspaceIsPruned }) => {
+      expect(conceptIdsAfterAWorkspaceIsPruned).toStrictEqual(["order.status"]);
+    });
   });
 
-  it("every workspace in the checkout contributes the hints it owns", ({
-    conceptIdsOfTwoWorkspaces,
-  }) => {
-    expect(conceptIdsOfTwoWorkspaces).toStrictEqual(["order.status", "article.status"]);
+  describe("an annotation inside a test file", () => {
+    const it = test.extend("conceptIdsOfATestFile", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "order-status.test.ts"), ORDER_STATUS_ARRAY);
+      return buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map(
+        (entry) => entry.conceptId,
+      );
+    });
+
+    it("declares nothing", ({ conceptIdsOfATestFile }) => {
+      expect(conceptIdsOfATestFile).toStrictEqual([]);
+    });
   });
 
-  it("a workspace missing from the checkout costs only the hints that workspace owned", ({
-    conceptIdsAfterAWorkspaceIsPruned,
-  }) => {
-    expect(conceptIdsAfterAWorkspaceIsPruned).toStrictEqual(["order.status"]);
-  });
+  describe("every declaration form the shared scan reads", () => {
+    const it = test
+      .extend("catalogRowsOfEveryDeclarationForm", ({}, { onCleanup }) => {
+        const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+        onCleanup(() => {
+          rmSync(root, { recursive: true, force: true });
+        });
+        for (const { conceptId, declaration } of sortBy(DECLARATION_FORMS, ["conceptId"])) {
+          writeFileSync(
+            join(root, `${conceptId}.ts`),
+            `/**\n * ${TAG} ${conceptId}\n */\n${declaration}\n`,
+          );
+        }
+        return buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map((entry) => [
+          entry.conceptId,
+          entry.values,
+        ]);
+      })
+      .extend("conceptIdsOfEveryDeclarationForm", ({}, { onCleanup }) => {
+        const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+        onCleanup(() => {
+          rmSync(root, { recursive: true, force: true });
+        });
+        for (const { conceptId, declaration } of sortBy(DECLARATION_FORMS, ["conceptId"])) {
+          writeFileSync(
+            join(root, `${conceptId}.ts`),
+            `/**\n * ${TAG} ${conceptId}\n */\n${declaration}\n`,
+          );
+        }
+        return buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map(
+          (entry) => entry.conceptId,
+        );
+      });
 
-  it("a test file is scanned for comments", ({ commentSourcePathsOfATestFile }) => {
-    expect(commentSourcePathsOfATestFile).toStrictEqual(["order-status.test.ts"]);
-  });
+    it("is carried into the catalog exactly as the scan reads it out of the same source", ({
+      catalogRowsOfEveryDeclarationForm,
+    }) => {
+      expect(catalogRowsOfEveryDeclarationForm).toStrictEqual(
+        sortBy(DECLARATION_FORMS, ["conceptId"]).flatMap(({ conceptId, declaration }) =>
+          scanCanonicalValuesText(
+            `/**\n * ${TAG} ${conceptId}\n */\n${declaration}\n`,
+          ).declarations.map((declared) => [declared.conceptId, declared.values]),
+        ),
+      );
+    });
 
-  it("a test file is no declaration source", ({ declarationSourcePathsOfATestFile }) => {
-    expect(declarationSourcePathsOfATestFile).toStrictEqual([]);
+    it("is listed in declaration path order", ({ conceptIdsOfEveryDeclarationForm }) => {
+      expect(conceptIdsOfEveryDeclarationForm).toStrictEqual([
+        "array.form",
+        "enum.form",
+        "object.form",
+        "type.form",
+      ]);
+    });
   });
+});
 
-  it("an annotation inside a test file declares nothing", ({ conceptIdsOfATestFile }) => {
-    expect(conceptIdsOfATestFile).toStrictEqual([]);
-  });
+describe("listRepositoryFiles", () => {
+  describe("a test file", () => {
+    const it = test
+      .extend("commentSourcePathsOfATestFile", ({}, { onCleanup }) => {
+        const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+        onCleanup(() => {
+          rmSync(root, { recursive: true, force: true });
+        });
+        writeFileSync(join(root, "order-status.test.ts"), ORDER_STATUS_ARRAY);
+        return listRepositoryFiles(root).commentSources.map((file) => file.relativePath);
+      })
+      .extend("declarationSourcePathsOfATestFile", ({}, { onCleanup }) => {
+        const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
+        onCleanup(() => {
+          rmSync(root, { recursive: true, force: true });
+        });
+        writeFileSync(join(root, "order-status.test.ts"), ORDER_STATUS_ARRAY);
+        return listRepositoryFiles(root).declarationSources.map((file) => file.relativePath);
+      });
 
-  it("the catalog carries exactly what the shared scan reads out of the same source", ({
-    catalogRowsOfEveryDeclarationForm,
-  }) => {
-    expect(catalogRowsOfEveryDeclarationForm).toStrictEqual(
-      sortBy(DECLARATION_FORMS, ["conceptId"]).flatMap(({ conceptId, declaration }) =>
-        scanCanonicalValuesText(
-          `/**\n * ${TAG} ${conceptId}\n */\n${declaration}\n`,
-        ).declarations.map((declared) => [declared.conceptId, declared.values]),
-      ),
-    );
-  });
+    it("is scanned for comments", ({ commentSourcePathsOfATestFile }) => {
+      expect(commentSourcePathsOfATestFile).toStrictEqual(["order-status.test.ts"]);
+    });
 
-  it("the catalog lists every declaration form the scan reads, in declaration path order", ({
-    conceptIdsOfEveryDeclarationForm,
-  }) => {
-    expect(conceptIdsOfEveryDeclarationForm).toStrictEqual([
-      "array.form",
-      "enum.form",
-      "object.form",
-      "type.form",
-    ]);
+    it("is no declaration source", ({ declarationSourcePathsOfATestFile }) => {
+      expect(declarationSourcePathsOfATestFile).toStrictEqual([]);
+    });
   });
 });

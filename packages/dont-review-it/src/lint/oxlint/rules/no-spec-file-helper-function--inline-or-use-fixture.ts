@@ -16,18 +16,13 @@ import {
 } from "../lib/spec-syntax/test-block-declarations.ts";
 
 import type { ESTree } from "@oxlint/plugins";
+import type { NamedReport } from "../lib/named-report.ts";
 
 const ANONYMOUS_DECLARATION_NAME = "default";
 
 type ScopeReading = {
   readonly functions: readonly ESTree.Node[];
   readonly groupingBodies: readonly ESTree.Node[];
-};
-
-type HelperReport = {
-  readonly node: ESTree.Node;
-  readonly messageId: string;
-  readonly data: { readonly name: string };
 };
 
 type BindingReading = {
@@ -46,6 +41,9 @@ const innermostHolderOf = (
     .filter((holder) => spans(holder, held) && !spans(held, holder))
     .toSorted((first, second) => second.start - first.start)
     .at(0) ?? null;
+
+const standsAtModuleScope = (held: ESTree.Node, reading: ScopeReading): boolean =>
+  innermostHolderOf(held, reading.functions) === null;
 
 const standsInHelperScope = (held: ESTree.Node, reading: ScopeReading): boolean => {
   const holder = innermostHolderOf(held, reading.functions);
@@ -126,7 +124,7 @@ const boundNameOf = (target: ESTree.VariableDeclarator["id"], source: string): s
 const bindingReportOf = (
   declarator: ESTree.VariableDeclarator,
   reading: BindingReading,
-): HelperReport | null => {
+): NamedReport | null => {
   const { init } = declarator;
   if (init === null) return null;
 
@@ -143,7 +141,25 @@ const bindingReportOf = (
   return null;
 };
 
-const fixtureReportsOf = (call: ESTree.CallExpression): readonly HelperReport[] =>
+const fixtureBindingReportOf = (
+  declarator: ESTree.VariableDeclarator,
+  source: string,
+): NamedReport | null => {
+  const { init } = declarator;
+  if (init === null) return null;
+
+  const written = unwrapSubject(init);
+  if (written.type !== "CallExpression") return null;
+  if (fixtureDeclarationsOf(written).length === 0) return null;
+
+  return {
+    node: declarator,
+    messageId: "moduleScopeFixtureBinding",
+    data: { name: boundNameOf(declarator.id, source) },
+  };
+};
+
+const fixtureReportsOf = (call: ESTree.CallExpression): readonly NamedReport[] =>
   fixtureDeclarationsOf(call).flatMap((declaration) =>
     declaration.subjects.flatMap((subject) => {
       const handed = asSpecFunction(subject);
@@ -172,7 +188,7 @@ const scopeReadingIn = (program: ESTree.Program, rootNames: ReadonlySet<string>)
 const declarationReportsIn = (
   program: ESTree.Program,
   reading: ScopeReading,
-): readonly HelperReport[] =>
+): readonly NamedReport[] =>
   nodesOfType(program, "FunctionDeclaration")
     .filter((declared) => standsInHelperScope(declared, reading))
     .map((declared) => ({
@@ -185,10 +201,19 @@ const bindingReportsIn = (read: {
   readonly program: ESTree.Program;
   readonly reading: ScopeReading;
   readonly binding: BindingReading;
-}): readonly HelperReport[] =>
+}): readonly NamedReport[] =>
   nodesOfType(read.program, "VariableDeclarator")
     .filter((declarator) => standsInHelperScope(declarator, read.reading))
     .flatMap((declarator) => bindingReportOf(declarator, read.binding) ?? []);
+
+const fixtureBindingReportsIn = (read: {
+  readonly program: ESTree.Program;
+  readonly reading: ScopeReading;
+  readonly binding: BindingReading;
+}): readonly NamedReport[] =>
+  nodesOfType(read.program, "VariableDeclarator")
+    .filter((declarator) => standsAtModuleScope(declarator, read.reading))
+    .flatMap((declarator) => fixtureBindingReportOf(declarator, read.binding.source) ?? []);
 
 export const noSpecFileHelperFunction = createDontReviewItRule({
   name: "no-spec-file-helper-function--inline-or-use-fixture",
@@ -196,7 +221,7 @@ export const noSpecFileHelperFunction = createDontReviewItRule({
     type: "problem",
     docs: {
       description:
-        "Disallow a helper function standing at module scope or in the body of a grouping block of a spec file, and a fixture handing back a function written in place, so the block that names a behaviour also spells out the work that behaviour runs",
+        "Disallow a helper function standing at module scope or in the body of a grouping block of a spec file, a fixture builder standing at module scope, and a fixture handing back a function written in place, so the block that names a behaviour also spells out the work that behaviour runs",
       relatedGuidelines: [],
     },
     messages: {
@@ -208,6 +233,8 @@ export const noSpecFileHelperFunction = createDontReviewItRule({
         "A binding must not take its value from a call that hands back a function. Inline the body of `{{name}}` into the test block that uses it, or have a base fixture run that behaviour and hand back the subject it built. An immediately invoked call, a return written inside a branch, a loop, a `switch` or a `try`, and a factory declared in this file are read the same way.",
       containedHelperBinding:
         "A binding must not carry functions inside an object or an array literal at module scope or in the body of a grouping block. Inline each function `{{name}}` carries into the test block that uses it, or have a base fixture run those behaviours and hand back the subjects they built. Nesting the literal deeper keeps the functions in the same scope.",
+      moduleScopeFixtureBinding:
+        "A fixture builder must not stand at module scope. Move `{{name}}` into the body of the grouping block whose test blocks read it, so the block that names a behaviour also stands beside the subject it reads. A builder derived from another builder and a builder carrying several fixtures are read the same way.",
       handedHelperFixture:
         "A fixture must not hand back a function written in place. Rewrite `{{name}}` to run that behaviour itself and hand back the subject it built, and leave the assertions against that subject standing in the test block. A fixture named anything at all is read the same way.",
     },
@@ -235,6 +262,7 @@ export const noSpecFileHelperFunction = createDontReviewItRule({
         const reports = [
           ...declarationReportsIn(program, reading),
           ...bindingReportsIn({ program, reading, binding }),
+          ...fixtureBindingReportsIn({ program, reading, binding }),
           ...nodesOfType(program, "CallExpression").flatMap((call) => fixtureReportsOf(call)),
         ];
 
