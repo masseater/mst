@@ -1,5 +1,7 @@
 import { extname } from "node:path";
 
+import { attempt } from "es-toolkit";
+
 import { runGitBuffer, runGitText } from "./git-text.ts";
 import { parseRepositoryChanges, type RepositoryChange } from "./repository-diff.ts";
 
@@ -73,16 +75,24 @@ const resolveRevisionObject = async (repositoryRoot: string, revision: string): 
 
 const sourceExtensions = [".cjs", ".cts", ".js", ".jsx", ".mjs", ".mts", ".ts", ".tsx"];
 
+const utf8SourceOf = (sourceBytes: Uint8Array): string | null => {
+  const [undecodable, decoded] = attempt<string, Error>(() =>
+    new TextDecoder("utf-8", { fatal: true }).decode(sourceBytes),
+  );
+  return undecodable === null ? decoded : null;
+};
+
 export const decodedSource = (path: string, sourceBytes: Uint8Array): string => {
-  if (sourceBytes.includes(0)) {
-    throw new Error(`Source blob contains NUL bytes: ${path}`);
+  const decoded = utf8SourceOf(sourceBytes);
+  if (decoded === null) {
+    throw new Error(`Source blob does not decode as UTF-8: ${path}`);
   }
 
-  return new TextDecoder("utf-8").decode(sourceBytes);
+  return decoded;
 };
 
 export const decodedPreviousSource = (sourceBytes: Uint8Array): string | null =>
-  sourceBytes.includes(0) ? null : new TextDecoder("utf-8").decode(sourceBytes);
+  utf8SourceOf(sourceBytes);
 
 export type SideSources = Readonly<{
   base: (path: string) => Promise<string | null>;

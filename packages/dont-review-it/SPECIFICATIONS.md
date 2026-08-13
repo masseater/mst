@@ -55,6 +55,24 @@
 - preset の外のルールを止めても報告しない
 - ツールチェーンの設定が無いリポジトリでは適用範囲を検査しない
 
+## 必須ファイルの形の検査
+
+[`specs/required-file-form.spec.ts`](specs/required-file-form.spec.ts)
+
+- JSON で置かれた knip の設定を、TypeScript の綴りを名指しして報告する
+- JSON で置かれた oxlint の設定を、ツールチェーン設定へ移す指示とともに報告する
+- 旧来の rc 形式で置かれた eslint の設定を報告する
+- JavaScript で置かれた vite の設定を報告する
+- リポジトリの根だけでなく、マニフェストを持つディレクトリに置かれた設定も報告する
+- TypeScript で書かれた設定を報告しない
+- AGENTS.md を持つディレクトリに CLAUDE.md が無いことを報告する
+- CLAUDE.md が中身を持つ実体ファイルであることを報告する
+- CLAUDE.md が AGENTS.md 以外を指すシンボリックリンクであることを報告する
+- CLAUDE.md だけがあって AGENTS.md が無いことを報告する
+- AGENTS.md を指すシンボリックリンクの CLAUDE.md を報告しない
+- どちらの指示ファイルも無いディレクトリを報告しない
+- マニフェストを 1 つも持たないリポジトリでも、根を開いた対象として数える
+
 ## 検査の走査証跡
 
 [`specs/scan-trace.spec.ts`](specs/scan-trace.spec.ts)
@@ -65,6 +83,17 @@
 - 人間が読む形では、状態の記号と対象の規模を観点ごとに桁で揃えて並べる
 - AI が読む形では、記号も桁揃えも持たせずに 1 行 1 観点で並べる
 - 違反を見つけた観点を、その件数とともに残す
+
+## 出荷する skill と宣言した版の突き合わせ
+
+[`specs/shipped-skill-versions.spec.ts`](specs/shipped-skill-versions.spec.ts)
+
+- npm へ公開できるパッケージが skill の隣に changelog を持たなければ報告する
+- changelog が宣言された版を書いていなければ、その changelog を指して報告する
+- 同梱する skill が別の版を名乗っていれば、その skill を指して報告する
+- changelog が版を書き、skill が同じ版を名乗っていれば何も報告しない
+- 公開しないパッケージが skill の隣に changelog を持てば報告する
+- 自動修正は skill の版を宣言へ揃え、changelog には触れない
 
 ## ワークフロー定義の検査
 

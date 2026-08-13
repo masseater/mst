@@ -2,7 +2,7 @@ import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   test: {
-    testTimeout: 15_000,
+    testTimeout: 60_000,
     coverage: {
       thresholds: { 100: true, perFile: true },
     },

@@ -211,4 +211,103 @@ describe("shippedSkillsProblems", () => {
 
     expect(problems).toHaveLength(3);
   });
+
+  const VERSIONED_MANIFEST = `{
+  "name": "@example/versioned",
+  "version": "0.1.0",
+  "files": ["dist", "skills"],
+  "keywords": ["tanstack-intent"]
+}
+`;
+
+  const skillDeclaring = (version: string): string =>
+    `---\nname: core\nmetadata:\n  library_version: "${version}"\n---\n`;
+
+  test("a version described by the changelog and named by the skill is silent", () => {
+    expect(
+      checkOn({
+        "packages/versioned/package.json": VERSIONED_MANIFEST,
+        "packages/versioned/skills/CHANGELOG.md": "## 0.1.0\n\n- a change\n",
+        "packages/versioned/skills/core/SKILL.md": skillDeclaring("0.1.0"),
+      }),
+    ).toStrictEqual([]);
+  });
+
+  test("a published package without a changelog is reported at its name", () => {
+    const problems = checkOn({
+      "packages/versioned/package.json": VERSIONED_MANIFEST,
+      "packages/versioned/skills/core/SKILL.md": skillDeclaring("0.1.0"),
+    });
+
+    expect(problems).toHaveLength(1);
+    expect(problems[0]?.file).toBe("packages/versioned/package.json");
+    expect(problems[0]?.line).toBe(2);
+    expect(problems[0]?.message).toContain("without a changelog beside them");
+  });
+
+  test("a changelog that leaves the declared version undescribed is reported at the changelog", () => {
+    const problems = checkOn({
+      "packages/versioned/package.json": VERSIONED_MANIFEST,
+      "packages/versioned/skills/CHANGELOG.md": "## 0.0.9\n\n- an older change\n",
+      "packages/versioned/skills/core/SKILL.md": skillDeclaring("0.1.0"),
+    });
+
+    expect(problems).toHaveLength(1);
+    expect(problems[0]?.file).toBe("packages/versioned/skills/CHANGELOG.md");
+    expect(problems[0]?.line).toBeNull();
+    expect(problems[0]?.message).toContain('Add a "## 0.1.0" heading');
+  });
+
+  test("a skill naming another version is reported at its library_version", () => {
+    const problems = checkOn({
+      "packages/versioned/package.json": VERSIONED_MANIFEST,
+      "packages/versioned/skills/CHANGELOG.md": "## 0.1.0\n\n- a change\n",
+      "packages/versioned/skills/core/SKILL.md": skillDeclaring("0.0.9"),
+    });
+
+    expect(problems).toHaveLength(1);
+    expect(problems[0]?.file).toBe("packages/versioned/skills/core/SKILL.md");
+    expect(problems[0]?.line).toBe(4);
+    expect(problems[0]?.message).toContain('Set metadata.library_version to "0.1.0"');
+  });
+
+  test("every shipped skill is checked against the declared version", () => {
+    const problems = checkOn({
+      "packages/versioned/package.json": VERSIONED_MANIFEST,
+      "packages/versioned/skills/CHANGELOG.md": "## 0.1.0\n\n- a change\n",
+      "packages/versioned/skills/core/SKILL.md": skillDeclaring("0.0.9"),
+      "packages/versioned/skills/extra/SKILL.md": skillDeclaring("0.0.8"),
+    });
+
+    expect(problems).toHaveLength(2);
+  });
+
+  test("a manifest without a version is left alone by the version checks", () => {
+    expect(
+      checkOn({
+        "packages/open/package.json": `{
+  "name": "@example/open",
+  "keywords": ["tanstack-intent"]
+}
+`,
+        "packages/open/skills/core/SKILL.md": "---\nname: core\n---\n",
+      }),
+    ).toStrictEqual([]);
+  });
+
+  test("a private package carrying a changelog is reported at private", () => {
+    const problems = checkOn({
+      "packages/internal/package.json": `{
+  "name": "@example/internal",
+  "private": true
+}
+`,
+      "packages/internal/skills/CHANGELOG.md": "## 0.1.0\n\n- a change\n",
+    });
+
+    expect(problems).toHaveLength(1);
+    expect(problems[0]?.file).toBe("packages/internal/package.json");
+    expect(problems[0]?.line).toBe(3);
+    expect(problems[0]?.message).toContain("must not carry a changelog beside its skills");
+  });
 });
