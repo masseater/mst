@@ -71,6 +71,7 @@ import { noPromiseChain } from "./lint/oxlint/rules/no-promise-chain--use-async-
 import { noReassign } from "./lint/oxlint/rules/no-reassign--use-spread-or-iife.ts";
 import { noReceiverMutation } from "./lint/oxlint/rules/no-receiver-mutation--derive-new-value.ts";
 import { noRedundantMockReset } from "./lint/oxlint/rules/no-redundant-mock-reset--lift-mocks-into-fixture.ts";
+import { noReplacedDoubleBehaviour } from "./lint/oxlint/rules/no-replaced-double-behaviour--let-the-replaced-module-answer.ts";
 import { noRuleSuppression } from "./lint/oxlint/rules/no-rule-suppression--fix-the-violation.ts";
 import { noSharedDoubleState } from "./lint/oxlint/rules/no-shared-double-state--reset-doubles-between-tests.ts";
 import { noSilentSuppression } from "./lint/oxlint/rules/no-silent-suppression--fix-or-justify-inline.ts";
@@ -215,6 +216,7 @@ const plugin: Plugin = {
     [noReassign.name]: noReassign,
     [noReceiverMutation.name]: noReceiverMutation,
     [noRedundantMockReset.name]: noRedundantMockReset,
+    [noReplacedDoubleBehaviour.name]: noReplacedDoubleBehaviour,
     [noRuleSuppression.name]: noRuleSuppression,
     [noSharedDoubleState.name]: noSharedDoubleState,
     [noSilentSuppression.name]: noSilentSuppression,
