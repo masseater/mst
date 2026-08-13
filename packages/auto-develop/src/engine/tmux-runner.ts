@@ -1,5 +1,6 @@
 import { join } from "node:path";
 
+import { CHILD_PROCESS_EVENT } from "../runtime/event-names.ts";
 import { shellQuote, type CommandExecutor, type TailFs } from "./command-executor.ts";
 import { ProcessFailedError } from "./process-failed-error.ts";
 import { UnresponsiveError } from "./unresponsive-error.ts";
@@ -226,7 +227,7 @@ export const runInTmux = (deps: TmuxRunnerDeps) =>
     const tempDir = deps.fs.makeTempDir(`auto-develop-tmux-${asked.sessionName}-`);
     try {
       const outPath = join(tempDir, "out.log");
-      const exitPath = join(tempDir, "exit");
+      const exitPath = join(tempDir, CHILD_PROCESS_EVENT.exit);
       await startSession({ deps, request: asked, outPath, exitPath });
       const heldState: TailState = { offsets: new Map(), flags: new Map(), times: new Map() };
       yield* tailLoop({ state: heldState, request: asked, deps, outPath, startedAtMs: deps.now() });

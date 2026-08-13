@@ -2,6 +2,7 @@ import { createDontReviewItRule } from "../../../create-rule.ts";
 import { propertyKeyOf } from "../lib/object-literal.ts";
 import { standardIoFixtureLocalNameOf } from "../lib/standard-io-fixture.ts";
 import { staticMemberOf } from "../lib/static-member.ts";
+import { PROCESS_IO_MEMBER } from "./no-logged-and-continued-failure--stop-or-recover.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
@@ -25,7 +26,7 @@ const isWriteShapedDouble = (held: ESTree.Expression): boolean => {
   return held.properties.some(
     (property) =>
       property.type === "Property" &&
-      propertyKeyOf(property) === "write" &&
+      propertyKeyOf(property) === PROCESS_IO_MEMBER.write &&
       isFunctionValued(property.value),
   );
 };

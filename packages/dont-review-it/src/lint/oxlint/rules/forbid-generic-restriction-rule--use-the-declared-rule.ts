@@ -1,3 +1,5 @@
+import { LINT_SEVERITY } from "@mst/lint-rule-authoring";
+
 import { createDontReviewItRule } from "../../../create-rule.ts";
 import { listedUnder } from "../lib/declared-replacements/option-lists.ts";
 import { bareRuleNameOf } from "../lib/lint-suppression/suppression-directives.ts";
@@ -37,9 +39,15 @@ const RESTRICTION_RULES: readonly { readonly rule: string; readonly substitute: 
   { rule: "no-restricted-types", substitute: "" },
 ];
 
-const DISABLED_SEVERITIES: ReadonlySet<string> = new Set(["off", "allow", "0"]);
+const DISABLED_SEVERITIES: ReadonlySet<string> = new Set([LINT_SEVERITY.OFF, "allow", "0"]);
 
-const ENABLED_SEVERITIES: ReadonlySet<string> = new Set(["error", "deny", "warn", "1", "2"]);
+const ENABLED_SEVERITIES: ReadonlySet<string> = new Set([
+  LINT_SEVERITY.ERROR,
+  "deny",
+  LINT_SEVERITY.WARN,
+  "1",
+  "2",
+]);
 
 const ENTRY_SCHEMA = {
   type: "object",

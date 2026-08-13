@@ -1,5 +1,7 @@
 import { test, vi } from "vite-plus/test";
 
+import { PROCESS_IO_MEMBER } from "../lint/oxlint/rules/no-logged-and-continued-failure--stop-or-recover.ts";
+
 type CapturedStream = {
   readonly text: string;
 };
@@ -8,7 +10,7 @@ const decoded = (writtenChunk: string | Uint8Array): string =>
   typeof writtenChunk === "string" ? writtenChunk : new TextDecoder().decode(writtenChunk);
 
 const captureWrites = (stream: NodeJS.WriteStream) => {
-  const spy = vi.spyOn(stream, "write").mockImplementation(() => true);
+  const spy = vi.spyOn(stream, PROCESS_IO_MEMBER.write).mockImplementation(() => true);
   return {
     subject: {
       get text(): string {

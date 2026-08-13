@@ -1,6 +1,7 @@
 import { carriedDeliveryId } from "./delivery-id.ts";
 import { asRecord } from "./unknown-record.ts";
 import {
+  DECLARED_MODE,
   isAuthorWorkConclusion,
   isCheckSuiteConclusion,
   type CheckSuiteConclusion,
@@ -31,7 +32,7 @@ export const filterCheckSuiteEvent = (
   delivered: Readonly<Record<string, unknown>>,
   spelledMode: Mode,
 ): FilteredEvent | null => {
-  if (spelledMode === "reviewer") return null;
+  if (spelledMode === DECLARED_MODE.reviewer) return null;
   const suite = completedSuiteShape(delivered);
   if (suite === null || delivered.action !== "completed") return null;
   if (!isAuthorWorkConclusion(suite.conclusion)) return null;

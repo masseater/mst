@@ -3,6 +3,7 @@ import { setTimeout as delay } from "node:timers/promises";
 
 import { attemptAsync } from "es-toolkit";
 
+import { CHILD_PROCESS_EVENT } from "../node-event-names.ts";
 import { signalProcessTree, TREE_TERMINATION_SIGNAL } from "./process-tree.ts";
 import {
   dropInterruptHandler,
@@ -19,7 +20,19 @@ const KILL_GRACE_MS = 5_000;
 
 type Settled =
   | { kind: "start-failure"; failure: Error }
-  | { kind: "exit"; exitCode: number | null; bySignal: NodeJS.Signals | null };
+  | {
+      kind: typeof CHILD_PROCESS_EVENT.exit;
+      exitCode: number | null;
+      bySignal: NodeJS.Signals | null;
+    };
+
+/** @canonical-values ai-native.delay-ending */
+const DELAY_ENDINGS = ["elapsed", "cancelled"] as const;
+
+const DELAY_ENDING = {
+  elapsed: DELAY_ENDINGS[0],
+  cancelled: DELAY_ENDINGS[1],
+} as const;
 
 type Verdict = { settled: Settled; timedOut: boolean };
 
@@ -31,20 +44,23 @@ type RunCommandDependencies = {
 
 const settledChild = (child: ChildProcess): Promise<Settled> =>
   new Promise((resolve) => {
-    child.once("error", (failure) => {
+    child.once(CHILD_PROCESS_EVENT.failure, (failure) => {
       resolve({ kind: "start-failure", failure });
     });
-    child.once("exit", (code, signal) => {
-      resolve({ kind: "exit", exitCode: code, bySignal: signal });
+    child.once(CHILD_PROCESS_EVENT.exit, (code, signal) => {
+      resolve({ kind: CHILD_PROCESS_EVENT.exit, exitCode: code, bySignal: signal });
     });
   });
 
-const settledDelay = async (ms: number, cancel: AbortSignal): Promise<"elapsed" | "cancelled"> => {
+const settledDelay = async (
+  ms: number,
+  cancel: AbortSignal,
+): Promise<(typeof DELAY_ENDINGS)[number]> => {
   try {
     await delay(ms, undefined, { signal: cancel });
-    return "elapsed";
+    return DELAY_ENDING.elapsed;
   } catch (cancelledDelay) {
-    return "cancelled";
+    return DELAY_ENDING.cancelled;
   }
 };
 
@@ -55,7 +71,7 @@ const timeoutFired = async (parameters: {
   dependencies: RunCommandDependencies;
 }): Promise<{ fired: boolean; terminationFailure: Error | null }> => {
   const beforeTimeout = await settledDelay(parameters.timeoutMs, parameters.cancel);
-  if (beforeTimeout === "cancelled") return { fired: false, terminationFailure: null };
+  if (beforeTimeout === DELAY_ENDING.cancelled) return { fired: false, terminationFailure: null };
   const firstSignal =
     parameters.dependencies.platform === "win32"
       ? TREE_TERMINATION_SIGNAL.forced
@@ -114,7 +130,9 @@ const guardChild = async (input: {
   };
 };
 
-const reportChildEnd = (settled: Extract<Settled, { kind: "exit" }>): number => {
+const reportChildEnd = (
+  settled: Extract<Settled, { kind: typeof CHILD_PROCESS_EVENT.exit }>,
+): number => {
   if (settled.bySignal !== null) {
     process.stderr.write(`throttle: command was killed by ${settled.bySignal}\n`);
     return 1;

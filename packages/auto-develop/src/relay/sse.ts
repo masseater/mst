@@ -1,3 +1,4 @@
+import { ABORT_SIGNAL_EVENT } from "../runtime/event-names.ts";
 import { KEEPALIVE_INTERVAL_MS } from "./durations.ts";
 import { readResumableEvents, toEnvelope } from "./poll.ts";
 
@@ -56,7 +57,7 @@ const createStreamLifecycle = (stream: EventStreamRequest): StreamLifecycle => {
   const cleanups = new Map<string, () => void>();
   const closed = new Promise<void>((resolve) => {
     halt.signal.addEventListener(
-      "abort",
+      ABORT_SIGNAL_EVENT.abort,
       () => {
         resolve();
       },
@@ -64,14 +65,14 @@ const createStreamLifecycle = (stream: EventStreamRequest): StreamLifecycle => {
     );
   });
   halt.signal.addEventListener(
-    "abort",
+    ABORT_SIGNAL_EVENT.abort,
     () => {
       for (const cleanup of cleanups.values()) cleanup();
     },
     { once: true },
   );
   stream.clientAbort.addEventListener(
-    "abort",
+    ABORT_SIGNAL_EVENT.abort,
     () => {
       stream.log.info({ clientId: stream.clientId }, "client disconnected");
       halt.abort();

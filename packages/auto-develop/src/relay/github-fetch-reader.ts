@@ -1,10 +1,14 @@
 import { Octokit } from "octokit";
 
 import { asRecord } from "../contract/unknown-record.ts";
+import {
+  CHECK_BUCKET,
+  type CheckBucket,
+  type GithubPullSummary,
+  type GithubReader,
+} from "./github-reader.ts";
 import { GithubRejectionError } from "./github-rejection-error.ts";
 import { GithubUnavailableError } from "./github-unavailable-error.ts";
-
-import type { CheckBucket, GithubPullSummary, GithubReader } from "./github-reader.ts";
 
 const PULL_SUMMARY_QUERY = `query($owner: String!, $name: String!) {
   repository(owner: $owner, name: $name) {
@@ -103,20 +107,54 @@ const toPullSummary = (node: Readonly<Record<string, unknown>>): GithubPullSumma
   requestedReviewerLogins: reviewerLoginsOf(asRecord(node.reviewRequests)?.nodes),
 });
 
+/** @canonical-values auto-develop.github-check-state */
+const GITHUB_CHECK_STATES = [
+  "SUCCESS",
+  "PENDING",
+  "EXPECTED",
+  "QUEUED",
+  "IN_PROGRESS",
+  "CANCELLED",
+  "SKIPPED",
+  "NEUTRAL",
+] as const;
+
+const GITHUB_CHECK_STATE = {
+  success: GITHUB_CHECK_STATES[0],
+  pending: GITHUB_CHECK_STATES[1],
+  expected: GITHUB_CHECK_STATES[2],
+  queued: GITHUB_CHECK_STATES[3],
+  inProgress: GITHUB_CHECK_STATES[4],
+  cancelled: GITHUB_CHECK_STATES[5],
+  skipped: GITHUB_CHECK_STATES[6],
+  neutral: GITHUB_CHECK_STATES[7],
+} as const;
+
 const statusContextBucket = (heldState: string): readonly CheckBucket[] => {
-  if (heldState === "SUCCESS") return ["pass"];
-  if (heldState === "PENDING" || heldState === "EXPECTED") return ["pending"];
-  return ["fail"];
+  if (heldState === GITHUB_CHECK_STATE.success) return [CHECK_BUCKET.pass];
+  if (heldState === GITHUB_CHECK_STATE.pending || heldState === GITHUB_CHECK_STATE.expected) {
+    return [CHECK_BUCKET.pending];
+  }
+  return [CHECK_BUCKET.fail];
 };
 
 const checkRunBucket = (node: Readonly<Record<string, unknown>>): readonly CheckBucket[] => {
-  if (node.status === "QUEUED" || node.status === "IN_PROGRESS" || node.status === "PENDING") {
-    return ["pending"];
+  if (
+    node.status === GITHUB_CHECK_STATE.queued ||
+    node.status === GITHUB_CHECK_STATE.inProgress ||
+    node.status === GITHUB_CHECK_STATE.pending
+  ) {
+    return [CHECK_BUCKET.pending];
   }
-  if (node.conclusion === "CANCELLED") return ["cancel"];
-  if (node.conclusion === "SKIPPED") return ["skipping"];
-  if (node.conclusion === "SUCCESS" || node.conclusion === "NEUTRAL") return ["pass"];
-  return ["fail"];
+  if (node.conclusion === GITHUB_CHECK_STATE.cancelled) return [CHECK_BUCKET.cancel];
+  if (node.conclusion === GITHUB_CHECK_STATE.skipped) return [CHECK_BUCKET.skipping];
+  if (
+    node.conclusion === GITHUB_CHECK_STATE.success ||
+    node.conclusion === GITHUB_CHECK_STATE.neutral
+  ) {
+    return [CHECK_BUCKET.pass];
+  }
+  return [CHECK_BUCKET.fail];
 };
 
 const toCheckBucket = (node: Readonly<Record<string, unknown>>): readonly CheckBucket[] =>

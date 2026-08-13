@@ -74,9 +74,16 @@ const comparisonFor = async (
       })
     : compareRevisions({ repositoryRoot, ...named });
 
+/** @canonical-values stop-ai-slop.parsed-arguments-failure-field */
+const PARSED_ARGUMENTS_FAILURE_FIELDS = ["failure"] as const;
+
+const PARSED_ARGUMENTS_FIELD = {
+  failure: PARSED_ARGUMENTS_FAILURE_FIELDS[0],
+} as const;
+
 const dispatch = async (argv: readonly string[]): Promise<CliResult> => {
   const parsedNode = parsedArguments(argv);
-  if ("failure" in parsedNode) return misuse();
+  if (PARSED_ARGUMENTS_FIELD.failure in parsedNode) return misuse();
   if (parsedNode.positionals.length !== 1 || parsedNode.positionals[0] !== "check") return misuse();
 
   const { base, head } = parsedNode.values;

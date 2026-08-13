@@ -1,4 +1,5 @@
 import { unwrapEnvelope } from "../contract/envelope.ts";
+import { ABSENT_VALUE_PLACEHOLDER } from "../runtime/absent-value-placeholder.ts";
 
 import type { EventQueue } from "./event-queue.ts";
 import type { SseFrame } from "./sse-frames.ts";
@@ -36,7 +37,7 @@ export const createFrameSink = (sink: {
         sink.eventQueue.enqueue(flattened);
       } catch (frameFailure) {
         sink.diagnostics.write(
-          `[sse-transport] Failed to parse or validate frame payload (frameId=${frame.id ?? "none"}): ${String(frameFailure)}\n`,
+          `[sse-transport] Failed to parse or validate frame payload (frameId=${frame.id ?? ABSENT_VALUE_PLACEHOLDER.none}): ${String(frameFailure)}\n`,
         );
       }
     },

@@ -7,6 +7,7 @@ import {
   EVENT_STREAM_PATH,
   STARTUP_DRAIN_PATH,
 } from "../contract/endpoints.ts";
+import { SOCKET_LIFECYCLE_EVENT } from "../runtime/event-names.ts";
 import {
   handleCheckBaseUpdatesRoute,
   handleHealthRoute,
@@ -80,9 +81,9 @@ export const createRelayServer = (deps: RelayDependencies): RelayServer => {
   const server = createServer((asked, produced) => {
     void handleRequest({ req: asked, res: produced });
   });
-  server.on("connection", (socket) => {
+  server.on(SOCKET_LIFECYCLE_EVENT.connection, (socket) => {
     openSockets.add(socket);
-    socket.on("close", () => {
+    socket.on(SOCKET_LIFECYCLE_EVENT.close, () => {
       openSockets.delete(socket);
     });
   });

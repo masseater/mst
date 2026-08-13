@@ -11,6 +11,15 @@ const readableFailure = (_fieldName: string, field: unknown): unknown =>
       }
     : field;
 
+/** @canonical-values auto-develop.log-level */
+const LOG_LEVELS = ["info", "warn", "error"] as const;
+
+const LOG_LEVEL = {
+  info: LOG_LEVELS[0],
+  warn: LOG_LEVELS[1],
+  error: LOG_LEVELS[2],
+} as const;
+
 export const createConsoleLogger = (
   spelled: string,
   ruleOptions: { readonly fileSink?: LogFileSink; readonly out?: NodeJS.WritableStream } = {},
@@ -36,13 +45,13 @@ export const createConsoleLogger = (
   };
   return {
     info: (fields, complaint) => {
-      writeLine({ level: "info", fields, message: complaint });
+      writeLine({ level: LOG_LEVEL.info, fields, message: complaint });
     },
     warn: (fields, complaint) => {
-      writeLine({ level: "warn", fields, message: complaint });
+      writeLine({ level: LOG_LEVEL.warn, fields, message: complaint });
     },
     error: (fields, complaint) => {
-      writeLine({ level: "error", fields, message: complaint });
+      writeLine({ level: LOG_LEVEL.error, fields, message: complaint });
     },
   };
 };

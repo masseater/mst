@@ -2,6 +2,7 @@ import { carriedDeliveryId } from "./delivery-id.ts";
 import { requestedReviewerLogin } from "./extract.ts";
 import { asRecord } from "./unknown-record.ts";
 import {
+  DECLARED_MODE,
   EXCLUSION_LABEL,
   indicatesBehindBase,
   indicatesMergeConflict,
@@ -53,7 +54,7 @@ const exclusionEdgeEvent = (shape: PullRequestShape, spelledMode: Mode): Filtere
       ...carriedDeliveryId(shape.delivered),
     };
   }
-  return spelledMode === "reviewer" ? reviewRequestedEvent(shape, undefined) : null;
+  return spelledMode === DECLARED_MODE.reviewer ? reviewRequestedEvent(shape, undefined) : null;
 };
 
 const filterForReviewer = (shape: PullRequestShape): FilteredEvent | null => {
@@ -111,5 +112,5 @@ export const filterPullRequestEvent = (
   if (isExclusionEdge && asRecord(delivered.label)?.name === EXCLUSION_LABEL) {
     return exclusionEdgeEvent(shape, spelledMode);
   }
-  return spelledMode === "reviewer" ? filterForReviewer(shape) : filterForAuthor(shape);
+  return spelledMode === DECLARED_MODE.reviewer ? filterForReviewer(shape) : filterForAuthor(shape);
 };

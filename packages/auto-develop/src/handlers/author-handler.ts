@@ -1,9 +1,18 @@
+import { COMMIT_STATUS_STATE } from "../lifecycle/review-verdict.ts";
 import { AUTHOR_STATUS_CONTEXT, type HandlerGithubClient } from "./github-client.ts";
 import { createStatusWriter, type StatusWriter } from "./status-writer.ts";
 
 import type { Logger } from "../logging/logger.ts";
 
+/** @canonical-values auto-develop.author-reason */
 const AUTHOR_REASONS = ["request_changes", "ci_failure", "merge_conflict", "base_update"] as const;
+
+export const AUTHOR_REASON = {
+  requestChanges: AUTHOR_REASONS[0],
+  ciFailure: AUTHOR_REASONS[1],
+  mergeConflict: AUTHOR_REASONS[2],
+  baseUpdate: AUTHOR_REASONS[3],
+} as const;
 
 export type AuthorReason = (typeof AUTHOR_REASONS)[number];
 
@@ -33,7 +42,7 @@ const requestRereview = async (rerequest: {
   } catch (requestFailure) {
     await rerequest.statusWriter.write({
       sha: rerequest.sha,
-      state: "failure",
+      state: COMMIT_STATUS_STATE.failure,
       description: "re-requesting the reviewer failed",
     });
     throw requestFailure;
@@ -57,7 +66,7 @@ const runSessionWithStatus = async (running: {
     const failed = await config.github.prSnapshot(delivered.prNumber);
     await running.statusWriter.write({
       sha: failed.headRefOid,
-      state: "failure",
+      state: COMMIT_STATUS_STATE.failure,
       description: "the author response failed",
     });
     throw sessionFailure;
@@ -81,7 +90,7 @@ export const createAuthorHandler = (config: AuthorHandlerConfig) => {
     const before = await config.github.prSnapshot(delivered.prNumber);
     await statusWriter.write({
       sha: before.headRefOid,
-      state: "pending",
+      state: COMMIT_STATUS_STATE.pending,
       description: "addressing feedback",
     });
     await runSessionWithStatus({
@@ -93,7 +102,7 @@ export const createAuthorHandler = (config: AuthorHandlerConfig) => {
     const after = await config.github.prSnapshot(delivered.prNumber);
     await statusWriter.write({
       sha: after.headRefOid,
-      state: "success",
+      state: COMMIT_STATUS_STATE.success,
       description: "the author response completed",
     });
     await requestRereview({

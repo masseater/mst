@@ -6,6 +6,7 @@ import { mkdir, unlink } from "node:fs/promises";
 import { constants } from "node:os";
 import { join } from "node:path";
 
+import { CHILD_PROCESS_EVENT, STREAM_EVENT } from "../node-event-names.ts";
 import { commandIdOf, defaultSpoolRoot, timestampOf } from "./log-destination.ts";
 import { createEscapeStripper } from "./strip-escapes.ts";
 
@@ -78,17 +79,17 @@ const exitCodeOf = (end: ChildEnd): number => {
 
 const waitSpawn = (child: ChildProcess): Promise<Error | undefined> =>
   new Promise((resolvePromise) => {
-    child.once("spawn", () => {
+    child.once(CHILD_PROCESS_EVENT.spawn, () => {
       resolvePromise(undefined);
     });
-    child.once("error", (spawnError) => {
+    child.once(CHILD_PROCESS_EVENT.failure, (spawnError) => {
       resolvePromise(spawnError);
     });
   });
 
 const waitClose = (child: ChildProcess): Promise<ChildEnd> =>
   new Promise((resolvePromise) => {
-    child.once("close", (code, signal) => {
+    child.once(CHILD_PROCESS_EVENT.close, (code, signal) => {
       resolvePromise({ code, signal });
     });
   });
@@ -136,7 +137,7 @@ class SpoolRecording {
 
   constructor(fileStream: WriteStream) {
     this.fileStream = fileStream;
-    fileStream.on("error", (streamError: Error) => {
+    fileStream.on(STREAM_EVENT.failure, (streamError: Error) => {
       this.abort(streamError);
     });
   }
@@ -174,7 +175,7 @@ class SpoolRecording {
     (input.child.stdout as Readable).pipe(strippers[0]).pipe(this.fileStream, { end: false });
     (input.child.stderr as Readable).pipe(strippers[1]).pipe(this.fileStream, { end: false });
     for (const stripper of strippers) {
-      stripper.on("data", (part: Buffer) => {
+      stripper.on(STREAM_EVENT.data, (part: Buffer) => {
         this.observe(part);
       });
     }
