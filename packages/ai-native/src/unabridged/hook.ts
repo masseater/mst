@@ -2,7 +2,7 @@ import { defineHook } from "cc-hooks-ts";
 
 import { denyReasonOf } from "./deny-reason.ts";
 
-export const hook = defineHook({
+export const hook: ReturnType<typeof defineHook<{ PreToolUse: true }>> = defineHook({
   trigger: { PreToolUse: true },
   run: (hookContext) => {
     const refusal = denyReasonOf(hookContext.input.tool_name, hookContext.input.tool_input);
