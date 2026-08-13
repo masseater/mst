@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 
 import { describe, expect, onTestFinished, test } from "vite-plus/test";
 
-import { readAnnotatedSources, readDeclarationSources } from "./annotated-sources.ts";
+import { readAnnotatedSources } from "./annotated-sources.ts";
 import { listRepositoryFiles } from "./source-files.ts";
 
 describe("readAnnotatedSources", () => {
@@ -58,6 +58,5 @@ export const STATUSES = ["draft"] as const;
     expect(
       readAnnotatedSources(listRepositoryFiles(root)).map((source) => source.declarations),
     ).toStrictEqual([[]]);
-    expect(readDeclarationSources(listRepositoryFiles(root))).toStrictEqual([]);
   });
 });

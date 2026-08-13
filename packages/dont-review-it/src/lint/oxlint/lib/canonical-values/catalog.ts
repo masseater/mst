@@ -1,11 +1,25 @@
 import { canonicalValueKey, type CanonicalValue } from "./fingerprint.ts";
 
+import type { GitSourceScope } from "../git-ignored-source.ts";
+
 export { canonicalValueKey };
 
+export type CanonicalValuesImportRoute = {
+  readonly exportName: string;
+  readonly resolvedSourcePaths: readonly string[];
+  readonly specifier: string;
+};
+
 export type CanonicalValuesEntry = {
+  readonly annotationStart: number;
+  readonly binding: string;
+  readonly bindingStart: number;
   readonly conceptId: string;
+  readonly declarationEnd: number;
   readonly declarationPath: string;
-  readonly exportPath: string | null;
+  readonly declarationStart: number;
+  readonly importRoutes: readonly CanonicalValuesImportRoute[];
+  readonly packageName: string | null;
   readonly values: readonly CanonicalValue[];
   readonly fingerprint: string;
 };
@@ -14,32 +28,45 @@ export type CanonicalValuesCatalog = {
   readonly entries: readonly CanonicalValuesEntry[];
   readonly entriesByFingerprint: ReadonlyMap<string, readonly CanonicalValuesEntry[]>;
   readonly entriesByValue: ReadonlyMap<string, readonly CanonicalValuesEntry[]>;
+  readonly packageNames: ReadonlySet<string>;
+  readonly sourceScope: GitSourceScope;
 };
 
+const ALL_SOURCES: GitSourceScope = { isIgnored: () => false };
+
 const groupBy = (
-  listedEntries: readonly CanonicalValuesEntry[],
-  keysOf: (entry: CanonicalValuesEntry) => readonly string[],
+  declarations: readonly CanonicalValuesEntry[],
+  keysOf: (declaration: CanonicalValuesEntry) => readonly string[],
 ): ReadonlyMap<string, readonly CanonicalValuesEntry[]> => {
   const grouped = new Map<string, CanonicalValuesEntry[]>();
-  for (const listed of listedEntries) {
-    for (const named of keysOf(listed)) {
-      const bucket = grouped.get(named);
+  for (const declaration of declarations) {
+    for (const lookupKey of keysOf(declaration)) {
+      const bucket = grouped.get(lookupKey);
       if (bucket === undefined) {
-        grouped.set(named, [listed]);
+        grouped.set(lookupKey, [declaration]);
         continue;
       }
-      if (!bucket.includes(listed)) bucket.push(listed);
+      if (!bucket.includes(declaration)) bucket.push(declaration);
     }
   }
   return grouped;
 };
 
 export const buildCatalog = (
-  listedEntries: readonly CanonicalValuesEntry[],
+  declarations: readonly CanonicalValuesEntry[],
+  catalogConfiguration: {
+    readonly packageNames?: readonly string[];
+    readonly sourceScope?: GitSourceScope;
+  } = {},
 ): CanonicalValuesCatalog => ({
-  entries: listedEntries,
-  entriesByFingerprint: groupBy(listedEntries, (listed) => [listed.fingerprint]),
-  entriesByValue: groupBy(listedEntries, (listed) => listed.values.map(canonicalValueKey)),
+  entries: declarations,
+  entriesByFingerprint: groupBy(declarations, (declaration) => [declaration.fingerprint]),
+  entriesByValue: groupBy(declarations, (declaration) => declaration.values.map(canonicalValueKey)),
+  packageNames: new Set(
+    catalogConfiguration.packageNames ??
+      declarations.flatMap((declaration) =>
+        declaration.packageName === null ? [] : [declaration.packageName],
+      ),
+  ),
+  sourceScope: catalogConfiguration.sourceScope ?? ALL_SOURCES,
 });
-
-export const EMPTY_CANONICAL_VALUES_CATALOG: CanonicalValuesCatalog = buildCatalog([]);

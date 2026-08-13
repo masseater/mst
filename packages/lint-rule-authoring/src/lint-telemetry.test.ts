@@ -4,14 +4,19 @@ import { describe, expect, onTestFinished, test, vi } from "vite-plus/test";
 
 const exports_ = new Set<string>();
 
+const exportedMetricNames = new Set<string>();
+
 vi.mock(import("@opentelemetry/exporter-metrics-otlp-http"), async (importOriginal) => {
   const real = await importOriginal();
   class SilentExporter extends real.OTLPMetricExporter {
     override export(
       ...call: Parameters<InstanceType<typeof real.OTLPMetricExporter>["export"]>
     ): void {
-      const [, resultCallback] = call;
+      const [collected, resultCallback] = call;
       exports_.add("export");
+      for (const scope of collected.scopeMetrics) {
+        for (const metric of scope.metrics) exportedMetricNames.add(metric.descriptor.name);
+      }
       resultCallback({ code: 0 });
     }
   }
@@ -30,6 +35,7 @@ const freshTelemetry = async (asked: {
     process.removeAllListeners("beforeExit");
     metrics.disable();
     exports_.clear();
+    exportedMetricNames.clear();
   });
   vi.resetModules();
   return import("./lint-telemetry.ts");
@@ -76,6 +82,25 @@ describe("startLintTelemetry", () => {
 
     await vi.waitFor(() => {
       expect(exports_.size).toBe(1);
+    });
+  });
+
+  test("a stage measured while nothing is started still hands back what it produced", async () => {
+    const telemetry = await freshTelemetry({ durations: false, disabled: false });
+
+    expect(telemetry.measureStage("canonical.scope", () => 41 + 1)).toBe(42);
+    expect(exports_.size).toBe(0);
+  });
+
+  test("a measured stage leaves under its own metric name", async () => {
+    const telemetry = await started();
+
+    expect(telemetry.measureStage("canonical.scope", () => 41 + 1)).toBe(42);
+
+    process.emit("beforeExit", 0);
+
+    await vi.waitFor(() => {
+      expect(exportedMetricNames).toContain("lint.stage.duration");
     });
   });
 

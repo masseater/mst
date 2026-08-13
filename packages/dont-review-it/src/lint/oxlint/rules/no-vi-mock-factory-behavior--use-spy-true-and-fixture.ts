@@ -30,8 +30,6 @@ const BUILTIN_MODULE_PREFIXES_OPTION = "builtinModulePrefixes";
 
 const DEFAULT_BUILTIN_MODULE_PREFIXES: readonly string[] = ["node:"];
 
-const CREATION_MEMBERS: ReadonlySet<string> = new Set(DEFAULT_MOCK_CREATION_MEMBERS);
-
 const WHITESPACE = /\s+/u;
 
 const builtinModulePrefixesFrom = (ruleOptions: Readonly<Options>): readonly string[] => {
@@ -104,7 +102,7 @@ const createsMockWithImplementation = (
   if (callee.type !== "MemberExpression") return false;
 
   const member = staticMemberName(callee);
-  if (member === null || !CREATION_MEMBERS.has(member)) return false;
+  if (member === null || !DEFAULT_MOCK_CREATION_MEMBERS.includes(member)) return false;
   if (call.arguments.length === 0) return false;
   return spellsMockNamespace(callee.object, lookup);
 };

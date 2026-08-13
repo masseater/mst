@@ -6,5 +6,6 @@ export {
   EXIT_SUCCESS,
   type CliResult,
 } from "./cli-result.ts";
+export { gitExecutablePath } from "./git-executable.ts";
 export { failureCodeOf, readUnlessMissing } from "./path-failure.ts";
 export type { RepositoryProblem } from "./problem.ts";

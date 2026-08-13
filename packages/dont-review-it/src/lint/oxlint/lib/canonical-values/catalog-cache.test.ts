@@ -1,166 +1,190 @@
+import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { describe, expect, onTestFinished, test, vi } from "vite-plus/test";
+import { describe, expect, onTestFinished, test } from "vite-plus/test";
 
-import { cacheInputFingerprint, readCachedEntries, writeCachedEntries } from "./catalog-cache.ts";
+import { readCachedEntries, writeCachedEntries } from "./catalog-cache.ts";
+import { fingerprintValues } from "./fingerprint.ts";
 
-const UNWRITABLE_MARKER = "refuse-to-write";
-
-vi.mock(import("node:fs"), async (importOriginal) => {
-  const real = await importOriginal();
-  const writeFileSync = (...call: Parameters<typeof real.writeFileSync>) => {
-    const [path] = call;
-    if (String(path).includes(UNWRITABLE_MARKER)) throw new Error("the write was refused");
-    real.writeFileSync(...call);
-  };
-  return { ...real, writeFileSync };
-});
-
-const CACHE_SEGMENTS = ["node_modules", ".cache", "mst-dont-review-it", "canonical-values.json"];
-
-const CATALOG_ENTRY = {
-  conceptId: "user.status",
-  declarationPath: "src/user.ts",
-  exportPath: null,
-  values: ["draft", "published"],
-  fingerprint: "vocabulary",
+const createCanonicalValuesTestRepository = (): string => {
+  const repositoryRoot = mkdtempSync(join(tmpdir(), "canonical-values-"));
+  onTestFinished(() => {
+    rmSync(repositoryRoot, { recursive: true, force: true });
+  });
+  return repositoryRoot;
 };
 
-describe("catalog-cache", () => {
-  const repository = (): string => {
-    const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
-    onTestFinished(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    return root;
+describe("catalog cache", () => {
+  const cachePathOf = (repositoryRoot: string): string =>
+    join(repositoryRoot, "node_modules", ".cache", "mst-dont-review-it", "canonical-values.json");
+
+  const cacheIntegrity = (fingerprint: string, catalogEntries: readonly unknown[]): string =>
+    createHash("sha256")
+      .update(JSON.stringify({ version: 5, fingerprint, entries: catalogEntries }))
+      .digest("hex");
+
+  const validEntry = {
+    annotationStart: 0,
+    binding: "VALUES",
+    bindingStart: 2,
+    conceptId: "order.status",
+    declarationEnd: 3,
+    declarationPath: "src/status.ts",
+    declarationStart: 1,
+    fingerprint: fingerprintValues(["draft"]),
+    importRoutes: [
+      {
+        exportName: "VALUES",
+        resolvedSourcePaths: ["src/index.ts"],
+        specifier: "@fixture/vocabulary",
+      },
+    ],
+    packageName: null,
+    values: ["draft"],
   };
 
-  const withCache = (writtenText: string): string => {
-    const root = repository();
-    const path = join(root, ...CACHE_SEGMENTS);
+  const writeCachePayload = (repositoryRoot: string, cacheDocument: unknown): void => {
+    const path = cachePathOf(repositoryRoot);
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, writtenText, "utf8");
-    return root;
+    writeFileSync(path, JSON.stringify(cacheDocument), "utf8");
   };
 
-  const cached = (carried: unknown): string => withCache(JSON.stringify(carried));
-
-  const entriesFrom = (root: string): unknown => readCachedEntries(root, "input");
-
-  test("a cache written for the same input is read back", () => {
-    const root = repository();
-    writeCachedEntries(root, { fingerprint: "input", entries: [CATALOG_ENTRY] });
-
-    expect(entriesFrom(root)).toStrictEqual([CATALOG_ENTRY]);
+  const validCacheDocument = (
+    catalogEntries: readonly unknown[] = [validEntry],
+    fingerprint = "repository-fingerprint",
+  ) => ({
+    entries: catalogEntries,
+    fingerprint,
+    integrity: cacheIntegrity(fingerprint, catalogEntries),
+    version: 5,
   });
 
-  test("a cache written for a different input is not read back", () => {
-    const root = repository();
-    writeCachedEntries(root, { fingerprint: "other", entries: [CATALOG_ENTRY] });
+  const readCacheDocument = (cacheDocument: unknown, fingerprint = "repository-fingerprint") => {
+    const repositoryRoot = createCanonicalValuesTestRepository();
+    writeCachePayload(repositoryRoot, cacheDocument);
+    return readCachedEntries(repositoryRoot, fingerprint);
+  };
 
-    expect(entriesFrom(root)).toBe(null);
+  test("a valid current payload is read only for its own repository fingerprint", () => {
+    const cacheDocument = validCacheDocument();
+
+    expect(readCacheDocument(cacheDocument)).toStrictEqual([validEntry]);
+    expect(readCacheDocument(cacheDocument, "other-fingerprint")).toBe(null);
   });
 
-  test("no cache at all is not read back", () => {
-    expect(entriesFrom(repository())).toBe(null);
+  test("an unreadable cache is treated as a cache miss", () => {
+    const repositoryRoot = createCanonicalValuesTestRepository();
+    const path = cachePathOf(repositoryRoot);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, "{not json", "utf8");
+
+    expect(readCachedEntries(repositoryRoot, "repository-fingerprint")).toBe(null);
   });
 
-  test("a cache that is not json is not read back", () => {
-    expect(entriesFrom(withCache("{ this is not json"))).toBe(null);
+  test.each([
+    null,
+    "cache",
+    {},
+    { ...validCacheDocument(), version: 4 },
+    { ...validCacheDocument(), fingerprint: 1 },
+    { ...validCacheDocument(), integrity: 1 },
+    { ...validCacheDocument(), entries: "entries" },
+    { ...validCacheDocument(), integrity: "forged" },
+  ])("an invalid cache envelope is rejected", (cacheDocument) => {
+    expect(readCacheDocument(cacheDocument)).toBe(null);
   });
 
-  test("a cache holding something other than an object is not read back", () => {
-    expect(entriesFrom(cached("a catalog"))).toBe(null);
+  test.each([
+    null,
+    "entry",
+    {},
+    { ...validEntry, annotationStart: 0.5 },
+    { ...validEntry, bindingStart: 0.5 },
+    { ...validEntry, declarationEnd: 0.5 },
+    { ...validEntry, declarationStart: 0.5 },
+    { ...validEntry, annotationStart: -1 },
+    { ...validEntry, declarationStart: -1 },
+    { ...validEntry, annotationStart: 1 },
+    { ...validEntry, bindingStart: 0 },
+    { ...validEntry, bindingStart: 3 },
+    { ...validEntry, declarationEnd: 1 },
+    { ...validEntry, binding: 1 },
+    { ...validEntry, binding: "" },
+    { ...validEntry, conceptId: 1 },
+    { ...validEntry, conceptId: "Order Status" },
+    { ...validEntry, declarationPath: 1 },
+    { ...validEntry, declarationPath: "" },
+    { ...validEntry, fingerprint: 1 },
+    { ...validEntry, fingerprint: "not-a-fingerprint" },
+    { ...validEntry, packageName: 1 },
+    { ...validEntry, packageName: "" },
+  ])("an entry with invalid identity or offsets is rejected", (candidateEntry) => {
+    expect(readCacheDocument(validCacheDocument([candidateEntry]))).toBe(null);
   });
 
-  test("a cache missing the fields that name it is not read back", () => {
-    expect(entriesFrom(cached({ fingerprint: "input", entries: [] }))).toBe(null);
+  test.each([
+    { ...validEntry, importRoutes: null },
+    { ...validEntry, importRoutes: [null] },
+    { ...validEntry, importRoutes: [{}] },
+    { ...validEntry, importRoutes: [{ ...validEntry.importRoutes[0], exportName: "" }] },
+    { ...validEntry, importRoutes: [{ ...validEntry.importRoutes[0], specifier: "" }] },
+    {
+      ...validEntry,
+      importRoutes: [{ exportName: "VALUES", specifier: "@fixture/vocabulary" }],
+    },
+    {
+      ...validEntry,
+      importRoutes: [{ ...validEntry.importRoutes[0], resolvedSourcePaths: "src/index.ts" }],
+    },
+    {
+      ...validEntry,
+      importRoutes: [{ ...validEntry.importRoutes[0], resolvedSourcePaths: [] }],
+    },
+    ...[
+      "",
+      ".",
+      "src\0index.ts",
+      "src\\index.ts",
+      "src/../index.ts",
+      "../index.ts",
+      "/src/index.ts",
+      "C:/src/index.ts",
+    ].map((path) => ({
+      ...validEntry,
+      importRoutes: [{ ...validEntry.importRoutes[0], resolvedSourcePaths: [path] }],
+    })),
+    {
+      ...validEntry,
+      importRoutes: [
+        { ...validEntry.importRoutes[0], resolvedSourcePaths: ["src/index.ts", "src/index.ts"] },
+      ],
+    },
+  ])("an entry with an invalid import route is rejected", (candidateEntry) => {
+    expect(readCacheDocument(validCacheDocument([candidateEntry]))).toBe(null);
   });
 
-  test("a cache written by an older format is not read back", () => {
-    expect(entriesFrom(cached({ version: 1, fingerprint: "input", entries: [] }))).toBe(null);
+  test.each([
+    { ...validEntry, values: null },
+    { ...validEntry, values: [] },
+    { ...validEntry, values: [{}] },
+    { ...validEntry, values: ["draft", "draft"] },
+    { ...validEntry, values: ["draft"], fingerprint: fingerprintValues(["other"]) },
+  ])("an entry with an invalid canonical domain is rejected", (candidateEntry) => {
+    expect(readCacheDocument(validCacheDocument([candidateEntry]))).toBe(null);
   });
 
-  test("a cache whose entries are not a list is not read back", () => {
-    expect(entriesFrom(cached({ version: 3, fingerprint: "input", entries: "none" }))).toBe(null);
-  });
-
-  test("a cache holding an entry that is not an object is not read back", () => {
-    expect(entriesFrom(cached({ version: 3, fingerprint: "input", entries: [null] }))).toBe(null);
-  });
-
-  test("a cache holding an entry that is missing a field is not read back", () => {
-    const { fingerprint, ...withoutFingerprint } = CATALOG_ENTRY;
-
-    expect(
-      entriesFrom(cached({ version: 3, fingerprint: "input", entries: [withoutFingerprint] })),
-    ).toBe(null);
-  });
-
-  test("a cache holding an entry whose concept is not a word is not read back", () => {
-    expect(
-      entriesFrom(
-        cached({ version: 3, fingerprint: "input", entries: [{ ...CATALOG_ENTRY, conceptId: 1 }] }),
-      ),
-    ).toBe(null);
-  });
-
-  test("a cache holding an entry whose export path is neither absent nor a word is not read back", () => {
-    expect(
-      entriesFrom(
-        cached({
-          version: 3,
-          fingerprint: "input",
-          entries: [{ ...CATALOG_ENTRY, exportPath: 1 }],
-        }),
-      ),
-    ).toBe(null);
-  });
-
-  test("a cache holding an entry whose values are not a list is not read back", () => {
-    expect(
-      entriesFrom(
-        cached({ version: 3, fingerprint: "input", entries: [{ ...CATALOG_ENTRY, values: 1 }] }),
-      ),
-    ).toBe(null);
-  });
-
-  test("a cache holding a value that is not a spelling is not read back", () => {
-    expect(
-      entriesFrom(
-        cached({ version: 3, fingerprint: "input", entries: [{ ...CATALOG_ENTRY, values: [{}] }] }),
-      ),
-    ).toBe(null);
-  });
-
-  test("a cache that cannot be written for a reason the runtime named is left unwritten", () => {
-    const root = repository();
-    const path = join(root, ...CACHE_SEGMENTS);
-    mkdirSync(path, { recursive: true });
+  test("a cache write failure caused by the file system is non-fatal", () => {
+    const repositoryRoot = createCanonicalValuesTestRepository();
+    const fileRoot = join(repositoryRoot, "not-a-directory");
+    writeFileSync(fileRoot, "occupied");
 
     expect(() => {
-      writeCachedEntries(root, { fingerprint: "input", entries: [CATALOG_ENTRY] });
+      writeCachedEntries(fileRoot, {
+        entries: [],
+        fingerprint: "repository-fingerprint",
+      });
     }).not.toThrow();
-  });
-
-  test("a cache that cannot be written for a reason the runtime did not name is raised", () => {
-    const root = join(repository(), UNWRITABLE_MARKER);
-
-    expect(() => {
-      writeCachedEntries(root, { fingerprint: "input", entries: [CATALOG_ENTRY] });
-    }).toThrow("could not be written");
-  });
-
-  test("the fingerprint of the inputs changes when a file changes", () => {
-    const before = cacheInputFingerprint([
-      { absolutePath: "/repo/src/user.ts", relativePath: "src/user.ts", size: 1, mtimeMs: 1 },
-    ]);
-    const after = cacheInputFingerprint([
-      { absolutePath: "/repo/src/user.ts", relativePath: "src/user.ts", size: 2, mtimeMs: 1 },
-    ]);
-
-    expect(before).not.toBe(after);
   });
 });

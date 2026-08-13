@@ -74,8 +74,7 @@ export const ORDER_STATUSES = ["draft"] as const;
       "src/order.ts": `/** @canonical-values order.status */
 export const ORDER_STATUSES = ["draft"] as const;
 `,
-      "src/order.test.ts": `/** @canonical-values order.status */
-const FIXTURE_STATUSES = ["draft"] as const;
+      "src/order.test.ts": `const FIXTURE_STATUSES = ["draft"] as const;
 `,
     });
     const { problems, warnings, failures } = runChecks(repositoryRoot);

@@ -1,4 +1,5 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { IN_PLACE_ARRAY_METHODS } from "../lib/array-mutation-methods.ts";
 import {
   resolveBinding,
   type BindingResolution,
@@ -6,18 +7,6 @@ import {
 } from "../lib/resolved-bindings.ts";
 
 import type { Definition, ESTree } from "@oxlint/plugins";
-
-const IN_PLACE_ARRAY_METHODS: ReadonlySet<string> = new Set([
-  "copyWithin",
-  "fill",
-  "pop",
-  "push",
-  "reverse",
-  "shift",
-  "sort",
-  "splice",
-  "unshift",
-]);
 
 const ARRAY_RETURNING_ARRAY_METHODS: ReadonlySet<string> = new Set([
   "concat",

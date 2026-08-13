@@ -23,6 +23,9 @@ const mergeBaseOf = async (
 ): Promise<string> =>
   (await runGitText({ repositoryRoot, args: ["merge-base", ...revisions] })).trim();
 
+const indexTreeOf = async (repositoryRoot: string): Promise<string> =>
+  (await runGitText({ repositoryRoot, args: ["write-tree"] })).trim();
+
 export const comparisonRangeIn = async (
   repositoryRoot: string,
 ): Promise<ComparisonRange | null> => {
@@ -30,7 +33,7 @@ export const comparisonRangeIn = async (
   if (mergeHead !== null) {
     return {
       baseRevision: await mergeBaseOf(repositoryRoot, ["HEAD", mergeHead]),
-      headRevision: mergeHead,
+      headRevision: await indexTreeOf(repositoryRoot),
     };
   }
 

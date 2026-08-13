@@ -21,7 +21,12 @@ export const SPAWN_FORM_SCHEMA = {
       specifier: { type: "string" },
       exported: { type: "string" },
       position: { type: "integer", minimum: 0 },
-      carries: { type: "string", enum: [SPAWN_TARGET_NAME, SPAWN_TARGET_LINE] },
+      carries: {
+        oneOf: [
+          { type: "string", const: SPAWN_TARGET_NAME },
+          { type: "string", const: SPAWN_TARGET_LINE },
+        ],
+      },
     },
     required: ["specifier", "exported", "carries"],
     additionalProperties: false,

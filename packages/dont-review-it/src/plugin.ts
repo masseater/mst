@@ -1,4 +1,4 @@
-import { loadCanonicalValuesCatalog } from "./lint/oxlint/lib/canonical-values/builder.ts";
+import { loadCanonicalValuesCatalogSnapshot } from "./lint/oxlint/lib/canonical-values/builder.ts";
 import { loadCatalogEntries } from "./lint/oxlint/lib/dependency-catalog/catalog-entries.ts";
 import { loadWorkspaceDependencies } from "./lint/oxlint/lib/dependency-catalog/workspace-manifests.ts";
 import { loadRepositoryBodyIndex } from "./lint/oxlint/lib/duplicated-bodies/builder.ts";
@@ -15,6 +15,7 @@ import { forbidMultiExpectIt } from "./lint/oxlint/rules/forbid-multi-expect-it-
 import { forbidNumberedSiblingFile } from "./lint/oxlint/rules/forbid-numbered-sibling-file--name-what-each-file-owns.ts";
 import { forbidOversizedFile } from "./lint/oxlint/rules/forbid-oversized-file--split-by-responsibility.ts";
 import { forbidRestrictedTargetRelay } from "./lint/oxlint/rules/forbid-restricted-target-relay--delete-the-relay.ts";
+import { forbidTestAdjacentFile } from "./lint/oxlint/rules/forbid-test-adjacent-file--inline-its-setup-into-the-test.ts";
 import { forbidTestHook } from "./lint/oxlint/rules/forbid-test-hook--move-setup-into-fixture.ts";
 import { forbidTrackedPath } from "./lint/oxlint/rules/forbid-tracked-path--untrack-and-ignore.ts";
 import { forbidUnresolvableModuleSpecifier } from "./lint/oxlint/rules/forbid-unresolvable-module-specifier--write-a-statically-resolvable-specifier.ts";
@@ -34,6 +35,7 @@ import { noDoubleTypeAssertion } from "./lint/oxlint/rules/no-double-type-assert
 import { noDryTestSetup } from "./lint/oxlint/rules/no-dry-test-setup--inline-owned-setup.ts";
 import { createNoDuplicateValueDeclaration } from "./lint/oxlint/rules/no-duplicate-value-declaration--reuse-authoritative-value.ts";
 import { createNoDuplicatedBody } from "./lint/oxlint/rules/no-duplicated-body--import-the-existing-declaration.ts";
+import { noDuplicatedTest } from "./lint/oxlint/rules/no-duplicated-test--delete-the-copy.ts";
 import { noExpectCallExpression } from "./lint/oxlint/rules/no-expect-call-expression--yield-from-fixture.ts";
 import { noExpectForbiddenSubjectName } from "./lint/oxlint/rules/no-expect-forbidden-subject-name--rename-to-concrete-subject.ts";
 import { noExpectMemberSubject } from "./lint/oxlint/rules/no-expect-member-subject--yield-subject-from-fixture.ts";
@@ -108,12 +110,12 @@ import { requireVitestExtendBuilder } from "./lint/oxlint/rules/require-vitest-e
 import type { Plugin } from "@oxlint/plugins";
 
 export const noLocalFiniteValueSet = createNoLocalFiniteValueSet({
-  loadCatalog: loadCanonicalValuesCatalog,
+  loadCatalog: loadCanonicalValuesCatalogSnapshot,
   loadLibraryVocabulary,
 });
 
 export const noStrictCanonicalLiteralUse = createNoStrictCanonicalLiteralUseRule({
-  loadCatalog: loadCanonicalValuesCatalog,
+  loadCatalog: loadCanonicalValuesCatalogSnapshot,
 });
 
 export const noDuplicatedBody = createNoDuplicatedBody({ loadIndex: loadRepositoryBodyIndex });
@@ -153,6 +155,7 @@ const plugin: Plugin = {
     [forbidMultiExpectIt.name]: forbidMultiExpectIt,
     [forbidNumberedSiblingFile.name]: forbidNumberedSiblingFile,
     [forbidOversizedFile.name]: forbidOversizedFile,
+    [forbidTestAdjacentFile.name]: forbidTestAdjacentFile,
     [forbidRestrictedTargetRelay.name]: forbidRestrictedTargetRelay,
     [forbidTestHook.name]: forbidTestHook,
     [forbidTrackedPath.name]: forbidTrackedPath,
@@ -173,6 +176,7 @@ const plugin: Plugin = {
     [noDryTestSetup.name]: noDryTestSetup,
     [noDuplicateValueDeclaration.name]: noDuplicateValueDeclaration,
     [noDuplicatedBody.name]: noDuplicatedBody,
+    [noDuplicatedTest.name]: noDuplicatedTest,
     [noExpectCallExpression.name]: noExpectCallExpression,
     [noExpectForbiddenSubjectName.name]: noExpectForbiddenSubjectName,
     [noExpectMemberSubject.name]: noExpectMemberSubject,

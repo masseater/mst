@@ -8,10 +8,7 @@ export type SpecStatement = ESTree.Directive | ESTree.Statement;
 
 export const unwrapSubject = (node: ESTree.Expression): ESTree.Expression => {
   const written = unwrapExpression(node);
-  if (written.type === "TSNonNullExpression") return unwrapSubject(written.expression);
-  if (written.type === "ChainExpression") return unwrapSubject(written.expression);
   if (written.type === "AwaitExpression") return unwrapSubject(written.argument);
-  if (written.type === "ParenthesizedExpression") return unwrapSubject(written.expression);
   return written;
 };
 

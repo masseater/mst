@@ -58,6 +58,10 @@ describe("declarationsIn", () => {
     );
   });
 
+  test("keeps bigint literal values serializable and distinct", () => {
+    expect(structureOfFirst("const amount = 1n;")).not.toBe(structureOfFirst("const amount = 2n;"));
+  });
+
   test("keeps the type annotation of a binding inside the structure", () => {
     expect(structureOfFirst("const parse: (text: string) => unknown = JSON.parse;")).not.toBe(
       structureOfFirst("const parse: (text: string) => string = JSON.parse;"),

@@ -3,6 +3,8 @@ import { mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
+import { gitExecutablePath } from "@mst/repository-checks";
+
 type RepositoryChanges = {
   readonly files?: Readonly<Record<string, string>>;
   readonly removed?: readonly string[];
@@ -15,7 +17,7 @@ export type TestRepository = {
 };
 
 const runGit = (repositoryRoot: string, handedArgs: readonly string[]): string =>
-  execFileSync("git", [...handedArgs], {
+  execFileSync(gitExecutablePath(process.env.PATH), [...handedArgs], {
     cwd: repositoryRoot,
     encoding: "utf8",
     env: {

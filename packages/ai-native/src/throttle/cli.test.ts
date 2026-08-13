@@ -6,10 +6,9 @@ import { text } from "node:stream/consumers";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
-import { lock } from "proper-lockfile";
 import { describe, expect, onTestFinished, test, vi } from "vite-plus/test";
 
-import { ensureSlots } from "./slots.ts";
+import { ensureSlots, tryAcquireAny } from "./slots.ts";
 
 const CLI_PATH = fileURLToPath(new URL("./cli.ts", import.meta.url));
 
@@ -62,12 +61,10 @@ const waitUntil = async (isDone: () => boolean): Promise<void> => {
 
 const acquireSlotIn = async (slotDir: string): Promise<() => Promise<void>> => {
   ensureSlots(slotDir, 1);
-  try {
-    return await lock(join(slotDir, "slot-0"), { stale: 60_000, retries: 0 });
-  } catch (heldElsewhere) {
-    await delay(200);
-    return acquireSlotIn(slotDir);
-  }
+  const hold = await tryAcquireAny({ slotDir, limit: 1 });
+  if (hold !== null) return hold.release;
+  await delay(200);
+  return acquireSlotIn(slotDir);
 };
 
 describe("cli", () => {

@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, onTestFinished, test } from "vite-plus/test";
 
+import { buildSetupExportSpecifierIndex } from "./export-specifier-index.ts";
 import {
   packageDirectoryInWorkspace,
   packageReferenceOf,
@@ -138,5 +139,50 @@ describe("setup-modules/specifier-resolution", () => {
         workspaceRoot,
       }),
     ).toStrictEqual({ kind: "repositoryFile", path: join(workspaceRoot, "held", "index.ts") });
+  });
+
+  test("a workspace package export indexes the files reachable through re-exports", () => {
+    const workspaceRoot = createdDirectory("setup-modules-specifier-workspace-");
+    const packageDirectory = join(workspaceRoot, "shared");
+    mkdirSync(join(packageDirectory, "src", "nested"), { recursive: true });
+    writeFileSync(
+      join(packageDirectory, "package.json"),
+      JSON.stringify({
+        name: "@fixture/shared",
+        exports: {
+          ".": {
+            types: "./src/index.d.ts",
+            import: "./src/index.ts",
+            require: ["../outside.cjs", "./src/index.ts"],
+          },
+          "./package.json": "./package.json",
+        },
+      }),
+    );
+    writeFileSync(
+      join(packageDirectory, "src", "index.ts"),
+      'export * from "./nested/one";\nexport * from "external";\n',
+    );
+    writeFileSync(
+      join(packageDirectory, "src", "nested", "one.ts"),
+      'export { value } from "./two.mjs";\n',
+    );
+    writeFileSync(
+      join(packageDirectory, "src", "nested", "two.mts"),
+      'export * from "../index.ts";\n',
+    );
+    expect([...buildSetupExportSpecifierIndex(packageDirectory)]).toStrictEqual([
+      [join(packageDirectory, "src", "index.ts"), "@fixture/shared"],
+      [join(packageDirectory, "src", "nested", "one.ts"), "@fixture/shared"],
+      [join(packageDirectory, "src", "nested", "two.mts"), "@fixture/shared"],
+    ]);
+  });
+
+  test("an invalid package manifest contributes no exported repository files", () => {
+    const workspaceRoot = createdDirectory("setup-modules-specifier-workspace-");
+    const packageDirectory = join(workspaceRoot, "shared");
+    mkdirSync(packageDirectory, { recursive: true });
+    writeFileSync(join(packageDirectory, "package.json"), "{}");
+    expect([...buildSetupExportSpecifierIndex(packageDirectory)]).toStrictEqual([]);
   });
 });

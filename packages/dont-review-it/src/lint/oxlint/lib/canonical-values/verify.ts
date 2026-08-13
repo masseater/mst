@@ -1,98 +1,23 @@
-import { resolve } from "node:path";
+import { analyzeCanonicalValuesRepository } from "./builder.ts";
+import { buildCatalog, type CanonicalValuesCatalog, type CanonicalValuesEntry } from "./catalog.ts";
 
-import { readAnnotatedSources, type AnnotatedSource } from "./annotated-sources.ts";
-import { buildCatalog, type CanonicalValuesEntry } from "./catalog.ts";
-import { listRepositoryFiles } from "./source-files.ts";
-
-import type { CanonicalValuesTextProblem } from "./declarations.ts";
-import type { CanonicalValue } from "./fingerprint.ts";
-
-export type CanonicalValuesProblem =
-  | (CanonicalValuesTextProblem & { readonly filePath: string })
-  | {
-      readonly kind: "duplicate-concept";
-      readonly filePath: string;
-      readonly line: number;
-      readonly conceptId: string;
-      readonly declaredFilePath: string;
-      readonly declaredLine: number;
-    };
-
-type DeclarationSite = {
-  readonly conceptId: string;
-  readonly filePath: string;
-  readonly line: number;
+export type CanonicalValuesInspection = {
+  readonly catalog: CanonicalValuesCatalog;
+  readonly problems: ReturnType<typeof analyzeCanonicalValuesRepository>["problems"];
 };
 
-const declarationSitesIn = (source: AnnotatedSource): readonly DeclarationSite[] =>
-  source.declarations.map((declaration) => ({
-    conceptId: declaration.conceptId,
-    filePath: source.relativePath,
-    line: declaration.line,
-  }));
-
-const duplicateConceptProblem = (
-  first: DeclarationSite,
-  site: DeclarationSite,
-): CanonicalValuesProblem => ({
-  kind: "duplicate-concept",
-  filePath: site.filePath,
-  line: site.line,
-  conceptId: site.conceptId,
-  declaredFilePath: first.filePath,
-  declaredLine: first.line,
-});
-
-export const verifyCanonicalValues = ({
-  repositoryRoot,
-}: {
+export const inspectCanonicalValues = (inspectionRequest: {
   readonly repositoryRoot: string;
-}): readonly CanonicalValuesProblem[] => {
-  const sources = readAnnotatedSources(listRepositoryFiles(resolve(repositoryRoot)));
-  const firstSiteByConcept = new Map<string, DeclarationSite>();
-
-  return sources.flatMap((source) => [
-    ...source.problems.map((problem) => ({ ...problem, filePath: source.relativePath })),
-    ...declarationSitesIn(source).flatMap((site) => {
-      const first = firstSiteByConcept.get(site.conceptId);
-      if (first === undefined) {
-        firstSiteByConcept.set(site.conceptId, site);
-        return [];
-      }
-      return [duplicateConceptProblem(first, site)];
-    }),
-  ]);
+}): CanonicalValuesInspection => {
+  const analyzed = analyzeCanonicalValuesRepository(inspectionRequest);
+  return { catalog: analyzed.catalog, problems: analyzed.problems };
 };
 
 export const findEquivalentConcepts = (
-  declared: readonly CanonicalValuesEntry[],
+  declarations: readonly CanonicalValuesEntry[],
 ): readonly (readonly CanonicalValuesEntry[])[] =>
-  [...buildCatalog(declared).entriesByFingerprint.values()].filter(
-    (grouped) => new Set(grouped.map((declaredEntry) => declaredEntry.conceptId)).size > 1,
+  [...buildCatalog(declarations).entriesByFingerprint.values()].filter(
+    (grouped) => new Set(grouped.map((declaration) => declaration.conceptId)).size > 1,
   );
 
-export const formatCanonicalValuesProblem = (problem: CanonicalValuesProblem): string => {
-  const location = `${problem.filePath}:${problem.line}`;
-  if (problem.kind === "retired-annotation-tag") {
-    return `${location} The retired annotation tag ${problem.tag} must not stay in the source, because opting a value set out of the canonical vocabulary is no longer possible. Delete the tag, and declare the concept it belonged to so every use derives from that declaration.`;
-  }
-  if (problem.kind === "unparsable-annotation") {
-    return `${location} A canonical values annotation must name the concept it declares. Write the tag followed by a concept id built from lowercase words joined by "-" or ".".`;
-  }
-  if (problem.kind === "vocabulary-without-values") {
-    return `${location} A canonical values annotation must sit on a declaration that spells out the values of ${problem.conceptId}. Move the annotation onto the declaration that lists them, or delete it.`;
-  }
-  return `${location} A concept must be declared in one place. ${problem.conceptId} is already declared at ${problem.declaredFilePath}:${problem.declaredLine}. Delete one of the two declarations, and derive from the one that stays.`;
-};
-
-const formatValues = (vocabulary: readonly CanonicalValue[]): string =>
-  [...new Set(vocabulary.map((held) => JSON.stringify(held)))].toSorted().join(", ");
-
-export const formatEquivalentConceptGroup = (
-  equivalent: readonly CanonicalValuesEntry[],
-): string => {
-  const declarations = equivalent
-    .map((declaredEntry) => `${declaredEntry.conceptId} (${declaredEntry.declarationPath})`)
-    .join(", ");
-  return `${equivalent.map((declaredEntry) => declaredEntry.declarationPath).join(" ")} One set of values must belong to one concept, because two names for the same set let each of them drift on its own. ${formatValues(equivalent.flatMap((declaredEntry) => declaredEntry.values))} is declared by ${declarations}. Keep one of the concepts, and derive the others from the declaration that stays.`;
-};
+export { formatCanonicalValuesProblem, formatEquivalentConceptGroup } from "./verify-format.ts";

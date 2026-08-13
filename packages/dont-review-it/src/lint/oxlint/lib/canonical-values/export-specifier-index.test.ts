@@ -1,227 +1,442 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { describe, expect, onTestFinished, test } from "vite-plus/test";
 
-import { buildExportSpecifierIndex } from "./export-specifier-index.ts";
+import { analyzeCanonicalValuesRepository } from "./builder.ts";
+import { publicPackageEntries, publicPackageName } from "./export-specifier-index.ts";
+import { importRouteStatus } from "./import-route.ts";
 
-describe("buildExportSpecifierIndex", () => {
-  const packageWith = (files: Readonly<Record<string, string>>): string => {
-    const root = mkdtempSync(join(tmpdir(), "export-specifier-index-"));
-    onTestFinished(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    for (const [path, source] of Object.entries(files)) {
-      const absolutePath = join(root, path);
-      mkdirSync(dirname(absolutePath), { recursive: true });
-      writeFileSync(absolutePath, source, "utf8");
-    }
-    return root;
-  };
+const buildCanonicalValuesCatalog = (catalogRequest: { readonly repositoryRoot: string }) =>
+  analyzeCanonicalValuesRepository(catalogRequest).catalog;
 
-  const manifest = (fields: Readonly<Record<string, unknown>>): string => JSON.stringify(fields);
+const writeRepositoryFile = ({
+  contents,
+  relativePath,
+  root,
+}: {
+  readonly contents: string;
+  readonly relativePath: string;
+  readonly root: string;
+}): void => {
+  const absolutePath = join(root, relativePath);
+  mkdirSync(dirname(absolutePath), { recursive: true });
+  writeFileSync(absolutePath, contents, "utf8");
+};
 
-  const specifiersIn = (root: string): readonly (readonly [string, string])[] =>
-    [...buildExportSpecifierIndex(root)].map(([file, specifier]) => [
-      file.slice(root.length + 1),
-      specifier,
-    ]);
-
-  test("a package that names its root export reaches the file behind it", () => {
-    const root = packageWith({
-      "package.json": manifest({ name: "@mst/user", exports: { ".": "./src/index.ts" } }),
-      "src/index.ts": "export const total = 1;\n",
-    });
-
-    expect(specifiersIn(root)).toStrictEqual([["src/index.ts", "@mst/user"]]);
+const createPackageRepository = (
+  exportsField: unknown,
+  extraFiles: Readonly<Record<string, string>> = {},
+): string => {
+  const root = mkdtempSync(join(tmpdir(), "canonical-values-exports-"));
+  onTestFinished(() => {
+    rmSync(root, { recursive: true, force: true });
   });
-
-  test("a subpath export carries the specifier that names it", () => {
-    const root = packageWith({
-      "package.json": manifest({ name: "@mst/user", exports: { "./plugin": "./src/plugin.ts" } }),
-      "src/plugin.ts": "export const total = 1;\n",
-    });
-
-    expect(specifiersIn(root)).toStrictEqual([["src/plugin.ts", "@mst/user/plugin"]]);
+  writeRepositoryFile({
+    contents: JSON.stringify({ name: "@fixture/vocabulary", exports: exportsField }),
+    relativePath: "packages/vocabulary/package.json",
+    root,
   });
-
-  test("a re-export chain carries the specifier to every file it reaches", () => {
-    const root = packageWith({
-      "package.json": manifest({ name: "@mst/user", exports: "./src/index.ts" }),
-      "src/index.ts": 'export * from "./status.ts";\nexport type { Draft } from "./draft.js";\n',
-      "src/status.ts": 'export { STATUSES } from "./vocabulary/index.ts";\n',
-      "src/draft.ts": "export type Draft = { readonly id: string };\n",
-      "src/vocabulary/index.ts": 'export const STATUSES = ["draft"];\n',
-    });
-
-    expect(specifiersIn(root).map(([file]) => file)).toStrictEqual([
-      "src/index.ts",
-      "src/status.ts",
-      "src/vocabulary/index.ts",
-      "src/draft.ts",
-    ]);
+  writeRepositoryFile({
+    contents:
+      '/** @canonical-values order.status */\nexport const ORDER_STATUSES = ["draft", "published"] as const;\n',
+    relativePath: "packages/vocabulary/src/order-status.ts",
+    root,
   });
-
-  test("a re-export that names a file which is not there reaches nothing further", () => {
-    const root = packageWith({
-      "package.json": manifest({ name: "@mst/user", exports: "./src/index.ts" }),
-      "src/index.ts": 'export * from "./missing.ts";\nexport * from "node:path";\n',
+  for (const relativePath of ["src/index.ts", "src/require.ts"]) {
+    writeRepositoryFile({
+      contents: 'export { ORDER_STATUSES } from "./order-status.ts";\n',
+      relativePath: `packages/vocabulary/${relativePath}`,
+      root,
     });
-
-    expect(specifiersIn(root)).toStrictEqual([["src/index.ts", "@mst/user"]]);
+  }
+  writeRepositoryFile({
+    contents: 'export const ORDER_STATUSES = ["draft", "published"] as const;\n',
+    relativePath: "packages/vocabulary/src/shadow.ts",
+    root,
   });
-
-  test("a file re-exported from two places keeps the specifier that reached it first", () => {
-    const root = packageWith({
-      "package.json": manifest({
-        name: "@mst/user",
-        exports: { ".": "./src/index.ts", "./plugin": "./src/plugin.ts" },
-      }),
-      "src/index.ts": 'export * from "./shared.ts";\n',
-      "src/plugin.ts": 'export * from "./shared.ts";\n',
-      "src/shared.ts": "export const total = 1;\n",
-    });
-
-    expect(specifiersIn(root)).toStrictEqual([
-      ["src/index.ts", "@mst/user"],
-      ["src/shared.ts", "@mst/user"],
-      ["src/plugin.ts", "@mst/user/plugin"],
-    ]);
+  writeRepositoryFile({
+    contents: 'import { ORDER_STATUSES } from "./order-status.ts";\nexport = ORDER_STATUSES;\n',
+    relativePath: "packages/vocabulary/src/module.ts",
+    root,
   });
-
-  test("an export map that names conditions reaches the file each of them names", () => {
-    const root = packageWith({
-      "package.json": manifest({
-        name: "@mst/user",
-        exports: {
-          ".": { types: "./src/index.d.ts", import: "./src/index.ts", require: "./src/index.ts" },
-          "./package.json": "./package.json",
-        },
-      }),
-      "src/index.ts": "export const total = 1;\n",
-    });
-
-    expect(specifiersIn(root)).toStrictEqual([["src/index.ts", "@mst/user"]]);
+  writeRepositoryFile({
+    contents: 'const ORDER_STATUSES = ["draft", "published"] as const;\nexport = ORDER_STATUSES;\n',
+    relativePath: "packages/vocabulary/src/module-shadow.ts",
+    root,
   });
-
-  test("a re-export cycle is walked once", () => {
-    const root = packageWith({
-      "package.json": manifest({ name: "@mst/user", exports: "./src/index.ts" }),
-      "src/index.ts": 'export * from "./status.ts";\n',
-      "src/status.ts": 'export * from "./index.ts";\n',
-    });
-
-    expect(specifiersIn(root).map(([file]) => file)).toStrictEqual([
-      "src/index.ts",
-      "src/status.ts",
-    ]);
+  writeRepositoryFile({
+    contents: 'export { ORDER_STATUSES } from "../order-status.ts";\n',
+    relativePath: "packages/vocabulary/src/public/owner.ts",
+    root,
   });
+  writeRepositoryFile({
+    contents: 'export const ORDER_STATUSES = ["draft", "published"] as const;\n',
+    relativePath: "packages/vocabulary/src/public/shadow.ts",
+    root,
+  });
+  for (const [relativePath, fileText] of Object.entries(extraFiles)) {
+    writeRepositoryFile({ contents: fileText, relativePath, root });
+  }
+  return root;
+};
 
-  test("a re-export chain deeper than the limit stops there", () => {
-    const step = (reachedNext: string): string => `export * from "./${reachedNext}.ts";\n`;
-    const root = packageWith({
-      "package.json": manifest({ name: "@mst/user", exports: "./src/a.ts" }),
-      "src/a.ts": step("b"),
-      "src/b.ts": step("c"),
-      "src/c.ts": step("d"),
-      "src/d.ts": step("e"),
-      "src/e.ts": step("f"),
-      "src/f.ts": "export const total = 1;\n",
+const importRoutesFor = (
+  exportsField: unknown,
+  extraFiles?: Readonly<Record<string, string>>,
+): readonly unknown[] =>
+  buildCanonicalValuesCatalog({
+    repositoryRoot: createPackageRepository(exportsField, extraFiles),
+  }).entries[0]?.importRoutes ?? [];
+
+const publicEntriesFor = (
+  exportsField: unknown,
+  extraFiles?: Readonly<Record<string, string>>,
+): readonly unknown[] => {
+  const root = createPackageRepository(exportsField, extraFiles);
+  return publicPackageEntries(join(root, "packages/vocabulary"));
+};
+
+describe("export specifier index", () => {
+  test.each([null, [], {}])(
+    "a package manifest without a public name publishes no entries",
+    (manifest) => {
+      const root = createPackageRepository("./src/index.ts");
+      writeRepositoryFile({
+        contents: JSON.stringify(manifest),
+        relativePath: "packages/vocabulary/package.json",
+        root,
+      });
+
+      expect(publicPackageEntries(join(root, "packages/vocabulary"))).toStrictEqual([]);
+      expect(publicPackageName(join(root, "packages/vocabulary"))).toBe(null);
+    },
+  );
+
+  test("package.json and invalid subpaths never become public source entries", () => {
+    const packageExports = publicEntriesFor({
+      ".": "./src/index.ts",
+      invalid: "./src/index.ts",
+      "./package.json": "./package.json",
+      "./blocked": null,
     });
 
-    expect(specifiersIn(root).map(([file]) => file)).toStrictEqual([
-      "src/a.ts",
-      "src/b.ts",
-      "src/c.ts",
-      "src/d.ts",
-      "src/e.ts",
-    ]);
+    expect(packageExports).toHaveLength(1);
+    expect(packageExports[0]).toMatchObject({ specifier: "@fixture/vocabulary" });
+    expect(String((packageExports[0] as { readonly sourceFile: unknown }).sourceFile)).toMatch(
+      /packages\/vocabulary\/src\/index\.ts$/u,
+    );
   });
 
-  test("an entry file the manifest names but the package does not hold reaches only itself", () => {
-    const root = packageWith({
-      "package.json": manifest({ name: "@mst/user", exports: "./src/missing.ts" }),
-    });
-
-    expect(specifiersIn(root)).toStrictEqual([["src/missing.ts", "@mst/user"]]);
-  });
-
-  test("two conditions that name different files both stand behind the subpath", () => {
-    const root = packageWith({
-      "package.json": manifest({
-        name: "@mst/user",
-        exports: { ".": { import: "./src/modern.ts", require: "./src/legacy.ts" } },
-      }),
-      "src/modern.ts": "export const total = 1;\n",
-      "src/legacy.ts": "export const total = 1;\n",
-    });
-
-    expect(specifiersIn(root).map(([file]) => file)).toStrictEqual([
-      "src/modern.ts",
-      "src/legacy.ts",
-    ]);
-  });
-
-  test("an export target that does not start with a relative marker is left out", () => {
-    const root = packageWith({
-      "package.json": manifest({ name: "@mst/user", exports: { ".": "src/index.ts" } }),
-      "src/index.ts": "export const total = 1;\n",
-    });
-
-    expect(specifiersIn(root)).toStrictEqual([]);
-  });
-
-  test("an export map nested deeper than the limit is not followed", () => {
-    const root = packageWith({
-      "package.json": manifest({
-        name: "@mst/user",
-        exports: {
-          ".": { a: { b: { c: { d: { e: { f: { g: { h: { i: "./src/index.ts" } } } } } } } } },
-        },
-      }),
-      "src/index.ts": "export const total = 1;\n",
-    });
-
-    expect(specifiersIn(root)).toStrictEqual([]);
-  });
-
-  test("an export map holding a list is not read as conditions", () => {
-    const root = packageWith({
-      "package.json": manifest({ name: "@mst/user", exports: { ".": ["./src/index.ts"] } }),
-      "src/index.ts": "export const total = 1;\n",
-    });
-
-    expect(specifiersIn(root)).toStrictEqual([]);
-  });
-
-  test("a package that names no export surface reaches nothing", () => {
-    const root = packageWith({ "package.json": manifest({ name: "@mst/user" }) });
-
-    expect(specifiersIn(root)).toStrictEqual([]);
-  });
-
-  test("a directory that holds no manifest reaches nothing", () => {
+  test("a non-module JSON export does not invalidate a script owner route", () => {
     expect(
-      specifiersIn(packageWith({ "src/index.ts": "export const total = 1;\n" })),
+      importRoutesFor(
+        { ".": "./src/index.ts", "./config": "./config.json" },
+        { "packages/vocabulary/config.json": "{}\n" },
+      ),
+    ).toHaveLength(1);
+  });
+
+  test("non-runtime and exhausted fallback targets publish no source entry", () => {
+    expect(publicEntriesFor(["types-only", null, "../outside.ts"])).toStrictEqual([]);
+  });
+
+  test("an empty fallback and an empty runtime condition publish no source entry", () => {
+    expect(publicEntriesFor([])).toStrictEqual([]);
+    expect(publicEntriesFor({ types: "./src/index.d.ts" })).toStrictEqual([]);
+  });
+
+  test("a malformed wildcard key and a package escape publish no source entry", () => {
+    expect(
+      publicEntriesFor({
+        "invalid/*": "./src/public/*.ts",
+        "./escape/*": "../public/*.ts",
+      }),
     ).toStrictEqual([]);
   });
 
-  test("a manifest that names no package reaches nothing", () => {
-    const root = packageWith({ "package.json": manifest({ exports: "./src/index.ts" }) });
+  test("a missing package directory publishes no name or entries", () => {
+    const root = createPackageRepository("./src/index.ts");
+    const missing = join(root, "packages/missing");
 
-    expect(specifiersIn(root)).toStrictEqual([]);
+    expect(publicPackageEntries(missing)).toStrictEqual([]);
+    expect(publicPackageName(missing)).toBe(null);
   });
 
-  test("a manifest whose name is empty reaches nothing", () => {
-    const root = packageWith({ "package.json": manifest({ name: "", exports: "./src/index.ts" }) });
+  test("package name reading rejects malformed manifests independently", () => {
+    for (const manifest of [null, [], {}, { name: "" }, { name: 1 }]) {
+      const root = createPackageRepository("./src/index.ts");
+      writeRepositoryFile({
+        contents: JSON.stringify(manifest),
+        relativePath: "packages/vocabulary/package.json",
+        root,
+      });
 
-    expect(specifiersIn(root)).toStrictEqual([]);
+      expect(publicPackageName(join(root, "packages/vocabulary"))).toBe(null);
+    }
   });
 
-  test("a manifest that is not an object reaches nothing", () => {
-    const root = packageWith({ "package.json": '"@mst/user"' });
+  test("an invalid package manifest grants no owner import route", () => {
+    const root = createPackageRepository("./src/index.ts");
+    writeRepositoryFile({
+      contents: "null",
+      relativePath: "packages/vocabulary/package.json",
+      root,
+    });
 
-    expect(specifiersIn(root)).toStrictEqual([]);
+    expect(buildCanonicalValuesCatalog({ repositoryRoot: root }).entries[0]).toMatchObject({
+      importRoutes: [],
+      packageName: null,
+    });
+  });
+
+  test("a package without exports exposes no public source entry", () => {
+    const root = createPackageRepository(undefined);
+
+    expect(publicPackageEntries(join(root, "packages/vocabulary"))).toStrictEqual([]);
+  });
+
+  test("an export-equals owner publishes the package module value", () => {
+    expect(
+      importRoutesFor({
+        ".": "./src/module.ts",
+        "./shadow": "./src/module-shadow.ts",
+      }),
+    ).toStrictEqual([
+      {
+        exportName: "<module>",
+        resolvedSourcePaths: ["packages/vocabulary/src/module.ts"],
+        specifier: "@fixture/vocabulary",
+      },
+    ]);
+  });
+
+  test("a single-star export pattern expands only owner source identities", () => {
+    expect(importRoutesFor({ "./*": "./src/public/*.ts" })).toStrictEqual([
+      {
+        exportName: "ORDER_STATUSES",
+        resolvedSourcePaths: ["packages/vocabulary/src/public/owner.ts"],
+        specifier: "@fixture/vocabulary/owner",
+      },
+    ]);
+  });
+
+  test("an exact null export overrides a matching wildcard route", () => {
+    expect(
+      importRoutesFor({
+        "./owner": null,
+        "./*": "./src/public/*.ts",
+      }),
+    ).toStrictEqual([]);
+  });
+
+  test("an exact shadow export overrides a matching wildcard owner route", () => {
+    expect(
+      importRoutesFor({
+        "./owner": "./src/shadow.ts",
+        "./*": "./src/public/*.ts",
+      }),
+    ).toStrictEqual([]);
+  });
+
+  test("a more specific null pattern overrides a matching broad wildcard route", () => {
+    const ownerRoutes = [
+      {
+        exportName: "ORDER_STATUSES",
+        resolvedSourcePaths: ["packages/vocabulary/src/public/owner.ts"],
+        specifier: "@fixture/vocabulary/owner",
+      },
+    ];
+    const extraFiles = {
+      "packages/vocabulary/src/public/private/status.ts":
+        'export { ORDER_STATUSES } from "../../order-status.ts";\n',
+    };
+    for (const exportsField of [
+      {
+        "./private/*": null,
+        "./*": "./src/public/*.ts",
+      },
+      {
+        "./*": "./src/public/*.ts",
+        "./private/*": null,
+      },
+    ]) {
+      expect(importRoutesFor(exportsField, extraFiles)).toStrictEqual(ownerRoutes);
+    }
+  });
+
+  test("a pattern capture comes from the existing target path", () => {
+    expect(importRoutesFor({ "./*": "./src/public/*" })).toStrictEqual([
+      {
+        exportName: "ORDER_STATUSES",
+        resolvedSourcePaths: ["packages/vocabulary/src/public/owner.ts"],
+        specifier: "@fixture/vocabulary/owner.ts",
+      },
+    ]);
+  });
+
+  test("a pattern whose target has no repository file publishes no route", () => {
+    expect(importRoutesFor({ "./*": "./src/missing/*.ts" })).toStrictEqual([]);
+  });
+
+  test("a pattern with an unresolved runtime condition publishes no route", () => {
+    expect(
+      importRoutesFor({
+        "./*": {
+          browser: "./src/missing/*.ts",
+          default: "./src/public/*.ts",
+        },
+      }),
+    ).toStrictEqual([]);
+  });
+
+  test("a JavaScript target pattern resolves its corresponding TypeScript source", () => {
+    expect(importRoutesFor({ "./*": "./src/public/*.js" })).toStrictEqual([
+      {
+        exportName: "ORDER_STATUSES",
+        resolvedSourcePaths: ["packages/vocabulary/src/public/owner.ts"],
+        specifier: "@fixture/vocabulary/owner",
+      },
+    ]);
+  });
+
+  test("a subpath with multiple stars publishes no route", () => {
+    expect(importRoutesFor({ "./**": "./src/public/*.ts" })).toStrictEqual([]);
+  });
+
+  test("a target with multiple stars publishes no route", () => {
+    expect(importRoutesFor({ "./*": "./src/**/index.*" })).toStrictEqual([]);
+  });
+
+  test("a pattern target outside the package publishes no route", () => {
+    expect(importRoutesFor({ "./*": "../public/*.ts" })).toStrictEqual([]);
+  });
+
+  test("a package target symlinked outside the package publishes no route", () => {
+    const root = createPackageRepository({ ".": "./src/public-link.ts" });
+    writeRepositoryFile({
+      contents: 'export { ORDER_STATUSES } from "../packages/vocabulary/src/order-status.ts";\n',
+      relativePath: "shared/index.ts",
+      root,
+    });
+    symlinkSync("../../../shared/index.ts", join(root, "packages/vocabulary/src/public-link.ts"));
+
+    expect(
+      buildCanonicalValuesCatalog({ repositoryRoot: root }).entries[0]?.importRoutes,
+    ).toStrictEqual([]);
+  });
+
+  test("a pattern target without a capture publishes no route", () => {
+    expect(importRoutesFor({ "./*": "./src/public/owner.ts" })).toStrictEqual([]);
+  });
+
+  test("a conditional route is rejected when one runtime target exports a shadow", () => {
+    expect(
+      importRoutesFor({
+        ".": {
+          import: "./src/shadow.ts",
+          require: "./src/index.ts",
+        },
+      }),
+    ).toStrictEqual([]);
+  });
+
+  test("a conditional route keeps an export shared by every runtime target", () => {
+    expect(
+      importRoutesFor({
+        ".": {
+          import: "./src/index.ts",
+          require: "./src/require.ts",
+        },
+      }),
+    ).toStrictEqual([
+      {
+        exportName: "ORDER_STATUSES",
+        resolvedSourcePaths: [
+          "packages/vocabulary/src/index.ts",
+          "packages/vocabulary/src/require.ts",
+        ],
+        specifier: "@fixture/vocabulary",
+      },
+    ]);
+  });
+
+  test("an unresolved runtime condition fails closed even when default reaches the owner", () => {
+    expect(
+      importRoutesFor({
+        ".": {
+          browser: "./src/missing.ts",
+          default: "./src/index.ts",
+        },
+      }),
+    ).toStrictEqual([]);
+  });
+
+  test("an export fallback stops at the first resolvable shadow target", () => {
+    expect(importRoutesFor({ ".": ["./src/shadow.ts", "./src/index.ts"] })).toStrictEqual([]);
+  });
+
+  test("an export fallback reaches the owner after an unresolved target", () => {
+    expect(importRoutesFor({ ".": ["./src/missing.ts", "./src/index.ts"] })).toStrictEqual([
+      {
+        exportName: "ORDER_STATUSES",
+        resolvedSourcePaths: ["packages/vocabulary/src/index.ts"],
+        specifier: "@fixture/vocabulary",
+      },
+    ]);
+  });
+
+  test("a workspace package types condition resolves to its registered runtime route", () => {
+    const root = mkdtempSync(join(tmpdir(), "canonical-public-route-types-"));
+    onTestFinished(() => {
+      rmSync(root, { recursive: true, force: true });
+    });
+    const files = {
+      "package.json": JSON.stringify({
+        name: "fixture-repository",
+        private: true,
+        workspaces: ["packages/*"],
+      }),
+      "tsconfig.json": JSON.stringify({
+        compilerOptions: { module: "nodenext", moduleResolution: "nodenext" },
+      }),
+      "packages/vocabulary/package.json": JSON.stringify({
+        name: "@fixture/vocabulary",
+        type: "module",
+        exports: {
+          ".": {
+            types: "./src/index.d.ts",
+            import: "./src/index.ts",
+            default: "./src/index.ts",
+          },
+        },
+      }),
+      "packages/vocabulary/src/owner.ts":
+        '/** @canonical-values order.status */\nexport const ORDER_STATUSES = ["draft", "published"] as const;\n',
+      "packages/vocabulary/src/index.ts": 'export { ORDER_STATUSES } from "./owner.ts";\n',
+      "packages/vocabulary/src/index.d.ts":
+        'export declare const ORDER_STATUSES: readonly ["draft", "published"];\n',
+      "src/consumer.ts": "export {};\n",
+    };
+    for (const [relativePath, fileText] of Object.entries(files)) {
+      writeRepositoryFile({ contents: fileText, relativePath, root });
+    }
+    const packageLink = join(root, "node_modules/@fixture/vocabulary");
+    mkdirSync(dirname(packageLink), { recursive: true });
+    symlinkSync("../../packages/vocabulary", packageLink, "dir");
+    const publicCatalog = buildCanonicalValuesCatalog({ repositoryRoot: root });
+
+    expect(
+      importRouteStatus(
+        {
+          importedName: "ORDER_STATUSES",
+          specifier: "@fixture/vocabulary",
+          filename: join(root, "src/consumer.ts"),
+          repositoryRoot: root,
+        },
+        publicCatalog,
+      ),
+    ).toBe("registered");
   });
 });

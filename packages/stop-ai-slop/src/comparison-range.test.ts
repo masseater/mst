@@ -16,11 +16,13 @@ describe("comparisonRangeIn", () => {
       repository.git(["switch", "--quiet", "main"]);
       repository.commit({ files: { "src/main-only.ts": "export const mainOnly = true;\n" } });
       repository.git(["merge", "--quiet", "--no-commit", "--no-ff", "feature"]);
+      const mergedTree = repository.git(["write-tree"]).trim();
 
       await expect(comparisonRangeIn(repository.root)).resolves.toStrictEqual({
         baseRevision: common,
-        headRevision: featureTip,
+        headRevision: mergedTree,
       });
+      expect(featureTip).not.toBe(mergedTree);
     });
   });
 

@@ -1,4 +1,3 @@
-import { spawn } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 
 import { describe, expect, test, vi } from "vite-plus/test";
@@ -10,7 +9,6 @@ import {
   makeRunningInterruptHandler,
   makeWaitingInterruptHandler,
   raiseSignal,
-  safeKill,
 } from "./signals.ts";
 
 describe("signals", () => {
@@ -69,27 +67,31 @@ describe("signals", () => {
     expect(raise).toHaveBeenCalledWith("SIGTERM");
   });
 
-  test("the running handler forwards the signal to the child's process group", () => {
-    const kill = vi.fn<(pid: number, signal: NodeJS.Signals) => boolean>(() => true);
-    const takenHandler = makeRunningInterruptHandler({ childPid: 4321, kill });
+  test("the running handler forwards the signal to the child's process tree", () => {
+    const signalTree = vi.fn<(input: { pid: number; signal: NodeJS.Signals }) => Error | null>(
+      () => null,
+    );
+    const reportFailure = vi.fn<(failure: Error) => void>();
+    const takenHandler = makeRunningInterruptHandler({ childPid: 4321, signalTree, reportFailure });
 
     takenHandler("SIGINT");
 
-    expect(kill).toHaveBeenCalledWith(-4321, "SIGINT");
+    expect(signalTree).toHaveBeenCalledWith({ pid: 4321, signal: "SIGINT" });
+    expect(reportFailure).not.toHaveBeenCalled();
   });
 
-  test("safeKill delivers a signal to a live process and swallows a miss on a dead one", async () => {
-    const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000);"]);
-    const childDeath = new Promise<NodeJS.Signals | null>((resolve) => {
-      child.once("exit", (_code, signal) => {
-        resolve(signal);
-      });
+  test("the running handler reports a process tree failure", () => {
+    const failure = new Error("taskkill denied");
+    const reportFailure = vi.fn<(reported: Error) => void>();
+    const takenHandler = makeRunningInterruptHandler({
+      childPid: 4321,
+      signalTree: () => failure,
+      reportFailure,
     });
 
-    expect(safeKill(child.pid ?? 0, "SIGTERM")).toBe(true);
+    takenHandler("SIGTERM");
 
-    expect(await childDeath).toBe("SIGTERM");
-    expect(safeKill(child.pid ?? 0, "SIGTERM")).toBe(false);
+    expect(reportFailure).toHaveBeenCalledWith(failure);
   });
 
   test("raiseSignal sends the signal to the wrapper's own process", () => {

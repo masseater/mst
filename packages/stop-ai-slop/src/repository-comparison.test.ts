@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { range } from "es-toolkit";
 import { describe, expect, it, vi } from "vite-plus/test";
 
-import { compareRevisions, decodedSource } from "./repository-comparison.ts";
+import { compareRevisions, decodedPreviousSource, decodedSource } from "./repository-comparison.ts";
 import { withTestRepository } from "./test-repository.ts";
 
 const renameSource = (prefix: string, changed = false): string =>
@@ -217,6 +217,10 @@ describe("compareRevisions", () => {
     expect(() => decodedSource("src/binary.ts", Uint8Array.from([0xff, 0xfe, 0xff]))).toThrow(
       "Source blob does not decode as UTF-8: src/binary.ts",
     );
+  });
+
+  it("reads a previous blob that does not decode as UTF-8 as an absent source", () => {
+    expect(decodedPreviousSource(Uint8Array.from([0xff, 0xfe, 0xff]))).toBeNull();
   });
 
   it("classifies a regular file changed to a symbolic link as changed", async () => {

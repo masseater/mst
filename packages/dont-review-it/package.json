@@ -51,6 +51,7 @@
     "oxlint": "catalog:",
     "std-env": "4.2.0",
     "typescript": "catalog:",
+    "typescript-6": "npm:@typescript/typescript6@6.0.2",
     "yaml": "catalog:"
   },
   "devDependencies": {

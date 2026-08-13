@@ -1,4 +1,4 @@
-import { testLintRule, type WorkspaceLintRule } from "@mst/lint-rule-authoring";
+import { parseSync } from "oxc-parser";
 import { describe, expect, test } from "vite-plus/test";
 
 import {
@@ -8,101 +8,60 @@ import {
   propertyKeyName,
   schemaUnionLiterals,
   staticArrayValues,
+  unwrapExpression,
+  unwrapType,
 } from "./finite-value-syntax.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
-const PROBE_META = {
-  type: "problem" as const,
-  docs: { description: "reports what the reader under test read", relatedGuidelines: [] },
-  messages: { read: "{{text}}" },
-  schema: [],
+const expressionFrom = (source: string): ESTree.Expression => {
+  const syntaxTree = parseSync("source.ts", source);
+  const [statement] = syntaxTree.program.body;
+  if (syntaxTree.errors.length !== 0 || statement?.type !== "ExpressionStatement") {
+    throw new Error(`Expected one expression statement: ${source}`);
+  }
+  return statement.expression as ESTree.Expression;
 };
 
-const spelt = (held: unknown): string => JSON.stringify(held);
-
-const arrayReader: WorkspaceLintRule = {
-  name: "probe-static-array-values",
-  meta: PROBE_META,
-  create(inspection) {
-    return {
-      ArrayExpression(node: ESTree.ArrayExpression) {
-        inspection.report({
-          node,
-          messageId: "read",
-          data: { text: spelt(staticArrayValues(node)) },
-        });
-      },
-    };
-  },
+const unionFrom = (source: string): ESTree.TSType => {
+  const syntaxTree = parseSync("source.ts", source);
+  const [statement] = syntaxTree.program.body;
+  if (syntaxTree.errors.length !== 0 || statement?.type !== "TSTypeAliasDeclaration") {
+    throw new Error(`Expected one type alias: ${source}`);
+  }
+  return statement.typeAnnotation as ESTree.TSType;
 };
 
-const unionTypeReader: WorkspaceLintRule = {
-  name: "probe-literal-union-values",
-  meta: PROBE_META,
-  create(inspection) {
-    return {
-      TSTypeAliasDeclaration(node: ESTree.TSTypeAliasDeclaration) {
-        inspection.report({
-          node,
-          messageId: "read",
-          data: { text: spelt(literalUnionValues(node.typeAnnotation)) },
-        });
-      },
-    };
-  },
+const propertyFrom = (source: string): ESTree.ObjectProperty => {
+  const expression = unwrapExpression(expressionFrom(source));
+  if (expression.type !== "ObjectExpression") throw new Error(`Expected an object: ${source}`);
+  const [property] = expression.properties;
+  if (property?.type !== "Property") throw new Error(`Expected one property: ${source}`);
+  return property;
 };
 
-const schemaReader: WorkspaceLintRule = {
-  name: "probe-schema-union-literals",
-  meta: PROBE_META,
-  create(inspection) {
-    return {
-      CallExpression(node: ESTree.CallExpression) {
-        if (calleeMemberName(node.callee) !== "union") return;
-        const read = schemaUnionLiterals(node);
-        inspection.report({
-          node,
-          messageId: "read",
-          data: { text: spelt(read === null ? null : read.values) },
-        });
-      },
-    };
-  },
+const callFrom = (source: string): ESTree.CallExpression => {
+  const expression = unwrapExpression(expressionFrom(source));
+  if (expression.type !== "CallExpression") throw new Error(`Expected a call: ${source}`);
+  return expression;
 };
 
-const propertyKeyReader: WorkspaceLintRule = {
-  name: "probe-property-key-name",
-  meta: PROBE_META,
-  create(inspection) {
-    return {
-      Property(node: ESTree.ObjectProperty) {
-        inspection.report({
-          node,
-          messageId: "read",
-          data: { text: spelt(propertyKeyName(node.key)) },
-        });
-      },
-    };
-  },
+const arrayFrom = (source: string): ESTree.ArrayExpression => {
+  const expression = unwrapExpression(expressionFrom(source));
+  if (expression.type !== "ArrayExpression") throw new Error(`Expected an array: ${source}`);
+  return expression;
 };
 
-const reads = (code: string, writtenText: string) => ({
-  name: `${code} reads as ${writtenText}`,
-  code,
-  errors: [{ messageId: "read", data: { text: writtenText } }],
-});
-
-describe("finite-held-syntax", () => {
+describe("finite-value-syntax", () => {
   test("two distinct spellings are a vocabulary", () => {
     expect(isFiniteVocabulary(["draft", "published"])).toBe(true);
   });
 
-  test("one spelling names a single held rather than a vocabulary", () => {
+  test("one spelling names a single value rather than a vocabulary", () => {
     expect(isFiniteVocabulary(["draft"])).toBe(false);
   });
 
-  test("the same spelling repeated is still one held", () => {
+  test("the same spelling repeated is still one value", () => {
     expect(isFiniteVocabulary(["draft", "draft"])).toBe(false);
   });
 
@@ -114,72 +73,81 @@ describe("finite-held-syntax", () => {
     expect(isFiniteVocabulary([true, "draft"])).toBe(true);
   });
 
-  test("a number and the same digits written as writtenText are two values", () => {
+  test("a number and the same digits written as text are two values", () => {
     expect(isFiniteVocabulary([1, "1"])).toBe(true);
   });
 
-  testLintRule(arrayReader, {
-    valid: [],
-    invalid: [
-      reads('const a = ["draft", 1, true, -2];', '["draft",1,true,-2]'),
-      reads("const a = [`draft`];", '["draft"]'),
-      reads("const a = [`draft${suffix}`];", "null"),
-      reads("const a = [null];", "null"),
-      reads("const a = [/draft/u];", "null"),
-      reads("const a = [-`draft`];", "null"),
-      reads("const a = [status];", "null"),
-      reads('const a = [, "draft"];', "null"),
-      reads("const a = [...rest];", "null"),
-      reads('const a = ["draft" as const];', '["draft"]'),
-      reads('const a = ["draft" satisfies string];', '["draft"]'),
-      reads('const a = [<string>"draft"];', '["draft"]'),
-    ],
+  test("static arrays reject holes, spreads, and non-scalar expressions", () => {
+    expect(staticArrayValues(arrayFrom('["draft", "published"]'))).toStrictEqual([
+      "draft",
+      "published",
+    ]);
+    expect(staticArrayValues(arrayFrom("[-1, +2, `draft`]"))).toStrictEqual([-1, 2, "draft"]);
+    expect(staticArrayValues(arrayFrom('[null, true, "draft"]'))).toStrictEqual([
+      null,
+      true,
+      "draft",
+    ]);
+    expect(staticArrayValues(arrayFrom('[-"draft", "published"]'))).toBeNull();
+    expect(staticArrayValues(arrayFrom('[/draft/u, "published"]'))).toBeNull();
+    expect(staticArrayValues(arrayFrom('["draft", , "published"]'))).toBeNull();
+    expect(staticArrayValues(arrayFrom('["draft", ...values]'))).toBeNull();
   });
 
-  testLintRule(unionTypeReader, {
-    valid: [],
-    invalid: [
-      reads('type A = "draft" | "published";', '["draft","published"]'),
-      reads("type A = string;", "null"),
-      reads('type A = "draft" | null;', '["draft"]'),
-      reads('type A = "draft" | undefined;', '["draft"]'),
-      reads('type A = `draft` | "published";', '["draft","published"]'),
-      reads('type A = "draft" | string;', "null"),
-      reads('type A = `draft${string}` | "published";', "null"),
-    ],
+  test("literal unions retain null and reject undefined members", () => {
+    expect(
+      literalUnionValues(unionFrom('type Status = "draft" | null | "published";')),
+    ).toStrictEqual(["draft", null, "published"]);
+    expect(
+      literalUnionValues(unionFrom('type Status = "draft" | undefined | "published";')),
+    ).toBeNull();
   });
 
-  testLintRule(schemaReader, {
-    valid: [
-      { name: "a call that names no member is not a schema call", code: 'union(["draft"]);' },
-      { name: "a member reached through a computed name is not read", code: 'z["union"]([]);' },
-      { name: "a member that is not a union is not read", code: 'z.enum(["draft"]);' },
-      {
-        name: "a private method is not a member that can be named",
-        code: "class Schemas {\n  #union(members) {\n    return members;\n  }\n  build() {\n    return this.#union([]);\n  }\n}",
-      },
-    ],
-    invalid: [
-      reads('z.union([z.literal("draft"), z.literal("published")]);', '["draft","published"]'),
-      reads("z.union();", "null"),
-      reads("z.union(...schemas);", "null"),
-      reads("z.union(schemas);", "null"),
-      reads("z.union([...schemas]);", "null"),
-      reads('z.union(["draft"]);', "null"),
-      reads('z.union([literal("draft")]);', "null"),
-      reads("z.union([z.literal()]);", "null"),
-      reads("z.union([z.literal(...spellings)]);", "null"),
-      reads("z.union([z.literal(status)]);", "null"),
-    ],
+  test("template literal types with substitutions are not finite scalar spellings", () => {
+    expect(
+      literalUnionValues(unionFrom('type Status = `draft-${string}` | "published";')),
+    ).toBeNull();
   });
 
-  testLintRule(propertyKeyReader, {
-    valid: [],
-    invalid: [
-      reads("const a = { draft: 1 };", '"draft"'),
-      reads('const a = { "draft": 1 };', '"draft"'),
-      reads("const a = { 1: 1 };", "null"),
-      reads("const a = { [suffix + 1]: 1 };", "null"),
-    ],
+  test("literal union extraction rejects non-unions and unwraps parenthesized types", () => {
+    expect(literalUnionValues(unionFrom('type Status = "draft";'))).toBeNull();
+    expect(unwrapType(unionFrom('type Status = ("draft" | "published");')).type).toBe(
+      "TSUnionType",
+    );
+  });
+
+  test("static string and template property keys have the same name", () => {
+    expect(propertyKeyName(propertyFrom("({ enum: [] });").key)).toBe("enum");
+    expect(propertyKeyName(propertyFrom('({ ["enum"]: [] });').key)).toBe("enum");
+    expect(propertyKeyName(propertyFrom("({ [1]: [] });").key)).toBe("1");
+    expect(propertyKeyName(propertyFrom("({ [`enum`]: [] });").key)).toBe("enum");
+    expect(propertyKeyName(propertyFrom("({ [`${name}`]: [] });").key)).toBeNull();
+    expect(propertyKeyName(propertyFrom("({ [/enum/u]: [] });").key)).toBeNull();
+    expect(propertyKeyName(propertyFrom("({ [true]: [] });").key)).toBeNull();
+    expect(propertyKeyName(propertyFrom("({ [names.enum]: [] });").key)).toBeNull();
+  });
+
+  test("schema member and union syntax is accepted only in the explicit forms", () => {
+    expect(calleeMemberName(callFrom("schema.enum([])").callee)).toBe("enum");
+    expect(calleeMemberName(callFrom("schema.enum?.([])").callee)).toBe("enum");
+    expect(calleeMemberName(callFrom('schema["enum"]([])').callee)).toBeNull();
+    expect(calleeMemberName(expressionFrom("schema"))).toBeNull();
+    expect(
+      schemaUnionLiterals(callFrom('z.union([z.literal("draft"), z.literal("published")])')),
+    ).toMatchObject({ values: ["draft", "published"] });
+    expect(schemaUnionLiterals(callFrom("z.union()"))).toBeNull();
+    expect(schemaUnionLiterals(callFrom("z.union(...members)"))).toBeNull();
+    expect(schemaUnionLiterals(callFrom("z.union(members)"))).toBeNull();
+    expect(schemaUnionLiterals(callFrom('z.union(["draft", z.literal("published")])'))).toBeNull();
+    expect(schemaUnionLiterals(callFrom('z.union([, z.literal("published")])'))).toBeNull();
+    expect(
+      schemaUnionLiterals(callFrom('z.union([z["literal"]("draft"), z.literal("published")])')),
+    ).toBeNull();
+    expect(
+      schemaUnionLiterals(callFrom('z.union([z.literal(), z.literal("published")])')),
+    ).toBeNull();
+    expect(
+      schemaUnionLiterals(callFrom('z.union([z.literal(...values), z.literal("published")])')),
+    ).toBeNull();
   });
 });

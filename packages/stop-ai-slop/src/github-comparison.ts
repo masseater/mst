@@ -1,5 +1,6 @@
 import {
   comparisonFrom,
+  decodedPreviousSource,
   decodedSource,
   type RepositoryComparison,
 } from "./repository-comparison.ts";
@@ -117,13 +118,15 @@ export const compareGitHubPullRequest = async ({
   );
   const files = compared.files ?? [];
   const mergeBase = compared.merge_base_commit.sha;
-  const contentsAt = (revision: string) => async (path: string) =>
-    decodedSource(
-      path,
-      decodedContent(
-        await request(`/repos/${repository}/contents/${encodeURI(path)}?ref=${revision}`),
-      ),
-    );
+  const contentsAt =
+    (revision: string, decode: (path: string, sourceBytes: Uint8Array) => string | null) =>
+    async (path: string) =>
+      decode(
+        path,
+        decodedContent(
+          await request(`/repos/${repository}/contents/${encodeURI(path)}?ref=${revision}`),
+        ),
+      );
 
   return {
     repositoryRoot,
@@ -132,7 +135,10 @@ export const compareGitHubPullRequest = async ({
     files: await comparisonFrom({
       inventoryOutput: files.map(inventoryEntryOf).join(""),
       diff: files.map(patchEntryOf).join(""),
-      sources: { base: contentsAt(mergeBase), head: contentsAt(headRevision) },
+      sources: {
+        base: contentsAt(mergeBase, (_path, sourceBytes) => decodedPreviousSource(sourceBytes)),
+        head: contentsAt(headRevision, decodedSource),
+      },
     }),
   };
 };

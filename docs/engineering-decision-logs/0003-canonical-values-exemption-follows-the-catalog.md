@@ -5,56 +5,90 @@
 
 ## 文脈
 
-有限値の語彙を 1 箇所に集める仕組みは、3 者が同じ「注釈が付いた宣言」を見ている。
+有限値の語彙は repository 内の 1 つの runtime binding が所有し、型・schema・membership check を含む consumer はその binding から導出する。注釈の存在だけで lint を免除すると、不正な位置の注釈、値域を解決できない宣言、別 binding、古い cache range でも owner を名乗れる。
 
-- カタログビルダー — 注釈から語彙を導出してカタログに載せる
-- 検証エントリポイント — 全走査して壊れた注釈と重複した概念を拒否する
-- 消費側ルール `no-strict-canonical-literal-use--use-canonical-import` — 宣言済みの語彙をリテラルで書き直した箇所を報告する。唯一の例外が「注釈が付いた宣言の中」
-
-この 3 者が受理する宣言の形が食い違うと、抑制の口が生まれる。実際に生まれていた。消費側ルールは注釈コメントに続く 4 種類のノード（`VariableDeclaration` / `ExportNamedDeclaration` / `TSTypeAliasDeclaration` / `TSEnumDeclaration`）を注釈の対象とみなしていたが、ビルダーは `enum` から語彙を導出しない。その結果 `/** @canonical-values my.local */ enum E { A = "draft" }` は、カタログに何も登録しないまま、その中のリテラルだけを検査から外せた。概念 id の内容も見ていなかったため、どこにも登録されていない id を書くだけで直下の宣言を丸ごと免除できた。行コメントと単星ブロックの注釈でも同じことができた。ビルダーが走査するのは JSDoc ブロックだけなので、免除と登録がここでも食い違っていた。
-
-不変条件の文書は「使用箇所ごとの抑制、所有者側の opt-out タグ、manifest の除外フィールド。どれも用意しない」と定めている。動作する抑制の口が 1 つでも残っていることは、この不変条件を満たしていない。
+owner の構文を認識する処理、値域を解決する処理、consumer を検出する処理がそれぞれ別の意味評価器を持つと、import、spread、公開 alias の解釈が分岐する。構文の対応付けは Oxc、解決済みの型と symbol identity は TypeScript に一任し、lint は完成した解析結果だけを使う必要がある。
 
 ## 決定
 
-消費側ルールの免除条件から、宣言の構文形を外す。免除はカタログへの登録に従属させる。
+### owner declaration を一つの構文へ限定する
 
-免除が効くのは次の 3 つを同時に満たす場合に限る。
+owner として受理するのは、production の TypeScript source にある module-scope の JSDoc `@canonical-values` と、その直後に空白だけを挟んで続く単一 variable statement である。
 
-1. 注釈が `/** */` の JSDoc ブロックに書かれている
-2. 注釈が名指す概念 id を、カタログがこのファイルを宣言ファイルとして登録している
-3. リテラルが、注釈の直後に空白だけを挟んで現れるトップレベル文の範囲内にある。間にコメントが挟まれば対はほどける。注釈が何かの文の内側にある場合はどの文も免除しない
+- JSDoc 内の canonical tag は 1 つだけにする
+- variable statement は単一の Identifier binding と runtime initializer を持つ
+- concept id は小文字英数字の語を `-` または `.` でつなぐ
+- line comment、通常の block comment、nested annotation、intervening token、ambient declaration、multi-binding、destructuring、type alias、enum、function、class、import、re-export、制御文を owner にしない
 
-宣言の形を受理するかどうかは、カタログビルダーが 1 箇所で決める。消費側ルールはその結果だけを見る。ビルダーが語彙を導出しない形（`enum`、`Object.freeze([...])` など）は、注釈を付けてもカタログに載らないので免除されない。
+Oxc parser は comment、top-level statement、binding、annotation・binding・declaration の各 offset を確定する。値域は解釈しない。
 
-注釈と宣言の対を取る処理は 2 本のルールが 1 つのモジュールを共有する。ビルダーが注釈の直後の空白しか読み飛ばさないので、共有する側もそれに合わせて空白だけを許す。コメントが挟まった対は、宣言側ルールが「所有していないファイルで語彙を定義している」として報告する。
+### repository を先に TypeScript 解析して catalog を作る
 
-`enum` を語彙の宣言形として認めることは、当面しない。認めるなら足すのはビルダー側であり、そこに足せば消費側ルールの免除は自動的に追随する。
+owner 候補を最寄りの TypeScript configuration ごとにまとめ、configuration ごとに 1 つの `typescript-6` Program を作る。checker が同じ binding に解決した型から値域を導出する。
 
-宣言側ルール `no-local-finite-value-set--use-or-register-canonical-values` の免除にはこの登録の条件を課さない。宣言側ルールにとって「注釈を付けて所有者として登録する」ことは報告への正しい応答そのものであり、注釈を書いた時点で免除されるのが正しい。消費側ルールにとっての正しい応答は所有者の束縛を import することであって、注釈を書き足すことではない。だから登録の条件は消費側だけに課す。
+- array は numeric index type の literal union を値域にする
+- object は index signature を持たない閉じた property name を値域にする
+- string、number、boolean、`null`、負数を扱う
+- checker が解決できる import と spread を扱う
+- empty、widened domain、scalar、非 literal domain、直接記述された重複値は problem にして entry を作らない
+
+public route は package specifier、export name、`exports` が解決した runtime source path を保持する。checker が解決した export symbol が owner symbol と同じ declaration を指す場合だけ登録し、同名の shadow export や別 source を登録しない。consumer の import は同じ TypeScript module resolution mode で実体 source を解決し、specifier・imported name・source identity が一致する場合だけ registered とする。
+
+repository analysis は declaration、entry、problem を一度に返す。duplicate concept は衝突した全 declaration を catalog から除外する。strict verification は cache を使わず、problem が 1 件でもあれば失敗する。lint は同じ builder の versioned cache を使うが、problem のある declaration を entry にしない。
+
+### consumer は visitor より前に source 全体を解析する
+
+二本の lint rule は `create` 時に Oxc AST 全体を一度索引化し、診断候補を不変な配列として完成させてから visitor を返す。visitor は `Program` で完成済み診断を報告するだけであり、走査順に binding や候補値を書き換えない。
+
+`no-local-finite-value-set--use-or-register-canonical-values` は、語彙を定義する明示的な構文だけを対象にする。
+
+- `enum` / `picklist` member call に渡す静的 scalar array
+- scalar literal union の type alias
+- `union` member call に渡す scalar `literal` call の静的配列
+- JSON Schema の非 computed `enum` property に渡す静的 scalar array
+- catalog fingerprint と一致する静的 `Set` initializer
+- catalog fingerprint と一致する `typeof ARRAY[number]`
+- named import または `import()` type を参照する `keyof`
+- schema call に渡す、静的 object または named import に対する `Object.keys`
+
+schema array は直接記述または同一ファイルの module-scope bindingを解決する。`Object.keys` は同一ファイルの module-scope object binding または named importを解決する。named import と `import()` type は TypeScript が解決した exact route を照合する。catalog owner と同名なのに登録 route を持たない ambient・local binding は、綴りだけで owner と同一視せず未登録 route として報告する。
+
+`no-strict-canonical-literal-use--use-canonical-import` は catalog の値を直接綴る string・number・boolean・`null` literal、置換のない template literal、符号付き numeric literal を対象にする。module specifier、構造上の property key、標準 `Pick` / `Omit` の key selector は値の使用箇所ではないため対象外にする。
+
+どちらのルールも JavaScript の一般式、callback の実行、標準 API の返値、collection mutation を評価しない。TypeScript checker と別の実行系を lint 内に作らず、対象構文を増やす場合は新しい明示的な syntax contract と耐久テストを追加する。
+
+### 免除を現在の declaration identity に限定する
+
+免除 range を作る前に現在の source を再走査し、次を catalog entry と完全一致させる。
+
+- repository root からの declaration path
+- concept id と binding
+- annotation start、binding start、declaration start、declaration end
+
+一致した declaration range のうち、entry の canonical domain に属する値だけを二本の rule から免除する。同じファイルの declaration 外、別 path、別 binding、現在の source と一致しない cache entry、不正・duplicate・out-of-scope・値域導出失敗の declaration は免除を持たない。
+
+### Git が除外する未追跡 source を repository 境界へ取り込まない
+
+repository scan と import route 判定は、lint 開始前に `git ls-files --others --ignored --exclude-standard --directory -z` で確定した source scope を共有する。Git が除外する未追跡 file、directory、symlink ancestor は catalog input と repository route から除外する。すでに index に登録された file は後から ignore pattern に一致しても repository source のままなので除外しない。
+
+source scope、repository file 一覧、catalog、TypeScript の解決結果は visitor の開始前に一度だけ作り、lint process の間は不変にする。repository の字面 path と real path を正規化し、ignored symlink 配下は symlink 自身の字面 path で除外する。visitor と import route lookup から Git command、repository scan、cache fingerprint の再計算を呼ばない。
 
 ## 影響
 
-免除の口が「カタログに載っているかどうか」の 1 点に集約される。抑制目的で注釈を書いても、カタログに載らない限り何も免除されない。カタログに載れば、それは概念の宣言そのものなので、検証エントリポイントの重複検査の対象になる。
+注釈を書くだけでは lint を止められない。catalog entry を作れた現在の declaration identity だけが免除を持ち、strict verification は不正候補を problem として返す。
 
-lint 時のカタログはビルダーが作るので、注釈を書いた側の宣言が「登録される形」でなければ、所有者自身のファイルで自分のリテラルが報告される。これは偽陽性だが、黙って免除されるより望ましい。免除が黙って効くと語彙の一元化が崩れるのに対し、報告は「ビルダーがこの宣言を取り込んでいない」ことを可視化するからである。
+owner の値域と public symbol identity は TypeScript checker の結果に従う。Oxc AST から import・spread・alias export の値を再帰評価する経路は持たない。
+
+consumer の判定は source offset 順の可変状態に依存しない。全候補が visitor 登録前に確定するため、前方参照や visitor の呼び出し順で結果が変わらない。
 
 ## 検討して採らなかった案
 
-**注釈と宣言の隣接判定でコメントを読み飛ばす。** 注釈と宣言の間にコメントが挟まると免除が壊れる問題は消えるが、概念 id を見ないまま宣言を免除する口はそのまま残る。免除の根拠を「注釈が書かれていること」に置く限り、抑制目的の注釈を排除できない。加えて、ビルダーは空白しか読み飛ばさないので、読み飛ばす側を増やすと 3 者の受理範囲がまた開く。読み飛ばさない側に揃えれば、対がほどけた注釈は宣言側ルールが報告する。
+**注釈が見つかった statement をそのまま免除する。** catalog entry を作れない注釈でも lint を止められる。
 
-**免除の対象を、ビルダーが導出できる構文形（配列・オブジェクト初期化子を持つ変数宣言と、リテラル合併の型エイリアス）にルール側で絞る。** 3 者の食い違いは減るが、受理する形の定義が 2 箇所に残る。ビルダー側に形を足したときにルール側を直し忘れると、また食い違う。
+**concept id と file path だけを照合する。** 同じ file 内の別 declaration と source edit 後の古い range を区別できない。
 
-## ビルダーと検証の食い違いを閉じた
+**Oxc AST の initializer を再帰走査して値を導出する。** TypeScript が解決する import・spread・alias・literal type と別の評価器になり、両者の結果がずれる。
 
-上の「決定」を書いた時点では、ビルダーと検証エントリポイントが別々の抽出器を持っていた。ビルダーは注釈の直後を正規表現で読み、検証は自前のトークナイザで読んでいたため、`enum` や、注釈と宣言の間にコメントが挟まる形で受理範囲が割れていた。走査対象のファイル集合も両者が別々に定義していた。
+**rule visitor が到着した順に binding state を更新する。** sink と write の走査順が解析結果を決め、構文を増やすたびに JavaScript 実行系の再実装へ膨張する。
 
-いまは 3 段に分けて 1 本化してある。
-
-1. 走査対象集合は `source-files.ts` の `listRepositoryFiles` だけが定義する。ビルダーが読む宣言ソース（テストを除いた TypeScript）と、検証が読むコメントソース（すべてのスクリプト）は、同じ 1 回の走査から出てくる 2 つの部分集合である
-2. 注釈の解釈は `declarations.ts` の `scanCanonicalValuesText` だけが行う。トークナイザ 1 本で、注釈が受理する宣言の形はここだけで決まる
-3. ファイルを読んで注釈付き宣言を取り出す処理は `annotated-sources.ts` に 1 本だけある。ビルダーも検証もここから引く。「どのファイルが概念を宣言してよいか」の判定もこのモジュールが 1 箇所で持つ
-
-残る非対称は厳しさだけになった。ビルダーは壊れた注釈を黙って落とし、検証はそれをエラーにする。受理する宣言の形と、そこから読み取る値集合は同一である。`verify.test.ts` の「the catalog and the verification read the same declarations out of the same source」が、宣言形ごとに「カタログの entry が立つ」ことと「検証が同じ宣言を認識する」ことを同時に固定している。
-
-そのため「決定」節が前提にしていた 2 点は、現在の実装には当てはまらない。ビルダーは `enum` からも値を導出し、注釈と宣言の間にコメントが挟まっても登録する。免除の条件 1（JSDoc ブロックであること）と条件 3（間に空白しか挟まないこと）はそのまま有効だが、その根拠は「ビルダーがそこまでしか読まないから」ではなく、「免除は狭い側に倒す」という選択である。免除はカタログへの登録に従属している（条件 2）ので、この非対称が生むのは所有者自身のファイルでの偽陽性だけで、抑制の口にはならない。
+**Git ignore を path pattern だけで再実装する。** tracked file と untracked file を区別できず、Git が repository source とみなす集合とずれる。

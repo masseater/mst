@@ -19,14 +19,30 @@ const readAnnotatedFile = (
 ): AnnotatedSource | null => {
   const sourceText = readTextFile(file.absolutePath);
   if (sourceText === null) return null;
-  if (!containsCanonicalValuesAnnotation(sourceText)) return null;
+  if (
+    !containsCanonicalValuesAnnotation(sourceText) &&
+    !sourceText.includes("oxlint-disable") &&
+    !sourceText.includes("eslint-disable")
+  ) {
+    return null;
+  }
 
   const scanned = scanCanonicalValuesText(sourceText, file.absolutePath);
+  const canDeclare = declaringPaths.has(file.absolutePath);
   return {
     absolutePath: file.absolutePath,
     relativePath: file.relativePath,
-    declarations: declaringPaths.has(file.absolutePath) ? scanned.declarations : [],
-    problems: scanned.problems,
+    declarations: canDeclare ? scanned.declarations : [],
+    problems: canDeclare
+      ? scanned.problems
+      : [
+          ...scanned.problems,
+          ...scanned.declarations.map((declaration) => ({
+            kind: "out-of-scope-declaration" as const,
+            line: declaration.line,
+            conceptId: declaration.conceptId,
+          })),
+        ],
   };
 };
 
@@ -38,11 +54,6 @@ const readAnnotatedFiles = (
 
 const declaringPathsOf = (repositoryFiles: RepositoryFiles): ReadonlySet<string> =>
   new Set(repositoryFiles.declarationSources.map((file) => file.absolutePath));
-
-export const readDeclarationSources = (
-  repositoryFiles: RepositoryFiles,
-): readonly AnnotatedSource[] =>
-  readAnnotatedFiles(repositoryFiles.declarationSources, declaringPathsOf(repositoryFiles));
 
 export const readAnnotatedSources = (
   repositoryFiles: RepositoryFiles,

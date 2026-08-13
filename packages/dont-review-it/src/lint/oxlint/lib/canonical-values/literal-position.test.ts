@@ -1,8 +1,8 @@
 import { testLintRule, type WorkspaceLintRule } from "@mst/lint-rule-authoring";
 import { describe } from "vite-plus/test";
 
+import { ancestorsOf } from "../ast-node.ts";
 import {
-  ancestorsOf,
   isKeySelectorArgument,
   isModuleSyntaxPosition,
   isStructuralKeyPosition,
@@ -136,6 +136,7 @@ describe("literal-position", () => {
       reads('import "draft";', MODULE),
       reads('export {} from "draft";', MODULE),
       reads('const a = import("draft");', MODULE),
+      reads('import A = require("draft");', MODULE),
       reads('type A = import("draft").B;', MODULE),
       reads('export * from "draft";', MODULE),
       reads('export * as "draft" from "other";', MODULE, MODULE),

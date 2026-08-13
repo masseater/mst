@@ -6,23 +6,17 @@ import { isJsdoc } from "../lib/jsdoc-comment.ts";
 
 import type { Comment, ESTree } from "@oxlint/plugins";
 
-const LINT_DIRECTIVES = new Set([
-  "eslint-disable",
-  "eslint-disable-line",
-  "eslint-disable-next-line",
-  "eslint-enable",
-  "oxlint-disable",
-  "oxlint-disable-line",
-  "oxlint-disable-next-line",
-  "oxlint-enable",
-  MOCK_FACTORY_EXEMPTION_DIRECTIVE,
-]);
+const LINT_DIRECTIVE = /^(?:eslint|oxlint)-(?:disable(?:-line|-next-line)?|enable)$/u;
 
 const COMPILER_DIRECTIVE_PREFIX = "@ts-";
 
 const isMachineReadDirective = (comment: Comment): boolean => {
   const token = firstToken(comment.value);
-  return LINT_DIRECTIVES.has(token) || token.startsWith(COMPILER_DIRECTIVE_PREFIX);
+  return (
+    LINT_DIRECTIVE.test(token) ||
+    token === MOCK_FACTORY_EXEMPTION_DIRECTIVE ||
+    token.startsWith(COMPILER_DIRECTIVE_PREFIX)
+  );
 };
 
 export const noExplanatoryComment = createDontReviewItRule({

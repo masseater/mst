@@ -22,8 +22,6 @@ import { INJECTED_TEST_HOOK_SPELLINGS } from "../lib/spec-syntax/test-hook-decla
 
 import type { Definition, ESTree } from "@oxlint/plugins";
 
-const TEST_HOOK_SPELLINGS: ReadonlySet<string> = new Set(INJECTED_TEST_HOOK_SPELLINGS);
-
 const REBINDING_MESSAGE = "sharedBindingRebound";
 
 const WRITING_MESSAGE = "sharedValueWritten";
@@ -121,14 +119,17 @@ const declaresRebindableName = (definition: Definition): boolean => {
 const hookLocalNamesIn = (declaration: ESTree.ImportDeclaration): readonly string[] =>
   declaration.specifiers.flatMap((specifier) =>
     specifier.type === "ImportSpecifier" &&
-    TEST_HOOK_SPELLINGS.has(moduleExportSpelling(specifier.imported))
+    INJECTED_TEST_HOOK_SPELLINGS.includes(moduleExportSpelling(specifier.imported))
       ? [specifier.local.name]
       : [],
   );
 
 const namesSetupHook = (node: ESTree.CallExpression, hookNames: ReadonlySet<string>): boolean => {
   const callee = unwrapSubject(node.callee);
-  return callee.type === "Identifier" && hookNames.has(callee.name);
+  return (
+    callee.type === "Identifier" &&
+    (INJECTED_TEST_HOOK_SPELLINGS.includes(callee.name) || hookNames.has(callee.name))
+  );
 };
 
 export const noModuleScopeMutableState = createDontReviewItRule({
@@ -161,7 +162,7 @@ export const noModuleScopeMutableState = createDontReviewItRule({
     };
 
     const blocks = testBlockBindings();
-    const hookNames = new Set<string>(TEST_HOOK_SPELLINGS);
+    const hookNames = new Set<string>();
     const calls = new Set<ESTree.CallExpression>();
     const writes = new Set<StateWrite>();
 

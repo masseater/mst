@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { runCommand } from "citty";
-import { describe, expect, onTestFinished } from "vite-plus/test";
+import { describe, expect, onTestFinished, vi } from "vite-plus/test";
 
 import { dontReviewItCommand } from "./dont-review-it-command.ts";
 import { RETIRED_ANNOTATION_TAGS } from "./lint/oxlint/lib/canonical-values/annotation.ts";
@@ -51,8 +51,37 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
   standardIoTest(
     "check given no repository root scans the working directory",
     async ({ stdout, stderr }) => {
-      expect(await cliExitCode(["check"])).toBe(1);
-      expect(stdout.text).toContain('The required "guard" script must not be missing.');
+      const root = repositoryWith({ "package.json": "{}" });
+      const cwd = vi.spyOn(process, "cwd").mockReturnValue(root);
+
+      try {
+        expect(await cliExitCode(["check"])).toBe(1);
+      } finally {
+        cwd.mockRestore();
+      }
+
+      expect(stdout.text).toContain('required "guard" entry must not be missing');
+      expect(stderr.text).toContain("entry-composition");
+    },
+  );
+
+  standardIoTest(
+    "check given no repository root reads canonical values from the working directory",
+    async ({ stdout, stderr }) => {
+      const root = repositoryWith({
+        "src/order.ts": `/** ${CANONICAL_VALUES_TAG} */
+export const ORDER_STATUSES = ["draft"] as const;
+`,
+      });
+      const cwd = vi.spyOn(process, "cwd").mockReturnValue(root);
+
+      try {
+        expect(await cliExitCode(["check"])).toBe(1);
+      } finally {
+        cwd.mockRestore();
+      }
+
+      expect(stdout.text).toContain("src/order.ts:1");
       expect(stderr.text).toContain("entry-composition");
     },
   );
@@ -146,8 +175,7 @@ export const LEGACY_STATUSES = ["draft"];
     "a concept a test file repeats is never reported against the declaration that owns it",
     async ({ stdout, stderr }) => {
       const root = repositoryWith({
-        "src/order.test.ts": `/** ${CANONICAL_VALUES_TAG} order.status */
-const FIXTURE_STATUSES = ["draft"] as const;
+        "src/order.test.ts": `const FIXTURE_STATUSES = ["draft"] as const;
 `,
         "src/order.ts": `/** ${CANONICAL_VALUES_TAG} order.status */
 export const ORDER_STATUSES = ["draft"] as const;

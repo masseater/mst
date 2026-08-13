@@ -38,7 +38,8 @@ pull request で `refs/pull/N/merge` を depth 1 で 1 本だけ取り、`origin
 読む。オブジェクトは無くてもコミット自身は手元にある。
 
 読む側を切り替えるのは CLI の中で、`origin/main` も merge の親も無いときだけである。
-CI の定義には何も足さない。
+CI は `contents: read` に限定した `github.token` を guard の `GITHUB_TOKEN` へ渡す。権限の宣言だけでは
+token は run step の環境変数にならず、API fallback を呼び出せないためである。
 
 実行の経路は `vp run guard` の 1 本にする。CI に観測用の実行ブロックを置かない。ゲートを guard の外に置くと、main に変更が入る 2 つの経路が別々の検査集合を通ることになる。観測用に置いていたブロックは、複数行の実行・`continue-on-error`・イベントによる絞り込みを持っていて、[0025](0025-check-workflow-definitions-with-our-own-policy-layer.md) が入れたワークフロー定義の検査にも 3 点で反していた。
 

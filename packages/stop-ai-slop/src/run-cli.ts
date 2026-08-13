@@ -27,7 +27,7 @@ Options:
   --repository-root <path>  Root of the Git repository. Defaults to the current working directory.
 
 Without --base and --head the change on its way into the integration branch is compared:
-the branch being merged when a merge is in progress, and the history since it left
+the staged merge result when a merge is in progress, and the history since it left
 origin/main otherwise.
 `;
 

@@ -2,7 +2,6 @@ import { parseSync } from "oxc-parser";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
-  ASSERTION_ENTRY_NAME,
   assertionEntryCallOf,
   isAssertionCall,
   isAssertionChain,
@@ -19,12 +18,6 @@ const expressionIn = (sourceText: string): ESTree.Expression => {
 
 const callIn = (sourceText: string): ESTree.CallExpression =>
   expressionIn(sourceText) as ESTree.CallExpression;
-
-describe("ASSERTION_ENTRY_NAME", () => {
-  it("spells the entry the way the runner injects it", () => {
-    expect(ASSERTION_ENTRY_NAME).toBe("expect");
-  });
-});
 
 describe("isAssertionEntryReference", () => {
   it("recognises the entry standing on its own", () => {

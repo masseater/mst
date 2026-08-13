@@ -1,4 +1,3 @@
-import { ASSERTION_ENTRY_NAME } from "./assertion-entries.ts";
 import { staticMemberName } from "./static-names.ts";
 import { unwrapSubject, type SpecFunction } from "./subject-expressions.ts";
 import { testBlockRootName } from "./test-block-modifiers.ts";
@@ -8,8 +7,6 @@ import type { ESTree } from "@oxlint/plugins";
 export const INJECTED_TEST_BLOCK_SPELLINGS: ReadonlySet<string> = new Set(["it", "test"]);
 
 const INJECTED_GROUPING_BLOCK_SPELLINGS: ReadonlySet<string> = new Set(["describe"]);
-
-const INJECTED_ASSERTION_ENTRY_SPELLINGS: ReadonlySet<string> = new Set([ASSERTION_ENTRY_NAME]);
 
 const DERIVED_BUILDER_MEMBER = "extend";
 
@@ -78,8 +75,7 @@ export const testBlockBindings = (): TestBlockBindings =>
 export const groupingBlockBindings = (): TestBlockBindings =>
   blockBindingsOf(INJECTED_GROUPING_BLOCK_SPELLINGS);
 
-export const assertionEntryBindings = (): TestBlockBindings =>
-  blockBindingsOf(INJECTED_ASSERTION_ENTRY_SPELLINGS);
+export const assertionEntryBindings = (): TestBlockBindings => blockBindingsOf(new Set(["expect"]));
 
 export const declaresTestBlock = (
   call: ESTree.CallExpression,

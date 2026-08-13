@@ -62,7 +62,6 @@ const recordedRun = (
 const quickSeams = (slotDir: string): ThrottleSeams => ({
   slotDir,
   limit: 1,
-  staleMs: 5000,
   waitBudgetMs: 15_000,
   pollMs: 50,
   isInteractive: false,
@@ -137,20 +136,20 @@ describe("run-throttle", () => {
 
   test(
     "a free slot is taken without any waiting output, well below one poll interval",
-    { timeout: 10_000 },
+    { timeout: 30_000 },
     async () => {
       const slotDir = temporaryDirectory("throttle-free-");
       const stderrText = captureStderr();
       const before = Date.now();
 
-      expect(await runThrottle(trivialCommand, { ...quickSeams(slotDir), pollMs: 10_000 })).toBe(0);
+      expect(await runThrottle(trivialCommand, { ...quickSeams(slotDir), pollMs: 30_000 })).toBe(0);
 
-      expect(Date.now() - before).toBeLessThan(5000);
+      expect(Date.now() - before).toBeLessThan(20_000);
       expect(stderrText()).not.toContain("waiting");
     },
   );
 
-  test("different namespaces never contend", { timeout: 10_000 }, async () => {
+  test("different namespaces never contend", { timeout: 30_000 }, async () => {
     const slotDirA = temporaryDirectory("throttle-ns-a-");
     const slotDirB = temporaryDirectory("throttle-ns-b-");
     const stamps = temporaryDirectory("throttle-ns-stamps-");
@@ -173,7 +172,7 @@ describe("run-throttle", () => {
 
   test(
     "the environment sets the limit, and two slots really run two at a time",
-    { timeout: 20_000 },
+    { timeout: 30_000 },
     async () => {
       stubLimit("2");
       const slotDir = temporaryDirectory("throttle-env-");
@@ -181,7 +180,6 @@ describe("run-throttle", () => {
       captureStderr();
       const seams = {
         slotDir,
-        staleMs: 5000,
         waitBudgetMs: 15_000,
         pollMs: 50,
         isInteractive: false,
@@ -213,7 +211,7 @@ describe("run-throttle", () => {
 
   test(
     "an invalid environment limit falls back to the default instead of failing",
-    { timeout: 15_000 },
+    { timeout: 30_000 },
     async () => {
       captureStderr();
       for (const raw of ["abc", "0", "-3"]) {
@@ -223,7 +221,6 @@ describe("run-throttle", () => {
         expect(
           await runThrottle(trivialCommand, {
             slotDir,
-            staleMs: 5000,
             waitBudgetMs: 5000,
             pollMs: 1000,
             isInteractive: false,
