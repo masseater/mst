@@ -80,6 +80,10 @@ mst は、リポジトリ運用の仕組みを再利用可能な単位として�
   - MAY: それ以外のテストの diff は読まない
     - カバレッジ担保テストの中身は guard が守るもので、merge の判断材料ではない
 - IF: `package.json` の依存や `devEngines` を変更した; THEN MUST: コミット前に `vp install --frozen-lockfile` が通ることを確認する
+- IF: 公開パッケージの `version` を上げる; THEN
+  - MUST: 同じ変更で `skills/CHANGELOG.md` にその版の見出しを書く
+  - PROHIBIT: SKILL.md の `metadata.library_version` を手で書き換える
+    - マニフェストから一意に決まる値で、`vp run guard:fix` が揃える
 - IF: `.github/workflows/ci.yml` の `voidzero-dev/setup-vp` を書く; THEN
   - MUST: commit SHA で固定する
   - MUST: コメントにタグを書く
