@@ -13,7 +13,8 @@
   },
   "bin": {
     "spool": "./src/spool/cli.ts",
-    "throttle": "./src/throttle/cli.ts"
+    "throttle": "./src/throttle/cli.ts",
+    "unabridged": "./src/unabridged/cli.ts"
   },
   "files": [
     "dist",
@@ -36,7 +37,9 @@
     "check:skills": "intent validate"
   },
   "dependencies": {
-    "proper-lockfile": "4.1.2"
+    "cc-hooks-ts": "2.1.220",
+    "proper-lockfile": "4.1.2",
+    "shell-quote": "1.10.0"
   },
   "devDependencies": {
     "@mst/ai-native": "workspace:*",

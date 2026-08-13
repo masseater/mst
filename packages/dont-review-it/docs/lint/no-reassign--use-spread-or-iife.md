@@ -6,16 +6,16 @@
 
 判定は構文形状だけで行う。型情報もスコープ解析も使わない。
 
-| 形状                                     | メッセージ                | 例                                                        |
-| ---------------------------------------- | ------------------------- | --------------------------------------------------------- |
-| 再束縛可能な宣言                         | `reassignableDeclaration` | `let pending = 1;` / `var queued = 2;`                    |
-| 既存の識別子束縛への書き込み             | `identifierAssignment`    | `pending = 2;` / `pending += 2;` / `pending ??= 2;`       |
-| 識別子束縛の増減                         | `identifierUpdate`        | `pending++;` / `--pending;`                               |
-| 既存オブジェクトのプロパティへの書き込み | `propertyAssignment`      | `base.count = 1;` / `items[0] = 3;` / `items.length = 0;` |
-| プロパティの増減                         | `propertyUpdate`          | `base.count++;` / `--items[0];`                           |
-| プロパティ代入を隠した標準呼び出し       | `mutatingCall`            | `Object.assign(base, patch);`                             |
-| プロパティの削除                         | `propertyDeletion`        | `delete base.count;`                                      |
-| 宣言を伴わないパターン代入               | `patternAssignment`       | `[first, second] = pair;` / `({ count } = holder);`       |
+| 形状 | メッセージ | 例 |
+| --- | --- | --- |
+| 再束縛可能な宣言 | `reassignableDeclaration` | `let pending = 1;` / `var queued = 2;` |
+| 既存の識別子束縛への書き込み | `identifierAssignment` | `pending = 2;` / `pending += 2;` / `pending ??= 2;` |
+| 識別子束縛の増減 | `identifierUpdate` | `pending++;` / `--pending;` |
+| 既存オブジェクトのプロパティへの書き込み | `propertyAssignment` | `base.count = 1;` / `items[0] = 3;` / `items.length = 0;` |
+| プロパティの増減 | `propertyUpdate` | `base.count++;` / `--items[0];` |
+| プロパティ代入を隠した標準呼び出し | `mutatingCall` | `Object.assign(base, patch);` |
+| プロパティの削除 | `propertyDeletion` | `delete base.count;` |
+| 宣言を伴わないパターン代入 | `patternAssignment` | `[first, second] = pair;` / `({ count } = holder);` |
 
 再束縛可能な宣言は、実際に再代入されているかを問わず報告する。「後で代入する」という意図が宣言の形に出た時点で、宣言箇所は最終値を示していない。
 

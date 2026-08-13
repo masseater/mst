@@ -24,12 +24,12 @@ merge を4段目のゲートにする。走らせるのは `vp run ready`（CI �
 
 git の merge がどのフックを呼ぶかを実測した（git 2.50.1）。対応する全フック名を仕掛けたスクラッチのリポジトリで、4通りの merge を実行した結果は次のとおり。
 
-| merge の形                                             | 発火するフック                                                                 |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------ |
-| fast-forward                                           | `post-merge` / `post-checkout` / `post-index-change` / `reference-transaction` |
-| 非 fast-forward・競合なし                              | `pre-merge-commit`                                                             |
-| 非 fast-forward・競合あり（解決して `git commit`）     | `pre-commit`                                                                   |
-| `pre-merge-commit` が非ゼロで終了した後に `git commit` | `pre-commit`                                                                   |
+| merge の形 | 発火するフック |
+| --- | --- |
+| fast-forward | `post-merge` / `post-checkout` / `post-index-change` / `reference-transaction` |
+| 非 fast-forward・競合なし | `pre-merge-commit` |
+| 非 fast-forward・競合あり（解決して `git commit`） | `pre-commit` |
+| `pre-merge-commit` が非ゼロで終了した後に `git commit` | `pre-commit` |
 
 `pre-merge-commit` は4経路のうち1つしか押さえない。残る3つに対して、決定はそれぞれ別の手段を取っている。
 

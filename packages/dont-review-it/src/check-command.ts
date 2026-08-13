@@ -6,6 +6,8 @@ import { isAgent, isColorSupported } from "std-env";
 
 import { defaultEntryCompositionConfig } from "./entry-composition/config.ts";
 import { writeEntryComposition } from "./entry-composition/write-entry-composition.ts";
+import { defaultIntentSkillsConfig } from "./intent-skills/config.ts";
+import { writeSkillVersions } from "./intent-skills/write-skill-versions.ts";
 import { isDirectory } from "./lint/oxlint/lib/canonical-values/source-files.ts";
 import { runChecks } from "./run-checks.ts";
 import { scanTraceFor } from "./scan-trace/scan-trace-report.ts";
@@ -24,10 +26,13 @@ const refuseMisuse = (complaint: string): void => {
   process.exitCode = EXIT_MISUSE;
 };
 
-const repairComposition = (repositoryRoot: string): boolean => {
-  const written = writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig });
-  if (written.failures.length === 0) return true;
-  refuseMisuse(written.failures.map((failure) => `${failure}\n`).join(""));
+const repairGeneratedParts = (repositoryRoot: string): boolean => {
+  const failures = [
+    writeEntryComposition({ repositoryRoot, config: defaultEntryCompositionConfig }),
+    writeSkillVersions({ repositoryRoot, config: defaultIntentSkillsConfig }),
+  ].flatMap((written) => written.failures);
+  if (failures.length === 0) return true;
+  refuseMisuse(failures.map((failure) => `${failure}\n`).join(""));
   return false;
 };
 
@@ -58,7 +63,7 @@ export const checkCommand = defineCommand({
       type: "boolean",
       default: false,
       description:
-        "Rewrite the manifest entry scripts that break the wrapper composition, then re-run the checks",
+        "Rewrite the parts this repository decides on its own, entry scripts and shipped skill versions, then re-run the checks",
     },
   },
   run({ args, rawArgs }) {
@@ -74,7 +79,7 @@ export const checkCommand = defineCommand({
       return;
     }
 
-    if (args.write && !repairComposition(repositoryRoot)) return;
+    if (args.write && !repairGeneratedParts(repositoryRoot)) return;
 
     reportProblems(repositoryRoot);
   },

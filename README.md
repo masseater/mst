@@ -31,6 +31,7 @@ vp install
 ```
 
 > [!IMPORTANT]
+>
 > `vp` を npm 経由（`npm i -g vite-plus`、mise の `npm:vite-plus` など）でグローバル導入すると、`vp test` が二重インスタンスになって失敗します。必ず上記の公式インストーラを使ってください。上流でも [voidzero-dev/vite-plus#2097](https://github.com/voidzero-dev/vite-plus/issues/2097) で、npm でのグローバルインストールはサポート対象外だと明言されています。
 
 ## Project Dependencies

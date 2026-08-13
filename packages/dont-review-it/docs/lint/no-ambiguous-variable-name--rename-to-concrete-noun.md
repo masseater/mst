@@ -43,17 +43,17 @@
 
 残りはすべて完全一致で、正規化した名前の全体がその語のときだけ落ちる。落とす語は次の 8 系統。
 
-| 系統                     | 例                                                                                                                                                                           |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 値そのものを指す語と略語 | `val` / `value` / `res` / `ret` / `data` / `datum`                                                                                                                           |
-| 入れ物の名前             | `obj` / `arr` / `str` / `item` / `entry` / `record` / `row` / `list` / `map` / `set` / `group` / `buf` / `chunk` / `content` / `body` / `payload`                            |
-| 仮の名前・置き場の名前   | `temp` / `tmp` / `dummy` / `sample` / `foo` / `bar` / `baz` / `qux`                                                                                                          |
-| 通信の役割だけを指す語   | `req` / `request` / `response` / `reply` / `answer`                                                                                                                          |
-| 仕組みの名前             | `ctx` / `context` / `opts` / `options` / `params` / `args` / `flag` / `state` / `status` / `fn` / `cb` / `callback` / `handler` / `helper` / `util` / `wrapper` / `instance` |
-| 検証の作法上の役割       | `actual` / `expected`                                                                                                                                                        |
-| 属性の種別だけを指す語   | `id` / `key` / `name` / `type` / `kind` / `mode` / `label` / `text` / `message` / `count` / `total` / `size` / `length`                                                      |
-| 計測の単位だけを指す語   | `date` / `time` / `timestamp` / `now`                                                                                                                                        |
-| 主題を伴わない操作の結果 | `parsed` / `formatted` / `normalized` / `converted` / `mapped` / `filtered` / `sorted` / `merged`                                                                            |
+| 系統 | 例 |
+| --- | --- |
+| 値そのものを指す語と略語 | `val` / `value` / `res` / `ret` / `data` / `datum` |
+| 入れ物の名前 | `obj` / `arr` / `str` / `item` / `entry` / `record` / `row` / `list` / `map` / `set` / `group` / `buf` / `chunk` / `content` / `body` / `payload` |
+| 仮の名前・置き場の名前 | `temp` / `tmp` / `dummy` / `sample` / `foo` / `bar` / `baz` / `qux` |
+| 通信の役割だけを指す語 | `req` / `request` / `response` / `reply` / `answer` |
+| 仕組みの名前 | `ctx` / `context` / `opts` / `options` / `params` / `args` / `flag` / `state` / `status` / `fn` / `cb` / `callback` / `handler` / `helper` / `util` / `wrapper` / `instance` |
+| 検証の作法上の役割 | `actual` / `expected` |
+| 属性の種別だけを指す語 | `id` / `key` / `name` / `type` / `kind` / `mode` / `label` / `text` / `message` / `count` / `total` / `size` / `length` |
+| 計測の単位だけを指す語 | `date` / `time` / `timestamp` / `now` |
+| 主題を伴わない操作の結果 | `parsed` / `formatted` / `normalized` / `converted` / `mapped` / `filtered` / `sorted` / `merged` |
 
 単数形と複数形は同じ語として扱う。
 

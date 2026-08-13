@@ -41,7 +41,7 @@ paths:
 - 消すとどうなるか: pnpm では `overrides` が実際の `vite` 依存エッジを持つワークスペースにしか効かない。直接依存のないワークスペースでは autoInstallPeers が上流の素の vite を別途インストールし、vite/vitest が二重インスタンス化する。これは前項と同じ構造の障害（`vp test` のキャッシュミス、dual instance）を招く
 - 上流: [voidzero-dev/vite-plus#1932](https://github.com/voidzero-dev/vite-plus/issues/1932)。テンプレートが root と `packages/utils` に直接 `vite` 依存を入れているのは、まさにこの対策として入れられたもの
 - 併せて必須の設定: `catalog` の `vite: npm:@voidzero-dev/vite-plus-core@<version>` エイリアスと `overrides.vite: "catalog:"`（[voidzero-dev/vite-plus#2034](https://github.com/voidzero-dev/vite-plus/issues/2034) でコラボレータが「想定どおり」と回答）。`peerDependencyRules` は機能上は任意で、外すと unmet peer の警告が出るだけ（[voidzero-dev/vite-plus#1021](https://github.com/voidzero-dev/vite-plus/issues/1021)）
-- 対処: `knip.json` の `ignoreDependencies` に `vite` を入れてある。これは「使っていないものを隠す」のではなく「knip の静的解析では見えない用途で使われている」ことを伝えるもの
+- 対処: `knip.ts` の `ignoreDependencies` に `vite` を入れてある。これは「使っていないものを隠す」のではなく「knip の静的解析では見えない用途で使われている」ことを伝えるもの
 
 - IF: knip が `vite` を未使用依存として報告した; THEN PROHIBIT: `vite` の直接依存または `ignoreDependencies` の指定を削除する
 - IF: ローカルで `vp check` / `vp run -r test` / `vp run -r build` が全て通った; THEN PROHIBIT: それをもってこの種の破壊が起きていない根拠とする
@@ -134,7 +134,7 @@ pack: { exports: { customExports: { './tsconfig/*': './tsconfig/*' } } }
 
 - 症状: preset に `ignorePatterns` を書いても 1 件も効かない。同じ 1 行をルートの `vite.config.ts` の `lint` に移すと効く。エラーも警告も出ない
 - 原因: oxlint の [`Oxlintrc::merge`](https://github.com/oxc-project/oxc/blob/367f730a7b578d24e8106713abaf517304b6b655/crates/oxc_linter/src/config/oxlintrc.rs) が `self`（`extends` を書いた側）の `ignore_patterns` だけを残し、`extends` で名指しした設定のものを読まない。`rules` / `overrides` / `plugins` / `options` は継承されるため、この 1 フィールドだけが例外になっている。`settings` / `env` / `globals` も同じ扱い
-- 対処: `defineConfig` に直接渡すオブジェクト自身に持たせる。このリポジトリでは `@mst/dont-review-it` の `withGitExcludes` が注入し、忘れると `no-unwrapped-toolchain-config--wrap-with-git-excludes` が報告する
+- 対処: `defineConfig` に直接渡すオブジェクト自身に持たせる。このリポジトリでは `@mst/dont-review-it` の `dontReviewItPreset.lint(...)` が注入し、忘れると `no-unwrapped-toolchain-config--call-the-preset-for-the-block` が報告する
 
 - IF: preset から何らかの設定を配れているか確かめる; THEN MUST: そのフィールドが `extends` で継承されるかを実測する
   - 継承されないフィールドは、書いても何も起きず lint は緑のまま通る
@@ -145,7 +145,7 @@ pack: { exports: { customExports: { './tsconfig/*': './tsconfig/*' } } }
 - 原因: 走査を組み立てる [`configure_walk_builder`](https://github.com/oxc-project/oxc/blob/20f68e74a3fddb4049fe33629be9bf91e14a4baa/crates/oxc_config/src/walk.rs#L16-L35) が `git_global(false)` を立てている。同じ関数が `git_ignore(true)` / `git_exclude(true)` / `parents(true)` を立てているため、リポジトリの `.gitignore`（ネストしたものと親側を含む）と `$GIT_COMMON_DIR/info/exclude` は尊重される。リンクした worktree の中でも `info/exclude` は解決される（上流に同名のテストがあり、こちらでも実測した）
 - 上流: 意図的な非対応である。[公式ドキュメント](https://oxc.rs/docs/guide/usage/linter/ignore-files.html)に `global gitignore files are not respected` と明記があり、[oxc#14926](https://github.com/oxc-project/oxc/issues/14926) は「開発者ごとに検査対象が変わるのは紛らわしい」として NOT_PLANNED で閉じられた。[oxc#22155](https://github.com/oxc-project/oxc/issues/22155) が `$XDG_CONFIG_HOME/git/ignore` の対応を求めて OPEN のまま残っている
 - 検出方法: 片方の経路だけが拾うパスに違反ファイルを置き、`vp lint` と `vp fmt --list-different` にかける。`git check-ignore -v` でどの経路が拾っているかを先に確かめる
-- 対処: `@mst/dont-review-it` の `withGitExcludes` が 3 経路すべてを読んで `ignorePatterns` に変換する。埋めたい穴はグローバルの 1 経路だけだが、残り 2 経路も読む。順序はグローバル → `$GIT_DIR/info/exclude` → リポジトリの `.gitignore` で、gitignore は last-match-wins なので、この順でないと `!` による再包含が負ける。経路をまたぐ再包含は 1 か所で並べないと表現できない
+- 対処: `@mst/dont-review-it` の `dontReviewItPreset` が 3 経路すべてを読んで `ignorePatterns` に変換する。埋めたい穴はグローバルの 1 経路だけだが、残り 2 経路も読む。順序はグローバル → `$GIT_DIR/info/exclude` → リポジトリの `.gitignore` で、gitignore は last-match-wins なので、この順でないと `!` による再包含が負ける。経路をまたぐ再包含は 1 か所で並べないと表現できない
 
 ## oxlint がルールに渡す AST に `ParenthesizedExpression` は現れない
 
@@ -169,3 +169,22 @@ pack: { exports: { customExports: { './tsconfig/*': './tsconfig/*' } } }
 
 - IF: ルールの `meta.schema` を別モジュールの定数から渡そうとしている; THEN PROHIBIT: 渡す
   - 索引が「設定を持たないルール」として生成され、lint も検査も緑のまま通る
+
+## cc-hooks-ts の `trigger` に書いたツール名は実行時に何も絞らない
+
+- 症状: `trigger: { PreToolUse: { Bash: true } }` と書いた hook に Read のペイロードを流したら `run` の中まで入り、`tool_input.command` を読んで `Cannot read properties of undefined` で落ちた。exit 1 になる
+- 原因: 2.1.220 の `extractInputSchemaFromTrigger` が `Object.keys(trigger)` しか見ない。イベント名だけが入力 schema の選択に使われ、ツール名の値は型の絞り込みにしか効かない
+- 波及: ツール名の門は 2 つある。`settings.json` の `matcher` が dispatch を絞り、hook 本体が自分で `tool_name` を確かめる。前者だけに頼ると、別の hook 設定から同じ実行ファイルを呼ばれた時に落ちる
+- 併せて: 入力に `tool_use_id` が無いと valibot が `Invalid key: Expected "tool_use_id"` で弾き、`run` に到達せず exit 1 になる。手で組んだペイロードで試すときに踏む
+
+- IF: cc-hooks-ts で hook を書く; THEN MUST: `run` の中で `tool_name` を確かめ、`tool_input` を `unknown` として読む
+  - 型の上ではツール固有の形に見えるが、実行時にはその保証がない
+
+## `trigger: { PreToolUse: true }` の `input` は型の上で組み立てられない
+
+- 症状: テストのために `input` を手で組むと、`tool_name` を広い union のまま渡した瞬間に `ExtractAllHookInputsForEvent<"PreToolUse">` へ代入できなくなる。`tool_input` が `unknown` のため、`{ tool_input: FileWriteInput; tool_name: "Write" }` のようなツール固有の枝と噛み合わない
+- 波及: 「不正なペイロードを渡したときの振る舞い」を hook の `run` 越しにテストできない。型が正しいペイロードしか組めないためである
+- 対処: 判断を純関数へ出し、`(toolName: string, toolInput: unknown)` を受ける形にしてそちらで不正な入力を網羅する。`run` はその戻り値を `context.success` / `context.json` に振り分けるだけにし、正しい Bash のペイロード 1 種類でテストする
+
+- IF: cc-hooks-ts の hook に分岐を書こうとしている; THEN MUST: 分岐を `run` の外の純関数に置く
+  - `run` に置いた分岐は、型が組めないペイロードの側を覆えないままカバレッジだけが緑になる
