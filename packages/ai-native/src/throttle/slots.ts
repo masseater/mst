@@ -19,9 +19,20 @@ const waitersDir = (slotDir: string): string => join(slotDir, "waiters");
 
 const slotIndexes = (limit: number): number[] => [...Array(limit).keys()];
 
+const discardForeignLock = (marker: string): void => {
+  const lockPath = `${marker}.lock`;
+  try {
+    if (statSync(lockPath).isDirectory()) return;
+  } catch (absentLock) {
+    return;
+  }
+  rmSync(lockPath, { force: true });
+};
+
 export const ensureSlots = (slotDir: string, limit: number): void => {
   mkdirSync(waitersDir(slotDir), { recursive: true });
   for (const index of slotIndexes(limit)) {
+    discardForeignLock(markerPath(slotDir, index));
     writeFileSync(markerPath(slotDir, index), "", { flag: "a" });
   }
 };

@@ -74,21 +74,57 @@ describe("slots", () => {
     await expect(tryAcquireAny(acquisition(directory))).rejects.toThrow(/ENOENT/);
   });
 
-  test("slotStateFingerprint changes whenever a slot's lock is created anew", async () => {
+  test("ensureSlots discards a lock left behind as a file instead of a directory", () => {
+    const directory = slotDirectory();
+    ensureSlots(directory, 1);
+    writeFileSync(join(directory, "slot-0.lock"), "");
+
+    ensureSlots(directory, 1);
+
+    expect(existsSync(join(directory, "slot-0.lock"))).toBe(false);
+  });
+
+  test("ensureSlots keeps the lock directory a running holder created", () => {
+    const directory = slotDirectory();
+    ensureSlots(directory, 1);
+    mkdirSync(join(directory, "slot-0.lock"));
+
+    ensureSlots(directory, 1);
+
+    expect(existsSync(join(directory, "slot-0.lock"))).toBe(true);
+  });
+
+  test("a slot polluted by a file named like a lock is takeable again", async () => {
+    const directory = slotDirectory();
+    ensureSlots(directory, 1);
+    writeFileSync(join(directory, "slot-0.lock"), "");
+
+    ensureSlots(directory, 1);
+    const hold = await tryAcquireAny(acquisition(directory));
+
+    expect(hold).not.toBeNull();
+    await hold?.release();
+  });
+
+  test("slotStateFingerprint tracks every slot as it becomes held and as it is freed", async () => {
     const directory = slotDirectory();
     ensureSlots(directory, 2);
 
-    const free = slotStateFingerprint(directory, 2);
-    expect(free).toBe("free,free");
+    const idle = slotStateFingerprint(directory, 2);
+    expect(idle).toBe("free,free");
 
     const first = await tryAcquireAny(acquisition(directory, 2));
-    const held = slotStateFingerprint(directory, 2);
-    expect(held).not.toBe(free);
+    const oneHeld = slotStateFingerprint(directory, 2);
+    expect(oneHeld).not.toBe(idle);
+
+    const second = await tryAcquireAny(acquisition(directory, 2));
+    expect(slotStateFingerprint(directory, 2)).not.toBe(oneHeld);
+
+    await second?.release();
+    expect(slotStateFingerprint(directory, 2)).toBe(oneHeld);
 
     await first?.release();
-    const second = await tryAcquireAny(acquisition(directory, 2));
-    expect(slotStateFingerprint(directory, 2)).not.toBe(held);
-    await second?.release();
+    expect(slotStateFingerprint(directory, 2)).toBe(idle);
   });
 
   test("sweepWaiters keeps live entries in name order and deletes the rest", () => {

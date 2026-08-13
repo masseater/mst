@@ -33,7 +33,7 @@ description: Machine-enforced answers to the writing questions that would otherw
 
 `lint` が配るルール集合は 1 枚だけである。対象種別による出し分けはしない。ルートの `lint` が呼んだ時点でリポジトリ全体に効き、採用の判断は残らない。CLI に固有の規律もこの中にあり、対象を絞るのはルールの側である。判断は [EDR 0042](../../docs/engineering-decision-logs/0042-apply-one-preset-at-the-root-and-report-the-exception-the-toolchain-forces.md) にある。
 
-`fmt` が決めているのは、整形結果が読み手に届く見た目を変えず、差分にだけ現れる書き方である。markdown の段落を 1 行に畳むこと、import の並び順がこれにあたる。判断は [EDR 0044](../../docs/engineering-decision-logs/0044-let-the-formatter-own-where-markdown-lines-break.md) と [EDR 0045](../../docs/engineering-decision-logs/0045-hand-every-toolchain-block-one-preset-function.md) にある。
+`fmt` が決めているのは、整形結果が読み手に届く見た目を変えず、差分にだけ現れる書き方である。markdown の段落を 1 行に畳むこと、import の並び順がこれにあたる。判断は [EDR 0045](../../docs/engineering-decision-logs/0045-let-the-formatter-own-where-markdown-lines-break.md) と [EDR 0046](../../docs/engineering-decision-logs/0046-hand-every-toolchain-block-one-preset-function.md) にある。
 
 - IF: 整形の選択を `fmt` に足したい; THEN
   - MUST: レンダリングされた結果が変わらないことを確かめる
@@ -131,8 +131,18 @@ npm へ公開できるパッケージには、あることを要求する。
 - `skills/**/SKILL.md` が 1 つ以上ある
 - `files` の許可リストがあるなら `skills` を載せている
 - `keywords` が `tanstack-intent` を含んでいる
+- `skills/CHANGELOG.md` があり、マニフェストの `version` を `## <version>` の見出しとして持つ
+- 同梱する各 SKILL.md の `metadata.library_version` が、マニフェストの `version` と一致する
 
-`private: true` のパッケージには、同じ 3 点が書かれていないことを要求する。出荷されない skill と、出荷されない前提の配線は、読む側に嘘を教える。
+`private: true` のパッケージには、同じものが書かれていないことを要求する。出荷されない skill と、出荷されない前提の配線は、読む側に嘘を教える。
+
+`version` を持たないマニフェストには、版に関する 2 点を要求しない。
 
 - IF: SKILL.md の中身の構造を検査したくなった; THEN MUST: この検査に足さず、上流の `intent validate`（各パッケージの `check:skills`）に任せる
   - 不変条件の分担は [EDR 0030](../../docs/engineering-decision-logs/0030-ship-agent-skills-with-published-packages-and-gate-the-shipping-ourselves.md) が決めている
+- IF: 公開パッケージの `version` を上げる; THEN
+  - MUST: 同じ変更で `skills/CHANGELOG.md` にその版の見出しを書く
+  - PROHIBIT: `metadata.library_version` を手で書き換える
+    - マニフェストから一意に決まる値なので `check --write` が揃える
+- IF: 版を上げた変更で SKILL.md の差分も要求したくなった; THEN PROHIBIT: 足す
+  - 書くことが無いのに本文をいじる操作が生まれる。線の引き方は [EDR 0044](../../docs/engineering-decision-logs/0044-ship-a-changelog-beside-the-skills-and-check-it-against-the-manifest.md) が決めている

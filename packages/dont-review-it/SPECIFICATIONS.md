@@ -58,6 +58,17 @@
 - AI が読む形では、記号も桁揃えも持たせずに 1 行 1 観点で並べる
 - 違反を見つけた観点を、その件数とともに残す
 
+## 出荷する skill と宣言した版の突き合わせ
+
+[`specs/shipped-skill-versions.spec.ts`](specs/shipped-skill-versions.spec.ts)
+
+- npm へ公開できるパッケージが skill の隣に changelog を持たなければ報告する
+- changelog が宣言された版を書いていなければ、その changelog を指して報告する
+- 同梱する skill が別の版を名乗っていれば、その skill を指して報告する
+- changelog が版を書き、skill が同じ版を名乗っていれば何も報告しない
+- 公開しないパッケージが skill の隣に changelog を持てば報告する
+- 自動修正は skill の版を宣言へ揃え、changelog には触れない
+
 ## ツールチェーン設定の preset
 
 [`specs/toolchain-preset.spec.ts`](specs/toolchain-preset.spec.ts)
