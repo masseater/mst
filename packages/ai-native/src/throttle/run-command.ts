@@ -3,7 +3,7 @@ import { setTimeout as delay } from "node:timers/promises";
 
 import { attemptAsync } from "es-toolkit";
 
-import { signalProcessTree } from "./process-tree.ts";
+import { signalProcessTree, TREE_TERMINATION_SIGNAL } from "./process-tree.ts";
 import {
   dropInterruptHandler,
   installInterruptHandler,
@@ -56,7 +56,10 @@ const timeoutFired = async (parameters: {
 }): Promise<{ fired: boolean; terminationFailure: Error | null }> => {
   const beforeTimeout = await settledDelay(parameters.timeoutMs, parameters.cancel);
   if (beforeTimeout === "cancelled") return { fired: false, terminationFailure: null };
-  const firstSignal = parameters.dependencies.platform === "win32" ? "SIGKILL" : "SIGTERM";
+  const firstSignal =
+    parameters.dependencies.platform === "win32"
+      ? TREE_TERMINATION_SIGNAL.forced
+      : TREE_TERMINATION_SIGNAL.graceful;
   const terminationFailure = parameters.dependencies.signalTree({
     pid: parameters.childPid,
     signal: firstSignal,
@@ -67,7 +70,7 @@ const timeoutFired = async (parameters: {
   await delay(KILL_GRACE_MS);
   const forcedFailure = parameters.dependencies.signalTree({
     pid: parameters.childPid,
-    signal: "SIGKILL",
+    signal: TREE_TERMINATION_SIGNAL.forced,
   });
   return { fired: true, terminationFailure: terminationFailure ?? forcedFailure };
 };

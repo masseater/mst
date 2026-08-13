@@ -13,6 +13,7 @@ import {
   createMemorySessionStore,
 } from "./relay/memory-store.ts";
 import { relayConfigFromEnv } from "./relay/relay-config.ts";
+import { SHUTDOWN_SIGNALS } from "./runtime/shutdown.ts";
 
 const log = createConsoleLogger("auto-develop-relay", {
   fileSink: createDailyLogFileSink({
@@ -51,12 +52,11 @@ const shutdownAndExit = async (signalName: string): Promise<void> => {
   process.exit(0);
 };
 
-process.on("SIGINT", () => {
-  void shutdownAndExit("SIGINT");
-});
-process.on("SIGTERM", () => {
-  void shutdownAndExit("SIGTERM");
-});
+for (const shutdownSignal of SHUTDOWN_SIGNALS) {
+  process.on(shutdownSignal, () => {
+    void shutdownAndExit(shutdownSignal);
+  });
+}
 
 relay.server.listen(relayConfig.port, () => {
   log.info({ port: relayConfig.port }, "relay server listening");

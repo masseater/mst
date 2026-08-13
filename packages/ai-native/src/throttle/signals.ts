@@ -1,3 +1,4 @@
+/** @canonical-values ai-native.interrupt-signal */
 const INTERRUPT_SIGNALS = ["SIGINT", "SIGTERM"] as const;
 
 export const raiseSignal = (signal: NodeJS.Signals): void => {

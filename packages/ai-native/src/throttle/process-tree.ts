@@ -75,6 +75,14 @@ const shutdownCompleted = (input: {
   input.rootFailure !== null &&
   processIsMissing(input.rootFailure);
 
+/** @canonical-values ai-native.tree-termination-signal */
+const TREE_TERMINATION_SIGNALS = ["SIGTERM", "SIGKILL"] as const;
+
+export const TREE_TERMINATION_SIGNAL = {
+  graceful: TREE_TERMINATION_SIGNALS[0],
+  forced: TREE_TERMINATION_SIGNALS[1],
+} as const;
+
 export const signalProcessTree = (input: {
   pid: number;
   signal: NodeJS.Signals;
@@ -85,7 +93,7 @@ export const signalProcessTree = (input: {
   if (treeFailure === null) return null;
   const rootFailure = dependencies.signalProcess(
     input.pid,
-    dependencies.platform === "win32" ? "SIGKILL" : input.signal,
+    dependencies.platform === "win32" ? TREE_TERMINATION_SIGNAL.forced : input.signal,
   );
   if (shutdownCompleted({ platform: dependencies.platform, treeFailure, rootFailure })) {
     return null;
