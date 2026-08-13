@@ -62,13 +62,13 @@ const sourceScanOutcomes = (repositoryRoot: string): readonly CheckOutcome[] => 
       unit: "concept",
       count: canonicalValues.catalog.entries.length,
       skippedReason: null,
-      problems:
+      problems: [],
+      warnings:
         canonicalValues.problems.length === 0
           ? findEquivalentConcepts(canonicalValues.catalog.entries)
               .map(formatEquivalentConceptGroup)
               .toSorted()
           : [],
-      warnings: [],
     },
     {
       check: "duplicated-bodies",

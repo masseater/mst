@@ -189,7 +189,7 @@ export const ORDER_STATUSES = ["draft"] as const;
   );
 
   standardIoTest(
-    "check fails on a value set that more than one concept declares",
+    "check warns without failing on a value set that more than one concept declares",
     async ({ stdout }) => {
       const root = repositoryWith({
         "src/article.ts": `/** ${CANONICAL_VALUES_TAG} article.status */
@@ -200,7 +200,7 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
 `,
       });
 
-      expect(await cliExitCode(["check", "--repository-root", root])).toBe(1);
+      expect(await cliExitCode(["check", "--repository-root", root])).toBe(0);
       expect(stdout.text).toContain("article.status");
       expect(stdout.text).toContain("order.status");
     },

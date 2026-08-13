@@ -35,7 +35,7 @@ export const STATUSES = ["draft", "published"] as const;
     expect(reported).toContain("src/order.ts");
   });
 
-  it("同じ値の集合を別々の概念が宣言していたら、両方の概念を挙げて報告する", async () => {
+  it("同じ値の集合を別々の概念が宣言していたら、両方の概念を挙げて警告し、落とさない", async () => {
     const repositoryRoot = await repositoryWith({
       "src/article.ts": `/** @canonical-values article.status */
 export const ARTICLE_STATUSES = ["published", "draft"] as const;
@@ -44,9 +44,11 @@ export const ARTICLE_STATUSES = ["published", "draft"] as const;
 export const ORDER_STATUSES = ["draft", "published"] as const;
 `,
     });
-    const reported = runChecks(repositoryRoot).problems.join("\n");
+    const report = runChecks(repositoryRoot);
+    const reported = report.warnings.join("\n");
     expect(reported).toContain("article.status");
     expect(reported).toContain("order.status");
+    expect(report.problems).toStrictEqual([]);
   });
 
   it("概念を名指ししない注釈を報告する", async () => {
