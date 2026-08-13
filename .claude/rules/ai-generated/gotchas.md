@@ -169,3 +169,22 @@ pack: { exports: { customExports: { './tsconfig/*': './tsconfig/*' } } }
 
 - IF: ルールの `meta.schema` を別モジュールの定数から渡そうとしている; THEN PROHIBIT: 渡す
   - 索引が「設定を持たないルール」として生成され、lint も検査も緑のまま通る
+
+## cc-hooks-ts の `trigger` に書いたツール名は実行時に何も絞らない
+
+- 症状: `trigger: { PreToolUse: { Bash: true } }` と書いた hook に Read のペイロードを流したら `run` の中まで入り、`tool_input.command` を読んで `Cannot read properties of undefined` で落ちた。exit 1 になる
+- 原因: 2.1.220 の `extractInputSchemaFromTrigger` が `Object.keys(trigger)` しか見ない。イベント名だけが入力 schema の選択に使われ、ツール名の値は型の絞り込みにしか効かない
+- 波及: ツール名の門は 2 つある。`settings.json` の `matcher` が dispatch を絞り、hook 本体が自分で `tool_name` を確かめる。前者だけに頼ると、別の hook 設定から同じ実行ファイルを呼ばれた時に落ちる
+- 併せて: 入力に `tool_use_id` が無いと valibot が `Invalid key: Expected "tool_use_id"` で弾き、`run` に到達せず exit 1 になる。手で組んだペイロードで試すときに踏む
+
+- IF: cc-hooks-ts で hook を書く; THEN MUST: `run` の中で `tool_name` を確かめ、`tool_input` を `unknown` として読む
+  - 型の上ではツール固有の形に見えるが、実行時にはその保証がない
+
+## `trigger: { PreToolUse: true }` の `input` は型の上で組み立てられない
+
+- 症状: テストのために `input` を手で組むと、`tool_name` を広い union のまま渡した瞬間に `ExtractAllHookInputsForEvent<"PreToolUse">` へ代入できなくなる。`tool_input` が `unknown` のため、`{ tool_input: FileWriteInput; tool_name: "Write" }` のようなツール固有の枝と噛み合わない
+- 波及: 「不正なペイロードを渡したときの振る舞い」を hook の `run` 越しにテストできない。型が正しいペイロードしか組めないためである
+- 対処: 判断を純関数へ出し、`(toolName: string, toolInput: unknown)` を受ける形にしてそちらで不正な入力を網羅する。`run` はその戻り値を `context.success` / `context.json` に振り分けるだけにし、正しい Bash のペイロード 1 種類でテストする
+
+- IF: cc-hooks-ts の hook に分岐を書こうとしている; THEN MUST: 分岐を `run` の外の純関数に置く
+  - `run` に置いた分岐は、型が組めないペイロードの側を覆えないままカバレッジだけが緑になる
