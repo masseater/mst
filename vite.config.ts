@@ -41,6 +41,8 @@ export default defineConfig({
     options: { typeAware: true, typeCheck: true },
   }),
   test: {
+    mockReset: true,
+    restoreMocks: true,
     coverage: {
       thresholds: { 100: true, perFile: true },
     },

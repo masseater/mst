@@ -70,6 +70,7 @@ import { noReassign } from "./lint/oxlint/rules/no-reassign--use-spread-or-iife.
 import { noReceiverMutation } from "./lint/oxlint/rules/no-receiver-mutation--derive-new-value.ts";
 import { noRedundantMockReset } from "./lint/oxlint/rules/no-redundant-mock-reset--lift-mocks-into-fixture.ts";
 import { noRuleSuppression } from "./lint/oxlint/rules/no-rule-suppression--fix-the-violation.ts";
+import { noSharedDoubleState } from "./lint/oxlint/rules/no-shared-double-state--reset-doubles-between-tests.ts";
 import { noSilentSuppression } from "./lint/oxlint/rules/no-silent-suppression--fix-or-justify-inline.ts";
 import { noSingleUseLocalType } from "./lint/oxlint/rules/no-single-use-local-type--inline-at-the-use-site.ts";
 import { noSpecFileHelperFunction } from "./lint/oxlint/rules/no-spec-file-helper-function--inline-or-use-fixture.ts";
@@ -209,6 +210,7 @@ const plugin: Plugin = {
     [noReceiverMutation.name]: noReceiverMutation,
     [noRedundantMockReset.name]: noRedundantMockReset,
     [noRuleSuppression.name]: noRuleSuppression,
+    [noSharedDoubleState.name]: noSharedDoubleState,
     [noSilentSuppression.name]: noSilentSuppression,
     [noSingleUseLocalType.name]: noSingleUseLocalType,
     [noSpecFileHelperFunction.name]: noSpecFileHelperFunction,
