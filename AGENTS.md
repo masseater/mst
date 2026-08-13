@@ -65,7 +65,7 @@ mst は、リポジトリ運用の仕組みを再利用可能な単位として�
   - PROHIBIT: `mise.toml` に node を書く
 - IF: `vite` の依存を整理する; THEN
   - PROHIBIT: ルートと `packages/repository-checks` の `vite` 直接依存を削除する
-  - PROHIBIT: `knip.json` の `ignoreDependencies` から `vite` を外す
+  - PROHIBIT: `knip.ts` の `ignoreDependencies` から `vite` を外す
 - IF: カバレッジ担保のテストを置く; THEN
   - MUST: 対象ソースと同じディレクトリに `<ソース名>.test.ts` として置く
   - PROHIBIT: `tests/` `test/` `__tests__/` `spec/` を作る
