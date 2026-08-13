@@ -1,12 +1,36 @@
-import { describe, expect, test } from "vite-plus/test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+
+import { describe, expect, onTestFinished, test } from "vite-plus/test";
 
 import { analyzeCanonicalValuesRepository } from "./builder.ts";
-import {
-  annotateCanonicalValues,
-  createCanonicalValuesTestRepository,
-  writeCanonicalValuesTestFile,
-} from "./canonical-values.test-fixture.ts";
 import { fingerprintValues } from "./fingerprint.ts";
+
+const createCanonicalValuesTestRepository = (): string => {
+  const repositoryRoot = mkdtempSync(join(tmpdir(), "canonical-values-"));
+  onTestFinished(() => {
+    rmSync(repositoryRoot, { recursive: true, force: true });
+  });
+  return repositoryRoot;
+};
+
+const writeCanonicalValuesTestFile = ({
+  repositoryRoot,
+  relativePath,
+  contents: fileText,
+}: {
+  readonly repositoryRoot: string;
+  readonly relativePath: string;
+  readonly contents: string;
+}): void => {
+  const absolutePath = join(repositoryRoot, relativePath);
+  mkdirSync(dirname(absolutePath), { recursive: true });
+  writeFileSync(absolutePath, fileText, "utf8");
+};
+
+const annotateCanonicalValues = (conceptId: string, declaration: string): string =>
+  `/** @canonical-values ${conceptId} */\n${declaration}\n`;
 
 describe("resolved entries", () => {
   const buildCanonicalValuesCatalog = (catalogRequest: { readonly repositoryRoot: string }) =>

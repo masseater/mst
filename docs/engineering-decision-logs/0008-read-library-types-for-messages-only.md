@@ -51,7 +51,7 @@ canonical catalog は別の runtime dependency `typescript-6` を使う。こち
 
 このパッケージの lint は、`node_modules` に型宣言が揃っていることを前提にした「良い報告」と、揃っていないときの「これまでどおりの報告」の 2 つの状態を持つようになった。合否は両方の状態で同じである。報告文が環境によって変わることは受け入れる。
 
-`typescript` と `typescript-6` が実行時依存になった。`@mst/dont-review-it` を使う側は library message 用の同期 API と、canonical catalog 用の TypeScript 6 checker の両方を引き込む。`pnpm-workspace.yaml` はそれぞれを別の catalog entry に固定し、各 workspace は `catalog:` で参照する。依存変更時は `vp install --frozen-lockfile` に加え、`vp why typescript` と `vp why typescript-6` で意図しない複数 instance が無いことを確認する。
+`typescript` と `typescript-6` が実行時依存になった。`@mst/dont-review-it` を使う側は library message 用の同期 API と、canonical catalog 用の TypeScript 6 checker の両方を引き込む。複数の workspace が共有する `typescript` は `pnpm-workspace.yaml` の catalog に置き、この workspace だけが使う `typescript-6` は `packages/dont-review-it` の manifest で直接固定する（[EDR 0028](0028-keep-the-catalog-for-shared-versions-only.md)）。依存変更時は `vp install --frozen-lockfile` に加え、`vp why typescript` と `vp why @typescript/typescript6` で意図しない複数 instance が無いことを確認する。
 
 候補の絞り込みをしないため、ノイズが混じる。実測では `error` / `warn` / `off` に対して `AllowWarnDeny` と `DummyRule` の 2 つが候補に並ぶ。後者は前者を内側に含む型で、語彙の所有者としては筋が悪い。順序で優劣を示さないと決めた以上、この選別は人が行う。
 

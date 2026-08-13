@@ -3,7 +3,7 @@ import { relative, resolve } from "node:path";
 
 import { pathIsInside } from "./path-is-inside.ts";
 
-const OUT_OF_SCOPE_FILE_NAME =
+export const OUT_OF_SCOPE_FILE_NAME =
   /\.(?:fixture|mock|test|spec|stories|story)(?:[.-][^.]+)*\.[cm]?[jt]sx?$/u;
 
 const OUT_OF_SCOPE_DIRECTORIES: ReadonlySet<string> = new Set([

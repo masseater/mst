@@ -11,7 +11,7 @@ export type BodyDeclaration = {
   readonly nodeCount: number;
 };
 
-const DEFAULT_SOURCE_NAME = "source.tsx";
+export const DEFAULT_SOURCE_NAME = "source.tsx";
 
 const POSITION_FIELDS: ReadonlySet<string> = new Set(["start", "end", "range", "loc"]);
 
@@ -23,7 +23,7 @@ const namedFieldsOf = (node: UnknownFields): readonly (readonly [string, unknown
     ([field, nestedField]) => !POSITION_FIELDS.has(field) && nestedField !== undefined,
   );
 
-const structureOf = (syntaxField: unknown): string => {
+export const structureOf = (syntaxField: unknown): string => {
   if (Array.isArray(syntaxField)) return `[${syntaxField.map(structureOf).join(",")}]`;
   if (!isNode(syntaxField)) {
     return typeof syntaxField === "bigint"
@@ -35,7 +35,7 @@ const structureOf = (syntaxField: unknown): string => {
     .join(",")}}`;
 };
 
-const nodeCountOf = (syntaxField: unknown): number => {
+export const nodeCountOf = (syntaxField: unknown): number => {
   if (Array.isArray(syntaxField))
     return syntaxField.reduce<number>(
       (accumulatedCount, nestedItem) => accumulatedCount + nodeCountOf(nestedItem),

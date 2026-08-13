@@ -1,14 +1,33 @@
-import { rmSync, symlinkSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 
-import { describe, expect, test } from "vite-plus/test";
+import { describe, expect, onTestFinished, test } from "vite-plus/test";
 
-import {
-  createCanonicalValuesTestRepository,
-  writeCanonicalValuesTestFile,
-} from "./canonical-values.test-fixture.ts";
 import { cacheInputFingerprint } from "./catalog-cache-fingerprint.ts";
 import { listRepositoryFiles } from "./source-files.ts";
+
+const createCanonicalValuesTestRepository = (): string => {
+  const repositoryRoot = mkdtempSync(join(tmpdir(), "canonical-values-"));
+  onTestFinished(() => {
+    rmSync(repositoryRoot, { recursive: true, force: true });
+  });
+  return repositoryRoot;
+};
+
+const writeCanonicalValuesTestFile = ({
+  repositoryRoot,
+  relativePath,
+  contents: fileText,
+}: {
+  readonly repositoryRoot: string;
+  readonly relativePath: string;
+  readonly contents: string;
+}): void => {
+  const absolutePath = join(repositoryRoot, relativePath);
+  mkdirSync(dirname(absolutePath), { recursive: true });
+  writeFileSync(absolutePath, fileText, "utf8");
+};
 
 describe("catalog cache fingerprint", () => {
   test("cache input problems participate in the fingerprint", () => {

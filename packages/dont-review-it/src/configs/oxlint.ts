@@ -3,6 +3,7 @@ import { defineConfig, type OxlintConfig } from "oxlint";
 
 import { forbidNumberedSiblingFile } from "../lint/oxlint/rules/forbid-numbered-sibling-file--name-what-each-file-owns.ts";
 import { forbidOversizedFile } from "../lint/oxlint/rules/forbid-oversized-file--split-by-responsibility.ts";
+import { forbidTestAdjacentFile } from "../lint/oxlint/rules/forbid-test-adjacent-file--inline-its-setup-into-the-test.ts";
 import { noAmbiguousVariableName } from "../lint/oxlint/rules/no-ambiguous-variable-name--rename-to-concrete-noun.ts";
 import { noArrayMutation } from "../lint/oxlint/rules/no-array-mutation--derive-new-array.ts";
 import { noCittyParentRun } from "../lint/oxlint/rules/no-citty-parent-run--move-run-into-a-subcommand.ts";
@@ -11,6 +12,7 @@ import { noDetachedRationale } from "../lint/oxlint/rules/no-detached-rationale-
 import { noDetachedTestFile } from "../lint/oxlint/rules/no-detached-test-file--move-beside-source.ts";
 import { noDiscardedFailure } from "../lint/oxlint/rules/no-discarded-failure--receive-and-surface-it.ts";
 import { noDoubleTypeAssertion } from "../lint/oxlint/rules/no-double-type-assertion--declare-the-real-type.ts";
+import { noDuplicatedTest } from "../lint/oxlint/rules/no-duplicated-test--delete-the-copy.ts";
 import { noExplanatoryComment } from "../lint/oxlint/rules/no-explanatory-comment--delete-or-move-to-commit-message.ts";
 import { noHandmadeStandardIoDouble } from "../lint/oxlint/rules/no-handmade-standard-io-double--use-standard-io-test.ts";
 import { noHardcodedEndpoint } from "../lint/oxlint/rules/no-hardcoded-endpoint--read-from-configuration.ts";
@@ -90,6 +92,7 @@ export const oxlint: OxlintConfig = defineConfig({
       LINT_SEVERITY.ERROR,
       { maxLines: MAX_LINES_PER_FILE },
     ],
+    [`${PLUGIN_NAME}/${forbidTestAdjacentFile.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noAmbiguousVariableName.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noArrayMutation.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noCittyParentRun.name}`]: LINT_SEVERITY.ERROR,
@@ -99,6 +102,7 @@ export const oxlint: OxlintConfig = defineConfig({
     [`${PLUGIN_NAME}/${noDiscardedFailure.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noDoubleTypeAssertion.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noDuplicatedBody.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noDuplicatedTest.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noExplanatoryComment.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noHandmadeStandardIoDouble.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noHardcodedEndpoint.name}`]: LINT_SEVERITY.ERROR,

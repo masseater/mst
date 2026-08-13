@@ -20,7 +20,7 @@ version は 2 箇所で照合する。
 
 fingerprint の file input は、`commentSources` と `declarationSources` から独立した `cacheInputs` である。repository 内の JavaScript・TypeScript source と declaration、JSON、package manifest、TypeScript config、dependency graph を決める workspace config と lockfile を含める。test・Story・fixture、`.d.ts`、`dist` の生成 source は owner 候補にならなくても checker が production owner の import や package entry から参照できるため、cache input からは外さない。`.git`・`.cache`・`coverage`・`node_modules` は走査せず、repository 外 dependency の内容は manifest・config・lockfile の変更で invalidation する。
 
-走査で検出した problem の kind・path・line も input fingerprint に含める。repository 外へ出る symbolic link の追加や除去は、走査対象 file の本文が変わらなくても disk cache と process 内 catalog instance を invalidation する。同じ file input と problem identity の間だけ同じ catalog instance を共有する。
+走査で検出した problem の kind・path・line も input fingerprint に含める。repository 外へ出る symbolic link の追加や除去は、走査対象 file の本文が変わらなくても disk cache を invalidation する。process 内では repository root ごとに catalog instance を 1 つだけ作り、lint process が終わるまで作り直さない。source を書き換えても同じ process には反映されず、次の process が fingerprint の差で cache miss を出す。
 
 各 input の repository-relative path と本文を、長さで境界を付けて順序どおり hash に入れる。size と mtime が同じまま本文が変わっても cache hit にはならない。owner source、import・spread・JSON・declaration が供給する型、公開 route、dependency 解決条件のいずれが変わっても cache miss になる。`commentSources` は strict annotation scan、`declarationSources` は production runtime owner 候補という従来の意味を維持し、cache の完全性のために範囲を広げない。
 

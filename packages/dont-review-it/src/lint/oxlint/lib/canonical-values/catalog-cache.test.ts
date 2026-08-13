@@ -1,12 +1,20 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { describe, expect, test } from "vite-plus/test";
+import { describe, expect, onTestFinished, test } from "vite-plus/test";
 
-import { createCanonicalValuesTestRepository } from "./canonical-values.test-fixture.ts";
-import { cacheInputFingerprint, readCachedEntries, writeCachedEntries } from "./catalog-cache.ts";
+import { readCachedEntries, writeCachedEntries } from "./catalog-cache.ts";
 import { fingerprintValues } from "./fingerprint.ts";
+
+const createCanonicalValuesTestRepository = (): string => {
+  const repositoryRoot = mkdtempSync(join(tmpdir(), "canonical-values-"));
+  onTestFinished(() => {
+    rmSync(repositoryRoot, { recursive: true, force: true });
+  });
+  return repositoryRoot;
+};
 
 describe("catalog cache", () => {
   const cachePathOf = (repositoryRoot: string): string =>
@@ -165,15 +173,6 @@ describe("catalog cache", () => {
     { ...validEntry, values: ["draft"], fingerprint: fingerprintValues(["other"]) },
   ])("an entry with an invalid canonical domain is rejected", (candidateEntry) => {
     expect(readCacheDocument(validCacheDocument([candidateEntry]))).toBe(null);
-  });
-
-  test("cache input problems participate in the fingerprint", () => {
-    expect(
-      cacheInputFingerprint(
-        [],
-        [{ filePath: "src/link.ts", kind: "unsafe-symbolic-link", line: 1 }],
-      ),
-    ).not.toBe(cacheInputFingerprint([]));
   });
 
   test("a cache write failure caused by the file system is non-fatal", () => {

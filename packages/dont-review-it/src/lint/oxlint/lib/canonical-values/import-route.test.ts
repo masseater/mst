@@ -1,15 +1,35 @@
-import { join } from "node:path";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 
-import { describe, expect, test } from "vite-plus/test";
+import { describe, expect, onTestFinished, test } from "vite-plus/test";
 
 import { analyzeCanonicalValuesRepository } from "./builder.ts";
-import {
-  createCanonicalValuesTestRepository,
-  writeCanonicalValuesTestFiles,
-} from "./canonical-values.test-fixture.ts";
 import { buildCatalog, type CanonicalValuesEntry } from "./catalog.ts";
 import { fingerprintValues } from "./fingerprint.ts";
 import { importRouteStatus } from "./import-route.ts";
+
+const createCanonicalValuesTestRepository = (): string => {
+  const repositoryRoot = mkdtempSync(join(tmpdir(), "canonical-values-"));
+  onTestFinished(() => {
+    rmSync(repositoryRoot, { recursive: true, force: true });
+  });
+  return repositoryRoot;
+};
+
+const writeCanonicalValuesTestFiles = ({
+  repositoryRoot,
+  files,
+}: {
+  readonly repositoryRoot: string;
+  readonly files: Readonly<Record<string, string>>;
+}): void => {
+  for (const [relativePath, fileText] of Object.entries(files)) {
+    const absolutePath = join(repositoryRoot, relativePath);
+    mkdirSync(dirname(absolutePath), { recursive: true });
+    writeFileSync(absolutePath, fileText, "utf8");
+  }
+};
 
 describe("import-route", () => {
   const REPOSITORY_ROOT = "/repository";
