@@ -21,9 +21,23 @@ const waitersDir = (slotDir: string): string => join(slotDir, "waiters");
 
 const slotIndexes = (limit: number): number[] => [...Array(limit).keys()];
 
+const ABSENT_LOCK_CODES: ReadonlySet<string> = new Set(["ENOENT", "ENOTDIR"]);
+
+const discardForeignLock = (marker: string): void => {
+  const lockPath = `${marker}.lock`;
+  try {
+    if (statSync(lockPath).isDirectory()) return;
+  } catch (absentLock) {
+    if (failedWithCode(absentLock, ABSENT_LOCK_CODES)) return;
+    throw absentLock;
+  }
+  rmSync(lockPath, { force: true });
+};
+
 export const ensureSlots = (slotDir: string, limit: number): void => {
   mkdirSync(waitersDir(slotDir), { recursive: true });
   for (const index of slotIndexes(limit)) {
+    discardForeignLock(markerPath(slotDir, index));
     writeFileSync(markerPath(slotDir, index), "", { flag: "a" });
   }
 };
@@ -57,8 +71,6 @@ export const tryAcquireAny = async (
   return null;
 };
 
-const ABSENT_LOCK_CODES: ReadonlySet<string> = new Set(["ENOENT", "ENOTDIR"]);
-
 const lockIdentity = (lockPath: string): string => {
   try {
     return String(statSync(lockPath).ino);
@@ -74,12 +86,12 @@ export const slotStateFingerprint = (slotDir: string, limit: number): string =>
     .join(",");
 
 export const enqueueWaiter = (slotDir: string): string => {
-  const name = [
+  const spelled = [
     String(Date.now()).padStart(13, "0"),
     String(process.pid),
     randomBytes(4).toString("hex"),
   ].join("-");
-  const entryPath = join(waitersDir(slotDir), name);
+  const entryPath = join(waitersDir(slotDir), spelled);
   writeFileSync(entryPath, `${process.pid}\n`);
   return entryPath;
 };
@@ -103,8 +115,8 @@ const UNREADABLE_ENTRY_CODES: ReadonlySet<string> = new Set(["ENOENT", "ENOTDIR"
 
 const recordedPid = (entryPath: string): number | null => {
   try {
-    const record = readFileSync(entryPath, "utf8").trim();
-    return /^[0-9]+$/.test(record) ? Number(record) : null;
+    const written = readFileSync(entryPath, "utf8").trim();
+    return /^[0-9]+$/.test(written) ? Number(written) : null;
   } catch (unreadableEntry) {
     if (failedWithCode(unreadableEntry, UNREADABLE_ENTRY_CODES)) return null;
     throw unreadableEntry;
@@ -121,4 +133,4 @@ const survives = (entryPath: string): boolean => {
 export const sweepWaiters = (slotDir: string): string[] =>
   readdirSync(waitersDir(slotDir))
     .toSorted()
-    .filter((name) => survives(join(waitersDir(slotDir), name)));
+    .filter((spelled) => survives(join(waitersDir(slotDir), spelled)));

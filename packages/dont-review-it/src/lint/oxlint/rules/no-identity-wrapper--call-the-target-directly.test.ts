@@ -40,7 +40,7 @@ describe("dont-review-it/no-identity-wrapper--call-the-target-directly", () => {
       },
       {
         name: "a call that takes a property off a parameter transforms it",
-        code: "const findUser = (record) => find(record.id);",
+        code: "const findUser = (written) => find(record.id);",
       },
       {
         name: "a call that reorders the parameters is not a pass through",

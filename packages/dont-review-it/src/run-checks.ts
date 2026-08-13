@@ -22,9 +22,13 @@ import {
 import { duplicatedClustersIn } from "./lint/oxlint/lib/duplicated-bodies/body-index.ts";
 import { buildRepositoryBodyIndex } from "./lint/oxlint/lib/duplicated-bodies/builder.ts";
 import { formatDuplicatedCluster } from "./lint/oxlint/lib/duplicated-bodies/site-report.ts";
+import { defaultPresetAdoptionConfig } from "./preset-adoption/config.ts";
+import { runPresetAdoptionChecks } from "./preset-adoption/run-preset-adoption-checks.ts";
 import { formatRepositoryProblem } from "./problem.ts";
+import { defaultRequiredFileFormConfig } from "./required-file-form/config.ts";
+import { runRequiredFileFormChecks } from "./required-file-form/run-required-file-form-checks.ts";
 import { defaultWorkflowChecksConfig } from "./workflows/config.ts";
-import { runWorkflowChecks } from "./workflows/run-workflow-checks.ts";
+import { workflowOutcomesOf } from "./workflows/workflow-outcomes.ts";
 
 import type { CheckOutcome } from "@mst/repository-checks";
 
@@ -37,34 +41,17 @@ export type CheckReport = {
 
 const NO_WORKSPACE_DEFINITION = "no workspace definition";
 
+const NO_WORKFLOW_DEFINITION = "no workflow definition";
+
+const NO_TOOLCHAIN_CONFIG = "no toolchain configuration";
+
 const UNREADABLE_WORKSPACE_DEFINITION = "workspace definition does not parse";
 
-export const runChecks = (repositoryRoot: string): CheckReport => {
-  const dependencyCatalog = runDependencyCatalogChecks({
-    repositoryRoot,
-    config: defaultDependencyCatalogChecksConfig,
-  });
-  const entryComposition = entryCompositionProblems({
-    repositoryRoot,
-    config: defaultEntryCompositionConfig,
-  });
+const sourceScanOutcomes = (repositoryRoot: string): readonly CheckOutcome[] => {
   const repositoryFiles = listRepositoryFiles(resolve(repositoryRoot));
   const catalog = buildCanonicalValuesCatalog({ repositoryRoot });
-  const workflows = runWorkflowChecks({ repositoryRoot, config: defaultWorkflowChecksConfig });
-  const skills = shippedSkillsProblems({ repositoryRoot, config: defaultIntentSkillsConfig });
-  const ruleIndex = dependencyCatalog.definitionUnreadable
-    ? { problems: [], scanned: 0 }
-    : lintRuleIndexProblems({ repositoryRoot, write: false });
 
-  const outcomes: readonly CheckOutcome[] = [
-    {
-      check: "entry-composition",
-      unit: "manifest",
-      count: entryComposition.scanned,
-      skippedReason: null,
-      problems: entryComposition.problems.map(formatRepositoryProblem).toSorted(),
-      warnings: [],
-    },
+  return [
     {
       check: "canonical-values",
       unit: "source file",
@@ -95,12 +82,59 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
         .toSorted(),
       warnings: [],
     },
+  ];
+};
+
+export const runChecks = (repositoryRoot: string): CheckReport => {
+  const dependencyCatalog = runDependencyCatalogChecks({
+    repositoryRoot,
+    config: defaultDependencyCatalogChecksConfig,
+  });
+  const entryComposition = entryCompositionProblems({
+    repositoryRoot,
+    config: defaultEntryCompositionConfig,
+  });
+  const workflows = workflowOutcomesOf({
+    repositoryRoot,
+    config: defaultWorkflowChecksConfig,
+  });
+  const skills = shippedSkillsProblems({ repositoryRoot, config: defaultIntentSkillsConfig });
+  const presetAdoption = runPresetAdoptionChecks({
+    repositoryRoot,
+    config: defaultPresetAdoptionConfig,
+  });
+  const requiredFileForm = runRequiredFileFormChecks({
+    repositoryRoot,
+    config: defaultRequiredFileFormConfig,
+  });
+  const ruleIndex = dependencyCatalog.definitionUnreadable
+    ? { problems: [], scanned: 0 }
+    : lintRuleIndexProblems({ repositoryRoot, write: false });
+
+  const outcomes: readonly CheckOutcome[] = [
+    {
+      check: "entry-composition",
+      unit: "manifest",
+      count: entryComposition.scanned,
+      skippedReason: null,
+      problems: entryComposition.problems.map(formatRepositoryProblem).toSorted(),
+      warnings: [],
+    },
+    ...sourceScanOutcomes(repositoryRoot),
     {
       check: "workflow-definitions",
       unit: "definition",
-      count: workflows.scanned,
+      count: workflows.definitions.scanned,
       skippedReason: null,
-      problems: workflows.problems.map(formatRepositoryProblem).toSorted(),
+      problems: workflows.definitions.problems.map(formatRepositoryProblem).toSorted(),
+      warnings: [],
+    },
+    {
+      check: "action-updates",
+      unit: "update configuration",
+      count: workflows.updates.scanned,
+      skippedReason: workflows.definitions.scanned === 0 ? NO_WORKFLOW_DEFINITION : null,
+      problems: workflows.updates.problems.map(formatRepositoryProblem).toSorted(),
       warnings: [],
     },
     {
@@ -122,6 +156,22 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
       warnings: dependencyCatalog.warnings.map(formatDependencyCatalogProblem).toSorted(),
     },
     {
+      check: "required-file-form",
+      unit: "package root",
+      count: requiredFileForm.scanned,
+      skippedReason: null,
+      problems: requiredFileForm.problems.map(formatRepositoryProblem).toSorted(),
+      warnings: [],
+    },
+    {
+      check: "preset-adoption",
+      unit: "workspace",
+      count: presetAdoption.scanned,
+      skippedReason: presetAdoption.configMissing ? NO_TOOLCHAIN_CONFIG : null,
+      problems: [],
+      warnings: presetAdoption.warnings.map(formatRepositoryProblem).toSorted(),
+    },
+    {
       check: "intent-skills",
       unit: "manifest",
       count: skills.scanned,
@@ -133,8 +183,8 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
 
   return {
     outcomes,
-    problems: outcomes.flatMap((outcome) => outcome.problems).toSorted(),
-    warnings: outcomes.flatMap((outcome) => outcome.warnings).toSorted(),
+    problems: outcomes.flatMap((ranCheck) => ranCheck.problems).toSorted(),
+    warnings: outcomes.flatMap((ranCheck) => ranCheck.warnings).toSorted(),
     failures: entryComposition.failures.toSorted(),
   };
 };

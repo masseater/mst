@@ -1,5 +1,8 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
-import { createForbiddenNameMatcher } from "../lib/forbidden-ambiguous-names.ts";
+import {
+  createForbiddenNameMatcher,
+  FORBIDDEN_AMBIGUOUS_NAMES,
+} from "../lib/forbidden-ambiguous-names.ts";
 import { isAssertionEntryCall } from "../lib/spec-syntax/assertion-entries.ts";
 import { forbiddenSubjectNamesFrom } from "../lib/spec-syntax/forbidden-subject-names.ts";
 import { isSpecFile, specFileSuffixesFrom } from "../lib/spec-syntax/spec-files.ts";
@@ -30,7 +33,7 @@ const carriedByComposite = (node: ESTree.Expression): readonly HandedValue[] | n
       property.type === "SpreadElement" ? [property] : keptFromProperty(property),
     );
   }
-  if (node.type === "ArrayExpression") return node.elements.flatMap((element) => element ?? []);
+  if (node.type === "ArrayExpression") return node.elements.flatMap((held) => held ?? []);
   if (node.type === "CallExpression" || node.type === "NewExpression") {
     return [...receiverOfCallee(node.callee), ...node.arguments];
   }
@@ -96,13 +99,13 @@ export const noExpectForbiddenSubjectName = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
-    const forbiddenNames = forbiddenSubjectNamesFrom(context.options);
-    if (forbiddenNames.length === 0) return {};
-
-    const isForbiddenName = createForbiddenNameMatcher(forbiddenNames);
+    const isForbiddenName = createForbiddenNameMatcher([
+      ...FORBIDDEN_AMBIGUOUS_NAMES,
+      ...forbiddenSubjectNamesFrom(inspection.options),
+    ]);
 
     return {
       CallExpression(node: ESTree.CallExpression) {
@@ -113,7 +116,7 @@ export const noExpectForbiddenSubjectName = createDontReviewItRule({
 
         for (const named of namesInside(handed)) {
           if (!isForbiddenName(named.name)) continue;
-          context.report({
+          inspection.report({
             node: named,
             messageId: "forbiddenSubjectName",
             data: { name: named.name },

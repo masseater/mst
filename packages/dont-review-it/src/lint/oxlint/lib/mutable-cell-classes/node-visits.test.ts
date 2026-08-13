@@ -77,7 +77,7 @@ describe("fieldOf", () => {
 
 describe("kindAt", () => {
   describe("a walked node", () => {
-    const it = test.extend("kind", () => {
+    const it = test.extend("heldNameKind", () => {
       const found = nodeVisitsIn(parseSync("held.ts", "held;").program).find(
         (visit) => nodeTypeOf(visit.node) === "Identifier" && visit.node.name === "held",
       );
@@ -85,16 +85,16 @@ describe("kindAt", () => {
       return kindAt(found.node);
     });
 
-    it("reads as its own kind", ({ kind }) => {
-      expect(kind).toBe("Identifier");
+    it("reads as its own kind", ({ heldNameKind }) => {
+      expect(heldNameKind).toBe("Identifier");
     });
   });
 
   describe("something that is no node", () => {
-    const it = test.extend("kind", () => kindAt(null));
+    const it = test.extend("nonNodeKind", () => kindAt(null));
 
-    it("reads as no kind", ({ kind }) => {
-      expect(kind).toBe("");
+    it("reads as no kind", ({ nonNodeKind }) => {
+      expect(nonNodeKind).toBe("");
     });
   });
 });

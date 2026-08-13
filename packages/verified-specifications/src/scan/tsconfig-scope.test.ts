@@ -19,9 +19,9 @@ const NARROWED_WITH_EXCLUDE =
 
 describe("tsconfigScopeProblemsOf", () => {
   const repositoryTest = test.extend("repositoryRoot", async ({}, { onCleanup }) => {
-    const created = await mkdtemp(join(tmpdir(), "verified-specifications-"));
-    onCleanup(async () => rm(created, { recursive: true, force: true }));
-    return created;
+    const temporaryRepositoryRoot = await mkdtemp(join(tmpdir(), "verified-specifications-"));
+    onCleanup(async () => rm(temporaryRepositoryRoot, { recursive: true, force: true }));
+    return temporaryRepositoryRoot;
   });
 
   describe("a workspace tsconfig that only extends a preset", () => {

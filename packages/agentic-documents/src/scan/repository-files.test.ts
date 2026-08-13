@@ -14,14 +14,14 @@ describe("findFilesNamed", () => {
       onCleanup(() => {
         rmSync(repositoryRoot, { recursive: true, force: true });
       });
-      for (const [path, text] of Object.entries({
+      for (const [path, markdownBody] of Object.entries({
         "packages/user/AGENTS.md": "# user\n",
         "AGENTS.md": "# root\n",
         "apps/site/AGENTS.md": "# site\n",
       })) {
-        const target = join(repositoryRoot, path);
-        mkdirSync(dirname(target), { recursive: true });
-        writeFileSync(target, text, "utf8");
+        const documentPath = join(repositoryRoot, path);
+        mkdirSync(dirname(documentPath), { recursive: true });
+        writeFileSync(documentPath, markdownBody, "utf8");
       }
       return findFilesNamed({
         repositoryRoot,
@@ -41,9 +41,9 @@ describe("findFilesNamed", () => {
       onCleanup(() => {
         rmSync(repositoryRoot, { recursive: true, force: true });
       });
-      const target = join(repositoryRoot, "packages/user/CLAUDE.md");
-      mkdirSync(dirname(target), { recursive: true });
-      writeFileSync(target, "# user\n", "utf8");
+      const documentPath = join(repositoryRoot, "packages/user/CLAUDE.md");
+      mkdirSync(dirname(documentPath), { recursive: true });
+      writeFileSync(documentPath, "# user\n", "utf8");
       return findFilesNamed({
         repositoryRoot,
         fileName: "AGENTS.md",
@@ -62,13 +62,13 @@ describe("findFilesNamed", () => {
       onCleanup(() => {
         rmSync(repositoryRoot, { recursive: true, force: true });
       });
-      for (const [path, text] of Object.entries({
+      for (const [path, markdownBody] of Object.entries({
         "node_modules/vendor/AGENTS.md": "# vendored\n",
         "AGENTS.md": "# root\n",
       })) {
-        const target = join(repositoryRoot, path);
-        mkdirSync(dirname(target), { recursive: true });
-        writeFileSync(target, text, "utf8");
+        const documentPath = join(repositoryRoot, path);
+        mkdirSync(dirname(documentPath), { recursive: true });
+        writeFileSync(documentPath, markdownBody, "utf8");
       }
       return findFilesNamed({
         repositoryRoot,

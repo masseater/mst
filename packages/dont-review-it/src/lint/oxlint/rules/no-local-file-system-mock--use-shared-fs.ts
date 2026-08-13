@@ -154,13 +154,13 @@ const replacementMessage = (
   reading: Reading,
 ): RuleMessage | null => {
   const { call, member } = called;
-  const target = handedArgument(call, 0);
-  const specifier = target === null ? null : staticSpecifierOf(target, reading);
+  const checked = handedArgument(call, 0);
+  const specifier = checked === null ? null : staticSpecifierOf(checked, reading);
   if (specifier === null) return { messageId: "unreadableModuleSpecifier", data: { member } };
   if (!reading.fileSystemModules.has(specifier)) return null;
 
-  const options = handedArgument(call, 1);
-  return options !== null && wrapsOriginal(options)
+  const ruleOptions = handedArgument(call, 1);
+  return ruleOptions !== null && wrapsOriginal(ruleOptions)
     ? { messageId: "wrappedFileSystemModule", data: { member, specifier } }
     : { messageId: LOCAL_DOUBLE_MESSAGE, data: { member, specifier } };
 };
@@ -190,8 +190,8 @@ const readCallSpecifier = (call: ESTree.CallExpression): ESTree.Expression | nul
   return handedArgument(call, 0);
 };
 
-const isRemovableStatement = (call: ESTree.CallExpression, message: RuleMessage): boolean =>
-  message.messageId === LOCAL_DOUBLE_MESSAGE &&
+const isRemovableStatement = (call: ESTree.CallExpression, complaint: RuleMessage): boolean =>
+  complaint.messageId === LOCAL_DOUBLE_MESSAGE &&
   call.arguments.length === 1 &&
   call.parent.type === "ExpressionStatement";
 
@@ -229,39 +229,41 @@ export const noLocalFileSystemMock = createDontReviewItRule({
     ],
     fixable: "code",
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
     const reading: Reading = {
-      scopeAt: (node) => context.sourceCode.getScope(node),
-      namespace: mockNamespaceFrom(context.options),
-      replacementMembers: spellingsFrom(context.options, {
+      scopeAt: (node) => inspection.sourceCode.getScope(node),
+      namespace: mockNamespaceFrom(inspection.options),
+      replacementMembers: spellingsFrom(inspection.options, {
         option: MODULE_REPLACEMENT_MEMBERS_OPTION,
         fallback: DEFAULT_MODULE_REPLACEMENT_MEMBERS,
       }),
-      fileSystemModules: spellingsFrom(context.options, {
+      fileSystemModules: spellingsFrom(inspection.options, {
         option: FILE_SYSTEM_MODULES_OPTION,
         fallback: DEFAULT_FILE_SYSTEM_MODULES,
       }),
-      inMemoryPackages: spellingsFrom(context.options, {
+      inMemoryPackages: spellingsFrom(inspection.options, {
         option: IN_MEMORY_FILE_SYSTEM_PACKAGES_OPTION,
         fallback: DEFAULT_IN_MEMORY_FILE_SYSTEM_PACKAGES,
       }),
       followed: [],
     };
 
-    const reportFound = (node: ESTree.Node, message: RuleMessage | null): void => {
-      if (message === null) return;
-      context.report({ node, messageId: message.messageId, data: message.data });
+    const reportFound = (node: ESTree.Node, complaint: RuleMessage | null): void => {
+      if (complaint === null) return;
+      inspection.report({ node, messageId: complaint.messageId, data: complaint.data });
     };
 
-    const reportCall = (call: ESTree.CallExpression, message: RuleMessage | null): void => {
-      if (message === null) return;
-      context.report({
+    const reportCall = (call: ESTree.CallExpression, complaint: RuleMessage | null): void => {
+      if (complaint === null) return;
+      inspection.report({
         node: call,
-        messageId: message.messageId,
-        data: message.data,
-        fix: isRemovableStatement(call, message) ? (fixer) => fixer.remove(call.parent) : undefined,
+        messageId: complaint.messageId,
+        data: complaint.data,
+        fix: isRemovableStatement(call, complaint)
+          ? (fixer) => fixer.remove(call.parent)
+          : undefined,
       });
     };
 

@@ -91,7 +91,7 @@ export const full = createRule({
   });
 
   describe("a rule handed out by an arrow creator", () => {
-    const it = test.extend("names", ({}, { onCleanup }) => {
+    const it = test.extend("ruleNamesFromArrowCreator", ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "rule-facts-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
@@ -116,8 +116,8 @@ export const makeNothing = () => {
       return lintRuleFactsIn({ workspaceRoot: root, sourcePath }).map((rule) => rule.name);
     });
 
-    it("is still found", ({ names }) => {
-      expect(names).toStrictEqual(["no-created--inline-it"]);
+    it("is still found", ({ ruleNamesFromArrowCreator }) => {
+      expect(ruleNamesFromArrowCreator).toStrictEqual(["no-created--inline-it"]);
     });
   });
 
@@ -238,7 +238,7 @@ export const tailless = {
   });
 
   describe("a rule without a name", () => {
-    const it = test.extend("names", ({}, { onCleanup }) => {
+    const it = test.extend("ruleNamesFromUnnamedRule", ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "rule-facts-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
@@ -257,13 +257,13 @@ export const tailless = {
       return lintRuleFactsIn({ workspaceRoot: root, sourcePath }).map((rule) => rule.name);
     });
 
-    it("is called after its file", ({ names }) => {
-      expect(names).toStrictEqual(["named-after-file"]);
+    it("is called after its file", ({ ruleNamesFromUnnamedRule }) => {
+      expect(ruleNamesFromUnnamedRule).toStrictEqual(["named-after-file"]);
     });
   });
 
   describe("a rule in a file with a generic stem", () => {
-    const it = test.extend("names", ({}, { onCleanup }) => {
+    const it = test.extend("ruleNamesFromIndexFile", ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "rule-facts-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
@@ -282,13 +282,13 @@ export const tailless = {
       return lintRuleFactsIn({ workspaceRoot: root, sourcePath }).map((rule) => rule.name);
     });
 
-    it("is called after its directory", ({ names }) => {
-      expect(names).toStrictEqual(["no-generic--house-it"]);
+    it("is called after its directory", ({ ruleNamesFromIndexFile }) => {
+      expect(ruleNamesFromIndexFile).toStrictEqual(["no-generic--house-it"]);
     });
   });
 
   describe("a name the source does not spell statically", () => {
-    const it = test.extend("names", ({}, { onCleanup }) => {
+    const it = test.extend("ruleNamesFromDynamicName", ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "rule-facts-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
@@ -308,13 +308,13 @@ export const tailless = {
       return lintRuleFactsIn({ workspaceRoot: root, sourcePath }).map((rule) => rule.name);
     });
 
-    it("falls back to the file", ({ names }) => {
-      expect(names).toStrictEqual(["fallback"]);
+    it("falls back to the file", ({ ruleNamesFromDynamicName }) => {
+      expect(ruleNamesFromDynamicName).toStrictEqual(["fallback"]);
     });
   });
 
   describe("a name spelled with a quoted key", () => {
-    const it = test.extend("names", ({}, { onCleanup }) => {
+    const it = test.extend("ruleNamesFromQuotedKey", ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "rule-facts-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
@@ -338,13 +338,13 @@ export const tailless = {
       return lintRuleFactsIn({ workspaceRoot: root, sourcePath }).map((rule) => rule.name);
     });
 
-    it("is still a name", ({ names }) => {
-      expect(names).toStrictEqual(["no-quoted--unquote-it"]);
+    it("is still a name", ({ ruleNamesFromQuotedKey }) => {
+      expect(ruleNamesFromQuotedKey).toStrictEqual(["no-quoted--unquote-it"]);
     });
   });
 
   describe("a file whose exports mostly define no rule", () => {
-    const it = test.extend("names", ({}, { onCleanup }) => {
+    const it = test.extend("ruleNamesFromMixedExports", ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "rule-facts-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
@@ -372,8 +372,8 @@ const [first] = [1];
       return lintRuleFactsIn({ workspaceRoot: root, sourcePath }).map((rule) => rule.name);
     });
 
-    it("passes over the exports that define no rule", ({ names }) => {
-      expect(names).toStrictEqual(["mixed", "mixed"]);
+    it("passes over the exports that define no rule", ({ ruleNamesFromMixedExports }) => {
+      expect(ruleNamesFromMixedExports).toStrictEqual(["mixed", "mixed"]);
     });
   });
 
@@ -414,7 +414,7 @@ export const borrowedDocs = {
   });
 
   describe("a file exporting more than one rule", () => {
-    const it = test.extend("names", ({}, { onCleanup }) => {
+    const it = test.extend("ruleNamesFromPairedExports", ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "rule-facts-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
@@ -439,8 +439,11 @@ export const second = {
       return lintRuleFactsIn({ workspaceRoot: root, sourcePath }).map((rule) => rule.name);
     });
 
-    it("makes every rule it exports appear once", ({ names }) => {
-      expect(names).toStrictEqual(["no-first--merge-them", "no-second--merge-them"]);
+    it("makes every rule it exports appear once", ({ ruleNamesFromPairedExports }) => {
+      expect(ruleNamesFromPairedExports).toStrictEqual([
+        "no-first--merge-them",
+        "no-second--merge-them",
+      ]);
     });
   });
 });

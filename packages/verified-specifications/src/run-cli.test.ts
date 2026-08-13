@@ -112,10 +112,14 @@ describe("runVerifiedSpecifications", () => {
   describe("no repository root named", () => {
     const it = test
       .extend("repositoryRoot", async ({}, { onCleanup }) => {
-        const created = await mkdtemp(join(tmpdir(), "verified-specifications-"));
-        onCleanup(async () => rm(created, { recursive: true, force: true }));
-        await writeFile(join(created, "package.json"), STANDALONE_MANIFEST, "utf-8");
-        return created;
+        const standaloneRepositoryRoot = await mkdtemp(join(tmpdir(), "verified-specifications-"));
+        onCleanup(async () => rm(standaloneRepositoryRoot, { recursive: true, force: true }));
+        await writeFile(
+          join(standaloneRepositoryRoot, "package.json"),
+          STANDALONE_MANIFEST,
+          "utf-8",
+        );
+        return standaloneRepositoryRoot;
       })
       .extend("theRunFromTheWorkingDirectory", async ({ repositoryRoot }, { onCleanup }) => {
         const launchDirectory = process.cwd();

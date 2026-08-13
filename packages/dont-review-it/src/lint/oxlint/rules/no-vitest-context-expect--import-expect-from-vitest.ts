@@ -18,8 +18,8 @@ import type { ESTree } from "@oxlint/plugins";
 
 const ASSERTION_ENTRY = "expect";
 
-const contextPatternOf = (callback: SpecFunction): ESTree.ObjectPattern | null => {
-  const [parameter] = callback.params;
+const contextPatternOf = (taker: SpecFunction): ESTree.ObjectPattern | null => {
+  const [parameter] = taker.params;
   if (parameter === undefined) return null;
 
   const written = parameter.type === "AssignmentPattern" ? parameter.left : parameter;
@@ -38,9 +38,11 @@ const takenAssertionEntry = (pattern: ESTree.ObjectPattern): ESTree.BindingPrope
   return taken[0] ?? null;
 };
 
-const contextBindingsOf = (callback: SpecFunction): readonly HeldContext[] => {
-  const name = fixtureContextParameterName(callback);
-  return name === null ? [] : [{ name, start: callback.start, end: callback.end }];
+const contextBindingsOf = (taker: SpecFunction): readonly HeldContext[] => {
+  const contextParameterName = fixtureContextParameterName(taker);
+  return contextParameterName === null
+    ? []
+    : [{ name: contextParameterName, start: taker.start, end: taker.end }];
 };
 
 const contextReachesIn = (program: ESTree.Program): readonly ContextReach[] =>
@@ -69,29 +71,29 @@ export const noVitestContextExpect = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
-    const reportTakenEntry = (callback: SpecFunction): void => {
-      const pattern = contextPatternOf(callback);
+  create(inspection) {
+    const reportTakenEntry = (taker: SpecFunction): void => {
+      const pattern = contextPatternOf(taker);
       if (pattern === null) return;
 
       const taken = takenAssertionEntry(pattern);
       if (taken === null) return;
-      context.report({ node: taken, messageId: "destructuredContextExpect" });
+      inspection.report({ node: taken, messageId: "destructuredContextExpect" });
     };
 
     return {
       "Program:exit"(program: ESTree.Program) {
         const rootNames = testBlockRootNames(program);
-        const callbacks = nodesOfType(program, "CallExpression")
+        const takers = nodesOfType(program, "CallExpression")
           .filter((call) => declaresTestBlock(call, rootNames))
           .flatMap((call) => testCallbacksOf(call));
 
-        for (const callback of callbacks) reportTakenEntry(callback);
+        for (const taker of takers) reportTakenEntry(taker);
 
-        const held = callbacks.flatMap((callback) => contextBindingsOf(callback));
+        const held = takers.flatMap((taker) => contextBindingsOf(taker));
         for (const access of contextReachesIn(program)) {
           if (isHeldContextReach(access, held)) {
-            context.report({ node: access.node, messageId: "reachedContextExpect" });
+            inspection.report({ node: access.node, messageId: "reachedContextExpect" });
           }
         }
       },

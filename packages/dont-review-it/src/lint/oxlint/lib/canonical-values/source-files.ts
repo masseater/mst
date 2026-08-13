@@ -64,11 +64,11 @@ const scannedFileAt = (repositoryRoot: string, absolutePath: string): ScannedFil
   };
 };
 
-const isScannedName = (name: string): boolean =>
-  name === MANIFEST_FILE_NAME ||
-  SCRIPT_FILE_NAME_PATTERN.test(name) ||
-  name.endsWith(STYLE_SHEET_EXTENSION) ||
-  MARKUP_SOURCE_NAME_PATTERN.test(name);
+const isScannedName = (spelled: string): boolean =>
+  spelled === MANIFEST_FILE_NAME ||
+  SCRIPT_FILE_NAME_PATTERN.test(spelled) ||
+  spelled.endsWith(STYLE_SHEET_EXTENSION) ||
+  MARKUP_SOURCE_NAME_PATTERN.test(spelled);
 
 const scannedFilesUnder = (repositoryRoot: string, directory: string): readonly ScannedFile[] =>
   readdirSync(directory, { withFileTypes: true }).flatMap((directoryEntry) => {
@@ -96,8 +96,8 @@ const isMarkupSource = (file: ScannedFile): boolean =>
   MARKUP_SOURCE_NAME_PATTERN.test(basename(file.absolutePath));
 
 const isDeclarationSource = (file: ScannedFile): boolean => {
-  const name = basename(file.absolutePath);
-  return DECLARATION_SOURCE_NAME_PATTERN.test(name) && !TEST_FILE_NAME_PATTERN.test(name);
+  const spelled = basename(file.absolutePath);
+  return DECLARATION_SOURCE_NAME_PATTERN.test(spelled) && !TEST_FILE_NAME_PATTERN.test(spelled);
 };
 
 const NO_REPOSITORY_FILES: RepositoryFiles = {

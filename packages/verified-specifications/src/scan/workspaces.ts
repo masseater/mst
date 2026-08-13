@@ -34,19 +34,19 @@ const workspaceGlobsOf = (manifestSource: string): readonly string[] => {
   if (!isPlainObject(manifest)) return [];
   const { packages }: { readonly packages?: unknown } = manifest;
   if (!Array.isArray(packages)) return [];
-  return packages.filter((entry): entry is string => typeof entry === "string");
+  return packages.filter((candidate): candidate is string => typeof candidate === "string");
 };
 
 const workspaceDirectoriesOf = async (input: {
   readonly repositoryRoot: string;
   readonly globs: readonly string[];
 }): Promise<readonly string[]> => {
-  const entries: readonly Dirent[] = await Array.fromAsync(
+  const listedEntries: readonly Dirent[] = await Array.fromAsync(
     glob([...input.globs], { cwd: input.repositoryRoot, withFileTypes: true }),
   );
-  return entries
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => join(entry.parentPath, entry.name));
+  return listedEntries
+    .filter((listed) => listed.isDirectory())
+    .map((listed) => join(listed.parentPath, listed.name));
 };
 
 const workspaceOf = async (
@@ -106,7 +106,7 @@ export const listWorkspaces = async (input: {
   });
   const read = await Promise.all(directories.toSorted().map(workspaceOf));
   return {
-    workspaces: read.flatMap((entry) => (entry.workspace === null ? [] : [entry.workspace])),
-    problems: read.flatMap((entry) => entry.problems),
+    workspaces: read.flatMap((listed) => (listed.workspace === null ? [] : [listed.workspace])),
+    problems: read.flatMap((listed) => listed.problems),
   };
 };

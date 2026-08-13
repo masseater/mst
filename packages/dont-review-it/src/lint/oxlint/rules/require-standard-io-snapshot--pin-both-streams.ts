@@ -66,8 +66,8 @@ const streamsReachedBy = (
   dependencies: ReadonlyMap<string, readonly string[]>,
 ): ReadonlyMap<string, ReadonlySet<string>> => {
   const grown = new Map(
-    [...dependencies].map(([name, declared]): readonly [string, ReadonlySet<string>] => [
-      name,
+    [...dependencies].map(([fixtureName, declared]): readonly [string, ReadonlySet<string>] => [
+      fixtureName,
       new Set(
         declared.flatMap((dependency) => [
           ...((CAPTURED_STREAM_NAMES as readonly string[]).includes(dependency)
@@ -80,7 +80,7 @@ const streamsReachedBy = (
   );
 
   const settled = [...grown].every(
-    ([name, streams]) => streams.size === (reached.get(name)?.size ?? -1),
+    ([fixtureName, streams]) => streams.size === (reached.get(fixtureName)?.size ?? -1),
   );
   return settled ? grown : streamsReachedBy(grown, dependencies);
 };
@@ -136,7 +136,7 @@ export const requireStandardIoSnapshot = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
+  create(inspection) {
     return {
       "Program:exit"(program: ESTree.Program) {
         const fixtureLocalNames = fixtureLocalNamesIn(program);
@@ -152,15 +152,21 @@ export const requireStandardIoSnapshot = createDontReviewItRule({
           return subject === null ? [] : (rootIdentifierName(subject) ?? []);
         });
         const pinnedStreams = new Set(
-          pinnedNames.flatMap((name) => [
-            ...((CAPTURED_STREAM_NAMES as readonly string[]).includes(name) ? [name] : []),
-            ...(behind.get(name) ?? []),
+          pinnedNames.flatMap((pinnedName) => [
+            ...((CAPTURED_STREAM_NAMES as readonly string[]).includes(pinnedName)
+              ? [pinnedName]
+              : []),
+            ...(behind.get(pinnedName) ?? []),
           ]),
         );
 
-        for (const name of CAPTURED_STREAM_NAMES) {
-          if (pinnedStreams.has(name)) continue;
-          context.report({ node: firstFixtureCall, messageId: "missingSnapshot", data: { name } });
+        for (const streamName of CAPTURED_STREAM_NAMES) {
+          if (pinnedStreams.has(streamName)) continue;
+          inspection.report({
+            node: firstFixtureCall,
+            messageId: "missingSnapshot",
+            data: { name: streamName },
+          });
         }
       },
     };

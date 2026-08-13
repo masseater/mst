@@ -8,8 +8,8 @@ import type { RepositoryProblem } from "@mst/repository-checks";
 
 const NARROWING_KEYS = ["exclude", "files", "include"];
 
-const narrowedProgram = (key: string): string =>
-  `A tsconfig that governs specification tests must not narrow the files it checks with ${key}, because a specs/ directory dropped from the program loses type checking silently while every check stays green. Delete ${key} and let the tsconfig cover the whole workspace.`;
+const narrowedProgram = (named: string): string =>
+  `A tsconfig that governs specification tests must not narrow the files it checks with ${named}, because a specs/ directory dropped from the program loses type checking silently while every check stays green. Delete ${named} and let the tsconfig cover the whole workspace.`;
 
 const governingTsconfigOf = async (input: {
   readonly repositoryRoot: string;
@@ -31,13 +31,13 @@ export const tsconfigScopeProblemsOf = async (input: {
   const governing = await governingTsconfigOf(input);
   if (governing === null) return [];
 
-  const parsed: unknown = parse(governing.source);
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return [];
+  const parsedNode: unknown = parse(governing.source);
+  if (typeof parsedNode !== "object" || parsedNode === null || Array.isArray(parsedNode)) return [];
 
   const file = relative(input.repositoryRoot, governing.path);
-  return NARROWING_KEYS.filter((key) => key in parsed).map((key) => ({
+  return NARROWING_KEYS.filter((named) => named in parsedNode).map((named) => ({
     file,
     line: null,
-    message: narrowedProgram(key),
+    message: narrowedProgram(named),
   }));
 };

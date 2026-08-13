@@ -23,8 +23,8 @@ const SUBJECT: Placement = {
   workspacePath: "packages/dont-review-it",
 };
 
-const OTHER: Placement = {
-  relativePath: "packages/dont-review-it/src/other.ts",
+const SIBLING: Placement = {
+  relativePath: "packages/dont-review-it/src/sibling.ts",
   workspacePath: "packages/dont-review-it",
 };
 
@@ -39,7 +39,7 @@ const THREE_NAMED_MEMBERS = "{ readonly a: string; readonly b: number; readonly 
 
 const SUBJECT_CODE = `export type Shape = ${THREE_NAMED_MEMBERS};`;
 
-const OTHER_SHAPE_CODE = "export type Shape = { readonly a: string };";
+const SIBLING_SHAPE_CODE = "export type Shape = { readonly a: string };";
 
 const FAR_NAME_CODE = `export type Basket = ${THREE_NAMED_MEMBERS};`;
 
@@ -48,15 +48,15 @@ const SUBJECT_FILE: ScannedTypeFile = {
   declarations: typeDeclarationsIn(SUBJECT_CODE),
 };
 
-const OTHER_SHAPE_FILE: ScannedTypeFile = {
-  ...OTHER,
-  declarations: typeDeclarationsIn(OTHER_SHAPE_CODE),
+const SIBLING_SHAPE_FILE: ScannedTypeFile = {
+  ...SIBLING,
+  declarations: typeDeclarationsIn(SIBLING_SHAPE_CODE),
 };
 
 const FAR_NAME_FILE: ScannedTypeFile = { ...FAR, declarations: typeDeclarationsIn(FAR_NAME_CODE) };
 
 const splitShapeRule = createNoSplitTypeAuthority({
-  loadIndex: () => buildTypeAuthorityIndex([SUBJECT_FILE, OTHER_SHAPE_FILE]),
+  loadIndex: () => buildTypeAuthorityIndex([SUBJECT_FILE, SIBLING_SHAPE_FILE]),
 });
 
 const splitNameRule = createNoSplitTypeAuthority({
@@ -64,14 +64,14 @@ const splitNameRule = createNoSplitTypeAuthority({
 });
 
 const splitBothWaysRule = createNoSplitTypeAuthority({
-  loadIndex: () => buildTypeAuthorityIndex([SUBJECT_FILE, OTHER_SHAPE_FILE, FAR_NAME_FILE]),
+  loadIndex: () => buildTypeAuthorityIndex([SUBJECT_FILE, SIBLING_SHAPE_FILE, FAR_NAME_FILE]),
 });
 
 const settledRule = createNoSplitTypeAuthority({
   loadIndex: () =>
     buildTypeAuthorityIndex([
       SUBJECT_FILE,
-      { ...OTHER, declarations: typeDeclarationsIn(SUBJECT_CODE) },
+      { ...SIBLING, declarations: typeDeclarationsIn(SUBJECT_CODE) },
     ]),
 });
 
@@ -79,7 +79,7 @@ const offPageRule = createNoSplitTypeAuthority({
   loadIndex: () =>
     buildTypeAuthorityIndex([
       { ...SUBJECT, declarations: typeDeclarationsIn(`\n\n\n\n\n${SUBJECT_CODE}`) },
-      OTHER_SHAPE_FILE,
+      SIBLING_SHAPE_FILE,
     ]),
 });
 

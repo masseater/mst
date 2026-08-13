@@ -19,10 +19,10 @@ const PROPERTY_KIND = "Property";
 const MEMBER_KIND = "MemberExpression";
 
 const readPositionsOf = (node: AstFields): readonly unknown[] => {
-  const kind = node[NODE_TYPE_FIELD];
+  const nodeKind = node[NODE_TYPE_FIELD];
   if (node.computed === true) return Object.values(node);
-  if (kind === PROPERTY_KIND) return [node.value];
-  if (kind === MEMBER_KIND) return [node.object];
+  if (nodeKind === PROPERTY_KIND) return [node.value];
+  if (nodeKind === MEMBER_KIND) return [node.object];
   return Object.values(node);
 };
 
@@ -40,7 +40,7 @@ const hookNamesBoundIn = (
   hookNames: ReadonlySet<string>,
 ): ReadonlySet<string> =>
   new Set([
-    ...[...hookNames].filter((name) => !module.initializerByName.has(name)),
+    ...[...hookNames].filter((spelled) => !module.initializerByName.has(spelled)),
     ...[...module.importedByName].flatMap(([local, imported]) =>
       hookNames.has(imported.exported) ? [local] : [],
     ),
@@ -62,11 +62,11 @@ export const reachesTestHook = (reach: {
   const { declared, module } = found;
   const read = namesReadIn(declared);
   const bound = hookNamesBoundIn(module, reach.hookNames);
-  if ([...read].some((name) => bound.has(name))) return true;
+  if ([...read].some((spelled) => bound.has(spelled))) return true;
 
   const visited = new Set([...reach.visited, module.filename]);
-  return [...read].some((name) => {
-    const imported = module.importedByName.get(name);
+  return [...read].some((spelled) => {
+    const imported = module.importedByName.get(spelled);
     if (imported === undefined) return false;
     return reachesTestHook({ from: module, imported, hookNames: reach.hookNames, visited });
   });

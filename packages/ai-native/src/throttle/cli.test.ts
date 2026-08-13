@@ -146,7 +146,9 @@ describe("cli", () => {
         });
         const waitersDir = join(slotDir, "waiters");
         const ownEntries = (): string[] =>
-          readdirSync(waitersDir).filter((name) => name.includes(`-${String(child.pid)}-`));
+          readdirSync(waitersDir).filter((waiterFileName) =>
+            waiterFileName.includes(`-${String(child.pid)}-`),
+          );
         const untilEnqueued = async (): Promise<void> => {
           if (ownEntries().length === 1) return;
           await delay(100);
@@ -182,7 +184,9 @@ describe("cli", () => {
         });
         const waitersDir = join(slotDir, "waiters");
         const ownEntries = (): string[] =>
-          readdirSync(waitersDir).filter((name) => name.includes(`-${String(child.pid)}-`));
+          readdirSync(waitersDir).filter((waiterFileName) =>
+            waiterFileName.includes(`-${String(child.pid)}-`),
+          );
         const untilEnqueued = async (): Promise<void> => {
           if (ownEntries().length === 1) return;
           await delay(100);

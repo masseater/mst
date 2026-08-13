@@ -46,15 +46,15 @@ const HELD_BY_REPOSITORY: Readonly<Record<string, Readonly<Record<string, string
   },
 };
 
-for (const [name, held] of Object.entries(HELD_BY_REPOSITORY)) {
-  mkdirSync(join(fixtureDir, name, "src"), { recursive: true });
-  writeFileSync(join(fixtureDir, name, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST);
-  writeFileSync(join(fixtureDir, name, "package.json"), ROOT_PACKAGE_MANIFEST);
-  for (const [path, source] of Object.entries(held)) {
-    mkdirSync(dirname(join(fixtureDir, name, path)), { recursive: true });
-    writeFileSync(join(fixtureDir, name, path), source);
+for (const [repositoryName, held] of Object.entries(HELD_BY_REPOSITORY)) {
+  mkdirSync(join(fixtureDir, repositoryName, "src"), { recursive: true });
+  writeFileSync(join(fixtureDir, repositoryName, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST);
+  writeFileSync(join(fixtureDir, repositoryName, "package.json"), ROOT_PACKAGE_MANIFEST);
+  for (const [heldPath, heldSource] of Object.entries(held)) {
+    mkdirSync(dirname(join(fixtureDir, repositoryName, heldPath)), { recursive: true });
+    writeFileSync(join(fixtureDir, repositoryName, heldPath), heldSource);
   }
-  writeFileSync(join(fixtureDir, name, "src/app.ts"), MODULE_SOURCE);
+  writeFileSync(join(fixtureDir, repositoryName, "src/app.ts"), MODULE_SOURCE);
 }
 
 const MANIFEST_READER = {

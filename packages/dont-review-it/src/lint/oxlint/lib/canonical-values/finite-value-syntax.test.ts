@@ -74,10 +74,10 @@ describe("staticArrayValues", () => {
     {
       name: "probe-static-array-values",
       meta: PROBE_META,
-      create(context) {
+      create(inspection) {
         return {
           ArrayExpression(node: ESTree.ArrayExpression) {
-            context.report({
+            inspection.report({
               node,
               messageId: "read",
               data: { text: JSON.stringify(staticArrayValues(node)) },
@@ -159,10 +159,10 @@ describe("literalUnionValues", () => {
     {
       name: "probe-literal-union-values",
       meta: PROBE_META,
-      create(context) {
+      create(inspection) {
         return {
           TSTypeAliasDeclaration(node: ESTree.TSTypeAliasDeclaration) {
-            context.report({
+            inspection.report({
               node,
               messageId: "read",
               data: { text: JSON.stringify(literalUnionValues(node.typeAnnotation)) },
@@ -219,12 +219,12 @@ describe("schemaUnionLiterals", () => {
     {
       name: "probe-schema-union-literals",
       meta: PROBE_META,
-      create(context) {
+      create(inspection) {
         return {
           CallExpression(node: ESTree.CallExpression) {
             if (calleeMemberName(node.callee) !== "union") return;
             const read = schemaUnionLiterals(node);
-            context.report({
+            inspection.report({
               node,
               messageId: "read",
               data: { text: JSON.stringify(read === null ? null : read.values) },
@@ -304,10 +304,10 @@ describe("propertyKeyName", () => {
     {
       name: "probe-property-key-name",
       meta: PROBE_META,
-      create(context) {
+      create(inspection) {
         return {
           Property(node: ESTree.ObjectProperty) {
-            context.report({
+            inspection.report({
               node,
               messageId: "read",
               data: { text: JSON.stringify(propertyKeyName(node.key)) },

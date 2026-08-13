@@ -51,20 +51,20 @@ export const forbidUnresolvableModuleSpecifier = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
+  create(inspection) {
     const covering = exceptionsCovering({
-      exceptions: specifierExceptionsIn(context.options),
+      exceptions: specifierExceptionsIn(inspection.options),
       pathSegments: segmentsOf({
-        path: resolve(context.cwd, context.filename),
+        path: resolve(inspection.cwd, inspection.filename),
         separator: sep,
       }),
-      cwd: context.cwd,
+      cwd: inspection.cwd,
     });
     const groundless = covering.filter((exception) => !carriesGrounds(exception));
 
     const reportRegistrations = (node: ESTree.Program): void => {
       for (const exception of groundless) {
-        context.report({
+        inspection.report({
           node,
           messageId: "groundlessSpecifierException",
           data: { path: exception.path },
@@ -74,12 +74,12 @@ export const forbidUnresolvableModuleSpecifier = createDontReviewItRule({
 
     if (groundless.length < covering.length) return { Program: reportRegistrations };
 
-    const forms = spellingsFrom(context.options, {
+    const forms = spellingsFrom(inspection.options, {
       option: STATICALLY_RESOLVED_FORMS_OPTION,
       fallback: STATICALLY_RESOLVED_FORMS,
     });
     const constantsOf = memoize(
-      (): ReadonlyMap<string, string> => constantSpecifiersIn(context.sourceCode.ast.body),
+      (): ReadonlyMap<string, string> => constantSpecifiersIn(inspection.sourceCode.ast.body),
     );
 
     const reportRequested = (node: ESTree.Node): void => {
@@ -90,10 +90,10 @@ export const forbidUnresolvableModuleSpecifier = createDontReviewItRule({
       if (staticSpecifierOf(requested, constants) !== null) return;
       if (namesStaticallyResolvedForm({ node: requested, forms, constants })) return;
 
-      context.report({
+      inspection.report({
         node,
         messageId: "unresolvableModuleSpecifier",
-        data: { written: context.sourceCode.getText({ range: requested.range as Range }) },
+        data: { written: inspection.sourceCode.getText({ range: requested.range as Range }) },
       });
     };
 

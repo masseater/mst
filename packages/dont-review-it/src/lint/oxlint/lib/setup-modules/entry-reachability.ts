@@ -68,10 +68,15 @@ export const entryReachableFilesOf = memoize(
     readonly packageDirectory: string;
     readonly workspaceRoot: string;
   }): ReadonlySet<string> | null => {
-    const entries = publicEntryFilesOf(packageDirectory);
-    return entries === null
+    const publicEntryFiles = publicEntryFilesOf(packageDirectory);
+    return publicEntryFiles === null
       ? null
-      : reachedFrom({ frontier: entries, reached: new Set(), packageDirectory, workspaceRoot });
+      : reachedFrom({
+          frontier: publicEntryFiles,
+          reached: new Set(),
+          packageDirectory,
+          workspaceRoot,
+        });
   },
   { getCacheKey: ({ packageDirectory }) => packageDirectory },
 );

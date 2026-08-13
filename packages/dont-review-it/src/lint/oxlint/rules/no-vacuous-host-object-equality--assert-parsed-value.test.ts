@@ -15,7 +15,7 @@ const EQUALITY = { messageId: "vacuousStructuralEquality" };
 
 const PARTIAL_SHAPE = { messageId: "vacuousPartialShape" };
 
-const RECORD = { messageId: "vacuousSnapshotRecord" };
+const SNAPSHOT_RECORD = { messageId: "vacuousSnapshotRecord" };
 
 const recordedDir = mkdtempSync(join(tmpdir(), "dont-review-it-no-vacuous-host-object-equality-"));
 
@@ -183,25 +183,31 @@ describe("dont-review-it/no-vacuous-host-object-equality--assert-parsed-value", 
         name: "a record holding a constructor name and an empty body pins nothing",
         code: "expect(subject).toMatchInlineSnapshot(`Response {}`);\nexpect(subject).toMatchInlineSnapshot(`Request {}`);\nexpect(subject).toMatchInlineSnapshot('Response {}');\nexpect(subject).toMatchInlineSnapshot({ id: expect.any(Number) }, `Response {}`);\nexpect.soft(subject).toMatchInlineSnapshot(`Response {}`);",
         filename: SPEC_FILENAME,
-        errors: [RECORD, RECORD, RECORD, RECORD, RECORD],
+        errors: [
+          SNAPSHOT_RECORD,
+          SNAPSHOT_RECORD,
+          SNAPSHOT_RECORD,
+          SNAPSHOT_RECORD,
+          SNAPSHOT_RECORD,
+        ],
       },
       {
         name: "a record kept in the external file is read through the entry the assertion writes",
         code: "describe('outer', () => {\n  it('names the response', () => {\n    expect(subject).toMatchSnapshot();\n  });\n});",
         filename: recordedSpec,
-        errors: [RECORD],
+        errors: [SNAPSHOT_RECORD],
       },
       {
         name: "entries are counted in the order the assertions run",
         code: "describe('outer', () => {\n  it('names the response', () => {\n    expect(first).toMatchSnapshot();\n    expect(second).toMatchSnapshot();\n  });\n});",
         filename: recordedSpec,
-        errors: [RECORD],
+        errors: [SNAPSHOT_RECORD],
       },
       {
         name: "a record kept in a file the assertion names is read from that file",
         code: "await expect(subject).toMatchFileSnapshot('./response-record.txt');",
         filename: recordedSpec,
-        errors: [RECORD],
+        errors: [SNAPSHOT_RECORD],
       },
       {
         name: "a roster the repository widens brings the added type into range",

@@ -31,16 +31,22 @@ describe("runChecks", () => {
   describe("a workspace whose list has never been written", () => {
     const it = test
       .extend("repositoryRoot", async ({}, { onCleanup }) => {
-        const created = await mkdtemp(join(tmpdir(), "verified-specifications-"));
-        onCleanup(async () => rm(created, { recursive: true, force: true }));
-        await mkdir(join(created, "packages/repository-checks"), { recursive: true });
-        await writeFile(join(created, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf-8");
+        const temporaryRepositoryRoot = await mkdtemp(join(tmpdir(), "verified-specifications-"));
+        onCleanup(async () => rm(temporaryRepositoryRoot, { recursive: true, force: true }));
+        await mkdir(join(temporaryRepositoryRoot, "packages/repository-checks"), {
+          recursive: true,
+        });
         await writeFile(
-          join(created, "packages/repository-checks/package.json"),
+          join(temporaryRepositoryRoot, "pnpm-workspace.yaml"),
+          WORKSPACE_MANIFEST,
+          "utf-8",
+        );
+        await writeFile(
+          join(temporaryRepositoryRoot, "packages/repository-checks/package.json"),
           PACKAGE_MANIFEST,
           "utf-8",
         );
-        return created;
+        return temporaryRepositoryRoot;
       })
       .extend("theMessagesOfAMissingList", async ({ repositoryRoot }) => {
         await mkdir(join(repositoryRoot, "packages/repository-checks/specs"), { recursive: true });
@@ -61,16 +67,22 @@ describe("runChecks", () => {
   describe("a writing run over a workspace whose list has never been written", () => {
     const it = test
       .extend("repositoryRoot", async ({}, { onCleanup }) => {
-        const created = await mkdtemp(join(tmpdir(), "verified-specifications-"));
-        onCleanup(async () => rm(created, { recursive: true, force: true }));
-        await mkdir(join(created, "packages/repository-checks"), { recursive: true });
-        await writeFile(join(created, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf-8");
+        const temporaryRepositoryRoot = await mkdtemp(join(tmpdir(), "verified-specifications-"));
+        onCleanup(async () => rm(temporaryRepositoryRoot, { recursive: true, force: true }));
+        await mkdir(join(temporaryRepositoryRoot, "packages/repository-checks"), {
+          recursive: true,
+        });
         await writeFile(
-          join(created, "packages/repository-checks/package.json"),
+          join(temporaryRepositoryRoot, "pnpm-workspace.yaml"),
+          WORKSPACE_MANIFEST,
+          "utf-8",
+        );
+        await writeFile(
+          join(temporaryRepositoryRoot, "packages/repository-checks/package.json"),
           PACKAGE_MANIFEST,
           "utf-8",
         );
-        return created;
+        return temporaryRepositoryRoot;
       })
       .extend("theProblemsOfAWritingRun", async ({ repositoryRoot }) => {
         await mkdir(join(repositoryRoot, "packages/repository-checks/specs"), { recursive: true });
@@ -90,16 +102,22 @@ describe("runChecks", () => {
   describe("the list a writing run leaves behind", () => {
     const it = test
       .extend("repositoryRoot", async ({}, { onCleanup }) => {
-        const created = await mkdtemp(join(tmpdir(), "verified-specifications-"));
-        onCleanup(async () => rm(created, { recursive: true, force: true }));
-        await mkdir(join(created, "packages/repository-checks"), { recursive: true });
-        await writeFile(join(created, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf-8");
+        const temporaryRepositoryRoot = await mkdtemp(join(tmpdir(), "verified-specifications-"));
+        onCleanup(async () => rm(temporaryRepositoryRoot, { recursive: true, force: true }));
+        await mkdir(join(temporaryRepositoryRoot, "packages/repository-checks"), {
+          recursive: true,
+        });
         await writeFile(
-          join(created, "packages/repository-checks/package.json"),
+          join(temporaryRepositoryRoot, "pnpm-workspace.yaml"),
+          WORKSPACE_MANIFEST,
+          "utf-8",
+        );
+        await writeFile(
+          join(temporaryRepositoryRoot, "packages/repository-checks/package.json"),
           PACKAGE_MANIFEST,
           "utf-8",
         );
-        return created;
+        return temporaryRepositoryRoot;
       })
       .extend("theListWrittenByAWritingRun", async ({ repositoryRoot }) => {
         await mkdir(join(repositoryRoot, "packages/repository-checks/specs"), { recursive: true });
@@ -134,16 +152,22 @@ describe("runChecks", () => {
   describe("a reporting run over a list that matches the tests", () => {
     const it = test
       .extend("repositoryRoot", async ({}, { onCleanup }) => {
-        const created = await mkdtemp(join(tmpdir(), "verified-specifications-"));
-        onCleanup(async () => rm(created, { recursive: true, force: true }));
-        await mkdir(join(created, "packages/repository-checks"), { recursive: true });
-        await writeFile(join(created, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf-8");
+        const temporaryRepositoryRoot = await mkdtemp(join(tmpdir(), "verified-specifications-"));
+        onCleanup(async () => rm(temporaryRepositoryRoot, { recursive: true, force: true }));
+        await mkdir(join(temporaryRepositoryRoot, "packages/repository-checks"), {
+          recursive: true,
+        });
         await writeFile(
-          join(created, "packages/repository-checks/package.json"),
+          join(temporaryRepositoryRoot, "pnpm-workspace.yaml"),
+          WORKSPACE_MANIFEST,
+          "utf-8",
+        );
+        await writeFile(
+          join(temporaryRepositoryRoot, "packages/repository-checks/package.json"),
           PACKAGE_MANIFEST,
           "utf-8",
         );
-        return created;
+        return temporaryRepositoryRoot;
       })
       .extend("theProblemsOfAListThatMatchesTheTests", async ({ repositoryRoot }) => {
         await mkdir(join(repositoryRoot, "packages/repository-checks/specs"), { recursive: true });
@@ -164,16 +188,22 @@ describe("runChecks", () => {
   describe("a workspace whose list disagrees with the tests", () => {
     const it = test
       .extend("repositoryRoot", async ({}, { onCleanup }) => {
-        const created = await mkdtemp(join(tmpdir(), "verified-specifications-"));
-        onCleanup(async () => rm(created, { recursive: true, force: true }));
-        await mkdir(join(created, "packages/repository-checks"), { recursive: true });
-        await writeFile(join(created, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf-8");
+        const temporaryRepositoryRoot = await mkdtemp(join(tmpdir(), "verified-specifications-"));
+        onCleanup(async () => rm(temporaryRepositoryRoot, { recursive: true, force: true }));
+        await mkdir(join(temporaryRepositoryRoot, "packages/repository-checks"), {
+          recursive: true,
+        });
         await writeFile(
-          join(created, "packages/repository-checks/package.json"),
+          join(temporaryRepositoryRoot, "pnpm-workspace.yaml"),
+          WORKSPACE_MANIFEST,
+          "utf-8",
+        );
+        await writeFile(
+          join(temporaryRepositoryRoot, "packages/repository-checks/package.json"),
           PACKAGE_MANIFEST,
           "utf-8",
         );
-        return created;
+        return temporaryRepositoryRoot;
       })
       .extend("theMessagesOfAStaleList", async ({ repositoryRoot }) => {
         await mkdir(join(repositoryRoot, "packages/repository-checks/specs"), { recursive: true });
@@ -199,16 +229,22 @@ describe("runChecks", () => {
   describe("the stale list a reporting run leaves behind", () => {
     const it = test
       .extend("repositoryRoot", async ({}, { onCleanup }) => {
-        const created = await mkdtemp(join(tmpdir(), "verified-specifications-"));
-        onCleanup(async () => rm(created, { recursive: true, force: true }));
-        await mkdir(join(created, "packages/repository-checks"), { recursive: true });
-        await writeFile(join(created, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf-8");
+        const temporaryRepositoryRoot = await mkdtemp(join(tmpdir(), "verified-specifications-"));
+        onCleanup(async () => rm(temporaryRepositoryRoot, { recursive: true, force: true }));
+        await mkdir(join(temporaryRepositoryRoot, "packages/repository-checks"), {
+          recursive: true,
+        });
         await writeFile(
-          join(created, "packages/repository-checks/package.json"),
+          join(temporaryRepositoryRoot, "pnpm-workspace.yaml"),
+          WORKSPACE_MANIFEST,
+          "utf-8",
+        );
+        await writeFile(
+          join(temporaryRepositoryRoot, "packages/repository-checks/package.json"),
           PACKAGE_MANIFEST,
           "utf-8",
         );
-        return created;
+        return temporaryRepositoryRoot;
       })
       .extend("theStaleListAfterAReportingRun", async ({ repositoryRoot }) => {
         await mkdir(join(repositoryRoot, "packages/repository-checks/specs"), { recursive: true });
@@ -237,16 +273,22 @@ describe("runChecks", () => {
   describe("a workspace whose list outlived its tests", () => {
     const it = test
       .extend("repositoryRoot", async ({}, { onCleanup }) => {
-        const created = await mkdtemp(join(tmpdir(), "verified-specifications-"));
-        onCleanup(async () => rm(created, { recursive: true, force: true }));
-        await mkdir(join(created, "packages/repository-checks"), { recursive: true });
-        await writeFile(join(created, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf-8");
+        const temporaryRepositoryRoot = await mkdtemp(join(tmpdir(), "verified-specifications-"));
+        onCleanup(async () => rm(temporaryRepositoryRoot, { recursive: true, force: true }));
+        await mkdir(join(temporaryRepositoryRoot, "packages/repository-checks"), {
+          recursive: true,
+        });
         await writeFile(
-          join(created, "packages/repository-checks/package.json"),
+          join(temporaryRepositoryRoot, "pnpm-workspace.yaml"),
+          WORKSPACE_MANIFEST,
+          "utf-8",
+        );
+        await writeFile(
+          join(temporaryRepositoryRoot, "packages/repository-checks/package.json"),
           PACKAGE_MANIFEST,
           "utf-8",
         );
-        return created;
+        return temporaryRepositoryRoot;
       })
       .extend("theMessagesOfAnOutlivedList", async ({ repositoryRoot }) => {
         await writeFile(
@@ -266,16 +308,22 @@ describe("runChecks", () => {
   describe("a writing run over a list that outlived its tests", () => {
     const it = test
       .extend("repositoryRoot", async ({}, { onCleanup }) => {
-        const created = await mkdtemp(join(tmpdir(), "verified-specifications-"));
-        onCleanup(async () => rm(created, { recursive: true, force: true }));
-        await mkdir(join(created, "packages/repository-checks"), { recursive: true });
-        await writeFile(join(created, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf-8");
+        const temporaryRepositoryRoot = await mkdtemp(join(tmpdir(), "verified-specifications-"));
+        onCleanup(async () => rm(temporaryRepositoryRoot, { recursive: true, force: true }));
+        await mkdir(join(temporaryRepositoryRoot, "packages/repository-checks"), {
+          recursive: true,
+        });
         await writeFile(
-          join(created, "packages/repository-checks/package.json"),
+          join(temporaryRepositoryRoot, "pnpm-workspace.yaml"),
+          WORKSPACE_MANIFEST,
+          "utf-8",
+        );
+        await writeFile(
+          join(temporaryRepositoryRoot, "packages/repository-checks/package.json"),
           PACKAGE_MANIFEST,
           "utf-8",
         );
-        return created;
+        return temporaryRepositoryRoot;
       })
       .extend("theProblemsOfDeletingAnOutlivedList", async ({ repositoryRoot }) => {
         await writeFile(
@@ -294,16 +342,22 @@ describe("runChecks", () => {
   describe("the workspace a writing run left after deleting an outlived list", () => {
     const it = test
       .extend("repositoryRoot", async ({}, { onCleanup }) => {
-        const created = await mkdtemp(join(tmpdir(), "verified-specifications-"));
-        onCleanup(async () => rm(created, { recursive: true, force: true }));
-        await mkdir(join(created, "packages/repository-checks"), { recursive: true });
-        await writeFile(join(created, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf-8");
+        const temporaryRepositoryRoot = await mkdtemp(join(tmpdir(), "verified-specifications-"));
+        onCleanup(async () => rm(temporaryRepositoryRoot, { recursive: true, force: true }));
+        await mkdir(join(temporaryRepositoryRoot, "packages/repository-checks"), {
+          recursive: true,
+        });
         await writeFile(
-          join(created, "packages/repository-checks/package.json"),
+          join(temporaryRepositoryRoot, "pnpm-workspace.yaml"),
+          WORKSPACE_MANIFEST,
+          "utf-8",
+        );
+        await writeFile(
+          join(temporaryRepositoryRoot, "packages/repository-checks/package.json"),
           PACKAGE_MANIFEST,
           "utf-8",
         );
-        return created;
+        return temporaryRepositoryRoot;
       })
       .extend("theEntriesLeftAfterDeletingAnOutlivedList", async ({ repositoryRoot }) => {
         await writeFile(
@@ -323,16 +377,22 @@ describe("runChecks", () => {
   describe("a workspace with neither tests nor a list", () => {
     const it = test
       .extend("repositoryRoot", async ({}, { onCleanup }) => {
-        const created = await mkdtemp(join(tmpdir(), "verified-specifications-"));
-        onCleanup(async () => rm(created, { recursive: true, force: true }));
-        await mkdir(join(created, "packages/repository-checks"), { recursive: true });
-        await writeFile(join(created, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf-8");
+        const temporaryRepositoryRoot = await mkdtemp(join(tmpdir(), "verified-specifications-"));
+        onCleanup(async () => rm(temporaryRepositoryRoot, { recursive: true, force: true }));
+        await mkdir(join(temporaryRepositoryRoot, "packages/repository-checks"), {
+          recursive: true,
+        });
         await writeFile(
-          join(created, "packages/repository-checks/package.json"),
+          join(temporaryRepositoryRoot, "pnpm-workspace.yaml"),
+          WORKSPACE_MANIFEST,
+          "utf-8",
+        );
+        await writeFile(
+          join(temporaryRepositoryRoot, "packages/repository-checks/package.json"),
           PACKAGE_MANIFEST,
           "utf-8",
         );
-        return created;
+        return temporaryRepositoryRoot;
       })
       .extend("theProblemsOfAWorkspaceWithNeitherTestsNorList", async ({ repositoryRoot }) =>
         runChecks({ repositoryRoot, write: false }),
@@ -346,16 +406,22 @@ describe("runChecks", () => {
   describe("a spec file whose subject stands without claims", () => {
     const it = test
       .extend("repositoryRoot", async ({}, { onCleanup }) => {
-        const created = await mkdtemp(join(tmpdir(), "verified-specifications-"));
-        onCleanup(async () => rm(created, { recursive: true, force: true }));
-        await mkdir(join(created, "packages/repository-checks"), { recursive: true });
-        await writeFile(join(created, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf-8");
+        const temporaryRepositoryRoot = await mkdtemp(join(tmpdir(), "verified-specifications-"));
+        onCleanup(async () => rm(temporaryRepositoryRoot, { recursive: true, force: true }));
+        await mkdir(join(temporaryRepositoryRoot, "packages/repository-checks"), {
+          recursive: true,
+        });
         await writeFile(
-          join(created, "packages/repository-checks/package.json"),
+          join(temporaryRepositoryRoot, "pnpm-workspace.yaml"),
+          WORKSPACE_MANIFEST,
+          "utf-8",
+        );
+        await writeFile(
+          join(temporaryRepositoryRoot, "packages/repository-checks/package.json"),
           PACKAGE_MANIFEST,
           "utf-8",
         );
-        return created;
+        return temporaryRepositoryRoot;
       })
       .extend("theMessagesOfASpecFileWithoutClaims", async ({ repositoryRoot }) => {
         await mkdir(join(repositoryRoot, "packages/repository-checks/specs"), { recursive: true });
@@ -378,16 +444,22 @@ describe("runChecks", () => {
   describe("a tsconfig that narrows the files it checks", () => {
     const it = test
       .extend("repositoryRoot", async ({}, { onCleanup }) => {
-        const created = await mkdtemp(join(tmpdir(), "verified-specifications-"));
-        onCleanup(async () => rm(created, { recursive: true, force: true }));
-        await mkdir(join(created, "packages/repository-checks"), { recursive: true });
-        await writeFile(join(created, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf-8");
+        const temporaryRepositoryRoot = await mkdtemp(join(tmpdir(), "verified-specifications-"));
+        onCleanup(async () => rm(temporaryRepositoryRoot, { recursive: true, force: true }));
+        await mkdir(join(temporaryRepositoryRoot, "packages/repository-checks"), {
+          recursive: true,
+        });
         await writeFile(
-          join(created, "packages/repository-checks/package.json"),
+          join(temporaryRepositoryRoot, "pnpm-workspace.yaml"),
+          WORKSPACE_MANIFEST,
+          "utf-8",
+        );
+        await writeFile(
+          join(temporaryRepositoryRoot, "packages/repository-checks/package.json"),
           PACKAGE_MANIFEST,
           "utf-8",
         );
-        return created;
+        return temporaryRepositoryRoot;
       })
       .extend("theMessagesOfATsconfigThatNarrowsTheProgram", async ({ repositoryRoot }) => {
         await mkdir(join(repositoryRoot, "packages/repository-checks/specs"), { recursive: true });
@@ -416,16 +488,22 @@ describe("runChecks", () => {
   describe("two workspaces reported in one run", () => {
     const it = test
       .extend("repositoryRoot", async ({}, { onCleanup }) => {
-        const created = await mkdtemp(join(tmpdir(), "verified-specifications-"));
-        onCleanup(async () => rm(created, { recursive: true, force: true }));
-        await mkdir(join(created, "packages/repository-checks"), { recursive: true });
-        await writeFile(join(created, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf-8");
+        const temporaryRepositoryRoot = await mkdtemp(join(tmpdir(), "verified-specifications-"));
+        onCleanup(async () => rm(temporaryRepositoryRoot, { recursive: true, force: true }));
+        await mkdir(join(temporaryRepositoryRoot, "packages/repository-checks"), {
+          recursive: true,
+        });
         await writeFile(
-          join(created, "packages/repository-checks/package.json"),
+          join(temporaryRepositoryRoot, "pnpm-workspace.yaml"),
+          WORKSPACE_MANIFEST,
+          "utf-8",
+        );
+        await writeFile(
+          join(temporaryRepositoryRoot, "packages/repository-checks/package.json"),
           PACKAGE_MANIFEST,
           "utf-8",
         );
-        return created;
+        return temporaryRepositoryRoot;
       })
       .extend("theFilesOfTheProblemsOfTwoWorkspaces", async ({ repositoryRoot }) => {
         await mkdir(join(repositoryRoot, "packages/b-utils/specs"), { recursive: true });
@@ -467,16 +545,22 @@ describe("runChecks", () => {
   describe("two problems in one file that name no line", () => {
     const it = test
       .extend("repositoryRoot", async ({}, { onCleanup }) => {
-        const created = await mkdtemp(join(tmpdir(), "verified-specifications-"));
-        onCleanup(async () => rm(created, { recursive: true, force: true }));
-        await mkdir(join(created, "packages/repository-checks"), { recursive: true });
-        await writeFile(join(created, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf-8");
+        const temporaryRepositoryRoot = await mkdtemp(join(tmpdir(), "verified-specifications-"));
+        onCleanup(async () => rm(temporaryRepositoryRoot, { recursive: true, force: true }));
+        await mkdir(join(temporaryRepositoryRoot, "packages/repository-checks"), {
+          recursive: true,
+        });
         await writeFile(
-          join(created, "packages/repository-checks/package.json"),
+          join(temporaryRepositoryRoot, "pnpm-workspace.yaml"),
+          WORKSPACE_MANIFEST,
+          "utf-8",
+        );
+        await writeFile(
+          join(temporaryRepositoryRoot, "packages/repository-checks/package.json"),
           PACKAGE_MANIFEST,
           "utf-8",
         );
-        return created;
+        return temporaryRepositoryRoot;
       })
       .extend("theLinesOfTwoProblemsWithoutALine", async ({ repositoryRoot }) => {
         await mkdir(join(repositoryRoot, "packages/repository-checks/specs"), { recursive: true });
@@ -505,16 +589,22 @@ describe("runChecks", () => {
   describe("two problems in one file that name a line", () => {
     const it = test
       .extend("repositoryRoot", async ({}, { onCleanup }) => {
-        const created = await mkdtemp(join(tmpdir(), "verified-specifications-"));
-        onCleanup(async () => rm(created, { recursive: true, force: true }));
-        await mkdir(join(created, "packages/repository-checks"), { recursive: true });
-        await writeFile(join(created, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf-8");
+        const temporaryRepositoryRoot = await mkdtemp(join(tmpdir(), "verified-specifications-"));
+        onCleanup(async () => rm(temporaryRepositoryRoot, { recursive: true, force: true }));
+        await mkdir(join(temporaryRepositoryRoot, "packages/repository-checks"), {
+          recursive: true,
+        });
         await writeFile(
-          join(created, "packages/repository-checks/package.json"),
+          join(temporaryRepositoryRoot, "pnpm-workspace.yaml"),
+          WORKSPACE_MANIFEST,
+          "utf-8",
+        );
+        await writeFile(
+          join(temporaryRepositoryRoot, "packages/repository-checks/package.json"),
           PACKAGE_MANIFEST,
           "utf-8",
         );
-        return created;
+        return temporaryRepositoryRoot;
       })
       .extend("theLinesOfTwoProblemsInOneFile", async ({ repositoryRoot }) => {
         await mkdir(join(repositoryRoot, "packages/repository-checks/specs"), { recursive: true });

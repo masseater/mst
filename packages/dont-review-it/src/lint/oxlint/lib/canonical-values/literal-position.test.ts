@@ -32,24 +32,24 @@ describe("literal-position", () => {
     {
       name: "probe-literal-value",
       meta: PROBE_META,
-      create(context) {
+      create(inspection) {
         return {
           Literal(node: LiteralNode) {
-            context.report({
+            inspection.report({
               node,
               messageId: "read",
               data: { text: JSON.stringify(literalValue(node)) },
             });
           },
           TemplateLiteral(node: ESTree.TemplateLiteral) {
-            context.report({
+            inspection.report({
               node,
               messageId: "read",
               data: { text: JSON.stringify(templateLiteralValue(node)) },
             });
           },
           UnaryExpression(node: ESTree.UnaryExpression) {
-            context.report({
+            inspection.report({
               node,
               messageId: "read",
               data: { text: JSON.stringify(negatedNumericValue(node)) },
@@ -135,7 +135,7 @@ describe("literal-position", () => {
     {
       name: "probe-literal-position",
       meta: PROBE_META,
-      create(context) {
+      create(inspection) {
         return {
           Literal(node: LiteralNode) {
             const ancestors = ancestorsOf(node);
@@ -146,7 +146,7 @@ describe("literal-position", () => {
               isKeySelectorArgument(ancestors),
             ];
             if (!held.includes(true)) return;
-            context.report({ node, messageId: "read", data: { text: held.join(" ") } });
+            inspection.report({ node, messageId: "read", data: { text: held.join(" ") } });
           },
         };
       },

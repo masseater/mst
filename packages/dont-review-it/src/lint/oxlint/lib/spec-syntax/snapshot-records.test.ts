@@ -24,7 +24,7 @@ describe("externalRecordKeyOf", () => {
 
 describe("externalRecordOf", () => {
   describe("a record written on one line", () => {
-    const it = test.extend("record", () => {
+    const it = test.extend("storedSingleLineSnapshot", () => {
       const directory = join(tmpdir(), "dont-review-it-snapshot-records", "one-line");
       rmSync(directory, { recursive: true, force: true });
       mkdirSync(join(directory, "__snapshots__"), { recursive: true });
@@ -46,13 +46,13 @@ describe("externalRecordOf", () => {
       return externalRecordOf(join(directory, "subject.test.ts"), "outer > names a behaviour 1");
     });
 
-    it("is read back whole", ({ record }) => {
-      expect(record).toBe('"alpha"');
+    it("is read back whole", ({ storedSingleLineSnapshot }) => {
+      expect(storedSingleLineSnapshot).toBe('"alpha"');
     });
   });
 
   describe("a record written across lines", () => {
-    const it = test.extend("record", () => {
+    const it = test.extend("storedMultiLineSnapshot", () => {
       const directory = join(tmpdir(), "dont-review-it-snapshot-records", "across-lines");
       rmSync(directory, { recursive: true, force: true });
       mkdirSync(join(directory, "__snapshots__"), { recursive: true });
@@ -74,13 +74,13 @@ describe("externalRecordOf", () => {
       return externalRecordOf(join(directory, "subject.test.ts"), "outer > names a behaviour 2");
     });
 
-    it("keeps the padding the runner wrote", ({ record }) => {
-      expect(record).toBe('\n{\n  "alpha": 1,\n}\n');
+    it("keeps the padding the runner wrote", ({ storedMultiLineSnapshot }) => {
+      expect(storedMultiLineSnapshot).toBe('\n{\n  "alpha": 1,\n}\n');
     });
   });
 
   describe("a key the file does not carry", () => {
-    const it = test.extend("record", () => {
+    const it = test.extend("snapshotForAbsentKey", () => {
       const directory = join(tmpdir(), "dont-review-it-snapshot-records", "other-key");
       rmSync(directory, { recursive: true, force: true });
       mkdirSync(join(directory, "__snapshots__"), { recursive: true });
@@ -102,26 +102,26 @@ describe("externalRecordOf", () => {
       return externalRecordOf(join(directory, "subject.test.ts"), "outer > some other behaviour 1");
     });
 
-    it("reads as no record", ({ record }) => {
-      expect(record).toBe(null);
+    it("reads as no record", ({ snapshotForAbsentKey }) => {
+      expect(snapshotForAbsentKey).toBe(null);
     });
   });
 
   describe("a spec with no record file", () => {
-    const it = test.extend("record", () => {
+    const it = test.extend("snapshotForSpecWithoutRecordFile", () => {
       const directory = join(tmpdir(), "dont-review-it-snapshot-records", "absent");
       rmSync(directory, { recursive: true, force: true });
       mkdirSync(directory, { recursive: true });
       return externalRecordOf(join(directory, "subject.test.ts"), "outer > names a behaviour 1");
     });
 
-    it("reads as no record", ({ record }) => {
-      expect(record).toBe(null);
+    it("reads as no record", ({ snapshotForSpecWithoutRecordFile }) => {
+      expect(snapshotForSpecWithoutRecordFile).toBe(null);
     });
   });
 
   describe("an escaped delimiter inside a record", () => {
-    const it = test.extend("record", () => {
+    const it = test.extend("snapshotCarryingEscapedDelimiters", () => {
       const directory = join(tmpdir(), "dont-review-it-snapshot-records", "escaped");
       rmSync(directory, { recursive: true, force: true });
       mkdirSync(join(directory, "__snapshots__"), { recursive: true });
@@ -143,13 +143,15 @@ describe("externalRecordOf", () => {
       return externalRecordOf(join(directory, "subject.test.ts"), "outer > carries delimiters 1");
     });
 
-    it("does not end the record", ({ record }) => {
-      expect(record).toBe('\n"line one\nexports[`decoy > key 1`] = `tricked`;\nline three"\n');
+    it("does not end the record", ({ snapshotCarryingEscapedDelimiters }) => {
+      expect(snapshotCarryingEscapedDelimiters).toBe(
+        '\n"line one\nexports[`decoy > key 1`] = `tricked`;\nline three"\n',
+      );
     });
   });
 
   describe("a record carrying a decoy key", () => {
-    const it = test.extend("record", () => {
+    const it = test.extend("snapshotAfterTheDecoy", () => {
       const directory = join(tmpdir(), "dont-review-it-snapshot-records", "after-decoy");
       rmSync(directory, { recursive: true, force: true });
       mkdirSync(join(directory, "__snapshots__"), { recursive: true });
@@ -171,13 +173,13 @@ describe("externalRecordOf", () => {
       return externalRecordOf(join(directory, "subject.test.ts"), "outer > after the decoy 1");
     });
 
-    it("does not hide the record that follows it", ({ record }) => {
-      expect(record).toBe('"beta"');
+    it("does not hide the record that follows it", ({ snapshotAfterTheDecoy }) => {
+      expect(snapshotAfterTheDecoy).toBe('"beta"');
     });
   });
 
   describe("the decoy key inside a record", () => {
-    const it = test.extend("record", () => {
+    const it = test.extend("snapshotForDecoyKey", () => {
       const directory = join(tmpdir(), "dont-review-it-snapshot-records", "decoy");
       rmSync(directory, { recursive: true, force: true });
       mkdirSync(join(directory, "__snapshots__"), { recursive: true });
@@ -199,8 +201,8 @@ describe("externalRecordOf", () => {
       return externalRecordOf(join(directory, "subject.test.ts"), "decoy > key 1");
     });
 
-    it("is not a key of its own", ({ record }) => {
-      expect(record).toBe(null);
+    it("is not a key of its own", ({ snapshotForDecoyKey }) => {
+      expect(snapshotForDecoyKey).toBe(null);
     });
   });
 });

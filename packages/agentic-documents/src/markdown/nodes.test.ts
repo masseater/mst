@@ -224,11 +224,13 @@ describe("flattenTextKeepingCode", () => {
 describe("leadingParagraphOf", () => {
   describe("a list item that opens with prose", () => {
     const it = test.extend("leadingParagraphOfTheItem", () => {
-      const item = descendants(parseMarkdown(A_LIST_HOLDING_ONE_ITEM)).find(
+      const listItemOpeningWithProse = descendants(parseMarkdown(A_LIST_HOLDING_ONE_ITEM)).find(
         (node) => node.type === "listItem",
       );
-      if (item === undefined) throw new Error("the document holds no list item");
-      return leadingParagraphOf(item);
+      if (listItemOpeningWithProse === undefined) {
+        throw new Error("the document holds no list item");
+      }
+      return leadingParagraphOf(listItemOpeningWithProse);
     });
 
     it("hands back that paragraph", ({ leadingParagraphOfTheItem }) => {
@@ -254,11 +256,13 @@ describe("leadingParagraphOf", () => {
 
   describe("a list item that opens with a nested list", () => {
     const it = test.extend("leadingParagraphOfTheItem", () => {
-      const item = descendants(parseMarkdown(A_LIST_WHOSE_ITEM_OPENS_WITH_A_NESTED_LIST)).find(
-        (node) => node.type === "listItem",
-      );
-      if (item === undefined) throw new Error("the document holds no list item");
-      return leadingParagraphOf(item);
+      const listItemOpeningWithANestedList = descendants(
+        parseMarkdown(A_LIST_WHOSE_ITEM_OPENS_WITH_A_NESTED_LIST),
+      ).find((node) => node.type === "listItem");
+      if (listItemOpeningWithANestedList === undefined) {
+        throw new Error("the document holds no list item");
+      }
+      return leadingParagraphOf(listItemOpeningWithANestedList);
     });
 
     it("hands back nothing", ({ leadingParagraphOfTheItem }) => {
@@ -268,11 +272,13 @@ describe("leadingParagraphOf", () => {
 
   describe("a list item that holds nothing at all", () => {
     const it = test.extend("leadingParagraphOfTheItem", () => {
-      const item = descendants(parseMarkdown(A_LIST_WHOSE_ITEM_HOLDS_NOTHING)).find(
-        (node) => node.type === "listItem",
-      );
-      if (item === undefined) throw new Error("the document holds no list item");
-      return leadingParagraphOf(item);
+      const listItemHoldingNothing = descendants(
+        parseMarkdown(A_LIST_WHOSE_ITEM_HOLDS_NOTHING),
+      ).find((node) => node.type === "listItem");
+      if (listItemHoldingNothing === undefined) {
+        throw new Error("the document holds no list item");
+      }
+      return leadingParagraphOf(listItemHoldingNothing);
     });
 
     it("hands back nothing", ({ leadingParagraphOfTheItem }) => {

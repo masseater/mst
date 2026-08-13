@@ -12,9 +12,9 @@ describe("ruleBlockObjectOf", () => {
       const statement = parseSync("config.ts", `const config = { test: { coverage: {} } };`).program
         .body[0] as ESTree.Statement;
       if (statement.type !== "VariableDeclaration") throw new Error("nothing was declared");
-      const object = statement.declarations[0]?.init;
-      if (object?.type !== "ObjectExpression") throw new Error("no object was written");
-      return ruleBlockObjectOf(object);
+      const configLiteral = statement.declarations[0]?.init;
+      if (configLiteral?.type !== "ObjectExpression") throw new Error("no object was written");
+      return ruleBlockObjectOf(configLiteral);
     });
 
     it("holds no rules object", ({ rulesObject }) => {
@@ -27,9 +27,9 @@ describe("ruleBlockObjectOf", () => {
       const statement = parseSync("config.ts", `const config = { rules: elsewhere };`).program
         .body[0] as ESTree.Statement;
       if (statement.type !== "VariableDeclaration") throw new Error("nothing was declared");
-      const object = statement.declarations[0]?.init;
-      if (object?.type !== "ObjectExpression") throw new Error("no object was written");
-      return ruleBlockObjectOf(object);
+      const configLiteral = statement.declarations[0]?.init;
+      if (configLiteral?.type !== "ObjectExpression") throw new Error("no object was written");
+      return ruleBlockObjectOf(configLiteral);
     });
 
     it("holds no rules object", ({ rulesObject }) => {
@@ -46,11 +46,11 @@ describe("configuredRuleBlockOf", () => {
         `const config = { rules: { "a": "error", "b": ["warn", {}], "c": 0 } };`,
       ).program.body[0] as ESTree.Statement;
       if (statement.type !== "VariableDeclaration") throw new Error("nothing was declared");
-      const object = statement.declarations[0]?.init;
-      if (object?.type !== "ObjectExpression") throw new Error("no object was written");
-      const rules = ruleBlockObjectOf(object);
+      const configLiteral = statement.declarations[0]?.init;
+      if (configLiteral?.type !== "ObjectExpression") throw new Error("no object was written");
+      const rules = ruleBlockObjectOf(configLiteral);
       if (rules === null) throw new Error("no rules object was written");
-      return configuredRuleBlockOf({ object, rules, ancestors: [] });
+      return configuredRuleBlockOf({ object: configLiteral, rules, ancestors: [] });
     });
 
     it("comes out with the level each rule sits at", ({ block }) => {
@@ -124,11 +124,11 @@ describe("configuredRuleBlockOf", () => {
       const statement = parseSync("config.ts", `const config = { rules: { "a": chosenSeverity } };`)
         .program.body[0] as ESTree.Statement;
       if (statement.type !== "VariableDeclaration") throw new Error("nothing was declared");
-      const object = statement.declarations[0]?.init;
-      if (object?.type !== "ObjectExpression") throw new Error("no object was written");
-      const rules = ruleBlockObjectOf(object);
+      const configLiteral = statement.declarations[0]?.init;
+      if (configLiteral?.type !== "ObjectExpression") throw new Error("no object was written");
+      const rules = ruleBlockObjectOf(configLiteral);
       if (rules === null) throw new Error("no rules object was written");
-      return configuredRuleBlockOf({ object, rules, ancestors: [] });
+      return configuredRuleBlockOf({ object: configLiteral, rules, ancestors: [] });
     });
 
     it("keeps no level", ({ block }) => {
@@ -172,11 +172,11 @@ describe("configuredRuleBlockOf", () => {
         `const config = { rules: { [computed]: "error", ...shared } };`,
       ).program.body[0] as ESTree.Statement;
       if (statement.type !== "VariableDeclaration") throw new Error("nothing was declared");
-      const object = statement.declarations[0]?.init;
-      if (object?.type !== "ObjectExpression") throw new Error("no object was written");
-      const rules = ruleBlockObjectOf(object);
+      const configLiteral = statement.declarations[0]?.init;
+      if (configLiteral?.type !== "ObjectExpression") throw new Error("no object was written");
+      const rules = ruleBlockObjectOf(configLiteral);
       if (rules === null) throw new Error("no rules object was written");
-      return configuredRuleBlockOf({ object, rules, ancestors: [] });
+      return configuredRuleBlockOf({ object: configLiteral, rules, ancestors: [] });
     });
 
     it("name no rule this reader can hold", ({ block }) => {
@@ -193,11 +193,11 @@ describe("configuredRuleBlockOf", () => {
       const statement = parseSync("config.ts", `const config = { rules: {} };`).program
         .body[0] as ESTree.Statement;
       if (statement.type !== "VariableDeclaration") throw new Error("nothing was declared");
-      const object = statement.declarations[0]?.init;
-      if (object?.type !== "ObjectExpression") throw new Error("no object was written");
-      const rules = ruleBlockObjectOf(object);
+      const configLiteral = statement.declarations[0]?.init;
+      if (configLiteral?.type !== "ObjectExpression") throw new Error("no object was written");
+      const rules = ruleBlockObjectOf(configLiteral);
       if (rules === null) throw new Error("no rules object was written");
-      return configuredRuleBlockOf({ object, rules, ancestors: [] });
+      return configuredRuleBlockOf({ object: configLiteral, rules, ancestors: [] });
     });
 
     it("covers the whole run", ({ block }) => {
@@ -216,11 +216,11 @@ describe("configuredRuleBlockOf", () => {
         `const config = { files: ["apps/site/**", "packages/cart/**"], rules: {} };`,
       ).program.body[0] as ESTree.Statement;
       if (statement.type !== "VariableDeclaration") throw new Error("nothing was declared");
-      const object = statement.declarations[0]?.init;
-      if (object?.type !== "ObjectExpression") throw new Error("no object was written");
-      const rules = ruleBlockObjectOf(object);
+      const configLiteral = statement.declarations[0]?.init;
+      if (configLiteral?.type !== "ObjectExpression") throw new Error("no object was written");
+      const rules = ruleBlockObjectOf(configLiteral);
       if (rules === null) throw new Error("no rules object was written");
-      return configuredRuleBlockOf({ object, rules, ancestors: [] });
+      return configuredRuleBlockOf({ object: configLiteral, rules, ancestors: [] });
     });
 
     it("carries the paths it covers", ({ block }) => {
@@ -237,11 +237,11 @@ describe("configuredRuleBlockOf", () => {
       const statement = parseSync("config.ts", `const config = { files: chosenPaths, rules: {} };`)
         .program.body[0] as ESTree.Statement;
       if (statement.type !== "VariableDeclaration") throw new Error("nothing was declared");
-      const object = statement.declarations[0]?.init;
-      if (object?.type !== "ObjectExpression") throw new Error("no object was written");
-      const rules = ruleBlockObjectOf(object);
+      const configLiteral = statement.declarations[0]?.init;
+      if (configLiteral?.type !== "ObjectExpression") throw new Error("no object was written");
+      const rules = ruleBlockObjectOf(configLiteral);
       if (rules === null) throw new Error("no rules object was written");
-      return configuredRuleBlockOf({ object, rules, ancestors: [] });
+      return configuredRuleBlockOf({ object: configLiteral, rules, ancestors: [] });
     });
 
     it("holds no path in the scope it covers", ({ block }) => {
@@ -260,11 +260,11 @@ describe("configuredRuleBlockOf", () => {
         `const config = { files: [chosenPath, 1], rules: {} };`,
       ).program.body[0] as ESTree.Statement;
       if (statement.type !== "VariableDeclaration") throw new Error("nothing was declared");
-      const object = statement.declarations[0]?.init;
-      if (object?.type !== "ObjectExpression") throw new Error("no object was written");
-      const rules = ruleBlockObjectOf(object);
+      const configLiteral = statement.declarations[0]?.init;
+      if (configLiteral?.type !== "ObjectExpression") throw new Error("no object was written");
+      const rules = ruleBlockObjectOf(configLiteral);
       if (rules === null) throw new Error("no rules object was written");
-      return configuredRuleBlockOf({ object, rules, ancestors: [] });
+      return configuredRuleBlockOf({ object: configLiteral, rules, ancestors: [] });
     });
 
     it("holds no path in the scope it covers", ({ block }) => {
@@ -283,11 +283,11 @@ describe("configuredRuleBlockOf", () => {
         `const config = { options: { typeAware: true }, rules: {} };`,
       ).program.body[0] as ESTree.Statement;
       if (statement.type !== "VariableDeclaration") throw new Error("nothing was declared");
-      const object = statement.declarations[0]?.init;
-      if (object?.type !== "ObjectExpression") throw new Error("no object was written");
-      const rules = ruleBlockObjectOf(object);
+      const configLiteral = statement.declarations[0]?.init;
+      if (configLiteral?.type !== "ObjectExpression") throw new Error("no object was written");
+      const rules = ruleBlockObjectOf(configLiteral);
       if (rules === null) throw new Error("no rules object was written");
-      return configuredRuleBlockOf({ object, rules, ancestors: [] });
+      return configuredRuleBlockOf({ object: configLiteral, rules, ancestors: [] });
     });
 
     it("declares it for its own block", ({ block }) => {
@@ -304,11 +304,11 @@ describe("configuredRuleBlockOf", () => {
       const statement = parseSync("config.ts", `const config = { rules: {} };`).program
         .body[0] as ESTree.Statement;
       if (statement.type !== "VariableDeclaration") throw new Error("nothing was declared");
-      const object = statement.declarations[0]?.init;
-      if (object?.type !== "ObjectExpression") throw new Error("no object was written");
-      const rules = ruleBlockObjectOf(object);
+      const configLiteral = statement.declarations[0]?.init;
+      if (configLiteral?.type !== "ObjectExpression") throw new Error("no object was written");
+      const rules = ruleBlockObjectOf(configLiteral);
       if (rules === null) throw new Error("no rules object was written");
-      return configuredRuleBlockOf({ object, rules, ancestors: [] });
+      return configuredRuleBlockOf({ object: configLiteral, rules, ancestors: [] });
     });
 
     it("declares none", ({ block }) => {
@@ -327,11 +327,11 @@ describe("configuredRuleBlockOf", () => {
         `const config = { options: { typeAware: false }, rules: {} };`,
       ).program.body[0] as ESTree.Statement;
       if (statement.type !== "VariableDeclaration") throw new Error("nothing was declared");
-      const object = statement.declarations[0]?.init;
-      if (object?.type !== "ObjectExpression") throw new Error("no object was written");
-      const rules = ruleBlockObjectOf(object);
+      const configLiteral = statement.declarations[0]?.init;
+      if (configLiteral?.type !== "ObjectExpression") throw new Error("no object was written");
+      const rules = ruleBlockObjectOf(configLiteral);
       if (rules === null) throw new Error("no rules object was written");
-      return configuredRuleBlockOf({ object, rules, ancestors: [] });
+      return configuredRuleBlockOf({ object: configLiteral, rules, ancestors: [] });
     });
 
     it("declares none", ({ block }) => {
@@ -350,11 +350,11 @@ describe("configuredRuleBlockOf", () => {
         `const config = { options: chosenOptions, rules: {} };`,
       ).program.body[0] as ESTree.Statement;
       if (statement.type !== "VariableDeclaration") throw new Error("nothing was declared");
-      const object = statement.declarations[0]?.init;
-      if (object?.type !== "ObjectExpression") throw new Error("no object was written");
-      const rules = ruleBlockObjectOf(object);
+      const configLiteral = statement.declarations[0]?.init;
+      if (configLiteral?.type !== "ObjectExpression") throw new Error("no object was written");
+      const rules = ruleBlockObjectOf(configLiteral);
       if (rules === null) throw new Error("no rules object was written");
-      return configuredRuleBlockOf({ object, rules, ancestors: [] });
+      return configuredRuleBlockOf({ object: configLiteral, rules, ancestors: [] });
     });
 
     it("declares none", ({ block }) => {
@@ -373,14 +373,19 @@ describe("configuredRuleBlockOf", () => {
         `const config = { options: { typeAware: true }, overrides: [{ files: [], rules: {} }] };`,
       ).program.body[0] as ESTree.Statement;
       if (statement.type !== "VariableDeclaration") throw new Error("nothing was declared");
-      const object = statement.declarations[0]?.init;
-      if (object?.type !== "ObjectExpression") throw new Error("no object was written");
-      const overrides = objectValueOf({ object, key: "overrides" });
-      const [element] = overrides?.type === "ArrayExpression" ? overrides.elements : [];
-      if (element?.type !== "ObjectExpression") throw new Error("no override object was written");
-      const rules = ruleBlockObjectOf(element);
+      const configLiteral = statement.declarations[0]?.init;
+      if (configLiteral?.type !== "ObjectExpression") throw new Error("no object was written");
+      const overrides = objectValueOf({ object: configLiteral, key: "overrides" });
+      const [overrideLiteral] = overrides?.type === "ArrayExpression" ? overrides.elements : [];
+      if (overrideLiteral?.type !== "ObjectExpression")
+        throw new Error("no override object was written");
+      const rules = ruleBlockObjectOf(overrideLiteral);
       if (rules === null) throw new Error("no rules object was written");
-      return configuredRuleBlockOf({ object: element, rules, ancestors: [object] });
+      return configuredRuleBlockOf({
+        object: overrideLiteral,
+        rules,
+        ancestors: [configLiteral],
+      });
     });
 
     it("takes the type awareness that configuration declares", ({ block }) => {
@@ -399,14 +404,15 @@ describe("configuredRuleBlockOf", () => {
         `const config = { options: { typeAware: true }, overrides: [{ files: [], rules: {} }] };`,
       ).program.body[0] as ESTree.Statement;
       if (statement.type !== "VariableDeclaration") throw new Error("nothing was declared");
-      const object = statement.declarations[0]?.init;
-      if (object?.type !== "ObjectExpression") throw new Error("no object was written");
-      const overrides = objectValueOf({ object, key: "overrides" });
-      const [element] = overrides?.type === "ArrayExpression" ? overrides.elements : [];
-      if (element?.type !== "ObjectExpression") throw new Error("no override object was written");
-      const rules = ruleBlockObjectOf(element);
+      const configLiteral = statement.declarations[0]?.init;
+      if (configLiteral?.type !== "ObjectExpression") throw new Error("no object was written");
+      const overrides = objectValueOf({ object: configLiteral, key: "overrides" });
+      const [overrideLiteral] = overrides?.type === "ArrayExpression" ? overrides.elements : [];
+      if (overrideLiteral?.type !== "ObjectExpression")
+        throw new Error("no override object was written");
+      const rules = ruleBlockObjectOf(overrideLiteral);
       if (rules === null) throw new Error("no rules object was written");
-      return configuredRuleBlockOf({ object: element, rules, ancestors: [] });
+      return configuredRuleBlockOf({ object: overrideLiteral, rules, ancestors: [] });
     });
 
     it("declares no type awareness", ({ block }) => {

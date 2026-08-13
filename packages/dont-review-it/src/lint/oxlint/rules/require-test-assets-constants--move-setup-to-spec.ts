@@ -71,7 +71,7 @@ const groupedValueIn = (written: ESTree.Expression, reading: Reading): AssetsFin
     return firstFinding(written.expressions.map((embedded) => assembledValueIn(embedded, reading)));
   }
   if (written.type === "ArrayExpression") {
-    return firstFinding(written.elements.map((element) => elementValueIn(element, reading)));
+    return firstFinding(written.elements.map((held) => elementValueIn(held, reading)));
   }
   if (written.type === "ObjectExpression") {
     return firstFinding(written.properties.map((property) => propertyValueIn(property, reading)));
@@ -109,19 +109,19 @@ const boundValueIn = (
 };
 
 const elementValueIn = (
-  element: ESTree.ArrayExpressionElement,
+  held: ESTree.ArrayExpressionElement,
   reading: Reading,
 ): AssetsFinding | null => {
-  if (element === null) return null;
-  if (element.type === "SpreadElement") return assembledFinding(element, SPREAD_SHAPE);
-  return assembledValueIn(element, reading);
+  if (held === null) return null;
+  if (held.type === "SpreadElement") return assembledFinding(held, SPREAD_SHAPE);
+  return assembledValueIn(held, reading);
 };
 
-const keyValueIn = (key: ESTree.PropertyKey, reading: Reading): AssetsFinding | null => {
-  if (key.type !== "Identifier" && key.type !== "PrivateIdentifier") {
-    return assembledValueIn(key, reading);
+const keyValueIn = (named: ESTree.PropertyKey, reading: Reading): AssetsFinding | null => {
+  if (named.type !== "Identifier" && named.type !== "PrivateIdentifier") {
+    return assembledValueIn(named, reading);
   }
-  return boundValueIn({ name: key.name, node: key }, reading);
+  return boundValueIn({ name: named.name, node: named }, reading);
 };
 
 const propertyValueIn = (
@@ -263,17 +263,17 @@ export const requireTestAssetsConstants = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    const markers = assetsNameMarkersFrom(context.options);
-    if (assetsStemOf(context.filename, markers) === null) return {};
+  create(inspection) {
+    const markers = assetsNameMarkersFrom(inspection.options);
+    if (assetsStemOf(inspection.filename, markers) === null) return {};
 
     return {
       Program(node: ESTree.Program) {
-        const declared = moduleDeclarationsOf(context.filename, node.body).initializerByName;
+        const declared = moduleDeclarationsOf(inspection.filename, node.body).initializerByName;
         const findings = node.body.flatMap(
           (statement) => statementFinding(statement, declared) ?? [],
         );
-        for (const finding of findings) context.report(finding);
+        for (const finding of findings) inspection.report(finding);
       },
     };
   },

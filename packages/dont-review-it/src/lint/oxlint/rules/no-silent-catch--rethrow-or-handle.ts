@@ -40,13 +40,13 @@ export const noSilentCatch = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
+  create(inspection) {
     return {
       CatchClause(node: ESTree.CatchClause) {
         if (node.param === null) return;
         if (bodyCarriesNoWork(node)) return;
 
-        const caught = context.sourceCode.getScope(node);
+        const caught = inspection.sourceCode.getScope(node);
         const carried = caught.variables.some((variable) =>
           variable.references.some(
             (reference) => reference.isRead() && carriesFailure(reference.identifier),
@@ -54,7 +54,7 @@ export const noSilentCatch = createDontReviewItRule({
         );
         if (carried) return;
 
-        context.report({ node, messageId: "silentCatch" });
+        inspection.report({ node, messageId: "silentCatch" });
       },
     };
   },

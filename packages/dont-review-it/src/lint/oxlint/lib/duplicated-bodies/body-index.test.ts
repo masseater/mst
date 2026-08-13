@@ -31,7 +31,7 @@ describe("buildBodyIndex", () => {
   });
 
   describe("a file declaring one body", () => {
-    const it = test.extend("bodies", () =>
+    const it = test.extend("indexedBodies", () =>
       buildBodyIndex([
         {
           relativePath: "a.ts",
@@ -41,8 +41,8 @@ describe("buildBodyIndex", () => {
         },
       ]).bodiesByPath.get("a.ts"));
 
-    it("keeps that declaration reachable by the path of the file", ({ bodies }) => {
-      expect(bodies).toStrictEqual([
+    it("keeps that declaration reachable by the path of the file", ({ indexedBodies }) => {
+      expect(indexedBodies).toStrictEqual([
         { name: "declaration1", line: 1, fingerprint: "alone", nodeCount: ENOUGH_NODES },
       ]);
     });
@@ -94,7 +94,7 @@ describe("buildBodyIndex", () => {
   });
 
   describe("a file whose only body has too few nodes", () => {
-    const it = test.extend("bodies", () =>
+    const it = test.extend("indexedBodies", () =>
       buildBodyIndex([
         {
           relativePath: "a.ts",
@@ -102,8 +102,8 @@ describe("buildBodyIndex", () => {
         },
       ]).bodiesByPath.get("a.ts"));
 
-    it("keeps that body reachable by the path of the file", ({ bodies }) => {
-      expect(bodies).toStrictEqual([
+    it("keeps that body reachable by the path of the file", ({ indexedBodies }) => {
+      expect(indexedBodies).toStrictEqual([
         { name: "declaration1", line: 1, fingerprint: "shared", nodeCount: 1 },
       ]);
     });

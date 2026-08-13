@@ -25,11 +25,11 @@ import type { ESTree } from "@oxlint/plugins";
 const NUMBER_TYPE_NODE = "TSNumberKeyword";
 
 const namesNumberKey = (node: ESTree.MemberExpression, scopeAt: ScopeLookup): boolean => {
-  const key = node.property;
-  if (key.type === "Literal") return typeof key.value === "number";
-  if (key.type !== "Identifier") return false;
+  const propertyNode = node.property;
+  if (propertyNode.type === "Literal") return typeof propertyNode.value === "number";
+  if (propertyNode.type !== "Identifier") return false;
 
-  const binding = resolveBinding(scopeAt(key), key.name);
+  const binding = resolveBinding(scopeAt(propertyNode), propertyNode.name);
   return (
     binding?.defs.some((definition) => {
       if (definition.name.typeAnnotation?.typeAnnotation.type === NUMBER_TYPE_NODE) return true;
@@ -66,45 +66,48 @@ export const noReceiverMutation = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
-    const scopeAt: ScopeLookup = (node) => context.sourceCode.getScope(node);
-    const file = resolve(context.cwd, context.filename);
+  create(inspection) {
+    const scopeAt: ScopeLookup = (node) => inspection.sourceCode.getScope(node);
+    const file = resolve(inspection.cwd, inspection.filename);
 
-    const importedNames = memoize(() => importedNamesIn(context.sourceCode.ast.body));
+    const importedNames = memoize(() => importedNamesIn(inspection.sourceCode.ast.body));
     const ownedNames = memoize(
       () =>
-        new Set([...declaredTypeNamesIn(context.sourceCode.ast.body), ...importedNames().keys()]),
+        new Set([
+          ...declaredTypeNamesIn(inspection.sourceCode.ast.body),
+          ...importedNames().keys(),
+        ]),
     );
 
-    const mutatingNamesOf = memoize((type: string): ReadonlySet<string> | null => {
-      const imported = importedNames().get(type) ?? null;
-      const className = imported === null ? type : imported.exported;
+    const mutatingNamesOf = memoize((typeName: string): ReadonlySet<string> | null => {
+      const imported = importedNames().get(typeName) ?? null;
+      const className = imported === null ? typeName : imported.exported;
       const found = classModulesFor({
         file,
-        source: context.sourceCode.text,
+        source: inspection.sourceCode.text,
         workspaceRoot: findWorkspaceRoot(dirname(file)),
         imported,
       }).flatMap((module) => {
-        const names = mutatingMethodNamesIn({ ...module, className });
-        return names === null ? [] : [...names];
+        const mutatingNames = mutatingMethodNamesIn({ ...module, className });
+        return mutatingNames === null ? [] : [...mutatingNames];
       });
       return found.length === 0 ? null : new Set(found);
     });
 
-    const writesReceiverThrough = (type: string): boolean =>
-      ownedNames().has(type)
-        ? (mutatingNamesOf(type)?.size ?? 0) > 0
-        : MUTATING_BUILTIN_TYPE_NAMES.has(type);
+    const writesReceiverThrough = (typeName: string): boolean =>
+      ownedNames().has(typeName)
+        ? (mutatingNamesOf(typeName)?.size ?? 0) > 0
+        : MUTATING_BUILTIN_TYPE_NAMES.has(typeName);
 
-    const reportNamedReceiver = (request: {
+    const reportNamedReceiver = (namedReceiver: {
       readonly node: ESTree.MemberExpression;
       readonly type: string;
       readonly method: string;
     }): void => {
-      const { node, type, method } = request;
+      const { node, type, method } = namedReceiver;
       if (ownedNames().has(type)) {
         if (mutatingNamesOf(type)?.has(method) !== true) return;
-        context.report({
+        inspection.report({
           node: node.property,
           messageId: "declaredClassMutation",
           data: { type, method },
@@ -114,7 +117,7 @@ export const noReceiverMutation = createDontReviewItRule({
 
       const member = mutatingBuiltinMemberOf({ type, method });
       if (member === null) return;
-      context.report({
+      inspection.report({
         node: node.property,
         messageId: member.sink ? "sinkReceiverMutation" : "builtinReceiverMutation",
         data: { type, method, derivation: member.derivation },
@@ -125,7 +128,7 @@ export const noReceiverMutation = createDontReviewItRule({
       if (receiver.kind !== "named" || !isCalledMember(node)) return;
       if (namesNumberKey(node, scopeAt)) return;
       if (!writesReceiverThrough(receiver.type)) return;
-      context.report({
+      inspection.report({
         node: node.property,
         messageId: "runtimeKeyReceiverMutation",
         data: { type: receiver.type },
@@ -134,7 +137,7 @@ export const noReceiverMutation = createDontReviewItRule({
 
     const reportCollapsedReceiver = (node: ESTree.MemberExpression, method: string): void => {
       if (!MUTATING_BUILTIN_METHOD_NAMES.has(method)) return;
-      context.report({
+      inspection.report({
         node: node.property,
         messageId: "collapsedReceiverMutation",
         data: { method },

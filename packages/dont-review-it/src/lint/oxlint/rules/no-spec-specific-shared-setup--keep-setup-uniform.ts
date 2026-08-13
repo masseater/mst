@@ -42,11 +42,11 @@ const NAMING_MESSAGES = {
 type SpecPathReader = () => readonly string[];
 
 const configurationVisitor = (asked: {
-  readonly context: Context;
+  readonly inspection: Context;
   readonly specPathsOf: SpecPathReader;
 }): Visitor => {
   const runnerBlockOf = memoize((): ESTree.Expression | null => {
-    const config = defaultExportedObject(asked.context.sourceCode.ast);
+    const config = defaultExportedObject(asked.inspection.sourceCode.ast);
     return config === null ? null : objectValueOf({ object: config, key: RUNNER_BLOCK_KEY });
   });
 
@@ -59,13 +59,13 @@ const configurationVisitor = (asked: {
       const spelled = spelledPathIn(node);
       if (spelled === null) return;
       if (!namesAuthoredSpec({ spelled, specPaths: asked.specPathsOf() })) return;
-      asked.context.report({ node, messageId: "specSpecificRunnerSetting", data: { spelled } });
+      asked.inspection.report({ node, messageId: "specSpecificRunnerSetting", data: { spelled } });
     },
   };
 };
 
 const setupVisitor = (asked: {
-  readonly context: Context;
+  readonly inspection: Context;
   readonly specPathsOf: SpecPathReader;
 }): Visitor => {
   const identityNames = new Set<string>();
@@ -79,12 +79,12 @@ const setupVisitor = (asked: {
   }): void => {
     const holder = steeringHolderOf(read.node);
     if (holder === null) {
-      const name = declaredBindingNameOf(read.node);
-      if (name !== null) read.held.add(name);
+      const spelled = declaredBindingNameOf(read.node);
+      if (spelled !== null) read.held.add(spelled);
       return;
     }
 
-    asked.context.report({
+    asked.inspection.report({
       node: read.node,
       messageId: handsOverValue(holder) ? read.messageIds.argument : read.messageIds.branch,
       data: { spelled: read.spelled },
@@ -153,19 +153,19 @@ export const noSpecSpecificSharedSetup = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    const filename = resolve(context.cwd, context.filename);
+  create(inspection) {
+    const filename = resolve(inspection.cwd, inspection.filename);
     const workspaceRoot = findWorkspaceRoot(dirname(filename));
     const specPathsOf = memoize((): readonly string[] => authoredSpecPathsUnder(workspaceRoot));
-    if (isRunnerConfigurationFile(context.filename)) {
-      return configurationVisitor({ context, specPathsOf });
+    if (isRunnerConfigurationFile(inspection.filename)) {
+      return configurationVisitor({ inspection, specPathsOf });
     }
 
-    const declaredEntries = configuredSuffixesFrom(context.options, {
+    const declaredEntries = configuredSuffixesFrom(inspection.options, {
       optionName: SHARED_SETUP_FILES_OPTION,
       carried: [],
     });
     if (!sharedSetupFilesUnder({ workspaceRoot, declaredEntries }).has(filename)) return {};
-    return setupVisitor({ context, specPathsOf });
+    return setupVisitor({ inspection, specPathsOf });
   },
 });

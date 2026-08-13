@@ -19,23 +19,29 @@ export type CanonicalValuesCatalog = {
 };
 
 const entriesByKey = (
-  entries: readonly CanonicalValuesEntry[],
-  keysOf: (entry: CanonicalValuesEntry) => readonly string[],
+  declarations: readonly CanonicalValuesEntry[],
+  keysOf: (declaration: CanonicalValuesEntry) => readonly string[],
 ): ReadonlyMap<string, readonly CanonicalValuesEntry[]> => {
-  const keyed = entries.flatMap((entry) => keysOf(entry).map((key) => ({ key, entry })));
+  const keyed = declarations.flatMap((declaration) =>
+    keysOf(declaration).map((groupingKey) => ({ groupingKey, declaration })),
+  );
 
   return new Map(
-    Object.entries(groupBy(keyed, (held) => held.key)).map(([key, grouped]) => [
-      key,
-      uniq(grouped.map((held) => held.entry)),
+    Object.entries(groupBy(keyed, (held) => held.groupingKey)).map(([groupingKey, grouped]) => [
+      groupingKey,
+      uniq(grouped.map((held) => held.declaration)),
     ]),
   );
 };
 
-export const buildCatalog = (entries: readonly CanonicalValuesEntry[]): CanonicalValuesCatalog => ({
-  entries,
-  entriesByFingerprint: entriesByKey(entries, (entry) => [entry.fingerprint]),
-  entriesByValue: entriesByKey(entries, (entry) => entry.values.map(canonicalValueKey)),
+export const buildCatalog = (
+  declarations: readonly CanonicalValuesEntry[],
+): CanonicalValuesCatalog => ({
+  entries: declarations,
+  entriesByFingerprint: entriesByKey(declarations, (declaration) => [declaration.fingerprint]),
+  entriesByValue: entriesByKey(declarations, (declaration) =>
+    declaration.values.map(canonicalValueKey),
+  ),
 });
 
 export const EMPTY_CANONICAL_VALUES_CATALOG: CanonicalValuesCatalog = buildCatalog([]);

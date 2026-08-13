@@ -52,9 +52,9 @@ const resolveDeps = (deps: SpoolDeps): ResolvedDeps => ({
 
 const recordFailureSummary = (
   commandLine: string,
-  record: { filePath: string; reason: unknown },
+  written: { filePath: string; reason: unknown },
 ): string =>
-  `spool: command: ${commandLine}\nspool: error: cannot record to ${record.filePath}: ${String(record.reason)}\n`;
+  `spool: command: ${commandLine}\nspool: error: cannot record to ${written.filePath}: ${String(written.reason)}\n`;
 
 const openRecordFile = async (rootDir: string, filePath: string): Promise<WriteStream | Error> => {
   try {
@@ -111,7 +111,7 @@ class SpoolRecording {
 
   private observe(part: Buffer): void {
     this.bytes += part.length;
-    this.newlines += part.reduce((count, byte) => (byte === 0x0a ? count + 1 : count), 0);
+    this.newlines += part.reduce((counted, byte) => (byte === 0x0a ? counted + 1 : counted), 0);
     this.endsWithNewline = part.at(-1) === 0x0a;
     this.tailParts = [...this.tailParts, part];
     this.tailLength += part.length;

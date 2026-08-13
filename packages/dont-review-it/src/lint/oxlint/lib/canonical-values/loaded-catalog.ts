@@ -11,6 +11,8 @@ const catalogAt = memoize(
     buildCanonicalValuesCatalog({ repositoryRoot }),
 );
 
-export const loadCanonicalValuesCatalog = (options: {
+export const loadCanonicalValuesCatalog = ({
+  repositoryRoot,
+}: {
   readonly repositoryRoot: string;
-}): CanonicalValuesCatalog => catalogAt(resolve(options.repositoryRoot));
+}): CanonicalValuesCatalog => catalogAt(resolve(repositoryRoot));

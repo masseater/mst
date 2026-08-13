@@ -6,12 +6,13 @@ export type CapturedStream = {
   readonly text: () => string;
 };
 
-const decoded = (chunk: string | Uint8Array): string =>
-  typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk);
+const decoded = (writtenFragment: string | Uint8Array): string =>
+  typeof writtenFragment === "string" ? writtenFragment : new TextDecoder().decode(writtenFragment);
 
 const capturedWrites = (stream: NodeJS.WriteStream): CapturedStream => {
   const spy = vi.spyOn(stream, "write").mockImplementation(() => true);
-  const written = (): readonly string[] => spy.mock.calls.map(([chunk]) => decoded(chunk));
+  const written = (): readonly string[] =>
+    spy.mock.calls.map(([writtenFragment]) => decoded(writtenFragment));
 
   return Object.create(Object.prototype, {
     chunks: { enumerable: true, get: written },

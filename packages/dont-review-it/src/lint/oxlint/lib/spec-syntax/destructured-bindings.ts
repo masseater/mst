@@ -20,10 +20,8 @@ const bindingsUnder = (
     );
   }
   if (pattern.type === "ArrayPattern") {
-    return pattern.elements.flatMap((element) =>
-      element === null
-        ? []
-        : bindingsUnder(element, element.type === "RestElement" ? depth : depth + 1),
+    return pattern.elements.flatMap((held) =>
+      held === null ? [] : bindingsUnder(held, held.type === "RestElement" ? depth : depth + 1),
     );
   }
   return [];

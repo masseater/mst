@@ -22,8 +22,8 @@ const isInsideRepository = (path: string, workspaceRoot: string): boolean =>
   isInsideDirectory({ path, directory: workspaceRoot }) &&
   !segmentsOf({ path: toPosixPath(path), separator: "/" }).includes("node_modules");
 
-const forwardingSpecifiersIn = (body: readonly SpecStatement[]): readonly string[] =>
-  body.flatMap((statement) => {
+const forwardingSpecifiersIn = (writtenBody: readonly SpecStatement[]): readonly string[] =>
+  writtenBody.flatMap((statement) => {
     if (statement.type === "ExportAllDeclaration") return [statement.source.value];
     if (statement.type === "ExportNamedDeclaration" && statement.source !== null) {
       return [statement.source.value];

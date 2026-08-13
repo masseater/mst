@@ -49,8 +49,8 @@ type Reading = {
 const handsRowsToCallback = (call: ESTree.CallExpression): boolean =>
   testBlockModifiersOf(call.callee).some((modifier) => TABLE_DRIVEN_MEMBERS.has(modifier.name));
 
-const contextSitesOf = (callback: SpecFunction): readonly HandedSite[] => {
-  const [parameter] = callback.params;
+const contextSitesOf = (specFunction: SpecFunction): readonly HandedSite[] => {
+  const [parameter] = specFunction.params;
   if (parameter === undefined) return [];
   return destructuredBindingsOf(parameter).map((binding) => ({
     name: binding.name,
@@ -113,10 +113,10 @@ const readingOfSubject = (subject: ESTree.Expression, lookup: Lookup): SubjectRe
 };
 
 const reportedSubjectIn = (
-  entry: ESTree.CallExpression,
+  assertionCall: ESTree.CallExpression,
   lookup: Lookup,
 ): { readonly node: ESTree.Expression; readonly messageId: string } | null => {
-  const [handed] = entry.arguments;
+  const [handed] = assertionCall.arguments;
   if (handed === undefined || handed.type === "SpreadElement") return null;
 
   const subject = unwrapSubject(handed);
@@ -152,34 +152,34 @@ export const noExpectMemberSubject = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
     return {
       "Program:exit"(program: ESTree.Program) {
         const rootNames = testBlockRootNames(program);
         const calls = nodesOfType(program, "CallExpression");
-        const callbacks = calls
+        const specFunctions = calls
           .filter((call) => declaresTestBlock(call, rootNames) && !handsRowsToCallback(call))
           .flatMap((call) => testCallbacksOf(call));
 
         const lookup: Lookup = {
           sites: [
-            ...callbacks.flatMap((callback) => contextSitesOf(callback)),
+            ...specFunctions.flatMap((specFunction) => contextSitesOf(specFunction)),
             ...nodesOfType(program, "VariableDeclarator").flatMap((declarator) =>
               declaredSitesOf(declarator),
             ),
           ],
-          scopeAt: (node: ESTree.Node) => context.sourceCode.getScope(node),
+          scopeAt: (node: ESTree.Node) => inspection.sourceCode.getScope(node),
         };
 
-        for (const entry of calls.filter((call) => isAssertionEntryCall(call))) {
-          const reported = reportedSubjectIn(entry, lookup);
+        for (const assertionCall of calls.filter((call) => isAssertionEntryCall(call))) {
+          const reported = reportedSubjectIn(assertionCall, lookup);
           if (reported === null) continue;
-          context.report({
+          inspection.report({
             node: reported.node,
             messageId: reported.messageId,
-            data: { subject: context.sourceCode.getText(reported.node) },
+            data: { subject: inspection.sourceCode.getText(reported.node) },
           });
         }
       },

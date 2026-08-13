@@ -33,14 +33,14 @@ describe("measureVisitor", () => {
     describe("the recorder behind a handler that was visited", () => {
       const it = test.extend("idleRecorder", () => {
         vi.mocked(startLintTelemetry).mockReturnValue(false);
-        const record = vi.fn<(elapsed: number, attributes: { rule: string }) => void>();
-        vi.mocked(ruleDuration).mockReturnValue({ record });
+        const durationRecorder = vi.fn<(elapsed: number, attributes: { rule: string }) => void>();
+        vi.mocked(ruleDuration).mockReturnValue({ record: durationRecorder });
         const idle = measureVisitor({
           ruleName: RULE_NAME,
           visitor: { VisitedNode: vi.fn<(node: unknown) => void>() },
         });
         (idle.VisitedNode as (node: unknown) => unknown)(VISITED_NODE);
-        return record;
+        return durationRecorder;
       });
 
       it("is never asked to record anything", ({ idleRecorder }) => {
@@ -54,14 +54,14 @@ describe("measureVisitor", () => {
       const it = test.extend("runningRecorder", () => {
         vi.mocked(startLintTelemetry).mockReturnValue(true);
         vi.spyOn(performance, "now").mockReturnValue(0);
-        const record = vi.fn<(elapsed: number, attributes: { rule: string }) => void>();
-        vi.mocked(ruleDuration).mockReturnValue({ record });
+        const durationRecorder = vi.fn<(elapsed: number, attributes: { rule: string }) => void>();
+        vi.mocked(ruleDuration).mockReturnValue({ record: durationRecorder });
         const running = measureVisitor({
           ruleName: RULE_NAME,
           visitor: { VisitedNode: vi.fn<(node: unknown) => void>() },
         });
         (running.VisitedNode as (node: unknown) => unknown)(VISITED_NODE);
-        return record;
+        return durationRecorder;
       });
 
       it("receives the elapsed time under the rule that spent it", ({ runningRecorder }) => {
@@ -75,10 +75,13 @@ describe("measureVisitor", () => {
         vi.mocked(ruleDuration).mockReturnValue({
           record: vi.fn<(elapsed: number, attributes: { rule: string }) => void>(),
         });
-        const handler = vi.fn<(node: unknown) => void>();
-        const running = measureVisitor({ ruleName: RULE_NAME, visitor: { VisitedNode: handler } });
+        const visitedNodeHandler = vi.fn<(node: unknown) => void>();
+        const running = measureVisitor({
+          ruleName: RULE_NAME,
+          visitor: { VisitedNode: visitedNodeHandler },
+        });
         (running.VisitedNode as (node: unknown) => unknown)(VISITED_NODE);
-        return handler;
+        return visitedNodeHandler;
       });
 
       it("is still called with the node the visit carried", ({ wrappedHandler }) => {

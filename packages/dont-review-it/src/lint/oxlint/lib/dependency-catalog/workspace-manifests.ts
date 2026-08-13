@@ -18,6 +18,6 @@ const scannedWorkspaces = (repositoryRoot: string): readonly WorkspaceDependenci
 
 const scannedWorkspacesUnder = memoize(scannedWorkspaces);
 
-export const loadWorkspaceDependencies = (options: {
+export const loadWorkspaceDependencies = (repository: {
   readonly repositoryRoot: string;
-}): readonly WorkspaceDependencies[] => scannedWorkspacesUnder(resolve(options.repositoryRoot));
+}): readonly WorkspaceDependencies[] => scannedWorkspacesUnder(resolve(repository.repositoryRoot));

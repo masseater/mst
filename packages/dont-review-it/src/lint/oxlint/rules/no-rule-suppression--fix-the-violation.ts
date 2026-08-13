@@ -51,14 +51,14 @@ const GATE_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-const targetRulesFrom = (options: Readonly<Options>): readonly string[] => {
-  const [declared] = options;
+const targetRulesFrom = (ruleOptions: Readonly<Options>): readonly string[] => {
+  const [declared] = ruleOptions;
   if (typeof declared !== "object" || declared === null || Array.isArray(declared)) {
     return DETERMINISM_GATE_RULES;
   }
   const listed = declared.targetRules;
   const added = Array.isArray(listed)
-    ? listed.filter((name): name is string => typeof name === "string")
+    ? listed.filter((spelled): spelled is string => typeof spelled === "string")
     : [];
   return uniq([...DETERMINISM_GATE_RULES, ...added]);
 };
@@ -105,10 +105,10 @@ export const noRuleSuppression = createDontReviewItRule({
     },
     schema: [GATE_SCHEMA],
   },
-  create(context) {
-    const targetRules = targetRulesFrom(context.options);
+  create(inspection) {
+    const targetRules = targetRulesFrom(inspection.options);
     const named = new Set(targetRules.map(bareRuleNameOf));
-    const posixFilename = toPosixPath(context.filename);
+    const posixFilename = toPosixPath(inspection.filename);
     const configurationFile = LINT_CONFIGURATION_FILE.test(posixFilename);
     const gateReadsThisFile =
       configurationFile || isSpecFile(posixFilename, DEFAULT_SPEC_FILE_SUFFIXES);
@@ -119,7 +119,7 @@ export const noRuleSuppression = createDontReviewItRule({
       const covered = coveredRulesOf({ directive, targetRules });
       if (covered.length === 0) return;
       if (directive.ruleNames.length === 0 && !gateReadsThisFile) return;
-      context.report({
+      inspection.report({
         loc: comment.loc,
         messageId: messageIdFor(directive),
         data: {
@@ -134,13 +134,13 @@ export const noRuleSuppression = createDontReviewItRule({
       if (ruleName === null || !named.has(bareRuleNameOf(ruleName))) return;
       const severity = severityLevelOf(property.value);
       if (severity === null) {
-        context.report({ node: property, messageId: "unreadableSeverity", data: { ruleName } });
+        inspection.report({ node: property, messageId: "unreadableSeverity", data: { ruleName } });
         return;
       }
       if (!SILENCED_LEVELS.has(severity)) return;
       const scope = scopeSpellingOf(property);
       const carried = { ruleName, severity };
-      context.report({
+      inspection.report({
         node: property,
         messageId: scope === null ? "weakenedRule" : "scopedWeakenedRule",
         data: scope === null ? carried : { ...carried, scope },
@@ -150,9 +150,11 @@ export const noRuleSuppression = createDontReviewItRule({
     const reportIgnoredSpecFiles = (program: ESTree.Program): void => {
       const lint = lintBlockOf(program);
       if (lint === null) return;
-      const repositoryRoot = findWorkspaceRoot(dirname(resolve(context.cwd, context.filename)));
+      const repositoryRoot = findWorkspaceRoot(
+        dirname(resolve(inspection.cwd, inspection.filename)),
+      );
       for (const ignored of ignoredSpecFilesIn({ lint, repositoryRoot })) {
-        context.report({
+        inspection.report({
           node: ignored.entry.element,
           messageId: "ignoredSpecFile",
           data: { pattern: ignored.entry.pattern, matchedPath: ignored.matchedPath },
@@ -164,7 +166,7 @@ export const noRuleSuppression = createDontReviewItRule({
       ObjectExpression(node: ESTree.ObjectExpression) {
         const respected = objectPropertyOf({ object: node, key: DIRECTIVE_RESPECT_KEY });
         if (respected?.value.type === "Literal" && respected.value.value === true) {
-          context.report({ node: respected, messageId: "respectedDisableDirectives" });
+          inspection.report({ node: respected, messageId: "respectedDisableDirectives" });
         }
         const rules = ruleBlockObjectOf(node);
         if (rules === null) return;

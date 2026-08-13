@@ -269,11 +269,13 @@ describe("verifyCanonicalValues", () => {
         );
         return {
           form,
-          catalogued: buildCanonicalValuesCatalog({ repositoryRoot }).entries.map((entry) => [
-            entry.declarationPath,
-            entry.conceptId,
-            entry.values,
-          ]),
+          catalogued: buildCanonicalValuesCatalog({ repositoryRoot }).entries.map(
+            (declaredConcept) => [
+              declaredConcept.declarationPath,
+              declaredConcept.conceptId,
+              declaredConcept.values,
+            ],
+          ),
           verified: verifyCanonicalValues({ repositoryRoot }).map((problem) => [
             problem.kind,
             problem.filePath,
@@ -320,7 +322,7 @@ describe("buildCanonicalValuesCatalog", () => {
       writeFileSync(join(repositoryRoot, ".config", "hidden.ts"), ORDER_STATUS);
       writeFileSync(join(repositoryRoot, "src", "order.ts"), ORDER_STATUS);
       return buildCanonicalValuesCatalog({ repositoryRoot }).entries.map(
-        (entry) => entry.declarationPath,
+        (declaredConcept) => declaredConcept.declarationPath,
       );
     });
 
@@ -339,7 +341,7 @@ describe("buildCanonicalValuesCatalog", () => {
       writeFileSync(join(repositoryRoot, "src", "order.test.ts"), ORDER_STATUS);
       writeFileSync(join(repositoryRoot, "src", "order.ts"), ORDER_STATUS);
       return buildCanonicalValuesCatalog({ repositoryRoot }).entries.map(
-        (entry) => entry.declarationPath,
+        (declaredConcept) => declaredConcept.declarationPath,
       );
     });
 
@@ -360,7 +362,7 @@ describe("findEquivalentConcepts", () => {
       writeFileSync(join(repositoryRoot, "src", "article.ts"), ARTICLE_STATUS_PAIR);
       writeFileSync(join(repositoryRoot, "src", "order.ts"), ORDER_STATUS_PAIR);
       return findEquivalentConcepts(buildCanonicalValuesCatalog({ repositoryRoot }).entries).map(
-        (group) => group.map((entry) => entry.conceptId),
+        (equivalenceGroup) => equivalenceGroup.map((declaredConcept) => declaredConcept.conceptId),
       );
     });
 
@@ -370,7 +372,7 @@ describe("findEquivalentConcepts", () => {
   });
 
   describe("concepts that declare different value sets", () => {
-    const it = test.extend("groups", ({}, { onCleanup }) => {
+    const it = test.extend("equivalenceGroups", ({}, { onCleanup }) => {
       const repositoryRoot = mkdtempSync(join(tmpdir(), "canonical-values-"));
       onCleanup(() => {
         rmSync(repositoryRoot, { recursive: true, force: true });
@@ -381,8 +383,8 @@ describe("findEquivalentConcepts", () => {
       return findEquivalentConcepts(buildCanonicalValuesCatalog({ repositoryRoot }).entries);
     });
 
-    it("form no group", ({ groups }) => {
-      expect(groups).toStrictEqual([]);
+    it("form no group", ({ equivalenceGroups }) => {
+      expect(equivalenceGroups).toStrictEqual([]);
     });
   });
 });

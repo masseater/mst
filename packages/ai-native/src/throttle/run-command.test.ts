@@ -39,11 +39,11 @@ const POLL_MS = 10_000;
 
 describe("runWithSlot", () => {
   const throttleTest = standardIoTest.extend("slotDirectory", ({}, { onCleanup }) => {
-    const created = mkdtempSync(join(tmpdir(), "throttle-command-"));
+    const madeSlotDirectory = mkdtempSync(join(tmpdir(), "throttle-command-"));
     onCleanup(() => {
-      rmSync(created, { recursive: true, force: true });
+      rmSync(madeSlotDirectory, { recursive: true, force: true });
     });
-    return created;
+    return madeSlotDirectory;
   });
 
   describe("a command that exits zero", () => {
@@ -282,11 +282,11 @@ describe("runWithSlot", () => {
   describe("a stubborn process tree that ignores SIGTERM", () => {
     const it = throttleTest
       .extend("stampsDirectory", ({}, { onCleanup }) => {
-        const created = mkdtempSync(join(tmpdir(), "throttle-tree-stamps-"));
+        const madeStampsDirectory = mkdtempSync(join(tmpdir(), "throttle-tree-stamps-"));
         onCleanup(() => {
-          rmSync(created, { recursive: true, force: true });
+          rmSync(madeStampsDirectory, { recursive: true, force: true });
         });
-        return created;
+        return madeStampsDirectory;
       })
       .extend("theCodeOfAStubbornProcessTree", async ({ slotDirectory, stampsDirectory }) =>
         runThrottle(
@@ -482,6 +482,46 @@ describe("runWithSlot", () => {
       theRefusalOfAnUnreleasableHold,
     }) => {
       expect(theRefusalOfAnUnreleasableHold).toBe("the lock store went away");
+    });
+  });
+
+  describe("everything a run of an unstartable command says", () => {
+    const it = throttleTest.extend(
+      "theRunOfAnUnstartableCommand",
+      { auto: true },
+      async ({ slotDirectory }) => {
+        await runThrottle(["--", MISSING_EXECUTABLE], {
+          slotDir: slotDirectory,
+          limit: 1,
+          staleMs: STALE_MS,
+          waitBudgetMs: WAIT_BUDGET_MS,
+          pollMs: POLL_MS,
+          isInteractive: false,
+        });
+      },
+    );
+
+    it("says nothing on stdout", { timeout: 30_000 }, ({ stdout }) => {
+      expect(stdout).toMatchInlineSnapshot(`
+        {
+          "chunks": [],
+        }
+      `);
+    });
+
+    it("tells the whole run on stderr", { timeout: 30_000 }, ({ stderr }) => {
+      expect(stderr).toMatchInlineSnapshot(`
+        {
+          "chunks": [
+            "throttle: acquiring a slot (limit 1)
+        ",
+            "throttle: run /no/such/executable-for-throttle
+        ",
+            "throttle: could not start /no/such/executable-for-throttle: spawn /no/such/executable-for-throttle ENOENT
+        ",
+          ],
+        }
+      `);
     });
   });
 });

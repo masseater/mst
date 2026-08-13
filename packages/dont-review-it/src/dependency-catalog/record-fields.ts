@@ -6,5 +6,5 @@ export const recordOf = (declared: unknown): Readonly<Record<string, unknown>> =
 
 export const stringEntriesOf = (declared: unknown): readonly (readonly [string, string])[] =>
   Object.entries(recordOf(declared)).filter(
-    (entry): entry is [string, string] => typeof entry[1] === "string",
+    (listed): listed is [string, string] => typeof listed[1] === "string",
   );

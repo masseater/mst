@@ -21,8 +21,8 @@ export const noSingleUseLocalType = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
-    if (isOutOfScopeSource(context.filename)) return {};
+  create(inspection) {
+    if (isOutOfScopeSource(inspection.filename)) return {};
 
     return {
       "Program:exit"(program: ESTree.Program) {
@@ -48,13 +48,18 @@ export const noSingleUseLocalType = createDontReviewItRule({
             .map((declared) => [declared.id.name, declared] as const),
         );
 
-        for (const [name, node] of declaredNodeByName) {
-          const count = referencedNames.filter((referenced) => referenced === name).length;
-          if (count >= REFERENCES_A_SHARED_TYPE) continue;
-          context.report({
-            node,
+        for (const [declaredTypeName, declaration] of declaredNodeByName) {
+          const referenceCount = referencedNames.filter(
+            (referenced) => referenced === declaredTypeName,
+          ).length;
+          if (referenceCount >= REFERENCES_A_SHARED_TYPE) continue;
+          inspection.report({
+            node: declaration,
             messageId: "singleUseLocalType",
-            data: { name, count: count === 0 ? "nowhere" : "one place" },
+            data: {
+              name: declaredTypeName,
+              count: referenceCount === 0 ? "nowhere" : "one place",
+            },
           });
         }
       },

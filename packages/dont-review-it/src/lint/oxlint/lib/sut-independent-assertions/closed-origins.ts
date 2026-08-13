@@ -83,7 +83,7 @@ export const isSpecClosedValue = (input: {
   return isClosedShape({
     bare,
     reach,
-    closedAs: (next, onceHeld) =>
-      isSpecClosedValue({ written: next, reach, walked: reached, held: held || onceHeld }),
+    closedAs: (reachedNext, onceHeld) =>
+      isSpecClosedValue({ written: reachedNext, reach, walked: reached, held: held || onceHeld }),
   });
 };

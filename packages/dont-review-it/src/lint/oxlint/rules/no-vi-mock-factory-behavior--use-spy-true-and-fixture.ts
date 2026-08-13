@@ -35,8 +35,8 @@ const CREATION_MEMBERS: ReadonlySet<string> = new Set(DEFAULT_MOCK_CREATION_MEMB
 
 const WHITESPACE = /\s+/u;
 
-const builtinModulePrefixesFrom = (options: Readonly<Options>): readonly string[] => {
-  const [first] = options;
+const builtinModulePrefixesFrom = (ruleOptions: Readonly<Options>): readonly string[] => {
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) {
     return DEFAULT_BUILTIN_MODULE_PREFIXES;
   }
@@ -44,7 +44,9 @@ const builtinModulePrefixesFrom = (options: Readonly<Options>): readonly string[
   const configured = first[BUILTIN_MODULE_PREFIXES_OPTION];
   if (!Array.isArray(configured)) return DEFAULT_BUILTIN_MODULE_PREFIXES;
 
-  const spelled = configured.filter((entry): entry is string => typeof entry === "string");
+  const spelled = configured.filter(
+    (candidate): candidate is string => typeof candidate === "string",
+  );
   return spelled.length === 0 ? DEFAULT_BUILTIN_MODULE_PREFIXES : spelled;
 };
 
@@ -195,21 +197,21 @@ export const noViMockFactoryBehavior = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
+  create(inspection) {
     const lookup: NamespaceLookup = {
-      scopeAt: (node: ESTree.Node): Scope => context.sourceCode.getScope(node),
+      scopeAt: (node: ESTree.Node): Scope => inspection.sourceCode.getScope(node),
       spellings: new Set(DEFAULT_MOCK_NAMESPACE_SPELLINGS),
       seenBindings: new Set(),
     };
-    const builtinPrefixes = builtinModulePrefixesFrom(context.options);
+    const builtinPrefixes = builtinModulePrefixesFrom(inspection.options);
 
     const grantsExemption = (call: ESTree.CallExpression): boolean => {
-      const written = commentBlockAbove(context.sourceCode.ast.comments, call.loc.start.line)
+      const written = commentBlockAbove(inspection.sourceCode.ast.comments, call.loc.start.line)
         .map((comment) => exemptionIn(comment))
         .filter((exemption) => exemption !== null);
 
       for (const exemption of written.filter((carried) => carried.grounds === "")) {
-        context.report({ loc: exemption.comment.loc, messageId: "unreasonedExemption" });
+        inspection.report({ loc: exemption.comment.loc, messageId: "unreasonedExemption" });
       }
       return written.some((exemption) => exemption.grounds !== "");
     };
@@ -220,14 +222,14 @@ export const noViMockFactoryBehavior = createDontReviewItRule({
     }): void => {
       const { factory, specifier } = declared.replacement;
       if (yieldsImportedBinding(factory, lookup.scopeAt)) {
-        context.report({ node: factory, messageId: "factoryBehaviour" });
+        inspection.report({ node: factory, messageId: "factoryBehaviour" });
       }
 
       const exempted = grantsExemption(declared.call);
       if (namesBuiltinModule(specifier, builtinPrefixes)) return;
       if (yieldsEmptyObjectOnly(factory)) return;
       if (exempted) return;
-      context.report({ node: factory, messageId: "factoryShape" });
+      inspection.report({ node: factory, messageId: "factoryShape" });
     };
 
     return {
@@ -246,7 +248,7 @@ export const noViMockFactoryBehavior = createDontReviewItRule({
         for (const factory of factories) {
           if (yieldsImportedBinding(factory, lookup.scopeAt)) continue;
           if (!behavesInside({ factory, factories, calls: inner, lookup })) continue;
-          context.report({ node: factory, messageId: "factoryBehaviour" });
+          inspection.report({ node: factory, messageId: "factoryBehaviour" });
         }
       },
     };

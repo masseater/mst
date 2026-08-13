@@ -18,12 +18,12 @@ export const noEmptyCatch = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
+  create(inspection) {
     return {
       CatchClause(node: ESTree.CatchClause) {
         if (!bodyCarriesNoWork(node)) return;
 
-        context.report({ node, messageId: "emptyCatch" });
+        inspection.report({ node, messageId: "emptyCatch" });
       },
     };
   },

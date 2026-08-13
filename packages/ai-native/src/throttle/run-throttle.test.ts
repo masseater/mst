@@ -14,18 +14,18 @@ const SLOT_MARKER_PATTERN = /^slot-\d+$/u;
 describe("runThrottle", () => {
   const throttleTest = standardIoTest
     .extend("slotDirectory", ({}, { onCleanup }) => {
-      const created = mkdtempSync(join(tmpdir(), "throttle-run-"));
+      const slotArea = mkdtempSync(join(tmpdir(), "throttle-run-"));
       onCleanup(() => {
-        rmSync(created, { recursive: true, force: true });
+        rmSync(slotArea, { recursive: true, force: true });
       });
-      return created;
+      return slotArea;
     })
     .extend("stampsDirectory", ({}, { onCleanup }) => {
-      const created = mkdtempSync(join(tmpdir(), "throttle-stamps-"));
+      const stampsArea = mkdtempSync(join(tmpdir(), "throttle-stamps-"));
       onCleanup(() => {
-        rmSync(created, { recursive: true, force: true });
+        rmSync(stampsArea, { recursive: true, force: true });
       });
-      return created;
+      return stampsArea;
     });
 
   describe("a run under every default", () => {
@@ -75,6 +75,14 @@ describe("runThrottle", () => {
       .extend("theUsageNamedForNoCommand", async ({ stderr }) => {
         await runThrottle([]);
         return stderr.text().includes("Usage: throttle");
+      })
+      .extend("theStandardOutputOfNoCommand", async ({ stdout }) => {
+        await runThrottle([]);
+        return stdout.text();
+      })
+      .extend("theStandardErrorOfNoCommand", async ({ stderr }) => {
+        await runThrottle([]);
+        return stderr.text();
       });
 
     it("is refused", ({ theCodeOfNoCommandAtAll }) => {
@@ -83,6 +91,41 @@ describe("runThrottle", () => {
 
     it("puts the usage on stderr", ({ theUsageNamedForNoCommand }) => {
       expect(theUsageNamedForNoCommand).toBe(true);
+    });
+
+    it("puts nothing on stdout", ({ theStandardOutputOfNoCommand }) => {
+      expect(theStandardOutputOfNoCommand).toMatchInlineSnapshot(`""`);
+    });
+
+    it("puts the whole refusal on stderr", ({ theStandardErrorOfNoCommand }) => {
+      expect(theStandardErrorOfNoCommand).toMatchInlineSnapshot(`
+        "Usage: throttle [--timeout <seconds>] -- <command> [args...]
+
+        Runs the command while keeping the number of simultaneous executions that
+        share this host and namespace at or below the limit. When every slot is held
+        the wrapper joins a wait queue, reports its position on stderr, and retries
+        every slot on each poll, for at most the wait budget. A slot whose holder
+        died without releasing is reclaimed once the holder's liveness mark goes
+        stale. Do not nest throttle inside a command it wraps: the inner call counts
+        as one more competitor and consumes a second slot.
+
+        Options:
+          --timeout <seconds>  Send SIGTERM to the command's process group after this
+                               many seconds, then SIGKILL after a short grace period.
+                               0 never interrupts the command. Defaults to 0.
+
+        Environment:
+          MST_THROTTLE_LIMIT   Number of slots shared by every throttle on this host
+                               and namespace. Invalid values (non-integer, zero or
+                               less) fall back to the default of 1.
+
+        Exit codes:
+          0  the wrapped command succeeded
+          1  the wrapped command failed, was killed, could not be started, ran past
+             the timeout, or the wrapper could not get a slot
+          2  throttle itself was called incorrectly
+        "
+      `);
     });
   });
 
@@ -480,13 +523,13 @@ describe("runThrottle", () => {
           isInteractive: false,
         };
         return Promise.all(
-          ["a", "b", "c"].map(async (name) =>
+          ["a", "b", "c"].map(async (stampPrefix) =>
             runThrottle(
               [
                 "--",
                 process.execPath,
                 "-e",
-                `const { writeFileSync } = require("node:fs"); writeFileSync(${JSON.stringify(join(stampsDirectory, `${name}-start`))}, String(Date.now())); setTimeout(() => { writeFileSync(${JSON.stringify(join(stampsDirectory, `${name}-end`))}, String(Date.now())); }, 1500);`,
+                `const { writeFileSync } = require("node:fs"); writeFileSync(${JSON.stringify(join(stampsDirectory, `${stampPrefix}-start`))}, String(Date.now())); setTimeout(() => { writeFileSync(${JSON.stringify(join(stampsDirectory, `${stampPrefix}-end`))}, String(Date.now())); }, 1500);`,
               ],
               seams,
             ),
@@ -503,26 +546,28 @@ describe("runThrottle", () => {
           isInteractive: false,
         };
         await Promise.all(
-          ["a", "b", "c"].map(async (name) =>
+          ["a", "b", "c"].map(async (stampPrefix) =>
             runThrottle(
               [
                 "--",
                 process.execPath,
                 "-e",
-                `const { writeFileSync } = require("node:fs"); writeFileSync(${JSON.stringify(join(stampsDirectory, `${name}-start`))}, String(Date.now())); setTimeout(() => { writeFileSync(${JSON.stringify(join(stampsDirectory, `${name}-end`))}, String(Date.now())); }, 1500);`,
+                `const { writeFileSync } = require("node:fs"); writeFileSync(${JSON.stringify(join(stampsDirectory, `${stampPrefix}-start`))}, String(Date.now())); setTimeout(() => { writeFileSync(${JSON.stringify(join(stampsDirectory, `${stampPrefix}-end`))}, String(Date.now())); }, 1500);`,
               ],
               seams,
             ),
           ),
         );
-        const spans = ["a", "b", "c"].map((name) => ({
-          start: Number(readFileSync(join(stampsDirectory, `${name}-start`), "utf8")),
-          end: Number(readFileSync(join(stampsDirectory, `${name}-end`), "utf8")),
+        const spans = ["a", "b", "c"].map((stampPrefix) => ({
+          start: Number(readFileSync(join(stampsDirectory, `${stampPrefix}-start`), "utf8")),
+          end: Number(readFileSync(join(stampsDirectory, `${stampPrefix}-end`), "utf8")),
         }));
         return Math.max(
           ...spans.map(
             ({ start }) =>
-              spans.filter((other) => other.start <= start && start < other.end).length,
+              spans.filter(
+                (candidateSpan) => candidateSpan.start <= start && start < candidateSpan.end,
+              ).length,
           ),
         );
       });
@@ -590,7 +635,9 @@ describe("runThrottle", () => {
           pollMs: 1000,
           isInteractive: false,
         });
-        return readdirSync(slotDirectory).filter((name) => SLOT_MARKER_PATTERN.test(name));
+        return readdirSync(slotDirectory).filter((slotFileName) =>
+          SLOT_MARKER_PATTERN.test(slotFileName),
+        );
       });
 
     it("does not fail the run", { timeout: 15_000 }, ({ theCodeOfARunUnderAWordedLimit }) => {
@@ -612,7 +659,9 @@ describe("runThrottle", () => {
         pollMs: 1000,
         isInteractive: false,
       });
-      return readdirSync(slotDirectory).filter((name) => SLOT_MARKER_PATTERN.test(name));
+      return readdirSync(slotDirectory).filter((slotFileName) =>
+        SLOT_MARKER_PATTERN.test(slotFileName),
+      );
     });
 
     it("falls back to one slot", { timeout: 15_000 }, ({ theMarkersUnderALimitOfZero }) => {
@@ -630,7 +679,9 @@ describe("runThrottle", () => {
         pollMs: 1000,
         isInteractive: false,
       });
-      return readdirSync(slotDirectory).filter((name) => SLOT_MARKER_PATTERN.test(name));
+      return readdirSync(slotDirectory).filter((slotFileName) =>
+        SLOT_MARKER_PATTERN.test(slotFileName),
+      );
     });
 
     it("falls back to one slot", { timeout: 15_000 }, ({ theMarkersUnderANegativeLimit }) => {

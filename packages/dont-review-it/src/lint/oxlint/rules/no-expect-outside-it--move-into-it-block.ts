@@ -22,8 +22,8 @@ import { testBlockRootIdentifier } from "../lib/spec-syntax/test-block-modifiers
 
 import type { ESTree, FixFn, Options, Variable } from "@oxlint/plugins";
 
-const blockSpellingFrom = (options: Readonly<Options>): string => {
-  const configured = optionsRecord(options)?.blockSpelling;
+const blockSpellingFrom = (ruleConfiguration: Readonly<Options>): string => {
+  const configured = optionsRecord(ruleConfiguration)?.blockSpelling;
   return typeof configured === "string" ? configured : "it";
 };
 
@@ -37,20 +37,20 @@ const blockBodiesOf = (call: ESTree.CallExpression): readonly BlockBody[] => {
   const root = testBlockRootIdentifier(call.callee);
   if (root === null || !carriesSpelledTitle(call)) return [];
 
-  return testCallbacksOf(call).map((callback) => ({
+  return testCallbacksOf(call).map((blockFunction) => ({
     root,
-    start: callback.start,
-    end: callback.end,
+    start: blockFunction.start,
+    end: blockFunction.end,
   }));
 };
 
 const innermostBodyAround = (
   assertion: ESTree.CallExpression,
-  bodies: readonly BlockBody[],
+  blockBodies: readonly BlockBody[],
 ): BlockBody | null =>
-  bodies
-    .filter((body) => body.start <= assertion.start && assertion.end <= body.end)
-    .toSorted((held, other) => other.start - held.start)
+  blockBodies
+    .filter((blockBody) => blockBody.start <= assertion.start && assertion.end <= blockBody.end)
+    .toSorted((heldBody, comparedBody) => comparedBody.start - heldBody.start)
     .at(0) ?? null;
 
 const receiverRootName = (
@@ -104,10 +104,12 @@ const namesRootedAt = (
   reached: ReadonlySet<string>,
   bases: ReadonlyMap<string, string>,
 ): ReadonlySet<string> => {
-  const gained = [...bases].filter(([name, base]) => !reached.has(name) && reached.has(base));
+  const gained = [...bases].filter(
+    ([derivedName, baseName]) => !reached.has(derivedName) && reached.has(baseName),
+  );
   if (gained.length === 0) return reached;
 
-  return namesRootedAt(new Set([...reached, ...gained.map(([name]) => name)]), bases);
+  return namesRootedAt(new Set([...reached, ...gained.map(([derivedName]) => derivedName)]), bases);
 };
 
 const exportedNamesOf = (declaration: ESTree.ExportNamedDeclaration): readonly string[] => {
@@ -162,8 +164,8 @@ export const noExpectOutsideIt = createDontReviewItRule({
     ],
     fixable: "code",
   },
-  create(context) {
-    const required = blockSpellingFrom(context.options);
+  create(inspection) {
+    const required = blockSpellingFrom(inspection.options);
     const harvested = {
       chainBases: new Map<string, string>(),
       factoryNames: new Set<string>(),
@@ -186,13 +188,13 @@ export const noExpectOutsideIt = createDontReviewItRule({
       root: ESTree.IdentifierReference,
       blockRootNames: ReadonlySet<string>,
     ): boolean => {
-      const bound = resolveBinding(context.sourceCode.getScope(root), root.name);
+      const bound = resolveBinding(inspection.sourceCode.getScope(root), root.name);
       if (bound !== null) return blockRootNames.has(root.name);
       return INJECTED_TEST_BLOCK_SPELLINGS.has(root.name) || root.name === required;
     };
 
     const renameFixOf = (root: ESTree.IdentifierReference): FixFn | null => {
-      const scope = context.sourceCode.getScope(root);
+      const scope = inspection.sourceCode.getScope(root);
       const bound = resolveBinding(scope, root.name);
       if (bound === null) {
         return INJECTED_TEST_BLOCK_SPELLINGS.has(required)
@@ -224,7 +226,7 @@ export const noExpectOutsideIt = createDontReviewItRule({
         messageId === "foreignTestBlockAssertion" && !harvested.fixedRoots.has(root.start);
       const fix = rewritable ? renameFixOf(root) : null;
       if (fix !== null) harvested.fixedRoots.add(root.start);
-      context.report({
+      inspection.report({
         node: asked.assertion,
         messageId,
         data: { written, required },
@@ -238,9 +240,9 @@ export const noExpectOutsideIt = createDontReviewItRule({
       readonly blockRootNames: ReadonlySet<string>;
       readonly entryRootNames: ReadonlySet<string>;
     }): void => {
-      const kind = assertionKindOf(asked.call, asked.entryRootNames);
-      if (kind === null) return;
-      if (asked.body !== null && kind === "assertion") {
+      const assertionKind = assertionKindOf(asked.call, asked.entryRootNames);
+      if (assertionKind === null) return;
+      if (asked.body !== null && assertionKind === "assertion") {
         reportPlacement({
           assertion: asked.call,
           body: asked.body,
@@ -250,25 +252,25 @@ export const noExpectOutsideIt = createDontReviewItRule({
       }
       if (asked.body !== null && runnerRooted(asked.body.root, asked.blockRootNames)) return;
 
-      const messageId = kind === "assertion" ? "detachedAssertion" : "strayAssertionCount";
-      context.report({ node: asked.call, messageId, data: { required } });
+      const messageId = assertionKind === "assertion" ? "detachedAssertion" : "strayAssertionCount";
+      inspection.report({ node: asked.call, messageId, data: { required } });
     };
 
     return {
       VariableDeclarator: takeDerivation,
       ExportNamedDeclaration(node: ESTree.ExportNamedDeclaration) {
-        for (const name of exportedNamesOf(node)) harvested.exportedNames.add(name);
+        for (const exportedName of exportedNamesOf(node)) harvested.exportedNames.add(exportedName);
       },
       "Program:exit"(program: ESTree.Program) {
         const blockRootNames = runnerRootedTestBlockRootNames(program);
         const entryRootNames = assertionEntryRootNames(program);
         const calls = nodesOfType(program, "CallExpression");
-        const bodies = calls.flatMap((call) => blockBodiesOf(call));
+        const blockBodies = calls.flatMap((call) => blockBodiesOf(call));
 
         for (const call of calls) {
           reportCall({
             call,
-            body: innermostBodyAround(call, bodies),
+            body: innermostBodyAround(call, blockBodies),
             blockRootNames,
             entryRootNames,
           });

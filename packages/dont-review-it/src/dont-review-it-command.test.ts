@@ -1319,6 +1319,7 @@ describe("dontReviewItCommand", () => {
         onCleanup(() => {
           rmSync(root, { recursive: true, force: true });
         });
+        writeFileSync(join(root, "renovate.json"), "{}\n", "utf8");
         mkdirSync(join(root, ".github/workflows"), { recursive: true });
         writeFileSync(
           join(root, ".github/workflows/ci.yml"),
@@ -1335,6 +1336,7 @@ describe("dontReviewItCommand", () => {
         onCleanup(() => {
           rmSync(root, { recursive: true, force: true });
         });
+        writeFileSync(join(root, "renovate.json"), "{}\n", "utf8");
         mkdirSync(join(root, ".github/workflows"), { recursive: true });
         writeFileSync(
           join(root, ".github/workflows/ci.yml"),
@@ -1352,6 +1354,7 @@ describe("dontReviewItCommand", () => {
           onCleanup(() => {
             rmSync(root, { recursive: true, force: true });
           });
+          writeFileSync(join(root, "renovate.json"), "{}\n", "utf8");
           mkdirSync(join(root, ".github/workflows"), { recursive: true });
           writeFileSync(
             join(root, ".github/workflows/ci.yml"),

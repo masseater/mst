@@ -123,7 +123,7 @@ describe("spawnSiteAt", () => {
   });
 
   describe("a call taking no argument", () => {
-    const it = test.extend("target", () => {
+    const it = test.extend("carriedTarget", () => {
       const statements = parseSync(
         SPEC_FILE,
         'import { execSync } from "node:child_process";\nexecSync();',
@@ -135,12 +135,12 @@ describe("spawnSiteAt", () => {
         forms: DEFAULT_SPAWN_FORMS,
       });
       if (site === null) throw new Error("no starting form was reached");
-      const { target } = site;
-      return target;
+      const { target: carriedTarget } = site;
+      return carriedTarget;
     });
 
-    it("carries no target", ({ target }) => {
-      expect(target).toBe(null);
+    it("carries no target", ({ carriedTarget }) => {
+      expect(carriedTarget).toBe(null);
     });
   });
 
@@ -646,7 +646,7 @@ describe("spawnRoutesIn", () => {
 
 describe("handedTextsOf", () => {
   describe("a call spelling its arguments out one by one", () => {
-    const it = test.extend("texts", () => {
+    const it = test.extend("handedTexts", () => {
       const statements = parseSync(
         SPEC_FILE,
         'import { spawn } from "node:child_process";\nspawn("npx", ["lerna", "run"]);',
@@ -662,13 +662,13 @@ describe("handedTextsOf", () => {
       return handedTextsOf({ handed, constants: new Map() });
     });
 
-    it("comes back as text", ({ texts }) => {
-      expect(texts).toStrictEqual(["lerna", "run"]);
+    it("comes back as text", ({ handedTexts }) => {
+      expect(handedTexts).toStrictEqual(["lerna", "run"]);
     });
   });
 
   describe("a call handing anything but a list", () => {
-    const it = test.extend("texts", () => {
+    const it = test.extend("handedTexts", () => {
       const statements = parseSync(
         SPEC_FILE,
         'import { spawn } from "node:child_process";\nspawn("npx", handed);',
@@ -684,13 +684,13 @@ describe("handedTextsOf", () => {
       return handedTextsOf({ handed, constants: new Map() });
     });
 
-    it("comes back as nothing", ({ texts }) => {
-      expect(texts).toBe(null);
+    it("comes back as nothing", ({ handedTexts }) => {
+      expect(handedTexts).toBe(null);
     });
   });
 
   describe("a call nobody wrote arguments for", () => {
-    const it = test.extend("texts", () => {
+    const it = test.extend("handedTexts", () => {
       const statements = parseSync(
         SPEC_FILE,
         'import { spawn } from "node:child_process";\nspawn("npx");',
@@ -706,13 +706,13 @@ describe("handedTextsOf", () => {
       return handedTextsOf({ handed, constants: new Map() });
     });
 
-    it("comes back as nothing", ({ texts }) => {
-      expect(texts).toBe(null);
+    it("comes back as nothing", ({ handedTexts }) => {
+      expect(handedTexts).toBe(null);
     });
   });
 
   describe("a list holding an argument nobody can fold", () => {
-    const it = test.extend("texts", () => {
+    const it = test.extend("handedTexts", () => {
       const statements = parseSync(
         SPEC_FILE,
         'import { spawn } from "node:child_process";\nspawn("npx", [chosen]);',
@@ -728,8 +728,8 @@ describe("handedTextsOf", () => {
       return handedTextsOf({ handed, constants: new Map() });
     });
 
-    it("comes back as nothing", ({ texts }) => {
-      expect(texts).toBe(null);
+    it("comes back as nothing", ({ handedTexts }) => {
+      expect(handedTexts).toBe(null);
     });
   });
 });

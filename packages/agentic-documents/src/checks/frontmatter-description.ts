@@ -30,8 +30,8 @@ const frontmatterOf = (document: NormativeDocument): Record<string, unknown> | n
   const [first] = document.tree.children;
   if (first?.type !== "yaml") return null;
 
-  const parsed: unknown = parse(first.value);
-  return isPlainObject(parsed) ? parsed : null;
+  const parsedFrontmatter: unknown = parse(first.value);
+  return isPlainObject(parsedFrontmatter) ? parsedFrontmatter : null;
 };
 
 const manifestDescriptionOf = async ({

@@ -95,7 +95,9 @@ describe("UNVERIFIED_REGION_BY_WEAK_MATCHER", () => {
       .extend("theRegionAnExactMatcherLeavesAlone", () =>
         UNVERIFIED_REGION_BY_WEAK_MATCHER.get("toStrictEqual"))
       .extend("weakMatchersThatAreAlsoExact", () =>
-        [...UNVERIFIED_REGION_BY_WEAK_MATCHER.keys()].filter((name) => EXACT_MATCHERS.has(name)),
+        [...UNVERIFIED_REGION_BY_WEAK_MATCHER.keys()].filter((weakMatcher) =>
+          EXACT_MATCHERS.has(weakMatcher),
+        ),
       );
 
     it("names no unverified region", ({ theRegionAnExactMatcherLeavesAlone }) => {
@@ -112,8 +114,8 @@ describe("UNVERIFIED_REGION_BY_WEAK_MATCHER", () => {
       .extend("theRegionACallContractMatcherLeavesAlone", () =>
         UNVERIFIED_REGION_BY_WEAK_MATCHER.get("toHaveBeenCalledWith"))
       .extend("weakMatchersThatAlsoPinHowAMockWasCalled", () =>
-        [...UNVERIFIED_REGION_BY_WEAK_MATCHER.keys()].filter((name) =>
-          CALL_CONTRACT_MATCHERS.has(name),
+        [...UNVERIFIED_REGION_BY_WEAK_MATCHER.keys()].filter((weakMatcher) =>
+          CALL_CONTRACT_MATCHERS.has(weakMatcher),
         ),
       );
 
@@ -228,8 +230,8 @@ describe("CANONICAL_SPELLING_BY_REDUNDANT_MATCHER", () => {
   describe("the one spelling a redundant matcher points at", () => {
     const it = test.extend("redundantMatchersPointingAtAnotherRedundantSpelling", () =>
       [...CANONICAL_SPELLING_BY_REDUNDANT_MATCHER.values()].filter((writeInstead) =>
-        [...CANONICAL_SPELLING_BY_REDUNDANT_MATCHER.keys()].some((name) =>
-          writeInstead.startsWith(`${name}(`),
+        [...CANONICAL_SPELLING_BY_REDUNDANT_MATCHER.keys()].some((redundantMatcher) =>
+          writeInstead.startsWith(`${redundantMatcher}(`),
         ),
       ));
 
@@ -332,7 +334,9 @@ describe("THROW_EXPECTING_MATCHERS", () => {
 
   describe("turning an assertion around", () => {
     const it = test.extend("throwExpectingMatchersFiledAsChainModifiers", () =>
-      [...THROW_EXPECTING_MATCHERS].filter((name) => ASSERTION_CHAIN_MODIFIERS.has(name)));
+      [...THROW_EXPECTING_MATCHERS].filter((throwExpectingMatcher) =>
+        ASSERTION_CHAIN_MODIFIERS.has(throwExpectingMatcher),
+      ));
 
     it("leaves the matcher that demands the failure spelled the same", ({
       throwExpectingMatchersFiledAsChainModifiers,

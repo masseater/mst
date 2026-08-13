@@ -6,6 +6,7 @@ import {
   mkdtempSync,
   readdirSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -27,11 +28,11 @@ const STALE_MS = 5000;
 
 describe("ensureSlots", () => {
   const slotTest = test.extend("slotDirectory", ({}, { onCleanup }) => {
-    const created = mkdtempSync(join(tmpdir(), "throttle-slots-"));
+    const temporarySlotDirectory = mkdtempSync(join(tmpdir(), "throttle-slots-"));
     onCleanup(() => {
-      rmSync(created, { recursive: true, force: true });
+      rmSync(temporarySlotDirectory, { recursive: true, force: true });
     });
-    return created;
+    return temporarySlotDirectory;
   });
 
   describe("a directory ensured twice for three slots", () => {
@@ -73,15 +74,99 @@ describe("ensureSlots", () => {
       expect(waitersDirectoryAfterEnsuringTwice).toBe(true);
     });
   });
+
+  describe("a lock left behind by a killed holder as a plain file", () => {
+    const it = slotTest
+      .extend("theStrandedPlainFileLockAfterEnsuring", ({ slotDirectory }) => {
+        ensureSlots(slotDirectory, 1);
+        writeFileSync(join(slotDirectory, "slot-0.lock"), "");
+        ensureSlots(slotDirectory, 1);
+        return existsSync(join(slotDirectory, "slot-0.lock"));
+      })
+      .extend("aSlotHeldAfterEnsuringOverTheStrandedLock", async ({ slotDirectory }) => {
+        ensureSlots(slotDirectory, 1);
+        writeFileSync(join(slotDirectory, "slot-0.lock"), "");
+        ensureSlots(slotDirectory, 1);
+        const held = await tryAcquireAny({
+          slotDir: slotDirectory,
+          limit: 1,
+          staleMs: STALE_MS,
+          onCompromised: (failure) => {
+            throw failure;
+          },
+        });
+        await held?.release();
+        return held !== null;
+      });
+
+    it("discards the stranded lock", ({ theStrandedPlainFileLockAfterEnsuring }) => {
+      expect(theStrandedPlainFileLockAfterEnsuring).toBe(false);
+    });
+
+    it("leaves the slot free to be taken", ({ aSlotHeldAfterEnsuringOverTheStrandedLock }) => {
+      expect(aSlotHeldAfterEnsuringOverTheStrandedLock).toBe(true);
+    });
+  });
+
+  describe("a slot ensured again while a live holder keeps it", () => {
+    const it = slotTest.extend(
+      "aRivalArrivingAfterEnsuringOverALiveHold",
+      async ({ slotDirectory }) => {
+        ensureSlots(slotDirectory, 1);
+        const held = await tryAcquireAny({
+          slotDir: slotDirectory,
+          limit: 1,
+          staleMs: STALE_MS,
+          onCompromised: (failure) => {
+            throw failure;
+          },
+        });
+        ensureSlots(slotDirectory, 1);
+        const rival = await tryAcquireAny({
+          slotDir: slotDirectory,
+          limit: 1,
+          staleMs: STALE_MS,
+          onCompromised: (failure) => {
+            throw failure;
+          },
+        });
+        await held?.release();
+        return rival;
+      },
+    );
+
+    it("leaves the live hold standing", ({ aRivalArrivingAfterEnsuringOverALiveHold }) => {
+      expect(aRivalArrivingAfterEnsuringOverALiveHold).toBe(null);
+    });
+  });
+
+  describe("a lock path that stat cannot follow", () => {
+    const it = slotTest.extend("theRefusalOfALockPointingAtItself", ({ slotDirectory }) => {
+      ensureSlots(slotDirectory, 1);
+      symlinkSync(join(slotDirectory, "slot-0.lock"), join(slotDirectory, "slot-0.lock"));
+      try {
+        ensureSlots(slotDirectory, 1);
+      } catch (refused) {
+        return refused instanceof Error ? refused.message.split(",")[0] : String(refused);
+      }
+      throw new Error("ensureSlots swallowed the lock it could not read");
+    });
+
+    it("hands the refusal on rather than discarding the lock", ({
+      theRefusalOfALockPointingAtItself,
+    }) => {
+      expect(theRefusalOfALockPointingAtItself).toBe("ELOOP: too many symbolic links encountered");
+    });
+  });
 });
 
 describe("tryAcquireAny", () => {
   const slotTest = test.extend("slotDirectory", ({}, { onCleanup }) => {
-    const created = mkdtempSync(join(tmpdir(), "throttle-slots-"));
+    const temporarySlotDirectory = mkdtempSync(join(tmpdir(), "throttle-slots-"));
     onCleanup(() => {
-      rmSync(created, { recursive: true, force: true });
+      rmSync(temporarySlotDirectory, { recursive: true, force: true });
     });
-    return created;
+    return temporarySlotDirectory;
   });
 
   describe("the only slot standing free", () => {
@@ -144,7 +229,7 @@ describe("tryAcquireAny", () => {
         },
       });
       await held?.release();
-      const next = await tryAcquireAny({
+      const holdAfterRelease = await tryAcquireAny({
         slotDir: slotDirectory,
         limit: 1,
         staleMs: STALE_MS,
@@ -152,8 +237,8 @@ describe("tryAcquireAny", () => {
           throw failure;
         },
       });
-      await next?.release();
-      return next !== null;
+      await holdAfterRelease?.release();
+      return holdAfterRelease !== null;
     });
 
     it("hands back the slot again", ({ anAcquisitionAfterRelease }) => {
@@ -190,21 +275,21 @@ describe("tryAcquireAny", () => {
 
 describe("slotStateFingerprint", () => {
   const slotTest = test.extend("slotDirectory", ({}, { onCleanup }) => {
-    const created = mkdtempSync(join(tmpdir(), "throttle-slots-"));
+    const temporarySlotDirectory = mkdtempSync(join(tmpdir(), "throttle-slots-"));
     onCleanup(() => {
-      rmSync(created, { recursive: true, force: true });
+      rmSync(temporarySlotDirectory, { recursive: true, force: true });
     });
-    return created;
+    return temporarySlotDirectory;
   });
 
   describe("two slots standing free", () => {
     const it = test.extend("theFingerprintOfFreeSlots", ({}, { onCleanup }) => {
-      const created = mkdtempSync(join(tmpdir(), "throttle-slots-"));
+      const temporarySlotDirectory = mkdtempSync(join(tmpdir(), "throttle-slots-"));
       onCleanup(() => {
-        rmSync(created, { recursive: true, force: true });
+        rmSync(temporarySlotDirectory, { recursive: true, force: true });
       });
-      ensureSlots(created, 2);
-      return slotStateFingerprint(created, 2);
+      ensureSlots(temporarySlotDirectory, 2);
+      return slotStateFingerprint(temporarySlotDirectory, 2);
     });
 
     it("names every free slot as free", ({ theFingerprintOfFreeSlots }) => {
@@ -276,11 +361,11 @@ describe("slotStateFingerprint", () => {
 
 describe("sweepWaiters", () => {
   const slotTest = test.extend("slotDirectory", ({}, { onCleanup }) => {
-    const created = mkdtempSync(join(tmpdir(), "throttle-slots-"));
+    const temporarySlotDirectory = mkdtempSync(join(tmpdir(), "throttle-slots-"));
     onCleanup(() => {
-      rmSync(created, { recursive: true, force: true });
+      rmSync(temporarySlotDirectory, { recursive: true, force: true });
     });
-    return created;
+    return temporarySlotDirectory;
   });
 
   describe("a queue holding this process's entry beside four planted ones", () => {
@@ -323,7 +408,7 @@ describe("sweepWaiters", () => {
         );
         writeFileSync(join(waiters, "0000000000004-root-dddddddd"), "1\n");
         const survivors = sweepWaiters(slotDirectory);
-        return readdirSync(waiters).filter((name) => !survivors.includes(name));
+        return readdirSync(waiters).filter((waiterFilename) => !survivors.includes(waiterFilename));
       })
       .extend("theSurvivorsSweepingKeptThatAreGoneFromDisk", ({ slotDirectory }) => {
         ensureSlots(slotDirectory, 1);
@@ -337,7 +422,9 @@ describe("sweepWaiters", () => {
         );
         writeFileSync(join(waiters, "0000000000004-root-dddddddd"), "1\n");
         const survivors = sweepWaiters(slotDirectory);
-        return survivors.filter((name) => !readdirSync(waiters).includes(name));
+        return survivors.filter(
+          (survivingWaiterFilename) => !readdirSync(waiters).includes(survivingWaiterFilename),
+        );
       });
 
     it("keeps the live entries in name order", ({ theSurvivorsBesideTheOwnWaiterEntry }) => {
@@ -360,19 +447,19 @@ describe("sweepWaiters", () => {
 
 describe("removeWaiter", () => {
   const slotTest = test.extend("slotDirectory", ({}, { onCleanup }) => {
-    const created = mkdtempSync(join(tmpdir(), "throttle-slots-"));
+    const temporarySlotDirectory = mkdtempSync(join(tmpdir(), "throttle-slots-"));
     onCleanup(() => {
-      rmSync(created, { recursive: true, force: true });
+      rmSync(temporarySlotDirectory, { recursive: true, force: true });
     });
-    return created;
+    return temporarySlotDirectory;
   });
 
   describe("an entry removed twice", () => {
     const it = slotTest.extend("theWaitersLeftAfterRemovingTwice", ({ slotDirectory }) => {
       ensureSlots(slotDirectory, 1);
-      const entry = enqueueWaiter(slotDirectory);
-      removeWaiter(entry);
-      removeWaiter(entry);
+      const waiterEntry = enqueueWaiter(slotDirectory);
+      removeWaiter(waiterEntry);
+      removeWaiter(waiterEntry);
       return readdirSync(join(slotDirectory, "waiters"));
     });
 
@@ -384,11 +471,11 @@ describe("removeWaiter", () => {
 
 describe("enqueueWaiter", () => {
   const slotTest = test.extend("slotDirectory", ({}, { onCleanup }) => {
-    const created = mkdtempSync(join(tmpdir(), "throttle-slots-"));
+    const temporarySlotDirectory = mkdtempSync(join(tmpdir(), "throttle-slots-"));
     onCleanup(() => {
-      rmSync(created, { recursive: true, force: true });
+      rmSync(temporarySlotDirectory, { recursive: true, force: true });
     });
-    return created;
+    return temporarySlotDirectory;
   });
 
   describe("two entries enqueued in turn", () => {
@@ -401,7 +488,7 @@ describe("enqueueWaiter", () => {
         const second = enqueueWaiter(slotDirectory);
         return (
           sweepWaiters(slotDirectory).join("\n") ===
-          [first, second].map((entry) => basename(entry)).join("\n")
+          [first, second].map((enqueuedWaiter) => basename(enqueuedWaiter)).join("\n")
         );
       },
     );
@@ -417,15 +504,15 @@ describe("enqueueWaiter", () => {
 describe("a slot directory this process may not read", () => {
   describe("a fingerprint read off a directory closed to this process", () => {
     const it = test.extend("theRefusalOfAClosedSlotDirectory", ({}, { onCleanup }) => {
-      const created = mkdtempSync(join(tmpdir(), "throttle-slots-"));
+      const temporarySlotDirectory = mkdtempSync(join(tmpdir(), "throttle-slots-"));
       onCleanup(() => {
-        chmodSync(created, 0o700);
-        rmSync(created, { recursive: true, force: true });
+        chmodSync(temporarySlotDirectory, 0o700);
+        rmSync(temporarySlotDirectory, { recursive: true, force: true });
       });
-      ensureSlots(created, 1);
-      chmodSync(created, 0o000);
+      ensureSlots(temporarySlotDirectory, 1);
+      chmodSync(temporarySlotDirectory, 0o000);
       try {
-        return slotStateFingerprint(created, 1);
+        return slotStateFingerprint(temporarySlotDirectory, 1);
       } catch (refused) {
         return refused instanceof Error ? refused.message.split(",")[0] : String(refused);
       }
@@ -440,15 +527,15 @@ describe("a slot directory this process may not read", () => {
 
   describe("a sweep over an entry closed to this process", () => {
     const it = test.extend("theRefusalOfAClosedWaiterEntry", ({}, { onCleanup }) => {
-      const created = mkdtempSync(join(tmpdir(), "throttle-slots-"));
+      const temporarySlotDirectory = mkdtempSync(join(tmpdir(), "throttle-slots-"));
       onCleanup(() => {
-        chmodSync(created, 0o700);
-        rmSync(created, { recursive: true, force: true });
+        chmodSync(temporarySlotDirectory, 0o700);
+        rmSync(temporarySlotDirectory, { recursive: true, force: true });
       });
-      ensureSlots(created, 1);
-      chmodSync(enqueueWaiter(created), 0o000);
+      ensureSlots(temporarySlotDirectory, 1);
+      chmodSync(enqueueWaiter(temporarySlotDirectory), 0o000);
       try {
-        return sweepWaiters(created);
+        return sweepWaiters(temporarySlotDirectory);
       } catch (refused) {
         return refused instanceof Error ? refused.message.split(",")[0] : String(refused);
       }

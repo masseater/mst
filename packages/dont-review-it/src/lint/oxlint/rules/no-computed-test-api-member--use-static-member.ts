@@ -38,16 +38,16 @@ export const noComputedTestApiMember = createDontReviewItRule({
     schema: [],
     fixable: "code",
   },
-  create(context) {
+  create(inspection) {
     const reportSubscript = (node: ESTree.ComputedMemberExpression): void => {
       const member = staticSpelling(node.property);
       if (member === null) {
-        context.report({ node: node.property, messageId: "unreadableSubscript" });
+        inspection.report({ node: node.property, messageId: "unreadableSubscript" });
         return;
       }
 
       const written = `${node.optional ? "?." : "."}${member}`;
-      context.report({
+      inspection.report({
         node: node.property,
         messageId: "spelledSubscript",
         data: { member },

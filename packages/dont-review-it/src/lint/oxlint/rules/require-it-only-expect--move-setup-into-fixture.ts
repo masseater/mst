@@ -24,8 +24,8 @@ const ASSERTION_NAMESPACE = "expect";
 
 const ALLOWED_UTILITIES_OPTION = "allowedExpectUtilities";
 
-const allowedUtilitiesFrom = (options: Readonly<Options>): ReadonlySet<string> => {
-  const [first] = options;
+const allowedUtilitiesFrom = (ruleOptions: Readonly<Options>): ReadonlySet<string> => {
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) {
     return ASSERTION_COUNT_DECLARATIONS;
   }
@@ -101,13 +101,13 @@ const testCallbackOf = (call: ESTree.CallExpression): SpecFunction | null => {
   return handed.flatMap((argument) => asSpecFunction(argument) ?? []).at(-1) ?? null;
 };
 
-const statementsOf = (callback: SpecFunction): readonly SpecStatement[] => {
-  const body = blockBodyOf(callback);
-  return body === null ? [] : body.body;
+const statementsOf = (takenFunction: SpecFunction): readonly SpecStatement[] => {
+  const writtenBody = blockBodyOf(takenFunction);
+  return writtenBody === null ? [] : writtenBody.body;
 };
 
-const conciseBodyOf = (callback: SpecFunction): ESTree.Expression | null => {
-  const { body } = callback;
+const conciseBodyOf = (takenFunction: SpecFunction): ESTree.Expression | null => {
+  const { body } = takenFunction;
   return body === null || body.type === "BlockStatement" ? null : body;
 };
 
@@ -138,10 +138,10 @@ const readingOf = (statement: SpecStatement): Reading => {
   return { expression: null, reported: statement, messageId };
 };
 
-const readingsIn = (callback: SpecFunction): readonly Reading[] => {
-  const concise = conciseBodyOf(callback);
+const readingsIn = (takenFunction: SpecFunction): readonly Reading[] => {
+  const concise = conciseBodyOf(takenFunction);
   return [
-    ...statementsOf(callback).map((statement) => readingOf(statement)),
+    ...statementsOf(takenFunction).map((statement) => readingOf(statement)),
     ...(concise === null
       ? []
       : [{ expression: concise, reported: concise, messageId: "nonAssertionBody" }]),
@@ -193,17 +193,17 @@ export const requireItOnlyExpect = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
-    const allowed = allowedUtilitiesFrom(context.options);
+    const allowed = allowedUtilitiesFrom(inspection.options);
 
     return {
       "Program:exit"(program: ESTree.Program) {
         const calls = nodesOfType(program, "CallExpression");
         const readings = calls
           .flatMap((call) => testCallbackOf(call) ?? [])
-          .flatMap((callback) => readingsIn(callback));
+          .flatMap((takenFunction) => readingsIn(takenFunction));
         const executions = [
           ...calls,
           ...nodesOfType(program, "NewExpression"),
@@ -218,7 +218,7 @@ export const requireItOnlyExpect = createDontReviewItRule({
             .map((utility) => ({ node: utility, messageId: "utilityArgument" })),
         ];
 
-        for (const finding of findings) context.report(finding);
+        for (const finding of findings) inspection.report(finding);
       },
     };
   },

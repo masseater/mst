@@ -34,10 +34,10 @@ type ScannedWorktree = {
 const holderOf = (workspace: string): string =>
   workspace === REPOSITORY_ROOT_WORKSPACE ? "the repository root" : `\`${workspace}\``;
 
-const contentGuaranteeOf = (entry: RequiredFileEntry): string =>
-  entry.contentChecks.length === 0
+const contentGuaranteeOf = (registration: RequiredFileEntry): string =>
+  registration.contentChecks.length === 0
     ? "What this file holds is read by no check, so this row asks only that it exists and holds something."
-    : `What this file holds is read by ${entry.contentChecks.map((name) => `\`${name}\``).join(", ")}, so a file that merely exists leaves the row unmet.`;
+    : `What this file holds is read by ${registration.contentChecks.map((checkName) => `\`${checkName}\``).join(", ")}, so a file that merely exists leaves the row unmet.`;
 
 const registeredPathIn = (asked: {
   readonly workspace: string;
@@ -107,26 +107,28 @@ const unmetInWorkspace = (
 
 const unmetFor = (
   scanned: ScannedWorktree,
-  entry: RequiredFileEntry,
+  registration: RequiredFileEntry,
 ): readonly UnmetRegistration[] => {
   const workspaces = holdingWorkspacesOf({
-    entry,
+    entry: registration,
     workspaceDirectories: scanned.workspaceDirectories,
   });
-  const { owner } = entry;
+  const { owner } = registration;
   if (owner !== null && workspaces.length === 0) {
     return [
       reportOf({
-        entry,
+        entry: registration,
         workspace: REPOSITORY_ROOT_WORKSPACE,
         messageId: DEAD_OWNER_REGISTRATION_MESSAGE_ID,
-        registeredPath: entry.pattern,
+        registeredPath: registration.pattern,
         holder: `\`${owner}\``,
       }),
     ];
   }
 
-  return workspaces.flatMap((workspace) => unmetInWorkspace(scanned, { entry, workspace }));
+  return workspaces.flatMap((workspace) =>
+    unmetInWorkspace(scanned, { entry: registration, workspace }),
+  );
 };
 
 const registryKeyOf = (registry: RequiredFileRegistry): string =>
@@ -147,7 +149,7 @@ export const unmetRegistrationsIn = memoize(
       filePaths,
       workspaceDirectories: workspaceDirectoriesIn(filePaths),
     };
-    const reports = registry.entries.flatMap((entry) => unmetFor(scanned, entry));
+    const reports = registry.entries.flatMap((registration) => unmetFor(scanned, registration));
     return new Map(Object.entries(groupBy(reports, (report) => report.workspace)));
   },
   { getCacheKey: registryKeyOf },

@@ -26,7 +26,10 @@ describe("gitExcludePatterns", () => {
         PATH: process.env.PATH ?? "",
       };
       const repositoryRoot = mkdtempSync(join(tmpdir(), "mst-git-excludes-repository-"));
-      execFileSync("git", ["init"], { cwd: repositoryRoot, env, stdio: "ignore" });
+      mkdirSync(join(repositoryRoot, ".git", "objects"), { recursive: true });
+      mkdirSync(join(repositoryRoot, ".git", "refs"), { recursive: true });
+      mkdirSync(join(repositoryRoot, ".git", "info"), { recursive: true });
+      writeFileSync(join(repositoryRoot, ".git", "HEAD"), "ref: refs/heads/main\n");
       writeFileSync(join(repositoryRoot, ".git", "info", "exclude"), "scratch/\n");
       writeFileSync(join(repositoryRoot, ".gitignore"), "dist/*\n!dist/keep.ts\n");
       return gitExcludePatterns({ cwd: repositoryRoot, env });

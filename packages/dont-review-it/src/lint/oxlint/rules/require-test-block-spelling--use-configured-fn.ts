@@ -20,19 +20,19 @@ const BLOCK_SPELLING_OPTION = "blockSpelling";
 
 const RUNNER_MODULES_OPTION = "runnerModules";
 
-const blockSpellingFrom = (options: Readonly<Options>): string => {
-  const configured = optionsRecord(options)?.[BLOCK_SPELLING_OPTION];
+const blockSpellingFrom = (ruleOptions: Readonly<Options>): string => {
+  const configured = optionsRecord(ruleOptions)?.[BLOCK_SPELLING_OPTION];
   return typeof configured === "string" ? configured : CANONICAL_BLOCK_SPELLING;
 };
 
-const runnerModulesFrom = (options: Readonly<Options>): readonly string[] => {
-  const configured = optionsRecord(options)?.[RUNNER_MODULES_OPTION];
+const runnerModulesFrom = (ruleOptions: Readonly<Options>): readonly string[] => {
+  const configured = optionsRecord(ruleOptions)?.[RUNNER_MODULES_OPTION];
   return Array.isArray(configured) ? configured : RUNNER_MODULES;
 };
 
-const boundVariable = (scope: Scope | null, name: string): Variable | null => {
+const boundVariable = (scope: Scope | null, identifierName: string): Variable | null => {
   if (scope === null) return null;
-  return scope.set.get(name) ?? boundVariable(scope.upper, name);
+  return scope.set.get(identifierName) ?? boundVariable(scope.upper, identifierName);
 };
 
 const initializerOf = (variable: Variable): ESTree.Expression | null => {
@@ -117,9 +117,9 @@ export const requireTestBlockSpelling = createDontReviewItRule({
     ],
     fixable: "code",
   },
-  create(context) {
-    const required = blockSpellingFrom(context.options);
-    const runnerModules = runnerModulesFrom(context.options);
+  create(inspection) {
+    const required = blockSpellingFrom(inspection.options);
+    const runnerModules = runnerModulesFrom(inspection.options);
 
     const runnerBlockKind = ({
       root,
@@ -133,7 +133,7 @@ export const requireTestBlockSpelling = createDontReviewItRule({
       if (seen.has(root.name)) return null;
       if (importedBlocks.has(root.name)) return "binding";
 
-      const variable = boundVariable(context.sourceCode.getScope(root), root.name);
+      const variable = boundVariable(inspection.sourceCode.getScope(root), root.name);
       if (variable === null)
         return INJECTED_TEST_BLOCK_SPELLINGS.has(root.name) ? "injected" : null;
 
@@ -157,15 +157,15 @@ export const requireTestBlockSpelling = createDontReviewItRule({
     ): void => {
       if (root.name === required) return;
 
-      const kind = runnerBlockKind({ root, importedBlocks, seen: new Set() });
-      if (kind === null) return;
+      const blockOrigin = runnerBlockKind({ root, importedBlocks, seen: new Set() });
+      if (blockOrigin === null) return;
 
       const report = { node: root, data: { written: root.name, required } };
-      if (kind === "binding") {
-        context.report({ ...report, messageId: "foreignBlockBinding" });
+      if (blockOrigin === "binding") {
+        inspection.report({ ...report, messageId: "foreignBlockBinding" });
         return;
       }
-      context.report({
+      inspection.report({
         ...report,
         messageId: "foreignBlockSpelling",
         fix: (fixer) => fixer.replaceText(root, required),

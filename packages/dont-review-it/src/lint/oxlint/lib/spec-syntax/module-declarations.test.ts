@@ -19,7 +19,7 @@ describe("moduleDeclarationsOf", () => {
             (statement) => statement as SpecStatement,
           ),
         ).initializerByName,
-      ].map(([name, bound]) => [name, bound.type]));
+      ].map(([boundName, bound]) => [boundName, bound.type]));
 
     it("names the value that constant is bound to", ({
       namesAndKindsBoundInAModuleExportingAConstant,
@@ -40,7 +40,7 @@ describe("moduleDeclarationsOf", () => {
             "export function ordered(rows) {\n  return rows;\n}",
           ).program.body.map((statement) => statement as SpecStatement),
         ).initializerByName,
-      ].map(([name, bound]) => [name, bound.type]));
+      ].map(([boundName, bound]) => [boundName, bound.type]));
 
     it("names the function that declaration introduces", ({
       namesAndKindsBoundInAModuleExportingAFunction,
@@ -60,7 +60,7 @@ describe("moduleDeclarationsOf", () => {
             (statement) => statement as SpecStatement,
           ),
         ).initializerByName,
-      ].map(([name, bound]) => [name, bound.type]));
+      ].map(([boundName, bound]) => [boundName, bound.type]));
 
     it("is nothing this reading can look up", ({
       namesAndKindsBoundByADeclarationWithoutAName,
@@ -79,7 +79,7 @@ describe("moduleDeclarationsOf", () => {
             "let ordered;\nconst [head] = rows;\ndeclare const listed: string;",
           ).program.body.map((statement) => statement as SpecStatement),
         ).initializerByName,
-      ].map(([name, bound]) => [name, bound.type]));
+      ].map(([boundName, bound]) => [boundName, bound.type]));
 
     it("are nothing this reading can look up", ({
       namesAndKindsBoundByBindingsWithoutAnInitialiser,

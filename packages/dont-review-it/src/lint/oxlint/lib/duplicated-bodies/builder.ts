@@ -20,13 +20,15 @@ const indexedFileAt = (file: ScannedFile): IndexedFile | null => {
   const source = readTextFile(file.absolutePath);
   if (source === null) return null;
 
-  const bodies = declarationsIn(source).map((declaration) => ({
+  const declarationFingerprints = declarationsIn(source).map((declaration) => ({
     name: declaration.name,
     line: declaration.line,
     fingerprint: declaration.structure,
     nodeCount: declaration.nodeCount,
   }));
-  return bodies.length === 0 ? null : { relativePath: file.relativePath, bodies };
+  return declarationFingerprints.length === 0
+    ? null
+    : { relativePath: file.relativePath, bodies: declarationFingerprints };
 };
 
 export const buildRepositoryBodyIndex = ({
@@ -46,5 +48,8 @@ const bodyIndexUnder = memoize(
   (repositoryRoot: string): BodyIndex => buildRepositoryBodyIndex({ repositoryRoot }),
 );
 
-export const loadRepositoryBodyIndex = (options: { readonly repositoryRoot: string }): BodyIndex =>
-  bodyIndexUnder(resolve(options.repositoryRoot));
+export const loadRepositoryBodyIndex = ({
+  repositoryRoot,
+}: {
+  readonly repositoryRoot: string;
+}): BodyIndex => bodyIndexUnder(resolve(repositoryRoot));

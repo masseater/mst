@@ -39,8 +39,8 @@ export const noExpectSyntheticSubject = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
     const syntheticSubjectOf = (
       node: ESTree.Expression,
@@ -51,7 +51,7 @@ export const noExpectSyntheticSubject = createDontReviewItRule({
       if (shape !== null) return { boundAs: null, shape };
       if (written.type !== "Identifier") return null;
 
-      const bound = resolveBinding(context.sourceCode.getScope(written), written.name);
+      const bound = resolveBinding(inspection.sourceCode.getScope(written), written.name);
       if (bound === null || walked.has(bound)) return null;
 
       const initialiser = boundInitialiserOf(bound);
@@ -73,7 +73,7 @@ export const noExpectSyntheticSubject = createDontReviewItRule({
         if (synthetic === null) return;
 
         const { boundAs, shape } = synthetic;
-        context.report(
+        inspection.report(
           boundAs === null
             ? { node: subject, messageId: "syntheticSubject", data: { shape } }
             : { node: subject, messageId: "boundSyntheticSubject", data: { name: boundAs, shape } },

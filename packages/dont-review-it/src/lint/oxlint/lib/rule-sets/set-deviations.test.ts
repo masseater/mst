@@ -30,11 +30,13 @@ describe("setDeviationsIn", () => {
         `const config = { rules: { "no-console": "error" } };`,
       ).program.body[0] as ESTree.Statement;
       if (statement.type !== "VariableDeclaration") throw new Error("nothing was declared");
-      const object = statement.declarations[0]?.init;
-      if (object?.type !== "ObjectExpression") throw new Error("no object was written");
-      const rules = ruleBlockObjectOf(object);
+      const declaredConfig = statement.declarations[0]?.init;
+      if (declaredConfig?.type !== "ObjectExpression") throw new Error("no object was written");
+      const rules = ruleBlockObjectOf(declaredConfig);
       if (rules === null) throw new Error("no rules object was written");
-      return setDeviationsIn(configuredRuleBlockOf({ object, rules, ancestors: [] }));
+      return setDeviationsIn(
+        configuredRuleBlockOf({ object: declaredConfig, rules, ancestors: [] }),
+      );
     });
 
     it("holds nothing to reconcile", ({ deviations }) => {
@@ -52,11 +54,13 @@ describe("setDeviationsIn", () => {
         `const config = { options: { typeAware: true }, rules: { ${held} } };`,
       ).program.body[0] as ESTree.Statement;
       if (statement.type !== "VariableDeclaration") throw new Error("nothing was declared");
-      const object = statement.declarations[0]?.init;
-      if (object?.type !== "ObjectExpression") throw new Error("no object was written");
-      const rules = ruleBlockObjectOf(object);
+      const declaredConfig = statement.declarations[0]?.init;
+      if (declaredConfig?.type !== "ObjectExpression") throw new Error("no object was written");
+      const rules = ruleBlockObjectOf(declaredConfig);
       if (rules === null) throw new Error("no rules object was written");
-      return setDeviationsIn(configuredRuleBlockOf({ object, rules, ancestors: [] }));
+      return setDeviationsIn(
+        configuredRuleBlockOf({ object: declaredConfig, rules, ancestors: [] }),
+      );
     });
 
     it("passes", ({ deviations }) => {
@@ -72,11 +76,13 @@ describe("setDeviationsIn", () => {
       const statement = parseSync("config.ts", `const config = { rules: { ${held} } };`).program
         .body[0] as ESTree.Statement;
       if (statement.type !== "VariableDeclaration") throw new Error("nothing was declared");
-      const object = statement.declarations[0]?.init;
-      if (object?.type !== "ObjectExpression") throw new Error("no object was written");
-      const rules = ruleBlockObjectOf(object);
+      const declaredConfig = statement.declarations[0]?.init;
+      if (declaredConfig?.type !== "ObjectExpression") throw new Error("no object was written");
+      const rules = ruleBlockObjectOf(declaredConfig);
       if (rules === null) throw new Error("no rules object was written");
-      return setDeviationsIn(configuredRuleBlockOf({ object, rules, ancestors: [] }));
+      return setDeviationsIn(
+        configuredRuleBlockOf({ object: declaredConfig, rules, ancestors: [] }),
+      );
     });
 
     it("passes", ({ deviations }) => {
@@ -91,11 +97,13 @@ describe("setDeviationsIn", () => {
         `const config = { rules: { "no-reassign--use-spread-or-iife": "error" } };`,
       ).program.body[0] as ESTree.Statement;
       if (statement.type !== "VariableDeclaration") throw new Error("nothing was declared");
-      const object = statement.declarations[0]?.init;
-      if (object?.type !== "ObjectExpression") throw new Error("no object was written");
-      const rules = ruleBlockObjectOf(object);
+      const declaredConfig = statement.declarations[0]?.init;
+      if (declaredConfig?.type !== "ObjectExpression") throw new Error("no object was written");
+      const rules = ruleBlockObjectOf(declaredConfig);
       if (rules === null) throw new Error("no rules object was written");
-      return setDeviationsIn(configuredRuleBlockOf({ object, rules, ancestors: [] }));
+      return setDeviationsIn(
+        configuredRuleBlockOf({ object: declaredConfig, rules, ancestors: [] }),
+      );
     });
 
     it("reports the rules it leaves out", ({ deviations }) => {
@@ -141,11 +149,13 @@ describe("setDeviationsIn", () => {
         `const config = { rules: { "no-promise-chain--use-async-await": "off" } };`,
       ).program.body[0] as ESTree.Statement;
       if (statement.type !== "VariableDeclaration") throw new Error("nothing was declared");
-      const object = statement.declarations[0]?.init;
-      if (object?.type !== "ObjectExpression") throw new Error("no object was written");
-      const rules = ruleBlockObjectOf(object);
+      const declaredConfig = statement.declarations[0]?.init;
+      if (declaredConfig?.type !== "ObjectExpression") throw new Error("no object was written");
+      const rules = ruleBlockObjectOf(declaredConfig);
       if (rules === null) throw new Error("no rules object was written");
-      return setDeviationsIn(configuredRuleBlockOf({ object, rules, ancestors: [] }));
+      return setDeviationsIn(
+        configuredRuleBlockOf({ object: declaredConfig, rules, ancestors: [] }),
+      );
     });
 
     it("reports the rules each set leaves out", ({ deviations }) => {
@@ -224,11 +234,13 @@ describe("setDeviationsIn", () => {
         `const config = { options: { typeAware: true }, rules: { ${held} } };`,
       ).program.body[0] as ESTree.Statement;
       if (statement.type !== "VariableDeclaration") throw new Error("nothing was declared");
-      const object = statement.declarations[0]?.init;
-      if (object?.type !== "ObjectExpression") throw new Error("no object was written");
-      const rules = ruleBlockObjectOf(object);
+      const declaredConfig = statement.declarations[0]?.init;
+      if (declaredConfig?.type !== "ObjectExpression") throw new Error("no object was written");
+      const rules = ruleBlockObjectOf(declaredConfig);
       if (rules === null) throw new Error("no rules object was written");
-      return setDeviationsIn(configuredRuleBlockOf({ object, rules, ancestors: [] }));
+      return setDeviationsIn(
+        configuredRuleBlockOf({ object: declaredConfig, rules, ancestors: [] }),
+      );
     });
 
     it("names the same rule", ({ deviations }) => {
@@ -243,11 +255,13 @@ describe("setDeviationsIn", () => {
         `const config = { files: ["apps/site/src/**"], rules: { "no-array-mutation--derive-new-array": "off" } };`,
       ).program.body[0] as ESTree.Statement;
       if (statement.type !== "VariableDeclaration") throw new Error("nothing was declared");
-      const object = statement.declarations[0]?.init;
-      if (object?.type !== "ObjectExpression") throw new Error("no object was written");
-      const rules = ruleBlockObjectOf(object);
+      const declaredConfig = statement.declarations[0]?.init;
+      if (declaredConfig?.type !== "ObjectExpression") throw new Error("no object was written");
+      const rules = ruleBlockObjectOf(declaredConfig);
       if (rules === null) throw new Error("no rules object was written");
-      return setDeviationsIn(configuredRuleBlockOf({ object, rules, ancestors: [] }));
+      return setDeviationsIn(
+        configuredRuleBlockOf({ object: declaredConfig, rules, ancestors: [] }),
+      );
     });
 
     it("reports the paths it takes them out of", ({ deviations }) => {
@@ -293,11 +307,13 @@ describe("setDeviationsIn", () => {
         `const config = { files: chosenPaths, rules: { "no-array-mutation--derive-new-array": "off" } };`,
       ).program.body[0] as ESTree.Statement;
       if (statement.type !== "VariableDeclaration") throw new Error("nothing was declared");
-      const object = statement.declarations[0]?.init;
-      if (object?.type !== "ObjectExpression") throw new Error("no object was written");
-      const rules = ruleBlockObjectOf(object);
+      const declaredConfig = statement.declarations[0]?.init;
+      if (declaredConfig?.type !== "ObjectExpression") throw new Error("no object was written");
+      const rules = ruleBlockObjectOf(declaredConfig);
       if (rules === null) throw new Error("no rules object was written");
-      return setDeviationsIn(configuredRuleBlockOf({ object, rules, ancestors: [] }));
+      return setDeviationsIn(
+        configuredRuleBlockOf({ object: declaredConfig, rules, ancestors: [] }),
+      );
     });
 
     it("still reports the set it splits", ({ deviations }) => {
@@ -346,11 +362,13 @@ describe("setDeviationsIn", () => {
         `const config = { options: { typeAware: true }, rules: { ${held}, "no-array-mutation--derive-new-array": "warn" } };`,
       ).program.body[0] as ESTree.Statement;
       if (statement.type !== "VariableDeclaration") throw new Error("nothing was declared");
-      const object = statement.declarations[0]?.init;
-      if (object?.type !== "ObjectExpression") throw new Error("no object was written");
-      const rules = ruleBlockObjectOf(object);
+      const declaredConfig = statement.declarations[0]?.init;
+      if (declaredConfig?.type !== "ObjectExpression") throw new Error("no object was written");
+      const rules = ruleBlockObjectOf(declaredConfig);
       if (rules === null) throw new Error("no rules object was written");
-      return setDeviationsIn(configuredRuleBlockOf({ object, rules, ancestors: [] }));
+      return setDeviationsIn(
+        configuredRuleBlockOf({ object: declaredConfig, rules, ancestors: [] }),
+      );
     });
 
     it("reports the rule sitting at the weaker one", ({ deviations }) => {
@@ -398,11 +416,13 @@ describe("setDeviationsIn", () => {
         `const config = { options: { typeAware: true }, rules: { ${held}, "no-reassign--use-spread-or-iife": chosenSeverity } };`,
       ).program.body[0] as ESTree.Statement;
       if (statement.type !== "VariableDeclaration") throw new Error("nothing was declared");
-      const object = statement.declarations[0]?.init;
-      if (object?.type !== "ObjectExpression") throw new Error("no object was written");
-      const rules = ruleBlockObjectOf(object);
+      const declaredConfig = statement.declarations[0]?.init;
+      if (declaredConfig?.type !== "ObjectExpression") throw new Error("no object was written");
+      const rules = ruleBlockObjectOf(declaredConfig);
       if (rules === null) throw new Error("no rules object was written");
-      return setDeviationsIn(configuredRuleBlockOf({ object, rules, ancestors: [] }));
+      return setDeviationsIn(
+        configuredRuleBlockOf({ object: declaredConfig, rules, ancestors: [] }),
+      );
     });
 
     it("is reported on the rule carrying it", ({ deviations }) => {
@@ -449,11 +469,13 @@ describe("setDeviationsIn", () => {
       const statement = parseSync("config.ts", `const config = { rules: { ${held} } };`).program
         .body[0] as ESTree.Statement;
       if (statement.type !== "VariableDeclaration") throw new Error("nothing was declared");
-      const object = statement.declarations[0]?.init;
-      if (object?.type !== "ObjectExpression") throw new Error("no object was written");
-      const rules = ruleBlockObjectOf(object);
+      const declaredConfig = statement.declarations[0]?.init;
+      if (declaredConfig?.type !== "ObjectExpression") throw new Error("no object was written");
+      const rules = ruleBlockObjectOf(declaredConfig);
       if (rules === null) throw new Error("no rules object was written");
-      return setDeviationsIn(configuredRuleBlockOf({ object, rules, ancestors: [] }));
+      return setDeviationsIn(
+        configuredRuleBlockOf({ object: declaredConfig, rules, ancestors: [] }),
+      );
     });
 
     it("reports each one and holds no unevenness", ({ deviations }) => {
@@ -842,11 +864,13 @@ describe("setDeviationsIn", () => {
       const statement = parseSync("config.ts", `const config = { rules: { ${held} } };`).program
         .body[0] as ESTree.Statement;
       if (statement.type !== "VariableDeclaration") throw new Error("nothing was declared");
-      const object = statement.declarations[0]?.init;
-      if (object?.type !== "ObjectExpression") throw new Error("no object was written");
-      const rules = ruleBlockObjectOf(object);
+      const declaredConfig = statement.declarations[0]?.init;
+      if (declaredConfig?.type !== "ObjectExpression") throw new Error("no object was written");
+      const rules = ruleBlockObjectOf(declaredConfig);
       if (rules === null) throw new Error("no rules object was written");
-      return setDeviationsIn(configuredRuleBlockOf({ object, rules, ancestors: [] }));
+      return setDeviationsIn(
+        configuredRuleBlockOf({ object: declaredConfig, rules, ancestors: [] }),
+      );
     });
 
     it("reports every rule of the set that reads types", ({ deviations }) => {

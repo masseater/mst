@@ -41,8 +41,8 @@ const inheritedSpecifiersOf = (config: Readonly<Record<string, unknown>>): reado
 
 const aliasesAt = (configPath: string, visited: ReadonlySet<string>): PathAliases | null => {
   if (visited.has(configPath)) return null;
-  const text = readTextFile(configPath);
-  const config = text === null ? null : namedFieldsOf(parseJsonc(text));
+  const configJsonc = readTextFile(configPath);
+  const config = configJsonc === null ? null : namedFieldsOf(parseJsonc(configJsonc));
   if (config === null) return null;
 
   const own = aliasesIn(configPath, config);
@@ -67,8 +67,8 @@ const nearestAliasesFrom: (directory: string) => PathAliases | null = memoize(
   },
 );
 
-const filledTarget = (target: string, captured: string): string =>
-  target.replace(WILDCARD, captured);
+const filledTarget = (pathTemplate: string, captured: string): string =>
+  pathTemplate.replace(WILDCARD, captured);
 
 const capturedBy = (pattern: string, specifier: string): string | null => {
   const [prefix, suffix, ...extraParts] = pattern.split(WILDCARD);
@@ -92,11 +92,13 @@ const matchedAliasesIn = (
 ): readonly {
   readonly prefixLength: number;
   readonly captured: string;
-  readonly targets: readonly string[];
+  readonly pathTemplates: readonly string[];
 }[] =>
-  [...aliases.patternTargets].flatMap(([pattern, targets]) => {
+  [...aliases.patternTargets].flatMap(([pattern, pathTemplates]) => {
     const captured = capturedBy(pattern, specifier);
-    return captured === null ? [] : [{ prefixLength: prefixLengthOf(pattern), captured, targets }];
+    return captured === null
+      ? []
+      : [{ prefixLength: prefixLengthOf(pattern), captured, pathTemplates }];
   });
 
 export const aliasedPathsFor = ({
@@ -111,10 +113,13 @@ export const aliasedPathsFor = ({
   const aliases = nearestAliasesFrom(dirname(fromFile));
   if (aliases === null) return [];
 
-  const matched = maxBy(matchedAliasesIn(aliases, specifier), (entry) => entry.prefixLength);
+  const matched = maxBy(
+    matchedAliasesIn(aliases, specifier),
+    (matchedAlias) => matchedAlias.prefixLength,
+  );
   if (matched === undefined) return [];
 
-  return matched.targets.map((target) =>
-    resolve(aliases.baseDirectory, filledTarget(target, matched.captured)),
+  return matched.pathTemplates.map((pathTemplate) =>
+    resolve(aliases.baseDirectory, filledTarget(pathTemplate, matched.captured)),
   );
 };

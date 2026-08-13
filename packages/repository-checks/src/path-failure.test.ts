@@ -15,7 +15,7 @@ class RuntimeRefusal extends Error {
 
 describe("readUnlessMissing", () => {
   describe("a read that succeeds", () => {
-    const it = test.extend("text", ({}, { onCleanup }) => {
+    const it = test.extend("presentFileText", ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "path-failure-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
@@ -25,8 +25,8 @@ describe("readUnlessMissing", () => {
       return readUnlessMissing(() => readFileSync(path, "utf8"));
     });
 
-    it("hands back what it read", ({ text }) => {
-      expect(text).toBe("written");
+    it("hands back what it read", ({ presentFileText }) => {
+      expect(presentFileText).toBe("written");
     });
   });
 
@@ -61,7 +61,7 @@ describe("readUnlessMissing", () => {
   });
 
   describe("a path that exists but cannot be read", () => {
-    const it = test.extend("message", () => {
+    const it = test.extend("wordedRefusalWording", () => {
       const [failure] = attempt<unknown, Error>(() =>
         readUnlessMissing(() => {
           throw new RuntimeRefusal("EACCES");
@@ -70,13 +70,13 @@ describe("readUnlessMissing", () => {
       return failure === null ? null : failure.message;
     });
 
-    it("is raised instead of becoming an absence", ({ message }) => {
-      expect(message).toBe("the runtime refused");
+    it("is raised instead of becoming an absence", ({ wordedRefusalWording }) => {
+      expect(wordedRefusalWording).toBe("the runtime refused");
     });
   });
 
   describe("a failure the runtime did not raise", () => {
-    const it = test.extend("message", () => {
+    const it = test.extend("uncodedFailureWording", () => {
       const [failure] = attempt<unknown, Error>(() =>
         readUnlessMissing(() => {
           throw new Error("the read failed for a reason the runtime did not name");
@@ -85,13 +85,13 @@ describe("readUnlessMissing", () => {
       return failure === null ? null : failure.message;
     });
 
-    it("is passed on untouched", ({ message }) => {
-      expect(message).toBe("the read failed for a reason the runtime did not name");
+    it("is passed on untouched", ({ uncodedFailureWording }) => {
+      expect(uncodedFailureWording).toBe("the read failed for a reason the runtime did not name");
     });
   });
 
   describe("a failure whose code is not a word", () => {
-    const it = test.extend("message", () => {
+    const it = test.extend("numberedRefusalWording", () => {
       const [failure] = attempt<unknown, Error>(() =>
         readUnlessMissing(() => {
           throw new RuntimeRefusal(7);
@@ -100,8 +100,8 @@ describe("readUnlessMissing", () => {
       return failure === null ? null : failure.message;
     });
 
-    it("is raised rather than becoming an absence", ({ message }) => {
-      expect(message).toBe("the runtime refused");
+    it("is raised rather than becoming an absence", ({ numberedRefusalWording }) => {
+      expect(numberedRefusalWording).toBe("the runtime refused");
     });
   });
 });

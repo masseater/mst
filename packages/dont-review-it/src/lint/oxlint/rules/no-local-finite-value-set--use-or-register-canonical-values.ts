@@ -45,8 +45,8 @@ import type {
 import type { LibraryVocabularyLoader } from "../lib/library-vocabulary/vocabulary-loader.ts";
 import type { RuleMessage } from "../lib/rule-message.ts";
 
-const describeOwner = (entry: CanonicalValuesEntry): string =>
-  `${entry.conceptId} (${entry.exportPath ?? entry.declarationPath})`;
+const describeOwner = (owner: CanonicalValuesEntry): string =>
+  `${owner.conceptId} (${owner.exportPath ?? owner.declarationPath})`;
 
 const libraryOwnerReport = (input: {
   readonly libraries: ReturnType<typeof libraryOwnersOf>;
@@ -101,7 +101,7 @@ type ValuesSources = {
 };
 
 const fileSourcesFor = (input: {
-  readonly context: {
+  readonly inspection: {
     readonly cwd: string;
     readonly filename: string;
     readonly options: Context["options"];
@@ -110,8 +110,8 @@ const fileSourcesFor = (input: {
   readonly loadCatalog: CanonicalValuesCatalogLoader;
   readonly loadLibraryVocabulary: LibraryVocabularyLoader;
 }): ValuesSources => {
-  const { context, loadCatalog, loadLibraryVocabulary } = input;
-  const repositoryRootOf = memoize((): string => findWorkspaceRoot(context.cwd));
+  const { inspection, loadCatalog, loadLibraryVocabulary } = input;
+  const repositoryRootOf = memoize((): string => findWorkspaceRoot(inspection.cwd));
 
   return {
     repositoryRootOf,
@@ -119,14 +119,18 @@ const fileSourcesFor = (input: {
       (): CanonicalValuesCatalog => loadCatalog({ repositoryRoot: repositoryRootOf() }),
     ),
     bindingsOf: memoize(
-      (): FileBindings => collectFileBindings(context.sourceCode.ast, context.sourceCode.text),
+      (): FileBindings =>
+        collectFileBindings(inspection.sourceCode.ast, inspection.sourceCode.text),
     ),
     libraryVocabularyOf: memoize(
       (): LibraryVocabularyIndex =>
-        loadLibraryVocabulary({ filename: context.filename, repositoryRoot: repositoryRootOf() }),
+        loadLibraryVocabulary({
+          filename: inspection.filename,
+          repositoryRoot: repositoryRootOf(),
+        }),
     ),
-    filename: context.filename,
-    ownershipPolicy: ownershipPolicyOf(context.options),
+    filename: inspection.filename,
+    ownershipPolicy: ownershipPolicyOf(inspection.options),
   };
 };
 
@@ -160,10 +164,10 @@ const positionForName = (
   asked: { readonly name: string; readonly at: ESTree.Span },
   sources: ValuesSources,
 ): ValuesPosition | null => {
-  const array = sources.bindingsOf().arrays.get(asked.name);
-  if (array !== undefined) {
-    const vocabulary = staticArrayValues(array);
-    return vocabulary === null ? null : { kind: "values", values: vocabulary, node: array };
+  const arrayLiteral = sources.bindingsOf().arrays.get(asked.name);
+  if (arrayLiteral !== undefined) {
+    const vocabulary = staticArrayValues(arrayLiteral);
+    return vocabulary === null ? null : { kind: "values", values: vocabulary, node: arrayLiteral };
   }
 
   const specifier = sources.bindingsOf().namedImports.get(asked.name);
@@ -380,10 +384,10 @@ export const createNoLocalFiniteValueSet = ({
       },
       schema: OWNERSHIP_POLICY_SCHEMA,
     },
-    create(context) {
-      if (isOutOfScopeSource(context.filename)) return {};
+    create(inspection) {
+      if (isOutOfScopeSource(inspection.filename)) return {};
 
-      const sources = fileSourcesFor({ context, loadCatalog, loadLibraryVocabulary });
+      const sources = fileSourcesFor({ inspection, loadCatalog, loadLibraryVocabulary });
 
       return {
         "Program:exit"(program: ESTree.Program) {
@@ -393,7 +397,7 @@ export const createNoLocalFiniteValueSet = ({
               !isInsideAnnotatedDeclaration(sources.bindingsOf().annotatedRanges, finding.node),
           );
 
-          for (const finding of uniqBy(outside, spanOf)) context.report(finding);
+          for (const finding of uniqBy(outside, spanOf)) inspection.report(finding);
         },
       };
     },

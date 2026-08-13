@@ -37,12 +37,12 @@ export const noCrossSpecAssetsImport = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    const readerPath = resolve(context.cwd, context.filename);
-    const markers = assetsNameMarkersFrom(context.options);
+  create(inspection) {
+    const readerPath = resolve(inspection.cwd, inspection.filename);
+    const markers = assetsNameMarkersFrom(inspection.options);
     if (assetsStemOf(readerPath, markers) !== null) return {};
 
-    const readerStem = specStemOf(readerPath, specFileSuffixesFrom(context.options));
+    const readerStem = specStemOf(readerPath, specFileSuffixesFrom(inspection.options));
     const workspaceRoot = findWorkspaceRoot(dirname(readerPath));
 
     const isOwnedByReader = (assetsPath: string): boolean =>
@@ -64,10 +64,10 @@ export const noCrossSpecAssetsImport = createDontReviewItRule({
         assetsPath: toPosixPath(relative(workspaceRoot, assetsPath)),
       };
       if (readerStem === null) {
-        context.report({ node, messageId: "foreignAssetsImport", data: reached });
+        inspection.report({ node, messageId: "foreignAssetsImport", data: reached });
         return;
       }
-      context.report({
+      inspection.report({
         node,
         messageId: "crossSpecAssetsImport",
         data: { ...reached, ownStem: readerStem },

@@ -27,9 +27,24 @@ description: Machine-enforced answers to the writing questions that would otherw
 
 説明に載せる例をどこから作るかは [文書](../../docs/guidelines/documents.md) が持つ。良い例と悪い例を対で置かないことは [規範の書き方](../../docs/normative-notation.md) が持つ。
 
-## CLI 向け config
+## 公開する config
 
-bin を公開するパッケージ向けに、全部入り config の厳密な上位集合 `oxlintCli` を公開する。何を足しているか、lint で検出できない CLI の規範は [CLI の作り方](docs/cli.md) が持つ。上位集合の形にした判断は [EDR 0032](../../docs/engineering-decision-logs/0032-ship-the-cli-config-as-a-strict-superset.md) にある。
+公開する config は `dontReviewItPreset` の 1 つだけである。`fmt` と `lint` の 2 つの関数を持ち、ルートの `vite.config.ts` はそれぞれのブロックで対応する関数を呼ぶ。呼び出し側が足したいものは引数に渡し、preset が返した値へ後ろから重なる。呼び忘れは [no-unwrapped-toolchain-config--call-the-preset-for-the-block](docs/lint/no-unwrapped-toolchain-config--call-the-preset-for-the-block.md) が報告する。
+
+`lint` が配るルール集合は 1 枚だけである。対象種別による出し分けはしない。ルートの `lint` が呼んだ時点でリポジトリ全体に効き、採用の判断は残らない。CLI に固有の規律もこの中にあり、対象を絞るのはルールの側である。判断は [EDR 0042](../../docs/engineering-decision-logs/0042-apply-one-preset-at-the-root-and-report-the-exception-the-toolchain-forces.md) にある。
+
+`fmt` が決めているのは、整形結果が読み手に届く見た目を変えず、差分にだけ現れる書き方である。markdown の段落を 1 行に畳むこと、import の並び順がこれにあたる。判断は [EDR 0046](../../docs/engineering-decision-logs/0046-let-the-formatter-own-where-markdown-lines-break.md) と [EDR 0047](../../docs/engineering-decision-logs/0047-hand-every-toolchain-block-one-preset-function.md) にある。
+
+- IF: 整形の選択を `fmt` に足したい; THEN
+  - MUST: レンダリングされた結果が変わらないことを確かめる
+  - PROHIBIT: 読み手に届く見た目を変える選択を入れる
+    - 見た目が変わる選択は書き手の判断であり、機械が一律に決めると表現を奪う
+- IF: 公開する config を増やしたくなった; THEN
+  - MUST: `dontReviewItPreset` の中へ入れる
+  - PROHIBIT: 2 つ目の export を作る
+    - 入口が複数あると、どれを配線したかで効いている範囲が変わり、採用の判断が呼び出し側に戻る
+
+lint で検出できない CLI の規範は [CLI の作り方](docs/cli.md) が持つ。
 
 ## 検証コマンド
 
@@ -62,12 +77,25 @@ CLI が持つコマンドは `check` の 1 つで、そこが全部の検査を�
 - ジョブが、宣言されていない既定の権限で走っていない
 - 実行ブロックが、1 つのコマンド呼び出しを超えていない
 - 失敗を成功に読み替える記述が置かれていない
+- アクションの参照が、可変な名前ではなくコミットハッシュで終わり、版を書いた注釈を伴っている
+- チェックアウトが、履歴を全部取りにいっていない
+
+同じ入口が、リポジトリに 1 つしかないものも読む。定義の数と対応しないので、観点は分けて数える。
+
+- 固定した参照を引き上げる機構が、リポジトリに繋がっている
 
 - IF: 上流に同じ形式を対象にする既製の検査を入れる; THEN
   - MUST: 既製の側が覆う不変条件をこの検査から外す
   - PROHIBIT: 同じ違反を 2 つの経路から報告する
-- IF: 構文・式の注入・ランナー名・アクションの入力名を検査したくなった; THEN MUST: この検査に足さず、その層を持つ既製の検査を導入する判断から始める
+- IF: 構文・式の注入・ランナー名を検査したくなった; THEN MUST: この検査に足さず、その層を持つ既製の検査を導入する判断から始める
   - この検査が持たない範囲であることは [EDR 0025](../../docs/engineering-decision-logs/0025-check-workflow-definitions-with-our-own-policy-layer.md) が決めている
+- IF: アクションの入力を検査したくなった; THEN MUST: 判定にそのアクションの定義が要るかで決める
+  - 定義が要るなら持たない。要らないなら持つ
+  - 線の引き方は [EDR 0039](../../docs/engineering-decision-logs/0039-pin-action-references-and-bound-the-history-a-run-fetches.md) が決めている
+- IF: 参照が最新の版かを検査したくなった; THEN
+  - MUST: 追随する機構が繋がっていることの検査に留める
+  - PROHIBIT: 検査の中から上流へ問い合わせる
+    - 手元の入力だけで結果が決まらなくなり、同じコミットへの判定が日によって変わる
 
 ## 依存宣言の検査
 
@@ -80,6 +108,42 @@ CLI が持つコマンドは `check` の 1 つで、そこが全部の検査を�
 - バージョンが食い違う宣言は警告として出す。どちらへ揃えるかは判断なので落とさない
 - 何も使っていない catalog エントリは報告しない。未使用の検出は knip が持つ
 
+## 必須ファイルの形の検査
+
+`check` が、リポジトリの根と `package.json` を持つディレクトリを開き、そこに置かれていなければならないファイルが要求された形で存在しているかを読む。ファイルの中身は読まない。判断は [EDR 0045](../../docs/engineering-decision-logs/0045-require-the-form-of-the-files-a-repository-cannot-do-without.md) にある。
+
+道具の設定が TypeScript の外に置かれていないことを見る。対象は knip・oxlint・eslint・vite で、それぞれの道具自身が読む綴りのうち、型検査が届かないものを名指しする。報告には移し先の綴りを載せる。oxlint と vite の移し先は `vite.config.ts` で、knip は `knip.ts`、eslint は `eslint.config.ts` になる。
+
+AI 向けの指示が 1 か所にしかないことを見る。`AGENTS.md` が実体で、`CLAUDE.md` はそこを指すシンボリックリンクである。
+
+- `AGENTS.md` を持つディレクトリに `CLAUDE.md` がある
+- `CLAUDE.md` が実体ファイルではない
+- `CLAUDE.md` が `AGENTS.md` 以外を指していない
+- `CLAUDE.md` だけがあって `AGENTS.md` が無い状態になっていない
+
+- IF: 道具の設定を TypeScript 以外の綴りで置きたくなった; THEN PROHIBIT: 置く
+  - 型検査もフォーマッタも lint も届かない設定は、それが支配しているコードから静かにずれていく
+- IF: 道具が TypeScript の設定を読めない; THEN MUST: その道具を使わない判断から始める
+  - 綴りを増やす前に、ツールチェーンを一本化する規約（[AGENTS.md](../../AGENTS.md)）に戻る
+- IF: 検査対象の綴りを増やす; THEN MUST: その道具自身が読む綴りの一覧を一次情報で確かめてから足す
+  - 道具が読まない綴りを足すと、直しようのない報告が出る
+- IF: `CLAUDE.md` に `AGENTS.md` と違うことを書きたくなった; THEN PROHIBIT: 書く
+  - 読み手ごとに違う規範を配ると、どちらが正なのかを人間が毎回決めることになる
+
+## preset の適用範囲の検査
+
+`check` が、ルートのツールチェーン設定とワークスペースの一覧を突き合わせる。preset を `extends` した時点で全体に効くという前提が、実際に成り立っているかを見る。
+
+設定を読んで `off` にされている preset のルールを拾い、その `files` が届くワークスペースを名指しして警告する。パスを絞らずに止めたルールは、すべてのワークスペースに届かないものとして数える。preset の外のルールは見ない。ツールチェーン設定が無いリポジトリでは何も検査しない。
+
+報告を警告に留めるのは、止め方を解く手段が 1 つに決まらないためである。override を消して報告を直す道と、依存の向きなどで届かないことを記録して残す道があり、どちらを選ぶかは判断になる。
+
+- IF: preset のルールを `overrides` で止める; THEN
+  - MUST: 止めた理由を EDR に残す
+    - 警告は消えない。理由が無い `off` は、適用範囲への載せ忘れと見分けが付かない
+- IF: 警告が指すワークスペースを preset の下に戻せた; THEN MUST: `off` を消す
+  - 残った `off` は、いつか誰かが「元からそうだった」として読む
+
 ## 公開パッケージの skill の検査
 
 `check` が、TanStack Intent の skill と package.json の宣言が食い違っていないことも読む。見るのは同梱と配布の配線だけで、両方向を検知する。
@@ -89,8 +153,26 @@ npm へ公開できるパッケージには、あることを要求する。
 - `skills/**/SKILL.md` が 1 つ以上ある
 - `files` の許可リストがあるなら `skills` を載せている
 - `keywords` が `tanstack-intent` を含んでいる
+- `skills/CHANGELOG.md` があり、マニフェストの `version` を `## <version>` の見出しとして持つ
+- 同梱する各 SKILL.md の `metadata.library_version` が、マニフェストの `version` と一致する
 
-`private: true` のパッケージには、同じ 3 点が書かれていないことを要求する。出荷されない skill と、出荷されない前提の配線は、読む側に嘘を教える。
+`private: true` のパッケージには、同じものが書かれていないことを要求する。出荷されない skill と、出荷されない前提の配線は、読む側に嘘を教える。
+
+`version` を持たないマニフェストには、版に関する 2 点を要求しない。
+
+changelog の中身は読まない。項目が実態と合っているかは機械が判定しないので、次の規範は人が守る。
 
 - IF: SKILL.md の中身の構造を検査したくなった; THEN MUST: この検査に足さず、上流の `intent validate`（各パッケージの `check:skills`）に任せる
   - 不変条件の分担は [EDR 0030](../../docs/engineering-decision-logs/0030-ship-agent-skills-with-published-packages-and-gate-the-shipping-ourselves.md) が決めている
+- IF: 公開パッケージの `version` を上げる; THEN
+  - MUST: 同じ変更で `skills/CHANGELOG.md` にその版の見出しを書く
+  - PROHIBIT: `metadata.library_version` を手で書き換える
+    - マニフェストから一意に決まる値なので `check --write` が揃える
+- IF: 既に書いた版の項目と実態が食い違った; THEN
+  - IF: その版をまだ publish していない; THEN MUST: その項目を実態に合わせて書き直す
+  - IF: その版を publish 済み; THEN
+    - PROHIBIT: その項目を書き直す
+    - MUST: 版を上げ、新しい項目に書く
+      - 配った tarball の中身は変わらない。過去の項目を今の姿へ寄せると、版ごとの差分という changelog の役目が消える
+- IF: 版を上げた変更で SKILL.md の差分も要求したくなった; THEN PROHIBIT: 足す
+  - 書くことが無いのに本文をいじる操作が生まれる。線の引き方は [EDR 0044](../../docs/engineering-decision-logs/0044-ship-a-changelog-beside-the-skills-and-check-it-against-the-manifest.md) が決めている

@@ -55,7 +55,9 @@ const findingsIn = (reconciled: CoverageReconciliation): readonly CoverageFindin
     ...broadDeclarationFindings(uncheckedDeclarations),
     ...deadRowFindings({
       registry: UNCHECKED_DECLARATION_REGISTRY,
-      rows: uncheckedDeclarations.filter((row) => !coversWholeDirectory(row.pattern)),
+      rows: uncheckedDeclarations.filter(
+        (uncheckedDeclaration) => !coversWholeDirectory(uncheckedDeclaration.pattern),
+      ),
       paths,
     }),
     ...registrationFindings({ tables: declarations.tables, checks, paths }),

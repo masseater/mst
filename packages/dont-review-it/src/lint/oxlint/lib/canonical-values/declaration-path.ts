@@ -2,9 +2,12 @@ import { toPosixPath } from "../posix-path.ts";
 
 import type { CanonicalValuesCatalog, CanonicalValuesEntry } from "./catalog.ts";
 
-const matchesDeclarationPath = (path: string, entry: CanonicalValuesEntry): boolean => {
-  const normalized = toPosixPath(path);
-  return normalized === entry.declarationPath || normalized.endsWith(`/${entry.declarationPath}`);
+const matchesDeclarationPath = (path: string, listed: CanonicalValuesEntry): boolean => {
+  const normalizedText = toPosixPath(path);
+  return (
+    normalizedText === listed.declarationPath ||
+    normalizedText.endsWith(`/${listed.declarationPath}`)
+  );
 };
 
 export const declaresConceptAt = (
@@ -12,5 +15,5 @@ export const declaresConceptAt = (
   { conceptId, path }: { readonly conceptId: string; readonly path: string },
 ): boolean =>
   catalog.entries.some(
-    (entry) => entry.conceptId === conceptId && matchesDeclarationPath(path, entry),
+    (listed) => listed.conceptId === conceptId && matchesDeclarationPath(path, listed),
   );

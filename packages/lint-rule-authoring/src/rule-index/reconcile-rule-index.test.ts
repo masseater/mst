@@ -499,11 +499,11 @@ describe("lintRuleIndexProblems", () => {
 
 describe("formatLintRuleIndexProblem", () => {
   describe("a problem naming the index it was found against", () => {
-    const it = test.extend("text", () =>
+    const it = test.extend("formattedProblem", () =>
       formatLintRuleIndexProblem({ file: INDEX_PATH, message: MISSING_INDEX }));
 
-    it("spells the path first and the message after it", ({ text }) => {
-      expect(text).toBe(`${INDEX_PATH} ${MISSING_INDEX}`);
+    it("spells the path first and the message after it", ({ formattedProblem }) => {
+      expect(formattedProblem).toBe(`${INDEX_PATH} ${MISSING_INDEX}`);
     });
   });
 });

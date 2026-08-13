@@ -4,155 +4,174 @@ import { carriesUndecidedTarget, invokedNamesIn, namesRunner } from "./command-l
 
 describe("invokedNamesIn", () => {
   describe("a line whose first word is the command", () => {
-    const it = test.extend("names", () => invokedNamesIn("lerna run build"));
+    const it = test.extend("commandsInLernaRunBuild", () => invokedNamesIn("lerna run build"));
 
-    it("reads the first word as the command the line starts", ({ names }) => {
-      expect(names).toStrictEqual(["lerna"]);
+    it("reads the first word as the command the line starts", ({ commandsInLernaRunBuild }) => {
+      expect(commandsInLernaRunBuild).toStrictEqual(["lerna"]);
     });
   });
 
   describe("a line holding nothing", () => {
-    const it = test.extend("names", () => invokedNamesIn(""));
+    const it = test.extend("commandsInAnEmptyLine", () => invokedNamesIn(""));
 
-    it("starts no command", ({ names }) => {
-      expect(names).toStrictEqual([]);
+    it("starts no command", ({ commandsInAnEmptyLine }) => {
+      expect(commandsInAnEmptyLine).toStrictEqual([]);
     });
   });
 
   describe("a line naming the tool as an argument", () => {
-    const it = test.extend("names", () => invokedNamesIn("node ./node_modules/lerna/cli.js"));
+    const it = test.extend("commandsInANodeInvocation", () =>
+      invokedNamesIn("node ./node_modules/lerna/cli.js"));
 
-    it("reads a name written as an argument as something other than the command", ({ names }) => {
-      expect(names).toStrictEqual(["node"]);
+    it("reads a name written as an argument as something other than the command", ({
+      commandsInANodeInvocation,
+    }) => {
+      expect(commandsInANodeInvocation).toStrictEqual(["node"]);
     });
   });
 
   describe("a command chain", () => {
-    const it = test.extend("names", () => invokedNamesIn("tsc && lerna run build"));
+    const it = test.extend("commandsInAChain", () => invokedNamesIn("tsc && lerna run build"));
 
-    it("reads each side of the chain as its own command", ({ names }) => {
-      expect(names).toStrictEqual(["tsc", "lerna"]);
+    it("reads each side of the chain as its own command", ({ commandsInAChain }) => {
+      expect(commandsInAChain).toStrictEqual(["tsc", "lerna"]);
     });
   });
 
   describe("commands separated by a semicolon", () => {
-    const it = test.extend("names", () => invokedNamesIn("tsc; lerna"));
+    const it = test.extend("commandsInASemicolonSequence", () => invokedNamesIn("tsc; lerna"));
 
-    it("reads them one by one", ({ names }) => {
-      expect(names).toStrictEqual(["tsc", "lerna"]);
+    it("reads them one by one", ({ commandsInASemicolonSequence }) => {
+      expect(commandsInASemicolonSequence).toStrictEqual(["tsc", "lerna"]);
     });
   });
 
   describe("commands joined by a pipe", () => {
-    const it = test.extend("names", () => invokedNamesIn("cat list | lerna"));
+    const it = test.extend("commandsInAPipeline", () => invokedNamesIn("cat list | lerna"));
 
-    it("reads them one by one", ({ names }) => {
-      expect(names).toStrictEqual(["cat", "lerna"]);
+    it("reads them one by one", ({ commandsInAPipeline }) => {
+      expect(commandsInAPipeline).toStrictEqual(["cat", "lerna"]);
     });
   });
 
   describe("commands joined by an alternative", () => {
-    const it = test.extend("names", () => invokedNamesIn("tsc || lerna"));
+    const it = test.extend("commandsInAnAlternative", () => invokedNamesIn("tsc || lerna"));
 
-    it("reads them one by one", ({ names }) => {
-      expect(names).toStrictEqual(["tsc", "lerna"]);
+    it("reads them one by one", ({ commandsInAnAlternative }) => {
+      expect(commandsInAnAlternative).toStrictEqual(["tsc", "lerna"]);
     });
   });
 
   describe("a command written inside brackets", () => {
-    const it = test.extend("names", () => invokedNamesIn("(lerna run build)"));
+    const it = test.extend("commandsInBrackets", () => invokedNamesIn("(lerna run build)"));
 
-    it("is read on its own", ({ names }) => {
-      expect(names).toStrictEqual(["lerna"]);
+    it("is read on its own", ({ commandsInBrackets }) => {
+      expect(commandsInBrackets).toStrictEqual(["lerna"]);
     });
   });
 
   describe("a line led by environment bindings", () => {
-    const it = test.extend("names", () => invokedNamesIn("NODE_ENV=test CI=1 lerna run build"));
+    const it = test.extend("commandsBehindEnvironmentBindings", () =>
+      invokedNamesIn("NODE_ENV=test CI=1 lerna run build"));
 
-    it("steps over the bindings written in front of the command", ({ names }) => {
-      expect(names).toStrictEqual(["lerna"]);
+    it("steps over the bindings written in front of the command", ({
+      commandsBehindEnvironmentBindings,
+    }) => {
+      expect(commandsBehindEnvironmentBindings).toStrictEqual(["lerna"]);
     });
   });
 
   describe("a line led by a runner", () => {
-    const it = test.extend("names", () => invokedNamesIn("npx lerna run build"));
+    const it = test.extend("commandsBehindNpx", () => invokedNamesIn("npx lerna run build"));
 
-    it("hands the position to what the runner runs", ({ names }) => {
-      expect(names).toStrictEqual(["lerna"]);
+    it("hands the position to what the runner runs", ({ commandsBehindNpx }) => {
+      expect(commandsBehindNpx).toStrictEqual(["lerna"]);
     });
   });
 
   describe("a line led by a two-word runner", () => {
-    const it = test.extend("names", () => invokedNamesIn("pnpm dlx lerna"));
+    const it = test.extend("commandsBehindPnpmDlx", () => invokedNamesIn("pnpm dlx lerna"));
 
-    it("hands the position to what the runner runs", ({ names }) => {
-      expect(names).toStrictEqual(["lerna"]);
+    it("hands the position to what the runner runs", ({ commandsBehindPnpmDlx }) => {
+      expect(commandsBehindPnpmDlx).toStrictEqual(["lerna"]);
     });
   });
 
   describe("a line carrying flags behind the runner", () => {
-    const it = test.extend("names", () => invokedNamesIn("npx --yes -- lerna"));
+    const it = test.extend("commandsBehindRunnerFlags", () => invokedNamesIn("npx --yes -- lerna"));
 
-    it("steps over the flags", ({ names }) => {
-      expect(names).toStrictEqual(["lerna"]);
+    it("steps over the flags", ({ commandsBehindRunnerFlags }) => {
+      expect(commandsBehindRunnerFlags).toStrictEqual(["lerna"]);
     });
   });
 
   describe("a runner argument carrying a version", () => {
-    const it = test.extend("names", () => invokedNamesIn("npx lerna@8.0.0 run build"));
+    const it = test.extend("commandsBehindAVersionedRunnerArgument", () =>
+      invokedNamesIn("npx lerna@8.0.0 run build"));
 
-    it("drops the version", ({ names }) => {
-      expect(names).toStrictEqual(["lerna"]);
+    it("drops the version", ({ commandsBehindAVersionedRunnerArgument }) => {
+      expect(commandsBehindAVersionedRunnerArgument).toStrictEqual(["lerna"]);
     });
   });
 
   describe("a scoped runner argument carrying a version", () => {
-    const it = test.extend("names", () => invokedNamesIn("npx @scope/lerna@8.0.0"));
+    const it = test.extend("commandsBehindAVersionedScopedRunnerArgument", () =>
+      invokedNamesIn("npx @scope/lerna@8.0.0"));
 
-    it("keeps the scope when the version is dropped", ({ names }) => {
-      expect(names).toStrictEqual(["@scope/lerna"]);
+    it("keeps the scope when the version is dropped", ({
+      commandsBehindAVersionedScopedRunnerArgument,
+    }) => {
+      expect(commandsBehindAVersionedScopedRunnerArgument).toStrictEqual(["@scope/lerna"]);
     });
   });
 
   describe("a scoped runner argument written without a version", () => {
-    const it = test.extend("names", () => invokedNamesIn("npx @scope/lerna"));
+    const it = test.extend("commandsBehindAScopedRunnerArgument", () =>
+      invokedNamesIn("npx @scope/lerna"));
 
-    it("stands as it is", ({ names }) => {
-      expect(names).toStrictEqual(["@scope/lerna"]);
+    it("stands as it is", ({ commandsBehindAScopedRunnerArgument }) => {
+      expect(commandsBehindAScopedRunnerArgument).toStrictEqual(["@scope/lerna"]);
     });
   });
 
   describe("a shell handed an inline script", () => {
-    const it = test.extend("names", () => invokedNamesIn('bash -c "lerna run build"'));
+    const it = test.extend("commandsInAnInlineShellScript", () =>
+      invokedNamesIn('bash -c "lerna run build"'));
 
-    it("hands the position to what the script starts", ({ names }) => {
-      expect(names).toStrictEqual(["lerna"]);
+    it("hands the position to what the script starts", ({ commandsInAnInlineShellScript }) => {
+      expect(commandsInAnInlineShellScript).toStrictEqual(["lerna"]);
     });
   });
 
   describe("a shell handed a script file", () => {
-    const it = test.extend("names", () => invokedNamesIn("bash scripts/release.sh"));
+    const it = test.extend("commandsInAShellScriptFile", () =>
+      invokedNamesIn("bash scripts/release.sh"));
 
-    it("starts the shell", ({ names }) => {
-      expect(names).toStrictEqual(["bash"]);
+    it("starts the shell", ({ commandsInAShellScriptFile }) => {
+      expect(commandsInAShellScriptFile).toStrictEqual(["bash"]);
     });
   });
 
   describe("a fetched address", () => {
-    const it = test.extend("names", () =>
+    const it = test.extend("commandsInAFetchedAddress", () =>
       invokedNamesIn("curl https://example.com/lerna/install.sh"));
 
-    it("reads the elements of the address one by one", ({ names }) => {
-      expect(names).toStrictEqual(["curl", "https:", "example.com", "lerna", "install.sh"]);
+    it("reads the elements of the address one by one", ({ commandsInAFetchedAddress }) => {
+      expect(commandsInAFetchedAddress).toStrictEqual([
+        "curl",
+        "https:",
+        "example.com",
+        "lerna",
+        "install.sh",
+      ]);
     });
   });
 
   describe("a command settled by a substitution", () => {
-    const it = test.extend("names", () => invokedNamesIn("$TOOL run build"));
+    const it = test.extend("commandsBehindASubstitution", () => invokedNamesIn("$TOOL run build"));
 
-    it("names nothing", ({ names }) => {
-      expect(names).toStrictEqual([]);
+    it("names nothing", ({ commandsBehindASubstitution }) => {
+      expect(commandsBehindASubstitution).toStrictEqual([]);
     });
   });
 });

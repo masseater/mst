@@ -17,7 +17,9 @@ describe("entryKeysOf", () => {
         nodeVisitsOfType(statement, "CallExpression").flatMap(
           (visit) => snapshotMatcherSiteOf(visit.node, visit.ancestors) ?? [],
         ),
-      ).map((entry) => (entry.kind === "spelled" ? entry.keys : entry.kind));
+      ).map((snapshotEntryKeys) =>
+        snapshotEntryKeys.kind === "spelled" ? snapshotEntryKeys.keys : snapshotEntryKeys.kind,
+      );
     });
 
     it("is keyed by the titles of the blocks it sits in and its ordinal", ({
@@ -37,7 +39,9 @@ describe("entryKeysOf", () => {
         nodeVisitsOfType(statement, "CallExpression").flatMap(
           (visit) => snapshotMatcherSiteOf(visit.node, visit.ancestors) ?? [],
         ),
-      ).map((entry) => (entry.kind === "spelled" ? entry.keys : entry.kind));
+      ).map((snapshotEntryKeys) =>
+        snapshotEntryKeys.kind === "spelled" ? snapshotEntryKeys.keys : snapshotEntryKeys.kind,
+      );
     });
 
     it("takes the next ordinal", ({ keysOfASecondSnapshotUnderTheSameTitles }) => {
@@ -55,7 +59,9 @@ describe("entryKeysOf", () => {
         nodeVisitsOfType(statement, "CallExpression").flatMap(
           (visit) => snapshotMatcherSiteOf(visit.node, visit.ancestors) ?? [],
         ),
-      ).map((entry) => (entry.kind === "spelled" ? entry.keys : entry.kind));
+      ).map((snapshotEntryKeys) =>
+        snapshotEntryKeys.kind === "spelled" ? snapshotEntryKeys.keys : snapshotEntryKeys.kind,
+      );
     });
 
     it("is keyed after the titles it is written under", ({ keysOfASnapshotHint }) => {
@@ -73,7 +79,9 @@ describe("entryKeysOf", () => {
         nodeVisitsOfType(statement, "CallExpression").flatMap(
           (visit) => snapshotMatcherSiteOf(visit.node, visit.ancestors) ?? [],
         ),
-      ).map((entry) => (entry.kind === "spelled" ? entry.keys : entry.kind));
+      ).map((snapshotEntryKeys) =>
+        snapshotEntryKeys.kind === "spelled" ? snapshotEntryKeys.keys : snapshotEntryKeys.kind,
+      );
     });
 
     it("holds property matchers rather than a hint", ({ keysOfALoneObjectArgument }) => {
@@ -91,7 +99,9 @@ describe("entryKeysOf", () => {
         nodeVisitsOfType(statement, "CallExpression").flatMap(
           (visit) => snapshotMatcherSiteOf(visit.node, visit.ancestors) ?? [],
         ),
-      ).map((entry) => (entry.kind === "spelled" ? entry.keys : entry.kind));
+      ).map((snapshotEntryKeys) =>
+        snapshotEntryKeys.kind === "spelled" ? snapshotEntryKeys.keys : snapshotEntryKeys.kind,
+      );
     });
 
     it("leaves the key unresolvable", ({ keysOfAHintThatIsNotWrittenOut }) => {
@@ -109,7 +119,9 @@ describe("entryKeysOf", () => {
         nodeVisitsOfType(statement, "CallExpression").flatMap(
           (visit) => snapshotMatcherSiteOf(visit.node, visit.ancestors) ?? [],
         ),
-      ).map((entry) => (entry.kind === "spelled" ? entry.keys : entry.kind));
+      ).map((snapshotEntryKeys) =>
+        snapshotEntryKeys.kind === "spelled" ? snapshotEntryKeys.keys : snapshotEntryKeys.kind,
+      );
     });
 
     it("leaves the key unresolvable", ({ keysOfAnArgumentListHandedOverAsASpread }) => {
@@ -127,7 +139,9 @@ describe("entryKeysOf", () => {
         nodeVisitsOfType(statement, "CallExpression").flatMap(
           (visit) => snapshotMatcherSiteOf(visit.node, visit.ancestors) ?? [],
         ),
-      ).map((entry) => (entry.kind === "spelled" ? entry.keys : entry.kind));
+      ).map((snapshotEntryKeys) =>
+        snapshotEntryKeys.kind === "spelled" ? snapshotEntryKeys.keys : snapshotEntryKeys.kind,
+      );
     });
 
     it("carries no hint", ({ keysOfAMatcherRecordingIntoAFileOfItsOwn }) => {
@@ -145,7 +159,9 @@ describe("entryKeysOf", () => {
         nodeVisitsOfType(statement, "CallExpression").flatMap(
           (visit) => snapshotMatcherSiteOf(visit.node, visit.ancestors) ?? [],
         ),
-      ).map((entry) => (entry.kind === "spelled" ? entry.keys : entry.kind));
+      ).map((snapshotEntryKeys) =>
+        snapshotEntryKeys.kind === "spelled" ? snapshotEntryKeys.keys : snapshotEntryKeys.kind,
+      );
     });
 
     it("keys one recorded value per case", ({ keysOfATableDrivenBlock }) => {
@@ -163,7 +179,9 @@ describe("entryKeysOf", () => {
         nodeVisitsOfType(statement, "CallExpression").flatMap(
           (visit) => snapshotMatcherSiteOf(visit.node, visit.ancestors) ?? [],
         ),
-      ).map((entry) => (entry.kind === "spelled" ? entry.keys : entry.kind));
+      ).map((snapshotEntryKeys) =>
+        snapshotEntryKeys.kind === "spelled" ? snapshotEntryKeys.keys : snapshotEntryKeys.kind,
+      );
     });
 
     it("share it and take an ordinal each", ({ keysOfCasesThatSpellOneTitle }) => {
@@ -181,7 +199,9 @@ describe("entryKeysOf", () => {
         nodeVisitsOfType(statement, "CallExpression").flatMap(
           (visit) => snapshotMatcherSiteOf(visit.node, visit.ancestors) ?? [],
         ),
-      ).map((entry) => (entry.kind === "spelled" ? entry.keys : entry.kind));
+      ).map((snapshotEntryKeys) =>
+        snapshotEntryKeys.kind === "spelled" ? snapshotEntryKeys.keys : snapshotEntryKeys.kind,
+      );
     });
 
     it("leaves the key unresolvable", ({ keysOfATableThatIsNotWrittenOut }) => {
@@ -199,7 +219,9 @@ describe("entryKeysOf", () => {
         nodeVisitsOfType(statement, "CallExpression").flatMap(
           (visit) => snapshotMatcherSiteOf(visit.node, visit.ancestors) ?? [],
         ),
-      ).map((entry) => (entry.kind === "spelled" ? entry.keys : entry.kind));
+      ).map((snapshotEntryKeys) =>
+        snapshotEntryKeys.kind === "spelled" ? snapshotEntryKeys.keys : snapshotEntryKeys.kind,
+      );
     });
 
     it("leaves the block spelling only its own title", ({ keysOfATableHandedOverAsASpread }) => {
@@ -217,7 +239,9 @@ describe("entryKeysOf", () => {
         nodeVisitsOfType(statement, "CallExpression").flatMap(
           (visit) => snapshotMatcherSiteOf(visit.node, visit.ancestors) ?? [],
         ),
-      ).map((entry) => (entry.kind === "spelled" ? entry.keys : entry.kind));
+      ).map((snapshotEntryKeys) =>
+        snapshotEntryKeys.kind === "spelled" ? snapshotEntryKeys.keys : snapshotEntryKeys.kind,
+      );
     });
 
     it("leaves the key unreadable", ({ keysOfATableWrittenAsATaggedTemplate }) => {
@@ -235,7 +259,9 @@ describe("entryKeysOf", () => {
         nodeVisitsOfType(statement, "CallExpression").flatMap(
           (visit) => snapshotMatcherSiteOf(visit.node, visit.ancestors) ?? [],
         ),
-      ).map((entry) => (entry.kind === "spelled" ? entry.keys : entry.kind));
+      ).map((snapshotEntryKeys) =>
+        snapshotEntryKeys.kind === "spelled" ? snapshotEntryKeys.keys : snapshotEntryKeys.kind,
+      );
     });
 
     it("spells the title as written", ({ keysOfATaggedTemplateNamingNoTableMember }) => {
@@ -253,7 +279,9 @@ describe("entryKeysOf", () => {
         nodeVisitsOfType(statement, "CallExpression").flatMap(
           (visit) => snapshotMatcherSiteOf(visit.node, visit.ancestors) ?? [],
         ),
-      ).map((entry) => (entry.kind === "spelled" ? entry.keys : entry.kind));
+      ).map((snapshotEntryKeys) =>
+        snapshotEntryKeys.kind === "spelled" ? snapshotEntryKeys.keys : snapshotEntryKeys.kind,
+      );
     });
 
     it("spells its own title", ({ keysOfABlockBuilderTakingFixtures }) => {
@@ -271,7 +299,9 @@ describe("entryKeysOf", () => {
         nodeVisitsOfType(statement, "CallExpression").flatMap(
           (visit) => snapshotMatcherSiteOf(visit.node, visit.ancestors) ?? [],
         ),
-      ).map((entry) => (entry.kind === "spelled" ? entry.keys : entry.kind));
+      ).map((snapshotEntryKeys) =>
+        snapshotEntryKeys.kind === "spelled" ? snapshotEntryKeys.keys : snapshotEntryKeys.kind,
+      );
     });
 
     it("spells its own title", ({ keysOfABlockBuiltByAPlainCall }) => {
@@ -289,7 +319,9 @@ describe("entryKeysOf", () => {
         nodeVisitsOfType(statement, "CallExpression").flatMap(
           (visit) => snapshotMatcherSiteOf(visit.node, visit.ancestors) ?? [],
         ),
-      ).map((entry) => (entry.kind === "spelled" ? entry.keys : entry.kind));
+      ).map((snapshotEntryKeys) =>
+        snapshotEntryKeys.kind === "spelled" ? snapshotEntryKeys.keys : snapshotEntryKeys.kind,
+      );
     });
 
     it("opens no title", ({ keysOfACallWhoseLastArgumentIsNotABlockBody }) => {
@@ -307,7 +339,9 @@ describe("entryKeysOf", () => {
         nodeVisitsOfType(statement, "CallExpression").flatMap(
           (visit) => snapshotMatcherSiteOf(visit.node, visit.ancestors) ?? [],
         ),
-      ).map((entry) => (entry.kind === "spelled" ? entry.keys : entry.kind));
+      ).map((snapshotEntryKeys) =>
+        snapshotEntryKeys.kind === "spelled" ? snapshotEntryKeys.keys : snapshotEntryKeys.kind,
+      );
     });
 
     it("opens no title", ({ keysOfACallHandedASpreadArgument }) => {
@@ -325,7 +359,9 @@ describe("entryKeysOf", () => {
         nodeVisitsOfType(statement, "CallExpression").flatMap(
           (visit) => snapshotMatcherSiteOf(visit.node, visit.ancestors) ?? [],
         ),
-      ).map((entry) => (entry.kind === "spelled" ? entry.keys : entry.kind));
+      ).map((snapshotEntryKeys) =>
+        snapshotEntryKeys.kind === "spelled" ? snapshotEntryKeys.keys : snapshotEntryKeys.kind,
+      );
     });
 
     it("cannot be placed among the recorded values", ({ keysOfASnapshotTakenInAHook }) => {
@@ -343,7 +379,9 @@ describe("entryKeysOf", () => {
         nodeVisitsOfType(statement, "CallExpression").flatMap(
           (visit) => snapshotMatcherSiteOf(visit.node, visit.ancestors) ?? [],
         ),
-      ).map((entry) => (entry.kind === "spelled" ? entry.keys : entry.kind));
+      ).map((snapshotEntryKeys) =>
+        snapshotEntryKeys.kind === "spelled" ? snapshotEntryKeys.keys : snapshotEntryKeys.kind,
+      );
     });
 
     it("loses its key while the one before it keeps its own", ({
@@ -363,7 +401,9 @@ describe("entryKeysOf", () => {
         nodeVisitsOfType(statement, "CallExpression").flatMap(
           (visit) => snapshotMatcherSiteOf(visit.node, visit.ancestors) ?? [],
         ),
-      ).map((entry) => (entry.kind === "spelled" ? entry.keys : entry.kind));
+      ).map((snapshotEntryKeys) =>
+        snapshotEntryKeys.kind === "spelled" ? snapshotEntryKeys.keys : snapshotEntryKeys.kind,
+      );
     });
 
     it("leaves the key unresolvable", ({ keysOfASnapshotWhereTheBlockTitleBelongs }) => {
@@ -379,7 +419,9 @@ describe("entryKeysOf", () => {
         nodeVisitsOfType(statement, "CallExpression").flatMap(
           (visit) => snapshotMatcherSiteOf(visit.node, visit.ancestors) ?? [],
         ),
-      ).map((entry) => (entry.kind === "spelled" ? entry.keys : entry.kind));
+      ).map((snapshotEntryKeys) =>
+        snapshotEntryKeys.kind === "spelled" ? snapshotEntryKeys.keys : snapshotEntryKeys.kind,
+      );
     });
 
     it("leaves the key unreadable", ({ keysOfASnapshotOutsideEveryTitledBlock }) => {
@@ -397,7 +439,9 @@ describe("entryKeysOf", () => {
         nodeVisitsOfType(statement, "CallExpression").flatMap(
           (visit) => snapshotMatcherSiteOf(visit.node, visit.ancestors) ?? [],
         ),
-      ).map((entry) => (entry.kind === "spelled" ? entry.keys : entry.kind));
+      ).map((snapshotEntryKeys) =>
+        snapshotEntryKeys.kind === "spelled" ? snapshotEntryKeys.keys : snapshotEntryKeys.kind,
+      );
     });
 
     it("is no site", ({ keysOfAMatcherCalledOnSomethingOtherThanAnAssertion }) => {

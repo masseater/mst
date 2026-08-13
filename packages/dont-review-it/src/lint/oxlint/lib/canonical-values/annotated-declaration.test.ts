@@ -12,9 +12,12 @@ describe("annotatedDeclarationRanges", () => {
       const sourceText = `/** @canonical-values user.status */
 export const USER_STATUSES = ["draft"] as const;
 `;
-      const parsed = parseSync("source.ts", sourceText);
+      const parsedSourceFile = parseSync("source.ts", sourceText);
       return annotatedDeclarationRanges(
-        { body: parsed.program.body, comments: parsed.comments },
+        {
+          body: parsedSourceFile.program.body,
+          comments: parsedSourceFile.comments,
+        },
         sourceText,
       );
     });
@@ -31,9 +34,12 @@ export const USER_STATUSES = ["draft"] as const;
       const sourceText = `/** what the value stands for */
 export const USER_STATUSES = ["draft"] as const;
 `;
-      const parsed = parseSync("source.ts", sourceText);
+      const parsedSourceFile = parseSync("source.ts", sourceText);
       return annotatedDeclarationRanges(
-        { body: parsed.program.body, comments: parsed.comments },
+        {
+          body: parsedSourceFile.program.body,
+          comments: parsedSourceFile.comments,
+        },
         sourceText,
       );
     });
@@ -48,9 +54,12 @@ export const USER_STATUSES = ["draft"] as const;
       const sourceText = `// @canonical-values user.status
 export const USER_STATUSES = ["draft"] as const;
 `;
-      const parsed = parseSync("source.ts", sourceText);
+      const parsedSourceFile = parseSync("source.ts", sourceText);
       return annotatedDeclarationRanges(
-        { body: parsed.program.body, comments: parsed.comments },
+        {
+          body: parsedSourceFile.program.body,
+          comments: parsedSourceFile.comments,
+        },
         sourceText,
       );
     });
@@ -67,9 +76,12 @@ export const USER_STATUSES = ["draft"] as const;
       const sourceText = `export const USER_STATUSES = ["draft"] as const;
 /** @canonical-values user.status */
 `;
-      const parsed = parseSync("source.ts", sourceText);
+      const parsedSourceFile = parseSync("source.ts", sourceText);
       return annotatedDeclarationRanges(
-        { body: parsed.program.body, comments: parsed.comments },
+        {
+          body: parsedSourceFile.program.body,
+          comments: parsedSourceFile.comments,
+        },
         sourceText,
       );
     });
@@ -85,9 +97,12 @@ export const USER_STATUSES = ["draft"] as const;
 // what the value stands for
 export const USER_STATUSES = ["draft"] as const;
 `;
-      const parsed = parseSync("source.ts", sourceText);
+      const parsedSourceFile = parseSync("source.ts", sourceText);
       return annotatedDeclarationRanges(
-        { body: parsed.program.body, comments: parsed.comments },
+        {
+          body: parsedSourceFile.program.body,
+          comments: parsedSourceFile.comments,
+        },
         sourceText,
       );
     });
@@ -104,9 +119,12 @@ export const USER_STATUSES = ["draft"] as const;
   statuses: ["draft"],
 };
 `;
-      const parsed = parseSync("source.ts", sourceText);
+      const parsedSourceFile = parseSync("source.ts", sourceText);
       return annotatedDeclarationRanges(
-        { body: parsed.program.body, comments: parsed.comments },
+        {
+          body: parsedSourceFile.program.body,
+          comments: parsedSourceFile.comments,
+        },
         sourceText,
       );
     });
@@ -123,9 +141,12 @@ describe("isInsideAnnotatedDeclaration", () => {
       const sourceText = `/** @canonical-values user.status */
 export const USER_STATUSES = ["draft"] as const;
 `;
-      const parsed = parseSync("source.ts", sourceText);
+      const parsedSourceFile = parseSync("source.ts", sourceText);
       const ranges = annotatedDeclarationRanges(
-        { body: parsed.program.body, comments: parsed.comments },
+        {
+          body: parsedSourceFile.program.body,
+          comments: parsedSourceFile.comments,
+        },
         sourceText,
       );
       return isInsideAnnotatedDeclaration(ranges, { start: 40, end: 45 });
@@ -141,9 +162,12 @@ export const USER_STATUSES = ["draft"] as const;
       const sourceText = `/** @canonical-values user.status */
 export const USER_STATUSES = ["draft"] as const;
 `;
-      const parsed = parseSync("source.ts", sourceText);
+      const parsedSourceFile = parseSync("source.ts", sourceText);
       const ranges = annotatedDeclarationRanges(
-        { body: parsed.program.body, comments: parsed.comments },
+        {
+          body: parsedSourceFile.program.body,
+          comments: parsedSourceFile.comments,
+        },
         sourceText,
       );
       return isInsideAnnotatedDeclaration(ranges, { start: 0, end: 5 });

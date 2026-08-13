@@ -35,9 +35,11 @@ const expandPattern = async ({
   if (!pattern.endsWith("/*")) return [pattern];
 
   const parentDirectory = pattern.slice(0, -2);
-  const names = await directoryNamesIn(join(repositoryRoot, parentDirectory));
+  const childDirectoryNames = await directoryNamesIn(join(repositoryRoot, parentDirectory));
 
-  return names.map((name) => `${parentDirectory}/${name}`);
+  return childDirectoryNames.map(
+    (childDirectoryName) => `${parentDirectory}/${childDirectoryName}`,
+  );
 };
 
 const declaredWorkspaceDirectories = async ({
@@ -52,10 +54,10 @@ const declaredWorkspaceDirectories = async ({
   const raw = await readTextOrNull(join(repositoryRoot, definitionFile));
   if (raw === null) return [];
 
-  const parsed: unknown = parse(raw);
-  if (!isPlainObject(parsed)) return [];
+  const definitionDocument: unknown = parse(raw);
+  if (!isPlainObject(definitionDocument)) return [];
 
-  const patterns: unknown = parsed[definitionField];
+  const patterns: unknown = definitionDocument[definitionField];
   if (!Array.isArray(patterns)) return [];
 
   const expanded = await Promise.all(
@@ -103,7 +105,11 @@ export const collectWorkspaces = async ({
   );
 
   return {
-    entries: resolved.filter((item): item is WorkspaceEntry => "description" in item),
-    incomplete: resolved.filter((item): item is IncompleteWorkspace => "reason" in item),
+    entries: resolved.filter(
+      (workspace): workspace is WorkspaceEntry => "description" in workspace,
+    ),
+    incomplete: resolved.filter(
+      (workspace): workspace is IncompleteWorkspace => "reason" in workspace,
+    ),
   };
 };

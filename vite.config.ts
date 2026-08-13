@@ -1,52 +1,19 @@
-import {
-  oxlint as dontReviewItOxlint,
-  oxlintCli as dontReviewItOxlintCli,
-  withGitExcludes,
-} from "@mst/dont-review-it";
-import { oxlint as lintRuleAuthoringOxlint } from "@mst/lint-rule-authoring";
-import { oxlint as verifiedSpecificationsOxlint } from "@mst/verified-specifications";
+import { dontReviewItPreset } from "@mst/dont-review-it";
 import { defineConfig } from "vite-plus";
-
-const dontReviewItBaseRuleIds = new Set(Object.keys(dontReviewItOxlint.rules ?? {}));
-
-const dontReviewItCliOnlyRules = Object.fromEntries(
-  Object.entries(dontReviewItOxlintCli.rules ?? {}).filter(
-    ([ruleId]) => !dontReviewItBaseRuleIds.has(ruleId),
-  ),
-);
 
 export default defineConfig({
   staged: {
     "*": "vp check --fix",
   },
-  fmt: withGitExcludes({
-    sortImports: {
-      customGroups: [
-        { groupName: "typeBuiltin", selector: "type", elementNamePattern: ["node:*"] },
-        { groupName: "typeRepository", selector: "type", elementNamePattern: ["./**", "../**"] },
-        { groupName: "typeInstalled", selector: "type" },
-      ],
-      groups: [
-        "builtin",
-        "external",
-        ["internal", "subpath", "parent", "sibling", "index"],
-        "typeBuiltin",
-        { newlinesBetween: false },
-        "typeInstalled",
-        { newlinesBetween: false },
-        "typeRepository",
-      ],
-    },
-  }),
-  lint: withGitExcludes({
-    extends: [lintRuleAuthoringOxlint, dontReviewItOxlint, verifiedSpecificationsOxlint],
+  fmt: dontReviewItPreset.fmt(),
+  lint: dontReviewItPreset.lint({
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
     rules: {
       "vite-plus/prefer-vite-plus-imports": "error",
       "vitest/consistent-test-filename": ["error", { pattern: "\\.test\\.tsx?$" }],
       "dont-review-it/no-default-export--use-named-export": [
         "error",
-        { toolRequiredFileNames: ["plugin.ts", "vite.config.ts"] },
+        { toolRequiredFileNames: ["knip.ts", "plugin.ts", "vite.config.ts"] },
       ],
       "dont-review-it/no-reassign--use-spread-or-iife": [
         "error",
@@ -61,11 +28,14 @@ export default defineConfig({
       "dont-review-it/no-partial-rule-set--enable-the-whole-set": "error",
       "dont-review-it/no-empty-catch--throw-or-handle": "error",
       "dont-review-it/no-silent-catch--rethrow-or-handle": "error",
+      "dont-review-it/no-version-range--pin-the-exact-version": "error",
     },
     overrides: [
       {
-        files: ["packages/dont-review-it/**"],
-        rules: dontReviewItCliOnlyRules,
+        files: ["packages/ai-native/**", "packages/lint-rule-authoring/**"],
+        rules: {
+          "dont-review-it/no-handmade-standard-io-double--use-standard-io-test": "off",
+        },
       },
       {
         files: ["**/{test,tests,__tests__,spec,__specs__}/**"],

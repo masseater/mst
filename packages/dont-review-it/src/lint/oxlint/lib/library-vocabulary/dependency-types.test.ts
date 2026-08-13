@@ -10,7 +10,7 @@ const FIXTURE_ROOT = join(tmpdir(), "dont-review-it-dependency-types");
 
 describe("dependencyTypeEntries", () => {
   describe("a dependency that names its declarations through its export map", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("typedDependenciesOfTheExportMapPackage", ({}, { onCleanup }) => {
       const packageDirectory = join(FIXTURE_ROOT, "export-map");
       rmSync(packageDirectory, { recursive: true, force: true });
       onCleanup(() => {
@@ -37,8 +37,8 @@ describe("dependencyTypeEntries", () => {
       return dependencyTypeEntries(packageDirectory);
     });
 
-    it("becomes an entry", ({ entries }) => {
-      expect(entries).toStrictEqual([
+    it("becomes an entry", ({ typedDependenciesOfTheExportMapPackage }) => {
+      expect(typedDependenciesOfTheExportMapPackage).toStrictEqual([
         {
           packageName: "oxlint",
           declarationsPath: join(
@@ -55,7 +55,7 @@ describe("dependencyTypeEntries", () => {
   });
 
   describe("an export map spelled as one path", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("typedDependenciesOfTheOnePathExportMap", ({}, { onCleanup }) => {
       const packageDirectory = join(FIXTURE_ROOT, "export-map-as-one-path");
       rmSync(packageDirectory, { recursive: true, force: true });
       onCleanup(() => {
@@ -80,8 +80,8 @@ describe("dependencyTypeEntries", () => {
       return dependencyTypeEntries(packageDirectory);
     });
 
-    it("is read as that path", ({ entries }) => {
-      expect(entries).toStrictEqual([
+    it("is read as that path", ({ typedDependenciesOfTheOnePathExportMap }) => {
+      expect(typedDependenciesOfTheOnePathExportMap).toStrictEqual([
         {
           packageName: "oxlint",
           declarationsPath: join(
@@ -97,7 +97,7 @@ describe("dependencyTypeEntries", () => {
   });
 
   describe("an export map that names only subpaths", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("typedDependenciesOfTheSubpathOnlyExportMap", ({}, { onCleanup }) => {
       const packageDirectory = join(FIXTURE_ROOT, "export-map-of-subpaths");
       rmSync(packageDirectory, { recursive: true, force: true });
       onCleanup(() => {
@@ -122,8 +122,10 @@ describe("dependencyTypeEntries", () => {
       return dependencyTypeEntries(packageDirectory);
     });
 
-    it("hands back no root entry, so the declared types field decides", ({ entries }) => {
-      expect(entries).toStrictEqual([
+    it("hands back no root entry, so the declared types field decides", ({
+      typedDependenciesOfTheSubpathOnlyExportMap,
+    }) => {
+      expect(typedDependenciesOfTheSubpathOnlyExportMap).toStrictEqual([
         {
           packageName: "oxlint",
           declarationsPath: join(
@@ -139,7 +141,7 @@ describe("dependencyTypeEntries", () => {
   });
 
   describe("an export map holding conditions that name nothing", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("typedDependenciesOfTheEmptyConditionExportMap", ({}, { onCleanup }) => {
       const packageDirectory = join(FIXTURE_ROOT, "export-map-of-empty-conditions");
       rmSync(packageDirectory, { recursive: true, force: true });
       onCleanup(() => {
@@ -164,8 +166,10 @@ describe("dependencyTypeEntries", () => {
       return dependencyTypeEntries(packageDirectory);
     });
 
-    it("hands back no entry, so the declared types field decides", ({ entries }) => {
-      expect(entries).toStrictEqual([
+    it("hands back no entry, so the declared types field decides", ({
+      typedDependenciesOfTheEmptyConditionExportMap,
+    }) => {
+      expect(typedDependenciesOfTheEmptyConditionExportMap).toStrictEqual([
         {
           packageName: "oxlint",
           declarationsPath: join(
@@ -181,7 +185,7 @@ describe("dependencyTypeEntries", () => {
   });
 
   describe("an entry path that carries no suffix", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("typedDependenciesOfTheSuffixlessEntryPath", ({}, { onCleanup }) => {
       const packageDirectory = join(FIXTURE_ROOT, "entry-path-without-a-suffix");
       rmSync(packageDirectory, { recursive: true, force: true });
       onCleanup(() => {
@@ -206,8 +210,10 @@ describe("dependencyTypeEntries", () => {
       return dependencyTypeEntries(packageDirectory);
     });
 
-    it("names no declarations, so the declared types field decides", ({ entries }) => {
-      expect(entries).toStrictEqual([
+    it("names no declarations, so the declared types field decides", ({
+      typedDependenciesOfTheSuffixlessEntryPath,
+    }) => {
+      expect(typedDependenciesOfTheSuffixlessEntryPath).toStrictEqual([
         {
           packageName: "oxlint",
           declarationsPath: join(
@@ -223,7 +229,7 @@ describe("dependencyTypeEntries", () => {
   });
 
   describe("a dependency declared for development", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("typedDevelopmentDependencies", ({}, { onCleanup }) => {
       const packageDirectory = join(FIXTURE_ROOT, "development-dependency");
       rmSync(packageDirectory, { recursive: true, force: true });
       onCleanup(() => {
@@ -250,8 +256,8 @@ describe("dependencyTypeEntries", () => {
       return dependencyTypeEntries(packageDirectory);
     });
 
-    it("is reachable the same way", ({ entries }) => {
-      expect(entries).toStrictEqual([
+    it("is reachable the same way", ({ typedDevelopmentDependencies }) => {
+      expect(typedDevelopmentDependencies).toStrictEqual([
         {
           packageName: "vite",
           declarationsPath: join(
@@ -269,7 +275,7 @@ describe("dependencyTypeEntries", () => {
   });
 
   describe("a dependency declared as a peer", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("typedPeerDependencies", ({}, { onCleanup }) => {
       const packageDirectory = join(FIXTURE_ROOT, "peer-dependency");
       rmSync(packageDirectory, { recursive: true, force: true });
       onCleanup(() => {
@@ -294,8 +300,8 @@ describe("dependencyTypeEntries", () => {
       return dependencyTypeEntries(packageDirectory);
     });
 
-    it("is reachable the same way", ({ entries }) => {
-      expect(entries).toStrictEqual([
+    it("is reachable the same way", ({ typedPeerDependencies }) => {
+      expect(typedPeerDependencies).toStrictEqual([
         {
           packageName: "oxlint",
           declarationsPath: join(
@@ -311,7 +317,7 @@ describe("dependencyTypeEntries", () => {
   });
 
   describe("a dependency inside this repository", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("typedDependenciesBesideTheWorkspacePackage", ({}, { onCleanup }) => {
       const packageDirectory = join(FIXTURE_ROOT, "repository-dependency");
       rmSync(packageDirectory, { recursive: true, force: true });
       onCleanup(() => {
@@ -351,8 +357,8 @@ describe("dependencyTypeEntries", () => {
       return dependencyTypeEntries(packageDirectory);
     });
 
-    it("is left to the repository catalog", ({ entries }) => {
-      expect(entries).toStrictEqual([
+    it("is left to the repository catalog", ({ typedDependenciesBesideTheWorkspacePackage }) => {
+      expect(typedDependenciesBesideTheWorkspacePackage).toStrictEqual([
         {
           packageName: "oxlint",
           declarationsPath: join(
@@ -368,7 +374,7 @@ describe("dependencyTypeEntries", () => {
   });
 
   describe("a types condition nested under another condition", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("typedDependenciesOfTheNestedTypesCondition", ({}, { onCleanup }) => {
       const packageDirectory = join(FIXTURE_ROOT, "nested-types-condition");
       rmSync(packageDirectory, { recursive: true, force: true });
       onCleanup(() => {
@@ -395,8 +401,8 @@ describe("dependencyTypeEntries", () => {
       return dependencyTypeEntries(packageDirectory);
     });
 
-    it("is still found", ({ entries }) => {
-      expect(entries).toStrictEqual([
+    it("is still found", ({ typedDependenciesOfTheNestedTypesCondition }) => {
+      expect(typedDependenciesOfTheNestedTypesCondition).toStrictEqual([
         {
           packageName: "nested",
           declarationsPath: join(
@@ -412,7 +418,7 @@ describe("dependencyTypeEntries", () => {
   });
 
   describe("an export map that names conditions without a subpath", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("typedDependenciesOfTheSubpathlessConditions", ({}, { onCleanup }) => {
       const packageDirectory = join(FIXTURE_ROOT, "conditions-without-a-subpath");
       rmSync(packageDirectory, { recursive: true, force: true });
       onCleanup(() => {
@@ -437,8 +443,8 @@ describe("dependencyTypeEntries", () => {
       return dependencyTypeEntries(packageDirectory);
     });
 
-    it("is read as the root entry", ({ entries }) => {
-      expect(entries).toStrictEqual([
+    it("is read as the root entry", ({ typedDependenciesOfTheSubpathlessConditions }) => {
+      expect(typedDependenciesOfTheSubpathlessConditions).toStrictEqual([
         {
           packageName: "rootonly",
           declarationsPath: join(
@@ -454,7 +460,7 @@ describe("dependencyTypeEntries", () => {
   });
 
   describe("a package that only names its runtime entry", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("typedDependenciesOfTheRuntimeEntryPackage", ({}, { onCleanup }) => {
       const packageDirectory = join(FIXTURE_ROOT, "runtime-entry-beside-declarations");
       rmSync(packageDirectory, { recursive: true, force: true });
       onCleanup(() => {
@@ -481,8 +487,8 @@ describe("dependencyTypeEntries", () => {
       return dependencyTypeEntries(packageDirectory);
     });
 
-    it("points at the declarations beside it", ({ entries }) => {
-      expect(entries).toStrictEqual([
+    it("points at the declarations beside it", ({ typedDependenciesOfTheRuntimeEntryPackage }) => {
+      expect(typedDependenciesOfTheRuntimeEntryPackage).toStrictEqual([
         {
           packageName: "runtimeonly",
           declarationsPath: join(
@@ -499,7 +505,9 @@ describe("dependencyTypeEntries", () => {
   });
 
   describe("a package that ships no type declarations", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("typedDependenciesOfThePackageWithoutDeclarations", ({}, {
+      onCleanup,
+    }) => {
       const packageDirectory = join(FIXTURE_ROOT, "runtime-entry-without-declarations");
       rmSync(packageDirectory, { recursive: true, force: true });
       onCleanup(() => {
@@ -526,13 +534,13 @@ describe("dependencyTypeEntries", () => {
       return dependencyTypeEntries(packageDirectory);
     });
 
-    it("is left out", ({ entries }) => {
-      expect(entries).toStrictEqual([]);
+    it("is left out", ({ typedDependenciesOfThePackageWithoutDeclarations }) => {
+      expect(typedDependenciesOfThePackageWithoutDeclarations).toStrictEqual([]);
     });
   });
 
   describe("a dependency missing from the checkout", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("typedDependenciesBesideThePrunedDependency", ({}, { onCleanup }) => {
       const packageDirectory = join(FIXTURE_ROOT, "pruned-dependency");
       rmSync(packageDirectory, { recursive: true, force: true });
       onCleanup(() => {
@@ -557,8 +565,8 @@ describe("dependencyTypeEntries", () => {
       return dependencyTypeEntries(packageDirectory);
     });
 
-    it("costs only that dependency", ({ entries }) => {
-      expect(entries).toStrictEqual([
+    it("costs only that dependency", ({ typedDependenciesBesideThePrunedDependency }) => {
+      expect(typedDependenciesBesideThePrunedDependency).toStrictEqual([
         {
           packageName: "oxlint",
           declarationsPath: join(
@@ -574,7 +582,7 @@ describe("dependencyTypeEntries", () => {
   });
 
   describe("three dependencies installed out of order", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("typedDependenciesOfThreeInstalledPackages", ({}, { onCleanup }) => {
       const packageDirectory = join(FIXTURE_ROOT, "three-dependencies");
       rmSync(packageDirectory, { recursive: true, force: true });
       onCleanup(() => {
@@ -624,8 +632,8 @@ describe("dependencyTypeEntries", () => {
       return dependencyTypeEntries(packageDirectory);
     });
 
-    it("come back sorted by package name", ({ entries }) => {
-      expect(entries).toStrictEqual([
+    it("come back sorted by package name", ({ typedDependenciesOfThreeInstalledPackages }) => {
+      expect(typedDependenciesOfThreeInstalledPackages).toStrictEqual([
         {
           packageName: "@oxlint/plugins",
           declarationsPath: join(
@@ -662,7 +670,7 @@ describe("dependencyTypeEntries", () => {
   });
 
   describe("a package that declares no dependencies", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("typedDependenciesOfTheLonePackage", ({}, { onCleanup }) => {
       const packageDirectory = join(FIXTURE_ROOT, "no-dependencies");
       rmSync(packageDirectory, { recursive: true, force: true });
       onCleanup(() => {
@@ -677,13 +685,13 @@ describe("dependencyTypeEntries", () => {
       return dependencyTypeEntries(packageDirectory);
     });
 
-    it("has nothing to offer", ({ entries }) => {
-      expect(entries).toStrictEqual([]);
+    it("has nothing to offer", ({ typedDependenciesOfTheLonePackage }) => {
+      expect(typedDependenciesOfTheLonePackage).toStrictEqual([]);
     });
   });
 
   describe("a directory that holds no manifest", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("typedDependenciesOfTheManifestlessDirectory", ({}, { onCleanup }) => {
       const packageDirectory = join(FIXTURE_ROOT, "no-manifest");
       rmSync(packageDirectory, { recursive: true, force: true });
       onCleanup(() => {
@@ -698,8 +706,8 @@ describe("dependencyTypeEntries", () => {
       return dependencyTypeEntries(join(packageDirectory, "src"));
     });
 
-    it("has nothing to offer", ({ entries }) => {
-      expect(entries).toStrictEqual([]);
+    it("has nothing to offer", ({ typedDependenciesOfTheManifestlessDirectory }) => {
+      expect(typedDependenciesOfTheManifestlessDirectory).toStrictEqual([]);
     });
   });
 });

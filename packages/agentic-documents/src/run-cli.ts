@@ -2,12 +2,12 @@ import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 
 import {
+  createCliRunner,
   EXIT_MISUSE,
   EXIT_PROBLEMS_FOUND,
   EXIT_SUCCESS,
   type CliResult,
 } from "@mst/repository-checks";
-import { attemptAsync } from "es-toolkit";
 
 import { defaultConfig } from "./config.ts";
 import { formatProblem } from "./problem.ts";
@@ -26,7 +26,7 @@ Options:
 const CHECK_COMMAND = "check";
 
 const dispatch = async (argv: readonly string[]): Promise<CliResult> => {
-  const parsed = parseArgs({
+  const parsedNode = parseArgs({
     args: [...argv],
     allowPositionals: true,
     options: {
@@ -35,15 +35,15 @@ const dispatch = async (argv: readonly string[]): Promise<CliResult> => {
     },
   });
 
-  const [command] = parsed.positionals;
+  const [command] = parsedNode.positionals;
   if (command !== CHECK_COMMAND) {
     return { exitCode: EXIT_MISUSE, out: "", error: USAGE };
   }
 
   const problems = await runChecks({
-    repositoryRoot: resolve(parsed.values["repository-root"] ?? process.cwd()),
+    repositoryRoot: resolve(parsedNode.values["repository-root"] ?? process.cwd()),
     config: defaultConfig,
-    write: parsed.values.write,
+    write: parsedNode.values.write,
   });
 
   return {
@@ -53,9 +53,4 @@ const dispatch = async (argv: readonly string[]): Promise<CliResult> => {
   };
 };
 
-export const runAgenticDocuments = async (argv: readonly string[]): Promise<CliResult> => {
-  const [failure, checked] = await attemptAsync<CliResult, Error>(async () => dispatch(argv));
-  return failure === null
-    ? checked
-    : { exitCode: EXIT_MISUSE, out: "", error: `${failure.message}\n` };
-};
+export const runAgenticDocuments = createCliRunner(dispatch);

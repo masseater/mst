@@ -23,32 +23,32 @@ const configuredRulesIn = (rules: ESTree.ObjectExpression): readonly ConfiguredR
     return [{ property, ruleName, level: severityLevelOf(property.value) }];
   });
 
-const scopeOf = (object: ESTree.ObjectExpression): readonly string[] | null => {
-  const files = objectValueOf({ object, key: "files" });
+const scopeOf = (holder: ESTree.ObjectExpression): readonly string[] | null => {
+  const files = objectValueOf({ object: holder, key: "files" });
   if (files === null) return null;
   if (files.type !== "ArrayExpression") return [];
-  return files.elements.flatMap((element) =>
-    element?.type === "Literal" && typeof element.value === "string" ? [element.value] : [],
+  return files.elements.flatMap((held) =>
+    held?.type === "Literal" && typeof held.value === "string" ? [held.value] : [],
   );
 };
 
 const spellsTypeAwareness = (node: ESTree.Node): boolean => {
   if (node.type !== "ObjectExpression") return false;
-  const options = objectValueOf({ object: node, key: "options" });
-  if (options?.type !== "ObjectExpression") return false;
-  const declared = objectValueOf({ object: options, key: "typeAware" });
+  const ruleOptions = objectValueOf({ object: node, key: "options" });
+  if (ruleOptions?.type !== "ObjectExpression") return false;
+  const declared = objectValueOf({ object: ruleOptions, key: "typeAware" });
   return declared?.type === "Literal" && declared.value === true;
 };
 
 export const ruleBlockObjectOf = (
-  object: ESTree.ObjectExpression,
+  holder: ESTree.ObjectExpression,
 ): ESTree.ObjectExpression | null => {
-  const rules = objectValueOf({ object, key: "rules" });
+  const rules = objectValueOf({ object: holder, key: "rules" });
   return rules?.type === "ObjectExpression" ? rules : null;
 };
 
 export const configuredRuleBlockOf = ({
-  object,
+  object: holder,
   rules,
   ancestors,
 }: {
@@ -57,6 +57,6 @@ export const configuredRuleBlockOf = ({
   readonly ancestors: readonly ESTree.Node[];
 }): ConfiguredRuleBlock => ({
   rules: configuredRulesIn(rules),
-  scope: scopeOf(object),
-  declaresTypeAwareness: [object, ...ancestors].some(spellsTypeAwareness),
+  scope: scopeOf(holder),
+  declaresTypeAwareness: [holder, ...ancestors].some(spellsTypeAwareness),
 });

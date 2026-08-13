@@ -78,6 +78,6 @@ test("drops the suffix from the file name", ({ stem }) => {
 
 `forbiddenSubjectNames` の各項目は `pattern` を 1 つだけ持つオブジェクトで、値は識別子名に照合する区切り記号なしの正規表現ソース文字列。アンカーの有無が一致の仕方を決める。`^data$` は識別子全体が `data` のときだけ一致し、`result$` はその語で終わる複合語にも一致する。`pattern` 以外のキーはスキーマが拒否する。
 
-既定値は空で、語彙が無ければ何も検査しない。語彙の実体は `src/lint/oxlint/lib/forbidden-ambiguous-names.ts` の `FORBIDDEN_AMBIGUOUS_NAMES` に置き、配備側の設定で注入する。宣言の位置を見る `no-ambiguous-variable-name--rename-to-concrete-noun` が同じ一覧を読むので、語を足すときは一覧の一箇所だけを触る。語彙が二箇所に分かれると、同じ名前が宣言では通ってアサーションでは落ちる、あるいはその逆が生まれる。
+`forbiddenSubjectNames` は既定の語彙に足すだけで、既定を削ることはできない。設定を渡さなくても既定の語彙で検査する。語彙の実体は `src/lint/oxlint/lib/forbidden-ambiguous-names.ts` の `FORBIDDEN_AMBIGUOUS_NAMES` にあり、宣言の位置を見る `no-ambiguous-variable-name--rename-to-concrete-noun` が同じ一覧を読むので、語を足すときは一覧の一箇所だけを触る。語彙が二箇所に分かれると、同じ名前が宣言では通ってアサーションでは落ちる、あるいはその逆が生まれる。照合前に名前の飾りを剥がす正規化も両方のルールで共通である。
 
 `specFileSuffixes` は対象ファイルの範囲を決める。既定は `.test.ts` と `.test.tsx` で、spec を見る他のルールと同じ範囲を共有する。

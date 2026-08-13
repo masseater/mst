@@ -52,30 +52,31 @@ const ENTRY_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-const holdsEnabledRule = (value: ESTree.Expression): boolean => {
-  const spelled = spelledSeverityOf(value);
+const holdsEnabledRule = (held: ESTree.Expression): boolean => {
+  const spelled = spelledSeverityOf(held);
   if (spelled === null) return true;
   if (DISABLED_SEVERITIES.has(spelled)) return false;
   return ENABLED_SEVERITIES.has(spelled);
 };
 
-const restrictionRulesIn = (options: Readonly<Options>): ReadonlyMap<string, string> => {
-  const declared = listedUnder(options, RESTRICTION_RULES_OPTION).flatMap(({ rule, substitute }) =>
-    typeof rule === "string" && rule !== ""
-      ? [{ rule, substitute: typeof substitute === "string" ? substitute : "" }]
-      : [],
+const restrictionRulesIn = (ruleOptions: Readonly<Options>): ReadonlyMap<string, string> => {
+  const declared = listedUnder(ruleOptions, RESTRICTION_RULES_OPTION).flatMap(
+    ({ rule, substitute }) =>
+      typeof rule === "string" && rule !== ""
+        ? [{ rule, substitute: typeof substitute === "string" ? substitute : "" }]
+        : [],
   );
   return new Map(
-    [...RESTRICTION_RULES, ...declared].map((entry): readonly [string, string] => [
-      bareRuleNameOf(entry.rule),
-      entry.substitute,
+    [...RESTRICTION_RULES, ...declared].map((listed): readonly [string, string] => [
+      bareRuleNameOf(listed.rule),
+      listed.substitute,
     ]),
   );
 };
 
-const exceptionGroundsIn = (options: Readonly<Options>): ReadonlyMap<string, string> =>
+const exceptionGroundsIn = (ruleOptions: Readonly<Options>): ReadonlyMap<string, string> =>
   new Map(
-    listedUnder(options, EXCEPTIONS_OPTION).flatMap(
+    listedUnder(ruleOptions, EXCEPTIONS_OPTION).flatMap(
       ({ rule, reason }): readonly (readonly [string, string])[] =>
         typeof rule === "string" && rule !== ""
           ? [[bareRuleNameOf(rule), typeof reason === "string" ? reason.trim() : ""]]
@@ -111,9 +112,9 @@ export const forbidGenericRestrictionRule = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    const restrictionRules = restrictionRulesIn(context.options);
-    const exceptionGrounds = exceptionGroundsIn(context.options);
+  create(inspection) {
+    const restrictionRules = restrictionRulesIn(inspection.options);
+    const exceptionGrounds = exceptionGroundsIn(inspection.options);
 
     const messageFor = (ruleName: string): RuleMessage | null => {
       const bare = bareRuleNameOf(ruleName);
@@ -134,10 +135,10 @@ export const forbidGenericRestrictionRule = createDontReviewItRule({
       if (property.type !== "Property") return;
       const ruleName = propertyKeyOf(property);
       if (ruleName === null) return;
-      const message = messageFor(ruleName);
-      if (message === null) return;
+      const complaint = messageFor(ruleName);
+      if (complaint === null) return;
       if (!holdsEnabledRule(property.value)) return;
-      context.report({ node: property, ...message });
+      inspection.report({ node: property, ...complaint });
     };
 
     return {

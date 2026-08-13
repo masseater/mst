@@ -64,23 +64,23 @@ export const noUncheckedAuthoredPath = createDontReviewItRule({
     },
     schema: DECLARED_COVERAGE_SCHEMA,
   },
-  create(context) {
-    const declarations = coverageDeclarationsFrom(context.options);
+  create(inspection) {
+    const declarations = coverageDeclarationsFrom(inspection.options);
     if (declarations.checks.length === 0) return {};
 
     return {
       Program(node: ESTree.Program) {
-        const fileDirectory = dirname(resolve(context.cwd, context.filename));
+        const fileDirectory = dirname(resolve(inspection.cwd, inspection.filename));
         const repositoryRoot = findWorkspaceRoot(fileDirectory);
         const held = coverageFindingsIn({
           repositoryRoot,
           declarations,
-          unscannedDirectoryNames: unscannedDirectoryNamesFrom(context.options),
+          unscannedDirectoryNames: unscannedDirectoryNamesFrom(inspection.options),
         });
         const findings = held.get(holdingWorkspaceOf({ repositoryRoot, fileDirectory })) ?? [];
 
         for (const finding of findings) {
-          context.report({ node, messageId: finding.messageId, data: finding.data });
+          inspection.report({ node, messageId: finding.messageId, data: finding.data });
         }
       },
     };

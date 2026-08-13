@@ -453,8 +453,8 @@ describe("localConstInitializer", () => {
       const statement = parseSync("spec.ts", "(() => { const caught = runSut(); return caught; });")
         .program.body[0] as ESTree.ExpressionStatement;
       const factory = asSpecFunction(statement.expression);
-      const body = factory === null ? null : blockBodyOf(factory);
-      return body === null ? null : localConstInitializer(body, "caught");
+      const factoryBlock = factory === null ? null : blockBodyOf(factory);
+      return factoryBlock === null ? null : localConstInitializer(factoryBlock, "caught");
     });
 
     it("is the initializer that name stands for", ({ initializerOfASingleConstInTheBody }) => {
@@ -483,8 +483,8 @@ describe("localConstInitializer", () => {
       const statement = parseSync("spec.ts", "(() => { let caught = runSut(); return caught; });")
         .program.body[0] as ESTree.ExpressionStatement;
       const factory = asSpecFunction(statement.expression);
-      const body = factory === null ? null : blockBodyOf(factory);
-      return body === null ? null : localConstInitializer(body, "caught");
+      const factoryBlock = factory === null ? null : blockBodyOf(factory);
+      return factoryBlock === null ? null : localConstInitializer(factoryBlock, "caught");
     });
 
     it("is not a name this reading resolves", ({ initializerOfANameDeclaredWithLet }) => {
@@ -499,8 +499,8 @@ describe("localConstInitializer", () => {
         "(() => { const { caught } = runSut(); return caught; });",
       ).program.body[0] as ESTree.ExpressionStatement;
       const factory = asSpecFunction(statement.expression);
-      const body = factory === null ? null : blockBodyOf(factory);
-      return body === null ? null : localConstInitializer(body, "caught");
+      const factoryBlock = factory === null ? null : blockBodyOf(factory);
+      return factoryBlock === null ? null : localConstInitializer(factoryBlock, "caught");
     });
 
     it("is not a name this reading resolves", ({ initializerOfANameDeclaredByDestructuring }) => {
@@ -513,8 +513,8 @@ describe("localConstInitializer", () => {
       const statement = parseSync("spec.ts", "(() => { const caught = runSut(); return caught; });")
         .program.body[0] as ESTree.ExpressionStatement;
       const factory = asSpecFunction(statement.expression);
-      const body = factory === null ? null : blockBodyOf(factory);
-      return body === null ? null : localConstInitializer(body, "other");
+      const factoryBlock = factory === null ? null : blockBodyOf(factory);
+      return factoryBlock === null ? null : localConstInitializer(factoryBlock, "other");
     });
 
     it("stands for nothing here", ({ initializerOfANameNoConstInTheBodyDeclares }) => {

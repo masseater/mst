@@ -395,8 +395,8 @@ describe("spool cli", () => {
             maxBuffer: 64 * 1024 * 1024,
           },
         );
-        return readdirSync(join(workTree, ".spool")).map((name) =>
-          readFileSync(join(workTree, ".spool", name), "utf8"),
+        return readdirSync(join(workTree, ".spool")).map((recordedFileName) =>
+          readFileSync(join(workTree, ".spool", recordedFileName), "utf8"),
         );
       })
       .extend(
@@ -409,25 +409,27 @@ describe("spool cli", () => {
       .extend(
         "aDoublyWrappedRunLeavesARecordOfTheOuterWrapping",
         ({ theRecordsLeftByADoublyWrappedRun }) =>
-          theRecordsLeftByADoublyWrappedRun.find((record) => record.includes("spool: log: ")) !==
-          undefined,
+          theRecordsLeftByADoublyWrappedRun.find((recordedOutput) =>
+            recordedOutput.includes("spool: log: "),
+          ) !== undefined,
       )
       .extend(
         "aDoublyWrappedRunLeavesARecordOfTheInnerCommand",
         ({ theRecordsLeftByADoublyWrappedRun }) =>
-          theRecordsLeftByADoublyWrappedRun.find((record) => !record.includes("spool: log: ")) !==
-          undefined,
+          theRecordsLeftByADoublyWrappedRun.find(
+            (recordedOutput) => !recordedOutput.includes("spool: log: "),
+          ) !== undefined,
       )
       .extend("theOuterRecordOfADoublyWrappedRun", ({ theRecordsLeftByADoublyWrappedRun }) => {
-        const outer = theRecordsLeftByADoublyWrappedRun.find((record) =>
-          record.includes("spool: log: "),
+        const outer = theRecordsLeftByADoublyWrappedRun.find((recordedOutput) =>
+          recordedOutput.includes("spool: log: "),
         );
         if (outer === undefined) throw new Error("the outer wrapping left no record");
         return outer;
       })
       .extend("theInnerRecordOfADoublyWrappedRun", ({ theRecordsLeftByADoublyWrappedRun }) => {
         const inner = theRecordsLeftByADoublyWrappedRun.find(
-          (record) => !record.includes("spool: log: "),
+          (recordedOutput) => !recordedOutput.includes("spool: log: "),
         );
         if (inner === undefined) throw new Error("the inner command left no record");
         return inner;

@@ -42,10 +42,12 @@ const duplicateConceptProblem = (
   declaredLine: first.line,
 });
 
-export const verifyCanonicalValues = (options: {
+export const verifyCanonicalValues = ({
+  repositoryRoot,
+}: {
   readonly repositoryRoot: string;
 }): readonly CanonicalValuesProblem[] => {
-  const sources = readAnnotatedSources(listRepositoryFiles(resolve(options.repositoryRoot)));
+  const sources = readAnnotatedSources(listRepositoryFiles(resolve(repositoryRoot)));
   const sites = sources.flatMap(declarationSitesIn);
   const duplicates = sites.flatMap((site, order) => {
     const declared = sites.slice(0, order).find((held) => held.conceptId === site.conceptId);
@@ -59,8 +61,8 @@ export const verifyCanonicalValues = (options: {
 };
 
 export const findEquivalentConcepts = (
-  entries: readonly CanonicalValuesEntry[],
+  declarations: readonly CanonicalValuesEntry[],
 ): readonly (readonly CanonicalValuesEntry[])[] =>
-  [...buildCatalog(entries).entriesByFingerprint.values()].filter(
-    (grouped) => new Set(grouped.map((entry) => entry.conceptId)).size > 1,
+  [...buildCatalog(declarations).entriesByFingerprint.values()].filter(
+    (grouped) => new Set(grouped.map((declaration) => declaration.conceptId)).size > 1,
   );

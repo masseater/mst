@@ -131,8 +131,9 @@ const breaksOrder = (ancestors: readonly ESTree.Node[]): boolean => {
 
   const inside = ancestors.slice(scopeAt + 1);
   const [head] = inside;
-  const body = head !== undefined && FUNCTION_NODE_TYPES.has(head.type) ? inside.slice(1) : inside;
-  return body.some((node) => ORDER_BREAKING_TYPES.has(node.type));
+  const writtenBody =
+    head !== undefined && FUNCTION_NODE_TYPES.has(head.type) ? inside.slice(1) : inside;
+  return writtenBody.some((node) => ORDER_BREAKING_TYPES.has(node.type));
 };
 
 export const snapshotMatcherSiteOf = (
@@ -269,9 +270,9 @@ export const entryKeysOf = (
     if (site.scopes.some((scope) => scope.kind === "runtime")) return { kind: "unresolvable" };
     if (site.scopes.some((scope) => scope.kind === "unreadable")) return { kind: "unreadable" };
 
-    const keys = spelled.get(site) ?? [];
-    return keys.length === placementsOf(site).length
-      ? { kind: "spelled", keys }
+    const namedKeys = spelled.get(site) ?? [];
+    return namedKeys.length === placementsOf(site).length
+      ? { kind: "spelled", keys: namedKeys }
       : { kind: "unresolvable" };
   });
 };

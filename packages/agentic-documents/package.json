@@ -32,21 +32,22 @@
     "dev": "vp pack --watch",
     "test": "spool -- vp test",
     "check": "spool -- vp check",
-    "check:skills": "intent validate"
+    "check:skills": "intent validate",
+    "typecheck": "spool -- tsc -p ."
   },
   "dependencies": {
     "@mst/repository-checks": "workspace:*",
     "es-toolkit": "catalog:",
-    "remark-frontmatter": "^5.0.0",
-    "remark-gfm": "^4.0.1",
-    "remark-parse": "^11.0.0",
-    "unified": "^11.0.5",
+    "remark-frontmatter": "5.0.0",
+    "remark-gfm": "4.0.1",
+    "remark-parse": "11.0.0",
+    "unified": "11.0.5",
     "yaml": "catalog:"
   },
   "devDependencies": {
     "@mst/ai-native": "workspace:*",
     "@tanstack/intent": "catalog:",
-    "@types/mdast": "^4.0.4",
+    "@types/mdast": "4.0.4",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "typescript": "catalog:",

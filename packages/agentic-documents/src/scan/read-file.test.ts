@@ -79,7 +79,7 @@ describe("statOrNull", () => {
 
 describe("readTextOrNull", () => {
   describe("a file that is there", () => {
-    const it = test.extend("text", async ({}, { onCleanup }) => {
+    const it = test.extend("documentText", async ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "read-file-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
@@ -89,13 +89,13 @@ describe("readTextOrNull", () => {
       return readTextOrNull(documentPath);
     });
 
-    it("is read", ({ text }) => {
-      expect(text).toBe("# root\n");
+    it("is read", ({ documentText }) => {
+      expect(documentText).toBe("# root\n");
     });
   });
 
   describe("a file that is not there", () => {
-    const it = test.extend("text", async ({}, { onCleanup }) => {
+    const it = test.extend("missingDocumentText", async ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "read-file-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
@@ -103,8 +103,8 @@ describe("readTextOrNull", () => {
       return readTextOrNull(join(root, "missing.md"));
     });
 
-    it("reads as an absence", ({ text }) => {
-      expect(text).toBe(null);
+    it("reads as an absence", ({ missingDocumentText }) => {
+      expect(missingDocumentText).toBe(null);
     });
   });
 
@@ -126,7 +126,7 @@ describe("readTextOrNull", () => {
 
 describe("directoryNamesIn", () => {
   describe("a directory holding a directory beside a file", () => {
-    const it = test.extend("names", async ({}, { onCleanup }) => {
+    const it = test.extend("directoryNames", async ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "read-file-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
@@ -136,13 +136,13 @@ describe("directoryNamesIn", () => {
       return directoryNamesIn(root);
     });
 
-    it("names the directories alone", ({ names }) => {
-      expect(names).toStrictEqual(["packages"]);
+    it("names the directories alone", ({ directoryNames }) => {
+      expect(directoryNames).toStrictEqual(["packages"]);
     });
   });
 
   describe("a directory that is not there", () => {
-    const it = test.extend("names", async ({}, { onCleanup }) => {
+    const it = test.extend("directoryNamesUnderMissingRoot", async ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "read-file-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
@@ -150,8 +150,8 @@ describe("directoryNamesIn", () => {
       return directoryNamesIn(join(root, "missing"));
     });
 
-    it("names nothing", ({ names }) => {
-      expect(names).toStrictEqual([]);
+    it("names nothing", ({ directoryNamesUnderMissingRoot }) => {
+      expect(directoryNamesUnderMissingRoot).toStrictEqual([]);
     });
   });
 

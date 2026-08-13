@@ -41,21 +41,21 @@ export const requireSpecOrAssetsOnlyInSpecDirectory = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
+  create(inspection) {
     const convention = {
-      specDirectoryNames: specDirectoryNamesFrom(context.options),
-      specFileSuffixes: specFileSuffixesFrom(context.options),
-      assetsNameMarkers: assetsNameMarkersFrom(context.options),
+      specDirectoryNames: specDirectoryNamesFrom(inspection.options),
+      specFileSuffixes: specFileSuffixesFrom(inspection.options),
+      assetsNameMarkers: assetsNameMarkersFrom(inspection.options),
     };
 
     return {
       Program(node: ESTree.Program) {
-        const visitedPath = resolve(context.cwd, context.filename);
+        const visitedPath = resolve(inspection.cwd, inspection.filename);
         const repositoryRoot = findWorkspaceRoot(dirname(visitedPath));
         const held = foreignFilesIn({
           repositoryRoot,
           convention,
-          unscannedDirectoryNames: unscannedDirectoryNamesFrom(context.options),
+          unscannedDirectoryNames: unscannedDirectoryNamesFrom(inspection.options),
         });
         const workspace = holdingWorkspaceOf({
           repositoryRoot,
@@ -63,7 +63,7 @@ export const requireSpecOrAssetsOnlyInSpecDirectory = createDontReviewItRule({
         });
 
         for (const foreign of held.get(workspace) ?? []) {
-          context.report({ node, messageId: foreign.messageId, data: foreign.data });
+          inspection.report({ node, messageId: foreign.messageId, data: foreign.data });
         }
       },
     };

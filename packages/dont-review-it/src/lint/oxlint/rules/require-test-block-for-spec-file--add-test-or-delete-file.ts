@@ -24,7 +24,7 @@ const isHeldBack = (modifiers: readonly TestBlockModifierUse[]): boolean =>
 const rowCountOf = (table: ESTree.Expression): number | null => {
   const written = unwrapSubject(table);
   if (written.type !== "ArrayExpression") return null;
-  const spread = written.elements.some((element) => element?.type === "SpreadElement");
+  const spread = written.elements.some((held) => held?.type === "SpreadElement");
   return spread ? null : written.elements.length;
 };
 
@@ -32,8 +32,8 @@ const runsFromTable = (use: TestBlockModifierUse): boolean | null => {
   const [table] = use.handed ?? [];
   if (table === undefined) return null;
 
-  const rows = rowCountOf(table);
-  return rows === null ? null : rows !== 0;
+  const linedRows = rowCountOf(table);
+  return linedRows === null ? null : linedRows !== 0;
 };
 
 const runsIn = (call: ESTree.CallExpression): boolean | null => {
@@ -42,8 +42,8 @@ const runsIn = (call: ESTree.CallExpression): boolean | null => {
   if (call.arguments.some((argument) => argument.type === "SpreadElement")) return null;
 
   const table = modifiers.find((modifier) => TABLE_DRIVEN_MEMBERS.has(modifier.name));
-  const rows = table === undefined ? true : runsFromTable(table);
-  if (rows !== true) return rows;
+  const linedRows = table === undefined ? true : runsFromTable(table);
+  if (linedRows !== true) return linedRows;
 
   if (testCallbacksOf(call).length !== 0) return true;
 
@@ -161,13 +161,15 @@ const messageIdFor = ({
   const carriedModifiers = new Set(calls.flatMap((call) => calleeCallsOf(call)));
   const declared = calls.filter((call) => !carriedModifiers.has(call));
 
-  const groups = declared.filter((call) => declaresTestBlock(call, groupNames));
-  const heldBackGroups = groups.filter((call) => isHeldBack(testBlockModifiersOf(call.callee)));
+  const groupedSets = declared.filter((call) => declaresTestBlock(call, groupNames));
+  const heldBackGroups = groupedSets.filter((call) =>
+    isHeldBack(testBlockModifiersOf(call.callee)),
+  );
   const runs = declared
     .filter((call) => declaresTestBlock(call, blockNames))
     .map((call) => (isInside(call, heldBackGroups) ? false : runsIn(call)));
 
-  return verdictOf({ runs, groups });
+  return verdictOf({ runs, groups: groupedSets });
 };
 
 export const requireTestBlockForSpecFile = createDontReviewItRule({
@@ -197,8 +199,8 @@ export const requireTestBlockForSpecFile = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
     return {
       "Program:exit"(node: ESTree.Program) {
@@ -209,7 +211,7 @@ export const requireTestBlockForSpecFile = createDontReviewItRule({
           origins: originsIn(node),
         });
         if (messageId === null) return;
-        context.report({ node, messageId });
+        inspection.report({ node, messageId });
       },
     };
   },

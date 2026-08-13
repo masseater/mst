@@ -15,7 +15,7 @@ export const canonicalValuesEntriesIn = (
 ): readonly CanonicalValuesEntry[] => {
   const specifierIndexFor = memoize(buildExportSpecifierIndex);
 
-  const entries = sources.flatMap((source) => {
+  const canonicalValuesEntries = sources.flatMap((source) => {
     if (source.declarations.length === 0) return [];
 
     const packageDirectory = nearestPackageDirectory(dirname(source.absolutePath), repositoryRoot);
@@ -33,5 +33,5 @@ export const canonicalValuesEntriesIn = (
     }));
   });
 
-  return sortBy(entries, ["declarationPath", "conceptId"]);
+  return sortBy(canonicalValuesEntries, ["declarationPath", "conceptId"]);
 };

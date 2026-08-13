@@ -34,19 +34,19 @@ export const createNoUnusedStyleClass = ({
       },
       schema: [],
     },
-    create(context) {
-      const repositoryRootOf = memoize((): string => findWorkspaceRoot(context.cwd));
+    create(inspection) {
+      const repositoryRootOf = memoize((): string => findWorkspaceRoot(inspection.cwd));
 
       return {
         ImportDeclaration(node: ESTree.ImportDeclaration) {
           const repositoryRoot = repositoryRootOf();
           const styleSheet = toPosixPath(
-            relative(repositoryRoot, resolve(dirname(context.filename), node.source.value)),
+            relative(repositoryRoot, resolve(dirname(inspection.filename), node.source.value)),
           );
           const unused = loadIndex({ repositoryRoot }).unusedByStyleSheet.get(styleSheet);
           if (unused === undefined) return;
 
-          context.report({
+          inspection.report({
             node,
             messageId: "unusedStyleClass",
             data: { styleSheet, classes: spellClasses(unused) },

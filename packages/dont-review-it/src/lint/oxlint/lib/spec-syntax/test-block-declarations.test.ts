@@ -550,7 +550,7 @@ describe("declaresTestBlock", () => {
 
 describe("assertionEntryRootNames", () => {
   describe("the injected assertion entry", () => {
-    const it = test.extend("names", () => {
+    const it = test.extend("assertionEntryRoots", () => {
       const program = {
         type: "Program",
         body: parseSync("spec.ts", "const port = 3000;").program.body,
@@ -558,13 +558,13 @@ describe("assertionEntryRootNames", () => {
       return assertionEntryRootNames(program);
     });
 
-    it("stands under its own spelling", ({ names }) => {
-      expect(names).toStrictEqual(new Set(["expect"]));
+    it("stands under its own spelling", ({ assertionEntryRoots }) => {
+      expect(assertionEntryRoots).toStrictEqual(new Set(["expect"]));
     });
   });
 
   describe("a renamed import of the assertion entry", () => {
-    const it = test.extend("names", () => {
+    const it = test.extend("assertionEntryRoots", () => {
       const program = {
         type: "Program",
         body: parseSync("spec.ts", 'import { expect as assertThat } from "vitest";').program.body,
@@ -572,13 +572,13 @@ describe("assertionEntryRootNames", () => {
       return assertionEntryRootNames(program);
     });
 
-    it("stands under the name it was bound to", ({ names }) => {
-      expect(names).toStrictEqual(new Set(["assertThat", "expect"]));
+    it("stands under the name it was bound to", ({ assertionEntryRoots }) => {
+      expect(assertionEntryRoots).toStrictEqual(new Set(["assertThat", "expect"]));
     });
   });
 
   describe("a local binding of the assertion entry", () => {
-    const it = test.extend("names", () => {
+    const it = test.extend("assertionEntryRoots", () => {
       const program = {
         type: "Program",
         body: parseSync("spec.ts", "const assertThat = expect;").program.body,
@@ -586,13 +586,13 @@ describe("assertionEntryRootNames", () => {
       return assertionEntryRootNames(program);
     });
 
-    it("stands under its own name", ({ names }) => {
-      expect(names).toStrictEqual(new Set(["assertThat", "expect"]));
+    it("stands under its own name", ({ assertionEntryRoots }) => {
+      expect(assertionEntryRoots).toStrictEqual(new Set(["assertThat", "expect"]));
     });
   });
 
   describe("a test block spelling", () => {
-    const it = test.extend("names", () => {
+    const it = test.extend("assertionEntryRoots", () => {
       const program = {
         type: "Program",
         body: parseSync("spec.ts", "const check = it;").program.body,
@@ -600,15 +600,15 @@ describe("assertionEntryRootNames", () => {
       return assertionEntryRootNames(program);
     });
 
-    it("binds no assertion entry", ({ names }) => {
-      expect(names).toStrictEqual(new Set(["expect"]));
+    it("binds no assertion entry", ({ assertionEntryRoots }) => {
+      expect(assertionEntryRoots).toStrictEqual(new Set(["expect"]));
     });
   });
 });
 
 describe("runnerRootedTestBlockRootNames", () => {
   describe("a spelling the runner injects", () => {
-    const it = test.extend("names", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
       const program = {
         type: "Program",
         body: parseSync("spec.ts", "const port = 3000;").program.body,
@@ -616,13 +616,15 @@ describe("runnerRootedTestBlockRootNames", () => {
       return runnerRootedTestBlockRootNames(program);
     });
 
-    it("stands as a root while nothing in the file takes its name", ({ names }) => {
-      expect(names).toStrictEqual(new Set(["it", "test"]));
+    it("stands as a root while nothing in the file takes its name", ({
+      runnerRootedTestBlockRoots,
+    }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["it", "test"]));
     });
   });
 
   describe("a renamed import from the test runner", () => {
-    const it = test.extend("names", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
       const program = {
         type: "Program",
         body: parseSync("spec.ts", 'import { it as check } from "vitest";').program.body,
@@ -630,13 +632,13 @@ describe("runnerRootedTestBlockRootNames", () => {
       return runnerRootedTestBlockRootNames(program);
     });
 
-    it("stands as a root under the name it was bound to", ({ names }) => {
-      expect(names).toStrictEqual(new Set(["check", "it", "test"]));
+    it("stands as a root under the name it was bound to", ({ runnerRootedTestBlockRoots }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["check", "it", "test"]));
     });
   });
 
   describe("an import of a spelling from a module that is no test runner", () => {
-    const it = test.extend("names", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
       const program = {
         type: "Program",
         body: parseSync("spec.ts", 'import { it } from "./runner.ts";').program.body,
@@ -644,13 +646,13 @@ describe("runnerRootedTestBlockRootNames", () => {
       return runnerRootedTestBlockRootNames(program);
     });
 
-    it("takes that name away", ({ names }) => {
-      expect(names).toStrictEqual(new Set(["test"]));
+    it("takes that name away", ({ runnerRootedTestBlockRoots }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["test"]));
     });
   });
 
   describe("a binding derived from the runner", () => {
-    const it = test.extend("names", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
       const program = {
         type: "Program",
         body: parseSync("spec.ts", "const it = test.extend({ subject: 1 });").program.body,
@@ -658,13 +660,13 @@ describe("runnerRootedTestBlockRootNames", () => {
       return runnerRootedTestBlockRootNames(program);
     });
 
-    it("stands as a root under its own name", ({ names }) => {
-      expect(names).toStrictEqual(new Set(["it", "test"]));
+    it("stands as a root under its own name", ({ runnerRootedTestBlockRoots }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["it", "test"]));
     });
   });
 
   describe("a binding of a spelling that reaches no runner", () => {
-    const it = test.extend("names", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
       const program = {
         type: "Program",
         body: parseSync("spec.ts", "const it = buildRunner();").program.body,
@@ -672,13 +674,13 @@ describe("runnerRootedTestBlockRootNames", () => {
       return runnerRootedTestBlockRootNames(program);
     });
 
-    it("takes that name away", ({ names }) => {
-      expect(names).toStrictEqual(new Set(["test"]));
+    it("takes that name away", ({ runnerRootedTestBlockRoots }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["test"]));
     });
   });
 
   describe("a function declaration taking a spelling", () => {
-    const it = test.extend("names", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
       const program = {
         type: "Program",
         body: parseSync("spec.ts", "function it(title, body) {}").program.body,
@@ -686,13 +688,13 @@ describe("runnerRootedTestBlockRootNames", () => {
       return runnerRootedTestBlockRootNames(program);
     });
 
-    it("takes that name away", ({ names }) => {
-      expect(names).toStrictEqual(new Set(["test"]));
+    it("takes that name away", ({ runnerRootedTestBlockRoots }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["test"]));
     });
   });
 
   describe("a function declared without a name", () => {
-    const it = test.extend("names", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
       const program = {
         type: "Program",
         body: parseSync("spec.ts", "export default function () {}").program.body,
@@ -700,13 +702,13 @@ describe("runnerRootedTestBlockRootNames", () => {
       return runnerRootedTestBlockRootNames(program);
     });
 
-    it("leaves every spelling standing", ({ names }) => {
-      expect(names).toStrictEqual(new Set(["it", "test"]));
+    it("leaves every spelling standing", ({ runnerRootedTestBlockRoots }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["it", "test"]));
     });
   });
 
   describe("a binding taken apart from an object", () => {
-    const it = test.extend("names", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
       const program = {
         type: "Program",
         body: parseSync("spec.ts", "const { it } = runner;").program.body,
@@ -714,13 +716,13 @@ describe("runnerRootedTestBlockRootNames", () => {
       return runnerRootedTestBlockRootNames(program);
     });
 
-    it("leaves every spelling standing", ({ names }) => {
-      expect(names).toStrictEqual(new Set(["it", "test"]));
+    it("leaves every spelling standing", ({ runnerRootedTestBlockRoots }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["it", "test"]));
     });
   });
 
   describe("a binding declared without an initialiser", () => {
-    const it = test.extend("names", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
       const program = {
         type: "Program",
         body: parseSync("spec.ts", "let it;").program.body,
@@ -728,13 +730,13 @@ describe("runnerRootedTestBlockRootNames", () => {
       return runnerRootedTestBlockRootNames(program);
     });
 
-    it("takes that name away", ({ names }) => {
-      expect(names).toStrictEqual(new Set(["test"]));
+    it("takes that name away", ({ runnerRootedTestBlockRoots }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["test"]));
     });
   });
 
   describe("an imported binding standing on its own", () => {
-    const it = test.extend("names", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
       const program = {
         type: "Program",
         body: parseSync("spec.ts", 'import { standardIoTest } from "./standard-io-test.ts";')
@@ -743,13 +745,13 @@ describe("runnerRootedTestBlockRootNames", () => {
       return runnerRootedTestBlockRootNames(program);
     });
 
-    it("stays out of the roots", ({ names }) => {
-      expect(names).toStrictEqual(new Set(["it", "test"]));
+    it("stays out of the roots", ({ runnerRootedTestBlockRoots }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["it", "test"]));
     });
   });
 
   describe("a binding derived from an imported factory", () => {
-    const it = test.extend("names", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
       const program = {
         type: "Program",
         body: parseSync(
@@ -760,13 +762,13 @@ describe("runnerRootedTestBlockRootNames", () => {
       return runnerRootedTestBlockRootNames(program);
     });
 
-    it("stands as a root under its own name", ({ names }) => {
-      expect(names).toStrictEqual(new Set(["it", "spec", "test"]));
+    it("stands as a root under its own name", ({ runnerRootedTestBlockRoots }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["it", "spec", "test"]));
     });
   });
 
   describe("a binding derived through a chain of extends from an imported factory", () => {
-    const it = test.extend("names", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
       const program = {
         type: "Program",
         body: parseSync(
@@ -777,13 +779,13 @@ describe("runnerRootedTestBlockRootNames", () => {
       return runnerRootedTestBlockRootNames(program);
     });
 
-    it("stands as a root the same way", ({ names }) => {
-      expect(names).toStrictEqual(new Set(["it", "spec", "test"]));
+    it("stands as a root the same way", ({ runnerRootedTestBlockRoots }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["it", "spec", "test"]));
     });
   });
 
   describe("a binding derived from a default import", () => {
-    const it = test.extend("names", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
       const program = {
         type: "Program",
         body: parseSync(
@@ -794,13 +796,15 @@ describe("runnerRootedTestBlockRootNames", () => {
       return runnerRootedTestBlockRootNames(program);
     });
 
-    it("stays out of the roots, since only named imports are followed", ({ names }) => {
-      expect(names).toStrictEqual(new Set(["it", "test"]));
+    it("stays out of the roots, since only named imports are followed", ({
+      runnerRootedTestBlockRoots,
+    }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["it", "test"]));
     });
   });
 
   describe("a binding filled by a call on an imported name that builds no fixture", () => {
-    const it = test.extend("names", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
       const program = {
         type: "Program",
         body: parseSync(
@@ -811,8 +815,8 @@ describe("runnerRootedTestBlockRootNames", () => {
       return runnerRootedTestBlockRootNames(program);
     });
 
-    it("takes that name away", ({ names }) => {
-      expect(names).toStrictEqual(new Set(["test"]));
+    it("takes that name away", ({ runnerRootedTestBlockRoots }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["test"]));
     });
   });
 });
@@ -823,7 +827,7 @@ describe("testCallbacksOf", () => {
       const statement = parseSync("spec.ts", 'it("names a behaviour", () => {});').program
         .body[0] as ESTree.ExpressionStatement;
       const written = statement.expression as ESTree.CallExpression;
-      return testCallbacksOf(written).map((callback) => callback.type);
+      return testCallbacksOf(written).map((testCallback) => testCallback.type);
     });
 
     it("is read as its callback", ({ callbackShapes }) => {
@@ -836,7 +840,7 @@ describe("testCallbacksOf", () => {
       const statement = parseSync("spec.ts", 'it("names a behaviour", function () {});').program
         .body[0] as ESTree.ExpressionStatement;
       const written = statement.expression as ESTree.CallExpression;
-      return testCallbacksOf(written).map((callback) => callback.type);
+      return testCallbacksOf(written).map((testCallback) => testCallback.type);
     });
 
     it("is read as its callback as well", ({ callbackShapes }) => {
@@ -849,7 +853,7 @@ describe("testCallbacksOf", () => {
       const statement = parseSync("spec.ts", 'it("names a behaviour", 3000);').program
         .body[0] as ESTree.ExpressionStatement;
       const written = statement.expression as ESTree.CallExpression;
-      return testCallbacksOf(written).map((callback) => callback.type);
+      return testCallbacksOf(written).map((testCallback) => testCallback.type);
     });
 
     it("is no callback", ({ callbackShapes }) => {
@@ -862,7 +866,7 @@ describe("testCallbacksOf", () => {
       const statement = parseSync("spec.ts", 'it("names a behaviour", withSetup(() => {}));')
         .program.body[0] as ESTree.ExpressionStatement;
       const written = statement.expression as ESTree.CallExpression;
-      return testCallbacksOf(written).map((callback) => callback.type);
+      return testCallbacksOf(written).map((testCallback) => testCallback.type);
     });
 
     it("is still the callback", ({ callbackShapes }) => {
@@ -875,7 +879,7 @@ describe("testCallbacksOf", () => {
       const statement = parseSync("spec.ts", 'it("names a behaviour", ...handlers);').program
         .body[0] as ESTree.ExpressionStatement;
       const written = statement.expression as ESTree.CallExpression;
-      return testCallbacksOf(written).map((callback) => callback.type);
+      return testCallbacksOf(written).map((testCallback) => testCallback.type);
     });
 
     it("hides itself from this reading", ({ callbackShapes }) => {
@@ -888,7 +892,7 @@ describe("testCallbacksOf", () => {
       const statement = parseSync("spec.ts", 'it("names a behaviour", withSetup(...handlers));')
         .program.body[0] as ESTree.ExpressionStatement;
       const written = statement.expression as ESTree.CallExpression;
-      return testCallbacksOf(written).map((callback) => callback.type);
+      return testCallbacksOf(written).map((testCallback) => testCallback.type);
     });
 
     it("hides itself the same way", ({ callbackShapes }) => {
@@ -990,11 +994,11 @@ describe("testBlockBodyOf", () => {
         body: parseSync("spec.ts", 'it("names a behaviour", () => {});').program.body,
       } as ESTree.Program;
       const last = program.body.at(-1) as ESTree.ExpressionStatement;
-      const body = testBlockBodyOf(
+      const testBlockBody = testBlockBodyOf(
         last.expression as ESTree.CallExpression,
         testBlockRootNames(program),
       );
-      return body === null ? null : body.type;
+      return testBlockBody === null ? null : testBlockBody.type;
     });
 
     it("hands over the function that carries its body", ({ bodyShape }) => {
@@ -1009,11 +1013,11 @@ describe("testBlockBodyOf", () => {
         body: parseSync("spec.ts", 'it("names a behaviour", function () {});').program.body,
       } as ESTree.Program;
       const last = program.body.at(-1) as ESTree.ExpressionStatement;
-      const body = testBlockBodyOf(
+      const testBlockBody = testBlockBodyOf(
         last.expression as ESTree.CallExpression,
         testBlockRootNames(program),
       );
-      return body === null ? null : body.type;
+      return testBlockBody === null ? null : testBlockBody.type;
     });
 
     it("hands that function over", ({ bodyShape }) => {
@@ -1029,11 +1033,11 @@ describe("testBlockBodyOf", () => {
           .body,
       } as ESTree.Program;
       const last = program.body.at(-1) as ESTree.ExpressionStatement;
-      const body = testBlockBodyOf(
+      const testBlockBody = testBlockBodyOf(
         last.expression as ESTree.CallExpression,
         testBlockRootNames(program),
       );
-      return body === null ? null : body.type;
+      return testBlockBody === null ? null : testBlockBody.type;
     });
 
     it("is still the body", ({ bodyShape }) => {
@@ -1051,11 +1055,11 @@ describe("testBlockBodyOf", () => {
         ).program.body,
       } as ESTree.Program;
       const last = program.body.at(-1) as ESTree.ExpressionStatement;
-      const body = testBlockBodyOf(
+      const testBlockBody = testBlockBodyOf(
         last.expression as ESTree.CallExpression,
         testBlockRootNames(program),
       );
-      return body === null ? null : body.type;
+      return testBlockBody === null ? null : testBlockBody.type;
     });
 
     it("is read the same way", ({ bodyShape }) => {
@@ -1070,11 +1074,11 @@ describe("testBlockBodyOf", () => {
         body: parseSync("spec.ts", 'it("names a behaviour");').program.body,
       } as ESTree.Program;
       const last = program.body.at(-1) as ESTree.ExpressionStatement;
-      const body = testBlockBodyOf(
+      const testBlockBody = testBlockBodyOf(
         last.expression as ESTree.CallExpression,
         testBlockRootNames(program),
       );
-      return body === null ? null : body.type;
+      return testBlockBody === null ? null : testBlockBody.type;
     });
 
     it("hands over no body", ({ bodyShape }) => {
@@ -1089,11 +1093,11 @@ describe("testBlockBodyOf", () => {
         body: parseSync("spec.ts", "it(() => {});").program.body,
       } as ESTree.Program;
       const last = program.body.at(-1) as ESTree.ExpressionStatement;
-      const body = testBlockBodyOf(
+      const testBlockBody = testBlockBodyOf(
         last.expression as ESTree.CallExpression,
         testBlockRootNames(program),
       );
-      return body === null ? null : body.type;
+      return testBlockBody === null ? null : testBlockBody.type;
     });
 
     it("hands over no body", ({ bodyShape }) => {
@@ -1108,11 +1112,11 @@ describe("testBlockBodyOf", () => {
         body: parseSync("spec.ts", 'describe("names a group", () => {});').program.body,
       } as ESTree.Program;
       const last = program.body.at(-1) as ESTree.ExpressionStatement;
-      const body = testBlockBodyOf(
+      const testBlockBody = testBlockBodyOf(
         last.expression as ESTree.CallExpression,
         testBlockRootNames(program),
       );
-      return body === null ? null : body.type;
+      return testBlockBody === null ? null : testBlockBody.type;
     });
 
     it("hands over no body", ({ bodyShape }) => {

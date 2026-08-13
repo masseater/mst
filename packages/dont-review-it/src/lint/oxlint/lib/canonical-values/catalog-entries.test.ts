@@ -50,12 +50,12 @@ describe("canonicalValuesEntriesIn", () => {
       });
       writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_ARRAY);
       return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-        (entry) => [
-          entry.conceptId,
-          entry.declarationPath,
-          entry.exportPath,
-          entry.values,
-          entry.fingerprint,
+        (catalogEntry) => [
+          catalogEntry.conceptId,
+          catalogEntry.declarationPath,
+          catalogEntry.exportPath,
+          catalogEntry.values,
+          catalogEntry.fingerprint,
         ],
       );
     });
@@ -81,7 +81,7 @@ describe("canonicalValuesEntriesIn", () => {
       });
       writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_OBJECT);
       return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-        (entry) => entry.values,
+        (catalogEntry) => catalogEntry.values,
       );
     });
 
@@ -98,7 +98,7 @@ describe("canonicalValuesEntriesIn", () => {
       });
       writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_TYPE_ALIAS);
       return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-        (entry) => entry.values,
+        (catalogEntry) => catalogEntry.values,
       );
     });
 
@@ -127,7 +127,7 @@ describe("canonicalValuesEntriesIn", () => {
         ORDER_STATUS_DRAFT_ONLY,
       );
       return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-        (entry) => entry.exportPath,
+        (catalogEntry) => catalogEntry.exportPath,
       );
     });
 
@@ -156,7 +156,7 @@ describe("canonicalValuesEntriesIn", () => {
         ORDER_STATUS_DRAFT_ONLY,
       );
       return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-        (entry) => entry.exportPath,
+        (catalogEntry) => catalogEntry.exportPath,
       );
     });
 
@@ -173,7 +173,7 @@ describe("canonicalValuesEntriesIn", () => {
       });
       writeFileSync(join(root, "order-status.ts"), CONCEPT_OUTSIDE_THE_VOCABULARY);
       return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-        (entry) => entry.conceptId,
+        (catalogEntry) => catalogEntry.conceptId,
       );
     });
 
@@ -190,7 +190,7 @@ describe("canonicalValuesEntriesIn", () => {
       });
       writeFileSync(join(root, "order-status.ts"), DECLARATION_WITHOUT_LITERALS);
       return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-        (entry) => entry.conceptId,
+        (catalogEntry) => catalogEntry.conceptId,
       );
     });
 
@@ -207,7 +207,7 @@ describe("canonicalValuesEntriesIn", () => {
       });
       writeFileSync(join(root, "order-status.ts"), TAG_OUTSIDE_A_DOC_BLOCK);
       return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-        (entry) => entry.conceptId,
+        (catalogEntry) => catalogEntry.conceptId,
       );
     });
 
@@ -224,7 +224,7 @@ describe("canonicalValuesEntriesIn", () => {
       });
       writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_ARRAY);
       return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-        (entry) => [entry.conceptId, entry.values],
+        (catalogEntry) => [catalogEntry.conceptId, catalogEntry.values],
       );
     });
 
@@ -241,7 +241,7 @@ describe("canonicalValuesEntriesIn", () => {
       });
       writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_LINE_COMMENT);
       return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-        (entry) => [entry.conceptId, entry.values],
+        (catalogEntry) => [catalogEntry.conceptId, catalogEntry.values],
       );
     });
 
@@ -258,7 +258,7 @@ describe("canonicalValuesEntriesIn", () => {
       });
       writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_ENUM_DOC_BLOCK);
       return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-        (entry) => [entry.conceptId, entry.values],
+        (catalogEntry) => [catalogEntry.conceptId, catalogEntry.values],
       );
     });
 
@@ -275,7 +275,7 @@ describe("canonicalValuesEntriesIn", () => {
       });
       writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_ENUM_LINE_COMMENT);
       return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-        (entry) => [entry.conceptId, entry.values],
+        (catalogEntry) => [catalogEntry.conceptId, catalogEntry.values],
       );
     });
 
@@ -292,7 +292,7 @@ describe("canonicalValuesEntriesIn", () => {
       });
       writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_TYPED_ARRAY);
       return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-        (entry) => entry.values,
+        (catalogEntry) => catalogEntry.values,
       );
     });
 
@@ -309,7 +309,7 @@ describe("canonicalValuesEntriesIn", () => {
       });
       writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_QUOTED_KEYS);
       return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-        (entry) => entry.values,
+        (catalogEntry) => catalogEntry.values,
       );
     });
 
@@ -326,7 +326,7 @@ describe("canonicalValuesEntriesIn", () => {
       });
       writeFileSync(join(root, "payment-method.ts"), PAYMENT_METHOD_SINGLE_VALUE);
       return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-        (entry) => [entry.conceptId, entry.values],
+        (catalogEntry) => [catalogEntry.conceptId, catalogEntry.values],
       );
     });
 
@@ -343,7 +343,7 @@ describe("canonicalValuesEntriesIn", () => {
       });
       writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_BEHIND_A_SECOND_DOC_BLOCK);
       return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-        (entry) => entry.conceptId,
+        (catalogEntry) => catalogEntry.conceptId,
       );
     });
 
@@ -360,7 +360,7 @@ describe("canonicalValuesEntriesIn", () => {
       });
       writeFileSync(join(root, "documentation.ts"), TAG_INSIDE_A_TEMPLATE_LITERAL);
       return canonicalValuesEntriesIn(root, readDeclarationSources(listRepositoryFiles(root))).map(
-        (entry) => entry.conceptId,
+        (catalogEntry) => catalogEntry.conceptId,
       );
     });
 

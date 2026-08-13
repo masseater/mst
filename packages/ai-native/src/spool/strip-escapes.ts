@@ -64,13 +64,13 @@ const stringEscape: StripState = {
     byte === 0x5c || byte === BEL ? { state: ground, emitted: "" } : escapeLead.consume(byte),
 };
 
-const consumeBytes = (state: StripState, bytes: Buffer): StripStep =>
+const consumeBytes = (startingState: StripState, bytes: Buffer): StripStep =>
   bytes.reduce<StripStep>(
     (accumulated, byte) => {
       const step = accumulated.state.consume(byte);
       return { state: step.state, emitted: accumulated.emitted + step.emitted };
     },
-    { state, emitted: "" },
+    { state: startingState, emitted: "" },
   );
 
 const writeChunk = async (destination: PassThrough, part: Buffer): Promise<void> => {
@@ -79,20 +79,20 @@ const writeChunk = async (destination: PassThrough, part: Buffer): Promise<void>
 };
 
 const stripInto = async (
-  chunks: AsyncIterator<Buffer>,
+  arrivals: AsyncIterator<Buffer>,
   stripping: { readonly state: StripState; readonly destination: PassThrough },
 ): Promise<void> => {
-  const arrived = await chunks.next();
+  const arrived = await arrivals.next();
   if (arrived.done === true) return;
   if (stripping.state === ground && !arrived.value.includes(ESC)) {
     await writeChunk(stripping.destination, arrived.value);
-    return stripInto(chunks, stripping);
+    return stripInto(arrivals, stripping);
   }
   const consumed = consumeBytes(stripping.state, arrived.value);
   if (consumed.emitted !== "") {
     await writeChunk(stripping.destination, Buffer.from(consumed.emitted, "latin1"));
   }
-  return stripInto(chunks, { state: consumed.state, destination: stripping.destination });
+  return stripInto(arrivals, { state: consumed.state, destination: stripping.destination });
 };
 
 const stripUntilExhausted = async (

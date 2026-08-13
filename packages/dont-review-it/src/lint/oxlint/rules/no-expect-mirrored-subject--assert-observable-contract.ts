@@ -29,7 +29,7 @@ const ASSERTION_RECEIVER = "expect";
 
 type MirrorCandidate = {
   readonly subject: ESTree.IdentifierReference;
-  readonly expected: ESTree.Expression;
+  readonly expectedExpression: ESTree.Expression;
 };
 
 type MirrorReport = {
@@ -43,10 +43,13 @@ const caughtName = (attempt: ESTree.TryStatement): string | null => {
   return caught?.type === "Identifier" ? caught.name : null;
 };
 
-const thrownUnderCatch = (body: ESTree.FunctionBody, name: string): readonly ESTree.Expression[] =>
-  body.body
+const thrownUnderCatch = (
+  factoryBody: ESTree.FunctionBody,
+  caughtErrorName: string,
+): readonly ESTree.Expression[] =>
+  factoryBody.body
     .flatMap((statement) => (statement.type === "TryStatement" ? [statement] : []))
-    .filter((attempt) => caughtName(attempt) === name)
+    .filter((attempt) => caughtName(attempt) === caughtErrorName)
     .flatMap((attempt) => attempt.block.body)
     .flatMap((statement) => (statement.type === "ThrowStatement" ? [statement.argument] : []));
 
@@ -123,8 +126,8 @@ const behindName = (input: {
   const bound = boundExpressionAt(scopeAt, written);
   if (bound !== null) return [bound];
 
-  const body = factory === null ? null : blockBodyOf(factory);
-  return body === null ? [] : thrownUnderCatch(body, written.name);
+  const factoryBody = factory === null ? null : blockBodyOf(factory);
+  return factoryBody === null ? [] : thrownUnderCatch(factoryBody, written.name);
 };
 
 const behindCall = (
@@ -147,8 +150,8 @@ const constructionsBehind = (input: {
 
   seen.add(written);
   const bare = unwrapSubject(written);
-  const reached = (next: ESTree.Expression): readonly ESTree.Expression[] =>
-    constructionsBehind({ scopeAt, written: next, factory, seen });
+  const reached = (nestedExpression: ESTree.Expression): readonly ESTree.Expression[] =>
+    constructionsBehind({ scopeAt, written: nestedExpression, factory, seen });
 
   if (bare.type === "Identifier") {
     return behindName({ scopeAt, written: bare, factory }).flatMap(reached);
@@ -178,11 +181,11 @@ const constructionShapesOf = (input: {
 }): ReadonlyMap<string, ReadonlySet<string>> => {
   const { scopeAt, declarations } = input;
   return new Map(
-    uniq(declarations.map((declaration) => declaration.name)).map((name) => [
-      name,
+    uniq(declarations.map((declaration) => declaration.name)).map((fixtureName) => [
+      fixtureName,
       new Set(
         declarations
-          .filter((declaration) => declaration.name === name)
+          .filter((declaration) => declaration.name === fixtureName)
           .flatMap((declaration) => subjectShapesOf(declaration, scopeAt)),
       ),
     ]),
@@ -229,13 +232,15 @@ const assertedSubjectOf = (call: ESTree.CallExpression): ESTree.IdentifierRefere
 
 const candidateOf = (call: ESTree.CallExpression): MirrorCandidate | null => {
   const subject = assertedSubjectOf(call);
-  const expected = subject === null ? null : firstValueOf(call);
-  return subject === null || expected === null ? null : { subject, expected };
+  const expectedExpression = subject === null ? null : firstValueOf(call);
+  return subject === null || expectedExpression === null ? null : { subject, expectedExpression };
 };
 
-const spreadSourcesOf = (expected: ESTree.Expression): readonly ESTree.IdentifierReference[] => {
-  if (expected.type !== "ObjectExpression") return [];
-  return expected.properties.flatMap((property) => {
+const spreadSourcesOf = (
+  expectedExpression: ESTree.Expression,
+): readonly ESTree.IdentifierReference[] => {
+  if (expectedExpression.type !== "ObjectExpression") return [];
+  return expectedExpression.properties.flatMap((property) => {
     if (property.type !== "SpreadElement") return [];
     const source = unwrapSubject(property.argument);
     return source.type === "Identifier" ? [source] : [];
@@ -248,13 +253,15 @@ const mirrorReportOf = (input: {
   readonly candidate: MirrorCandidate;
 }): MirrorReport | null => {
   const { scopeAt, shapesByFixture, candidate } = input;
-  const { subject, expected } = candidate;
-  const reached = resolvedExpression({ scopeAt, written: expected });
+  const { subject, expectedExpression } = candidate;
+  const reached = resolvedExpression({ scopeAt, written: expectedExpression });
   const fixture = fixtureNameOf(scopeAt, subject);
   const spreads = spreadSourcesOf(reached).some((source) =>
     namesOneBinding({ scopeAt, left: source, right: subject }),
   );
-  if (spreads) return { node: expected, messageId: "spreadSubject", data: { subject: fixture } };
+  if (spreads) {
+    return { node: expectedExpression, messageId: "spreadSubject", data: { subject: fixture } };
+  }
 
   const mirrored =
     reached.type === "Identifier"
@@ -262,7 +269,7 @@ const mirrorReportOf = (input: {
       : boundExpressionAt(scopeAt, subject) === null &&
         (shapesByFixture.get(fixture)?.has(syntaxShapeOf(reached)) ?? false);
   if (!mirrored) return null;
-  return { node: expected, messageId: "mirroredSubject", data: { subject: fixture } };
+  return { node: expectedExpression, messageId: "mirroredSubject", data: { subject: fixture } };
 };
 
 const mirrorReportsOf = (input: {
@@ -303,10 +310,10 @@ export const noExpectMirroredSubject = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
-    const scopeAt: ScopeLookup = (node) => context.sourceCode.getScope(node);
+    const scopeAt: ScopeLookup = (node) => inspection.sourceCode.getScope(node);
 
     return {
       "Program:exit"(program: ESTree.Program) {
@@ -318,7 +325,7 @@ export const noExpectMirroredSubject = createDontReviewItRule({
         });
 
         for (const report of mirrorReportsOf({ scopeAt, declarations, candidates })) {
-          context.report(report);
+          inspection.report(report);
         }
       },
     };

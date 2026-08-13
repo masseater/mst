@@ -20,12 +20,12 @@ export const noMultiBindingDeclaration = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
+  create(inspection) {
     return {
       VariableDeclaration(node: ESTree.VariableDeclaration) {
         if (node.declarations.length < 2) return;
         if (isForStatementInitializer(node)) return;
-        context.report({
+        inspection.report({
           node,
           messageId: "multiBindingDeclaration",
           data: { count: String(node.declarations.length) },

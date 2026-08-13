@@ -8,7 +8,7 @@ import { textOrNull } from "./read-text.ts";
 
 describe("textOrNull", () => {
   describe("a file that exists", () => {
-    const it = test.extend("text", ({}, { onCleanup }) => {
+    const it = test.extend("presentFileText", ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "read-text-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
@@ -17,17 +17,17 @@ describe("textOrNull", () => {
       return textOrNull(join(root, "present.txt"));
     });
 
-    it("hands back its text", ({ text }) => {
-      expect(text).toBe("written");
+    it("hands back its text", ({ presentFileText }) => {
+      expect(presentFileText).toBe("written");
     });
   });
 
   describe("a file that does not exist", () => {
-    const it = test.extend("text", () =>
+    const it = test.extend("missingFileText", () =>
       textOrNull(join(tmpdir(), "read-text-absent", "missing.txt")));
 
-    it("is an absence", ({ text }) => {
-      expect(text).toBe(null);
+    it("is an absence", ({ missingFileText }) => {
+      expect(missingFileText).toBe(null);
     });
   });
 });

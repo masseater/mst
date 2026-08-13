@@ -74,10 +74,12 @@ const asFunction = (node: ESTree.Expression): SpecFunction | null => {
   return written.type === "FunctionDeclaration" ? written : null;
 };
 
-const parameterNamesOf = (fn: SpecFunction): ReadonlySet<string> =>
+const parameterNamesOf = (takenFunction: SpecFunction): ReadonlySet<string> =>
   new Set([
-    ...fn.params.flatMap((parameter) => (parameter.type === "Identifier" ? [parameter.name] : [])),
-    ...(fixtureDependenciesOf(fn) ?? []).flatMap((dependency) =>
+    ...takenFunction.params.flatMap((parameter) =>
+      parameter.type === "Identifier" ? [parameter.name] : [],
+    ),
+    ...(fixtureDependenciesOf(takenFunction) ?? []).flatMap((dependency) =>
       dependency.boundAs === null ? [] : [dependency.boundAs],
     ),
   ]);
@@ -87,31 +89,31 @@ const readingIn = (input: {
   readonly factory: SpecFunction | null;
   readonly visitedModules: ReadonlySet<string>;
 }): Reading => {
-  const body = input.factory === null ? null : blockBodyOf(input.factory);
+  const writtenBody = input.factory === null ? null : blockBodyOf(input.factory);
   return {
     ...input,
     locals:
-      body === null
+      writtenBody === null
         ? new Map()
-        : moduleDeclarationsOf(input.module.filename, body.body).initializerByName,
+        : moduleDeclarationsOf(input.module.filename, writtenBody.body).initializerByName,
     bound: input.factory === null ? new Set() : parameterNamesOf(input.factory),
   };
 };
 
-const localInitializer = (name: string, reading: Reading): ESTree.Expression | null => {
-  if (reading.bound.has(name)) return null;
-  return reading.locals.get(name) ?? reading.module.initializerByName.get(name) ?? null;
+const localInitializer = (spelled: string, reading: Reading): ESTree.Expression | null => {
+  if (reading.bound.has(spelled)) return null;
+  return reading.locals.get(spelled) ?? reading.module.initializerByName.get(spelled) ?? null;
 };
 
 const resolvedName = (
-  name: string,
+  spelled: string,
   reading: Reading,
 ): { readonly declared: ESTree.Expression; readonly reading: Reading } | null => {
-  const local = localInitializer(name, reading);
+  const local = localInitializer(spelled, reading);
   if (local !== null) return { declared: local, reading };
-  if (reading.bound.has(name)) return null;
+  if (reading.bound.has(spelled)) return null;
 
-  const imported = reading.module.importedByName.get(name);
+  const imported = reading.module.importedByName.get(spelled);
   if (imported === undefined) return null;
 
   const found = importedDeclarationOf({
@@ -153,8 +155,8 @@ const findingsIn = (walk: Walk): readonly Finding[] => {
   return bare.type === "CallExpression" ? [...beside, ...findingsInCall(bare, walk)] : beside;
 };
 
-const findingsBehindName = (name: ESTree.IdentifierReference, walk: Walk): readonly Finding[] => {
-  const resolved = resolvedName(name.name, walk.reading);
+const findingsBehindName = (bare: ESTree.IdentifierReference, walk: Walk): readonly Finding[] => {
+  const resolved = resolvedName(bare.name, walk.reading);
   if (resolved === null) return [];
   if (resolved.reading.module.filename !== walk.reading.module.filename) return [];
 
@@ -186,13 +188,13 @@ const findingsInCall = (call: ESTree.CallExpression, walk: Walk): readonly Findi
     return [operationFinding({ node: call, operation: SPREADING_WRITE, origin: walk.origin })];
   }
 
-  const name = staticCalleeName(call);
-  if (name === null) return [];
-  if (walk.vocabulary.has(name)) {
-    return [operationFinding({ node: call, operation: name, origin: walk.origin })];
+  const spelling = staticCalleeName(call);
+  if (spelling === null) return [];
+  if (walk.vocabulary.has(spelling)) {
+    return [operationFinding({ node: call, operation: spelling, origin: walk.origin })];
   }
 
-  return findingsBehindCalledName({ call, name }, walk);
+  return findingsBehindCalledName({ call, name: spelling }, walk);
 };
 
 const rootName = (node: ESTree.Expression): string | null => {
@@ -318,16 +320,16 @@ export const noNormalizeSutOutput = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
     const vocabulary = new Set([
       ...NORMALIZING_METHODS,
-      ...normalizingFunctionsFrom(context.options),
+      ...normalizingFunctionsFrom(inspection.options),
     ]);
     return {
       "Program:exit"(program: ESTree.Program) {
-        const module = moduleDeclarationsOf(context.filename, program.body);
+        const module = moduleDeclarationsOf(inspection.filename, program.body);
         const mutations = mutationsIn(program);
         const found = nodesOfType(program, "CallExpression")
           .flatMap((call) => fixtureDeclarationsOf(call))
@@ -335,7 +337,7 @@ export const noNormalizeSutOutput = createDontReviewItRule({
             const reading = readingIn({
               module,
               factory: declaration.factory,
-              visitedModules: new Set([context.filename]),
+              visitedModules: new Set([inspection.filename]),
             });
             return declaration.subjects.flatMap((subject) => [
               ...findingsIn({
@@ -352,7 +354,7 @@ export const noNormalizeSutOutput = createDontReviewItRule({
           found.map((finding) => [`${finding.messageId}:${finding.node.start}`, finding] as const),
         );
 
-        for (const finding of reported.values()) context.report(finding);
+        for (const finding of reported.values()) inspection.report(finding);
       },
     };
   },

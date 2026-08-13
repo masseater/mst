@@ -54,10 +54,10 @@ describe("worktreeFilePathsUnder", () => {
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
       });
-      const target = join(root, "src", "entry.ts");
-      mkdirSync(dirname(target), { recursive: true });
-      writeFileSync(target, "held\n", "utf8");
-      symlinkSync(target, join(root, "link.ts"));
+      const linkedFilePath = join(root, "src", "entry.ts");
+      mkdirSync(dirname(linkedFilePath), { recursive: true });
+      writeFileSync(linkedFilePath, "held\n", "utf8");
+      symlinkSync(linkedFilePath, join(root, "link.ts"));
       return worktreeFilePathsUnder({ root, unscannedDirectoryNames: UNSCANNED_DIRECTORY_NAMES });
     });
 
@@ -104,27 +104,27 @@ describe("worktreeFilePathsUnder", () => {
 
 describe("unscannedDirectoryNamesFrom", () => {
   describe("options nobody wrote", () => {
-    const it = test.extend("names", () => unscannedDirectoryNamesFrom([]));
+    const it = test.extend("unscannedDirectoryNames", () => unscannedDirectoryNamesFrom([]));
 
-    it("leaves the declared list standing", ({ names }) => {
-      expect(names).toBe(UNSCANNED_DIRECTORY_NAMES);
+    it("leaves the declared list standing", ({ unscannedDirectoryNames }) => {
+      expect(unscannedDirectoryNames).toBe(UNSCANNED_DIRECTORY_NAMES);
     });
   });
 
   describe("options that name no unscanned directories", () => {
-    const it = test.extend("names", () => unscannedDirectoryNamesFrom([{}]));
+    const it = test.extend("unscannedDirectoryNames", () => unscannedDirectoryNamesFrom([{}]));
 
-    it("leaves the declared list standing", ({ names }) => {
-      expect(names).toBe(UNSCANNED_DIRECTORY_NAMES);
+    it("leaves the declared list standing", ({ unscannedDirectoryNames }) => {
+      expect(unscannedDirectoryNames).toBe(UNSCANNED_DIRECTORY_NAMES);
     });
   });
 
   describe("options that name unscanned directories", () => {
-    const it = test.extend("names", () =>
+    const it = test.extend("unscannedDirectoryNames", () =>
       unscannedDirectoryNamesFrom([{ unscannedDirectories: ["vendor"] }]));
 
-    it("replaces the declared list", ({ names }) => {
-      expect(names).toStrictEqual(new Set(["vendor"]));
+    it("replaces the declared list", ({ unscannedDirectoryNames }) => {
+      expect(unscannedDirectoryNames).toStrictEqual(new Set(["vendor"]));
     });
   });
 });

@@ -9,7 +9,7 @@ describe("severityLevelOf", () => {
   describe("the word a run fails on", () => {
     const it = test.extend("levels", () =>
       parseSync("severity.ts", `const severity = "error";`)
-        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .program.body.map((topLevelStatement) => topLevelStatement as ESTree.Statement)
         .flatMap((declared) =>
           declared.type === "VariableDeclaration" ? declared.declarations : [],
         )
@@ -24,7 +24,7 @@ describe("severityLevelOf", () => {
   describe("the word a run denies on", () => {
     const it = test.extend("levels", () =>
       parseSync("severity.ts", `const severity = "deny";`)
-        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .program.body.map((topLevelStatement) => topLevelStatement as ESTree.Statement)
         .flatMap((declared) =>
           declared.type === "VariableDeclaration" ? declared.declarations : [],
         )
@@ -39,7 +39,7 @@ describe("severityLevelOf", () => {
   describe("the loudest digit", () => {
     const it = test.extend("levels", () =>
       parseSync("severity.ts", "const severity = 2;")
-        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .program.body.map((topLevelStatement) => topLevelStatement as ESTree.Statement)
         .flatMap((declared) =>
           declared.type === "VariableDeclaration" ? declared.declarations : [],
         )
@@ -54,7 +54,7 @@ describe("severityLevelOf", () => {
   describe("a list opened by the failing word", () => {
     const it = test.extend("levels", () =>
       parseSync("severity.ts", `const severity = ["error", { max: 1 }];`)
-        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .program.body.map((topLevelStatement) => topLevelStatement as ESTree.Statement)
         .flatMap((declared) =>
           declared.type === "VariableDeclaration" ? declared.declarations : [],
         )
@@ -69,7 +69,7 @@ describe("severityLevelOf", () => {
   describe("a named constant spelling the loudest", () => {
     const it = test.extend("levels", () =>
       parseSync("severity.ts", "const severity = LINT_SEVERITY.ERROR;")
-        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .program.body.map((topLevelStatement) => topLevelStatement as ESTree.Statement)
         .flatMap((declared) =>
           declared.type === "VariableDeclaration" ? declared.declarations : [],
         )
@@ -84,7 +84,7 @@ describe("severityLevelOf", () => {
   describe("the word a run warns on", () => {
     const it = test.extend("levels", () =>
       parseSync("severity.ts", `const severity = "warn";`)
-        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .program.body.map((topLevelStatement) => topLevelStatement as ESTree.Statement)
         .flatMap((declared) =>
           declared.type === "VariableDeclaration" ? declared.declarations : [],
         )
@@ -99,7 +99,7 @@ describe("severityLevelOf", () => {
   describe("the warning digit", () => {
     const it = test.extend("levels", () =>
       parseSync("severity.ts", "const severity = 1;")
-        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .program.body.map((topLevelStatement) => topLevelStatement as ESTree.Statement)
         .flatMap((declared) =>
           declared.type === "VariableDeclaration" ? declared.declarations : [],
         )
@@ -114,7 +114,7 @@ describe("severityLevelOf", () => {
   describe("the word a run stays silent on", () => {
     const it = test.extend("levels", () =>
       parseSync("severity.ts", `const severity = "off";`)
-        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .program.body.map((topLevelStatement) => topLevelStatement as ESTree.Statement)
         .flatMap((declared) =>
           declared.type === "VariableDeclaration" ? declared.declarations : [],
         )
@@ -129,7 +129,7 @@ describe("severityLevelOf", () => {
   describe("the word a run allows", () => {
     const it = test.extend("levels", () =>
       parseSync("severity.ts", `const severity = "allow";`)
-        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .program.body.map((topLevelStatement) => topLevelStatement as ESTree.Statement)
         .flatMap((declared) =>
           declared.type === "VariableDeclaration" ? declared.declarations : [],
         )
@@ -144,7 +144,7 @@ describe("severityLevelOf", () => {
   describe("the silent digit", () => {
     const it = test.extend("levels", () =>
       parseSync("severity.ts", "const severity = 0;")
-        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .program.body.map((topLevelStatement) => topLevelStatement as ESTree.Statement)
         .flatMap((declared) =>
           declared.type === "VariableDeclaration" ? declared.declarations : [],
         )
@@ -159,7 +159,7 @@ describe("severityLevelOf", () => {
   describe("a name this reader cannot resolve", () => {
     const it = test.extend("levels", () =>
       parseSync("severity.ts", "const severity = chosenSeverity;")
-        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .program.body.map((topLevelStatement) => topLevelStatement as ESTree.Statement)
         .flatMap((declared) =>
           declared.type === "VariableDeclaration" ? declared.declarations : [],
         )
@@ -174,7 +174,7 @@ describe("severityLevelOf", () => {
   describe("a word outside the vocabulary", () => {
     const it = test.extend("levels", () =>
       parseSync("severity.ts", `const severity = "quiet";`)
-        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .program.body.map((topLevelStatement) => topLevelStatement as ESTree.Statement)
         .flatMap((declared) =>
           declared.type === "VariableDeclaration" ? declared.declarations : [],
         )
@@ -189,7 +189,7 @@ describe("severityLevelOf", () => {
   describe("a digit outside the vocabulary", () => {
     const it = test.extend("levels", () =>
       parseSync("severity.ts", "const severity = 3;")
-        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .program.body.map((topLevelStatement) => topLevelStatement as ESTree.Statement)
         .flatMap((declared) =>
           declared.type === "VariableDeclaration" ? declared.declarations : [],
         )
@@ -204,7 +204,7 @@ describe("severityLevelOf", () => {
   describe("an empty list", () => {
     const it = test.extend("levels", () =>
       parseSync("severity.ts", "const severity = [];")
-        .program.body.map((parsed) => parsed as ESTree.Statement)
+        .program.body.map((topLevelStatement) => topLevelStatement as ESTree.Statement)
         .flatMap((declared) =>
           declared.type === "VariableDeclaration" ? declared.declarations : [],
         )

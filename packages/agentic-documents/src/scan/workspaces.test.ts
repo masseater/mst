@@ -12,19 +12,19 @@ const DEFINITION_FIELD = "packages";
 
 describe("collectWorkspaces", () => {
   describe("a pattern that ends in a star", () => {
-    const it = test.extend("collection", async ({}, { onCleanup }) => {
+    const it = test.extend("scannedWorkspaces", async ({}, { onCleanup }) => {
       const repositoryRoot = mkdtempSync(join(tmpdir(), "workspaces-"));
       onCleanup(() => {
         rmSync(repositoryRoot, { recursive: true, force: true });
       });
-      for (const [path, text] of Object.entries({
+      for (const [relativePath, fileSource] of Object.entries({
         [DEFINITION_FILE]: "packages:\n  - packages/*\n",
         "packages/session/package.json": '{"name":"session","description":"接続"}',
         "packages/user/package.json": '{"name":"user","description":"利用者"}',
       })) {
-        const target = join(repositoryRoot, path);
-        mkdirSync(dirname(target), { recursive: true });
-        writeFileSync(target, text, "utf8");
+        const absolutePath = join(repositoryRoot, relativePath);
+        mkdirSync(dirname(absolutePath), { recursive: true });
+        writeFileSync(absolutePath, fileSource, "utf8");
       }
       return collectWorkspaces({
         repositoryRoot,
@@ -33,8 +33,8 @@ describe("collectWorkspaces", () => {
       });
     });
 
-    it("names every directory below it", ({ collection }) => {
-      expect(collection).toStrictEqual({
+    it("names every directory below it", ({ scannedWorkspaces }) => {
+      expect(scannedWorkspaces).toStrictEqual({
         entries: [
           { directory: "packages/session", description: "接続" },
           { directory: "packages/user", description: "利用者" },
@@ -45,18 +45,18 @@ describe("collectWorkspaces", () => {
   });
 
   describe("a pattern that names one directory", () => {
-    const it = test.extend("collection", async ({}, { onCleanup }) => {
+    const it = test.extend("scannedWorkspaces", async ({}, { onCleanup }) => {
       const repositoryRoot = mkdtempSync(join(tmpdir(), "workspaces-"));
       onCleanup(() => {
         rmSync(repositoryRoot, { recursive: true, force: true });
       });
-      for (const [path, text] of Object.entries({
+      for (const [relativePath, fileSource] of Object.entries({
         [DEFINITION_FILE]: "packages:\n  - tools/build\n",
         "tools/build/package.json": '{"name":"build","description":"組み立て"}',
       })) {
-        const target = join(repositoryRoot, path);
-        mkdirSync(dirname(target), { recursive: true });
-        writeFileSync(target, text, "utf8");
+        const absolutePath = join(repositoryRoot, relativePath);
+        mkdirSync(dirname(absolutePath), { recursive: true });
+        writeFileSync(absolutePath, fileSource, "utf8");
       }
       return collectWorkspaces({
         repositoryRoot,
@@ -65,8 +65,8 @@ describe("collectWorkspaces", () => {
       });
     });
 
-    it("is taken as it is", ({ collection }) => {
-      expect(collection).toStrictEqual({
+    it("is taken as it is", ({ scannedWorkspaces }) => {
+      expect(scannedWorkspaces).toStrictEqual({
         entries: [{ directory: "tools/build", description: "組み立て" }],
         incomplete: [],
       });
@@ -74,19 +74,19 @@ describe("collectWorkspaces", () => {
   });
 
   describe("workspaces missing the manifest and the description they declare", () => {
-    const it = test.extend("collection", async ({}, { onCleanup }) => {
+    const it = test.extend("scannedWorkspaces", async ({}, { onCleanup }) => {
       const repositoryRoot = mkdtempSync(join(tmpdir(), "workspaces-"));
       onCleanup(() => {
         rmSync(repositoryRoot, { recursive: true, force: true });
       });
-      for (const [path, text] of Object.entries({
+      for (const [relativePath, fileSource] of Object.entries({
         [DEFINITION_FILE]: "packages:\n  - packages/*\n",
         "packages/session/package.json": '{"name":"session"}',
         "packages/user/README.md": "# user\n",
       })) {
-        const target = join(repositoryRoot, path);
-        mkdirSync(dirname(target), { recursive: true });
-        writeFileSync(target, text, "utf8");
+        const absolutePath = join(repositoryRoot, relativePath);
+        mkdirSync(dirname(absolutePath), { recursive: true });
+        writeFileSync(absolutePath, fileSource, "utf8");
       }
       return collectWorkspaces({
         repositoryRoot,
@@ -95,8 +95,8 @@ describe("collectWorkspaces", () => {
       });
     });
 
-    it("names each of them incomplete, with what it is missing", ({ collection }) => {
-      expect(collection).toStrictEqual({
+    it("names each of them incomplete, with what it is missing", ({ scannedWorkspaces }) => {
+      expect(scannedWorkspaces).toStrictEqual({
         entries: [],
         incomplete: [
           { directory: "packages/session", reason: "マニフェストに説明が無い" },
@@ -107,7 +107,7 @@ describe("collectWorkspaces", () => {
   });
 
   describe("a repository that declares no workspace definition", () => {
-    const it = test.extend("collection", async ({}, { onCleanup }) => {
+    const it = test.extend("scannedWorkspaces", async ({}, { onCleanup }) => {
       const repositoryRoot = mkdtempSync(join(tmpdir(), "workspaces-"));
       onCleanup(() => {
         rmSync(repositoryRoot, { recursive: true, force: true });
@@ -120,13 +120,13 @@ describe("collectWorkspaces", () => {
       });
     });
 
-    it("names nothing", ({ collection }) => {
-      expect(collection).toStrictEqual({ entries: [], incomplete: [] });
+    it("names nothing", ({ scannedWorkspaces }) => {
+      expect(scannedWorkspaces).toStrictEqual({ entries: [], incomplete: [] });
     });
   });
 
   describe("a definition that is not a mapping", () => {
-    const it = test.extend("collection", async ({}, { onCleanup }) => {
+    const it = test.extend("scannedWorkspaces", async ({}, { onCleanup }) => {
       const repositoryRoot = mkdtempSync(join(tmpdir(), "workspaces-"));
       onCleanup(() => {
         rmSync(repositoryRoot, { recursive: true, force: true });
@@ -139,13 +139,13 @@ describe("collectWorkspaces", () => {
       });
     });
 
-    it("names nothing", ({ collection }) => {
-      expect(collection).toStrictEqual({ entries: [], incomplete: [] });
+    it("names nothing", ({ scannedWorkspaces }) => {
+      expect(scannedWorkspaces).toStrictEqual({ entries: [], incomplete: [] });
     });
   });
 
   describe("a definition that holds nothing at all", () => {
-    const it = test.extend("collection", async ({}, { onCleanup }) => {
+    const it = test.extend("scannedWorkspaces", async ({}, { onCleanup }) => {
       const repositoryRoot = mkdtempSync(join(tmpdir(), "workspaces-"));
       onCleanup(() => {
         rmSync(repositoryRoot, { recursive: true, force: true });
@@ -158,13 +158,13 @@ describe("collectWorkspaces", () => {
       });
     });
 
-    it("names nothing", ({ collection }) => {
-      expect(collection).toStrictEqual({ entries: [], incomplete: [] });
+    it("names nothing", ({ scannedWorkspaces }) => {
+      expect(scannedWorkspaces).toStrictEqual({ entries: [], incomplete: [] });
     });
   });
 
   describe("a definition whose field is not a list", () => {
-    const it = test.extend("collection", async ({}, { onCleanup }) => {
+    const it = test.extend("scannedWorkspaces", async ({}, { onCleanup }) => {
       const repositoryRoot = mkdtempSync(join(tmpdir(), "workspaces-"));
       onCleanup(() => {
         rmSync(repositoryRoot, { recursive: true, force: true });
@@ -177,24 +177,24 @@ describe("collectWorkspaces", () => {
       });
     });
 
-    it("names nothing", ({ collection }) => {
-      expect(collection).toStrictEqual({ entries: [], incomplete: [] });
+    it("names nothing", ({ scannedWorkspaces }) => {
+      expect(scannedWorkspaces).toStrictEqual({ entries: [], incomplete: [] });
     });
   });
 
   describe("a list holding a pattern that is not a word", () => {
-    const it = test.extend("collection", async ({}, { onCleanup }) => {
+    const it = test.extend("scannedWorkspaces", async ({}, { onCleanup }) => {
       const repositoryRoot = mkdtempSync(join(tmpdir(), "workspaces-"));
       onCleanup(() => {
         rmSync(repositoryRoot, { recursive: true, force: true });
       });
-      for (const [path, text] of Object.entries({
+      for (const [relativePath, fileSource] of Object.entries({
         [DEFINITION_FILE]: "packages:\n  - 1\n  - tools/build\n",
         "tools/build/package.json": '{"name":"build","description":"組み立て"}',
       })) {
-        const target = join(repositoryRoot, path);
-        mkdirSync(dirname(target), { recursive: true });
-        writeFileSync(target, text, "utf8");
+        const absolutePath = join(repositoryRoot, relativePath);
+        mkdirSync(dirname(absolutePath), { recursive: true });
+        writeFileSync(absolutePath, fileSource, "utf8");
       }
       return collectWorkspaces({
         repositoryRoot,
@@ -203,8 +203,8 @@ describe("collectWorkspaces", () => {
       });
     });
 
-    it("leaves that pattern out and keeps the rest", ({ collection }) => {
-      expect(collection).toStrictEqual({
+    it("leaves that pattern out and keeps the rest", ({ scannedWorkspaces }) => {
+      expect(scannedWorkspaces).toStrictEqual({
         entries: [{ directory: "tools/build", description: "組み立て" }],
         incomplete: [],
       });

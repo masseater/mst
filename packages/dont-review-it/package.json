@@ -37,19 +37,21 @@
     "dev": "vp pack --watch",
     "test": "spool -- vp test",
     "check": "spool -- vp check",
-    "check:skills": "intent validate"
+    "check:skills": "intent validate",
+    "typecheck": "spool -- tsc -p ."
   },
   "dependencies": {
     "@mst/lint-rule-authoring": "workspace:*",
     "@mst/repository-checks": "workspace:*",
+    "@mst/verified-specifications": "workspace:*",
     "@oxlint/plugins": "catalog:",
-    "citty": "0.2.2",
+    "citty": "catalog:",
     "es-toolkit": "catalog:",
     "jsonc-parser": "catalog:",
     "oxc-parser": "catalog:",
     "oxfmt": "0.61.0",
     "oxlint": "catalog:",
-    "std-env": "^4.2.0",
+    "std-env": "4.2.0",
     "typescript": "catalog:",
     "yaml": "catalog:"
   },

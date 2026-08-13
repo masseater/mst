@@ -72,31 +72,31 @@ const commandLineOf = ({
 }): string | null => {
   if (site.form.carries !== SPAWN_TARGET_NAME || !namesRunner(target)) return target;
 
-  const elements = handedTextsOf({ handed: site.handed, constants });
-  return elements === null ? null : [target, ...elements].join(" ");
+  const heldElements = handedTextsOf({ handed: site.handed, constants });
+  return heldElements === null ? null : [target, ...heldElements].join(" ");
 };
 
 const reportRegistrations = ({
-  context,
+  inspection,
   node,
   declared,
   withdrawals,
   groundless,
 }: {
-  readonly context: Context;
+  readonly inspection: Context;
   readonly node: ESTree.Program;
   readonly declared: readonly DeclaredReplacement[];
   readonly withdrawals: readonly ReplacementWithdrawal[];
   readonly groundless: readonly SpecifierException[];
 }): void => {
   for (const withdrawal of groundlessWithdrawals(withdrawals)) {
-    context.report({ node, messageId: "groundlessWithdrawal", data: { name: withdrawal.name } });
+    inspection.report({ node, messageId: "groundlessWithdrawal", data: { name: withdrawal.name } });
   }
   for (const withdrawal of deadWithdrawals({ declared, withdrawals })) {
-    context.report({ node, messageId: "deadWithdrawal", data: { name: withdrawal.name } });
+    inspection.report({ node, messageId: "deadWithdrawal", data: { name: withdrawal.name } });
   }
   for (const exception of groundless) {
-    context.report({
+    inspection.report({
       node,
       messageId: "groundlessInvocationException",
       data: { path: exception.path },
@@ -105,92 +105,100 @@ const reportRegistrations = ({
 };
 
 const reportUndecided = ({
-  context,
+  inspection,
   node,
 }: {
-  readonly context: Context;
+  readonly inspection: Context;
   readonly node: ESTree.Node;
 }): void => {
-  context.report({
+  inspection.report({
     node,
     messageId: "undecidedCommandTarget",
-    data: { written: context.sourceCode.getText(node) },
+    data: { written: inspection.sourceCode.getText(node) },
   });
 };
 
 const reportRetired = ({
-  context,
+  inspection,
   node,
   line,
   entries,
 }: {
-  readonly context: Context;
+  readonly inspection: Context;
   readonly node: ESTree.Node;
   readonly line: string;
   readonly entries: readonly DeclaredReplacement[];
 }): void => {
-  for (const name of uniq(invokedNamesIn(line))) {
-    const entry = replacementNamed({ entries, name });
-    if (entry === null) continue;
-    context.report({
+  for (const spelled of uniq(invokedNamesIn(line))) {
+    const listed = replacementNamed({ entries, name: spelled });
+    if (listed === null) continue;
+    inspection.report({
       node,
       messageId: "declaredCommandInvocation",
-      data: { name, substitute: entry.substitute },
+      data: { name: spelled, substitute: listed.substitute },
     });
   }
 };
 
 const reportSite = ({
-  context,
+  inspection,
   node,
   site,
   entries,
   reading,
 }: {
-  readonly context: Context;
+  readonly inspection: Context;
   readonly node: SpawnCall;
   readonly site: SpawnSite;
   readonly entries: readonly DeclaredReplacement[];
   readonly reading: Reading;
 }): void => {
-  const target = site.target === null ? null : staticSpecifierOf(site.target, reading.constants);
+  const checked = site.target === null ? null : staticSpecifierOf(site.target, reading.constants);
   const reported = targetNodeOf(node, site.form);
   const line =
-    target === null ? null : commandLineOf({ site, target, constants: reading.constants });
+    checked === null
+      ? null
+      : commandLineOf({ site, target: checked, constants: reading.constants });
 
   if (line === null) {
-    reportUndecided({ context, node: target === null ? reported : node });
+    reportUndecided({ inspection, node: checked === null ? reported : node });
     return;
   }
   if (carriesUndecidedTarget(line)) {
-    context.report({ node: reported, messageId: "unreadableCommandLine", data: { line } });
+    inspection.report({ node: reported, messageId: "unreadableCommandLine", data: { line } });
     return;
   }
-  reportRetired({ context, node: reported, line, entries });
+  reportRetired({ inspection, node: reported, line, entries });
 };
 
 const declarationIn = (
-  options: Context["options"],
+  ruleOptions: Context["options"],
 ): {
   readonly declared: readonly DeclaredReplacement[];
   readonly withdrawals: readonly ReplacementWithdrawal[];
   readonly entries: readonly DeclaredReplacement[];
 } => {
-  const withdrawals = withdrawalsIn(options);
-  const declared = declaredReplacementsIn({ options, standing: DEFAULT_DECLARED_REPLACEMENTS });
+  const withdrawals = withdrawalsIn(ruleOptions);
+  const declared = declaredReplacementsIn({
+    options: ruleOptions,
+    standing: DEFAULT_DECLARED_REPLACEMENTS,
+  });
   return { declared, withdrawals, entries: replacementsInForce({ declared, withdrawals }) };
 };
 
 const registeredPositionsIn = (
-  context: Context,
+  inspection: Context,
 ): {
   readonly covering: readonly SpecifierException[];
   readonly groundless: readonly SpecifierException[];
 } => {
   const covering = exceptionsCovering({
-    exceptions: specifierExceptionsIn(context.options),
-    pathSegments: segmentsOf({ path: resolve(context.cwd, context.filename), separator: sep }),
-    cwd: context.cwd,
+    exceptions: specifierExceptionsIn(inspection.options),
+    pathSegments: segmentsOf({
+      path: resolve(inspection.cwd, inspection.filename),
+      separator: sep,
+    }),
+    cwd: inspection.cwd,
   });
   return { covering, groundless: covering.filter((exception) => !carriesGrounds(exception)) };
 };
@@ -231,12 +239,12 @@ export const forbidDeclaredCommandInvocation = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    const declaration = declarationIn(context.options);
-    const positions = registeredPositionsIn(context);
+  create(inspection) {
+    const declaration = declarationIn(inspection.options);
+    const positions = registeredPositionsIn(inspection);
     const registrations = (node: ESTree.Program): void => {
       reportRegistrations({
-        context,
+        inspection,
         node,
         declared: declaration.declared,
         withdrawals: declaration.withdrawals,
@@ -251,11 +259,14 @@ export const forbidDeclaredCommandInvocation = createDontReviewItRule({
       return { Program: registrations };
     }
 
-    const forms = spawnFormsIn({ options: context.options, standing: DEFAULT_SPAWN_FORMS });
+    const forms = spawnFormsIn({ options: inspection.options, standing: DEFAULT_SPAWN_FORMS });
     const readingOf = memoize(
       (): Reading => ({
-        routes: spawnRoutesIn({ body: context.sourceCode.ast.body, filename: context.filename }),
-        constants: constantSpecifiersIn(context.sourceCode.ast.body),
+        routes: spawnRoutesIn({
+          body: inspection.sourceCode.ast.body,
+          filename: inspection.filename,
+        }),
+        constants: constantSpecifiersIn(inspection.sourceCode.ast.body),
       }),
     );
 
@@ -263,7 +274,7 @@ export const forbidDeclaredCommandInvocation = createDontReviewItRule({
       const reading = readingOf();
       const site = spawnSiteAt({ node, routes: reading.routes, forms });
       if (site !== null) {
-        reportSite({ context, node, site, entries: declaration.entries, reading });
+        reportSite({ inspection, node, site, entries: declaration.entries, reading });
       }
     };
 

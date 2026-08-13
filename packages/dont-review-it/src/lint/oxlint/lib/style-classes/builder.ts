@@ -30,5 +30,5 @@ const buildRepositoryStyleClassIndex = ({
 };
 
 export const loadStyleClassIndex = memoize(buildRepositoryStyleClassIndex, {
-  getCacheKey: (options) => resolve(options.repositoryRoot),
+  getCacheKey: (ruleOptions) => resolve(ruleOptions.repositoryRoot),
 });

@@ -125,8 +125,8 @@ writeFileSync(
 );
 writeFileSync(join(aliasedDir, "manifestless/package.json"), "[]\n");
 
-const oneEntry = join(aliasedDir, "packages/one/entry.ts");
-writeFileSync(oneEntry, MODULE_SOURCE);
+const packageOneEntry = join(aliasedDir, "packages/one/entry.ts");
+writeFileSync(packageOneEntry, MODULE_SOURCE);
 const twoEntry = join(aliasedDir, "packages/two/entry.ts");
 writeFileSync(twoEntry, MODULE_SOURCE);
 
@@ -256,7 +256,7 @@ describe("dont-review-it/require-catalog-entry--register-shared-dependency", () 
       {
         name: "an alias is counted under the package it resolves to",
         code: MODULE_SOURCE,
-        filename: oneEntry,
+        filename: packageOneEntry,
         options: CATALOG,
         errors: [
           {

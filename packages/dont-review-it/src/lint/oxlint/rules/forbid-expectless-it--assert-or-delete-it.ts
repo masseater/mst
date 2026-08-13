@@ -18,7 +18,7 @@ const innermostAround = (
 ): Block | null =>
   blocks
     .filter((block) => block.start <= assertion.start && assertion.end <= block.end)
-    .toSorted((held, other) => other.start - held.start)
+    .toSorted((heldBlock, comparedBlock) => comparedBlock.start - heldBlock.start)
     .at(0) ?? null;
 
 const claimlessAmong = (
@@ -57,21 +57,23 @@ export const forbidExpectlessIt = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
     return {
       "Program:exit"(program: ESTree.Program) {
         const rootNames = testBlockRootNames(program);
         const calls = nodesOfType(program, "CallExpression");
         const blocks = calls.flatMap((call): readonly Block[] => {
-          const body = testBlockBodyOf(call, rootNames);
-          return body === null ? [] : [{ call, start: body.start, end: body.end }];
+          const testBlockBody = testBlockBodyOf(call, rootNames);
+          return testBlockBody === null
+            ? []
+            : [{ call, start: testBlockBody.start, end: testBlockBody.end }];
         });
         const assertions = calls.filter((call) => isAssertionCall(call));
 
         for (const claimless of claimlessAmong(blocks, assertions)) {
-          context.report({ node: claimless, messageId: "expectlessIt" });
+          inspection.report({ node: claimless, messageId: "expectlessIt" });
         }
       },
     };

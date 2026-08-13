@@ -285,9 +285,9 @@ describe("loadRepositoryValueDeclarationIndex", () => {
         onCleanup(() => {
           rmSync(repositoryRoot, { recursive: true, force: true });
         });
-        const target = join(repositoryRoot, "src", "a.ts");
-        mkdirSync(dirname(target), { recursive: true });
-        writeFileSync(target, SEED, "utf8");
+        const sourceFilePath = join(repositoryRoot, "src", "a.ts");
+        mkdirSync(dirname(sourceFilePath), { recursive: true });
+        writeFileSync(sourceFilePath, SEED, "utf8");
         return repositoryRoot;
       })
       .extend("indexBuiltFirst", ({ repositoryRootHoldingOneSource }) =>

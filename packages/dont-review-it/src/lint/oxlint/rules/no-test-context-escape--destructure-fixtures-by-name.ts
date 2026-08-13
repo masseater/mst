@@ -106,7 +106,7 @@ export const noTestContextEscape = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
+  create(inspection) {
     const reachesTo = (node: ESTree.Node, written: ESTree.Expression): readonly ContextReach[] => {
       const reached = unwrapSubject(written);
       return reached.type === "Identifier" ? [{ node, name: reached.name }] : [];
@@ -126,7 +126,7 @@ export const noTestContextEscape = createDontReviewItRule({
 
         for (const taker of takers) {
           for (const fault of contextFaultsOf(taker)) {
-            context.report({ node: fault.node, messageId: fault.messageId });
+            inspection.report({ node: fault.node, messageId: fault.messageId });
           }
         }
 
@@ -153,7 +153,7 @@ export const noTestContextEscape = createDontReviewItRule({
         const held = [...takers].flatMap(heldContextOf);
         for (const reach of reaches) {
           if (!isHeldContextReach(reach, held)) continue;
-          context.report({
+          inspection.report({
             node: reach.node,
             messageId: "traversedContext",
             data: { held: reach.name },

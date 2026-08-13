@@ -36,24 +36,24 @@ type ReachLookup = {
   readonly tracedBindings: ReadonlySet<Variable>;
 };
 
-const listedNames = (options: Readonly<Options>, named: string): readonly string[] | null => {
-  const [first] = options;
+const listedNames = (ruleOptions: Readonly<Options>, named: string): readonly string[] | null => {
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) return null;
 
   const listed = first[named];
   if (!Array.isArray(listed)) return null;
 
-  const spelled = listed.filter((entry): entry is string => typeof entry === "string");
+  const spelled = listed.filter((candidate): candidate is string => typeof candidate === "string");
   return spelled.length === 0 ? null : spelled;
 };
 
-const mockVocabularyFrom = (options: Readonly<Options>): MockVocabulary => ({
-  namespaceSpellings: new Set(listedNames(options, "mockNamespaceSpellings") ?? ["vi"]),
+const mockVocabularyFrom = (ruleOptions: Readonly<Options>): MockVocabulary => ({
+  namespaceSpellings: new Set(listedNames(ruleOptions, "mockNamespaceSpellings") ?? ["vi"]),
   creationMembers: new Set(
-    listedNames(options, "mockCreationMembers") ?? ["fn", "mocked", "spyOn"],
+    listedNames(ruleOptions, "mockCreationMembers") ?? ["fn", "mocked", "spyOn"],
   ),
   behaviorMembers: new Set(
-    listedNames(options, "mockBehaviorMembers") ?? [
+    listedNames(ruleOptions, "mockBehaviorMembers") ?? [
       "mockImplementation",
       "mockImplementationOnce",
       "mockRejectedValue",
@@ -69,7 +69,7 @@ const mockVocabularyFrom = (options: Readonly<Options>): MockVocabulary => ({
     ],
   ),
   replacementMembers: new Set(
-    listedNames(options, "moduleReplacementMembers") ?? ["mock", "doMock"],
+    listedNames(ruleOptions, "moduleReplacementMembers") ?? ["mock", "doMock"],
   ),
 });
 
@@ -258,12 +258,12 @@ export const noModuleScopeMockConfig = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
     const lookup: ReachLookup = {
-      scopeAt: (node) => context.sourceCode.getScope(node),
-      vocabulary: mockVocabularyFrom(context.options),
+      scopeAt: (node) => inspection.sourceCode.getScope(node),
+      vocabulary: mockVocabularyFrom(inspection.options),
       tracedBindings: new Set(),
     };
 
@@ -288,7 +288,7 @@ export const noModuleScopeMockConfig = createDontReviewItRule({
 
         for (const writing of outstanding) {
           if (chained.has(writing.call)) continue;
-          context.report({
+          inspection.report({
             node: writing.call,
             messageId: writing.messageId,
             data: { member: writing.member },

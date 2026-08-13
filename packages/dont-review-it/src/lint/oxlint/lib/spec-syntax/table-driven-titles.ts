@@ -30,11 +30,11 @@ const POSITIONAL_SPELLINGS: ReadonlyMap<string, (held: CaseValue) => string | nu
   ["%i", (held) => (typeof held === "number" ? String(Math.trunc(held)) : null)],
 ]);
 
-const scalarValueOf = (value: unknown): { readonly held: CaseValue } | null => {
-  if (value === null) return { held: null };
-  if (typeof value === "string") return { held: value };
-  if (typeof value === "number") return { held: value };
-  return typeof value === "boolean" ? { held: value } : null;
+const scalarValueOf = (candidate: unknown): { readonly held: CaseValue } | null => {
+  if (candidate === null) return { held: null };
+  if (typeof candidate === "string") return { held: candidate };
+  if (typeof candidate === "number") return { held: candidate };
+  return typeof candidate === "boolean" ? { held: candidate } : null;
 };
 
 const negatedNumberOf = (node: ESTree.Expression): number | null => {
@@ -58,29 +58,31 @@ const scalarOf = (node: ESTree.Expression): { readonly held: CaseValue } | null 
 const namedEntryOf = (property: ESTree.ObjectExpression["properties"][number]) => {
   if (property.type !== "Property" || property.computed) return null;
 
-  const name = staticPropertyName(property);
-  if (name === null) return null;
+  const propertyName = staticPropertyName(property);
+  if (propertyName === null) return null;
 
   const scalar = property.value.type === "Identifier" ? null : scalarOf(property.value);
-  return scalar === null ? null : ([name, scalar.held] as const);
+  return scalar === null ? null : ([propertyName, scalar.held] as const);
 };
 
-const namedValuesOf = (object: ESTree.ObjectExpression): ReadonlyMap<string, CaseValue> | null => {
-  const held = object.properties.map(namedEntryOf);
-  return held.every((entry) => entry !== null) ? new Map(held) : null;
+const namedValuesOf = (
+  caseObject: ESTree.ObjectExpression,
+): ReadonlyMap<string, CaseValue> | null => {
+  const held = caseObject.properties.map(namedEntryOf);
+  return held.every((named) => named !== null) ? new Map(held) : null;
 };
 
-const positionalRowOf = (array: ESTree.ArrayExpression): CaseRow | null => {
-  const held = array.elements.map((element) =>
-    element === null || element.type === "SpreadElement" ? null : scalarOf(element),
+const positionalRowOf = (caseArray: ESTree.ArrayExpression): CaseRow | null => {
+  const held = caseArray.elements.map((caseElement) =>
+    caseElement === null || caseElement.type === "SpreadElement" ? null : scalarOf(caseElement),
   );
   return held.every((scalar) => scalar !== null)
     ? { positional: held.map((scalar) => scalar.held), named: null }
     : null;
 };
 
-const rowOf = (element: ESTree.Expression): CaseRow | null => {
-  const written = unwrapSubject(element);
+const rowOf = (caseElement: ESTree.Expression): CaseRow | null => {
+  const written = unwrapSubject(caseElement);
   if (written.type === "ArrayExpression") return positionalRowOf(written);
   if (written.type === "ObjectExpression") {
     const named = namedValuesOf(written);
@@ -97,7 +99,7 @@ const indexFilled = (template: string, index: number): string =>
     .map((piece) => INDEX_PLACEHOLDERS.get(piece)?.(index) ?? piece)
     .join("");
 
-const positionallyFilled = (template: string, row: CaseRow): string | null =>
+const positionallyFilled = (template: string, caseRow: CaseRow): string | null =>
   template.split(/(%[a-zA-Z%])/u).reduce<{ readonly text: string; readonly taken: number } | null>(
     (carried, piece) => {
       if (carried === null) return null;
@@ -110,7 +112,7 @@ const positionallyFilled = (template: string, row: CaseRow): string | null =>
           : { text: carried.text + piece, taken: carried.taken };
       }
 
-      const held = row.positional[carried.taken];
+      const held = caseRow.positional[carried.taken];
       const spelled = held === undefined ? null : spell(held);
       return spelled === null ? null : { text: carried.text + spelled, taken: carried.taken + 1 };
     },
@@ -122,8 +124,8 @@ const displayedValue = (held: CaseValue): string | null => {
   return DISPLAYED_TEXT.test(held) ? `'${held}'` : null;
 };
 
-const propertyFilled = (template: string, row: CaseRow): string | null => {
-  const { named } = row;
+const propertyFilled = (template: string, caseRow: CaseRow): string | null => {
+  const { named } = caseRow;
   if (named === null) return template;
 
   return template.split(/(\$[$\w.]+)/u).reduce<string | null>((carried, piece) => {
@@ -156,12 +158,12 @@ export const tableDrivenTitlesOf = (
   const written = unwrapSubject(table);
   if (written.type !== "ArrayExpression") return { kind: "runtime" };
 
-  const rows = written.elements.map((element) =>
-    element === null || element.type === "SpreadElement" ? null : rowOf(element),
+  const caseRows = written.elements.map((caseElement) =>
+    caseElement === null || caseElement.type === "SpreadElement" ? null : rowOf(caseElement),
   );
-  if (!rows.every((row) => row !== null)) return { kind: "runtime" };
+  if (!caseRows.every((caseRow) => caseRow !== null)) return { kind: "runtime" };
 
-  const titles = rows.map((row, index) => titleOf({ template, row, index }));
+  const titles = caseRows.map((caseRow, index) => titleOf({ template, row: caseRow, index }));
   return titles.every((title) => title !== null)
     ? { kind: "spelled", titles }
     : { kind: "unreadable" };

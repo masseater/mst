@@ -22,17 +22,18 @@ const forwardedArgument = (argument: ESTree.Argument): ForwardedName | null => {
   return spread.type === "Identifier" ? { name: spread.name, spread: true } : null;
 };
 
-const soleReturnedExpression = (body: ESTree.FunctionBody): ESTree.Expression | null => {
-  if (body.body.length !== 1) return null;
-  const [statement] = body.body;
+const soleReturnedExpression = (writtenBody: ESTree.FunctionBody): ESTree.Expression | null => {
+  if (writtenBody.body.length !== 1) return null;
+  const [statement] = writtenBody.body;
   if (statement?.type !== "ReturnStatement") return null;
   return statement.argument;
 };
 
 const forwardedCall = (declared: FunctionLike): ESTree.CallExpression | null => {
-  const body = declared.body as ESTree.FunctionBody | ESTree.Expression;
+  const writtenBody = declared.body as ESTree.FunctionBody | ESTree.Expression;
 
-  const forwarded = body.type === "BlockStatement" ? soleReturnedExpression(body) : body;
+  const forwarded =
+    writtenBody.type === "BlockStatement" ? soleReturnedExpression(writtenBody) : writtenBody;
   if (forwarded?.type !== "CallExpression") return null;
   return (forwarded.typeArguments ?? null) === null ? forwarded : null;
 };
@@ -41,8 +42,11 @@ const calleeIsOwnParameter = (
   callee: ESTree.Expression,
   parameters: readonly (ForwardedName | null)[],
 ): boolean => {
-  const target = callee;
-  return target.type === "Identifier" && parameters.some((entry) => entry?.name === target.name);
+  const checked = callee;
+  return (
+    checked.type === "Identifier" &&
+    parameters.some((parameter) => parameter?.name === checked.name)
+  );
 };
 
 const declaresOwnTypeContract = (declared: FunctionLike): boolean =>
@@ -56,7 +60,7 @@ const isIdentityForwarding = (declared: FunctionLike): boolean => {
   if (call === null) return false;
 
   const parameters = declared.params.map(forwardedParameter);
-  if (parameters.some((entry) => entry === null)) return false;
+  if (parameters.some((parameter) => parameter === null)) return false;
   if (calleeIsOwnParameter(call.callee, parameters)) return false;
 
   return isEqual(parameters, call.arguments.map(forwardedArgument));
@@ -68,7 +72,7 @@ export const noIdentityWrapper = createDontReviewItRule({
     type: "problem",
     docs: {
       description:
-        "Disallow a named function whose whole body forwards its own parameters unchanged to one other call and declares no type contract of its own, so a caller reaches the function that does the work instead of a name that only stands in front of it",
+        "Disallow a named function whose whole writtenBody forwards its own parameters unchanged to one other call and declares no type contract of its own, so a caller reaches the function that does the work instead of a name that only stands in front of it",
       relatedGuidelines: [],
     },
     messages: {
@@ -77,11 +81,11 @@ export const noIdentityWrapper = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
+  create(inspection) {
     return {
       FunctionDeclaration(node: ESTree.Function) {
         if (!isIdentityForwarding(node)) return;
-        context.report({ node, messageId: "identityWrapper" });
+        inspection.report({ node, messageId: "identityWrapper" });
       },
       VariableDeclarator(node: ESTree.VariableDeclarator) {
         const { id, init } = node;
@@ -95,7 +99,7 @@ export const noIdentityWrapper = createDontReviewItRule({
         }
         if (!isIdentityForwarding(declared)) return;
 
-        context.report({ node: declared, messageId: "identityWrapper" });
+        inspection.report({ node: declared, messageId: "identityWrapper" });
       },
     };
   },

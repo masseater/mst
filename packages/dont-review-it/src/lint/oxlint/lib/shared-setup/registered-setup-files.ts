@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { memoize } from "es-toolkit";
 
 import { LINT_CONFIGURATION_FILE } from "../lint-suppression/lint-config-suppression.ts";
+import { ARRAY_EXPRESSION } from "../node-kinds.ts";
 import { toPosixPath } from "../posix-path.ts";
 import {
   UNSCANNED_DIRECTORY_NAMES,
@@ -29,8 +30,6 @@ export const RUNNER_BLOCK_KEY = "test";
 
 const PROJECT_LIST_KEY = "projects";
 
-const ARRAY_EXPRESSION = "ArrayExpression";
-
 export const isRunnerConfigurationFile = (filename: string): boolean =>
   LINT_CONFIGURATION_FILE.test(toPosixPath(filename));
 
@@ -38,25 +37,25 @@ const NO_CONSTANTS: ReadonlyMap<string, string> = new Map();
 
 const propertyNameOf = (property: AstFields): string | null => {
   if (property.computed === true) return null;
-  const key = astFieldsOf(property.key);
-  if (key === null) return null;
-  if (nodeTypeOf(key) === "Identifier") return String(key.name);
-  return staticSpecifierOf(key, NO_CONSTANTS);
+  const keyNode = astFieldsOf(property.key);
+  if (keyNode === null) return null;
+  if (nodeTypeOf(keyNode) === "Identifier") return String(keyNode.name);
+  return staticSpecifierOf(keyNode, NO_CONSTANTS);
 };
 
-const valueAt = (object: AstFields, key: string): AstFields | null => {
-  const found = listedFieldsOf(object.properties).findLast(
-    (property) => propertyNameOf(property) === key,
+const valueAt = (holder: AstFields, named: string): AstFields | null => {
+  const found = listedFieldsOf(holder.properties).findLast(
+    (property) => propertyNameOf(property) === named,
   );
   return found === undefined ? null : astFieldsOf(found.value);
 };
 
-const objectFrom = (value: AstFields | null): AstFields | null => {
-  if (value === null) return null;
-  const type = nodeTypeOf(value);
-  if (type === "ObjectExpression") return value;
-  if (type !== "CallExpression") return null;
-  const [handed] = listedFieldsOf(value.arguments);
+const objectFrom = (written: AstFields | null): AstFields | null => {
+  if (written === null) return null;
+  const nodeType = nodeTypeOf(written);
+  if (nodeType === "ObjectExpression") return written;
+  if (nodeType !== "CallExpression") return null;
+  const [handed] = listedFieldsOf(written.arguments);
   return handed === undefined ? null : objectFrom(handed);
 };
 
@@ -70,15 +69,15 @@ const runnerBlockIn = (program: AstFields): AstFields | null => {
 };
 
 const spelledEntriesOf = (
-  value: AstFields | null,
+  written: AstFields | null,
   constants: ReadonlyMap<string, string>,
 ): readonly string[] => {
-  if (value === null) return [];
-  const single = staticSpecifierOf(value, constants);
+  if (written === null) return [];
+  const single = staticSpecifierOf(written, constants);
   if (single !== null) return [single];
-  if (nodeTypeOf(value) !== ARRAY_EXPRESSION) return [];
-  return listedFieldsOf(value.elements).flatMap((element) => {
-    const spelled = staticSpecifierOf(element, constants);
+  if (nodeTypeOf(written) !== ARRAY_EXPRESSION) return [];
+  return listedFieldsOf(written.elements).flatMap((held) => {
+    const spelled = staticSpecifierOf(held, constants);
     return spelled === null ? [] : [spelled];
   });
 };
@@ -87,16 +86,16 @@ const registeredEntriesIn = (
   runnerBlock: AstFields,
   constants: ReadonlyMap<string, string>,
 ): readonly string[] => {
-  const own = REGISTERED_SETUP_KEYS.flatMap((key) =>
-    spelledEntriesOf(valueAt(runnerBlock, key), constants),
+  const own = REGISTERED_SETUP_KEYS.flatMap((registeredKey) =>
+    spelledEntriesOf(valueAt(runnerBlock, registeredKey), constants),
   );
   const projects = valueAt(runnerBlock, PROJECT_LIST_KEY);
   if (projects === null || nodeTypeOf(projects) !== ARRAY_EXPRESSION) return own;
 
   return [
     ...own,
-    ...listedFieldsOf(projects.elements).flatMap((element) => {
-      const nested = objectFrom(valueAt(element, RUNNER_BLOCK_KEY));
+    ...listedFieldsOf(projects.elements).flatMap((listed) => {
+      const nested = objectFrom(valueAt(listed, RUNNER_BLOCK_KEY));
       return nested === null ? [] : registeredEntriesIn(nested, constants);
     }),
   ];

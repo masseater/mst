@@ -25,11 +25,13 @@ export const deadRowFindings = (asked: {
   readonly paths: readonly string[];
 }): readonly CoverageFinding[] =>
   asked.rows
-    .filter((row) => pathsMatching({ paths: asked.paths, patterns: [row.pattern] }).length === 0)
-    .map((row) => ({
+    .filter(
+      (lined) => pathsMatching({ paths: asked.paths, patterns: [lined.pattern] }).length === 0,
+    )
+    .map((lined) => ({
       heldPath: null,
       messageId: DEAD_REGISTRATION_MESSAGE_ID,
-      data: { registry: asked.registry, pattern: row.pattern, reason: row.reason },
+      data: { registry: asked.registry, pattern: lined.pattern, reason: lined.reason },
     }));
 
 const receiverFindings = (asked: {
@@ -96,13 +98,13 @@ const recordedReceiverFindings = (asked: {
     receivers: [asked.table.consumedBy],
     checks: asked.checks,
   });
-  const rows = [...asked.table.rows, ...asked.table.allowances];
+  const linedRows = [...asked.table.rows, ...asked.table.allowances];
   return [
     ...consumer,
-    ...rows.flatMap((row) =>
+    ...linedRows.flatMap((lined) =>
       receiverFindings({
-        record: `Row \`${row.pattern}\` of registry ${registry}`,
-        receivers: row.receivers,
+        record: `Row \`${lined.pattern}\` of registry ${registry}`,
+        receivers: lined.receivers,
         checks: asked.checks,
       }),
     ),
@@ -118,8 +120,8 @@ const tableFindings = (asked: {
   const reached =
     consumer === null
       ? []
-      : asked.table.rows.flatMap((row) => {
-          const found = unreachableFindingOf({ ...asked, consumer, row });
+      : asked.table.rows.flatMap((lined) => {
+          const found = unreachableFindingOf({ ...asked, consumer, row: lined });
           return found === null ? [] : [found];
         });
 

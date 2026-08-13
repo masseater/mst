@@ -43,11 +43,15 @@ const settledNames = (
   initializers: ReadonlyMap<string, ESTree.Expression>,
 ): ReadonlySet<string> => {
   const gained = [...initializers].filter(
-    ([name, initializer]) => !reached.has(name) && reached.has(boundRootName(initializer) ?? ""),
+    ([declaredName, initializer]) =>
+      !reached.has(declaredName) && reached.has(boundRootName(initializer) ?? ""),
   );
   if (gained.length === 0) return reached;
 
-  return settledNames(new Set([...reached, ...gained.map(([name]) => name)]), initializers);
+  return settledNames(
+    new Set([...reached, ...gained.map(([declaredName]) => declaredName)]),
+    initializers,
+  );
 };
 
 const initializersIn = (program: ESTree.Program): ReadonlyMap<string, ESTree.Expression> =>
@@ -112,8 +116,8 @@ const derivedRootName = (initializer: ESTree.Expression): string | null => {
 
 const namesDerivedFromImports = (program: ESTree.Program): readonly string[] => {
   const imported = importedNamesIn(program);
-  return [...initializersIn(program)].flatMap(([name, initializer]) =>
-    imported.has(derivedRootName(initializer) ?? "") ? [name] : [],
+  return [...initializersIn(program)].flatMap(([declaredName, initializer]) =>
+    imported.has(derivedRootName(initializer) ?? "") ? [declaredName] : [],
   );
 };
 
@@ -122,7 +126,7 @@ export const runnerRootedTestBlockRootNames = (program: ESTree.Program): Readonl
   const imported = nodesOfType(program, "ImportDeclaration")
     .filter((declaration) => RUNNER_MODULES.includes(declaration.source.value))
     .flatMap((declaration) => importedBlockNames(declaration, INJECTED_TEST_BLOCK_SPELLINGS));
-  const injected = [...INJECTED_TEST_BLOCK_SPELLINGS].filter((name) => !shadowed.has(name));
+  const injected = [...INJECTED_TEST_BLOCK_SPELLINGS].filter((spelling) => !shadowed.has(spelling));
   const handedOn = namesDerivedFromImports(program);
 
   return settledNames(new Set([...injected, ...imported, ...handedOn]), initializersIn(program));

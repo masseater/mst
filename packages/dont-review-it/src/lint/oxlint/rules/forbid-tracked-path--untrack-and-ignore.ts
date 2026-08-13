@@ -117,13 +117,13 @@ export const forbidTrackedPath = createDontReviewItRule({
     },
     schema: FORBIDDEN_TRACKED_PATH_SCHEMA,
   },
-  create(context) {
-    const file = resolve(context.cwd, context.filename);
+  create(inspection) {
+    const file = resolve(inspection.cwd, inspection.filename);
     const workspaceRoot = findWorkspaceRoot(dirname(file));
     if (dirname(file) !== workspaceRoot) return {};
 
-    const registered = registeredTrackedPathsFrom(context.options);
-    const releases = releasesFrom(context.options);
+    const registered = registeredTrackedPathsFrom(inspection.options);
+    const releases = releasesFrom(inspection.options);
     const registrations = trackedPathsInForce({ registered, releases });
 
     return {
@@ -139,7 +139,7 @@ export const forbidTrackedPath = createDontReviewItRule({
           ...unignoredFindings({ registrations, listing: ignoreListingAt(workspaceRoot) }),
         ];
 
-        for (const finding of findings) context.report({ node, ...finding });
+        for (const finding of findings) inspection.report({ node, ...finding });
       },
     };
   },

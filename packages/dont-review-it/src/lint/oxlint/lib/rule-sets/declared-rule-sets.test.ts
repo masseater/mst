@@ -79,7 +79,11 @@ describe("memberNamedBy", () => {
   describe("the bare name a configuration spells", () => {
     const it = test.extend("membersNamed", () =>
       DECLARED_RULE_SETS.filter((declared) => declared.name === SINGLE_ASSIGNMENT).flatMap(
-        (set) => memberNamedBy({ set, ruleName: "no-reassign--use-spread-or-iife" }) ?? [],
+        (singleAssignmentSet) =>
+          memberNamedBy({
+            set: singleAssignmentSet,
+            ruleName: "no-reassign--use-spread-or-iife",
+          }) ?? [],
       ));
 
     it("finds the rule of the set that carries it", ({ membersNamed }) => {
@@ -96,9 +100,11 @@ describe("memberNamedBy", () => {
   describe("the name a configuration qualifies with its plugin", () => {
     const it = test.extend("membersNamed", () =>
       DECLARED_RULE_SETS.filter((declared) => declared.name === SINGLE_ASSIGNMENT).flatMap(
-        (set) =>
-          memberNamedBy({ set, ruleName: "dont-review-it/no-array-mutation--derive-new-array" }) ??
-          [],
+        (singleAssignmentSet) =>
+          memberNamedBy({
+            set: singleAssignmentSet,
+            ruleName: "dont-review-it/no-array-mutation--derive-new-array",
+          }) ?? [],
       ));
 
     it("finds the same rule the bare name reaches", ({ membersNamed }) => {
@@ -115,7 +121,8 @@ describe("memberNamedBy", () => {
   describe("a name the set does not carry", () => {
     const it = test.extend("membersNamed", () =>
       DECLARED_RULE_SETS.filter((declared) => declared.name === SINGLE_ASSIGNMENT).flatMap(
-        (set) => memberNamedBy({ set, ruleName: "no-console" }) ?? [],
+        (singleAssignmentSet) =>
+          memberNamedBy({ set: singleAssignmentSet, ruleName: "no-console" }) ?? [],
       ));
 
     it("reaches no member", ({ membersNamed }) => {

@@ -23,9 +23,9 @@ const importedModuleOf = (input: {
 };
 
 const takenNameOf = (specifier: AstFields): string => {
-  const kind = specifier[NODE_TYPE_FIELD];
-  if (kind === "ImportDefaultSpecifier") return DEFAULT_IMPORT;
-  if (kind === "ImportNamespaceSpecifier") return WHOLE_MODULE_IMPORT;
+  const nodeKind = specifier[NODE_TYPE_FIELD];
+  if (nodeKind === "ImportDefaultSpecifier") return DEFAULT_IMPORT;
+  if (nodeKind === "ImportNamespaceSpecifier") return WHOLE_MODULE_IMPORT;
 
   const taken = specifier.imported as AstFields;
   return String(taken.name ?? taken.value);

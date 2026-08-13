@@ -42,19 +42,19 @@ const standsInsideTest = (node: ESTree.Node, regions: readonly ESTree.Node[]): b
   regions.some((region) => region.start <= node.start && node.end <= region.end);
 
 const writtenLeavesOf = (
-  target:
+  pattern:
     | ESTree.AssignmentTargetMaybeDefault
     | ESTree.AssignmentTargetProperty
     | ESTree.AssignmentTargetRest,
 ): readonly ESTree.Expression[] => {
-  if (target.type === "ArrayPattern") {
-    return target.elements.flatMap((element) => (element === null ? [] : writtenLeavesOf(element)));
+  if (pattern.type === "ArrayPattern") {
+    return pattern.elements.flatMap((held) => (held === null ? [] : writtenLeavesOf(held)));
   }
-  if (target.type === "ObjectPattern") return target.properties.flatMap(writtenLeavesOf);
-  if (target.type === "Property") return writtenLeavesOf(target.value);
-  if (target.type === "RestElement") return writtenLeavesOf(target.argument);
-  if (target.type === "AssignmentPattern") return writtenLeavesOf(target.left);
-  return [unwrapSubject(target)];
+  if (pattern.type === "ObjectPattern") return pattern.properties.flatMap(writtenLeavesOf);
+  if (pattern.type === "Property") return writtenLeavesOf(pattern.value);
+  if (pattern.type === "RestElement") return writtenLeavesOf(pattern.argument);
+  if (pattern.type === "AssignmentPattern") return writtenLeavesOf(pattern.left);
+  return [unwrapSubject(pattern)];
 };
 
 const memberWriteOf = (node: ESTree.Node, leaf: ESTree.Expression): readonly StateWrite[] => {
@@ -187,10 +187,10 @@ export const noModuleScopeMutableState = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, DEFAULT_SPEC_FILE_SUFFIXES)) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, DEFAULT_SPEC_FILE_SUFFIXES)) return {};
 
-    const scopeAt: ScopeLookup = (node) => context.sourceCode.getScope(node);
+    const scopeAt: ScopeLookup = (node) => inspection.sourceCode.getScope(node);
     const namespaces: NamespaceLookup = {
       scopeAt,
       spellings: new Set(DEFAULT_MOCK_NAMESPACE_SPELLINGS),
@@ -219,7 +219,7 @@ export const noModuleScopeMutableState = createDontReviewItRule({
             if (write.messageId === REBINDING_MESSAGE && !declaresRebindableName(definition)) {
               continue;
             }
-            context.report({
+            inspection.report({
               node: write.node,
               messageId: write.messageId,
               data: { name: write.root.name, origin: originOf(definition), member: write.member },

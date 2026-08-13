@@ -20,14 +20,14 @@ const specifiersOf = (config: unknown): readonly string[] => {
   const declared = config.extends;
   if (typeof declared === "string") return [declared];
   if (!Array.isArray(declared)) return [];
-  return declared.filter((entry: unknown): entry is string => typeof entry === "string");
+  return declared.filter((listed: unknown): listed is string => typeof listed === "string");
 };
 
 const declaredIn = (directory: string): TsconfigExtends | null => {
   const candidatePath = join(directory, TSCONFIG_FILE_NAME);
-  const text = readTextFile(candidatePath);
-  if (text === null) return null;
-  return { tsconfigPath: candidatePath, specifiers: specifiersOf(parseJsonc(text)) };
+  const writtenText = readTextFile(candidatePath);
+  if (writtenText === null) return null;
+  return { tsconfigPath: candidatePath, specifiers: specifiersOf(parseJsonc(writtenText)) };
 };
 
 const nearestFrom: (directory: string) => TsconfigExtends | null = memoize(

@@ -35,16 +35,19 @@ const filesReachedFrom = (
   if (walked.includes(file)) return walked;
   const opened = [...walked, file];
   if (depth >= RE_EXPORT_DEPTH_LIMIT) return opened;
-  const text = readTextFile(file);
-  if (text === null) return opened;
+  const moduleSource = readTextFile(file);
+  if (moduleSource === null) return opened;
 
-  return [...text.matchAll(RE_EXPORT_PATTERN)].reduce<readonly string[]>((reached, match) => {
-    const [, specifier] = match;
-    const target = resolveRelativeSpecifier(file, String(specifier));
-    return target === null
-      ? reached
-      : filesReachedFrom(target, { depth: depth + 1, walked: reached });
-  }, opened);
+  return [...moduleSource.matchAll(RE_EXPORT_PATTERN)].reduce<readonly string[]>(
+    (reached, match) => {
+      const [, specifier] = match;
+      const reExportedFile = resolveRelativeSpecifier(file, String(specifier));
+      return reExportedFile === null
+        ? reached
+        : filesReachedFrom(reExportedFile, { depth: depth + 1, walked: reached });
+    },
+    opened,
+  );
 };
 
 const filesReachableByReExport = (entryFile: string): readonly string[] =>
@@ -67,11 +70,11 @@ const exportSubpathReaches = (
 
   const conditions: readonly (readonly [string, unknown])[] = Object.entries(declared);
   return conditions
-    .filter(([key]) => key !== `./${MANIFEST_FILE_NAME}`)
-    .flatMap(([key, nested]) =>
+    .filter(([conditionOrSubpath]) => conditionOrSubpath !== `./${MANIFEST_FILE_NAME}`)
+    .flatMap(([conditionOrSubpath, nested]) =>
       exportSubpathReaches(nested, {
         packageDirectory,
-        subpath: key.startsWith(".") ? key : subpath,
+        subpath: conditionOrSubpath.startsWith(".") ? conditionOrSubpath : subpath,
         depth: depth + 1,
       }),
     );

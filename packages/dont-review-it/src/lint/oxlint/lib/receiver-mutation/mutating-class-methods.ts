@@ -41,9 +41,9 @@ const unwrappedNodeOf = (node: AstFields): AstFields => {
 
 const rootsAtThis = (node: AstFields): boolean => {
   const written = unwrappedNodeOf(node);
-  const type = nodeTypeOf(written);
-  if (type === "ThisExpression") return true;
-  if (type !== "MemberExpression") return false;
+  const nodeType = nodeTypeOf(written);
+  if (nodeType === "ThisExpression") return true;
+  if (nodeType !== "MemberExpression") return false;
 
   const inside = astFieldsOf(written.object);
   return inside !== null && rootsAtThis(inside);
@@ -55,22 +55,24 @@ const writesThroughThis = (held: unknown): boolean =>
     return nodeTypeOf(written) === "MemberExpression" && rootsAtThis(written);
   });
 
-const spelledNamesOf = (key: AstFields, computed: unknown): readonly string[] => {
-  const type = nodeTypeOf(key);
-  if (type === "PrivateIdentifier") return [`${PRIVATE_NAME_PREFIX}${String(key.name)}`];
-  if (type === "Identifier") return computed === true ? [] : [String(key.name)];
-  if (type === "Literal") return typeof key.value === "string" ? [key.value] : [];
-  if (type !== "TemplateLiteral") return [];
+const spelledNamesOf = (keyNode: AstFields, computed: unknown): readonly string[] => {
+  const nodeType = nodeTypeOf(keyNode);
+  if (nodeType === "PrivateIdentifier") return [`${PRIVATE_NAME_PREFIX}${String(keyNode.name)}`];
+  if (nodeType === "Identifier") return computed === true ? [] : [String(keyNode.name)];
+  if (nodeType === "Literal") return typeof keyNode.value === "string" ? [keyNode.value] : [];
+  if (nodeType !== "TemplateLiteral") return [];
 
-  const quasis = listedFieldsOf(key.quasis);
-  const substituted = quasis.length !== 1 || listedFieldsOf(key.expressions).length !== 0;
+  const quasis = listedFieldsOf(keyNode.quasis);
+  const substituted = quasis.length !== 1 || listedFieldsOf(keyNode.expressions).length !== 0;
   if (substituted) return [];
-  return quasis.flatMap((quasi) => listedFieldsOf(quasi.value)).map((text) => String(text.cooked));
+  return quasis
+    .flatMap((quasi) => listedFieldsOf(quasi.value))
+    .map((quasiValue) => String(quasiValue.cooked));
 };
 
 const spelledKeyOf = (held: unknown, computed: unknown): string | null =>
   listedFieldsOf(held)
-    .flatMap((key) => spelledNamesOf(key, computed))
+    .flatMap((keyNode) => spelledNamesOf(keyNode, computed))
     .at(0) ?? null;
 
 const nestedNodesOf = (node: AstFields): readonly AstFields[] =>
@@ -83,10 +85,10 @@ const reachedNodesIn = (node: AstFields): readonly AstFields[] =>
 
 const writesThisIn = (nodes: readonly AstFields[]): boolean =>
   nodes.some((node) => {
-    const type = nodeTypeOf(node);
-    if (type === "AssignmentExpression") return writesThroughThis(node.left);
-    if (type === "UpdateExpression") return writesThroughThis(node.argument);
-    if (type !== "UnaryExpression" || node.operator !== DELETE_OPERATOR) return false;
+    const nodeType = nodeTypeOf(node);
+    if (nodeType === "AssignmentExpression") return writesThroughThis(node.left);
+    if (nodeType === "UpdateExpression") return writesThroughThis(node.argument);
+    if (nodeType !== "UnaryExpression" || node.operator !== DELETE_OPERATOR) return false;
     return writesThroughThis(node.argument);
   });
 
@@ -105,23 +107,23 @@ const memberBodyOf = (member: AstFields): AstFields | null => {
   const written = astFieldsOf(member.value);
   if (written === null) return null;
 
-  const type = nodeTypeOf(member);
-  if (type === "MethodDefinition") {
+  const nodeType = nodeTypeOf(member);
+  if (nodeType === "MethodDefinition") {
     return member.kind === WRITTEN_METHOD_KIND ? astFieldsOf(written.body) : null;
   }
-  if (type !== "PropertyDefinition") return null;
+  if (nodeType !== "PropertyDefinition") return null;
   return nodeTypeOf(written) === "ArrowFunctionExpression" ? astFieldsOf(written.body) : null;
 };
 
 const classMemberOf = (member: AstFields): readonly ClassMember[] => {
-  const name = spelledKeyOf(member.key, member.computed);
-  const body = memberBodyOf(member);
-  if (name === null || body === null) return [];
+  const memberName = spelledKeyOf(member.key, member.computed);
+  const memberBody = memberBodyOf(member);
+  if (memberName === null || memberBody === null) return [];
 
-  const reached = [body, ...reachedNodesIn(body)];
+  const reached = [memberBody, ...reachedNodesIn(memberBody)];
   return [
     {
-      name,
+      name: memberName,
       writesThis: writesThisIn(reached),
       calledOwnMethods: reached.flatMap((node) => {
         const called = calledOwnMethodOf(node);
@@ -148,14 +150,14 @@ const declaredNameOf = (node: AstFields): readonly string[] =>
   listedFieldsOf(node.id).flatMap((named) => (typeof named.name === "string" ? [named.name] : []));
 
 const namedBodiesOf = (named: AstFields, holder: AstFields): readonly NamedClassBody[] =>
-  declaredNameOf(named).flatMap((name) =>
-    listedFieldsOf(holder.body).map((body): NamedClassBody => [name, body]),
+  declaredNameOf(named).flatMap((className) =>
+    listedFieldsOf(holder.body).map((classBody): NamedClassBody => [className, classBody]),
   );
 
 const classBodiesOf = (node: AstFields): readonly NamedClassBody[] => {
-  const type = nodeTypeOf(node);
-  if (type === "ClassDeclaration") return namedBodiesOf(node, node);
-  if (type !== "VariableDeclaration") return [];
+  const nodeType = nodeTypeOf(node);
+  if (nodeType === "ClassDeclaration") return namedBodiesOf(node, node);
+  if (nodeType !== "VariableDeclaration") return [];
 
   return listedFieldsOf(node.declarations).flatMap((declarator) =>
     listedFieldsOf(declarator.init)
@@ -165,22 +167,23 @@ const classBodiesOf = (node: AstFields): readonly NamedClassBody[] => {
 };
 
 const declaredNodesOf = (statement: AstFields): readonly AstFields[] => {
-  const type = nodeTypeOf(statement);
-  if (type !== "ExportNamedDeclaration" && type !== "ExportDefaultDeclaration") return [statement];
+  const nodeType = nodeTypeOf(statement);
+  if (nodeType !== "ExportNamedDeclaration" && nodeType !== "ExportDefaultDeclaration")
+    return [statement];
 
   const declared = astFieldsOf(statement.declaration);
   return declared === null ? [] : [declared];
 };
 
-export const mutatingMethodNamesIn = (request: {
+export const mutatingMethodNamesIn = (asked: {
   readonly source: string;
   readonly path: string;
   readonly className: string;
 }): ReadonlySet<string> | null => {
-  const statements = listedFieldsOf(parseSync(request.path, request.source).program.body);
-  const bodies = new Map(statements.flatMap(declaredNodesOf).flatMap(classBodiesOf));
-  const body = bodies.get(request.className);
-  if (body === undefined) return null;
+  const statements = listedFieldsOf(parseSync(asked.path, asked.source).program.body);
+  const bodyByClassName = new Map(statements.flatMap(declaredNodesOf).flatMap(classBodiesOf));
+  const classBody = bodyByClassName.get(asked.className);
+  if (classBody === undefined) return null;
 
-  return closedOverWrites(listedFieldsOf(body.body).flatMap(classMemberOf));
+  return closedOverWrites(listedFieldsOf(classBody.body).flatMap(classMemberOf));
 };

@@ -9,18 +9,18 @@ const DEFAULT_MAX_LINES = 500;
 
 const DEFAULT_MAX_SPEC_LINES = 1500;
 
-const optionObjectFrom = (options: Readonly<Options>): Readonly<Record<string, unknown>> => {
-  const [first] = options;
+const optionObjectFrom = (ruleOptions: Readonly<Options>): Readonly<Record<string, unknown>> => {
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) return {};
   return first;
 };
 
-const budgetFrom = (options: Readonly<Options>, filename: string): number => {
-  const configured = optionObjectFrom(options);
-  const spec = isSpecFile(filename, specFileSuffixesFrom(options));
-  const key = spec ? "maxSpecLines" : "maxLines";
+const budgetFrom = (ruleOptions: Readonly<Options>, filename: string): number => {
+  const configured = optionObjectFrom(ruleOptions);
+  const spec = isSpecFile(filename, specFileSuffixesFrom(ruleOptions));
+  const budgetProperty = spec ? "maxSpecLines" : "maxLines";
   const fallback = spec ? DEFAULT_MAX_SPEC_LINES : DEFAULT_MAX_LINES;
-  const written = configured[key];
+  const written = configured[budgetProperty];
   return typeof written === "number" ? written : fallback;
 };
 
@@ -52,13 +52,13 @@ export const forbidOversizedFile = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    const maxLines = budgetFrom(context.options, context.filename);
+  create(inspection) {
+    const maxLines = budgetFrom(inspection.options, inspection.filename);
     return {
       Program(node: ESTree.Program) {
-        const codeLines = codeLineCountOf(context.sourceCode.ast.tokens);
+        const codeLines = codeLineCountOf(inspection.sourceCode.ast.tokens);
         if (codeLines <= maxLines) return;
-        context.report({
+        inspection.report({
           node,
           messageId: "oversizedFile",
           data: { codeLines, maxLines },

@@ -71,21 +71,21 @@ export const noMixedPackageSurface = createDontReviewItRule({
     },
     schema: PACKAGE_SURFACE_SCHEMA,
   },
-  create(context) {
-    const runnablePackages = runnablePackagesFrom(context.options);
-    const importablePackages = importablePackagesFrom(context.options);
-    const exemptPackages = exemptPackagesFrom(context.options);
+  create(inspection) {
+    const runnablePackages = runnablePackagesFrom(inspection.options);
+    const importablePackages = importablePackagesFrom(inspection.options);
+    const exemptPackages = exemptPackagesFrom(inspection.options);
 
     return {
       Program(node: ESTree.Program) {
-        const surfaces = governingSurfacesOf(context);
+        const surfaces = governingSurfacesOf(inspection);
         if (surfaces === null) return;
         if (exemptPackages.has(surfaces.packageName)) return;
 
         const violation = surfaceViolationOf({ surfaces, runnablePackages, importablePackages });
         if (violation === null) return;
 
-        context.report({ node, ...violation });
+        inspection.report({ node, ...violation });
       },
     };
   },

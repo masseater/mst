@@ -16,13 +16,14 @@ describe("warnUnreleased", () => {
       });
 
     it("names the failure under the tool that owns the slot", ({ theWarningOnStandardError }) => {
-      expect(theWarningOnStandardError).toBe(
-        "throttle: releasing the slot before re-raising SIGINT failed\n",
-      );
+      expect(theWarningOnStandardError).toMatchInlineSnapshot(`
+        "throttle: releasing the slot before re-raising SIGINT failed
+        "
+      `);
     });
 
     it("leaves standard output untouched", ({ theStandardOutputOfTheWarning }) => {
-      expect(theStandardOutputOfTheWarning).toBe("");
+      expect(theStandardOutputOfTheWarning).toMatchInlineSnapshot(`""`);
     });
   });
 });

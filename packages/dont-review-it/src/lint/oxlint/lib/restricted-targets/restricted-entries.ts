@@ -59,10 +59,13 @@ export const RESTRICTED_TARGET_SCHEMA: RuleMeta["schema"] = [
   },
 ];
 
-const declaredListOf = (options: Context["options"], key: string): readonly unknown[] => {
-  const [first] = options;
+const declaredListOf = (
+  ruleSettings: Context["options"],
+  settingField: string,
+): readonly unknown[] => {
+  const [first] = ruleSettings;
   if (!isNamedFields(first)) return [];
-  const declared = first[key];
+  const declared = first[settingField];
   return Array.isArray(declared) ? declared : [];
 };
 
@@ -88,22 +91,27 @@ const aliasOf = (held: unknown): InternalAlias | null => {
 };
 
 export const restrictedTargetsFrom = (
-  options: Context["options"],
+  ruleSettings: Context["options"],
 ): readonly RestrictedTargetEntry[] =>
-  declaredListOf(options, "restricted")
+  declaredListOf(ruleSettings, "restricted")
     .map(entryOf)
-    .filter((entry) => entry !== null);
+    .filter((restrictedTarget) => restrictedTarget !== null);
 
-export const internalAliasesFrom = (options: Context["options"]): readonly InternalAlias[] =>
-  declaredListOf(options, "internalAliases")
+export const internalAliasesFrom = (ruleSettings: Context["options"]): readonly InternalAlias[] =>
+  declaredListOf(ruleSettings, "internalAliases")
     .map(aliasOf)
     .filter((alias) => alias !== null);
 
-const namesModule = (entry: RestrictedTargetEntry, specifier: string): boolean =>
-  specifier === entry.module || specifier.startsWith(`${entry.module}/`);
+const namesModule = (restrictedTarget: RestrictedTargetEntry, specifier: string): boolean =>
+  specifier === restrictedTarget.module || specifier.startsWith(`${restrictedTarget.module}/`);
 
-const coversExported = (entry: RestrictedTargetEntry, exported: string | null): boolean =>
-  entry.exports.length === 0 || exported === null || entry.exports.includes(exported);
+const coversExported = (
+  restrictedTarget: RestrictedTargetEntry,
+  exported: string | null,
+): boolean =>
+  restrictedTarget.exports.length === 0 ||
+  exported === null ||
+  restrictedTarget.exports.includes(exported);
 
 export const matchingRestrictedTarget = ({
   entries,
@@ -113,7 +121,9 @@ export const matchingRestrictedTarget = ({
   readonly forwarded: ForwardedTarget;
 }): RestrictedTargetEntry | null =>
   entries.find(
-    (entry) => namesModule(entry, forwarded.specifier) && coversExported(entry, forwarded.exported),
+    (restrictedTarget) =>
+      namesModule(restrictedTarget, forwarded.specifier) &&
+      coversExported(restrictedTarget, forwarded.exported),
   ) ?? null;
 
 export const entriesInForceAt = ({
@@ -127,8 +137,10 @@ export const entriesInForceAt = ({
 }): readonly RestrictedTargetEntry[] => {
   const pathSegments = segmentsOf({ path: file, separator: sep });
   return entries.filter(
-    (entry) =>
-      !entry.allowedPositions.some((pattern) => matchesGlobPath({ pathSegments, pattern, cwd })),
+    (restrictedTarget) =>
+      !restrictedTarget.allowedPositions.some((pattern) =>
+        matchesGlobPath({ pathSegments, pattern, cwd }),
+      ),
   );
 };
 

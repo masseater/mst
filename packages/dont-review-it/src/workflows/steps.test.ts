@@ -104,7 +104,7 @@ describe("entriesNamedInSteps", () => {
         }),
         config: defaultWorkflowChecksConfig,
         key: defaultWorkflowChecksConfig.runKey,
-      }).map((entry) => scalarText(entry.value)));
+      }).map((runEntry) => scalarText(runEntry.value)));
 
     it("collects the named entry from the steps of every job", ({ commands }) => {
       expect(commands).toStrictEqual(["vp run build", "vp run test"]);
@@ -128,7 +128,7 @@ describe("entriesNamedInSteps", () => {
         }),
         config: defaultWorkflowChecksConfig,
         key: "uses",
-      }).map((entry) => scalarText(entry.value)));
+      }).map((usesEntry) => scalarText(usesEntry.value)));
 
     it("skips the steps that do not declare the entry", ({ actions }) => {
       expect(actions).toStrictEqual(["actions/checkout@v5"]);

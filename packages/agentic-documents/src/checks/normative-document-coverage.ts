@@ -8,7 +8,7 @@ import type { DocumentProblem } from "../problem.ts";
 
 const REPOSITORY_ROOT_LOCATION = ".";
 
-const message = (fileName: string): string =>
+const complaint = (fileName: string): string =>
   `この場所に \`${fileName}\` が無い。ここで作業する読み手は、固有の規約が無いのか書かれていないだけなのかを区別できない。この場所が守るものを書く。見出しだけの空の文書で通すと、無いことすら読み取れなくなる。`;
 
 const locationsRequiringDocument = async ({
@@ -18,13 +18,13 @@ const locationsRequiringDocument = async ({
   readonly repositoryRoot: string;
   readonly config: AgenticDocumentsConfig;
 }): Promise<readonly string[]> => {
-  const collection = await collectWorkspaces({
+  const listedCollection = await collectWorkspaces({
     repositoryRoot,
     definitionFile: config.workspaceDefinition.file,
     definitionField: config.workspaceDefinition.field,
   });
 
-  return [REPOSITORY_ROOT_LOCATION, ...collection.entries.map((entry) => entry.directory)];
+  return [REPOSITORY_ROOT_LOCATION, ...listedCollection.entries.map((listed) => listed.directory)];
 };
 
 export const missingNormativeDocuments = async ({
@@ -50,7 +50,7 @@ export const missingNormativeDocuments = async ({
             {
               file: relativePath,
               line: null,
-              message: message(config.normativeDocumentFileName),
+              message: complaint(config.normativeDocumentFileName),
             },
           ]
         : [];

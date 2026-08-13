@@ -73,8 +73,8 @@ const exportedNodesIn = (statements: readonly AstFields[]): ReadonlySet<AstField
       if (declaring !== statement) return boundNodesOf(declaring);
 
       return boundNodesOf(declaring).filter((node) => {
-        const name = declaredNameOf(node);
-        return name !== null && sentAway.has(name);
+        const spelled = declaredNameOf(node);
+        return spelled !== null && sentAway.has(spelled);
       });
     }),
   );
@@ -84,11 +84,11 @@ const valueDeclarationAt = (node: AstFields, reading: Reading): ValueDeclaration
   const bodyOf = BODY_BY_KIND[String(node[NODE_TYPE_FIELD])];
   if (bodyOf === undefined) return null;
 
-  const name = declaredNameOf(node);
-  if (name === null) return null;
+  const spelled = declaredNameOf(node);
+  if (spelled === null) return null;
 
   return {
-    name,
+    name: spelled,
     line: reading.source.slice(0, Number(node.start)).split("\n").length,
     exported: reading.exportedNodes.has(node),
     fingerprint: normalizedBodyOf({ body: bodyOf(node), routes: reading.routes }),
@@ -96,7 +96,7 @@ const valueDeclarationAt = (node: AstFields, reading: Reading): ValueDeclaration
 };
 
 const declarationsWithin = (held: unknown, reading: Reading): readonly ValueDeclaration[] => {
-  if (Array.isArray(held)) return held.flatMap((item) => declarationsWithin(item, reading));
+  if (Array.isArray(held)) return held.flatMap((member) => declarationsWithin(member, reading));
   if (!isAstFields(held)) return [];
 
   const declared = valueDeclarationAt(held, reading);

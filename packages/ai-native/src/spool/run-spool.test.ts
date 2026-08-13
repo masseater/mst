@@ -1350,8 +1350,8 @@ describe("runSpool", () => {
             });
           }),
         );
-        return readdirSync(CONCURRENT_ROOT).map((record) =>
-          /^\d{8}T\d{6}Z-node--e-[0-9a-f]{8}\.log$/.test(record),
+        return readdirSync(CONCURRENT_ROOT).map((logFileName) =>
+          /^\d{8}T\d{6}Z-node--e-[0-9a-f]{8}\.log$/.test(logFileName),
         );
       })
       .extend("theWholeLineShapesOfFiveConcurrentRuns", async ({}, { onCleanup }) => {
@@ -1371,9 +1371,9 @@ describe("runSpool", () => {
             });
           }),
         );
-        return readdirSync(CONCURRENT_ROOT).map((record) =>
+        return readdirSync(CONCURRENT_ROOT).map((logFileName) =>
           /^\d+\n$/.test(
-            readFileSync(join(CONCURRENT_ROOT, record), "utf8").split("\n\n")[1] ?? "",
+            readFileSync(join(CONCURRENT_ROOT, logFileName), "utf8").split("\n\n")[1] ?? "",
           ),
         );
       })
@@ -1394,10 +1394,13 @@ describe("runSpool", () => {
             });
           }),
         );
-        const bodies = readdirSync(CONCURRENT_ROOT).map(
-          (record) => readFileSync(join(CONCURRENT_ROOT, record), "utf8").split("\n\n")[1] ?? "",
+        const recordedPidLines = readdirSync(CONCURRENT_ROOT).map(
+          (logFileName) =>
+            readFileSync(join(CONCURRENT_ROOT, logFileName), "utf8").split("\n\n")[1] ?? "",
         );
-        return bodies.map((body, index) => bodies.indexOf(body) === index);
+        return recordedPidLines.map(
+          (recordedPidLine, index) => recordedPidLines.indexOf(recordedPidLine) === index,
+        );
       });
 
     it(

@@ -95,6 +95,14 @@ describe("runPassthrough", () => {
           monotonicNow: () => 0,
         });
         return stderr.text();
+      })
+      .extend("theStdoutOfAPassedThroughMissingExecutable", async ({ stdout }) => {
+        await runPassthrough([MISSING_EXECUTABLE], {
+          stdout: process.stdout,
+          stderr: process.stderr,
+          monotonicNow: () => 0,
+        });
+        return stdout.text();
       });
 
     it("is refused with the code kept for a command that cannot start", ({
@@ -109,6 +117,12 @@ describe("runPassthrough", () => {
         spool: error: cannot start command: Error: spawn /nonexistent/never-here ENOENT
         "
       `);
+    });
+
+    it("leaves standard output with nothing when the command cannot start", ({
+      theStdoutOfAPassedThroughMissingExecutable,
+    }) => {
+      expect(theStdoutOfAPassedThroughMissingExecutable).toMatchInlineSnapshot(`""`);
     });
   });
 

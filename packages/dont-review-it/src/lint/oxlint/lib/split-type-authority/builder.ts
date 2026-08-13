@@ -63,6 +63,8 @@ const typeAuthorityIndexAt = memoize(
     buildRepositoryTypeAuthorityIndex({ repositoryRoot }),
 );
 
-export const loadRepositoryTypeAuthorityIndex = (options: {
+export const loadRepositoryTypeAuthorityIndex = ({
+  repositoryRoot,
+}: {
   readonly repositoryRoot: string;
-}): TypeAuthorityIndex => typeAuthorityIndexAt(resolve(options.repositoryRoot));
+}): TypeAuthorityIndex => typeAuthorityIndexAt(resolve(repositoryRoot));

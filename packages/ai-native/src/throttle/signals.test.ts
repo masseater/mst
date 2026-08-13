@@ -19,20 +19,20 @@ describe("installInterruptHandler", () => {
   describe("a handler installed on this process", () => {
     const it = test
       .extend("theInterruptHandlerIsRegisteredForInterrupt", ({}, { onCleanup }) => {
-        const handler = vi.fn<(signal: NodeJS.Signals) => void>();
+        const interruptHandler = vi.fn<(signal: NodeJS.Signals) => void>();
         onCleanup(() => {
-          dropInterruptHandler(handler);
+          dropInterruptHandler(interruptHandler);
         });
-        installInterruptHandler(handler);
-        return process.listeners("SIGINT").includes(handler);
+        installInterruptHandler(interruptHandler);
+        return process.listeners("SIGINT").includes(interruptHandler);
       })
       .extend("theInterruptHandlerIsRegisteredForTermination", ({}, { onCleanup }) => {
-        const handler = vi.fn<(signal: NodeJS.Signals) => void>();
+        const interruptHandler = vi.fn<(signal: NodeJS.Signals) => void>();
         onCleanup(() => {
-          dropInterruptHandler(handler);
+          dropInterruptHandler(interruptHandler);
         });
-        installInterruptHandler(handler);
-        return process.listeners("SIGTERM").includes(handler);
+        installInterruptHandler(interruptHandler);
+        return process.listeners("SIGTERM").includes(interruptHandler);
       });
 
     it("registers the handler for the interrupt signal", ({
@@ -53,16 +53,16 @@ describe("dropInterruptHandler", () => {
   describe("a handler dropped after it was installed", () => {
     const it = test
       .extend("theInterruptHandlerIsGoneFromInterruptAfterDropping", () => {
-        const handler = vi.fn<(signal: NodeJS.Signals) => void>();
-        installInterruptHandler(handler);
-        dropInterruptHandler(handler);
-        return process.listeners("SIGINT").includes(handler);
+        const interruptHandler = vi.fn<(signal: NodeJS.Signals) => void>();
+        installInterruptHandler(interruptHandler);
+        dropInterruptHandler(interruptHandler);
+        return process.listeners("SIGINT").includes(interruptHandler);
       })
       .extend("theInterruptHandlerIsGoneFromTerminationAfterDropping", () => {
-        const handler = vi.fn<(signal: NodeJS.Signals) => void>();
-        installInterruptHandler(handler);
-        dropInterruptHandler(handler);
-        return process.listeners("SIGTERM").includes(handler);
+        const interruptHandler = vi.fn<(signal: NodeJS.Signals) => void>();
+        installInterruptHandler(interruptHandler);
+        dropInterruptHandler(interruptHandler);
+        return process.listeners("SIGTERM").includes(interruptHandler);
       });
 
     it("takes the handler off the interrupt signal", ({

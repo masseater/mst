@@ -22,22 +22,28 @@ export type Worktree = {
   readonly unscannedDirectoryNames: ReadonlySet<string>;
 };
 
-export const unscannedDirectoryNamesFrom = (options: Context["options"]): ReadonlySet<string> => {
-  const declared = ((options[0] ?? {}) as { readonly unscannedDirectories?: readonly string[] })
+export const unscannedDirectoryNamesFrom = (
+  ruleOptions: Context["options"],
+): ReadonlySet<string> => {
+  const declared = ((ruleOptions[0] ?? {}) as { readonly unscannedDirectories?: readonly string[] })
     .unscannedDirectories;
   return declared === undefined ? UNSCANNED_DIRECTORY_NAMES : new Set(declared);
 };
 
 const filePathsUnder = (worktree: Worktree, directory: string): readonly string[] => {
-  const entries = readUnlessMissing(() => readdirSync(directory, { withFileTypes: true }));
-  if (entries === null) return [];
+  const directoryChildren = readUnlessMissing(() =>
+    readdirSync(directory, { withFileTypes: true }),
+  );
+  if (directoryChildren === null) return [];
 
-  return entries.flatMap((entry) => {
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) {
-      return worktree.unscannedDirectoryNames.has(entry.name) ? [] : filePathsUnder(worktree, path);
+  return directoryChildren.flatMap((directoryChild) => {
+    const path = join(directory, directoryChild.name);
+    if (directoryChild.isDirectory()) {
+      return worktree.unscannedDirectoryNames.has(directoryChild.name)
+        ? []
+        : filePathsUnder(worktree, path);
     }
-    return entry.isFile() ? [toPosixPath(relative(worktree.root, path))] : [];
+    return directoryChild.isFile() ? [toPosixPath(relative(worktree.root, path))] : [];
   });
 };
 

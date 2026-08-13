@@ -2,23 +2,23 @@ import { canonicalValueKey, type CanonicalValue } from "../canonical-values/fing
 
 import type { LibraryVocabularyEntry } from "./vocabulary-index.ts";
 
-const spellValues = (values: readonly CanonicalValue[]): string =>
-  values.map((value) => JSON.stringify(value)).join(" | ");
+const spellValues = (heldValues: readonly CanonicalValue[]): string =>
+  heldValues.map((held) => JSON.stringify(held)).join(" | ");
 
 export const describeLibraryOwner = (
-  entry: LibraryVocabularyEntry,
-  values: readonly CanonicalValue[],
+  listed: LibraryVocabularyEntry,
+  heldValues: readonly CanonicalValue[],
 ): string => {
-  const written = new Set(values.map(canonicalValueKey));
-  const beyond = entry.values.filter((value) => !written.has(canonicalValueKey(value)));
+  const written = new Set(heldValues.map(canonicalValueKey));
+  const beyond = listed.values.filter((held) => !written.has(canonicalValueKey(held)));
 
   const admitted = [
     ...(beyond.length === 0 ? [] : [spellValues(beyond)]),
-    ...(entry.admitsUnnamedValues ? ["values that are not spelled out as literals"] : []),
+    ...(listed.admitsUnnamedValues ? ["values that are not spelled out as literals"] : []),
   ];
 
-  const name = `${entry.typeName} from ${entry.packageName}`;
+  const spelled = `${listed.typeName} from ${listed.packageName}`;
   return admitted.length === 0
-    ? name
-    : `${name} (which also admits ${admitted.join(" and ")}, so narrow it)`;
+    ? spelled
+    : `${spelled} (which also admits ${admitted.join(" and ")}, so narrow it)`;
 };

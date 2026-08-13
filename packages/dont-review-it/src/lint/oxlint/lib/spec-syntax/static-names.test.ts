@@ -83,8 +83,8 @@ describe("staticMemberName", () => {
         "class Suite { #skip = 1; read() { return this.#skip; } }",
       ).program.body[0] as ESTree.Class;
       const [, method] = declared.body.body;
-      const body = (method as ESTree.MethodDefinition).value.body as ESTree.FunctionBody;
-      const [returned] = body.body;
+      const methodBody = (method as ESTree.MethodDefinition).value.body as ESTree.FunctionBody;
+      const [returned] = methodBody.body;
       const read = (returned as ESTree.ReturnStatement).argument as ESTree.MemberExpression;
       return staticMemberName(read);
     });
@@ -101,8 +101,8 @@ describe("staticPropertyName", () => {
       const declared = parseSync("spec.ts", "const written = { subject };").program
         .body[0] as ESTree.VariableDeclaration;
       const declarator = declared.declarations[0] as ESTree.VariableDeclarator;
-      const object = declarator.init as ESTree.ObjectExpression;
-      return staticPropertyName(object.properties[0] as ESTree.ObjectProperty);
+      const objectLiteral = declarator.init as ESTree.ObjectExpression;
+      return staticPropertyName(objectLiteral.properties[0] as ESTree.ObjectProperty);
     });
 
     it("spells the name it binds", ({ spelledName }) => {
@@ -115,8 +115,8 @@ describe("staticPropertyName", () => {
       const declared = parseSync("spec.ts", 'const written = { "subject": 1 };').program
         .body[0] as ESTree.VariableDeclaration;
       const declarator = declared.declarations[0] as ESTree.VariableDeclarator;
-      const object = declarator.init as ESTree.ObjectExpression;
-      return staticPropertyName(object.properties[0] as ESTree.ObjectProperty);
+      const objectLiteral = declarator.init as ESTree.ObjectExpression;
+      return staticPropertyName(objectLiteral.properties[0] as ESTree.ObjectProperty);
     });
 
     it("spells that name", ({ spelledName }) => {
@@ -129,8 +129,8 @@ describe("staticPropertyName", () => {
       const declared = parseSync("spec.ts", "const written = { [`subject`]: 1 };").program
         .body[0] as ESTree.VariableDeclaration;
       const declarator = declared.declarations[0] as ESTree.VariableDeclarator;
-      const object = declarator.init as ESTree.ObjectExpression;
-      return staticPropertyName(object.properties[0] as ESTree.ObjectProperty);
+      const objectLiteral = declarator.init as ESTree.ObjectExpression;
+      return staticPropertyName(objectLiteral.properties[0] as ESTree.ObjectProperty);
     });
 
     it("spells that name", ({ spelledName }) => {
@@ -143,8 +143,8 @@ describe("staticPropertyName", () => {
       const declared = parseSync("spec.ts", "const written = { [chosen]: 1 };").program
         .body[0] as ESTree.VariableDeclaration;
       const declarator = declared.declarations[0] as ESTree.VariableDeclarator;
-      const object = declarator.init as ESTree.ObjectExpression;
-      return staticPropertyName(object.properties[0] as ESTree.ObjectProperty);
+      const objectLiteral = declarator.init as ESTree.ObjectExpression;
+      return staticPropertyName(objectLiteral.properties[0] as ESTree.ObjectProperty);
     });
 
     it("spells no readable name", ({ spelledName }) => {
@@ -157,8 +157,8 @@ describe("staticPropertyName", () => {
       const declared = parseSync("spec.ts", "const written = { 1: 'first' };").program
         .body[0] as ESTree.VariableDeclaration;
       const declarator = declared.declarations[0] as ESTree.VariableDeclarator;
-      const object = declarator.init as ESTree.ObjectExpression;
-      return staticPropertyName(object.properties[0] as ESTree.ObjectProperty);
+      const objectLiteral = declarator.init as ESTree.ObjectExpression;
+      return staticPropertyName(objectLiteral.properties[0] as ESTree.ObjectProperty);
     });
 
     it("spells no name this reading can use", ({ spelledName }) => {

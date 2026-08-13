@@ -180,9 +180,9 @@ describe("startLintTelemetry", () => {
         vi.resetModules();
         const telemetry = await import("./lint-telemetry.ts");
         telemetry.startLintTelemetry();
-        const written = vi.fn<(text: string) => void>();
-        vi.spyOn(process.stderr, "write").mockImplementation((text) => {
-          written(String(text));
+        const written = vi.fn<(failureReport: string) => void>();
+        vi.spyOn(process.stderr, "write").mockImplementation((failureReport) => {
+          written(String(failureReport));
           return true;
         });
         globalErrorHandler(new Error("the collector refused"));
@@ -208,9 +208,9 @@ describe("startLintTelemetry", () => {
         vi.resetModules();
         const telemetry = await import("./lint-telemetry.ts");
         telemetry.startLintTelemetry();
-        const written = vi.fn<(text: string) => void>();
-        vi.spyOn(process.stderr, "write").mockImplementation((text) => {
-          written(String(text));
+        const written = vi.fn<(failureReport: string) => void>();
+        vi.spyOn(process.stderr, "write").mockImplementation((failureReport) => {
+          written(String(failureReport));
           return true;
         });
         globalErrorHandler({ code: "503" });

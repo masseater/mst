@@ -18,9 +18,13 @@ describe("gitOutput", () => {
   describe("a question asked under a hook environment that names another repository", () => {
     const it = test
       .extend("repositoryRoot", () => {
-        const created = mkdtempSync(join(tmpdir(), "dont-review-it-git-output-"));
-        execFileSync("git", ["init"], { cwd: created, env: CLEAN_ENVIRONMENT, stdio: "ignore" });
-        return realpathSync(created);
+        const temporaryDirectory = mkdtempSync(join(tmpdir(), "dont-review-it-git-output-"));
+        execFileSync("git", ["init"], {
+          cwd: temporaryDirectory,
+          env: CLEAN_ENVIRONMENT,
+          stdio: "ignore",
+        });
+        return realpathSync(temporaryDirectory);
       })
       .extend("toplevelAnswered", ({ repositoryRoot }) =>
         gitOutput(["rev-parse", "--show-toplevel"], {

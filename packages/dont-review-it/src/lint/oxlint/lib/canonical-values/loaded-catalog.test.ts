@@ -34,7 +34,7 @@ describe("loadCanonicalValuesCatalog", () => {
         loadCanonicalValuesCatalog({ repositoryRoot: root });
         writeFileSync(join(root, "order-status.ts"), ARTICLE_STATUS);
         return loadCanonicalValuesCatalog({ repositoryRoot: root }).entries.map(
-          (entry) => entry.conceptId,
+          (declaration) => declaration.conceptId,
         );
       });
 
@@ -56,7 +56,7 @@ describe("loadCanonicalValuesCatalog", () => {
         });
         return loadCanonicalValuesCatalog({
           repositoryRoot: join(root, "pruned-checkout"),
-        }).entries.map((entry) => entry.conceptId);
+        }).entries.map((declaration) => declaration.conceptId);
       })
       .extend("rootExistsAfterLoading", ({}, { onCleanup }) => {
         const root = mkdtempSync(join(tmpdir(), "canonical-values-"));

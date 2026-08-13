@@ -8,11 +8,11 @@ import { classModulesFor } from "./class-modules.ts";
 
 describe("classModulesFor", () => {
   const testInARepository = test.extend("root", ({}, { onCleanup }) => {
-    const created = realpathSync(mkdtempSync(join(tmpdir(), "class-modules-")));
+    const repositoryDirectory = realpathSync(mkdtempSync(join(tmpdir(), "class-modules-")));
     onCleanup(() => {
-      rmSync(created, { recursive: true, force: true });
+      rmSync(repositoryDirectory, { recursive: true, force: true });
     });
-    return created;
+    return repositoryDirectory;
   });
 
   describe("a class this file declares itself", () => {

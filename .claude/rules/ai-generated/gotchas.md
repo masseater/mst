@@ -9,6 +9,19 @@ paths:
 
 各項目は「症状 → 原因 → 対処」で読める形にしている。
 
+## git hook の中で走る git は、cwd ではなく継承した `GIT_DIR` を見る
+
+- 症状: 一時ディレクトリに作った検証用リポジトリに対する git 操作が、共有リポジトリの側に当たった。`codex/feat-stop-ai-slop` の ref がテストの `snapshot` コミット列に進み、共有の `.git/config` に `user.email` / `user.name` / `diff.noprefix` / `diff.renameLimit` が書き込まれた。`git init` は `warning: re-init: ignored --initial-branch=main` だけを出して通る
+- 原因: git は hook を起動するとき `GIT_DIR` / `GIT_INDEX_FILE` などを環境変数に置く。hook から派生したプロセスはこれを継承し、`cwd` を渡しても `GIT_DIR` のほうが勝つ。このリポジトリの `.vite-hooks/pre-commit` と `pre-merge-commit` は `vp run guard` を呼ぶので、guard が走らせるテストと検証コマンドはすべてこの環境の下にいる
+- 気づけない理由: 手元で `vp run guard` を直接叩くぶんには `GIT_DIR` が無いので再現しない。hook 経由の 1 回だけ壊れる
+- 対処: git を起動する側が環境を作り直す。`packages/stop-ai-slop/src/git-text.ts` は `GIT_` で始まる変数をすべて落としてから git を呼ぶ。検証用リポジトリを作る側はさらに強く、`PATH` と `HOME` と `GIT_CONFIG_GLOBAL` / `GIT_CONFIG_SYSTEM` だけを渡す。開発者の global 設定（`init.templatedir` など）も一緒に締め出せる
+
+- IF: リポジトリのパスを引数で受け取って git を起動するコードを書く; THEN
+  - MUST: `GIT_` で始まる環境変数を落としてから起動する
+  - PROHIBIT: `cwd` を渡しただけで対象リポジトリが決まるとみなす
+- IF: テストから git を起動する; THEN MUST: 同じ扱いにする
+  - 検証用リポジトリのつもりの操作が、hook 経由で走ったときだけ本物のリポジトリに当たる
+
 ## npm 経由でグローバル導入した vp は `vp test` を壊す
 
 - 症状: `vp test` および `vp run -r test` が `Vitest failed to find the current suite` で必ず失敗する。`vp check` は通ってしまうため、CLI の導入経路が原因だとは気づきにくい
@@ -28,7 +41,7 @@ paths:
 - 消すとどうなるか: pnpm では `overrides` が実際の `vite` 依存エッジを持つワークスペースにしか効かない。直接依存のないワークスペースでは autoInstallPeers が上流の素の vite を別途インストールし、vite/vitest が二重インスタンス化する。これは前項と同じ構造の障害（`vp test` のキャッシュミス、dual instance）を招く
 - 上流: [voidzero-dev/vite-plus#1932](https://github.com/voidzero-dev/vite-plus/issues/1932)。テンプレートが root と `packages/utils` に直接 `vite` 依存を入れているのは、まさにこの対策として入れられたもの
 - 併せて必須の設定: `catalog` の `vite: npm:@voidzero-dev/vite-plus-core@<version>` エイリアスと `overrides.vite: "catalog:"`（[voidzero-dev/vite-plus#2034](https://github.com/voidzero-dev/vite-plus/issues/2034) でコラボレータが「想定どおり」と回答）。`peerDependencyRules` は機能上は任意で、外すと unmet peer の警告が出るだけ（[voidzero-dev/vite-plus#1021](https://github.com/voidzero-dev/vite-plus/issues/1021)）
-- 対処: `knip.json` の `ignoreDependencies` に `vite` を入れてある。これは「使っていないものを隠す」のではなく「knip の静的解析では見えない用途で使われている」ことを伝えるもの
+- 対処: `knip.ts` の `ignoreDependencies` に `vite` を入れてある。これは「使っていないものを隠す」のではなく「knip の静的解析では見えない用途で使われている」ことを伝えるもの
 
 - IF: knip が `vite` を未使用依存として報告した; THEN PROHIBIT: `vite` の直接依存または `ignoreDependencies` の指定を削除する
 - IF: ローカルで `vp check` / `vp run -r test` / `vp run -r build` が全て通った; THEN PROHIBIT: それをもってこの種の破壊が起きていない根拠とする
@@ -121,7 +134,7 @@ pack: { exports: { customExports: { './tsconfig/*': './tsconfig/*' } } }
 
 - 症状: preset に `ignorePatterns` を書いても 1 件も効かない。同じ 1 行をルートの `vite.config.ts` の `lint` に移すと効く。エラーも警告も出ない
 - 原因: oxlint の [`Oxlintrc::merge`](https://github.com/oxc-project/oxc/blob/367f730a7b578d24e8106713abaf517304b6b655/crates/oxc_linter/src/config/oxlintrc.rs) が `self`（`extends` を書いた側）の `ignore_patterns` だけを残し、`extends` で名指しした設定のものを読まない。`rules` / `overrides` / `plugins` / `options` は継承されるため、この 1 フィールドだけが例外になっている。`settings` / `env` / `globals` も同じ扱い
-- 対処: `defineConfig` に直接渡すオブジェクト自身に持たせる。このリポジトリでは `@mst/dont-review-it` の `withGitExcludes` が注入し、忘れると `no-unwrapped-toolchain-config--wrap-with-git-excludes` が報告する
+- 対処: `defineConfig` に直接渡すオブジェクト自身に持たせる。このリポジトリでは `@mst/dont-review-it` の `dontReviewItPreset.lint(...)` が注入し、忘れると `no-unwrapped-toolchain-config--call-the-preset-for-the-block` が報告する
 
 - IF: preset から何らかの設定を配れているか確かめる; THEN MUST: そのフィールドが `extends` で継承されるかを実測する
   - 継承されないフィールドは、書いても何も起きず lint は緑のまま通る
@@ -132,7 +145,7 @@ pack: { exports: { customExports: { './tsconfig/*': './tsconfig/*' } } }
 - 原因: 走査を組み立てる [`configure_walk_builder`](https://github.com/oxc-project/oxc/blob/20f68e74a3fddb4049fe33629be9bf91e14a4baa/crates/oxc_config/src/walk.rs#L16-L35) が `git_global(false)` を立てている。同じ関数が `git_ignore(true)` / `git_exclude(true)` / `parents(true)` を立てているため、リポジトリの `.gitignore`（ネストしたものと親側を含む）と `$GIT_COMMON_DIR/info/exclude` は尊重される。リンクした worktree の中でも `info/exclude` は解決される（上流に同名のテストがあり、こちらでも実測した）
 - 上流: 意図的な非対応である。[公式ドキュメント](https://oxc.rs/docs/guide/usage/linter/ignore-files.html)に `global gitignore files are not respected` と明記があり、[oxc#14926](https://github.com/oxc-project/oxc/issues/14926) は「開発者ごとに検査対象が変わるのは紛らわしい」として NOT_PLANNED で閉じられた。[oxc#22155](https://github.com/oxc-project/oxc/issues/22155) が `$XDG_CONFIG_HOME/git/ignore` の対応を求めて OPEN のまま残っている
 - 検出方法: 片方の経路だけが拾うパスに違反ファイルを置き、`vp lint` と `vp fmt --list-different` にかける。`git check-ignore -v` でどの経路が拾っているかを先に確かめる
-- 対処: `@mst/dont-review-it` の `withGitExcludes` が 3 経路すべてを読んで `ignorePatterns` に変換する。埋めたい穴はグローバルの 1 経路だけだが、残り 2 経路も読む。順序はグローバル → `$GIT_DIR/info/exclude` → リポジトリの `.gitignore` で、gitignore は last-match-wins なので、この順でないと `!` による再包含が負ける。経路をまたぐ再包含は 1 か所で並べないと表現できない
+- 対処: `@mst/dont-review-it` の `dontReviewItPreset` が 3 経路すべてを読んで `ignorePatterns` に変換する。埋めたい穴はグローバルの 1 経路だけだが、残り 2 経路も読む。順序はグローバル → `$GIT_DIR/info/exclude` → リポジトリの `.gitignore` で、gitignore は last-match-wins なので、この順でないと `!` による再包含が負ける。経路をまたぐ再包含は 1 か所で並べないと表現できない
 
 ## oxlint がルールに渡す AST に `ParenthesizedExpression` は現れない
 
@@ -145,3 +158,14 @@ pack: { exports: { customExports: { './tsconfig/*': './tsconfig/*' } } }
   - 型に現れるのは AST 定義の共有によるもので、oxlint 経由では到達しない
 - IF: パーサの出力そのものを扱うコード（`parseSync` を直接呼ぶ側）を書いている; THEN MUST: 括弧を考慮する
   - こちらには実際に現れる
+
+## 生成される lint ルール索引の「設定可能」印は、schema がその場に書かれていないと付かない
+
+- 症状: オプションを受け取るルールを書いたのに、`docs/lint/index.md` の設定可能を示す列が空のまま生成される。ルールは実際にオプションを読んでいて、テストも通る
+- 原因: 索引の事実を抽出する `packages/lint-rule-authoring/src/rule-index/rule-facts.ts` は、`meta.schema` がその場に書かれた配列リテラルで、要素が 1 つ以上あるときだけ設定可能と判定する。定数へ括り出して参照すると識別子として読まれ、要素数が数えられない。抽出はルールのファイル 1 つを `oxc-parser` で読むだけなので、別モジュールから import した定数は解決しようがない
+- 波及: `name` と `docs.description` は同じファイル内の `const` なら解決される。`schema` だけがこの解決を通らない
+- 実測: `require-catalog-entry--register-shared-dependency` は `CATALOG_ENTRY_SCHEMA` を別モジュールから import していて、オプションを 2 つ持つのに索引の印が付いていない
+- 対処: schema はルールのファイルに配列リテラルとして直接書く
+
+- IF: ルールの `meta.schema` を別モジュールの定数から渡そうとしている; THEN PROHIBIT: 渡す
+  - 索引が「設定を持たないルール」として生成され、lint も検査も緑のまま通る

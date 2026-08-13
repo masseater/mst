@@ -31,8 +31,8 @@ const differentlyShapedSites = (
       site.relativePath !== unit.relativePath && site.declarationForm !== unit.declarationForm,
   );
 
-const isDerivedFrom = (one: IndexedType, other: IndexedType): boolean =>
-  one.referencedNames.includes(other.name) || other.referencedNames.includes(one.name);
+const isDerivedFrom = (one: IndexedType, later: IndexedType): boolean =>
+  one.referencedNames.includes(later.name) || later.referencedNames.includes(one.name);
 
 const differentlyNamedSites = (
   index: TypeAuthorityIndex,

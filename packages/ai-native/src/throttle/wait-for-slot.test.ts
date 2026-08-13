@@ -23,11 +23,11 @@ const GAVE_UP_LINE = "throttle: gave up: every slot stayed held for the whole 40
 
 describe("waitForSlot", () => {
   const throttleTest = standardIoTest.extend("slotDirectory", ({}, { onCleanup }) => {
-    const created = mkdtempSync(join(tmpdir(), "throttle-wait-"));
+    const temporarySlotDirectory = mkdtempSync(join(tmpdir(), "throttle-wait-"));
     onCleanup(() => {
-      rmSync(created, { recursive: true, force: true });
+      rmSync(temporarySlotDirectory, { recursive: true, force: true });
     });
-    return created;
+    return temporarySlotDirectory;
   });
 
   describe("a slot left locked by a holder that is gone", () => {
@@ -141,8 +141,8 @@ describe("waitForSlot", () => {
         await delay(150);
         const runB = runThrottle(SHORT_SLEEP_COMMAND, seams);
         await delay(200);
-        const waiting = readdirSync(join(slotDirectory, "waiters")).map((entry) =>
-          entry.split("-").at(1),
+        const waiting = readdirSync(join(slotDirectory, "waiters")).map((waiterFileName) =>
+          waiterFileName.split("-").at(1),
         );
         await release();
         await runA;
@@ -170,8 +170,8 @@ describe("waitForSlot", () => {
           `${String(exited)}\n`,
         );
         await delay(200);
-        const waiting = readdirSync(join(slotDirectory, "waiters")).map((entry) =>
-          entry.split("-").at(1),
+        const waiting = readdirSync(join(slotDirectory, "waiters")).map((waiterFileName) =>
+          waiterFileName.split("-").at(1),
         );
         await release();
         await runA;
@@ -195,8 +195,8 @@ describe("waitForSlot", () => {
         await delay(200);
         await release();
         await delay(150);
-        const waiting = readdirSync(join(slotDirectory, "waiters")).map((entry) =>
-          entry.split("-").at(1),
+        const waiting = readdirSync(join(slotDirectory, "waiters")).map((waiterFileName) =>
+          waiterFileName.split("-").at(1),
         );
         await runA;
         await runB;
@@ -635,5 +635,48 @@ describe("waitForSlot", () => {
         expect(anInteractiveWaitOutOfBudgetReportsGivingUp).toBe(true);
       },
     );
+  });
+
+  describe("the two streams of a non-interactive wait that ran out of its budget", () => {
+    const it = throttleTest.extend(
+      "theRunBehindASlotHeldForTheWholeBudget",
+      { auto: true },
+      async ({ slotDirectory }) => {
+        ensureSlots(slotDirectory, 1);
+        const release = await lock(join(slotDirectory, "slot-0"), { stale: 5000, retries: 0 });
+        await runThrottle(TRIVIAL_COMMAND, {
+          slotDir: slotDirectory,
+          limit: 1,
+          staleMs: 5000,
+          waitBudgetMs: 400,
+          pollMs: 100,
+          isInteractive: false,
+        });
+        await release();
+      },
+    );
+
+    it("puts nothing on standard output", { timeout: 10_000 }, ({ stdout }) => {
+      expect(stdout).toMatchInlineSnapshot(`
+        {
+          "chunks": [],
+        }
+      `);
+    });
+
+    it("puts the rank and the giving up on standard error", { timeout: 10_000 }, ({ stderr }) => {
+      expect(stderr).toMatchInlineSnapshot(`
+        {
+          "chunks": [
+            "throttle: acquiring a slot (limit 1)
+        ",
+            "throttle: waiting 1/1
+        ",
+            "throttle: gave up: every slot stayed held for the whole 400ms wait budget
+        ",
+          ],
+        }
+      `);
+    });
   });
 });

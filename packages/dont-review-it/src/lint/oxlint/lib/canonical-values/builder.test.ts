@@ -69,7 +69,7 @@ describe("buildCanonicalValuesCatalog", () => {
         }),
       );
       return buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map(
-        (entry) => entry.conceptId,
+        (catalogedConcept) => catalogedConcept.conceptId,
       );
     });
 
@@ -88,7 +88,7 @@ describe("buildCanonicalValuesCatalog", () => {
       buildCanonicalValuesCatalog({ repositoryRoot: root });
       writeFileSync(join(root, "order-status.ts"), ORDER_STATUS_WITH_ARCHIVED);
       return buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map(
-        (entry) => entry.values,
+        (catalogedConcept) => catalogedConcept.values,
       );
     });
 
@@ -111,7 +111,7 @@ describe("buildCanonicalValuesCatalog", () => {
         ARTICLE_STATUS_PUBLISHED_ONLY,
       );
       return buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map(
-        (entry) => entry.conceptId,
+        (catalogedConcept) => catalogedConcept.conceptId,
       );
     });
 
@@ -136,7 +136,7 @@ describe("buildCanonicalValuesCatalog", () => {
       buildCanonicalValuesCatalog({ repositoryRoot: root });
       rmSync(join(root, "packages", "pruned"), { recursive: true, force: true });
       return buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map(
-        (entry) => entry.conceptId,
+        (catalogedConcept) => catalogedConcept.conceptId,
       );
     });
 
@@ -153,7 +153,7 @@ describe("buildCanonicalValuesCatalog", () => {
       });
       writeFileSync(join(root, "order-status.test.ts"), ORDER_STATUS_ARRAY);
       return buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map(
-        (entry) => entry.conceptId,
+        (catalogedConcept) => catalogedConcept.conceptId,
       );
     });
 
@@ -175,10 +175,9 @@ describe("buildCanonicalValuesCatalog", () => {
             `/**\n * ${TAG} ${conceptId}\n */\n${declaration}\n`,
           );
         }
-        return buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map((entry) => [
-          entry.conceptId,
-          entry.values,
-        ]);
+        return buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map(
+          (catalogedConcept) => [catalogedConcept.conceptId, catalogedConcept.values],
+        );
       })
       .extend("conceptIdsOfEveryDeclarationForm", ({}, { onCleanup }) => {
         const root = mkdtempSync(join(tmpdir(), "canonical-values-"));
@@ -192,7 +191,7 @@ describe("buildCanonicalValuesCatalog", () => {
           );
         }
         return buildCanonicalValuesCatalog({ repositoryRoot: root }).entries.map(
-          (entry) => entry.conceptId,
+          (catalogedConcept) => catalogedConcept.conceptId,
         );
       });
 

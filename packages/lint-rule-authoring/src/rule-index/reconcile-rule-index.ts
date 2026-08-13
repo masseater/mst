@@ -41,8 +41,8 @@ const duplicatedRuleName = ({
 }): string =>
   `Two rules in \`${workspaceDir}\` must not share the name \`${ruleName}\`; they claim the same document. Rename one of them.`;
 
-const normalizedContent = (text: string): string =>
-  text
+const normalizedContent = (writtenText: string): string =>
+  writtenText
     .split("\n")
     .map((line) =>
       line
@@ -71,13 +71,14 @@ const regionIn = (source: string): GeneratedRegion | null => {
   };
 };
 
-const blockOf = (content: string): string => `${BEGIN_MARKER}\n\n${content}\n\n${END_MARKER}`;
+const blockOf = (writtenContent: string): string =>
+  `${BEGIN_MARKER}\n\n${writtenContent}\n\n${END_MARKER}`;
 
 const FRONTMATTER_FENCE = "---\n";
 
 const withInsertedRegion = ({
   source,
-  content,
+  content: writtenContent,
 }: {
   readonly source: string;
   readonly content: string;
@@ -85,14 +86,14 @@ const withInsertedRegion = ({
   const fenceClosesAt = source.startsWith(FRONTMATTER_FENCE)
     ? source.indexOf(`\n${FRONTMATTER_FENCE}`, FRONTMATTER_FENCE.length)
     : -1;
-  if (fenceClosesAt === -1) return `${blockOf(content)}\n\n${source}`;
+  if (fenceClosesAt === -1) return `${blockOf(writtenContent)}\n\n${source}`;
 
   const frontmatterEndsAt = fenceClosesAt + `\n${FRONTMATTER_FENCE}`.length;
-  return `${source.slice(0, frontmatterEndsAt)}\n${blockOf(content)}\n\n${source.slice(frontmatterEndsAt)}`;
+  return `${source.slice(0, frontmatterEndsAt)}\n${blockOf(writtenContent)}\n\n${source.slice(frontmatterEndsAt)}`;
 };
 
-const scaffoldOf = (content: string): string =>
-  `# lint ルール索引\n\nこのワークスペースの自前 lint ルールの一覧。ルール実装から生成される。手で書き換えない。更新は \`${REGENERATE_COMMAND}\` で行う。\n\n${blockOf(content)}\n`;
+const scaffoldOf = (writtenContent: string): string =>
+  `# lint ルール索引\n\nこのワークスペースの自前 lint ルールの一覧。ルール実装から生成される。手で書き換えない。更新は \`${REGENERATE_COMMAND}\` で行う。\n\n${blockOf(writtenContent)}\n`;
 
 type ReconcileTarget = {
   readonly absolutePath: string;
@@ -157,13 +158,13 @@ const contentProblems = ({
   readonly expected: string;
   readonly write: boolean;
 }): readonly LintRuleIndexProblem[] => {
-  const target = { absolutePath: join(repositoryRoot, file), file, expected, write };
-  const source = textOrNull(target.absolutePath);
-  if (source === null) return absentIndexProblems(target);
+  const checked = { absolutePath: join(repositoryRoot, file), file, expected, write };
+  const source = textOrNull(checked.absolutePath);
+  if (source === null) return absentIndexProblems(checked);
 
   const region = regionIn(source);
-  if (region === null) return unmarkedIndexProblems({ target, source });
-  return staleIndexProblems({ target, region });
+  if (region === null) return unmarkedIndexProblems({ target: checked, source });
+  return staleIndexProblems({ target: checked, region });
 };
 
 const workspaceRulesOf = ({

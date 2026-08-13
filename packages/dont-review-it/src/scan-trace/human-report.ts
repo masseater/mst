@@ -29,28 +29,28 @@ const painted = ({
 }): string => (palette.colored ? styleText(color, text, { validateStream: false }) : text);
 
 const markOf = ({
-  outcome,
+  outcome: ranCheck,
   palette,
 }: {
   readonly outcome: CheckOutcome;
   readonly palette: Palette;
 }): string => {
-  if (outcome.skippedReason !== null) return painted({ color: "dim", text: SKIP_MARK, palette });
-  return outcome.problems.length === 0
+  if (ranCheck.skippedReason !== null) return painted({ color: "dim", text: SKIP_MARK, palette });
+  return ranCheck.problems.length === 0
     ? painted({ color: "green", text: PASS_MARK, palette })
     : painted({ color: "red", text: FAIL_MARK, palette });
 };
 
 const scaleOf = ({
-  outcome,
+  outcome: ranCheck,
   countWidth,
 }: {
   readonly outcome: CheckOutcome;
   readonly countWidth: number;
 }): string =>
-  outcome.skippedReason === null
-    ? `${String(outcome.count).padStart(countWidth)} ${pluralized({ count: outcome.count, noun: outcome.unit })}`
-    : `skipped — ${outcome.skippedReason}`;
+  ranCheck.skippedReason === null
+    ? `${String(ranCheck.count).padStart(countWidth)} ${pluralized({ count: ranCheck.count, noun: ranCheck.unit })}`
+    : `skipped — ${ranCheck.skippedReason}`;
 
 const reportedCounts = ({
   problems,
@@ -63,10 +63,10 @@ const reportedCounts = ({
   ...(warnings === 0 ? [] : [counted({ count: warnings, noun: "warning" })]),
 ];
 
-const tailOf = (outcome: CheckOutcome): string => {
+const tailOf = (ranCheck: CheckOutcome): string => {
   const reported = reportedCounts({
-    problems: outcome.problems.length,
-    warnings: outcome.warnings.length,
+    problems: ranCheck.problems.length,
+    warnings: ranCheck.warnings.length,
   });
   return reported.length === 0 ? "" : `${GAP}${reported.join(", ")}`;
 };
@@ -74,8 +74,8 @@ const tailOf = (outcome: CheckOutcome): string => {
 const tallyOf = (outcomes: readonly CheckOutcome[]): string => {
   const ran = counted({ count: outcomes.length, noun: "check" });
   const reported = reportedCounts({
-    problems: sumBy(outcomes, (outcome) => outcome.problems.length),
-    warnings: sumBy(outcomes, (outcome) => outcome.warnings.length),
+    problems: sumBy(outcomes, (ranCheck) => ranCheck.problems.length),
+    warnings: sumBy(outcomes, (ranCheck) => ranCheck.warnings.length),
   });
   return reported.length === 0
     ? `${ran} ran, nothing to report`
@@ -92,11 +92,11 @@ export const humanScanTrace = ({
   if (outcomes.length === 0) return "";
 
   const palette = { colored };
-  const nameWidth = Math.max(...outcomes.map((outcome) => outcome.check.length));
-  const countWidth = Math.max(...outcomes.map((outcome) => String(outcome.count).length));
+  const nameWidth = Math.max(...outcomes.map((ranCheck) => ranCheck.check.length));
+  const countWidth = Math.max(...outcomes.map((ranCheck) => String(ranCheck.count).length));
   const lines = outcomes.map(
-    (outcome) =>
-      `${INDENT}${markOf({ outcome, palette })} ${outcome.check.padEnd(nameWidth)}${GAP}${scaleOf({ outcome, countWidth })}${tailOf(outcome)}`,
+    (ranCheck) =>
+      `${INDENT}${markOf({ outcome: ranCheck, palette })} ${ranCheck.check.padEnd(nameWidth)}${GAP}${scaleOf({ outcome: ranCheck, countWidth })}${tailOf(ranCheck)}`,
   );
   return `${lines.join("\n")}\n\n${INDENT}${painted({ color: "dim", text: tallyOf(outcomes), palette })}\n`;
 };

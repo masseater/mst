@@ -26,7 +26,7 @@ const findingsForUsage = ({
 }): DependencyCatalogFindings => {
   const classified = usage.directReferences.map((reference) => ({
     reference,
-    matchingEntry: entriesForName.find((entry) => entry.version === reference.specifier),
+    matchingEntry: entriesForName.find((listed) => listed.version === reference.specifier),
   }));
 
   return {
@@ -46,7 +46,7 @@ const findingsForUsage = ({
     }),
     warnings: classified.flatMap(({ reference, matchingEntry }) => {
       if (matchingEntry !== undefined) return [];
-      const catalogVersions = entriesForName.map((entry) => entry.version).join(", ");
+      const catalogVersions = entriesForName.map((listed) => listed.version).join(", ");
       return [
         {
           file: reference.manifestPath,
@@ -69,7 +69,7 @@ export const bypassedCatalogFindings = ({
 }): DependencyCatalogFindings => {
   const findings = usages.flatMap((usage) => {
     const entriesForName = catalogEntries.filter(
-      (entry) => entry.dependencyName === usage.dependencyName,
+      (listed) => listed.dependencyName === usage.dependencyName,
     );
     if (entriesForName.length === 0) return [];
     return [findingsForUsage({ usage, entriesForName, config })];

@@ -33,6 +33,8 @@ const buildRepositoryCellClassIndex = memoize((repositoryRoot: string): CellClas
   return buildCellClassIndex(scanned.map(scannedSourceAt).filter((source) => source !== null));
 });
 
-export const loadRepositoryCellClassIndex = (options: {
+export const loadRepositoryCellClassIndex = ({
+  repositoryRoot,
+}: {
   readonly repositoryRoot: string;
-}): CellClassIndex => buildRepositoryCellClassIndex(resolve(options.repositoryRoot));
+}): CellClassIndex => buildRepositoryCellClassIndex(resolve(repositoryRoot));

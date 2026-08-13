@@ -14,14 +14,14 @@ describe("loadNormativeDocuments", () => {
       onCleanup(() => {
         rmSync(repositoryRoot, { recursive: true, force: true });
       });
-      for (const [path, text] of Object.entries({
+      for (const [relativePath, documentSource] of Object.entries({
         "AGENTS.md": "root\n",
         "packages/user/AGENTS.md": "user\n",
         "packages/user/CLAUDE.md": "companion\n",
       })) {
-        const target = join(repositoryRoot, path);
-        mkdirSync(dirname(target), { recursive: true });
-        writeFileSync(target, text, "utf8");
+        const documentPath = join(repositoryRoot, relativePath);
+        mkdirSync(dirname(documentPath), { recursive: true });
+        writeFileSync(documentPath, documentSource, "utf8");
       }
       return loadNormativeDocuments({ repositoryRoot, config: defaultConfig });
     });

@@ -51,8 +51,8 @@ const identityKeyNameOf = (property: ESTree.ObjectProperty): string | null => {
 };
 
 const writtenOutIdentityOf = (property: ESTree.ObjectProperty): ESTree.Expression | null => {
-  const name = identityKeyNameOf(property);
-  if (name === null || !PROVIDER_IDENTITY_KEYS.has(name)) return null;
+  const identityKeyName = identityKeyNameOf(property);
+  if (identityKeyName === null || !PROVIDER_IDENTITY_KEYS.has(identityKeyName)) return null;
   return hasWrittenOutText(property.value) ? property.value : null;
 };
 
@@ -102,7 +102,7 @@ export const noHardcodedProviderId = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
+  create(inspection) {
     return {
       "Program:exit"(program: ESTree.Program) {
         const providerBindings: ReadonlySet<string> = new Set(providerBindingNamesIn(program));
@@ -110,7 +110,7 @@ export const noHardcodedProviderId = createDontReviewItRule({
         for (const node of nodesOfType(program, "NewExpression")) {
           if (!isProviderConstructor(node.callee, providerBindings)) continue;
           for (const identity of writtenOutIdentitiesOf(node)) {
-            context.report({ node: identity, messageId: "hardcodedProviderId" });
+            inspection.report({ node: identity, messageId: "hardcodedProviderId" });
           }
         }
       },

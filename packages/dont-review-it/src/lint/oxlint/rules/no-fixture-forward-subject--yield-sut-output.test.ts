@@ -48,7 +48,7 @@ describe("dont-review-it/no-fixture-forward-subject--yield-sut-output", () => {
       {
         name: "a constructor run over a dependency is read by the rule against built subjects",
         filename: SPEC_FILE,
-        code: 'const test = baseTest.extend("report", async ({ input }) => new Report(input));',
+        code: 'const test = baseTest.extend("report", async ({ input }) => new Report(given));',
       },
       {
         name: "a literal spreading a local binding is read by the rule against built subjects",

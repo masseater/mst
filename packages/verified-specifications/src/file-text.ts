@@ -8,8 +8,10 @@ const isAbsence = (failure: unknown): boolean =>
   (failure.code === "ENOENT" || failure.code === "ENOTDIR");
 
 export const fileTextOrNull = async (path: string): Promise<string | null> => {
-  const [failure, text] = await attemptAsync<string, Error>(async () => readFile(path, "utf-8"));
-  if (text !== null) return text;
+  const [failure, writtenText] = await attemptAsync<string, Error>(async () =>
+    readFile(path, "utf-8"),
+  );
+  if (writtenText !== null) return writtenText;
   if (isAbsence(failure)) return null;
   throw failure;
 };

@@ -21,7 +21,7 @@ const NAME_FIELD = "name";
 
 const PLACEHOLDER_PREFIX = "$";
 
-const asWritten: Spelling = (name) => name;
+const asWritten: Spelling = (identifierName) => identifierName;
 
 const jsonTextOf: (held: unknown) => string = JSON.stringify;
 
@@ -29,7 +29,7 @@ const namesAMember = (node: AstFields, field: string): boolean =>
   MEMBER_NAME_FIELDS.has(field) && node.computed === false;
 
 const structureOf = (held: unknown, spell: Spelling): string => {
-  if (Array.isArray(held)) return `[${held.map((item) => structureOf(item, spell)).join(",")}]`;
+  if (Array.isArray(held)) return `[${held.map((child) => structureOf(child, spell)).join(",")}]`;
   if (!isAstFields(held)) return jsonTextOf(held);
 
   const namesABinding = held[NODE_TYPE_FIELD] === "Identifier";
@@ -50,13 +50,15 @@ export const normalizedBodyOf = (input: {
   const bound = boundNamesIn(input.body);
   const placeholderByName = new Map<string, string>();
   const placeholderFor = memoize(
-    (name: string): string =>
-      `${PLACEHOLDER_PREFIX}${[...placeholderByName.keys(), name].indexOf(name)}`,
+    (boundName: string): string =>
+      `${PLACEHOLDER_PREFIX}${[...placeholderByName.keys(), boundName].indexOf(boundName)}`,
     { cache: placeholderByName },
   );
 
-  const spell: Spelling = (name) =>
-    bound.has(name) ? placeholderFor(name) : (input.routes.get(name) ?? name);
+  const spell: Spelling = (identifierName) =>
+    bound.has(identifierName)
+      ? placeholderFor(identifierName)
+      : (input.routes.get(identifierName) ?? identifierName);
 
   return structureOf(input.body, spell);
 };

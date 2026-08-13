@@ -146,7 +146,9 @@ describe("constantSpecifiersIn", () => {
     const it = test.extend("specifiersOfAConstantBindingAPattern", () => {
       const program = astFieldsOf(parseSync("spec.ts", "const { picked } = held;").program);
       if (program === null) throw new Error("nothing was parsed");
-      const [specifiers] = [program.body].map((body) => constantSpecifiersIn(body));
+      const [specifiers] = [program.body].map((programStatements) =>
+        constantSpecifiersIn(programStatements),
+      );
       if (specifiers === undefined) throw new Error("no specifier was read");
       return specifiers;
     });
@@ -162,7 +164,9 @@ describe("constantSpecifiersIn", () => {
         parseSync("spec.ts", 'export const SETUP = "./held.ts";').program,
       );
       if (program === null) throw new Error("nothing was parsed");
-      const [specifiers] = [program.body].map((body) => constantSpecifiersIn(body));
+      const [specifiers] = [program.body].map((programStatements) =>
+        constantSpecifiersIn(programStatements),
+      );
       if (specifiers === undefined) throw new Error("no specifier was read");
       return specifiers;
     });
@@ -180,7 +184,9 @@ describe("constantSpecifiersIn", () => {
         parseSync("spec.ts", 'const HELD = "./held.ts";\nexport { HELD };').program,
       );
       if (program === null) throw new Error("nothing was parsed");
-      const [specifiers] = [program.body].map((body) => constantSpecifiersIn(body));
+      const [specifiers] = [program.body].map((programStatements) =>
+        constantSpecifiersIn(programStatements),
+      );
       if (specifiers === undefined) throw new Error("no specifier was read");
       return specifiers;
     });
@@ -196,7 +202,9 @@ describe("constantSpecifiersIn", () => {
     const it = test.extend("specifiersOfABindingThatCanBeWrittenToAgain", () => {
       const program = astFieldsOf(parseSync("spec.ts", 'let entry = "./held.ts";').program);
       if (program === null) throw new Error("nothing was parsed");
-      const [specifiers] = [program.body].map((body) => constantSpecifiersIn(body));
+      const [specifiers] = [program.body].map((programStatements) =>
+        constantSpecifiersIn(programStatements),
+      );
       if (specifiers === undefined) throw new Error("no specifier was read");
       return specifiers;
     });
@@ -210,7 +218,9 @@ describe("constantSpecifiersIn", () => {
     const it = test.extend("specifiersOfAConstantBoundToANumber", () => {
       const program = astFieldsOf(parseSync("spec.ts", "const RETRIES = 3;").program);
       if (program === null) throw new Error("nothing was parsed");
-      const [specifiers] = [program.body].map((body) => constantSpecifiersIn(body));
+      const [specifiers] = [program.body].map((programStatements) =>
+        constantSpecifiersIn(programStatements),
+      );
       if (specifiers === undefined) throw new Error("no specifier was read");
       return specifiers;
     });
@@ -227,7 +237,9 @@ describe("constantSpecifiersIn", () => {
           .program,
       );
       if (program === null) throw new Error("nothing was parsed");
-      const [specifiers] = [program.body].map((body) => constantSpecifiersIn(body));
+      const [specifiers] = [program.body].map((programStatements) =>
+        constantSpecifiersIn(programStatements),
+      );
       if (specifiers === undefined) throw new Error("no specifier was read");
       return specifiers;
     });
@@ -245,7 +257,9 @@ describe("couplingEdgesUnder", () => {
     const it = test.extend("edgesOfAnImportDeclaration", () => {
       const program = astFieldsOf(parseSync("spec.ts", 'import held from "./held.ts";').program);
       if (program === null) throw new Error("nothing was parsed");
-      const [constants] = [program.body].map((body) => constantSpecifiersIn(body));
+      const [constants] = [program.body].map((programStatements) =>
+        constantSpecifiersIn(programStatements),
+      );
       if (constants === undefined) throw new Error("no constant was read");
       return couplingEdgesUnder(program, constants);
     });
@@ -263,7 +277,9 @@ describe("couplingEdgesUnder", () => {
         parseSync("spec.ts", 'import type { Held } from "./held.ts";').program,
       );
       if (program === null) throw new Error("nothing was parsed");
-      const [constants] = [program.body].map((body) => constantSpecifiersIn(body));
+      const [constants] = [program.body].map((programStatements) =>
+        constantSpecifiersIn(programStatements),
+      );
       if (constants === undefined) throw new Error("no constant was read");
       return couplingEdgesUnder(program, constants);
     });
@@ -283,7 +299,9 @@ describe("couplingEdgesUnder", () => {
         parseSync("spec.ts", 'export { held } from "./held.ts";').program,
       );
       if (program === null) throw new Error("nothing was parsed");
-      const [constants] = [program.body].map((body) => constantSpecifiersIn(body));
+      const [constants] = [program.body].map((programStatements) =>
+        constantSpecifiersIn(programStatements),
+      );
       if (constants === undefined) throw new Error("no constant was read");
       return couplingEdgesUnder(program, constants);
     });
@@ -301,7 +319,9 @@ describe("couplingEdgesUnder", () => {
         parseSync("spec.ts", 'export type { Held } from "./held.ts";').program,
       );
       if (program === null) throw new Error("nothing was parsed");
-      const [constants] = [program.body].map((body) => constantSpecifiersIn(body));
+      const [constants] = [program.body].map((programStatements) =>
+        constantSpecifiersIn(programStatements),
+      );
       if (constants === undefined) throw new Error("no constant was read");
       return couplingEdgesUnder(program, constants);
     });
@@ -317,7 +337,9 @@ describe("couplingEdgesUnder", () => {
     const it = test.extend("edgesOfAnExportOfEverythingAnotherModuleHolds", () => {
       const program = astFieldsOf(parseSync("spec.ts", 'export * from "./held.ts";').program);
       if (program === null) throw new Error("nothing was parsed");
-      const [constants] = [program.body].map((body) => constantSpecifiersIn(body));
+      const [constants] = [program.body].map((programStatements) =>
+        constantSpecifiersIn(programStatements),
+      );
       if (constants === undefined) throw new Error("no constant was read");
       return couplingEdgesUnder(program, constants);
     });
@@ -336,7 +358,9 @@ describe("couplingEdgesUnder", () => {
           .program,
       );
       if (program === null) throw new Error("nothing was parsed");
-      const [constants] = [program.body].map((body) => constantSpecifiersIn(body));
+      const [constants] = [program.body].map((programStatements) =>
+        constantSpecifiersIn(programStatements),
+      );
       if (constants === undefined) throw new Error("no constant was read");
       return couplingEdgesUnder(program, constants);
     });
@@ -354,7 +378,9 @@ describe("couplingEdgesUnder", () => {
         parseSync("spec.ts", 'const loaded = import("./held" + ".ts");').program,
       );
       if (program === null) throw new Error("nothing was parsed");
-      const [constants] = [program.body].map((body) => constantSpecifiersIn(body));
+      const [constants] = [program.body].map((programStatements) =>
+        constantSpecifiersIn(programStatements),
+      );
       if (constants === undefined) throw new Error("no constant was read");
       return couplingEdgesUnder(program, constants);
     });
@@ -372,7 +398,9 @@ describe("couplingEdgesUnder", () => {
         parseSync("spec.ts", 'const loaded = import("./" + chosen);').program,
       );
       if (program === null) throw new Error("nothing was parsed");
-      const [constants] = [program.body].map((body) => constantSpecifiersIn(body));
+      const [constants] = [program.body].map((programStatements) =>
+        constantSpecifiersIn(programStatements),
+      );
       if (constants === undefined) throw new Error("no constant was read");
       return couplingEdgesUnder(program, constants);
     });
@@ -388,7 +416,9 @@ describe("couplingEdgesUnder", () => {
         parseSync("spec.ts", 'const loaded = import("./held.ts" ?? "./other.ts");').program,
       );
       if (program === null) throw new Error("nothing was parsed");
-      const [constants] = [program.body].map((body) => constantSpecifiersIn(body));
+      const [constants] = [program.body].map((programStatements) =>
+        constantSpecifiersIn(programStatements),
+      );
       if (constants === undefined) throw new Error("no constant was read");
       return couplingEdgesUnder(program, constants);
     });
@@ -407,7 +437,9 @@ describe("couplingEdgesUnder", () => {
         ).program,
       );
       if (program === null) throw new Error("nothing was parsed");
-      const [constants] = [program.body].map((body) => constantSpecifiersIn(body));
+      const [constants] = [program.body].map((programStatements) =>
+        constantSpecifiersIn(programStatements),
+      );
       if (constants === undefined) throw new Error("no constant was read");
       return couplingEdgesUnder(program, constants);
     });
@@ -428,7 +460,9 @@ describe("couplingEdgesUnder", () => {
         ).program,
       );
       if (program === null) throw new Error("nothing was parsed");
-      const [constants] = [program.body].map((body) => constantSpecifiersIn(body));
+      const [constants] = [program.body].map((programStatements) =>
+        constantSpecifiersIn(programStatements),
+      );
       if (constants === undefined) throw new Error("no constant was read");
       return couplingEdgesUnder(program, constants);
     });

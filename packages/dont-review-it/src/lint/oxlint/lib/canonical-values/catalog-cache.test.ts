@@ -9,7 +9,7 @@ import { cacheInputFingerprint, readCachedEntries, writeCachedEntries } from "./
 
 const CACHE_SEGMENTS = ["node_modules", ".cache", "mst-dont-review-it", "canonical-values.json"];
 
-const ENTRY = {
+const USER_STATUS_CATALOG_ENTRY = {
   conceptId: "user.status",
   declarationPath: "src/user.ts",
   exportPath: null,
@@ -21,37 +21,37 @@ const UNSERIALIZABLE_CACHE_ROOT = join(tmpdir(), "catalog-cache-unserializable")
 
 describe("readCachedEntries", () => {
   describe("a cache written for the same input", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("catalogReadBackForTheSameInput", ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
       });
-      writeCachedEntries(root, { fingerprint: "input", entries: [ENTRY] });
+      writeCachedEntries(root, { fingerprint: "input", entries: [USER_STATUS_CATALOG_ENTRY] });
       return readCachedEntries(root, "input");
     });
 
-    it("is read back", ({ entries }) => {
-      expect(entries).toStrictEqual([ENTRY]);
+    it("is read back", ({ catalogReadBackForTheSameInput }) => {
+      expect(catalogReadBackForTheSameInput).toStrictEqual([USER_STATUS_CATALOG_ENTRY]);
     });
   });
 
   describe("a cache written for a different input", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("catalogReadBackForADifferentInput", ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
       });
-      writeCachedEntries(root, { fingerprint: "other", entries: [ENTRY] });
+      writeCachedEntries(root, { fingerprint: "other", entries: [USER_STATUS_CATALOG_ENTRY] });
       return readCachedEntries(root, "input");
     });
 
-    it("is not read back", ({ entries }) => {
-      expect(entries).toBe(null);
+    it("is not read back", ({ catalogReadBackForADifferentInput }) => {
+      expect(catalogReadBackForADifferentInput).toBe(null);
     });
   });
 
   describe("no cache at all", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("catalogReadBackWithoutACache", ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
@@ -59,13 +59,13 @@ describe("readCachedEntries", () => {
       return readCachedEntries(root, "input");
     });
 
-    it("is not read back", ({ entries }) => {
-      expect(entries).toBe(null);
+    it("is not read back", ({ catalogReadBackWithoutACache }) => {
+      expect(catalogReadBackWithoutACache).toBe(null);
     });
   });
 
   describe("a cache that is not json", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("catalogReadBackFromANonJsonCache", ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
@@ -75,13 +75,13 @@ describe("readCachedEntries", () => {
       return readCachedEntries(root, "input");
     });
 
-    it("is not read back", ({ entries }) => {
-      expect(entries).toBe(null);
+    it("is not read back", ({ catalogReadBackFromANonJsonCache }) => {
+      expect(catalogReadBackFromANonJsonCache).toBe(null);
     });
   });
 
   describe("a cache holding something other than an object", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("catalogReadBackFromACacheHoldingASpelling", ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
@@ -91,13 +91,15 @@ describe("readCachedEntries", () => {
       return readCachedEntries(root, "input");
     });
 
-    it("is not read back", ({ entries }) => {
-      expect(entries).toBe(null);
+    it("is not read back", ({ catalogReadBackFromACacheHoldingASpelling }) => {
+      expect(catalogReadBackFromACacheHoldingASpelling).toBe(null);
     });
   });
 
   describe("a cache missing the fields that name it", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("catalogReadBackFromACacheWithoutItsNamingFields", ({}, {
+      onCleanup,
+    }) => {
       const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
@@ -110,13 +112,13 @@ describe("readCachedEntries", () => {
       return readCachedEntries(root, "input");
     });
 
-    it("is not read back", ({ entries }) => {
-      expect(entries).toBe(null);
+    it("is not read back", ({ catalogReadBackFromACacheWithoutItsNamingFields }) => {
+      expect(catalogReadBackFromACacheWithoutItsNamingFields).toBe(null);
     });
   });
 
   describe("a cache written by an older format", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("catalogReadBackFromAnOlderFormatCache", ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
@@ -129,13 +131,15 @@ describe("readCachedEntries", () => {
       return readCachedEntries(root, "input");
     });
 
-    it("is not read back", ({ entries }) => {
-      expect(entries).toBe(null);
+    it("is not read back", ({ catalogReadBackFromAnOlderFormatCache }) => {
+      expect(catalogReadBackFromAnOlderFormatCache).toBe(null);
     });
   });
 
   describe("a cache whose entries are not a list", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("catalogReadBackFromACacheWhoseEntriesAreASpelling", ({}, {
+      onCleanup,
+    }) => {
       const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
@@ -148,13 +152,13 @@ describe("readCachedEntries", () => {
       return readCachedEntries(root, "input");
     });
 
-    it("is not read back", ({ entries }) => {
-      expect(entries).toBe(null);
+    it("is not read back", ({ catalogReadBackFromACacheWhoseEntriesAreASpelling }) => {
+      expect(catalogReadBackFromACacheWhoseEntriesAreASpelling).toBe(null);
     });
   });
 
   describe("a cache holding an entry that is not an object", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("catalogReadBackFromACacheHoldingANullEntry", ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
@@ -167,13 +171,15 @@ describe("readCachedEntries", () => {
       return readCachedEntries(root, "input");
     });
 
-    it("is not read back", ({ entries }) => {
-      expect(entries).toBe(null);
+    it("is not read back", ({ catalogReadBackFromACacheHoldingANullEntry }) => {
+      expect(catalogReadBackFromACacheHoldingANullEntry).toBe(null);
     });
   });
 
   describe("a cache holding an entry that is missing a field", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("catalogReadBackFromACacheHoldingAnEntryWithoutAFingerprint", ({}, {
+      onCleanup,
+    }) => {
       const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
@@ -197,13 +203,15 @@ describe("readCachedEntries", () => {
       return readCachedEntries(root, "input");
     });
 
-    it("is not read back", ({ entries }) => {
-      expect(entries).toBe(null);
+    it("is not read back", ({ catalogReadBackFromACacheHoldingAnEntryWithoutAFingerprint }) => {
+      expect(catalogReadBackFromACacheHoldingAnEntryWithoutAFingerprint).toBe(null);
     });
   });
 
   describe("a cache holding an entry whose concept is not a word", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("catalogReadBackFromACacheHoldingANumberForAConceptId", ({}, {
+      onCleanup,
+    }) => {
       const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
@@ -214,19 +222,21 @@ describe("readCachedEntries", () => {
         JSON.stringify({
           version: 3,
           fingerprint: "input",
-          entries: [{ ...ENTRY, conceptId: 1 }],
+          entries: [{ ...USER_STATUS_CATALOG_ENTRY, conceptId: 1 }],
         }),
       );
       return readCachedEntries(root, "input");
     });
 
-    it("is not read back", ({ entries }) => {
-      expect(entries).toBe(null);
+    it("is not read back", ({ catalogReadBackFromACacheHoldingANumberForAConceptId }) => {
+      expect(catalogReadBackFromACacheHoldingANumberForAConceptId).toBe(null);
     });
   });
 
   describe("a cache holding an entry whose export path is neither absent nor a word", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("catalogReadBackFromACacheHoldingANumberForAnExportPath", ({}, {
+      onCleanup,
+    }) => {
       const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
@@ -237,19 +247,21 @@ describe("readCachedEntries", () => {
         JSON.stringify({
           version: 3,
           fingerprint: "input",
-          entries: [{ ...ENTRY, exportPath: 1 }],
+          entries: [{ ...USER_STATUS_CATALOG_ENTRY, exportPath: 1 }],
         }),
       );
       return readCachedEntries(root, "input");
     });
 
-    it("is not read back", ({ entries }) => {
-      expect(entries).toBe(null);
+    it("is not read back", ({ catalogReadBackFromACacheHoldingANumberForAnExportPath }) => {
+      expect(catalogReadBackFromACacheHoldingANumberForAnExportPath).toBe(null);
     });
   });
 
   describe("a cache holding an entry whose values are not a list", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("catalogReadBackFromACacheHoldingANumberForTheCanonicalValues", ({}, {
+      onCleanup,
+    }) => {
       const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
@@ -257,18 +269,24 @@ describe("readCachedEntries", () => {
       mkdirSync(dirname(join(root, ...CACHE_SEGMENTS)), { recursive: true });
       writeFileSync(
         join(root, ...CACHE_SEGMENTS),
-        JSON.stringify({ version: 3, fingerprint: "input", entries: [{ ...ENTRY, values: 1 }] }),
+        JSON.stringify({
+          version: 3,
+          fingerprint: "input",
+          entries: [{ ...USER_STATUS_CATALOG_ENTRY, values: 1 }],
+        }),
       );
       return readCachedEntries(root, "input");
     });
 
-    it("is not read back", ({ entries }) => {
-      expect(entries).toBe(null);
+    it("is not read back", ({ catalogReadBackFromACacheHoldingANumberForTheCanonicalValues }) => {
+      expect(catalogReadBackFromACacheHoldingANumberForTheCanonicalValues).toBe(null);
     });
   });
 
   describe("a cache holding a value that is not a spelling", () => {
-    const it = test.extend("entries", ({}, { onCleanup }) => {
+    const it = test.extend("catalogReadBackFromACacheHoldingAnObjectAsACanonicalValue", ({}, {
+      onCleanup,
+    }) => {
       const root = mkdtempSync(join(tmpdir(), "catalog-cache-"));
       onCleanup(() => {
         rmSync(root, { recursive: true, force: true });
@@ -276,13 +294,17 @@ describe("readCachedEntries", () => {
       mkdirSync(dirname(join(root, ...CACHE_SEGMENTS)), { recursive: true });
       writeFileSync(
         join(root, ...CACHE_SEGMENTS),
-        JSON.stringify({ version: 3, fingerprint: "input", entries: [{ ...ENTRY, values: [{}] }] }),
+        JSON.stringify({
+          version: 3,
+          fingerprint: "input",
+          entries: [{ ...USER_STATUS_CATALOG_ENTRY, values: [{}] }],
+        }),
       );
       return readCachedEntries(root, "input");
     });
 
-    it("is not read back", ({ entries }) => {
-      expect(entries).toBe(null);
+    it("is not read back", ({ catalogReadBackFromACacheHoldingAnObjectAsACanonicalValue }) => {
+      expect(catalogReadBackFromACacheHoldingAnObjectAsACanonicalValue).toBe(null);
     });
   });
 });
@@ -296,7 +318,7 @@ describe("writeCachedEntries", () => {
       });
       mkdirSync(join(root, ...CACHE_SEGMENTS), { recursive: true });
       const [failure] = attempt<unknown, Error>(() => {
-        writeCachedEntries(root, { fingerprint: "input", entries: [ENTRY] });
+        writeCachedEntries(root, { fingerprint: "input", entries: [USER_STATUS_CATALOG_ENTRY] });
       });
       return failure;
     });

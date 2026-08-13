@@ -49,7 +49,7 @@ const standsInHelperScope = (held: ESTree.Node, reading: ScopeReading): boolean 
   const holder = innermostHolderOf(held, reading.functions);
   if (holder === null) return true;
   return reading.groupingBodies.some(
-    (body) => body.start === holder.start && body.end === holder.end,
+    (groupingBody) => groupingBody.start === holder.start && groupingBody.end === holder.end,
   );
 };
 
@@ -65,8 +65,8 @@ const functionsInLiteral = (written: ESTree.Expression): readonly ESTree.Express
     );
   }
   if (written.type !== "ArrayExpression") return [];
-  return written.elements.flatMap((element) =>
-    element === null || element.type === "SpreadElement" ? [] : heldFunctionsIn(element),
+  return written.elements.flatMap((listed) =>
+    listed === null || listed.type === "SpreadElement" ? [] : heldFunctionsIn(listed),
   );
 };
 
@@ -76,14 +76,14 @@ const functionsHeldByLiteral = (initializer: ESTree.Expression): readonly ESTree
   return functionsInLiteral(written);
 };
 
-const functionsHandedBack = (fn: SpecFunction): readonly ESTree.Expression[] =>
-  returnedExpressionsOf(fn).flatMap((handed) => {
+const functionsHandedBack = (specFunction: SpecFunction): readonly ESTree.Expression[] =>
+  returnedExpressionsOf(specFunction).flatMap((handed) => {
     const written = unwrapSubject(handed);
     return asSpecFunction(written) === null ? [] : [written];
   });
 
-const anythingHandedBack = (fn: SpecFunction): readonly ESTree.Expression[] =>
-  returnedExpressionsOf(fn).flatMap((handed) => heldFunctionsIn(handed));
+const anythingHandedBack = (specFunction: SpecFunction): readonly ESTree.Expression[] =>
+  returnedExpressionsOf(specFunction).flatMap((handed) => heldFunctionsIn(handed));
 
 const declaredFunctionOf = (declared: ESTree.Node): SpecFunction | null => {
   if (declared.type === "FunctionDeclaration") return declared;
@@ -118,8 +118,10 @@ const disguisedYieldOf = (
   return factory === null ? [] : functionsHandedBack(factory);
 };
 
-const boundNameOf = (target: ESTree.VariableDeclarator["id"], source: string): string =>
-  target.type === "Identifier" ? target.name : source.slice(target.start, target.end);
+const boundNameOf = (declaredId: ESTree.VariableDeclarator["id"], source: string): string =>
+  declaredId.type === "Identifier"
+    ? declaredId.name
+    : source.slice(declaredId.start, declaredId.end);
 
 const bindingReportOf = (
   declarator: ESTree.VariableDeclarator,
@@ -248,12 +250,12 @@ export const noSpecFileHelperFunction = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
     const binding: BindingReading = {
-      lookup: (node) => context.sourceCode.getScope(node),
-      source: context.sourceCode.text,
+      lookup: (node) => inspection.sourceCode.getScope(node),
+      source: inspection.sourceCode.text,
     };
 
     return {
@@ -266,7 +268,7 @@ export const noSpecFileHelperFunction = createDontReviewItRule({
           ...nodesOfType(program, "CallExpression").flatMap((call) => fixtureReportsOf(call)),
         ];
 
-        for (const report of reports) context.report(report);
+        for (const report of reports) inspection.report(report);
       },
     };
   },

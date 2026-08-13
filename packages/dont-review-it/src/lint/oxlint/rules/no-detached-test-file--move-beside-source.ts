@@ -15,14 +15,14 @@ const TEST_ONLY_DIRECTORY_NAMES = new Set(["test", "tests", "__tests__", "spec"]
 const pathExists = memoize((path: string): boolean => existsSync(path));
 
 const stringsFrom = (
-  options: Readonly<Options>,
-  key: "testFileSuffixes" | "exemptPaths",
+  ruleOptions: Readonly<Options>,
+  named: "testFileSuffixes" | "exemptPaths",
 ): readonly string[] => {
-  const [first] = options;
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) return [];
-  const configured = first[key];
+  const configured = first[named];
   if (!Array.isArray(configured)) return [];
-  return configured.filter((entry): entry is string => typeof entry === "string");
+  return configured.filter((candidate): candidate is string => typeof candidate === "string");
 };
 
 const longestMatchingSuffix = (path: string, suffixes: readonly string[]): string | null =>
@@ -49,8 +49,8 @@ const containsSegmentRun = (
   );
 
 const isExemptPath = (pathSegments: readonly string[], exemptPaths: readonly string[]): boolean =>
-  exemptPaths.some((entry) =>
-    containsSegmentRun(pathSegments, segmentsOf({ path: entry, separator: "/" })),
+  exemptPaths.some((exemptPath) =>
+    containsSegmentRun(pathSegments, segmentsOf({ path: exemptPath, separator: "/" })),
   );
 
 const findingFor = (
@@ -102,21 +102,21 @@ export const noDetachedTestFile = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
+  create(inspection) {
     const suffixes = [
       ...DEFAULT_TEST_FILE_SUFFIXES,
-      ...stringsFrom(context.options, "testFileSuffixes"),
+      ...stringsFrom(inspection.options, "testFileSuffixes"),
     ];
-    const exemptPaths = stringsFrom(context.options, "exemptPaths");
+    const exemptPaths = stringsFrom(inspection.options, "exemptPaths");
 
     return {
       Program(node: ESTree.Program) {
-        const finding = findingFor(resolve(context.cwd, context.filename), {
+        const finding = findingFor(resolve(inspection.cwd, inspection.filename), {
           suffixes,
           exemptPaths,
         });
         if (finding === null) return;
-        context.report({ node, messageId: finding.messageId, data: finding.data });
+        inspection.report({ node, messageId: finding.messageId, data: finding.data });
       },
     };
   },

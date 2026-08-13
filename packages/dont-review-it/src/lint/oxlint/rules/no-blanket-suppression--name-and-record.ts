@@ -67,8 +67,8 @@ export const noBlanketSuppression = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
-    const absolutePath = resolve(context.cwd, context.filename);
+  create(inspection) {
+    const absolutePath = resolve(inspection.cwd, inspection.filename);
     const repositoryRoot = findWorkspaceRoot(dirname(absolutePath));
     const relativePath = toPosixPath(relative(repositoryRoot, absolutePath));
     const ledger = approvalLedgerIn(repositoryRoot);
@@ -82,7 +82,7 @@ export const noBlanketSuppression = createDontReviewItRule({
     }): void => {
       const approval = approvalFor({ ledger, path: relativePath, ruleName });
       if (approval === null) {
-        context.report({
+        inspection.report({
           loc: comment.loc,
           messageId: "unrecordedSuppression",
           data: { ruleName, path: relativePath },
@@ -91,7 +91,7 @@ export const noBlanketSuppression = createDontReviewItRule({
       }
       const gap = gapIn(approval);
       if (gap === null) return;
-      context.report({
+      inspection.report({
         loc: comment.loc,
         messageId: "incompleteApproval",
         data: { gap, ruleName, path: relativePath },
@@ -107,7 +107,7 @@ export const noBlanketSuppression = createDontReviewItRule({
     }): void => {
       const unmet = unmetConditionFor(directive);
       if (unmet !== null) {
-        context.report({ loc: comment.loc, ...unmet });
+        inspection.report({ loc: comment.loc, ...unmet });
         return;
       }
       for (const ruleName of directive.ruleNames) reportRecord({ comment, ruleName });
@@ -122,7 +122,7 @@ export const noBlanketSuppression = createDontReviewItRule({
     }): void => {
       const held = readTextFile(join(repositoryRoot, approval.path));
       if (held === null) {
-        context.report({
+        inspection.report({
           node: program,
           messageId: "abandonedApproval",
           data: { path: approval.path },
@@ -130,7 +130,7 @@ export const noBlanketSuppression = createDontReviewItRule({
         return;
       }
       if (holdsDirectiveNaming({ text: held, ruleName: approval.rule })) return;
-      context.report({
+      inspection.report({
         node: program,
         messageId: "staleApproval",
         data: { path: approval.path, ruleName: approval.rule },
@@ -143,7 +143,7 @@ export const noBlanketSuppression = createDontReviewItRule({
           const directive = suppressionDirectiveOf(comment);
           if (directive !== null) reportDirective({ comment, directive });
         }
-        if (!LINT_CONFIGURATION_FILE.test(toPosixPath(context.filename))) return;
+        if (!LINT_CONFIGURATION_FILE.test(toPosixPath(inspection.filename))) return;
         for (const approval of ledger) reportApproval({ program: node, approval });
       },
     };

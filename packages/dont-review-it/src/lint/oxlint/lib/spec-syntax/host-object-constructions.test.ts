@@ -16,7 +16,10 @@ describe("constructedHostTypeOf", () => {
         .body[0] as ESTree.Statement;
       const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
       return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        named: (constructorSpelling) =>
+          constructorSpelling === "Request" || constructorSpelling === "Response"
+            ? constructorSpelling
+            : null,
         qualified: (namespace, member) =>
           namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
       });
@@ -33,7 +36,10 @@ describe("constructedHostTypeOf", () => {
         .program.body[0] as ESTree.Statement;
       const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
       return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        named: (constructorSpelling) =>
+          constructorSpelling === "Request" || constructorSpelling === "Response"
+            ? constructorSpelling
+            : null,
         qualified: (namespace, member) =>
           namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
       });
@@ -66,7 +72,10 @@ describe("constructedHostTypeOf", () => {
         .body[0] as ESTree.Statement;
       const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
       return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        named: (constructorSpelling) =>
+          constructorSpelling === "Request" || constructorSpelling === "Response"
+            ? constructorSpelling
+            : null,
         qualified: (namespace, member) =>
           namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
       });
@@ -83,7 +92,10 @@ describe("constructedHostTypeOf", () => {
         .body[0] as ESTree.Statement;
       const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
       return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        named: (constructorSpelling) =>
+          constructorSpelling === "Request" || constructorSpelling === "Response"
+            ? constructorSpelling
+            : null,
         qualified: (namespace, member) =>
           namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
       });
@@ -100,7 +112,10 @@ describe("constructedHostTypeOf", () => {
         .body[0] as ESTree.Statement;
       const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
       return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        named: (constructorSpelling) =>
+          constructorSpelling === "Request" || constructorSpelling === "Response"
+            ? constructorSpelling
+            : null,
         qualified: (namespace, member) =>
           namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
       });
@@ -117,7 +132,10 @@ describe("constructedHostTypeOf", () => {
         .body[0] as ESTree.Statement;
       const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
       return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        named: (constructorSpelling) =>
+          constructorSpelling === "Request" || constructorSpelling === "Response"
+            ? constructorSpelling
+            : null,
         qualified: (namespace, member) =>
           namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
       });
@@ -134,7 +152,10 @@ describe("constructedHostTypeOf", () => {
         .body[0] as ESTree.Statement;
       const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
       return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        named: (constructorSpelling) =>
+          constructorSpelling === "Request" || constructorSpelling === "Response"
+            ? constructorSpelling
+            : null,
         qualified: (namespace, member) =>
           namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
       });
@@ -151,7 +172,10 @@ describe("constructedHostTypeOf", () => {
         .body[0] as ESTree.Statement;
       const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
       return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        named: (constructorSpelling) =>
+          constructorSpelling === "Request" || constructorSpelling === "Response"
+            ? constructorSpelling
+            : null,
         qualified: (namespace, member) =>
           namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
       });
@@ -168,7 +192,10 @@ describe("constructedHostTypeOf", () => {
         .body[0] as ESTree.Statement;
       const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
       return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        named: (constructorSpelling) =>
+          constructorSpelling === "Request" || constructorSpelling === "Response"
+            ? constructorSpelling
+            : null,
         qualified: (namespace, member) =>
           namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
       });
@@ -185,7 +212,10 @@ describe("constructedHostTypeOf", () => {
         .body[0] as ESTree.Statement;
       const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
       return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        named: (constructorSpelling) =>
+          constructorSpelling === "Request" || constructorSpelling === "Response"
+            ? constructorSpelling
+            : null,
         qualified: (namespace, member) =>
           namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
       });
@@ -202,7 +232,10 @@ describe("constructedHostTypeOf", () => {
         .program.body[0] as ESTree.Statement;
       const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
       return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        named: (constructorSpelling) =>
+          constructorSpelling === "Request" || constructorSpelling === "Response"
+            ? constructorSpelling
+            : null,
         qualified: (namespace, member) =>
           namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
       });
@@ -219,7 +252,10 @@ describe("constructedHostTypeOf", () => {
         .body[0] as ESTree.Statement;
       const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
       return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        named: (constructorSpelling) =>
+          constructorSpelling === "Request" || constructorSpelling === "Response"
+            ? constructorSpelling
+            : null,
         qualified: (namespace, member) =>
           namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
       });
@@ -236,7 +272,10 @@ describe("constructedHostTypeOf", () => {
         .body[0] as ESTree.Statement;
       const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
       return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        named: (constructorSpelling) =>
+          constructorSpelling === "Request" || constructorSpelling === "Response"
+            ? constructorSpelling
+            : null,
         qualified: (namespace, member) =>
           namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
       });
@@ -253,7 +292,10 @@ describe("constructedHostTypeOf", () => {
         .body[0] as ESTree.Statement;
       const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
       return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        named: (constructorSpelling) =>
+          constructorSpelling === "Request" || constructorSpelling === "Response"
+            ? constructorSpelling
+            : null,
         qualified: (namespace, member) =>
           namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
       });
@@ -270,7 +312,10 @@ describe("constructedHostTypeOf", () => {
         .body[0] as ESTree.Statement;
       const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
       return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        named: (constructorSpelling) =>
+          constructorSpelling === "Request" || constructorSpelling === "Response"
+            ? constructorSpelling
+            : null,
         qualified: (namespace, member) =>
           namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
       });
@@ -287,7 +332,10 @@ describe("constructedHostTypeOf", () => {
         .body[0] as ESTree.Statement;
       const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
       return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        named: (constructorSpelling) =>
+          constructorSpelling === "Request" || constructorSpelling === "Response"
+            ? constructorSpelling
+            : null,
         qualified: (namespace, member) =>
           namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
       });
@@ -304,7 +352,10 @@ describe("constructedHostTypeOf", () => {
         .body[0] as ESTree.Statement;
       const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
       return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        named: (constructorSpelling) =>
+          constructorSpelling === "Request" || constructorSpelling === "Response"
+            ? constructorSpelling
+            : null,
         qualified: (namespace, member) =>
           namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
       });
@@ -321,7 +372,10 @@ describe("constructedHostTypeOf", () => {
         .body[0] as ESTree.Statement;
       const [declarator] = (declared as ESTree.VariableDeclaration).declarations;
       return constructedHostTypeOf(declarator?.init as ESTree.Expression, {
-        named: (name) => (name === "Request" || name === "Response" ? name : null),
+        named: (constructorSpelling) =>
+          constructorSpelling === "Request" || constructorSpelling === "Response"
+            ? constructorSpelling
+            : null,
         qualified: (namespace, member) =>
           namespace === "undici" && (member === "Request" || member === "Response") ? member : null,
       });

@@ -1,3 +1,5 @@
+import { isNamedFields } from "../named-fields.ts";
+
 const DEPENDENCY_SECTIONS: readonly string[] = [
   "dependencies",
   "devDependencies",
@@ -13,15 +15,25 @@ export type DeclaredDependency = {
   readonly declaredVersion: string;
 };
 
-const isJsonObject = (value: unknown): value is Readonly<Record<string, unknown>> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
+const aliasPartsOf = (
+  declaredVersion: string,
+): { readonly targetName: string; readonly range: string } => {
+  const checked = declaredVersion.slice(ALIAS_PROTOCOL.length);
+  const rangeAt = checked.lastIndexOf("@");
+  return rangeAt > 0
+    ? { targetName: checked.slice(0, rangeAt), range: checked.slice(rangeAt + 1) }
+    : { targetName: checked, range: "" };
+};
 
 const aliasTargetOf = (declaredVersion: string): string | null => {
-  const target = declaredVersion.slice(ALIAS_PROTOCOL.length);
-  const rangeAt = target.lastIndexOf("@");
-  const targetName = rangeAt > 0 ? target.slice(0, rangeAt) : target;
+  const { targetName } = aliasPartsOf(declaredVersion);
   return targetName === "" ? null : targetName;
 };
+
+export const declaredRangeOf = (declaredVersion: string): string =>
+  declaredVersion.startsWith(ALIAS_PROTOCOL)
+    ? aliasPartsOf(declaredVersion).range
+    : declaredVersion;
 
 const packageNameOf = (declaration: {
   readonly declaredName: string;
@@ -35,7 +47,7 @@ const packageNameOf = (declaration: {
 };
 
 const sectionDependencies = (section: unknown): readonly DeclaredDependency[] => {
-  if (!isJsonObject(section)) return [];
+  if (!isNamedFields(section)) return [];
 
   return Object.entries(section).flatMap(([declaredName, declaredValue]) => {
     if (typeof declaredValue !== "string") return [];
@@ -45,6 +57,6 @@ const sectionDependencies = (section: unknown): readonly DeclaredDependency[] =>
 };
 
 export const declaredDependenciesIn = (manifest: unknown): readonly DeclaredDependency[] =>
-  isJsonObject(manifest)
+  isNamedFields(manifest)
     ? DEPENDENCY_SECTIONS.flatMap((section) => sectionDependencies(manifest[section]))
     : [];

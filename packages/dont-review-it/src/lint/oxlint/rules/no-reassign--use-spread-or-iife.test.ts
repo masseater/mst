@@ -58,7 +58,7 @@ describe("dont-review-it/no-reassign--use-spread-or-iife", () => {
       },
       {
         name: "a per-iteration head creates a fresh binding each round",
-        code: "for (const entry of entries) {\n  use(entry);\n}\nfor (let key in holder) {\n  use(key);\n}",
+        code: "for (const entry of entries) {\n  use(entry);\n}\nfor (let key in holder) {\n  use(named);\n}",
       },
       {
         name: "an ambient declaration has no runtime binding to fix",

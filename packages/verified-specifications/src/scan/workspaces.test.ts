@@ -16,9 +16,9 @@ const NAMELESS_PACKAGE =
 
 describe("listWorkspaces", () => {
   const repositoryTest = test.extend("repositoryRoot", async ({}, { onCleanup }) => {
-    const created = await mkdtemp(join(tmpdir(), "verified-specifications-"));
-    onCleanup(async () => rm(created, { recursive: true, force: true }));
-    return created;
+    const temporaryRepositoryDirectory = await mkdtemp(join(tmpdir(), "verified-specifications-"));
+    onCleanup(async () => rm(temporaryRepositoryDirectory, { recursive: true, force: true }));
+    return temporaryRepositoryDirectory;
   });
 
   describe("a manifest whose glob reaches two package directories", () => {
@@ -37,7 +37,7 @@ describe("listWorkspaces", () => {
         "utf-8",
       );
       const listed = await listWorkspaces({ repositoryRoot });
-      return listed.workspaces.map((entry) => entry.packageName);
+      return listed.workspaces.map((listedWorkspace) => listedWorkspace.packageName);
     });
 
     it("names each workspace after its package.json", ({ theNamesOfTwoWorkspaces }) => {
@@ -63,7 +63,7 @@ describe("listWorkspaces", () => {
           "utf-8",
         );
         const listed = await listWorkspaces({ repositoryRoot });
-        return listed.workspaces.map((entry) => entry.packageName);
+        return listed.workspaces.map((listedWorkspace) => listedWorkspace.packageName);
       },
     );
 
@@ -124,7 +124,7 @@ describe("listWorkspaces", () => {
       async ({ repositoryRoot }) => {
         await writeFile(join(repositoryRoot, "package.json"), '{ "name": "standalone" }', "utf-8");
         const listed = await listWorkspaces({ repositoryRoot });
-        return listed.workspaces.map((entry) => entry.packageName);
+        return listed.workspaces.map((listedWorkspace) => listedWorkspace.packageName);
       },
     );
 
@@ -227,7 +227,7 @@ describe("listWorkspaces", () => {
           "utf-8",
         );
         const listed = await listWorkspaces({ repositoryRoot });
-        return listed.workspaces.map((entry) => entry.packageName);
+        return listed.workspaces.map((listedWorkspace) => listedWorkspace.packageName);
       },
     );
 
