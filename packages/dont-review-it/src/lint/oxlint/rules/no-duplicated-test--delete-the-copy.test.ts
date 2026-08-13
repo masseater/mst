@@ -89,8 +89,8 @@ test("counts one", () => {
 });`,
         filename: SUBJECT_FILE,
         errors: [
-          { messageId: "duplicatedTest", data: { title: "counts one" } },
-          { messageId: "duplicatedTest", data: { title: "counts one" } },
+          { messageId: "duplicatedTest", data: { title: "counts one", line: "1" } },
+          { messageId: "duplicatedTest", data: { title: "counts one", line: "4" } },
         ],
       },
       {
@@ -105,8 +105,8 @@ test("counts one", () => {
 });`,
         filename: SUBJECT_FILE,
         errors: [
-          { messageId: "duplicatedTest", data: { title: "counts one" } },
-          { messageId: "duplicatedTest", data: { title: "counts one" } },
+          { messageId: "duplicatedTest", data: { title: "counts one", line: "2" } },
+          { messageId: "duplicatedTest", data: { title: "counts one", line: "5" } },
         ],
       },
       {
@@ -119,8 +119,8 @@ test.only("counts one", () => {
 });`,
         filename: SUBJECT_FILE,
         errors: [
-          { messageId: "duplicatedTest", data: { title: "counts one" } },
-          { messageId: "duplicatedTest", data: { title: "counts one" } },
+          { messageId: "duplicatedTest", data: { title: "counts one", line: "1" } },
+          { messageId: "duplicatedTest", data: { title: "counts one", line: "4" } },
         ],
       },
     ],

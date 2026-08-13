@@ -1,5 +1,4 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
-import { statementCovering } from "../lib/duplicated-bodies/site-report.ts";
 import { repeatedTestCasesIn } from "../lib/duplicated-tests/test-cases.ts";
 
 import type { ESTree } from "@oxlint/plugins";
@@ -15,7 +14,7 @@ export const noDuplicatedTest = createDontReviewItRule({
     },
     messages: {
       duplicatedTest:
-        "A test must not carry both the title and the body of another test in this file. Delete every `{{title}}` after the first.",
+        "A test must not carry both the title and the body of another test in this file. Delete the `{{title}}` that starts on line {{line}}.",
     },
     schema: [],
   },
@@ -24,9 +23,9 @@ export const noDuplicatedTest = createDontReviewItRule({
       Program(node: ESTree.Program) {
         for (const testCase of repeatedTestCasesIn(inspection.sourceCode.text)) {
           inspection.report({
-            node: statementCovering(node.body, testCase.line) ?? node,
+            node,
             messageId: "duplicatedTest",
-            data: { title: testCase.name },
+            data: { title: testCase.name, line: String(testCase.line) },
           });
         }
       },

@@ -15,14 +15,17 @@ const RUNNER_BODY_TYPES: ReadonlySet<string> = new Set([
   "FunctionExpression",
 ]);
 
+const receiverOf = (callee: AstFields): unknown => {
+  if (callee[NODE_TYPE_FIELD] === "CallExpression") return callee.callee;
+  if (callee[NODE_TYPE_FIELD] !== "MemberExpression") return null;
+  const member = callee.property;
+  return isAstFields(member) && member.name === FIXTURE_BUILDER_MEMBER ? null : callee.object;
+};
+
 const calleeRootName = (callee: unknown): string | null => {
   if (!isAstFields(callee)) return null;
   if (callee[NODE_TYPE_FIELD] === "Identifier") return String(callee.name);
-  if (callee[NODE_TYPE_FIELD] === "CallExpression") return calleeRootName(callee.callee);
-  if (callee[NODE_TYPE_FIELD] !== "MemberExpression") return null;
-  const member = callee.property;
-  if (isAstFields(member) && member.name === FIXTURE_BUILDER_MEMBER) return null;
-  return calleeRootName(callee.object);
+  return calleeRootName(receiverOf(callee));
 };
 
 const titleOf = (handedArgument: unknown): string | null => {
@@ -39,7 +42,7 @@ const testCaseOf = (call: AstFields, source: string): BodyDeclaration | null => 
   const rootName = calleeRootName(call.callee);
   if (rootName === null || !INJECTED_TEST_BLOCK_SPELLINGS.has(rootName)) return null;
 
-  const handedArguments = Array.isArray(call.arguments) ? call.arguments : [];
+  const handedArguments = call.arguments as readonly unknown[];
   const title = titleOf(handedArguments[0]);
   const runnerBody = handedArguments.map(runnerBodyOf).find((written) => written !== null);
   if (title === null || runnerBody === undefined) return null;
@@ -60,7 +63,7 @@ const callExpressionsIn = (syntaxField: unknown): readonly AstFields[] => {
   return syntaxField[NODE_TYPE_FIELD] === "CallExpression" ? [syntaxField, ...nested] : nested;
 };
 
-export const testCasesIn = (source: string): readonly BodyDeclaration[] => {
+const testCasesIn = (source: string): readonly BodyDeclaration[] => {
   const parsedSource = parseSync(DEFAULT_SOURCE_NAME, source);
   return callExpressionsIn(parsedSource.program.body).flatMap((call) => {
     const testCase = testCaseOf(call, source);
@@ -70,13 +73,12 @@ export const testCasesIn = (source: string): readonly BodyDeclaration[] => {
 
 export const repeatedTestCasesIn = (source: string): readonly BodyDeclaration[] => {
   const testCases = testCasesIn(source);
-  const spellingCounts = testCases.reduce<ReadonlyMap<string, number>>((counted, testCase) => {
-    const spelling = JSON.stringify([testCase.name, testCase.structure]);
-    return new Map([...counted, [spelling, (counted.get(spelling) ?? 0) + 1]]);
-  }, new Map());
-
-  return testCases.filter(
-    (testCase) =>
-      (spellingCounts.get(JSON.stringify([testCase.name, testCase.structure])) ?? 0) > 1,
+  const spellings = testCases.map((testCase) =>
+    JSON.stringify([testCase.name, testCase.structure]),
+  );
+  return testCases.filter((_, index) =>
+    spellings.some(
+      (spelling, comparedIndex) => comparedIndex !== index && spelling === spellings[index],
+    ),
   );
 };
