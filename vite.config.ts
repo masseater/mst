@@ -34,7 +34,7 @@ export default defineConfig({
       "vitest/consistent-test-filename": ["error", { pattern: "\\.test\\.tsx?$" }],
       "dont-review-it/no-default-export--use-named-export": [
         "error",
-        { toolRequiredFileNames: ["plugin.ts", "vite.config.ts"] },
+        { toolRequiredFileNames: ["knip.ts", "plugin.ts", "vite.config.ts"] },
       ],
       "dont-review-it/no-reassign--use-spread-or-iife": [
         "error",

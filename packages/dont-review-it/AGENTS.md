@@ -95,6 +95,28 @@ CLI が持つコマンドは `check` の 1 つで、そこが全部の検査を�
 - バージョンが食い違う宣言は警告として出す。どちらへ揃えるかは判断なので落とさない
 - 何も使っていない catalog エントリは報告しない。未使用の検出は knip が持つ
 
+## 必須ファイルの形の検査
+
+`check` が、リポジトリの根と `package.json` を持つディレクトリを開き、そこに置かれていなければならないファイルが要求された形で存在しているかを読む。ファイルの中身は読まない。判断は [EDR 0045](../../docs/engineering-decision-logs/0045-require-the-form-of-the-files-a-repository-cannot-do-without.md) にある。
+
+道具の設定が TypeScript の外に置かれていないことを見る。対象は knip・oxlint・eslint・vite で、それぞれの道具自身が読む綴りのうち、型検査が届かないものを名指しする。報告には移し先の綴りを載せる。oxlint と vite の移し先は `vite.config.ts` で、knip は `knip.ts`、eslint は `eslint.config.ts` になる。
+
+AI 向けの指示が 1 か所にしかないことを見る。`AGENTS.md` が実体で、`CLAUDE.md` はそこを指すシンボリックリンクである。
+
+- `AGENTS.md` を持つディレクトリに `CLAUDE.md` がある
+- `CLAUDE.md` が実体ファイルではない
+- `CLAUDE.md` が `AGENTS.md` 以外を指していない
+- `CLAUDE.md` だけがあって `AGENTS.md` が無い状態になっていない
+
+- IF: 道具の設定を TypeScript 以外の綴りで置きたくなった; THEN PROHIBIT: 置く
+  - 型検査もフォーマッタも lint も届かない設定は、それが支配しているコードから静かにずれていく
+- IF: 道具が TypeScript の設定を読めない; THEN MUST: その道具を使わない判断から始める
+  - 綴りを増やす前に、ツールチェーンを一本化する規約（[AGENTS.md](../../AGENTS.md)）に戻る
+- IF: 検査対象の綴りを増やす; THEN MUST: その道具自身が読む綴りの一覧を一次情報で確かめてから足す
+  - 道具が読まない綴りを足すと、直しようのない報告が出る
+- IF: `CLAUDE.md` に `AGENTS.md` と違うことを書きたくなった; THEN PROHIBIT: 書く
+  - 読み手ごとに違う規範を配ると、どちらが正なのかを人間が毎回決めることになる
+
 ## preset の適用範囲の検査
 
 `check` が、ルートのツールチェーン設定とワークスペースの一覧を突き合わせる。preset を `extends` した時点で全体に効くという前提が、実際に成り立っているかを見る。

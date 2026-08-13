@@ -55,6 +55,24 @@
 - preset の外のルールを止めても報告しない
 - ツールチェーンの設定が無いリポジトリでは適用範囲を検査しない
 
+## 必須ファイルの形の検査
+
+[`specs/required-file-form.spec.ts`](specs/required-file-form.spec.ts)
+
+- JSON で置かれた knip の設定を、TypeScript の綴りを名指しして報告する
+- JSON で置かれた oxlint の設定を、ツールチェーン設定へ移す指示とともに報告する
+- 旧来の rc 形式で置かれた eslint の設定を報告する
+- JavaScript で置かれた vite の設定を報告する
+- リポジトリの根だけでなく、マニフェストを持つディレクトリに置かれた設定も報告する
+- TypeScript で書かれた設定を報告しない
+- AGENTS.md を持つディレクトリに CLAUDE.md が無いことを報告する
+- CLAUDE.md が中身を持つ実体ファイルであることを報告する
+- CLAUDE.md が AGENTS.md 以外を指すシンボリックリンクであることを報告する
+- CLAUDE.md だけがあって AGENTS.md が無いことを報告する
+- AGENTS.md を指すシンボリックリンクの CLAUDE.md を報告しない
+- どちらの指示ファイルも無いディレクトリを報告しない
+- マニフェストを 1 つも持たないリポジトリでも、根を開いた対象として数える
+
 ## 検査の走査証跡
 
 [`specs/scan-trace.spec.ts`](specs/scan-trace.spec.ts)
