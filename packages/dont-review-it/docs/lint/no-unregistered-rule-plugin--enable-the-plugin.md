@@ -20,7 +20,7 @@ oxlint では、有効にするプラグインの一覧と、重大度を与え�
 
 消えた側は「違反が無かった」と区別が付かない。[強制の機構](../../../docs/guidelines/enforcement.md)が「走らなかった検査を成功と数えない」として置いている形そのもので、宣言が 2 か所に分かれている限り、片側を削る変更は何も落とさずに通る。
 
-この不変条件を型でも検証コマンドでもなく lint で止めた判断と、そこで受け入れた限界は [EDR 0053](../../../docs/engineering-decision-logs/0053-report-the-rule-whose-plugin-no-list-enables.md) にある。
+この不変条件を型でも検証コマンドでもなく lint で止めた判断と、そこで受け入れた限界は [EDR 0056](../../../docs/engineering-decision-logs/0056-report-the-rule-whose-plugin-no-list-enables.md) にある。
 
 ## どう直すか
 
