@@ -1,11 +1,16 @@
-import { readFileSync, realpathSync } from "node:fs";
-import { dirname, extname, isAbsolute, relative, resolve, sep } from "node:path";
+import { readFileSync } from "node:fs";
+import { dirname, extname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { attempt } from "es-toolkit";
 import * as ts from "typescript-6";
 
 import { pathIsInside } from "../path-is-inside.ts";
+import {
+  realPathOf,
+  repositoryModuleLocation,
+  type RepositoryModuleLocation,
+} from "./import-route-source-identity.ts";
 import { isRelativeImportSpecifier } from "./import-specifier.ts";
 
 import type {
@@ -24,20 +29,7 @@ export type ImportRouteQuery = {
 
 const IMPORT_MODULE_RESOLUTION_MODE: NonNullable<ts.ResolutionMode> = ts.ModuleKind.ESNext;
 
-type ResolvedModuleLocation =
-  | { readonly kind: "external" }
-  | {
-      readonly kind: "repository";
-      readonly path: string;
-      readonly sourcePaths: readonly string[];
-    }
-  | { readonly kind: "unresolved" };
-
-const realPathOf = (path: string): string => {
-  const absolutePath = resolve(path);
-  const [failure, realPath] = attempt(() => realpathSync.native(absolutePath));
-  return failure === null && realPath !== null ? realPath : absolutePath;
-};
+type ResolvedModuleLocation = RepositoryModuleLocation | { readonly kind: "unresolved" };
 
 const containingFileOf = (query: ImportRouteQuery): string =>
   resolve(query.repositoryRoot, query.filename);
@@ -76,29 +68,11 @@ const compilerOptionsFor = (
   return { containingFile, options: compilerOptions ?? {} };
 };
 
-const lexicalRepositorySource = (query: ImportRouteQuery, resolvedPath: string): string | null => {
-  const repositoryRoot = resolve(query.repositoryRoot);
-  const sourcePath = resolve(resolvedPath);
-  if (!pathIsInside(repositoryRoot, sourcePath)) return null;
-  return relative(repositoryRoot, sourcePath).split(sep).includes("node_modules")
-    ? null
-    : sourcePath;
-};
-
 const repositoryLocation = (
   query: ImportRouteQuery,
   resolvedPath: string,
-): ResolvedModuleLocation => {
-  const repositoryRoot = realPathOf(query.repositoryRoot);
-  const path = realPathOf(resolvedPath);
-  if (!pathIsInside(repositoryRoot, path)) return { kind: "external" };
-  if (relative(repositoryRoot, path).split(sep).includes("node_modules")) {
-    return { kind: "external" };
-  }
-  const lexicalPath = lexicalRepositorySource(query, resolvedPath);
-  const sourcePaths = lexicalPath === null || lexicalPath === path ? [path] : [path, lexicalPath];
-  return { kind: "repository", path, sourcePaths };
-};
+): RepositoryModuleLocation =>
+  repositoryModuleLocation({ repositoryRoot: query.repositoryRoot, resolvedPath });
 
 const fileUrlLocation = (query: ImportRouteQuery): ResolvedModuleLocation | null => {
   if (!query.specifier.startsWith("file:")) return null;
