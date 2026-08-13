@@ -2,13 +2,16 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { compareGitHubPullRequest, type GitHubRequest } from "./github-comparison.ts";
 
-const encoded = (source: string): string => Buffer.from(source, "utf8").toString("base64");
+const encoded = (source: string | Uint8Array): string =>
+  (typeof source === "string" ? Buffer.from(source, "utf8") : Buffer.from(source)).toString(
+    "base64",
+  );
 
 const LEGACY_BEFORE = "export const current = true;\nexport const legacyMode = true;\n";
 
 const LEGACY_AFTER = "export const current = true;\n";
 
-const answering = (writtenContents: Readonly<Record<string, string>>): GitHubRequest =>
+const answering = (writtenContents: Readonly<Record<string, string | Uint8Array>>): GitHubRequest =>
   async function answer(path: string): Promise<unknown> {
     if (path.startsWith("/repos/owner/name/compare/")) {
       return {
@@ -73,14 +76,14 @@ describe("compareGitHubPullRequest", () => {
     });
   });
 
-  it("compares a source after removing NUL bytes from its previous API blob", async () => {
+  it("compares a source whose previous API blob does not decode as UTF-8", async () => {
     const comparison = await compareGitHubPullRequest({
       repositoryRoot: "/checkout",
       repository: "owner/name",
       baseRevision: "basetip",
       headRevision: "headsha",
       request: answering({
-        "/repos/owner/name/contents/src/legacy.ts?ref=basesha": "export const current = \0true;\n",
+        "/repos/owner/name/contents/src/legacy.ts?ref=basesha": Uint8Array.from([0xff, 0xfe, 0xff]),
         "/repos/owner/name/contents/src/legacy.ts?ref=headsha": LEGACY_AFTER,
         "/repos/owner/name/contents/src/legacy-api.test.ts?ref=headsha": "const added = true;\n",
       }),
@@ -93,7 +96,7 @@ describe("compareGitHubPullRequest", () => {
     });
   });
 
-  it("rejects a NUL-bearing source in the API head", async () => {
+  it("rejects an API head blob that does not decode as UTF-8", async () => {
     await expect(
       compareGitHubPullRequest({
         repositoryRoot: "/checkout",
@@ -102,12 +105,13 @@ describe("compareGitHubPullRequest", () => {
         headRevision: "headsha",
         request: answering({
           "/repos/owner/name/contents/src/legacy.ts?ref=basesha": LEGACY_BEFORE,
-          "/repos/owner/name/contents/src/legacy.ts?ref=headsha":
-            "export const current = \0true;\n",
+          "/repos/owner/name/contents/src/legacy.ts?ref=headsha": Uint8Array.from([
+            0xff, 0xfe, 0xff,
+          ]),
           "/repos/owner/name/contents/src/legacy-api.test.ts?ref=headsha": "const added = true;\n",
         }),
       }),
-    ).rejects.toThrow("Source blob contains NUL bytes: src/legacy.ts");
+    ).rejects.toThrow("Source blob does not decode as UTF-8: src/legacy.ts");
   });
 
   it("reads a removal, a rename and a copy the compare reported", async () => {
