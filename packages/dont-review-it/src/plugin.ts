@@ -88,6 +88,7 @@ import { noUnorderedImport } from "./lint/oxlint/rules/no-unordered-import--grou
 import { createNoUnusedStyleClass } from "./lint/oxlint/rules/no-unused-style-class--delete-or-reference-it.ts";
 import { noUnwrappedToolchainConfig } from "./lint/oxlint/rules/no-unwrapped-toolchain-config--call-the-preset-for-the-block.ts";
 import { noVacuousHostObjectEquality } from "./lint/oxlint/rules/no-vacuous-host-object-equality--assert-parsed-value.ts";
+import { noVacuousTestRun } from "./lint/oxlint/rules/no-vacuous-test-run--let-the-empty-run-fail.ts";
 import { createNoVersionRange } from "./lint/oxlint/rules/no-version-range--pin-the-exact-version.ts";
 import { noViMockFactoryBehavior } from "./lint/oxlint/rules/no-vi-mock-factory-behavior--use-spy-true-and-fixture.ts";
 import { noVitestContextExpect } from "./lint/oxlint/rules/no-vitest-context-expect--import-expect-from-vitest.ts";
@@ -227,6 +228,7 @@ const plugin: Plugin = {
     [noUnusedStyleClass.name]: noUnusedStyleClass,
     [noUnwrappedToolchainConfig.name]: noUnwrappedToolchainConfig,
     [noVacuousHostObjectEquality.name]: noVacuousHostObjectEquality,
+    [noVacuousTestRun.name]: noVacuousTestRun,
     [noViMockFactoryBehavior.name]: noViMockFactoryBehavior,
     [noVersionRange.name]: noVersionRange,
     [noVitestContextExpect.name]: noVitestContextExpect,

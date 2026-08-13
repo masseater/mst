@@ -26,6 +26,7 @@ import { noStandaloneTsconfig } from "../lint/oxlint/rules/no-standalone-tsconfi
 import { noTautologicalAssertion } from "../lint/oxlint/rules/no-tautological-assertion--assert-on-a-computed-value.ts";
 import { noUnorderedImport } from "../lint/oxlint/rules/no-unordered-import--group-by-origin-then-sort-by-specifier.ts";
 import { noUnwrappedToolchainConfig } from "../lint/oxlint/rules/no-unwrapped-toolchain-config--call-the-preset-for-the-block.ts";
+import { noVacuousTestRun } from "../lint/oxlint/rules/no-vacuous-test-run--let-the-empty-run-fail.ts";
 import { requireReExportOnlyFiles } from "../lint/oxlint/rules/require-re-export-only-files--move-declaration-to-owning-module.ts";
 import { requireStandardIoSnapshot } from "../lint/oxlint/rules/require-standard-io-snapshot--pin-both-streams.ts";
 import {
@@ -120,6 +121,7 @@ export const oxlint: OxlintConfig = defineConfig({
     [`${PLUGIN_NAME}/${noUnorderedImport.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noUnusedStyleClass.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noUnwrappedToolchainConfig.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noVacuousTestRun.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${requireReExportOnlyFiles.name}`]: [
       LINT_SEVERITY.ERROR,
       { targets: [...RE_EXPORT_ONLY_FILES] },
