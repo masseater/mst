@@ -1,11 +1,9 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
 import { defaultExportedObject } from "../lib/default-exported-object.ts";
 import { nestedObjectAt, objectPropertyOf, objectValueOf } from "../lib/object-literal.ts";
-import { toPosixPath } from "../lib/posix-path.ts";
+import { isTestRunnerConfig } from "../lib/test-runner-config.ts";
 
 import type { ESTree, Options } from "@oxlint/plugins";
-
-const TEST_CONFIG_PATH = /(?:^|\/)vite(?:st)?\.config\.[cm]?[jt]s$/u;
 
 const THRESHOLDS_PATH = ["test", "coverage", "thresholds"];
 
@@ -120,7 +118,7 @@ export const noLenientCoverageThreshold = createDontReviewItRule({
     ],
   },
   create(inspection) {
-    if (!TEST_CONFIG_PATH.test(toPosixPath(inspection.filename))) return {};
+    if (!isTestRunnerConfig(inspection.filename)) return {};
     const requirements = requirementsFrom(inspection.options);
 
     return {
