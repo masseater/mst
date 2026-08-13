@@ -35,7 +35,9 @@ const patternsIn = (lint: string): readonly string[] => {
 describe("lint-config-suppression", () => {
   test("the lint block is read through the call that wraps it", () => {
     expect(lintIn(configWith("{ rules: {} }"))?.type).toBe("ObjectExpression");
-    expect(lintIn(configWith("withGitExcludes({ rules: {} })"))?.type).toBe("ObjectExpression");
+    expect(lintIn(configWith("dontReviewItPreset.lint({ rules: {} })"))?.type).toBe(
+      "ObjectExpression",
+    );
     expect(lintIn("export default defineConfig({ lint: { rules: {} } });")?.type).toBe(
       "ObjectExpression",
     );

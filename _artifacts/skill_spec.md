@@ -16,7 +16,7 @@ mst packages reusable units of repository operation: a lint preset that answers 
 
 | Skill | Type | Domain | What it covers | Failure modes |
 | --- | --- | --- | --- | --- |
-| dont-review-it-core | core | enforcing-writing-standards | preset, withGitExcludes, plugin, tsconfig presets, wiring probe | 4 |
+| dont-review-it-core | core | enforcing-writing-standards | dontReviewItPreset, plugin, tsconfig presets, markdown prose wrapping, wiring probe | 5 |
 | dont-review-it-repository-checks | core | gating-the-repository | check CLI, workflow checks, shipped-skills check, guard wiring | 6 |
 | lint-rule-authoring-core | core | authoring-lint-rules | factory, tester, severity, message discipline, docs pathing | 5 |
 | agentic-documents-core | core | keeping-documents-true | check CLI, --write, normative notation, generated regions | 4 |
