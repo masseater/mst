@@ -1,6 +1,11 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
 import { mockNamespaceFrom, spellingsFrom } from "../lib/configured-spellings.ts";
+import { SUBPATH_SEPARATOR } from "../lib/path-segments.ts";
 import { resolveBinding } from "../lib/resolved-bindings.ts";
+import {
+  DEFAULT_MODULE_REPLACEMENT_MEMBERS,
+  MODULE_REPLACEMENT_MEMBERS_OPTION,
+} from "../lib/spec-syntax/mock-namespace.ts";
 import { moduleExportSpelling } from "../lib/spec-syntax/module-declarations.ts";
 import { isSpecFile, specFileSuffixesFrom } from "../lib/spec-syntax/spec-files.ts";
 import {
@@ -13,13 +18,9 @@ import { unwrapSubject } from "../lib/spec-syntax/subject-expressions.ts";
 import type { Definition, ESTree, Scope, Variable } from "@oxlint/plugins";
 import type { RuleMessage } from "../lib/rule-message.ts";
 
-const MODULE_REPLACEMENT_MEMBERS_OPTION = "moduleReplacementMembers";
-
 const FILE_SYSTEM_MODULES_OPTION = "fileSystemModules";
 
 const IN_MEMORY_FILE_SYSTEM_PACKAGES_OPTION = "inMemoryFileSystemPackages";
-
-const DEFAULT_MODULE_REPLACEMENT_MEMBERS: readonly string[] = ["doMock", "mock"];
 
 const DEFAULT_FILE_SYSTEM_MODULES: readonly string[] = [
   "fs",
@@ -35,8 +36,6 @@ const ORIGINAL_WRAPPING_OPTION = "spy";
 const SYNCHRONOUS_READ_CALLEE = "require";
 
 const TYPE_IMPORT_KIND = "type";
-
-const SUBPATH_SEPARATOR = "/";
 
 const LOCAL_DOUBLE_MESSAGE = "localFileSystemDouble";
 

@@ -19,6 +19,10 @@ export default defineConfig({
         "error",
         { assignOnlyTargets: ["RuleTester.describe", "RuleTester.it", "RuleTester.itOnly"] },
       ],
+      "dont-review-it/no-non-boundary-double--replace-at-the-external-boundary": [
+        "error",
+        { externalIoPackages: ["@opentelemetry/exporter-metrics-otlp-http"] },
+      ],
       "dont-review-it/no-version-range--pin-the-exact-version": "error",
     },
     overrides: [

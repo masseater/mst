@@ -32,6 +32,7 @@ import { requireStandardIoSnapshot } from "../lint/oxlint/rules/require-standard
 import {
   noDuplicatedBody,
   noLocalFiniteValueSet,
+  noNonBoundaryDouble,
   noStrictCanonicalLiteralUse,
   noTwinDeclaration,
   noUnusedStyleClass,
@@ -108,6 +109,7 @@ export const oxlint: OxlintConfig = defineConfig({
     [`${PLUGIN_NAME}/${noLocalFiniteValueSet.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noLoggedAndContinuedFailure.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noMultiBindingDeclaration.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noNonBoundaryDouble.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noPromiseChain.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noReassign.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noSharedDoubleState.name}`]: LINT_SEVERITY.ERROR,
