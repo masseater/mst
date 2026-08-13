@@ -53,6 +53,7 @@ describe("検査の走査証跡", () => {
       ["action-updates", 1],
       ["lint-rule-index", 0],
       ["dependency-declarations", 0],
+      ["required-file-form", 1],
       ["preset-adoption", 0],
       ["intent-skills", 0],
     ]);
@@ -88,10 +89,11 @@ describe("検査の走査証跡", () => {
         ✓ action-updates           1 update configuration
         ✓ lint-rule-index          0 workspaces
         ⊘ dependency-declarations  skipped — no workspace definition
+        ✓ required-file-form       1 package root
         ⊘ preset-adoption          skipped — no toolchain configuration
         ✓ intent-skills            0 manifests
 
-        10 checks ran, nothing to report
+        11 checks ran, nothing to report
       "
     `);
   });
@@ -112,6 +114,7 @@ describe("検査の走査証跡", () => {
       checked action-updates 1 update configuration 0 problems 0 warnings
       checked lint-rule-index 0 workspaces 0 problems 0 warnings
       skipped dependency-declarations no workspace definition
+      checked required-file-form 1 package root 0 problems 0 warnings
       skipped preset-adoption no toolchain configuration
       checked intent-skills 0 manifests 0 problems 0 warnings
       "

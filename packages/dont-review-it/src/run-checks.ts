@@ -23,6 +23,8 @@ import { formatDuplicatedCluster } from "./lint/oxlint/lib/duplicated-bodies/sit
 import { defaultPresetAdoptionConfig } from "./preset-adoption/config.ts";
 import { runPresetAdoptionChecks } from "./preset-adoption/run-preset-adoption-checks.ts";
 import { formatRepositoryProblem } from "./problem.ts";
+import { defaultRequiredFileFormConfig } from "./required-file-form/config.ts";
+import { runRequiredFileFormChecks } from "./required-file-form/run-required-file-form-checks.ts";
 import { defaultWorkflowChecksConfig } from "./workflows/config.ts";
 import { workflowOutcomesOf } from "./workflows/workflow-outcomes.ts";
 
@@ -43,39 +45,11 @@ const NO_TOOLCHAIN_CONFIG = "no toolchain configuration";
 
 const UNREADABLE_WORKSPACE_DEFINITION = "workspace definition does not parse";
 
-export const runChecks = (repositoryRoot: string): CheckReport => {
-  const dependencyCatalog = runDependencyCatalogChecks({
-    repositoryRoot,
-    config: defaultDependencyCatalogChecksConfig,
-  });
-  const entryComposition = entryCompositionProblems({
-    repositoryRoot,
-    config: defaultEntryCompositionConfig,
-  });
+const sourceScanOutcomes = (repositoryRoot: string): readonly CheckOutcome[] => {
   const repositoryFiles = listRepositoryFiles(resolve(repositoryRoot));
   const catalog = buildCanonicalValuesCatalog({ repositoryRoot });
-  const workflows = workflowOutcomesOf({
-    repositoryRoot,
-    config: defaultWorkflowChecksConfig,
-  });
-  const skills = shippedSkillsProblems({ repositoryRoot, config: defaultIntentSkillsConfig });
-  const presetAdoption = runPresetAdoptionChecks({
-    repositoryRoot,
-    config: defaultPresetAdoptionConfig,
-  });
-  const ruleIndex = dependencyCatalog.definitionUnreadable
-    ? { problems: [], scanned: 0 }
-    : lintRuleIndexProblems({ repositoryRoot, write: false });
 
-  const outcomes: readonly CheckOutcome[] = [
-    {
-      check: "entry-composition",
-      unit: "manifest",
-      count: entryComposition.scanned,
-      skippedReason: null,
-      problems: entryComposition.problems.map(formatRepositoryProblem).toSorted(),
-      warnings: [],
-    },
+  return [
     {
       check: "canonical-values",
       unit: "source file",
@@ -106,6 +80,45 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
         .toSorted(),
       warnings: [],
     },
+  ];
+};
+
+export const runChecks = (repositoryRoot: string): CheckReport => {
+  const dependencyCatalog = runDependencyCatalogChecks({
+    repositoryRoot,
+    config: defaultDependencyCatalogChecksConfig,
+  });
+  const entryComposition = entryCompositionProblems({
+    repositoryRoot,
+    config: defaultEntryCompositionConfig,
+  });
+  const workflows = workflowOutcomesOf({
+    repositoryRoot,
+    config: defaultWorkflowChecksConfig,
+  });
+  const skills = shippedSkillsProblems({ repositoryRoot, config: defaultIntentSkillsConfig });
+  const presetAdoption = runPresetAdoptionChecks({
+    repositoryRoot,
+    config: defaultPresetAdoptionConfig,
+  });
+  const requiredFileForm = runRequiredFileFormChecks({
+    repositoryRoot,
+    config: defaultRequiredFileFormConfig,
+  });
+  const ruleIndex = dependencyCatalog.definitionUnreadable
+    ? { problems: [], scanned: 0 }
+    : lintRuleIndexProblems({ repositoryRoot, write: false });
+
+  const outcomes: readonly CheckOutcome[] = [
+    {
+      check: "entry-composition",
+      unit: "manifest",
+      count: entryComposition.scanned,
+      skippedReason: null,
+      problems: entryComposition.problems.map(formatRepositoryProblem).toSorted(),
+      warnings: [],
+    },
+    ...sourceScanOutcomes(repositoryRoot),
     {
       check: "workflow-definitions",
       unit: "definition",
@@ -139,6 +152,14 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
       skippedReason: dependencyCatalog.definitionMissing ? NO_WORKSPACE_DEFINITION : null,
       problems: dependencyCatalog.problems.map(formatDependencyCatalogProblem).toSorted(),
       warnings: dependencyCatalog.warnings.map(formatDependencyCatalogProblem).toSorted(),
+    },
+    {
+      check: "required-file-form",
+      unit: "package root",
+      count: requiredFileForm.scanned,
+      skippedReason: null,
+      problems: requiredFileForm.problems.map(formatRepositoryProblem).toSorted(),
+      warnings: [],
     },
     {
       check: "preset-adoption",
