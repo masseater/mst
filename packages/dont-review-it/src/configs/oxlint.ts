@@ -29,6 +29,7 @@ import { noSingleUseLocalType } from "../lint/oxlint/rules/no-single-use-local-t
 import { noStandaloneTsconfig } from "../lint/oxlint/rules/no-standalone-tsconfig--extend-shared-preset.ts";
 import { noTautologicalAssertion } from "../lint/oxlint/rules/no-tautological-assertion--assert-on-a-computed-value.ts";
 import { noUnorderedImport } from "../lint/oxlint/rules/no-unordered-import--group-by-origin-then-sort-by-specifier.ts";
+import { noUnregisteredRulePlugin } from "../lint/oxlint/rules/no-unregistered-rule-plugin--enable-the-plugin.ts";
 import { noUnwrappedToolchainConfig } from "../lint/oxlint/rules/no-unwrapped-toolchain-config--call-the-preset-for-the-block.ts";
 import { noVacuousTestRun } from "../lint/oxlint/rules/no-vacuous-test-run--let-the-empty-run-fail.ts";
 import { requireReExportOnlyFiles } from "../lint/oxlint/rules/require-re-export-only-files--move-declaration-to-owning-module.ts";
@@ -129,6 +130,10 @@ export const oxlint: OxlintConfig = defineConfig({
     [`${PLUGIN_NAME}/${noTautologicalAssertion.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noTwinDeclaration.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noUnorderedImport.name}`]: LINT_SEVERITY.ERROR,
+    [`${PLUGIN_NAME}/${noUnregisteredRulePlugin.name}`]: [
+      LINT_SEVERITY.ERROR,
+      { plugins: [...UPSTREAM_PLUGINS, PLUGIN_NAME] },
+    ],
     [`${PLUGIN_NAME}/${noUnusedStyleClass.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noUnwrappedToolchainConfig.name}`]: LINT_SEVERITY.ERROR,
     [`${PLUGIN_NAME}/${noVacuousTestRun.name}`]: LINT_SEVERITY.ERROR,

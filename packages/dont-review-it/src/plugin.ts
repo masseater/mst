@@ -91,6 +91,7 @@ import { noUncheckedAuthoredPath } from "./lint/oxlint/rules/no-unchecked-author
 import { noUncheckedCast } from "./lint/oxlint/rules/no-unchecked-cast--parse-at-boundary.ts";
 import { noUndersizedExternalSnapshot } from "./lint/oxlint/rules/no-undersized-external-snapshot--use-inline-snapshot.ts";
 import { noUnorderedImport } from "./lint/oxlint/rules/no-unordered-import--group-by-origin-then-sort-by-specifier.ts";
+import { noUnregisteredRulePlugin } from "./lint/oxlint/rules/no-unregistered-rule-plugin--enable-the-plugin.ts";
 import { createNoUnusedStyleClass } from "./lint/oxlint/rules/no-unused-style-class--delete-or-reference-it.ts";
 import { noUnwrappedToolchainConfig } from "./lint/oxlint/rules/no-unwrapped-toolchain-config--call-the-preset-for-the-block.ts";
 import { noVacuousHostObjectEquality } from "./lint/oxlint/rules/no-vacuous-host-object-equality--assert-parsed-value.ts";
@@ -238,6 +239,7 @@ const plugin: Plugin = {
     [noUncheckedCast.name]: noUncheckedCast,
     [noUndersizedExternalSnapshot.name]: noUndersizedExternalSnapshot,
     [noUnorderedImport.name]: noUnorderedImport,
+    [noUnregisteredRulePlugin.name]: noUnregisteredRulePlugin,
     [noUnusedStyleClass.name]: noUnusedStyleClass,
     [noUnwrappedToolchainConfig.name]: noUnwrappedToolchainConfig,
     [noVacuousHostObjectEquality.name]: noVacuousHostObjectEquality,
