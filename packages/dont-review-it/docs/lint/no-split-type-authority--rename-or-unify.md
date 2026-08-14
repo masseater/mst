@@ -1,119 +1,171 @@
+---
+description: "Disallow an exported type whose name carries a second shape inside its workspace, or whose non-trivial shape carries a second name inside the repository, so a name and a structure keep pointing at each other one to one"
+---
+
 # no-split-type-authority--rename-or-unify
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-export された型宣言のうち、名前と構造の対応が 1 対 1 でなくなっているもの。型エイリアスとインターフェースの 2 形式を、ファイルのトップレベルに立っているものだけ見る。
+Disallow an exported type whose name carries a second shape inside its workspace, or whose non-trivial shape carries a second name inside the repository, so a name and a structure keep pointing at each other one to one
 
-検出する形は 2 つあり、見る範囲がそれぞれ違う。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-split-type-authority--rename-or-unify.ts`](../../src/lint/oxlint/rules/no-split-type-authority--rename-or-unify.ts)
 
-### 同じ名前が 2 つの構造を持つ
+<!-- END GENERATED rule-header -->
 
-1 つのワークスペース（自分の `package.json` を持つ最小の単位）の中で、同じ名前の公開型が正規化後に一致しない構造で宣言されている状態。報告は `splitTypeShape`。
+## Violation
 
-範囲をワークスペースに閉じるのは、パッケージをまたいだ同名が正常だからである。再利用可能なパッケージ群では、各パッケージが自分の入口の型に `Config` や `Options` のような同じ語を使う。名前空間が分かれている以上、それは 2 つの権威ではない。1 つのパッケージの公開 API が同じ名前に 2 つの構造を持っている状態は、名前空間が分かれていないので、そのまま契約の二重化になる。
+An exported type declaration where the correspondence between name and structure has stopped being one to one. Two forms are read — type aliases and interfaces — and only those standing at a file's top level.
 
-### 同じ構造が 2 つの名前を持つ
+Two shapes are detected, each over a different range.
 
-リポジトリ全体で、名前を除いた構造の正規形が一致する公開型が、違う名前で宣言されている状態。報告は `splitTypeName`。
+### One name carrying two structures
 
-こちらは範囲を広く取る代わりに、構造に下限を課す。メンバーが 3 つ以上あること、かつ少なくとも 1 つのメンバーが名前付きの型を参照していること。両方を満たしたものだけ突き合わせる。
+Inside one workspace (the smallest unit carrying its own `package.json`), a published type of the same name declared with structures that do not match after normalization. Reported as `splitTypeShape`.
 
-### 正規形の作り方
+The range closes on the workspace because the same name across packages is normal. In a set of reusable packages, each uses the same word — `Config`, `Options` — for the type at its own entrance. With the namespaces separated, that is not two authorities. One package's public API carrying two structures under one name has no separated namespace, and is a duplicated contract as it stands.
 
-2 つの形は同じ正規化を使う。同じものを使わないと、片方では一致して片方では一致しない領域ができ、その隙間が新しい回避先になる。
+### One structure carrying two names
 
-正規化が消すのは、書いても書かなくても意味が変わらない差だけである。
+Across the whole repository, published types whose canonical forms match with the name removed, declared under different names. Reported as `splitTypeName`.
 
-- メンバーの並び順
-- ユニオンの選択肢の並び順、インターセクションの構成要素の並び順
-- 型引数の名前。宣言された順で位置に置き換える
-- 空白・改行・区切り記号（構文木を見ているので最初から差にならない）
+That one takes a wide range and imposes a lower bound on the structure in exchange: three members or more, and at least one member referencing a named type. Only what meets both is reconciled.
 
-消さないものは、意味が変わる差である。`readonly` と `?` は残す。参照している型の名前も残すので、`ReadonlyMap<string, string>` と `ReadonlyMap<string, number>` は別の構造になる。
+### How the canonical form is built
 
-同じ名前の対応を見る側だけ、正規形に宣言形式（型エイリアスかインターフェースか）を含める。同じ名前が片方でインターフェース、片方で型エイリアスとして宣言されていれば、それは 1 つの名前が 2 つの宣言を持っている状態として報告する。構造の対応を見る側は宣言形式を含めない。含めると、インターフェースを型エイリアスに書き換えるだけで一致を外せてしまう。
+Both shapes use the same normalization. Use different ones and a region appears where one matches and the other does not, and that gap becomes a new place to escape to.
 
-### 索引の範囲
+Normalization erases only differences that mean nothing whether written or not.
 
-索引はリポジトリ根から作る。根は lint の実行ディレクトリから上に辿って決める。テストファイルとテスト用ディレクトリの配下、生成物、取得済みの依存、バージョン管理の内部領域は索引に入らない。判定は [no-duplicated-body--import-the-existing-declaration](./no-duplicated-body--import-the-existing-declaration.md) と同じものを使う。
+- The order of members
+- The order of a union's alternatives and an intersection's constituents
+- The names of type parameters, replaced by position in declaration order
+- Whitespace, newlines and separators (never differences to begin with, since the syntax tree is what is read)
 
-## なぜそれが要るか
+What it does not erase is what changes meaning. `readonly` and `?` stay. The names of referenced types stay, so `ReadonlyMap<string, string>` and `ReadonlyMap<string, number>` are different structures.
 
-守っている不変条件は「1 つの契約に持ち主が 1 人だけいる」ことである。
+Only the side reading the name correspondence includes the declaration form (type alias or interface) in the canonical form. Where one name is declared as an interface in one place and a type alias in another, that is one name carrying two declarations and is reported. The side reading the structure correspondence does not include the declaration form: including it would let a match be broken by rewriting an interface as a type alias.
 
-1 層目は、2 つの形がどちらも同じ壊れ方の局面だということ。同じ名前に 2 つの構造があると、名前を頼りに参照した読み手が、自分が思っているのと違う構造を掴む。同じ構造に 2 つの名前があると、片方を直した人が、同じ構造を持つもう一方の存在を知らないまま直し終える。どちらも、型検査は通り、テストも通る。
+### The range of the index
 
-2 層目は、この状態が完全一致の検出をすり抜けた後にしか現れないということ。このリポジトリで名前も本体も一致する宣言を止めているのは [no-twin-declaration--merge-into-one-owner](./no-twin-declaration--merge-into-one-owner.md) で、あちらは「2 つ目の権威が生まれた瞬間」を狙って止める設計になっている。その瞬間を過ぎた状態、つまり片方の名前を変えるか片方のメンバーをずらした後の状態を、あちらは意図的に手放している。手放した先に受け手がいなければ、一致を外す操作がそのまま回避策として働く。禁止を禁止のまま成立させるために、手放した先にも目を置く。
+The index is built from the repository root. The root is settled by walking up from the lint's working directory. Test files and everything under a test directory, build products, fetched dependencies and version control internals are not in the index. The judgment is the same one [no-duplicated-body--import-the-existing-declaration](./no-duplicated-body--import-the-existing-declaration.md) uses.
 
-機械に決められないのは「どちらが正しいか」であって、「2 つある」という事実ではない。このルールは事実だけを報告し、どちらへ寄せるかの判断は人に残す。自動修正を持たないのも同じ理由による。
+### The invariant
 
-## どう直すか
+One contract has exactly one owner.
 
-報告に並んだ 2 か所を両方読んでから、この 2 つが同じ概念かどうかを決める。決まれば直し方も決まる。
+The first layer is that both shapes are the same breakage seen from different sides. With two structures under one name, a reader who followed the name grabs a structure other than the one they had in mind. With two names over one structure, whoever fixes one finishes without knowing the other with the same structure exists. In both, the type check passes and the tests pass.
 
-### 同じ名前が 2 つの構造を持っているとき
+The second layer is that this state appears only after exact-match detection has been slipped past. What stops declarations matching in both name and body in this repository is [no-twin-declaration--merge-into-one-owner](./no-twin-declaration--merge-into-one-owner.md), designed to stop "the moment a second authority is born". The state past that moment — after one name is changed or one member is shifted — is deliberately released by that rule. With nobody receiving what it released, the act of breaking a match works as a bypass. To keep a prohibition standing as a prohibition, an eye is placed on what was released.
 
-- **別の概念だった** → 名前を分ける。どちらか片方ではなく、両方に自分の指すものを名乗らせる。片方だけ変えると、残った側が「一般的な名前を占有している方」として残ってしまう
-- **同じ概念だった** → 構造の差がどちらの都合で生まれたのかを見て、契約を所有するモジュールの構造に寄せる。寄せ終えた状態は名前も構造も一致するので、そこからは [no-twin-declaration--merge-into-one-owner](./no-twin-declaration--merge-into-one-owner.md) が「1 つに集約せよ」と続きを言う
+What a machine cannot settle is "which one is right", not "there are two". This rule reports the fact alone and leaves the choice of where to converge to a person. There is no automatic fix for the same reason.
 
-### 同じ構造が 2 つの名前を持っているとき
+### Configuration
 
-- **同じ概念だった** → 権威を 1 つ決めて他方を削除し、権威側を import する。どちらを権威にするかは、その型が表す契約を所有しているのがどのモジュールかで決める。先に書かれた方でも、報告に先に並んだ方でもない
-- **別の概念だった** → その違いを型の側に現す。区別のためのメンバーを持たせるか、片方を他方から導出する形に書き換える。構造が同じまま名前だけが違う状態を残さない
+None. Only whether the rule is on or off is settled by the configuration.
 
-## 禁じる回避策
+The lower bound is not exposed. With the bound in the configuration, whoever is reported can raise it and move their own declaration outside the condition, making the prohibition negotiable.
 
-- **使われないメンバーを足して構造をずらす。** ずらした結果はどちらの形にも当たらなくなるが、2 つの宣言が同じものを表している事実は変わらない
-- **メンバーの並びを入れ替える、ユニオンの選択肢を並べ替える、型引数を改名する。** どれも正規化が吸収するので一致は外れない
-- **インターフェースを型エイリアスに書き換える。** 構造の対応を見る側は宣言形式を見ていない
-- **名前に意味のない接尾辞を付けて別名にする。** 同じ構造が 2 つの名前を持つ状態がそのまま残る
-- **公開をやめて参照側から到達できる別の経路を用意する。** 公開の取り下げが正しいのは、その型を本当に外へ出さないときだけである
-- **ルールごと・パッケージごと・宣言ごとの除外。** どれも用意しない。「この名前は 2 つの構造を持ってよい」と設定に書けるようにすることは、二重の権威を設定で正当化することにほかならない
+There is no exception list either, for the same reason.
 
-## 何を検出しないか
+### Why the member lower bound is three
 
-- **名前が同じで、正規形も一致する宣言。** このルールが見ているのは対応が 1 対 1 でなくなった状態なので、正規形が一致する組は対象から外している。書き方まで同じものは [no-twin-declaration--merge-into-one-owner](./no-twin-declaration--merge-into-one-owner.md) が受ける
-- **1 つのファイルに分けて書かれた同名のインターフェース。** 言語が用意した宣言のマージであって 2 つの権威ではない。索引は同じファイルの同じ名前を 1 つの型としてまとめ、メンバーを合わせた 1 つの構造として扱う
-- **`declare module` の中で外部モジュールの型を拡張する宣言。** ファイルのトップレベルに立っていないので索引に入らない
-- **別々のワークスペースにある同名の公開型。** 名前の対応を見る範囲に入らない
-- **メンバーが 3 つに満たない構造、および名前付きの型を 1 つも参照しない構造。** 偶然一致するのが普通の形である
-- **一方が他方から導出されている宣言。** 型演算で他方を加工して作られた宣言は、権威が 1 つのまま派生を書いた姿である。相手の名前を参照している組は突き合わせから外す
-- **export されていないローカルな型。** ファイルの外から参照されないものは契約を主張していない
-- **宣言を伴わない再エクスポート。** このルールが推奨する直し方そのものである
-- **値の重複。** 定数・関数・処理の塊が 2 か所にある状態は [no-duplicated-body--import-the-existing-declaration](./no-duplicated-body--import-the-existing-declaration.md) と [no-twin-declaration--merge-into-one-owner](./no-twin-declaration--merge-into-one-owner.md) が担当する
+Where a type references named types, the most common shape is a carrier holding one key and one payload — `{ messageId, data }`, `{ relativePath, bodies }` — with two members. Two such types sit one member rename apart from matching each other, and that is the layer where coincidental matches first appear. At three members or more, three independent name choices, three annotation choices and the fact that one of them is a named type all coincide, so they do not line up exactly unless one was copied from the other. The bound sits one layer above where coincidence begins.
 
-## 2 本のルールが同じ箇所を報告することがある
+### What is not detected
 
-同じ構造が 2 つの名前を持つ組のうち、宣言の本体が構文木として完全に一致し、かつ本体が AST ノード 8 個以上あるものは、[no-duplicated-body--import-the-existing-declaration](./no-duplicated-body--import-the-existing-declaration.md) も報告する。植えた違反で確かめたところ、両方が同じ宣言を報告した。どちらの報告も同時に正しく、権威を 1 つに決めれば両方消える。片方を抑える細工は入れていない。
+- **Declarations sharing a name whose canonical forms also match.** What this rule reads is a correspondence that has stopped being one to one, so matching pairs are out of scope. Ones matching down to the spelling are received by [no-twin-declaration--merge-into-one-owner](./no-twin-declaration--merge-into-one-owner.md)
+- **Same-named interfaces written apart in one file.** That is the language's declaration merging, not two authorities. The index gathers the same name in the same file into one type and treats the combined members as one structure
+- **A declaration inside `declare module` augmenting an external module's types.** It does not stand at a file's top level and does not enter the index
+- **Same-named published types in separate workspaces.** Outside the range where the name correspondence is read
+- **A structure of fewer than three members, or one referencing no named type.** Matching by coincidence is the ordinary case there
+- **A declaration derived from the other.** A declaration built by transforming the other with type operations is one authority with a derivation written beside it. Pairs referencing each other's names are excluded from reconciliation
+- **A local type that is not exported.** What is not referenced from outside the file claims no contract
+- **A re-export with no declaration.** That is exactly the fix this rule recommends
+- **Duplicate values.** A constant, a function or a block of work standing in two places belongs to [no-duplicated-body--import-the-existing-declaration](./no-duplicated-body--import-the-existing-declaration.md) and [no-twin-declaration--merge-into-one-owner](./no-twin-declaration--merge-into-one-owner.md)
 
-このルールが余分に受けるのは、正規化が吸収する範囲の差である。メンバーの並びが違う、ユニオンの選択肢の並びが違う、型引数の名前が違う、片方がインターフェースで片方が型エイリアス。どれも本体の構文木としては一致しないので、あちらは素通りさせる。
+### Two rules can report the same place
 
-## 今は誰も受けていない状態
+Of the pairs where one structure carries two names, those whose declaration bodies match exactly as syntax trees and whose bodies hold eight AST nodes or more are reported by `no-duplicated-body--import-the-existing-declaration` too. Both reports are right at once, and settling on one authority clears both. No trick is built in to suppress one.
 
-同じ名前で、正規形は一致するが書き方が違う組（メンバーの並びを入れ替えただけ、型引数を改名しただけ、といった状態）は、どのルールも報告しない。このルールは正規形が一致する組を対象から外し、既存の 2 本は構文木の一致を見ているので並びの差で外れる。
+What this rule additionally receives are the differences normalization absorbs: a different member order, a different order of union alternatives, differently named type parameters, one being an interface and the other a type alias. None of those matches as a syntax tree, so that rule lets them past.
 
-これはこのルールの取りこぼしではなく、受け手がまだ居ないことによる。この状態を受けるのは「同じ名前の公開型が正規化後に完全一致する」を見るルールで、このリポジトリにはまだ無い。それが入るまで、この形は人が見つけることになる。
+### The state nobody currently receives
 
-## メンバー数の下限を 3 にした根拠
+A pair sharing a name whose canonical forms match while the spellings differ — members merely reordered, type parameters merely renamed — is reported by no rule. This rule excludes pairs whose canonical forms match, and the existing rules read syntax tree equality and come off on the ordering difference.
 
-導入時点のこのリポジトリで、公開されている型は 94 個ある。メンバー数の分布は次のとおりで、名前付きの型を参照するものは 34 個だった。
+That is not a miss on this rule's part but the absence of a receiver. What would receive it is a rule reading "published types of the same name match exactly after normalization", and this repository holds none. Until one arrives, a person finds this shape.
 
-| メンバー数 | 0   | 1   | 2   | 3   | 4   | 5   | 6   | 8   | 9   | 20  |
-| ---------- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 型の数     | 25  | 3   | 30  | 19  | 9   | 3   | 2   | 1   | 1   | 1   |
+## Fix
 
-正規形が一致する組は全体で 1 つだけあり、`TypeParameterPlaceholders` と `ImportRoutes` の 2 つだった。どちらも `ReadonlyMap` への別名で、メンバーは 0 個、名前付きの型を参照するメンバーも持たない。これは偶然の一致で、統合すべき重複ではない。
+Read both places in the report before settling whether the two are the same concept. Settle that and the fix settles too.
 
-観測できたのはここまでである。メンバーを 1 つでも持つ側では一致する組が 1 つも無かったので、下限を 1 から 6 のどこに置いても導入時点の報告数は 0 のまま変わらない。実測は下限 0 を否定するだけで、それより上を決めない。
+### Where one name carries two structures
 
-そこで分布の側から決めた。名前付きの型を参照する 34 個のうち、12 個がメンバー 2 個である。`RuleMessage` の `{ messageId, data }` や `IndexedFile` の `{ relativePath, bodies }` のように、鍵と中身を 1 組ずつ持つ運び手が最も多い形で、これらはメンバー名を 1 つ変えれば互いに一致する距離にある。偶然の一致が最初に現れるのはこの層である。メンバー 3 個以上になると、名前 3 つと注釈 3 つとそのうち 1 つが名前付きの型という独立した選択が重なるので、写したのでなければ完全には揃わない。下限をこの層の 1 つ上に置いた。
+- **They were different concepts** → split the names. Have both name what they point at, not just one. Change only one and what remains occupies the general name
+- **They were the same concept** → see which side's convenience produced the structural difference, and converge on the structure of the module owning the contract. The converged state matches in name and structure, and from there `no-twin-declaration--merge-into-one-owner` says the rest: gather them into one
 
-## 下限を設定に出さない理由
+### Where one structure carries two names
 
-下限が設定にあると、報告された側が下限を上げて自分の宣言を条件の外へ動かせるようになり、禁止が交渉可能になる。オプションは持たず、有効か無効かだけを設定側で決める。
+- **They were the same concept** → settle one authority, delete the other, and import the authority. Which is the authority is settled by which module owns the contract that type expresses — not whichever was written first, nor whichever appeared first in the report
+- **They were different concepts** → express the difference on the type side. Give it a distinguishing member, or rewrite one as derived from the other. Do not leave a state where the structure is the same and only the name differs
 
-例外リストを設けないのも同じ理由による。実測しても下限が 1 つの値に収束しない場合にだけ、設定化を検討し直す。
+<!-- BEGIN GENERATED examples -->
 
-## 導入時に報告された数
+Code this rule rejects.
 
-0 件。名前が 2 つの構造を持つ組も、非自明な構造が 2 つの名前を持つ組も、導入時点のこのリポジトリには無かった。
+```ts
+// a type whose name carries another shape in the workspace is reported
+export type Shape = { readonly a: string; readonly b: number; readonly c: Named };
+```
+
+```ts
+// a type whose structure carries another name in the repository is reported
+export type Shape = { readonly a: string; readonly b: number; readonly c: Named };
+```
+
+Code this rule accepts.
+
+```ts
+// a test file is never linted, so it is never reported
+export type Shape = { readonly a: string; readonly b: number; readonly c: Named };
+```
+
+```ts
+// a type declared twice with one shape is left to the rule that reads exact matches
+export type Shape = { readonly a: string; readonly b: number; readonly c: Named };
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- **Adding an unused member to shift the structure.** The shifted result hits neither shape, and that the two declarations express the same thing is unchanged
+- **Reordering members, reordering union alternatives, renaming type parameters.** Normalization absorbs all of them, so the match does not come off
+- **Rewriting an interface as a type alias.** The side reading the structure correspondence does not read the declaration form
+- **Adding a meaningless suffix to make another name.** One structure carrying two names stays exactly as it was
+- **Stopping the publication while providing another route reachable from the referencing side.** Withdrawing publication is right only where the type really is not going outside
+- **Per-rule, per-package and per-declaration exclusions.** None is offered. Writing "this name may carry two structures" in configuration is justifying a duplicated authority through configuration
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `SPLIT_SHAPE_MESSAGE_ID` | One name must not stand for two shapes. \`{{name}}\` is also declared with a different shape at {{sites}} of this workspace. Read both declarations, decide whether they name one concept, and land on a single shape for \`{{name}}\` or on a separate name for each shape. Shifting one shape until the two stop matching leaves the split standing. |
+| `SPLIT_NAME_MESSAGE_ID` | One shape must not stand for two names. \`{{name}}\` repeats a structure this repository also declares at {{sites}}. Read both declarations, decide whether they name one concept, and keep a single declaration to import everywhere or put the difference between them into the types. Adding a member until the two stop matching leaves the split standing. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->
