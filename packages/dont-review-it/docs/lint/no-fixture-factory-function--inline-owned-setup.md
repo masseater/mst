@@ -1,74 +1,102 @@
+---
+description: "Disallow a fixture handing back a function that builds the subject, so the setup a scenario runs is spelled out in the fixture that owns it rather than chosen again by every test block"
+---
+
 # no-fixture-factory-function--inline-owned-setup
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-spec ファイルの中の fixture 宣言について、その fixture が subject として何を返しているかを見る。返しているものが関数値であれば報告する。
+Disallow a fixture handing back a function that builds the subject, so the setup a scenario runs is spelled out in the fixture that owns it rather than chosen again by every test block
 
-対象のファイルはファイル名の接尾辞で決める。既定は `.test.ts` と `.test.tsx` で、`specFileSuffixes` で差し替えられる。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-fixture-factory-function--inline-owned-setup.ts`](../../src/lint/oxlint/rules/no-fixture-factory-function--inline-owned-setup.ts)
 
-fixture 宣言は 2 つの形を読む。
+<!-- END GENERATED rule-header -->
 
-| 形                     | 名前               | subject の位置        |
-| ---------------------- | ------------------ | --------------------- |
-| builder 形式           | 文字列リテラル引数 | factory の返り値      |
-| 旧来のオブジェクト形式 | プロパティキー     | `use(...)` に渡した値 |
+## Violation
 
-`extend` というメンバー名は共有するが受け手が `expect` である呼び出しは、カスタムマッチャの登録であって fixture 宣言ではない。この判定は fixture 宣言を読む共通処理側にあり、このルールを含む fixture 側の全ルールが同じ除外を持つ。
+For a fixture declaration in a spec file, what the fixture hands back as the subject is read. Where it hands back a function value, the report stands.
 
-subject の位置に置かれた式は、型アサーション・`satisfies`・非 null アサーション・括弧・オプショナルチェーン・`await` を剥いでから読む。剥いだ結果がアロー関数式または関数式であれば関数値とみなす。剥いだ結果が識別子であれば、fixture 本体の同名の `const` 宣言をたどり、その初期化子を同じ読み方で見る。たどる先が無い、あるいは同じ名前へ戻る場合はそこで止める。
+The files in scope are settled by the file name suffix. The default is `.test.ts` and `.test.tsx`, replaceable through `specFileSuffixes`.
 
-ゲートは名前ではなく返り値の側にある。`make` で始まる名前かどうかは判定を変えない。
+Two shapes of fixture declaration are read.
 
-報告は 2 つに分かれる。
+| Shape | The name | Where the subject sits |
+| --- | --- | --- |
+| The builder form | The string literal argument | The factory's return value |
+| The older object form | The property key | The value handed to `use(...)` |
 
-1. **仮引数を宣言している関数値**。既定値付きの仮引数も残余引数も仮引数として数える。この形は例外なく報告する
-2. **仮引数を宣言していない関数値**（サンク）。下の除外に当たらないときだけ報告する
+A call sharing the member name `extend` but whose receiver is `expect` registers a custom matcher and is not a fixture declaration. That judgment lives in the shared code reading fixture declarations, so every fixture-side rule, this one included, carries the same exclusion.
 
-### サンクの除外
+The expression in the subject position is read with type assertions, `satisfies`, non-null assertions, parentheses, optional chains and `await` peeled off. Where what is left is an arrow function expression or a function expression, it counts as a function value. Where what is left is an identifier, the same-named `const` declaration in the fixture body is followed and its initializer read the same way. Where there is nothing to follow, or where it returns to the same name, the walk stops.
 
-例外を検証するために「呼ぶと失敗する引数なしの関数」を fixture から返す形は、`no-expect-call-expression--yield-from-fixture` が指定している直し方そのものである。この形を落とさないために、次の 2 つを**同時に**満たすサンクだけを除外する。
+The gate is on the return side, not on names. Whether the name starts with `make` does not change the judgment.
 
-1. 返す関数値が仮引数を 1 つも宣言していない
-2. その fixture 名が、同じ spec の中で失敗を要求する assertion の subject としてしか読まれていない
+Reports divide into two.
 
-2 つ目は、fixture 名を分割代入で受け取っているテストブロックのコールバックを走査して判定する。取り出した束縛の参照を 1 つずつ見て、次のいずれかがあれば除外は成立しない。
+1. **A function value declaring parameters.** A defaulted parameter and a rest parameter both count as parameters. This shape is reported without exception
+2. **A function value declaring no parameters** (a thunk). Reported only where the exclusion below does not hold
 
-| 読まれ方 | 除外が成立しない理由 |
+### The thunk exclusion
+
+Returning "a function taking no arguments that fails when called" from a fixture, in order to verify an exception, is exactly the fix [no-expect-call-expression--yield-from-fixture](./no-expect-call-expression--yield-from-fixture.md) prescribes. So that this shape does not fall, a thunk is excluded only where **both** of these hold.
+
+1. The function value it returns declares no parameters
+2. That fixture name is read, inside the same spec, only as the subject of an assertion demanding a failure
+
+The second is settled by walking the test block callbacks that destructure the fixture name. Each reference to the extracted binding is read, and any of these means the exclusion does not hold.
+
+| How it is read | Why the exclusion does not hold |
 | --- | --- |
-| 失敗を要求しない assertion の subject | そのテストは subject の組み立てを自分で決めている |
-| assertion の subject 以外の位置 | 呼んで結果を assert する、他の値と組み合わせる、がここに入る |
-| 書き込みの参照 | 束縛が別の値に差し替わっており、何が読まれたか決まらない |
-| 別の fixture が依存として分割代入している | 組み立ての判断が別の fixture に渡っている。渡した先の中身は追わない |
-| 静的に名前が読めない受け方 | 既定値付き・入れ子・計算キーの分割代入。何に束縛されたか決まらない |
+| The subject of an assertion not demanding a failure | That test settles the subject's assembly for itself |
+| Any position other than an assertion's subject | Calling it and asserting on the result, or combining it with other values, lands here |
+| A write reference | The binding has been swapped for another value, and what was read is not settled |
+| Another fixture destructuring it as a dependency | The assembly decision has been handed to another fixture. What is inside that one is not followed |
+| A reception whose name cannot be read statically | A destructuring with a default, a nested one, a computed key. What it bound to is not settled |
 
-失敗を要求する assertion は 2 つの経路で判定する。マッチャ名が `toThrow` / `toThrowError` / `toThrowErrorMatchingSnapshot` / `toThrowErrorMatchingInlineSnapshot` のいずれかであるか、`expect(...)` とマッチャの間に `rejects` が挟まっているかである。`not` は名前を変えないので否定形は同じ経路で通る。`resolves` は失敗ではなく値を要求するので通らない。マッチャ名の集合は `throwExpectingMatchers` で差し替えられる。
+An assertion demanding a failure is settled by two routes: the matcher name being one of `toThrow`, `toThrowError`, `toThrowErrorMatchingSnapshot`, `toThrowErrorMatchingInlineSnapshot`, or a `rejects` standing between `expect(...)` and the matcher. `not` does not change the name, so a negated form passes through the same route. `resolves` demands a value rather than a failure and does not pass. The set of matcher names is replaceable through `throwExpectingMatchers`.
 
-どのテストブロックからも読まれていない fixture は、除外が成立する側に置く。この判定が見ているのは「失敗の要求以外の読まれ方が 1 つでもあるか」であり、読まれ方が 1 つも無ければその条件は満たされない。読まれ方が 1 つ足された瞬間に報告へ変わる。
+A fixture no test block reads is placed on the excluded side. What this judgment reads is "is there even one way of reading it other than demanding a failure", and with no readings at all that condition is not met. It turns into a report the moment one reading is added.
 
-### 意図的に広げていない範囲
+### Deliberately not widened
 
-| 形 | 対象にしない理由 |
+| Shape | Why it is left out |
 | --- | --- |
-| fixture 本体の中で定義され、返り値にならない関数 | subject ではない。setup の一部である |
-| fixture が返す識別子が別ファイル由来である場合 | 初期化子がこの実行系では読めない。読めないものを違反として扱わない |
-| コンテキストを丸ごと受け取るテストブロック | 何を読んでいるかが分割代入から決まらない。この形自体を別のルールが落とす |
-| コンテキストを rest でまとめて受ける形 | 同上 |
+| A function defined inside the fixture body and never returned | Not the subject. Part of the setup |
+| An identifier the fixture returns that comes from another file | The initializer cannot be read by this runtime. What cannot be read is not treated as a violation |
+| A test block receiving the whole context | What it reads is not settled from a destructuring. That shape is dropped by another rule |
+| A test block receiving the context as a rest | As above |
 
-後ろの 2 つは静的解析の限界ではなく、担当の分割である。コンテキストの受け方は `no-test-context-escape--destructure-fixtures-by-name` の担当で、そちらが落とすまでこのルールの走査はその fixture 名に届かない。届かないことは許していることを意味しない。
+The last two are a division of responsibility rather than a limit of static analysis. How the context is received belongs to [no-test-context-escape--destructure-fixtures-by-name](./no-test-context-escape--destructure-fixtures-by-name.md), and until that one drops it, this rule's walk does not reach that fixture name. Not reaching does not mean it is allowed.
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「fixture はそのシナリオの具体的な subject を返す」ことである。
+A fixture returns the concrete subject of that scenario.
 
-fixture が「subject を作る関数」を返すと、setup は再利用可能なラッパーの裏に隠れ、どう subject を作るかを各テストブロックが自分で決めることになる。同じ fixture から、テストごとに違う形の subject が出てくる。fixture を読んでもそのシナリオの setup は分からず、spec が単体で読める振る舞い契約であるという前提が崩れる。
+Where a fixture returns "a function that makes the subject", the setup hides behind a reusable wrapper and each test block settles for itself how the subject is made. Subjects of different shapes come out of the same fixture per test. Reading the fixture does not say what that scenario's setup is, and the premise that a spec is a behavioural contract readable on its own collapses.
 
-もう 1 層ある。この群の他のルールは「fixture が返した subject」を基準に判定している。subject が関数であれば、その関数を呼んだ結果が何であるかは静的には決まらず、構築・複写・射影を見ている検査はいずれも起点を失う。1 か所で fixture が返す値の形を緩めると、緩めた場所ではなく別のルールの検出が黙って減る。
+There is one more layer. The other rules of this bundle judge against "the subject the fixture returned". Where the subject is a function, what calling it yields is not settled statically, and every check reading construction, copying and projection loses its starting point. Loosen the shape of what a fixture returns in one place and the detection that quietly shrinks is not there but in another rule.
 
-これは spec 所有の setup という規範を spec の内部で反故にする形でもある。ヘルパーをファイルの外に置けなくしても、fixture が関数を返せるなら同じ抽象が spec の中に戻ってくる。
+It is also a way of voiding, from inside the spec, the norm that a spec owns its setup. Stop helpers from sitting outside the file and, as long as a fixture may return a function, the same abstraction comes back inside the spec.
 
-## どう直すか
+### Configuration
 
-setup を fixture の中にインラインで展開し、具体的な subject を返す。シナリオごとに fixture を分け、それぞれが自分の setup を持つ形にする。シナリオ間で setup が重複することは許容する。
+| Name | Default | What it changes |
+| --- | --- | --- |
+| `specFileSuffixes` | `.test.ts` / `.test.tsx` | Which files count as specs |
+| `throwExpectingMatchers` | `toThrow` / `toThrowError` / `toThrowErrorMatchingSnapshot` / `toThrowErrorMatchingInlineSnapshot` | The matcher names the thunk exclusion accepts as demanding a failure |
+
+Setting `throwExpectingMatchers` to an empty array leaves no thunk excluded except through a `rejects`. That is the only way in for removing the exclusion; disabling per file, or moving the rule to off, is dropped by [require-spec-lint-coverage--lint-every-spec-file](./require-spec-lint-coverage--lint-every-spec-file.md).
+
+There is no option for replacing `rejects`. It is a chain modifier rather than a matcher name, and the vocabulary of modifiers is held in one place by the assertion-reading side.
+
+## Fix
+
+Expand the setup inline inside the fixture and return the concrete subject. Split the fixtures per scenario so each holds its own setup. Setup duplicated between scenarios is accepted.
 
 ```ts
 const test = baseTest.extend("stem", () =>
@@ -80,7 +108,7 @@ test("drops the suffix from the file name", ({ stem }) => {
 });
 ```
 
-引数で振る舞いを変えていた factory は、引数の値ごとに fixture を分ける。
+Where a factory varied behaviour by its arguments, split the fixtures per argument value.
 
 ```ts
 const test = baseTest
@@ -88,27 +116,76 @@ const test = baseTest
   .extend("configuredStem", () => specStemOf("report.spec.ts", [".spec.ts"]));
 ```
 
-例外を検証する場合だけ、引数なしのサンクを返す。そのサンクは失敗を要求する assertion にしか渡さない。
+Return a thunk taking no arguments only to verify an exception, and hand that thunk to nothing but an assertion demanding a failure.
 
-## 禁じる回避策
+There is no automatic fix. Deleting the function and expanding it inline means settling the argument values that scenario actually needs, and that decision belongs to the writer's intent.
 
-- fixture 名を変えて検出を避ける。ゲートは返り値の側にあるので名前を変えても落ちる
-- 引数を消して引数なしの関数にし、サンクのふりをする。除外は読まれ方まで見るので、失敗を要求する assertion 以外で使っていれば成立しない
-- 関数値を型アサーションで包む、あるいは fixture の中で一度 `const` に束縛してから返す。どちらも剥がされ、たどられる
-- 関数を返す fixture を別の fixture に依存させ、そちら経由で使う。依存として分割代入された時点で除外は成立しない
-- factory をモジュールスコープの関数に出す。`no-spec-file-helper-function--inline-or-use-fixture` に当たる
-- factory を別ファイルに出す。`no-dry-test-setup--inline-owned-setup` に当たる
-- 抑制ディレクティブ
+<!-- BEGIN GENERATED examples -->
 
-自動修正は持たせない。関数を消してインラインに展開するには、そのシナリオが本当に必要とする引数の値を決めなければならず、その決定は書き手の意図に属する。
+Code this rule rejects.
 
-## オプション
+```ts
+// a factory taking the values its subject is built from hands the choice over
+// in report.test.ts
+const test = baseTest.extend("report", () => (port) => summarise(port));
+```
 
-| 名前 | 既定 | 何を変えるか |
-| --- | --- | --- |
-| `specFileSuffixes` | `.test.ts` / `.test.tsx` | どのファイルを spec とみなすか |
-| `throwExpectingMatchers` | `toThrow` / `toThrowError` / `toThrowErrorMatchingSnapshot` / `toThrowErrorMatchingInlineSnapshot` | サンクの除外が失敗の要求として認めるマッチャ名 |
+```ts
+// a thunk read once for something other than a failure is reported for that read
+// in report.test.ts
+const test = baseTest.extend("failing", () => () => summarise(-1));
+test("refuses a negative port", ({ failing }) => {
+  expect(failing).toThrow(new RangeError("port is negative"));
+});
+test("hands back a callable", ({ failing }) => {
+  expect(failing).toBeTypeOf("function");
+});
+```
 
-`throwExpectingMatchers` を空の配列にすると、`rejects` を挟む形以外のサンクは除外されなくなる。除外そのものを外したい場合の入口はここだけで、ファイル単位の無効化やルールの off へ移し替える形は `require-spec-lint-coverage--lint-every-spec-file` が落とす。
+Code this rule accepts.
 
-`rejects` を差し替えるオプションは置かない。これはマッチャ名ではなくチェーンの修飾子であり、修飾子の語彙は assertion の読み取り側が 1 か所で持っている。
+```ts
+// a fixture handing back the value the scenario produced owns its setup
+// in report.test.ts
+const test = baseTest.extend("report", () => summarise(3000));
+```
+
+```ts
+// a thunk every test block demands fail is the shape the thrown-value reading asks for
+// in report.test.ts
+const test = baseTest.extend("failing", () => () => summarise(-1));
+test("refuses a negative port", ({ failing }) => {
+  expect(failing).toThrow(new RangeError("port is negative"));
+});
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Renaming the fixture to avoid detection. The gate is on the return side, so a rename does not clear it
+- Dropping the parameters to make a no-argument function and pose as a thunk. The exclusion reads how it is used, so using it anywhere but an assertion demanding a failure means it does not hold
+- Wrapping the function value in a type assertion, or binding it to a `const` inside the fixture before returning. Both are peeled and followed
+- Making the function-returning fixture a dependency of another fixture and using it through that. The exclusion stops holding the moment it is destructured as a dependency
+- Lifting the factory into a module-scope function. That lands on [no-spec-file-helper-function--inline-or-use-fixture](./no-spec-file-helper-function--inline-or-use-fixture.md)
+- Lifting the factory into another file. That lands on [no-dry-test-setup--inline-owned-setup](./no-dry-test-setup--inline-owned-setup.md)
+- A suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `parameterisedFactory` | A fixture must not hand back a function that declares parameters. \`{{fixture}}\` hands one back, leaving every test block to pick the arguments its own subject is built from. Move the setup into this fixture, return the subject the scenario produces, and declare one fixture per scenario, repeating the setup the scenarios share. Renaming the fixture leaves the same function standing, and dropping the parameters to pass it off as a thunk leaves it reported. |
+| `handedBackFunction` | A fixture must not hand back a function as its subject. \`{{fixture}}\` hands one back, and the test blocks reading it ask for something other than a thrown value. Move the setup into this fixture, return the subject the scenario produces, and declare one fixture per scenario, repeating the setup the scenarios share. Wrapping the function in a type assertion, binding it to a name inside the fixture first, and handing it to the older \`use\` callback are all read the same way. Keep a thunk that takes no parameters only for assertions demanding a thrown value. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

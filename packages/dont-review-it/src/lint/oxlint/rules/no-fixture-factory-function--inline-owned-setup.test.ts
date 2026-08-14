@@ -10,6 +10,7 @@ describe("dont-review-it/no-fixture-factory-function--inline-owned-setup", () =>
     valid: [
       {
         name: "a fixture handing back the value the scenario produced owns its setup",
+        documented: true,
         filename: SPEC_FILE,
         code: `const test = baseTest.extend("report", () => summarise(3000));`,
       },
@@ -50,6 +51,7 @@ describe("dont-review-it/no-fixture-factory-function--inline-owned-setup", () =>
       },
       {
         name: "a thunk every test block demands fail is the shape the thrown-value reading asks for",
+        documented: true,
         filename: SPEC_FILE,
         code: `const test = baseTest.extend("failing", () => () => summarise(-1));\ntest("refuses a negative port", ({ failing }) => {\n  expect(failing).toThrow(new RangeError("port is negative"));\n});`,
       },
@@ -139,6 +141,7 @@ describe("dont-review-it/no-fixture-factory-function--inline-owned-setup", () =>
     invalid: [
       {
         name: "a factory taking the values its subject is built from hands the choice over",
+        documented: true,
         filename: SPEC_FILE,
         code: `const test = baseTest.extend("report", () => (port) => summarise(port));`,
         errors: [{ messageId: "parameterisedFactory" }],
@@ -205,6 +208,7 @@ describe("dont-review-it/no-fixture-factory-function--inline-owned-setup", () =>
       },
       {
         name: "a thunk read once for something other than a failure is reported for that read",
+        documented: true,
         filename: SPEC_FILE,
         code: `const test = baseTest.extend("failing", () => () => summarise(-1));\ntest("refuses a negative port", ({ failing }) => {\n  expect(failing).toThrow(new RangeError("port is negative"));\n});\ntest("hands back a callable", ({ failing }) => {\n  expect(failing).toBeTypeOf("function");\n});`,
         errors: [{ messageId: "handedBackFunction" }],
