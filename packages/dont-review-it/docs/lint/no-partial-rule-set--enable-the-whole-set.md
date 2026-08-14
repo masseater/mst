@@ -1,102 +1,152 @@
+---
+description: "Require a configuration naming any rule of a declared set to name the whole set at one severity in one scope on a run carrying the type information those rules read, so a set stands whole or stands nowhere"
+---
+
 # no-partial-rule-set--enable-the-whole-set
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-同じ不変条件を形ごとに分担するルール群（以下、束）のうち、一部だけを名指しした lint 設定。検査対象はソースコードではなく設定そのものである。
+Require a configuration naming any rule of a declared set to name the whole set at one severity in one scope on a run carrying the type information those rules read, so a set stands whole or stands nowhere
 
-束の定義はこのパッケージが持つ。2 つある。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-partial-rule-set--enable-the-whole-set.ts`](../../src/lint/oxlint/rules/no-partial-rule-set--enable-the-whole-set.ts)
 
-**single-assignment**（8 本）。「宣言箇所が最終値を決める」を分担する。
+<!-- END GENERATED rule-header -->
 
-| ルール | 欠けたときに開く穴 | 型情報 |
+## Violation
+
+A lint configuration naming only part of a rule set — a group of rules dividing one invariant between them. What is checked is the configuration itself rather than source code.
+
+The set definitions are held by this package. There are two.
+
+**single-assignment** (eight rules), dividing "the declaration settles the final value".
+
+| Rule | The hole its absence opens | Type information |
 | --- | --- | --- |
-| no-reassign--use-spread-or-iife | 再束縛可能な宣言と代入の形をとる書き込みが素通りする | 不要 |
-| no-array-mutation--derive-new-array | 配列へのメソッド呼び出し形の変異が丸ごと素通りする | 要 |
-| no-receiver-mutation--derive-new-value | 連想配列・集合・日時・自前クラスへのメソッド呼び出し形の変異が丸ごと素通りする | 要 |
-| no-class-as-mutable-cell--decide-in-an-iife | 局所の可変状態をクラスに包み直した形が素通りする | 要 |
-| no-promise-chain--use-async-await | 失敗処理がチェーンに散り、どの `catch` 節にも入らなくなる | 要 |
-| no-floating-promise--await-the-result | 誰も待たない Promise が失敗を落としたまま進む | 要 |
-| no-blanket-suppression--name-and-record | ルール名を書かない抑制が束の全員を一度に黙らせる | 不要 |
-| no-partial-rule-set--enable-the-whole-set | 束の一部だけを持つ設定が素通りする | 不要 |
+| no-reassign--use-spread-or-iife | Rebindable declarations and writes shaped as assignments pass through | Not needed |
+| no-array-mutation--derive-new-array | Every mutation shaped as a method call on an array passes through | Needed |
+| no-receiver-mutation--derive-new-value | Every mutation shaped as a method call on a map, a set, a date or a class of your own passes through | Needed |
+| no-class-as-mutable-cell--decide-in-an-iife | Local mutable state rewrapped in a class passes through | Needed |
+| no-promise-chain--use-async-await | Failure handling scatters across chains and enters no `catch` clause | Needed |
+| no-floating-promise--await-the-result | A promise nobody waits for carries on having dropped its failure | Needed |
+| no-blanket-suppression--name-and-record | A suppression naming no rule silences the whole set at once | Not needed |
+| no-partial-rule-set--enable-the-whole-set | A configuration holding only part of a set passes through | Not needed |
 
-**failure-routing**（4 本）。「失敗が必ずどこかで観測される」を分担する。
+**failure-routing** (four rules), dividing "a failure is always observed somewhere".
 
-| ルール | 欠けたときに開く穴 | 型情報 |
+| Rule | The hole its absence opens | Type information |
 | --- | --- | --- |
-| no-promise-chain--use-async-await | 失敗処理がチェーンに散り、どの `catch` 節にも入らなくなる | 要 |
-| no-empty-catch--throw-or-handle | 文を 1 つも持たない `catch` 節が素通りする | 不要 |
-| no-silent-catch--rethrow-or-handle | 失敗をどこにも記録しない `catch` 節が素通りする | 不要 |
-| no-floating-promise--await-the-result | 誰も待たない Promise が失敗を落としたまま進む | 要 |
+| no-promise-chain--use-async-await | Failure handling scatters across chains and enters no `catch` clause | Needed |
+| no-empty-catch--throw-or-handle | A `catch` clause holding not one statement passes through | Not needed |
+| no-silent-catch--rethrow-or-handle | A `catch` clause recording the failure nowhere passes through | Not needed |
+| no-floating-promise--await-the-result | A promise nobody waits for carries on having dropped its failure | Needed |
 
-2 本は両方の束に属する。片方の束を揃えても、もう片方に欠けがあれば束ごとに 1 件ずつ報告される。
+Two rules belong to both sets. Complete one set and, where the other has a gap, one report stands per set.
 
-読むのは、`rules` というキーがオブジェクトリテラルを指しているオブジェクトすべてである。**ファイル名では絞らない。** `vite.config.ts` の `lint` の中でも、パッケージが配る設定プリセットの中でも、同じ入口に入る。束のルール名が 1 つも書かれていないブロックは何も報告しないので、`rules` というキーを持つだけの別種のオブジェクトが対象に入ることはない。
+What is read is every object whose `rules` key points at an object literal. **There is no narrowing by file name.** Inside `lint` in `vite.config.ts`, and inside a configuration preset a package ships, both enter the same way in. A block naming not one rule of a set reports nothing, so another kind of object merely carrying a `rules` key never comes into scope.
 
-1 つの `rules` オブジェクトを 1 つの設定層として扱い、その中だけで突合する。`overrides` の要素が持つ `rules` は、それ自体が 1 つの層である。
+One `rules` object is treated as one configuration layer, and reconciliation closes inside it. The `rules` of an `overrides` element is a layer of its own.
 
-報告するのは次の 4 形である。
+Four shapes are reported.
 
-**1. 束の一部だけを名指しした層。** 名指しが 1 本でもあれば、その束の全員が同じ層に居なければならない。欠けたルール名と、欠けたことで開く穴を挙げて報告する。重大度は問わない。1 本を `off` にして残りに触れない形も、`off` にした 1 本だけが束から外れた状態なのでこの形に当たる。
+**1. A layer naming only part of a set.** With even one rule named, the whole set has to stand in the same layer. The missing rule names, and the holes their absence opens, are listed in the report. The severity is not read. Turning one off and leaving the rest untouched falls here too, because the one turned off is the one that left the set.
 
-**2. 束の中で重大度が揃っていない層。** 全員が名指しされていても、値が 1 つでなければ報告する。`error` / `deny` / 2 を 1 つの水準、`warn` / 1 を 1 つ、`off` / `allow` / 0 を 1 つとして読む。`[水準, 設定]` の形なら先頭を、名前付き定数のメンバーならそのメンバー名を読む。報告は弱いほうに出す。
+**2. A layer where the severity is not aligned across the set.** Even with everyone named, the report stands unless the value is one. `error` / `deny` / 2 read as one level, `warn` / 1 as one, and `off` / `allow` / 0 as one. For the `[level, options]` form the head is read, and for a member of a named constant the member name. The report stands on the weaker side.
 
-**3. 重大度がこの規則から読めない層。** 束のルールに、変数など解決できない式が置かれている形。読めない値を揃っているとみなすと、値を設定の外へ逃がすだけで 2 を回避できる。
+**3. A layer whose severity this rule cannot read.** A set rule holding an unresolvable expression such as a variable. Treat an unreadable value as aligned and shape 2 is evaded by moving the value outside the configuration.
 
-**4. 型情報を持たない実行系に置いた層。** 束には型情報がなければ成立しないルールがある。それらを `off` 以外で名指ししている層は、同じ設定の中で `options.typeAware` が `true` と書かれていなければ報告する。判定は、その層自身か、その層を囲むオブジェクトのどれかが書いているかで行う。`overrides` の中の層は、外側の設定が書いた宣言を受け取る。
+**4. A layer placed on a runtime without type information.** Some rules of a set do not hold without type information. A layer naming those at anything but `off` is reported unless `options.typeAware` is written as `true` in the same configuration. The judgment reads whether that layer itself, or any object enclosing it, writes it. A layer inside `overrides` receives the declaration the outer configuration wrote.
 
-名前の照合は最後の `/` 以降で行うので、`dont-review-it/` を付けた綴りでも付けない綴りでも同じ 1 本を指す。
+Names are matched after the last `/`, so a spelling with `dont-review-it/` and one without name the same rule.
 
-## なぜそれが要るか
+### The invariant
 
-1 層目は、束のルールが単体では意味を成さない分担関係にあることである。no-reassign--use-spread-or-iife は代入の形を型を見ずに担当し、メソッド呼び出し形を no-array-mutation--derive-new-array と no-receiver-mutation--derive-new-value へ渡す。no-promise-chain--use-async-await は失敗処理を `catch` 節へ集約し、その中身の検査を failure-routing の 2 本へ渡す。渡した先が無効な設定では、渡した側は「その形を検出しない」と宣言しただけの状態になる。分担は、全員が居ることを前提にしたときだけ分担である。
+The first layer is that the rules of a set stand in a division of labour that means nothing alone. `no-reassign--use-spread-or-iife` takes the assignment shape without reading types and hands method-call shapes to `no-array-mutation--derive-new-array` and `no-receiver-mutation--derive-new-value`. `no-promise-chain--use-async-await` gathers failure handling into `catch` clauses and hands checking their contents to the two failure-routing rules. In a configuration where the receiver is disabled, the handing side has merely declared that it does not detect that shape. A division is a division only on the premise that everyone is present.
 
-2 層目は、この条件を各ルールの文書に注意書きとして書くと、守るのが設定を書いた人になり、守られたかどうかを誰も確認しないことである。設定ファイルはリポジトリの中にあって走査できる。走査できるものを人の注意力に預ける理由が無い。
+The second layer is that writing this condition as a note in each rule's document makes whoever wrote the configuration responsible for it, with nobody confirming it was kept. A configuration file sits in the repository and can be walked. There is no reason to entrust to human attention what can be walked.
 
-3 層目は、部分採用が規律の弱い版ではないことである。一部だけが有効な設定では、書き手は「機械が止めないほうの形」を学習する。学習された迂回は、後から全員を有効にしたときに大量の違反として噴出するか、迂回した形が既定のまま残る。どちらも、最初から何も入れなかった場合より状態が悪い。
+The third layer is that partial adoption is not a weaker version of the discipline. Under a configuration where only part is enabled, a writer learns the shape the machine does not stop. The learnt detour either erupts as a mass of violations when everyone is later enabled, or stays as the default. Both leave the state worse than adding nothing at all.
 
-型情報の要否を実行系の構成から読むのは、前提条件を文書に書くだけでは、型なしの実行系に束を置いた設定が黙って通ってしまうためである。その設定では、型を読むルールが 1 件も報告しないまま緑になる。
+Whether type information is required is read from the runtime's configuration because writing the precondition in a document alone lets a configuration placing a set on an untyped runtime pass silently. Under that configuration, the rules that read types report nothing and it goes green.
 
-## どう直すか
+### Configuration
 
-方向は 2 つで、中間は無い。
+None.
 
-**全員を有効にする。** 束の全員を同じ `rules` ブロックに、同じ重大度で書く。型を読むルールを含む束を持つなら、同じ設定に `options.typeAware: true` を書く。これが既定である。
+Give this rule options and they become the way in for permitting partial adoption through configuration. A shape letting the set definition be rewritten from the configuration side, and one letting exclusion ranges be given from there, are refused for the same reason.
 
-**全員を無効にする。** 束を採用しない判断そのものはこの規則の対象外である。全員を `off` で並べた層は報告しない。
+There is no automatic fix either. There are two directions for aligning — "enable the disabled ones" and "disable the enabled ones" — and which to take is the judgment of whether to adopt the discipline at all. That is not a machine's to settle.
 
-除外範囲を設ける場合は、束の全員に同じ範囲を与える。`overrides` を 1 件足し、その `files` の下に束の全員を並べる。範囲の妥当性は各ルールの決定事項で、この規則は束の中で揃っているかだけを見る。
+Type information is not needed.
 
-束の一部が導入先の事情で入れられないなら、全員を入れないという判断をする。入れられない事情そのものを報告し、束の定義を見直すかどうかの材料にする。
+### Where the detection does not reach
 
-## 禁じる回避策
+A configuration reached through `extends` is not read. Reconciliation closes inside one `rules` block. So the layer shipping the defaults and the layer receiving them are checked separately. Where the receiving side wants to pass options to one rule of a set, it too lines the whole set up at the same severity in that layer. It looks redundant, and it leaves a state where reading that layer alone shows the set is complete.
 
-- 束の一部だけを名目上有効にし、重大度を最も弱い値にする。検出形 2 が報告する
-- 束の一部だけを、ほぼ全ファイルを除外する `overrides` で有効にする。その `overrides` は束の一部しか持たないので検出形 1 が報告する
-- 重大度を設定ファイルの外の変数へ逃がす。検出形 3 が報告する
-- 束を 2 つの設定ファイルに割って、それぞれが一部だけを持つ形にする。層ごとに突合するので、両方が報告される
-- 汎用の lint 無効化コメントでこの規則自身を黙らせる。no-blanket-suppression--name-and-record が報告する
-- 束の定義からルールを削って揃った形にする。定義はこのパッケージの中にあり、設定からは動かせない
+Rule names assembled at run time are not read. A block using a template literal or a variable as a key cannot be settled on which rule it names, so it does not count as naming a set member. A plugin registering its own rules in bulk takes this shape.
 
-## 検出が届かない範囲
+Conversely, where a plugin writes rule names as string literals under `rules` with rule implementations as the values, this rule sees a configuration naming part of a set. The implementation cannot be read as a severity, so shape 3 comes out too. Writing it with the rule object's `name` as a computed key keeps that text out of this rule's way in.
 
-`extends` の先にある設定は読まない。突合は 1 つの `rules` ブロックの中で閉じる。したがって、既定を配る側の層と、それを受け取る側の層は別々に検査される。受け取る側で束の 1 本にだけ設定を渡したい場合も、その層に束の全員を同じ重大度で並べることになる。冗長に見えるが、その層だけを読んで束が揃っているとわかる状態が残る。
+A severity given as a CLI argument, configuration written in JSON or YAML, and an operation that never starts the linter do not enter this rule's input. Holding the same invariant on those hosts needs a separate receiver.
 
-実行時に組み立てたルール名は読まない。テンプレートリテラルや変数をキーに使ったブロックは、どのルールを指しているか確定できないので束の名指しとして数えない。プラグインが自分のルールをまとめて登録する記述はこの形になる。
+Whether type information is present is read only from `options.typeAware` being written as `true`. That spelling is vite-plus's lint option. Where another host passes type information under another spelling, this rule sees an untyped runtime.
 
-逆に、プラグインが `rules` の下にルール名を文字列リテラルで書き、値にルールの実装を置いている場合、この規則からは束の一部を名指しした設定に見える。実装は重大度として読めないので検出形 3 も出る。ルールオブジェクトの `name` を計算キーに使う書き方にすれば、その記述はこの規則の入口に入らない。
+Which rules go into a set is written by a person. The soundness of the definition itself sits outside this rule.
 
-CLI の引数で与えた重大度、JSON や YAML で書かれた設定、リンタを起動しない運用は、この規則の入力に入らない。同じ不変条件をそれらのホストで守る受け手は別に要る。
+## Fix
 
-型情報の有無は `options.typeAware` が `true` と書かれているかだけで読む。この綴りは vite-plus の lint オプションである。別のホストが別の綴りで型情報を渡している場合、この規則からは型なしに見える。
+Two directions, with nothing in between.
 
-束にどのルールを入れるかは人が書く。定義そのものの妥当性はこの規則の外にある。
+**Enable everyone.** Write the whole set in the same `rules` block at the same severity. Where the set holds rules that read types, write `options.typeAware: true` in the same configuration. This is the default.
 
-## オプション
+**Disable everyone.** The decision not to adopt a set is outside this rule. A layer lining everyone up at `off` is not reported.
 
-持たない。
+To set an exclusion range, give the whole set the same range: add one `overrides` entry and line the whole set up under its `files`. The soundness of the range is each rule's own decision; this rule reads only whether the set is aligned.
 
-このルールにオプションを持たせると、それが部分採用を設定で許す入口になる。束の定義を設定側から書き換えられる形も、除外範囲を設定側から与えられる形も、同じ理由で採らない。
+Where part of a set cannot be introduced for reasons at the destination, decide not to introduce any of it. Report the reason itself, as material for reconsidering the set's definition.
 
-自動修正も提供しない。揃え方には「無効なほうを有効にする」と「有効なほうを無効にする」の 2 方向があり、どちらを採るかは規律を採用するかどうかの判断そのものである。機械が決めてよいものではない。
+<!-- BEGIN GENERATED examples -->
 
-型情報は要らない。
+Code this rule rejects.
+
+```ts
+// a configuration naming one rule of a set is reported with the rules it leaves out
+export default { lint: { rules: { "no-reassign--use-spread-or-iife": "error" } } };
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Nominally enabling part of a set at the weakest severity. Shape 2 reports it
+- Enabling part of a set through an `overrides` that excludes almost every file. That `overrides` holds only part of the set, so shape 1 reports it
+- Escaping the severity into a variable outside the configuration file. Shape 3 reports it
+- Splitting the set across two configuration files so each holds part. Reconciliation runs per layer, so both are reported
+- Silencing this rule itself with a general lint-disabling comment. `no-blanket-suppression--name-and-record` reports it
+- Removing a rule from the set definition to make it look aligned. The definition lives inside this package and cannot be moved from a configuration
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `PARTIAL_RULE_SET_MESSAGE_ID` | A lint configuration must not hold part of the \`{{ruleSet}}\` rule set. This block names \`{{namedRule}}\` and leaves out {{missingRules}}, and each rule left out opens a hole: {{holes}}. Name every rule of the set in this block at one severity, or name none of them. Part of a set is not a milder discipline, it is the look of one laid over the holes it leaves. |
+| `SCOPED_PARTIAL_RULE_SET_MESSAGE_ID` | An override must not take part of the \`{{ruleSet}}\` rule set out of scope. It covers {{scope}}, names \`{{namedRule}}\`, and leaves out {{missingRules}}, leaving those paths with the holes: {{holes}}. Give every rule of the set the same scope in this override, or delete the override. Part of a set is not a milder discipline, it is the look of one laid over the paths it covers. |
+| `UNEVEN_SEVERITY_MESSAGE_ID` | A lint configuration must not hold the \`{{ruleSet}}\` rule set at more than one severity. \`{{ruleName}}\` sits at \`{{severity}}\` and \`{{matchedRule}}\` sits at \`{{matchedSeverity}}\`, and the weaker of the two leaves a hole: {{hole}}. Raise \`{{ruleName}}\` to \`{{matchedSeverity}}\`, or lower every rule of the set to one severity. A set split across two severities is not a milder discipline, it is the look of one laid over the half nobody has to obey. |
+| `UNREADABLE_SEVERITY_MESSAGE_ID` | A severity this rule cannot read must not stand on \`{{ruleName}}\`, a rule of the \`{{ruleSet}}\` set. Write the severity of every rule of the set as a literal in this block, or name none of them. |
+| `TYPELESS_RULE_SET_HOST_MESSAGE_ID` | A run carrying no type information must not host \`{{ruleName}}\`, a rule of the \`{{ruleSet}}\` set that reads types. Set \`options.typeAware\` to \`true\` in this configuration, or take every rule of the set out of it. A typeless run leaves that rule reporting nothing, and this hole stays open: {{hole}}. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->
