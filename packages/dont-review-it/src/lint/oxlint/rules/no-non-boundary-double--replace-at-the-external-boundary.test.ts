@@ -29,6 +29,7 @@ describe("dont-review-it/no-non-boundary-double--replace-at-the-external-boundar
     valid: [
       {
         name: "a module that lives outside this repository is a boundary the spec may take",
+        documented: true,
         code: "vi.mock('node:child_process');",
         filename: SPEC_FILE,
       },
@@ -80,6 +81,7 @@ describe("dont-review-it/no-non-boundary-double--replace-at-the-external-boundar
     valid: [
       {
         name: "a module that owns the boundary itself is the place to replace",
+        documented: true,
         code: "vi.mock('./transport.ts');",
         filename: SPEC_FILE,
       },
@@ -92,6 +94,7 @@ describe("dont-review-it/no-non-boundary-double--replace-at-the-external-boundar
     invalid: [
       {
         name: "a module whose output is determined by its input is reported",
+        documented: true,
         code: "vi.mock('./compose.ts');",
         filename: SPEC_FILE,
         errors: [{ messageId: "determinedModuleDouble" }],
@@ -122,6 +125,7 @@ describe("dont-review-it/no-non-boundary-double--replace-at-the-external-boundar
     invalid: [
       {
         name: "a module that reaches the outside only through another module is reported",
+        documented: true,
         code: "vi.mock('./send.ts');",
         filename: SPEC_FILE,
         errors: [{ messageId: "insideBoundaryDouble" }],

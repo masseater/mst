@@ -1,87 +1,151 @@
+---
+description: "Disallow replacing a module that does not own an external I/O boundary itself, so a spec cannot take the code it is supposed to be checking out of the run and call what is left a verification"
+---
+
 # no-non-boundary-double--replace-at-the-external-boundary
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-spec ファイルに書かれたモジュールの差し替え（`vi.mock` と `vi.doMock`）のうち、差し替える対象がこのリポジトリのモジュールであり、かつそのモジュール自身が外部 I/O を持っていないものを報告する。
+Disallow replacing a module that does not own an external I/O boundary itself, so a spec cannot take the code it is supposed to be checking out of the run and call what is left a verification
 
-対象の同定は指定子の解決で行う。文字列リテラル・テンプレートリテラル・`import("...")` のいずれで書かれていても同じ指定子として読み、spec ファイルの位置から解決する。解決できなかった指定子（node の組み込みと `node_modules` のパッケージ）はこのリポジトリの外にあり、そこが境界なので報告しない。ワークスペースのパッケージ名で書かれた指定子は、そのパッケージが公開しているエントリを対象として読む。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-non-boundary-double--replace-at-the-external-boundary.ts`](../../src/lint/oxlint/rules/no-non-boundary-double--replace-at-the-external-boundary.ts)
 
-解決できた対象については、そのモジュールが import している指定子を見る。外部 I/O の語彙に載っている指定子を **直接** import していれば、そのモジュールが境界を持っている。報告しない。
+<!-- END GENERATED rule-header -->
 
-直接持っていないときは、そこから import を推移的にたどる。
+## Violation
 
-- たどった先に境界を持つモジュールが 1 つも無ければ、入力から出力が決まるモジュールである（`determinedModuleDouble`）
-- たどった先に境界を持つモジュールがあれば、対象は境界の手前に立っている（`insideBoundaryDouble`）。報告文はそのモジュールの位置を名指しする
+A module replacement written in a spec file (`vi.mock` and `vi.doMock`) whose target is a module of this repository and where that module itself holds no external I/O.
 
-外部 I/O の語彙は 2 つに割れる。node の組み込みは名前で決まるのでルールが既定として持つ。`node_modules` のパッケージは中まで辿れないので、利用側が `externalIoPackages` に名前を並べる。人が宣言するのはここだけである。
+The target is identified by resolving the specifier. Written as a string literal, a template literal or `import("...")`, it is read as the same specifier and resolved from the spec file's position. A specifier that does not resolve — a node built-in, or a package in `node_modules` — lies outside this repository and is the boundary itself, so it is not reported. A specifier written as a workspace package name is read against the entry that package publishes.
 
-### 他のルールとの境界
+For a resolvable target, the specifiers that module imports are read. Importing a specifier in the external I/O vocabulary **directly** means that module holds a boundary. Not reported.
 
-差し替えの是非を見るルールは、見ているものが違う 3 本で分担している。
+Where it does not hold one directly, imports are followed transitively from there.
 
-| 形 | 見ているもの |
+- Where the walk reaches no module holding a boundary, it is a module whose output is settled by its input (`determinedModuleDouble`)
+- Where the walk reaches a module holding a boundary, the target stands in front of the boundary (`insideBoundaryDouble`). The message names that module's position
+
+The external I/O vocabulary splits in two. Node built-ins are settled by name, so the rule holds them as a default. Packages in `node_modules` cannot be walked into, so a consumer lists their names in `externalIoPackages`. That is the only place a person declares anything.
+
+### The boundary with the other rules
+
+The rules reading whether a replacement is permissible divide across three, each reading something different.
+
+| Shape | What reads it |
 | --- | --- |
-| ファイルシステムを spec ごとに差し替える | `no-local-file-system-mock--use-shared-fs` |
-| 標準入出力のダブルを spec ごとに組み立てる | `no-handmade-standard-io-double--use-standard-io-test` |
-| 差し替えたモジュールに挙動を書く | `no-vi-mock-factory-behavior--use-spy-true-and-fixture` |
-| 差し替えてよい対象かどうか | 本ルール |
+| Replacing the file system per spec | [no-local-file-system-mock--use-shared-fs](./no-local-file-system-mock--use-shared-fs.md) |
+| Building a standard I/O double per spec | [no-handmade-standard-io-double--use-standard-io-test](./no-handmade-standard-io-double--use-standard-io-test.md) |
+| Writing behaviour into a replaced module | [no-vi-mock-factory-behavior--use-spy-true-and-fixture](./no-vi-mock-factory-behavior--use-spy-true-and-fixture.md) |
+| Whether the target may be replaced at all | This rule |
 
-上の 2 本が扱う `node:fs` と標準入出力はこのリポジトリの外にあり、本ルールから見れば境界そのものなので報告しない。同じ違反を 2 本が別々の言葉で報告する状態は作らない。
+The `node:fs` and standard I/O the first two handle lie outside this repository and are, from this rule's view, the boundary itself, so they are not reported. A state where two rules report the same violation in different words is not built.
 
-### 判定が届かない範囲
+### Where the judgment does not reach
 
-- `vi.spyOn(object, "member")` は対象がモジュールではなくオブジェクトなので、この解析が効かない
-- 実行時に組み立てた指定子は読めない。これは `forbid-unresolvable-module-specifier--write-a-statically-resolvable-specifier` が塞いでいる
-- 再 export をまたぐ同定には限界がある。型情報を使わず、指定子の解決とファイルの import だけを見ている
+- `vi.spyOn(object, "member")` targets an object rather than a module, so this analysis does not apply
+- A specifier assembled at run time cannot be read. That is closed by [forbid-unresolvable-module-specifier--write-a-statically-resolvable-specifier](./forbid-unresolvable-module-specifier--write-a-statically-resolvable-specifier.md)
+- Identification across re-exports has limits. No type information is used; only specifier resolution and a file's imports are read
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「置き換えてよいのは、そのテストがもともと何も主張していない領域だけである」ことである。[テストの書き方](../../../../docs/guidelines/tests.md)が 2 つの禁止としてこれを書いている。
+What may be replaced is only the region that test was claiming nothing about in the first place. [How tests are written](../../../../docs/guidelines/tests.md) states this as two prohibitions: do not replace an in-process dependency whose output is settled by its input, and where a failure of an external process or a communication fault has to be created, keep the replacement at that same external boundary rather than stepping inside it.
 
-> PROHIBIT: 入力から出力が決まるプロセス内の依存を置き換える
+The norm existed with no layer enforcing it. A per-boundary rule teaches "how to handle that boundary correctly"; no layer read "may this target be replaced at all".
 
-> IF: 再現できない外部プロセスの失敗や通信の障害を作る; THEN MUST: 置き換える位置を同じ外部境界に留める / PROHIBIT: その内側へ踏み込む
+About whatever was replaced, the test claims nothing. A test that replaced a module whose output is settled by its input has taken what it could have verified out of the run itself and submitted the remainder as evidence. A test that replaced in front of a boundary has, on top of that, taken the modules between the target and the boundary out of the run too. Neither turns red. The tests pass, and the vanished range meets nobody's eye.
 
-規範はあったが、強制する層が無かった。境界ごとの個別ルールは「その境界の正しい扱い方」を教えるもので、「そもそも差し替えてよい対象か」を見る層はどこにも無かった。
+### Why it is settled by reach rather than by declaration
 
-差し替えた対象について、そのテストは何も主張しなくなる。入力から出力が決まるモジュールを差し替えたテストは、検証できたはずのものを自分で run から外し、残ったものを証拠として提出している。境界の手前で差し替えたテストは、それに加えて、対象と境界の間にあるモジュールの分まで run から外している。どちらも赤くならない。テストは通り、消えた範囲は誰の目にも触れない。
+A shape declaring "the list of targets that may be replaced" as configuration and reconciling against it is available. It is not taken. That is not a judgment but a relocated declaration, and nobody verifies whether the list is right. Being in the list becomes the grounds, so the moment a module is added, it may be replaced.
 
-### なぜ宣言ではなく到達で決めるのか
+Settle it by reach and the grounds sit in the code. Whether a module holds external I/O is settled by what it imports, and rewriting the imports changes the judgment. All a person declares is the names of `node_modules` packages, and that is the minimum declaration following from the fact that they cannot be walked into.
 
-「差し替えてよい対象の一覧」を設定として宣言し、それと突き合わせる形も採れる。採らない。それは判定ではなく宣言の移動であり、「その一覧が正しいか」を誰も検証しないままになる。一覧に載っていることが根拠になるので、載せた瞬間にどのモジュールも差し替えてよくなる。
+### Configuration
 
-到達で決めれば、根拠はコードの側にある。あるモジュールが外部 I/O を持つかどうかは、そのモジュールが何を import しているかで決まっており、import を書き換えれば判定も変わる。人が宣言するのは `node_modules` のパッケージ名だけで、それは中を辿れないという事実に由来する最小限の宣言である。
+- `externalIoModules` — the built-in modules holding external I/O. The default lines up the ways in for the file system, the process, the network, the clock and randomness, and holds both the `node:`-prefixed and unprefixed spellings
+- `externalIoPackages` — the `node_modules` package names holding external I/O. The default is empty; a consumer lists them. A specifier with a subpath (`undici/fetch`) counts as the same package where its leading part is listed here
+- `moduleReplacementMembers` — the member spellings read as a module replacement
+- `specFileSuffixes` — the suffixes read as spec files
 
-## どう直すか
+### Not violations
 
-**入力から出力が決まるモジュールだった場合。** 差し替えの宣言を消し、本物を呼ぶ。テストが用意したい値があるなら、その値を対象の引数として渡す。渡せる形になっていないなら、注入境界を作るのは実装の側の設計変更であり、[テストの書き方](../../../../docs/guidelines/tests.md)の「本物をどこまで残すか」がその条件を持っている。
+- Node built-ins and `node_modules` packages. They lie outside this repository and are the boundary
+- A module directly importing external I/O
+- A replacement written in a file that is not a spec
+- A specifier that cannot be read statically
 
-**境界の手前だった場合。** 報告文が名指ししているモジュールへ宣言を移す。そこがこのリポジトリで外部 I/O を持っているモジュールである。
+## Fix
+
+**Where it was a module whose output is settled by its input.** Delete the replacement declaration and call the real thing. Where the test wants to prepare a value, hand that value to the target as an argument. Where it is not in a shape that accepts one, building an injection boundary is a design change on the implementation side, and "how much of the real thing to keep" in [how tests are written](../../../../docs/guidelines/tests.md) holds the conditions for it.
+
+**Where it was in front of the boundary.** Move the declaration to the module the message names. That is the module holding external I/O in this repository.
 
 ```ts
-// 報告される。send.ts は transport.ts を通してしか外へ出ない
+// reported: send.ts leaves only through transport.ts
 vi.mock(import("./send.ts"), { spy: true });
 
-// 通る。transport.ts が node:fs を直接 import している
+// passes: transport.ts imports node:fs directly
 vi.mock(import("./transport.ts"), { spy: true });
 ```
 
-## 違反にならないもの
+<!-- BEGIN GENERATED examples -->
 
-- node の組み込みと `node_modules` のパッケージ。このリポジトリの外にあり、そこが境界である
-- 外部 I/O を直接 import しているモジュール
-- spec でないファイルに書かれた差し替え
-- 静的に読めない指定子
+Code this rule rejects.
 
-## 禁じる回避策
+```ts
+// a module whose output is determined by its input is reported
+// in packages/mailer/src/send.test.ts
+vi.mock('./compose.ts');
+```
 
-- 差し替えたい対象に外部 I/O の import を 1 つ足して境界に見せる。境界の位置は import が決めるので判定は変わるが、その import が実装として必要かどうかは別の問いである
-- `externalIoPackages` に、外部 I/O を持たないパッケージの名前を並べる。語彙は「中を辿れないパッケージのうち、外へ出るもの」を書く場所である
-- 抑制ディレクティブ
+```ts
+// a module that reaches the outside only through another module is reported
+// in packages/mailer/src/send.test.ts
+vi.mock('./send.ts');
+```
 
-## オプション
+Code this rule accepts.
 
-- `externalIoModules` — 外部 I/O を持つ組み込みモジュールの一覧。既定はファイルシステム・プロセス・ネットワーク・時刻・乱数の入口を並べたもので、`node:` を付けた綴りと付けない綴りの両方を含む
-- `externalIoPackages` — 外部 I/O を持つ `node_modules` のパッケージ名。既定は空で、利用側が並べる。サブパス付きの指定子（`undici/fetch`）は、その前半がここに載っていれば同じパッケージとして数える
-- `moduleReplacementMembers` — モジュールの差し替えとして読む member の綴り
-- `specFileSuffixes` — spec ファイルとして読む接尾辞
+```ts
+// a module that lives outside this repository is a boundary the spec may take
+// in packages/mailer/src/send.test.ts
+vi.mock('node:child_process');
+```
+
+```ts
+// a module that owns the boundary itself is the place to replace
+// in packages/mailer/src/send.test.ts
+vi.mock('./transport.ts');
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Adding one external I/O import to the target you want to replace so it looks like a boundary. The boundary's position is settled by imports so the judgment changes, but whether that import is needed by the implementation is a separate question
+- Listing packages that hold no external I/O in `externalIoPackages`. That vocabulary is where "packages that cannot be walked into and that leave the process" are written
+- A suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `determinedModuleDouble` | A module replacement must not take a module whose output is determined by its input. Nothing \`{{specifier}}\` reaches leaves this process, so what it returns is decided by what it is handed, and this declaration takes that decision out of the run. Delete the declaration and let the real module answer what the test hands it. |
+| `insideBoundaryDouble` | A module replacement must not stand in front of the module that owns the boundary. \`{{specifier}}\` reaches the outside only through \`{{boundary}}\`, so replacing it here takes everything between the two out of the run along with the I/O. Move the declaration to \`{{boundary}}\`, which is the module this repository owns the boundary in, and let the modules in between run. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->
