@@ -1,110 +1,179 @@
+---
+description: "Disallow defining a finite value set inside a file that does not own it, so one place declares the vocabulary and every other place derives from it"
+---
+
 # no-local-finite-value-set--use-or-register-canonical-values
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-production の TypeScript source で、string・number・boolean・`null` からなる有限語彙を新しく定義する次の構文を検出する。
+Disallow defining a finite value set inside a file that does not own it, so one place declares the vocabulary and every other place derives from it
 
-- member 名が `enum` または `picklist` の call に渡す静的 scalar array
-- scalar literal union の type alias
-- member 名が `union` の call に渡す scalar `literal` call の静的 array
-- JSON Schema の非 computed `enum` property に渡す静的 scalar array
-- catalog fingerprint と一致する静的 `Set` initializer
-- catalog fingerprint と一致する `typeof ARRAY[number]`
-- named import または `import()` type を参照する `keyof`
-- schema call に渡す、静的 object または named import に対する `Object.keys`
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-local-finite-value-set--use-or-register-canonical-values.ts`](../../src/lint/oxlint/rules/no-local-finite-value-set--use-or-register-canonical-values.ts)
 
-schema array は直接記述した配列と、同じ file の module-scope Identifier binding に置いた配列を扱う。`Object.keys` は同じ file の module-scope object binding と named import を扱う。型 assertion、`satisfies`、non-null assertion、括弧は外して値を見る。値が 2 個未満の集合と、`true` / `false` だけの集合は語彙とみなさない。
+<!-- END GENERATED rule-header -->
 
-`Set` と indexed access は一般の局所集合にも現れるため、catalog fingerprint と一致した場合だけ報告する。schema、literal union、JSON Schema は構文自体が有限語彙の定義なので、catalog owner がまだ無くても報告する。
+## Violation
 
-自動修正は持たない。同じ綴りが別概念に属する場合があり、どの owner から導出するかを値だけでは決められないためである。
+Syntax in a production TypeScript source that newly defines a finite vocabulary made of strings, numbers, booleans and `null`.
 
-## 解析の順序
+- A static scalar array handed to a call whose member name is `enum` or `picklist`
+- A type alias that is a union of scalar literals
+- A static array of scalar `literal` calls handed to a call whose member name is `union`
+- A static scalar array handed to a non-computed `enum` property of a JSON Schema
+- A static `Set` initializer matching a catalog fingerprint
+- A `typeof ARRAY[number]` matching a catalog fingerprint
+- A `keyof` referencing a named import or an `import()` type
+- An `Object.keys` over a static object or a named import, handed to a schema call
 
-rule は visitor を返す前に source 全体を一度解析する。
+A schema array covers both an array written inline and one placed in a module-scope identifier binding in the same file. `Object.keys` covers a module-scope object binding in the same file and a named import. Type assertions, `satisfies`, non-null assertions and parentheses are peeled before the value is read. A set of fewer than two values, and a set of `true` / `false` alone, are not vocabularies.
 
-1. Oxc AST から module-scope の静的 array・object binding と named import を索引化する
-2. source 全体から対象構文を列挙する
-3. 局所値域、catalog fingerprint、import route を照合して診断を確定する
-4. `Program` visitor は完成済み診断を報告するだけにする
+`Set` and indexed access also appear in ordinary local sets, so they are reported only where they match a catalog fingerprint. A schema, a literal union and a JSON Schema are themselves syntax defining a finite vocabulary, so they are reported even where no catalog owner exists yet.
 
-visitor が到着した順に binding state を書き換えない。callback の実行、標準 API の返値、collection mutation、一般の alias chain は評価しない。対象を増やす場合は明示的な syntax contract と耐久テストを追加し、JavaScript 実行系を lint 内に作らない。
+There is no automatic fix. The same spelling can belong to a different concept, and which owner to derive from cannot be settled from the values alone.
 
-## import route の確認
+### The order of analysis
 
-対象構文が named import の binding を受け取る場合、その import は catalog が登録した public route または owner declaration 自身へ解決される必要がある。
+The rule analyses the whole source once before returning its visitor.
 
-public route は次の identity をすべて保持する。
+1. Index module-scope static array and object bindings and named imports from the Oxc AST
+2. Enumerate the target syntax across the whole source
+3. Settle the diagnostics by matching local value ranges, catalog fingerprints and import routes
+4. Leave the `Program` visitor doing nothing but reporting finished diagnostics
 
-- package specifier
-- exported name
-- package `exports` が解決した runtime source path
+Binding state is never rewritten in the order the visitor arrives. Callback execution, standard API return values, collection mutation and general alias chains are not evaluated. Widening the targets means adding an explicit syntax contract and durable tests, not building a JavaScript runtime inside the lint.
 
-consumer 側も TypeScript module resolution で実体 source を解決する。同じ specifier でも別 export name、別 source、未登録 subpath、`paths` が shadow sourceへ向けた alias は unregistered になる。relative import は実体 pathと imported name を owner declaration path・binding に完全一致させる。
+### Confirming the import route
 
-catalog owner と同じ名前の ambient または local binding は、綴りだけで owner と同一視しない。runtime source identity を持たない同名 binding を対象 sink へ渡した場合は unregistered route として報告する。
+Where the target syntax receives a named import's binding, that import has to resolve to a public route the catalog registered, or to the owner declaration itself.
 
-外部 package は repository route ではないため、この route check の対象外である。
+A public route holds all of this identity.
 
-## owner の登録
+- The package specifier
+- The exported name
+- The runtime source path the package's `exports` resolved to
 
-`@canonical-values` owner は次をすべて満たす必要がある。
+The consuming side resolves the real source through TypeScript module resolution too. The same specifier under a different export name, a different source, an unregistered subpath, or an alias where `paths` points at a shadow source is unregistered. A relative import must match the real path and the imported name exactly against the owner's declaration path and binding.
 
-- production の TypeScript sourceにある module-scope の JSDocである
-- canonical tag は JSDoc 内に1つだけである
-- JSDoc の直後に空白だけを挟んで単一 variable statement が続く
-- variable statement は単一 Identifier binding と runtime initializerを持つ
-- concept id は小文字英数字の語を `-` または `.` でつないだ形である
+An ambient or local binding of the same name as a catalog owner is not taken as the owner on spelling alone. Hand a same-named binding with no runtime source identity to a target sink and it is reported as an unregistered route.
 
-line comment、通常の block comment、nested annotation、intervening token、ambient declaration、multi-binding、destructuring、type alias、enum、function、class、import、re-export、制御文は owner にならない。
+An external package is not a repository route and is outside this route check.
 
-owner 候補は最寄りの TypeScript configuration ごとにまとめ、configuration ごとに1つの `typescript-6` Programを作る。checker が同じ binding に解決した型から値域を導出する。
+### Registering an owner
 
-- array は numeric index type の literal union を値域にする
-- object は index signature を持たない閉じた property nameを値域にする
-- string、number、boolean、`null`、負数を扱う
-- checker が解決できる import と spreadを扱う
-- empty、widened domain、scalar、非 literal domain、直接記述された重複値は problem にする
+A `@canonical-values` owner must satisfy all of this.
 
-duplicate concept は衝突した全 declaration を catalog から除外する。strict verification は cache を使わず、invalid・duplicate・out-of-scope・値域導出失敗が1件でもあれば失敗する。
+- It is a module-scope JSDoc in a production TypeScript source
+- Exactly one canonical tag stands in the JSDoc
+- A single variable statement follows the JSDoc with nothing but whitespace between
+- The variable statement carries a single identifier binding and a runtime initializer
+- The concept id is lowercase alphanumeric words joined by `-` or `.`
 
-## lint 免除
+A line comment, an ordinary block comment, a nested annotation, an intervening token, an ambient declaration, a multi-binding, a destructuring, a type alias, an enum, a function, a class, an import, a re-export and a control statement are none of them owners.
 
-免除は注釈の存在ではなく、catalog entry と現在の source の declaration identity が一致する場合だけ作る。
+Owner candidates are gathered per nearest TypeScript configuration, and one `typescript-6` Program is built per configuration. The value range is derived from the type the checker resolved for that binding.
 
-- repository root からの declaration path
-- concept id と binding
-- annotation start、binding start、declaration start、declaration end
+- An array's range is the literal union of its numeric index type
+- An object's range is its closed property names, provided it carries no index signature
+- Strings, numbers, booleans, `null` and negative numbers are handled
+- Imports and spreads the checker can resolve are handled
+- Empty, widened, scalar and non-literal domains, and directly written duplicate values, become problems
 
-一致した owner declaration 内の canonical domain だけを免除する。同じ file の declaration 外、別 path、別 binding、古い cache range、不正・duplicate・out-of-scope・値域導出失敗の declaration は免除を持たない。
+A duplicate concept removes every colliding declaration from the catalog. Strict verification uses no cache and fails where there is even one invalid, duplicate, out-of-scope, or range-derivation failure.
 
-## Git ignore と production scope
+### The lint exemption
 
-ファイル名に `.fixture.` / `.mock.` / `.test.` / `.spec.` / `.stories.` / `.story.` を含むものと、`__fixtures__` / `__mocks__` / `__stories__` / `__tests__` / `.cache` / `.local-agents` / `coverage` / `dist` / `dist-ssr` / `fixtures` / `test` / `tests` directory 配下は production source ではない。
+The exemption is created not by the annotation existing but only where the catalog entry and the current source's declaration identity match.
 
-repository scan と import route 判定は、lint 開始前に `git ls-files --others --ignored --exclude-standard --directory` から作る同じ source scope に従う。Git が除外する未追跡 file、directory、symlink ancestor は catalog input と repository route に取り込まない。すでに tracked の file は後から ignore pattern に一致しても repository source のまま扱う。source scope と catalog は lint process の間は不変であり、visitor や import route lookup から Git と repository scan を再実行しない。
+- The declaration path from the repository root
+- The concept id and the binding
+- The annotation start, the binding start, the declaration start and the declaration end
 
-## なぜそれが要るか
+Only the canonical domain inside a matched owner declaration is exempt. Outside the declaration in the same file, another path, another binding, a stale cached range, and declarations that are invalid, duplicated, out of scope or failed to derive a range carry no exemption.
 
-同じ有限集合が複数箇所に独立して書かれると、owner だけを変更しても型検査やテストが落ちない。schema、型、membership checkを同じ runtime bindingから導出すれば、語彙変更の供給元を1箇所に固定できる。
+### Git ignore and the production scope
 
-owner 候補の値域は TypeScript checker に一任する。Oxc AST から import・spread・public alias の値を独自に評価すると、TypeScript と異なる意味になり、catalog と consumer の間に別の抜け道が生まれる。
+Files whose name carries `.fixture.`, `.mock.`, `.test.`, `.spec.`, `.stories.` or `.story.`, and anything under `__fixtures__`, `__mocks__`, `__stories__`, `__tests__`, `.cache`, `.local-agents`, `coverage`, `dist`, `dist-ssr`, `fixtures`, `test` or `tests`, are not production sources.
 
-## どう直すか
+The repository scan and the import-route judgment follow the same source scope, built before the lint starts from `git ls-files --others --ignored --exclude-standard --directory`. Untracked files, directories and symlink ancestors that Git excludes are taken into neither the catalog input nor the repository routes. A file already tracked stays a repository source even where it later matches an ignore pattern. The source scope and the catalog are immutable for the life of the lint process, and no visitor or import-route lookup re-runs Git or re-scans the repository.
 
-報告に owner が示された場合は、局所の有限集合を削除し、registered public routeから owner bindingを importしてschema・型・membership checkを導出する。
+### The invariant
 
-owner が示されない場合は、その概念を所有する production module に runtime valuesを登録し、consumerから参照する。依存 package が語彙を所有する場合は、その公開型またはruntime APIから導出する。
+Where the same finite set is written independently in several places, changing only the owner fails neither the type check nor the tests. Derive the schema, the type and the membership check from one runtime binding and the supply of a vocabulary change is fixed to one place.
 
-unregistered route の場合は、参照先をownerとして正しく登録するか、すでに登録された public routeへimportを張り替える。
+The value range of an owner candidate is left entirely to the TypeScript checker. Evaluate imports, spreads and public aliases from the Oxc AST independently and the meaning diverges from TypeScript's, opening another way out between the catalog and its consumers.
 
-## 禁じる回避策
+### Configuration
 
-- 語彙ごとの opt-out、workspaceごとの除外、owner側の除外tagを追加する
-- canonical ruleを`eslint-disable` / `oxlint-disable`で抑制する
-- ownerと同名のambient bindingを置いてregistered routeに見せる
-- 値をGit ignoredの未追跡fileへ移し、repository ownerとして扱わせる
+`ownershipPolicy` is taken as a string. It only rides along in the report message to state how ownership is assigned, and does not change what is detected.
 
-## オプション
+## Fix
 
-`ownershipPolicy` を文字列で受け取る。所有権の割り当て方針を報告メッセージに載せるだけで、検出範囲は変えない。
+Where the report names an owner, delete the local finite set, import the owner binding from its registered public route, and derive the schema, the type and the membership check from it.
+
+Where no owner is named, register the runtime values in the production module that owns that concept and reference them from the consumer. Where a dependency package owns the vocabulary, derive from its published type or runtime API.
+
+For an unregistered route, either register the referenced declaration properly as an owner, or repoint the import to a public route that is already registered.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// a finite vocabulary written into a schema call defines it here
+export const schema = z.enum(["draft", "published"]);
+```
+
+```ts
+// a literal union type defines the same vocabulary over again
+export type Status = "draft" | "published";
+```
+
+Code this rule accepts.
+
+```ts
+// a union that also admits any string names no finite vocabulary
+export type Loose = string | "draft";
+```
+
+```ts
+// a spec file is not a production source
+// in /repo/src/status.test.ts
+export type Status = "draft" | "published";
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Adding a per-vocabulary opt-out, a per-workspace exclusion, or an exclusion tag on the owner side
+- Suppressing the canonical rules with `eslint-disable` or `oxlint-disable`
+- Placing an ambient binding of the owner's name to pose as a registered route
+- Moving the values into a Git-ignored untracked file to have it treated as a repository owner
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `localFiniteValueSetWithOwner` | Defining a finite value set inside a file that does not own it is forbidden. Delete the local values and derive the schema, type, or membership check from {{owner}}. Ownership policy: {{ownershipPolicy}}. |
+| `localFiniteValueSetWithOwnerCandidates` | Defining a finite value set inside a file that does not own it is forbidden. Delete the local values and derive them from the matching owner among {{owners}}. Ownership policy: {{ownershipPolicy}}. |
+| `localFiniteValueSetWithoutOwner` | Defining a finite value set without an owner is forbidden. Register the runtime values in the module that owns the concept. Ownership policy: {{ownershipPolicy}}. |
+| `localFiniteValueSetOwnedByLibraryType` | Defining a finite value set that a dependency already owns is forbidden. Delete the local values and derive the type from {{owner}}. Ownership policy: {{ownershipPolicy}}. |
+| `localFiniteValueSetOwnedByLibraryTypeCandidates` | Defining a finite value set that dependencies already own is forbidden. Delete the local values and derive the type from the matching owner among {{owners}}. Ownership policy: {{ownershipPolicy}}. |
+| `unregisteredCanonicalValuesImportRoute` | Feeding a finite value set from an unregistered repository route is forbidden. \`{{name}}\` from \`{{specifier}}\` has neither a registered public export path nor an annotated declaration. Register the owner and import its registered binding. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->
