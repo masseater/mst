@@ -542,4 +542,35 @@ export const second = {
       ]);
     });
   });
+
+  describe("messages whose name or whose text is settled while the program runs", () => {
+    const it = test.extend("readMessages", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "rule-facts-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      const sourcePath = "src/rules/settled.ts";
+      mkdirSync(dirname(join(root, sourcePath)), { recursive: true });
+      writeFileSync(
+        join(root, sourcePath),
+        `export const settled = {
+  name: "no-settled--write-it-out",
+  meta: {
+    docs: { description: "Disallow settling at run time" },
+    messages: { 1: "No.", report: phrase(), spelled: "It is forbidden. Write it out." },
+  },
+  create: () => ({}),
+};
+`,
+        "utf8",
+      );
+      return lintRuleFactsIn({ workspaceRoot: root, sourcePath }).flatMap((rule) => rule.messages);
+    });
+
+    it("keeps the one written out and passes over the two it cannot read", ({ readMessages }) => {
+      expect(readMessages).toStrictEqual([
+        { messageId: "spelled", template: "It is forbidden. Write it out." },
+      ]);
+    });
+  });
 });

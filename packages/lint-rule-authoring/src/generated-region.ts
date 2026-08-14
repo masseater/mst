@@ -53,3 +53,18 @@ export const withRefreshedRegion = ({
   readonly region: GeneratedRegion;
   readonly content: string;
 }): string => `${region.head}\n\n${content}\n\n${region.tail}`;
+
+export const withRefreshedRegionIn = ({
+  source,
+  begin,
+  end,
+  content,
+}: {
+  readonly source: string;
+  readonly begin: string;
+  readonly end: string;
+  readonly content: string;
+}): string => {
+  const found = regionIn({ source, begin, end });
+  return found === null ? source : withRefreshedRegion({ region: found, content });
+};

@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { normalizedContent, regionIn, withRefreshedRegion } from "../generated-region.ts";
+import { normalizedContent, regionIn, withRefreshedRegionIn } from "../generated-region.ts";
 import { REGENERATE_COMMAND } from "../regenerate-command.ts";
 import {
   lintRuleWorkspacesIn,
@@ -95,10 +95,13 @@ const upToDateSource = ({
   readonly rendered: readonly RenderedRegion[];
 }): string =>
   rendered.reduce(
-    (carried, { region, content }) => {
-      const found = foundRegionIn({ source: carried, region });
-      return found === null ? carried : withRefreshedRegion({ region: found, content });
-    },
+    (carried, { region, content }) =>
+      withRefreshedRegionIn({
+        source: carried,
+        begin: beginMarkerOf(region),
+        end: endMarkerOf(region),
+        content,
+      }),
     source.replace(FRONTMATTER_DESCRIPTION_PATTERN, renderFrontmatterDescription(rule)),
   );
 
