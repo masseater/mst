@@ -1,7 +1,15 @@
+import { fileURLToPath } from "node:url";
+
 import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   test: {
+    experimental: {
+      openTelemetry: {
+        enabled: process.env.MST_TELEMETRY !== undefined,
+        sdkPath: fileURLToPath(import.meta.resolve("@mst/ai-native/vitest-sdk")),
+      },
+    },
     mockReset: true,
     restoreMocks: true,
     fileParallelism: false,
@@ -15,7 +23,12 @@ export default defineConfig({
     unstubGlobals: true,
   },
   pack: {
-    entry: ["src/throttle/cli.ts", "src/spool/cli.ts", "src/unabridged/cli.ts"],
+    entry: [
+      "src/throttle/cli.ts",
+      "src/spool/cli.ts",
+      "src/unabridged/cli.ts",
+      "src/telemetry/telemetry.ts",
+    ],
     dts: {
       tsgo: true,
     },

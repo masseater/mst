@@ -10,6 +10,9 @@ export default {
     "@mst/verified-specifications",
   ],
   workspaces: {
+    "packages/ai-native": {
+      ignore: ["src/telemetry/vitest-sdk.ts"],
+    },
     "packages/stop-ai-slop": {
       project: ["src/**/*.ts!", "!src/check-test-repository.ts!", "!src/test-repository.ts!"],
     },

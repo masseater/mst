@@ -1,4 +1,5 @@
 export type { CheckOutcome, ScannedProblems } from "./check-outcome.ts";
+export { measureCheck } from "./check-telemetry.ts";
 export {
   createCliRunner,
   EXIT_MISUSE,

@@ -27,10 +27,11 @@
     "typecheck": "spool -- tsc -p ."
   },
   "dependencies": {
+    "@mst/ai-native": "workspace:*",
+    "@opentelemetry/api": "catalog:",
     "es-toolkit": "catalog:"
   },
   "devDependencies": {
-    "@mst/ai-native": "workspace:*",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "typescript": "catalog:",

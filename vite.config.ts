@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import { dontReviewItPreset } from "@mst/dont-review-it";
 import { LINT_SEVERITY } from "@mst/lint-rule-authoring";
 import { defineConfig } from "vite-plus";
@@ -14,7 +16,7 @@ export default defineConfig({
       "vitest/consistent-test-filename": [LINT_SEVERITY.ERROR, { pattern: "\\.test\\.tsx?$" }],
       "dont-review-it/no-default-export--use-named-export": [
         LINT_SEVERITY.ERROR,
-        { toolRequiredFileNames: ["knip.ts", "plugin.ts", "vite.config.ts"] },
+        { toolRequiredFileNames: ["knip.ts", "plugin.ts", "vite.config.ts", "vitest-sdk.ts"] },
       ],
       "dont-review-it/no-reassign--use-spread-or-iife": [
         LINT_SEVERITY.ERROR,
@@ -31,7 +33,14 @@ export default defineConfig({
       "dont-review-it/no-silent-catch--rethrow-or-handle": LINT_SEVERITY.ERROR,
       "dont-review-it/no-non-boundary-double--replace-at-the-external-boundary": [
         LINT_SEVERITY.ERROR,
-        { externalIoPackages: ["@opentelemetry/exporter-metrics-otlp-http"] },
+        {
+          externalIoPackages: [
+            "@mst/ai-native/telemetry",
+            "@opentelemetry/exporter-logs-otlp-http",
+            "@opentelemetry/exporter-metrics-otlp-http",
+            "@opentelemetry/exporter-trace-otlp-http",
+          ],
+        },
       ],
       "dont-review-it/no-version-range--pin-the-exact-version": LINT_SEVERITY.ERROR,
     },
@@ -55,6 +64,12 @@ export default defineConfig({
     options: { typeAware: true, typeCheck: true },
   }),
   test: {
+    experimental: {
+      openTelemetry: {
+        enabled: process.env.MST_TELEMETRY !== undefined,
+        sdkPath: fileURLToPath(import.meta.resolve("@mst/ai-native/vitest-sdk")),
+      },
+    },
     mockReset: true,
     restoreMocks: true,
     coverage: {

@@ -108,6 +108,15 @@ mst は、リポジトリ運用の仕組みを再利用可能な単位として�
   - MUST: コミットメッセージの本文に残す
 - IF: 設計上の意思決定をした; THEN MUST: `docs/engineering-decision-logs/` に残す
   - EDR は architecture に限らず、ツールチェーンの選定・運用方針・依存の扱い方も対象
+- IF: 何かを計測する; THEN
+  - MUST: OpenTelemetry の信号として出す
+  - MUST: 送り先の既定を、`compose.yaml` が立てる手元の grafana-lgtm にする
+  - PROHIBIT: 計測した値を独自の形式で出力して読む
+    - 形式ごとに読み方を作ることになり、別々に測った値を突き合わせられなくなる
+- IF: 計測を仕込む場所を決める; THEN
+  - MUST: 時間を使っている当人に仕込む
+  - PROHIBIT: 呼び出し側でコマンドを包んで測る
+    - 包み忘れた経路が計測から静かに漏れ、漏れていることは計測結果からは読めない
 
 ## 開発コマンド
 
@@ -121,17 +130,21 @@ mst は、リポジトリ運用の仕組みを再利用可能な単位として�
 - `vp run guard` — CI とフックが呼ぶ唯一のゲート。何を実行するかは `package.json` の `guard` が持つ
 - `vp run guard:fix` — 自動で直せるものを直し、生成部分を更新する
 
-## 自作 lint ルールの実行時間を見る
+## どこに時間がかかっているかを見る
 
-どのルールが遅いかを知りたいときだけ使う。既定では何も測らず何も送らない。
+何がどれだけ遅いかを知りたいときだけ使う。既定では何も測らず何も送らない。
 
 1. `docker compose up -d` で受け皿を起動する
-2. `MST_LINT_RULE_DURATION=1 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 OTEL_SERVICE_NAME=mst-lint vp lint` を実行する
-3. <http://localhost:3000> を開き、`lint_rule_duration_milliseconds_sum` をルール名で集計する
+2. `MST_TELEMETRY=1 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 vp run guard` を実行する
+3. <http://localhost:3000> を開き、Tempo で 1 本のトレースとして読む
 
-有効にしたまま受け皿を止めていると lint は失敗する。観測しているつもりで何も残らない状態を避けるためで、止めたいときは有効化の環境変数を外す。
+有効にしたまま受け皿を止めていると、包んだコマンドは失敗する。観測しているつもりで何も残らない状態を避けるためで、止めたいときは有効化の環境変数を外す。
 
-`lint_run_duration_milliseconds_sum` は lint 全体の時間で、自作ルールの合計との差が oxlint 本体・型検査・プラグインの橋渡しに使われた時間になる。判断は [EDR 0021](docs/engineering-decision-logs/0021-measure-our-own-lint-rules-and-let-the-user-choose-the-sink.md) にある。
+`spool` が包んだコマンドはスパンになり、子プロセスへは trace context が環境変数で渡る。ゲートの各ステップ、各ワークスペースのテスト、lint のステージ、vitest のテストファイルとテストケースが、1 本のトレースの中で入れ子になる。同じ実行から `command.duration` と `lint.rule.duration` の分布、コマンドの記録本文が LogRecord として出る。
+
+Grafana へは `.mcp.json` が繋ぐ MCP サーバーから問い合わせられる。トレースの検索には Tempo が持つ MCP を使い、`compose.yaml` がそれを有効にしている。
+
+判断は [EDR 0021](docs/engineering-decision-logs/0021-measure-our-own-lint-rules-and-let-the-user-choose-the-sink.md) と [EDR 0064](docs/engineering-decision-logs/0064-carry-one-trace-through-the-gate-and-let-the-agent-query-it.md) にある。
 
 <!--VITE PLUS START-->
 

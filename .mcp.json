@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "grafana": {
+      "command": "uvx",
+      "args": [
+        "mcp-grafana",
+        "--enabled-tools",
+        "datasource,prometheus,loki,proxied",
+        "--disable-write"
+      ],
+      "env": {
+        "GRAFANA_URL": "http://localhost:3000"
+      }
+    }
+  }
+}

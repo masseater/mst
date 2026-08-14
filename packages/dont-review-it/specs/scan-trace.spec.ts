@@ -55,6 +55,7 @@ describe("検査の走査証跡", () => {
       ["dependency-declarations", 0],
       ["required-file-form", 1],
       ["preset-adoption", 0],
+      ["telemetry-wiring", 0],
       ["intent-skills", 0],
     ]);
   });
@@ -104,9 +105,10 @@ describe("検査の走査証跡", () => {
         ⊘ dependency-declarations  skipped — no workspace definition
         ✓ required-file-form       1 package root
         ⊘ preset-adoption          skipped — no toolchain configuration
+        ✓ telemetry-wiring         0 package roots
         ✓ intent-skills            0 manifests
 
-        11 checks ran, nothing to report
+        12 checks ran, nothing to report
       "
     `);
   });
@@ -129,6 +131,7 @@ describe("検査の走査証跡", () => {
       skipped dependency-declarations no workspace definition
       checked required-file-form 1 package root 0 problems 0 warnings
       skipped preset-adoption no toolchain configuration
+      checked telemetry-wiring 0 package roots 0 problems 0 warnings
       checked intent-skills 0 manifests 0 problems 0 warnings
       "
     `);

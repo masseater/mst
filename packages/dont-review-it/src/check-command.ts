@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 
-import { EXIT_MISUSE, EXIT_PROBLEMS_FOUND } from "@mst/repository-checks";
+import { EXIT_MISUSE, EXIT_PROBLEMS_FOUND, measureCheck } from "@mst/repository-checks";
 import { defineCommand } from "citty";
 import { isAgent, isColorSupported } from "std-env";
 
@@ -66,21 +66,23 @@ export const checkCommand = defineCommand({
         "Rewrite the parts this repository decides on its own, entry scripts and shipped skill versions, then re-run the checks",
     },
   },
-  run({ args, rawArgs }) {
-    const unknownFlags = flagsIn(rawArgs).filter((raised) => !KNOWN_FLAGS.includes(raised));
-    if (unknownFlags.length > 0) {
-      refuseMisuse(`Unknown option ${unknownFlags.join(", ")}. Run --help for usage.\n`);
-      return;
-    }
+  async run({ args, rawArgs }) {
+    await measureCheck(() => {
+      const unknownFlags = flagsIn(rawArgs).filter((raised) => !KNOWN_FLAGS.includes(raised));
+      if (unknownFlags.length > 0) {
+        refuseMisuse(`Unknown option ${unknownFlags.join(", ")}. Run --help for usage.\n`);
+        return;
+      }
 
-    const repositoryRoot = resolve(args["repository-root"] ?? process.cwd());
-    if (!isDirectory(repositoryRoot)) {
-      refuseMisuse(`${repositoryRoot} is not a directory that can be scanned.\n`);
-      return;
-    }
+      const repositoryRoot = resolve(args["repository-root"] ?? process.cwd());
+      if (!isDirectory(repositoryRoot)) {
+        refuseMisuse(`${repositoryRoot} is not a directory that can be scanned.\n`);
+        return;
+      }
 
-    if (args.write && !repairGeneratedParts(repositoryRoot)) return;
+      if (args.write && !repairGeneratedParts(repositoryRoot)) return;
 
-    reportProblems(repositoryRoot);
+      reportProblems(repositoryRoot);
+    });
   },
 });

@@ -24,6 +24,8 @@ import { runPresetAdoptionChecks } from "./preset-adoption/run-preset-adoption-c
 import { formatRepositoryProblem } from "./problem.ts";
 import { defaultRequiredFileFormConfig } from "./required-file-form/config.ts";
 import { runRequiredFileFormChecks } from "./required-file-form/run-required-file-form-checks.ts";
+import { defaultTelemetryWiringConfig } from "./telemetry-wiring/config.ts";
+import { runTelemetryWiringChecks } from "./telemetry-wiring/run-telemetry-wiring-checks.ts";
 import { defaultWorkflowChecksConfig } from "./workflows/config.ts";
 import { workflowOutcomesOf } from "./workflows/workflow-outcomes.ts";
 
@@ -105,6 +107,10 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
     repositoryRoot,
     config: defaultRequiredFileFormConfig,
   });
+  const telemetryWiring = runTelemetryWiringChecks({
+    repositoryRoot,
+    config: defaultTelemetryWiringConfig,
+  });
   const ruleIndex = dependencyCatalog.definitionUnreadable
     ? { problems: [], scanned: 0 }
     : lintRuleIndexProblems({ repositoryRoot, write: false });
@@ -168,6 +174,14 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
       skippedReason: presetAdoption.configMissing ? NO_TOOLCHAIN_CONFIG : null,
       problems: [],
       warnings: presetAdoption.warnings.map(formatRepositoryProblem).toSorted(),
+    },
+    {
+      check: "telemetry-wiring",
+      unit: "package root",
+      count: telemetryWiring.scanned,
+      skippedReason: null,
+      problems: telemetryWiring.problems.map(formatRepositoryProblem).toSorted(),
+      warnings: [],
     },
     {
       check: "intent-skills",

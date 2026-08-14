@@ -1,6 +1,17 @@
 import { parseSync } from "oxc-parser";
 
-import { isAstFields, NODE_TYPE_FIELD, type AstFields } from "../lint/oxlint/lib/ast-node.ts";
+import { NODE_TYPE_FIELD } from "../lint/oxlint/lib/ast-node.ts";
+import {
+  defaultExportedValue,
+  fieldsIn,
+  IDENTIFIER,
+  keyNameOf,
+  LITERAL,
+  nodeOfType,
+  propertiesOf,
+  unwrappedCall,
+  valueAt,
+} from "../lint/oxlint/lib/config-object.ts";
 import { ARRAY_EXPRESSION } from "../lint/oxlint/lib/node-kinds.ts";
 import { levelOfSpelling, SILENT_LEVEL } from "../lint/oxlint/lib/rule-sets/severity-levels.ts";
 
@@ -12,42 +23,7 @@ export type DisabledRuleDeclaration = {
   readonly filePatterns: readonly string[];
 };
 
-const OBJECT_EXPRESSION = "ObjectExpression";
-
-const CALL_EXPRESSION = "CallExpression";
-
-const LITERAL = "Literal";
-
-const IDENTIFIER = "Identifier";
-
 const MEMBER_EXPRESSION = "MemberExpression";
-
-const EXPORT_DEFAULT = "ExportDefaultDeclaration";
-
-const fieldsIn = (held: unknown): readonly AstFields[] =>
-  Array.isArray(held) ? held.filter(isAstFields) : [];
-
-const nodeOfType = ({ held, type }: { readonly held: unknown; readonly type: string }) =>
-  isAstFields(held) && String(held[NODE_TYPE_FIELD]) === type ? held : null;
-
-const propertiesOf = (held: unknown): readonly AstFields[] =>
-  fieldsIn(nodeOfType({ held, type: OBJECT_EXPRESSION })?.properties);
-
-const keyNameOf = (property: AstFields): string | null => {
-  const named = property.key;
-  if (nodeOfType({ held: named, type: LITERAL }) !== null)
-    return String((named as AstFields).value);
-  const identifier = nodeOfType({ held: named, type: IDENTIFIER });
-  return identifier === null || property.computed === true ? null : String(identifier.name);
-};
-
-const valueAt = ({ held, key }: { readonly held: unknown; readonly key: string }): unknown =>
-  propertiesOf(held).findLast((property) => keyNameOf(property) === key)?.value ?? null;
-
-const unwrappedCall = (held: unknown): unknown => {
-  const call = nodeOfType({ held, type: CALL_EXPRESSION });
-  return call === null ? held : unwrappedCall(fieldsIn(call.arguments)[0]);
-};
 
 const stringLiteralsIn = (held: unknown): readonly string[] =>
   fieldsIn(nodeOfType({ held, type: ARRAY_EXPRESSION })?.elements)
@@ -105,11 +81,9 @@ export const disabledRuleDeclarationsIn = ({
   readonly source: string;
   readonly config: PresetAdoptionConfig;
 }): readonly DisabledRuleDeclaration[] => {
-  const program = parseSync(config.toolchainConfigFileName, source).program;
-  const exported = fieldsIn(program.body).findLast(
-    (statement) => String(statement[NODE_TYPE_FIELD]) === EXPORT_DEFAULT,
+  const configured = defaultExportedValue(
+    parseSync(config.toolchainConfigFileName, source).program,
   );
-  const configured = unwrappedCall(exported?.declaration);
   const lint = unwrappedCall(valueAt({ held: configured, key: config.lintFieldName }));
   const everywhere = disabledEntriesIn({
     rules: valueAt({ held: lint, key: config.rulesFieldName }),

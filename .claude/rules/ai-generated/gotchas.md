@@ -47,6 +47,22 @@ paths:
 - IF: ローカルで `vp check` / `vp run -r test` / `vp run -r build` が全て通った; THEN PROHIBIT: それをもってこの種の破壊が起きていない根拠とする
   - 実際に `vite` 依存を削除しても、ローカルの検証は全て緑になった。この検証系はこの障害を検出しない
 
+## Vitest の OpenTelemetry の `sdkPath` は Vitest の `root` から解決される
+
+- 症状: `sdkPath: "./otel.ts"` と書くと、ワークスペースごとのテスト実行で `packages/<各パッケージ>/otel.ts` を探しに行って失敗する。ルートに置いたファイルは見つからない
+- 原因: `resolved.experimental.openTelemetry.sdkPath` は `resolve(resolved.root, sdkPath)` される。各パッケージの `test` スクリプトはパッケージ直下で Vitest を起こすため、`root` はリポジトリのルートではなくパッケージのディレクトリになる
+- 対処: 絶対パスを渡す。このリポジトリは `fileURLToPath(import.meta.resolve("@mst/ai-native/vitest-sdk"))` で解決している
+- あわせて、`sdkPath` が指すモジュールは `shutdown` を持つオブジェクトを default export しなければならない。持たないと Vitest は警告を出すだけで進み、トレースは出ないまま終わる
+
+- IF: `experimental.openTelemetry` を配線する; THEN MUST: 違反ではなく正の実行で、実際にトレースが受け皿へ届いたことを確かめる
+  - 配線が効いていない状態は、テストが緑のまま「速いワークスペース」と同じ見た目になる
+
+## knip は文字列で解決されるモジュールを追えない
+
+- 症状: `import.meta.resolve("@mst/ai-native/vitest-sdk")` でしか参照されないファイルの default export が、`knip --production` で未使用として報告される
+- 原因: 参照が静的な import ではなく文字列なので、静的解析からは誰も使っていないファイルに見える。`includeEntryExports: true` を立てていると、entry のエクスポートまで検査対象になる
+- 対処: `knip.ts` の該当ワークスペースの `ignore` に入れてある。使っていないものを隠すためではなく、knip の静的解析では見えない経路で使われていることを伝えるもの
+
 ## `vp pack` の `pack.exports: true` は package.json の exports を書き換える
 
 - 症状: `vp pack` を実行すると package.json の `exports` フィールドが自動生成で上書きされ、手書きで足したサブパス export（例: `"./tsconfig/*": "./tsconfig/*"`）が消える

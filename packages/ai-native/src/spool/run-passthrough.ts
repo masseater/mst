@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 
+import { childEnvironment } from "../telemetry/command-telemetry.ts";
 import {
   exitCodeOf,
   startFailureSummary,
@@ -35,7 +36,10 @@ const reportStartFailure = async (input: {
 export const runPassthrough = async (command: Command, deps: PassthroughDeps): Promise<number> => {
   const commandLine = command.join(" ");
   const startedAt = deps.monotonicNow();
-  const child = spawn(command[0], command.slice(1), { stdio: "inherit" });
+  const child = spawn(command[0], command.slice(1), {
+    stdio: "inherit",
+    env: childEnvironment(),
+  });
   const closed = waitClose(child);
   const spawnError = await waitSpawn(child);
   if (spawnError !== undefined) {
