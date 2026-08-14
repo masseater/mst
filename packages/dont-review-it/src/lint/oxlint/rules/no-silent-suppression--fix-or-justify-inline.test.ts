@@ -29,6 +29,7 @@ describe("dont-review-it/no-silent-suppression--fix-or-justify-inline", () => {
       },
       {
         name: "a next-line suppression carrying grounds is the path this rule leaves open",
+        documented: true,
         code: `// oxlint-disable-next-line ${GUARDED_RULE} -- the generator writes both copies from one schema\n${DECLARATION}`,
       },
       {
@@ -37,6 +38,7 @@ describe("dont-review-it/no-silent-suppression--fix-or-justify-inline", () => {
       },
       {
         name: "a suppression naming only rules outside the guarded set is another rule's business",
+        documented: true,
         code: `// oxlint-disable-next-line no-console\nconsole.log(1);`,
       },
       {
@@ -97,6 +99,7 @@ describe("dont-review-it/no-silent-suppression--fix-or-justify-inline", () => {
     invalid: [
       {
         name: "a next-line suppression of a guarded rule without grounds is reported",
+        documented: true,
         code: `// oxlint-disable-next-line ${GUARDED_RULE}\n${DECLARATION}`,
         errors: [
           {
@@ -148,6 +151,7 @@ describe("dont-review-it/no-silent-suppression--fix-or-justify-inline", () => {
       },
       {
         name: "a whole-file suppression of a guarded rule is reported even with grounds",
+        documented: true,
         code: `/* oxlint-disable ${GUARDED_RULE} -- the generator writes both copies */\n${DECLARATION}`,
         errors: [
           {
