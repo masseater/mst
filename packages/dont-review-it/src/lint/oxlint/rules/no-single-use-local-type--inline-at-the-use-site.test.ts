@@ -8,6 +8,7 @@ describe("dont-review-it/no-single-use-local-type--inline-at-the-use-site", () =
     valid: [
       {
         name: "a type two declarations agree on passes",
+        documented: true,
         code: "type Draft = { readonly title: string };\nconst read = (draft: Draft): Draft => draft;",
       },
       {
@@ -32,6 +33,7 @@ describe("dont-review-it/no-single-use-local-type--inline-at-the-use-site", () =
       },
       {
         name: "a type that refers to itself counts that reference, so one use site is enough",
+        documented: true,
         code: "type Branch = { readonly children: readonly Branch[] };\nconst read = (branch: Branch) => branch.children;",
       },
       {
@@ -47,11 +49,13 @@ describe("dont-review-it/no-single-use-local-type--inline-at-the-use-site", () =
     invalid: [
       {
         name: "a type one declaration names is reported",
+        documented: true,
         code: "type Draft = { readonly title: string };\nconst read = (draft: Draft) => draft.title;",
         errors: [{ messageId: "singleUseLocalType" }],
       },
       {
         name: "a type nothing refers to is reported",
+        documented: true,
         code: "type Draft = { readonly title: string };\nexport const read = () => 1;",
         errors: [{ messageId: "singleUseLocalType" }],
       },

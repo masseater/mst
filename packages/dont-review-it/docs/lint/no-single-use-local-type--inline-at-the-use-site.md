@@ -1,77 +1,140 @@
+---
+description: "Disallow a type declared at the top level of a file without being exported when the file references it at most once, so a name is given to a shape only where more than one place has to agree on it"
+---
+
 # no-single-use-local-type--inline-at-the-use-site
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-production の TypeScript ソースで、そのファイルがトップレベルに宣言し、export していない型が、同じファイルの中から 1 回以下しか参照されていない状態。
+Disallow a type declared at the top level of a file without being exported when the file references it at most once, so a name is given to a shape only where more than one place has to agree on it
 
-宣言として見るのは型エイリアスとインターフェースの 2 つ。どちらもファイルのトップレベルに立っているものだけを対象にする。関数やブロックの内側に置かれた型宣言は対象にしない。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-single-use-local-type--inline-at-the-use-site.ts`](../../src/lint/oxlint/rules/no-single-use-local-type--inline-at-the-use-site.ts)
 
-参照として数えるのは型の位置に書かれた名前で、次の 3 つ。
+<!-- END GENERATED rule-header -->
 
-- 型参照（`readonly draft: Draft` の `Draft`）
-- インターフェースの `extends` 節
-- クラスの `implements` 節
+## Violation
 
-`typeof X` は値の `X` を指していて型宣言の `X` を指していないので、数に入れない。宣言そのものが名乗る名前も数に入れない。
+A type declared at a production TypeScript source's top level, not exported, referenced at most once from inside that same file.
 
-### 自分自身への参照
+Two declaration forms are read: type aliases and interfaces. Only those standing at the file's top level are in scope. A type declaration placed inside a function or a block is not.
 
-型が自分の本体の中で自分を参照している場合、その参照は数に入る。したがって再帰する型は、他所から 1 回参照されていれば合計 2 回になり、報告されない。再帰する型は展開できないので、これは意図した結果である。
+Three things count as a reference — names written in type position.
 
-再帰する型が他所から 1 回も参照されていなければ、自己参照だけの 1 回になって報告される。このときの直し方は展開ではなく削除で、それは実行できる。
+- A type reference (the `Draft` of `readonly draft: Draft`)
+- An interface's `extends` clause
+- A class's `implements` clause
 
-### export された型を見ない理由
+`typeof X` points at the value `X` rather than the type declaration `X` and is not counted. The name the declaration itself carries is not counted either.
 
-このルールが数えるのはファイル 1 つの中だけである。export された型の参照を数えるにはリポジトリ全体で import を解決する必要があり、名前だけを頼りに数えると別のファイルの同名の型と混ざる。実際にこのリポジトリには `ParsedSource` という同じ名前の型が別の構造で 2 箇所にある。
+### A reference to itself
 
-決定的に判定できる範囲に限る、という [EDR 0013](../../../../docs/engineering-decision-logs/0013-draw-the-duplication-line-at-decidability.md) の線をここでも引いている。1 ファイルの中に閉じた参照は構文だけで数え切れる。
+Where a type references itself inside its own body, that reference counts. So a recursive type referenced once from elsewhere reaches two and is not reported. A recursive type cannot be inlined, and this is the intended result.
 
-そのため、export を付けるとこのルールの対象から外れる。これは検出の穴であって、直し方ではない。「禁じる回避策」に挙げてある。
+Where a recursive type is referenced nowhere else, the self-reference alone makes one and it is reported. The fix there is deletion rather than inlining, and that can be carried out.
 
-## なぜそれが要るか
+### Why exported types are not read
 
-型に名前を付ける理由は、2 箇所以上がその形について合意する必要があるからである。合意する相手がいない名前は、合意を作らずに間接参照だけを作る。形を知りたい読み手は、いま読んでいる行を離れて宣言まで移動し、戻ってこなければならない。
+This rule counts inside one file. Counting references to an exported type would mean resolving imports across the repository, and counting by name alone mixes it up with a type of the same name in another file. This repository has actually held two differently structured types both named `ParsedSource`.
 
-名前はさらに、そこに共有があるという誤った合図を出す。「この型は他でも使われているはずだ」と読んだ人は、変更するときに影響範囲を探しに行く。探しても何も出てこない。
+The line of [EDR 0013](../../../../docs/engineering-decision-logs/0013-draw-the-duplication-line-at-decidability.md) — limit to what can be settled deterministically — is drawn here too. References closing inside one file can be counted by syntax alone.
 
-[EDR 0013](../../../../docs/engineering-decision-logs/0013-draw-the-duplication-line-at-decidability.md) は「一度しか使われないヘルパー」を、判定は決定的にできるが規範として成立しないとして lint から外した。そこで数えたのは値の宣言で、長い手続きを名前付きの段に割る書き方が大半を占めていた。型は違う。型エイリアスは実行時に何も起こさず、段に割る対象になる手続きを持たない。単一使用の型別名に残るのは間接参照だけである。この違いで判断を分けた記録が [EDR 0019](../../../../docs/engineering-decision-logs/0019-name-a-type-only-where-two-places-agree.md) にある。
+So adding `export` takes a type out of this rule's scope. That is a hole in the detection, not a fix. It is named under forbidden bypasses.
 
-自動修正を持たないのは、報告された宣言に対して直し方が 1 つに決まらないから。使用箇所に展開するのが普通だが、参照が 0 回なら削除であり、本当は共有されるべき形なら 2 つ目の使用箇所を作るのが正しい。どれを選ぶかは周囲を読んだ人が決める。
+### The invariant
 
-## どう直すか
+The reason to name a type is that two or more places have to agree about that shape. A name with nobody to agree with creates indirection without creating agreement. A reader who wants to know the shape has to leave the line being read, travel to the declaration, and come back.
 
-宣言を消して、形を使用箇所にそのまま書く。関数の引数や戻り値の位置に書くのが最も多い形になる。
+A name also gives a false signal that sharing exists there. Somebody reading "this type must be used elsewhere too" goes looking for the reach of a change when modifying it, and finds nothing.
 
-型引数を持つ宣言なら、使用箇所で型引数を実引数に置き換えてから書く。
+[EDR 0013](../../../../docs/engineering-decision-logs/0013-draw-the-duplication-line-at-decidability.md) left "a helper used only once" out of the lint as something deterministically decidable that does not hold as a norm. What was counted there was value declarations, most of which were the practice of splitting a long procedure into named steps. Types are different: a type alias does nothing at run time and holds no procedure to split into steps. What is left in a single-use type alias is indirection alone. The record of dividing the judgment on that difference is [EDR 0019](../../../../docs/engineering-decision-logs/0019-name-a-type-only-where-two-places-agree.md).
 
-参照が 0 回なら宣言ごと消す。export も一緒に消す。
+There is no automatic fix because the fix does not settle on one answer for a reported declaration. Inlining at the use site is the usual one, but with zero references it is deletion, and where the shape really should be shared it is creating a second use site. Which to choose is settled by a person who reads what is around it.
 
-その形が本当に 2 箇所で共有されるべきものなら、足りないのは 2 つ目の使用箇所である。同じ形を別に綴っている場所を探し、そこにこの型を使わせる。宣言を残す理由になるのは、実際に 2 箇所目が参照することだけで、将来そうなる見込みではない。
+### Configuration
 
-### knip の未使用 export 指摘に従った直後は、この報告が出る
+None. There is no per-rule exclusion, no per-file exclusion, and no per-declaration exclusion tag.
 
-knip が「どこからも import されていない export」を挙げ、それに従って `export` を落とすと、その型は非 export のトップレベル型になる。自ファイル内の参照が 1 回だけなら、その時点でこのルールの対象に入る。`knip.ts` に `includeEntryExports: true` が入っているので、barrel から外す作業のたびにこの並びが起きる。
+### What is not detected
 
-これは 2 本の指摘が食い違っているのではなく、続きになっている。knip が「外から要らない」と言い、このルールが「中でも 1 回しか要らない」と言う。順に従えば、export を落として使用箇所に展開するところまでで 1 つの作業になる。実際に、公開する export を絞る作業で非 export になった 3 件がこの順で片付いた。
+- An exported type. As above: counting is deterministic only when it closes inside one file
+- A type declared inside a function or a block. What does not stand at the top level is part of the procedure it sits in
+- Value declarations. Neither a constant nor a helper function is reported for being used once. The judgment counted and set aside in [EDR 0013](../../../../docs/engineering-decision-logs/0013-draw-the-duplication-line-at-decidability.md) carries over as it stands
+- A type referenced twice or more. As long as the references appear in type position, it is not reported even where they sit together in one function
 
-## 禁じる回避策
+## Fix
 
-- export を付けて報告から外す。形はどこにも動いておらず、export された型を他のファイルが 1 つも import しない状態が残る
-- 型を 2 回参照するだけの使い捨ての宣言を足す。参照の数は増えるが、合意する場所は増えていない
-- 型を別ファイルに移して import する。1 箇所からしか参照されない形が、ファイルを 1 つ増やしただけの状態になる
-- ルールごとの除外、ファイルごとの除外、宣言ごとの除外タグ。どれも用意しない
+Delete the declaration and write the shape at the use site. Writing it at a function's parameter or return position is the most common shape.
 
-## 何を検出しないか
+For a declaration carrying type parameters, substitute the arguments for the parameters before writing it at the use site.
 
-- export された型。前述のとおり、1 ファイルに閉じた判定でないと決定的に数えられない
-- 関数やブロックの内側で宣言された型。トップレベルに立っていないものは、その場の手続きの一部である
-- 値の宣言。定数もヘルパー関数も、1 回しか使われていないことを理由には報告しない。[EDR 0013](../../../../docs/engineering-decision-logs/0013-draw-the-duplication-line-at-decidability.md) で数えて外した判断をそのまま引き継ぐ
-- 2 回以上参照されている型。参照が型の位置に現れる限り、それが同じ関数の中にまとまっていても報告しない
+With zero references, delete the declaration entirely, `export` and all.
 
-## 導入時に直した数
+Where the shape really should be shared by two places, what is missing is the second use site. Find the place spelling the same shape separately and have it use this type. The only reason to keep a declaration is a second place actually referencing it, not the prospect of one later.
 
-非 export のトップレベル型宣言 34 件のうち 16 件（47%）が 1 回以下の参照だった。0 回のものは無かった。
+### Right after following knip's unused-export report
 
-export されたトップレベル型宣言 37 件のうち 5 件は、リポジトリ内のどのファイルからも import されていなかった。うち 1 件は 2 本のルールが共有する場所へ移し、3 件は export を外してから使用箇所に展開し、1 件はどこからも参照されていなかったので宣言ごと消した。
+knip lists "an export nothing imports", and following it by dropping the `export` makes that type a non-exported top-level type. Where its references inside its own file number one, it enters this rule's scope at that moment. `knip.ts` carries `includeEntryExports: true`, so this sequence arises each time something is taken out of a barrel.
 
-この計測のあと、公開する export を絞る作業が別に入り、非 export になった型が 3 件増えた（`WorkspaceLintRuleMeta` / `LintRuleSeverity` / `LintRuleTestCases`）。いずれも自ファイル内の参照が 1 回で、同じように展開した。export を外す作業とこのルールが噛み合うことが、そこで確かめられている。
+The two reports do not contradict; they continue one another. knip says "not needed from outside", and this rule says "needed only once inside". Follow them in order and dropping the export and inlining at the use site is one piece of work.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// a type one declaration names is reported
+type Draft = { readonly title: string };
+const read = (draft: Draft) => draft.title;
+```
+
+```ts
+// a type nothing refers to is reported
+type Draft = { readonly title: string };
+export const read = () => 1;
+```
+
+Code this rule accepts.
+
+```ts
+// a type two declarations agree on passes
+type Draft = { readonly title: string };
+const read = (draft: Draft): Draft => draft;
+```
+
+```ts
+// a type that refers to itself counts that reference, so one use site is enough
+type Branch = { readonly children: readonly Branch[] };
+const read = (branch: Branch) => branch.children;
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Adding `export` to leave the report. The shape has moved nowhere, and what remains is an exported type no other file imports
+- Adding a throwaway declaration that only references the type a second time. The reference count grows and the places that agree do not
+- Moving the type to another file and importing it. A shape referenced from one place becomes a shape referenced from one place with one more file
+- Per-rule, per-file and per-declaration exclusion tags. None is offered
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `singleUseLocalType` | A type that this file declares without exporting must not be referenced from fewer than two places in the file. \`{{name}}\` is referenced from {{count}}. Write the shape where it is used and delete the declaration. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->
