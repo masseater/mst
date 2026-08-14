@@ -22,8 +22,43 @@ const escapePipes = (writtenText: string): string => writtenText.replaceAll("|",
 const rowOf = (rule: LintRuleFacts): string =>
   `| [${rule.name}](./${rule.name}.md) | ${escapePipes(rule.description)} | ${toolOf(rule.sourcePath)} | ${noticesOf(rule)} |`;
 
+const tableOf = (rules: readonly LintRuleFacts[]): string =>
+  [TABLE_HEAD, ...rules.map(rowOf)].join("\n");
+
+const SHIPPED_HEADING = "## 既定で配るルール";
+
+const OPT_IN_HEADING = "## 名指しで有効にするルール";
+
+const OPT_IN_NOTE =
+  "このワークスペースが実装して配布するが、出荷する preset には載せていないルール。使う側が `rules` に名前を書いて初めて効く。載せていない理由は各ルールの文書が持つ。";
+
+const splitTablesOf = ({
+  shipped,
+  optIn,
+}: {
+  readonly shipped: readonly LintRuleFacts[];
+  readonly optIn: readonly LintRuleFacts[];
+}): string =>
+  [
+    SHIPPED_HEADING,
+    "",
+    tableOf(shipped),
+    "",
+    OPT_IN_HEADING,
+    "",
+    OPT_IN_NOTE,
+    "",
+    tableOf(optIn),
+  ].join("\n");
+
 export const renderRuleIndex = (rules: readonly LintRuleFacts[]): string => {
   const sortedOnes = rules.toSorted((left, right) => left.name.localeCompare(right.name));
-  const table = [TABLE_HEAD, ...sortedOnes.map(rowOf)].join("\n");
-  return sortedOnes.some((rule) => noticesOf(rule) !== "") ? `${table}\n\n${NOTICE_LEGEND}` : table;
+  const optIn = sortedOnes.filter((rule) => !rule.shipped);
+  const renderedTables =
+    optIn.length === 0
+      ? tableOf(sortedOnes)
+      : splitTablesOf({ shipped: sortedOnes.filter((rule) => rule.shipped), optIn });
+  return sortedOnes.some((rule) => noticesOf(rule) !== "")
+    ? `${renderedTables}\n\n${NOTICE_LEGEND}`
+    : renderedTables;
 };

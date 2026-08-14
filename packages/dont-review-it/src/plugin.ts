@@ -23,6 +23,8 @@ import { forbidUnresolvableModuleSpecifier } from "./lint/oxlint/rules/forbid-un
 import { forbidWeakMatcher } from "./lint/oxlint/rules/forbid-weak-matcher--use-exact-matcher.ts";
 import { noAmbiguousVariableName } from "./lint/oxlint/rules/no-ambiguous-variable-name--rename-to-concrete-noun.ts";
 import { noArrayMutation } from "./lint/oxlint/rules/no-array-mutation--derive-new-array.ts";
+import { noBarrelImport } from "./lint/oxlint/rules/no-barrel-import--import-from-the-owning-module.ts";
+import { noBarrelModule } from "./lint/oxlint/rules/no-barrel-module--declare-in-the-owning-module.ts";
 import { noBlanketSuppression } from "./lint/oxlint/rules/no-blanket-suppression--name-and-record.ts";
 import { noCittyParentRun } from "./lint/oxlint/rules/no-citty-parent-run--move-run-into-a-subcommand.ts";
 import { createNoClassAsMutableCell } from "./lint/oxlint/rules/no-class-as-mutable-cell--decide-in-an-iife.ts";
@@ -173,6 +175,8 @@ const plugin: Plugin = {
     [forbidWeakMatcher.name]: forbidWeakMatcher,
     [noAmbiguousVariableName.name]: noAmbiguousVariableName,
     [noArrayMutation.name]: noArrayMutation,
+    [noBarrelImport.name]: noBarrelImport,
+    [noBarrelModule.name]: noBarrelModule,
     [noBlanketSuppression.name]: noBlanketSuppression,
     [noCittyParentRun.name]: noCittyParentRun,
     [noClassAsMutableCell.name]: noClassAsMutableCell,

@@ -14,6 +14,7 @@ export type WorkspaceLintRule = {
     readonly docs: {
       readonly description: string;
       readonly relatedGuidelines: readonly string[];
+      readonly shipped?: boolean;
       readonly url?: string;
     };
     readonly messages: Record<string, string>;

@@ -11,6 +11,7 @@ const plainRule: LintRuleFacts = {
   fixable: false,
   hasSuggestions: false,
   configurable: false,
+  shipped: true,
 };
 
 describe("renderRuleIndex", () => {
@@ -77,6 +78,36 @@ describe("renderRuleIndex", () => {
           "| --- | --- | --- | --- |",
           "| [no-plain--decorate-it](./no-plain--decorate-it.md) | Disallow plainness | - |  |",
           "| [no-tail--move-it](./no-tail--move-it.md) | Disallow plainness | - |  |",
+        ].join("\n"),
+      );
+    });
+  });
+
+  describe("a workspace where one rule is left off the shipped preset", () => {
+    const it = test.extend("ruleIndex", () =>
+      renderRuleIndex([
+        { ...plainRule, name: "no-shipped--fix-it" },
+        { ...plainRule, name: "no-named--enable-it", shipped: false },
+      ]));
+
+    it("puts the two under headings of their own with the note on the named side", ({
+      ruleIndex,
+    }) => {
+      expect(ruleIndex).toBe(
+        [
+          "## 既定で配るルール",
+          "",
+          "| ルール | 説明 | ツール | 補足 |",
+          "| --- | --- | --- | --- |",
+          "| [no-shipped--fix-it](./no-shipped--fix-it.md) | Disallow plainness | oxlint |  |",
+          "",
+          "## 名指しで有効にするルール",
+          "",
+          "このワークスペースが実装して配布するが、出荷する preset には載せていないルール。使う側が `rules` に名前を書いて初めて効く。載せていない理由は各ルールの文書が持つ。",
+          "",
+          "| ルール | 説明 | ツール | 補足 |",
+          "| --- | --- | --- | --- |",
+          "| [no-named--enable-it](./no-named--enable-it.md) | Disallow plainness | oxlint |  |",
         ].join("\n"),
       );
     });

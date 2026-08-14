@@ -4,6 +4,8 @@
 
 <!-- BEGIN GENERATED lint-rules -->
 
+## 既定で配るルール
+
 | ルール | 説明 | ツール | 補足 |
 | --- | --- | --- | --- |
 | [forbid-declared-command-invocation--use-designated-replacement](./forbid-declared-command-invocation--use-designated-replacement.md) | Disallow starting a command the shared declaration has retired as a child process, so the declaration that closes the import route and the manifest route closes the process route with the same entry | oxlint | ⚙️ |
@@ -61,7 +63,6 @@
 | [no-local-file-system-mock--use-shared-fs](./no-local-file-system-mock--use-shared-fs.md) | Disallow a spec standing up its own file system double or naming the in-memory implementation behind the standard API, so every spec reads and writes through one abstraction that the shared setup rebuilds before each test | oxlint | 🔧 ⚙️ |
 | [no-local-finite-value-set--use-or-register-canonical-values](./no-local-finite-value-set--use-or-register-canonical-values.md) | Disallow defining a finite value set inside a file that does not own it, so one place declares the vocabulary and every other place derives from it | oxlint |  |
 | [no-logged-and-continued-failure--stop-or-recover](./no-logged-and-continued-failure--stop-or-recover.md) | Disallow writing a caught failure to an output stream inside a catch clause that neither stops nor returns, so a failure that was caught either ends the work or produces a value the caller can use | oxlint |  |
-| [no-mixed-package-surface--declare-one-surface](./no-mixed-package-surface--declare-one-surface.md) | Require a package to declare either the surface it is run through or the surface it is imported through, so which discipline owns the package is decided by its manifest instead of by whoever reaches into it next | oxlint |  |
 | [no-module-scope-mock-config--lift-into-fixture](./no-module-scope-mock-config--lift-into-fixture.md) | Disallow creating a mock or settling what it does anywhere but a module replacement factory and the body of a fixture, so the instance a test reads was stood up and settled for that test alone | oxlint | ⚙️ |
 | [no-module-scope-mutable-state--lift-into-fixture](./no-module-scope-mutable-state--lift-into-fixture.md) | Disallow a test writing to a binding declared outside every fixture, test block and setup hook, so the state a test changes belongs to that test alone rather than to the whole file | oxlint |  |
 | [no-multi-binding-declaration--declare-one-binding-per-statement](./no-multi-binding-declaration--declare-one-binding-per-statement.md) | Disallow a declaration statement that introduces more than one binding, so every binding has a statement of its own to be read, moved and deleted at | oxlint |  |
@@ -106,12 +107,22 @@
 | [require-registered-file--restore-it-at-the-registered-path](./require-registered-file--restore-it-at-the-registered-path.md) | Require every path the required-file table registers to hold a file that is not empty, so a file whose readers sit outside the source keeps its place instead of leaving with the change that stopped mentioning it | oxlint |  |
 | [require-spec-file-for-assets--create-matching-spec](./require-spec-file-for-assets--create-matching-spec.md) | Require every test data file to sit beside a spec of the same stem, so the data has one owner that reads it and leaves the repository with the test that gave it a reason to exist | oxlint | ⚙️ |
 | [require-spec-lint-coverage--lint-every-spec-file](./require-spec-lint-coverage--lint-every-spec-file.md) | Require every file declaring a test block to sit inside the reach of the spec discipline bundle, with those rules failing a run and their shared settings handed out from one declaration, so a run that reports nothing stands apart from a bundle that reaches nothing | oxlint |  |
-| [require-spec-or-assets-only-in-spec-directory--move-out-or-inline](./require-spec-or-assets-only-in-spec-directory--move-out-or-inline.md) | Require every file under a directory named for specs to be a spec or the test data one of those specs owns, so setup carved out of a spec is reported where it sits instead of only where a spec imports it | oxlint | ⚙️ |
 | [require-standard-io-snapshot--pin-both-streams](./require-standard-io-snapshot--pin-both-streams.md) | Require a spec that derives tests from `standardIoTest` to pin both captured streams with a snapshot, so every change to what the command prints surfaces as a diff | oxlint |  |
 | [require-test-assets-constants--move-setup-to-spec](./require-test-assets-constants--move-setup-to-spec.md) | Require an assets file to carry nothing but const declarations of written-out data, so setup cannot leave the spec that owns it under the name of test data | oxlint | ⚙️ |
 | [require-test-block-for-spec-file--add-test-or-delete-file](./require-test-block-for-spec-file--add-test-or-delete-file.md) | Require a file named as a spec to declare at least one test block that runs, so naming a file a spec costs a check that actually executes rather than buying the standing of a spec for free | oxlint | ⚙️ |
 | [require-test-block-spelling--use-configured-fn](./require-test-block-spelling--use-configured-fn.md) | Require every test block declaration to be rooted at one configured spelling, so a scan of the test surface settles what an identifier means without reading the block behind it | oxlint | 🔧 ⚙️ |
 | [require-vitest-extend-builder--infer-fixture-type](./require-vitest-extend-builder--infer-fixture-type.md) | Require every fixture to be declared as its own builder call whose type is inferred from what the factory returns, so the shape a test destructures is the shape the factory produces rather than a hand-written copy that drifts away from it | oxlint | 🔧 |
+
+## 名指しで有効にするルール
+
+このワークスペースが実装して配布するが、出荷する preset には載せていないルール。使う側が `rules` に名前を書いて初めて効く。載せていない理由は各ルールの文書が持つ。
+
+| ルール | 説明 | ツール | 補足 |
+| --- | --- | --- | --- |
+| [no-barrel-import--import-from-the-owning-module](./no-barrel-import--import-from-the-owning-module.md) | Disallow a module specifier that names a re-export module while the statement takes a value through it, so the module a binding is taken from is the module that declares it | oxlint |  |
+| [no-barrel-module--declare-in-the-owning-module](./no-barrel-module--declare-in-the-owning-module.md) | Disallow a module whose every statement is a re-export and which forwards at least one value, so the module a binding is taken from is the module that declares it | oxlint | ⚙️ |
+| [no-mixed-package-surface--declare-one-surface](./no-mixed-package-surface--declare-one-surface.md) | Require a package to declare either the surface it is run through or the surface it is imported through, so which discipline owns the package is decided by its manifest instead of by whoever reaches into it next | oxlint |  |
+| [require-spec-or-assets-only-in-spec-directory--move-out-or-inline](./require-spec-or-assets-only-in-spec-directory--move-out-or-inline.md) | Require every file under a directory named for specs to be a spec or the test data one of those specs owns, so setup carved out of a spec is reported where it sits instead of only where a spec imports it | oxlint | ⚙️ |
 
 補足の記号 — 🔧: 自動修正あり / 💡: エディタの修正候補あり / ⚙️: オプションあり
 
