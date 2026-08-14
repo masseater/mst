@@ -1,69 +1,157 @@
+---
+description: "Require the test config to demand full coverage on every metric, so the amount of untested code that is allowed to stay is a decision written down once rather than whatever the suite happens to reach"
+---
+
 # no-lenient-coverage-threshold--demand-full-coverage
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-テストランナーの設定ファイルが、カバレッジの下限を宣言しているか、そしてその下限がリポジトリの要求と等しいかを見る。
+Require the test config to demand full coverage on every metric, so the amount of untested code that is allowed to stay is a decision written down once rather than whatever the suite happens to reach
 
-対象になるのはファイル名が `vite.config` または `vitest.config` で始まり、拡張子が `.ts` / `.mts` / `.cts` / `.js` / `.mjs` / `.cjs` のいずれかであるファイルだけである。それ以外のファイルは一切見ない。Vite+ を使う構成では設定が `vite.config.ts` に集約されるが、Vitest を単体で使う構成では `vitest.config.ts` が別に置かれることがあり、どちらに書かれていても同じ要求が効く必要がある。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-lenient-coverage-threshold--demand-full-coverage.ts`](../../src/lint/oxlint/rules/no-lenient-coverage-threshold--demand-full-coverage.ts)
 
-読むのは、そのファイルが default export している式である。`defineConfig({ ... })` のように関数呼び出しで包まれている場合は第 1 引数まで降りる。そこから `test` → `coverage` → `thresholds` とオブジェクトリテラルを辿り、`branches` / `functions` / `lines` / `statements` の 4 つを 1 つずつ見る。
+<!-- END GENERATED rule-header -->
 
-報告は 4 種類ある。
+## Violation
 
-`thresholds` に辿り着けなかった場合は 1 件だけ報告する。`test` が無い、`coverage` が無い、`thresholds` が無い、default export が無い、default export が変数を指していてリテラルを読めない、のいずれもこれに畳まれる。どこで辿れなくなったかを区別しても直し方は同じで、`thresholds` を書くことだからである。
+A test runner configuration that declares no coverage floor, or one whose floor falls short of what the repository demands.
 
-`thresholds` はあるが、あるメトリクスに数値リテラルが無い場合は、そのメトリクスについて報告する。プロパティ自体が無い場合と、値が数値リテラルでない場合（変数参照、スプレッドで流し込まれたもの、計算式）の両方が該当する。設定ファイルの外に値が置かれていると、そのファイルを読んだだけでは下限が確定しないため、宣言されていないものとして扱う。
+Only files whose name starts with `vite.config` or `vitest.config` and whose extension is one of `.ts`, `.mts`, `.cts`, `.js`, `.mjs`, `.cjs` are read. Nothing else is looked at. A Vite+ setup gathers the configuration into `vite.config.ts`, while a setup using Vitest on its own may keep a separate `vitest.config.ts`, and the same demand has to hold wherever it is written.
 
-`thresholds` に数値リテラルがあり、それが要求値を下回る場合は、そのメトリクスについて報告する。要求値と等しい場合と上回る場合は通す。`thresholds` は下限であって、上回ること自体は問題にならない。
+What is read is the expression the file default-exports. Where it is wrapped in a call such as `defineConfig({ ... })`, the first argument is entered. From there the object literals `test`, `coverage` and `thresholds` are entered in turn, and `branches`, `functions`, `lines` and `statements` are read one at a time.
 
-`thresholds` に辿り着けた場合は、`perFile` が `true` かどうかを見る。`true` でなければ 1 件報告する。この判定はメトリクスごとの判定とは独立していて、両方が同時に報告されることがある。
+There are four reports.
 
-Vitest の短縮記法 `thresholds: { 100: true }` は、全メトリクスを 100 として扱う。キーが数値リテラルでも文字列リテラルでもよい。要求値が 100 を超えることはないため、この記法があれば 4 メトリクスすべてが満たされる。`100: false` は何も宣言していないのと同じ扱いになる。
+Where `thresholds` could not be reached, one report is raised. No `test`, no `coverage`, no `thresholds`, no default export, and a default export pointing at a variable whose literal cannot be read all collapse into it. Telling apart where the walk stopped would not change the fix, which is to write `thresholds`.
 
-同じキーが 2 回書かれている場合は後のものを採る。実行時に効くのが後のものだからである。
+Where `thresholds` is there and a metric carries no numeric literal, that metric is reported. Both the property being absent and its value not being a numeric literal — a variable reference, something poured in by a spread, a computed expression — land here. With the value outside the configuration file, reading that file does not settle the floor, so it counts as undeclared.
 
-このルールが見るのは宣言であって、実測値ではない。宣言した下限が実際に検査されるかどうかは、カバレッジの計測が有効になっているかで決まり、それは lint の管轄外にある。
+Where `thresholds` carries a numeric literal below what is demanded, that metric is reported. Equal to or above the demand passes: `thresholds` is a floor, and standing above it is not a problem.
 
-## なぜそれが要るか
+Where `thresholds` was reached, `perFile` is checked for `true`. Anything else raises one report. That judgment is independent of the per-metric ones, so both can be reported at once.
 
-1 層目は、下限を宣言していないカバレッジは数字を出しているだけで何も強制しない、という点である。カバレッジレポートは「今どうなっているか」しか言わない。下限が無ければ、値が下がったコミットと上がったコミットが同じ扱いになる。誰かがレポートを読んで気付くことに頼っている状態は、実際には誰も見ていない状態と区別できない。
+Vitest's shorthand `thresholds: { 100: true }` is treated as 100 on every metric, with the key written either as a numeric or a string literal. The demand never exceeds 100, so this shorthand satisfies all four. `100: false` is treated as declaring nothing.
 
-2 層目は、100 を下回る下限は「許容する未検証コードの量」を宣言している、という点である。90 と書けば、テストの無いコードが 10% まで存在してよいという合意になる。この 10% がどこかは誰も指定していないので、実際には「テストを書かなくても通る枠」として最も書きにくい箇所に集まる。そして枠が埋まったときに取られる行動は、テストを足すことではなく下限を下げることになりやすい。下限を下げる変更は 1 行で、レビューでは他の変更に紛れる。
+Where the same key is written twice, the later one is taken, because that is the one that takes effect at run time.
 
-3 層目は、その枠が設定ファイルごとに別々に決まると、リポジトリ全体としての基準が存在しなくなる点である。ワークスペースごとに 90 / 85 / 80 と書かれていても、それぞれの数字がどういう検討の結果なのかは残らない。要求値をルールの側に置き、設定ファイルには「要求を満たしている」ことだけを書かせると、基準を変える操作が 1 箇所への変更になり、変えたこと自体が差分として見える。
+What this rule reads is the declaration, not the measured value. Whether a declared floor is actually checked depends on coverage measurement being enabled, which is outside the lint's jurisdiction.
 
-4 層目は、下限をパッケージ全体の集計で見ると、その数字がどのファイルのものかを何も言わない点である。集計で 100 を要求している間は per-file と一致するが、オプションで 1 つでも下げた瞬間に意味が変わる。集計 90 は「テストの無いファイルが 1 つあっても、よく書かれたファイルがその分を埋めれば通る」を意味し、埋めている側と埋められている側のどちらがどれかは数字に出ない。新しく足したファイルがテストなしで着地しても、パッケージが十分大きければ集計は動かない。`perFile` を要求するのは、下限が「どのファイルについても言えること」であって「平均について言えること」ではないという読み方に固定するためである。
+### The invariant
 
-5 層目は、メトリクスを 1 つだけ書く形が最も静かに壊れる点である。`lines` だけ 100 にした設定は一見厳しいが、`branches` が無いので分岐は 1 本も通っていなくても構わない。行カバレッジは分岐の存在を見ないため、この組み合わせでは「全行を通ったが片方の分岐しか実行していない」コードが満点になる。4 つを揃えて要求するのは、どれか 1 つが緩いと残り 3 つの意味が薄れるからである。
+The first layer is that coverage with no declared floor only prints numbers and enforces nothing. A coverage report says how things are right now. Without a floor, a commit that lowered the value and one that raised it are treated identically. A state that depends on somebody reading the report and noticing is indistinguishable from a state where nobody is looking.
 
-## どう直すか
+The second layer is that a floor below 100 declares how much unverified code is acceptable. Writing 90 is an agreement that code without tests may exist up to 10%. Nobody specifies where that 10% is, so in practice it collects in the hardest places to write, as the allowance for skipping tests. And when the allowance fills up, the move that gets made is lowering the floor rather than adding tests — a one-line change that hides among the others in a review.
 
-設定ファイルに `test.coverage.thresholds` を書き、4 メトリクスすべてに要求値を入れ、`perFile: true` を足す。全メトリクスが 100 でよいなら `thresholds: { 100: true, perFile: true }` と書けば同じことになる。
+The third layer is that when the allowance is settled per configuration file, no repository-wide standard exists any more. Workspaces reading 90, 85 and 80 leave no record of what deliberation produced each number. Putting the demand in the rule and letting configuration files say only "the demand is met" makes changing the standard a change in one place, and makes the change itself visible as a diff.
 
-宣言を書いた結果として実測値が下限に届かないなら、直す対象は下限ではなくコードである。届いていない箇所は、多くの場合「起きないことになっている失敗系」である。到達できないと判断したなら、それは本当に到達できないのか、それとも呼び出し側がその状態を作れてしまうのかを確かめる。前者ならその分岐自体が不要であり、消せばカバレッジは上がる。後者ならテストが要る。
+The fourth layer is that a floor read against a package total says nothing about which file it belongs to. While the total demands 100 it agrees with per-file, and the moment an option lowers even one metric the meaning changes. A total of 90 means "one file without tests still passes as long as well-written files make up the difference", and which files are covering for which does not show in the number. A newly added file can land without tests and, in a package large enough, the total will not move. `perFile` is demanded to pin the floor as something said about every file rather than about an average.
 
-下限を満たせない事情がリポジトリ全体にあるなら、下げるのはルールのオプションであって設定ファイルではない。オプションで下げれば、その数字はリポジトリで 1 つに決まり、すべての設定ファイルに同じ要求として効く。設定ファイル側を個別に下げると、下げた理由がそのファイルにしか残らず、他のファイルが同じ緩さを持つべきかどうかを誰も判断できなくなる。
+The fifth layer is that writing only one metric breaks the most quietly. A configuration setting `lines` to 100 looks strict, and with `branches` missing, not a single branch need have been taken. Line coverage does not see branches, so in that combination code that ran every line while executing only one side of a branch scores full marks. All four are demanded together because one being loose thins the meaning of the other three.
 
-## 禁じる回避策
+### Configuration
 
-- 設定ファイルから `test` ブロックごと消して報告を止める。`thresholds` が無い状態として同じ報告が出る。仮に対象外にできたとしても、消した先にあるのは下限が無い状態そのものである
-- 下限を満たすために `coverage.exclude` へ届いていないファイルを足す。分母から外れるので数字は上がるが、未検証のコードは 1 行も減っていない。除外は「そもそも計測対象でないもの」に対する操作であって、計測したくないものに対する操作ではない
-- `thresholds` の値を別ファイルの定数に逃がす。設定ファイルを読んだだけでは下限が確定しなくなるため、このルールは宣言されていないものとして扱う。下限は使う場所に数値で書く
-- `perFile` を外して集計で通す。届いていないファイルはそのまま残り、数字だけが緑になる。どのファイルが届いていないのかは集計から読み取れないので、外した瞬間に「あと何をすれば満たせるか」も分からなくなる
-- 満たせないメトリクスだけを設定ファイルから外す。外したメトリクスは報告されるが、仮に報告を抑制できたとしても、そのメトリクスは以後どこまで下がっても誰も気付かない
-- そのファイルだけ抑制ディレクティブで黙らせる。下限はリポジトリ全体に対する合意なので、ファイル単位の免除はそのまま合意の無効化になる
-- オプションを使ってリポジトリの要求値を実測値まで下げ、その場を通す。オプションは「このリポジトリでは何を要求するか」を決めるものであって、今の実測値を追認するためのものではない。下げるなら、下げた数字が次に上げられるのはいつなのかをコミットログに残す
-
-## オプション
-
-- `branches` / `functions` / `lines` / `statements`（数値、任意）: そのメトリクスに要求する下限。0 以上 100 以下。既定はすべて 100。指定しなかったメトリクスは既定のまま残るので、1 つ下げたときに他の 3 つが黙って落ちることはない
+- `branches`, `functions`, `lines`, `statements` (optional, numbers): the floor demanded of that metric, from 0 to 100. All default to 100. A metric left unnamed keeps its default, so lowering one never drops the other three quietly
 
 ```jsonc
 ["error", { "branches": 90 }]
 ```
 
-`perFile` を下げる口は持たない。ファイル単位で見るかどうかは下限の読み方そのものであり、下げられる数字ではない。
+There is no way to lower `perFile`. Whether the floor is read per file is how the floor is read at all, not a number that can be lowered.
 
-要求値をワークスペースごとに変える口は持たない。カバレッジの下限は「このリポジトリではどこまでの未検証コードを許すか」という 1 つの合意であり、ワークスペースごとに違う数字を置けるようにすると、その合意が存在しなくなる。特定のワークスペースだけ事情が違うなら、そのワークスペースを別リポジトリに分けるか、要求値をリポジトリ全体で下げるかのどちらかになる。
+There is no way to vary the demand per workspace. A coverage floor is one agreement about how much unverified code this repository allows, and letting each workspace hold a different number would mean the agreement does not exist. Where one workspace genuinely has different circumstances, either it belongs in another repository or the demand comes down for the whole one.
 
-カバレッジの計測を有効にすることは要求しない。このルールが見るのは設定ファイルの宣言であって、テストの起動方法ではない。計測が有効かどうかは CLI の引数や実行環境でも変わり、設定ファイルを読むだけでは決まらない。宣言と起動の両方を 1 本のルールで判定すると、どちらの違反も同じ 1 本の設定でしか制御できなくなる。
+Coverage measurement being enabled is not required. This rule reads the declaration in the configuration file, not how the tests are launched. Whether measurement is on can also change with CLI arguments and the environment, and cannot be settled by reading the configuration file. Judging the declaration and the launch in one rule would leave both violations controllable only through one setting.
+
+## Fix
+
+Write `test.coverage.thresholds` in the configuration file, put the demanded number on all four metrics, and add `perFile: true`. Where 100 on every metric is right, `thresholds: { 100: true, perFile: true }` says the same thing.
+
+Where writing the declaration leaves the measured value below the floor, what needs fixing is the code, not the floor. What is not reached is usually a failure path that "cannot happen". Where you judge it unreachable, confirm whether it really is unreachable or whether a caller can produce that state. In the first case the branch itself is unnecessary and deleting it raises the coverage; in the second, a test is needed.
+
+Where circumstances keep the whole repository from meeting the floor, what comes down is the rule's option, not the configuration file. Lowered through the option, the number is settled once for the repository and reaches every configuration file as the same demand. Lowering configuration files one at a time leaves the reason in that file alone, and nobody can judge whether the others should carry the same looseness.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// a full threshold checked against the package total is reported
+// in vite.config.ts
+import { defineConfig } from "vite-plus";
+export default defineConfig({
+  test: {
+    coverage: { thresholds: { branches: 100, functions: 100, lines: 100, statements: 100 } },
+  },
+});
+```
+
+```ts
+// a metric left out is reported on its own
+// in vite.config.ts
+import { defineConfig } from "vite-plus";
+export default defineConfig({
+  test: {
+    coverage: { thresholds: { functions: 100, lines: 100, statements: 100, perFile: true } },
+  },
+});
+```
+
+Code this rule accepts.
+
+```ts
+// every metric spelled out at full coverage, checked file by file, passes
+// in vite.config.ts
+import { defineConfig } from "vite-plus";
+export default defineConfig({
+  test: {
+    coverage: {
+      thresholds: { branches: 100, functions: 100, lines: 100, statements: 100, perFile: true },
+    },
+  },
+});
+```
+
+```ts
+// the shorthand that demands full coverage on every metric at once passes
+// in vite.config.ts
+import { defineConfig } from "vite-plus";
+export default defineConfig({ test: { coverage: { thresholds: { 100: true, perFile: true } } } });
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Deleting the whole `test` block from the configuration to stop the report. It comes out as the same report for having no `thresholds`, and even if it could be taken out of reach, what lies beyond is the state of having no floor at all
+- Adding files that fall short to `coverage.exclude` to meet the floor. They leave the denominator so the number rises, and not one line of unverified code is gone. Exclusion is for what was never a measurement target, not for what you would rather not measure
+- Escaping the `thresholds` values into constants in another file. The floor stops being settled by reading the configuration file, so this rule treats it as undeclared. Write the floor as a number where it is used
+- Removing `perFile` to pass on the total. The files that fall short stay exactly as they were and only the number goes green. Which files fall short cannot be read off a total, so the moment it is removed, so is any answer to "what is left to do"
+- Removing from the configuration only the metric you cannot meet. The removed metric is reported, and even if the report could be suppressed, nobody will notice however far that metric falls afterwards
+- Silencing that one file with a suppression directive. The floor is an agreement across the whole repository, so an exemption per file is that agreement being voided
+- Using the options to lower the repository's demand to the measured value to get through. The options settle what this repository demands; they are not for ratifying today's measurement. If it comes down, leave in the commit message when it goes back up
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `missingCoverageThresholds` | A test config must not measure coverage without demanding a number. \`{{path}}\` is absent from this config. Add it and set {{requirement}} together with \`perFile: true\`. |
+| `aggregateCoverageThreshold` | A coverage threshold must not be checked against the package total. \`perFile\` is not set to \`true\` in \`test.coverage.thresholds\`. Add it. |
+| `unsetCoverageThreshold` | A coverage metric must not be left without a threshold. \`{{metric}}\` carries no number in \`test.coverage.thresholds\`. Set it to {{required}}. |
+| `lenientCoverageThreshold` | A coverage threshold must not sit below what this repository demands. \`{{metric}}\` is declared as {{declared}} against a demanded {{required}}. Raise it to {{required}} and cover the code that made you lower it. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->
