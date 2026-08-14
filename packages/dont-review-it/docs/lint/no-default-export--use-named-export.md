@@ -1,81 +1,144 @@
+---
+description: "Disallow every export whose outward name is `default`, so a symbol keeps the name it was defined under all the way to the places that call it"
+---
+
 # no-default-export--use-named-export
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-「そのエクスポート宣言の結果、外向きのエクスポート名が `default` になるか」だけを見る。構文の一覧ではなく性質で判定するため、系統は 3 つに分かれる。
+Disallow every export whose outward name is `default`, so a symbol keeps the name it was defined under all the way to the places that call it
 
-1. 直接の default エクスポート（`ExportDefaultDeclaration`）。続くものが関数宣言・クラス宣言・オブジェクトリテラル・既存の識別子・任意の式のいずれであっても区別せず報告する。値か型かも問わない
-2. `default` という名前への別名付き再エクスポート。`export { total as default }`、`export { total as default } from "..."`、`export { default } from "..."`、`export type { Total as default } from "..."` を含む。`from` 句の有無は問わない。外に出る名前が識別子で書かれていても文字列リテラル（`export { total as "default" }`）で書かれていても、結果が同じ `default` である以上は同じ違反として扱う。片方だけ塞ぐと、もう片方がそのまま抜け道になる
-3. TypeScript のエクスポート代入（`export = total`）。外向きの公開名が読み込み側の任意名になる点で default と同値でありながら、静的なエクスポート宣言ノードとして存在するため検出できる
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-default-export--use-named-export.ts`](../../src/lint/oxlint/rules/no-default-export--use-named-export.ts)
 
-再エクスポートで見るのは常に外に出る名前であり、内側の名前ではない。
+<!-- END GENERATED rule-header -->
 
-報告位置は、系統 1 と 3 はその文全体、系統 2 は `default` として出ている specifier そのもの。1 つの文が複数の specifier を持つ場合、報告されるのは `default` になっている 1 つだけである。
+## Violation
 
-ファイル名による例外をルールは 1 つも持たない。ツールが規約として default エクスポートを要求するファイルはあるが、その綴りは配備先が何のツールを使い、どう名付けたかで決まる。`vite.config.ts` は Vite を使う配備先にしか存在しないし、oxlint の JS プラグインの実体は `jsPlugins` の指定子が指すファイルであって、`plugin.ts` という名前はどのツールも要求していない。ルールが持てば、持っていない配備先にまで他所の綴りを配ることになる。
+Only one question is asked of an export declaration: does the outward name it produces come out as `default`? The judgment runs on that property rather than on a list of syntax, which splits the reports into three families.
 
-例外にする綴りは `toolRequiredFileNames` で配備先が名指しする。名指ししたファイルで通るのは直接の default エクスポート（系統 1）だけで、系統 2 と 3 は同じファイルでも報告される。ツールが要求しているのは `export default` という 1 つの形であって、`default` という名前を外に出す手段すべてではないためである。
+1. A direct default export (`ExportDefaultDeclaration`). What follows — a function declaration, a class declaration, an object literal, an existing identifier, any expression at all — makes no difference, and neither does whether it is a value or a type
+2. A re-export aliased to the name `default`. That covers `export { total as default }`, `export { total as default } from "..."`, `export { default } from "..."` and `export type { Total as default } from "..."`, with or without a `from` clause. Whether the outward name is written as an identifier or as a string literal (`export { total as "default" }`) makes no difference, because the result is the same `default`. Closing one and leaving the other would leave the other standing as the way around
+3. A TypeScript export assignment (`export = total`). It matches a default export in leaving the published name up to whoever imports it, while still existing as a static export declaration node that can be detected
 
-判定はベース名の完全一致である。`my-plugin.ts` や `plugin.entry.ts` は `plugin.ts` ではないので例外にならない。`vite.config.js` も `vite.config.ts` ではないので例外にならない。ディレクトリの位置は見ないので、名指しした綴りはどのワークスペースでも同じく例外になる。
+What a re-export is judged on is always the outward name, never the inner one.
 
-## なぜそれが要るか
+The report covers the whole statement for families 1 and 3, and the specifier going out as `default` for family 2. When one statement carries several specifiers, only the one that comes out as `default` is reported.
 
-守っている不変条件は「シンボル名が定義から呼び出しまで保たれる」ことである。
+The rule carries no exemption by file name of its own. Tools do require a default export from certain files, but the spelling of those files follows from which tools a deployment uses and what it named them. `vite.config.ts` exists only where Vite is used, and an oxlint JS plugin is whatever file the `jsPlugins` specifier points at — no tool asks for the name `plugin.ts`. Holding those names in the rule would ship one deployment's spellings to every deployment that does not share them.
 
-default export には名前がない。名前を決めるのは import する側であり、しかも import する側は好きな名前を選べる。同じ関数が、あるファイルでは `parseUser`、別のファイルでは `parse`、さらに別のファイルでは `userParser` として呼ばれる状態が、何の警告もなく成立する。
+A deployment names its exempt spellings through `toolRequiredFileNames`. In a named file only the direct default export (family 1) passes; families 2 and 3 are still reported there. What the tool requires is the single shape `export default`, not every route by which the name `default` reaches the outside.
 
-これが壊すのは読み手の検索である。定義を知っている人がその名前で grep しても、別名を付けた呼び出し側は引っかからない。呼び出しを読んでいる人がその名前で定義を探しても、定義は別の名前で書かれている。名前が対応関係を失うと、影響範囲の把握はファイルを 1 つずつ開く作業になる。
+The match is on the exact base name. `my-plugin.ts` and `plugin.entry.ts` are not `plugin.ts`, and `vite.config.js` is not `vite.config.ts`, so none of them is exempt. Directory position is not read, so a named spelling is exempt in every workspace alike.
 
-リネームも同じ理由で壊れる。named export なら定義側の名前を変えれば import 側が壊れて追随を強制されるが、default export では定義側の名前をいくら変えても import 側は無傷のまま古い名前を使い続ける。名前と実体がずれたことを何も検出しない。
-
-そもそも名前が存在しない場合もある。無名関数式やオブジェクトリテラルをそのまま default で出すと、定義側に名前が一つも無い。この場合、検索すべき正準名自体が存在しない。
-
-## どう直すか
-
-値に名前を付けて、その名前を export する。
-
-```ts
-export const parseUser = (input: string): User => JSON.parse(input) as User;
-```
-
-import 側は同じ名前で受け取る。
-
-```ts
-import { parseUser } from "./parse-user.ts";
-```
-
-`export default function foo() {}` のように既に名前が付いているなら、`default` を外して `export function foo() {}` にするだけで済む。無名の値を default export していたなら、まず名前を考えることになる。名前が決まらない値は、切り出す単位が間違っている可能性が高い。
-
-再エクスポートは `default` に付け替えず、元の名前をそのまま転送する。`export * as default from "..."` には転送すべき元の名前が存在しないため、名前空間に名前を与える（`export * as parseUser from "..."`）。
-
-`export = total` は `export { total }` にする。
-
-## 違反にならないもの
-
-- 名前付きエクスポート全般。宣言に直接付ける形、束縛をまとめて出す形、他モジュールから名前を保ったまま転送する形のいずれも対象外
-- `export * from "..."`。ES モジュールの仕様上 default を転送しないため、これによって `default` が新たに生えることはない
-- `default` 以外の名前を付けた名前空間再エクスポート（`export * as total from "..."`）
-- 外部モジュールの default に外向きの名前を与えて転送する形（`export { default as total } from "external"`）。外に出る名前が `default` でないため違反ではない。default しか公開していない外部パッケージを、この規律の下で扱う唯一の橋渡しになる
-- 読み込み側の記述。このルールはエクスポート側だけを見る
-
-## 禁じる回避策
-
-- CommonJS 形式で default 相当のプロパティを生やす書き方。ES モジュールのエクスポート宣言を経由しないためこのルールには現れないが、出力される形は default そのものであり、読み込み側が任意の名前を付けられる状態は何も変わらない。検出されないことを理由に採用してはならない
-- エクスポート名を実行時に組み立てるなど、静的な一致を避けることだけを目的とした間接化
-- 例外を得るためにファイル名を `plugin.ts` や `vite.config.ts` に変える。ツールが読むエントリでないファイルにその名前を付けるのは、例外の前提そのものを壊す
-- named export を 1 つ書いた上で default export を併置する。呼び出し側がどちらを使うかは選べるままなので、名前が保たれる保証は得られない
-- 抑制ディレクティブ。例外はルールが持つ既定と、それを置き換える `toolRequiredFileNames` だけを正規の経路とする
-
-機械検出の範囲と規律の範囲は一致しない。検出は不変条件を守るための下限であって、上限ではない。
-
-## オプション
-
-`toolRequiredFileNames`（文字列の配列、既定は空）だけを取る。ツールが default エクスポートを要求するファイルの綴りを、配備先が名指しする。
+`toolRequiredFileNames` is a list of strings and is the only option the rule takes:
 
 ```jsonc
 ["error", { "toolRequiredFileNames": ["plugin.ts", "vite.config.ts"] }]
 ```
 
-既定が空なので、何も書かなければ例外は 1 つも無い。未知のキーは schema が拒否する（`additionalProperties: false`）。
+It defaults to empty, so writing nothing leaves no exemption at all, and an unknown key is refused by the schema. Turning the rule off for a file pattern through `overrides` reaches the same result for that one file, but it stops the whole rule there; naming the file through the option keeps the other violations inside it (`export { total as default }` and the rest) reported.
 
-例外を設定側の `overrides` でファイルパターンごと off にする形でも同じ結果は作れるが、その形はルールを丸ごと止める。オプションで名指しすれば、そのファイルの中の他の違反（`export { total as default }` など）は報告され続ける。
+### The invariant
+
+A symbol keeps its name from where it is defined to where it is called.
+
+A default export has no name. The name is chosen by whoever imports it, and they may choose whatever they like. The same function ends up called `parseUser` in one file, `parse` in another and `userParser` in a third, and nothing anywhere warns about it.
+
+What that breaks first is searching. Someone who knows the definition greps for that name and misses every call site that renamed it. Someone reading a call site searches for the definition under the name in front of them and finds it written under another. Once names stop corresponding, working out the reach of a change becomes a matter of opening files one at a time.
+
+Renaming breaks for the same reason. Under a named export, changing the name at the definition breaks the imports and forces them to follow. Under a default export, the definition can be renamed as often as you like while the imports carry on untouched under the old name, and nothing detects that the name and the thing have come apart.
+
+Sometimes there is no name at all. An anonymous function expression or an object literal exported directly as default leaves the definition side with no name anywhere, and then there is no canonical name to search for in the first place.
+
+### What is not a violation
+
+- Named exports in general: attached to a declaration, grouped over bindings, or forwarded from another module under the name it already had
+- `export * from "..."`. The ES module specification does not forward `default` through it, so no new `default` grows out of it
+- A namespace re-export under any name but `default` (`export * as total from "..."`)
+- Giving an outward name to another module's default (`export { default as total } from "external"`). The outward name is not `default`, so it is not a violation. This is the one bridge by which an external package that publishes only a default can be handled under this discipline
+- Anything on the importing side. This rule reads the exporting side alone
+
+Where the machine reaches and where the discipline reaches are not the same. Detection is the floor under the invariant, not the ceiling.
+
+## Fix
+
+Give the value a name and export that name.
+
+```ts
+export const parseUser = (input: string): User => JSON.parse(input) as User;
+```
+
+Receive it under the same name:
+
+```ts
+import { parseUser } from "./parse-user.ts";
+```
+
+Where a name is already there, as in `export default function foo() {}`, dropping `default` for `export function foo() {}` is the whole fix. Where an anonymous value was being exported, the first step is deciding on a name. A value you cannot name is usually a sign that the unit being carved out is the wrong one.
+
+Forward re-exports under the original name rather than renaming them to `default`. `export * as default from "..."` has no original name to forward, so give the namespace one (`export * as parseUser from "..."`).
+
+Turn `export = total` into `export { total }`.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// a default exported anonymous expression is reported
+export default () => 1;
+```
+
+```ts
+// renaming a local binding to default on the way out is reported
+const total = 1;
+export { total as default };
+```
+
+Code this rule accepts.
+
+```ts
+// a named export keeps the defined name at the module boundary
+export const total = 1 + 2;
+```
+
+```ts
+// giving an outward name to another module's default is the way across the boundary
+export { default as total } from "external-package";
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Growing a default-equivalent property through CommonJS. It never passes through an ES module export declaration, so it does not appear to this rule, while the emitted shape is a default in every respect and the importing side still names it whatever it likes. Not being detected is not a reason to adopt it
+- Assembling the export name at runtime, or any other indirection whose only purpose is to avoid a static match
+- Renaming a file to `plugin.ts` or `vite.config.ts` to earn the exemption. Putting that name on a file no tool reads as an entry breaks the premise the exemption stands on
+- Writing one named export and placing a default export beside it. Callers can still choose either, so nothing guarantees the name is kept
+- A suppression directive. The only sanctioned routes to an exception are the rule's own default and the `toolRequiredFileNames` that replaces it
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `defaultExport` | A module must not put a value out under the name \`default\`. Name the value and export the name: \`export const parseConfig = ...\` or \`export function parseConfig() {}\`. |
+| `defaultAliasReExport` | A re-export must not rename what it forwards to \`default\`. Forward the name the owning module already gave it: \`export { parseConfig } from "./parse-config.ts"\`. |
+| `namespaceDefaultReExport` | A namespace re-export must not be bound to the name \`default\`. Give the namespace a name here: \`export \* as parseConfig from "./parse-config.ts"\`. |
+| `exportAssignment` | An export assignment must not stand in for a named export. Export the value under the name it was declared with: \`export { parseConfig }\`. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

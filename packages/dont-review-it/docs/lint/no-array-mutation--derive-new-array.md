@@ -1,127 +1,177 @@
+---
+description: "Disallow calling an array method that changes the receiver in place, so a changed array always appears as a newly derived binding"
+---
+
 # no-array-mutation--derive-new-array
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-メソッド呼び出しのうち、次の 2 つを同時に満たすもの。報告位置は呼び出し式全体ではなくメソッド名そのもの。
+Disallow calling an array method that changes the receiver in place, so a changed array always appears as a newly derived binding
 
-**1. 呼んでいるメソッドがその場でレシーバを書き換える 9 個のいずれかであること**
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-array-mutation--derive-new-array.ts`](../../src/lint/oxlint/rules/no-array-mutation--derive-new-array.ts)
 
-| メソッド     | 何をするか         |
-| ------------ | ------------------ |
-| `push`       | 末尾への追加       |
-| `pop`        | 末尾からの取り出し |
-| `shift`      | 先頭からの取り出し |
-| `unshift`    | 先頭への追加       |
-| `splice`     | 範囲の差し替え     |
-| `sort`       | 並べ替え           |
-| `reverse`    | 反転               |
-| `fill`       | 一括代入           |
-| `copyWithin` | 内部コピー         |
+<!-- END GENERATED rule-header -->
 
-ES2023 の copy-by-change 群（`toSorted` / `toReversed` / `toSpliced` / `with`）は検出しない。レシーバを変えずに新しい配列を返すので、このルールが求める導出そのものである。詳しくは「違反とみなさないもの」を参照。
+## Violation
 
-メソッド名は静的に確定できる 3 つの書き方を同じものとして扱う。ドット記法（`items.sort()`）、文字列リテラルによる添字アクセス（`items["sort"]()`）、置換を含まないテンプレートリテラルによる添字アクセス（``items[`sort`]()``）。後の 2 つを抜け道にしないため。
+A method call that meets two conditions at once. The report points at the method name, not at the whole call expression.
 
-**2. レシーバが構文だけで配列だと確定できること**
+**The method called is one of the nine that change the receiver in place.**
 
-この判定に型検査器は使わない（次節「型情報を使わないこと」を参照）。確定できるのは次の形。
+| Method       | What it does               |
+| ------------ | -------------------------- |
+| `push`       | append to the end          |
+| `pop`        | take from the end          |
+| `shift`      | take from the front        |
+| `unshift`    | prepend to the front       |
+| `splice`     | replace a range            |
+| `sort`       | reorder                    |
+| `reverse`    | reverse                    |
+| `fill`       | assign across a range      |
+| `copyWithin` | copy inside the same array |
 
-- 配列リテラル（`[...items].sort()`）
-- `new Array(...)` / `Array.from(...)` / `Array.of(...)`
-- 上のいずれかに解決できるレシーバに対する、新しい配列を返すメソッド呼び出し（`items.slice().sort()` / `items.filter(f).reverse()`）。連鎖は何段でも辿る
-- 同じファイル内で宣言された識別子で、その宣言が配列型の注釈を持つもの。`T[]`、タプル（`[A, B]`）、`readonly` を付けた形、`Array<T>` / `ReadonlyArray<T>`、およびそれらを含む合併型・交差型。合併は構成要素の 1 つでも配列的なら対象にして安全側に倒す
-- 同じファイル内で宣言された識別子で、初期化式が上のいずれかであるもの（`const items = [3, 1, 2]; items.sort();`）
-- 配列型に制約された型引数（`<Entries extends readonly string[]>(items: Entries)`）。制約を辿って判定する
-- 上のいずれかを型アサーション・`satisfies`・非 null 表明・省略可能連結で包んだ形。包みを剥がして中身で判定する。アサーション先の型が配列型である形（`(input as string[]).push(x)`）も対象にする
+The ES2023 copy-by-change methods (`toSorted`, `toReversed`, `toSpliced`, `with`) are not reported. They return a new array without touching the receiver, which is the derivation this rule asks for.
 
-出自による免除は持たない。直前に複製した配列に対する破壊的呼び出しも報告する。`[...items].sort()` も `items.slice().sort()` も違反である。「作ったばかりだから安全」という判断は、その配列がその後どこへ渡るかを読み手が追わないと成立せず、このルールが消したはずの判断コストがそのまま戻る。
+Three spellings of a method name are read as the same one: dot notation (`items.sort()`), a subscript written as a string literal (`items["sort"]()`), and a subscript written as a template literal with no substitution (``items[`sort`]()``). The last two are read so they cannot serve as a way around the first.
 
-省略可能連結（`items?.sort()`）は形が同じなので同じく報告する。`string[] | undefined` のような合併の扱いから素直に導かれる帰結であって、別扱いはしていない。
+**The receiver is settled as an array from the syntax alone.** The type checker is not consulted. These are the shapes that settle it:
 
-同じ式に該当する呼び出しが複数現れるとき（`items.sort().reverse()`）は、それぞれを独立した違反として報告する。1 件にまとめると、直したあとに残りが見えない。
+- An array literal (`[...items].sort()`)
+- `new Array(...)`, `Array.from(...)`, `Array.of(...)`
+- A method returning a new array, called on a receiver that resolves to one of the above (`items.slice().sort()`, `items.filter(f).reverse()`). The chain is followed to any depth
+- An identifier declared in the same file whose declaration carries an array type annotation: `T[]`, a tuple (`[A, B]`), a `readonly` form, `Array<T>` / `ReadonlyArray<T>`, and unions and intersections containing them. A union counts when even one member is array-like, which errs toward reporting
+- An identifier declared in the same file whose initialiser is one of the above (`const items = [3, 1, 2]; items.sort();`)
+- A type parameter constrained to an array type (`<Entries extends readonly string[]>(items: Entries)`). The constraint is followed
+- Any of the above wrapped in a type assertion, a `satisfies`, a non-null assertion or an optional chain. The wrapper is peeled and the contents decide. An assertion to an array type (`(input as string[]).push(x)`) counts as well
 
-### 型情報を使わないこと
+Where the array came from grants no exemption. A destructive call on an array copied one line earlier is reported: `[...items].sort()` and `items.slice().sort()` are both violations. "It was just built, so it is safe" only holds once a reader has followed where that array goes next, and that is the reading cost this rule exists to remove.
 
-不変条件の記述は「レシーバの静的型が配列的かどうか」で判定すると定めている。このリポジトリの oxlint JS plugin には型情報が無いので、その判定を**構文で確定できる範囲に絞って**実装している。上に列挙した形がその範囲である。
+An optional chain (`items?.sort()`) has the same shape and is reported the same way. It follows from how unions like `string[] | undefined` are handled and is not a case of its own.
 
-この差は精度ではなく網羅性に出る。列挙した形に当たれば型検査器と同じ結論になり、当たらなければ何も報告しない。名前だけで報告する実装にはしていない。`push` も `sort` も `with` も配列以外の API で広く使われる名前であり、名前一致だけで報告すると運用に耐えない誤検知になるためである。
+When one expression carries several qualifying calls (`items.sort().reverse()`), each is reported on its own. Collapsing them into one report would hide what is left after the first fix.
 
-## なぜそれが要るか
+### Why the type checker is not used
 
-守っている不変条件は「配列の値は、作られた後に中身を書き換えられない」ことである。読み手がある配列を目にしたとき、その値は宣言サイトが作った内容のままだと仮定してよい。
+The invariant is stated over the static type of the receiver. The oxlint JS plugin in this repository has no type information, so the judgment is implemented **narrowed to what the syntax settles**, and the shapes listed above are that range.
 
-理由は 2 層ある。
+The gap shows up in coverage, not in precision. A shape on the list reaches the same conclusion a type checker would; a shape off the list is not reported at all. Reporting on the name alone was not implemented: `push`, `sort` and `with` are widely used names on APIs that are not arrays, and matching the name alone would produce false reports at a rate no one would run with.
 
-1 層目は、変更の事実が呼び出し行の形に現れないことである。破壊的な配列メソッドは返り値ではなくレシーバを変える。返り値を使っていない `sort()` の行でも、そこを通過した時点で配列は並び替わっている。読み手は呼び出し式を見ただけでは「ここで何かが変わったのか」を判断できず、メソッド名を 1 つずつ破壊的かどうか分類しながら読むことになる。
+### The invariant
 
-2 層目は、その影響が呼び出し箇所の外に出ることである。配列は参照で共有される。引数として渡した先、クロージャが捕まえている変数、状態として保持されている同じ参照が、書き換えた側のコードを読まない限り追えない形で変わる。特に参照の同一性で変化を検出する仕組み（メモ化、再描画の判定、差分計算）は、中身が変わっても参照が変わらないため変更を取りこぼす。バグは書き換えた場所ではなく、共有していた側で表面化する。
+An array value is not changed after it is built. A reader who meets an array may assume it still holds what its declaration site produced.
 
-導出の形に統一すると 2 層がまとめて消える。変更は必ず新しい値として現れるので呼び出し行を見れば変更の有無が分かり、古い参照を持っている側は古い値を見続けることが保証される。
+Two layers hold that up. The first is that the change never shows in the shape of the call line. A destructive array method changes the receiver rather than the return value, so a line calling `sort()` and discarding the result still leaves the array reordered once control passes it. A reader cannot tell from the call expression whether anything changed here, and ends up classifying method names as destructive or not while reading.
 
-copy-by-change 群を対象から外しているのは、これを禁じると標準の手段だけでは並べ替えができなくなるからである。自前の非破壊ヘルパを書いて逃がす道は、このルールの下では塞がっている。ヘルパの内側に書く `[...values].sort()` は、出自による免除を持たないという上の規定によってそのまま報告されるためである。したがって「両群を禁じたうえで非破壊ヘルパを用意する」構成は成立しない。
+The second is that the effect leaves the call site. Arrays are shared by reference. An argument handed elsewhere, a variable a closure captured, a reference held as state — all change in a way that cannot be traced without reading the code that did the writing. Anything detecting change by reference identity (memoisation, re-render decisions, diffing) misses it outright, since the contents move while the reference does not. The bug then surfaces on the sharing side rather than where the write happened.
 
-このルールは、再代入を禁じる [no-reassign--use-spread-or-iife](./no-reassign--use-spread-or-iife.md) と同じ不変条件を分担している。2 本を揃えて有効化しないと、片方の経路だけが素通りする。
+Deriving instead removes both layers at once. A change always appears as a new value, so the call line says whether anything changed, and whoever holds the old reference is guaranteed to keep seeing the old value.
 
-## どう直すか
+The copy-by-change methods stay off the target list because forbidding them would leave no way to reorder with the standard library alone. Writing a non-destructive helper of one's own is already closed off under this rule: the `[...values].sort()` inside such a helper is reported like any other, since provenance grants no exemption. A setup that forbids both groups and supplies a helper therefore does not stand.
 
-元の配列を変えず、必要な形の新しい配列を作って束縛する。
+This rule shares one invariant with [no-reassign--use-spread-or-iife](./no-reassign--use-spread-or-iife.md), which forbids reassignment. Enabling one without the other leaves one of the two routes open.
 
-- 要素を足す: spread で新しい配列を作る
-- 絞る / 変換する: `filter` / `map` / `reduce` を使う。空配列を用意して積み上げる形にしない
-- 並べ替える / 反転する / 範囲を差し替える / 1 要素だけ置き換える: `toSorted` / `toReversed` / `toSpliced` / `with` を使う。いずれも新しい配列を返し、レシーバに触れない
-- 末尾の要素を読む: 反転してから先頭を取る形や、そのためだけにコピーを作る形ではなく、末尾を直接読むアクセサを使う
+An option to narrow any of this is not offered. There is no way to add or remove target methods, to restrict the files read, or to condition on something like "only arrays that live a long time". Expressing exceptions as configuration brings back the per-violation judgment of whether this one qualifies, which is the cost fixing the shape was meant to remove. An argument that an exception is needed is an argument about whether to enable the rule at all, not about a setting.
 
-自動修正は提供しない。導出への書き換えは、結果をどこに束縛するかの選択を伴い、機械的に一意に定まらない。この帰結として、書き手が直し方を知る唯一の経路が報告メッセージになる。
+### What is deliberately not a violation
 
-**有効化の前提条件が 1 つある。** 直し方が copy-by-change 群に寄っているので、配備先が配信するランタイムがこの 4 つを持っている必要がある。持たないランタイムに配るなら、代わりの非破壊ヘルパを外部依存として用意したうえで、そのヘルパの内側だけをこのルールの対象から外す設定が要る。
+- A call to a same-named method on a receiver that is not an array: `push` on a navigation client, `push` on a version-control client, a hand-written stack class, `push` on a stream. A matching name with no settled array is not reported
+- Non-destructive array methods in general: `map`, `filter`, `slice`, `concat`, `flatMap`, `reduce`, `find`, `at`, `join`, `includes`, and the copy-by-change group as well. They leave the receiver alone and are the derivations this rule accepts
+- Index assignment (`items[0] = x`) and assignment to `length`. Neither takes the form of a method call, so neither enters this rule. Mutation in assignment form belongs to [no-reassign--use-spread-or-iife](./no-reassign--use-spread-or-iife.md), which reads no types. That division is settled and carries no room for judgment
+- Destructive methods on `Map` and `Set`. Neither rule's syntactic detection reaches them. They are violations under the guidelines and are rejected in review
+- Whether the receiver is local, escapes its scope, or lives long or briefly. These are not distinguished, all are violations, and none is an exemption
 
-## 違反とみなさないもの
+### What is not detected and still not allowed
 
-3 つは根拠が違うので混ぜずに扱う。
+Nothing below is permitted. Each is a shape this rule does not report, which is not the same as a shape that may be written. All of them are violations under the guidelines and are rejected in review. Because no type information is used, this range is wider than the statement of the invariant would suggest.
 
-### (a) 意図的に違反としないもの
+- **A receiver reached through a property** (`this.items.push(x)`, `state.items.push(x)`). The most common shape in real code, and the property's type lives at its declaration, out of the call expression's reach
+- **An imported binding** (`import { names } from "./names.ts"; names.push(x)`). The declaration is in another file
+- **A binding taken out by a destructuring pattern** (`const [first] = pairs; first.push(x)`). The element's type comes from the array's element type and is not settled by the pattern
+- **A function's return value used directly as the receiver** (`loadNames().sort()`). The call expression carries no annotation
+- **An annotation reached through a type alias or a type from outside the workspace** (`names: Names` where `type Names = string[]`). Following an alias needs type resolution
+- **Unannotated parameters and bindings**, and receivers typed `any` or `unknown`
+- **A call through a key only known at runtime** (`items[key](...)`). The method name is not settled statically
+- **A call through `call`, `apply` or `bind`**, and a method handed around as a binding or a callback before being called. The array is no longer in the receiver position
+- **Every shape that depends on a declaration outside the file**
 
-- 配列でないレシーバに対する同名メソッド呼び出し。画面遷移 API の `push`、バージョン管理クライアントの `push`、スタック風の自前クラス、ストリームの `push` が該当する。名前が一致しても配列だと確定しなければ報告しない
-- 配列に対する非破壊メソッド全般。`map` / `filter` / `slice` / `concat` / `flatMap` / `reduce` / `find` / `at` / `join` / `includes` に加えて、copy-by-change 群の `toSorted` / `toReversed` / `toSpliced` / `with` も含む。レシーバを変えず、かつ導出の手段として認めている形だから
-- 添字への代入（`items[0] = x`）と `length` への代入。これらはメソッド呼び出しの形をとらないため、このルールの検出形に入らない。代入の形をとる変異は [no-reassign--use-spread-or-iife](./no-reassign--use-spread-or-iife.md) が型を見ずに担当する。この分担は確定しており、判断の余地はない
-- 連想配列（`Map`）と集合（`Set`）の破壊的メソッド。どちらのルールの構文検出にも乗らない。規約上は違反として扱い、レビューで拒否する
-- レシーバがローカル変数か、スコープ外へ漏れるか、生存期間が長いか短いか。これらは区別せず、いずれも違反とする。免除条件にはしない
+Hiding the receiver behind a cast to a non-array type does not belong on that list. Wrappers are peeled, so a locally declared array is still reported through one; it is a forbidden bypass, listed below.
 
-### (b) 検出されないが、許可ではないもの
+### Left open for now
 
-このラベルを外すと、実装者にも書き手にも「許可」と誤読される。ここに挙げた形は、このルールが報告しないというだけであって、書いてよいという意味ではない。規約上は違反であり、レビューで拒否する。
+- TypedArrays (`Uint8Array` and the rest). They carry destructive sorting and range assignment, and the current judgment does not accept them as arrays. Whether to widen the accepted types to include them is undecided and is settled at deployment
+- Named types and classes that extend an array. The syntactic judgment does not follow type references, so `x: Named` against `class Named extends Array {}` is not detected. That is the current implementation's answer, not a decision about whether it belongs in scope, and it is settled by watching the behaviour at deployment
 
-型情報を使わないため、不変条件の記述が想定していたよりこの範囲は広い。
+## Fix
 
-- **プロパティ経由のレシーバ**（`this.items.push(x)` / `state.items.push(x)`）。実際のコードで最も多い形だが、プロパティの型は宣言側にあり呼び出し式からは読めない
-- **import した束縛**（`import { names } from "./names.ts"; names.push(x)`）。宣言が別ファイルにある
-- **分割代入で取り出した束縛**（`const [first] = pairs; first.push(x)`）。取り出した要素の型は元の配列の要素型であり、パターンからは決まらない
-- **関数の返り値をそのままレシーバにした形**（`loadNames().sort()`）。呼び出し式に型注釈が無い
-- **型エイリアスやワークスペース外の型を経由した注釈**（`type Names = string[]` に対する `names: Names`）。別名を辿るには型解決が要る
-- **注釈の無い引数・束縛**、およびレシーバの型が `any` / `unknown` である形
-- **実行時にしか決まらないキーによる呼び出し**（`items[key](...)`）。メソッド名が静的に確定しない
-- **`call` / `apply` / `bind` を経由する呼び出し**、およびメソッドを一度束縛やコールバックとして受け渡してから呼ぶ形。呼び出し式のレシーバが配列でなくなる
-- **同じファイルの外にある宣言に依存するすべての形**
+Leave the original array alone and bind a new one in the shape you need.
 
-なお、レシーバを非配列型にキャストして隠す形は (b) に入らない。中身を剥がして判定するので、局所で宣言された配列であれば包んでも報告される。後述のとおり禁止された回避策である。
+- Adding elements: build a new array with spread
+- Narrowing or transforming: use `filter`, `map` or `reduce`. Do not start from an empty array and accumulate into it
+- Reordering, reversing, replacing a range, replacing one element: use `toSorted`, `toReversed`, `toSpliced` or `with`. Each returns a new array and leaves the receiver untouched
+- Reading the last element: use an accessor that reads the end directly, rather than reversing to take the first or building a copy for that alone
 
-### (c) 現時点で範囲外とし、拡張するかを未決とするもの
+No automatic fix is offered. Rewriting into a derivation carries a choice of where to bind the result, which does not settle mechanically. As a consequence, the report message is the only route by which a writer learns the fix, which is why it names the derivations outright: spread, `filter` / `map` / `reduce`, and `toSorted` / `toReversed` / `toSpliced` / `with`. All are built into the language and do not depend on what a deployment picked for dependencies.
 
-- TypedArray（`Uint8Array` など）。破壊的な並べ替えや一括代入を持つが、現在の判定はこれを配列として受理しない。受理する型の定義を広げて対象に含めるかは未決であり、配備時に決める
-- 配列を継承した名前付きの型やクラス。現在の構文判定は型参照を辿らないので、`class Named extends Array {}` に対する `x: Named` は検出されない。これは現時点の実装の答えであって、対象に含めるかどうかの判断は済んでいない。配備時に実際の挙動を確認して決める
+**Enabling the rule carries one precondition.** Because the fixes lean on the copy-by-change group, the runtimes a deployment ships to have to carry those four. Shipping to one that does not means supplying a non-destructive helper as an external dependency and holding the inside of that helper out of this rule's reach through configuration.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- **レシーバを非配列型にキャストして判定から隠す。** 変異はそのまま残し、検出だけを消す操作である。局所で宣言された配列に対しては包みを剥がして報告するが、剥がせない形（プロパティ経由・import 経由）で通ってしまうものはレビューで差し戻す
-- **`call` / `apply` / `bind` や、メソッドを値として取り出してからの呼び出し。** 検出は外れるが、不変条件の違反としては同じである
-- **実行時に決まるキーへ逃がして添字で呼ぶ。** 同上
-- **プロパティやモジュール境界の向こうへレシーバを押し出して (b) に逃がす。** (b) は検出の限界であって、書いてよい場所として空けているわけではない
-- **ルール抑止コメント。** 個々の書き手の判断で付けてよいものとしては扱わない。抑止を認めるか、認めるとして誰がどこで承認を記録するかは配備先で決める必要があり、決まるまでは抑止せず、違反として報告させたまま相談に上げる
+Code this rule rejects.
 
-## オプション
+```ts
+// pushing onto an annotated array is an in-place change
+const items: string[] = [];
+items.push("a");
+```
 
-取らない。有効か無効かの切り替えだけを提供し、対象メソッドの追加・除外、対象ファイルの絞り込み、「生存期間の長い配列だけを対象にする」といった条件付けは持たせない。
+```ts
+// a copy made by spreading gets no exemption from where it came from
+const items: string[] = [];
+const ordered = [...items].sort();
+```
 
-例外を設定として表現できるようにすると、違反ごとに「これは例外に該当するか」を判断する余地が戻り、書き方を 1 つに固定するという目的そのものが失われる。例外が要るという議論は、設定値の議論ではなく、このルールを有効にするかどうかの議論として扱う。
+Code this rule accepts.
 
-報告メッセージには導出の手段を名指しで書いている。spread、`filter` / `map` / `reduce`、そして `toSorted` / `toReversed` / `toSpliced` / `with` である。いずれも言語の組み込みで、配備先の依存選定に従属しない。自動修正が無い以上、書き手が直し方を知る唯一の経路が報告メッセージであり、そこに一般名しか書かないと、代替を探す作業が書き手ごとに散る。
+```ts
+// a non-destructive derivation on an array is the accepted form
+const items: string[] = [];
+const shouted = items.map((entry) => entry.toUpperCase());
+```
+
+```ts
+// ordering through the copy-by-change method is an accepted derivation
+const publish = (items: readonly string[]) => items.toSorted();
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- **Casting the receiver to a non-array type to hide it from the judgment.** It leaves the mutation and removes only the detection. A locally declared array is still reported through the wrapper; the shapes that get through (a property, an import) are sent back in review
+- **`call`, `apply`, `bind`, or taking the method as a value before calling it.** Detection falls away while the breach of the invariant stays the same
+- **Escaping into a key settled at runtime and calling through a subscript.** As above
+- **Pushing the receiver past a property or a module boundary into what is not detected.** That range is the limit of detection, not a place left open to write in
+- **A suppression directive.** It is not treated as something an individual writer decides. Whether suppression is allowed at all, and who records approval where, has to be settled by the deployment; until it is, leave the report standing and raise it
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `inPlaceArrayMutation` | \`{{method}}\` must not be called on an array. Derive a new array and bind it: spread the old one to add elements, \`filter\` or \`map\` or \`reduce\` to narrow or transform, and \`toSorted\` or \`toReversed\` or \`toSpliced\` or \`with\` to order, reverse, splice or replace. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

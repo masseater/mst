@@ -8,18 +8,30 @@ import { runLintRuleAuthoring } from "./run-cli.ts";
 
 const USAGE = `Usage: lint-rule-authoring check [--write] [--repository-root <path>]
 
-Reconciles every workspace lint rule index (docs/lint/index.md) with the rule
-implementations found under the directories that the workspace manifests declare
-in their lintRules field. Without --write it only reports the indexes that are
-missing, unmarked, or stale; with --write it regenerates the generated region of
-each index. Exits non-zero when a problem remains.
+Reconciles every workspace lint rule index (docs/lint/index.md) and every rule
+document (docs/lint/<rule>.md) with the rule implementations found under the
+directories that the workspace manifests declare in their lintRules field.
+Without --write it only reports what is missing, unmarked, stale, or still
+carrying the text a seeded document was written with; with --write it seeds the
+absent documents and regenerates every generated region. Exits non-zero when a
+problem remains.
 
 Options:
-  --write                   Write the regenerated indexes instead of only reporting them.
+  --write                   Write the regenerated documents instead of only reporting them.
   --repository-root <path>  Root of the repository to scan. Defaults to the current working directory.
 `;
 
 const MISSING_INDEX = `packages/example/docs/lint/index.md A workspace that declares lint rules must not go without \`packages/example/docs/lint/index.md\`. Generate it with \`vp run guard:fix\`.\n`;
+
+const MISSING_DOC = `packages/example/docs/lint/no-thing--allow-it.md A rule must not go without its document. Seed it with \`vp run guard:fix\`, then write the sections it leaves for you.\n`;
+
+const SEEDED_SECTIONS_LEFT_AS_WRITTEN = [
+  `packages/example/docs/lint/no-thing--allow-it.md A seeded section must not be left as it was written. Replace "State what this rule rejects, why the invariant behind it holds, and where the detection stops short.".`,
+  `packages/example/docs/lint/no-thing--allow-it.md A seeded section must not be left as it was written. Replace "State the change that resolves a report.".`,
+  `packages/example/docs/lint/no-thing--allow-it.md A seeded section must not be left as it was written. Replace "Name the ways a report can be silenced without being resolved.".`,
+  `packages/example/docs/lint/no-thing--allow-it.md A rule document must not go without an example. Mark the test cases to publish with \`documented: true\` in \`src/rules/no-thing--allow-it.test.ts\`.`,
+  "",
+].join("\n");
 
 const DECLARED_RULE = `export const rule = {
   name: "no-thing--allow-it",
@@ -92,8 +104,12 @@ describe("runLintRuleAuthoring", () => {
         runLintRuleAuthoring(["check", "--repository-root", declaringRepository]),
       );
 
-      it("reports the missing index and exits one", ({ theRun }) => {
-        expect(theRun).toStrictEqual({ exitCode: 1, out: MISSING_INDEX, error: "" });
+      it("reports the missing index and the missing document, and exits one", ({ theRun }) => {
+        expect(theRun).toStrictEqual({
+          exitCode: 1,
+          out: `${MISSING_INDEX}${MISSING_DOC}`,
+          error: "",
+        });
       });
     });
 
@@ -102,8 +118,14 @@ describe("runLintRuleAuthoring", () => {
         runLintRuleAuthoring(["check", "--write", "--repository-root", declaringRepository]),
       );
 
-      it("regenerates the indexes and exits zero", ({ theRun }) => {
-        expect(theRun).toStrictEqual({ exitCode: 0, out: "", error: "" });
+      it("regenerates the index, seeds the document, and asks for the sections it left", ({
+        theRun,
+      }) => {
+        expect(theRun).toStrictEqual({
+          exitCode: 1,
+          out: SEEDED_SECTIONS_LEFT_AS_WRITTEN,
+          error: "",
+        });
       });
     });
 
@@ -113,8 +135,14 @@ describe("runLintRuleAuthoring", () => {
         return runLintRuleAuthoring(["check", "--repository-root", declaringRepository]);
       });
 
-      it("exits zero", ({ theRun }) => {
-        expect(theRun).toStrictEqual({ exitCode: 0, out: "", error: "" });
+      it("leaves nothing about the index and keeps asking for the seeded sections", ({
+        theRun,
+      }) => {
+        expect(theRun).toStrictEqual({
+          exitCode: 1,
+          out: SEEDED_SECTIONS_LEFT_AS_WRITTEN,
+          error: "",
+        });
       });
     });
   });

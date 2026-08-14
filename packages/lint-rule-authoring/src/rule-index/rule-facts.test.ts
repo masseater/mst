@@ -46,6 +46,7 @@ export const full = createRule({
           hasSuggestions: true,
           configurable: true,
           shipped: true,
+          messages: [{ messageId: "report", template: "The thing must not be done. Stop." }],
         },
       ]);
     });
@@ -87,6 +88,7 @@ export const full = createRule({
           hasSuggestions: false,
           configurable: false,
           shipped: true,
+          messages: [{ messageId: "report", template: "It is forbidden." }],
         },
       ]);
     });
@@ -411,6 +413,7 @@ export const borrowedDocs = {
           hasSuggestions: false,
           configurable: false,
           shipped: true,
+          messages: [{ messageId: "report", template: "No." }],
         },
       ]);
     });

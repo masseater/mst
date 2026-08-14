@@ -8,6 +8,7 @@ describe("dont-review-it/no-detached-rationale--comment-at-explained-line", () =
     valid: [
       {
         name: "a JSDoc block that carries tag content only passes",
+        documented: true,
         code: "/**\n * @param count how many rows to take\n * @returns the taken rows\n */\nexport const take = (count: number) => count;",
       },
       {
@@ -24,12 +25,14 @@ describe("dont-review-it/no-detached-rationale--comment-at-explained-line", () =
       },
       {
         name: "prose wrapped under a tag belongs to that tag",
+        documented: true,
         code: "/**\n * @remarks\n *   the caller owns the cursor, so the rows are taken eagerly\n */\nexport const take = 1;",
       },
     ],
     invalid: [
       {
         name: "description prose above the first tag is reported",
+        documented: true,
         code: "/**\n * Takes the rows the caller asked for.\n * @param count how many rows to take\n */\nexport const take = (count: number) => count;",
         errors: [{ messageId: "jsdocDescriptionProse" }],
       },
@@ -40,6 +43,7 @@ describe("dont-review-it/no-detached-rationale--comment-at-explained-line", () =
       },
       {
         name: "a single line JSDoc block carrying prose is reported",
+        documented: true,
         code: "/** Takes the rows the caller asked for. */\nexport const take = 1;",
         errors: [{ messageId: "jsdocDescriptionProse" }],
       },

@@ -16,6 +16,7 @@ describe("dont-review-it/no-barrel-module--declare-in-the-owning-module", () => 
       },
       {
         name: "a re-export beside a declaration leaves the file with something of its own",
+        documented: true,
         code: "export { sum } from './sum.ts';\nexport const total = 1;",
       },
       {
@@ -24,6 +25,7 @@ describe("dont-review-it/no-barrel-module--declare-in-the-owning-module", () => 
       },
       {
         name: "forwarding types alone leaves nothing behind once the build is done",
+        documented: true,
         code: "export type { Total } from './total.ts';",
       },
       {
@@ -49,6 +51,7 @@ describe("dont-review-it/no-barrel-module--declare-in-the-owning-module", () => 
     invalid: [
       {
         name: "a file holding one named re-export and nothing else is reported",
+        documented: true,
         code: "export { total } from './total.ts';",
         errors: [{ messageId: "barrelModule" }],
       },
@@ -69,6 +72,7 @@ describe("dont-review-it/no-barrel-module--declare-in-the-owning-module", () => 
       },
       {
         name: "one value among forwarded types is enough to carry values",
+        documented: true,
         code: "export { total, type Total } from './total.ts';",
         errors: [{ messageId: "barrelModule" }],
       },
