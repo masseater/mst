@@ -8,10 +8,12 @@ describe("lint-rule-authoring/no-explained-lint-message--state-prohibition-then-
     valid: [
       {
         name: "a prohibition followed by an imperative repair direction is the sanctioned shape",
+        documented: true,
         code: 'const rule = createRule({ name: "a-rule", meta: { docs: { description: "Disallow a default export" }, messages: { defaultExport: "A module must not put a value out under the name default. Name the value and export the name." } } });',
       },
       {
         name: "a condition word inside a code span is part of the quoted code, not a branch",
+        documented: true,
         code: 'const rule = createRule({ name: "a-rule", meta: { docs: { description: "Disallow a bare conditional" }, messages: { bareConditional: "A statement must not be written as `if (ready) run();`. Move the branch into its own block." } } });',
       },
       {
@@ -78,6 +80,7 @@ describe("lint-rule-authoring/no-explained-lint-message--state-prohibition-then-
     invalid: [
       {
         name: "a because clause argues for the rule",
+        documented: true,
         code: 'const rule = createRule({ name: "a-rule", meta: { docs: { description: "Disallow a default export" }, messages: { defaultExport: "A module must not use a default export, because every importing file then invents a name. Name the value and export the name." } } });',
         errors: [
           {
@@ -100,6 +103,7 @@ describe("lint-rule-authoring/no-explained-lint-message--state-prohibition-then-
       },
       {
         name: "a message that stops at the prohibition names no repair",
+        documented: true,
         code: 'const rule = createRule({ name: "a-rule", meta: { docs: { description: "Disallow a default export" }, messages: { defaultExport: "A module must not put a value out under the name default." } } });',
         errors: [{ messageId: "missingFixDirection" }],
       },
