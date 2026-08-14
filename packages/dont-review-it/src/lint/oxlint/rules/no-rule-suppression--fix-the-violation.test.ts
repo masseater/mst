@@ -56,6 +56,7 @@ describe("dont-review-it/no-rule-suppression--fix-the-violation", () => {
       },
       {
         name: "a suppression naming only a rule outside this gate is another rule's business",
+        documented: true,
         code: `/* eslint-disable ${OUTSIDE_RULE} */\n${DECLARATION}`,
         filename: SPEC_FILE,
       },
@@ -81,6 +82,7 @@ describe("dont-review-it/no-rule-suppression--fix-the-violation", () => {
       },
       {
         name: "a configuration holding a gate rule at error passes",
+        documented: true,
         code: `export default { lint: { rules: { "${PREFIXED_GATE_RULE}": "error" } } };`,
         filename: CONFIG_FILE,
       },
@@ -162,6 +164,7 @@ describe("dont-review-it/no-rule-suppression--fix-the-violation", () => {
       },
       {
         name: "grounds written after the separator leave the report standing",
+        documented: true,
         code: `// eslint-disable-next-line ${GATE_RULE} -- the shared setup lands later\n${DECLARATION}`,
         filename: SPEC_FILE,
         errors: [{ messageId: "lineScopedSuppression" }],
@@ -202,6 +205,7 @@ describe("dont-review-it/no-rule-suppression--fix-the-violation", () => {
       },
       {
         name: "a configuration turning a gate rule off is reported",
+        documented: true,
         code: `export default { lint: { rules: { "${PREFIXED_GATE_RULE}": "off" } } };`,
         filename: CONFIG_FILE,
         errors: [
