@@ -1,108 +1,159 @@
+---
+description: "Disallow a named function whose whole body forwards its own parameters unchanged to one other call and declares no type contract of its own, so a caller reaches the function that does the work instead of a name that only stands in front of it"
+---
+
 # no-identity-wrapper--call-the-target-directly
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-名前を持つ関数のうち、次の 3 つを同時に満たすもの。
+Disallow a named function whose whole body forwards its own parameters unchanged to one other call and declares no type contract of its own, so a caller reaches the function that does the work instead of a name that only stands in front of it
 
-1. 本体が 1 つの呼び出し式だけでできている
-2. その呼び出しの実引数が、自分の仮引数と同じ順序・同じ個数・同じ名前で並んでいる
-3. 自分の境界に戻り値の型契約を宣言していない
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-identity-wrapper--call-the-target-directly.ts`](../../src/lint/oxlint/rules/no-identity-wrapper--call-the-target-directly.ts)
 
-「名前を持つ関数」は 2 通りに限る。`function` 宣言と、識別子への代入（`const forward = (input) => target(input);`、`const forward = function (input) { return target(input); };`）である。オブジェクトのプロパティ、クラスのメソッド、呼び出しの引数に直接書いたコールバックは対象にしない。これは検出できないからではなく、意図的に外している（後述）。
+<!-- END GENERATED rule-header -->
 
-本体として認めるのは 2 つの形である。式本体のアロー関数（`(a) => f(a)`）と、`return` 文 1 つだけからなるブロック（`(a) => { return f(a); }`）。文が 2 つ以上あれば、この関数は転送以外のこともしている。
+## Violation
 
-引数の一致は名前で見る。`(a, b) => f(a, b)` は一致し、`(a, b) => f(b, a)` は一致しない。残余引数の展開（`(...args) => f(...args)`）は一致として扱う。仮引数が 0 個で実引数も 0 個のとき（`() => start()`）も一致である。同じ呼び出しに別の名前を与えている点は変わらない。
+A named function meeting all three of these at once.
 
-呼び先の形は問わない。識別子（`f(a)`）でもメンバー参照（`parser.parse(a)`）でも同じく報告する。
+1. Its body is one call expression and nothing else
+2. That call's arguments stand in the same order, in the same number and under the same names as the function's own parameters
+3. It declares no return type contract at its own boundary
 
-### 戻り値の型契約を宣言しているものは通す
+"A named function" is limited to two shapes: a `function` declaration, and an assignment to an identifier (`const forward = (input) => target(input);`, `const forward = function (input) { return target(input); };`). Object properties, class methods and callbacks written straight into a call are left out. Not because they cannot be detected, but on purpose — see below.
 
-次のいずれかがあれば、この関数は自分の境界で「何を返すか」を宣言している。値が素通しであっても報告しない。
+Two body shapes count. An arrow with an expression body (`(a) => f(a)`), and a block made of one `return` statement (`(a) => { return f(a); }`). With two statements or more, the function is doing something besides forwarding.
 
-- 関数自身の戻り値型注釈（`const parse = (input: string): User => read(input);`）
-- 代入先の束縛の型注釈（`const parse: ParseUser = (input) => read(input);`）
-- 関数自身の型引数宣言（`const parse = <Parsed>(input) => read(input);`）
-- 転送する呼び出しへの型引数（`const parse = (input) => read<User>(input);`）
+Arguments are matched by name. `(a, b) => f(a, b)` matches; `(a, b) => f(b, a)` does not. Spreading a rest parameter (`(...args) => f(...args)`) counts as a match. Zero parameters with zero arguments (`() => start()`) is a match too — it is still a second name for the same call.
 
-仮引数の型注釈は含めない。`noImplicitAny` の下では仮引数の注釈は事実上必須なので、これを契約の宣言とみなすとルールが何も報告しなくなる。任意に書ける戻り値側の宣言だけが、書き手の判断としての意味を持つ。
+The shape of the target makes no difference. An identifier (`f(a)`) and a member reference (`parser.parse(a)`) are reported alike.
 
-このルールは「宣言された型が呼び先の型より本当に狭いか」を確かめない。型の関係を見るには型検査器の結果が要り、このルール群は構文だけで判定する土台の上にある（[EDR 0004](../../../../docs/engineering-decision-logs/0004-shape-the-lint-rule-foundation-around-tooling-limits.md)）。したがって判定は「境界に戻り値の契約が書かれているか」で行い、狭めていない広い注釈を足して報告を消す書き方は「禁じる回避策」で塞ぐ。
+### Declaring a return contract passes
 
-### 別名の再エクスポートをどう扱うか
+Any of these means the function declares at its own boundary what it produces. The value passing straight through is then not reported.
 
-**特別扱いしない。転送関数として書かれている限り報告する。**
+- A return type annotation on the function (`const parse = (input: string): User => read(input);`)
+- A type annotation on the binding it is assigned to (`const parse: ParseUser = (input) => read(input);`)
+- Type parameters of its own (`const parse = <Parsed>(input) => read(input);`)
+- Type arguments on the forwarded call (`const parse = (input) => read<User>(input);`)
 
-再エクスポート専用ファイルであることを構造的に保証する仕組みは、このリポジトリには無い。`require-re-export-only-files--move-declaration-to-owning-module` は opt-in のルールで、base preset では `targets` を渡していないため何も検査していない。つまり「このファイルは面だから転送関数を許してよい」という前提を、ルールが置ける根拠がどこにもない。ファイル名やパスで例外を切れば、その例外はいつでも何にでも適用できる。
+Parameter type annotations are not included. Under `noImplicitAny` a parameter annotation is effectively mandatory, so counting it as a declared contract would leave the rule reporting nothing. Only the return-side declaration, which is optional to write, carries a writer's judgment.
 
-そして、名前を付け替えて公開する正規の構文は既に存在する。
+This rule does not confirm that the declared type is genuinely narrower than the target's. Reading a type relation needs the type checker's answer, and this rule set sits on a foundation that judges on syntax alone ([EDR 0004](../../../../docs/engineering-decision-logs/0004-shape-the-lint-rule-foundation-around-tooling-limits.md)). So the judgment is "is a return contract written at the boundary", and adding a wide annotation that narrows nothing to clear the report is closed off under forbidden bypasses.
+
+### Re-exporting under another name
+
+**No exemption. As long as it is written as a forwarding function, it is reported.**
+
+This repository holds nothing that structurally guarantees a file is a re-export-only file. `require-re-export-only-files--move-declaration-to-owning-module` is opt-in and receives no `targets` in the base preset, so it checks nothing. There is nowhere for a rule to stand the premise "this file is a surface, so a forwarding function is allowed here". Carve the exception by file name or path, and that exception can be applied to anything at any time.
+
+The proper syntax for publishing under another name already exists.
 
 ```ts
 export { parseUser } from "./parse-user.ts";
 export { parseUser as parse } from "./parse-user.ts";
 ```
 
-再エクスポートは定義そのものを転送する。転送関数は定義の形を写すだけで、別の関数を新しく作る。定義へ辿る経路、リネーム時の追随、呼び出しの検索は、この 2 つで別物になる。転送関数を許す理由は、正規の構文が存在する以上どこにも無い。
+A re-export forwards the definition itself. A forwarding function copies the shape of the definition and creates another function. The route back to the definition, what follows a rename, and what a search for the call finds are all different between the two. With the proper syntax available, there is no reason left to allow a forwarding function.
 
-### インラインのコールバックを外している理由
+### Why inline callbacks are left out
 
-`inputs.map((input) => parse(input))` を報告しないのは、直し方が正しくないからである。`inputs.map(parse)` は同じ動作にならない。`map` はコールバックに要素・添字・配列の 3 つを渡すので、`parse` が 2 つ目以降の引数を持つと挙動が変わる。「呼び先を直接呼べ」という直し方が成立しない場所で報告すると、指示に従った結果が壊れる。
+`inputs.map((input) => parse(input))` is not reported because the fix would not be correct. `inputs.map(parse)` does not behave the same: `map` hands the callback the element, the index and the array, so behaviour changes as soon as `parse` takes a second parameter. Reporting where "call the target directly" does not hold produces breakage in whoever follows the instruction.
 
-同じ理由で、`async` と generator も外している。`async (a) => f(a)` は `f` と同じ関数ではない。同期的に投げられる失敗が拒否された Promise に変わる。generator も戻り値の契約が列に変わる。どちらも `f` を直接呼ぶ形には置き換えられない。
+`async` functions and generators are left out for the same reason. `async (a) => f(a)` is not the same function as `f`: a failure thrown synchronously becomes a rejected promise. A generator turns the return contract into a sequence. Neither can be replaced by calling `f` directly.
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「1 つの動作には 1 つの名前が対応する」ことである。
+One behaviour corresponds to one name.
 
-転送だけの関数はこの対応を 1 対 2 にする。同じ動作に 2 つの名前が付き、しかも片方は中身を持たない。
+A function that only forwards makes that correspondence one to two. Two names name the same behaviour, and one of them holds nothing.
 
-読み手側で壊れるものは 3 つある。定義へ辿る作業が 1 段増える。名前を引いた読み手が得るのは「別の名前がある」という情報だけで、動作は次の階層にある。次に、呼び先の名前で検索したときに、この関数を経由した呼び出しが結果に出ない。影響範囲の把握が、検索 1 回では終わらなくなる。最後に、2 つの名前は独立に変えられるので、片方をリネームしてももう片方は無傷のまま残り、名前どうしの対応が静かにずれる。
+Three things break for the reader. Reaching the definition takes one more step: looking up the name yields only "there is another name", with the behaviour one layer further on. Searching for the target's name does not turn up calls that went through this function, so working out the reach of a change no longer ends with one search. And the two names can be changed independently, so renaming one leaves the other intact and the correspondence between the names drifts apart in silence.
 
-書き手側では、この関数が「後で何かを足す場所」として置かれることが多い。足されるまでの間、その場所は空である。空の抽象は、実際に何かを足す段になっても役に立たない。何を足すかが決まったときに必要な引数や戻り値は、置いた時点の 1 対 1 の形とは違うのが普通だからである。
+For the writer, such a function is usually placed as "somewhere to add something later". Until something is added, the place is empty. An empty abstraction does not help when the time comes to add something, because the parameters and the return the addition needs are normally not the one-to-one shape that was put there.
 
-一方で、値が素通しでも意味を持つ形がある。呼び先の型が広く、その広さがこのモジュールにとって正しくないとき、狭い型を宣言した束縛を置くのは、動作ではなく語彙を足す行為である。素通しであることは形の問題であって、そこで何が宣言されているかとは別である。だからこのルールは、境界に戻り値の契約があるかどうかで両者を分ける。
+There is, on the other hand, a shape where a value passing straight through does mean something. Where the target's type is wide and that width is not right for this module, placing a binding that declares a narrow type adds vocabulary rather than behaviour. Passing straight through is a question of shape, and what is declared there is a separate question. That is why this rule divides the two by whether a return contract stands at the boundary.
 
-## どう直すか
+### Configuration
 
-**呼び先を直接呼ぶ。** 転送関数の呼び出し箇所を呼び先の呼び出しに置き換え、関数を消す。呼び出し箇所が多くても、置き換えは機械的である。
+None. Only whether the rule is on or off is settled by the configuration.
 
-```ts
-const parsed = parse(input);
-```
+## Fix
 
-**名前を変えて公開したかった場合、再エクスポートにする。**
+**Call the target directly.** Replace the calls to the forwarding function with calls to the target and delete the function. However many call sites there are, the replacement is mechanical.
+
+**Where publishing under another name was the point, make it a re-export.**
 
 ```ts
 export { parse as parseUser } from "./parse.ts";
 ```
 
-**呼び先の型が広すぎたのが理由なら、狭い型を宣言する。** 戻り値型注釈か、束縛の型注釈を書く。宣言した型が本当に狭いなら、その宣言はこのモジュールの語彙になる。
+**Where the target's type being too wide was the reason, declare the narrow type.** Write a return type annotation, or a type annotation on the binding. If the declared type is genuinely narrower, that declaration is this module's vocabulary.
 
 ```ts
 const scopeAt: ScopeLookup = (node) => context.sourceCode.getScope(node);
 ```
 
-**受け手の形に合わせるためだった場合、呼び先の側を直す。** 引数の順序や個数が合わないから包んでいるのであれば、それは転送ではなく変形であり、このルールには当たらない。当たっているということは、形は既に合っている。
+**Where matching a receiver's shape was the reason, repair the target instead.** If the parameters are wrapped because their order or number does not line up, that is a transformation and not forwarding, and this rule does not reach it. Being reported means the shapes already line up.
 
-## 違反にならないもの
+<!-- BEGIN GENERATED examples -->
 
-- 引数を変形して渡す形。定数を足す（`(a) => f(a, DEFAULT)`）、値を取り出す（`(a) => f(a.id)`）、順序を変える（`(a, b) => f(b, a)`）、個数を減らす（`(a, b) => f(a)`）。これらは部分適用であり、別の関心事である
-- 呼び出し以外を含む本体。文が 2 つ以上あるもの、`new` 式、省略可能呼び出し（`f?.(a)`）
-- 分割代入や既定値を持つ仮引数。値を取り出す・補う処理が入っている
-- 仮引数そのものを呼ぶ形（`(run, input) => run(input)`）。渡されたものを適用しているのであって、固定の呼び先へ転送しているのではない
-- `async` 関数と generator
-- オブジェクトのプロパティ、クラスのメソッド、インラインのコールバック
+Code this rule rejects.
 
-## 禁じる回避策
+```ts
+// an arrow that forwards its only parameter is reported
+const parseUser = (input) => parse(input);
+```
 
-- 狭めていない戻り値型注釈を足して報告を消す。`(input) => read(input)` に `: ReturnType<typeof read>` や、呼び先の戻り値そのままの型を書いても、この関数が何も宣言していない事実は変わらない。このルールは型の関係を確かめないので報告は消えるが、消える理由は検査の限界であって、書き方が正当になったからではない
-- 束縛に呼び先と同じ型の別名を付ける。型エイリアスの名前が増えるだけで、契約は 1 ミリも狭まっていない
-- 本体に無意味な文を足して「1 文だけ」の条件から外す。転送以外のことをしていない以上、増えたのは行数だけである
-- 引数名を変えて一致判定から外す（`(source) => parse(source)` を `(source) => parse(source as string)` にするなど）。判定は名前の一致で行っているので変え方によっては報告が消えるが、その関数がしていることは変わらない。型アサーションを足した場合は `no-double-type-assertion--declare-the-real-type` の対象にもなる
-- 転送関数をオブジェクトのプロパティやクラスのメソッドに移して対象から外す。名前を持つ束縛だけを見ているのは、直し方が成立する範囲に判定を限るためであって、それらの位置なら書いてよいという意味ではない
-- `async` を足して対象から外す。呼び先が同期関数なら、`async` を足した時点で呼び出し側は `await` を書くことになり、失敗の伝わり方も変わる。報告を消すためだけに契約を変えるのは、この関数を残す理由にならない
-- 抑制ディレクティブ
+```ts
+// renaming an imported name through a wrapper is reported, not exempted
+import { parse } from './parse.ts';
+export const parseUser = (input) => parse(input);
+```
 
-## オプション
+Code this rule accepts.
 
-取らない。有効か無効かだけを設定側で決める。
+```ts
+// a return type annotation declares a contract at this boundary
+const parseUser = (input: string): User => parse(input);
+```
+
+```ts
+// re-exporting the name forwards the definition instead of copying its shape
+export { parseUser } from './parse-user.ts';
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Adding a return type annotation that narrows nothing to clear the report. Writing `: ReturnType<typeof read>`, or the target's return type verbatim, on `(input) => read(input)` does not change that this function declares nothing. The report clears because this rule does not confirm type relations — the reason it clears is the limit of the check, not the spelling becoming legitimate
+- Giving the binding an alias of the target's own type. The count of type alias names goes up and the contract narrows not at all
+- Adding a pointless statement to the body to escape the one-statement condition. Nothing besides forwarding is happening, so all that grew is the line count
+- Renaming a parameter to escape the name match (turning `(source) => parse(source)` into `(source) => parse(source as string)` and the like). The judgment runs on name equality, so some rewrites clear the report while what the function does stays the same. Adding a type assertion also brings it under `no-double-type-assertion--declare-the-real-type`
+- Moving the forwarding function onto an object property or a class method to leave the scope. Only named bindings are read so that the judgment stays inside the range where the fix holds — not because those positions are places it may be written
+- Adding `async` to leave the scope. Where the target is synchronous, adding `async` makes callers write `await` and changes how failures travel. Changing the contract only to clear a report is not a reason to keep the function
+- A suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `identityWrapper` | A named function must not consist of nothing but a call that passes its own parameters through unchanged. Call the target where this function is being called and delete this one. To publish a name from another module, re-export it: \`export { parseUser } from "./parse-user.ts"\`. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->
