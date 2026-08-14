@@ -1,87 +1,153 @@
+---
+description: "Disallow a binding named by one of the ambiguous-name patterns, so the name says what the binding holds instead of sending a reader upstream to the assignment"
+---
+
 # no-ambiguous-variable-name--rename-to-concrete-noun
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-書き手が名前を選べる束縛のうち、名前が禁止パターンのいずれかに一致するもの。見る位置は次の 5 つ。
+Disallow a binding named by one of the ambiguous-name patterns, so the name says what the binding holds instead of sending a reader upstream to the assignment
 
-- 変数宣言子の束縛が単純な識別子であるもの。宣言の種別（`const` / `let` / `var`）も初期化式の有無も問わない。`for (const value of lines)` の束縛も含む
-- 改名を伴うオブジェクト分割代入で新しく与えられた名前（`const { parsed: entry } = payload;` の `entry`）
-- 配列分割代入の束縛（`const [value] = lines;`）。取り出す名前は位置で決まるので、名前は書き手が選んでいる
-- 関数・メソッド・アロー関数の仮引数。デフォルト値付きの束縛と rest 束縛を含む
-- クラスのフィールド
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-ambiguous-variable-name--rename-to-concrete-noun.ts`](../../src/lint/oxlint/rules/no-ambiguous-variable-name--rename-to-concrete-noun.ts)
 
-次の位置は名前が書き手のものではないので対象外。
+<!-- END GENERATED rule-header -->
 
-- 改名を伴わない分割代入（`const { data } = payload;`）。取り出す名前は元のオブジェクトの形に従う
-- オブジェクトリテラルのプロパティ名。外部 API 由来の形をそのまま書く位置
-- 計算されたクラスフィールドのキー
-- `override` を付けたクラスフィールド。名前は継承元が決めている
-- catch の束縛
+## Violation
 
-照合の前に、名前から意味を持たない飾りを取り除く。取り除くのは前後のアンダースコアとドル記号、末尾に続く数字、そして先頭に付いた「意味を持たない修飾語」（`the` / `a` / `my` / `some` / `new` / `old` / `raw` / `real` / `just` / `only` / `simple` / `plain` / `generic` / `other` / `this` / `that` / `current` / `prev` / `next` など、それ自体は主題を指さない語）である。剥がした結果が禁止パターンに当たれば違反とする。剥がして何も残らなくなる場合は最後の 1 語を残すので、`current` のように修飾語だけで出来た名前も判定を免れない。
+A binding whose name the writer chose, where that name matches one of the forbidden patterns. Five positions are read:
 
-一致判定は大文字小文字を区別しない。報告位置は宣言文全体ではなく識別子そのもの。
+- A variable declarator whose binding is a plain identifier, whatever the declaration keyword (`const`, `let`, `var`) and whether or not there is an initialiser. The binding of `for (const value of lines)` is included
+- A name newly given by a renaming object destructure (the `entry` of `const { parsed: entry } = payload;`)
+- A binding of an array destructure (`const [value] = lines;`). What is taken out is settled by position, so the name is the writer's
+- Parameters of functions, methods and arrow functions, including bindings with defaults and rest bindings
+- Class fields
 
-既定の語彙は常に効く。設定は既定に足すだけで、既定を削ることも空にすることもできないので、このルールが何も検査しない状態は作れない。
+Four positions are out of reach because the name is not the writer's:
 
-## なぜそれが要るか
+- A destructure without renaming (`const { data } = payload;`). What is taken out follows the shape of the object it came from
+- Property names in object literals. The position where the shape of an external API is written as it is
+- Computed class field keys
+- A class field carrying `override`. The name was settled by the base
+- A catch binding
 
-汎用的な名前は「何かが出てきた入れ物」を指すだけで、中身の主題を指さない。`data` と書かれた束縛から分かるのは「何かのデータである」ことだけで、それが解析済みの設定なのか取得した記録なのかは分からない。略語（`res` / `ret` / `val` / `ctx`）は主題そのものを捨てている。`actual` は検証の作法上の役割を示すだけで、どの主題が束縛されているかを隠す。
+Before matching, meaningless decoration is stripped from the name: leading and trailing underscores and dollar signs, trailing digits, and leading qualifiers that name no subject of their own (`the`, `a`, `my`, `some`, `new`, `old`, `raw`, `real`, `just`, `only`, `simple`, `plain`, `generic`, `other`, `this`, `that`, `current`, `prev`, `next` and the like). What remains after stripping is what gets matched. Where stripping would leave nothing, the last word is kept, so a name built entirely out of qualifiers, such as `current`, does not escape the judgment.
 
-結果として、読み手は名前ではなく代入を上流に辿ることで主題を知ることになる。宣言から使用箇所までの距離が、そのまま読み取りのコストになる。
+Matching ignores case. The report points at the identifier rather than at the whole declaration statement.
 
-語彙に入れる基準は「その語を見ても、束縛されている具体的な主題が一つに決まらない語」。一致の仕方が語彙の一部になっている。
+The default vocabulary is always in force. Configuration only adds to it — it can neither remove entries nor empty it — so a state where this rule checks nothing cannot be created.
 
-接尾辞一致（その語で終わる名前も落とす）:
+### The invariant
 
-| パターン   | 落ちる例                   |
-| ---------- | -------------------------- |
-| `outcome$` | `outcome` / `queryOutcome` |
-| `result$`  | `result` / `parseResult`   |
+A generic name points at a container something came out of rather than at its subject. All a binding named `data` says is that it is data of some sort, and whether it is a parsed configuration or a fetched record is not there. Abbreviations (`res`, `ret`, `val`, `ctx`) throw the subject away entirely. `actual` states a role in the etiquette of verification and hides which subject is bound.
 
-この 2 語は「何かの結果の詰め合わせ」を意味する。接頭辞に何を付けても「何かの結果」であることしか伝わらないので、複合語ごと落とす。
+The reader ends up learning the subject by tracing the assignment upstream rather than reading the name. The distance from declaration to use site becomes the cost of reading.
 
-残りはすべて完全一致で、正規化した名前の全体がその語のときだけ落ちる。落とす語は次の 8 系統。
+The bar for the vocabulary is "a word from which the concrete subject being bound does not settle". How something matches is part of the vocabulary.
 
-| 系統 | 例 |
+Two entries match as suffixes, so a compound ending in them falls too:
+
+| Pattern    | What falls                |
+| ---------- | ------------------------- |
+| `outcome$` | `outcome`, `queryOutcome` |
+| `result$`  | `result`, `parseResult`   |
+
+Those two mean "an assortment of the results of something". Whatever prefix is added still conveys only "the results of something", so the compound falls with them.
+
+Everything else matches exactly, falling only when the whole normalised name is that word. The words fall into eight families:
+
+| Family | Examples |
 | --- | --- |
-| 値そのものを指す語と略語 | `val` / `value` / `res` / `ret` / `data` / `datum` |
-| 入れ物の名前 | `obj` / `arr` / `str` / `item` / `entry` / `record` / `row` / `list` / `map` / `set` / `group` / `buf` / `chunk` / `content` / `body` / `payload` |
-| 仮の名前・置き場の名前 | `temp` / `tmp` / `dummy` / `sample` / `foo` / `bar` / `baz` / `qux` |
-| 通信の役割だけを指す語 | `req` / `request` / `response` / `reply` / `answer` |
-| 仕組みの名前 | `ctx` / `context` / `opts` / `options` / `params` / `args` / `flag` / `state` / `status` / `fn` / `cb` / `callback` / `handler` / `helper` / `util` / `wrapper` / `instance` |
-| 検証の作法上の役割 | `actual` / `expected` |
-| 属性の種別だけを指す語 | `id` / `key` / `name` / `type` / `kind` / `mode` / `label` / `text` / `message` / `count` / `total` / `size` / `length` |
-| 計測の単位だけを指す語 | `date` / `time` / `timestamp` / `now` |
-| 主題を伴わない操作の結果 | `parsed` / `formatted` / `normalized` / `converted` / `mapped` / `filtered` / `sorted` / `merged` |
+| Words naming the value itself, and abbreviations | `val`, `value`, `res`, `ret`, `data`, `datum` |
+| Names of containers | `obj`, `arr`, `str`, `item`, `entry`, `record`, `row`, `list`, `map`, `set`, `group`, `buf`, `chunk`, `content`, `body`, `payload` |
+| Placeholder names and names of somewhere to put things | `temp`, `tmp`, `dummy`, `sample`, `foo`, `bar`, `baz`, `qux` |
+| Words naming only a role in a exchange | `req`, `request`, `response`, `reply`, `answer` |
+| Names of machinery | `ctx`, `context`, `opts`, `options`, `params`, `args`, `flag`, `state`, `status`, `fn`, `cb`, `callback`, `handler`, `helper`, `util`, `wrapper`, `instance` |
+| Roles in the etiquette of verification | `actual`, `expected` |
+| Words naming only a kind of attribute | `id`, `key`, `name`, `type`, `kind`, `mode`, `label`, `text`, `message`, `count`, `total`, `size`, `length` |
+| Words naming only a unit of measurement | `date`, `time`, `timestamp`, `now` |
+| Results of an operation carrying no subject | `parsed`, `formatted`, `normalized`, `converted`, `mapped`, `filtered`, `sorted`, `merged` |
 
-単数形と複数形は同じ語として扱う。
+Singular and plural are treated as one word.
 
-完全一致にしているのは、語を含むだけの正当な名前を巻き込まないため。`interval` は `val` を内部に含み、`defaultValue` は `value` で終わり、`metadata` は `data` で終わる。これらを接尾辞一致にすると、主題を語っている名前まで落ちる。同じ理由で `output` と `info` も完全一致に置いてあり、`gitOutput` や `userInfo` は主題を語る名前として通る。
+The match is exact so that legitimate names merely containing one of the words are not dragged in. `interval` carries `val` inside it, `defaultValue` ends in `value`, and `metadata` ends in `data`; matching those as suffixes would drop names that do state their subject. For the same reason `output` and `info` sit among the exact matches, and `gitOutput` and `userInfo` pass as names that state a subject.
 
-仮引数を対象に含めているのは、実装対象のシグネチャが同じ位置に名前を与えている場合でも、JavaScript の仮引数名は呼び出し側から見えず、実装側がいつでも改名できるためである。契約に合わせて `context` や `options` と書きたくなる位置ほど、その名前は束縛の中身を語らない。
+Parameters are targets because, even where the signature being implemented gives the same position a name, a JavaScript parameter name is invisible to the caller and can be renamed by the implementation at any time. The positions where the contract tempts you to write `context` or `options` are exactly the ones where that name says nothing about what is bound.
 
-## どう直すか
+### Configuration
 
-束縛が何を保持しているかを名指しする名詞に改名する。解析済みのスキーマ値、描画された断片、取得した記録、捕捉した例外、といった具体名を使う。
-
-ひとつのブロックで具体名の候補が複数出てきて名前を決めきれないなら、そのブロックが複数の仕事をしている。名前を妥協するのではなくブロックを分割する。
-
-## 禁じる回避策
-
-- 禁止語に無意味な接頭辞・接尾辞を付けて完全一致から外す（`theData` / `res2` / `_data`）。照合前に飾りを剥がすので報告は消えない
-- 具体名で受けてから禁止語の別名に移し替える。宣言が 1 つ増えただけで、使用箇所が読む名前は曖昧なまま
-- 禁止語の束縛を仮引数・クラスフィールド・配列分割代入へ押し出す。どれも対象位置なので報告は消えない
-- 個別の違反を消すために語彙から語を外す。語彙は設定なので足せるが、既定から削る手段は用意していない
-
-## オプション
-
-既定の語彙に足す名前パターンの一覧を 1 つ取る。
+One list of name patterns is taken and added to the default vocabulary.
 
 ```ts
 [{ pattern: "^bucket$" }, { pattern: "envelope$" }];
 ```
 
-各項目は `pattern` を 1 つだけ持つオブジェクトで、値は正規化後の識別子名に照合する、区切り記号なしの正規表現ソース文字列。アンカーの有無が一致の仕方を決める。`pattern` 以外のキーはスキーマが拒否する。
+Each entry is an object carrying exactly one `pattern`, whose value is a regular expression source string, with no delimiters, matched against the normalised identifier. Whether it is anchored settles how it matches. Any key other than `pattern` is refused by the schema.
 
-設定を渡さなくても既定の語彙で検査する。既定の語彙は `src/lint/oxlint/lib/forbidden-ambiguous-names.ts` の `FORBIDDEN_AMBIGUOUS_NAMES` にあり、テストのアサーション対象の名前を検査する `no-expect-forbidden-subject-name--rename-to-concrete-subject` も同じ一覧を既定として読む。語を足すときは一覧の一箇所だけを触る。語彙が二箇所に分かれると、同じ名前が宣言では通ってアサーションでは落ちる、あるいはその逆が生まれる。
+The default vocabulary checks even with no configuration handed over. It lives in `FORBIDDEN_AMBIGUOUS_NAMES` in `src/lint/oxlint/lib/forbidden-ambiguous-names.ts`, and `no-expect-forbidden-subject-name--rename-to-concrete-subject`, which checks the names of assertion subjects, reads the same list as its default. Adding a word touches that one place. Split across two, the same name would pass in a declaration and fail in an assertion, or the reverse.
+
+## Fix
+
+Rename the binding to a noun naming what it holds: the parsed schema value, the rendered fragment, the fetched record, the caught error.
+
+Where one block produces several candidate concrete names and none can be settled on, that block is doing several jobs. Split the block rather than compromising on the name.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// a compound name ending in a bag word is reported on the name itself
+const parseResult = parse(source);
+```
+
+```ts
+// a decoration in front of a forbidden word does not rescue the name
+const theData = load();
+```
+
+Code this rule accepts.
+
+```ts
+// an object pattern takes its names from the shape it destructures
+const { data } = payload;
+```
+
+```ts
+// a name that merely contains a forbidden word still names its subject
+const interval = 30;
+const defaultValue = 0;
+const metadata = read();
+const resultCount = 3;
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Adding a meaningless prefix or suffix to escape the exact match (`theData`, `res2`, `_data`). The decoration is stripped before matching, so the report stands
+- Receiving it under a concrete name and moving it into an alias that is a forbidden word. One declaration was added and the name the use sites read is still vague
+- Pushing the forbidden binding out into a parameter, a class field or an array destructure. All are target positions, so the report stands
+- Removing a word from the vocabulary to clear one violation. The vocabulary is configuration and can be added to; there is no means of removing a default
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `ambiguousVariableName` | The name \`{{name}}\` must not be used as a binding name. Rename it to a noun that names the value itself: the parsed config, the rendered fragment, the fetched record, the caught error. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

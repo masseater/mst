@@ -111,6 +111,7 @@ describe("dont-review-it/no-blanket-suppression--name-and-record", () => {
       },
       {
         name: "a directive that names its rule, covers the next statement, carries grounds and is recorded passes",
+        documented: true,
         code: `// oxlint-disable-next-line ${REASSIGN_RULE} -- ${GROUNDS}\n${STATEMENT}`,
         filename: recordedHost,
       },
@@ -121,6 +122,7 @@ describe("dont-review-it/no-blanket-suppression--name-and-record", () => {
       },
       {
         name: "a rule name carrying its plugin prefix reaches the row that names it bare",
+        documented: true,
         code: `// oxlint-disable-next-line dont-review-it/${REASSIGN_RULE} -- ${GROUNDS}\n${STATEMENT}`,
         filename: recordedHost,
       },
@@ -138,6 +140,7 @@ describe("dont-review-it/no-blanket-suppression--name-and-record", () => {
     invalid: [
       {
         name: "a whole-file directive naming no rule is reported for naming none",
+        documented: true,
         code: `// oxlint-disable\n${STATEMENT}`,
         errors: [{ messageId: "unnamedSuppression", data: { spelling: "oxlint-disable" } }],
       },
@@ -186,6 +189,7 @@ describe("dont-review-it/no-blanket-suppression--name-and-record", () => {
       },
       {
         name: "a directive the ledger does not record is reported for the missing row",
+        documented: true,
         code: `// oxlint-disable-next-line ${REASSIGN_RULE} -- ${GROUNDS}\n${STATEMENT}`,
         filename: unledgeredHost,
         errors: [

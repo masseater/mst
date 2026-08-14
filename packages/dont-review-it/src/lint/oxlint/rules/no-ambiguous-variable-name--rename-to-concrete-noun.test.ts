@@ -8,6 +8,7 @@ describe("dont-review-it/no-ambiguous-variable-name--rename-to-concrete-noun", (
     valid: [
       {
         name: "an object pattern takes its names from the shape it destructures",
+        documented: true,
         code: "const { data } = payload;",
       },
       {
@@ -20,6 +21,7 @@ describe("dont-review-it/no-ambiguous-variable-name--rename-to-concrete-noun", (
       },
       {
         name: "a name that merely contains a forbidden word still names its subject",
+        documented: true,
         code: "const interval = 30;\nconst defaultValue = 0;\nconst metadata = read();\nconst resultCount = 3;",
       },
       {
@@ -78,6 +80,7 @@ describe("dont-review-it/no-ambiguous-variable-name--rename-to-concrete-noun", (
       },
       {
         name: "a compound name ending in a bag word is reported on the name itself",
+        documented: true,
         code: "const parseResult = parse(source);",
         errors: [
           {
@@ -101,6 +104,7 @@ describe("dont-review-it/no-ambiguous-variable-name--rename-to-concrete-noun", (
       },
       {
         name: "a decoration in front of a forbidden word does not rescue the name",
+        documented: true,
         code: "const theData = load();",
         errors: [{ messageId: "ambiguousVariableName", data: { name: "theData" } }],
       },
