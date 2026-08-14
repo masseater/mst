@@ -1,75 +1,136 @@
+---
+description: "Disallow a declaration whose body is spelled exactly as another declaration elsewhere in the repository, so one behaviour keeps one owner instead of drifting between copies"
+---
+
 # no-duplicated-body--import-the-existing-declaration
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-production の TypeScript ソースで、宣言の本体が、リポジトリ内の別の宣言と一字一句同じに綴られている状態。
+Disallow a declaration whose body is spelled exactly as another declaration elsewhere in the repository, so one behaviour keeps one owner instead of drifting between copies
 
-見るのはトップレベルの宣言だけで、対象は 4 つの形。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-duplicated-body--import-the-existing-declaration.ts`](../../src/lint/oxlint/rules/no-duplicated-body--import-the-existing-declaration.ts)
 
-- 束縛（`const` / `let` / `var`）。型注釈と初期化子を本体とする
-- 関数宣言。型引数・引数・戻り値の型・本体・`async` と `generator` の別を本体とする
-- 型エイリアス。型引数と右辺を本体とする
-- インターフェース。型引数と `extends` 節とメンバを本体とする
+<!-- END GENERATED rule-header -->
 
-**宣言そのものの名前は本体に含めない。** 名前を変えただけの複製を捕まえるため。実際に、同じ glob マッチャが 2 つのパッケージで別々の名前を持って存在していた。名前まで一致する組は [no-twin-declaration--merge-into-one-owner](./no-twin-declaration--merge-into-one-owner.md) が別に扱う。
+## Violation
 
-呼び出し位置に直接書かれた無名の関数式は対象外。他の宣言の内側にある宣言も対象外。トップレベルに立っていないものは、その場の手続きの一部であって、リポジトリのどこかから import できる単位ではない。
+A declaration in a production TypeScript source whose body is spelled word for word the same as another declaration in the repository.
 
-### 一致の判定
+Only top-level declarations are read, in four shapes.
 
-本体を AST に直し、位置情報（`start` / `end` / `range` / `loc`）を落とした構造を文字列にして比べる。落ちるもの、残るものは次のとおり。
+- A binding (`const` / `let` / `var`), with its type annotation and initializer as the body
+- A function declaration, with its type parameters, parameters, return type, body, and whether it is `async` or a generator as the body
+- A type alias, with its type parameters and right-hand side as the body
+- An interface, with its type parameters, `extends` clause and members as the body
 
-- コメントは落ちる。同じ処理に別の注釈が付いているだけで別物と見なされると、この検出は役に立たない
-- 空白と改行は落ちる。整形の違いは本体の違いではない
-- 文字列とテンプレートリテラルは綴りごと残る。同じ形でメッセージだけが違う 2 つは別物
-- 識別子は書かれたまま残る。**束縛された名前も、import やグローバルから来る自由な名前も区別しない**
+**The declaration's own name is not part of the body**, so that a copy differing only in name is caught. A pair matching in name as well is taken separately by [no-twin-declaration--merge-into-one-owner](./no-twin-declaration--merge-into-one-owner.md).
 
-識別子を書かれたまま比べるのは、この検出で最も弱い一致条件にあたる。束縛された名前だけを正規化して引数名の違いを吸収する余地はあるが、現状のリポジトリではその強化なしに既知の重複がすべて拾えている。弱い側から始めて、取りこぼしが実際に見つかったときに広げる。
+An anonymous function expression written straight into a call position is out of scope. A declaration inside another declaration is out of scope. What does not stand at the top level is part of the procedure it sits in rather than a unit anything in the repository can import.
 
-自由な名前を潰さないことには積極的な理由もある。`attempt(() => statSync(path))[1]` と `attempt(() => readFileSync(path, "utf8"))[1]` は構造が同じで、呼び先の名前だけが違う。ここを潰すと、失敗の扱いを揃えた定型がすべて同一の指紋になり、報告が意味を失う。
+### How the match is settled
 
-### 短すぎる本体
+The body is turned into an AST, and the structure with position information (`start` / `end` / `range` / `loc`) dropped is stringified and compared. What is dropped and what is kept:
 
-AST のノードが 8 個に満たない本体は報告しない。短い本体は偶然に一致する。`= 1` や `= []` が repository 中で一致しても、そこには共有すべき振る舞いが無い。
+- Comments are dropped. Treating the same work as different because a different note sits on it would make this detection useless
+- Whitespace and newlines are dropped. A difference in formatting is not a difference in body
+- Strings and template literals keep their spelling. Two of the same shape differing only in the message are different
+- Identifiers stay as written. **A bound name and a free name arriving from an import or a global are not distinguished**
 
-この下限を持たないのが [no-twin-declaration--merge-into-one-owner](./no-twin-declaration--merge-into-one-owner.md) である。名前まで一致していれば偶然の一致ではないので、あちらは本体の大きさを問わない。名前も本体も一致し、かつ本体が 8 ノード以上なら、両方のルールが同じ宣言を報告する。どちらの報告も同時に正しく、所有者を 1 つに決めれば両方消える。
+Comparing identifiers as written is the weakest matching condition in this detection. There is room to strengthen it by normalizing bound names to absorb differences in parameter names, but in the repository as it stands every known duplicate is caught without that. Start from the weak side and widen when a miss is actually found.
 
-### 索引の範囲
+There is also a positive reason not to collapse free names. `attempt(() => statSync(path))[1]` and `attempt(() => readFileSync(path, "utf8"))[1]` have the same structure and differ only in the name of what they call. Collapse there and every stock form that aligns how failures are handled becomes one fingerprint, and the reports lose their meaning.
 
-索引はリポジトリ根から作る。根は lint の実行ディレクトリから上に辿って決める。パッケージのディレクトリから lint を走らせても、リポジトリ全体から走らせたときと同じ索引を見る。
+### Bodies that are too short
 
-テストファイルと、テスト用ディレクトリの配下は索引に入らない。判定は [no-strict-canonical-literal-use--use-canonical-import](./no-strict-canonical-literal-use--use-canonical-import.md) と同じものを使う。テストは同じ形のセットアップを繰り返し書くことが正しい場面があり、そこを縛るのはこのルールの仕事ではない。
+A body of fewer than eight AST nodes is not reported. Short bodies match by chance. `= 1` and `= []` matching somewhere in the repository holds no behaviour worth sharing.
 
-## なぜそれが要るか
+The rule without that lower bound is [no-twin-declaration--merge-into-one-owner](./no-twin-declaration--merge-into-one-owner.md). With the name matching too it is not a chance match, so that one does not read the size of the body. Where the name and the body both match and the body is eight nodes or more, both rules report the same declaration. Both reports are right at once, and settling on one owner clears both.
 
-同じ本体が 2 箇所にあると、片方だけ変えても何も落ちない。テストは通り、型検査も通る。壊れたことが分かるのは、2 つの綴りが食い違ったまま別々の呼び出し元に届いたときで、そこには元の 2 箇所を結ぶ手掛かりが残っていない。
+### The range of the index
 
-これは書き手の不注意ではなく、書き方の帰結として出る。リポジトリ全体を見ずに必要な処理を書けば、既にある実装と同じものが生まれる。生まれた側にも生んだ側にも、相手の存在を知る契機が無い。だから機械が結ぶ。
+The index is built from the repository root. The root is settled by walking up from the lint's working directory. Run the lint from a package directory and it sees the same index as running it from the whole repository.
 
-自動修正を持たないのは、本体が一致することが同じ概念であることの証明にならないから。同じ綴りが別々の責務に属することがあり、そのときは片方を消すのではなく両方を別の名前で保つのが正しい。どちらが所有者かは、周囲の責務を読んだ人が決める。
+Test files, and everything under a test directory, are not in the index. The judgment is the same one [no-strict-canonical-literal-use--use-canonical-import](./no-strict-canonical-literal-use--use-canonical-import.md) uses. There are places where writing the same shape of setup over and over is right in a test, and binding that is not this rule's job.
 
-## どう直すか
+### The invariant
 
-報告に並んだ位置を全部読んでから、どこがその振る舞いを所有すべきかを決める。
+With the same body in two places, changing one drops nothing. The tests pass and the type check passes. That it broke becomes visible when the two spellings, having diverged, reach separate callers — and nothing there links back to the two original places.
 
-所有者が決まったら、そこから export して他の全箇所は import する。所有者を選ぶときは、報告に並んだ順序で選ばない。先に書かれた方を選ばない。名前が良い方を選ばない。その振る舞いが誰の責務かで選ぶ。
+This is not carelessness on the writer's part; it comes out as a consequence of how writing works. Write the work you need without reading the whole repository and something identical to an existing implementation is born. Neither the side that was born nor the side that gave birth has any occasion to learn the other exists. So the machine links them.
 
-パッケージを跨いで重複しているときは、どちらのパッケージが所有するかを決める。決められないなら、両方が依存できる場所に置く。依存の向きを逆にしてまで片方に寄せない。
+There is no automatic fix because a matching body does not prove the same concept. The same spelling can belong to separate responsibilities, and there the right move is to keep both under different names rather than delete one. Which is the owner is settled by a person who reads the responsibilities around them.
 
-同じ本体だが責務が違うと判断したなら、片方を実際に違う実装にする。名前だけ変えても報告は消えない。
+### Configuration
 
-依存パッケージの公開 API に同じ振る舞いがあるなら、そちらを使って両方を消す。
+None. No per-rule exclusion, no per-package exclusion, no per-declaration exclusion tag. Leave one mouth for suppression open and "excluded because it was tiresome" piles up.
 
-## 禁じる回避策
+### What is not detected
 
-- 本体に意味の無い文や束縛を足して一致から外す。重複は残ったまま、報告だけが消える
-- 引数を 1 つ経由させて綴りをずらす。同上
-- 片方をテストファイルに移す。索引がテストを見ないことを、重複を隠す口として使わない
-- ルールごとの除外、パッケージごとの除外、宣言ごとの除外タグ。どれも用意しない。抑制の口を 1 つでも残すと「面倒だから除外」が積み上がる
+- Similarity short of an exact match. The same work written in different spellings is not caught. Put a threshold on similarity and it could be picked up, but a report settled by a threshold does not fit an enforcement level of "an error by default". Only what can be settled deterministically is handled here
+- Writing it yourself when a dependency package holds the same function. There is no import, so no trace is left in the syntax
+- A declaration of a value used only once. That could be settled deterministically, but it does not hold as a norm. Most single-reference top-level declarations are the good practice of splitting a long procedure into named steps. For types this judgment was overturned by [EDR 0019](../../../../docs/engineering-decision-logs/0019-name-a-type-only-where-two-places-agree.md), and [no-single-use-local-type--inline-at-the-use-site](./no-single-use-local-type--inline-at-the-use-site.md) takes it
+- Declarations matching in name and body whose body is under eight nodes. [no-twin-declaration--merge-into-one-owner](./no-twin-declaration--merge-into-one-owner.md) takes those
 
-## 何を検出しないか
+## Fix
 
-- 完全一致に満たない類似。同じ処理が違う綴りで書かれている状態は捕まらない。実際にこのリポジトリには、パスの区切りを揃える処理が 3 つの綴りで存在する。類似度に閾値を置けば拾えるが、閾値で決まる報告は「既定でエラーにする」という強制度と噛み合わない。ここは決定的に判定できるものだけを扱う
-- 依存パッケージに同じ関数があるのに自前で書いた状態。import が無いので構文に手掛かりが残らない
-- 一度しか使われていない値の宣言。判定は決定的にできるが、規範として成立しない。このリポジトリの非 export のトップレベル宣言 204 件のうち 140 件が 1 回しか参照されておらず、その大半は長い手続きを名前付きの段に割る良い書き方である。export を 1 箇所からしか参照されないものに絞っても 116 件中 58 件が該当する。数えたうえで、ルールにしないと決めた。型についてはこの判断を [EDR 0019](../../../../docs/engineering-decision-logs/0019-name-a-type-only-where-two-places-agree.md) で覆し、[no-single-use-local-type--inline-at-the-use-site](./no-single-use-local-type--inline-at-the-use-site.md) が受け持っている
-- 名前も本体も一致する宣言のうち、本体が 8 ノードに満たないもの。[no-twin-declaration--merge-into-one-owner](./no-twin-declaration--merge-into-one-owner.md) が受け持つ
+Read every position listed in the report, then settle where that behaviour should be owned.
+
+Once the owner is settled, export from there and import everywhere else. When choosing the owner, do not choose by the order they appear in the report, do not choose the one written first, and do not choose the one with the better name. Choose by whose responsibility that behaviour is.
+
+Where the duplication spans packages, settle which package owns it. Where that cannot be settled, put it somewhere both can depend on. Do not reverse a dependency direction to force it onto one side.
+
+Where you judge the bodies the same but the responsibilities different, actually make one of them a different implementation. Changing only the name does not clear the report.
+
+Where a dependency package's public API already holds the same behaviour, use that and delete both.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// a declaration whose body is spelled the same elsewhere is reported
+const twice = (value: number): number => value * 2;
+```
+
+Code this rule accepts.
+
+```ts
+// a declaration whose body is spelled nowhere else passes
+const twice = (value: number): number => value * 2;
+```
+
+```ts
+// a body whose only site is this one is not spelled anywhere else
+const twice = (value: number): number => value * 2;
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Adding a meaningless statement or binding to the body to break the match. The duplication stays and only the report clears
+- Routing through one extra parameter to shift the spelling. As above
+- Moving one side into a test file. That the index does not read tests is not a mouth for hiding duplication
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `duplicatedBody` | A declaration must not repeat a body that already exists elsewhere in this repository. The same body is declared at {{sites}}. Decide which module owns the behaviour, export it from there, and import it everywhere else. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->
