@@ -14,6 +14,7 @@ describe("dont-review-it/require-test-assets-constants--move-setup-to-spec", () 
     valid: [
       {
         name: "an assets file holding written-out literals is the shape this rule asks for",
+        documented: true,
         filename: ASSETS_FILE,
         code: 'export const REPORT_ID = "a";\nconst COUNT = 2;\nexport const TOTAL = COUNT;',
       },
@@ -54,6 +55,7 @@ describe("dont-review-it/require-test-assets-constants--move-setup-to-spec", () 
       },
       {
         name: "a chain of constants this file declares resolves to written-out data",
+        documented: true,
         filename: ASSETS_FILE,
         code: 'const NAME = "a";\nconst ID = NAME;\nexport const REPORT = { id: ID };',
       },
@@ -78,6 +80,7 @@ describe("dont-review-it/require-test-assets-constants--move-setup-to-spec", () 
     invalid: [
       {
         name: "an import is reported whatever it names",
+        documented: true,
         filename: ASSETS_FILE,
         code: 'import { build } from "./builder.ts";\nexport const REPORT_ID = "a";',
         errors: [{ messageId: "assetsImport", data: { specifier: "./builder.ts" } }],
@@ -178,6 +181,7 @@ describe("dont-review-it/require-test-assets-constants--move-setup-to-spec", () 
       },
       {
         name: "a call that generates the value is reported",
+        documented: true,
         filename: ASSETS_FILE,
         code: "export const REPORT = buildReport();",
         errors: [{ messageId: "assetsAssembledValue", data: { shape: "a call" } }],
