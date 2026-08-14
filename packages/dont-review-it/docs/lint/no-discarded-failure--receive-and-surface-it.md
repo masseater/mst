@@ -1,71 +1,88 @@
+---
+description: "Disallow taking the result of a call that returns a failure and a value as a pair without binding the failure, and disallow a catch clause that names nothing, so a failure reaches a place that can act on it instead of turning into the value that stands for its own absence"
+---
+
 # no-discarded-failure--receive-and-surface-it
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-失敗を表す値を受け取らずに捨てている構文。2 系統ある。
+Disallow taking the result of a call that returns a failure and a value as a pair without binding the failure, and disallow a catch clause that names nothing, so a failure reaches a place that can act on it instead of turning into the value that stands for its own absence
 
-**1. 失敗と結果を組で返す呼び出しの分解で、失敗側を束縛していないもの。** このリポジトリでその組を返すのは es-toolkit の `attempt` と `attemptAsync` だけである。判定は呼び先の綴りで行い、その名前がどこから来たかは解決しない。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-discarded-failure--receive-and-surface-it.ts`](../../src/lint/oxlint/rules/no-discarded-failure--receive-and-surface-it.ts)
 
-報告する形は次のとおり。
+<!-- END GENERATED rule-header -->
 
-| 形                                           | 何が起きているか                     |
-| -------------------------------------------- | ------------------------------------ |
-| `const [, parsed] = attempt(...)`            | 失敗の位置が穴になっている           |
-| `const [_, parsed] = attempt(...)`           | 読まないと宣言した名前に束縛している |
-| `const [] = attempt(...)`                    | どちらも束縛していない               |
-| `const { 1: parsed } = attempt(...)`         | 結果の添字だけを綴っている           |
-| `attempt(...)[1]`                            | 結果の要素だけを読んでいる           |
-| `attempt(...);`（文として単独）              | 組ごと捨てている                     |
-| `void attempt(...)`                          | 同上                                 |
-| `const [, parsed] = await attemptAsync(...)` | `await` を挟んでも同じ               |
+## Violation
 
-丸括弧・`as` によるアサーション・非 null アサーション・省略可能連鎖は、組がどこへ届くかを変えないので、辿って外側で判定する。
+Syntax that throws away a value standing for a failure without receiving it. Two families.
 
-報告しない形は次のとおり。組が受け取られているか、失敗に届く経路が残っている。
+**1. Taking apart a call that returns a failure and a result as a pair, without binding the failure side.** In this repository the only calls returning such a pair are es-toolkit's `attempt` and `attemptAsync`. The judgment is made on the spelling of the callee, and where that name came from is not resolved.
 
-- 両方を束縛する（`const [failure, parsed] = attempt(...)`）
-- 失敗だけを束縛する（`const [failure] = attempt(...)` / `attempt(...)[0]`）
-- 組そのものを束縛する（`const parsed = attempt(...)`）
-- 先頭が残余要素（`const [...both] = attempt(...)`）
-- 失敗の添字を綴ったオブジェクトパターン（`const { 0: failure, 1: parsed } = attempt(...)`）
-- 組を別の呼び出しへ渡す、`return` する、関数の本体の値にする
+| Shape | What is happening |
+| --- | --- |
+| `const [, parsed] = attempt(...)` | The failure's position is a hole |
+| `const [_, parsed] = attempt(...)` | It is bound to a name declared as one that will not be read |
+| `const [] = attempt(...)` | Neither half is bound |
+| `const { 1: parsed } = attempt(...)` | Only the result's index is spelled |
+| `attempt(...)[1]` | Only the result element is read |
+| `attempt(...);` standing as a statement | The whole pair is discarded |
+| `void attempt(...)` | As above |
+| `const [, parsed] = await attemptAsync(...)` | An `await` in between changes nothing |
 
-**2. 束縛を持たない `catch` 節。** `catch { ... }` と、下線だけで綴った束縛（`catch (_)`）を報告する。どちらも「捕まえたものは読まない」と宣言している。
+Parentheses, `as` assertions, non-null assertions and optional chains do not change where the pair lands, so they are followed and the position outside them is judged.
 
-### 既存の公式ルールとの境界
+These are not reported: the pair was received, or a route to the failure remains.
 
-失敗を握り潰す形は 4 本で分担している。
+- Binding both (`const [failure, parsed] = attempt(...)`)
+- Binding the failure alone (`const [failure] = attempt(...)`, `attempt(...)[0]`)
+- Binding the pair itself (`const parsed = attempt(...)`)
+- A rest element at the head (`const [...both] = attempt(...)`)
+- An object pattern spelling the failure's index (`const { 0: failure, 1: parsed } = attempt(...)`)
+- Handing the pair to another call, returning it, or making it the value of a function's body
 
-| 形                               | 見ているもの                                       |
-| -------------------------------- | -------------------------------------------------- |
-| `catch { }`（本体が空）          | `no-empty` と本ルールの両方が報告する              |
-| `catch (e) { throw e; }` だけ    | `no-useless-catch`                                 |
-| 失敗を出力先に書いてから続行する | `no-logged-and-continued-failure--stop-or-recover` |
-| 失敗を受け取らずに捨てる         | 本ルール                                           |
+**2. A `catch` clause carrying no binding.** `catch { ... }` and a binding spelled with underscores alone (`catch (_)`) are reported. Both declare that what was caught will not be read.
 
-本体が空で束縛も無い `catch` は `no-empty` と二重に報告される。前者は本体を、本ルールは束縛を見ているので、片方だけを直しても残る。
+### Where it overlaps the off-the-shelf rules
 
-ファイル種別による例外は持たない。テストコードも同じに扱う。
+Swallowing a failure is divided across four rules.
 
-## なぜそれが要るか
+| Shape | What watches it |
+| --- | --- |
+| `catch { }` with an empty body | `no-empty` and this rule both report it |
+| `catch (e) { throw e; }` alone | `no-useless-catch` |
+| Writing the failure to an output and carrying on | `no-logged-and-continued-failure--stop-or-recover` |
+| Discarding a failure without receiving it | This rule |
 
-守っている不変条件は「検査した対象の集合と、検査できたと報告する対象の集合が一致する」ことである。
+A `catch` with an empty body and no binding is reported twice: `no-empty` reads the body and this rule reads the binding, so fixing one leaves the other.
 
-失敗を捨てると、失敗はその失敗自身の不在を表す値に化ける。読めなかったファイルは `null` になり、一覧できなかったディレクトリは空の配列になり、走らなかった走査は空の索引になる。
+No file kind is exempt. Test code is read the same way.
 
-壊れ方は 2 層ある。
+### The invariant
 
-1 層目は、呼び出し側が区別できないことである。「対象が無い」と「対象はあるが読めない」が同じ値になるので、呼び出し側は前者として扱う。空のディレクトリは走査から外れ、`null` の manifest は「宣言が無い」として扱われる。値の形からは、どちらだったのかを復元できない。
+The set of things that were checked equals the set of things reported as checked.
 
-2 層目は、区別できないことが検査に現れないことである。走査対象が黙って縮み、縮んだ状態で全件が通り、終了コードは 0 になる。このリポジトリが最も嫌う「lint が緑なのに検査されていない」は、ここから生まれる。実際、読めないディレクトリを空のディレクトリとして扱う経路がこのリポジトリに存在し、その配下は丸ごと検査対象から消えていた。消えたことを知らせるものは何も無かった。
+Discard a failure and it turns into a value standing for its own absence. A file that could not be read becomes `null`, a directory that could not be listed becomes an empty array, a scan that never ran becomes an empty index.
 
-構文としての `try` / `catch` を見るだけでは、この形は捕まらない。組で返す呼び出しの分解は `catch` 節ですらない。だから本ルールは構文ではなく「失敗を表す値を受け取っているか」で判定する。
+That breaks in two layers. The first is that the caller cannot tell them apart. "There is nothing" and "there is something and it cannot be read" become the same value, so the caller takes the first reading. An empty directory drops out of the walk; a `null` manifest is treated as "no declaration". The shape of the value cannot recover which it was.
 
-## どう直すか
+The second is that being unable to tell does not show up in a check. The set being scanned shrinks quietly, everything passes in the shrunken state, and the exit status is zero. This is where a green lint over an unchecked repository comes from. A route treating an unreadable directory as an empty one did exist in this repository, and everything under it had vanished from what was checked. Nothing anywhere said so.
 
-その呼び出しにとって、失敗が何を意味するかを決める。答えは 3 つある。
+Reading `try` / `catch` as syntax does not catch this shape: taking apart a pair-returning call is not even a `catch` clause. So this rule judges on whether the value standing for a failure was received, not on syntax.
 
-**対象が無いことは正常な入力なので、値で表してよい。** ただし値になるのは不在だけである。失敗が持つ `code` で振り分ける。
+### Configuration
+
+None. Whether the rule is on or off is settled by the configuration, and nothing else about the judgment is. The list of pair-returning callees lives in the rule. Introducing another library that returns such a pair pairs with adding its spelling here.
+
+## Fix
+
+Settle what a failure means for that call. There are three answers.
+
+**Where the target being absent is normal input, it may be expressed as a value.** Only absence becomes a value, and the failure's `code` sorts it.
 
 ```ts
 export const readUnlessMissing = <Read>(read: () => Read): Read | null => {
@@ -78,9 +95,9 @@ export const readUnlessMissing = <Read>(read: () => Read): Read | null => {
 };
 ```
 
-`ENOENT` と `ENOTDIR` は「そこに無い」であり、正常な入力である。`EACCES` は「あるが読めない」であり、正常な入力ではない。同じ `null` に潰さないこと。
+`ENOENT` and `ENOTDIR` mean "it is not there" and are normal input. `EACCES` means "it is there and cannot be read" and is not. Do not collapse them into one `null`.
 
-**それ以外の失敗は表に出す。** 何が読めなかったかを名前にした失敗を投げ、元の失敗を `cause` に渡す。
+**Every other failure is surfaced.** Throw a failure named after what could not be read, handing the original over as `cause`.
 
 ```ts
 const [unparsableText, parsed] = attempt(() => parseJson(text));
@@ -88,31 +105,82 @@ if (unparsableText === null) return parsed;
 throw new Error(`${path} exists but does not parse as JSON`, { cause: unparsableText });
 ```
 
-**握り潰してよいのは、走査の結果を変えない失敗だけである。** 判定は 2 段でする。
+**Only a failure that changes nothing about the walk may be swallowed.** The judgment runs in two steps.
 
-1. その失敗によって、検査される対象の集合か報告される箇所の集合が変わるか。変わるなら握り潰してはいけない
-2. 変わらないなら、その失敗を環境が拒んだのか、こちらの宣言が壊れているのかを分ける。環境が拒んだ失敗は runtime が `code` を付ける。付いていない失敗はこちら側の欠陥なので、変わらない範囲であっても表に出す
+1. Does that failure change the set of things checked or the set of places reported? If it does, it may not be swallowed
+2. If it does not, separate a failure the environment refused from a declaration of ours that is broken. A failure the environment refused carries a `code` from the runtime. One without a `code` is a defect on our side and is surfaced even where nothing changes
 
-このリポジトリで 1 と 2 の両方を通るのは 2 箇所しかない。
+Only two places in this repository pass both steps.
 
-- 導出キャッシュの読み書き（`catalog-cache.ts`）。キャッシュは走査の結果から作る派生物なので、読めなければ作り直せばよく、書けなければ次回また作ればよい。検査される対象は 1 件も変わらない。書き込み側は `code` を持つ失敗だけを握り潰し、直列化できない値のような欠陥はそのまま投げる
-- 依存パッケージの語彙の収穫（`library-vocabulary/harvester.ts`）。[EDR 0008](../../../../docs/engineering-decision-logs/0008-read-library-types-for-messages-only.md) が定めたとおり、この型情報は報告に何を書くかにしか使われず、報告される箇所の集合を変えない。型チェッカを起動できない環境で lint が落ちないことは、その EDR が明示した契約である。ここでも `code` を持つ失敗だけを握り潰す
+- Reading and writing the derived cache (`catalog-cache.ts`). The cache is derived from the walk's results, so failing to read it means rebuilding it and failing to write it means building it again next time. Not one thing checked changes. The writing side swallows only failures carrying a `code`, and throws defects such as a value that cannot be serialised
+- Harvesting the vocabulary of dependency packages (`library-vocabulary/harvester.ts`). As [EDR 0008](../../../../docs/engineering-decision-logs/0008-read-library-types-for-messages-only.md) settled, this type information is used only for what a report says and changes no set of reported places. That the lint does not fail in an environment where the type checker cannot start is a contract that EDR stated outright. Here too, only failures carrying a `code` are swallowed
 
-**`catch` 節は捕まえたものに名前を付ける。** 名前を付けたうえで、止めるか戻すかを選ぶ。どちらを選ぶかは [no-logged-and-continued-failure--stop-or-recover](./no-logged-and-continued-failure--stop-or-recover.md) が扱う。
+**A `catch` clause names what it caught.** Having named it, choose between stopping and returning. Which one belongs to [no-logged-and-continued-failure--stop-or-recover](./no-logged-and-continued-failure--stop-or-recover.md).
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- 組を一度変数に受けてから結果だけを読む（`const pair = attempt(...);` の次の行で `pair[1]`）。判定は分解の位置で行うので報告は消えるが、失敗が読まれないことは変わらない
-- `at` で結果を取り出す（`attempt(...).at(1)`）。同上
-- 添字を変数に入れてから読む（`attempt(...)[RESULT]`）。添字がリテラルでなくなると判定できない。読み手にとっても何番目を読んでいるのか分からなくなる
-- `attempt` を包む自前の関数を作り、その中で失敗を捨てる。判定は呼び先の綴りを見ているので、包んだ先は報告されない。包むこと自体が失敗を隠す作業になっている
-- import 名を変えて呼ぶ（`import { attempt as run }`）。同上
-- 失敗を名前に束縛したうえで一度も読まない。文法上は受け取っているので本ルールは通す。受け取った失敗をどう扱うかは、その場で決めること
-- 下線を足して束縛名に見せかける（`_failure`）。下線だけの名前は報告するが、下線に続けて語を書けば通る。通るのは、その名前で読むつもりがあると宣言したからである
-- `try` / `catch` を `attempt` に書き換えて、束縛を持たない `catch` の報告だけ消す。組の分解でも同じ判定に当たる
-- 「対象が無い」と「読めない」をまとめて `null` にして、正常な入力として扱う。走査が黙って縮む経路はこれで戻ってくる。`code` で振り分けること
-- 抑制ディレクティブ
+Code this rule rejects.
 
-## オプション
+```ts
+// eliding the failure element is reported
+const [, parsed] = attempt(() => parse(text));
+```
 
-取らない。有効か無効かだけを設定側で決める。組を返す呼び先の一覧はルールが持つ。別の組を返すライブラリを入れたなら、その綴りをこのルールに足すのが対になる作業である。
+```ts
+// a catch clause that binds nothing is reported
+try {
+  run();
+} catch {
+  recover();
+}
+```
+
+Code this rule accepts.
+
+```ts
+// binding both halves of the pair receives the failure
+const [failure, parsed] = attempt(() => parse(text));
+```
+
+```ts
+// a catch clause that names the failure and rethrows it receives it
+try {
+  run();
+} catch (failure) {
+  throw failure;
+}
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Receiving the pair into a variable first and reading only the result (`const pair = attempt(...);` then `pair[1]` on the next line). The judgment is made where it is taken apart, so the report clears while the failure still goes unread
+- Taking the result out with `at` (`attempt(...).at(1)`). As above
+- Putting the index in a variable first (`attempt(...)[RESULT]`). A non-literal index cannot be judged, and a reader cannot tell which element is being read either
+- Writing your own wrapper around `attempt` and discarding the failure inside it. The judgment reads the spelling of the callee, so what is inside the wrapper is not reported. Wrapping it is itself the act of hiding the failure
+- Renaming the import and calling that (`import { attempt as run }`). As above
+- Binding the failure to a name and never reading it. It is grammatically received, so this rule passes it. What to do with a failure you received is settled there and then
+- Adding an underscore to make it look like a binding name (`_failure`). A name of underscores alone is reported, and a word after the underscore passes — it passes because you declared an intent to read it under that name
+- Rewriting `try` / `catch` into `attempt` to clear only the report about an unbound `catch`. Taking the pair apart meets the same judgment
+- Collapsing "it is not there" and "it cannot be read" into one `null` and treating it as normal input. That is the route by which the walk quietly shrinks. Sort them by `code`
+- A suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `discardedFailurePair` | The failure half of this pair must not be dropped. Bind the failure and decide at this call what it means: keep a normal absence as a value selected by the failure's \`code\`, and throw for every other failure with the original passed as \`cause\`. |
+| `unnamedCatchFailure` | A catch clause must not leave what it caught unbound. Bind the failure and pick an ending the caller can act on: rethrow it, throw one that names this layer's part in it with the original as \`cause\`, or return a value that shows the operation did not complete. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

@@ -8,6 +8,7 @@ describe("dont-review-it/no-discarded-failure--receive-and-surface-it", () => {
     valid: [
       {
         name: "binding both halves of the pair receives the failure",
+        documented: true,
         code: "const [failure, parsed] = attempt(() => parse(text));",
       },
       {
@@ -68,6 +69,7 @@ describe("dont-review-it/no-discarded-failure--receive-and-surface-it", () => {
       },
       {
         name: "a catch clause that names the failure and rethrows it receives it",
+        documented: true,
         code: "try {\n  run();\n} catch (failure) {\n  throw failure;\n}",
       },
       {
@@ -82,6 +84,7 @@ describe("dont-review-it/no-discarded-failure--receive-and-surface-it", () => {
     invalid: [
       {
         name: "eliding the failure element is reported",
+        documented: true,
         code: "const [, parsed] = attempt(() => parse(text));",
         errors: [{ messageId: "discardedFailurePair" }],
       },
@@ -148,6 +151,7 @@ describe("dont-review-it/no-discarded-failure--receive-and-surface-it", () => {
       },
       {
         name: "a catch clause that binds nothing is reported",
+        documented: true,
         code: "try {\n  run();\n} catch {\n  recover();\n}",
         errors: [{ messageId: "unnamedCatchFailure" }],
       },
