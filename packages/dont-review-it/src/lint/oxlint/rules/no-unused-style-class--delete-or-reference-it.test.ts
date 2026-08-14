@@ -29,6 +29,7 @@ describe("dont-review-it/no-unused-style-class--delete-or-reference-it", () => {
     valid: [
       {
         name: "an import of a module the index holds no unused class for is left alone",
+        documented: true,
         code: `import { setupCounter } from "./counter.ts";`,
         filename: subjectFilename,
       },
@@ -36,6 +37,7 @@ describe("dont-review-it/no-unused-style-class--delete-or-reference-it", () => {
     invalid: [
       {
         name: "an import of a style sheet that defines a class nothing spells is reported",
+        documented: true,
         code: `import "./style.css";`,
         filename: subjectFilename,
         errors: [{ messageId: "unusedStyleClass" }],

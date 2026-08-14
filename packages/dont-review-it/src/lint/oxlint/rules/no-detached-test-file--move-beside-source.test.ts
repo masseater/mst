@@ -38,6 +38,7 @@ describe("dont-review-it/no-detached-test-file--move-beside-source", () => {
     valid: [
       {
         name: "a test file whose source sits beside it under the same name passes",
+        documented: true,
         code: "export const total = 1;",
         filename: join(fixtureDir, "beside-source.test.ts"),
       },
@@ -86,6 +87,7 @@ describe("dont-review-it/no-detached-test-file--move-beside-source", () => {
       },
       {
         name: "a path the deployment exempts is left out of the invariant",
+        documented: true,
         code: "export const total = 1;",
         filename: join(fixtureDir, "e2e", "checkout-journey.test.ts"),
         options: [{ exemptPaths: ["e2e"] }],
@@ -118,6 +120,7 @@ describe("dont-review-it/no-detached-test-file--move-beside-source", () => {
       },
       {
         name: "a test file parked in an isolation directory is reported",
+        documented: true,
         code: "export const total = 1;",
         filename: join(fixtureDir, "isolated-tests", "orphan.test.ts"),
         errors: [
@@ -175,6 +178,7 @@ describe("dont-review-it/no-detached-test-file--move-beside-source", () => {
       },
       {
         name: "a source moved into the test tree to satisfy the pairing is reported on its own message",
+        documented: true,
         code: "export const total = 1;",
         filename: join(fixtureDir, "tests", "co-located.test.ts"),
         errors: [{ messageId: "testOnlyDirectory", data: { directory: "tests" } }],

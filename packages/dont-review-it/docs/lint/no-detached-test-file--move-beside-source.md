@@ -1,65 +1,129 @@
+---
+description: "Require a test file to sit in the directory of the source it tests under that source's name, so the pair is tied together by the path and a test cannot be left behind when its source moves"
+---
+
 # no-detached-test-file--move-beside-source
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-テストファイルとみなした各ファイルについて、2 つを見る。
+Require a test file to sit in the directory of the source it tests under that source's name, so the pair is tied together by the path and a test cannot be left behind when its source moves
 
-主判定は、名前から接尾辞を落とした実装ファイルが**同じディレクトリに**実在するかである。隔離ディレクトリに置かれたテストと、対象がもう存在しないテストの両方がここで捕まる。書き手から見れば別の事故だが、ファイルシステム上は同じ形をしている。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-detached-test-file--move-beside-source.ts`](../../src/lint/oxlint/rules/no-detached-test-file--move-beside-source.ts)
 
-探索範囲は同一ディレクトリに限る。リポジトリ全体を走査して「別のディレクトリにある」と「どこにも無い」を区別することはしない。したがって報告は 1 種類に畳まれ、メッセージには「探しに行って見つからなかったパス」が入る。
+<!-- END GENERATED rule-header -->
 
-補助判定は、テスト専用と分かるディレクトリ名（`test` / `tests` / `__tests__` / `spec`）がパス上に現れるかである。これはパスのどの位置にあってもよく、直上の親でなくてもよい（`spec/nested/buried.test.ts` も該当する）。主判定だけで大半は捕まるが、テストツリーの中に実装まで一緒に置いてステム一致を成立させた場合は主判定をすり抜けるため、ディレクトリ名の側からも塞ぐ。
+## Violation
 
-主判定が発火した場合、補助判定は見ない。報告は 1 ファイルにつき 1 件で、位置はファイル全体（Program ノード）になる。指すべき行がファイルの中に無いため。
+Two things are read of every file taken to be a test file.
 
-「テストファイルかどうか」はファイル名の接尾辞で決める。既定の語彙は `.test.ts` / `.test.tsx` / `.spec.ts` / `.spec.tsx` で、テストランナーが実際に拾う接尾辞を含めてある。採用していない語彙で書かれた離れたテストを素通しさせないため。複数の接尾辞が一致する場合は最も長いものを採る。`contest.ts` のように区切りのドットが無い名前は該当しない。
+The main judgment is whether the source file, named by dropping the suffix, exists **in the same directory**. A test parked in an isolation directory and a test whose subject no longer exists are both caught here. To the writer those are two different accidents; on the file system they have the same shape.
 
-実装ファイルの名前は「接尾辞を落とし、その接尾辞が持つ拡張子を付けたもの」になる。`foo.test.ts` が探すのは `foo.ts` だけ、`foo.test.tsx` が探すのは `foo.tsx` だけである。`widget.test.tsx` の隣に `widget.ts` があっても、探しているのは `widget.tsx` なので報告する。対応を 1 対 1 に固定するために、拡張子の違いを吸収しない。
+The search stays inside the one directory. The repository is not walked to tell "it is in another directory" from "it is nowhere", so the report collapses into one kind, and the message carries the path that was looked for and not found.
 
-対象が存在するかどうかはファイルシステムに問い合わせ、その答えはプロセスが生きている間だけ覚える。同じパスを二度以上問い合わせても、ファイルシステムに行くのは最初の一度だけになる。したがって lint の実行中に対象ファイルを作っても、そのプロセスの答えは変わらない。変わるのは次に lint を起動したときである。
+The secondary judgment is whether a directory name that marks a test-only tree (`test`, `tests`, `__tests__`, `spec`) appears anywhere on the path. It may sit at any position, not only directly above (`spec/nested/buried.test.ts` counts). The main judgment catches most of it, but placing the source inside the test tree as well makes the stems match and slips past, so the directory name closes that from the other side.
 
-テストが存在することは要求しない。テストの無いソースファイルは報告されない。テストを書かせるのは別のルールの仕事で、ここで兼ねると、どちらの違反も同じ 1 本の設定でしか制御できなくなる。
+Where the main judgment fires, the secondary is not read. One report is raised per file, covering the whole file (the Program node), because there is no line to point at inside it.
 
-## なぜそれが要るか
+Whether a file is a test file is settled by the suffix in its name. The default vocabulary is `.test.ts`, `.test.tsx`, `.spec.ts`, `.spec.tsx`, which includes the suffixes the test runner actually picks up, so a detached test written in a vocabulary this repository does not use is not passed over. Where several suffixes match, the longest is taken. A name with no separating dot, such as `contest.ts`, does not qualify.
 
-1 層目は、対応関係を人間の記憶とツール設定の外に出すことである。テストが別ツリーにあるとき、「この実装にテストがあるか」は、実装側のパスをテスト側のパスへ変換する規則を頭の中で解いて初めて分かる。変換規則はどこにも書かれず、書かれていても実際の配置と一致している保証がない。同階層なら、実装を開いた時点でディレクトリ一覧にテストが並ぶので、有無の確認に変換作業そのものが要らない。
+The source file's name is the suffix dropped and the extension that suffix carries put back. `foo.test.ts` looks for `foo.ts` alone, and `foo.test.tsx` for `foo.tsx` alone. `widget.test.tsx` is reported even with `widget.ts` beside it, because what it is looking for is `widget.tsx`. Extension differences are not absorbed, so the pairing stays one to one.
 
-2 層目は、その変換規則が実装の移動で壊れ、壊れたことが赤くならない点である。パスの対応が規則としてしか存在しないと、実装ファイルを別ディレクトリへ移した瞬間に対応が切れる。切れてもテストはその場では落ちない。インポートパスさえ直せば通り続けるからだ。結果として、もう誰も呼ばない実装の古い振る舞いを検証し続けるテストや、対象が消えた後も残るテストが、失敗しないまま蓄積する。
+Whether the subject exists is asked of the file system, and the answer is remembered for as long as the process lives. Asking about the same path twice reaches the file system only the first time, so creating the subject mid-run does not change that process's answer; the next run does.
 
-3 層目は、配置の語彙が増えると、その語彙を前提にした glob が設定ファイル群へ分散する点である。テストの居場所が複数あると、カバレッジ対象・ビルド除外・型検査対象・lint 対象の各設定が、それぞれ別の前提でパターンを書くことになる。片方の語彙だけを更新した設定が生まれ、「除外したつもりのファイルが計測に入っている」「対象にしたつもりのファイルが lint されていない」という穴が、どの設定を単独で読んでも見えない形で残る。居場所を 1 つに固定すると、この分散が起きる余地自体が消える。
+A test existing is not required. A source file with no test is not reported. Making tests be written belongs to another rule, and folding it in here would leave both violations controllable only through one setting.
 
-これはディレクトリ配置の規律であり、テストが実装の内部に触れてよいという意味ではない。同階層に置くことと、公開されている振る舞いだけを検証することは独立している。
+### The invariant
 
-## どう直すか
+The first layer is putting the correspondence outside human memory and tool configuration. With tests in another tree, "does this implementation have a test" is only answerable by solving, in your head, the rule that turns an implementation path into a test path. That rule is written nowhere, and where it is written nothing guarantees it matches the actual layout. Side by side, opening the implementation puts the test in the same directory listing, so confirming its presence takes no translation at all.
 
-対象実装がどこかに存在するなら、テストファイルをその実装と同じディレクトリへ移し、名前を実装に合わせる。インポートは同一ディレクトリからの相対参照になり、多くの場合その分だけ短くなる。
+The second layer is that the translation rule breaks when an implementation moves, and the break does not turn red. Where the path correspondence exists only as a rule, moving an implementation to another directory severs it, and severing it fails nothing on the spot — fixing the import paths keeps it passing. Tests that go on verifying the old behaviour of an implementation nobody calls, and tests left behind after their subject is gone, accumulate without ever failing.
 
-対象実装がもう存在しないなら、そのテストが検証していた振る舞いが今どのモジュールの責務になっているかを確かめる。移った先があるならそのモジュールのテストへ統合する。振る舞いごと消えているならテストも消す。
+The third layer is that more vocabulary for placement scatters globs across the configuration files. With tests living in several places, the coverage targets, the build exclusions, the type check targets and the lint targets each write their patterns on a different premise. A configuration updated for only one vocabulary appears, and holes — a file meant to be excluded being measured, a file meant to be targeted not being linted — stay invisible to anyone reading any one configuration on its own. Fixing the location to one removes the room for that scattering.
 
-対象が 1 つに決まらないテスト（複数のモジュールをまたいで振る舞いを確かめるもの）を書いているなら、置き場所ではなく、そのテストが確かめている振る舞いに持ち主が無いことが問題になっている。その振る舞いをまとめる入口を 1 つのファイルとして作り、テストをその隣に置く。入口を作れないなら、それは 1 つの振る舞いとして名前が付いていないということなので、テストの前に対象を設計する。それでも配置を免除する必要があるなら `exemptPaths` に書く。
+This is a discipline about directory layout and does not mean a test may reach into an implementation's internals. Sitting side by side and verifying only published behaviour are independent.
 
-補助判定で報告された場合、動かすのはテストだけではない。実装がテストツリーの中にあるので、実装を使う側のモジュールの隣へ戻し、テストを一緒に連れて行く。
+### Configuration
 
-## 禁じる回避策
-
-- 期待されるパスに空のファイルを置いて通す。存在だけを見る判定なので通ってしまうが、残るのは検証対象のいないテストと、誰も import しない空モジュールの 2 つで、元の問題は何一つ解決していない
-- `.spec.ts` に変える、`.test` を外すなど、名前をずらしてルールの対象から外す。検出されなくなるだけで、テストが取り残される性質は何も変わらない。名前を変えただけで通ったなら、それは判定が名前に寄りすぎている合図であり、逃げた側ではなく判定を直す
-- 隔離ディレクトリの中に対象と同じ名前のダミーを置き、その隣にテストを並べる。ディレクトリ構造が二重になり、本物の対象を動かしたときに追随しない
-- 実装をテストの側へ移動して同居させる。同階層は満たされるが、実装の居場所がテストの都合で決まっている。動かすのはテストであって、実装ではない。これは補助判定が捕まえる
-- `exemptPaths` を広げてツリーごと飲み込ませる。「E2E 用に 1 ディレクトリだけ」のつもりで書いたパターンが、実際にはその配下すべてを免除している、という形が典型。免除の範囲は、指定を読んだだけで確定できる狭さに保つ
-- そのファイルだけ抑制ディレクティブで黙らせる。配置は 1 ファイルの都合ではなくツリー全体に対する規律なので、ファイル単位の免除はそのまま規律の無効化になる
-
-## オプション
-
-- `testFileSuffixes`（文字列の配列、任意）: テストファイルとみなす接尾辞。既定（`.test.ts` / `.test.tsx` / `.spec.ts` / `.spec.tsx`）に**加算**される。上書きではないので、既定が写し漏れで静かに消えることはない。エントリは接尾辞のリテラルで、ファイル名の末尾と照合する。大文字・小文字は区別する
-- `exemptPaths`（文字列の配列、任意）: 不変条件の適用外とするパス。エントリはパスセグメントの並びで、パス上のどこかに連続した並びとして現れれば一致する。セグメント境界で照合するので、`e2` は `e2e` に一致しない
+- `testFileSuffixes` (optional, a list of strings): the suffixes taken to mark a test file. They are **added** to the defaults (`.test.ts`, `.test.tsx`, `.spec.ts`, `.spec.tsx`) rather than replacing them, so the defaults never disappear quietly through a missed copy. Each entry is a literal suffix matched against the end of the file name, and case is significant
+- `exemptPaths` (optional, a list of strings): paths held outside the invariant. Each entry is a run of path segments, matching where that run appears consecutively anywhere on the path. Matching is on segment boundaries, so `e2` does not match `e2e`
 
 ```jsonc
 ["error", { "testFileSuffixes": ["-test.ts"], "exemptPaths": ["apps/website/e2e"] }]
 ```
 
-接尾辞の禁止（正でない接尾辞を使わせない）は持たない。「この接尾辞を使うな」は名前の規律であって配置の規律である。このルールは正でない接尾辞を「テストとして認識する」ところまでを担当し、その名前を許すかどうかは別のルールに委ねる。1 本のルールが配置と命名の両方を判定すると、片方だけ緩めたいときにもう片方まで一緒に外れる。
+Forbidding a suffix — keeping the wrong ones from being used — is not carried here. "Do not use this suffix" is a discipline about names, while this one is about placement. This rule takes responsibility for _recognising_ a wrong suffix as a test, and leaves permitting the name to another rule. One rule judging placement and naming together would mean loosening one loosens the other with it.
 
-ファイル単位の除外リストも持たない。規律がツリー全体に対して意味を持つ以上、「このファイルだけ免除」は成立しない。
+There is no per-file exclusion list. Since the discipline means something over the whole tree, "exempt this one file" does not stand.
 
-補助判定のディレクトリ名リストはルールに固定してあり、設定では変えられない。
+The directory names of the secondary judgment are fixed in the rule and cannot be changed by configuration.
+
+## Fix
+
+Where the subject exists somewhere, move the test file into that implementation's directory and match its name. The imports become relative within one directory, usually getting shorter for it.
+
+Where the subject no longer exists, find out which module now owns the behaviour that test was verifying. Where it moved, fold the test into that module's test. Where the behaviour is gone, delete the test too.
+
+Where the test has no single subject — verifying behaviour across several modules — the problem is not the placement but that the behaviour being verified has no owner. Build one file as the entrance gathering that behaviour and put the test beside it. Where no entrance can be built, the behaviour has not been named as one thing, so design the subject before the test. Where the placement genuinely has to be exempt after all, write it into `exemptPaths`.
+
+Where the secondary judgment reported, the test is not the only thing that moves. The implementation is inside the test tree, so return it beside the modules that use it, taking the test along.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// a test file parked in an isolation directory is reported
+export const total = 1;
+```
+
+```ts
+// a source moved into the test tree to satisfy the pairing is reported on its own message
+export const total = 1;
+```
+
+Code this rule accepts.
+
+```ts
+// a test file whose source sits beside it under the same name passes
+export const total = 1;
+```
+
+```ts
+// a path the deployment exempts is left out of the invariant
+export const total = 1;
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Placing an empty file at the expected path to get through. The judgment reads existence alone so it passes, and what is left is a test with no subject and an empty module nobody imports — none of the original problem solved
+- Shifting the name out of the rule's reach, by switching to `.spec.ts` or dropping `.test`. Only the detection stops; nothing changes about the test being left behind. If a rename alone got it through, that is a signal the judgment leans too hard on the name: fix the judgment rather than the escape
+- Placing a dummy of the same name inside the isolation directory and lining the test up beside it. The directory structure doubles, and the copy does not follow when the real subject moves
+- Moving the implementation over to the test to make them cohabit. Side by side is satisfied while the implementation's location is being decided by the test's convenience. What moves is the test, not the implementation. The secondary judgment catches this
+- Widening `exemptPaths` until it swallows a whole tree. The classic shape is a pattern written meaning "just the one directory for E2E" that in fact exempts everything under it. Keep an exemption narrow enough to be settled by reading the entry alone
+- Silencing that one file with a suppression directive. Placement is a discipline over the whole tree rather than one file's convenience, so an exemption per file is that discipline being voided
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `detachedTestFile` | A test file must not sit apart from the source it tests. Nothing exists at \`{{sourcePath}}\`. Move this file into the directory of the source it tests and name it after that source. |
+| `testOnlyDirectory` | A test file must not sit under a directory that exists only to hold tests. This file sits under \`{{directory}}\`. Move the source it tests back among the modules that use it, and move this file with it. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

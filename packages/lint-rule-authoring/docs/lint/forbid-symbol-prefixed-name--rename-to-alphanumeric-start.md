@@ -1,64 +1,131 @@
+---
+description: "Require every directory and file name on the path of a linted file to start with a letter or a digit, so nothing sits where a glob walk never reaches it"
+---
+
 # forbid-symbol-prefixed-name--rename-to-alphanumeric-start
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-検査対象ファイルのパスを構成するセグメントのうち、先頭が英数字（`a-z` / `A-Z` / `0-9`）でないもの。ディレクトリ名もファイル名も同じ扱いで見る。
+Require every directory and file name on the path of a linted file to start with a letter or a digit, so nothing sits where a glob walk never reaches it
 
-パスは、lint が走り出した作業ディレクトリからの相対パスとして取る。`_internal/helper.ts` なら `_internal` が、`src/@entry.ts` なら `@entry.ts` が対象になる。作業ディレクトリの外にあるファイル（相対パスが `..` を含むもの）は判定しない。リポジトリの外側のパスは書き手の管理下にないため。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`forbid-symbol-prefixed-name--rename-to-alphanumeric-start.ts`](../../src/lint/oxlint/rules/forbid-symbol-prefixed-name--rename-to-alphanumeric-start.ts)
 
-判定は許可方式で行う。「先頭 1 文字が `[A-Za-z0-9]` であること」だけを条件にしており、「`_` `-` `.` で始めてはいけない」という禁止列挙にはしていない。列挙しなかった記号（`~` `@` `+` `!`、全角記号、絵文字など）がそのまま素通りする穴を作らないため。
+<!-- END GENERATED rule-header -->
 
-ドットで始まる名前も他の記号と同じく違反である。`.github` や `.storybook` のような、ツールが規約として要求する名前は、後述の許可リストに書いて通す。ドット始まりを一律で通すと、`.internal/` のような名前を 1 つ作るだけで検査対象から抜けられ、その操作が設定の差分として残らない。
+## Violation
 
-先頭文字の判定は ASCII の英数字だけを通す。日本語やアクセント付き文字で始まる名前も報告対象になる。
+A segment of the checked file's path that does not start with an alphanumeric character (`a-z`, `A-Z`, `0-9`). Directory names and file names are read alike.
 
-1 つのパスに該当するセグメントが複数あれば、パス上に現れる順にそれぞれ報告する。同じ名前が同一パス上に 2 回以上現れる場合は 1 件にまとめる（`packages/_shared/_shared/index.ts` は 1 件）。同じ名前を繰り返し名指ししても読み手が得る情報は増えないため。
+The path is taken relative to the working directory the lint started from. In `_internal/helper.ts` the target is `_internal`; in `src/@entry.ts` it is `@entry.ts`. Files outside the working directory — those whose relative path carries `..` — are not judged, because a path outside the repository is not under the writer's control.
 
-報告位置はファイルの Program ノード。位置を持つ違反ではなく、そのファイルがどこに置かれているかについての違反だからである。
+The judgment allows rather than forbids. The only condition is that the first character be `[A-Za-z0-9]`, rather than a list of forbidden openings such as `_`, `-` and `.`. A list would leave whatever it failed to enumerate (`~`, `@`, `+`, `!`, full-width symbols, emoji) passing straight through.
 
-lint はファイル単位で走るため、lint 対象拡張子のファイルを 1 つも含まないディレクトリ（画像やデータだけの置き場など）は、記号で始まっていても検出できない。
+A name opening with a dot is a violation like any other symbol. Names a tool requires as a convention, such as `.github` and `.storybook`, pass by being written into the allow list below. Letting every dotted name through would mean one directory named `.internal/` is enough to leave the checked set, with that move leaving no trace in a configuration diff.
 
-## なぜそれが要るか
+The first character is checked against ASCII alphanumerics alone, so a name opening with Japanese or an accented letter is reported as well.
 
-ファイルとディレクトリの名前は、それ自体が「見つけてもらえるかどうか」を決めている。記号で始まる名前は glob の走査から漏れ、そこに置かれたものが検査されないまま残る。lint も型検査もテスト収集も、まず対象を集める段階を通る。その段階で拾われなければ、後段のルールが何本あろうと 1 本も当たらない。
+Where one path carries several offending segments, each is reported in the order it appears. The same name appearing twice on one path is folded into one report (`packages/_shared/_shared/index.ts` raises one), because naming the same name twice tells a reader nothing more.
 
-厄介なのは、この漏れが失敗として現れないことである。検査されなかったファイルは「違反ゼロ」と区別がつかない。緑のまま、検査されていない領域だけが増えていく。だから、対象が集まったかどうかを後から検証するのではなく、集まる名前しか付けられないようにする。
+The report points at the file's Program node. It is not a violation with a position, but a violation about where the file has been placed.
 
-さらに、この漏れは事故としてだけでなく手段としても使える。あるルールの適用範囲から外れたければ、ディレクトリ名の先頭に記号を 1 文字足すだけでよい。抜け道が「リネーム 1 回」の距離にあり、差分としてはただのリネームにしか見えないため、レビューでは止まらない。禁止を機械化すると、そうした名前は「許可リストに書き足す」という、差分として残りレビューを通る操作なしには存在できなくなる。
+Because the lint runs per file, a directory holding no file of a linted extension — a place for images or data alone — is not detected even when it opens with a symbol.
 
-## どう直すか
+### The invariant
 
-該当するセグメントを、英数字で始まる名前に変える。`_internal` なら `internal`、`@entry.ts` なら `entry.ts` にする。先頭さえ英数字であれば、それ以降に記号が含まれていてよい（`user-profile.ts`、`v2_adapter.ts`）。
+The names of files and directories decide, by themselves, whether they get found. A name opening with a symbol slips past a glob's walk, and what was placed there stays unchecked. The lint, the type check and the test collection all pass through a stage that gathers targets first. Something not picked up at that stage is reached by none of the rules that follow, however many there are.
 
-記号を付けたくなった動機が「これは内部向けだ」という区別であれば、名前ではなくモジュールの公開範囲で表す。パッケージの `exports` に載せない、公開面から再 export しない、といった手段は走査から外れずに同じ区別を作れる。
+What makes it awkward is that the miss never surfaces as a failure. A file that was not checked is indistinguishable from a file with no violations. Everything stays green while the unchecked territory grows.
 
-記号を付けたくなった動機が「これは一時的なものだ」という断りであれば、リポジトリに置かない。作業中の下書きは `.local-agents/` 配下のような、隠し名で走査から外れることが意図されている場所に置く。
+Worse, the miss works as a method as well as an accident. To leave a rule's reach, add one symbol to the front of a directory name. The way around sits one rename away, and as a diff it looks like nothing but a rename, so a review does not stop it. Made mechanical, such a name cannot exist without an operation that does leave a diff and does go through review: adding a line to the allow list.
 
-## 例外を足す手順
+### Configuration
 
-許可リストに載せてよいのは、フレームワークやツールがその名前を仕様として要求している場合だけである。判定基準は「名前を英数字始まりに変えると機能が壊れるか」。壊れるなら許可、壊れないならリネームで直す。
+`allowedNames` (a list of strings, empty by default) is the only option. Names listed there are not violations even when they open with a symbol.
 
-許可は、その名前を持つファイル群を所有する側の設定に置く。全体の共通設定に足すと、1 箇所のフレームワーク事情が全体の緩和になる。あわせて、どのフレームワークやツールがその名前を要求しているのかを設定側に書き残す。後から「なぜこれが許可されているのか」を調べ直さずに済ませるため。
+- The match is against the whole path segment, never a substring. Allowing `_ui` does not let `_ui-legacy` through
+- `*` stands for a run of characters of any length, including none. Regular expressions are not accepted, both to avoid building a regular expression out of a configuration value and to keep the expressive power narrow enough that an over-broad allowance is hard to write
+- Case is significant. Allowing `_ui` does not let `_UI` through
+- An entry cannot carry `/`; the schema refuses it with `^[^/]+$`. Allowance is per path segment, not per subtree
+- An allowance covers that one name and does not propagate downward. Allowing `_ui` leaves `_legacy` in `_ui/_legacy/index.ts` a violation. Propagating would turn an allowed name into the entrance to an unchecked territory
+
+Axes such as allowing particular symbols, a depth limit, or switching which extensions are targeted are deliberately absent. Each one added makes it harder to trace which setting caused something not to be detected, and raises the total number of ways around.
+
+## Fix
+
+Rename the offending segment to something starting with an alphanumeric: `_internal` to `internal`, `@entry.ts` to `entry.ts`. As long as the first character is alphanumeric, symbols may appear after it (`user-profile.ts`, `v2_adapter.ts`).
+
+Where the motive for the symbol was marking something as internal, express that through the module's published surface rather than its name. Leaving it out of the package's `exports`, or not re-exporting it from the public entry, draws the same distinction without leaving the walk.
+
+Where the motive was noting that something is temporary, do not put it in the repository. A draft in progress belongs somewhere like `.local-agents/`, where being hidden from the walk is the intent.
+
+### Adding an exception
+
+The allow list is for names a framework or a tool requires as a specification, and nothing else. The test is whether renaming it to start with an alphanumeric breaks the functionality. If it breaks, allow it; if not, fix it by renaming.
+
+Put the allowance in the configuration owned by whoever owns the files carrying that name. Adding it to the shared configuration turns one framework's circumstances into a loosening for everything. Write down alongside it which framework or tool requires the name, so that "why is this allowed" does not have to be researched again later.
 
 ```jsonc
 ["error", { "allowedNames": [".storybook", ".*rc"] }]
 ```
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- 別の記号始まりの名前へリネームして、他ルールの適用範囲から逃げる（`_fixtures/` → `~fixtures/`）。新しい名前も同じ違反であり、逃げること自体がこのルールの対象である
-- 「内部用」「private」「一時置き場」など、自分たちで作った区分を理由に許可リストへ足す。フレームワークの要求ではないので、リネームで解決できる
-- 該当ファイルを隠しディレクトリの下に移して走査から外す。このルールを含む検査全体が当たらなくなるだけで、直したことにはならない
-- 抑制ディレクティブでこのルールだけを黙らせる。指摘はファイル単位で出るため 1 行で消せてしまうが、消しても当該ディレクトリが他ツールの glob をすり抜ける事実は変わらない。消してよいのは名前を直したときだけである
+Code this rule rejects.
 
-## オプション
+```ts
+// a directory name starting with an underscore is reported
+// in packages/lint-rule-authoring/_internal/helper.ts
+const total = 1;
+```
 
-`allowedNames`（文字列の配列、既定は空）だけを取る。ここに挙げた名前は、記号で始まっていても違反としない。
+```ts
+// an allowed name does not carry the allowance down to the names under it
+// in packages/_ui/_legacy/index.ts
+const total = 1;
+```
 
-- 一致はパスセグメント全体に対して行う。部分一致にはしない。`_ui` を許可しても `_ui-legacy` は通らない
-- `*` は任意長（空を含む）の文字列を表す。正規表現は採らない。設定値から正規表現を組み立てずに済ませること、表現力を絞って「広すぎる許可」を書きにくくすることの 2 点による
-- 大文字・小文字は区別する。`_ui` を許可しても `_UI` は通らない
-- エントリに `/` は書けない。schema が `^[^/]+$` で拒否する。許可はパスセグメント単位であり、サブツリー単位ではないため
-- 許可はその名前 1 つに対してのみ効き、配下へは伝播しない。`_ui` を許可しても `_ui/_legacy/index.ts` の `_legacy` は違反のままである。許可が配下へ伝播すると、許可された名前がそのまま無検査領域の入口になる
+Code this rule accepts.
 
-記号の種類ごとの許可、深さの上限、対象拡張子の切り替えといった調整軸は意図的に持たせていない。増やすほど「どの設定のせいで検出されなかったか」を追う手間が増え、抜け道の総数が増える。
+```ts
+// every segment of a nested path starts with a letter
+// in packages/lint-rule-authoring/src/lint/oxlint/rules/some-rule.ts
+const total = 1;
+```
+
+```ts
+// a name the deployment listed is allowed to start with a symbol
+// in .config/tooling/setup.ts
+const total = 1;
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Renaming to another symbol-prefixed name to escape another rule's reach (`_fixtures/` to `~fixtures/`). The new name is the same violation, and escaping is what this rule watches for
+- Adding a name to the allow list on the grounds of a category you invented — "internal", "private", "scratch space". No framework requires it, so renaming solves it
+- Moving the file under a hidden directory to leave the walk. Every check including this one stops reaching it, which is not a fix
+- Silencing this one rule with a suppression directive. The report is per file so one line removes it, and removing it changes nothing about that directory slipping past other tools' globs. It may be removed only when the name has been fixed
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `symbolPrefixedSegment` | A directory or file name must not start with anything other than a letter or a digit. The name \`{{segment}}\`, on the path \`{{path}}\`, starts with something else. Rename that one name to start with a letter or a digit. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->
