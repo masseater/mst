@@ -33,7 +33,7 @@ description: Machine-enforced answers to the writing questions that would otherw
 
 `lint` が配るルール集合は 1 枚だけである。対象種別による出し分けはしない。ルートの `lint` が呼んだ時点でリポジトリ全体に効き、採用の判断は残らない。CLI に固有の規律もこの中にあり、対象を絞るのはルールの側である。判断は [EDR 0042](../../docs/engineering-decision-logs/0042-apply-one-preset-at-the-root-and-report-the-exception-the-toolchain-forces.md) にある。
 
-仕様担保テストの置き場所だけは、この 1 枚の中で `overrides` として範囲を絞る。`specs/` の下はテスト規律の束の射程外で、名前の綴りを `.spec.ts` に切り替え、ソース隣接の要求と `describe` の入れ子の上限をそこに与える。射程の分担は [EDR 0039](../../docs/engineering-decision-logs/0039-let-the-specifications-bundle-guard-the-specs-directory-alone.md) が、設定の所在は [EDR 0057](../../docs/engineering-decision-logs/0057-read-the-spelling-the-repository-mandates-and-move-the-spec-lint-settings-into-the-preset.md) が決めている。
+仕様担保テストの置き場所だけは、この 1 枚の中で `overrides` として範囲を絞る。`specs/` の下はテスト規律の束の射程外で、名前の綴りを `.spec.ts` に切り替え、ソース隣接の要求と `describe` の入れ子の上限をそこに与える。射程の分担は [EDR 0060](../../docs/engineering-decision-logs/0060-let-the-specifications-bundle-guard-the-specs-directory-alone.md) が、設定の所在は [EDR 0057](../../docs/engineering-decision-logs/0057-read-the-spelling-the-repository-mandates-and-move-the-spec-lint-settings-into-the-preset.md) が決めている。
 
 `fmt` が決めているのは、整形結果が読み手に届く見た目を変えず、差分にだけ現れる書き方である。markdown の段落を 1 行に畳むこと、import の並び順がこれにあたる。判断は [EDR 0046](../../docs/engineering-decision-logs/0046-let-the-formatter-own-where-markdown-lines-break.md) と [EDR 0047](../../docs/engineering-decision-logs/0047-hand-every-toolchain-block-one-preset-function.md) にある。
 

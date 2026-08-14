@@ -5,7 +5,7 @@
 
 ## 文脈
 
-lint 設定の棚卸しをした。preset が配る 106 本のうち有効化していない 2 本と、`off` にしている 6 か所を数え、判断がどこにあるかを追った。`no-mixed-package-surface--declare-one-surface` と `require-spec-or-assets-only-in-spec-directory--move-out-or-inline` を有効にしないことは登録のコミットが、`no-version-range--pin-the-exact-version` を preset に載せないことは [EDR 0041](0041-let-the-declaration-decide-the-release.md) が、`specs/**` で `no-detached-test-file--move-beside-source` を止めることは [EDR 0039](0039-let-the-specifications-bundle-guard-the-specs-directory-alone.md) が既に決めていた。判断の抜けは 1 件も無かった。
+lint 設定の棚卸しをした。preset が配る 106 本のうち有効化していない 2 本と、`off` にしている 6 か所を数え、判断がどこにあるかを追った。`no-mixed-package-surface--declare-one-surface` と `require-spec-or-assets-only-in-spec-directory--move-out-or-inline` を有効にしないことは登録のコミットが、`no-version-range--pin-the-exact-version` を preset に載せないことは [EDR 0041](0041-let-the-declaration-decide-the-release.md) が、`specs/**` で `no-detached-test-file--move-beside-source` を止めることは [EDR 0060](0060-let-the-specifications-bundle-guard-the-specs-directory-alone.md) が既に決めていた。判断の抜けは 1 件も無かった。
 
 抜けていたのは、`off` を見張る側だった。`vp exec dont-review-it check` の preset-adoption は `0 problems 0 warnings` を返し続けていた。ルートの設定に `off` が無いからではない。`disabled-rule-declarations.ts` が重大度を `Literal` ノードとしてしか読まず、ルートが書く `LINT_SEVERITY.OFF` は `MemberExpression` だったためである。しかもこの綴りは `no-strict-canonical-literal-use--use-canonical-import` が強制しているもので、検査が読める `"off"` のほうを lint が禁じている。読める綴りと書ける綴りが交わっていなかった。
 
@@ -17,7 +17,7 @@ lint 設定の棚卸しをした。preset が配る 106 本のうち有効化し
 
 **重大度の綴りを、束の検査と同じ語彙で読む。** `Literal`、静的な `MemberExpression`、`[水準, 設定]` の先頭の 3 形を読み、`off` / `allow` / `0` を無効として扱う。語彙の表は `no-partial-rule-set--enable-the-whole-set` が使っているものをそのまま借り、2 つ目の表を作らない。同じ設定を読む 2 つの検査が別々の綴りを理解する状態を残さないためである。
 
-**仕様担保テストの lint 設定を `@mst/dont-review-it` の preset へ移す。** [EDR 0039](0039-let-the-specifications-bundle-guard-the-specs-directory-alone.md) の「仕様担保テストの規律は `@mst/verified-specifications` が配る lint 設定と検査コマンドが持っている」のうち、lint 設定の部分を取り消す。射程の分担そのものは変えない。`specs/` の下の `.spec.ts` がテスト規律の束の射程外であることも、`specs` の外に置いた `.spec.ts` を報告することも、そのまま残る。移すのは設定の置き場所だけである。
+**仕様担保テストの lint 設定を `@mst/dont-review-it` の preset へ移す。** [EDR 0060](0060-let-the-specifications-bundle-guard-the-specs-directory-alone.md) の「仕様担保テストの規律は `@mst/verified-specifications` が配る lint 設定と検査コマンドが持っている」のうち、lint 設定の部分を取り消す。射程の分担そのものは変えない。`specs/` の下の `.spec.ts` がテスト規律の束の射程外であることも、`specs` の外に置いた `.spec.ts` を報告することも、そのまま残る。移すのは設定の置き場所だけである。
 
 **`@mst/verified-specifications` を実行される面だけのパッケージにする。** 公開エントリと `src/index.ts` を落とし、`bin` だけを宣言する。このパッケージが人間に配るのは `SPECIFICATIONS.md` を生成する検査コマンドであって、import される値ではない。
 
