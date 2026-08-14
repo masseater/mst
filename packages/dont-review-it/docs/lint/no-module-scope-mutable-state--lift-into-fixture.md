@@ -1,60 +1,81 @@
+---
+description: "Disallow a test writing to a binding declared outside every fixture, test block and setup hook, so the state a test changes belongs to that test alone rather than to the whole file"
+---
+
 # no-module-scope-mutable-state--lift-into-fixture
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-テスト宣言ファイルの中で、テストの内側から、テストの外側に宣言された束縛が書き換えられている形。
+Disallow a test writing to a binding declared outside every fixture, test block and setup hook, so the state a test changes belongs to that test alone rather than to the whole file
 
-「テストの内側」は次の 3 つである。判定はスコープの見え方ではなく AST の包含関係で行い、パラメータを含む関数ノード全体を範囲とする。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-module-scope-mutable-state--lift-into-fixture.ts`](../../src/lint/oxlint/rules/no-module-scope-mutable-state--lift-into-fixture.ts)
 
-1. fixture 関数
-2. テストブロックのコールバック
-3. setup フックのコールバック
+<!-- END GENERATED rule-header -->
 
-「テストの外側」はその 3 つのどれにも含まれない位置をいう。モジュールのトップレベル、`describe` の本体、hoisted コンテナ（`vi.hoisted`）を受ける束縛、他のモジュールから取り込んだ束縛がここに落ちる。
+## Violation
 
-### 書き換えとして扱う 2 系統
+A binding declared outside a test being written from inside a test, in a test declaration file.
 
-| 系統 | 何を見るか |
+"Inside a test" is these three. The judgment runs on AST containment rather than on how scope looks, and the range is the whole function node, parameters included.
+
+1. A fixture function
+2. A test block's callback
+3. A setup hook's callback
+
+"Outside a test" means any position contained in none of those three. The module's top level, a `describe` body, a binding receiving a hoisted container (`vi.hoisted`), and a binding taken in from another module all land here.
+
+### The two families counted as writing
+
+| Family | What is read |
 | --- | --- |
-| 束縛の結び直し | `let` / `var` で宣言された束縛への代入と更新。分割代入の左辺・既定値・残余要素も左辺として読む |
-| 値の書き換え | 宣言の種類を問わず、束縛が指す値へのプロパティの追加・書き換え・削除、および内容を変える標準メソッド呼び出し |
+| Rebinding | Assignment to and update of a binding declared with `let` or `var`. The left side of a destructuring, its defaults and its rest element are read as left sides too |
+| Writing the value | Whatever the declaration kind: adding, rewriting or deleting a property of the value the binding points at, and calls to standard methods that change the contents |
 
-内容を変える標準メソッドは `add` / `clear` / `copyWithin` / `delete` / `fill` / `pop` / `push` / `reverse` / `set` / `shift` / `sort` / `splice` / `unshift` の 13 個で、配列・`Map`・`Set` の破壊的操作をまとめた語彙を共有している。文字列リテラルと置換を持たないテンプレートリテラルの添字は名前として読むので、`entries['push']()` は `entries.push()` と同じに扱う。型アサーション・`satisfies`・非 null 表明・オプショナルチェーンの包みは剥がしてから判定する。
+The standard methods that change contents are thirteen — `add`, `clear`, `copyWithin`, `delete`, `fill`, `pop`, `push`, `reverse`, `set`, `shift`, `sort`, `splice`, `unshift` — sharing one vocabulary gathering the destructive operations of arrays, `Map` and `Set`. A string-literal subscript and a template-literal subscript with no substitution are read as names, so `entries['push']()` is treated as `entries.push()`. Wrapping in a type assertion, `satisfies`, a non-null assertion or an optional chain is peeled before the judgment.
 
-### 報告位置
+### Where the report stands
 
-報告位置は書き換えの側である。宣言そのものは、書き換えられなければ違反ではない。宣言の位置は報告文に併記する。ファイル内の宣言なら行番号、取り込んだ束縛ならその取り込み元のモジュール指定子を出す。
+The report stands on the writing side. A declaration is no violation unless it is written to. The declaration's position rides along in the message: a line number for a declaration in the file, and the module specifier it came from for an imported binding.
 
-宣言が spec の外のモジュールにあり、spec がそれを取り込んで書き換えている場合も報告する。宣言の側を辿るのは位置を書くためであり、宣言のあるモジュールを規律の対象に加えるためではない。
+Where the declaration lives in a module outside the spec and the spec imports and writes to it, the report stands too. The declaration side is followed to write the position, not to bring the declaring module under the discipline.
 
-適用範囲はテスト宣言ファイルに限る。`.test.ts` / `.test.tsx` で終わるファイルだけを見る。
+The range is limited to test declaration files: only files ending in `.test.ts` or `.test.tsx` are read.
 
-### 意図的に広げていない範囲
+### Deliberately not widened
 
-| 形 | 対象にしない理由 |
+| Shape | Why it is left out |
 | --- | --- |
-| 読むだけの参照。凍結された値、リテラルの定数、型 | 書き換えが無い。宣言の位置は問題にしていない |
-| fixture の内側で宣言された束縛の書き換え | fixture は各テストのために評価され直すので、その実体はテスト間で共有されない |
-| トップレベルで宣言し、トップレベルで初期化して以後触らない形 | 書き換えの側がテストの内側に無い。走査はテストの内側の記述だけを見る |
-| モックの生成と挙動設定 | `no-module-scope-mock-config--lift-into-fixture` の担当。右辺がモック名前空間に行き着く代入は外す |
-| ファイルシステムへの書き込み | `no-local-file-system-mock--use-shared-fs` の担当。破壊的操作の語彙にファイル API を入れていない |
-| 束縛に行き着かないレシーバへの書き換え（`openLedger().calls = 1`） | 書き換えられる実体がこのファイルの宣言に紐づかない。同定できないものを巻き込まない |
-| `Object.assign` / `Reflect.set` 経由の書き換え | レシーバではなく引数に対象が来る形。走査はレシーバを見る |
-| spec 以外のファイルの中で完結する書き換え | 対象コードや共有 setup が自分の状態を書き換えることは、この規律の関心ではない |
+| A read-only reference. A frozen value, a literal constant, a type | There is no write. The declaration's position is not the issue |
+| Writing a binding declared inside a fixture | A fixture is re-evaluated for each test, so its instance is not shared between tests |
+| Declaring at the top level, initializing at the top level and never touching it again | The writing side is not inside a test. The walk reads only what is written inside a test |
+| Creating mocks and settling their behaviour | [no-module-scope-mock-config--lift-into-fixture](./no-module-scope-mock-config--lift-into-fixture.md) takes it. An assignment whose right side reaches the mock namespace is excluded |
+| Writes to the file system | [no-local-file-system-mock--use-shared-fs](./no-local-file-system-mock--use-shared-fs.md) takes it. File APIs are not in the destructive-operation vocabulary |
+| A write on a receiver that reaches no binding (`openLedger().calls = 1`) | The instance being written is tied to no declaration in this file. What cannot be identified is not swept in |
+| A write through `Object.assign` or `Reflect.set` | The target arrives as an argument rather than as the receiver. The walk reads the receiver |
+| A write closing inside a file that is not a spec | The code under test or a shared setup writing its own state is not this discipline's concern |
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「テストが書き換える状態は、そのテストのためだけに存在する」ことである。
+The state a test writes exists for that test alone.
 
-1 層目は共有である。テストはファイル単位でも同一ファイル内のテストブロック単位でも並列に走る前提で書かれる。テストの外側に置かれた束縛は、そのファイルの全テストが同時に触る一つの実体になる。あるテストが押し込んだ要素も、書き換えたプロパティも、次のテストから見える。しかも「次のテスト」が何かは実行のたびに変わるので、失敗は再現しない形で現れる。
+The first layer is sharing. Tests are written assuming they run in parallel both per file and per test block inside one file. A binding placed outside a test is one instance every test in the file touches at once. An element one test pushed, and a property it rewrote, are visible to the next test — and what "the next test" is changes from run to run, so the failure appears in a form that does not reproduce.
 
-2 層目は、この規律が可変状態のうちモックでないものを担うことである。モックの置き場所を fixture に固定しても、同じ共有を素のオブジェクトや配列で作る経路は残る。hoisted コンテナに配列を一つ置き、fixture からそこへ記録を積む形は、モックの生成呼び出しを一つも含まないので置き場所のルールには映らない。散文で禁じるだけでは、その spec は検査を通り続ける。
+The second layer is that this discipline covers the mutable state that is not a mock. Fix the placement of mocks to fixtures and the route for building the same sharing out of a plain object or array is still open. Putting one array in a hoisted container and piling records into it from fixtures contains not one mock creation call, so a placement rule for mocks does not see it. Forbidden in prose alone, that spec keeps passing the checks.
 
-3 層目は、直し方が宣言の種類の問題ではないことである。`const` にしても、凍結しても、実体が一つであることは変わらない。束縛が指す値を書き換える経路は宣言の種類に関係なく開いている。置き場所を変えることだけが不変条件を回復する。
+The third layer is that the fix is not a question of declaration kind. Make it `const`, freeze it — the instance is still one. The route that writes the value a binding points at is open regardless of the declaration kind. Only changing where it is placed restores the invariant.
 
-## どう直すか
+### Configuration
 
-束縛を fixture の中へ移し、fixture がその実体を返す。テストはパラメータとして受け取る。
+None. Where mutable state is placed is not something a configuration may loosen. The test declaration file suffixes, the mock namespace spelling and the destructive-operation vocabulary are all held fixed by this rule.
+
+## Fix
+
+Move the binding into a fixture and have the fixture return that instance. The test receives it as a parameter.
 
 ```ts
 const it = test.extend("entries", () => {
@@ -69,19 +90,82 @@ it("records the entry", ({ entries }) => {
 });
 ```
 
-テストをまたいで積み上げたいカウンタや記録は、積み上げたいという意図そのものが並列実行と両立しない。数を読むテストの中で数え切る形に組み替える。
+A counter or a record you want to accumulate across tests carries an intent that does not sit with parallel execution at all. Rework it into a shape that finishes counting inside the test that reads the number.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- **束縛をオブジェクトのプロパティに包んで `const` にする。** 中身を書き換えれば共有されている事実は変わらず、宣言の種類を問わない系統が報告する
-- **凍結して書き換えを防いだことにする。** 凍結は実行時の失敗に変えるだけで、置き場所は変わらない
-- **getter / setter を挟んで書き換えを隠す。** プロパティへの代入として同じに読む
-- **hoisted コンテナに実体を置き、fixture からは触るだけにする。** コンテナを受ける束縛はテストの外側にあるので、そこへの書き換えは報告される
-- **別モジュールへ追い出して import する。** 取り込んだ束縛を spec が書き換えるなら、取り込み元を報告文に出したうえで報告する
-- **型アサーションや非 null 表明で包む。** 包みは剥がしてから判定する
-- **分割代入や添字で書く。** 左辺のパターンは葉まで辿り、静的に読める添字は名前として読む
-- **抑制ディレクティブ。** `no-rule-suppression--fix-the-violation` が報告する
+Code this rule rejects.
 
-## オプション
+```ts
+// a module scope let reassigned from the test block is one counter for the whole file
+// in ledger.test.ts
+let calls = 0;
+it('counts the call', () => {
+  calls = calls + 1;
+  expect(calls).toBe(1);
+});
+```
 
-取らない。可変状態の置き場所は、構成で緩められる対象ではない。テスト宣言ファイルの接尾辞も、モック名前空間の綴りも、破壊的操作の語彙も、このルールが固定して持つ。
+```ts
+// wrapping the counter in a const object keeps the single instance the file shares
+// in ledger.test.ts
+const held = { calls: 0 };
+it('counts the call', () => {
+  held.calls += 1;
+  expect(held.calls).toBe(1);
+});
+```
+
+Code this rule accepts.
+
+```ts
+// state built inside the fixture and handed back is the shape this rule keeps
+// in ledger.test.ts
+const it = test.extend('entries', () => {
+  const entries = [];
+  entries.push('opening');
+  return entries;
+});
+```
+
+```ts
+// a module scope value that tests only read is not shared state anybody writes
+// in ledger.test.ts
+const opening = ['a', 'b'];
+it('counts what it was given', () => {
+  expect(!opening.length).toBe(false);
+});
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- **Wrapping the binding in an object property and making it `const`.** Writing the contents leaves the sharing exactly as it was, and the family that ignores declaration kind reports it
+- **Freezing it and calling the writing prevented.** Freezing only turns it into a run-time failure; the placement is unchanged
+- **Interposing a getter or setter to hide the write.** It is read the same as an assignment to a property
+- **Putting the instance in a hoisted container and only touching it from the fixture.** The binding receiving the container is outside a test, so writes to it are reported
+- **Pushing it out to another module and importing it.** Where a spec writes to an imported binding, the report stands with the source module named in the message
+- **Wrapping in a type assertion or a non-null assertion.** Wrappers are peeled before the judgment
+- **Writing it as a destructuring or a subscript.** Left-side patterns are followed to their leaves, and statically readable subscripts are read as names
+- **A suppression directive.** [no-rule-suppression--fix-the-violation](./no-rule-suppression--fix-the-violation.md) reports it
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `sharedBindingRebound` | A binding declared outside every test must not be reassigned from inside one. \`{{name}}\` is declared at {{origin}}, and the whole file shares the single instance it names: what this test leaves behind is what the next test starts from, in an order that changes from run to run. Move the declaration into the body of the fixture the test takes its subject from and return it, leaving every test to receive its own through a parameter. Declaring it \`const\`, packing it into an object, hiding the write behind a setter, and moving the declaration into another module all keep the single instance and are reported the same way. A count meant to add up across tests belongs inside the one test that reads the number. |
+| `sharedValueWritten` | A value declared outside every test must not be written into from inside one. \`{{name}}\` is declared at {{origin}}, and every test in this file reads and writes the one value it names: a property this test adds, replaces or deletes is still there for the next test, in an order that changes from run to run. Move the declaration into the body of the fixture the test takes its subject from and return it, leaving every test to receive its own through a parameter. \`const\` on the declaration does not stop this write, freezing the value only turns it into a failure at run time, and moving the declaration into another module leaves the sharing exactly where it stood. |
+| `sharedValueChangedByCall` | \`{{member}}\` must not be called on a value declared outside every test. \`{{name}}\` is declared at {{origin}}, and the elements or entries this call adds, removes or reorders stay in the one value the whole file shares: the next test starts from whatever this test left behind, in an order that changes from run to run. Move the declaration into the body of the fixture the test takes its subject from and return it, leaving every test to receive its own through a parameter. Declaring it \`const\` and freezing it both keep the single instance; build the value this test needs inside the fixture instead. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->
