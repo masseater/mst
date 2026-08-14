@@ -8,6 +8,7 @@ describe("dont-review-it/no-hardcoded-endpoint--read-from-configuration", () => 
     valid: [
       {
         name: "a destination read from configuration passes",
+        documented: true,
         code: "fetch(config.catalogEndpoint);",
       },
       {
@@ -36,6 +37,7 @@ describe("dont-review-it/no-hardcoded-endpoint--read-from-configuration", () => 
       },
       {
         name: "a link written in markup is not an argument of a call that opens a connection",
+        documented: true,
         code: 'document.body.innerHTML = `<a href="https://vite.dev/" target="_blank">Vite</a>`;',
       },
       {
@@ -70,6 +72,7 @@ describe("dont-review-it/no-hardcoded-endpoint--read-from-configuration", () => 
     invalid: [
       {
         name: "a written out destination passed to fetch is reported",
+        documented: true,
         code: "fetch('https://example.test/catalog');",
         errors: [{ messageId: "hardcodedEndpoint" }],
       },
@@ -90,6 +93,7 @@ describe("dont-review-it/no-hardcoded-endpoint--read-from-configuration", () => 
       },
       {
         name: "a written out path appended to a configured origin is still written out text",
+        documented: true,
         code: "fetch(`${config.origin}/api/catalog`);",
         errors: [{ messageId: "hardcodedEndpoint" }],
       },
