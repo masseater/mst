@@ -1,80 +1,153 @@
+---
+description: "Require the files the deployment lists as re-export only to carry re-exports and nothing else, so the surface a module presents can be read off that file without opening what it forwards"
+---
+
 # require-re-export-only-files--move-declaration-to-owning-module
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-このルールは opt-in である。設定の `targets` に書かれたファイルだけを「再エクスポート専用ファイル」として検査し、書かれていなければ一切発火しない。どのファイルが面なのかを決めるのは利用側であり、ルールがファイル名を知っているわけではない。
+Require the files the deployment lists as re-export only to carry re-exports and nothing else, so the surface a module presents can be read off that file without opening what it forwards
 
-対象ファイルについて、次の 2 つを独立に判定する。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`require-re-export-only-files--move-declaration-to-owning-module.ts`](../../src/lint/oxlint/rules/require-re-export-only-files--move-declaration-to-owning-module.ts)
 
-- Program 直下の文がすべて「モジュールソースを伴うエクスポート文」であること
-- そのような文を最低 1 つ持つこと
+<!-- END GENERATED rule-header -->
 
-再エクスポートとして通すのは次の 2 つだけ。
+## Violation
 
-- `export ... from "..."`（`source` を持つ `ExportNamedDeclaration`）。`export type { T } from "..."` も `export { default as X } from "..."` も含む
-- `export * from "..."` / `export * as ns from "..."`（`ExportAllDeclaration`）
+This rule is opt-in. It checks as a "re-export only file" nothing but the files written in the configuration's `targets`, and with none written it never fires. Which files are a surface is settled by the consumer; the rule does not know any file name of its own.
 
-これ以外は、宣言も、import も、式文も、`export default` も、`"use client"` のようなディレクティブも、すべて余分な文として報告する。判定は「再エクスポートの形かどうか」だけで行い、違反の側を列挙しない。
+For a target file, two things are judged independently.
 
-報告は 2 種類ある。
+- Every statement directly under Program is an export statement carrying a module source
+- At least one such statement is there
 
-- `missingReExport`: 再エクスポートが 1 つも無い。ファイル全体（Program ノード）を指す
-- `extraStatement`: 再エクスポートでない文がある。その文そのものを指す。1 ファイルに複数あれば、それぞれ個別に報告する
+Only two things pass as a re-export.
 
-2 つは独立に判定するため、ローカル宣言だけのファイルには両方が出る。これは重複ではなく、「余分なものがある」と「必要なものが無い」を別の欠陥として扱う意図的な設計である。
+- `export ... from "..."` (an `ExportNamedDeclaration` carrying a `source`). `export type { T } from "..."` and `export { default as X } from "..."` are included
+- `export * from "..."` / `export * as ns from "..."` (an `ExportAllDeclaration`)
 
-`import { total } from "./total.ts";` と `export { total };` の 2 文に分けて書いた場合は、両方の文が `extraStatement` として報告される。1 つの問題に対して 2 件出るが、直すべき文が 2 つあるので集約しない。
+Everything else — a declaration, an import, an expression statement, an `export default`, a directive such as `"use client"` — is reported as a surplus statement. The judgment runs on "is this the shape of a re-export" alone, and the violating side is not enumerated.
 
-## 対象の指定
+There are two reports.
 
-`targets` / `exclude` のパターンは、lint に渡るパスが絶対パスになりうることを前提に照合する。
+- `missingReExport`: not one re-export is there. It points at the whole file (the Program node)
+- `extraStatement`: a statement that is no re-export is there. It points at that statement itself. Several in one file are reported one by one
 
-- `/` `./` `../` で始まるパターンは、作業ディレクトリを基準に解決したうえでパス全体と照合する
-- それ以外のパターンは、パスの末尾部分と照合する。照合はセグメント境界で揃える。`models/index.ts` は `data-models/index.ts` に一致しない
-- 末尾照合であるため、パスの途中にツールが作る作業用ディレクトリやドット始まりのディレクトリが挟まっても、リポジトリ相対で書いたパターンは一致する
-- `*` は 1 セグメント内の任意長（空を含む）の文字列を表す。`/` はまたがない
-- `**` は 1 セグメントとして書いたときだけ意味を持ち、0 個以上のセグメントを表す
-- ブレース展開・否定パターン・文字クラスは持たない。大文字・小文字は区別する
-- `exclude` は `targets` と同じ照合規則で評価する
+The two are judged independently, so a file holding local declarations alone gets both. That is not a duplicate but a deliberate design treating "something surplus is here" and "what is needed is missing" as separate defects.
+
+Written as the two statements `import { total } from "./total.ts";` and `export { total };`, both statements are reported as `extraStatement`. Two reports come out for one problem, and they are not gathered, because there are two statements to fix.
+
+### Naming the targets
+
+`targets` and `exclude` patterns are matched on the premise that the path reaching the lint may be absolute.
+
+- A pattern beginning with `/`, `./` or `../` is resolved against the working directory and matched against the whole path
+- Every other pattern is matched against the tail of the path, aligned at a segment boundary. `models/index.ts` does not match `data-models/index.ts`
+- Because it is a tail match, a pattern written relative to the repository matches even where a tool's working directory or a dot-directory sits in the middle of the path
+- `*` stands for any run of characters (the empty one included) inside one segment. It does not span `/`
+- `**` carries meaning only when written as a whole segment, and stands for zero or more segments
+- There is no brace expansion, no negated pattern and no character class. Case is distinguished
+- `exclude` is evaluated by the same matching rules as `targets`
 
 ```jsonc
 ["error", { "targets": ["**/index.ts"], "exclude": ["**/generated/index.ts"] }]
 ```
 
-`targets` を渡さずに有効化した場合、schema は `required` と `minItems: 1` で拒否する。schema を強制しない経路で渡された場合は何も検査しない（空配列を渡した場合、パターンに一致するファイルが 0 件だった場合と区別しない）。
+Turned on without `targets`, the schema refuses it through `required` and `minItems: 1`. Handed in through a route that does not enforce the schema, nothing is checked — an empty array is not distinguished from a pattern matching no file.
 
-## なぜそれが要るか
+### The invariant
 
-再エクスポート専用ファイルは「モジュールが外に出す面」を一意に固定するために置かれる。値の宣言が混ざると、その面が 3 点で崩れる。
+A re-export only file is placed to fix, uniquely, the surface a module puts outside itself. Mix a value declaration in and that surface breaks at three points.
 
-- 読み手が「このファイルは面そのものであって実装は無い」と仮定できなくなる。面を知るために中身を読む必要が生じ、面としての機能が消える
-- 面だけのファイルと実装を持つファイルとで、tree-shaking やリネームの挙動が変わる。「経由しても素通しである」という前提が成り立たなくなる
-- トップレベル文を許すと、副作用（副作用インポートや初期化処理）が面の裏に紛れ込む。面をインポートしただけで副作用が走る状態は、インポート元から見えない
+- The reader can no longer assume "this file is the surface itself and holds no implementation". Learning the surface now needs reading the contents, and the file's function as a surface is gone
+- Tree shaking and renaming behave differently between a surface-only file and a file holding implementation. The premise that "passing through it is passing straight through" stops holding
+- Allow top-level statements and side effects — a side-effect import, an initialisation — slip in behind the surface. A state where importing the surface alone runs a side effect is invisible from the importing side
 
-import と `source` を持たない export を許さないのも同じ理由による。`export { total } from "./total.ts";` は、公開されている名前と、それを所有するモジュールを 1 文で言い切る。2 文に分けると、公開面が何を出しているかを読むのに、別の文まで戻って結び直す必要が出る。この結び直しは、export される名前が増えるほど効いてくる。
+Not allowing imports, and exports carrying no `source`, follows from the same reason. `export { total } from "./total.ts";` says in one statement both the name being published and the module that owns it. Split into two and reading what the public surface puts out means going back to another statement and tying them together again. That re-tying tells more the more names are exported.
 
-面であることは規約として書いても人間の注意力でしか守れない。「このファイルは面そのものであり、他には何も無い」を機械的に保証するのがこのルールの役割である。
+Being a surface can be written as a convention, but then only human attention holds it. Guaranteeing by machine that "this file is the surface itself and there is nothing else" is what this rule is for.
 
-## どう直すか
+### Configuration
 
-直し方は 2 通りあり、どちらを選ぶかは「そのファイルが本当に面なのか」で決まる。
+It takes the naming of targets and nothing else.
 
-面である場合、宣言をその値を本来所有すべき隣接モジュールへ移し、面からは `export ... from` で再エクスポートする。移す先のファイル名は、その宣言の名前に対応させる。import と `source` を持たない export の 2 文は、`export ... from "..."` の 1 文にまとめる。副作用のための import は、その副作用を必要としているモジュールへ移す。
+- `targets` (required, one or more globs): selects the files treated as re-export only
+- `exclude` (optional, globs): selects files matching `targets` that are taken out of the check. For writing a broad target and cutting exceptions out of it
 
-面でない場合、つまり値を持つのが正しい場合、それは再エクスポート専用ファイルではない。`targets` からそのファイルを外す。opt-in である以上、誤って対象に含めた指定を直すほうが筋が通っている。
+There is no other escape (a switch permitting declarations conditionally, say). "The consumer settles the definition of a surface" is the point of the opt-in design, so the keys are held to these two and the schema refuses an unknown key.
 
-## 禁じる回避策
+## Fix
 
-- 抑制ディレクティブで黙らせ、宣言をそのまま残す。これは面そのものを壊す。抑止理由の記載を強制する別ルールと併用しても正当化できない。書ける「理由」はこのルールの目的そのものの否定にしかならず、正当な抑止に当たらない
-- ファイル名を変えて `targets` から外れる。公開面としての役割は変わらないまま、それが面であるという手がかりだけが失われる
-- 宣言だけを別ファイルに切り出し、そのファイルが面からしか使われない状態にする。ファイル名が所有者を指していないので、面に置いたときと同じことが起きる
-- 宣言を `export default` にして面に残す。再エクスポートの形ではないので報告される
+There are two repairs, and which one applies is settled by whether that file really is a surface.
 
-## オプション
+Where it is a surface, move the declaration to the neighbouring module that ought to own that value, and re-export it from the surface with `export ... from`. Name the file it moves to after the name of that declaration. The two statements of an import and a source-less export are gathered into the one statement `export ... from "..."`. An import for a side effect moves to the module that needs that side effect.
 
-対象の指定だけを取る。
+Where it is no surface — where holding values is the correct thing — it is no re-export only file. Take that file out of `targets`. Since the rule is opt-in, fixing a naming that wrongly took the file in is the coherent move.
 
-- `targets`（必須・1 つ以上の glob）: 再エクスポート専用として扱うファイルを選ぶ
-- `exclude`（任意・glob）: `targets` に一致するが検査から外すファイルを選ぶ。対象を広く書いたうえで例外を切る用途
+<!-- BEGIN GENERATED examples -->
 
-対象集合の指定以外の逃げ道（宣言を条件付きで許すスイッチなど）は持たない。「面の定義を利用側が決める」ことが opt-in 設計の要であるため、キーはこの 2 つに限定し、未知のキーは schema が拒否する。
+Code this rule rejects.
+
+```ts
+// an exported declaration on a listed file is reported
+// in src/index.ts
+export const total = 1;
+export * from "./sum.ts";
+```
+
+```ts
+// an import paired with a source-less export is reported on both statements
+// in src/index.ts
+import { total } from "./total.ts";
+export { total };
+export * from "./sum.ts";
+```
+
+Code this rule accepts.
+
+```ts
+// a named re-export names the module that owns the declaration
+// in src/index.ts
+export { total } from "./total.ts";
+```
+
+```ts
+// several re-exports stand together in any order
+// in src/index.ts
+export * from "./sum.ts";
+export { total } from "./total.ts";
+export type { Total } from "./total.ts";
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Silencing it with a suppression directive and leaving the declaration where it is. That breaks the surface itself. Pairing it with the rule that forces grounds to be written does not justify it either: the "grounds" that could be written are nothing but a denial of this rule's purpose, and do not amount to legitimate suppression
+- Renaming the file so it falls out of `targets`. Its role as a public surface is unchanged while the one clue that it is a surface is lost
+- Cutting the declaration out into another file used only by the surface. The file name does not name the owner, so the same thing happens as when it stood on the surface
+- Leaving the declaration on the surface as an `export default`. That is no re-export shape, so it is reported
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `extraStatement` | A file the deployment lists as re-export only must not carry a statement that is not a re-export. Move what this statement brings in or declares into the module that should own it, and re-export it from here with \`export { ... } from "..."\`, \`export \* from "..."\` or \`export \* as Name from "..."\`. |
+| `missingReExport` | A file the deployment lists as re-export only must not carry zero re-exports. Re-export from here what the modules beside this file own, with \`export { ... } from "..."\`, \`export \* from "..."\` or \`export \* as Name from "..."\`. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->
