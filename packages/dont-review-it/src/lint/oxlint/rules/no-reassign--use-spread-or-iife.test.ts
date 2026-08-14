@@ -37,6 +37,7 @@ describe("dont-review-it/no-reassign--use-spread-or-iife", () => {
     valid: [
       {
         name: "a single binding declaration is the shape the rule asks for",
+        documented: true,
         code: "const base = load();\nconst first = 1,\n  second = 2;",
       },
       {
@@ -75,6 +76,7 @@ describe("dont-review-it/no-reassign--use-spread-or-iife", () => {
       },
       {
         name: "a class writes its own state through a direct this or super target",
+        documented: true,
         code: CLASS_STATE_EXCEPTION,
       },
       {
@@ -115,6 +117,7 @@ describe("dont-review-it/no-reassign--use-spread-or-iife", () => {
     invalid: [
       {
         name: "a re-bindable declaration is reported whether or not it is written to again",
+        documented: true,
         code: "let pending = 1;\nvar queued = 2;",
         errors: [
           { messageId: "reassignableDeclaration", data: { kind: "let" } },
@@ -206,6 +209,7 @@ describe("dont-review-it/no-reassign--use-spread-or-iife", () => {
       },
       {
         name: "a property-writing standard call is reported by its shape",
+        documented: true,
         code: 'Object.assign(base, patch);\nObject.defineProperty(base, "count", spec);\nObject.defineProperties(base, specs);\nObject.setPrototypeOf(base, proto);\nReflect.set(base, "count", 1);',
         errors: [
           { messageId: "mutatingCall", data: { callee: "Object.assign" } },
