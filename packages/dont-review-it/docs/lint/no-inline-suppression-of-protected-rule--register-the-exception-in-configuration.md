@@ -1,90 +1,68 @@
+---
+description: "Disallow silencing a protected rule from a comment in the source or from a severity the lint configuration lowers, so an exception to one of these rules stands as one registered entry carrying the grounds somebody wrote for it"
+---
+
 # no-inline-suppression-of-protected-rule--register-the-exception-in-configuration
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-保護対象として宣言されたルールが、コードの中に書かれた指示で無効化されている状態と、設定の重大度で黙らされている状態。例外の置き場は設定側の登録 1 つだけで、それ以外の消え方を報告する。
+Disallow silencing a protected rule from a comment in the source or from a severity the lint configuration lowers, so an exception to one of these rules stands as one registered entry carrying the grounds somebody wrote for it
 
-保護対象になるルールの集合は `protectedRules` と `unprotected` が決める。既定は「置かれてはいけないファイル」と「到達してはいけないライブラリ」を守る 20 本で、本ルール自身を含む。既定値はライブラリ側にあり、消費側の指定は既定に足される。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-inline-suppression-of-protected-rule--register-the-exception-in-configuration.ts`](../../src/lint/oxlint/rules/no-inline-suppression-of-protected-rule--register-the-exception-in-configuration.ts)
 
-見るものは 3 系統ある。
+<!-- END GENERATED rule-header -->
 
-**抑制ディレクティブ。** どのファイルでも、コメントの先頭トークンが `eslint-disable` / `oxlint-disable` の系列であるものを読む。次行・同行・ファイル全体のどの綴りでも、また `eslint-enable` までを範囲とする書き方でも、開始のコメントが同じ入口に入る。
+## Violation
 
-- 保護対象を名指ししたもの。名指しされた保護対象 1 本につき 1 件報告する。**理由が併記されていても報告する**
-- ルール名を 1 つも挙げないもの。挙げない抑制は覆う範囲のすべてのルールを消すので、保護対象も覆う。1 件報告する
+A rule declared as protected being disabled by a directive written in the code, or silenced by a severity in the configuration. The one place for an exception is a registration on the configuration side; every other way it disappears is reported.
 
-名前の照合は最後の `/` 以降で行うので、`dont-review-it/` を付けた綴りでも付けない綴りでも同じ 1 本を指す。報告に出るのは保護対象として登録されている綴りである。
+The set of protected rules is settled by `protectedRules` and `unprotected`. The default is the twenty rules protecting "files that must not be placed" and "libraries that must not be reached", this rule included. The default lives on the library side, and what a consumer names is added to it.
 
-**リンタの設定。** ファイル名が `vite.config` で始まり拡張子が `.ts` / `.mts` / `.cts` / `.js` / `.mjs` / `.cjs` のファイルだけを、設定として追加で読む。default export された式まで降り、それが関数呼び出しで包まれていれば第 1 引数まで降りる。`lint` の値も同じように包みを外す。
+Three families are read.
 
-そこから見るのは、`rules` と `overrides[].rules` に書かれた保護対象のうち、実行を失敗させない水準に置かれているものである。`off` / `allow` / `warn` と 2 未満の数値がこれにあたり、`[水準, 設定]` の形なら先頭を、名前付き定数のメンバーならそのメンバー名を水準として読む。
+**Suppression directives.** In any file, comments whose opening token belongs to the `eslint-disable` / `oxlint-disable` families are read. The next-line, same-line and whole-file spellings, and the form whose range runs to an `eslint-enable`, all enter through the same way in at the opening comment.
 
-そのうち例外として通すのは 1 つだけで、**`files` が完全なパスだけを 1 件ずつ並べた override に置かれたもの**である。次のいずれかに当たれば例外として認めない。
+- One naming a protected rule. One report per protected rule named. **It is reported even where grounds are written beside it**
+- One naming no rule at all. A suppression naming nothing erases every rule over its range, so it covers the protected set too. One report
 
-- `files` の指定に `*` `?` `[` `]` `{` `}` のいずれかを含むものがある。その指定を名指しして報告する
-- `files` を持たない、`files` が空、`files` の要素にこの規則が読めない式がある。この場合は水準そのものを報告する
+Names are matched after the last `/`, so a spelling with `dont-review-it/` and one without name the same rule. What appears in the report is the spelling the rule is registered under.
 
-**保護対象を外す登録。** `unprotected` に書かれた各エントリを読む。理由が空のもの、および本ルール自身を名指ししたものは登録として成立しないので、設定ファイルの先頭位置で報告する。**成立しない登録は対象を保護対象から外さない。**報告が出ている間、そのルールへの抑制はこれまでどおり報告される。
+**The linter's configuration.** Only files whose name starts with `vite.config` and whose extension is `.ts`, `.mts`, `.cts`, `.js`, `.mjs` or `.cjs` are additionally read as configuration. The walk descends to the default-exported expression, and where that is wrapped in a function call, to its first argument. The value of `lint` is unwrapped the same way.
 
-生成物の置き場にあるファイルは、どの系統も読まない。既定で外れるのは `dist` / `coverage` / `node_modules` / `generated` / `__snapshots__` 配下と、`.d.ts` で終わるファイルである。判定はリポジトリのルートからの相対パスに対して行う。
+What is read from there is the protected rules written in `rules` and `overrides[].rules` that sit at a level not failing a run. `off`, `allow`, `warn` and numbers below 2 count, and for the `[level, options]` form the head is read, while for a member of a named constant the member name is read as the level.
 
-## なぜそれが要るか
+Exactly one of those passes as an exception: **one placed in an override whose `files` lists complete paths, one per entry.** Any of these means it does not pass.
 
-1 層目は、抑制が書かれた場所でだけ検査を消し、消えたことが検査の出力に現れないことである。報告が 0 件になるだけなので、禁止を追加した側からは、抑制が増えたことも観測できない。
+- A `files` entry containing any of `*`, `?`, `[`, `]`, `{`, `}`. That entry is named in the report
+- No `files`, an empty `files`, or a `files` element this rule cannot read. Here the level itself is reported
 
-2 層目は、抑制と設定側の例外登録で可視性がまったく違うことである。抑制は 1 行で書け、レビューではその行の周辺しか見えないので判断が局所化する。設定側の例外はリポジトリの共有部分に差分として現れ、判断が全体の文脈に晒される。同じ「例外を作る」操作でも、可視性の低いほうが常に選ばれる。選ばれるほうを塞ぐ以外にない。
+**Registrations taking a rule out of the protected set.** Each entry in `unprotected` is read. An entry with an empty reason, and an entry naming this rule itself, do not hold as registrations and are reported at the head of the configuration file. **A registration that does not hold takes nothing out of the protected set.** While the report stands, suppressions of that rule keep being reported as before.
 
-3 層目は、保護対象になっているルールが自分の節で「例外は設定側に書け」と書いていることである。同じ文が繰り返し現れる事実は、その要求を守らせる層が要ることの証拠である。守らせる層が無ければ、要求は書き手の善意に依存する。
+Files under a build-output location are read by none of the three families. Excluded by default are anything under `dist`, `coverage`, `node_modules`, `generated` or `__snapshots__`, and files ending in `.d.ts`. The judgment runs on the path relative to the repository root.
 
-理由の併記を抑制の逃げ道にしないのは、この 2 層目と 3 層目が理由の有無では変わらないからである。理由が書かれていても、それが読まれる場所はその行の周辺のままである。
+### The invariant
 
-パターンで書かれた無効化を例外として認めないのは、後から作られた別のファイルが、誰の判断も経ずにその例外へ入るからである。完全なパスを 1 件ずつ並べる形なら、入る対象が増えるたびに設定の差分が出る。
+The first layer is that a suppression erases the check only where it is written, and the erasure does not appear in the check's output. The report count simply goes to zero, so from the side that added the prohibition, neither the suppression nor its growth can be observed.
 
-## どう直すか
+The second layer is that a suppression and a configured exception differ completely in visibility. A suppression is one line, and in review only its surroundings are visible, so the judgment stays local. A configured exception appears as a diff in a shared part of the repository, where the judgment is exposed to the whole context. For the same act of "making an exception", the less visible route is always the one chosen. There is nothing to do but close it.
 
-直す。それが最初の選択肢である。
+The third layer is that the protected rules themselves say, in their own sections, "write the exception in the configuration". The same sentence appearing over and over is evidence that a layer enforcing that demand is needed. Without one, the demand rests on the writer's goodwill.
 
-直せない事情があるなら、設定側に例外を登録して理由を書く。登録の形は 2 つある。
+Grounds written beside a suppression are not a way out because the second and third layers do not change with them. However well the reason is written, the place it is read stays the surroundings of that line.
 
-そのファイルだけを例外にするなら、`overrides` に 1 件足し、`files` に対象ファイルの完全なパスを 1 件ずつ並べ、そこで保護対象の水準を落とす。ワークスペース全体やディレクトリを覆うパターンでは書かない。
+A disablement written as a pattern does not pass as an exception because another file created later enters that exception without anybody's judgment. With complete paths listed one per entry, a configuration diff appears each time something enters.
 
-そのルールを保護対象から外すなら、`unprotected` にエントリを足し、`reason` に外す理由を書く。何がそのルールを他と違うものにしているのか、その事情が消えるとしたら何が起きたときかを書けば足りる。理由の無いエントリは登録として成立せず、対象は保護されたままになる。
+### Configuration
 
-本ルール自身は `unprotected` で外せない。外そうとしたエントリは報告され、保護は残る。
-
-## 禁じる回避策
-
-- ルール名を書かない形の抑制で範囲ごと黙らせる。名指しの禁止だけが検出されると考えて名前を省くと、覆う範囲のすべてが報告の対象になる
-- 保護対象の一覧から理由を書かずに行を外す。理由が空の解除エントリは登録として扱われない
-- 抑制を書いたファイルを、生成物とみなされるパスへ移す。移した先が生成物の置き場に見えるだけで、コードは 1 行も直っていない
-- 例外の `files` をパターンで書き、後から増えるファイルを黙って例外に入れる
-- 水準や `files` を設定ファイルの外の変数へ逃がす。式が読めない場合、この規則は例外として認めずに水準そのものを報告する
-- 保護対象のルール名を `protectedRules` から消す。既定は消費側の指定で減らないので、減らす操作は解除エントリとして差分に現れる
-
-## 検出が届かない範囲
-
-`extends` の先にある設定、CLI の引数で与えた水準、リンタを起動しない運用は、`vite.config` の中身を読むだけでは見えない。解除エントリの報告も、本ルールの設定が `vite.config` に書かれていない場合は位置を持たないため出ない。
-
-JSON や YAML で書かれた設定と、そこに書かれた抑制の形式は、この規則の入力に入らない。同じ不変条件をそれらのホストで守る受け手は別に要る。
-
-解析器が将来足す抑制の綴りは、`suppressionSpellings` に足すまで検出されない。この追随の遅れは他の検査では見えないので、**抑制形式の一覧は、解析器の版を上げるときに見直す対象として扱う。**
-
-何を保護対象にするかの選定は人が書く。既定は 20 本で、外すには理由を伴う解除エントリが要る。
-
-## no-silent-suppression--fix-or-justify-inline との関係
-
-[no-silent-suppression--fix-or-justify-inline](no-silent-suppression--fix-or-justify-inline.md) は、「同じ宣言が 2 箇所にない」を守るルール群の報告が黙って消えることを禁じ、理由を併記した行単位の抑制を逃げ道として残している。本ルールが見るのは、抑制の可否そのものである。保護対象に対しては行単位でも理由付きでも通さない。
-
-両方の集合に入っているルールが 1 本ある（`forbid-target-file--delete-or-relocate`）。そのルールへの理由付きの行単位抑制は、前者を通り、本ルールで止まる。重なりは意図したもので、厳しいほうが結論になる。
-
-[@mst/lint-rule-authoring](../../../lint-rule-authoring/src/lint/oxlint/rules/no-broad-lint-disable--use-next-line-with-reason.ts) の `no-broad-lint-disable--use-next-line-with-reason` は、ルールを問わず、行より広く効く抑制の綴りそのものを報告する。1 つのコメントに 3 本とも発火することがある。
-
-## オプション
-
-- `protectedRules`（文字列の配列、任意）: 保護対象に**足す**ルール名。既定の 20 本は残る
-- `unprotected`（`{ rule, reason }` の配列、任意）: 保護対象から外す登録。`reason` が空のエントリと、本ルール自身を名指ししたエントリは登録として成立せず、報告される
-- `generatedPaths`（文字列の配列、任意）: 生成物として読み飛ばす場所。リポジトリのルートからの相対パスに対するグロブで書く。既定に足される
-- `suppressionSpellings`（文字列の配列、任意）: 既定の綴りに足す抑制ディレクティブの綴り。足した綴りはファイル全体に効くものとして読む
+- `protectedRules` (a list of strings, optional): rule names **added** to the protected set. The twenty defaults remain
+- `unprotected` (a list of `{ rule, reason }`, optional): registrations taking a rule out of the protected set. An entry with an empty `reason`, and an entry naming this rule itself, do not hold as registrations and are reported
+- `generatedPaths` (a list of strings, optional): the places skipped as build output. Written as globs against paths relative to the repository root. Added to the default
+- `suppressionSpellings` (a list of strings, optional): suppression directive spellings added to the defaults. Added spellings are read as holding over the whole file
 
 ```jsonc
 [
@@ -93,11 +71,105 @@ JSON や YAML で書かれた設定と、そこに書かれた抑制の形式は
     "unprotected": [
       {
         "rule": "forbid-tracked-path--untrack-and-ignore",
-        "reason": "追跡の判定は CI の別ジョブが持つ",
+        "reason": "a separate CI job holds the tracking judgment",
       },
     ],
   },
 ]
 ```
 
-「このルールだけは抑制してよい」という一覧は持たない。持たせると、抑制の可否がルールごとの判断に戻る。
+There is no list of "rules that may be suppressed". Hold one and whether a suppression is allowed returns to a per-rule judgment.
+
+### Where the detection does not reach
+
+A configuration reached through `extends`, a level given as a CLI argument, and an operation that never starts the linter are invisible from reading `vite.config` alone. The report about registrations that do not hold also has no position, and so does not come out, where this rule's configuration is not written in `vite.config`.
+
+Configuration written in JSON or YAML, and the suppression forms written there, do not enter this rule's input. Holding the same invariant on those hosts needs a separate receiver.
+
+Suppression spellings the analyser adds in future are not detected until they are added to `suppressionSpellings`. That lag is invisible to every other check, so **treat the list of suppression forms as something to revisit when the analyser's version is raised.**
+
+Which rules are protected is written by a person. The default is twenty, and taking one out needs a release entry carrying a reason.
+
+### Its relationship with no-silent-suppression--fix-or-justify-inline
+
+[no-silent-suppression--fix-or-justify-inline](./no-silent-suppression--fix-or-justify-inline.md) forbids the reports of the rule group protecting "no declaration stands in two places" from disappearing silently, and leaves a line-scoped suppression carrying grounds as a way out. What this rule reads is whether a suppression is permissible at all. Against a protected rule, neither line scope nor grounds passes.
+
+One rule sits in both sets (`forbid-target-file--delete-or-relocate`). A line-scoped suppression of it carrying grounds passes the former and is stopped here. The overlap is intended, and the stricter one is the conclusion.
+
+`no-broad-lint-disable--use-next-line-with-reason` in [@mst/lint-rule-authoring](../../../lint-rule-authoring/src/lint/oxlint/rules/no-broad-lint-disable--use-next-line-with-reason.ts) reports the spelling of any suppression holding wider than a line, whatever the rule. All three can fire on one comment.
+
+## Fix
+
+Fix it. That is the first option.
+
+Where there is a reason it cannot be fixed, register the exception in the configuration and write the reason. Two shapes of registration.
+
+To except that one file, add an entry to `overrides`, list the complete path of each target file in `files`, and lower the protected rule's level there. Do not write it as a pattern covering the workspace or a directory.
+
+To take the rule out of the protected set, add an entry to `unprotected` with the reason in `reason`. Writing what makes that rule different from the others, and what would have to happen for that circumstance to disappear, is enough. An entry with no reason does not hold as a registration, and the target stays protected.
+
+This rule itself cannot be taken out through `unprotected`. An entry trying to is reported, and the protection remains.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// a next-line suppression naming a protected rule is reported
+// oxlint-disable-next-line forbid-target-file--delete-or-relocate
+export const total = 1;
+```
+
+```ts
+// grounds do not make a suppression of a protected rule acceptable
+// oxlint-disable-next-line forbid-target-file--delete-or-relocate -- the generator writes this file
+export const total = 1;
+```
+
+Code this rule accepts.
+
+```ts
+// re-enabling a rule is not a suppression
+// oxlint-enable forbid-target-file--delete-or-relocate
+export const total = 1;
+```
+
+```ts
+// a suppression naming only rules outside the protected set is another rule's business
+// oxlint-disable-next-line no-console -- the bootstrap has no logger yet
+console.log(1);
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Silencing a whole range with a suppression that names no rule. Omit the names thinking only named prohibitions are detected, and everything the range covers becomes the target of the report
+- Taking a row out of the protected list without writing a reason. A release entry with an empty reason is not treated as a registration
+- Moving the file carrying the suppression to a path treated as build output. Only the destination looks like build output; not one line of code has been fixed
+- Writing an exception's `files` as a pattern so that files added later enter the exception silently
+- Escaping the level or `files` into a variable outside the configuration file. Where the expression cannot be read, this rule does not accept it as an exception and reports the level itself
+- Deleting a protected rule's name from `protectedRules`. The default does not shrink from what a consumer names, so shrinking it appears in the diff as a release entry
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `namedSuppression` | A \`{{spelling}}\` comment must not name \`{{ruleName}}\`, a rule this package protects. Rewrite the code that rule reports, or register the exception in the lint configuration together with the grounds for it. |
+| `blanketSuppression` | A \`{{spelling}}\` comment that names no rule covers every rule this package protects, and must not stand in the source. Rewrite the code those rules report, or register the exception in the lint configuration together with the grounds for it. |
+| `weakenedProtectedRule` | A lint configuration must not hold \`{{ruleName}}\`, a rule this package protects, at \`{{severity}}\`. Set it to \`error\`, or move the exception into an override that lists the complete path of every file it covers together with the grounds for it. |
+| `patternScopedException` | An override holding \`{{ruleName}}\` at \`{{severity}}\` must not take its scope from the pattern \`{{pattern}}\`. Replace that pattern with the complete path of every file this exception covers. |
+| `groundlessDeviation` | A deviation must not take \`{{ruleName}}\` out of the protected list without grounds. Write into that entry what makes the rule an exception, or delete the entry. |
+| `selfDeviation` | A deviation must not take \`{{ruleName}}\` out of the protected list. Delete that entry and rewrite the code this rule reports. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

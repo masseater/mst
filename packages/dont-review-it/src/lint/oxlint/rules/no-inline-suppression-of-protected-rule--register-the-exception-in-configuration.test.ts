@@ -24,10 +24,12 @@ describe("dont-review-it/no-inline-suppression-of-protected-rule--register-the-e
       },
       {
         name: "re-enabling a rule is not a suppression",
+        documented: true,
         code: `// oxlint-enable ${PROTECTED_RULE}\n${DECLARATION}`,
       },
       {
         name: "a suppression naming only rules outside the protected set is another rule's business",
+        documented: true,
         code: `// oxlint-disable-next-line no-console -- the bootstrap has no logger yet\nconsole.log(1);`,
       },
       {
@@ -94,6 +96,7 @@ describe("dont-review-it/no-inline-suppression-of-protected-rule--register-the-e
     invalid: [
       {
         name: "a next-line suppression naming a protected rule is reported",
+        documented: true,
         code: `// oxlint-disable-next-line ${PROTECTED_RULE}\n${DECLARATION}`,
         errors: [
           {
@@ -104,6 +107,7 @@ describe("dont-review-it/no-inline-suppression-of-protected-rule--register-the-e
       },
       {
         name: "grounds do not make a suppression of a protected rule acceptable",
+        documented: true,
         code: `// oxlint-disable-next-line ${PROTECTED_RULE} -- the generator writes this file\n${DECLARATION}`,
         errors: [{ messageId: "namedSuppression" }],
       },
