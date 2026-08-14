@@ -8,6 +8,7 @@ describe("dont-review-it/no-barrel-import--import-from-the-owning-module", () =>
     valid: [
       {
         name: "naming the module that declares the binding is the shape this rule asks for",
+        documented: true,
         code: "import { total } from './total.ts';",
       },
       {
@@ -28,6 +29,7 @@ describe("dont-review-it/no-barrel-import--import-from-the-owning-module", () =>
       },
       {
         name: "taking types alone leaves nothing behind once the build is done",
+        documented: true,
         code: "import type { Total } from './totals/index.ts';",
       },
       {
@@ -58,6 +60,7 @@ describe("dont-review-it/no-barrel-import--import-from-the-owning-module", () =>
     invalid: [
       {
         name: "naming a re-export module by its file is reported",
+        documented: true,
         code: "import { total } from './totals/index.ts';",
         errors: [{ messageId: "barrelImport" }],
       },
@@ -93,6 +96,7 @@ describe("dont-review-it/no-barrel-import--import-from-the-owning-module", () =>
       },
       {
         name: "importing for the side effect alone still runs the whole re-export module",
+        documented: true,
         code: "import './totals/index.ts';",
         errors: [{ messageId: "barrelImport" }],
       },

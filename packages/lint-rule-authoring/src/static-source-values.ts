@@ -27,12 +27,15 @@ export const propertyOf = (objectNode: UnknownFields, propertyName: string): Unk
     .map((property) => property.value as UnknownFields)
     .at(0) ?? null;
 
-const templateTextOf = (node: UnknownFields): string | null => {
-  const expressions = node.expressions as readonly unknown[];
-  if (expressions.length > 0) return null;
-  return nodesIn(node.quasis)
-    .map((quasi) => (quasi.value as UnknownFields).cooked as string)
-    .join("");
+const templateTextOf = ({ node, constants, visited }: ResolveInput): string | null => {
+  const written = nodesIn(node.quasis).map(
+    (quasi) => (quasi.value as UnknownFields).cooked as string,
+  );
+  const filled = nodesIn(node.expressions).map((expression) =>
+    resolveText({ node: expression, constants, visited }),
+  );
+  if (filled.includes(null)) return null;
+  return written.map((literal, at) => `${literal}${filled[at] ?? ""}`).join("");
 };
 
 const concatenatedTextOf = ({ node, constants, visited }: ResolveInput): string | null => {
@@ -58,7 +61,7 @@ const referencedTextOf = ({
 export const resolveText = (input: ResolveInput): string | null => {
   const { node, constants, visited } = input;
   if (node.type === "Literal") return typeof node.value === "string" ? node.value : null;
-  if (node.type === "TemplateLiteral") return templateTextOf(node);
+  if (node.type === "TemplateLiteral") return templateTextOf(input);
   if (node.type === "BinaryExpression" && node.operator === "+") return concatenatedTextOf(input);
   if (node.type === "Identifier") {
     return referencedTextOf({ referencedName: node.name as string, constants, visited });

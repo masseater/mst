@@ -13,6 +13,7 @@ describe("dont-review-it/no-vacuous-test-run--let-the-empty-run-fail", () => {
       },
       {
         name: "an empty run spelled out as a failure passes",
+        documented: true,
         code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { passWithNoTests: false } });\n`,
         filename: "vite.config.ts",
       },
@@ -23,6 +24,7 @@ describe("dont-review-it/no-vacuous-test-run--let-the-empty-run-fail", () => {
       },
       {
         name: "the same key outside the test block is not the option the run reads",
+        documented: true,
         code: `export default { passWithNoTests: true, test: {} };\n`,
         filename: "vite.config.ts",
       },
@@ -60,6 +62,7 @@ describe("dont-review-it/no-vacuous-test-run--let-the-empty-run-fail", () => {
     invalid: [
       {
         name: "a run told to pass when it found no test file is reported",
+        documented: true,
         code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { passWithNoTests: true } });\n`,
         filename: "vite.config.ts",
         errors: [{ messageId: "vacuousTestRun" }],
@@ -90,6 +93,7 @@ describe("dont-review-it/no-vacuous-test-run--let-the-empty-run-fail", () => {
       },
       {
         name: "the outcome handed over by a binding is reported",
+        documented: true,
         code: `import { passWithNoTests } from "./shared.ts";\nexport default { test: { passWithNoTests } };\n`,
         filename: "vite.config.ts",
         errors: [{ messageId: "unsettledEmptyRunOutcome" }],

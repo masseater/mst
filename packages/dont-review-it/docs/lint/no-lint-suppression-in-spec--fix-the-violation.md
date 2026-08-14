@@ -1,61 +1,136 @@
+---
+description: "Disallow a lint suppression comment in the files these rules run on, so a report ends in a repair to the code or a repair to the rule and never in a comment that takes the report away"
+---
+
 # no-lint-suppression-in-spec--fix-the-violation
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-ファイルに置かれたコメントを字句として読み、先頭トークンが lint の抑制を指示する綴りであるものを報告する。
+Disallow a lint suppression comment in the files these rules run on, so a report ends in a repair to the code or a repair to the rule and never in a comment that takes the report away
 
-| 抑制の範囲                     | 綴り                                                    |
-| ------------------------------ | ------------------------------------------------------- |
-| その行                         | `oxlint-disable-line` / `eslint-disable-line`           |
-| 次の行                         | `oxlint-disable-next-line` / `eslint-disable-next-line` |
-| ファイル全体、および範囲の開始 | `oxlint-disable` / `eslint-disable`                     |
-| 範囲の終了                     | `oxlint-enable` / `eslint-enable`                       |
+- Tool: `oxlint`
+- Fixable: yes
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-lint-suppression-in-spec--fix-the-violation.ts`](../../src/lint/oxlint/rules/no-lint-suppression-in-spec--fix-the-violation.ts)
 
-ルール名を並べているかどうかは検出の条件ではない。名前が書かれていれば報告にその名前が載り、書かれていなければ「このファイルが検査される全ルールを覆う」と載る。名前が何を指していても、この束のルールでなくても報告する。
+<!-- END GENERATED rule-header -->
 
-`--` の後ろに根拠が書かれていても報告は変わらない。ここで守っているのは「抑制に根拠があること」ではなく「抑制が無いこと」である。根拠を求めるのは `no-silent-suppression--fix-or-justify-inline` の担当で、そちらは抑制が成立し得る領域を見ている。
+## Violation
 
-抑制が実際に何かを黙らせているかどうかも条件ではない。指示の先に報告が無い残骸も同じ形で報告する。判定はコメントの字句だけを見て、抑制の到達範囲を解釈しない。範囲の終了を単独で報告するのは、範囲指定の抑制が 2 つのコメントで書かれるためである。開始だけを消すと終了が残骸として残る。
+A comment in the file whose first token is a spelling that directs a lint suppression.
 
-ファイル種別による絞り込みはしない。どのファイルにこのルールを効かせるかは共有 lint 設定の glob が決める。
-
-### 意図的に広げていない範囲
-
-| 形 | 対象にしない理由 |
+| What the suppression covers | Spelling |
 | --- | --- |
-| `@ts-ignore` / `@ts-expect-error` / `@ts-nocheck` | 型チェッカへの指示であり lint の抑制ではない。型のエラーを検証すること自体がテストの仕事に含まれる |
-| `mock-factory-exemption` で始まるコメント | lint ランナーが解釈する指示ではなく、1 本のルールが読む登録である。受け付けるかはそのルールが決める |
-| 抑制の綴りを先頭トークン以外の位置に含む散文 | 判定は先頭トークンだけを見る |
-| shebang | 先頭トークンが抑制の綴りになり得ない |
-| 適用対象の外にあるファイルに置かれた抑制コメント | glob の外はこのルールの管轄ではない |
+| That line | `oxlint-disable-line` / `eslint-disable-line` |
+| The next line | `oxlint-disable-next-line` / `eslint-disable-next-line` |
+| The whole file, and the opening of a range | `oxlint-disable` / `eslint-disable` |
+| The closing of a range | `oxlint-enable` / `eslint-enable` |
 
-## なぜそれが要るか
+Whether rule names are listed is not a condition of detection. Where names are written the report carries them; where they are not, it says the suppression covers every rule the file is checked by. Whatever the names point at, and whether or not they belong to this bundle, it is reported.
 
-守っている不変条件は「この束のルールが効いているファイルに、機械の出力を消すコメントが 1 つも無い」ことである。
+Grounds written after `--` change nothing. What is held here is not "a suppression carries grounds" but "there is no suppression". Demanding grounds belongs to `no-silent-suppression--fix-or-justify-inline`, which watches the territory where a suppression can stand at all.
 
-1 層目は、報告が出た spec が何であるかである。この束のルールはすべて「テストが実装を写しているか」を見ている。報告が立った spec は写せていない spec であり、抑制はその事実を報告から消すだけで、写せていない状態はコードに残る。
+Whether the suppression actually silences anything is not a condition either. Residue whose direction reaches no report is reported the same way. The judgment reads the comment as tokens and does not interpret how far the suppression reaches. A range's closing end is reported on its own because a ranged suppression is written as two comments, and removing only the opening leaves the closing behind as residue.
 
-2 層目は、消えた報告が後からどう見えるかである。抑制コメントを読み飛ばした読み手には、報告を消した spec と最初から違反が無かった spec が同じ形に見える。この束は lint が緑であることを規律の証拠として使う。書き手が機械の出力を選択的に消せる経路がある限り、緑は証拠にならない。
+No filtering by file kind is done. Which files this rule reaches is settled by the glob in the shared lint configuration.
 
-3 層目は、抑制コメントがコードの中に何を持ち込むかである。抑制は「この 1 件は見逃してほしい」という交渉であり、押し戻せるのはレビューだけになる。レビューで同じ問いを立て直さずに済ませることがこのパッケージの目的なので、その交渉の置き場を残すこと自体が目的に反する。
+### What is deliberately left out of reach
 
-## どう直すか
+| Shape | Why it is not a target |
+| --- | --- |
+| `@ts-ignore` / `@ts-expect-error` / `@ts-nocheck` | A direction to the type checker, not a lint suppression. Verifying type errors is part of what a test does |
+| A comment opening with `mock-factory-exemption` | Not a direction the lint runner interprets, but a registration one rule reads. Whether to accept it is that rule's decision |
+| Prose carrying a suppression spelling anywhere but the first token | The judgment reads the first token alone |
+| A shebang | Its first token cannot be a suppression spelling |
+| A suppression comment in a file outside the applied range | Outside the glob is outside this rule's jurisdiction |
 
-報告されている違反を直す。直せないなら、そのルールの検出条件が違反でないものを拾っているということなので、ルールの仕様を直す。報告の終わり方はこの 2 つしかない。
+### The invariant
 
-抑制コメントを消すところまでは機械的に決まるので、削除の自動修正を持たせる。修正はコメントの範囲だけを消す。削除するとそれまで黙っていた報告が再び立つ。それが正しい状態である。
+No comment that erases a machine's output stands in a file the bundle's rules reach.
 
-## 禁じる回避策
+The first layer is what a reported spec is. Every rule in this bundle watches whether a test mirrors the implementation. A spec that raised a report is a spec that failed to mirror it, and a suppression removes that fact from the report while the failure stays in the code.
 
-- ルール名を書かない全面抑制をファイルの冒頭に置く。名前の有無は検出の条件に入っていない
-- `--` の後ろに根拠を書いて抑制を残す。根拠の有無も検出の条件に入っていない
-- 範囲の開始だけを消して終了のコメントを残す。終了も単独で報告する
-- このルール自身の名前を書いた抑制を置く。名前を条件にしていないので、他の抑制とまったく同じ扱いで報告される
-- 抑制の綴りを別名に変えて lint 設定側でその別名を抑制として登録する。登録した綴りは設定の側に現れ、`require-spec-lint-coverage--lint-every-spec-file` が範囲と設定値を突き合わせる
-- 抑制コメントを設定側の除外（ファイル単位の無効化、ルールの off）へ移し替える。移した先も `require-spec-lint-coverage--lint-every-spec-file` が落とす
+The second layer is how an erased report looks afterwards. To a reader skimming past the suppression comment, a spec that erased its report and a spec that never violated anything look the same. This bundle uses a green lint as evidence of the discipline. As long as a route exists for a writer to selectively erase the machine's output, green is not evidence.
 
-## オプション
+The third layer is what a suppression comment brings into the code. A suppression is a negotiation — "let this one through" — and the only place to push back is a review. Not having to raise the same question in review again is what this package is for, so leaving a place for that negotiation works against the purpose.
 
-取らない。有効か無効かだけを設定側で決める。
+### Configuration
 
-抑制を条件付きで許す例外を設定で表現できるようにしない。その設定自体が新しい抑制経路になり、コードの中にあった交渉を設定ファイルへ移しただけになる。抑制を置きたいファイルがあるなら、それは適用範囲の話であり、範囲は `require-spec-lint-coverage--lint-every-spec-file` が見る。
+None. Whether the rule is on or off is settled by the configuration, and nothing else about the judgment is.
+
+No setting expresses a conditional exception. Such a setting is itself a new suppression channel, moving the negotiation out of the code and into a configuration file. If there is a file where a suppression should stand, that is a question about the applied range, and the range is watched by `require-spec-lint-coverage--lint-every-spec-file`.
+
+## Fix
+
+Fix the violation being reported. If it cannot be fixed, then the rule's detection is picking up something that is not a violation, so fix the rule's specification. Those two are the only ways a report ends.
+
+Deleting the suppression comment is settled mechanically, so an automatic fix is offered that deletes it. The fix removes the comment's range alone. Once deleted, the reports it had been silencing stand again, and that is the correct state.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// grounds written after the separator leave the suppression standing
+// oxlint-disable-next-line forbid-weak-matcher--use-exact-matcher -- the matcher reads a floating clock
+it("adds", () => {
+  expect(runSut()).toBe(3);
+});
+```
+
+```ts
+// the closing end of a suppression range is reported on its own
+it("adds", () => {
+  expect(runSut()).toBe(3);
+});
+/* oxlint-enable forbid-weak-matcher--use-exact-matcher */
+```
+
+Code this rule accepts.
+
+```ts
+// a line direction to the type checker is not a lint suppression
+// @ts-ignore the parse rejects this shape
+const row = readRow(1);
+```
+
+```ts
+// prose naming a directive spelling past the opening token passes
+// this spec used to carry an oxlint-disable comment
+it("adds", () => {
+  expect(runSut()).toBe(3);
+});
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Placing a blanket suppression naming no rule at the head of the file. Whether names are there is not a condition of detection
+- Writing grounds after `--` and keeping the suppression. Whether grounds are there is not a condition either
+- Removing only the opening of a range and leaving the closing comment. The closing is reported on its own
+- Placing a suppression naming this rule. Names are not a condition, so it is reported exactly like any other
+- Renaming the suppression spelling and registering that alias as a suppression in the lint configuration. The registered spelling surfaces on the configuration side, where `require-spec-lint-coverage--lint-every-spec-file` compares the range against the settings
+- Moving the suppression into an exclusion on the configuration side, whether a per-file disable or a rule set to off. `require-spec-lint-coverage--lint-every-spec-file` fails it where it lands
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `namedSuppression` | A \`{{spelling}}\` comment must not stay in this file. It takes away what {{silenced}} reports. Delete the comment, then rewrite the code that report stands on, or narrow what that rule detects. Nothing else settles a report. |
+| `blanketSuppression` | A \`{{spelling}}\` comment naming no rule must not stay in this file. It takes away what {{silenced}} reports. Delete the comment, then rewrite the code those reports stand on, or narrow what those rules detect. Nothing else settles a report. |
+| `suppressionRangeEnd` | A \`{{spelling}}\` comment must not stay in this file. It closes the range a suppression comment opens. Delete both ends of that range, then rewrite the code the reopened reports stand on, or narrow what those rules detect. Nothing else settles a report. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->
