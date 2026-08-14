@@ -14,11 +14,13 @@ describe("dont-review-it/no-module-scope-mock-config--lift-into-fixture", () => 
     valid: [
       {
         name: "a mock built inside the fixture that hands it back is the shape this rule keeps",
+        documented: true,
         code: "const it = test.extend('sendMail', () => vi.fn());",
         filename: SPEC_FILENAME,
       },
       {
         name: "what the mock does, settled inside the fixture body, is applied for each test on its own",
+        documented: true,
         code: "const it = test.extend('sendMail', () => {\n  const sendMail = vi.fn();\n  sendMail.mockResolvedValue({ accepted: 1 });\n  return sendMail;\n});",
         filename: SPEC_FILENAME,
       },
@@ -228,6 +230,7 @@ describe("dont-review-it/no-module-scope-mock-config--lift-into-fixture", () => 
     invalid: [
       {
         name: "a mock built at module scope is one instance every test in the file shares",
+        documented: true,
         code: "const sendMail = vi.fn();",
         filename: SPEC_FILENAME,
         errors: [{ messageId: "mockCreationOutsideFixture" }],
@@ -264,6 +267,7 @@ describe("dont-review-it/no-module-scope-mock-config--lift-into-fixture", () => 
       },
       {
         name: "a setting written in the body of a test block buries what the test verifies",
+        documented: true,
         code: "it('accepts the address', () => {\n  sendMail.mockReturnValue(1);\n  expect(sendMail).toHaveBeenCalled();\n});",
         filename: SPEC_FILENAME,
         errors: [{ messageId: "mockBehaviorOutsideFixture" }],
