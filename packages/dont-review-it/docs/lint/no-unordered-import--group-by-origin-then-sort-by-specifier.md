@@ -1,68 +1,138 @@
+---
+description: "Disallow an import list whose order does not follow origin then specifier, so what a file depends on is read off the block boundaries instead of every specifier"
+---
+
 # no-unordered-import--group-by-origin-then-sort-by-specifier
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-ファイル先頭の import 宣言の並びを、次の 2 つの規則に照らして検査する。
+Disallow an import list whose order does not follow origin then specifier, so what a file depends on is read off the block boundaries instead of every specifier
 
-**由来のブロック順。** import は由来で 4 つのブロックに分かれ、この順に並ぶ。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-unordered-import--group-by-origin-then-sort-by-specifier.ts`](../../src/lint/oxlint/rules/no-unordered-import--group-by-origin-then-sort-by-specifier.ts)
 
-1. 実行環境の組み込み（`node:` で始まる指定子）
-2. インストール済みのパッケージ（相対でない指定子）
-3. このリポジトリ内のモジュール（`.` で始まる指定子）
-4. 型だけの import（`import type` で書かれたもの）
+<!-- END GENERATED rule-header -->
 
-ブロックの間には空行をちょうど 1 つ以上置く。ブロックの内側には空行を置かない。空行の判定は、直前の宣言が終わる行と当該宣言が始まる行の差で行う。複数行に折られた import でも位置が変わらない。
+## Violation
 
-**ブロック内の並び。** 指定子を小文字化した文字列の昇順に並ぶ。型だけの import のブロックでは、まず由来（組み込み → インストール済み → リポジトリ内）で並び、その中で指定子の昇順になる。値の import で由来がブロックを分けているのと同じ順序を、型のブロックの内側でも保つためである。
+The run of import declarations at the head of a file, read against two rules.
 
-リポジトリ内のモジュールについて、上位ディレクトリ（`../`）と同階層（`./`）を別のブロックにはしない。指定子の昇順で並べると `../` が `./` より前に来るため、順序は文字列比較から自然に決まる。
+**The order of the origin blocks.** Imports fall into four blocks by origin, standing in this order:
 
-束縛を持たない import（副作用のためだけの `import "./style.css";`）は並びの検査に含めない。評価される順序そのものが意味を持ち、並べ替えると挙動が変わるからである。
+1. Built into the runtime (specifiers opening with `node:`)
+2. Installed packages (specifiers that are not relative)
+3. Modules inside this repository (specifiers opening with `.`)
+4. Type-only imports (those written as `import type`)
 
-## なぜそれが要るか
+Exactly one blank line or more stands between blocks, and none inside a block. A blank line is judged by the gap between the line where the previous declaration ends and the line where this one begins, so an import folded across several lines does not move the boundary.
 
-守っている不変条件は「このファイルが何に手を伸ばしているかが、指定子を 1 本ずつ読まなくても分かる」ことである。
+**The order inside a block.** Specifiers are sorted ascending as lowercased strings. The type-only block sorts by origin first (built-in, then installed, then this repository) and by specifier within that, so the ordering the origins give the value imports is kept inside the type block as well.
 
-1 層目は読む費用である。由来が混ざった並びでは、実行環境に依存しているのか、外部パッケージに依存しているのか、リポジトリ内で閉じているのかを知るのに、指定子を全部読むことになる。ブロックが分かれていれば、境界の位置を見るだけで済む。この差は 1 ファイルでは小さいが、依存の向きを確かめる作業は読む側が繰り返し行うものなので、回数だけ効いてくる。
+Modules above this directory (`../`) and beside it (`./`) are not separate blocks. Sorting by specifier puts `../` before `./` anyway, so the order falls out of the string comparison.
 
-2 層目は履歴に出る費用である。並びが決まっていないと、同じ import を足す位置が書き手ごとに変わる。2 人が別々の位置に同じ行を足すと、統合したときに両方が残る。残った重複は構文としては正しく、型検査でも実行でも何も起きないので、気付くのは次に読んだ人になる。並びが 1 つに決まっていれば、同じ import は同じ行に来るので、統合の時点で衝突として現れる。
+An import carrying no bindings — `import "./style.css";` for its side effect — is left out of the ordering check. The order it is evaluated in carries meaning of its own, and reordering it would change what happens.
 
-つまりこのルールの価値は、読みやすさの改善に見えて、実際は「同じものが 2 か所に入る経路を閉じる」ことにある。空行を規則に含めているのも同じ理由で、境界が書き手ごとに動くなら、ブロックの位置も動いてしまう。
+### The invariant
 
-## どう直すか
+What a file reaches out to can be told without reading the specifiers one at a time.
 
-由来ごとにブロックへ分け、ブロックの間に空行を 1 つ置き、ブロックの内側を指定子の昇順に並べる。
+The first layer is the cost of reading. With origins mixed together, telling whether the file depends on the runtime, on external packages, or stays inside the repository takes reading every specifier. With the blocks separated, looking at where the boundaries fall is enough. The difference is small in one file, and checking which way dependencies run is something a reader does over and over, so it adds up by the count.
+
+The second layer is the cost that shows up in the history. With no settled order, where an import gets added varies by writer. Two people adding the same line in two places leaves both after a merge. The duplicate is syntactically fine, and neither the type check nor the run says anything, so it is noticed by whoever reads next. With one settled order, the same import lands on the same line and surfaces as a conflict at merge time.
+
+The value of this rule, then, looks like readability and is really about closing a route by which the same thing gets into two places. The blank lines are part of the rule for the same reason: if the boundaries move by writer, so do the blocks.
+
+### Configuration
+
+None. Whether the rule is on or off is settled by the configuration, and nothing else about the judgment is.
+
+The blocks and their order are not settable, because the value of this invariant lies in the same origin standing in the same position in every file. If each workspace could pick a different order, a reader would have to check that order every time they opened a file, and the premise that looking at the boundaries is enough would be gone.
+
+## Fix
+
+Split by origin, put one blank line between the blocks, and sort inside each block by specifier.
 
 ```ts
-import { memoize } from "es-toolkit";
 import { join } from "node:path";
-import type { ESTree } from "@oxlint/plugins";
+
+import { memoize } from "es-toolkit";
+
 import { report } from "./report.ts";
+
+import type { ESTree } from "@oxlint/plugins";
+```
+
+The rule offers no automatic fix of its own, and there is no need to fix it by hand: `vp fmt` is configured to emit exactly this order, so `vp check --fix` and the pre-commit hook do it. The settings live in `fmt.sortImports` in `vite.config.ts` and emit the origin blocks, the ascending order inside them and the blank lines between them in the same shape this rule reads.
+
+Reordering will not change evaluation order. Imports carrying no bindings do not move, because oxfmt's `sortSideEffects` is off by default, and this rule does not read them either.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// an installed package placed above a runtime built-in is reported
+import { memoize } from "es-toolkit";
+
+import { join } from "node:path";
 ```
 
 ```ts
+// two blocks written without a blank line between them are reported
+import { join } from "node:path";
+import { memoize } from "es-toolkit";
+```
+
+Code this rule accepts.
+
+```ts
+// the four origins in order, each block separated by one blank line
 import { join } from "node:path";
 
 import { memoize } from "es-toolkit";
 
 import { report } from "./report.ts";
 
-import type { ESTree } from "@oxlint/plugins";
+import type { Entry } from "./entry.ts";
 ```
 
-ルール自身は自動修正を提供しないが、手で直す必要はない。`vp fmt` がこの並びを出力するよう設定してあるので、`vp check --fix` と pre-commit が直す。設定は `vite.config.ts` の `fmt.sortImports` にあり、由来のブロック順・ブロック内の昇順・ブロック間の空行のすべてをこのルールと同じ形で出す。
+```ts
+// a side-effect import carries no bindings and is left where its evaluation order puts it
+import "./style.css";
+import heroImage from "./assets/hero.png";
+import { report } from "./report.ts";
+```
 
-並べ替えが評価順序を変える心配は無い。束縛を持たない import は oxfmt の `sortSideEffects` が既定で無効なので動かず、このルールも検査の対象にしていない。
+<!-- END GENERATED examples -->
 
-## 禁じる回避策
+### Forbidden bypasses (do not do this)
 
-- 指定子を別名の再エクスポートモジュール経由に変えて、由来を偽る。並びの検査は通るが、依存の向きは変わっていない。
-- 束縛を使わない形（副作用 import）に書き換えて検査から外す。束縛を持たない import を対象外にしているのは評価順序を守るためであって、抜け道として用意したものではない。
-- import を関数の内側の動的 import へ落として先頭から消す。読み込みの時期が変わり、静的解析が依存を追えなくなる。
-- 該当箇所の lint 無効化。
+- Routing the specifier through a re-export module under another name to fake its origin. The ordering check passes while the direction of the dependency is unchanged
+- Rewriting it as a form that binds nothing, to leave the check. Imports without bindings are out of reach to preserve evaluation order, not as a way around
+- Dropping the import into a dynamic import inside a function to remove it from the head. When it loads changes, and static analysis stops being able to follow the dependency
+- Disabling the lint at the site
 
-## オプション
+## Messages
 
-取らない。有効か無効かだけを設定側で決める。
+<!-- BEGIN GENERATED messages -->
 
-ブロックの定義や並び順を設定で変えられるようにしない理由は、この不変条件が「どのファイルでも同じ位置に同じ由来が来る」ことに価値があるからである。ワークスペースごとに違う順序を選べるなら、読み手はファイルを開くたびにその順序を確かめることになり、境界を見るだけで済むという前提が失われる。
+| messageId | Text |
+| --- | --- |
+| `originOutOfOrder` | An import of {{origin}} must not sit after an import of {{precedingOrigin}}. Move it up into an order that runs the runtime built-ins, the installed packages, this repository, then the type-only imports. |
+| `specifierOutOfOrder` | \`{{specifier}}\` must not sit after \`{{precedingSpecifier}}\` inside the same block. Sort the block by specifier. |
+| `missingBlankLineBetweenOrigins` | An import of {{origin}} must not sit directly under an import of {{precedingOrigin}}. Put one blank line between the two blocks. |
+| `blankLineInsideOrigin` | A blank line must not split the imports of {{origin}}. Delete the blank line. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

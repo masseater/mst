@@ -14,6 +14,7 @@ describe("dont-review-it/no-unwrapped-toolchain-config--call-the-preset-for-the-
     valid: [
       {
         name: "both blocks call the preset function that matches them",
+        documented: true,
         code: `${NAMED_IMPORTS}export default defineConfig({ fmt: dontReviewItPreset.fmt(), lint: dontReviewItPreset.lint({ rules: {} }) });`,
       },
       {
@@ -22,6 +23,7 @@ describe("dont-review-it/no-unwrapped-toolchain-config--call-the-preset-for-the-
       },
       {
         name: "a configuration that declares neither block has nothing to wrap",
+        documented: true,
         code: `${NAMED_IMPORTS}export default defineConfig({ pack: { entry: ["src/index.ts"] } });`,
       },
       {
@@ -86,6 +88,7 @@ describe("dont-review-it/no-unwrapped-toolchain-config--call-the-preset-for-the-
       },
       {
         name: "both bare blocks are reported separately",
+        documented: true,
         code: `${NAMED_IMPORTS}export default defineConfig({ fmt: {}, lint: {} });`,
         errors: [{ messageId: "unwrappedFmt" }, { messageId: "unwrappedLint" }],
       },
@@ -111,6 +114,7 @@ describe("dont-review-it/no-unwrapped-toolchain-config--call-the-preset-for-the-
       },
       {
         name: "the preset function for the other block does not stand in",
+        documented: true,
         code: `${NAMED_IMPORTS}export default defineConfig({ fmt: dontReviewItPreset.lint({}) });`,
         errors: [{ messageId: "unwrappedFmt" }],
       },
