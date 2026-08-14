@@ -22,6 +22,7 @@ describe("dont-review-it/no-unchecked-cast--parse-at-boundary", () => {
       },
       {
         name: "an assertion on a value with a declared shape keeps the compatibility step",
+        documented: true,
         code: "const input: string = read();\nconst total = input as number;",
       },
       {
@@ -42,6 +43,7 @@ describe("dont-review-it/no-unchecked-cast--parse-at-boundary", () => {
       },
       {
         name: "a value a parse hands back is bound to the type that parse returns",
+        documented: true,
         code: "const row: Row = parseRow(given);",
       },
       {
@@ -128,6 +130,7 @@ describe("dont-review-it/no-unchecked-cast--parse-at-boundary", () => {
     invalid: [
       {
         name: "an any value handed a named type by assertion is reported",
+        documented: true,
         code: `${ANY_BINDING}\nconst row = loose as Row;`,
         errors: [{ messageId: "uncheckedCast" }],
       },
@@ -188,6 +191,7 @@ describe("dont-review-it/no-unchecked-cast--parse-at-boundary", () => {
       },
       {
         name: "a predicate whose body never reads the parameter is reported",
+        documented: true,
         code: "const isRow = (value: unknown): value is Row => true;",
         errors: [{ messageId: "unexaminedTypePredicate" }],
       },

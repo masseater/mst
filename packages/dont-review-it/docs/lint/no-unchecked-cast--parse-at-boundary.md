@@ -1,51 +1,83 @@
+---
+description: "Disallow handing a concrete type to a value the source declares as `any` or `unknown`, so every concrete type a value carries reached it through a step that read the value"
+---
+
 # no-unchecked-cast--parse-at-boundary
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-`any` または `unknown` と宣言された値に、具体的な型を名乗らせている位置。名乗らせ方は 3 つある。
+Disallow handing a concrete type to a value the source declares as `any` or `unknown`, so every concrete type a value carries reached it through a step that read the value
 
-**アサーションで名乗らせる。** `expr as T`（`TSAsExpression`）と `<T>expr`（`TSTypeAssertion`）の両方を見る。被演算子が `any` か `unknown` で、`T` が具体的な型のときに報告する。被演算子は括弧・`!`・オプショナルチェーンを剥がしてから判定する。名前を経由していてもよく、`const held = loose;` を挟んだ先の宣言まで辿る。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-unchecked-cast--parse-at-boundary.ts`](../../src/lint/oxlint/rules/no-unchecked-cast--parse-at-boundary.ts)
 
-**注釈で名乗らせる。** 変数宣言・クラスフィールド・関数の戻り値の 3 箇所で、注釈された型が具体的で、渡している値が `any` のときに報告する。この位置で `unknown` を見ないのは、`unknown` からの代入を型検査器自身が拒むためで、アサーションを消して注釈へ移す書き換えが通るのは `any` の側だけである。
+<!-- END GENERATED rule-header -->
 
-**型述語で名乗らせる。** 戻り型が型述語（`value is T`、`asserts value is T`、`asserts value`）である関数のうち、本体が判定対象の仮引数を一度も読まないものを報告する。読んだかどうかは、その仮引数に解決された参照が本体の範囲に 1 つでもあるかで決まる。
+## Violation
 
-被演算子の型は、このファイルが書いている注釈から決める。`no-unchecked-cast--parse-at-boundary` は構文だけを見る層で動くので、宣言された注釈と、注釈へ辿り着く束縛の連鎖だけが判定材料になる。
+A position where a value declared `any` or `unknown` is made to claim a concrete type. There are three ways of making that claim.
 
-次は検出しない。
+**Claiming it by assertion.** Both `expr as T` (`TSAsExpression`) and `<T>expr` (`TSTypeAssertion`) are read. Reported when the operand is `any` or `unknown` and `T` is a concrete type. The operand is stripped of parentheses, `!` and optional chaining before the judgment. It may go through a name: a `const held = loose;` in between is followed to the declaration on the other side.
 
-| 形 | 検出しない理由 |
+**Claiming it by annotation.** Three positions are read — a variable declaration, a class field, and a function's return type — and reported when the annotated type is concrete and the value handed over is `any`. `unknown` is not read in this position because the type checker itself refuses an assignment from `unknown`; the rewrite of dropping an assertion and moving to an annotation only passes on the `any` side.
+
+**Claiming it by type predicate.** A function whose return type is a type predicate (`value is T`, `asserts value is T`, `asserts value`) is reported when its body never once reads the parameter being judged. Whether it read it is settled by whether one reference resolving to that parameter stands inside the body's range.
+
+The operand's type is settled from the annotations this file writes. This rule runs in the layer that reads syntax only, so declared annotations and the chain of bindings reaching an annotation are the whole of the material.
+
+### Deliberately not widened
+
+| Shape | Why it is left out |
 | --- | --- |
-| 具体的な型を持つ値へのアサーション | 互換性の確認が働いている。書き手の知識を検査器に伝えているだけである |
-| 目標型が `any` / `unknown` のアサーション | 具体的な主張をしていない。迂回の条件が成立していない |
-| `as const` | 名前のある型を名乗っていない |
-| 被演算子自身がアサーション式 | `no-double-type-assertion--declare-the-real-type` が担当する範囲である |
-| 検査関数・解析関数が返した値 | 具体型はアサーションではなく戻り型として得られている |
-| 型述語だけを書いた宣言（`declare` / 型別名 / インターフェース） | 読む本体がない |
-| `this is T` | 判定対象が仮引数ではない |
+| An assertion on a value carrying a concrete type | The compatibility step is working. It only tells the checker what the writer knows |
+| An assertion whose target type is `any` or `unknown` | No concrete claim is made. The condition for a bypass is not met |
+| `as const` | It names no type |
+| An operand that is itself an assertion | That range belongs to [no-double-type-assertion--declare-the-real-type](./no-double-type-assertion--declare-the-real-type.md) |
+| A value a checking or parsing function returned | The concrete type came from a return type, not an assertion |
+| A declaration carrying a predicate and no body (`declare`, a type alias, an interface) | There is no body to read |
+| `this is T` | The thing being judged is not a parameter |
 
-型宣言ファイルと、意図的に不整合な型を書くファイル群は、lint の対象から外す配備側の責務とする。ルール側に除外は持たない。`no-double-type-assertion--declare-the-real-type` と同じ扱いである。
+Type declaration files, and the file groups that deliberately write inconsistent types, are taken out of the lint target by whoever deploys it. The rule holds no exclusion of its own. This matches how `no-double-type-assertion--declare-the-real-type` is handled.
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「値が具体的な型を名乗っているなら、その型はその値を読んだ手続きから受け取ったものである」ことである。
+What is held is that where a value claims a concrete type, that type was handed over by a procedure that read the value.
 
-`any` と `unknown` は、あらゆる目標型と互換だとみなされる型である。値がいったんその型になっていれば、アサーションが 1 つでも型検査器の互換性確認は働かない。`no-double-type-assertion--declare-the-real-type` が塞ぐのは入れ子の二段構えだが、二段構えは形を変えても同じ結果になる。
+`any` and `unknown` are the types treated as compatible with every target type. Once a value is in one of them, one assertion is enough for the type checker's compatibility step to stop working. What [no-double-type-assertion--declare-the-real-type](./no-double-type-assertion--declare-the-real-type.md) closes is the nested two-step, but the two-step reaches the same result in other shapes.
 
-- 2 つの文に割る。`const raw: unknown = read();` のあとに `const row = raw as Row;` と書く
-- 補助関数の内側へ移す。`unknown` の仮引数を受け取り、具体型へアサーションして返す
-- 上流が既に `any` なので、単独のアサーションで済ませる
-- アサーションを消し、注釈だけ具体型にした束縛へ値を移す
+- Split into two statements. `const raw: unknown = read();` then `const row = raw as Row;`
+- Move it inside a helper. Take an `unknown` parameter, assert to a concrete type, return
+- The upstream is already `any`, so a single assertion is enough
+- Drop the assertion and move the value into a binding annotated with the concrete type
 
-入れ子の形はどれからも消えるが、値の形が保証されていないのに保証されているように見えるコードが残る点は変わらない。入れ子だけを塞ぐと、入れ子を解くという書き換えで報告が消えてしまい、規律が書き方の好みに落ちる。
+The nested shape leaves each of these, and what stays the same is code that looks as if the value's shape were guaranteed when it is not. Close only the nesting and un-nesting becomes the rewrite that clears the report, which drops the discipline to a matter of style.
 
-型述語を別扱いにするのも同じ理由による。型述語は「値を読んだ結果として型を得る」ための構文だが、本体が仮引数を読んでいなければ、読んだふりをしているだけで、値の形は確かめられていない。名前が検査を主張していることは検査ではない。
+Type predicates are handled separately for the same reason. A type predicate is the syntax for "obtain a type as the result of reading a value", but where the body never reads the parameter it only pretends to read, and the value's shape was never confirmed. A name claiming a check is not a check.
 
-## どう直すか
+### Configuration
 
-値がプログラムに入ってくる境界で、解析するか検査する。
+None. Only whether the rule is on or off is settled by the configuration.
 
-外から入ってきた値には、スキーマ検証・型述語を持つ検査関数・解析関数のいずれかを通し、その戻り型として具体型を受け取る。検査に失敗したときに通る経路を必ず持たせる。このリポジトリでは、lint ルールが受け取る設定の読み取りがその形をしている。
+### Where the detection does not reach
+
+Not being reported does not mean being allowed.
+
+- The value's `any` comes from a library's return type, an import, or the inference of a call rather than this file's annotation. `JSON.parse(text) as Config` is that shape. Parsing at the boundary is placed by the writer
+- A destructuring declaration annotated with a concrete type receives an `any` value
+- A type predicate's body reads the parameter but does not use what it read in the judgment
+- An `any` value is handed as an argument to a function declaring a concrete parameter. The claim's position becomes the caller's argument, which is none of the three positions
+
+To widen this range in a layer holding type information, `typescript/no-unsafe-type-assertion` and `typescript/no-unsafe-assignment` exist as a separate discipline. They report narrowing from concrete to concrete and assertions whose target is `any`, so their range does not coincide with this rule's.
+
+## Fix
+
+Parse it or check it at the boundary where the value enters the program.
+
+Put a value arriving from outside through a schema validation, a checking function carrying a type predicate, or a parsing function, and receive the concrete type as that function's return type. Always give it a route to take when the check fails. In this repository, reading the options a lint rule receives takes that shape.
 
 ```ts
 const maxLinesFrom = (options: Readonly<Options>): number => {
@@ -58,33 +90,64 @@ const maxLinesFrom = (options: Readonly<Options>): number => {
 };
 ```
 
-外から渡された設定を `number` と名乗らせる代わりに、値の形を確かめ、確かめられなかった場合に返すものを決めている。呼び出し側は具体型を戻り値として受け取るので、アサーションを書く理由がない。
+Instead of making a setting handed in from outside claim to be a `number`, it confirms the value's shape and settles what to return when it could not be confirmed. The caller receives the concrete type as a return value, so there is no reason to write an assertion.
 
-型述語を書くなら、本体は仮引数を読む。
+Where a type predicate is written, the body reads the parameter.
 
 ```ts
 export const isAstFields = (held: unknown): held is AstFields =>
   typeof held === "object" && held !== null && !Array.isArray(held);
 ```
 
-プロセス内の値が `any` になっているなら、その型を作っている上流を直す。関数の戻り値・変数の宣言・パラメータの注釈のどれかを直せば、下流でアサーションを書く理由が消える。
+Where a value inside the process has become `any`, fix the upstream making that type. Fix the function's return type, the variable's declaration, or the parameter's annotation, and the reason to write an assertion downstream disappears.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- 検証のふりをした型述語を通す。本体が仮引数を読まずに真を返す関数は、名前が検査を主張しているだけである。この形は報告される
-- 目標型を緩める。すべてのプロパティを任意にした型へ落としても、それは具体的な主張なので同じ判定で報告される
-- アサーションを消し、注釈だけ具体型にした束縛へ値を移す。注釈による名乗りも同じ判定で報告される
-- 抑制ディレクティブ。`any` に具体型を名乗らせている事実は、抑止理由として書ける内容と同じものにしかならない
+Code this rule rejects.
 
-次の抜け道は、このルールでは報告されない。報告されないことは許していることを意味しない。
+```ts
+// a predicate whose body never reads the parameter is reported
+const isRow = (value: unknown): value is Row => true;
+```
 
-- 値の `any` が、このファイルの注釈ではなく、ライブラリの戻り型・インポート・呼び出しの推論結果から来ている場合。`JSON.parse(text) as Config` はその形である。境界の解析は書き手が置く
-- 分割代入で受ける宣言に具体型を注釈し、`any` の値を渡す場合
-- 型述語の本体が仮引数を読みはするが、読んだ結果を判定に使っていない場合
-- `any` の値を、具体型の仮引数を宣言している関数へ引数として渡す場合。名乗りの位置が呼び出し側の引数になるため、この 3 箇所のどれにも当たらない
+Code this rule accepts.
 
-型情報を持つ層でこの範囲を広げたい場合は、`typescript/no-unsafe-type-assertion` と `typescript/no-unsafe-assignment` が別の規律として存在する。これらは具体型から具体型への絞り込みや、目標型が `any` のアサーションまで報告するので、このルールとは検出範囲が一致しない。
+```ts
+// an assertion on a value with a declared shape keeps the compatibility step
+const input: string = read();
+const total = input as number;
+```
 
-## オプション
+```ts
+// a value a parse hands back is bound to the type that parse returns
+const row: Row = parseRow(given);
+```
 
-取らない。有効か無効かだけを設定側で決める。
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Passing through a type predicate that only pretends to check. A function returning true without reading its parameter is a name claiming a check. That shape is reported
+- Loosening the target type. Dropping to a type with every property made optional is still a concrete claim, and the same judgment reports it
+- Dropping the assertion and moving the value into a binding whose annotation is the concrete type. A claim made by annotation meets the same judgment
+- A suppression directive. What can be written as a reason for suppression is the same thing as the fact that an `any` value is claiming a concrete type
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `uncheckedCast` | A value declared \`{{looseType}}\` must not be handed a concrete type by assertion. Parse \`{{claimed}}\` at the boundary it enters through and take the concrete type from the return type of that parse. |
+| `uncheckedTypeClaim` | A value declared \`any\` must not be handed a concrete type by annotation. Parse \`{{claimed}}\` at the boundary it enters through and take the concrete type from the return type of that parse. |
+| `unexaminedTypePredicate` | A type predicate must not stand on a body that leaves \`{{parameter}}\` unread. Read \`{{parameter}}\` in the body and return what that reading settles. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->
