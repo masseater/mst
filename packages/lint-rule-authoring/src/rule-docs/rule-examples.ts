@@ -17,6 +17,7 @@ import type { UnknownFields } from "../unknown-fields.ts";
 export type LintRuleExample = {
   readonly name: string;
   readonly code: string;
+  readonly filename: string | null;
 };
 
 export type LintRuleExamples = {
@@ -62,9 +63,12 @@ const exampleOf = ({
 }): readonly LintRuleExample[] => {
   const namedAs = propertyOf(testCase, "name");
   const written = propertyOf(testCase, "code");
+  const placedAt = propertyOf(testCase, "filename");
   const caseName = namedAs === null ? null : resolveText({ node: namedAs, constants, visited: [] });
   const code = written === null ? null : resolveText({ node: written, constants, visited: [] });
-  return caseName === null || code === null ? [] : [{ name: caseName, code }];
+  const filename =
+    placedAt === null ? null : resolveText({ node: placedAt, constants, visited: [] });
+  return caseName === null || code === null ? [] : [{ name: caseName, code, filename }];
 };
 
 const markedExamplesIn = ({

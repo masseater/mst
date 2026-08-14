@@ -10,6 +10,7 @@ describe("dont-review-it/forbid-test-adjacent-file--inline-its-setup-into-the-te
     valid: [
       {
         name: "the test spelling the runner picks up passes",
+        documented: true,
         code: "export const total = 1;",
         filename: "/repository/src/order.test.ts",
       },
@@ -35,6 +36,7 @@ describe("dont-review-it/forbid-test-adjacent-file--inline-its-setup-into-the-te
       },
       {
         name: "a directory named after tests leaves the file name alone",
+        documented: true,
         code: "export const total = 1;",
         filename: "/repository/fixtures/order.ts",
       },
@@ -42,12 +44,14 @@ describe("dont-review-it/forbid-test-adjacent-file--inline-its-setup-into-the-te
     invalid: [
       {
         name: "a test marker carrying a further suffix is reported",
+        documented: true,
         code: "export const total = 1;",
         filename: "/repository/src/order.test-fixture.ts",
         errors: [{ messageId: "testAdjacentFile", data: { fileName: "order.test-fixture.ts" } }],
       },
       {
         name: "a fixture spelling is reported",
+        documented: true,
         code: "export const total = 1;",
         filename: "/repository/src/order.fixture.ts",
         errors: [{ messageId: "testAdjacentFile", data: { fileName: "order.fixture.ts" } }],

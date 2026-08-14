@@ -9,6 +9,7 @@ describe("lint-rule-authoring/no-broad-lint-disable--use-next-line-with-reason",
       { name: "source without any comment passes", code: "const total = 1 + 2;" },
       {
         name: "the oxlint next-line form with a rule name and a reason is the sanctioned shape",
+        documented: true,
         code: "// oxlint-disable-next-line no-console -- the CLI writes its result here\nconsole.log(1);",
       },
       {
@@ -25,6 +26,7 @@ describe("lint-rule-authoring/no-broad-lint-disable--use-next-line-with-reason",
       },
       {
         name: "prose that names a directive mid sentence is not a directive",
+        documented: true,
         code: "// this repository never writes eslint-disable\nconst total = 1;",
       },
       {
@@ -60,6 +62,7 @@ describe("lint-rule-authoring/no-broad-lint-disable--use-next-line-with-reason",
       },
       {
         name: "a bare oxlint-disable opens the suppression for the rest of the file",
+        documented: true,
         code: "// oxlint-disable\nconst total = 1;",
         errors: [
           {
@@ -89,6 +92,7 @@ describe("lint-rule-authoring/no-broad-lint-disable--use-next-line-with-reason",
       },
       {
         name: "oxlint-disable-line is reported even when it already carries a reason",
+        documented: true,
         code: "console.log(1); // oxlint-disable-line no-console -- the CLI writes its result here",
         errors: [
           {

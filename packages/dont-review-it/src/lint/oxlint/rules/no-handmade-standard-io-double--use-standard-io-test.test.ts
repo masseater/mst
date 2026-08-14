@@ -16,6 +16,7 @@ standardIoTest("captures", ({ stdout }) => {
       },
       {
         name: "a spec that imports the fixture may exercise the process streams directly",
+        documented: true,
         code: `import { standardIoTest } from "@mst/dont-review-it/vitest";
 standardIoTest("captures", ({ stdout }) => {
   process.stdout.write("result");
@@ -40,6 +41,7 @@ standardIoTest("captures", ({ stdout }) => {
       },
       {
         name: "a stream-named property holding plain data is not a double",
+        documented: true,
         code: `const result = { stdout: "captured text", stderr: "" };`,
         filename: "/repo/src/cli.test.ts",
       },
@@ -90,6 +92,7 @@ const home = process.env.HOME;`,
     invalid: [
       {
         name: "an extend fixture named stdout is a handmade double",
+        documented: true,
         code: `const ioTest = test.extend({ stdout: async ({}, use) => { await use([]); } });`,
         filename: "/repo/src/cli.test.ts",
         errors: [{ messageId: "ownFixture" }],
@@ -127,6 +130,7 @@ const ioTest = standardIoTest.extend({ stdout: async ({}, use) => { await use([]
       },
       {
         name: "a stdout-shaped object with a write method is an assembled double",
+        documented: true,
         code: `const deps = { stdout: { write: () => true } };`,
         filename: "/repo/src/cli.test.ts",
         errors: [{ messageId: "streamShapedDouble" }],

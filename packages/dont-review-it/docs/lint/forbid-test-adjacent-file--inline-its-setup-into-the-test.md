@@ -1,37 +1,102 @@
+---
+description: "Disallow a file whose name carries a test marker other than the two the repository runs, so no file can leave the production scope by the way it is spelled"
+---
+
 # forbid-test-adjacent-file--inline-its-setup-into-the-test
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-ファイル名が production の対象外を表す綴りを持ちながら、リポジトリが実行する `.test.` と `.spec.` のどちらでもないもの。
+Disallow a file whose name carries a test marker other than the two the repository runs, so no file can leave the production scope by the way it is spelled
 
-対象外の綴りは `.fixture.` / `.mock.` / `.test.` / `.spec.` / `.stories.` / `.story.` の 6 つで、いずれも後ろに `.` か `-` で区切った語をいくつでも重ねられる。この綴りに当たったファイルは production の source ではないとみなされ、有限値の語彙を見る 2 本のルールも、重複した宣言本体を見るルールも対象から外す。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`forbid-test-adjacent-file--inline-its-setup-into-the-test.ts`](../../src/lint/oxlint/rules/forbid-test-adjacent-file--inline-its-setup-into-the-test.ts)
 
-そのうち `.test.<拡張子>` と `.spec.<拡張子>` で終わるものだけがテストである。それ以外はすべて報告する。`order.test-fixture.ts` は `.test.` に当たるので production の対象から外れるが、テストの綴りではないのでここで報告される。
+<!-- END GENERATED rule-header -->
 
-ディレクトリ名は見ない。`fixtures/order.ts` はこのルールの対象ではない。
+## Violation
 
-## なぜそれが要るか
+A file whose name carries a marker that puts it outside the production scope while being neither of the two the repository actually runs, `.test.` and `.spec.`.
 
-production の対象かどうかを決めているのはファイル名である。テストらしい綴りを付ければ、そのファイルは lint の対象から外れ、`knip` からも見えにくくなる。この 2 つが同時に起きると、規約を満たせない置き場所を綴りだけで作れてしまう。
+The markers are `.fixture.`, `.mock.`, `.test.`, `.spec.`, `.stories.` and `.story.`, and each may carry any number of further words separated by `.` or `-`. A file matching one of them is taken to be something other than a production source: the two rules that read finite value vocabularies hold it out of reach, and so does the rule that reads duplicated declaration bodies.
 
-実際に `canonical-values.test-fixture.ts` がこの形で置かれていた。`.test-fixture.` は production の対象外判定には当たり、テストファイル判定には当たらない。2 つの分類器の隙間に収まる名前で、テスト用の共有ヘルパが検査を受けないまま置かれていた。
+Of those, only the ones ending in `.test.<extension>` or `.spec.<extension>` are tests. Everything else is reported. `order.test-fixture.ts` matches `.test.` and so leaves the production scope, while it is not spelled as a test, and it is reported here.
 
-テストの置き場は 2 つだけである。カバレッジを担保するものは対象ソースと同じディレクトリの `<ソース名>.test.ts`、仕様を担保するものはパッケージ直下の `specs/<機能名>.spec.ts`。この 2 つ以外の綴りは、置き場を増やすか、検査を避けるかのどちらかにしかならない。
+Directory names are not read. `fixtures/order.ts` is out of this rule's reach.
 
-## どう直すか
+### The invariant
 
-報告されたファイルを削除し、そこに書かれていたものを、使っている各テストの中で宣言する。
+What settles whether a file is in the production scope is its name. Spell a file like a test and it leaves the lint's reach and becomes hard for `knip` to see. With both happening at once, a place that cannot meet the guidelines can be created out of a spelling alone.
 
-テストの setup が複数のテストで似ることは許される。共有を避けることでテストが互いに結合せず、1 本を書き換えても他が動かなくなることがない。同じ内容のテストを複数箇所に書くことだけは [no-duplicated-test--assert-once](./no-duplicated-test--assert-once.md) が禁じる。
+`canonical-values.test-fixture.ts` was once placed exactly that way in this repository. `.test-fixture.` matches the out-of-production judgment and misses the is-a-test judgment: a name landing in the gap between two classifiers, where a shared helper for tests sat without being checked by anything.
 
-production のコードとして必要なものだった場合は、名前からテストの綴りを外して production の source として置く。その時点から lint の対象になる。
+There are two places for tests and no others. What holds coverage up goes beside its source as `<source name>.test.ts`; what holds a specification up goes directly under the package as `specs/<feature>.spec.ts`. Any other spelling either adds a third place or dodges a check.
 
-## 禁じる回避策
+No option is offered. Widening the accepted spellings through configuration would hand back the very channel — leaving the scope by spelling — that this rule closes.
 
-- 綴りを変えて分類器の隙間を探す。`.test-helper.` も `.spec-support.` も同じ形で報告される
-- ディレクトリ名を `__fixtures__` や `fixtures` にしてファイル名から綴りを外す。ディレクトリによる対象外判定は残っているが、そこに置いたものは [no-detached-test-file--move-beside-source](./no-detached-test-file--move-beside-source.md) が報告する
-- `knip` の設定に除外を足して未使用の報告だけを黙らせる。検査を受けない置き場が残ることは変わらない
+## Fix
 
-## オプション
+Delete the reported file and declare what it held inside each test that uses it.
 
-取らない。受理する綴りを設定で広げられると、綴りで対象を外す口がそのまま戻る。
+Test setup is allowed to look alike across tests. Not sharing it keeps tests from coupling, so rewriting one never stops another from running. Only writing the same test in several places is forbidden, by [no-duplicated-test--delete-the-copy](./no-duplicated-test--delete-the-copy.md).
+
+Where the contents were needed as production code, drop the test marker from the name and place it as a production source. It comes under the lint from that point on.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// a test marker carrying a further suffix is reported
+// in /repository/src/order.test-fixture.ts
+export const total = 1;
+```
+
+```ts
+// a fixture spelling is reported
+// in /repository/src/order.fixture.ts
+export const total = 1;
+```
+
+Code this rule accepts.
+
+```ts
+// the test spelling the runner picks up passes
+// in /repository/src/order.test.ts
+export const total = 1;
+```
+
+```ts
+// a directory named after tests leaves the file name alone
+// in /repository/fixtures/order.ts
+export const total = 1;
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Hunting for another gap between the classifiers by changing the spelling. `.test-helper.` and `.spec-support.` are reported the same way
+- Naming the directory `__fixtures__` or `fixtures` to keep the marker out of the file name. The out-of-scope judgment by directory still stands, and what is placed there is reported by [no-detached-test-file--move-beside-source](./no-detached-test-file--move-beside-source.md)
+- Adding an exclusion to the `knip` configuration to silence the unused report alone. A place that nothing checks is still there
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `testAdjacentFile` | A file name must not carry a test marker other than \`.test.\` or \`.spec.\`. Delete \`{{fileName}}\` and declare what it holds inside each test that uses it. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

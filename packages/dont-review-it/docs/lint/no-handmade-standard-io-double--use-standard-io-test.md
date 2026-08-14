@@ -1,24 +1,50 @@
+---
+description: "Disallow a spec that assembles its own stdout or stderr test double, so stream capture is solved once by the shared `standardIoTest` fixture"
+---
+
 # no-handmade-standard-io-double--use-standard-io-test
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-テストファイル（`*.test.ts` / `*.test.tsx` / `*.spec.ts` / `*.spec.tsx`）が stdout / stderr のテストダブルを自前で組み立てている形を検出する。系統は 3 つある。
+Disallow a spec that assembles its own stdout or stderr test double, so stream capture is solved once by the shared `standardIoTest` fixture
 
-1. `*.extend({ ... })` のフィクスチャ定義に `stdout` / `stderr` という名前を宣言する形。第 1 引数に名前を文字列で渡す builder 形式（`*.extend("stdout", ...)`）も同じ再宣言として扱う。共有フィクスチャを import しているファイルでも、宣言し直した時点で報告される
-2. `process.stdout` / `process.stderr` への直接の参照。spy を張る形も、直接書き込む形も同じ違反として扱う。ただし `standardIoTest` を import 済みのファイルは除く。捕捉が共有フィクスチャに一元化されたうえで、テスト対象にストリームへ書かせる行為そのものは正当だからである
-3. `stdout` / `stderr` という名前のプロパティに、`write` メソッドを持つオブジェクトリテラルやストリームのインスタンス（`new PassThrough()` など）を与える形。テスト対象へ手製の偽ストリームを注入する書き方が該当する
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-handmade-standard-io-double--use-standard-io-test.ts`](../../src/lint/oxlint/rules/no-handmade-standard-io-double--use-standard-io-test.ts)
 
-テストファイル以外では何も報告しない。共有フィクスチャの実装自体がストリームの捕捉を組み立てる場所であり、そこはこのルールの対象外である。
+<!-- END GENERATED rule-header -->
 
-## なぜそれが要るか
+## Violation
 
-標準ストリームのテストダブルには、捕捉の張り替え・チャンクの復号・テスト後の復元という付随作業が必ずついてくる。spec ごとに組み立てると、この付随作業が spec の数だけ別実装になり、それぞれが独自の癖（復元漏れ、エンコーディングの違い、並行実行時の干渉）を抱える。1 つの spec で見つかった不具合の修正は他の spec に伝播しない。
+A test file (`*.test.ts`, `*.test.tsx`, `*.spec.ts`, `*.spec.tsx`) assembling a test double for stdout or stderr of its own. Three families are reported.
 
-この付随作業は一度だけ解決すればよい種類の問題であり、その解決が `@mst/dont-review-it/vitest` の `standardIoTest` フィクスチャである。spec 側に残る仕事は「テストを走らせ、捕捉されたテキストを検証する」ことだけになる。
+1. A fixture definition `*.extend({ ... })` declaring a name of `stdout` or `stderr`. The builder form handing the name over as a string in the first argument (`*.extend("stdout", ...)`) counts as the same redeclaration. A file importing the shared fixture is reported all the same once it declares one again
+2. A direct reach for `process.stdout` or `process.stderr`, whether to spy on it or to write to it. A file that has imported `standardIoTest` is exempt: with the capture settled in one shared fixture, letting the code under test write to the stream is exactly what should happen
+3. A property named `stdout` or `stderr` handed an object literal carrying a `write` method, or a stream instance such as `new PassThrough()`. That is the shape of injecting a hand-built fake stream into the code under test
 
-## どう直すか
+Nothing is reported outside test files. The implementation of the shared fixture is where capturing a stream is assembled, and it is out of this rule's reach.
 
-`standardIoTest` を import し、そこからテストを導出する。捕捉されたテキストはフィクスチャの `text` で読める。
+### The invariant
+
+A test double for a standard stream always drags along the same incidental work: swapping the capture in, decoding the chunks, restoring the stream afterwards. Assembled per spec, that incidental work becomes as many implementations as there are specs, each with quirks of its own — a missed restore, a different encoding, interference under parallel runs. A fix found in one spec does not reach the others.
+
+That work is the kind of problem to be solved once, and the solution is the `standardIoTest` fixture in `@mst/dont-review-it/vitest`. What is left to the spec is running the test and checking the captured text.
+
+### What is not a violation
+
+- A spec that imported `standardIoTest` writing to `process.stdout` or `process.stderr` through the code under test
+- An `extend` fixture under a name unrelated to streams, such as `repository`
+- A property named `stdout` holding something that is not a write target, such as a string. Handing the captured result around is not the same shape
+- `process` members other than the two captured streams, such as `process.exitCode` and `process.env`
+
+Where the machine reaches and where the discipline reaches are not the same. Detection is the floor under the invariant, not the ceiling.
+
+## Fix
+
+Import `standardIoTest` and derive the test from it. The captured text is read from the fixture's `text`.
 
 ```ts
 import { standardIoTest } from "@mst/dont-review-it/vitest";
@@ -30,19 +56,70 @@ standardIoTest("hands the subject everything written to stdout", ({ stdout }) =>
 });
 ```
 
-テスト対象へストリームを注入していた場合は、注入をやめてテスト対象に `process.stdout` / `process.stderr` へ書かせ、フィクスチャで捕捉する。
+Where a stream was being injected into the code under test, stop injecting it: let the code write to `process.stdout` or `process.stderr` and let the fixture capture it.
 
-## 違反にならないもの
+<!-- BEGIN GENERATED examples -->
 
-- `standardIoTest` を import した spec が、テスト対象を通じて `process.stdout` / `process.stderr` へ書く行為
-- `repository` のような、ストリームと無関係な名前の `extend` フィクスチャ
-- `stdout` という名前に文字列など「書き込み先ではない値」を持たせたプロパティ。捕捉結果の受け渡しは双子ではない
-- `process.exitCode` や `process.env` など、捕捉対象の 2 ストリーム以外の `process` メンバー
+Code this rule rejects.
 
-## 禁じる回避策
+```ts
+// an extend fixture named stdout is a handmade double
+// in /repo/src/cli.test.ts
+const ioTest = test.extend({
+  stdout: async ({}, use) => {
+    await use([]);
+  },
+});
+```
 
-- 偽ストリームを一度変数に束ねてからプロパティに与え、値の形の静的判定を外す。組み立てている実体は変わらない
-- `standardIoTest` という名前のモジュールを自作して import し、除外条件だけを満たす。除外は共有フィクスチャの実装を信頼して置かれているのであって、名前に与えられているのではない
-- stdin のテストダブルを組み立てる。現時点のフィクスチャは stdout / stderr だけを提供するため機械検出はしないが、同じ性質の違反である。stdin の捕捉が必要になったら、spec に組み立てるのではなく共有フィクスチャ側に足すこと
+```ts
+// a stdout-shaped object with a write method is an assembled double
+// in /repo/src/cli.test.ts
+const deps = { stdout: { write: () => true } };
+```
 
-機械検出の範囲と規律の範囲は一致しない。検出は不変条件を守るための下限であって、上限ではない。
+Code this rule accepts.
+
+```ts
+// a spec that imports the fixture may exercise the process streams directly
+// in /repo/src/cli.test.ts
+import { standardIoTest } from "@mst/dont-review-it/vitest";
+standardIoTest("captures", ({ stdout }) => {
+  process.stdout.write("result");
+  expect(stdout.text).toBe("result");
+});
+```
+
+```ts
+// a stream-named property holding plain data is not a double
+// in /repo/src/cli.test.ts
+const result = { stdout: "captured text", stderr: "" };
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Binding the fake stream to a variable first and handing that to the property, to escape the judgment made on the shape of the value. What is being assembled has not changed
+- Writing a module of your own named `standardIoTest` and importing it to satisfy the exemption alone. The exemption rests on trusting the shared fixture's implementation, not on the name
+- Assembling a test double for stdin. The fixture provides stdout and stderr today, so the machine does not detect it, and it is a violation of the same kind. When capturing stdin is needed, add it to the shared fixture rather than assembling it in a spec
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `ownFixture` | A spec must not declare a \`{{name}}\` fixture of its own. Import \`standardIoTest\` from \`@mst/dont-review-it/vitest\` and derive the test from it. |
+| `directStream` | A spec must not reach \`process.{{name}}\` by hand. Import \`standardIoTest\` from \`@mst/dont-review-it/vitest\`; its \`{{name}}\` fixture hands the captured stream to the test. |
+| `streamShapedDouble` | A spec must not assemble a \`{{name}}\`-shaped write double. Import \`standardIoTest\` from \`@mst/dont-review-it/vitest\` and assert on its \`{{name}}\` fixture instead. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

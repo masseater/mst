@@ -101,8 +101,10 @@ const REJECTED_HEADING = "Code this rule rejects.";
 
 const ACCEPTED_HEADING = "Code this rule accepts.";
 
-const blockOf = ({ name, code }: LintRuleExample): string =>
-  ["```ts", `// ${name}`, code, "```"].join("\n");
+const blockOf = ({ name, code, filename }: LintRuleExample): string =>
+  ["```ts", `// ${name}`, ...(filename === null ? [] : [`// in ${filename}`]), code, "```"].join(
+    "\n",
+  );
 
 const groupOf = ({
   heading,
