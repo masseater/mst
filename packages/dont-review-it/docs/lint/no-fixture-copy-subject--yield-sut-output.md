@@ -1,57 +1,80 @@
+---
+description: "Disallow a fixture handing back a subject assembled by reading same-named properties off another value, so an assertion compares the shape the code under test produced instead of a hand-written copy that goes stale on its own"
+---
+
 # no-fixture-copy-subject--yield-sut-output
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-spec ファイルの中の fixture 宣言について、その fixture が被験体として渡すオブジェクトの組み立て方を読む。
+Disallow a fixture handing back a subject assembled by reading same-named properties off another value, so an assertion compares the shape the code under test produced instead of a hand-written copy that goes stale on its own
 
-対象のファイルはファイル名の接尾辞で決める。既定は `.test.ts` と `.test.tsx` で、`specFileSuffixes` で差し替えられる。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-fixture-copy-subject--yield-sut-output.ts`](../../src/lint/oxlint/rules/no-fixture-copy-subject--yield-sut-output.ts)
 
-読む位置は 3 つある。ビルダ形式 `test.extend("name", factory)` の `return` に到達する式、オブジェクト形式 `test.extend({ name: (context, use) => use(subject) })` で `use` に渡る第一引数、そして関数ではなく値を直に渡した形の、その値である。`expect.extend(...)` は綴りを共有するが fixture を宣言しないので、構造的に外れる。
+<!-- END GENERATED rule-header -->
 
-### 複写と判定する形
+## Violation
 
-被験体がオブジェクトリテラルに解決されるとき、そのプロパティを 1 つずつ読む。**キーの名前と、その値が読んでいるプロパティの名前が一致するもの**が 1 つでもあれば、そのオブジェクトを複写として報告する。報告は被験体のオブジェクトごとに 1 件で、一致したキーをすべて挙げる。
+For a fixture declaration in a spec file, how the object it hands over as the subject was assembled is read.
 
-被験体そのものと、各プロパティの値は、どちらも束縛を一段たどる。たどる先は fixture 本体の `const` と、そのファイル直下の `const` である。したがって次はすべて同じ 1 つの形として読む。
+The files in scope are settled by the file name suffix. The default is `.test.ts` and `.test.tsx`, replaceable through `specFileSuffixes`.
 
-- その場に書いたリテラル `() => ({ total: source.total })`
-- 束縛に入れてから渡す形 `const copied = { total: source.total }; return copied;`
-- 短縮記法と束縛の組 `const total = source.total; return { total };`
-- キーと別の名前を持つ束縛 `const held = source.total; return { total: held };`
+Three positions are read: the expression reaching the `return` of the builder form `test.extend("name", factory)`, the first argument reaching `use` in the object form `test.extend({ name: (context, use) => use(subject) })`, and the value itself where a value rather than a function was handed over directly. `expect.extend(...)` shares the spelling but declares no fixture and falls out structurally.
 
-名前の読み方はキー側と読み出し側で揃えてある。ドット記法、文字列リテラルのキーと添字、補間の無いテンプレートリテラルを同じ名前として扱う。読み出しを包む括弧・`await`・非 null アサーション・省略可能連結・型アサーションは剥がしてから読む。
+### What counts as a copy
 
-キーが 1 つでも一致すれば報告するのは、複製の性質が「全部を写したかどうか」ではなく「元の形をなぞった箇所があるかどうか」で決まるからである。一致するキーが 1 つでもあれば、その 1 つの名前は元の値の綴りに固定されており、元が動いたときに黙って古くなる箇所がそこにある。
+Where the subject resolves to an object literal, its properties are read one by one. Where even one of them has **a key name equal to the name of the property its value reads**, that object is reported as a copy. One report stands per subject object, naming every key that matched.
 
-### 隣のルールとの重なり
+Both the subject itself and each property's value are followed one binding step. The step lands on a `const` in the fixture body and on a `const` directly under the file. So these are all read as one and the same shape.
 
-その場に書いたオブジェクトリテラルは、同名の複写を含んでいても、fixture がオブジェクトを組み立てている形ではある。`no-fixture-construct-in-use--yield-sut-output` からも同時に報告され得る。同名の複写を含むオブジェクトの直し方はこのルールが持つので、両方の報告を受け取った場合はこのルールの直し方を採ればどちらも消える。
+- A literal written on the spot: `() => ({ total: source.total })`
+- Put into a binding before handing over: `const copied = { total: source.total }; return copied;`
+- Shorthand paired with a binding: `const total = source.total; return { total };`
+- A binding named apart from the key: `const held = source.total; return { total: held };`
 
-### 意図的に広げていない範囲
+Names are read the same way on the key side and the read side. Dot notation, a string-literal key or subscript, and a template literal with no interpolation are treated as the same name. Parentheses, `await`, non-null assertions, optional chains and type assertions around the read are peeled before reading.
 
-| 形 | 対象にしない理由 |
+One matching key is enough to report because what makes something a copy is not "was all of it copied" but "is there a place tracing the original's shape". With one matching key, that one name is fixed to the original value's spelling, and there is a place that quietly goes stale when the original moves.
+
+### Overlap with the neighbouring rule
+
+An object literal written on the spot is, even when it contains same-named copies, still a shape the fixture assembled. [no-fixture-construct-in-use--yield-sut-output](./no-fixture-construct-in-use--yield-sut-output.md) may report it at the same time. The fix for an object containing same-named copies is held by this rule, so on receiving both reports, taking this rule's fix clears them both.
+
+### Deliberately not widened
+
+| Shape | Why it is left out |
 | --- | --- |
-| 全プロパティが元と別の名前を持つオブジェクト | 元の形をなぞった箇所が無い。fixture が組み立てていること自体は `no-fixture-construct-in-use--yield-sut-output` が引き受ける |
-| メソッドと `get` / `set` | 名前の一致だけで複製とは言えない。本体が何を返すかは実行してみるまで決まらない |
-| スプレッドだけで作ったオブジェクト | 列挙するプロパティが無い。インラインの構築は construct が、fixture 依存のスプレッドは `no-fixture-forward-subject--yield-sut-output` が受ける |
-| 分割代入で受けた依存をそのまま同名のキーに置く形 | 値が読み出しの形をしていない。横流しとして forward が受ける |
-| 実行時にしか決まらないキー、実行時にしか決まらない添字 | 名前として読めない |
-| 束縛を二段以上たどった先にある読み出し | たどるのは一段だけである |
-| 呼び出しの返り値として渡された複写 | 呼び先の中は読まない |
+| An object whose every property is named apart from the original | There is no place tracing the original's shape. That the fixture is assembling at all is taken by `no-fixture-construct-in-use--yield-sut-output` |
+| Methods, and `get` / `set` | Name equality alone does not make a copy. What the body returns is not settled until it runs |
+| An object built only out of spreads | There is no property to enumerate. Inline construction is taken by construct, and a spread of a fixture dependency by [no-fixture-forward-subject--yield-sut-output](./no-fixture-forward-subject--yield-sut-output.md) |
+| Placing a destructured dependency straight onto a same-named key | The value is not shaped like a read. Forward takes it as a pass-through |
+| A key or a subscript that settles only at run time | It cannot be read as a name |
+| A read lying two or more binding steps away | The walk takes one step only |
+| A copy handed over as the return of a call | The inside of the callee is not read |
 
-最後の 2 つは実装の都合ではなく、この読みが持たない情報である。届かないことは許していることを意味しないので、禁じる回避策の節に名前を挙げてある。
+The last two are information this reading does not hold rather than a convenience of the implementation. Not reaching does not mean it is allowed, so they are named in the forbidden bypasses section.
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「fixture が被験体として渡すオブジェクトは、コードが実際に生成した形そのものである」ことである。
+The object a fixture hands over as the subject is the shape the code actually produced.
 
-同名のプロパティを写して組み直したオブジェクトは、元の形の手作業の複製になる。元がフィールドを得ても、名前が変わっても、消えても、複製の側は書いた時点の形のまま静かに残る。`it` が突き合わせているのは複製なので、そのずれはアサーションを落とさない。テストが主張するのは「私が写した形は、私が書いた期待値と等しい」であって、コードが出す形については何も言っていない。
+An object reassembled by copying same-named properties is a hand-made replica of the original shape. When the original gains a field, is renamed, or loses one, the replica stays quietly in the shape it was written in. What the `it` compares is the replica, so the drift does not fail the assertion. What the test claims is "the shape I copied equals the expected value I wrote", and it says nothing about the shape the code produces.
 
-壊れ方はもう 1 層ある。複製を挟んだ時点で、そのアサーションはコードの変更に対して失敗しなくなる方向へ動く。落ちないテストは、収集されるどの信号でも通っているテストと区別が付かない。カバレッジは実行が到達したことしか見ないからである。
+There is one more layer. The moment a replica is interposed, that assertion moves toward never failing on a change to the code. A test that does not fail cannot be told apart from a passing test by any signal collected, because coverage sees only that execution reached it.
 
-## どう直すか
+### Configuration
 
-コードが生成した値をそのまま渡し、突き合わせは被験体の全体に対して書く。
+`specFileSuffixes`. The default is `.test.ts` and `.test.tsx`, sharing one range with the other rules of this bundle.
+
+There is no setting for allowing individual copies. Make an exception expressible in configuration and a route opens where whoever received a report adds an exception instead of fixing it.
+
+## Fix
+
+Hand over the value the code produced as it stands, and write the comparison against the whole subject.
 
 ```ts
 const test = baseTest.extend("declarations", () => moduleDeclarationsOf("report.test.ts", []));
@@ -68,20 +91,64 @@ test("carries the file it read and no declaration from an empty body", ({ declar
 });
 ```
 
-本当に別の被験体が要るなら、元の形をなぞらない形で組む。写したい名前が 1 つだけなら、それは被験体を狭めたいという要求なので、fixture を分けるか、コードが返す値そのものを見直す。
+Where a genuinely different subject is needed, build it in a shape that does not trace the original. Where only one name is worth copying, that is a demand to narrow the subject, so split the fixture or rework the value the code returns.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- 束縛を挟んで複写を隠す。被験体もプロパティの値も一段たどるので、fixture 本体の `const` とファイル直下の `const` は素通りしない
-- キーを 1 つだけ残して他をすべて rename し、別物だと主張する。1 つ残っていれば報告する
-- 複写を `expect(...)` の引数へ移す。`no-expect-synthetic-subject--yield-from-fixture` が受ける
-- 束縛を二段以上重ねて読み出しを遠ざける。この読みからは消えるが、渡している値は複製のままである
-- 複写を別の関数へ押し出し、その呼び出しの返り値を渡す。呼び先は読まないので報告は消えるが、渡している値は複製のままである
-- キーか読み出しを実行時にしか決まらない形へ書き換える。名前として読めなくなるだけで、複製であることは変わらない
-- 抑制ディレクティブ
+Code this rule rejects.
 
-## オプション
+```ts
+// an object written as the arrow body copies the shape it reads from
+// in report.test.ts
+const it = test.extend('report', () => ({ total: source.total }));
+```
 
-`specFileSuffixes` を取る。既定は `.test.ts` と `.test.tsx` で、この群の他のルールと同じ範囲を共有する。
+```ts
+// renaming every key but one leaves the copy in place
+// in report.test.ts
+const it = test.extend('report', () => ({ count: source.entries, total: source.total }));
+```
 
-複写を個別に許す設定は持たない。例外を設定で表現できるようにすると、報告を受けた側が直す代わりに例外を足す経路ができる。
+Code this rule accepts.
+
+```ts
+// a fixture handing back what the code under test produced carries its shape unchanged
+// in report.test.ts
+const it = test.extend('report', () => summarise(entries));
+```
+
+```ts
+// an object whose every key is spelled apart from the value it reads is not a copy of a shape
+// in report.test.ts
+const it = test.extend('report', () => ({ count: source.total, at: source.recordedAt }));
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Interposing a binding to hide the copy. The subject and each property value are followed one step, so a `const` in the fixture body and a `const` directly under the file do not pass through
+- Leaving one key and renaming all the rest, then claiming it is a different thing. One left is enough to report
+- Moving the copy into the argument of `expect(...)`. [no-expect-synthetic-subject--yield-from-fixture](./no-expect-synthetic-subject--yield-from-fixture.md) takes it
+- Stacking two or more bindings to put distance between the read and the key. It disappears from this reading, but the value handed over is still a replica
+- Pushing the copy into another function and handing over that call's return. The callee is not read so the report clears, but the value handed over is still a replica
+- Rewriting the key or the read into a form that settles only at run time. It merely stops being readable as a name; it is still a replica
+- A suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `copiedSubject` | A fixture must not hand back a subject assembled by reading same-named properties off another value. \`{{fixture}}\` reads {{properties}} into keys spelled the same way. Return the value the code under test produced, whole, and read the parts an assertion needs in the \`it\` body. Holding the copy in a binding before handing it back, and renaming every key but one, are reported all the same. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->
