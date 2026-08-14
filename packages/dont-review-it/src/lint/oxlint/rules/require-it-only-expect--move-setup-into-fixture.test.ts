@@ -12,6 +12,7 @@ describe("dont-review-it/require-it-only-expect--move-setup-into-fixture", () =>
     valid: [
       {
         name: "a body holding one assertion against the subject is the shape this rule keeps",
+        documented: true,
         code: "it('totals the lines', () => {\n  expect(total).toStrictEqual({ amount: 3 });\n});",
         filename: SPEC_FILENAME,
       },
@@ -52,6 +53,7 @@ describe("dont-review-it/require-it-only-expect--move-setup-into-fixture", () =>
       },
       {
         name: "preparation standing outside the test block is where this rule wants it",
+        documented: true,
         code: "const order = build();\ndescribe('order', () => {\n  const paid = pay(order);\n  it('totals the lines', () => {\n    expect(paid).toBe(3);\n  });\n});",
         filename: SPEC_FILENAME,
       },
@@ -131,12 +133,14 @@ describe("dont-review-it/require-it-only-expect--move-setup-into-fixture", () =>
     invalid: [
       {
         name: "a binding that prepares the subject is reported",
+        documented: true,
         code: "it('totals the lines', () => {\n  const order = build();\n  expect(order).toBe(3);\n});",
         filename: SPEC_FILENAME,
         errors: [{ messageId: "setupStatement" }],
       },
       {
         name: "the call under test written as a statement is reported",
+        documented: true,
         code: "it('totals the lines', () => {\n  save(order);\n  expect(order).toBe(3);\n});",
         filename: SPEC_FILENAME,
         errors: [{ messageId: "setupStatement" }],
