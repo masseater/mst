@@ -1,4 +1,4 @@
-# 0039. 仕様担保テストは verified-specifications が単独で受け持ち、テスト規律の束の射程から外す
+# 0060. 仕様担保テストは verified-specifications が単独で受け持ち、テスト規律の束の射程から外す
 
 - ステータス: Accepted
 - 日付: 2026-08-13
