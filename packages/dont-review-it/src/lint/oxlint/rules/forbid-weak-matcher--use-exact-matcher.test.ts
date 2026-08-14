@@ -12,11 +12,13 @@ describe("dont-review-it/forbid-weak-matcher--use-exact-matcher", () => {
     valid: [
       {
         name: "comparing the subject with the value it has to equal is the shape this rule keeps",
+        documented: true,
         code: "expect(subject).toBe(1);",
         filename: SPEC_FILENAME,
       },
       {
         name: "comparing the subject with the structure it has to equal is the other shape it keeps",
+        documented: true,
         code: "expect(subject).toStrictEqual({ id: 1, spelled: 'ada' });",
         filename: SPEC_FILENAME,
       },
@@ -236,6 +238,7 @@ describe("dont-review-it/forbid-weak-matcher--use-exact-matcher", () => {
       },
       {
         name: "an asymmetric matcher nested inside an expected structure is reported where it stands",
+        documented: true,
         code: "expect(save).toHaveBeenCalledWith({ id: expect.any(Number), spelled: expect.stringContaining('ada') });",
         filename: SPEC_FILENAME,
         errors: [{ messageId: "weakAsymmetricMatcher" }, { messageId: "weakAsymmetricMatcher" }],
@@ -260,6 +263,7 @@ describe("dont-review-it/forbid-weak-matcher--use-exact-matcher", () => {
       },
       {
         name: "a matcher dedicated to a single value restates the exact comparison",
+        documented: true,
         code: "expect(subject).toBeNull();\nexpect(subject).toBeUndefined();\nexpect(subject).toBeNaN();",
         filename: SPEC_FILENAME,
         errors: [
