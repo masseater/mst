@@ -20,6 +20,7 @@ describe("dont-review-it/no-local-file-system-mock--use-shared-fs", () => {
     valid: [
       {
         name: "the standard file system API used as it stands is the shape this rule keeps",
+        documented: true,
         filename: SPEC_FILE,
         code: [
           "import { writeFileSync } from 'node:fs';",
@@ -87,6 +88,7 @@ describe("dont-review-it/no-local-file-system-mock--use-shared-fs", () => {
       },
       {
         name: "a type-only import binds no value at run time",
+        documented: true,
         filename: SPEC_FILE,
         code: "import type { IFs } from 'memfs';\nimport { type Volume } from 'memfs';",
       },
@@ -237,6 +239,7 @@ describe("dont-review-it/no-local-file-system-mock--use-shared-fs", () => {
       },
       {
         name: "asking for the real implementation to be wrapped walks past the shared abstraction",
+        documented: true,
         filename: SPEC_FILE,
         code: "vi.mock('node:fs', { spy: true });\nvi.mock('fs', { 'spy': true });",
         errors: [WRAPPED, WRAPPED],
@@ -270,6 +273,7 @@ describe("dont-review-it/no-local-file-system-mock--use-shared-fs", () => {
       },
       {
         name: "importing the in-memory implementation binds the spec to a choice the shared setup owns",
+        documented: true,
         filename: SPEC_FILE,
         code: [
           "import { Volume } from 'memfs';",

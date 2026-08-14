@@ -1,83 +1,112 @@
+---
+description: "Disallow a spec standing up its own file system double or naming the in-memory implementation behind the standard API, so every spec reads and writes through one abstraction that the shared setup rebuilds before each test"
+---
+
 # no-local-file-system-mock--use-shared-fs
 
-## 前提
+<!-- BEGIN GENERATED rule-header -->
 
-このルールは共有のテスト設定とセットでしか成立しない。有効にする前に、次の 2 つが揃っていること。
+Disallow a spec standing up its own file system double or naming the in-memory implementation behind the standard API, so every spec reads and writes through one abstraction that the shared setup rebuilds before each test
 
-- ファイルシステムモジュールの指定子が、接頭辞の有無と同期版・Promise 版のすべてについて、共有のインメモリ実装に解決されている
-- 共有 setup が各テストの前にその領域を作り直し、必要な初期状態を用意する
+- Tool: `oxlint`
+- Fixable: yes
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-local-file-system-mock--use-shared-fs.ts`](../../src/lint/oxlint/rules/no-local-file-system-mock--use-shared-fs.ts)
 
-この 2 つが無い状態でルールだけを有効にすると、spec には差し替えの手段も後始末の手段も残らない。ルールが禁じているのは「spec が自前で持つこと」であって、「誰も持たないこと」ではない。
+<!-- END GENERATED rule-header -->
 
-## 何を検出するか
+## Violation
 
-対象は spec ファイルだけである。ファイル名の接尾辞で決め、既定は `.test.ts` と `.test.tsx`、`specFileSuffixes` で差し替えられる。実装側のパッケージがインメモリのファイルシステムに依存することはこのルールの関知するところではないので、範囲を spec に閉じている。
+This rule holds only together with the shared test configuration. Before enabling it, both of these must be in place.
 
-読む対象は 3 系統ある。
+- The file system module's specifiers, across the prefixed and unprefixed spellings and the synchronous and promise flavours, all resolve to one shared in-memory implementation
+- A shared setup rebuilds that area before each test and prepares whatever initial state is needed
 
-### ファイルシステムモジュールに対する差し替え宣言
+Enable the rule alone without those two and a spec is left with neither a means of replacement nor a means of teardown. What the rule forbids is "a spec holding one of its own", not "nobody holding one".
 
-差し替え宣言はランナーのモック名前空間の `mock` と `doMock` である。名前空間は素の綴りの一致に加えて、同一ファイル内で束縛の宣言まで辿って判定する。別名を付けた import も、いったん定数に置き直した参照も、グローバル注入の構成も同じ扱いになる。メンバ名は文字列リテラルと補間の無いテンプレートリテラルの添字も名前として読む。
+Only spec files are in scope. They are settled by the file name suffix; the default is `.test.ts` and `.test.tsx`, replaceable through `specFileSuffixes`. Whether an implementation package depends on an in-memory file system is none of this rule's business, so the range closes on specs.
 
-差し替えのメソッド自体を `const` に束ね直してから呼ぶ形も、束縛元が同一ファイル内で辿れる場合は元のメソッド呼び出しと同じに扱う。分割代入で取り出した束縛は辿らない。
+Three families are read.
 
-第一引数から静的に読める文字列指定子を取り出し、それが次の 4 つのいずれかであれば報告する。
+### A replacement declaration against a file system module
 
-| 指定子             | 由来                   |
-| ------------------ | ---------------------- |
-| `fs`               | 接頭辞なし・同期版     |
-| `fs/promises`      | 接頭辞なし・Promise 版 |
-| `node:fs`          | 接頭辞あり・同期版     |
-| `node:fs/promises` | 接頭辞あり・Promise 版 |
+Replacement declarations are `mock` and `doMock` on the runner's mock namespace. The namespace is settled by a plain spelling match and, additionally, by following bindings to their declaration inside the same file. An import taken under another name, a reference put through a constant first, and a globally injected setup are all treated the same. Member names are read from a string-literal subscript and a template-literal subscript with no interpolation as well.
 
-指定子は文字列リテラルでも、補間の無いテンプレートリテラルでも、同一ファイル内で 1 つの文字列リテラルに解決できる `const` の束縛でも、それらを動的 import の中に置いた形でもよい。
+Binding the replacement method itself to a `const` and calling that is treated as the original method call, where the binding's source is followable inside the same file. A binding taken out by destructuring is not followed.
 
-第二引数のオプションに実体をラップする指定 `spy` が真のリテラルとして含まれる場合だけ、別のメッセージで報告する。ラップ形は本物のファイルシステム実装を生かしたまま通すので、共有のインメモリ抽象を素通りしてしまう。理由が違うのでメッセージを分けている。それ以外（ファクトリを渡す形、他のオプション、ラップ指定が偽、ラップ指定が非リテラル、引数が 1 つだけ）は、ローカルなダブルの設定として報告する。
+The string specifier readable statically from the first argument is taken, and the report stands where it is one of these four.
 
-### 指定子が静的に読めない差し替え宣言
-
-実行時にしか値の決まらない式を指定子に渡された場合、その差し替えがファイルシステムを対象にしているかは判定できない。判定できないことを理由に見逃すと、指定子を変数へ移すだけでこのルールを回避できる。そこで対象の同定を諦め、「静的に読めない指定子で差し替え宣言を書いたこと」自体を 3 つ目のメッセージで報告する。
-
-誤検出は出ない。差し替え宣言は読み込みより前に巻き上げられて評価されるので、実行時に組み立てた指定子を渡す正当な用途が存在しないためである。書き換えられる束縛（`let` / `var`）に置かれた指定子も、分割代入で取り出した指定子も、この系統に落ちる。
-
-### インメモリ実装を値として取り込むこと
-
-共有 setup が内部で使っているインメモリファイルシステム実装のパッケージを、spec が値として取り込む形を報告する。パッケージ名そのものと、その配下のサブパスの双方を見る。見る位置は 3 つある。
-
-- 静的な import 宣言
-- 同期の読み込み呼び出し（`require`）
-- 指定子が静的に読める動的 import
-
-どのパッケージかは共有 setup 側の選択に従うので、`inMemoryFileSystemPackages` は共有設定と同じ一箇所から導かれていなければならない。既定は `memfs` である。
-
-## 違反とみなさないもの
-
-| 形 | 対象にしない理由 |
+| Specifier | Origin |
 | --- | --- |
-| 型だけの import | 実行時に何も起こさない。実装詳細への結合にならない |
-| ファイルシステム以外のモジュールに対する差し替え宣言 | 指定子が静的に読めて、かつ 4 つの指定子のいずれでもない場合に限る |
-| 差し替え宣言ではない呼び出し | スパイの設置、同名の素の関数呼び出し、束縛を辿ってもモック名前空間に到達しないオブジェクトのメソッド、プロパティを辿った先のメソッド、private identifier |
-| 計算された添字での呼び出し | メンバの名前が読めない。文字列リテラルの添字は名前として読むので対象になる |
-| 言語標準のファイルシステム API をそのまま使うこと | むしろこれが正しい形である |
-| 指定子を実行時に組み立てる動的 import | 値が実行時にしか決まらないので、インメモリ実装を指すかが決まらない |
+| `fs` | Unprefixed, synchronous |
+| `fs/promises` | Unprefixed, promise |
+| `node:fs` | Prefixed, synchronous |
+| `node:fs/promises` | Prefixed, promise |
 
-最後の 2 つは実装の都合ではなく、この読みが持たない情報である。差し替え宣言と違って、動的 import は「読めない指定子の読み込み」を一律に報告する形が取れない。spec が遅延読み込みの挙動を検証するために計算した指定子で動的 import を書くことは正当にありうるためである。届かないことは許していることを意味しないので、禁じる回避策の節に名前を挙げてある。
+The specifier may be a string literal, a template literal with no interpolation, a `const` binding resolvable to one string literal inside the same file, or any of those placed inside a dynamic import.
 
-## なぜそれが要るか
+Only where the second argument's options carry the wrap-the-real-thing setting `spy` as a true literal is a different message reported. The wrapping form lets the real file system implementation through alive, so it walks past the shared in-memory abstraction. The reason differs, so the message does. Everything else — handing over a factory, other options, a false wrap setting, a non-literal wrap setting, a single argument — is reported as setting up a local double.
 
-守っている不変条件は「spec はファイルシステムを言語標準の API としてそのまま使い、誰がそれを実ディスクから切り離しているかを知らない」ことである。
+### A replacement declaration whose specifier cannot be read statically
 
-共有設定がその解決と後始末を持っている環境では、spec が自前でダブルを設定する行為は 3 通りに壊れる。
+Where an expression settling only at run time is handed as the specifier, whether that replacement targets the file system cannot be judged. Overlook it on the grounds that it cannot be judged and this rule is evaded by moving the specifier into a variable. So identifying the target is given up, and **writing a replacement declaration with a specifier that cannot be read statically** is itself reported as a third message.
 
-第一に、共有の抽象と spec ローカルのダブルが二重管理になり、実挙動が食い違っていく。第二に、ローカルのダブルは共有 setup の各テスト前の初期化の外に出るので、テスト間でファイル状態が持ち越される。第三に、インメモリ実装を直接取り込むと、共有 setup が隠している実装詳細に spec が結合し、共有側を差し替えたときに spec が壊れる。
+There are no false positives. Replacement declarations are hoisted and evaluated before loading, so no legitimate use exists for handing over a specifier assembled at run time. A specifier held in a rewritable binding (`let` / `var`), and one taken out by destructuring, fall into this family.
 
-並列実行の文脈では第二が効く。テストはファイル単位でも同一ファイル内の `it` 単位でも並列に走る前提で書かれる。ファイルシステムはそのファイルのすべてのテストが同時に触る広域の可変状態であり、初期化されないまま持ち越されればテストの結果は実行順に依存する。「次に走るテストが何か」は実行のたびに変わりうるので、失敗は再現しない形で現れる。
+### Taking the in-memory implementation in as a value
 
-ラップ形を別メッセージにしているのも同じ理由からである。ラップ形は「モックしていない」と読めてしまうが、本物の実装が生きるぶん、書き込みは共有 setup のどの初期化も届かない面に落ちる。
+A spec taking in, as a value, the in-memory file system package the shared setup uses internally is reported. Both the package name itself and subpaths under it are read. Three positions are read.
 
-## どう直すか
+- A static `import` declaration
+- A synchronous read call (`require`)
+- A dynamic import whose specifier is readable statically
 
-ローカルの差し替え宣言を削除し、言語標準の API でテスト用のファイルを用意してから対象を呼ぶ。テストの本体は共有設定が入る前と変わらない。
+Which package it is follows the shared setup's choice, so `inMemoryFileSystemPackages` must be derived from the same one place as the shared configuration. The default is `memfs`.
+
+### Not violations
+
+| Shape | Why it is left out |
+| --- | --- |
+| A type-only import | Nothing happens at run time. It is no coupling to an implementation detail |
+| A replacement declaration against a module other than the file system | Only where the specifier is readable statically and is none of the four |
+| A call that is not a replacement declaration | Installing a spy, a plain function call of the same name, a method on an object that reaches no mock namespace when its binding is followed, a method behind a property walk, a private identifier |
+| A call through a computed subscript | The member's name cannot be read. A string-literal subscript is read as a name and is in scope |
+| Using the language's standard file system API as it stands | This is the right shape |
+| A dynamic import assembling its specifier at run time | The value settles only at run time, so whether it names the in-memory implementation is not settled |
+
+The last two are information this reading does not hold rather than a convenience of the implementation. Unlike a replacement declaration, a dynamic import cannot be reported wholesale as "a read with an unreadable specifier": a spec computing a specifier to verify lazy-loading behaviour is legitimate. Not reaching does not mean it is allowed, so they are named in the forbidden bypasses section.
+
+### The invariant
+
+A spec uses the file system through the language's standard API as it stands, and does not know who has cut that off from a real disk.
+
+In an environment where the shared configuration holds that resolution and that teardown, a spec setting up a double of its own breaks in three ways.
+
+First, the shared abstraction and the spec-local double become two things to maintain, and their real behaviour diverges. Second, a local double sits outside the shared setup's per-test initialization, so file state carries over between tests. Third, taking the in-memory implementation in directly couples the spec to an implementation detail the shared setup hides, so replacing the shared side breaks the spec.
+
+The second matters most under parallel execution. Tests are written assuming they run in parallel both per file and per `it` inside one file. The file system is broad mutable state every test in that file touches at once, and carried over uninitialized, results depend on execution order. Which test runs next can change from run to run, so the failure appears in a form that does not reproduce.
+
+The wrapping form gets its own message for the same reason. It reads as "not mocked", but with the real implementation alive, writes land on a face no initialization in the shared setup reaches.
+
+### Configuration
+
+| Name | Default | What it lines up with |
+| --- | --- | --- |
+| `mockNamespace` | `vi` | The mock namespace of the test runner in use |
+| `moduleReplacementMembers` | `doMock` / `mock` | The spellings of that runner's replacement declarations |
+| `fileSystemModules` | `fs` / `fs/promises` / `node:fs` / `node:fs/promises` | The specifiers the shared configuration aliases |
+| `inMemoryFileSystemPackages` | `memfs` | The package the shared configuration chose as those specifiers' target |
+| `specFileSuffixes` | `.test.ts` / `.test.tsx` | The range shared with the other rules of this bundle |
+
+`fileSystemModules` and `inMemoryFileSystemPackages` appear in the configuration because they mean nothing unless they match the shared configuration's contents. Make what the shared configuration aliases the detection target as it stands, and derive both from the same one place. Handing over an empty array returns to the default.
+
+The spelling of the wrap-the-real-thing setting (`spy`) is not exposed in the configuration. Respell it and the wrapping form is still reported as a local double, so making it removable is no way out — it would only add one more thing to reconcile against the shared configuration.
+
+## Fix
+
+Delete the local replacement declaration and prepare the test's files through the standard API before calling the target. The body of the test is what it was before the shared configuration arrived.
 
 ```ts
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -99,34 +128,63 @@ describe("nearestTsconfigExtends", () => {
 });
 ```
 
-自動修正は、指定子が静的に読めて引数が 1 つだけの単独文として書かれた差し替え宣言に限って行う。ファクトリ付き、ラップ指定付き、指定子が静的に読めないもの、インメモリ実装の取り込みは自動修正しない。いずれも意図を共有の抽象側か、production 側の依存注入に移す判断が必要で、機械的な削除では意味が変わるためである。
+The automatic fix covers only a replacement declaration written as a lone statement with a statically readable specifier and one argument. A form with a factory, one with a wrap setting, one whose specifier cannot be read statically, and taking the in-memory implementation in are not fixed automatically. Each needs a decision about moving the intent to the shared abstraction or to dependency injection on the production side, and a mechanical deletion would change the meaning.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- ラップ指定を付けて「モックしていない」ことにする。本物の実装が生きるため、共有抽象を素通りする
-- インメモリ実装を直接取り込んで、その領域を spec から操作する
-- 指定子を定数に移す。同一ファイル内の `const` は 1 つの文字列リテラルまで辿るので報告は消えない
-- 指定子を実行時に組み立てて差し替え宣言に渡す。読めない指定子であること自体を報告する
-- メンバを文字列の添字で書く。文字列リテラルの添字は名前として読む
-- 差し替えのメソッドを別の名前に束ね直してから呼ぶ。`const` の束縛は辿るので報告は消えない
-- メンバを計算された添字で書く。この読みからは消えるが、差し替えが起きることは変わらない
-- 差し替えのメソッドを分割代入で取り出してから呼ぶ。この読みからは消えるが、差し替えが起きることは変わらない
-- 指定子を実行時に組み立ててインメモリ実装を動的に読み込む。この読みからは消えるが、実装詳細への結合は変わらない
-- 差し替えやインメモリ実装の取り込みを、spec の接尾辞を持たない補助ファイルへ押し出す。この読みは spec ファイルだけを見る
-- 共有 setup 側にこの spec のための特別扱いを足す。共有 setup は spec から見えない一箇所であり続けなければならない
-- `fileSystemModules` や `inMemoryFileSystemPackages` から名前を外して語彙を空にする
-- 抑制ディレクティブ
+Code this rule rejects.
 
-## オプション
+```ts
+// asking for the real implementation to be wrapped walks past the shared abstraction
+// in mailer.test.ts
+vi.mock('node:fs', { spy: true });
+vi.mock('fs', { 'spy': true });
+```
 
-| 名前 | 既定 | 何に合わせるか |
-| --- | --- | --- |
-| `mockNamespace` | `vi` | 採用するテストランナーのモック名前空間 |
-| `moduleReplacementMembers` | `doMock` / `mock` | 同じランナーの差し替え宣言の綴り |
-| `fileSystemModules` | `fs` / `fs/promises` / `node:fs` / `node:fs/promises` | 共有設定が別名解決している指定子 |
-| `inMemoryFileSystemPackages` | `memfs` | 共有設定がその指定子の解決先に選んだパッケージ |
-| `specFileSuffixes` | `.test.ts` / `.test.tsx` | この群の他のルールと共有する範囲 |
+Code this rule accepts.
 
-`fileSystemModules` と `inMemoryFileSystemPackages` が設定に出ているのは、この 2 つが共有設定の内容と一致していなければ意味を成さないからである。共有設定の別名解決の対象をそのまま検出対象にし、両者が同じ一箇所から導かれる形にする。配列を空で渡した場合は既定に戻る。
+```ts
+// a type-only import binds no value at run time
+// in mailer.test.ts
+import type { IFs } from 'memfs';
+import { type Volume } from 'memfs';
+```
 
-実体をラップする指定の綴り（`spy`）は設定に出さない。綴りを言い換えてもラップ形はローカルなダブルとして報告されるため、外せるようにしても抜け道にはならず、増える設定の分だけ共有設定との突き合わせが増える。
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Adding the wrap setting to call it "not mocked". The real implementation stays alive and walks past the shared abstraction
+- Taking the in-memory implementation in directly and operating its area from the spec
+- Moving the specifier into a constant. A `const` inside the same file is followed to one string literal, so the report does not clear
+- Assembling the specifier at run time and handing it to a replacement declaration. An unreadable specifier is itself reported
+- Writing the member as a string subscript. A string-literal subscript is read as a name
+- Rebinding the replacement method to another name and calling that. `const` bindings are followed, so the report does not clear
+- Writing the member as a computed subscript. It disappears from this reading, and the replacement still happens
+- Taking the replacement method out by destructuring and calling that. It disappears from this reading, and the replacement still happens
+- Assembling the specifier at run time to load the in-memory implementation dynamically. It disappears from this reading, and the coupling to an implementation detail is unchanged
+- Pushing the replacement, or the in-memory import, into a helper file carrying no spec suffix. This reading looks at spec files only
+- Adding special handling for this spec to the shared setup. The shared setup has to stay one place invisible from a spec
+- Emptying the vocabulary by removing names from `fileSystemModules` or `inMemoryFileSystemPackages`
+- A suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `localFileSystemDouble` | A spec must not stand up its own file system double. Delete this \`{{member}}\` declaration for \`{{specifier}}\` and create whatever files the test needs through the standard file system API before calling the subject. The shared test setup already puts an in-memory implementation behind that specifier and rebuilds it before each test, so a double declared here is a second implementation that drifts from the shared one and carries file state across tests running beside it. Handing a factory, moving the specifier into a binding, and spelling the member out as a string subscript are all read as this same declaration. |
+| `wrappedFileSystemModule` | A file system replacement must not keep the real implementation. Delete this \`{{member}}\` declaration for \`{{specifier}}\` instead of asking for the original to be wrapped. Wrapping leaves the real disk in place, so the spec walks straight past the in-memory implementation the shared setup put behind that specifier and writes to a surface no per-test rebuild reaches. Create the files the test needs through the standard file system API and call the subject. |
+| `unreadableModuleSpecifier` | A module replacement declaration must not take a target that only settles at run time. Write the module out as a string literal at this \`{{member}}\` call. The declaration is hoisted above the imports and evaluated before any of them, so a specifier assembled at run time cannot be the module it replaces, and a target nobody can read cannot be held against the file system modules the shared setup owns. |
+| `inMemoryFileSystemTaken` | A spec must not take the in-memory file system implementation as a value. Drop this reach for \`{{specifier}}\` and go through the standard file system API instead. Which implementation stands behind that API is the shared setup's to choose and the spec's not to see: naming it here ties the spec to a choice that will change under it, and the region reached this way sits outside the rebuild the shared setup runs before each test. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->
