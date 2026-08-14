@@ -76,24 +76,9 @@ Code this rule rejects.
 export const total = 1;
 ```
 
-```ts
-// extending the shared base directly skips the layer that decides the runtime
-export const total = 1;
-```
-
-Code this rule accepts.
-
-```ts
-// extending the library preset by package name passes
-export const total = 1;
-```
-
-```ts
-// extending the same preset by a relative path passes
-export const total = 1;
-```
-
 <!-- END GENERATED examples -->
+
+The subject of this rule is the compiler configuration a workspace holds rather than the source in front of you, so the code above is the file the report stands on, and what settles the judgment is what the configuration beside it extends.
 
 ### Forbidden bypasses (do not do this)
 

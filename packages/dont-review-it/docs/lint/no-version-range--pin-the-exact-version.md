@@ -87,26 +87,12 @@ Code this rule rejects.
 ```ts
 // the root workspace carries both its own ranges and the ones the catalog registers
 export const shipped = true;
-```
 
-```ts
-// an alias carrying a range is reported under the package it resolves to
-export const shipped = true;
-```
-
-Code this rule accepts.
-
-```ts
-// a workspace declaring references, an exact alias, a tag and a host passes
-export const shipped = true;
-```
-
-```ts
-// names registered as intentional ranges are not asked to be pinned
-export const shipped = true;
 ```
 
 <!-- END GENERATED examples -->
+
+The subject of this rule is the repository's manifests rather than the source in front of you, so the code above is the file the report stands on, and what settles the judgment is the versions those manifests declare.
 
 ### Forbidden bypasses (do not do this)
 

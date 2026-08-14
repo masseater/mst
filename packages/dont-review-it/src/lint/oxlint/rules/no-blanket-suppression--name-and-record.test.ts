@@ -111,7 +111,6 @@ describe("dont-review-it/no-blanket-suppression--name-and-record", () => {
       },
       {
         name: "a directive that names its rule, covers the next statement, carries grounds and is recorded passes",
-        documented: true,
         code: `// oxlint-disable-next-line ${REASSIGN_RULE} -- ${GROUNDS}\n${STATEMENT}`,
         filename: recordedHost,
       },

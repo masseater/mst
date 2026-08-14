@@ -107,7 +107,6 @@ describe("dont-review-it/no-duplicated-body--import-the-existing-declaration", (
     valid: [
       {
         name: "a declaration whose body is spelled nowhere else passes",
-        documented: true,
         code: "const twice = (value: number): number => value * 2;",
         filename: subjectFilename,
       },
@@ -142,7 +141,6 @@ describe("dont-review-it/no-duplicated-body--import-the-existing-declaration", (
     valid: [
       {
         name: "a body whose only site is this one is not spelled anywhere else",
-        documented: true,
         code: "const twice = (value: number): number => value * 2;",
         filename: subjectFilename,
       },

@@ -81,24 +81,9 @@ Code this rule rejects.
 export const total = 1;
 ```
 
-```ts
-// a source moved into the test tree to satisfy the pairing is reported on its own message
-export const total = 1;
-```
-
-Code this rule accepts.
-
-```ts
-// a test file whose source sits beside it under the same name passes
-export const total = 1;
-```
-
-```ts
-// a path the deployment exempts is left out of the invariant
-export const total = 1;
-```
-
 <!-- END GENERATED examples -->
+
+The subject of this rule is where a test file sits relative to its source rather than the source in front of you, so the code above is the file the report stands on, and what settles the judgment is the path it was placed at.
 
 ### Forbidden bypasses (do not do this)
 

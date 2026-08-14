@@ -150,27 +150,9 @@ export const shipped = true;
 
 ```
 
-```ts
-// a declaration of paths no check reads that covers a whole directory
-export const shipped = true;
-
-```
-
-Code this rule accepts.
-
-```ts
-// every authored path sits inside a check, and two checks may open the same path
-export const shipped = true;
-
-```
-
-```ts
-// an extension declared as read by no check is not a hole
-export const shipped = true;
-
-```
-
 <!-- END GENERATED examples -->
+
+The subject of this rule is the repository's paths and registers rather than the source in front of you, so the code above is the file the report stands on, and what settles the judgment is where that file sits.
 
 ### Forbidden bypasses (do not do this)
 

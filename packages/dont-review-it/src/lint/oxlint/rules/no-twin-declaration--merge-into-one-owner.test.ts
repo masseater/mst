@@ -214,7 +214,6 @@ describe("dont-review-it/no-twin-declaration--merge-into-one-owner", () => {
     invalid: [
       {
         name: "a declaration that shares both its name and its body is reported although the body is short",
-        documented: true,
         code: `const MANIFEST_FILE_NAME = "package.json";`,
         filename: subjectFilename,
         errors: [{ messageId: "twinDeclaration" }],

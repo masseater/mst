@@ -153,7 +153,6 @@ describe("dont-review-it/no-mixed-package-surface--declare-one-surface", () => {
     valid: [
       {
         name: "a package that declares one runnable entry and no import surface is the asked-for shape",
-        documented: true,
         code: MODULE_SOURCE,
         filename: runnableEntry,
       },
@@ -169,7 +168,6 @@ describe("dont-review-it/no-mixed-package-surface--declare-one-surface", () => {
       },
       {
         name: "task definitions are not a surface",
-        documented: true,
         code: MODULE_SOURCE,
         filename: runnableEntry,
         options: RUNNABLE_AS_RUNNABLE,
@@ -290,7 +288,6 @@ describe("dont-review-it/no-mixed-package-surface--declare-one-surface", () => {
       },
       {
         name: "a package registered as importable is reported for the runnable entry it declares",
-        documented: true,
         code: MODULE_SOURCE,
         filename: manyBinsEntry,
         options: MANY_BINS_AS_IMPORTABLE,

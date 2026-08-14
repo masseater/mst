@@ -92,7 +92,6 @@ describe("dont-review-it/no-class-as-mutable-cell--decide-in-an-iife", () => {
     invalid: [
       {
         name: "a class built inside a function with no name of its own is reported in place",
-        documented: true,
         code: TALLY,
         filename: subjectFilename,
         errors: [{ messageId: "containedMutableCellInPlace" }],

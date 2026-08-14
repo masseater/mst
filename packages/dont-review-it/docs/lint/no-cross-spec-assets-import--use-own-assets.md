@@ -100,11 +100,6 @@ import { rows } from "./relay.ts";
 Code this rule accepts.
 
 ```ts
-// the spec of the same stem in the same directory owns the test data it reads
-import { rows } from "./order.assets.ts";
-```
-
-```ts
 // the owner is recognised through a specifier that carries no extension
 import { rows } from "./order.assets";
 ```

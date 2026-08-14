@@ -97,19 +97,9 @@ Code this rule rejects.
 const twice = (value: number): number => value * 2;
 ```
 
-Code this rule accepts.
-
-```ts
-// a declaration whose body is spelled nowhere else passes
-const twice = (value: number): number => value * 2;
-```
-
-```ts
-// a body whose only site is this one is not spelled anywhere else
-const twice = (value: number): number => value * 2;
-```
-
 <!-- END GENERATED examples -->
+
+The subject of this rule is the bodies declared across the repository rather than the source in front of you alone, so the code above is the file the report stands on, and what settles the judgment is whether the same body is spelled somewhere else.
 
 ### Forbidden bypasses (do not do this)
 

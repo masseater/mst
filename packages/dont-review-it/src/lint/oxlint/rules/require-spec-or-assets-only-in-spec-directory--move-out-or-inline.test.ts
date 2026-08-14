@@ -104,7 +104,6 @@ describe("dont-review-it/require-spec-or-assets-only-in-spec-directory--move-out
     valid: [
       {
         name: "a spec directory holding only specs and their test data asks for nothing",
-        documented: true,
         code: MODULE_SOURCE,
         filename: heldSource,
       },
@@ -126,7 +125,6 @@ describe("dont-review-it/require-spec-or-assets-only-in-spec-directory--move-out
       },
       {
         name: "a directory declared unscanned is walked past",
-        documented: true,
         code: MODULE_SOURCE,
         filename: generatedSource,
         options: [{ unscannedDirectories: ["build"] }],
@@ -168,7 +166,6 @@ describe("dont-review-it/require-spec-or-assets-only-in-spec-directory--move-out
       },
       {
         name: "a file carrying the test data marker without a stem in front of it is a third kind",
-        documented: true,
         code: MODULE_SOURCE,
         filename: stemlessSource,
         errors: [

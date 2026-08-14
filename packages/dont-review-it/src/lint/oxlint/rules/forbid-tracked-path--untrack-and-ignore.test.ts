@@ -145,13 +145,11 @@ describe("dont-review-it/forbid-tracked-path--untrack-and-ignore", () => {
       },
       {
         name: "an untracked file of the same name is left where it stands",
-        documented: true,
         code: HOST_CODE,
         filename: join(untrackedEnv, HOST_FILE_NAME),
       },
       {
         name: "a tracked path outside every registered pattern is left alone",
-        documented: true,
         code: HOST_CODE,
         filename: join(trackedOutsideEveryPattern, HOST_FILE_NAME),
       },
@@ -228,7 +226,6 @@ describe("dont-review-it/forbid-tracked-path--untrack-and-ignore", () => {
       },
       {
         name: "a registered pattern missing from the ignore settings is reported",
-        documented: true,
         code: HOST_CODE,
         filename: join(missingListing, HOST_FILE_NAME),
         errors: [{ messageId: "unignoredForbiddenPattern" }],

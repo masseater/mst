@@ -84,11 +84,6 @@ Code this rule rejects.
 const MANIFEST_FILE_NAME = "package.json";
 ```
 
-```ts
-// a declaration that shares both its name and its body is reported although the body is short
-const MANIFEST_FILE_NAME = "package.json";
-```
-
 Code this rule accepts.
 
 ```ts

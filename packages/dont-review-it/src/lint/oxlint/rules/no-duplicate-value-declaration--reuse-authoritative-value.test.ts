@@ -94,7 +94,6 @@ describe("dont-review-it/no-duplicate-value-declaration--reuse-authoritative-val
     valid: [
       {
         name: "a value that shares only its name with another one passes",
-        documented: true,
         code: MANIFEST_SOURCE,
         filename: subjectFilename,
       },
@@ -117,7 +116,6 @@ describe("dont-review-it/no-duplicate-value-declaration--reuse-authoritative-val
     valid: [
       {
         name: "two values that share a name and a body without either being exported pass",
-        documented: true,
         code: MANIFEST_SOURCE,
         filename: subjectFilename,
       },
@@ -166,7 +164,6 @@ describe("dont-review-it/no-duplicate-value-declaration--reuse-authoritative-val
     invalid: [
       {
         name: "a value kept local under the name of an exported one is reported as hiding it",
-        documented: true,
         code: MANIFEST_SOURCE,
         filename: subjectFilename,
         errors: [{ messageId: "hiddenExportedValue" }],

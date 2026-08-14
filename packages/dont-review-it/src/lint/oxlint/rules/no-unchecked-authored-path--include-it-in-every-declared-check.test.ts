@@ -113,14 +113,12 @@ describe("dont-review-it/no-unchecked-authored-path--include-it-in-every-declare
     valid: [
       {
         name: "every authored path sits inside a check, and two checks may open the same path",
-        documented: true,
         code: MODULE_SOURCE,
         filename: coveredEntry,
         options: [{ declaredChecks: [MANIFEST_READER, ANALYSER, TYPE_CHECK] }],
       },
       {
         name: "an extension declared as read by no check is not a hole",
-        documented: true,
         code: MODULE_SOURCE,
         filename: declaredEntry,
         options: [{ declaredChecks: DECLARED_CHECKS, uncheckedDeclarations: READ_TEXT }],
@@ -207,7 +205,6 @@ describe("dont-review-it/no-unchecked-authored-path--include-it-in-every-declare
       },
       {
         name: "a declaration of paths no check reads that covers a whole directory",
-        documented: true,
         code: MODULE_SOURCE,
         filename: broadEntry,
         options: [

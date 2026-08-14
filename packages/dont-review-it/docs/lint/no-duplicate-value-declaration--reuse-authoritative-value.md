@@ -105,24 +105,9 @@ Code this rule rejects.
 const MANIFEST_FILE_NAME = "package.json";
 ```
 
-```ts
-// a value kept local under the name of an exported one is reported as hiding it
-const MANIFEST_FILE_NAME = "package.json";
-```
-
-Code this rule accepts.
-
-```ts
-// a value that shares only its name with another one passes
-const MANIFEST_FILE_NAME = "package.json";
-```
-
-```ts
-// two values that share a name and a body without either being exported pass
-const MANIFEST_FILE_NAME = "package.json";
-```
-
 <!-- END GENERATED examples -->
+
+The subject of this rule is the values declared across the repository rather than the source in front of you alone, so the code above is the file the report stands on, and what settles the judgment is what the other files declare.
 
 ### Forbidden bypasses (do not do this)
 

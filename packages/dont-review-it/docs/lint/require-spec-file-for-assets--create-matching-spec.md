@@ -67,26 +67,12 @@ Code this rule rejects.
 ```ts
 // test data with no spec of its stem anywhere
 export const orderTotals = [1, 2];
-```
 
-```ts
-// a spec of the same stem in another directory does not own this data
-export const orderTotals = [1, 2];
-```
-
-Code this rule accepts.
-
-```ts
-// test data owned by the spec of the same stem beside it
-export const orderTotals = [1, 2];
-```
-
-```ts
-// a module named after the marker alone names no stem to own it
-export const orderTotals = [1, 2];
 ```
 
 <!-- END GENERATED examples -->
+
+The subject of this rule is where test data sits and which spec owns it rather than the source in front of you, so the code above is the file the report stands on, and what settles the judgment is the stem it was named with and what stands beside it.
 
 ### Forbidden bypasses (do not do this)
 

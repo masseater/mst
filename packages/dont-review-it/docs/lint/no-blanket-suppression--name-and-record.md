@@ -135,12 +135,6 @@ element.total = 1;
 Code this rule accepts.
 
 ```ts
-// a directive that names its rule, covers the next statement, carries grounds and is recorded passes
-// oxlint-disable-next-line no-reassign--use-spread-or-iife -- the platform interface writes the total back into the element
-element.total = 1;
-```
-
-```ts
 // a rule name carrying its plugin prefix reaches the row that names it bare
 // oxlint-disable-next-line dont-review-it/no-reassign--use-spread-or-iife -- the platform interface writes the total back into the element
 element.total = 1;

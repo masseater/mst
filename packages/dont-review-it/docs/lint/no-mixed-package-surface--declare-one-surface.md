@@ -101,27 +101,9 @@ export const shipped = true;
 
 ```
 
-```ts
-// a package registered as importable is reported for the runnable entry it declares
-export const shipped = true;
-
-```
-
-Code this rule accepts.
-
-```ts
-// a package that declares one runnable entry and no import surface is the asked-for shape
-export const shipped = true;
-
-```
-
-```ts
-// task definitions are not a surface
-export const shipped = true;
-
-```
-
 <!-- END GENERATED examples -->
+
+The subject of this rule is what a package's manifest declares rather than the source in front of you, so the code above is the file the report stands on, and what settles the judgment is the surfaces that manifest names.
 
 ### Forbidden bypasses (do not do this)
 

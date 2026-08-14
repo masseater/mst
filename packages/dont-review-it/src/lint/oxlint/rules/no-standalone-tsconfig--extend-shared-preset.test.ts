@@ -106,7 +106,6 @@ describe("dont-review-it/no-standalone-tsconfig--extend-shared-preset", () => {
       },
       {
         name: "extending the library preset by package name passes",
-        documented: true,
         code: "export const total = 1;",
         filename: extendsLibrary,
         options: [sharedPresets],
@@ -119,7 +118,6 @@ describe("dont-review-it/no-standalone-tsconfig--extend-shared-preset", () => {
       },
       {
         name: "extending the same preset by a relative path passes",
-        documented: true,
         code: "export const total = 1;",
         filename: extendsRelative,
         options: [sharedPresets],
@@ -176,7 +174,6 @@ describe("dont-review-it/no-standalone-tsconfig--extend-shared-preset", () => {
       },
       {
         name: "extending the shared base directly skips the layer that decides the runtime",
-        documented: true,
         code: "export const total = 1;",
         filename: extendsBase,
         options: [sharedPresets],

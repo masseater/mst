@@ -88,7 +88,6 @@ describe("dont-review-it/no-cross-spec-assets-import--use-own-assets", () => {
     valid: [
       {
         name: "the spec of the same stem in the same directory owns the test data it reads",
-        documented: true,
         code: 'import { rows } from "./order.assets.ts";',
         filename: join(fixtureDir, "owner/order.test.ts"),
       },

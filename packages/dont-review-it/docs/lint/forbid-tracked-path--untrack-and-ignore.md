@@ -102,24 +102,9 @@ Code this rule rejects.
 export const total = 1;
 ```
 
-```ts
-// a registered pattern missing from the ignore settings is reported
-export const total = 1;
-```
-
-Code this rule accepts.
-
-```ts
-// an untracked file of the same name is left where it stands
-export const total = 1;
-```
-
-```ts
-// a tracked path outside every registered pattern is left alone
-export const total = 1;
-```
-
 <!-- END GENERATED examples -->
+
+The subject of this rule is the paths the index tracks rather than the source in front of you, so the code above is the file the report stands on, and what settles the judgment is which paths the index holds and what the ignore settings register.
 
 ### Forbidden bypasses (do not do this)
 

@@ -79,26 +79,12 @@ Code this rule rejects.
 ```ts
 // a file that is neither a spec nor test data is reported against the workspace holding it
 export const held = true;
-```
 
-```ts
-// a file carrying the test data marker without a stem in front of it is a third kind
-export const held = true;
-```
-
-Code this rule accepts.
-
-```ts
-// a spec directory holding only specs and their test data asks for nothing
-export const held = true;
-```
-
-```ts
-// a directory declared unscanned is walked past
-export const held = true;
 ```
 
 <!-- END GENERATED examples -->
+
+The subject of this rule is what a spec directory holds rather than the source in front of you, so the code above is the file the report stands on, and what settles the judgment is which of the two kinds the file placed there is.
 
 ### Forbidden bypasses (do not do this)
 

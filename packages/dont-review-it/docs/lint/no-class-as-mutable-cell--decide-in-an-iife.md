@@ -139,16 +139,7 @@ class Tally {
     this.total += row;
   }
 }
-```
 
-```ts
-// a class built inside a function with no name of its own is reported in place
-class Tally {
-  total = 0;
-  add(row: number) {
-    this.total += row;
-  }
-}
 ```
 
 Code this rule accepts.
@@ -158,6 +149,7 @@ Code this rule accepts.
 const Tally = class {
   total = 0;
 };
+
 ```
 
 ```ts
@@ -165,6 +157,7 @@ const Tally = class {
 export default class {
   total = 0;
 }
+
 ```
 
 <!-- END GENERATED examples -->

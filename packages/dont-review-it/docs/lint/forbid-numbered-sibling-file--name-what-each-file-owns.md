@@ -79,24 +79,9 @@ Code this rule rejects.
 export const total = 1;
 ```
 
-```ts
-// the ordinal is found before the suffix chain, so numbered test files are caught
-export const total = 1;
-```
-
-Code this rule accepts.
-
-```ts
-// digits attached to a word without a separator carry meaning of their own
-export const total = 1;
-```
-
-```ts
-// a single letter after the separator can name an axis, so it is left to review
-export const total = 1;
-```
-
 <!-- END GENERATED examples -->
+
+The subject of this rule is the names a directory holds rather than the source in front of you, so the code above is the file the report stands on, and what settles the judgment is what that file is called and what stands beside it.
 
 ### Forbidden bypasses (do not do this)
 

@@ -88,7 +88,6 @@ describe("dont-review-it/no-split-type-authority--rename-or-unify", () => {
     valid: [
       {
         name: "a test file is never linted, so it is never reported",
-        documented: true,
         code: SUBJECT_CODE,
         filename: join(repositoryRoot, "packages/dont-review-it/src/subject.test.ts"),
       },
@@ -113,7 +112,6 @@ describe("dont-review-it/no-split-type-authority--rename-or-unify", () => {
     valid: [
       {
         name: "a type declared twice with one shape is left to the rule that reads exact matches",
-        documented: true,
         code: SUBJECT_CODE,
         filename: subjectFilename,
       },
@@ -126,7 +124,6 @@ describe("dont-review-it/no-split-type-authority--rename-or-unify", () => {
     invalid: [
       {
         name: "a type whose structure carries another name in the repository is reported",
-        documented: true,
         code: SUBJECT_CODE,
         filename: subjectFilename,
         errors: [{ messageId: "splitTypeName" }],

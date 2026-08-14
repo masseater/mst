@@ -123,24 +123,9 @@ Code this rule rejects.
 export type Shape = { readonly a: string; readonly b: number; readonly c: Named };
 ```
 
-```ts
-// a type whose structure carries another name in the repository is reported
-export type Shape = { readonly a: string; readonly b: number; readonly c: Named };
-```
-
-Code this rule accepts.
-
-```ts
-// a test file is never linted, so it is never reported
-export type Shape = { readonly a: string; readonly b: number; readonly c: Named };
-```
-
-```ts
-// a type declared twice with one shape is left to the rule that reads exact matches
-export type Shape = { readonly a: string; readonly b: number; readonly c: Named };
-```
-
 <!-- END GENERATED examples -->
+
+The subject of this rule is the types declared across the repository rather than the source in front of you alone, so the code above is the file the report stands on, and what settles the judgment is which names and which shapes the other files carry.
 
 ### Forbidden bypasses (do not do this)
 
