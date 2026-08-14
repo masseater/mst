@@ -113,11 +113,13 @@ describe("dont-review-it/no-version-range--pin-the-exact-version", () => {
       },
       {
         name: "a workspace declaring references, an exact alias, a tag and a host passes",
+        documented: true,
         code: MODULE_SOURCE,
         filename: exactMemberEntry,
       },
       {
         name: "names registered as intentional ranges are not asked to be pinned",
+        documented: true,
         code: MODULE_SOURCE,
         filename: rangedRootEntry,
         options: INTENTIONAL,
@@ -141,6 +143,7 @@ describe("dont-review-it/no-version-range--pin-the-exact-version", () => {
     invalid: [
       {
         name: "the root workspace carries both its own ranges and the ones the catalog registers",
+        documented: true,
         code: MODULE_SOURCE,
         filename: rangedRootEntry,
         errors: [
@@ -156,6 +159,7 @@ describe("dont-review-it/no-version-range--pin-the-exact-version", () => {
       },
       {
         name: "an alias carrying a range is reported under the package it resolves to",
+        documented: true,
         code: MODULE_SOURCE,
         filename: alphaEntry,
         errors: [
