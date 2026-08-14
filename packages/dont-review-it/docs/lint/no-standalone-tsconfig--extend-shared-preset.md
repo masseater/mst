@@ -1,58 +1,121 @@
+---
+description: "Require the tsconfig.json that governs a file to extend one of the shared presets, so compiler ruleOptions are decided in one place instead of being copied into every workspace"
+---
+
 # no-standalone-tsconfig--extend-shared-preset
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-lint 対象のファイルから上へ辿って最初に見つかる `tsconfig.json` が、設定で許可されたプリセットのどれも `extends` していないこと。`extends` が無い場合も、別のプリセットを指している場合も、ここで捕まる。
+Require the tsconfig.json that governs a file to extend one of the shared presets, so compiler ruleOptions are decided in one place instead of being copied into every workspace
 
-判定に使うのは `extends` の指定だけで、`compilerOptions` の中身は見ない。プリセットを extends したうえで一部を上書きしていても報告しない。何を上書きしてよいかはこのルールが決めることではなく、上書きが積み上がったかどうかはレビューで見える。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-standalone-tsconfig--extend-shared-preset.ts`](../../src/lint/oxlint/rules/no-standalone-tsconfig--extend-shared-preset.ts)
 
-`extends` は 1 つの文字列でも文字列の配列でも受け取る。配列の場合は 1 つでも許可された指定があれば通る。
+<!-- END GENERATED rule-header -->
 
-`tsconfig.json` は JSON ではなく JSONC として読む。コメントと末尾のカンマがあっても `extends` を読み落とさない。テンプレートが生成する `tsconfig.json` はコメント付きで出てくるので、ここで読めないとルールが最も効いてほしい相手を素通しする。
+## Violation
 
-読めなかった `tsconfig.json`（JSON としても JSONC としても解釈できないもの）は、`extends` が無いものとして扱う。
+The first `tsconfig.json` found by walking up from a linted file extending none of the presets the configuration allows. Carrying no `extends` at all and pointing at some other preset are both caught here.
 
-上へ辿って `tsconfig.json` が 1 つも見つからないファイルは報告しない。どの設定に属しているか決まらないため。
+Only the `extends` entry is read; the contents of `compilerOptions` are not. Extending a preset and overriding part of it is not reported. What may be overridden is not this rule's to settle, and overrides piling up is visible in review.
 
-報告は違反している `tsconfig.json` に属するファイルすべてに出る。先頭の 1 ファイルに絞ると、どのファイルに出るかが lint の実行順で決まってしまい、実行するたびに報告位置が動く。`tsconfig.json` を 1 つ直せば、そのワークスペースの報告はまとめて消える。
+`extends` is accepted as a single string or as a list of strings. In a list, one allowed entry is enough to pass.
 
-位置はファイル全体（Program ノード）になる。指すべき行が、報告されているファイルの中には無いため。
+`tsconfig.json` is read as JSONC rather than JSON, so comments and a trailing comma do not hide the `extends`. The `tsconfig.json` a template generates comes out with comments in it, and failing to read that would let this rule pass over exactly the case it most needs to catch.
 
-`tsconfig.json` の内容はディレクトリごとに一度だけ読み、その答えはプロセスが生きている間だけ覚える。lint の実行中に `tsconfig.json` を書き換えても、そのプロセスの答えは変わらない。変わるのは次に lint を起動したときである。
+A `tsconfig.json` that cannot be read — as JSON or as JSONC — is treated as carrying no `extends`.
 
-## なぜそれが要るか
+A file with no `tsconfig.json` anywhere above it is not reported, because which configuration it belongs to is not settled.
 
-コンパイラオプションをワークスペースごとに書き出すと、書いた瞬間は同じ内容の写しになる。写しであることを保っているものは何も無いので、どれか 1 つを触った時点で写しではなくなる。そして食い違ったことを報告するものも無い。
+Every file belonging to an offending `tsconfig.json` is reported. Narrowing that to the first file would leave which file carries the report up to the order the lint happens to run in, moving the report around from run to run. Fixing one `tsconfig.json` clears every report for that workspace at once.
 
-このリポジトリは実際にその状態にあった。3 つのパッケージの `tsconfig.json` は 15 項目が完全に同一で、ルートと `apps/website` だけが別内容だった。`strict` はそのうち 3 つにしか入っておらず、ルートと `apps/website` では効いていなかった。誰かが外したのではなく、テンプレートが配ったものをそれぞれが受け取り、そのまま置いていた結果である。
+The report covers the whole file (the Program node), because there is no line to point at inside the file being reported.
 
-集約するだけでは同じ状態に戻る。次にワークスペースを足す人はテンプレートが吐いた `tsconfig.json` をそのまま置き、それは動いてしまう。動いてしまう以上、レビューで指摘されるまで気づかれない。そしてレビューは毎回同じ指摘を繰り返すことになる。
+The contents of a `tsconfig.json` are read once per directory, and the answer is remembered for as long as the process lives. Rewriting a `tsconfig.json` mid-run does not change that process's answer; the next run does.
 
-このルールがあると、集約された状態から外れたときに機械が報告する。どのオプションを選ぶかという議論は、プリセットを直す 1 か所に集まる。
+### The invariant
 
-## どう直すか
+Writing compiler options out per workspace produces copies that are identical the moment they are written. Nothing holds them identical, so the first time one is touched they stop being copies, and nothing reports that they have diverged.
 
-その `tsconfig.json` の `compilerOptions` を消し、ワークスペースの動く場所に合う共有プリセットを `extends` する。Node で動くなら library、ブラウザで動くなら app を指す。
+This repository was in exactly that state. Three packages' `tsconfig.json` files agreed on 15 entries, while the root and `apps/website` held something else. `strict` was in only three of them and was not in force at the root or in `apps/website`. Nobody had removed it: each had received what the template handed out and left it where it landed.
 
-残してよいのは、そのワークスペースに固有で、かつプリセットに置くと他のワークスペースを壊すものだけである。実際には `include` がそれにあたる。
+Consolidating alone returns to the same state. The next person adding a workspace drops in the `tsconfig.json` the template emitted, and it works. Because it works, nothing notices until a review says so, and the review then says the same thing every time.
 
-プリセットが渡してくれないオプションが要るなら、選択肢は 2 つしかない。そのオプションがどのワークスペースにも要るならプリセットに足す。動く場所が既存のどのプリセットとも違うなら、その場所のためのプリセットを新しく作り、許可される指定の一覧に足す。どちらもせずにワークスペース側で決めると、次のワークスペースが同じ判断をもう一度することになり、このルールが防ごうとしている状態に戻る。
+With this rule, a machine reports the moment something falls out of the consolidated state. The argument about which options to choose gathers in the one place that fixes the preset.
 
-土台のプリセットを直接 `extends` するのは直し方にならない。土台は動く場所を決めていないので、Node 向けかブラウザ向けかがそのワークスペースだけ未定になる。
+### Configuration
 
-## 禁じる回避策
+The allowed `extends` entries are taken as a list of strings matched by suffix. Left unset, or handed an empty list, this rule reads nothing.
 
-- 許可される指定の一覧に、そのワークスペース専用のプリセットを 1 対 1 で足す。プリセットの数がワークスペースの数に追いつくと、集約したことにならない
-- プリセットを extends したうえで、元の `compilerOptions` をそのまま下に書き足す。報告は消えるが、写しは残っているので食い違いは同じように起きる
-- そのファイルだけ lint 抑制ディレクティブで黙らせる。ワークスペースがプリセットの外にいる状態が、理由の説明なしに固定される
-- 動く場所が違うという理由で新しいプリセットを作る前に、既存のプリセットに条件付きの分岐を入れる。`tsconfig.json` の `extends` に条件は書けないので、分岐は結局どこかのワークスペースの側に現れる
+The match is on the suffix because there are two ways to point at the same preset. A workspace that can depend on the package owning the preset points at it by package name (`@mst/dont-review-it/tsconfig/library.json`); one that cannot, because the dependency runs the other way, points at it by relative path (`../dont-review-it/tsconfig/library.json`). Both end in `dont-review-it/tsconfig/library.json`, so the list carries that part alone.
 
-## オプション
+Include the name of the package owning the preset in each entry. Allowing a bare suffix such as `./tsconfig/library.json` would also let through a preset from any other package that happens to carry a file of the same name.
 
-許可される `extends` の指定を、末尾一致で判定する文字列の一覧として受け取る。設定しない、あるいは空の一覧を渡した場合、このルールは何も見ない。
+Which presets are allowed is not settled inside the rule. How the presets are arranged follows from the situation of whoever uses them, and embedding that in the rule would mean changing the rule every time a preset is added.
 
-末尾一致にしているのは、同じプリセットを指す書き方が 2 通りあるためである。プリセットを所有するパッケージに依存できるワークスペースはパッケージ名で指し（`@mst/dont-review-it/tsconfig/library.json`）、依存の向きが逆で依存できないワークスペースは相対パスで指す（`../dont-review-it/tsconfig/library.json`）。どちらも `dont-review-it/tsconfig/library.json` で終わるので、一覧にはその部分だけを置く。
+## Fix
 
-一覧に置く文字列には、プリセットを所有するパッケージの名前を含める。`./tsconfig/library.json` のようにパッケージ名を含まない末尾だけを許すと、たまたま同じ名前のファイルを持つ別のパッケージのプリセットも通ってしまう。
+Delete that `tsconfig.json`'s `compilerOptions` and `extends` the shared preset matching where the workspace runs: the library preset for Node, the app preset for a browser.
 
-どのプリセットを許すかはルール側では決めない。プリセットの構成はそれを使う側の事情で決まるものであり、ルールに埋め込むと、プリセットを 1 本足すたびにルールの変更が要る。
+What may stay is only what is specific to that workspace and would break other workspaces if it were put in the preset. In practice that is `include`.
+
+If an option the preset does not hand over is needed, there are two choices. Where every workspace needs it, add it to the preset. Where the workspace runs somewhere none of the existing presets covers, make a new preset for that place and add it to the list of allowed entries. Settling it on the workspace side instead means the next workspace makes the same decision again, which is the state this rule exists to prevent.
+
+Extending the base preset directly is not a fix. The base settles nothing about where the code runs, so that workspace alone is left without an answer to whether it targets Node or a browser.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// a tsconfig that writes its own compilerOptions is reported
+export const total = 1;
+```
+
+```ts
+// extending the shared base directly skips the layer that decides the runtime
+export const total = 1;
+```
+
+Code this rule accepts.
+
+```ts
+// extending the library preset by package name passes
+export const total = 1;
+```
+
+```ts
+// extending the same preset by a relative path passes
+export const total = 1;
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Adding a preset dedicated to one workspace to the allowed list, one for one. Once the number of presets catches up with the number of workspaces, nothing has been consolidated
+- Extending the preset and then writing the original `compilerOptions` underneath. The report clears while the copy remains, so the divergence happens exactly as before
+- Silencing that one file with a suppression directive. A workspace standing outside the preset is then pinned in place with no explanation of why
+- Adding a conditional branch to an existing preset rather than making a new one for a place that runs differently. `extends` in a `tsconfig.json` carries no conditions, so the branch ends up on some workspace's side anyway
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `standaloneTsconfig` | The tsconfig.json that governs this file must not decide compiler ruleOptions on its own. \`{{tsconfigPath}}\` extends none of {{allowedSuffixes}}. Replace its compilerOptions with an \`extends\` naming the preset that matches how the workspace runs, and keep only what is particular to the workspace, such as \`include\`. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

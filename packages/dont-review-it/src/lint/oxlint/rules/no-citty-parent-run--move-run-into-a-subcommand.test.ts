@@ -13,11 +13,13 @@ const check = defineCommand({ meta: { name: "check" }, run() {} });`,
       },
       {
         name: "a parent that only dispatches leaves the bare invocation to the framework",
+        documented: true,
         code: `import { defineCommand } from "citty";
 const main = defineCommand({ meta: { name: "cli" }, subCommands: { check } });`,
       },
       {
         name: "a parent names its bare-invocation behavior through default",
+        documented: true,
         code: `import { defineCommand } from "citty";
 const main = defineCommand({ meta: { name: "cli" }, subCommands: { check }, default: "check" });`,
       },
@@ -51,6 +53,7 @@ const main = defineCommand({ subCommands: { check }, [key]() {} });`,
     invalid: [
       {
         name: "a parent that declares both subCommands and run is reported",
+        documented: true,
         code: `import { defineCommand } from "citty";
 const main = defineCommand({ subCommands: { check }, run() {} });`,
         errors: [{ messageId: "parentRun" }],
@@ -75,6 +78,7 @@ const main = citty.defineCommand({ subCommands: { check }, run() {} });`,
       },
       {
         name: "declaring default does not excuse the parent run",
+        documented: true,
         code: `import { defineCommand } from "citty";
 const main = defineCommand({ subCommands: { check }, default: "check", run() {} });`,
         errors: [{ messageId: "parentRun" }],

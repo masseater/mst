@@ -52,6 +52,7 @@ describe("dont-review-it/require-spec-file-for-assets--create-matching-spec", ()
     valid: [
       {
         name: "test data owned by the spec of the same stem beside it",
+        documented: true,
         code: ASSETS_SOURCE,
         filename: join(fixtureDir, "owned/order.assets.ts"),
       },
@@ -72,6 +73,7 @@ describe("dont-review-it/require-spec-file-for-assets--create-matching-spec", ()
       },
       {
         name: "a module named after the marker alone names no stem to own it",
+        documented: true,
         code: ASSETS_SOURCE,
         filename: join(fixtureDir, "bare/assets.ts"),
       },
@@ -89,12 +91,14 @@ describe("dont-review-it/require-spec-file-for-assets--create-matching-spec", ()
     invalid: [
       {
         name: "test data with no spec of its stem anywhere",
+        documented: true,
         code: ASSETS_SOURCE,
         filename: join(fixtureDir, "orphan/order.assets.ts"),
         errors: [{ messageId: "unownedAssets", data: { ownerNames: ORDER_OWNER_NAMES } }],
       },
       {
         name: "a spec of the same stem in another directory does not own this data",
+        documented: true,
         code: ASSETS_SOURCE,
         filename: join(fixtureDir, "elsewhere/order.assets.ts"),
         errors: [{ messageId: "unownedAssets", data: { ownerNames: ORDER_OWNER_NAMES } }],
