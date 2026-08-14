@@ -34,6 +34,7 @@ type RunCommandDependencies = {
   platform: NodeJS.Platform;
   signalTree: (input: { pid: number; signal: NodeJS.Signals }) => Error | null;
   spawnChild: (input: { executable: string; args: readonly string[] }) => ChildProcess;
+  killGraceMs: number;
 };
 
 const settledChild = (child: ChildProcess): Promise<Settled> =>
@@ -65,7 +66,7 @@ const timeoutFired = async (parameters: {
   if (parameters.dependencies.platform === "win32") {
     return { fired: true, terminationFailure };
   }
-  await delay(KILL_GRACE_MS);
+  await delay(parameters.dependencies.killGraceMs);
   const forcedFailure = parameters.dependencies.signalTree({
     pid: parameters.childPid,
     signal: TREE_TERMINATION_SIGNAL.forced,
@@ -204,6 +205,7 @@ export const runWithSlot = async (input: {
           detached: true,
           stdio: "inherit",
         })),
+    killGraceMs: input.dependencies?.killGraceMs ?? KILL_GRACE_MS,
   };
   const startedCommand = await spawnUnderHeldInterrupt({
     invocation: input.invocation,

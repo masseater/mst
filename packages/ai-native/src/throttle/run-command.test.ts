@@ -195,6 +195,7 @@ describe("runWithSlot", () => {
   });
 
   describe("a command that runs past its timeout", () => {
+    const TIMED_OUT_KILL_GRACE_MS = 100;
     const it = test
       .extend("theCodeOfACommandThatRanPastItsTimeout", async ({ slotDirectory }) =>
         runThrottle(SLEEPING_COMMAND, {
@@ -203,6 +204,7 @@ describe("runWithSlot", () => {
           waitBudgetMs: WAIT_BUDGET_MS,
           pollMs: POLL_MS,
           isInteractive: false,
+          killGraceMs: TIMED_OUT_KILL_GRACE_MS,
         }))
       .extend("theTimeoutIsNamedOnStderr", async ({ slotDirectory, stderr }) => {
         await runThrottle(SLEEPING_COMMAND, {
@@ -211,6 +213,7 @@ describe("runWithSlot", () => {
           waitBudgetMs: WAIT_BUDGET_MS,
           pollMs: POLL_MS,
           isInteractive: false,
+          killGraceMs: TIMED_OUT_KILL_GRACE_MS,
         });
         return stderr.text().includes("ran past the 1s timeout");
       })
@@ -221,6 +224,7 @@ describe("runWithSlot", () => {
           waitBudgetMs: WAIT_BUDGET_MS,
           pollMs: POLL_MS,
           isInteractive: false,
+          killGraceMs: TIMED_OUT_KILL_GRACE_MS,
         });
         return stderr.text().includes("could not terminate the whole command tree");
       });
@@ -352,6 +356,7 @@ describe("runWithSlot", () => {
   });
 
   describe("a grandchild that survives SIGTERM after the root exits", () => {
+    const GRANDCHILD_KILL_GRACE_MS = 100;
     const it = test
       .extend("stampsDirectory", ({}, { onCleanup }) => {
         const madeStampsDirectory = mkdtempSync(join(tmpdir(), "throttle-tree-stamps-"));
@@ -367,7 +372,7 @@ describe("runWithSlot", () => {
           return runThrottle(
             [
               "--timeout",
-              "10",
+              "1",
               "--",
               process.execPath,
               "-e",
@@ -379,6 +384,7 @@ describe("runWithSlot", () => {
               waitBudgetMs: WAIT_BUDGET_MS,
               pollMs: POLL_MS,
               isInteractive: false,
+              killGraceMs: GRANDCHILD_KILL_GRACE_MS,
             },
           );
         },
@@ -390,7 +396,7 @@ describe("runWithSlot", () => {
           await runThrottle(
             [
               "--timeout",
-              "10",
+              "1",
               "--",
               process.execPath,
               "-e",
@@ -402,9 +408,10 @@ describe("runWithSlot", () => {
               waitBudgetMs: WAIT_BUDGET_MS,
               pollMs: POLL_MS,
               isInteractive: false,
+              killGraceMs: GRANDCHILD_KILL_GRACE_MS,
             },
           );
-          return stderr.text().includes("ran past the 10s timeout");
+          return stderr.text().includes("ran past the 1s timeout");
         },
       )
       .extend("theEscalationOutlastedTheTimeout", async ({ slotDirectory, stampsDirectory }) => {
@@ -413,7 +420,7 @@ describe("runWithSlot", () => {
         await runThrottle(
           [
             "--timeout",
-            "10",
+            "1",
             "--",
             process.execPath,
             "-e",
@@ -425,16 +432,17 @@ describe("runWithSlot", () => {
             waitBudgetMs: WAIT_BUDGET_MS,
             pollMs: POLL_MS,
             isInteractive: false,
+            killGraceMs: GRANDCHILD_KILL_GRACE_MS,
           },
         );
-        return Date.now() - before > 14_500;
+        return Date.now() - before > 1_000 + GRANDCHILD_KILL_GRACE_MS;
       })
       .extend("theProbeOfTheGrandchild", async ({ slotDirectory, stampsDirectory }) => {
         const pidFile = join(stampsDirectory, "grandchild-pid");
         await runThrottle(
           [
             "--timeout",
-            "10",
+            "1",
             "--",
             process.execPath,
             "-e",
@@ -446,6 +454,7 @@ describe("runWithSlot", () => {
             waitBudgetMs: WAIT_BUDGET_MS,
             pollMs: POLL_MS,
             isInteractive: false,
+            killGraceMs: GRANDCHILD_KILL_GRACE_MS,
           },
         );
         await delay(200);

@@ -16,6 +16,7 @@ export type ThrottleSeams = {
   waitBudgetMs?: number;
   pollMs?: number;
   isInteractive?: boolean;
+  killGraceMs?: number;
 };
 
 const limitFromEnvironment = (): number => {
@@ -54,5 +55,7 @@ export const runThrottle = async (
     return 2;
   }
   const hold = await acquireSlot(resolveConfiguration(seams));
-  return hold === null ? 1 : runWithSlot({ invocation, hold });
+  return hold === null
+    ? 1
+    : runWithSlot({ invocation, hold, dependencies: { killGraceMs: seams.killGraceMs } });
 };
