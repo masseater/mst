@@ -20,6 +20,7 @@ describe("dont-review-it/require-mock-type-parameter--annotate-vi-fn", () => {
     valid: [
       {
         name: "a creation carrying the call signature of the dependency is typed",
+        documented: true,
         code: "const send = vi.fn<(recipient: string) => Promise<void>>();",
       },
       {
@@ -32,6 +33,7 @@ describe("dont-review-it/require-mock-type-parameter--annotate-vi-fn", () => {
       },
       {
         name: "spying on an existing function derives the signature from the real member",
+        documented: true,
         code: "const send = vi.spyOn(mailer, 'send');",
       },
       {
@@ -127,6 +129,7 @@ describe("dont-review-it/require-mock-type-parameter--annotate-vi-fn", () => {
     invalid: [
       {
         name: "a creation without a type parameter is reported",
+        documented: true,
         code: "const send = vi.fn();",
         errors: [{ messageId: "untypedMockCreation" }],
       },
@@ -182,6 +185,7 @@ describe("dont-review-it/require-mock-type-parameter--annotate-vi-fn", () => {
       },
       {
         name: "a type parameter naming the catch all callable type pins nothing",
+        documented: true,
         code: "const send = vi.fn<Function>();",
         errors: [{ messageId: "unconstrainedMockTypeParameter" }],
       },

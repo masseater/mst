@@ -1,94 +1,163 @@
+---
+description: "Require every mock function creation to carry a type parameter that pins the call signature of the dependency it stands in for, so a mock drifting from that dependency is caught by the type checker instead of passing every assertion in the suite"
+---
+
 # require-mock-type-parameter--annotate-vi-fn
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-モック関数の生成呼び出し（既定では `vi.fn(...)`）のうち、次のどちらかに当たるもの。
+Require every mock function creation to carry a type parameter that pins the call signature of the dependency it stands in for, so a mock drifting from that dependency is caught by the type checker instead of passing every assertion in the suite
 
-1. **型引数を持たない生成。** 実装を引数として渡していても同じ扱いにする
-2. **呼び出しシグネチャを何も固定しない型引数を持つ生成**
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`require-mock-type-parameter--annotate-vi-fn.ts`](../../src/lint/oxlint/rules/require-mock-type-parameter--annotate-vi-fn.ts)
 
-型引数の有無は生成呼び出しのノードそのものから読む。生成に型引数が付いていれば、その後ろに振る舞い設定のメソッドを何段つないでも報告しない。型引数が無ければ、後ろに何段つないでいても報告は生成呼び出しの位置に出る。
+<!-- END GENERATED rule-header -->
 
-### モック名前空間の決め方
+## Violation
 
-`fn` という綴りのメンバを呼んでいることだけでは対象にならない。受け手を束縛まで解決し、次のいずれかに行き着いたときだけモック名前空間とみなす。
+A mock function creation call (`vi.fn(...)` by default) falling into either of these.
 
-- どこにも束縛されていない `vi`。テストランナーがグローバルに注入する形がこれに当たる
-- `vi` を取り込んだ import の局所名。`import { vi as mocker }` も、引用符付きの輸出名で書いた `import { "vi" as mocker }` も同じ
-- モジュール全体を取り込んだ名前空間のメンバ。`import * as vitest` から `vitest.vi` を辿る形
-- 上のいずれかに行き着く束縛の連鎖。段数の上限は置いていない
+1. **A creation carrying no type argument.** Handing an implementation over as an argument makes no difference
+2. **A creation whose type argument pins no call signature at all**
 
-メンバ名は静的に読める綴りをすべて同じ名前として扱う。ドット記法、文字列リテラルの角括弧記法、補間の無いテンプレートリテラルの角括弧記法を区別しない。
+Whether a type argument is there is read from the creation call node itself. Where the creation carries one, no number of behaviour-settling methods chained after it is reported. Where it carries none, however many stages follow, the report comes out at the creation call.
 
-### 呼び出しシグネチャを固定していない型
+### How the mock namespace is settled
 
-| 形 | 固定していないもの |
+Calling a member spelled `fn` is not on its own enough. The receiver is resolved to its binding, and only a binding landing on one of these counts as the mock namespace.
+
+- A `vi` bound nowhere. The shape the test runner injects globally falls here
+- The local name of an import that took `vi` in. `import { vi as mocker }` and the quoted-export form `import { "vi" as mocker }` are the same
+- A member of a namespace that took the whole module in — following `vitest.vi` from `import * as vitest`
+- A chain of bindings landing on any of the above. No limit is placed on the number of steps
+
+Member names are treated as the same name across every statically readable spelling: dot notation, a string literal subscript, and a template literal subscript carrying no interpolation are not distinguished.
+
+### Types that pin no call signature
+
+| Shape | What it leaves unpinned |
 | --- | --- |
-| 何でも受ける組み込みの型そのもの | 引数も戻り値も何ひとつ |
-| `unconstrainedTypeNames` に載っている型名 | 既定の `Function` は引数の並びと戻り値の両方 |
-| 戻り値の型が開いている関数型 | 戻り値。呼び出し側は検査を受けずに何にでも使える |
-| 引数が rest ひとつだけで、その型が省略されているか、開いた型か、開いた型を角括弧で並べたリストか、その読み取り専用版である関数型 | 引数の個数と、各引数の型 |
+| The builtin catch-all type itself | The arguments and the return, all of it |
+| A type name listed in `unconstrainedTypeNames` | `Function`, the default, leaves both the argument list and the return |
+| A function type whose return type is open | The return. The caller may use it as anything without a check |
+| A function type whose only parameter is a rest one typed as omitted, as an open type, as a bracketed list of an open type, or as the readonly version of those | The number of arguments and the type of each |
 
-### 意図的に対象にしていない形
+### Deliberately not widened
 
-| 形 | 対象にしない理由 |
+| Shape | Why it is left out |
 | --- | --- |
-| `vi.spyOn(...)` / `vi.mocked(...)` | 本物の宣言からシグネチャが導かれる。型引数を書く余地が無く、不変条件は構造上すでに満たされている |
-| 型引数の付いた生成から伸びるチェーン全体 | 型引数は生成呼び出しのノードから読む。上流の同種ルールが誤検出するのはこの形である |
-| 束縛を解決した結果がモック名前空間でない `fn` 呼び出し | 綴りだけで見分けると、無関係なオブジェクトの同名メソッドを巻き込む |
-| 呼び先の名前が実行時にしか決まらない生成 | 名前として読めない。この形は `no-computed-callee-name--write-name-literally` が落とす |
-| 戻り値の型が `unknown` の関数型 | 呼び出し側は絞り込まないと値を使えない。型検査が黙って通る形ではない |
-| rest の型がタプルの関数型 | 引数の位置と型が固定されている |
-| rest の前に名前付きの引数がある関数型 | 先頭の引数が固定されている。本物の依存が可変長なら、この形が正しい写し取りになる |
-| 型の名前で呼んだ関数型 | 名前の指す中身は構文からは見えない。名前で呼んだ形は固定しているものとして扱う |
-| 名前空間を分割代入で取り出してから呼ぶ生成 | 名前空間そのものの別名だけを辿る。取り出したメンバは辿らない |
+| `vi.spyOn(...)` / `vi.mocked(...)` | The signature is derived from the real declaration. There is no room to write a type argument, and the invariant is already met structurally |
+| The whole chain running off a typed creation | The type argument is read from the creation call node. This is the shape the upstream rule of the same kind misreports |
+| An `fn` call whose receiver resolves to something that is no mock namespace | Judge by spelling alone and a same-named method on an unrelated object gets swept in |
+| A creation whose callee name is settled only at run time | It cannot be read as a name. That shape falls to [no-computed-callee-name--write-name-literally](./no-computed-callee-name--write-name-literally.md) |
+| A function type returning `unknown` | The caller cannot use the value without narrowing. It is no shape the type check passes over in silence |
+| A function type whose rest parameter is a tuple | The position and type of each argument are pinned |
+| A function type carrying a named parameter before the rest | The leading argument is pinned. Where the real dependency is variadic, this shape is the correct copy |
+| A function type called by a type name | What the name stands for is invisible from the syntax. A form called by name is treated as pinning |
+| A creation called after taking the namespace apart with a destructuring | Only aliases of the namespace itself are followed, not members taken out of it |
 
-適用範囲をファイル名で絞らない。テスト宣言ファイルの外に置いた共有のテスト補助でも、モックが本物とずれる余地は同じである。
+The range is not narrowed by file name. In a shared test helper placed outside a test declaration file, the room for a mock to drift from the real thing is the same.
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「モック関数は、それが代役を務める依存の呼び出しシグネチャで型付けされている」ことである。
+What is held is that a mock function is typed with the call signature of the dependency it stands in for.
 
-1 層目は型検査の沈黙である。型引数のない生成は「任意の引数を受け、何を返すか分からない」ものとして型付けされる。本物の依存と引数の並びや戻り値がずれても、型検査は何も言わない。
+The first layer is the type check's silence. A creation with no type argument is typed as "takes any arguments, returns who knows what". Let the argument list or the return drift from the real dependency and the type check says nothing.
 
-2 層目は、モックが本物との間に持つ暗黙の契約である。テストはモックの振る舞いを前提に組み立てられるので、契約が嘘であればローカルのアサーションは全部緑のまま、本番だけ別の分岐を通る。テストダブルを本物と突き合わせる作業のうち、呼び出しシグネチャの部分を型検査に肩代わりさせるのが型引数である。
+The second layer is the implicit contract a mock holds with the real thing. Tests are assembled on the assumption of the mock's behaviour, so where the contract lies, every local assertion stays green and only production takes the other branch. A type argument is what hands the call-signature part of reconciling a test double against the real thing over to the type check.
 
-3 層目は、形だけ整える逃げ道である。型引数を書くこと自体は目的ではない。何でも受ける型を書けば型引数の欄は埋まるが、型検査に載る情報は 1 つも増えない。だから中身も見る。
+The third layer is the escape of meeting the form alone. Writing a type argument is not the goal. Write a catch-all type and the type argument slot is filled while not one piece of information reaches the type check. So the contents are read too.
 
-## どう直すか
+### Relation to the upstream rule of the same kind
 
-依存の呼び出しシグネチャをそのまま型引数に書く。このリポジトリの `src/lint/oxlint/lib/resolved-bindings.ts` が公開している束縛の解決をモックにするなら、その宣言の引数と戻り値をそのまま写す。
+The upstream `vitest/require-mock-type-parameters` reads the same invariant. Turn both on and the upstream misreports on the chain running off a typed creation, on top of two reports landing on the same creation. Where this rule is turned on, the upstream is turned off in the shared configuration. Take only one side and both break: upstream alone leaves the misreports standing, and adding this rule while keeping upstream gives doubled reports.
+
+### Configuration
+
+| Name | Default | Meaning |
+| --- | --- | --- |
+| `mockNamespaceSpellings` | `["vi"]` | The spellings counted as the namespace of the mock API |
+| `mockFactoryMembers` | `["fn"]` | The member names that create a mock function |
+| `unconstrainedTypeNames` | `["Function"]` | The type names counted as pinning no call signature |
+
+Each replaces its default wholesale. Handed an empty array, the default stays.
+
+What may go into `mockFactoryMembers` is creations whose signature is not derived from the real declaration. Put in a means of wrapping an existing function, or of promoting a real one to a mock type, and calls with no room for a type argument end up reported.
+
+### Where the detection does not reach
+
+Not being reported does not mean being allowed.
+
+- An open type hidden behind a type alias. Naming an open function type and writing that name as the type argument is not reported, because the contents of a type alias are not followed. Add the alias's name to `unconstrainedTypeNames`, or write the signature directly
+- A creation made after taking the namespace apart with a destructuring. Members taken out are not followed, so the report clears while the mock stays untyped
+- An import from a namespace re-exported under another spelling. The judgment uses the export name written in the import statement and does not read inside the file it came from
+- A rest parameter list written with a generic spelling. Only a bracketed list is read, so the same meaning written with a generic type name is not reported
+- A creation moved into a helper in another file. Binding resolution stays inside one file
+
+## Fix
+
+Write the dependency's call signature straight into the type argument. To mock the binding resolution this repository publishes from `src/lint/oxlint/lib/resolved-bindings.ts`, copy that declaration's arguments and return as they stand.
 
 ```ts
 const resolveBinding = vi.fn<(scope: Scope | null, name: string) => Variable | null>();
 ```
 
-こう書いておくと、本物の宣言が引数を 1 つ増やしたときや戻り値を変えたときに、モックを使っているテストが型検査で落ちる。
+Written this way, a test using the mock falls at the type check the moment the real declaration takes one more argument or changes its return.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- **型引数を書かず、モックを受け取る側の変数に型注釈を足す。** 検査しているのは生成呼び出しそのもの。注釈を足しても報告は消えない
-- **何でも受ける型を型引数に書いて形だけ整える。** 中身を見るので落ちる
-- **上流ルールの誤検出を理由に、このルールごと外す。** 誤検出の回避は上流を無効化することで済んでいる
-- **型別名の裏に開いた型を隠す。** 開いた関数型に名前を付けてその名前を型引数に書く形は、型別名の中身まで辿らないため報告されない。報告されないことは許していることを意味しない。型別名の名前を `unconstrainedTypeNames` に足すか、シグネチャを直に書く
-- **名前空間を分割代入で取り出してから生成する。** 取り出したメンバは辿らないので報告は消えるが、モックが型付けされていないことは変わらない
-- **別の綴りを付けて再輸出した名前空間から取り込む。** 判定に使うのは import 文に書かれた輸出名で、取り込み先のファイルの中までは読まない。輸出側で綴りを変えた名前空間は追えないが、これは検出の限界であって許可ではない
-- **rest 引数のリストをジェネリックの綴りで書く。** 角括弧で並べたリストだけを読むので、同じ意味をジェネリックの型名で書いた形は報告されない。これも検出の限界であって許可ではない
-- **生成を別ファイルのヘルパへ移す。** 束縛の解決は同一ファイルの中で閉じている。報告は消えるが、モックが型付けされていないことは変わらない
-- **抑制ディレクティブ**
+Code this rule rejects.
 
-## 上流の同種ルールとの関係
+```ts
+// a creation without a type parameter is reported
+const send = vi.fn();
+```
 
-上流の `vitest/require-mock-type-parameters` は同じ不変条件を見る。両方を有効にすると、型引数の付いた生成から伸びるチェーンで上流が誤検出したうえに、同じ生成へ二重の報告が出る。このルールを有効にするときは、共有設定で上流を無効にする。片方だけを入れるとどちらも壊れる。上流だけなら誤検出が残り、このルールだけを足して上流を残せば二重報告になる。
+```ts
+// a type parameter naming the catch all callable type pins nothing
+const send = vi.fn<Function>();
+```
 
-## オプション
+Code this rule accepts.
 
-| 名前                     | 既定値         | 意味                                               |
-| ------------------------ | -------------- | -------------------------------------------------- |
-| `mockNamespaceSpellings` | `["vi"]`       | モック API の名前空間とみなす綴りの集合            |
-| `mockFactoryMembers`     | `["fn"]`       | モック関数を生成するメンバ名の集合                 |
-| `unconstrainedTypeNames` | `["Function"]` | 呼び出しシグネチャを固定しない型とみなす型名の集合 |
+```ts
+// a creation carrying the call signature of the dependency is typed
+const send = vi.fn<(recipient: string) => Promise<void>>();
+```
 
-いずれも既定値を丸ごと置き換える。空の配列を渡した場合は既定値のままになる。
+```ts
+// spying on an existing function derives the signature from the real member
+const send = vi.spyOn(mailer, 'send');
+```
 
-`mockFactoryMembers` に載せてよいのは、本物の宣言からシグネチャが導かれない生成だけである。既存の関数を包む手段や、本物をモック型へ昇格させる手段を載せると、型引数を書く余地の無い呼び出しを報告することになる。
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- **Skipping the type argument and annotating the variable that receives the mock instead.** What is checked is the creation call itself; an annotation does not clear the report
+- **Writing a catch-all type as the type argument to meet the form.** The contents are read, so it falls
+- **Turning this rule off wholesale on the grounds of the upstream rule's misreports.** Avoiding those misreports is already handled by turning the upstream off
+- **A suppression directive**
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `untypedMockCreation` | A mock function must not be created without a type parameter naming the call signature it stands in for. Write the call signature of the real dependency as the type parameter of the creation call. |
+| `unconstrainedMockTypeParameter` | The type parameter of a mock function creation must not leave the call signature open. Replace \`{{written}}\` with the call signature of the real dependency: name the type of every parameter and the type of the returned value. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->
