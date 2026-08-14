@@ -1,71 +1,142 @@
+---
+description: "Disallow reading `expect` out of the context a test block hands its callback, so every assertion in the suite runs through the one `expect` the file imported from the test runner"
+---
+
 # no-vitest-context-expect--import-expect-from-vitest
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-テストブロック宣言に渡されたコールバックについて、コンテキストから `expect` を引き出している 2 つの形を見る。
+Disallow reading `expect` out of the context a test block hands its callback, so every assertion in the suite runs through the one `expect` the file imported from the test runner
 
-分割代入形は、コールバックの第 1 引数のオブジェクトパターンに `expect` というキーがあるものである。識別子で書かれたキーでも文字列リテラルで書かれたキーでも同じで、別名へリネームしていても、引き出した事実は変わらないので対象になる。既定値だけを付けたパターン（`({ expect } = {})`）も同じ。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-vitest-context-expect--import-expect-from-vitest.ts`](../../src/lint/oxlint/rules/no-vitest-context-expect--import-expect-from-vitest.ts)
 
-メンバアクセス形は、コンテキストを識別子で受けたコールバックの内側にある、その識別子に対する非計算の `.expect` である。判定は最も内側のコールバックに限らない。外側のテストコールバックが束縛した名前であれば、配列走査のコールバックのようなテストでない関数を何枚挟んでいても、入れ子になったテストブロックの中にあっても対象になる。
+<!-- END GENERATED rule-header -->
 
-「テストブロック宣言」の判定は 1 箇所に置いてある（`src/lint/oxlint/lib/spec-syntax/test-block-declarations.ts`）。次のいずれかを根とする呼び出しを宣言とみなす。
+## Violation
 
-- グローバル注入されたテストブロックの綴り（`it` / `test`）
-- テストブロックの綴りを import した束縛。リネーム import も含む
-- 上記のいずれか、あるいは `test.extend(...)` の結果で初期化されたローカル束縛。束縛から束縛への受け直しは何段でもたどる
+Two shapes of taking `expect` out of the context, in the callback handed to a test block declaration.
 
-根は修飾子メンバ（`skip` / `each` など）、表駆動の呼び出し、タグ付きテンプレートを越えてたどる。したがって綴りルールに違反しているコードの上でも、このルールは独立に成立する。
+The destructuring shape is an object pattern in the callback's first parameter carrying a key named `expect`. A key written as an identifier and one written as a string literal are the same, and renaming it changes nothing about the fact that it was taken out, so it is a target. A pattern carrying only a default (`({ expect } = {})`) is the same.
 
-コールバックは、宣言に渡された引数のうち関数であるものすべてである。名前とコールバックの間にオプションを置いても、コールバックの後ろにタイムアウトを置いても位置で取り違えない。関数が呼び出しで包まれている場合は、その呼び出しに渡された関数まで剥がす。
+The member shape is a non-computed `.expect` on the identifier a callback received the context as, anywhere inside that callback. The judgment is not confined to the innermost callback: as long as the name was bound by an outer test callback, it is a target however many non-test functions such as an array traversal's callback stand in between, and inside a nested test block as well.
 
-### 意図的に広げていない範囲
+What counts as a test block declaration is settled in one place (`src/lint/oxlint/lib/spec-syntax/test-block-declarations.ts`). A call is a declaration when its root is any of these:
 
-| 形 | 対象にしない理由 |
+- A globally injected test block spelling (`it`, `test`)
+- A binding importing a test block spelling, renamed imports included
+- A local binding initialised from either of the above, or from the result of `test.extend(...)`. Rebinding from binding to binding is followed to any depth
+
+The root is followed past modifier members (`skip`, `each` and the rest), table-driven calls and tagged templates, so this rule stands on its own even over code that violates the spelling rules.
+
+The callbacks are every argument to the declaration that is a function. Options between the name and the callback, or a timeout after the callback, never cause a mix-up by position. Where the function is wrapped in a call, it is peeled to the function handed to that call.
+
+### What is deliberately left out of reach
+
+| Shape | Why it is not a target |
 | --- | --- |
-| `({ expect, ...rest })` | rest を含む分割代入は `no-test-context-escape--destructure-fixtures-by-name` が形ごと落とす |
-| `({ ["expect"]: assert })` | 分割代入の計算キーは同じく `no-test-context-escape--destructure-fixtures-by-name` の担当 |
-| `ctx["expect"]` | コンテキストへの添字アクセスも同上。名前を実行時に決める形そのものを落とす側に寄せてある |
-| fixture factory の第 1 引数 | テストブロック宣言のコールバックではない。fixture 側のコンテキストは上記のルールが見る |
-| グルーピングブロックのコールバック | テストブロックの宣言ではない |
-| `runner.it(...)` のような名前空間経由 | 共通定義が根を識別子まで解決できない。名前空間 import でテスト API を持ち込む構成を採るなら共通定義を組み直す |
-| 型だけがテストブロック API である束縛 | 判定は構文だけで行う。型情報は使わない |
+| `({ expect, ...rest })` | A destructuring carrying a rest is failed as a shape by `no-test-context-escape--destructure-fixtures-by-name` |
+| `({ ["expect"]: assert })` | A computed key in a destructuring belongs to the same rule |
+| `ctx["expect"]` | A subscript into the context, likewise. Settling a name at run time is failed by the rule watching that shape itself |
+| The first parameter of a fixture factory | Not the callback of a test block declaration. The fixture's own context is watched by the rule above |
+| The callback of a grouping block | Not a test block declaration |
+| A namespace route such as `runner.it(...)` | The shared definition cannot resolve the root down to an identifier. A structure that brings the test API in through a namespace import means rebuilding that shared definition |
+| A binding that is a test block API by type alone | The judgment runs on syntax; no type information is used |
 
-ファイル種別による絞り込みはしない。どのファイルにこのルールを効かせるかは共有 lint 設定の glob が決める。
+No filtering by file kind is done. Which files this rule reaches is settled by the glob in the shared lint configuration.
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「アサーションの入口が、テストランナー本体から静的 import した `expect` ただ 1 つである」ことである。
+There is one entrance to an assertion: the `expect` imported statically from the test runner.
 
-1 層目は型である。カスタム matcher の型拡張は import した `expect` の型に対して効く。コンテキスト経由の `expect` が混ざると、同じスイートの中に拡張の効くテストと効かないテストが並び、どちらなのかは呼び出し側の書き方を読むまで分からない。型が揃っていないことは実行するまで表に出ないので、書き手は「この matcher は使えるはずだ」という前提のまま書き進められてしまう。
+The first layer is types. A custom matcher's type extension applies to the type of the imported `expect`. With a context-borne `expect` mixed in, tests where the extension applies and tests where it does not stand side by side in one suite, and which is which cannot be told without reading how the call site was written. Types not lining up does not surface until a run, so a writer can carry on under the premise that a matcher must be available.
 
-2 層目は検索とリネームである。「このスイートはどこで何を主張しているか」を機械的に集計する側は、`expect` が import 束縛であることを前提にする。前提を置かなければ、識別子 `expect` がテストランナーのものかどうかを集計側が毎回判定することになり、その判定はこの束のルールと同じものを書き直す作業になる。コンテキスト経由の `expect` はこの網から漏れ、漏れたテストは棚卸しの上では「アサーションを持たないテスト」として現れる。数え落としは赤くならないので、集計結果を信じた判断だけが静かにずれる。
+The second layer is searching and renaming. Whatever mechanically tallies what a suite claims and where stands on `expect` being an imported binding. Without that premise the tally has to decide, every time, whether the identifier `expect` is the test runner's — and that decision is the same work these rules already do, written again. A context-borne `expect` falls through that net, and the tests that fall through show up in the tally as tests carrying no assertion. A miscount never turns red, so only the decisions trusting the tally drift, quietly.
 
-このルールは設定とセットで成立する。共有 setup ファイルがカスタム matcher を import 側の `expect` に登録していることが前提で、その登録があって初めて「どのテストでも同じ matcher 集合・同じ型」が言える。
+This rule stands together with the configuration. It presumes a shared setup file registers the custom matchers against the imported `expect`, and only with that registration can "every test has the same matcher set and the same types" be said.
 
-## どう直すか
+### Configuration
 
-`expect` をテストランナーから import し、コールバックの引数には実際に使う fixture だけを残す。このリポジトリのテストが取っている形がそのまま直した形になる。
+None. Whether the rule is on or off is settled by the configuration, and nothing else about the judgment is.
+
+The canonical test block spellings and the test runner's vocabulary live in the rule itself. Letting a configuration move what counts as a test block would split the vocabulary from the other rules of this bundle, leaving one of them silently blind to its targets.
+
+## Fix
+
+Import `expect` from the test runner and leave only the fixtures actually used in the callback's parameter. What this repository's tests already do is the fixed shape.
 
 ```ts
 import { parseSync } from "oxc-parser";
 import { expect, test } from "vite-plus/test";
 ```
 
-リネーム import された束縛や `test.extend(...)` から派生したビルダーでテストを宣言している場合も直し方は変わらない。宣言の綴りが何であれ、`expect` の出どころだけを import に寄せる。
+The fix is no different where the tests are declared through a renamed import or a builder derived from `test.extend(...)`. Whatever the declaration is spelled as, only where `expect` comes from moves to an import.
 
-自動修正は持たせない。直すには import 文の追加が要り、1 トークンの置換に収まらないためである。
+No automatic fix is offered, because fixing it requires adding an import statement and does not fit into replacing one token.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- rest でまとめてから、その別名越しに `expect` を呼ぶ。分割代入のキーとしては現れなくなるが、`no-test-context-escape--destructure-fixtures-by-name` が rest そのものを落とす
-- コンテキストのプロパティを実行時に走査して `expect` 相当を取り出す。同上
-- `ctx["expect"]` と添字で書く。名前としての判定は外れるが、コンテキストへの添字アクセスは同じルールが落とす
-- コンテキストを別の束縛へ受け直してから `.expect` を読む（`const inner = ctx;`）。このルールはコールバックが束縛した名前だけを見るので報告は消える。コンテキストは受けた名前のまま使うこと
-- `expect` を包んだ薄い関数を fixture として配り、テスト側ではその fixture を分割代入する。キーの名前が変わるだけで、アサーションの入口が import 束縛でないことは変わらない
-- 抑制ディレクティブで黙らせる。アサーションの入口はスイート全体に対する規律であり、1 ファイルの都合で外れるものではない
+Code this rule rejects.
 
-## オプション
+```ts
+// taking expect out of the context is reported
+it("names a behaviour", ({ expect }) => {
+  expect(runSut()).toBe(1);
+});
+```
 
-取らない。有効か無効かだけを設定側で決める。
+```ts
+// reaching expect through the context binding is reported
+it("names a behaviour", (ctx) => {
+  ctx.expect(runSut()).toBe(1);
+});
+```
 
-正となるテストブロックの綴りも、テストランナーの綴りの語彙もルール本体に置いてある。どの綴りをテストブロックとみなすかを設定で動かせるようにすると、この束の他のルールと語彙が分かれ、片方だけが対象を見失って黙る。
+Code this rule accepts.
+
+```ts
+// asserting through the imported binding passes
+import { expect } from "vitest";
+it("names a behaviour", ({ subject }) => {
+  expect(subject).toBe(1);
+});
+```
+
+```ts
+// taking fixtures apart by name passes
+it("names a behaviour", ({ subject, options }) => {});
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Gathering into a rest and calling `expect` through that alias. It stops appearing as a destructuring key, and `no-test-context-escape--destructure-fixtures-by-name` fails the rest itself
+- Walking the context's properties at run time to pull out something equivalent. As above
+- Writing `ctx["expect"]` as a subscript. The judgment on the name falls away, and the same rule fails a subscript into the context
+- Rebinding the context and reading `.expect` off the new name (`const inner = ctx;`). This rule reads only the name the callback bound, so the report clears. Use the context under the name it was received as
+- Handing out a thin function wrapping `expect` as a fixture and destructuring that fixture in the test. Only the key's name changed, and the entrance to an assertion is still not an imported binding
+- Silencing it with a suppression directive. The entrance to assertions is a discipline over the whole suite and does not come off for one file's convenience
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `destructuredContextExpect` | A test callback must not take \`expect\` out of the test context. Import \`expect\` from the test runner and leave the callback parameter holding only the fixtures this test uses. |
+| `reachedContextExpect` | A test callback must not reach \`expect\` through the test context. Import \`expect\` from the test runner and call that binding. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

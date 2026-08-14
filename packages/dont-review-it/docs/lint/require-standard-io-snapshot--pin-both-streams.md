@@ -1,26 +1,55 @@
+---
+description: "Require a spec that derives tests from `standardIoTest` to pin both captured streams with a snapshot, so every change to what the command prints surfaces as a diff"
+---
+
 # require-standard-io-snapshot--pin-both-streams
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-`standardIoTest` からテストを導出しているファイルが、捕捉された 2 ストリームのスナップショットを欠いている状態を検出する。要求は「stdout と stderr のそれぞれについて、そのストリームに届く値を主語とするスナップショット assertion が最低 1 つある」ことで、`toMatchInlineSnapshot` と `toMatchSnapshot` のどちらでも満たせる。
+Require a spec that derives tests from `standardIoTest` to pin both captured streams with a snapshot, so every change to what the command prints surfaces as a diff
 
-ストリームに届くかどうかは、スナップショットの主語の根にある識別子で決める。根がストリームの束縛そのもの（`stdout` / `stderr`）ならそのストリームに届く。根がこのファイルで宣言されたフィクスチャなら、そのフィクスチャが依存として受けた名前を辿り、ストリームに行き着くかを見る。依存の連鎖は段数に上限を置かず、行き着いた時点で届いたものとして数える。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`require-standard-io-snapshot--pin-both-streams.ts`](../../src/lint/oxlint/rules/require-standard-io-snapshot--pin-both-streams.ts)
 
-綴りでは決めない。特定のメンバの読み出し（`expect(stdout.text)` のような形）だけを受理すると、フィクスチャが渡す値の射影を禁じている隣のルールと衝突し、どちらの要求も満たせない spec ができる。
+<!-- END GENERATED rule-header -->
 
-導出の判定は import した `standardIoTest`（改名 import を含む）の呼び出しで行い、`standardIoTest.skip` のような修飾呼び出しも導出に数える。`const it = standardIoTest.extend(...)` のように束縛へ導出した形も、その束縛からの呼び出しを含めて追跡する。導出の連鎖（導出した束縛からさらに `extend` した束縛）も同様に数える。欠けているストリームごとに 1 件、最初の導出呼び出しの位置に報告する。
+## Violation
 
-フィクスチャを使っていないファイルには何も要求しない。
+A file deriving its tests from `standardIoTest` that is missing a snapshot of either captured stream. The demand is one snapshot assertion, for stdout and for stderr each, whose subject is a value that reaches that stream, and either `toMatchInlineSnapshot` or `toMatchSnapshot` satisfies it.
 
-## なぜそれが要るか
+Whether a value reaches a stream is settled from the identifier at the root of the snapshot's subject. A root that is the stream binding itself (`stdout`, `stderr`) reaches that stream. A root that is a fixture declared in this file is followed through the names that fixture took as dependencies, to see whether a stream is arrived at. The chain of dependencies has no depth limit, and arriving is enough to count.
 
-CLI の stdout / stderr はユーザー向けの契約である。`standardIoTest` で捕捉していても、捕捉したテキストをどこにも固定していなければ、出力は何に変わっても全部の assertion が通り続ける。「捕捉しているから検証している」という見た目だけが残る。
+The judgment is not made on the spelling. Accepting only a particular member read (a shape such as `expect(stdout.text)`) would collide with the neighbouring rule that forbids projecting the value a fixture hands over, leaving a spec that can satisfy neither demand.
 
-`toContain` のような内容の assertion は、書き手が意識した断片しか守らない。ストリーム全体のスナップショットを 1 つ置くと、書き手が意識していなかった側の変化 — 進捗表示の混入、警告の増減、末尾改行の変化 — がスナップショット差分として現れる。両方のストリームに要求するのは、意識の外に置かれがちなのがたいてい「もう片方のストリーム」だからである。
+Derivation is settled from calls to the imported `standardIoTest`, renamed imports included, and a modified call such as `standardIoTest.skip` counts as derivation too. A form derived into a binding, as `const it = standardIoTest.extend(...)`, is tracked through calls on that binding as well, and so is a chain of derivations — a binding that `extend`s a binding that was itself derived. One report is raised per missing stream, at the position of the first derivation call.
 
-## どう直すか
+A file that does not use the fixture is asked for nothing.
 
-各ストリームを固定するテストを足す。実行はフィクスチャに閉じ、`it` はストリームの束縛をそのまま主語に取る。
+### The invariant
+
+A CLI's stdout and stderr are a contract with the user. Even with `standardIoTest` capturing them, with the captured text pinned nowhere the output can change into anything while every assertion keeps passing. What is left is the appearance of verification because something is being captured.
+
+A content assertion such as `toContain` guards only the fragment the writer had in mind. One snapshot of the whole stream makes the changes the writer did not have in mind — a progress display leaking in, warnings appearing or disappearing, a trailing newline moving — show up as a snapshot diff. Both streams are demanded because what tends to fall outside anyone's attention is usually the other stream.
+
+### What is not a violation
+
+- Content assertions standing beside the snapshots. The division where the snapshot guards the whole and the content assertion guards the intent is welcome
+- A file that neither imports nor uses `standardIoTest`
+- Tests using only one of the streams being mixed in. The demand is per file, not per test
+
+Where the machine reaches and where the discipline reaches are not the same. Detection is the floor under the invariant, not the ceiling.
+
+### Configuration
+
+None.
+
+## Fix
+
+Add a test pinning each stream. Keep the run inside the fixture and let the `it` take the stream binding itself as the subject.
 
 ```ts
 import { standardIoTest } from "@mst/dont-review-it/vitest";
@@ -38,9 +67,9 @@ it("pins what the run put on standard error", ({ stderr }) => {
 });
 ```
 
-ストリームの束縛をそのまま主語に取れるのは、束縛が列挙可能な面として書かれたチャンクだけを持つためである。スナップショットに現れるのは書かれた内容で、テキストへの畳み込みと書き込みの受け口は現れない。
+The stream binding can stand as the subject because it carries only the chunks that were written, as an enumerable surface. What appears in the snapshot is what was written; the folding into text and the intake for writes do not.
 
-テキストの形で固定したい場合は、フィクスチャの中で畳み込んでからその束縛を主語にする。
+To pin it in text form, fold it inside the fixture and make that binding the subject.
 
 ```ts
 const it = standardIoTest.extend("theStandardOutputOfTheRun", ({ stdout }) => {
@@ -53,18 +82,84 @@ it("pins what the run put on standard output", ({ theStandardOutputOfTheRun }) =
 });
 ```
 
-出力にテンポラリパスのような実行ごとに変わる値が混ざってスナップショットにできない場合は、その値が混ざらない不変の経路（決定的な違反メッセージなど）を選んでスナップショットし、変動する経路は内容の assertion で補う。
+Where the output mixes in values that change per run, such as a temporary path, and cannot be snapshotted, snapshot an invariant route those values do not reach — a deterministic violation message, say — and cover the varying route with content assertions.
 
-## 違反にならないもの
+<!-- BEGIN GENERATED examples -->
 
-- スナップショットの横に置かれた内容の assertion。スナップショットが全体を、内容の assertion が意図を守る分担は歓迎される
-- `standardIoTest` を import も使用もしないファイル
-- 片方のストリームしか使わないテストが混ざること。要求はファイル単位であり、テスト単位ではない
+Code this rule rejects.
 
-## 禁じる回避策
+```ts
+// pinning stdout alone leaves stderr unpinned
+import { standardIoTest } from "@mst/dont-review-it/vitest";
+standardIoTest("pins stdout", ({ stdout }) => {
+  expect(stdout.text).toMatchInlineSnapshot();
+});
+```
 
-- フィクスチャの束縛を別名に付け替えて（`({ stdout: out })`）、主語の静的判定を外す。固定されていない事実は変わらない
-- ストリームに届かない値をスナップショットして件数だけ満たす。主語の根を辿るので、依存の連鎖がストリームに行き着かない値では満たせない
-- 空のテストにスナップショットだけ置いて要求を満たし、実際の実行経路を通さない。固定されるのは空の記録であり、契約は守られない
+```ts
+// a snapshot rooted at a binding unrelated to the streams pins neither of them
+import { standardIoTest } from "@mst/dont-review-it/vitest";
+standardIoTest("snapshots an unrelated subject", ({ stdout, stderr }) => {
+  expect(buffer.text).toMatchInlineSnapshot();
+});
+```
 
-機械検出の範囲と規律の範囲は一致しない。検出は不変条件を守るための下限であって、上限ではない。
+Code this rule accepts.
+
+```ts
+// the stream bindings standing as the subjects pin both streams
+import { standardIoTest } from "@mst/dont-review-it/vitest";
+const it = standardIoTest.extend("theRun", { auto: true }, () => {
+  runTheCli();
+});
+it("pins stdout", ({ stdout }) => {
+  expect(stdout).toMatchInlineSnapshot();
+});
+it("pins stderr", ({ stderr }) => {
+  expect(stderr).toMatchInlineSnapshot();
+});
+```
+
+```ts
+// a stream reached through a chain of fixtures still counts as pinned
+import { standardIoTest } from "@mst/dont-review-it/vitest";
+const it = standardIoTest
+  .extend("theRun", ({ stdout }) => runTheCli(stdout))
+  .extend("theOutcomeOfTheRun", ({ theRun }) => theRun.settle())
+  .extend("theStandardErrorOfARun", ({ stderr }) => {
+    runTheCli();
+    return stderr.text();
+  });
+it("pins stdout through the chain", ({ theOutcomeOfTheRun }) => {
+  expect(theOutcomeOfTheRun).toMatchInlineSnapshot();
+});
+it("pins stderr", ({ theStandardErrorOfARun }) => {
+  expect(theStandardErrorOfARun).toMatchInlineSnapshot();
+});
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Renaming the fixture binding (`({ stdout: out })`) to escape the static judgment of the subject. Nothing changes about it not being pinned
+- Snapshotting a value that reaches no stream to satisfy the count. The root of the subject is followed, so a value whose chain of dependencies never arrives at a stream does not satisfy it
+- Placing a snapshot in an empty test to meet the demand without going through the real run. What gets pinned is an empty record, and the contract is unguarded
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `missingSnapshot` | A spec that derives tests from \`standardIoTest\` must not leave \`{{name}}\` unpinned. Add a test taking \`{{name}}\` as its subject and pinning it with \`toMatchInlineSnapshot()\`, or pin a fixture that reads from it. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

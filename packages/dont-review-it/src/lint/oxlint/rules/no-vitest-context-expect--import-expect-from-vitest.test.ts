@@ -8,10 +8,12 @@ describe("dont-review-it/no-vitest-context-expect--import-expect-from-vitest", (
     valid: [
       {
         name: "asserting through the imported binding passes",
+        documented: true,
         code: 'import { expect } from "vitest";\nit("names a behaviour", ({ subject }) => {\n  expect(subject).toBe(1);\n});',
       },
       {
         name: "taking fixtures apart by name passes",
+        documented: true,
         code: 'it("names a behaviour", ({ subject, options }) => {});',
       },
       {
@@ -82,6 +84,7 @@ describe("dont-review-it/no-vitest-context-expect--import-expect-from-vitest", (
     invalid: [
       {
         name: "taking expect out of the context is reported",
+        documented: true,
         code: 'it("names a behaviour", ({ expect }) => {\n  expect(runSut()).toBe(1);\n});',
         errors: [{ messageId: "destructuredContextExpect" }],
       },
@@ -160,6 +163,7 @@ describe("dont-review-it/no-vitest-context-expect--import-expect-from-vitest", (
       },
       {
         name: "reaching expect through the context binding is reported",
+        documented: true,
         code: 'it("names a behaviour", (ctx) => {\n  ctx.expect(runSut()).toBe(1);\n});',
         errors: [{ messageId: "reachedContextExpect" }],
       },
