@@ -44,6 +44,7 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@mst/ai-native": "workspace:*",
     "@mst/dont-review-it": "workspace:*",
     "@tanstack/intent": "catalog:",
     "@types/node": "catalog:",

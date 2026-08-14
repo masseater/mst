@@ -1,24 +1,26 @@
-import { metrics } from "@opentelemetry/api";
+import { context, metrics, propagation, trace } from "@opentelemetry/api";
 import { globalErrorHandler } from "@opentelemetry/core";
 import { DataPointType } from "@opentelemetry/sdk-metrics";
 import { describe, expect, onTestFinished, test, vi } from "vite-plus/test";
 
 type ExportedDuration = { readonly name: string; readonly sum: number | undefined };
 
-const EXPORT_FAILURE_PREFIX =
-  "MST_LINT_RULE_DURATION asked for lint durations, but they could not be exported: ";
+const EXPORT_FAILURE_PREFIX = "MST_TELEMETRY asked for telemetry, but it could not be exported: ";
 
 const UPTIME_SECONDS = 2;
 
 describe("startLintTelemetry", () => {
-  describe("an environment that never asked for durations", () => {
+  describe("an environment that never asked for telemetry", () => {
     const it = test.extend("startAnswer", async () => {
-      vi.stubEnv("MST_LINT_RULE_DURATION", undefined);
+      vi.stubEnv("MST_TELEMETRY", undefined);
       vi.stubEnv("OTEL_SDK_DISABLED", undefined);
       onTestFinished(() => {
         process.exitCode = undefined;
         process.removeAllListeners("beforeExit");
+        context.disable();
         metrics.disable();
+        propagation.disable();
+        trace.disable();
       });
       vi.resetModules();
       const telemetry = await import("./lint-telemetry.ts");
@@ -30,14 +32,17 @@ describe("startLintTelemetry", () => {
     });
   });
 
-  describe("an environment that asked for durations but disabled the sdk", () => {
+  describe("an environment that asked for telemetry but disabled the sdk", () => {
     const it = test.extend("startAnswer", async () => {
-      vi.stubEnv("MST_LINT_RULE_DURATION", "1");
+      vi.stubEnv("MST_TELEMETRY", "1");
       vi.stubEnv("OTEL_SDK_DISABLED", "true");
       onTestFinished(() => {
         process.exitCode = undefined;
         process.removeAllListeners("beforeExit");
+        context.disable();
         metrics.disable();
+        propagation.disable();
+        trace.disable();
       });
       vi.resetModules();
       const telemetry = await import("./lint-telemetry.ts");
@@ -49,14 +54,17 @@ describe("startLintTelemetry", () => {
     });
   });
 
-  describe("an environment that asked for durations", () => {
+  describe("an environment that asked for telemetry", () => {
     const it = test.extend("startAnswer", async () => {
-      vi.stubEnv("MST_LINT_RULE_DURATION", "1");
+      vi.stubEnv("MST_TELEMETRY", "1");
       vi.stubEnv("OTEL_SDK_DISABLED", undefined);
       onTestFinished(() => {
         process.exitCode = undefined;
         process.removeAllListeners("beforeExit");
+        context.disable();
         metrics.disable();
+        propagation.disable();
+        trace.disable();
       });
       vi.resetModules();
       const telemetry = await import("./lint-telemetry.ts");
@@ -68,14 +76,17 @@ describe("startLintTelemetry", () => {
     });
   });
 
-  describe("an environment that asked for durations and started once already", () => {
+  describe("an environment that asked for telemetry and started once already", () => {
     const it = test.extend("restartAnswer", async () => {
-      vi.stubEnv("MST_LINT_RULE_DURATION", "1");
+      vi.stubEnv("MST_TELEMETRY", "1");
       vi.stubEnv("OTEL_SDK_DISABLED", undefined);
       onTestFinished(() => {
         process.exitCode = undefined;
         process.removeAllListeners("beforeExit");
+        context.disable();
         metrics.disable();
+        propagation.disable();
+        trace.disable();
       });
       vi.resetModules();
       const telemetry = await import("./lint-telemetry.ts");
@@ -90,12 +101,15 @@ describe("startLintTelemetry", () => {
 
   describe("a process winding down after a rule duration was recorded", () => {
     const it = test.extend("windDownExports", async () => {
-      vi.stubEnv("MST_LINT_RULE_DURATION", "1");
+      vi.stubEnv("MST_TELEMETRY", "1");
       vi.stubEnv("OTEL_SDK_DISABLED", undefined);
       onTestFinished(() => {
         process.exitCode = undefined;
         process.removeAllListeners("beforeExit");
+        context.disable();
         metrics.disable();
+        propagation.disable();
+        trace.disable();
       });
       vi.resetModules();
       vi.spyOn(process, "uptime").mockReturnValue(UPTIME_SECONDS);
@@ -142,12 +156,15 @@ describe("startLintTelemetry", () => {
   describe("an export that fails", () => {
     describe("the exit code the process carried when the failure was reported", () => {
       const it = test.extend("exitCodeCarriedIntoTheReport", async () => {
-        vi.stubEnv("MST_LINT_RULE_DURATION", "1");
+        vi.stubEnv("MST_TELEMETRY", "1");
         vi.stubEnv("OTEL_SDK_DISABLED", undefined);
         onTestFinished(() => {
           process.exitCode = undefined;
           process.removeAllListeners("beforeExit");
+          context.disable();
           metrics.disable();
+          propagation.disable();
+          trace.disable();
         });
         vi.resetModules();
         const telemetry = await import("./lint-telemetry.ts");
@@ -170,12 +187,15 @@ describe("startLintTelemetry", () => {
 
     describe("a failure carrying an error", () => {
       const it = test.extend("thrownErrorReport", async () => {
-        vi.stubEnv("MST_LINT_RULE_DURATION", "1");
+        vi.stubEnv("MST_TELEMETRY", "1");
         vi.stubEnv("OTEL_SDK_DISABLED", undefined);
         onTestFinished(() => {
           process.exitCode = undefined;
           process.removeAllListeners("beforeExit");
+          context.disable();
           metrics.disable();
+          propagation.disable();
+          trace.disable();
         });
         vi.resetModules();
         const telemetry = await import("./lint-telemetry.ts");
@@ -198,12 +218,15 @@ describe("startLintTelemetry", () => {
 
     describe("a failure carrying a value that is not an error", () => {
       const it = test.extend("thrownNonErrorReport", async () => {
-        vi.stubEnv("MST_LINT_RULE_DURATION", "1");
+        vi.stubEnv("MST_TELEMETRY", "1");
         vi.stubEnv("OTEL_SDK_DISABLED", undefined);
         onTestFinished(() => {
           process.exitCode = undefined;
           process.removeAllListeners("beforeExit");
+          context.disable();
           metrics.disable();
+          propagation.disable();
+          trace.disable();
         });
         vi.resetModules();
         const telemetry = await import("./lint-telemetry.ts");
@@ -227,15 +250,18 @@ describe("startLintTelemetry", () => {
 });
 
 describe("measureStage", () => {
-  describe("a stage measured in an environment that never asked for durations", () => {
+  describe("a stage measured in an environment that never asked for telemetry", () => {
     describe("what the measured stage produced", () => {
       const it = test.extend("stageProductWithoutDurations", async () => {
-        vi.stubEnv("MST_LINT_RULE_DURATION", undefined);
+        vi.stubEnv("MST_TELEMETRY", undefined);
         vi.stubEnv("OTEL_SDK_DISABLED", undefined);
         onTestFinished(() => {
           process.exitCode = undefined;
           process.removeAllListeners("beforeExit");
+          context.disable();
           metrics.disable();
+          propagation.disable();
+          trace.disable();
         });
         vi.resetModules();
         const telemetry = await import("./lint-telemetry.ts");
@@ -249,12 +275,15 @@ describe("measureStage", () => {
 
     describe("the exporter behind a stage nobody asked to measure", () => {
       const it = test.extend("exportsWithoutDurations", async () => {
-        vi.stubEnv("MST_LINT_RULE_DURATION", undefined);
+        vi.stubEnv("MST_TELEMETRY", undefined);
         vi.stubEnv("OTEL_SDK_DISABLED", undefined);
         onTestFinished(() => {
           process.exitCode = undefined;
           process.removeAllListeners("beforeExit");
+          context.disable();
           metrics.disable();
+          propagation.disable();
+          trace.disable();
         });
         vi.resetModules();
         const exporterModule = await import("@opentelemetry/exporter-metrics-otlp-http");
@@ -270,15 +299,18 @@ describe("measureStage", () => {
     });
   });
 
-  describe("a stage measured in an environment that asked for durations", () => {
+  describe("a stage measured in an environment that asked for telemetry", () => {
     describe("what the measured stage produced", () => {
       const it = test.extend("stageProductWithDurations", async () => {
-        vi.stubEnv("MST_LINT_RULE_DURATION", "1");
+        vi.stubEnv("MST_TELEMETRY", "1");
         vi.stubEnv("OTEL_SDK_DISABLED", undefined);
         onTestFinished(() => {
           process.exitCode = undefined;
           process.removeAllListeners("beforeExit");
+          context.disable();
           metrics.disable();
+          propagation.disable();
+          trace.disable();
         });
         vi.resetModules();
         const telemetry = await import("./lint-telemetry.ts");
@@ -292,12 +324,15 @@ describe("measureStage", () => {
 
     describe("the metrics the exporter was handed as the process wound down", () => {
       const it = test.extend("windDownStageMetricNames", async () => {
-        vi.stubEnv("MST_LINT_RULE_DURATION", "1");
+        vi.stubEnv("MST_TELEMETRY", "1");
         vi.stubEnv("OTEL_SDK_DISABLED", undefined);
         onTestFinished(() => {
           process.exitCode = undefined;
           process.removeAllListeners("beforeExit");
+          context.disable();
           metrics.disable();
+          propagation.disable();
+          trace.disable();
         });
         vi.resetModules();
         const exporterModule = await import("@opentelemetry/exporter-metrics-otlp-http");
@@ -332,18 +367,69 @@ describe("measureStage", () => {
       });
     });
   });
+
+  describe("a stage measured while another stage is already being measured", () => {
+    const it = test.extend("nestedStageNames", async () => {
+      vi.stubEnv("MST_TELEMETRY", "1");
+      vi.stubEnv("OTEL_SDK_DISABLED", undefined);
+      onTestFinished(() => {
+        process.exitCode = undefined;
+        process.removeAllListeners("beforeExit");
+        context.disable();
+        metrics.disable();
+        propagation.disable();
+        trace.disable();
+      });
+      vi.resetModules();
+      const exporterModule = await import("@opentelemetry/exporter-metrics-otlp-http");
+      const exported = vi.fn<(stageNames: readonly string[]) => void>();
+      vi.spyOn(exporterModule.OTLPMetricExporter.prototype, "export").mockImplementation(
+        (batch, resultCallback) => {
+          exported(
+            batch.scopeMetrics.flatMap((scope) =>
+              scope.metrics.flatMap((metric) =>
+                metric.dataPointType === DataPointType.HISTOGRAM
+                  ? metric.dataPoints.flatMap((point) =>
+                      typeof point.attributes.stage === "string" ? [point.attributes.stage] : [],
+                    )
+                  : [],
+              ),
+            ),
+          );
+          resultCallback({ code: 0 });
+        },
+      );
+      const stopped = vi
+        .spyOn(exporterModule.OTLPMetricExporter.prototype, "shutdown")
+        .mockResolvedValue();
+      const telemetry = await import("./lint-telemetry.ts");
+      telemetry.measureStage("outer.scope", () =>
+        telemetry.measureStage("inner.scope", () => 41 + 1),
+      );
+      process.emit("beforeExit", 0);
+      await vi.waitUntil(() => stopped.mock.calls.length > 0);
+      return exported;
+    });
+
+    it("is carried under a name of its own", ({ nestedStageNames }) => {
+      expect(nestedStageNames).toHaveBeenCalledExactlyOnceWith(["inner.scope", "outer.scope"]);
+    });
+  });
 });
 
 describe("ruleDuration", () => {
   describe("the histogram behind a second call", () => {
     const it = test
       .extend("startedTelemetry", async () => {
-        vi.stubEnv("MST_LINT_RULE_DURATION", "1");
+        vi.stubEnv("MST_TELEMETRY", "1");
         vi.stubEnv("OTEL_SDK_DISABLED", undefined);
         onTestFinished(() => {
           process.exitCode = undefined;
           process.removeAllListeners("beforeExit");
+          context.disable();
           metrics.disable();
+          propagation.disable();
+          trace.disable();
         });
         vi.resetModules();
         const telemetry = await import("./lint-telemetry.ts");

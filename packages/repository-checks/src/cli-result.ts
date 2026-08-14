@@ -1,5 +1,7 @@
 import { attemptAsync } from "es-toolkit";
 
+import { measureCheck } from "./check-telemetry.ts";
+
 export type CliResult = {
   readonly exitCode: number;
   readonly out: string;
@@ -27,4 +29,4 @@ export const createCliRunner =
     operation: (...args: Arguments) => Promise<CliResult>,
   ): ((...args: Arguments) => Promise<CliResult>) =>
   (...handed) =>
-    safelyRunCli(() => operation(...handed));
+    measureCheck(() => safelyRunCli(() => operation(...handed)));

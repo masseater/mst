@@ -1,19 +1,14 @@
-import { metrics } from "@opentelemetry/api";
-import { setGlobalErrorHandler } from "@opentelemetry/core";
-import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
-import { defaultResource, detectResources, envDetector } from "@opentelemetry/resources";
-import { MeterProvider, PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
+import { inheritedContext, startTelemetry } from "@mst/ai-native/telemetry";
+import { context, metrics, trace, type Context } from "@opentelemetry/api";
 import { once } from "es-toolkit";
 
-const ENABLE_VARIABLE = "MST_LINT_RULE_DURATION";
+const SERVICE_NAME = "mst-lint";
 
-const DISABLE_VARIABLE = "OTEL_SDK_DISABLED";
-
-const METER_NAME = "@mst/lint-rule-authoring";
+const INSTRUMENTATION_NAME = "@mst/lint-rule-authoring";
 
 const MILLISECONDS_PER_SECOND = 1000;
 
-const meter = once(() => metrics.getMeter(METER_NAME));
+const meter = once(() => metrics.getMeter(INSTRUMENTATION_NAME));
 
 export const ruleDuration = once(() =>
   meter().createHistogram("lint.rule.duration", {
@@ -36,50 +31,37 @@ const stageDuration = once(() =>
   }),
 );
 
-const isEnabled = (): boolean =>
-  process.env[ENABLE_VARIABLE] !== undefined && process.env[DISABLE_VARIABLE] !== "true";
+const runSpan = once(() =>
+  trace
+    .getTracer(INSTRUMENTATION_NAME)
+    .startSpan("lint", { startTime: performance.timeOrigin }, inheritedContext()),
+);
 
-const reasonOf = (thrown: unknown): string =>
-  thrown instanceof Error ? thrown.message : JSON.stringify(thrown);
-
-const failWhateverCannotBeExported = (): void => {
-  setGlobalErrorHandler((thrown: unknown) => {
-    process.exitCode = 1;
-    process.stderr.write(
-      `${ENABLE_VARIABLE} asked for lint durations, but they could not be exported: ${reasonOf(thrown)}\n`,
-    );
-  });
+const closeRun = (): void => {
+  runDuration().record(process.uptime() * MILLISECONDS_PER_SECOND);
+  runSpan().end();
 };
 
-const stopOnExit = (provider: MeterProvider): void => {
-  const shutdownOnce = once(async (): Promise<void> => {
-    runDuration().record(process.uptime() * MILLISECONDS_PER_SECOND);
-    await provider.shutdown();
-  });
-  process.on("beforeExit", () => {
-    void shutdownOnce();
-  });
+const stageContext = (): Context => {
+  const active = context.active();
+  return trace.getSpan(active) === undefined ? trace.setSpan(active, runSpan()) : active;
 };
 
 export const measureStage = <Produced>(stage: string, run: () => Produced): Produced => {
   if (!startLintTelemetry()) return run();
-  const startedAt = performance.now();
-  const produced = run();
-  stageDuration().record(performance.now() - startedAt, { stage });
-  return produced;
+  return context.with(stageContext(), () =>
+    trace.getTracer(INSTRUMENTATION_NAME).startActiveSpan(stage, (span) => {
+      const startedAt = performance.now();
+      const produced = run();
+      stageDuration().record(performance.now() - startedAt, { stage });
+      span.end();
+      return produced;
+    }),
+  );
 };
 
 export const startLintTelemetry = once((): boolean => {
-  if (!isEnabled()) {
-    return false;
-  }
-  failWhateverCannotBeExported();
-  const reader = new PeriodicExportingMetricReader({ exporter: new OTLPMetricExporter() });
-  const provider = new MeterProvider({
-    readers: [reader],
-    resource: defaultResource().merge(detectResources({ detectors: [envDetector] })),
-  });
-  metrics.setGlobalMeterProvider(provider);
-  stopOnExit(provider);
+  if (!startTelemetry(SERVICE_NAME).enabled) return false;
+  process.on("beforeExit", closeRun);
   return true;
 });

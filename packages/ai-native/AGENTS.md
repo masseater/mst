@@ -13,6 +13,19 @@ description: Command wrappers that keep parallel heavy commands within the host'
 - `throttle [--timeout <seconds>]` — 同一ホスト × 同一名前空間で、包んだコマンドの同時実行数を上限以下に保つ。上限の既定は 1 で、`MST_THROTTLE_LIMIT` から上書きできる。空きが無ければ待ち、待機は有界。保持 process が終了すれば OS がスロットを解放し、生きている保持者はコマンドが終わるか打ち切られるまで保持する。`--timeout` は process tree 全体を打ち切る。POSIX は穏当な終了要求 → 猶予 → 強制終了、Windows は `taskkill /T /F` による即時強制終了を使う。0 は打ち切らない
 - `spool` — 包んだコマンドの出力を全量ログファイルへ逃がし、呼び出し元には固定行数の要約だけを返す。記録は package.json を目印にした上方探索で決まる `.spool/` に置かれ、端末制御のエスケープ列は除去される。CI（環境変数 `CI`）ではジョブログ自体が耐久的な記録なので素通しに切り替わる
 
+`spool` が包んだコマンドは計測の対象でもある。包んだ 1 件がスパンになり、所要時間が分布として出て、記録した本文が LogRecord として出る。子プロセスへは trace の文脈を環境変数で渡すので、子が自分を計測していれば同じトレースの中に入れ子で並ぶ。
+
+計測を立ち上げる口はこのパッケージが持ち、`@mst/ai-native/telemetry` として公開する。provider を組むのは 1 プロセスで 1 回だけで、最初に求めた入口が `service.name` を決める。有効化は `MST_TELEMETRY`、送信先は `OTEL_EXPORTER_OTLP_ENDPOINT`、停止は `OTEL_SDK_DISABLED` が決める。判断は [EDR 0064](../../docs/engineering-decision-logs/0064-carry-one-trace-through-the-gate-and-let-the-agent-query-it.md) にある。
+
+- IF: 計測を仕込む; THEN
+  - MUST: 時間を使っている当人に仕込む
+  - PROHIBIT: 計測のためだけにコマンドを包む
+    - 包み忘れた経路は、計測結果の上では速い経路と同じ見た目になる
+- IF: プロセスの終了前に片付けたいものがある; THEN
+  - MUST: `beforeExit` に自分で登録する
+  - PROHIBIT: 送信の停止処理より先に登録されることを前提にする
+    - 停止はマイクロタスクへ回してあり、登録順に関わらず全ての片付けの後で始まる
+
 3 つ目の `unabridged` は包まない。Claude Code の `PreToolUse` hook として標準入力から JSON を読み、Bash に渡されたコマンド行のコマンド位置に `head` / `tail` があれば `deny` を返す。通す判断のときは何も出さない。配線はリポジトリの `.claude/settings.json` が `matcher` を `Bash` にして行う。hook を書くときの規律は [hook の書き方](docs/hooks.md) が持つ。
 
 実行可能な契約は各コマンドのヘルプ本文とテストの 2 つである。振る舞いを変えるときは両方を同時に変える。

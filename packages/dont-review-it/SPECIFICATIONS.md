@@ -88,6 +88,18 @@
 - 公開しないパッケージが skill の隣に changelog を持てば報告する
 - 自動修正は skill の版を宣言へ揃え、changelog には触れない
 
+## 計測の配線の検査
+
+[`specs/telemetry-wiring.spec.ts`](specs/telemetry-wiring.spec.ts)
+
+- 計測を宣言している test ブロックを黙って通す
+- 計測を宣言していない test ブロックを、宣言を足す指示とともに報告する
+- 宣言の途中までしか書かれていない test ブロックも報告する
+- 宣言された計測が無効にされていても、宣言があるものとして通す
+- test ブロックを持たない設定を報告しない
+- ツールチェーンの設定を持たないワークスペースを報告しない
+- マニフェストを持つディレクトリを、開いた対象として数える
+
 ## ツールチェーン設定の preset
 
 [`specs/toolchain-preset.spec.ts`](specs/toolchain-preset.spec.ts)

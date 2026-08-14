@@ -7,6 +7,11 @@ import { join } from "node:path";
 
 import { STREAM_EVENT } from "../node-event-names.ts";
 import {
+  childEnvironment,
+  measureCommand,
+  recordCommandRecord,
+} from "../telemetry/command-telemetry.ts";
+import {
   exitCodeOf,
   startFailureSummary,
   waitClose,
@@ -206,6 +211,14 @@ const reportCompletion = (input: {
   input.deps.stdout.write(
     `spool: command: ${input.commandLine}\nspool: log: ${input.filePath} (${bytes} bytes, ${lineCount} lines)\nspool: exit: ${exitCode} (${input.elapsed})\n`,
   );
+  recordCommandRecord({
+    commandLine: input.commandLine,
+    exitCode,
+    filePath: input.filePath,
+    bytes,
+    lineCount,
+    excerpt: input.recording.excerpt(),
+  });
   if (exitCode !== 0) {
     input.deps.stdout.write(input.recording.excerpt());
   }
@@ -223,6 +236,7 @@ const recordRun = async (input: {
   const startedAt = input.deps.monotonicNow();
   const child = spawn(input.command[0], input.command.slice(1), {
     stdio: ["inherit", "pipe", "pipe"],
+    env: childEnvironment(),
   });
   const closed = waitClose(child);
   const spawnError = await waitSpawn(child);
@@ -282,7 +296,11 @@ export const runSpool = async (argv: string[], deps: SpoolDeps): Promise<number>
     return 2;
   }
   const resolved = resolveDeps(deps);
-  return (deps.isPassthrough ?? defaultIsPassthrough)()
-    ? runPassthrough(command, resolved)
-    : runEscaped(command, resolved);
+  return measureCommand({
+    command,
+    run: () =>
+      (deps.isPassthrough ?? defaultIsPassthrough)()
+        ? runPassthrough(command, resolved)
+        : runEscaped(command, resolved),
+  });
 };
