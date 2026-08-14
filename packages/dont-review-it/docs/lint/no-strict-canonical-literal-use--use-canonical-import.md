@@ -11,7 +11,7 @@ Disallow writing a value that a declared vocabulary already owns as a literal, s
 - Tool: `oxlint`
 - Fixable: no
 - Suggestions: no
-- Options: no
+- Options: yes
 - Shipped in the preset: yes
 - Source: [`no-strict-canonical-literal-use--use-canonical-import.ts`](../../src/lint/oxlint/rules/no-strict-canonical-literal-use--use-canonical-import.ts)
 
@@ -130,6 +130,6 @@ type Draft = Pick<Model, "draft">;
 
 <!-- BEGIN GENERATED runtime -->
 
-This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
 
 <!-- END GENERATED runtime -->

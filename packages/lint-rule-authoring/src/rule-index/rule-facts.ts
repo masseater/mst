@@ -100,6 +100,21 @@ const messagesOf = ({
       return messageId === null || template === null ? [] : [{ messageId, template }];
     });
 
+const declaresOptions = ({
+  schema,
+  constants,
+}: {
+  readonly schema: UnknownFields | null;
+  readonly constants: ConstantsByName;
+}): boolean => {
+  if (schema === null) return false;
+  if (schema.type === "Identifier") {
+    const named = constants.get(schema.name as string);
+    return named === undefined ? true : declaresOptions({ schema: named, constants });
+  }
+  return Array.isArray(schema.elements) && schema.elements.length > 0;
+};
+
 const factsOf = ({
   definition,
   constants,
@@ -127,7 +142,7 @@ const factsOf = ({
       sourcePath,
       fixable: propertyOf(meta, "fixable") !== null,
       hasSuggestions: suggestionsFlag?.value === true,
-      configurable: schema !== null && Array.isArray(schema.elements) && schema.elements.length > 0,
+      configurable: declaresOptions({ schema, constants }),
       shipped: shippedFlag?.value !== false,
       messages: messagesOf({ complaints, constants }),
     },

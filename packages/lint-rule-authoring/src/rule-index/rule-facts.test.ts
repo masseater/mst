@@ -403,12 +403,52 @@ export const borrowedDocs = {
       return lintRuleFactsIn({ workspaceRoot: root, sourcePath });
     });
 
-    it("reads as no description", ({ facts }) => {
+    it("reads as no description, and a schema it cannot open still declares options", ({
+      facts,
+    }) => {
       expect(facts).toStrictEqual([
         {
           name: "no-borrowed-docs--inline-them",
           description: "",
           sourcePath: "src/rules/borrowed-docs.ts",
+          fixable: false,
+          hasSuggestions: false,
+          configurable: true,
+          shipped: true,
+          messages: [{ messageId: "report", template: "No." }],
+        },
+      ]);
+    });
+  });
+
+  describe("a schema named by a constant of the same file", () => {
+    const it = test.extend("facts", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "rule-facts-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      const sourcePath = "src/rules/named-schema.ts";
+      mkdirSync(dirname(join(root, sourcePath)), { recursive: true });
+      writeFileSync(
+        join(root, sourcePath),
+        `const EMPTY_SCHEMA = [];
+export const namedSchema = {
+  name: "no-named-schema--read-it",
+  meta: { messages: { report: "No." }, schema: EMPTY_SCHEMA },
+  create: () => ({}),
+};
+`,
+        "utf8",
+      );
+      return lintRuleFactsIn({ workspaceRoot: root, sourcePath });
+    });
+
+    it("takes the constant it names as the schema it declares", ({ facts }) => {
+      expect(facts).toStrictEqual([
+        {
+          name: "no-named-schema--read-it",
+          description: "",
+          sourcePath: "src/rules/named-schema.ts",
           fixable: false,
           hasSuggestions: false,
           configurable: false,
