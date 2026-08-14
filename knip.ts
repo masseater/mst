@@ -6,7 +6,6 @@ export default {
   ignoreDependencies: [
     "vite",
     "@mst/agentic-documents",
-    "@mst/lint-rule-authoring",
     "@mst/stop-ai-slop",
     "@mst/verified-specifications",
   ],

@@ -23,14 +23,6 @@
 - 構文として読めないファイルを報告する
 - 構造に問題がある間は一覧を書き換えない
 
-## lint の配布設定
-
-[`specs/lint-preset.spec.ts`](specs/lint-preset.spec.ts)
-
-- specs ディレクトリに .spec.ts 以外のテストを置けない設定を配る
-- 仕様担保テストの describe の入れ子を 1 段に制限する設定を配る
-- specs の中のテストを、ソース隣接の要求から外す設定を配る
-
 ## 仕様一覧の生成
 
 [`specs/specification-listing.spec.ts`](specs/specification-listing.spec.ts)

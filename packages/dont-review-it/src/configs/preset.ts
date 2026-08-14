@@ -1,5 +1,4 @@
 import { oxlint as lintRuleAuthoringOxlint } from "@mst/lint-rule-authoring";
-import { oxlint as verifiedSpecificationsOxlint } from "@mst/verified-specifications";
 
 import { oxfmt } from "./oxfmt.ts";
 import { oxlint } from "./oxlint.ts";
@@ -14,11 +13,6 @@ export const dontReviewItPreset = {
   lint: (config: OxlintConfig = {}): OxlintConfig =>
     withGitExcludes({
       ...config,
-      extends: [
-        lintRuleAuthoringOxlint,
-        oxlint,
-        verifiedSpecificationsOxlint,
-        ...(config.extends ?? []),
-      ],
+      extends: [lintRuleAuthoringOxlint, oxlint, ...(config.extends ?? [])],
     }),
 };

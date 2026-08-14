@@ -90,7 +90,79 @@ describe("disabledRuleDeclarationsIn", () => {
         config: defaultPresetAdoptionConfig,
       }));
 
-    it("says nothing about a rule whose severity is not written as a plain value", ({
+    it("reads the severity from the head of a tuple", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        {
+          ruleId: "dont-review-it/no-reassign--use-spread-or-iife",
+          line: 2,
+          filePatterns: [],
+        },
+      ]);
+    });
+  });
+
+  describe("a preset rule switched off through a named severity constant", () => {
+    const it = test.extend("declarations", () =>
+      disabledRuleDeclarationsIn({
+        source: `export default defineConfig({
+  lint: { rules: { "dont-review-it/no-reassign--use-spread-or-iife": LINT_SEVERITY.OFF } },
+});`,
+        config: defaultPresetAdoptionConfig,
+      }));
+
+    it("reads the member name of a named severity constant", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        {
+          ruleId: "dont-review-it/no-reassign--use-spread-or-iife",
+          line: 2,
+          filePatterns: [],
+        },
+      ]);
+    });
+  });
+
+  describe("a named severity constant that switches a preset rule on", () => {
+    const it = test.extend("declarations", () =>
+      disabledRuleDeclarationsIn({
+        source: `export default defineConfig({
+  lint: { rules: { "dont-review-it/no-reassign--use-spread-or-iife": LINT_SEVERITY.ERROR } },
+});`,
+        config: defaultPresetAdoptionConfig,
+      }));
+
+    it("says nothing about a named constant that names a severity other than off", ({
+      declarations,
+    }) => {
+      expect(declarations).toStrictEqual([]);
+    });
+  });
+
+  describe("a severity whose member is computed at run time", () => {
+    const it = test.extend("declarations", () =>
+      disabledRuleDeclarationsIn({
+        source: `export default defineConfig({
+  lint: { rules: { "dont-review-it/no-reassign--use-spread-or-iife": LINT_SEVERITY[level] } },
+});`,
+        config: defaultPresetAdoptionConfig,
+      }));
+
+    it("says nothing about a severity whose member name is computed at run time", ({
+      declarations,
+    }) => {
+      expect(declarations).toStrictEqual([]);
+    });
+  });
+
+  describe("a severity handed over as an identifier", () => {
+    const it = test.extend("declarations", () =>
+      disabledRuleDeclarationsIn({
+        source: `export default defineConfig({
+  lint: { rules: { "dont-review-it/no-reassign--use-spread-or-iife": severity } },
+});`,
+        config: defaultPresetAdoptionConfig,
+      }));
+
+    it("says nothing about a severity that names neither a value nor a member", ({
       declarations,
     }) => {
       expect(declarations).toStrictEqual([]);
