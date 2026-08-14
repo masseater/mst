@@ -1,101 +1,168 @@
+---
+description: "Disallow text written out in the source at an identity argument of a client built from a provider package, so which account a deployment acts as is decided by its configuration rather than by the file that builds the client"
+---
+
 # no-hardcoded-provider-id--read-from-configuration
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-provider のパッケージから作られたクライアントの**識別子の引数**に、ソースへ書き出された文字列が現れているもの。
+Disallow text written out in the source at an identity argument of a client built from a provider package, so which account a deployment acts as is decided by its configuration rather than by the file that builds the client
 
-### 渡される先で判定する
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-hardcoded-provider-id--read-from-configuration.ts`](../../src/lint/oxlint/rules/no-hardcoded-provider-id--read-from-configuration.ts)
 
-判定はリテラルの形では行わない。そのリテラルが**渡される先**だけを見る。宛先の位置にソースへ書き出された文字列が現れたら報告し、その文字列が URL に見えるか識別子に見えるかは一切見ない。
+<!-- END GENERATED rule-header -->
 
-この方針を採る理由は実測にある。このリポジトリで URL の形をしたリテラルは 8 件あり、6 件はスキャフォールドが生成したランディングページの外部リンク、2 件は文書 URL の組み立てを確かめるテストの期待値である。`AGENTS.md` はスキャフォールド生成物を独自設計に置き換えることを禁じているので、形で判定する版は入れた瞬間に規約と衝突する。識別子の形（20 文字以上の英数字）をしたリテラルは 264 件あるが、そのすべてがルール名・メッセージ ID・AST のノード種別名で、provider の ID は 1 件も無い。形で判定するルールは、直すべきものに 1 件も当たらないまま、直してはいけないものを全件報告する。渡される先で判定すれば、報告されるのは実際に外へ出ていく値だけになり、provider の一覧をオプションとして設定側に持つ必要も無くなる。
+## Violation
 
-`no-hardcoded-endpoint--read-from-configuration` も同じ方針で書かれている。2 本は見る位置が違うだけで、判定の考え方は同一である。
+A string written out in the source appearing in an **identity argument** of a client built from a provider package.
 
-### 何を provider クライアントの初期化とみなすか
+### The judgment runs on where it is handed, not on how it looks
 
-`new` 式のうち、その構築子が **provider のパッケージから import された束縛**であるもの。
+The judgment never reads the shape of the literal. It reads only **where that literal is handed**. Where a string written out in the source stands in an identity position, the report stands, and whether that string looks like a URL or like an identifier is not read at all.
 
-provider のパッケージとは、モジュール指定子が bare であるものを指す。`.` `/` `#` で始まるものはこのリポジトリ自身のモジュールなので除く。`node:` で始まるものはプラットフォームであって provider ではないので除く。
+A shape-based judgment does not work here. Most URL-shaped literals in a repository are external links in scaffold-generated pages and expected values in tests that check how a document URL is assembled — and a scaffold's output must not be replaced with a design of one's own, so a shape-based version collides with the norms the moment it is added. Identifier-shaped literals are overwhelmingly rule names, message ids and AST node kinds. A shape-based rule hits none of what should be fixed while reporting all of what must not be. Judge on where it is handed and only values that actually leave are reported, and no list of providers has to be held as an option on the configuration side.
 
-構築子は名前付き import・既定 import・名前空間 import のいずれでもよい。名前空間経由の `new sdk.Provider(...)` も、受け手が provider のパッケージの束縛であれば同じ構築とみなす。
+[no-hardcoded-endpoint--read-from-configuration](./no-hardcoded-endpoint--read-from-configuration.md) is written on the same policy. The two differ only in which position they read.
 
-この境界の外に落ちるものが 2 つあり、いずれも意図して外している。
+### What counts as initializing a provider client
 
-- **位置引数で識別子を受け取る SDK。** `new Provider('acct-123')` の形は報告しない。「外部パッケージの構築子に渡された文字列」を一律に見ると、`new Command('build')` のような、識別子でも接続先でもない引数まで報告することになる。これはまさに判定が形へ寄った状態である。そういう SDK を採用したら、その構築子の引数の意味を確かめたうえでこの判定に足す
-- **関数呼び出しでクライアントを作る SDK。** `createClient(url, key)` の形は報告しない。`defineConfig({...})` のような設定関数と構文上区別できず、区別を名前で付ければやはり形の判定になる。そういう SDK を採用したら、その呼び出しをこの判定に足す
+A `new` expression whose constructor is **a binding imported from a provider package**.
 
-### 何を識別子の引数とみなすか
+A provider package means a bare module specifier. Specifiers starting with `.`, `/` or `#` are this repository's own modules and are excluded. Specifiers starting with `node:` are the platform rather than a provider and are excluded.
 
-構築子に渡されたオブジェクトの中で、キーが次のいずれかであるプロパティの値を識別子とする。入れ子のオブジェクトも辿る。
+The constructor may be a named import, a default import or a namespace import. `new sdk.Provider(...)` through a namespace counts as the same construction as long as the receiver is a binding of a provider package.
+
+Two things fall outside this boundary, both deliberately.
+
+- **An SDK taking the identity as a positional argument.** `new Provider('acct-123')` is not reported. Reading "any string handed to an external package's constructor" would report arguments that are neither identity nor destination, such as `new Command('build')` — which is exactly the judgment sliding toward shape. On adopting such an SDK, confirm what its constructor's arguments mean and add them to this judgment
+- **An SDK building a client through a function call.** `createClient(url, key)` is not reported. It is syntactically indistinguishable from a configuration function such as `defineConfig({...})`, and distinguishing them by name would again be a shape-based judgment. On adopting such an SDK, add that call to this judgment
+
+### What counts as an identity argument
+
+Inside the object handed to the constructor, the value of a property whose key is one of the following is an identity. Nested objects are walked.
 
 `accessKeyId` / `accessToken` / `accountId` / `apiKey` / `apiSecret` / `apiToken` / `appId` / `applicationId` / `authToken` / `clientId` / `clientSecret` / `dsn` / `organizationId` / `privateKey` / `projectId` / `publicKey` / `secretAccessKey` / `tenantId` / `token` / `workspaceId`
 
-この一覧は「誰として繋ぐか」を決めるものだけを持つ。`region` や `baseURL` や `endpoint` は入れていない。前者は配備の設定ではあるが識別子ではなく、後者 2 つは識別子ではなく宛先であって、`no-hardcoded-endpoint--read-from-configuration` が扱う領分である。初期化時に宛先を受け取る SDK を採用したら、その位置をあちらの一覧に足す。
+The list holds only what settles "as whom do we connect". `region`, `baseURL` and `endpoint` are not in it: the first is a deployment setting but not an identity, and the other two are destinations rather than identities and belong to `no-hardcoded-endpoint--read-from-configuration`. On adopting an SDK that takes the destination at initialization, add that position to that rule's list.
 
-キーは算出されていないものだけを見る。`{ ["projectId"]: '...' }` は報告されない。これは「禁じる回避策」に挙げてある。
+Only non-computed keys are read. `{ ["projectId"]: '...' }` is not reported. That is named under forbidden bypasses.
 
-### 何を書き出された文字列とみなすか
+### What counts as a string written out
 
-`no-hardcoded-endpoint--read-from-configuration` と同じ判定を使う。識別子の式に、次のいずれかが 1 つでも含まれていれば書き出されているとみなす。
+The same judgment as `no-hardcoded-endpoint--read-from-configuration`. The identity expression counts as written out where it contains even one of these.
 
-- 文字列リテラル
-- テンプレートリテラルの、中身のある静的部分
-- `+` による連結の、いずれかの側にある上記
+- A string literal
+- A non-empty static part of a template literal
+- Either side of a `+` concatenation holding one of the above
 
-したがって ``new Provider({ projectId: `acme-${stage}` })`` は報告される。段階が値から来ていても、どの組織かはこのファイルに焼き込まれているためである。
+So ``new Provider({ projectId: `acme-${stage}` })`` is reported: the stage comes from a value, but which organization it is is baked into this file.
 
-### 走査の境界
+### The boundary of the walk
 
-ファイル種別による例外は持たない。テストコードも同じに扱う。テストが本物の識別子で本物のクライアントを作ってよい理由は無い。
+There is no exemption by file kind. Test code is treated the same. There is no reason a test may build a real client with a real identity.
 
-`new` の外で書き出された文字列は対象外である。`export const PROJECT_ID = 'acme-production';` はどこにも渡っていない。渡した時点で、渡した先が判定する。
+A string written out outside a `new` is out of scope. `export const PROJECT_ID = 'acme-production';` has been handed nowhere. The moment it is handed over, the place it is handed to judges it.
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「誰として繋ぐかは、繋ぐコードではなく、そのコードを動かす設定が決める」ことである。
+As whom to connect is settled by the configuration that runs the code, not by the code that connects.
 
-クライアントの初期化に渡す識別子は、そのプロセスが provider の前でどのアカウントとして振る舞うかを決める。環境ごとに必ず違う。同じソースが、テストではサンドボックスのアカウントとして、レビューではステージングのアカウントとして、本番では本物のアカウントとして動かなければならない。構築に焼き込まれた文字列は、そのどれか 1 つにしかなれない。
+The identity handed to a client's initialization settles which account that process acts as in front of the provider. It necessarily differs per environment. The same source has to run as a sandbox account in tests, as a staging account in review and as the real account in production. A string baked into a construction can only ever be one of those.
 
-壊れ方は 3 層ある。
+It breaks in three layers.
 
-1 層目は、成果物がアカウントを 1 つしか持てなくなることである。ビルドは、それを書いた人が持っていたアカウントでしか動かない。
+The first is that an artefact can hold only one account. A build runs only under the account whoever wrote it had.
 
-2 層目は、間違ったアカウントで動いたことが観測できないことである。識別子は型を持たない文字列で、正しいかどうかは実際に繋いだ結果でしか分からない。テストは通り、型検査も通る。テストが本物の識別子を持っていれば、テストは本物のデータに触る。触ったことは緑のテスト結果からは読み取れない。
+The second is that running under the wrong account cannot be observed. An identity is an untyped string, and whether it is right is known only from the result of actually connecting. The tests pass and the type check passes. Where the tests hold a real identity, the tests touch real data — and that they touched it cannot be read from a green test result.
 
-3 層目は、識別子が資格情報を兼ねている場合に、それが履歴に入ることである。`apiKey` や `clientSecret` は、書いた時点でこのリポジトリの履歴に入り、現在のファイルから消しても履歴からは消えない。取り消すには provider 側で無効化するしかなく、無効化すればその鍵を使っていた全ての配備が止まる。1 層目・2 層目と違って、これは気付いた後でも元に戻らない。
+The third is that where an identity doubles as a credential, it enters the history. An `apiKey` or a `clientSecret` enters this repository's history the moment it is written, and deleting it from the current file does not delete it from the history. Revoking it means invalidating it at the provider, which stops every deployment that was using that key. Unlike the first two layers, this cannot be undone after it is noticed.
 
-書き出された文字列そのものが悪いのではない。その文字列が**クライアントの識別子の位置にある**ことが、この 3 層を作る。
+The string written out is not the problem in itself. It is that string **standing in a client's identity** that builds those three layers.
 
-## どう直すか
+### Configuration
 
-識別子を設定から読み、渡す。取り方は 2 つある。
+None. Only whether the rule is on or off is settled by the configuration. The list of identity keys is held by the rule. It is not something that varies per deployment target, and where it changes, the rule itself is repaired.
 
-**プロセスを起動した環境から取る。** 配備ごとに違う値は、配備ごとに違う場所に置く。資格情報はソースに置ける形をそもそも持っていない。
+## Fix
+
+Read the identity from configuration and hand it over. Two ways to take it.
+
+**Take it from the environment that started the process.** Values that differ per deployment go where deployments differ. A credential has no shape that can sit in source at all.
 
 ```ts
 const client = new Provider({ projectId: process.env.PROVIDER_PROJECT_ID });
 ```
 
-**関数の引数として受け取る。** 誰として繋ぐかを呼び出し側が決められるようにする。テストはサンドボックスの識別子を渡せばよく、製品のコードは設定から読んだ値を渡せばよい。
+**Take it as a function parameter.** Let the caller settle as whom to connect. A test hands over the sandbox identity, and the product code hands over the value it read from configuration.
 
 ```ts
 const openProvider = (identity: ProviderIdentity): Provider =>
   new Provider({ projectId: identity.projectId, apiKey: identity.apiKey });
 ```
 
-識別子の一部だけを設定から取る形（`` `acme-${stage}` ``）は解決になっていない。組織の部分が焼き込まれている限り、その組織の外では動かない。識別子は 1 つの値として設定から来るようにする。
+Taking only part of the identity from configuration (`` `acme-${stage}` ``) is not a solution. While the organization part is baked in, it does not run outside that organization. Have the identity arrive from configuration as one value.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- 識別子を変数に取ってから渡す（`const projectId = 'acme-production';` を上に置く）。判定は識別子の位置に置かれた式だけを見るので報告は消える。識別子がこのファイルに焼き込まれている状態は変わらない
-- キーを算出形で書く（`{ ["projectId"]: '...' }`）。判定は算出されていないキーだけを見るので報告は消える。渡っている値も渡し先も変わっていない
-- provider の構築子をこのリポジトリのクラスで包み、その包みを `new` する。構築子が相対 import になるので報告は消える。包みの中で焼き込まれた識別子が渡っていることは変わらない
-- 一覧に無いキー名を使う（`project` や `key` に改名する）。キー名は provider の API が決めるものであって、こちらが選べるものではない。改名して通るなら、それは provider に渡っていないということである
-- 識別子を分割して連結する（`'acme' + '-production'`）。連結はどちらの側も見る
-- テストだから、サンドボックスだから、という理由で残す。ファイル種別による例外は持たない。サンドボックスの識別子もテストの設定から渡す
-- 抑制ディレクティブ
+Code this rule rejects.
 
-## オプション
+```ts
+// a written out project identifier passed to a provider client is reported
+import Provider from 'provider-sdk';
+new Provider({ projectId: 'acme-production' });
+```
 
-取らない。有効か無効かだけを設定側で決める。識別子のキーの一覧はルールが持つ。配備先ごとに変わる性質のものではなく、変わったならルール本体を直す。
+```ts
+// an identity assembled with a written out prefix is still written out
+import Provider from 'provider-sdk';
+new Provider({ projectId: `acme-${stage}` });
+```
+
+Code this rule accepts.
+
+```ts
+// an identity read from configuration passes
+import Provider from 'provider-sdk';
+new Provider({ projectId: config.projectId });
+```
+
+```ts
+// a setting that is not an identity may be written out
+import { RuleTester } from '@oxlint/plugins';
+new RuleTester({ languageOptions: { parserOptions: { lang: 'ts' } } });
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Taking the identity into a variable before handing it over (placing `const projectId = 'acme-production';` above). The judgment reads only the expression in the identity position, so the report clears. The identity is still baked into this file
+- Writing the key in computed form (`{ ["projectId"]: '...' }`). The judgment reads non-computed keys only, so the report clears. Neither the value handed over nor where it goes has changed
+- Wrapping the provider's constructor in a class of this repository and `new`-ing the wrapper. The constructor becomes a relative import so the report clears. A baked-in identity is still being handed over inside the wrapper
+- Using a key name absent from the list (renaming to `project` or `key`). Key names are settled by the provider's API and are not ours to choose. If renaming makes it pass, it is not reaching the provider
+- Splitting the identity and concatenating (`'acme' + '-production'`). Concatenation reads both sides
+- Keeping it because it is a test, or because it is a sandbox. There is no exemption by file kind. A sandbox identity comes from the test's configuration too
+- A suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `hardcodedProviderId` | A client built from a provider package must not take the identity it acts as from text written out in this file. Read the identity from configuration and pass it in: take it from the environment the process was started with, or accept it as a parameter of the function that builds the client. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->
