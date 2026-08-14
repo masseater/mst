@@ -23,6 +23,7 @@ export const requireSpecOrAssetsOnlyInSpecDirectory = createDontReviewItRule({
       description:
         "Require every file under a directory named for specs to be a spec or the test data one of those specs owns, so setup carved out of a spec is reported where it sits instead of only where a spec imports it",
       relatedGuidelines: [],
+      shipped: false,
     },
     messages: {
       [FOREIGN_FILE_IN_SPEC_DIRECTORY_MESSAGE_ID]:

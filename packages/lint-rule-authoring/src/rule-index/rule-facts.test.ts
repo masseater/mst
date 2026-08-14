@@ -45,6 +45,7 @@ export const full = createRule({
           fixable: true,
           hasSuggestions: true,
           configurable: true,
+          shipped: true,
         },
       ]);
     });
@@ -85,6 +86,7 @@ export const full = createRule({
           fixable: false,
           hasSuggestions: false,
           configurable: false,
+          shipped: true,
         },
       ]);
     });
@@ -408,8 +410,59 @@ export const borrowedDocs = {
           fixable: false,
           hasSuggestions: false,
           configurable: false,
+          shipped: true,
         },
       ]);
+    });
+  });
+
+  describe("rules that say whether the shipped preset carries them", () => {
+    const it = test.extend("shippedFlags", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "rule-facts-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      const sourcePath = "src/rules/delivery.ts";
+      mkdirSync(dirname(join(root, sourcePath)), { recursive: true });
+      writeFileSync(
+        join(root, sourcePath),
+        `export const withheld = {
+  name: "no-withheld--name-it-yourself",
+  meta: {
+    docs: { description: "Disallow withholding", shipped: false },
+    messages: { report: "No." },
+  },
+  create: () => ({}),
+};
+export const declared = {
+  name: "no-declared--keep-it",
+  meta: {
+    docs: { description: "Disallow declaring", shipped: true },
+    messages: { report: "No." },
+  },
+  create: () => ({}),
+};
+export const silent = {
+  name: "no-silent--keep-it",
+  meta: { docs: { description: "Disallow silence" }, messages: { report: "No." } },
+  create: () => ({}),
+};
+export const opaque = {
+  name: "no-opaque--spell-it-out",
+  meta: {
+    docs: { description: "Disallow opacity", shipped: decide() },
+    messages: { report: "No." },
+  },
+  create: () => ({}),
+};
+`,
+        "utf8",
+      );
+      return lintRuleFactsIn({ workspaceRoot: root, sourcePath }).map((rule) => rule.shipped);
+    });
+
+    it("counts as withheld only the one that spells the refusal out", ({ shippedFlags }) => {
+      expect(shippedFlags).toStrictEqual([false, true, true, true]);
     });
   });
 
