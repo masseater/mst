@@ -1,9 +1,11 @@
+import { API } from "typescript/unstable/sync";
+
 import { loadCanonicalValuesCatalogSnapshot } from "./lint/oxlint/lib/canonical-values/builder.ts";
 import { loadCatalogEntries } from "./lint/oxlint/lib/dependency-catalog/catalog-entries.ts";
 import { loadWorkspaceDependencies } from "./lint/oxlint/lib/dependency-catalog/workspace-manifests.ts";
 import { loadRepositoryBodyIndex } from "./lint/oxlint/lib/duplicated-bodies/builder.ts";
 import { replacedModuleAt } from "./lint/oxlint/lib/external-io-boundary.ts";
-import { loadLibraryVocabulary } from "./lint/oxlint/lib/library-vocabulary/harvester.ts";
+import { createLibraryVocabularyLoader } from "./lint/oxlint/lib/library-vocabulary/harvester.ts";
 import { loadRepositoryCellClassIndex } from "./lint/oxlint/lib/mutable-cell-classes/builder.ts";
 import { loadRepositoryTypeAuthorityIndex } from "./lint/oxlint/lib/split-type-authority/builder.ts";
 import { loadStyleClassIndex } from "./lint/oxlint/lib/style-classes/builder.ts";
@@ -119,7 +121,9 @@ import type { Plugin } from "@oxlint/plugins";
 
 export const noLocalFiniteValueSet = createNoLocalFiniteValueSet({
   loadCatalog: loadCanonicalValuesCatalogSnapshot,
-  loadLibraryVocabulary,
+  loadLibraryVocabulary: createLibraryVocabularyLoader({
+    openApi: (packageDirectory) => new API({ cwd: packageDirectory }),
+  }),
 });
 
 export const noStrictCanonicalLiteralUse = createNoStrictCanonicalLiteralUseRule({
