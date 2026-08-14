@@ -12,7 +12,6 @@ export default defineConfig({
     },
     mockReset: true,
     restoreMocks: true,
-    fileParallelism: false,
     testTimeout: 60_000,
     coverage: {
       thresholds: { 100: true, perFile: true },

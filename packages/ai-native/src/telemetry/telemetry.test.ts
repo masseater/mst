@@ -396,6 +396,50 @@ describe("startTelemetry", () => {
         );
       });
     });
+
+    describe("a shutdown that cannot reach the sink", () => {
+      const it = test.extend("shutdownFailureReport", async () => {
+        vi.stubEnv("MST_TELEMETRY", "1");
+        vi.stubEnv("OTEL_SDK_DISABLED", undefined);
+        process.removeAllListeners("beforeExit");
+        context.disable();
+        propagation.disable();
+        trace.disable();
+        metrics.disable();
+        logs.disable();
+        onTestFinished(() => {
+          process.exitCode = undefined;
+          process.removeAllListeners("beforeExit");
+          context.disable();
+          propagation.disable();
+          trace.disable();
+          metrics.disable();
+          logs.disable();
+        });
+        vi.resetModules();
+        const exporterModule = await import("@opentelemetry/exporter-trace-otlp-http");
+        vi.spyOn(exporterModule.OTLPTraceExporter.prototype, "shutdown").mockRejectedValue(
+          new Error("the collector went away"),
+        );
+        const telemetry = await import("./telemetry.ts");
+        const started = telemetry.startTelemetry(MEASURED_SERVICE);
+        const written = vi.fn<(failureReport: string) => void>();
+        vi.spyOn(process.stderr, "write").mockImplementation((failureReport) => {
+          written(String(failureReport));
+          return true;
+        });
+        await started.shutdown();
+        return written;
+      });
+
+      it("reports the failure instead of leaving the rejection unhandled", ({
+        shutdownFailureReport,
+      }) => {
+        expect(shutdownFailureReport).toHaveBeenCalledExactlyOnceWith(
+          `${EXPORT_FAILURE_PREFIX}the collector went away\n`,
+        );
+      });
+    });
   });
 });
 

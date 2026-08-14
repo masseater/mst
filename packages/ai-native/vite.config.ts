@@ -12,9 +12,7 @@ export default defineConfig({
     },
     mockReset: true,
     restoreMocks: true,
-    fileParallelism: false,
     pool: "threads",
-    maxWorkers: 1,
     testTimeout: 60_000,
     coverage: {
       thresholds: { 100: true, perFile: true },

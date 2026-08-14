@@ -22,7 +22,7 @@ import { BatchLogRecordProcessor, LoggerProvider } from "@opentelemetry/sdk-logs
 import { MeterProvider, PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { BatchSpanProcessor, TracerProvider } from "@opentelemetry/sdk-trace";
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
-import { once } from "es-toolkit";
+import { attemptAsync, once } from "es-toolkit";
 
 export type Telemetry = {
   readonly enabled: boolean;
@@ -39,13 +39,15 @@ const isEnabled = (): boolean =>
 const reasonOf = (thrown: unknown): string =>
   thrown instanceof Error ? thrown.message : JSON.stringify(thrown);
 
+const reportExportFailure = (thrown: unknown): void => {
+  process.exitCode = 1;
+  process.stderr.write(
+    `${ENABLE_VARIABLE} asked for telemetry, but it could not be exported: ${reasonOf(thrown)}\n`,
+  );
+};
+
 const failWhateverCannotBeExported = (): void => {
-  setGlobalErrorHandler((thrown: unknown) => {
-    process.exitCode = 1;
-    process.stderr.write(
-      `${ENABLE_VARIABLE} asked for telemetry, but it could not be exported: ${reasonOf(thrown)}\n`,
-    );
-  });
+  setGlobalErrorHandler(reportExportFailure);
 };
 
 const registerPropagation = (): void => {
@@ -94,11 +96,14 @@ const registerProviders = (resource: Resource): (() => Promise<void>) => {
   const meterProvider = registerMetering(resource);
   const loggerProvider = registerLogging(resource);
   return async (): Promise<void> => {
-    await Promise.all([
-      tracerProvider.shutdown(),
-      meterProvider.shutdown(),
-      loggerProvider.shutdown(),
-    ]);
+    const [failure] = await attemptAsync(async () => {
+      await Promise.all([
+        tracerProvider.shutdown(),
+        meterProvider.shutdown(),
+        loggerProvider.shutdown(),
+      ]);
+    });
+    if (failure !== null) reportExportFailure(failure);
   };
 };
 
