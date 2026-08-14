@@ -8,6 +8,7 @@ describe("dont-review-it/no-computed-test-api-member--use-static-member", () => 
     valid: [
       {
         name: "a modifier written as a static member is the shape this rule asks for",
+        documented: true,
         code: "it.skip('adds', () => {});",
       },
       {
@@ -20,6 +21,7 @@ describe("dont-review-it/no-computed-test-api-member--use-static-member", () => 
       },
       {
         name: "a subscript on a value the suite owns is outside this rule",
+        documented: true,
         code: "it('adds', () => {\n  expect(runSut()[key]).toBe(1);\n});",
       },
       {
@@ -58,6 +60,7 @@ describe("dont-review-it/no-computed-test-api-member--use-static-member", () => 
     invalid: [
       {
         name: "a modifier written out as a subscript is reported and rewritten as a static member",
+        documented: true,
         code: "it['skip']('adds', () => {});",
         output: "it.skip('adds', () => {});",
         errors: [{ messageId: "spelledSubscript" }],
@@ -103,6 +106,7 @@ describe("dont-review-it/no-computed-test-api-member--use-static-member", () => 
       },
       {
         name: "a matcher settled at run time is reported without a rewrite",
+        documented: true,
         code: "expect(runSut())[matcher]({ total: 1 });",
         errors: [{ messageId: "unreadableSubscript" }],
       },
