@@ -1,56 +1,79 @@
+---
+description: "Disallow a fixture factory handing back a value the spec built instead of the value the code under test produced, so a green assertion says something about the production and not about the stand-in the spec packed for it"
+---
+
 # no-fixture-construct-in-use--yield-sut-output
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-spec ファイルの中の fixture 宣言について、その fixture が返す値を見る。
+Disallow a fixture factory handing back a value the spec built instead of the value the code under test produced, so a green assertion says something about the production and not about the stand-in the spec packed for it
 
-fixture 宣言は 2 系統を読む。builder 形式では文字列リテラルの名前に続く factory の `return`、旧来のオブジェクト形式ではプロパティの値として書かれた factory が `use(...)` に渡す引数である。どちらも「factory が書かれている宣言」だけが対象で、値を直接渡した宣言は読まない。直接の値は produce された結果ではなく宣言された入力であり、`require-vitest-extend-builder--infer-fixture-type` の自動修正もその形をそのまま残す。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-fixture-construct-in-use--yield-sut-output.ts`](../../src/lint/oxlint/rules/no-fixture-construct-in-use--yield-sut-output.ts)
 
-対象のファイルはファイル名の接尾辞で決める。既定は `.test.ts` と `.test.tsx` で、`specFileSuffixes` で差し替えられる。
+<!-- END GENERATED rule-header -->
 
-読む値は、型アサーション・`satisfies`・非 null アサーション・括弧・オプショナルチェーン・`await` を剥いでから判定する。剥いだ結果が次のいずれかに解決されるとき報告する。
+## Violation
 
-| 解決した先 | 例 |
+For a fixture declaration in a spec file, the value that fixture hands back is read.
+
+Two families of fixture declaration are read. In the builder form it is the factory's `return` following a string-literal name; in the older object form it is the argument the factory written as a property's value passes to `use(...)`. Only declarations where a factory is written are in scope; a declaration handing over a value directly is not read. A direct value is a declared input rather than a produced result, and the automatic fix of [require-vitest-extend-builder--infer-fixture-type](./require-vitest-extend-builder--infer-fixture-type.md) leaves that shape as it stands.
+
+The files in scope are settled by the file name suffix. The default is `.test.ts` and `.test.tsx`, replaceable through `specFileSuffixes`.
+
+The value read is judged with type assertions, `satisfies`, non-null assertions, parentheses, optional chains and `await` peeled off. The report stands where what is left resolves to one of these.
+
+| What it resolves to | Example |
 | --- | --- |
-| その場で書かれた値 | `() => null` / `() => "a"` / `` () => `a` `` / `() => undefined` / `() => void 0` / `() => -1` |
-| オブジェクトリテラル・配列リテラル | `() => ({ id: "a" })` / `() => []` |
-| コンストラクタ呼び出し | `() => new Report(input)` |
-| リフレクション経由の生成 | `() => Object.create(prototype)` / `() => Reflect.construct(Report, [input])` |
-| 合成呼び出しの第 1 引数が上のいずれか | `() => Object.assign({ id: "a" }, extra)` |
-| 即時実行関数がその `return` で上のいずれかを返す | `() => (() => ({ id: "a" }))()` |
-| 上のいずれかで初期化された名前 | `() => { const report = { id: "a" }; return report; }` |
+| A value written on the spot | `() => null` / `() => "a"` / `` () => `a` `` / `() => undefined` / `() => void 0` / `() => -1` |
+| An object literal or an array literal | `() => ({ id: "a" })` / `() => []` |
+| A constructor call | `() => new Report(input)` |
+| Creation through reflection | `() => Object.create(prototype)` / `() => Reflect.construct(Report, [input])` |
+| A composition call whose first argument is any of the above | `() => Object.assign({ id: "a" }, extra)` |
+| An immediately invoked function returning any of the above | `() => (() => ({ id: "a" }))()` |
+| A name initialized with any of the above | `() => { const report = { id: "a" }; return report; }` |
 
-名前は宣言まで辿る。辿るのは同じファイルの中で `const` / `let` の宣言子に解決したときだけで、factory の中でも `describe` の中でもモジュールスコープでも同じように読む。宣言子を挟む段数に上限は置かない。段を増やしても終端に同じ値が残るためである。
+Names are followed to their declaration. They are followed only where they resolve to a `const` or `let` declarator inside the same file, read the same inside the factory, inside a `describe` and at module scope. No cap is placed on the number of declarators in between, because adding steps leaves the same value at the end.
 
-もう 1 つ、factory が抱えた名前から一部を読み出して返す形（`() => { const caught = runSut(); return caught.stdout; }`）を報告する。読み出しを名前に一度入れてから返しても同じである。この判定が成立するのは根がこのファイルの宣言子に解決したときだけで、factory の仮引数に解決した根は成立しない。
+One more shape is reported: a factory reading a part off a name it holds and returning that (`() => { const caught = runSut(); return caught.stdout; }`). Putting the read into a name before returning is the same. This judgment holds only where the root resolves to a declarator in this file; a root resolving to the factory's parameter does not hold.
 
-### 意図的に広げていない範囲
+### Deliberately not widened
 
-| 形 | 対象にしない理由 |
+| Shape | Why it is left out |
 | --- | --- |
-| 呼び出しの結果 | code under test を実行した結果である。これが求めている形 |
-| 名前に対するメソッド呼び出し | 呼び出しは新しい値を生む。読み出しと呼び出しをここで分けている |
-| 空のリテラルで初期化され、その名前へのメソッド呼び出しがある名前 | 実行を通じて中身が積まれる観測用のバッファである。ここを塞ぐと副作用を集めて観測するテストが書けなくなる |
-| 合成呼び出しの第 1 引数が code under test 由来の名前 | 返しているのは produce された値そのもので、その上に setup を重ねているだけである。判定は第 1 引数だけを見る |
-| fixture 依存を根とする読み出し、依存をそのまま返す形 | `no-fixture-forward-subject--yield-sut-output` が引き受ける |
-| 関数値を返す形 | `no-fixture-factory-function--inline-owned-setup` が引き受ける |
-| 別ファイルで宣言された名前 | 宣言がこの実行系からは読めない。読めないものを違反として扱わない |
+| The result of a call | The result of running the code under test. This is the shape being asked for |
+| A method call on a name | A call produces a new value. Reading and calling are divided here |
+| A name initialized with an empty literal that has a method call on it | An observation buffer whose contents accumulate through the run. Close this and a test collecting side effects to observe them cannot be written |
+| A composition call whose first argument is a name from the code under test | What is handed back is the produced value itself, with setup layered on top. The judgment reads the first argument only |
+| A read rooted at a fixture dependency, and handing a dependency back as it stands | [no-fixture-forward-subject--yield-sut-output](./no-fixture-forward-subject--yield-sut-output.md) takes it |
+| Handing back a function value | [no-fixture-factory-function--inline-owned-setup](./no-fixture-factory-function--inline-owned-setup.md) takes it |
+| A name declared in another file | The declaration cannot be read by this runtime. What cannot be read is not treated as a violation |
 
-同名プロパティの複写でオブジェクトを組む形は `no-fixture-copy-subject--yield-sut-output` も報告する。この読みはオブジェクトリテラルを中身によらず組み立てとして扱うので、両方から報告される。片方に寄せていない。寄せるには一方が他方の判定を内側に持つ必要があり、そうすると相手を無効にした構成で穴が開く。
+Assembling an object by copying same-named properties is reported by [no-fixture-copy-subject--yield-sut-output](./no-fixture-copy-subject--yield-sut-output.md) too. This reading treats an object literal as assembly regardless of its contents, so both report it. They are not collapsed into one: collapsing would need one to hold the other's judgment inside it, and a configuration disabling the other would then open a hole.
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「fixture が subject として返す値は、code under test が実際に produce した値である」ことである。
+The value a fixture hands back as the subject is a value the code under test actually produced.
 
-fixture がリテラルや `new` で subject を作ると、`it` はテストの作者が書いた身代わりを検証する。code under test の出力の形が全く違っていてもテストは緑のままで、フィールドが増えても、名前が変わっても、消えても落ちない。「観測可能な振る舞いを assert する」という規範は assert の対象が観測結果であることを前提にしており、fixture が作った値は観測結果ではない。
+Where a fixture builds the subject with a literal or `new`, the `it` verifies a stand-in the test's author wrote. The test stays green even where the shape of the code under test's output is entirely different, and it does not fail when a field is added, renamed or removed. The norm "assert on observable behaviour" presumes the target of the assertion is an observation, and a value the fixture made is not one.
 
-読み出しの側も同じ穴を開ける。出力の一部だけを返せば、残りの出力はその spec のどの assertion からも見えなくなる。assertion 側で射影を禁じても、fixture 側から同じ狭窄が入ってくる。
+The reading side opens the same hole. Return only part of the output and the rest becomes invisible to every assertion in that spec. Forbid projection on the assertion side and the same narrowing comes in from the fixture side.
 
-subject を produce できない状況で正しい出口は「代わりの値を返す」ではなく「fixture から throw する」である。テストは失敗すべきで、身代わりで緑にすべきではない。
+Where the subject cannot be produced, the right exit is not "hand back a substitute value" but "throw from the fixture". The test should fail, not go green on a stand-in.
 
-## どう直すか
+### Configuration
 
-fixture の中で code under test を実行し、返ってきた値をそのまま返す。射影は `it` 側に置く。
+`specFileSuffixes` alone. The default is `.test.ts` and `.test.tsx`, shared as one range across the rules of this bundle.
+
+The names read as composition calls and as creation through reflection are not exposed in the configuration. Make them replaceable and handing over an empty list becomes a way past this rule.
+
+## Fix
+
+Run the code under test inside the fixture and hand back what came out, as it stands. Put the projection on the `it` side.
 
 ```ts
 const test = baseTest.extend("marked", () =>
@@ -62,25 +85,77 @@ test("marks a file whose name ends in a spec suffix", ({ marked }) => {
 });
 ```
 
-assertion が通らないのは produce された値が期待と違うからであり、fixture 側で辻褄を合わせてはいけない。期待の側を書き直すか、code under test の返り値を見直す。
+An assertion failing means the produced value differs from the expectation; do not make it add up on the fixture side. Rewrite the expectation, or rework what the code under test returns.
 
-自動修正は持たせない。組み立てられた subject からは本来の出力を特定できないためである。`return { httpStatus: raw.status }` に対する正しい直し方は「`raw` を返す」「返り値をより豊かにする」「その assertion を消す」のいずれもあり得て、テストの意図を持たないツールには選べない。
+There is no automatic fix, because the original output cannot be identified from an assembled subject. The right fix for `return { httpStatus: raw.status }` might be "return `raw`", "make the return value richer", or "delete that assertion", and a tool holding no intent for the test cannot choose.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- 組み立てを名前に一度入れてから返す。宣言子まで辿るので落ちる
-- 組み立てをモジュールスコープや `describe` スコープへ出す。スコープを上がって辿るので落ちる
-- 組み立てを即時実行関数や `Object.assign` で包む。どちらも中を辿る
-- 型アサーションで包んで見た目を変える。剥がしてから判定する
-- リテラルを配列リテラルや `new` 式に置き換えて形だけ変える。同じ範囲に入る
-- factory を外して値を直接渡す形に書き換える。この読みからは消えるが、assert される値が spec の書いた値であることは変わらない
-- 組み立てを別ファイルの名前に移して import する。宣言が読めなくなるので報告は消えるが、fixture が produce された値を返していないことは変わらない
-- 読み出しを分割代入で受ける（`const { stdout } = runSut(); return stdout`）。根の名前が残らないので報告は消えるが、出力の一部しか返していないことは変わらない
-- 読み出しを名前に入れずに呼び出しから直接取る（`() => runSut().stdout`）。辿る根が無いので報告は消えるが、同じ狭窄である
-- 抑制ディレクティブ
+Code this rule rejects.
 
-## オプション
+```ts
+// an object literal handed back is a shape the spec assembled
+// in report.test.ts
+const test = baseTest.extend("report", () => ({ id: "a" }));
+```
 
-`specFileSuffixes` だけを取る。既定は `.test.ts` と `.test.tsx` で、この群のルールが同じ範囲を共有する。
+```ts
+// a part read off a binding the factory holds narrows what the fixture hands back
+// in report.test.ts
+const test = baseTest.extend("output", () => {
+  const caught = runSut();
+  return caught.stdout;
+});
+```
 
-合成呼び出しとリフレクション経由の生成として読む名前は設定に出さない。名前を差し替えられるようにした時点で、空の一覧を渡すだけでこのルールを通せるようになる。
+Code this rule accepts.
+
+```ts
+// a factory that runs the code under test hands back what it produced
+// in report.test.ts
+const test = baseTest.extend("report", async () => await summarise(input));
+```
+
+```ts
+// setup laid over the produced value keeps the production at its root
+// in report.test.ts
+const test = baseTest.extend("report", async () => {
+  const report = await summarise(input);
+  return Object.assign(report, { seen: true });
+});
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Putting the assembly into a name before returning it. Declarators are followed, so it falls
+- Moving the assembly out to module scope or `describe` scope. The walk goes up through scopes, so it falls
+- Wrapping the assembly in an immediately invoked function or `Object.assign`. Both are walked into
+- Wrapping in a type assertion to change the look. It is peeled before the judgment
+- Replacing the literal with an array literal or a `new` expression to change only the shape. It falls in the same range
+- Dropping the factory and rewriting as a direct value. It disappears from this reading, but the value being asserted is still one the spec wrote
+- Moving the assembly to a name in another file and importing it. The declaration becomes unreadable so the report clears, but the fixture is still not handing back a produced value
+- Receiving the read by destructuring (`const { stdout } = runSut(); return stdout`). No root name is left so the report clears, but only part of the output is being handed back
+- Taking the read straight off the call without a name (`() => runSut().stdout`). There is no root to follow so the report clears, but it is the same narrowing
+- A suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `builtSubject` | A fixture must not hand back a value it built itself. This one is {{shape}}. Return the value the code under test produced, untouched. |
+| `boundBuiltSubject` | A fixture must not hand back a value it built itself. \`{{name}}\` holds {{shape}}. Return the value the code under test produced, untouched. Spreading the building across further bindings, an immediately invoked function or \`Object.assign\` leaves the same built value at the end of the chain. |
+| `readSubject` | A fixture must not hand back a part read off a binding it already holds. Return \`{{root}}\` whole and read the part in the assertion. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

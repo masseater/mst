@@ -12,6 +12,7 @@ describe("dont-review-it/no-fixture-construct-in-use--yield-sut-output", () => {
     valid: [
       {
         name: "a factory that runs the code under test hands back what it produced",
+        documented: true,
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("report", async () => await summarise(input));',
       },
@@ -27,6 +28,7 @@ describe("dont-review-it/no-fixture-construct-in-use--yield-sut-output", () => {
       },
       {
         name: "setup laid over the produced value keeps the production at its root",
+        documented: true,
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("report", async () => {\n  const report = await summarise(input);\n  return Object.assign(report, { seen: true });\n});',
       },
@@ -130,6 +132,7 @@ describe("dont-review-it/no-fixture-construct-in-use--yield-sut-output", () => {
     invalid: [
       {
         name: "an object literal handed back is a shape the spec assembled",
+        documented: true,
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("report", () => ({ id: "a" }));',
         errors: [{ messageId: "builtSubject", data: { shape: "an object literal" } }],
@@ -280,6 +283,7 @@ describe("dont-review-it/no-fixture-construct-in-use--yield-sut-output", () => {
       },
       {
         name: "a part read off a binding the factory holds narrows what the fixture hands back",
+        documented: true,
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("output", () => {\n  const caught = runSut();\n  return caught.stdout;\n});',
         errors: [{ messageId: "readSubject", data: { root: "caught" } }],
