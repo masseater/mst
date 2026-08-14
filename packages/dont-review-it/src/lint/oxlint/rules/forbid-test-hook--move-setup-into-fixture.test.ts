@@ -45,6 +45,7 @@ describe("dont-review-it/forbid-test-hook--move-setup-into-fixture", () => {
     valid: [
       {
         name: "a spec that leaves preparation to its fixture names no hook",
+        documented: true,
         code: "const check = test.extend({ order: async ({}, use) => { await use(build()); } });\ncheck('totals the lines', ({ order }) => {\n  expect(order).toBe(3);\n});",
         filename: SPEC_FILENAME,
       },
@@ -60,6 +61,7 @@ describe("dont-review-it/forbid-test-hook--move-setup-into-fixture", () => {
       },
       {
         name: "a name the spec declares itself is not the runner hook it shadows",
+        documented: true,
         code: "const beforeEach = (run) => {\n  run();\n};\nbeforeEach(() => {\n  seed();\n});",
         filename: SPEC_FILENAME,
       },
@@ -103,6 +105,7 @@ describe("dont-review-it/forbid-test-hook--move-setup-into-fixture", () => {
     invalid: [
       {
         name: "a hook the runner injects is reported where it is named",
+        documented: true,
         code: "beforeEach(() => {\n  seed();\n});",
         filename: SPEC_FILENAME,
         errors: [{ messageId: "testHook" }],
@@ -208,6 +211,7 @@ describe("dont-review-it/forbid-test-hook--move-setup-into-fixture", () => {
       },
       {
         name: "a hook hidden in a helper declared in this spec is reported inside that helper",
+        documented: true,
         code: "const install = () => {\n  beforeEach(() => {\n    seed();\n  });\n};\ninstall();",
         filename: SPEC_FILENAME,
         errors: [{ messageId: "testHook" }],
