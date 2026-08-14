@@ -3,68 +3,21 @@ import { parseSync } from "oxc-parser";
 
 import type { RepositoryProblem } from "@mst/repository-checks";
 
-export type SpecificationSubject = {
-  readonly subject: string;
-  readonly claims: readonly string[];
-};
+const UNPARSABLE_SOURCE =
+  "A specification test must parse as TypeScript, because its claims are read without running it. Fix the syntax so the parser accepts the file.";
+
+const FILE_WITHOUT_SUBJECTS =
+  "A specification test file must not go without a top-level describe, because the generated list groups claims under subjects. Declare a describe whose name is the feature the file specifies.";
 
 type AstFields = {
   readonly type?: unknown;
   readonly [field: string]: unknown;
 };
 
-type CallFields = AstFields & {
-  readonly type: "CallExpression";
-  readonly start: number;
-  readonly callee: AstFields;
-  readonly arguments: readonly unknown[];
-};
-
-type ProblemAt = { readonly offset: number; readonly message: string };
-
-const RUNNER_NAMES: ReadonlySet<string> = new Set(["describe", "it", "test"]);
-
-const UNPARSABLE_SOURCE =
-  "A specification test must parse as TypeScript, because its claims are read without running it. Fix the syntax so the parser accepts the file.";
-
-const COMPUTED_NAME =
-  "A subject or claim must not carry a computed name, because the specification list is assembled without running the tests. Write the first argument as a plain string literal.";
-
-const TEST_FUNCTION_CLAIM =
-  "A claim must not be declared with the test function, because a claim reads as a sentence about the subject and it keeps that form. Replace test with it.";
-
-const NARROWED_RUNNER =
-  "A describe or it must not be narrowed through a member such as each, skip or only, because a claim that runs conditionally or in variants cannot be read as one plain sentence. Write each claim as its own it with a literal name.";
-
-const SUBJECT_WITHOUT_CLAIMS =
-  "A subject must not stand without claims, because a heading with no sentences under it promises nothing. Give the describe at least one it, or delete it.";
-
-const FILE_WITHOUT_SUBJECTS =
-  "A specification test file must not go without a top-level describe, because the generated list groups claims under subjects. Declare a describe whose name is the feature the file specifies.";
-
 const isAstNode = (candidate: unknown): candidate is AstFields => isPlainObject(candidate);
 
 const isParenthesized = (node: AstFields): node is AstFields & { readonly expression: AstFields } =>
   node.type === "ParenthesizedExpression";
-
-const isExpressionStatement = (
-  node: AstFields,
-): node is AstFields & { readonly expression: AstFields } => node.type === "ExpressionStatement";
-
-const isCallNode = (node: AstFields): node is CallFields => node.type === "CallExpression";
-
-const isIdentifierNode = (node: AstFields): node is AstFields & { readonly name: string } =>
-  node.type === "Identifier";
-
-const isMemberNode = (node: AstFields): node is AstFields & { readonly object: AstFields } =>
-  node.type === "MemberExpression";
-
-const isBlockNode = (
-  node: AstFields,
-): node is AstFields & { readonly body: readonly AstFields[] } => node.type === "BlockStatement";
-
-const isLiteralNode = (node: AstFields): node is AstFields & { readonly value: unknown } =>
-  node.type === "Literal";
 
 const withoutParentheses = (node: AstFields): AstFields =>
   isParenthesized(node) ? withoutParentheses(node.expression) : node;
@@ -72,34 +25,16 @@ const withoutParentheses = (node: AstFields): AstFields =>
 const nodeOrNull = (candidate: unknown): AstFields | null =>
   isAstNode(candidate) ? withoutParentheses(candidate) : null;
 
-const callWithin = (statement: AstFields): CallFields | null => {
-  if (!isExpressionStatement(statement)) return null;
-  const expression = withoutParentheses(statement.expression);
-  return isCallNode(expression) ? expression : null;
-};
+const isBlockNode = (
+  node: AstFields,
+): node is AstFields & { readonly body: readonly AstFields[] } => node.type === "BlockStatement";
 
-const identifierNameOf = (callee: AstFields): string | null => {
-  const node = withoutParentheses(callee);
-  return isIdentifierNode(node) ? node.name : null;
+type CallFields = AstFields & {
+  readonly type: "CallExpression";
+  readonly start: number;
+  readonly callee: AstFields;
+  readonly arguments: readonly unknown[];
 };
-
-const rootRunnerNameOf = (callee: AstFields): string | null => {
-  const node = withoutParentheses(callee);
-  if (isMemberNode(node)) return rootRunnerNameOf(node.object);
-  if (isCallNode(node)) return rootRunnerNameOf(node.callee);
-  const spelled = isIdentifierNode(node) ? node.name : null;
-  return spelled !== null && RUNNER_NAMES.has(spelled) ? spelled : null;
-};
-
-const literalTextOf = (argument: AstFields | null): string | null => {
-  if (argument === null || !isLiteralNode(argument)) return null;
-  return typeof argument.value === "string" ? argument.value : null;
-};
-
-const at = (call: CallFields, complaint: string): ProblemAt => ({
-  offset: call.start,
-  message: complaint,
-});
 
 const bodyStatementsOf = (call: CallFields): readonly AstFields[] => {
   const handedCallback = nodeOrNull(call.arguments[1]);
@@ -109,12 +44,69 @@ const bodyStatementsOf = (call: CallFields): readonly AstFields[] => {
   return [{ type: "ExpressionStatement", expression: callbackBody }];
 };
 
+const TEST_FUNCTION_CLAIM =
+  "A claim must not be declared with the test function, because a claim reads as a sentence about the subject and it keeps that form. Replace test with it.";
+
+const NARROWED_RUNNER =
+  "A describe or it must not be narrowed through a member such as each, skip or only, because a claim that runs conditionally or in variants cannot be read as one plain sentence. Write each claim as its own it with a literal name.";
+
+const isIdentifierNode = (node: AstFields): node is AstFields & { readonly name: string } =>
+  node.type === "Identifier";
+
+const identifierNameOf = (callee: AstFields): string | null => {
+  const node = withoutParentheses(callee);
+  return isIdentifierNode(node) ? node.name : null;
+};
+
 const claimIssueOf = (input: {
   readonly call: CallFields;
   readonly runner: string;
 }): string | null => {
   if (identifierNameOf(input.call.callee) === null) return NARROWED_RUNNER;
   return input.runner === "test" ? TEST_FUNCTION_CLAIM : null;
+};
+
+const RUNNER_NAMES: ReadonlySet<string> = new Set(["describe", "it", "test"]);
+
+const isMemberNode = (node: AstFields): node is AstFields & { readonly object: AstFields } =>
+  node.type === "MemberExpression";
+
+const isCallNode = (node: AstFields): node is CallFields => node.type === "CallExpression";
+
+const rootRunnerNameOf = (callee: AstFields): string | null => {
+  const node = withoutParentheses(callee);
+  if (isMemberNode(node)) return rootRunnerNameOf(node.object);
+  if (isCallNode(node)) return rootRunnerNameOf(node.callee);
+  const spelled = isIdentifierNode(node) ? node.name : null;
+  return spelled !== null && RUNNER_NAMES.has(spelled) ? spelled : null;
+};
+
+const COMPUTED_NAME =
+  "A subject or claim must not carry a computed name, because the specification list is assembled without running the tests. Write the first argument as a plain string literal.";
+
+const isExpressionStatement = (
+  node: AstFields,
+): node is AstFields & { readonly expression: AstFields } => node.type === "ExpressionStatement";
+
+const callWithin = (statement: AstFields): CallFields | null => {
+  if (!isExpressionStatement(statement)) return null;
+  const expression = withoutParentheses(statement.expression);
+  return isCallNode(expression) ? expression : null;
+};
+
+type ProblemAt = { readonly offset: number; readonly message: string };
+
+const at = (call: CallFields, complaint: string): ProblemAt => ({
+  offset: call.start,
+  message: complaint,
+});
+
+const isLiteralNode = (node: AstFields): node is AstFields & { readonly value: unknown } =>
+  node.type === "Literal";
+
+const literalTextOf = (argument: AstFields | null): string | null => {
+  if (argument === null || !isLiteralNode(argument)) return null;
+  return typeof argument.value === "string" ? argument.value : null;
 };
 
 const claimReadOf = (
@@ -155,6 +147,14 @@ const subjectHeaderOf = (
   if (subject === null) return { kind: "issue", issue: at(call, COMPUTED_NAME) };
   return { kind: "ok", subject };
 };
+
+export type SpecificationSubject = {
+  readonly subject: string;
+  readonly claims: readonly string[];
+};
+
+const SUBJECT_WITHOUT_CLAIMS =
+  "A subject must not stand without claims, because a heading with no sentences under it promises nothing. Give the describe at least one it, or delete it.";
 
 const subjectReadOf = (
   statement: AstFields,

@@ -3,64 +3,12 @@ import { WIDENED_TYPE_NODES } from "./widened-type-nodes.ts";
 
 import type { Definition, ESTree } from "@oxlint/plugins";
 
-const PROMISE_TYPE_NAMES: ReadonlySet<string> = new Set(["Promise", "PromiseLike", "Thenable"]);
-
-const PROMISE_GLOBAL_NAME = "Promise";
-
-const PROMISE_PRODUCING_STATIC_MEMBERS: ReadonlySet<string> = new Set([
-  "all",
-  "allSettled",
-  "any",
-  "race",
-  "reject",
-  "resolve",
-  "try",
-]);
-
-export type CallSignature = {
-  readonly asyncFunction: boolean;
-  readonly parameters: readonly ESTree.ParamPattern[];
-  readonly returnType: ESTree.TSType | null;
-};
-
 type DeclaredValue = {
   readonly valueType: ESTree.TSType | null;
   readonly named: ESTree.Function | ESTree.ArrowFunctionExpression | null;
   readonly widenedType: boolean;
   readonly initialiser: ESTree.Expression | null;
 };
-
-const UNDECLARED: DeclaredValue = {
-  valueType: null,
-  named: null,
-  widenedType: false,
-  initialiser: null,
-};
-
-export const carriedThroughExpression = (node: ESTree.Expression): ESTree.Expression => {
-  if (
-    node.type === "ChainExpression" ||
-    node.type === "ParenthesizedExpression" ||
-    node.type === "TSInstantiationExpression" ||
-    node.type === "TSNonNullExpression"
-  ) {
-    return carriedThroughExpression(node.expression);
-  }
-  return node;
-};
-
-const isPromiseType = (node: ESTree.TSType): boolean => {
-  if (node.type === "TSTypeReference") {
-    return node.typeName.type === "Identifier" && PROMISE_TYPE_NAMES.has(node.typeName.name);
-  }
-  if (node.type === "TSUnionType" || node.type === "TSIntersectionType") {
-    return node.types.some(isPromiseType);
-  }
-  return false;
-};
-
-const functionTypeOf = (node: ESTree.TSType): ESTree.TSFunctionType | null =>
-  node.type === "TSFunctionType" ? node : null;
 
 const annotatedValue = (definition: Definition): DeclaredValue => {
   const annotation = definition.name.typeAnnotation?.typeAnnotation ?? null;
@@ -70,6 +18,13 @@ const annotatedValue = (definition: Definition): DeclaredValue => {
     widenedType: annotation !== null && WIDENED_TYPE_NODES.has(annotation.type),
     initialiser: null,
   };
+};
+
+const UNDECLARED: DeclaredValue = {
+  valueType: null,
+  named: null,
+  widenedType: false,
+  initialiser: null,
 };
 
 const initialisedValue = ({
@@ -131,6 +86,18 @@ const assertedValueOf = (
     : { ...inner, valueType: node.typeAnnotation };
 };
 
+export const carriedThroughExpression = (node: ESTree.Expression): ESTree.Expression => {
+  if (
+    node.type === "ChainExpression" ||
+    node.type === "ParenthesizedExpression" ||
+    node.type === "TSInstantiationExpression" ||
+    node.type === "TSNonNullExpression"
+  ) {
+    return carriedThroughExpression(node.expression);
+  }
+  return node;
+};
+
 const declaredValueOf = (node: ESTree.Expression, lookup: BindingResolution): DeclaredValue => {
   const carried = carriedThroughExpression(node);
 
@@ -145,6 +112,15 @@ const declaredValueOf = (node: ESTree.Expression, lookup: BindingResolution): De
     return assertedValueOf(carried, lookup);
   }
   return carried.type === "Identifier" ? declaredValueOfBinding(carried, lookup) : UNDECLARED;
+};
+
+const functionTypeOf = (node: ESTree.TSType): ESTree.TSFunctionType | null =>
+  node.type === "TSFunctionType" ? node : null;
+
+export type CallSignature = {
+  readonly asyncFunction: boolean;
+  readonly parameters: readonly ESTree.ParamPattern[];
+  readonly returnType: ESTree.TSType | null;
 };
 
 const callSignatureOfDeclared = (declared: DeclaredValue): CallSignature | null => {
@@ -171,6 +147,18 @@ export const callSignatureOf = (
   lookup: BindingResolution,
 ): CallSignature | null => callSignatureOfDeclared(declaredValueOf(node, lookup));
 
+const PROMISE_TYPE_NAMES: ReadonlySet<string> = new Set(["Promise", "PromiseLike", "Thenable"]);
+
+const isPromiseType = (node: ESTree.TSType): boolean => {
+  if (node.type === "TSTypeReference") {
+    return node.typeName.type === "Identifier" && PROMISE_TYPE_NAMES.has(node.typeName.name);
+  }
+  if (node.type === "TSUnionType" || node.type === "TSIntersectionType") {
+    return node.types.some(isPromiseType);
+  }
+  return false;
+};
+
 const yieldsPromise = (signature: CallSignature | null): boolean =>
   signature !== null &&
   (signature.asyncFunction ||
@@ -181,10 +169,22 @@ export const isPromiseYieldingCallee = (
   lookup: BindingResolution,
 ): boolean => yieldsPromise(callSignatureOf(node, lookup));
 
+const PROMISE_GLOBAL_NAME = "Promise";
+
 const isPromiseGlobal = (node: ESTree.Expression): boolean => {
   const carried = carriedThroughExpression(node);
   return carried.type === "Identifier" && carried.name === PROMISE_GLOBAL_NAME;
 };
+
+const PROMISE_PRODUCING_STATIC_MEMBERS: ReadonlySet<string> = new Set([
+  "all",
+  "allSettled",
+  "any",
+  "race",
+  "reject",
+  "resolve",
+  "try",
+]);
 
 const isPromiseStaticCall = (node: ESTree.CallExpression): boolean => {
   const callee = carriedThroughExpression(node.callee);

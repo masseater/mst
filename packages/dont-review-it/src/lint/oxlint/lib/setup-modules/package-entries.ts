@@ -12,19 +12,17 @@ import { isFile } from "../canonical-values/source-files.ts";
 import { segmentsOf } from "../path-segments.ts";
 import { toPosixPath } from "../posix-path.ts";
 
-const MODULE_FILE_NAME = /\.[cm]?[jt]sx?$/u;
+const manifestOf = (packageDirectory: string): Readonly<Record<string, unknown>> | null => {
+  const read = readJsonFile(join(packageDirectory, MANIFEST_FILE_NAME));
+  if (read === null || typeof read !== "object" || Array.isArray(read)) return null;
+  return read as Readonly<Record<string, unknown>>;
+};
 
 const RELATIVE_TARGET_PREFIX = "./";
 
 type DeclaredEntry = {
   readonly subpath: string;
   readonly target: string;
-};
-
-const manifestOf = (packageDirectory: string): Readonly<Record<string, unknown>> | null => {
-  const read = readJsonFile(join(packageDirectory, MANIFEST_FILE_NAME));
-  if (read === null || typeof read !== "object" || Array.isArray(read)) return null;
-  return read as Readonly<Record<string, unknown>>;
 };
 
 const entriesUnder = (
@@ -63,6 +61,8 @@ const declaredEntriesOf = (packageDirectory: string): readonly DeclaredEntry[] =
   if (manifest === null) return [];
   return [...importableEntriesOf(manifest), ...runnableEntriesOf(manifest)];
 };
+
+const MODULE_FILE_NAME = /\.[cm]?[jt]sx?$/u;
 
 const isModuleFile = (path: string): boolean => MODULE_FILE_NAME.test(path) && isFile(path);
 

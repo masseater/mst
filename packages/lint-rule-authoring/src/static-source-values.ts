@@ -1,13 +1,5 @@
 import type { UnknownFields } from "./unknown-fields.ts";
 
-export type ConstantsByName = ReadonlyMap<string, UnknownFields>;
-
-type ResolveInput = {
-  readonly node: UnknownFields;
-  readonly constants: ConstantsByName;
-  readonly visited: readonly string[];
-};
-
 export const isAstNode = (candidate: unknown): candidate is UnknownFields =>
   typeof candidate === "object" && candidate !== null;
 
@@ -26,6 +18,14 @@ export const propertyOf = (objectNode: UnknownFields, propertyName: string): Unk
     .filter((property) => property.type === "Property" && keyNameOf(property) === propertyName)
     .map((property) => property.value as UnknownFields)
     .at(0) ?? null;
+
+export type ConstantsByName = ReadonlyMap<string, UnknownFields>;
+
+type ResolveInput = {
+  readonly node: UnknownFields;
+  readonly constants: ConstantsByName;
+  readonly visited: readonly string[];
+};
 
 const templateTextOf = ({ node, constants, visited }: ResolveInput): string | null => {
   const written = nodesIn(node.quasis).map(

@@ -2,23 +2,9 @@ import { listedUnder } from "./option-lists.ts";
 
 import type { Options } from "@oxlint/plugins";
 
-/** @canonical-values dont-review-it.child-process-export */
-const CHILD_PROCESS_EXPORTS = ["spawn"] as const;
-
-const CHILD_PROCESS_EXPORT = {
-  spawn: CHILD_PROCESS_EXPORTS[0],
-} as const;
-
 export const SPAWN_TARGET_NAME = "name";
 
 export const SPAWN_TARGET_LINE = "commandLine";
-
-export type SpawnForm = {
-  readonly specifier: string;
-  readonly exported: string;
-  readonly position: number;
-  readonly carries: typeof SPAWN_TARGET_NAME | typeof SPAWN_TARGET_LINE;
-};
 
 export const SPAWN_FORM_SCHEMA = {
   type: "array",
@@ -40,9 +26,19 @@ export const SPAWN_FORM_SCHEMA = {
   },
 } as const;
 
-export const SPAWN_FORMS_OPTION = "spawnForms";
+/** @canonical-values dont-review-it.child-process-export */
+const CHILD_PROCESS_EXPORTS = ["spawn"] as const;
 
-const RUNTIME_MARK = /^node:/u;
+const CHILD_PROCESS_EXPORT = {
+  spawn: CHILD_PROCESS_EXPORTS[0],
+} as const;
+
+export type SpawnForm = {
+  readonly specifier: string;
+  readonly exported: string;
+  readonly position: number;
+  readonly carries: typeof SPAWN_TARGET_NAME | typeof SPAWN_TARGET_LINE;
+};
 
 export const DEFAULT_SPAWN_FORMS: readonly SpawnForm[] = [
   { specifier: "node:child_process", exported: "exec", position: 0, carries: SPAWN_TARGET_LINE },
@@ -84,6 +80,8 @@ export const DEFAULT_SPAWN_FORMS: readonly SpawnForm[] = [
   { specifier: "zx", exported: "$", position: 0, carries: SPAWN_TARGET_LINE },
 ];
 
+export const SPAWN_FORMS_OPTION = "spawnForms";
+
 export const spawnFormsIn = ({
   options,
   standing,
@@ -102,6 +100,8 @@ export const spawnFormsIn = ({
   );
   return declared.length === 0 ? standing : declared;
 };
+
+const RUNTIME_MARK = /^node:/u;
 
 export const spawnFormMatching = ({
   forms,

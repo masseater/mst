@@ -17,8 +17,6 @@ const LEVEL_BY_SPELLING: Readonly<Record<string, string>> = {
   warn: LINT_SEVERITY.WARN,
 };
 
-const RANK_BY_LEVEL: Readonly<Record<string, number>> = { error: 2, off: 0, warn: 1 };
-
 export const levelOfSpelling = (spelled: string): string | null =>
   LEVEL_BY_SPELLING[spelled] ?? null;
 
@@ -26,6 +24,8 @@ export const severityLevelOf = (held: ESTree.Expression): string | null => {
   const spelled = spelledSeverityOf(held);
   return spelled === null ? null : levelOfSpelling(spelled);
 };
+
+const RANK_BY_LEVEL: Readonly<Record<string, number>> = { error: 2, off: 0, warn: 1 };
 
 export const rankOfLevel = (level: string): number => RANK_BY_LEVEL[level] ?? 0;
 

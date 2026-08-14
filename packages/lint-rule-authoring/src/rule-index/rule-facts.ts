@@ -16,22 +16,6 @@ import {
 
 import type { UnknownFields } from "../unknown-fields.ts";
 
-type LintRuleMessage = {
-  readonly messageId: string;
-  readonly template: string;
-};
-
-export type LintRuleFacts = {
-  readonly name: string;
-  readonly description: string;
-  readonly sourcePath: string;
-  readonly fixable: boolean;
-  readonly hasSuggestions: boolean;
-  readonly configurable: boolean;
-  readonly shipped: boolean;
-  readonly messages: readonly LintRuleMessage[];
-};
-
 const FUNCTION_EXPRESSION_TYPES: readonly string[] = [
   "ArrowFunctionExpression",
   "FunctionExpression",
@@ -82,6 +66,11 @@ const descriptionOf = ({
   return resolveText({ node: descriptionNode, constants, visited: [] }) ?? "";
 };
 
+type LintRuleMessage = {
+  readonly messageId: string;
+  readonly template: string;
+};
+
 const messagesOf = ({
   complaints,
   constants,
@@ -113,6 +102,17 @@ const declaresOptions = ({
     return named === undefined ? true : declaresOptions({ schema: named, constants });
   }
   return Array.isArray(schema.elements) && schema.elements.length > 0;
+};
+
+export type LintRuleFacts = {
+  readonly name: string;
+  readonly description: string;
+  readonly sourcePath: string;
+  readonly fixable: boolean;
+  readonly hasSuggestions: boolean;
+  readonly configurable: boolean;
+  readonly shipped: boolean;
+  readonly messages: readonly LintRuleMessage[];
 };
 
 const factsOf = ({

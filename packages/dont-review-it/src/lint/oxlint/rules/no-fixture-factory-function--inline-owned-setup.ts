@@ -31,25 +31,6 @@ import type { ScopeLookup } from "../lib/resolved-bindings.ts";
 
 const THROW_EXPECTING_MATCHERS_OPTION = "throwExpectingMatchers";
 
-type AssertedChain = {
-  readonly subject: ESTree.Expression;
-  readonly matcher: string;
-  readonly modifiers: readonly string[];
-};
-
-type FactoryReport = {
-  readonly node: ESTree.Node;
-  readonly messageId: string;
-  readonly data: { readonly fixture: string };
-};
-
-type ThunkReading = {
-  readonly handedOn: ReadonlySet<string>;
-  readonly takenApart: readonly FixtureDependency[];
-  readonly throwSubjects: ReadonlySet<ESTree.Node>;
-  readonly scopeAt: ScopeLookup;
-};
-
 const throwExpectingMatchersFrom = (ruleOptions: Readonly<Options>): ReadonlySet<string> => {
   const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) {
@@ -72,6 +53,12 @@ const entryUnder = (
 
   const member = staticMemberName(written);
   return member === null ? null : entryUnder(written.object, [member, ...modifiers]);
+};
+
+type AssertedChain = {
+  readonly subject: ESTree.Expression;
+  readonly matcher: string;
+  readonly modifiers: readonly string[];
 };
 
 const assertedChainOf = (call: ESTree.CallExpression): AssertedChain | null => {
@@ -115,6 +102,13 @@ const handedBackFunctionOf = (input: {
 const referencesTo = (scope: Scope, spelled: string): readonly Reference[] =>
   scope.variables.filter((bound) => bound.name === spelled).flatMap((bound) => bound.references);
 
+type ThunkReading = {
+  readonly handedOn: ReadonlySet<string>;
+  readonly takenApart: readonly FixtureDependency[];
+  readonly throwSubjects: ReadonlySet<ESTree.Node>;
+  readonly scopeAt: ScopeLookup;
+};
+
 const readsOnlyDemandFailure = (dependency: FixtureDependency, reading: ThunkReading): boolean => {
   const { boundAs, property } = dependency;
   if (boundAs === null) return false;
@@ -129,6 +123,12 @@ const isDemandedFailureThunk = (fixtureName: string, reading: ThunkReading): boo
   reading.takenApart
     .filter((dependency) => dependency.name === fixtureName)
     .every((dependency) => readsOnlyDemandFailure(dependency, reading));
+
+type FactoryReport = {
+  readonly node: ESTree.Node;
+  readonly messageId: string;
+  readonly data: { readonly fixture: string };
+};
 
 const reportForSubject = (input: {
   readonly declaration: FixtureDeclaration;

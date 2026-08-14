@@ -14,19 +14,6 @@ import { resolveCoupling } from "./specifier-resolution.ts";
 
 import type { AstFields } from "../ast-node.ts";
 
-export type SetupModulePolicy = {
-  readonly workspaceRoot: string;
-  readonly namePatterns: readonly string[];
-  readonly allowedPackageSpecifiers: readonly string[];
-  readonly assetsNameMarkers: ReadonlySet<string>;
-};
-
-export type ReachedSetupModule = {
-  readonly path: string;
-  readonly relays: readonly string[];
-  readonly reason: "forbiddenName" | "reachedOnlyFromSpecs";
-};
-
 const RELAY_HOP_LIMIT = 4;
 
 const TYPE_DECLARATION_TYPES: ReadonlySet<string> = new Set([
@@ -55,6 +42,38 @@ const carriesOnlyTypes = memoize((file: string): boolean => {
   return program !== null && statementsOf(program).every(isTypeStatement);
 });
 
+export type SetupModulePolicy = {
+  readonly workspaceRoot: string;
+  readonly namePatterns: readonly string[];
+  readonly allowedPackageSpecifiers: readonly string[];
+  readonly assetsNameMarkers: ReadonlySet<string>;
+};
+
+const isAllowedPackageSpecifier = ({
+  specifier,
+  policy,
+}: {
+  readonly specifier: string;
+  readonly policy: SetupModulePolicy;
+}): boolean =>
+  policy.allowedPackageSpecifiers.some(
+    (allowed) => specifier === allowed || specifier.startsWith(`${allowed}/`),
+  );
+
+const isAssetsFile = ({
+  file,
+  policy,
+}: {
+  readonly file: string;
+  readonly policy: SetupModulePolicy;
+}): boolean => assetsStemOf(file, policy.assetsNameMarkers) !== null;
+
+export type ReachedSetupModule = {
+  readonly path: string;
+  readonly relays: readonly string[];
+  readonly reason: "forbiddenName" | "reachedOnlyFromSpecs";
+};
+
 export const spelledPathOf = ({
   file,
   workspaceRoot,
@@ -78,25 +97,6 @@ const carriesForbiddenName = ({
     separator: "/",
   }).some((segment) =>
     policy.namePatterns.some((pattern) => matchesGlobSegment({ segment, pattern })),
-  );
-
-const isAssetsFile = ({
-  file,
-  policy,
-}: {
-  readonly file: string;
-  readonly policy: SetupModulePolicy;
-}): boolean => assetsStemOf(file, policy.assetsNameMarkers) !== null;
-
-const isAllowedPackageSpecifier = ({
-  specifier,
-  policy,
-}: {
-  readonly specifier: string;
-  readonly policy: SetupModulePolicy;
-}): boolean =>
-  policy.allowedPackageSpecifiers.some(
-    (allowed) => specifier === allowed || specifier.startsWith(`${allowed}/`),
   );
 
 const verdictFor = ({

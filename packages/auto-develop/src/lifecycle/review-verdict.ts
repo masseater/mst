@@ -7,14 +7,6 @@ const GITHUB_REVIEW_STATES = [
   "PENDING",
 ] as const;
 
-export const GITHUB_REVIEW_STATE = {
-  approved: GITHUB_REVIEW_STATES[0],
-  changesRequested: GITHUB_REVIEW_STATES[1],
-  commented: GITHUB_REVIEW_STATES[2],
-  dismissed: GITHUB_REVIEW_STATES[3],
-  pending: GITHUB_REVIEW_STATES[4],
-} as const;
-
 type GithubReviewState = (typeof GITHUB_REVIEW_STATES)[number];
 
 export type Review = {
@@ -24,6 +16,14 @@ export type Review = {
   readonly commitSha: string;
   readonly authorLogin: string;
 };
+
+export const GITHUB_REVIEW_STATE = {
+  approved: GITHUB_REVIEW_STATES[0],
+  changesRequested: GITHUB_REVIEW_STATES[1],
+  commented: GITHUB_REVIEW_STATES[2],
+  dismissed: GITHUB_REVIEW_STATES[3],
+  pending: GITHUB_REVIEW_STATES[4],
+} as const;
 
 const EFFECTIVE_STATES: readonly GithubReviewState[] = [
   GITHUB_REVIEW_STATE.approved,

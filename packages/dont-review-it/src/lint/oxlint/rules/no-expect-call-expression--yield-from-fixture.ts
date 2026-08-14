@@ -7,8 +7,6 @@ import { unwrapSubject } from "../lib/spec-syntax/subject-expressions.ts";
 
 import type { Definition, ESTree, Scope, Variable } from "@oxlint/plugins";
 
-const VISIBLE_DECLARATIONS: ReadonlySet<string> = new Set(["FunctionName", "Variable"]);
-
 const PRODUCED_SUBJECT_FORMS: ReadonlyMap<string, string> = new Map([
   ["CallExpression", "calling a function"],
   ["NewExpression", "running a constructor"],
@@ -57,6 +55,8 @@ const writtenParameterCount = (definition: Definition): number | null => {
   if (written.type === "ArrowFunctionExpression") return written.params.length;
   return written.type === "FunctionExpression" ? written.params.length : null;
 };
+
+const VISIBLE_DECLARATIONS: ReadonlySet<string> = new Set(["FunctionName", "Variable"]);
 
 const declaresParameters = (definition: Definition): boolean => {
   if (!VISIBLE_DECLARATIONS.has(definition.type)) return false;

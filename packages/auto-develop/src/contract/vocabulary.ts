@@ -14,16 +14,16 @@ export const isMode = (candidate: unknown): candidate is Mode =>
 /** @canonical-values auto-develop.review-state */
 const REVIEW_STATES = ["changes_requested", "commented", "approved"] as const;
 
+export type ReviewState = (typeof REVIEW_STATES)[number];
+
+export const isReviewState = (candidate: string): candidate is ReviewState =>
+  (REVIEW_STATES as readonly string[]).includes(candidate);
+
 export const REVIEW_STATE = {
   changesRequested: REVIEW_STATES[0],
   commented: REVIEW_STATES[1],
   approved: REVIEW_STATES[2],
 } as const;
-
-export type ReviewState = (typeof REVIEW_STATES)[number];
-
-export const isReviewState = (candidate: string): candidate is ReviewState =>
-  (REVIEW_STATES as readonly string[]).includes(candidate);
 
 const AUTHOR_WORK_REVIEW_STATES = [REVIEW_STATE.changesRequested] as const;
 
@@ -47,6 +47,11 @@ const CHECK_SUITE_CONCLUSIONS = [
   "stale",
 ] as const;
 
+export type CheckSuiteConclusion = (typeof CHECK_SUITE_CONCLUSIONS)[number];
+
+export const isCheckSuiteConclusion = (candidate: unknown): candidate is CheckSuiteConclusion =>
+  (CHECK_SUITE_CONCLUSIONS as readonly unknown[]).includes(candidate);
+
 export const CHECK_SUITE_CONCLUSION = {
   success: CHECK_SUITE_CONCLUSIONS[0],
   failure: CHECK_SUITE_CONCLUSIONS[1],
@@ -58,11 +63,6 @@ export const CHECK_SUITE_CONCLUSION = {
   startupFailure: CHECK_SUITE_CONCLUSIONS[7],
   stale: CHECK_SUITE_CONCLUSIONS[8],
 } as const;
-
-export type CheckSuiteConclusion = (typeof CHECK_SUITE_CONCLUSIONS)[number];
-
-export const isCheckSuiteConclusion = (candidate: unknown): candidate is CheckSuiteConclusion =>
-  (CHECK_SUITE_CONCLUSIONS as readonly unknown[]).includes(candidate);
 
 const AUTHOR_WORK_CONCLUSIONS = [
   CHECK_SUITE_CONCLUSION.failure,

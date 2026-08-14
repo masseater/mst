@@ -1,8 +1,6 @@
 import type { ESTree } from "@oxlint/plugins";
 import type { CanonicalValue } from "./fingerprint.ts";
 
-const KEY_SELECTION_TYPE_NAMES: ReadonlySet<string> = new Set(["Omit", "Pick"]);
-
 export type LiteralNode =
   | ESTree.BigIntLiteral
   | ESTree.BooleanLiteral
@@ -101,6 +99,8 @@ const isModuleNamePosition = (parent: ESTree.Node, node: ESTree.Node): boolean |
 
 export const isModuleSyntaxPosition = (parent: ESTree.Node, node: ESTree.Node): boolean =>
   isModuleSourcePosition(parent, node) ?? isModuleNamePosition(parent, node) ?? false;
+
+const KEY_SELECTION_TYPE_NAMES: ReadonlySet<string> = new Set(["Omit", "Pick"]);
 
 const isKeySelectionTypeName = (typeName: string): boolean =>
   KEY_SELECTION_TYPE_NAMES.has(typeName);

@@ -27,11 +27,6 @@ import { toPosixPath } from "../lib/posix-path.ts";
 import type { Comment, ESTree } from "@oxlint/plugins";
 import type { RuleMessage } from "../lib/rule-message.ts";
 
-const RULE_NAME =
-  "no-inline-suppression-of-protected-rule--register-the-exception-in-configuration";
-
-const PATTERN_MARKER = /[*?[\]{}]/u;
-
 const scopedPathsOf = (property: ESTree.ObjectProperty): readonly (string | null)[] | null => {
   const scope = ancestorsOf(property).findLast(
     (node): node is ESTree.ObjectExpression =>
@@ -44,6 +39,8 @@ const scopedPathsOf = (property: ESTree.ObjectProperty): readonly (string | null
     held?.type === "Literal" && typeof held.value === "string" ? held.value : null,
   );
 };
+
+const PATTERN_MARKER = /[*?[\]{}]/u;
 
 const listsCompletePaths = (paths: readonly (string | null)[]): boolean =>
   paths.length > 0 && paths.every((path) => path !== null && !PATTERN_MARKER.test(path));
@@ -60,6 +57,9 @@ const weakeningMessageFor = (weakened: WeakenedRule): RuleMessage | null => {
   if (pattern === undefined) return { messageId: "weakenedProtectedRule", data: carried };
   return { messageId: "patternScopedException", data: { ...carried, pattern } };
 };
+
+const RULE_NAME =
+  "no-inline-suppression-of-protected-rule--register-the-exception-in-configuration";
 
 const deviationMessageFor = (deviation: ProtectionDeviation): RuleMessage | null => {
   const carried = { ruleName: deviation.rule };

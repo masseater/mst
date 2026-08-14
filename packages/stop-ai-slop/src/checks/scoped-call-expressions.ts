@@ -24,17 +24,6 @@ const namesBoundBy = (pattern: unknown): readonly string[] => {
     : [];
 };
 
-const isFunctionNode = (fields: UnknownFields): boolean =>
-  fields.type === "FunctionDeclaration" ||
-  fields.type === "FunctionExpression" ||
-  fields.type === "ArrowFunctionExpression";
-
-const isClassNode = (fields: UnknownFields): boolean =>
-  fields.type === "ClassDeclaration" || fields.type === "ClassExpression";
-
-const isIsolatedVarScope = (fields: UnknownFields): boolean =>
-  fields.type === "StaticBlock" || fields.type === "TSModuleBlock";
-
 const functionBindingsOf = (node: UnknownFields): readonly string[] => {
   const functionName = node.type === "ArrowFunctionExpression" ? [] : namesBoundBy(node.id);
   const parameters = (node.params as readonly unknown[]).flatMap(namesBoundBy);
@@ -77,6 +66,25 @@ const declarationBindingsIn = (held: unknown): readonly string[] => {
 const statementBindingsIn = (statements: readonly unknown[]): readonly string[] =>
   statements.flatMap(declarationBindingsIn);
 
+const switchBindingsIn = (fields: UnknownFields): readonly string[] =>
+  (fields.cases as readonly UnknownFields[]).flatMap((switchCase) =>
+    statementBindingsIn(switchCase.consequent as readonly unknown[]),
+  );
+
+const statementScopeBindings = (fields: UnknownFields): readonly string[] =>
+  statementBindingsIn(fields.body as readonly unknown[]);
+
+const isFunctionNode = (fields: UnknownFields): boolean =>
+  fields.type === "FunctionDeclaration" ||
+  fields.type === "FunctionExpression" ||
+  fields.type === "ArrowFunctionExpression";
+
+const isClassNode = (fields: UnknownFields): boolean =>
+  fields.type === "ClassDeclaration" || fields.type === "ClassExpression";
+
+const isIsolatedVarScope = (fields: UnknownFields): boolean =>
+  fields.type === "StaticBlock" || fields.type === "TSModuleBlock";
+
 const varBindingsIn = (held: unknown): readonly string[] => {
   if (Array.isArray(held)) return held.flatMap(varBindingsIn);
   if (!isPlainObject(held)) return [];
@@ -87,14 +95,6 @@ const varBindingsIn = (held: unknown): readonly string[] => {
   }
   return Object.entries(fields).flatMap(([, nested]) => varBindingsIn(nested));
 };
-
-const switchBindingsIn = (fields: UnknownFields): readonly string[] =>
-  (fields.cases as readonly UnknownFields[]).flatMap((switchCase) =>
-    statementBindingsIn(switchCase.consequent as readonly unknown[]),
-  );
-
-const statementScopeBindings = (fields: UnknownFields): readonly string[] =>
-  statementBindingsIn(fields.body as readonly unknown[]);
 
 const isolatedVarScopeBindings = (fields: UnknownFields): readonly string[] => [
   ...statementBindingsIn(fields.body as readonly unknown[]),

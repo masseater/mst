@@ -7,27 +7,21 @@ import type { ESTree, Options } from "@oxlint/plugins";
 
 const THRESHOLDS_PATH = ["test", "coverage", "thresholds"];
 
-const FULL_COVERAGE = 100;
-
-const COVERAGE_METRICS = ["branches", "functions", "lines", "statements"];
-
 const PER_FILE_KEY = "perFile";
 
+const FULL_COVERAGE = 100;
+
 const THRESHOLD_SCHEMA = { type: "number", minimum: 0, maximum: FULL_COVERAGE } as const;
+
+const isRecord = (held: unknown): held is Readonly<Record<string, unknown>> =>
+  held instanceof Object;
 
 type CoverageRequirement = {
   readonly metric: string;
   readonly required: number;
 };
 
-type CoverageViolation = {
-  readonly node: ESTree.ObjectExpression | ESTree.ObjectProperty;
-  readonly messageId: string;
-  readonly data: Record<string, number | string>;
-};
-
-const isRecord = (held: unknown): held is Readonly<Record<string, unknown>> =>
-  held instanceof Object;
+const COVERAGE_METRICS = ["branches", "functions", "lines", "statements"];
 
 const requirementsFrom = (ruleOptions: Readonly<Options>): readonly CoverageRequirement[] => {
   const [first] = ruleOptions;
@@ -43,6 +37,12 @@ const requirementSummaryOf = (requirements: readonly CoverageRequirement[]): str
 
 const declaredNumberOf = (literal: ESTree.Expression): number | null =>
   literal.type === "Literal" && typeof literal.value === "number" ? literal.value : null;
+
+type CoverageViolation = {
+  readonly node: ESTree.ObjectExpression | ESTree.ObjectProperty;
+  readonly messageId: string;
+  readonly data: Record<string, number | string>;
+};
 
 const violationsIn = ({
   thresholds,

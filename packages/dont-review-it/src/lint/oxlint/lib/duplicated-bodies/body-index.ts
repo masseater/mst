@@ -42,14 +42,14 @@ export type IndexedFile = {
   readonly bodies: readonly IndexedBody[];
 };
 
-type PlacedBody = IndexedBody & { readonly relativePath: string };
-
 const bySiteOrder = (left: BodySite, right: BodySite): number => {
   if (left.relativePath !== right.relativePath) {
     return left.relativePath < right.relativePath ? -1 : 1;
   }
   return left.line - right.line;
 };
+
+type PlacedBody = IndexedBody & { readonly relativePath: string };
 
 const siteOf = ({ relativePath, name, line }: PlacedBody): BodySite => ({
   relativePath,

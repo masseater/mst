@@ -10,23 +10,6 @@ import { spawnFormMatching, SPAWN_TARGET_LINE, type SpawnForm } from "./spawn-fo
 
 import type { AstFields } from "../ast-node.ts";
 
-const ROUTE_MARK = "#";
-
-const WHOLE_MODULE_MARKS: ReadonlySet<string> = new Set(["default", "*"]);
-
-const NAMESPACE_ROUTE_EXPORT = "default";
-
-export type SpawnSite = {
-  readonly form: SpawnForm;
-  readonly target: AstFields | null;
-  readonly handed: readonly AstFields[];
-};
-
-const routePartsOf = (route: string): { readonly specifier: string; readonly exported: string } => {
-  const mark = route.lastIndexOf(ROUTE_MARK);
-  return { specifier: route.slice(0, mark), exported: route.slice(mark + 1) };
-};
-
 const declaredStatementOf = (statement: AstFields): AstFields =>
   nodeTypeOf(statement) === "ExportNamedDeclaration"
     ? (astFieldsOf(statement.declaration) ?? statement)
@@ -36,6 +19,10 @@ const requiredSpecifierOf = (bound: AstFields): string | null => {
   const requested = requestedSpecifierOf(bound);
   return requested === null ? null : staticSpecifierOf(requested, new Map());
 };
+
+const NAMESPACE_ROUTE_EXPORT = "default";
+
+const ROUTE_MARK = "#";
 
 const takenRoutesOf = ({
   named,
@@ -112,6 +99,30 @@ export const spawnRoutesIn = ({
   );
 };
 
+export const handedTextsOf = ({
+  handed,
+  constants,
+}: {
+  readonly handed: readonly AstFields[];
+  readonly constants: ReadonlyMap<string, string>;
+}): readonly string[] | null => {
+  const [listed] = handed;
+  if (listed === undefined || nodeTypeOf(listed) !== "ArrayExpression") return null;
+
+  const heldElements = listedFieldsOf(listed.elements);
+  const spelled = heldElements
+    .map((held) => staticSpecifierOf(held, constants))
+    .filter((writtenText) => writtenText !== null);
+  return spelled.length === heldElements.length ? spelled : null;
+};
+
+const routePartsOf = (route: string): { readonly specifier: string; readonly exported: string } => {
+  const mark = route.lastIndexOf(ROUTE_MARK);
+  return { specifier: route.slice(0, mark), exported: route.slice(mark + 1) };
+};
+
+const WHOLE_MODULE_MARKS: ReadonlySet<string> = new Set(["default", "*"]);
+
 const memberRouteOf = ({
   callee,
   routes,
@@ -152,23 +163,6 @@ const calledFieldOf = (node: AstFields): AstFields | null => {
   return nodeType === "CallExpression" ? astFieldsOf(node.callee) : null;
 };
 
-export const handedTextsOf = ({
-  handed,
-  constants,
-}: {
-  readonly handed: readonly AstFields[];
-  readonly constants: ReadonlyMap<string, string>;
-}): readonly string[] | null => {
-  const [listed] = handed;
-  if (listed === undefined || nodeTypeOf(listed) !== "ArrayExpression") return null;
-
-  const heldElements = listedFieldsOf(listed.elements);
-  const spelled = heldElements
-    .map((held) => staticSpecifierOf(held, constants))
-    .filter((writtenText) => writtenText !== null);
-  return spelled.length === heldElements.length ? spelled : null;
-};
-
 const spawnFormAt = ({
   written,
   routes,
@@ -183,6 +177,12 @@ const spawnFormAt = ({
 
   const route = calleeRouteOf({ callee, routes });
   return route === null ? null : spawnFormMatching({ forms, ...routePartsOf(route) });
+};
+
+export type SpawnSite = {
+  readonly form: SpawnForm;
+  readonly target: AstFields | null;
+  readonly handed: readonly AstFields[];
 };
 
 const siteUnder = (written: AstFields, form: SpawnForm): SpawnSite => {

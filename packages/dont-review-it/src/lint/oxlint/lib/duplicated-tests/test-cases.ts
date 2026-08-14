@@ -13,11 +13,6 @@ import {
   INJECTED_TEST_BLOCK_SPELLINGS,
 } from "../spec-syntax/test-block-declarations.ts";
 
-const RUNNER_BODY_TYPES: ReadonlySet<string> = new Set([
-  "ArrowFunctionExpression",
-  "FunctionExpression",
-]);
-
 const receiverOf = (callee: AstFields): unknown => {
   if (callee[NODE_TYPE_FIELD] === "CallExpression") return callee.callee;
   if (callee[NODE_TYPE_FIELD] !== "MemberExpression") return null;
@@ -35,6 +30,11 @@ const titleOf = (handedArgument: unknown): string | null => {
   if (!isAstFields(handedArgument) || handedArgument[NODE_TYPE_FIELD] !== "Literal") return null;
   return typeof handedArgument.value === "string" ? handedArgument.value : null;
 };
+
+const RUNNER_BODY_TYPES: ReadonlySet<string> = new Set([
+  "ArrowFunctionExpression",
+  "FunctionExpression",
+]);
 
 const runnerBodyOf = (handedArgument: unknown): unknown =>
   isAstFields(handedArgument) && RUNNER_BODY_TYPES.has(String(handedArgument[NODE_TYPE_FIELD]))

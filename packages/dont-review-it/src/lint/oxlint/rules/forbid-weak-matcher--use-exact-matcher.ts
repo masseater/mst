@@ -16,8 +16,6 @@ import { unwrapSubject } from "../lib/spec-syntax/subject-expressions.ts";
 import type { ESTree, Options } from "@oxlint/plugins";
 import type { RuleMessage } from "../lib/rule-message.ts";
 
-const ALLOWED_MATCHERS_OPTION = "allowedMatchers";
-
 const spelledMatcherOf = (call: string): string => call.slice(0, call.indexOf("("));
 
 const exactRestatements: ReadonlyMap<string, string> = new Map(
@@ -25,6 +23,8 @@ const exactRestatements: ReadonlyMap<string, string> = new Map(
     EXACT_MATCHERS.has(spelledMatcherOf(writeInstead)),
   ),
 );
+
+const ALLOWED_MATCHERS_OPTION = "allowedMatchers";
 
 const allowedMatchersFrom = (ruleOptions: Readonly<Options>): ReadonlySet<string> => {
   const [first] = ruleOptions;

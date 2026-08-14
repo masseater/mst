@@ -3,6 +3,27 @@ import { carriesHaltDisposition } from "./halt-disposition.ts";
 import type { Logger } from "../logging/logger.ts";
 import type { JobLedger, JobRecord } from "./job-ledger.ts";
 
+export type JobExecution = {
+  readonly pump: () => void;
+  readonly isDrained: () => boolean;
+  readonly notifyDrain: () => void;
+  readonly settleStartedJobs: () => Promise<void>;
+};
+
+const logSettled = (
+  log: Logger,
+  settling: { readonly record: JobRecord; readonly failure?: unknown },
+): void => {
+  if (settling.failure === undefined) {
+    log.info({ lane: settling.record.lane, label: settling.record.label }, "job completed");
+    return;
+  }
+  log.error(
+    { label: settling.record.label, err: settling.failure },
+    "job failed; written consumed",
+  );
+};
+
 export type QueueSharedState = {
   readonly ledger: JobLedger;
   readonly flags: Map<string, boolean>;
@@ -10,13 +31,6 @@ export type QueueSharedState = {
   readonly drainWaiters: Set<() => void>;
   readonly handlerTable: Map<string, (payload: unknown) => Promise<void>>;
   readonly onHaltCell: Map<string, ((failure: unknown) => void) | undefined>;
-};
-
-export type JobExecution = {
-  readonly pump: () => void;
-  readonly isDrained: () => boolean;
-  readonly notifyDrain: () => void;
-  readonly settleStartedJobs: () => Promise<void>;
 };
 
 class TrackedStartedJobs {
@@ -37,20 +51,6 @@ const createStartedJobs = (): {
   readonly track: (settlingJob: Promise<void>) => void;
   readonly settleAll: () => Promise<void>;
 } => new TrackedStartedJobs();
-
-const logSettled = (
-  log: Logger,
-  settling: { readonly record: JobRecord; readonly failure?: unknown },
-): void => {
-  if (settling.failure === undefined) {
-    log.info({ lane: settling.record.lane, label: settling.record.label }, "job completed");
-    return;
-  }
-  log.error(
-    { label: settling.record.label, err: settling.failure },
-    "job failed; written consumed",
-  );
-};
 
 const createJobStarter = (starting: {
   readonly state: QueueSharedState;

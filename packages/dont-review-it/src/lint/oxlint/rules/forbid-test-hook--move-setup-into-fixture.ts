@@ -20,17 +20,6 @@ import type { ESTree, Options, Scope, Variable } from "@oxlint/plugins";
 
 const HOOK_NAMES_OPTION = "hookNames";
 
-type Report = {
-  readonly node: ESTree.Node;
-  readonly messageId: string;
-  readonly data: { readonly hook: string } | { readonly through: string };
-};
-
-type HookReading = {
-  readonly hookNames: ReadonlySet<string>;
-  readonly scopeAt: ScopeLookup;
-};
-
 const hookNamesFrom = (ruleOptions: Readonly<Options>): ReadonlySet<string> => {
   const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) {
@@ -55,8 +44,23 @@ const importsHook = (variable: Variable, hookNames: ReadonlySet<string>): boolea
     return hookNames.has(moduleExportSpelling(declared.imported));
   });
 
-const importsNamespace = (variable: Variable): boolean =>
-  variable.defs.some((definition) => definition.node.type === "ImportNamespaceSpecifier");
+const boundVariableOf = (
+  identifier: ESTree.IdentifierReference,
+  scopeAt: ScopeLookup,
+): Variable | null => resolveBinding(scopeAt(identifier), identifier.name);
+
+type HookReading = {
+  readonly hookNames: ReadonlySet<string>;
+  readonly scopeAt: ScopeLookup;
+};
+
+const namesHook = (
+  identifier: ESTree.IdentifierReference,
+  reading: HookReading & { readonly reached: ReadonlySet<Variable> },
+): boolean => {
+  const bound = boundVariableOf(identifier, reading.scopeAt);
+  return bound === null ? reading.hookNames.has(identifier.name) : reading.reached.has(bound);
+};
 
 const aliasedIdentifier = (variable: Variable): ESTree.IdentifierReference | null =>
   variable.defs
@@ -68,27 +72,6 @@ const aliasedIdentifier = (variable: Variable): ESTree.IdentifierReference | nul
       return written.type === "Identifier" ? [written] : [];
     })
     .at(-1) ?? null;
-
-const boundVariableOf = (
-  identifier: ESTree.IdentifierReference,
-  scopeAt: ScopeLookup,
-): Variable | null => resolveBinding(scopeAt(identifier), identifier.name);
-
-const namesHook = (
-  identifier: ESTree.IdentifierReference,
-  reading: HookReading & { readonly reached: ReadonlySet<Variable> },
-): boolean => {
-  const bound = boundVariableOf(identifier, reading.scopeAt);
-  return bound === null ? reading.hookNames.has(identifier.name) : reading.reached.has(bound);
-};
-
-const namesReachedVariable = (
-  identifier: ESTree.IdentifierReference,
-  reading: { readonly scopeAt: ScopeLookup; readonly reached: ReadonlySet<Variable> },
-): boolean => {
-  const bound = boundVariableOf(identifier, reading.scopeAt);
-  return bound !== null && reading.reached.has(bound);
-};
 
 const aliasChainOf = (
   variables: readonly Variable[],
@@ -118,6 +101,17 @@ const hookAliasesOf = (
     reached: reading.reached,
   });
 
+const importsNamespace = (variable: Variable): boolean =>
+  variable.defs.some((definition) => definition.node.type === "ImportNamespaceSpecifier");
+
+const namesReachedVariable = (
+  identifier: ESTree.IdentifierReference,
+  reading: { readonly scopeAt: ScopeLookup; readonly reached: ReadonlySet<Variable> },
+): boolean => {
+  const bound = boundVariableOf(identifier, reading.scopeAt);
+  return bound !== null && reading.reached.has(bound);
+};
+
 const namespaceBindingsOf = (
   variables: readonly Variable[],
   scopeAt: ScopeLookup,
@@ -128,6 +122,37 @@ const namespaceBindingsOf = (
     reached,
   });
 };
+
+type Report = {
+  readonly node: ESTree.Node;
+  readonly messageId: string;
+  readonly data: { readonly hook: string } | { readonly through: string };
+};
+
+const injectedReports = (scope: Scope, hookNames: ReadonlySet<string>): readonly Report[] =>
+  scope.through.flatMap((reference) => {
+    const { identifier } = reference;
+    if (!hookNames.has(identifier.name)) return [];
+    return [{ node: identifier, messageId: "testHook", data: { hook: identifier.name } }];
+  });
+
+const spotsOf = (variable: Variable): readonly Variable["identifiers"][number][] =>
+  uniqBy(
+    [...variable.identifiers, ...variable.references.map((reference) => reference.identifier)],
+    (identifier) => identifier.start,
+  );
+
+const boundReports = (reached: {
+  readonly imported: ReadonlySet<Variable>;
+  readonly aliased: ReadonlySet<Variable>;
+}): readonly Report[] =>
+  [...reached.aliased].flatMap((variable) =>
+    spotsOf(variable).map((spot) => ({
+      node: spot,
+      messageId: reached.imported.has(variable) ? "testHook" : "aliasedTestHook",
+      data: { hook: variable.name },
+    })),
+  );
 
 const namespaceHookOf = (
   member: ESTree.MemberExpression,
@@ -142,31 +167,6 @@ const namespaceHookOf = (
   const bound = boundVariableOf(receiver, reading.scopeAt);
   return bound !== null && reading.namespaces.has(bound) ? named : null;
 };
-
-const spotsOf = (variable: Variable): readonly Variable["identifiers"][number][] =>
-  uniqBy(
-    [...variable.identifiers, ...variable.references.map((reference) => reference.identifier)],
-    (identifier) => identifier.start,
-  );
-
-const injectedReports = (scope: Scope, hookNames: ReadonlySet<string>): readonly Report[] =>
-  scope.through.flatMap((reference) => {
-    const { identifier } = reference;
-    if (!hookNames.has(identifier.name)) return [];
-    return [{ node: identifier, messageId: "testHook", data: { hook: identifier.name } }];
-  });
-
-const boundReports = (reached: {
-  readonly imported: ReadonlySet<Variable>;
-  readonly aliased: ReadonlySet<Variable>;
-}): readonly Report[] =>
-  [...reached.aliased].flatMap((variable) =>
-    spotsOf(variable).map((spot) => ({
-      node: spot,
-      messageId: reached.imported.has(variable) ? "testHook" : "aliasedTestHook",
-      data: { hook: variable.name },
-    })),
-  );
 
 const namespaceReports = (
   members: readonly ESTree.MemberExpression[],

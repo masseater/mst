@@ -36,14 +36,6 @@ export const packageExportSourceFile = (
   exportTarget: string,
 ): string | null => targetCandidates(packageDirectory, exportTarget).find(isFile) ?? null;
 
-export const singleWildcardPattern = (
-  pattern: string,
-): { readonly prefix: string; readonly suffix: string } | null => {
-  const wildcard = pattern.indexOf("*");
-  if (wildcard === -1 || pattern.includes("*", wildcard + 1)) return null;
-  return { prefix: pattern.slice(0, wildcard), suffix: pattern.slice(wildcard + 1) };
-};
-
 const packageExportPatternBaseLength = (pattern: string): number => {
   const wildcard = pattern.indexOf("*");
   return wildcard === -1 ? pattern.length : wildcard + 1;
@@ -54,6 +46,14 @@ const packageExportPatternKeyCompare = (left: string, right: string): number => 
   const rightBaseLength = packageExportPatternBaseLength(right);
   if (leftBaseLength !== rightBaseLength) return leftBaseLength > rightBaseLength ? -1 : 1;
   return left.length === right.length ? 0 : left.length > right.length ? -1 : 1;
+};
+
+export const singleWildcardPattern = (
+  pattern: string,
+): { readonly prefix: string; readonly suffix: string } | null => {
+  const wildcard = pattern.indexOf("*");
+  if (wildcard === -1 || pattern.includes("*", wildcard + 1)) return null;
+  return { prefix: pattern.slice(0, wildcard), suffix: pattern.slice(wildcard + 1) };
 };
 
 const packageExportPatternMatches = (pattern: string, subpath: string): boolean => {

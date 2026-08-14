@@ -22,26 +22,33 @@ const BEGIN_MARKER = "<!-- BEGIN GENERATED lint-rules -->";
 
 const END_MARKER = "<!-- END GENERATED lint-rules -->";
 
+const wrappedBlockOf = (writtenContent: string): string =>
+  blockOf({ begin: BEGIN_MARKER, content: writtenContent, end: END_MARKER });
+
+const scaffoldOf = (writtenContent: string): string =>
+  `# lint ルール索引\n\nこのワークスペースの自前 lint ルールの一覧。ルール実装から生成される。手で書き換えない。更新は \`${REGENERATE_COMMAND}\` で行う。\n\n${wrappedBlockOf(writtenContent)}\n`;
+
+type ReconcileTarget = {
+  readonly absolutePath: string;
+  readonly file: string;
+  readonly expected: string;
+  readonly write: boolean;
+};
+
 const missingIndex = (file: string): string =>
   `A workspace that declares lint rules must not go without \`${file}\`. Generate it with \`${REGENERATE_COMMAND}\`.`;
 
-const missingMarkers = (file: string): string =>
-  `\`${file}\` must not lose its generated region. Put \`${BEGIN_MARKER}\` and \`${END_MARKER}\` back, or delete the file and regenerate it with \`${REGENERATE_COMMAND}\`.`;
-
-const staleIndex = (file: string): string =>
-  `\`${file}\` must not fall behind the rule implementations. Regenerate it with \`${REGENERATE_COMMAND}\`.`;
-
-const duplicatedRuleName = ({
-  ruleName,
-  workspaceDir,
-}: {
-  readonly ruleName: string;
-  readonly workspaceDir: string;
-}): string =>
-  `Two rules in \`${workspaceDir}\` must not share the name \`${ruleName}\`; they claim the same document. Rename one of them.`;
-
-const wrappedBlockOf = (writtenContent: string): string =>
-  blockOf({ begin: BEGIN_MARKER, content: writtenContent, end: END_MARKER });
+const absentIndexProblems = ({
+  absolutePath,
+  file,
+  expected,
+  write,
+}: ReconcileTarget): readonly LintRuleProblem[] => {
+  if (!write) return [{ file, message: missingIndex(file) }];
+  mkdirSync(dirname(absolutePath), { recursive: true });
+  writeFileSync(absolutePath, scaffoldOf(expected), "utf8");
+  return [];
+};
 
 const FRONTMATTER_FENCE = "---\n";
 
@@ -61,27 +68,8 @@ const withInsertedRegion = ({
   return `${source.slice(0, frontmatterEndsAt)}\n${wrappedBlockOf(writtenContent)}\n\n${source.slice(frontmatterEndsAt)}`;
 };
 
-const scaffoldOf = (writtenContent: string): string =>
-  `# lint ルール索引\n\nこのワークスペースの自前 lint ルールの一覧。ルール実装から生成される。手で書き換えない。更新は \`${REGENERATE_COMMAND}\` で行う。\n\n${wrappedBlockOf(writtenContent)}\n`;
-
-type ReconcileTarget = {
-  readonly absolutePath: string;
-  readonly file: string;
-  readonly expected: string;
-  readonly write: boolean;
-};
-
-const absentIndexProblems = ({
-  absolutePath,
-  file,
-  expected,
-  write,
-}: ReconcileTarget): readonly LintRuleProblem[] => {
-  if (!write) return [{ file, message: missingIndex(file) }];
-  mkdirSync(dirname(absolutePath), { recursive: true });
-  writeFileSync(absolutePath, scaffoldOf(expected), "utf8");
-  return [];
-};
+const missingMarkers = (file: string): string =>
+  `\`${file}\` must not lose its generated region. Put \`${BEGIN_MARKER}\` and \`${END_MARKER}\` back, or delete the file and regenerate it with \`${REGENERATE_COMMAND}\`.`;
 
 const unmarkedIndexProblems = ({
   target,
@@ -98,6 +86,9 @@ const unmarkedIndexProblems = ({
   );
   return [];
 };
+
+const staleIndex = (file: string): string =>
+  `\`${file}\` must not fall behind the rule implementations. Regenerate it with \`${REGENERATE_COMMAND}\`.`;
 
 const staleIndexProblems = ({
   target,
@@ -135,6 +126,15 @@ const contentProblems = ({
   if (region === null) return unmarkedIndexProblems({ target: checked, source });
   return staleIndexProblems({ target: checked, region });
 };
+
+const duplicatedRuleName = ({
+  ruleName,
+  workspaceDir,
+}: {
+  readonly ruleName: string;
+  readonly workspaceDir: string;
+}): string =>
+  `Two rules in \`${workspaceDir}\` must not share the name \`${ruleName}\`; they claim the same document. Rename one of them.`;
 
 const reconcileWorkspace = ({
   repositoryRoot,

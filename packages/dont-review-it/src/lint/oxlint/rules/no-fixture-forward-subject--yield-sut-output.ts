@@ -21,17 +21,6 @@ const HANDLER_SCOPING_WRAPPERS_OPTION = "handlerScopingWrappers";
 
 const DEFAULT_HANDLER_SCOPING_WRAPPERS: readonly string[] = [];
 
-type HandedBack = {
-  readonly at: ESTree.Expression;
-  readonly bodies: readonly ESTree.FunctionBody[];
-};
-
-type ForwardedSubject = {
-  readonly at: ESTree.Expression;
-  readonly messageId: string;
-  readonly root: ESTree.Expression;
-};
-
 const handlerScopingWrappersFrom = (ruleOptions: Readonly<Options>): ReadonlySet<string> => {
   const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) {
@@ -63,6 +52,11 @@ const scopedCallbackOf = (
   const handed = call.arguments.at(-1);
   if (handed === undefined || handed.type === "SpreadElement") return null;
   return asSpecFunction(handed);
+};
+
+type HandedBack = {
+  readonly at: ESTree.Expression;
+  readonly bodies: readonly ESTree.FunctionBody[];
 };
 
 const handedBackValues = (
@@ -134,6 +128,12 @@ type SubjectReading = {
   readonly at: ESTree.Expression;
   readonly written: ESTree.Expression;
   readonly handed: ReadonlySet<string>;
+};
+
+type ForwardedSubject = {
+  readonly at: ESTree.Expression;
+  readonly messageId: string;
+  readonly root: ESTree.Expression;
 };
 
 const carriedForwardingOf = ({ at, written, handed }: SubjectReading): ForwardedSubject | null => {

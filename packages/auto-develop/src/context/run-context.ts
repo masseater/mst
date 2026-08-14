@@ -2,8 +2,6 @@ import { z } from "zod";
 
 import { isMode, type Mode } from "../contract/vocabulary.ts";
 
-const RUN_CONTEXT_SCHEMA_VERSION = 1;
-
 const LAUNCH_PATHS = ["auto", "manual"] as const;
 
 export type LaunchPath = (typeof LAUNCH_PATHS)[number];
@@ -12,6 +10,8 @@ export const LAUNCH_AUTO: LaunchPath = "auto";
 
 const isLaunchPath = (candidate: unknown): candidate is LaunchPath =>
   (LAUNCH_PATHS as readonly unknown[]).includes(candidate);
+
+const RUN_CONTEXT_SCHEMA_VERSION = 1;
 
 const runContextSchema = z.object({
   schemaVersion: z.literal(RUN_CONTEXT_SCHEMA_VERSION),

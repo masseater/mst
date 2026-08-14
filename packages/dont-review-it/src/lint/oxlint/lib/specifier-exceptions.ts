@@ -2,11 +2,6 @@ import { matchesGlobPath } from "./glob-path-match.ts";
 
 import type { Options } from "@oxlint/plugins";
 
-export type SpecifierException = {
-  readonly path: string;
-  readonly reason: string;
-};
-
 export const SPECIFIER_EXCEPTION_SCHEMA = {
   type: "array",
   items: {
@@ -16,6 +11,11 @@ export const SPECIFIER_EXCEPTION_SCHEMA = {
     additionalProperties: false,
   },
 } as const;
+
+export type SpecifierException = {
+  readonly path: string;
+  readonly reason: string;
+};
 
 export const specifierExceptionsIn = (
   ruleOptions: Readonly<Options>,

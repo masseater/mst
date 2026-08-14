@@ -3,9 +3,9 @@ import { basename } from "node:path";
 import { inheritedContext, startTelemetry } from "@mst/ai-native/telemetry";
 import { context, trace } from "@opentelemetry/api";
 
-const SERVICE_NAME = "mst-check";
-
 const INSTRUMENTATION_NAME = "@mst/repository-checks";
+
+const SERVICE_NAME = "mst-check";
 
 const invocationName = (): string =>
   [basename(process.argv[1] ?? SERVICE_NAME), ...process.argv.slice(2)].join(" ");

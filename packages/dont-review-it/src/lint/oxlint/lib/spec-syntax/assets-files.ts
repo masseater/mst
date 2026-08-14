@@ -6,8 +6,6 @@ const DEFAULT_ASSETS_NAME_MARKERS: readonly string[] = ["assets"];
 
 const ASSETS_NAME_MARKERS_OPTION = "assetsNameMarkers";
 
-const NAME_SEPARATOR = ".";
-
 export const assetsNameMarkersFrom = (ruleOptions: Readonly<Options>): ReadonlySet<string> =>
   new Set(
     configuredSuffixesFrom(ruleOptions, {
@@ -15,6 +13,8 @@ export const assetsNameMarkersFrom = (ruleOptions: Readonly<Options>): ReadonlyS
       carried: DEFAULT_ASSETS_NAME_MARKERS,
     }),
   );
+
+const NAME_SEPARATOR = ".";
 
 export const assetsStemOf = (filename: string, markers: ReadonlySet<string>): string | null => {
   const parts = baseNameOf(filename).split(NAME_SEPARATOR);

@@ -1,35 +1,15 @@
 import { isAstFields, NODE_TYPE_FIELD, type AstFields } from "../ast-node.ts";
 import { CONCATENATION_OPERATOR } from "../written-out-text.ts";
 
-export type CouplingEdge = {
-  readonly specifier: string;
-  readonly carriesValues: boolean;
-};
-
-const TRAVERSED_AWAY_FIELDS: ReadonlySet<string> = new Set(["parent", "loc", "range"]);
-
-export const TYPE_ONLY_KIND = "type";
-
-const REQUIRE_CALL_NAME = "require";
-
-const IMPORT_DECLARATION = "ImportDeclaration";
-
-const EXPORT_NAMED_DECLARATION = "ExportNamedDeclaration";
-
-const EXPORT_ALL_DECLARATION = "ExportAllDeclaration";
-
 export const astFieldsOf = (held: unknown): AstFields | null => (isAstFields(held) ? held : null);
-
-export const nodeTypeOf = (node: AstFields): string => {
-  const spelled = node[NODE_TYPE_FIELD];
-  return typeof spelled === "string" ? spelled : "";
-};
 
 export const listedFieldsOf = (held: unknown): readonly AstFields[] =>
   (Array.isArray(held) ? held : [held]).map(astFieldsOf).filter((candidate) => candidate !== null);
 
 export const statementsOf = (program: AstFields): readonly AstFields[] =>
   listedFieldsOf(program.body);
+
+const TRAVERSED_AWAY_FIELDS: ReadonlySet<string> = new Set(["parent", "loc", "range"]);
 
 const childrenOf = (node: AstFields): readonly AstFields[] =>
   Object.entries(node)
@@ -69,6 +49,11 @@ const joinedFromSides = (
   return spelled.includes(null) ? null : spelled.join("");
 };
 
+export const nodeTypeOf = (node: AstFields): string => {
+  const spelled = node[NODE_TYPE_FIELD];
+  return typeof spelled === "string" ? spelled : "";
+};
+
 export const staticSpecifierOf = (
   node: AstFields,
   constants: ReadonlyMap<string, string>,
@@ -81,6 +66,13 @@ export const staticSpecifierOf = (
   return null;
 };
 
+export type CouplingEdge = {
+  readonly specifier: string;
+  readonly carriesValues: boolean;
+};
+
+export const TYPE_ONLY_KIND = "type";
+
 const edgeThrough = (
   source: unknown,
   { kind, constants }: { readonly kind: unknown; readonly constants: ReadonlyMap<string, string> },
@@ -91,6 +83,12 @@ const edgeThrough = (
   if (specifier === null) return null;
   return { specifier, carriesValues: kind !== TYPE_ONLY_KIND };
 };
+
+const IMPORT_DECLARATION = "ImportDeclaration";
+
+const EXPORT_NAMED_DECLARATION = "ExportNamedDeclaration";
+
+const EXPORT_ALL_DECLARATION = "ExportAllDeclaration";
 
 const declaredEdgeOf = (
   node: AstFields,
@@ -105,6 +103,8 @@ const declaredEdgeOf = (
   }
   return null;
 };
+
+const REQUIRE_CALL_NAME = "require";
 
 export const requestedSpecifierOf = (node: unknown): AstFields | null => {
   const spelled = astFieldsOf(node);

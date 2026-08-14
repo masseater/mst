@@ -10,11 +10,11 @@ const CYCLE_OUTCOMES = ["restart-requested", "signalled", "stream-ended"] as con
 
 export type CycleOutcome = (typeof CYCLE_OUTCOMES)[number];
 
+export const STREAM_ENDED: CycleOutcome = "stream-ended";
+
 const RESTART_REQUESTED: CycleOutcome = "restart-requested";
 
 const SIGNALLED: CycleOutcome = "signalled";
-
-export const STREAM_ENDED: CycleOutcome = "stream-ended";
 
 export type ConnectionCycleConfig = {
   readonly mode: Mode;
@@ -30,18 +30,6 @@ export type ConnectionCycleConfig = {
   readonly log: Logger;
 };
 
-const dispatchAll = (dispatching: {
-  readonly events: readonly Readonly<Record<string, unknown>>[];
-  readonly dispatcher: EventDispatcher;
-  readonly mode: Mode;
-}): number => {
-  const dispatched = dispatching.events.flatMap((raw) => {
-    const filteredOnes = filterEvent(raw, dispatching.mode);
-    return filteredOnes === null ? [] : [dispatching.dispatcher.dispatch(filteredOnes)];
-  });
-  return dispatched.filter(Boolean).length;
-};
-
 const consumeStream = async (config: ConnectionCycleConfig): Promise<CycleOutcome | null> => {
   for await (const raw of config.subscribe()) {
     config.onActivity();
@@ -52,6 +40,18 @@ const consumeStream = async (config: ConnectionCycleConfig): Promise<CycleOutcom
   }
   if (config.signalled()) return SIGNALLED;
   return config.restart.requested() === null ? null : RESTART_REQUESTED;
+};
+
+const dispatchAll = (dispatching: {
+  readonly events: readonly Readonly<Record<string, unknown>>[];
+  readonly dispatcher: EventDispatcher;
+  readonly mode: Mode;
+}): number => {
+  const dispatched = dispatching.events.flatMap((raw) => {
+    const filteredOnes = filterEvent(raw, dispatching.mode);
+    return filteredOnes === null ? [] : [dispatching.dispatcher.dispatch(filteredOnes)];
+  });
+  return dispatched.filter(Boolean).length;
 };
 
 const dispatchStartupDrain = async (config: ConnectionCycleConfig): Promise<void> => {

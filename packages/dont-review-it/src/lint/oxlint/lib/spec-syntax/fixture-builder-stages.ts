@@ -10,21 +10,6 @@ import {
 
 import type { ESTree } from "@oxlint/plugins";
 
-const CLEANUP_REGISTRATION = "onCleanup";
-
-const NON_FUNCTION_VALUES: ReadonlySet<string> = new Set([
-  "ArrayExpression",
-  "Literal",
-  "ObjectExpression",
-  "TemplateLiteral",
-  "UnaryExpression",
-]);
-
-export type FixtureSource = {
-  readonly textOf: (node: ESTree.Node) => string;
-  readonly readCountOf: (declared: ESTree.Node, name: string) => number;
-};
-
 type FixtureParts = {
   readonly written: string;
   readonly dependencies: readonly string[];
@@ -32,11 +17,26 @@ type FixtureParts = {
 
 type BuilderStage = FixtureParts & { readonly name: string };
 
-type FactoryShape = {
-  readonly opened: string;
-  readonly context: string;
-  readonly handoff: string;
-  readonly source: FixtureSource;
+export type FixtureSource = {
+  readonly textOf: (node: ESTree.Node) => string;
+  readonly readCountOf: (declared: ESTree.Node, name: string) => number;
+};
+
+const CLEANUP_REGISTRATION = "onCleanup";
+
+const endedStatement = (written: string): string =>
+  written.endsWith(";") ? written : `${written};`;
+
+const cleanupRegistrationText = (
+  trailing: readonly SpecStatement[],
+  { source, awaited }: { readonly source: FixtureSource; readonly awaited: boolean },
+): string | null => {
+  if (trailing.length === 0) return "";
+  if (trailing.some((statement) => statement.type !== "ExpressionStatement")) return null;
+  const registered = trailing
+    .map((statement) => endedStatement(source.textOf(statement)))
+    .join("\n");
+  return `${CLEANUP_REGISTRATION}(${awaited ? "async " : ""}() => {\n${registered}\n});`;
 };
 
 type HandoffSplit = {
@@ -45,8 +45,12 @@ type HandoffSplit = {
   readonly registered: string;
 };
 
-const endedStatement = (written: string): string =>
-  written.endsWith(";") ? written : `${written};`;
+type FactoryShape = {
+  readonly opened: string;
+  readonly context: string;
+  readonly handoff: string;
+  readonly source: FixtureSource;
+};
 
 const soleArgumentOf = (call: ESTree.CallExpression): ESTree.Expression | null => {
   const [only, ...rivals] = call.arguments;
@@ -65,23 +69,6 @@ const handoffCallOf = (
 
 const handoffCallIn = (statement: SpecStatement, handoff: string): ESTree.CallExpression | null =>
   statement.type === "ExpressionStatement" ? handoffCallOf(statement.expression, handoff) : null;
-
-const arrowBodyText = (yielded: ESTree.Expression, source: FixtureSource): string => {
-  const written = source.textOf(yielded);
-  return unwrapSubject(yielded).type === "ObjectExpression" ? `(${written})` : written;
-};
-
-const cleanupRegistrationText = (
-  trailing: readonly SpecStatement[],
-  { source, awaited }: { readonly source: FixtureSource; readonly awaited: boolean },
-): string | null => {
-  if (trailing.length === 0) return "";
-  if (trailing.some((statement) => statement.type !== "ExpressionStatement")) return null;
-  const registered = trailing
-    .map((statement) => endedStatement(source.textOf(statement)))
-    .join("\n");
-  return `${CLEANUP_REGISTRATION}(${awaited ? "async " : ""}() => {\n${registered}\n});`;
-};
 
 const handoffSplitOf = (
   { fn, body }: { readonly fn: ESTree.ArrowFunctionExpression; readonly body: ESTree.FunctionBody },
@@ -105,6 +92,11 @@ const handoffSplitOf = (
   return registered === null
     ? null
     : { leading: body.body.slice(0, handed.at), yielded, registered };
+};
+
+const arrowBodyText = (yielded: ESTree.Expression, source: FixtureSource): string => {
+  const written = source.textOf(yielded);
+  return unwrapSubject(yielded).type === "ObjectExpression" ? `(${written})` : written;
 };
 
 const blockFactoryText = (
@@ -170,6 +162,14 @@ const factoryParts = (takenFunction: SpecFunction, source: FixtureSource): Fixtu
   const split = handoffSplitOf({ fn: takenFunction, body: takenFunction.body }, shape);
   return split === null ? null : { written: blockFactoryText(split, shape), dependencies };
 };
+
+const NON_FUNCTION_VALUES: ReadonlySet<string> = new Set([
+  "ArrayExpression",
+  "Literal",
+  "ObjectExpression",
+  "TemplateLiteral",
+  "UnaryExpression",
+]);
 
 const heldValueParts = (written: ESTree.Expression, source: FixtureSource): FixtureParts | null =>
   NON_FUNCTION_VALUES.has(unwrapSubject(written).type)

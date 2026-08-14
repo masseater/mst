@@ -4,6 +4,10 @@ import type { Logger } from "../logging/logger.ts";
 import type { JobExecution } from "./job-execution.ts";
 import type { JobLedger, JobRecord } from "./job-ledger.ts";
 
+export type CoalesceTable = Readonly<
+  Record<string, (existingPayload: unknown, incomingPayload: unknown) => unknown>
+>;
+
 export type JobIntake = {
   readonly type: string;
   readonly payload: unknown;
@@ -11,10 +15,6 @@ export type JobIntake = {
   readonly lane: string;
   readonly label: string;
 };
-
-export type CoalesceTable = Readonly<
-  Record<string, (existingPayload: unknown, incomingPayload: unknown) => unknown>
->;
 
 export type JobIntakeDesk = {
   readonly enqueue: (intake: JobIntake) => boolean;

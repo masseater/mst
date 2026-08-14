@@ -45,42 +45,9 @@ import {
 
 import type { ESTree, Options } from "@oxlint/plugins";
 
-const PARTIAL_SHAPE_MATCHERS: ReadonlySet<string> = new Set(["toMatchObject"]);
-
-const PARTIAL_SHAPE_ASYMMETRIC_MATCHER = "objectContaining";
-
-const FILE_RECORD_MATCHER = "toMatchFileSnapshot";
-
 const PARSED_VALUE_MATCHER_OPTION = "parsedValueMatcher";
 
 const DEFAULT_PARSED_VALUE_MATCHER = "toHaveParsedFields";
-
-const STRUCTURAL_EQUALITY_MESSAGE = "vacuousStructuralEquality";
-
-const PARTIAL_SHAPE_MESSAGE = "vacuousPartialShape";
-
-type RuntimeImports = {
-  readonly names: ReadonlyMap<string, string>;
-  readonly namespaces: ReadonlySet<string>;
-};
-
-type SpecReader = {
-  readonly lookup: HostTypeLookup;
-  readonly resolve: SideResolution;
-  readonly settle: (side: ComparedSide) => ComparedSide;
-  readonly mayHold: (side: ESTree.Expression, hostType: string) => boolean;
-};
-
-type ComparisonSite = {
-  readonly left: ComparedSide;
-  readonly right: ComparedSide;
-  readonly messageId: string;
-};
-
-type SnapshotRecording = {
-  readonly site: SnapshotMatcherSite;
-  readonly subject: ComparedSide;
-};
 
 const parsedValueMatcherFrom = (ruleOptions: Readonly<Options>): string => {
   const [first] = ruleOptions;
@@ -121,11 +88,25 @@ const assertionAt = (
   return root === null ? null : { matcher, subject: argumentAt(root, 0) };
 };
 
+const PARTIAL_SHAPE_ASYMMETRIC_MATCHER = "objectContaining";
+
 const isAsymmetricPartialShape = (call: ESTree.CallExpression): boolean => {
   const callee = unwrapSubject(call.callee);
   if (callee.type !== "MemberExpression") return false;
   if (staticMemberName(callee) !== PARTIAL_SHAPE_ASYMMETRIC_MATCHER) return false;
   return isAssertionEntryReference(callee.object);
+};
+
+const PARTIAL_SHAPE_MATCHERS: ReadonlySet<string> = new Set(["toMatchObject"]);
+
+const STRUCTURAL_EQUALITY_MESSAGE = "vacuousStructuralEquality";
+
+const PARTIAL_SHAPE_MESSAGE = "vacuousPartialShape";
+
+type ComparisonSite = {
+  readonly left: ComparedSide;
+  readonly right: ComparedSide;
+  readonly messageId: string;
 };
 
 const comparedByMatcher = (
@@ -153,6 +134,11 @@ const comparisonSiteOf = (call: ESTree.CallExpression): ComparisonSite | null =>
   return matched === null ? null : comparedByMatcher(call, matched);
 };
 
+type SnapshotRecording = {
+  readonly site: SnapshotMatcherSite;
+  readonly subject: ComparedSide;
+};
+
 const snapshotRecordingOf = (call: ESTree.CallExpression): SnapshotRecording | null => {
   const matched = assertionAt(call);
   if (matched === null) return null;
@@ -161,16 +147,9 @@ const snapshotRecordingOf = (call: ESTree.CallExpression): SnapshotRecording | n
   return site === null ? null : { site, subject: matched.subject };
 };
 
-const inlineRecordOf = (call: ESTree.CallExpression): string | null => {
-  const given = call.arguments.flatMap((argument) =>
-    argument.type === "SpreadElement" ? [] : [argument],
-  );
-  if (given.length !== call.arguments.length) return null;
-
-  const last = given.at(-1);
-  if (last === undefined) return null;
-  if (given.length === 1 && unwrapSubject(last).type === "ObjectExpression") return null;
-  return staticSpelling(last);
+type RuntimeImports = {
+  readonly names: ReadonlyMap<string, string>;
+  readonly namespaces: ReadonlySet<string>;
 };
 
 const runtimeImportsOf = ({
@@ -227,6 +206,13 @@ const lookupOf = ({
     imports.namespaces.has(namespace) && hostTypes.has(member) ? member : null,
 });
 
+type SpecReader = {
+  readonly lookup: HostTypeLookup;
+  readonly resolve: SideResolution;
+  readonly settle: (side: ComparedSide) => ComparedSide;
+  readonly mayHold: (side: ESTree.Expression, hostType: string) => boolean;
+};
+
 const specReaderOf = ({
   lookup,
   scopeAt,
@@ -242,12 +228,6 @@ const specReaderOf = ({
     if (only === undefined || rest.length > 0) return null;
     return only.init ? only.writeExpr : null;
   };
-
-  const boundToDeclaration = (identifier: ESTree.IdentifierReference): boolean =>
-    resolveBinding(scopeAt(identifier), identifier.name)?.defs.some(
-      (definition) => definition.type === "ClassName" || definition.type === "FunctionName",
-    ) === true;
-
   const returnedByThunk = (
     call: ESTree.CallExpression,
     seen: ReadonlySet<string>,
@@ -280,6 +260,10 @@ const specReaderOf = ({
 
   const resolve: SideResolution = (node) => settledValue(node, new Set());
 
+  const boundToDeclaration = (identifier: ESTree.IdentifierReference): boolean =>
+    resolveBinding(scopeAt(identifier), identifier.name)?.defs.some(
+      (definition) => definition.type === "ClassName" || definition.type === "FunctionName",
+    ) === true;
   const mayHold = (side: ESTree.Expression, hostType: string): boolean => {
     const host = constructedHostTypeOf(side, lookup);
     if (host !== null) return host === hostType;
@@ -320,6 +304,20 @@ const namedFileRecordOf = (call: ESTree.CallExpression, filename: string): reado
   const fileRecord = named === null ? null : fileRecordOf(filename, named);
   return fileRecord === null ? [] : [fileRecord];
 };
+
+const inlineRecordOf = (call: ESTree.CallExpression): string | null => {
+  const given = call.arguments.flatMap((argument) =>
+    argument.type === "SpreadElement" ? [] : [argument],
+  );
+  if (given.length !== call.arguments.length) return null;
+
+  const last = given.at(-1);
+  if (last === undefined) return null;
+  if (given.length === 1 && unwrapSubject(last).type === "ObjectExpression") return null;
+  return staticSpelling(last);
+};
+
+const FILE_RECORD_MATCHER = "toMatchFileSnapshot";
 
 const recordsAt = ({
   site,

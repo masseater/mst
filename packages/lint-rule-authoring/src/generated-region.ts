@@ -1,9 +1,3 @@
-export type GeneratedRegion = {
-  readonly head: string;
-  readonly body: string;
-  readonly tail: string;
-};
-
 export const normalizedContent = (writtenText: string): string =>
   writtenText
     .split("\n")
@@ -15,6 +9,30 @@ export const normalizedContent = (writtenText: string): string =>
     )
     .filter((line) => line !== "")
     .join("\n");
+
+export const blockOf = ({
+  begin,
+  content,
+  end,
+}: {
+  readonly begin: string;
+  readonly content: string;
+  readonly end: string;
+}): string => `${begin}\n\n${content}\n\n${end}`;
+
+export type GeneratedRegion = {
+  readonly head: string;
+  readonly body: string;
+  readonly tail: string;
+};
+
+export const withRefreshedRegion = ({
+  region,
+  content,
+}: {
+  readonly region: GeneratedRegion;
+  readonly content: string;
+}): string => `${region.head}\n\n${content}\n\n${region.tail}`;
 
 export const regionIn = ({
   source,
@@ -35,24 +53,6 @@ export const regionIn = ({
     tail: source.slice(endAt),
   };
 };
-
-export const blockOf = ({
-  begin,
-  content,
-  end,
-}: {
-  readonly begin: string;
-  readonly content: string;
-  readonly end: string;
-}): string => `${begin}\n\n${content}\n\n${end}`;
-
-export const withRefreshedRegion = ({
-  region,
-  content,
-}: {
-  readonly region: GeneratedRegion;
-  readonly content: string;
-}): string => `${region.head}\n\n${content}\n\n${region.tail}`;
 
 export const withRefreshedRegionIn = ({
   source,

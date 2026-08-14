@@ -14,18 +14,6 @@ import {
 
 import type { UnknownFields } from "../unknown-fields.ts";
 
-export type LintRuleExample = {
-  readonly name: string;
-  readonly code: string;
-  readonly filename: string | null;
-};
-
-export type LintRuleExamples = {
-  readonly valid: readonly LintRuleExample[];
-  readonly invalid: readonly LintRuleExample[];
-  readonly unspellable: readonly string[];
-};
-
 const TESTER_NAME = "testLintRule";
 
 const isNode = (candidate: unknown): candidate is UnknownFields =>
@@ -55,6 +43,26 @@ const isMarked = (testCase: UnknownFields): boolean => {
   return marker?.type === "Literal" && marker.value === true;
 };
 
+const markedCasesIn = ({
+  cases,
+  field,
+}: {
+  readonly cases: UnknownFields;
+  readonly field: string;
+}): readonly UnknownFields[] => {
+  const listed = propertyOf(cases, field);
+  if (listed === null) return [];
+  return nodesIn(listed.elements)
+    .filter((listedCase) => listedCase.type === "ObjectExpression")
+    .filter(isMarked);
+};
+
+export type LintRuleExample = {
+  readonly name: string;
+  readonly code: string;
+  readonly filename: string | null;
+};
+
 const fieldTextOf = ({
   testCase,
   fieldName,
@@ -81,20 +89,6 @@ const exampleOf = ({
   return caseName === null || code === null ? [] : [{ name: caseName, code, filename }];
 };
 
-const markedCasesIn = ({
-  cases,
-  field,
-}: {
-  readonly cases: UnknownFields;
-  readonly field: string;
-}): readonly UnknownFields[] => {
-  const listed = propertyOf(cases, field);
-  if (listed === null) return [];
-  return nodesIn(listed.elements)
-    .filter((listedCase) => listedCase.type === "ObjectExpression")
-    .filter(isMarked);
-};
-
 const UNNAMED_CASE = "a case that spells out no name";
 
 const unspellableNamesIn = ({
@@ -107,6 +101,12 @@ const unspellableNamesIn = ({
   marked
     .filter((testCase) => exampleOf({ testCase, constants }).length === 0)
     .map((testCase) => fieldTextOf({ testCase, fieldName: "name", constants }) ?? UNNAMED_CASE);
+
+export type LintRuleExamples = {
+  readonly valid: readonly LintRuleExample[];
+  readonly invalid: readonly LintRuleExample[];
+  readonly unspellable: readonly string[];
+};
 
 const NO_EXAMPLES: LintRuleExamples = { valid: [], invalid: [], unspellable: [] };
 

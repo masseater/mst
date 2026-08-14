@@ -26,42 +26,6 @@ const DEFAULT_MAX_ASSERTIONS = 1;
 
 const MAX_ASSERTIONS_OPTION = "maxAssertions";
 
-type Callee = {
-  readonly kind: "fixture" | "helper";
-  readonly label: string;
-  readonly body: SpecFunction;
-};
-
-type Owner =
-  | { readonly kind: "block"; readonly block: ESTree.CallExpression }
-  | { readonly kind: "callee"; readonly callee: Callee };
-
-type Placed = {
-  readonly at: ESTree.Node;
-  readonly count: number;
-};
-
-type Reached = Placed & { readonly through: Callee };
-
-type Reading = {
-  readonly assertions: ReadonlySet<ESTree.CallExpression>;
-  readonly blocks: ReadonlyMap<ESTree.CallExpression, SpecFunction>;
-  readonly calleeByCall: ReadonlyMap<ESTree.CallExpression, Callee>;
-  readonly fixtures: ReadonlyMap<string, Callee>;
-  readonly ownerByCall: ReadonlyMap<ESTree.CallExpression, Owner | null>;
-};
-
-type Report = {
-  readonly node: ESTree.Node;
-  readonly messageId: string;
-  readonly data: Readonly<Record<string, number | string>>;
-};
-
-type Traversal = {
-  readonly total: number;
-  readonly seen: ReadonlySet<SpecFunction>;
-};
-
 const maxAssertionsFrom = (ruleSettings: Readonly<Options>): number => {
   const [first] = ruleSettings;
   if (typeof first !== "object" || first === null || Array.isArray(first)) {
@@ -76,6 +40,12 @@ const declaredFunctionOf = (definition: Definition): SpecFunction | null => {
   if (declared.type === "FunctionDeclaration") return declared;
   if (declared.type !== "VariableDeclarator" || declared.init === null) return null;
   return asSpecFunction(declared.init);
+};
+
+type Callee = {
+  readonly kind: "fixture" | "helper";
+  readonly label: string;
+  readonly body: SpecFunction;
 };
 
 const helperCalledBy = (sourceCode: SourceCode, call: ESTree.CallExpression): Callee | null => {
@@ -96,29 +66,17 @@ const helperCalledBy = (sourceCode: SourceCode, call: ESTree.CallExpression): Ca
     : { kind: "helper", label: callee.name, body: declaredHelper };
 };
 
-const isUnder = (owner: Owner | null, enclosingNode: ESTree.Node): boolean => {
-  if (owner === null) return false;
-  return owner.kind === "block"
-    ? owner.block === enclosingNode
-    : owner.callee.body === enclosingNode;
+type Owner =
+  | { readonly kind: "block"; readonly block: ESTree.CallExpression }
+  | { readonly kind: "callee"; readonly callee: Callee };
+
+type Reading = {
+  readonly assertions: ReadonlySet<ESTree.CallExpression>;
+  readonly blocks: ReadonlyMap<ESTree.CallExpression, SpecFunction>;
+  readonly calleeByCall: ReadonlyMap<ESTree.CallExpression, Callee>;
+  readonly fixtures: ReadonlyMap<string, Callee>;
+  readonly ownerByCall: ReadonlyMap<ESTree.CallExpression, Owner | null>;
 };
-
-const inSourceOrder = <Held extends Placed>(placed: readonly Held[]): readonly Held[] =>
-  placed.toSorted((earlier, later) => earlier.at.start - later.at.start);
-
-const beyondBudget = (placed: readonly Placed[], budget: number): readonly Placed[] =>
-  inSourceOrder(placed)
-    .flatMap((placement) => range(0, placement.count).map(() => placement))
-    .slice(budget);
-
-const throughText = (reached: readonly Reached[]): string =>
-  reached
-    .filter((contribution) => contribution.count !== 0)
-    .map(
-      (contribution) =>
-        `${contribution.count} through the ${contribution.through.kind} \`${contribution.through.label}\``,
-    )
-    .join(", ");
 
 const readingOf = (collected: {
   readonly assertions: ReadonlySet<ESTree.CallExpression>;
@@ -163,6 +121,48 @@ const readingOf = (collected: {
   );
   return { assertions, blocks, calleeByCall, fixtures, ownerByCall };
 };
+
+type Report = {
+  readonly node: ESTree.Node;
+  readonly messageId: string;
+  readonly data: Readonly<Record<string, number | string>>;
+};
+
+type Placed = {
+  readonly at: ESTree.Node;
+  readonly count: number;
+};
+
+const inSourceOrder = <Held extends Placed>(placed: readonly Held[]): readonly Held[] =>
+  placed.toSorted((earlier, later) => earlier.at.start - later.at.start);
+
+const beyondBudget = (placed: readonly Placed[], budget: number): readonly Placed[] =>
+  inSourceOrder(placed)
+    .flatMap((placement) => range(0, placement.count).map(() => placement))
+    .slice(budget);
+
+const isUnder = (owner: Owner | null, enclosingNode: ESTree.Node): boolean => {
+  if (owner === null) return false;
+  return owner.kind === "block"
+    ? owner.block === enclosingNode
+    : owner.callee.body === enclosingNode;
+};
+
+type Traversal = {
+  readonly total: number;
+  readonly seen: ReadonlySet<SpecFunction>;
+};
+
+type Reached = Placed & { readonly through: Callee };
+
+const throughText = (reached: readonly Reached[]): string =>
+  reached
+    .filter((contribution) => contribution.count !== 0)
+    .map(
+      (contribution) =>
+        `${contribution.count} through the ${contribution.through.kind} \`${contribution.through.label}\``,
+    )
+    .join(", ");
 
 const overflowingIn = (reading: Reading, budget: number): readonly Report[] => {
   const carriedBy = (enclosingNode: ESTree.Node): readonly ESTree.CallExpression[] =>

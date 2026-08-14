@@ -1,12 +1,5 @@
 import type { Context, RuleMeta } from "@oxlint/plugins";
 
-export type RequiredFileEntry = {
-  readonly pattern: string;
-  readonly owner: string | null;
-  readonly reason: string;
-  readonly contentChecks: readonly string[];
-};
-
 export const REQUIRED_FILE_SCHEMA: RuleMeta["schema"] = [
   {
     type: "object",
@@ -40,6 +33,13 @@ type DeclaredRequiredFile = {
 
 const spelledTextOf = (held: unknown): string | null =>
   typeof held === "string" && held !== "" ? held : null;
+
+export type RequiredFileEntry = {
+  readonly pattern: string;
+  readonly owner: string | null;
+  readonly reason: string;
+  readonly contentChecks: readonly string[];
+};
 
 const entryOf = (declared: DeclaredRequiredFile): RequiredFileEntry | null => {
   const pattern = spelledTextOf(declared.pattern);

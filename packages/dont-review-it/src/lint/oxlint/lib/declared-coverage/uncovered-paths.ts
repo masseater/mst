@@ -7,12 +7,6 @@ import {
   type RegistrationRow,
 } from "./coverage-declarations.ts";
 
-export const UNCHECKED_AUTHORED_PATH_MESSAGE_ID = "uncheckedAuthoredPath";
-
-export const BROAD_UNCHECKED_DECLARATION_MESSAGE_ID = "broadUncheckedDeclaration";
-
-const EXTENSION_DECLARATION = /^\*\.[^*]+$/u;
-
 const matchesPattern = (asked: {
   readonly relativePath: string;
   readonly pattern: string;
@@ -45,6 +39,8 @@ export const opensPath = (asked: {
   return covered && excludingPatternsOf(asked).length === 0;
 };
 
+export const UNCHECKED_AUTHORED_PATH_MESSAGE_ID = "uncheckedAuthoredPath";
+
 const uncheckedFindingOf = (asked: {
   readonly relativePath: string;
   readonly checks: readonly DeclaredCheck[];
@@ -72,10 +68,14 @@ export const uncheckedPathFindings = (asked: {
     )
     .map((relativePath) => uncheckedFindingOf({ relativePath, checks: asked.checks }));
 
+const EXTENSION_DECLARATION = /^\*\.[^*]+$/u;
+
 export const coversWholeDirectory = (pattern: string): boolean =>
   segmentsOf({ path: pattern, separator: "/" })
     .slice(-1)
     .some((named) => named.includes("*") && !EXTENSION_DECLARATION.test(named));
+
+export const BROAD_UNCHECKED_DECLARATION_MESSAGE_ID = "broadUncheckedDeclaration";
 
 export const broadDeclarationFindings = (
   uncheckedDeclarations: readonly RegistrationRow[],

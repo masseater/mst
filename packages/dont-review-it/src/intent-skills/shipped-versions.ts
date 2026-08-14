@@ -23,9 +23,6 @@ const changelogPathOf = ({ manifest, config }: SkillPackage): string =>
 const changelogSourceOf = (scope: SkillPackage): string | null =>
   readUnlessMissing(() => readFileSync(changelogPathOf(scope), "utf8"));
 
-const relativeTo = ({ repositoryRoot }: SkillPackage, absolutePath: string): string =>
-  relative(repositoryRoot, absolutePath);
-
 export const declaredVersionOf = ({ manifest }: SkillPackage): string | null => {
   const declared = propertyValueOf(manifest.root, "version");
   return typeof declared === "string" ? declared : null;
@@ -41,6 +38,9 @@ const missingChangelog = (scope: SkillPackage): readonly RepositoryProblem[] => 
     },
   ];
 };
+
+const relativeTo = ({ repositoryRoot }: SkillPackage, absolutePath: string): string =>
+  relative(repositoryRoot, absolutePath);
 
 const missingVersionHeading = ({
   scope,

@@ -16,6 +16,88 @@ import {
 
 import type { ESTree } from "@oxlint/plugins";
 
+type NameOrigins = {
+  readonly imported: ReadonlySet<string>;
+  readonly initializers: ReadonlyMap<string, ESTree.Expression>;
+};
+
+const originsIn = (program: ESTree.Program): NameOrigins => ({
+  imported: new Set(
+    nodesOfType(program, "ImportDeclaration").flatMap((declaration) =>
+      declaration.specifiers.map((specifier) => specifier.local.name),
+    ),
+  ),
+  initializers: new Map(
+    nodesOfType(program, "VariableDeclarator").flatMap(
+      (declarator): readonly (readonly [string, ESTree.Expression])[] =>
+        declarator.id.type === "Identifier" && declarator.init !== null
+          ? [[declarator.id.name, declarator.init]]
+          : [],
+    ),
+  ),
+});
+
+const rootNameOf = (expression: ESTree.Expression): string | null => {
+  const written = unwrapSubject(expression);
+  if (written.type === "Identifier") return written.name;
+  if (written.type === "MemberExpression") return rootNameOf(written.object);
+  if (written.type === "CallExpression") return rootNameOf(written.callee);
+  if (written.type === "TaggedTemplateExpression") return rootNameOf(written.tag);
+  return null;
+};
+
+const isImportBound = ({
+  name,
+  origins,
+  seen,
+}: {
+  readonly name: string;
+  readonly origins: NameOrigins;
+  readonly seen: ReadonlySet<string>;
+}): boolean => {
+  if (origins.imported.has(name)) return true;
+  if (seen.has(name)) return false;
+
+  const initializer = origins.initializers.get(name);
+  const root = initializer === undefined ? null : rootNameOf(initializer);
+  return root !== null && isImportBound({ name: root, origins, seen: new Set([...seen, name]) });
+};
+
+const isInside = (
+  call: ESTree.CallExpression,
+  holders: readonly ESTree.CallExpression[],
+): boolean => holders.some((holder) => holder.start <= call.start && call.end <= holder.end);
+
+const reachesAnotherModule = ({
+  calls,
+  origins,
+  testApiNames,
+  testTimeCalls,
+}: {
+  readonly calls: readonly ESTree.CallExpression[];
+  readonly origins: NameOrigins;
+  readonly testApiNames: ReadonlySet<string>;
+  readonly testTimeCalls: readonly ESTree.CallExpression[];
+}): boolean =>
+  calls.some((call) => {
+    const root = rootNameOf(call.callee);
+    if (root === null || testApiNames.has(root)) return false;
+    if (!isImportBound({ name: root, origins, seen: new Set() })) return false;
+    return !isInside(call, testTimeCalls);
+  });
+
+const verdictOf = ({
+  runs,
+  groups,
+}: {
+  readonly runs: readonly (boolean | null)[];
+  readonly groups: readonly ESTree.CallExpression[];
+}): string | null => {
+  if (runs.some((run) => run !== false)) return null;
+  if (runs.length !== 0) return "heldBackTestBlocks";
+  return groups.length === 0 ? "noTestBlock" : "onlyGroupingBlocks";
+};
+
 const HELD_BACK_MODIFIERS: ReadonlySet<string> = new Set(["skip", "todo"]);
 
 const isHeldBack = (modifiers: readonly TestBlockModifierUse[]): boolean =>
@@ -54,88 +136,6 @@ const runsIn = (call: ESTree.CallExpression): boolean | null => {
 const calleeCallsOf = (call: ESTree.CallExpression): readonly ESTree.CallExpression[] => {
   const written = unwrapSubject(call.callee);
   return written.type === "CallExpression" ? [written, ...calleeCallsOf(written)] : [];
-};
-
-const isInside = (
-  call: ESTree.CallExpression,
-  holders: readonly ESTree.CallExpression[],
-): boolean => holders.some((holder) => holder.start <= call.start && call.end <= holder.end);
-
-const rootNameOf = (expression: ESTree.Expression): string | null => {
-  const written = unwrapSubject(expression);
-  if (written.type === "Identifier") return written.name;
-  if (written.type === "MemberExpression") return rootNameOf(written.object);
-  if (written.type === "CallExpression") return rootNameOf(written.callee);
-  if (written.type === "TaggedTemplateExpression") return rootNameOf(written.tag);
-  return null;
-};
-
-type NameOrigins = {
-  readonly imported: ReadonlySet<string>;
-  readonly initializers: ReadonlyMap<string, ESTree.Expression>;
-};
-
-const originsIn = (program: ESTree.Program): NameOrigins => ({
-  imported: new Set(
-    nodesOfType(program, "ImportDeclaration").flatMap((declaration) =>
-      declaration.specifiers.map((specifier) => specifier.local.name),
-    ),
-  ),
-  initializers: new Map(
-    nodesOfType(program, "VariableDeclarator").flatMap(
-      (declarator): readonly (readonly [string, ESTree.Expression])[] =>
-        declarator.id.type === "Identifier" && declarator.init !== null
-          ? [[declarator.id.name, declarator.init]]
-          : [],
-    ),
-  ),
-});
-
-const isImportBound = ({
-  name,
-  origins,
-  seen,
-}: {
-  readonly name: string;
-  readonly origins: NameOrigins;
-  readonly seen: ReadonlySet<string>;
-}): boolean => {
-  if (origins.imported.has(name)) return true;
-  if (seen.has(name)) return false;
-
-  const initializer = origins.initializers.get(name);
-  const root = initializer === undefined ? null : rootNameOf(initializer);
-  return root !== null && isImportBound({ name: root, origins, seen: new Set([...seen, name]) });
-};
-
-const reachesAnotherModule = ({
-  calls,
-  origins,
-  testApiNames,
-  testTimeCalls,
-}: {
-  readonly calls: readonly ESTree.CallExpression[];
-  readonly origins: NameOrigins;
-  readonly testApiNames: ReadonlySet<string>;
-  readonly testTimeCalls: readonly ESTree.CallExpression[];
-}): boolean =>
-  calls.some((call) => {
-    const root = rootNameOf(call.callee);
-    if (root === null || testApiNames.has(root)) return false;
-    if (!isImportBound({ name: root, origins, seen: new Set() })) return false;
-    return !isInside(call, testTimeCalls);
-  });
-
-const verdictOf = ({
-  runs,
-  groups,
-}: {
-  readonly runs: readonly (boolean | null)[];
-  readonly groups: readonly ESTree.CallExpression[];
-}): string | null => {
-  if (runs.some((run) => run !== false)) return null;
-  if (runs.length !== 0) return "heldBackTestBlocks";
-  return groups.length === 0 ? "noTestBlock" : "onlyGroupingBlocks";
 };
 
 const messageIdFor = ({

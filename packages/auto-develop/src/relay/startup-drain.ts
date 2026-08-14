@@ -16,28 +16,6 @@ import { startupDrainDeliveryId, synthesizeEnvelope } from "./synth.ts";
 
 import type { EventEnvelope } from "../contract/envelope.ts";
 
-/** @canonical-values auto-develop.check-fold-verdict */
-const CHECK_FOLD_VERDICTS = ["success", "pending", "failure", "none"] as const;
-
-const CHECK_FOLD_VERDICT = {
-  success: CHECK_FOLD_VERDICTS[0],
-  pending: CHECK_FOLD_VERDICTS[1],
-  failure: CHECK_FOLD_VERDICTS[2],
-  none: CHECK_FOLD_VERDICTS[3],
-} as const;
-
-const foldCheckBuckets = (
-  buckets: readonly CheckBucket[],
-): (typeof CHECK_FOLD_VERDICTS)[number] => {
-  if (buckets.length === 0) return CHECK_FOLD_VERDICT.success;
-  if (buckets.includes(CHECK_BUCKET.pending)) return CHECK_FOLD_VERDICT.pending;
-  if (buckets.includes(CHECK_BUCKET.fail)) return CHECK_FOLD_VERDICT.failure;
-  if (buckets.includes(CHECK_BUCKET.cancel) || buckets.includes(CHECK_BUCKET.skipping)) {
-    return CHECK_FOLD_VERDICT.none;
-  }
-  return CHECK_FOLD_VERDICT.success;
-};
-
 const reviewRequestedEnvelope = (pull: GithubPullSummary): EventEnvelope =>
   synthesizeEnvelope({
     filtered: {
@@ -105,6 +83,28 @@ const ciFailureEnvelope = (pull: GithubPullSummary): EventEnvelope =>
 
 export const indicatesSummaryConflict = (pull: GithubPullSummary): boolean =>
   pull.mergeable === "CONFLICTING" || pull.mergeStateStatus === "DIRTY";
+
+/** @canonical-values auto-develop.check-fold-verdict */
+const CHECK_FOLD_VERDICTS = ["success", "pending", "failure", "none"] as const;
+
+const CHECK_FOLD_VERDICT = {
+  success: CHECK_FOLD_VERDICTS[0],
+  pending: CHECK_FOLD_VERDICTS[1],
+  failure: CHECK_FOLD_VERDICTS[2],
+  none: CHECK_FOLD_VERDICTS[3],
+} as const;
+
+const foldCheckBuckets = (
+  buckets: readonly CheckBucket[],
+): (typeof CHECK_FOLD_VERDICTS)[number] => {
+  if (buckets.length === 0) return CHECK_FOLD_VERDICT.success;
+  if (buckets.includes(CHECK_BUCKET.pending)) return CHECK_FOLD_VERDICT.pending;
+  if (buckets.includes(CHECK_BUCKET.fail)) return CHECK_FOLD_VERDICT.failure;
+  if (buckets.includes(CHECK_BUCKET.cancel) || buckets.includes(CHECK_BUCKET.skipping)) {
+    return CHECK_FOLD_VERDICT.none;
+  }
+  return CHECK_FOLD_VERDICT.success;
+};
 
 const authorWorkEnvelopes = async (work: {
   readonly pull: GithubPullSummary;

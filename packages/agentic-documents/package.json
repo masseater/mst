@@ -16,8 +16,7 @@
   },
   "files": [
     "dist",
-    "skills",
-    "src"
+    "skills"
   ],
   "type": "module",
   "sideEffects": false,
@@ -25,6 +24,9 @@
     "./package.json": "./package.json"
   },
   "publishConfig": {
+    "bin": {
+      "agentic-documents": "./dist/cli.mjs"
+    },
     "access": "public"
   },
   "scripts": {
@@ -36,7 +38,8 @@
     "typecheck": "spool -- tsc -p ."
   },
   "dependencies": {
-    "@mst/repository-checks": "workspace:*",
+    "@mst/ai-native": "workspace:*",
+    "@opentelemetry/api": "catalog:",
     "es-toolkit": "catalog:",
     "remark-frontmatter": "5.0.0",
     "remark-gfm": "4.0.1",
@@ -45,7 +48,7 @@
     "yaml": "catalog:"
   },
   "devDependencies": {
-    "@mst/ai-native": "workspace:*",
+    "@mst/repository-checks": "workspace:*",
     "@tanstack/intent": "catalog:",
     "@types/mdast": "4.0.4",
     "@types/node": "catalog:",

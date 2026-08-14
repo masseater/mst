@@ -2,15 +2,15 @@ import { findNodeAtLocation, getNodeValue, type Node } from "jsonc-parser";
 
 import type { ScannedFile } from "../lint/oxlint/lib/canonical-values/source-files.ts";
 
+export const propertyValueOf = (root: Node, named: string): unknown => {
+  const node = findNodeAtLocation(root, [named]);
+  return node === undefined ? undefined : getNodeValue(node);
+};
+
 export type PublishedManifest = {
   readonly file: ScannedFile;
   readonly source: string;
   readonly root: Node;
-};
-
-export const propertyValueOf = (root: Node, named: string): unknown => {
-  const node = findNodeAtLocation(root, [named]);
-  return node === undefined ? undefined : getNodeValue(node);
 };
 
 export const lineOfProperty = ({

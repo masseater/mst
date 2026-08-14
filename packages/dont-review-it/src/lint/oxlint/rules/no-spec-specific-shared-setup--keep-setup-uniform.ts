@@ -29,16 +29,6 @@ import type { LiteralNode } from "../lib/canonical-values/literal-position.ts";
 
 const SHARED_SETUP_FILES_OPTION = "sharedSetupFiles";
 
-const IDENTITY_MESSAGES = {
-  branch: "specIdentifyingBranch",
-  argument: "specIdentifyingArgument",
-};
-
-const NAMING_MESSAGES = {
-  branch: "specNamingBranch",
-  argument: "specNamingArgument",
-};
-
 type SpecPathReader = () => readonly string[];
 
 const configurationVisitor = (asked: {
@@ -62,6 +52,16 @@ const configurationVisitor = (asked: {
       asked.inspection.report({ node, messageId: "specSpecificRunnerSetting", data: { spelled } });
     },
   };
+};
+
+const IDENTITY_MESSAGES = {
+  branch: "specIdentifyingBranch",
+  argument: "specIdentifyingArgument",
+};
+
+const NAMING_MESSAGES = {
+  branch: "specNamingBranch",
+  argument: "specNamingArgument",
 };
 
 const setupVisitor = (asked: {

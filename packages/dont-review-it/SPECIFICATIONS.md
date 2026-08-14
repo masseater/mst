@@ -77,6 +77,18 @@
 - AI が読む形では、記号も桁揃えも持たせずに 1 行 1 観点で並べる
 - 違反を見つけた観点を、その件数とともに残す
 
+## 出荷できるパッケージの検査
+
+[`specs/shippable-packages.spec.ts`](specs/shippable-packages.spec.ts)
+
+- 公開できるパッケージが private なワークスペースを依存に載せていることを報告する
+- 同じワークスペースを開発依存に置いた公開できるパッケージを黙って通す
+- 公開後に実行時が解決する入口が型注釈を持つソースを指していることを報告する
+- 公開後の入口を publishConfig が成果物へ置き換えているパッケージを黙って通す
+- 型を渡す条件がソースを指していても報告しない
+- 公開後の入口が指す場所を files の許可リストが載せていないことを報告する
+- private なパッケージを、公開できるものとして数えない
+
 ## 出荷する skill と宣言した版の突き合わせ
 
 [`specs/shipped-skill-versions.spec.ts`](specs/shipped-skill-versions.spec.ts)

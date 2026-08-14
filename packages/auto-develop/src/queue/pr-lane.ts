@@ -1,16 +1,16 @@
+export const prLaneOf = (prNumber: number): string => `pr-${prNumber}`;
+
+export type PrFilter = {
+  readonly targetPrs: readonly number[];
+  readonly excludedPrs: readonly number[];
+};
+
 const PR_LANE_PATTERN = /^pr-([1-9]\d*)$/;
 
 export const prLaneNumber = (lane: string): number | null => {
   const matched = PR_LANE_PATTERN.exec(lane);
   const digits = matched?.[1];
   return digits === undefined ? null : Number(digits);
-};
-
-export const prLaneOf = (prNumber: number): string => `pr-${prNumber}`;
-
-export type PrFilter = {
-  readonly targetPrs: readonly number[];
-  readonly excludedPrs: readonly number[];
 };
 
 export const laneAdmitted = (admission: {

@@ -25,14 +25,14 @@ export const syncMain = async (sync: {
   readonly targetBranch?: string;
   readonly log: Logger;
 }): Promise<void> => {
-  const targetBranch = sync.targetBranch ?? DEFAULT_BRANCH_FALLBACK;
   const rootOutput = await sync.git.run({
     args: ["rev-parse", "--show-toplevel"],
     cwd: sync.startDir,
   });
   const repoDir = rootOutput.stdout.trim();
-  const run = (handedArgs: readonly string[]) => sync.git.run({ args: handedArgs, cwd: repoDir });
+  const targetBranch = sync.targetBranch ?? DEFAULT_BRANCH_FALLBACK;
   sync.log.info({ targetBranch }, "syncing repository to the target branch");
+  const run = (handedArgs: readonly string[]) => sync.git.run({ args: handedArgs, cwd: repoDir });
   await checkoutIfNeeded({ run, targetBranch, log: sync.log });
   await run(["fetch", "origin"]);
   await run(["reset", "--hard", `origin/${targetBranch}`]);

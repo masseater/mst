@@ -18,12 +18,12 @@ const CANONICAL_BLOCK_SPELLING = "it";
 
 const BLOCK_SPELLING_OPTION = "blockSpelling";
 
-const RUNNER_MODULES_OPTION = "runnerModules";
-
 const blockSpellingFrom = (ruleOptions: Readonly<Options>): string => {
   const configured = optionsRecord(ruleOptions)?.[BLOCK_SPELLING_OPTION];
   return typeof configured === "string" ? configured : CANONICAL_BLOCK_SPELLING;
 };
+
+const RUNNER_MODULES_OPTION = "runnerModules";
 
 const runnerModulesFrom = (ruleOptions: Readonly<Options>): readonly string[] => {
   const configured = optionsRecord(ruleOptions)?.[RUNNER_MODULES_OPTION];

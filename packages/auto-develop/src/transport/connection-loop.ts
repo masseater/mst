@@ -47,59 +47,6 @@ export const createConnectionLoop = (wiring: {
 }): { readonly run: () => Promise<void> } => {
   const { runtime, controllers, resumePositions, streamReader } = wiring;
 
-  const requestStream = async (attemptSignal: AbortSignal): Promise<Response> => {
-    const authorization = await runtime.credentials.authorizationFor({
-      url: runtime.streamUrl,
-      signal: attemptSignal,
-    });
-    const resumeId = resumePositions.get("last");
-    return runtime.fetchImpl(runtime.streamUrl, {
-      signal: attemptSignal,
-      headers: {
-        accept: "text/event-stream",
-        authorization,
-        ...(resumeId === undefined ? {} : { "last-event-id": resumeId }),
-      },
-    });
-  };
-
-  const openStream = async (opening: {
-    readonly windowRemainingMs: number;
-    readonly disconnectSignal: AbortSignal;
-  }): Promise<Response> => {
-    const deadlineHalt = new AbortController();
-    const deadlineTimer = Number.isFinite(opening.windowRemainingMs)
-      ? setTimeout(() => {
-          deadlineHalt.abort(new Error("SSE retry deadline reached"));
-        }, opening.windowRemainingMs)
-      : undefined;
-    try {
-      const produced = await requestStream(
-        AbortSignal.any([opening.disconnectSignal, deadlineHalt.signal]),
-      );
-      if (!produced.ok) classifyResponse(produced, runtime.credentials);
-      return produced;
-    } catch (openFailure) {
-      if (deadlineHalt.signal.aborted) {
-        throw new Error("SSE retry deadline exceeded", { cause: openFailure });
-      }
-      throw openFailure;
-    } finally {
-      if (deadlineTimer !== undefined) clearTimeout(deadlineTimer);
-    }
-  };
-
-  const attemptStream = async (windowRemainingMs: number): Promise<"client" | "server"> => {
-    const disconnectHalt = new AbortController();
-    controllers.set("current", disconnectHalt);
-    const produced = await openStream({
-      windowRemainingMs,
-      disconnectSignal: disconnectHalt.signal,
-    });
-    if (produced.body === null) return "server";
-    return streamReader.readStream(produced.body);
-  };
-
   const windowElapsedMs = (retry: RetryState): number =>
     retry.windowStartMs === undefined ? 0 : runtime.now() - retry.windowStartMs;
 
@@ -133,6 +80,56 @@ export const createConnectionLoop = (wiring: {
     return { ...retry, backoffMs: Math.min(retry.backoffMs * 2, BACKOFF_CAP_MS) };
   };
 
+  const requestStream = async (attemptSignal: AbortSignal): Promise<Response> => {
+    const authorization = await runtime.credentials.authorizationFor({
+      url: runtime.streamUrl,
+      signal: attemptSignal,
+    });
+    const resumeId = resumePositions.get("last");
+    return runtime.fetchImpl(runtime.streamUrl, {
+      signal: attemptSignal,
+      headers: {
+        accept: "text/event-stream",
+        authorization,
+        ...(resumeId === undefined ? {} : { "last-event-id": resumeId }),
+      },
+    });
+  };
+  const openStream = async (opening: {
+    readonly windowRemainingMs: number;
+    readonly disconnectSignal: AbortSignal;
+  }): Promise<Response> => {
+    const deadlineHalt = new AbortController();
+    const deadlineTimer = Number.isFinite(opening.windowRemainingMs)
+      ? setTimeout(() => {
+          deadlineHalt.abort(new Error("SSE retry deadline reached"));
+        }, opening.windowRemainingMs)
+      : undefined;
+    try {
+      const produced = await requestStream(
+        AbortSignal.any([opening.disconnectSignal, deadlineHalt.signal]),
+      );
+      if (!produced.ok) classifyResponse(produced, runtime.credentials);
+      return produced;
+    } catch (openFailure) {
+      if (deadlineHalt.signal.aborted) {
+        throw new Error("SSE retry deadline exceeded", { cause: openFailure });
+      }
+      throw openFailure;
+    } finally {
+      if (deadlineTimer !== undefined) clearTimeout(deadlineTimer);
+    }
+  };
+  const attemptStream = async (windowRemainingMs: number): Promise<"client" | "server"> => {
+    const disconnectHalt = new AbortController();
+    controllers.set("current", disconnectHalt);
+    const produced = await openStream({
+      windowRemainingMs,
+      disconnectSignal: disconnectHalt.signal,
+    });
+    if (produced.body === null) return "server";
+    return streamReader.readStream(produced.body);
+  };
   const runAttemptCycle = async (
     retry: RetryState,
   ): Promise<"settled" | { readonly retry: RetryState; readonly failure: unknown }> => {

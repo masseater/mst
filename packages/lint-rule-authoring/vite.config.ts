@@ -20,6 +20,7 @@ export default defineConfig({
   },
   pack: {
     entry: ["src/cli.ts", "src/index.ts", "src/plugin.ts"],
+    external: [/^vite-plus/],
     dts: {
       tsgo: true,
     },

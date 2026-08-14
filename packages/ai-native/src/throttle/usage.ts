@@ -1,5 +1,12 @@
 import { parseArgs } from "node:util";
 
+export type Invocation = {
+  timeoutSec: number;
+  executable: string;
+  args: readonly string[];
+  commandLine: string;
+};
+
 const USAGE = `Usage: throttle [--timeout <seconds>] -- <command> [args...]
 
 Runs the command while keeping the number of simultaneous executions that
@@ -26,13 +33,6 @@ Exit codes:
   1  the wrapped command failed, was killed, could not be started, ran past
      the timeout, or the wrapper could not get or release a slot
   2  throttle itself was called incorrectly`;
-
-export type Invocation = {
-  timeoutSec: number;
-  executable: string;
-  args: readonly string[];
-  commandLine: string;
-};
 
 const parsedTimeoutSeconds = (head: readonly string[]): { seconds: number } | string => {
   const raw = ((): string | undefined | Error => {

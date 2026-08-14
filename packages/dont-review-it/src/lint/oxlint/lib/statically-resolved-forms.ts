@@ -4,14 +4,6 @@ import type { AstFields } from "./ast-node.ts";
 
 export const STATICALLY_RESOLVED_FORMS: readonly string[] = ["URL", "import.meta.resolve"];
 
-const WRAPPED_FIELD_BY_TYPE: ReadonlyMap<string, string> = new Map([
-  ["AwaitExpression", "argument"],
-  ["ChainExpression", "expression"],
-  ["ParenthesizedExpression", "expression"],
-  ["TSAsExpression", "expression"],
-  ["TSNonNullExpression", "expression"],
-]);
-
 const CALLED_TYPES: ReadonlySet<string> = new Set(["CallExpression", "NewExpression"]);
 
 const spelledNameOf = (node: AstFields): string | null => {
@@ -26,6 +18,14 @@ const dottedNameOf = (parts: readonly unknown[]): string | null => {
   const spelled = parts.map((part) => spelledNameOf(part as AstFields));
   return spelled.includes(null) ? null : spelled.join(".");
 };
+
+const WRAPPED_FIELD_BY_TYPE: ReadonlyMap<string, string> = new Map([
+  ["AwaitExpression", "argument"],
+  ["ChainExpression", "expression"],
+  ["ParenthesizedExpression", "expression"],
+  ["TSAsExpression", "expression"],
+  ["TSNonNullExpression", "expression"],
+]);
 
 const carriedInsideOf = (node: AstFields): AstFields | null => {
   const nodeType = nodeTypeOf(node);

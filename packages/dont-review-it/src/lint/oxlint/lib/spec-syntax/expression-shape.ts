@@ -24,14 +24,14 @@ const FORWARDED_BY_TYPE: ReadonlyMap<string, string> = new Map([
 
 const UNORDERED_MEMBERS_TYPE = "ObjectExpression";
 
-const spelledOut = (held: unknown): string => JSON.stringify(held ?? null);
-
 const spelledTemplate = (node: AstFields): string | null => {
   const substitutions = [node.expressions].flat();
   const [piece] = [node.quasis].flat();
   const spelling = isAstFields(piece) && isAstFields(piece.value) ? piece.value.cooked : null;
   return substitutions.length === 0 && typeof spelling === "string" ? spelling : null;
 };
+
+const spelledOut = (held: unknown): string => JSON.stringify(held ?? null);
 
 const literalShape = (node: AstFields): string => {
   const pattern = node.regex;

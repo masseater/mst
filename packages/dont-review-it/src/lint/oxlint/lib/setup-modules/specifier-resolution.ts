@@ -11,7 +11,21 @@ import { aliasedPathsFor } from "../tsconfig-path-aliases.ts";
 import { buildSetupExportSpecifierIndex } from "./export-specifier-index.ts";
 import { declaresPublicSubpath, isInsideDirectory } from "./package-entries.ts";
 
-const SCOPE_PREFIX = "@";
+const rememberedIndexOf = memoize(buildSetupExportSpecifierIndex);
+
+const entryFilesUnder = (packageDirectory: string, specifier: string): readonly string[] =>
+  [...rememberedIndexOf(packageDirectory)]
+    .filter(([, spelled]) => spelled === specifier)
+    .map(([file]) => file);
+
+export const relativeSpecifierTo = (fromFile: string, checked: string): string => {
+  const spelled = toPosixPath(relative(dirname(fromFile), checked));
+  return spelled.startsWith(".") ? spelled : `./${spelled}`;
+};
+
+export type ResolvedModule =
+  | { readonly kind: "repositoryFile"; readonly path: string }
+  | { readonly kind: "publicEntry"; readonly packageDirectory: string };
 
 const MODULE_SUFFIXES: readonly string[] = [
   ".ts",
@@ -31,10 +45,6 @@ const REWRITTEN_SUFFIXES: readonly (readonly [RegExp, string])[] = [
   [/\.cjs$/u, ".cts"],
 ];
 
-export type ResolvedModule =
-  | { readonly kind: "repositoryFile"; readonly path: string }
-  | { readonly kind: "publicEntry"; readonly packageDirectory: string };
-
 const candidatePathsFor = (base: string): readonly string[] => [
   base,
   ...REWRITTEN_SUFFIXES.map(([written, source]) => base.replace(written, source)),
@@ -46,6 +56,8 @@ const existingModuleAt = (base: string): ResolvedModule | null => {
   const found = candidatePathsFor(base).find(isFile);
   return found === undefined ? null : { kind: "repositoryFile", path: found };
 };
+
+const SCOPE_PREFIX = "@";
 
 export const packageReferenceOf = (
   specifier: string,
@@ -118,18 +130,6 @@ export type CouplingRequest = {
   readonly specifier: string;
   readonly fromFile: string;
   readonly workspaceRoot: string;
-};
-
-const rememberedIndexOf = memoize(buildSetupExportSpecifierIndex);
-
-const entryFilesUnder = (packageDirectory: string, specifier: string): readonly string[] =>
-  [...rememberedIndexOf(packageDirectory)]
-    .filter(([, spelled]) => spelled === specifier)
-    .map(([file]) => file);
-
-export const relativeSpecifierTo = (fromFile: string, checked: string): string => {
-  const spelled = toPosixPath(relative(dirname(fromFile), checked));
-  return spelled.startsWith(".") ? spelled : `./${spelled}`;
 };
 
 const aliasedFilesFor = (asked: CouplingRequest): readonly string[] =>

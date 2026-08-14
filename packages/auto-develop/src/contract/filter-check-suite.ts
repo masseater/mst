@@ -20,8 +20,8 @@ const completedSuiteShape = (
   const checkSuite = asRecord(delivered.check_suite);
   const conclusion = checkSuite?.conclusion;
   const headSha = checkSuite?.head_sha;
-  const pullRequests = checkSuite?.pull_requests;
   if (!isCheckSuiteConclusion(conclusion) || typeof headSha !== "string") return null;
+  const pullRequests = checkSuite?.pull_requests;
   if (!Array.isArray(pullRequests)) return null;
   const pullNumber = asRecord(pullRequests[0])?.number;
   if (typeof pullNumber !== "number") return null;

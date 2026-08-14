@@ -13,8 +13,6 @@ import type { WorkflowChecksConfig } from "../config.ts";
 
 const COMMIT_SHA_PATTERN = /^[0-9a-f]{40}$/u;
 
-const REFERENCE_SEPARATOR = "@";
-
 const CARRIES_ITS_OWN_COMMIT = ["./", "docker://"];
 
 const referenceEntries = ({
@@ -35,6 +33,8 @@ const referenceEntries = ({
     return referenceEntry === null ? [] : [referenceEntry];
   });
 };
+
+const REFERENCE_SEPARATOR = "@";
 
 const refOf = (reference: string): string => {
   const separator = reference.lastIndexOf(REFERENCE_SEPARATOR);

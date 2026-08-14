@@ -19,23 +19,6 @@ type MockVocabulary = {
   readonly replacementMembers: ReadonlySet<string>;
 };
 
-type RunnerReach = {
-  readonly namespace: boolean;
-  readonly mock: boolean;
-};
-
-const REACHED_NOTHING: RunnerReach = { namespace: false, mock: false };
-
-const REACHED_NAMESPACE: RunnerReach = { namespace: true, mock: false };
-
-const REACHED_MOCK: RunnerReach = { namespace: false, mock: true };
-
-type ReachLookup = {
-  readonly scopeAt: (node: ESTree.Node) => Scope;
-  readonly vocabulary: MockVocabulary;
-  readonly tracedBindings: ReadonlySet<Variable>;
-};
-
 const listedNames = (ruleOptions: Readonly<Options>, named: string): readonly string[] | null => {
   const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) return null;
@@ -73,8 +56,23 @@ const mockVocabularyFrom = (ruleOptions: Readonly<Options>): MockVocabulary => (
   ),
 });
 
+type RunnerReach = {
+  readonly namespace: boolean;
+  readonly mock: boolean;
+};
+
+const REACHED_NOTHING: RunnerReach = { namespace: false, mock: false };
+
 const soonestReach = (reached: readonly RunnerReach[]): RunnerReach =>
   reached.find((reach) => reach.namespace || reach.mock) ?? REACHED_NOTHING;
+
+const REACHED_NAMESPACE: RunnerReach = { namespace: true, mock: false };
+
+type ReachLookup = {
+  readonly scopeAt: (node: ESTree.Node) => Scope;
+  readonly vocabulary: MockVocabulary;
+  readonly tracedBindings: ReadonlySet<Variable>;
+};
 
 const qualifiedNamespaceReach = (
   node: ESTree.MemberExpression,
@@ -92,6 +90,8 @@ const qualifiedNamespaceReach = (
     ? REACHED_NAMESPACE
     : REACHED_NOTHING;
 };
+
+const REACHED_MOCK: RunnerReach = { namespace: false, mock: true };
 
 const memberReach = (node: ESTree.MemberExpression, lookup: ReachLookup): RunnerReach =>
   runnerReachOf(node.object, lookup).mock ? REACHED_MOCK : qualifiedNamespaceReach(node, lookup);

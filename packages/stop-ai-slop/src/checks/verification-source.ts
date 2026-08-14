@@ -32,14 +32,6 @@ type ExportAbsenceVerification = {
 
 export type AbsenceVerification = FileAbsenceVerification | ExportAbsenceVerification;
 
-export const exportVerificationLocator = ({
-  modulePath,
-  exportName,
-}: {
-  readonly modulePath: string;
-  readonly exportName: string;
-}): string => JSON.stringify(["declaration", modulePath, exportName]);
-
 const parsedSource = (file: string, source: string): ParseResult => {
   const parsedNode = parseSync(file, source, { preserveParens: false });
   const [problem] = parsedNode.errors;
@@ -80,11 +72,11 @@ const namespaceImports = (parsedNode: ParseResult): ReadonlyMap<string, string> 
 const callExpression = (held: Argument | Expression | null): CallExpression | null =>
   held?.type === "CallExpression" ? held : null;
 
-const identifierName = (held: Node | null): string | null =>
-  held?.type === "Identifier" ? held.name : null;
-
 const literalValue = (held: Argument | null): unknown =>
   held?.type === "Literal" ? held.value : null;
+
+const identifierName = (held: Node | null): string | null =>
+  held?.type === "Identifier" ? held.name : null;
 
 const staticMember = (
   held: Expression,
@@ -93,9 +85,6 @@ const staticMember = (
   if (held.type !== "MemberExpression" || held.computed) return null;
   return identifierName(held.property) === propertyName ? { object: held.object } : null;
 };
-
-const onlyArgument = (call: CallExpression): Argument | null =>
-  call.arguments.length === 1 ? (call.arguments[0] as Argument) : null;
 
 const repositoryPath = (held: string): string | null => {
   if (held.startsWith("/") || /^[A-Za-z]:[\\/]/u.test(held)) return null;
@@ -115,6 +104,9 @@ const importedBindingIsUnshadowed = ({
   readonly candidate: string | null;
 }): boolean =>
   candidate !== null && importedBindings.includes(candidate) && !localBindings.has(candidate);
+
+const onlyArgument = (call: CallExpression): Argument | null =>
+  call.arguments.length === 1 ? (call.arguments[0] as Argument) : null;
 
 const argumentOfImportedCall = ({
   call,
@@ -259,6 +251,14 @@ const undefinedPropertyTargetFrom = ({
   const exportName = identifierName(expectedValue.property);
   return namespaceBinding === null || exportName === null ? null : { namespaceBinding, exportName };
 };
+
+export const exportVerificationLocator = ({
+  modulePath,
+  exportName,
+}: {
+  readonly modulePath: string;
+  readonly exportName: string;
+}): string => JSON.stringify(["declaration", modulePath, exportName]);
 
 const exportVerificationFrom = ({
   file,

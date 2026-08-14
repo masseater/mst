@@ -13,14 +13,14 @@ import { formatElapsed } from "./format-elapsed.ts";
 import type { Writable } from "node:stream";
 import type { Command } from "./parse-command.ts";
 
+export const isPassthroughSignalled = (ciSignal: string | undefined): boolean =>
+  ciSignal !== undefined && ciSignal !== "" && ciSignal !== "false";
+
 export type PassthroughDeps = {
   stdout: Writable;
   stderr: Writable;
   monotonicNow: () => number;
 };
-
-export const isPassthroughSignalled = (ciSignal: string | undefined): boolean =>
-  ciSignal !== undefined && ciSignal !== "" && ciSignal !== "false";
 
 const reportStartFailure = async (input: {
   deps: PassthroughDeps;

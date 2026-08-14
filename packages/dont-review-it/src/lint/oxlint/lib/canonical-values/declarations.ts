@@ -8,15 +8,10 @@ import {
   RETIRED_ANNOTATION_TAGS,
 } from "./annotation.ts";
 
-export type CanonicalValuesDeclaration = {
-  readonly binding: string;
-  readonly bindingStart: number;
-  readonly conceptId: string;
-  readonly line: number;
-  readonly annotationStart: number;
-  readonly declarationStart: number;
-  readonly declarationEnd: number;
-};
+const DEFAULT_SOURCE_NAME = "source.ts";
+
+const withoutRetiredTags = (commentValue: string): string =>
+  RETIRED_ANNOTATION_TAGS.reduce((remaining, tag) => remaining.replaceAll(tag, ""), commentValue);
 
 /** @canonical-values canonical-values.invalid-declaration-reason */
 export const INVALID_CANONICAL_DECLARATION_REASONS = {
@@ -51,65 +46,19 @@ export type CanonicalValuesTextProblem =
       readonly conceptId: string;
     };
 
+export type CanonicalValuesDeclaration = {
+  readonly binding: string;
+  readonly bindingStart: number;
+  readonly conceptId: string;
+  readonly line: number;
+  readonly annotationStart: number;
+  readonly declarationStart: number;
+  readonly declarationEnd: number;
+};
+
 export type CanonicalValuesTextScan = {
   readonly declarations: readonly CanonicalValuesDeclaration[];
   readonly problems: readonly CanonicalValuesTextProblem[];
-};
-
-type ProgramStatement = ParseResult["program"]["body"][number];
-
-type VariableDeclarationFields = Extract<
-  ProgramStatement,
-  { readonly type: "VariableDeclaration" }
->;
-
-type ValidationResult<Value> =
-  | { readonly value: Value }
-  | { readonly problem: CanonicalValuesTextScan };
-
-const COMMENT_BODY_OFFSET = 2;
-
-const DEFAULT_SOURCE_NAME = "source.ts";
-
-const JSDOC_COMMENT_VALUE_PREFIX = "*";
-
-const CANONICAL_RULE_BASENAMES: ReadonlySet<string> = new Set([
-  "no-local-finite-value-set--use-or-register-canonical-values",
-  "no-strict-canonical-literal-use--use-canonical-import",
-]);
-
-const LINT_DISABLE_DIRECTIVE =
-  /\b(?:eslint|oxlint)-disable(?:-line|-next-line)?(?:[ \t]+([^\n]*))?/gu;
-
-const lineAt = (sourceText: string, offset: number): number =>
-  sourceText.slice(0, offset).split("\n").length;
-
-const normalizedCommentLines = (commentValue: string): readonly string[] =>
-  commentValue.split("\n").map((line) => line.replace(/^\s*\*?\s?/u, "").trim());
-
-const canonicalAnnotationLines = (commentValue: string): readonly string[] =>
-  normalizedCommentLines(commentValue).filter((line) => line.includes(CANONICAL_VALUES_TAG));
-
-const withoutRetiredTags = (commentValue: string): string =>
-  RETIRED_ANNOTATION_TAGS.reduce((remaining, tag) => remaining.replaceAll(tag, ""), commentValue);
-
-const isNodeFields = (
-  candidate: unknown,
-): candidate is { readonly end: number; readonly start: number; readonly type: string } =>
-  candidate !== null &&
-  typeof candidate === "object" &&
-  "type" in candidate &&
-  typeof candidate.type === "string" &&
-  "start" in candidate &&
-  typeof candidate.start === "number" &&
-  "end" in candidate &&
-  typeof candidate.end === "number";
-
-const variableDeclarationIn = (statement: ProgramStatement): VariableDeclarationFields | null => {
-  if (statement.type === "VariableDeclaration") return statement;
-  if (statement.type !== "ExportNamedDeclaration") return null;
-  const { declaration } = statement;
-  return declaration?.type === "VariableDeclaration" ? declaration : null;
 };
 
 const invalidDeclaration = (input: {
@@ -127,6 +76,18 @@ const invalidDeclaration = (input: {
     },
   ],
 });
+
+type ValidationResult<Value> =
+  | { readonly value: Value }
+  | { readonly problem: CanonicalValuesTextScan };
+
+const JSDOC_COMMENT_VALUE_PREFIX = "*";
+
+const normalizedCommentLines = (commentValue: string): readonly string[] =>
+  commentValue.split("\n").map((line) => line.replace(/^\s*\*?\s?/u, "").trim());
+
+const canonicalAnnotationLines = (commentValue: string): readonly string[] =>
+  normalizedCommentLines(commentValue).filter((line) => line.includes(CANONICAL_VALUES_TAG));
 
 const annotationConceptId = (input: {
   readonly comment: Comment;
@@ -203,6 +164,20 @@ const ownerStatement = (input: {
   return { value: owner };
 };
 
+type ProgramStatement = ParseResult["program"]["body"][number];
+
+type VariableDeclarationFields = Extract<
+  ProgramStatement,
+  { readonly type: "VariableDeclaration" }
+>;
+
+const variableDeclarationIn = (statement: ProgramStatement): VariableDeclarationFields | null => {
+  if (statement.type === "VariableDeclaration") return statement;
+  if (statement.type !== "ExportNamedDeclaration") return null;
+  const { declaration } = statement;
+  return declaration?.type === "VariableDeclaration" ? declaration : null;
+};
+
 const runtimeVariable = (input: {
   readonly conceptId: string;
   readonly line: number;
@@ -235,6 +210,18 @@ const runtimeVariable = (input: {
   }
   return { value: variable };
 };
+
+const isNodeFields = (
+  candidate: unknown,
+): candidate is { readonly end: number; readonly start: number; readonly type: string } =>
+  candidate !== null &&
+  typeof candidate === "object" &&
+  "type" in candidate &&
+  typeof candidate.type === "string" &&
+  "start" in candidate &&
+  typeof candidate.start === "number" &&
+  "end" in candidate &&
+  typeof candidate.end === "number";
 
 const identifierBinding = (input: {
   readonly conceptId: string;
@@ -307,6 +294,11 @@ const declarationFor = (input: {
   };
 };
 
+const COMMENT_BODY_OFFSET = 2;
+
+const lineAt = (sourceText: string, offset: number): number =>
+  sourceText.slice(0, offset).split("\n").length;
+
 const retiredProblemsIn = (
   sourceText: string,
   comment: Comment,
@@ -316,6 +308,14 @@ const retiredProblemsIn = (
     line: lineAt(sourceText, comment.start + COMMENT_BODY_OFFSET + comment.value.indexOf(tag)),
     tag,
   }));
+
+const CANONICAL_RULE_BASENAMES: ReadonlySet<string> = new Set([
+  "no-local-finite-value-set--use-or-register-canonical-values",
+  "no-strict-canonical-literal-use--use-canonical-import",
+]);
+
+const LINT_DISABLE_DIRECTIVE =
+  /\b(?:eslint|oxlint)-disable(?:-line|-next-line)?(?:[ \t]+([^\n]*))?/gu;
 
 const canonicalRuleSuppressionProblemsIn = (
   sourceText: string,

@@ -16,18 +16,18 @@ import type { ESTree, Scope, Variable } from "@oxlint/plugins";
 
 const RULE_NAME = "no-replaced-double-behaviour--let-the-replaced-module-answer";
 
-const MOCK_VIEW_MEMBER = "mocked";
-
-type Reach = {
-  readonly lookup: NamespaceLookup;
-  readonly followed: readonly Variable[];
-};
-
 const boundExpressionOf = (definition: {
   readonly node: ESTree.Node;
 }): ESTree.Expression | null => {
   const declared = definition.node;
   return declared.type === "VariableDeclarator" ? declared.init : null;
+};
+
+const MOCK_VIEW_MEMBER = "mocked";
+
+type Reach = {
+  readonly lookup: NamespaceLookup;
+  readonly followed: readonly Variable[];
 };
 
 const viewedDoubleOf = (call: ESTree.CallExpression, reach: Reach): ESTree.Expression | null => {

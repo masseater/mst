@@ -36,12 +36,6 @@ const MISSING_DOC = `A rule must not go without its document. Seed it with \`${R
 const missingHeading = (heading: string): string =>
   `A rule document must not go without \`${heading}\`.`;
 
-const missingRegion = (region: string): string =>
-  `A rule document must not lose its \`${region}\` region. Delete the file and seed it again with \`${REGENERATE_COMMAND}\`.`;
-
-const staleRegion = (region: string): string =>
-  `The \`${region}\` region must not fall behind the rule. Regenerate it with \`${REGENERATE_COMMAND}\`.`;
-
 const remainingPlaceholder = (token: string): string =>
   `A seeded section must not be left as it was written. Replace "${token}".`;
 
@@ -75,9 +69,6 @@ const renderedRegionsOf = ({
   { region: GENERATED_REGIONS.runtime, content: renderRuntimeSelection(rule) },
 ];
 
-const foundRegionIn = ({ source, region }: { readonly source: string; readonly region: string }) =>
-  regionIn({ source, begin: beginMarkerOf(region), end: endMarkerOf(region) });
-
 const missingHeadings = (source: string): readonly string[] => {
   const written = source.split("\n").map((line) => line.trim());
   return REQUIRED_HEADINGS.filter((heading) => !written.includes(heading));
@@ -85,25 +76,8 @@ const missingHeadings = (source: string): readonly string[] => {
 
 const FRONTMATTER_DESCRIPTION = "frontmatter description";
 
-const upToDateSource = ({
-  source,
-  rule,
-  rendered,
-}: {
-  readonly source: string;
-  readonly rule: LintRuleFacts;
-  readonly rendered: readonly RenderedRegion[];
-}): string =>
-  rendered.reduce(
-    (carried, { region, content }) =>
-      withRefreshedRegionIn({
-        source: carried,
-        begin: beginMarkerOf(region),
-        end: endMarkerOf(region),
-        content,
-      }),
-    source.replace(FRONTMATTER_DESCRIPTION_PATTERN, renderFrontmatterDescription(rule)),
-  );
+const foundRegionIn = ({ source, region }: { readonly source: string; readonly region: string }) =>
+  regionIn({ source, begin: beginMarkerOf(region), end: endMarkerOf(region) });
 
 const absentTargetsIn = ({
   source,
@@ -138,26 +112,31 @@ const staleTargetsIn = ({
     .map(({ region }) => region),
 ];
 
-const seededSourceOf = ({
-  absolutePath,
+const upToDateSource = ({
+  source,
   rule,
-  examples,
-  write,
+  rendered,
 }: {
-  readonly absolutePath: string;
+  readonly source: string;
   readonly rule: LintRuleFacts;
-  readonly examples: LintRuleExamples;
-  readonly write: boolean;
-}): string | null => {
-  const existing = textOrNull(absolutePath);
-  if (existing !== null) return existing;
-  if (!write) return null;
+  readonly rendered: readonly RenderedRegion[];
+}): string =>
+  rendered.reduce(
+    (carried, { region, content }) =>
+      withRefreshedRegionIn({
+        source: carried,
+        begin: beginMarkerOf(region),
+        end: endMarkerOf(region),
+        content,
+      }),
+    source.replace(FRONTMATTER_DESCRIPTION_PATTERN, renderFrontmatterDescription(rule)),
+  );
 
-  mkdirSync(dirname(absolutePath), { recursive: true });
-  const seeded = scaffoldRuleDoc({ rule, examples });
-  writeFileSync(absolutePath, seeded, "utf8");
-  return seeded;
-};
+const missingRegion = (region: string): string =>
+  `A rule document must not lose its \`${region}\` region. Delete the file and seed it again with \`${REGENERATE_COMMAND}\`.`;
+
+const staleRegion = (region: string): string =>
+  `The \`${region}\` region must not fall behind the rule. Regenerate it with \`${REGENERATE_COMMAND}\`.`;
 
 const generatedProblems = ({
   source,
@@ -181,6 +160,27 @@ const generatedProblems = ({
 
   writeFileSync(absolutePath, upToDateSource({ source, rule, rendered }), "utf8");
   return [];
+};
+
+const seededSourceOf = ({
+  absolutePath,
+  rule,
+  examples,
+  write,
+}: {
+  readonly absolutePath: string;
+  readonly rule: LintRuleFacts;
+  readonly examples: LintRuleExamples;
+  readonly write: boolean;
+}): string | null => {
+  const existing = textOrNull(absolutePath);
+  if (existing !== null) return existing;
+  if (!write) return null;
+
+  mkdirSync(dirname(absolutePath), { recursive: true });
+  const seeded = scaffoldRuleDoc({ rule, examples });
+  writeFileSync(absolutePath, seeded, "utf8");
+  return seeded;
 };
 
 const ruleDocProblems = ({

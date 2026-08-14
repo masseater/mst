@@ -27,10 +27,6 @@ export type ImportRouteQuery = {
   readonly resolutionMode?: ts.ResolutionMode;
 };
 
-const IMPORT_MODULE_RESOLUTION_MODE: NonNullable<ts.ResolutionMode> = ts.ModuleKind.ESNext;
-
-type ResolvedModuleLocation = RepositoryModuleLocation | { readonly kind: "unresolved" };
-
 const containingFileOf = (query: ImportRouteQuery): string =>
   resolve(query.repositoryRoot, query.filename);
 
@@ -68,21 +64,50 @@ const compilerOptionsFor = (
   return { containingFile, options: compilerOptions ?? {} };
 };
 
+const matchesPathPattern = (specifier: string, pattern: string): boolean => {
+  const wildcard = pattern.indexOf("*");
+  if (wildcard === -1) return specifier === pattern;
+  if (pattern.includes("*", wildcard + 1)) return false;
+  const prefix = pattern.slice(0, wildcard);
+  const suffix = pattern.slice(wildcard + 1);
+  return specifier.startsWith(prefix) && specifier.endsWith(suffix);
+};
+
+export const matchesConfiguredPathAlias = (query: ImportRouteQuery): boolean => {
+  const resolution = compilerOptionsFor(query);
+  return Object.keys(resolution.options.paths ?? {}).some((pattern) =>
+    matchesPathPattern(query.specifier, pattern),
+  );
+};
+
+type CompilerResolution = ReturnType<typeof compilerOptionsFor>;
+
 const repositoryLocation = (
   query: ImportRouteQuery,
   resolvedPath: string,
 ): RepositoryModuleLocation =>
   repositoryModuleLocation({ repositoryRoot: query.repositoryRoot, resolvedPath });
 
-const fileUrlLocation = (query: ImportRouteQuery): ResolvedModuleLocation | null => {
-  if (!query.specifier.startsWith("file:")) return null;
-  const [failure, path] = attempt(() => fileURLToPath(query.specifier));
-  return failure === null && path !== null
-    ? repositoryLocation(query, path)
-    : { kind: "unresolved" };
+type ResolvedModuleLocation = RepositoryModuleLocation | { readonly kind: "unresolved" };
+
+const relativeModuleLocation = (
+  query: ImportRouteQuery,
+  resolution: CompilerResolution,
+): ResolvedModuleLocation => {
+  if (!isRelativeImportSpecifier(query.specifier) && !isAbsolute(query.specifier)) {
+    return { kind: "unresolved" };
+  }
+  const base = isAbsolute(query.specifier)
+    ? query.specifier
+    : resolve(dirname(resolution.containingFile), query.specifier);
+  const extensions = extname(base) === "" ? [".ts", ".tsx", ".mts", ".cts"] : [""];
+  const candidate = extensions
+    .map((extension) => `${base}${extension}`)
+    .find((path) => ts.sys.fileExists(path));
+  return candidate === undefined ? { kind: "unresolved" } : repositoryLocation(query, candidate);
 };
 
-type CompilerResolution = ReturnType<typeof compilerOptionsFor>;
+const IMPORT_MODULE_RESOLUTION_MODE: NonNullable<ts.ResolutionMode> = ts.ModuleKind.ESNext;
 
 const typescriptModuleLocation = (
   query: ImportRouteQuery,
@@ -102,21 +127,12 @@ const typescriptModuleLocation = (
     : repositoryLocation(query, resolvedModule.resolvedFileName);
 };
 
-const relativeModuleLocation = (
-  query: ImportRouteQuery,
-  resolution: CompilerResolution,
-): ResolvedModuleLocation => {
-  if (!isRelativeImportSpecifier(query.specifier) && !isAbsolute(query.specifier)) {
-    return { kind: "unresolved" };
-  }
-  const base = isAbsolute(query.specifier)
-    ? query.specifier
-    : resolve(dirname(resolution.containingFile), query.specifier);
-  const extensions = extname(base) === "" ? [".ts", ".tsx", ".mts", ".cts"] : [""];
-  const candidate = extensions
-    .map((extension) => `${base}${extension}`)
-    .find((path) => ts.sys.fileExists(path));
-  return candidate === undefined ? { kind: "unresolved" } : repositoryLocation(query, candidate);
+const fileUrlLocation = (query: ImportRouteQuery): ResolvedModuleLocation | null => {
+  if (!query.specifier.startsWith("file:")) return null;
+  const [failure, path] = attempt(() => fileURLToPath(query.specifier));
+  return failure === null && path !== null
+    ? repositoryLocation(query, path)
+    : { kind: "unresolved" };
 };
 
 const resolvedModuleLocation = (query: ImportRouteQuery): ResolvedModuleLocation => {
@@ -124,22 +140,6 @@ const resolvedModuleLocation = (query: ImportRouteQuery): ResolvedModuleLocation
   if (fileUrl !== null) return fileUrl;
   const resolution = compilerOptionsFor(query);
   return typescriptModuleLocation(query, resolution) ?? relativeModuleLocation(query, resolution);
-};
-
-const matchesPathPattern = (specifier: string, pattern: string): boolean => {
-  const wildcard = pattern.indexOf("*");
-  if (wildcard === -1) return specifier === pattern;
-  if (pattern.includes("*", wildcard + 1)) return false;
-  const prefix = pattern.slice(0, wildcard);
-  const suffix = pattern.slice(wildcard + 1);
-  return specifier.startsWith(prefix) && specifier.endsWith(suffix);
-};
-
-export const matchesConfiguredPathAlias = (query: ImportRouteQuery): boolean => {
-  const resolution = compilerOptionsFor(query);
-  return Object.keys(resolution.options.paths ?? {}).some((pattern) =>
-    matchesPathPattern(query.specifier, pattern),
-  );
 };
 
 export const repositoryModulePath = (query: ImportRouteQuery): string | null => {
@@ -154,15 +154,6 @@ export const isIgnoredRepositoryModule = (
   const location = resolvedModuleLocation(query);
   return location.kind === "repository" && location.sourcePaths.some(catalog.sourceScope.isIgnored);
 };
-
-const matchesDeclarationPath = (input: {
-  readonly declaration: CanonicalValuesEntry;
-  readonly query: ImportRouteQuery;
-  readonly resolvedPath: string;
-}): boolean =>
-  input.query.importedName === input.declaration.binding &&
-  input.resolvedPath ===
-    realPathOf(resolve(input.query.repositoryRoot, input.declaration.declarationPath));
 
 const routeMatchesResolvedSource = (input: {
   readonly location: Extract<ResolvedModuleLocation, { readonly kind: "repository" }>;
@@ -220,6 +211,15 @@ export const resolvedPublicImportEntries = (
     ? matchingRuntimeRoute({ entries: declarations, location, query })
     : exact;
 };
+
+const matchesDeclarationPath = (input: {
+  readonly declaration: CanonicalValuesEntry;
+  readonly query: ImportRouteQuery;
+  readonly resolvedPath: string;
+}): boolean =>
+  input.query.importedName === input.declaration.binding &&
+  input.resolvedPath ===
+    realPathOf(resolve(input.query.repositoryRoot, input.declaration.declarationPath));
 
 export const resolvedDirectImportEntries = (
   query: ImportRouteQuery,

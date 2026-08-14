@@ -4,11 +4,6 @@ import { unwrapSubject } from "../spec-syntax/subject-expressions.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
-export type ComparedOperands = {
-  readonly subject: ESTree.Expression;
-  readonly expectations: readonly ESTree.Expression[];
-};
-
 const spreadOnlySource = (
   members: readonly (ESTree.Expression | ESTree.ObjectPropertyKind | ESTree.SpreadElement | null)[],
 ): ESTree.Expression | null => {
@@ -27,6 +22,11 @@ export const unwrapCopiedValue = (node: ESTree.Expression): ESTree.Expression =>
 
   const copied = spreadOnlySource(written.elements);
   return copied === null ? written : unwrapCopiedValue(copied);
+};
+
+export type ComparedOperands = {
+  readonly subject: ESTree.Expression;
+  readonly expectations: readonly ESTree.Expression[];
 };
 
 export const comparedOperandsOf = (call: ESTree.CallExpression): ComparedOperands | null => {

@@ -15,16 +15,22 @@ import {
 
 import type { AstFields } from "../ast-node.ts";
 
-export type ReachPolicy = {
-  readonly workspaceRoot: string;
-  readonly entries: readonly RestrictedTargetEntry[];
-  readonly aliases: readonly InternalAlias[];
-};
-
 export type RestrictedReach = {
   readonly entry: RestrictedTargetEntry;
   readonly target: string;
   readonly relays: readonly string[];
+};
+
+const passThroughExportsAt = memoize((file: string): readonly PassThroughExport<AstFields>[] => {
+  const source = readTextFile(file);
+  const program = source === null ? null : astFieldsOf(parseSync(file, source).program);
+  return program === null ? [] : passThroughExportsIn(statementsOf(program));
+});
+
+export type ReachPolicy = {
+  readonly workspaceRoot: string;
+  readonly entries: readonly RestrictedTargetEntry[];
+  readonly aliases: readonly InternalAlias[];
 };
 
 type Walk = {
@@ -34,12 +40,6 @@ type Walk = {
   readonly visited: ReadonlySet<string>;
   readonly relays: readonly string[];
 };
-
-const passThroughExportsAt = memoize((file: string): readonly PassThroughExport<AstFields>[] => {
-  const source = readTextFile(file);
-  const program = source === null ? null : astFieldsOf(parseSync(file, source).program);
-  return program === null ? [] : passThroughExportsIn(statementsOf(program));
-});
 
 const reachedFilesFor = (walk: Walk): readonly string[] => {
   const { specifier, fromFile, policy } = walk;

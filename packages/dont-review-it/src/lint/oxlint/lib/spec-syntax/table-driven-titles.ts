@@ -12,24 +12,6 @@ export type TableDrivenTitles =
 
 type CaseValue = string | number | boolean | null;
 
-type CaseRow = {
-  readonly positional: readonly CaseValue[];
-  readonly named: ReadonlyMap<string, CaseValue> | null;
-};
-
-const DISPLAYED_TEXT = /^[\w \-.:/]{0,20}$/u;
-
-const INDEX_PLACEHOLDERS: ReadonlyMap<string, (index: number) => string> = new Map([
-  ["%#", (index) => String(index)],
-  ["%$", (index) => String(index + 1)],
-]);
-
-const POSITIONAL_SPELLINGS: ReadonlyMap<string, (held: CaseValue) => string | null> = new Map([
-  ["%s", (held) => String(held)],
-  ["%d", (held) => (typeof held === "number" ? String(held) : null)],
-  ["%i", (held) => (typeof held === "number" ? String(Math.trunc(held)) : null)],
-]);
-
 const scalarValueOf = (candidate: unknown): { readonly held: CaseValue } | null => {
   if (candidate === null) return { held: null };
   if (typeof candidate === "string") return { held: candidate };
@@ -72,6 +54,11 @@ const namedValuesOf = (
   return held.every((named) => named !== null) ? new Map(held) : null;
 };
 
+type CaseRow = {
+  readonly positional: readonly CaseValue[];
+  readonly named: ReadonlyMap<string, CaseValue> | null;
+};
+
 const positionalRowOf = (caseArray: ESTree.ArrayExpression): CaseRow | null => {
   const held = caseArray.elements.map((caseElement) =>
     caseElement === null || caseElement.type === "SpreadElement" ? null : scalarOf(caseElement),
@@ -93,11 +80,22 @@ const rowOf = (caseElement: ESTree.Expression): CaseRow | null => {
   return scalar === null ? null : { positional: [scalar.held], named: null };
 };
 
+const INDEX_PLACEHOLDERS: ReadonlyMap<string, (index: number) => string> = new Map([
+  ["%#", (index) => String(index)],
+  ["%$", (index) => String(index + 1)],
+]);
+
 const indexFilled = (template: string, index: number): string =>
   template
     .split(/(%%|%#|%\$)/u)
     .map((piece) => INDEX_PLACEHOLDERS.get(piece)?.(index) ?? piece)
     .join("");
+
+const POSITIONAL_SPELLINGS: ReadonlyMap<string, (held: CaseValue) => string | null> = new Map([
+  ["%s", (held) => String(held)],
+  ["%d", (held) => (typeof held === "number" ? String(held) : null)],
+  ["%i", (held) => (typeof held === "number" ? String(Math.trunc(held)) : null)],
+]);
 
 const positionallyFilled = (template: string, caseRow: CaseRow): string | null =>
   template.split(/(%[a-zA-Z%])/u).reduce<{ readonly text: string; readonly taken: number } | null>(
@@ -118,6 +116,8 @@ const positionallyFilled = (template: string, caseRow: CaseRow): string | null =
     },
     { text: "", taken: 0 },
   )?.text ?? null;
+
+const DISPLAYED_TEXT = /^[\w \-.:/]{0,20}$/u;
 
 const displayedValue = (held: CaseValue): string | null => {
   if (typeof held !== "string") return String(held);

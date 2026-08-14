@@ -23,84 +23,8 @@ import { INJECTED_TEST_HOOK_SPELLINGS } from "../lib/spec-syntax/test-hook-decla
 
 import type { Definition, ESTree } from "@oxlint/plugins";
 
-const REBINDING_MESSAGE = "sharedBindingRebound";
-
-const WRITING_MESSAGE = "sharedValueWritten";
-
-const OPERATION_MESSAGE = "sharedValueChangedByCall";
-
-type StateWrite = {
-  readonly node: ESTree.Node;
-  readonly root: { readonly name: string; readonly at: ESTree.Node };
-  readonly messageId: string;
-  readonly member: string;
-};
-
 const standsInsideTest = (node: ESTree.Node, regions: readonly ESTree.Node[]): boolean =>
   regions.some((region) => region.start <= node.start && node.end <= region.end);
-
-const writtenLeavesOf = (
-  pattern:
-    | ESTree.AssignmentTargetMaybeDefault
-    | ESTree.AssignmentTargetProperty
-    | ESTree.AssignmentTargetRest,
-): readonly ESTree.Expression[] => {
-  if (pattern.type === "ArrayPattern") {
-    return pattern.elements.flatMap((held) => (held === null ? [] : writtenLeavesOf(held)));
-  }
-  if (pattern.type === "ObjectPattern") return pattern.properties.flatMap(writtenLeavesOf);
-  if (pattern.type === "Property") return writtenLeavesOf(pattern.value);
-  if (pattern.type === "RestElement") return writtenLeavesOf(pattern.argument);
-  if (pattern.type === "AssignmentPattern") return writtenLeavesOf(pattern.left);
-  return [unwrapSubject(pattern)];
-};
-
-const memberWriteOf = (node: ESTree.Node, leaf: ESTree.Expression): readonly StateWrite[] => {
-  if (leaf.type !== "MemberExpression") return [];
-
-  const root = memberRootOf(leaf);
-  if (root === null) return [];
-  return [{ node, root: { name: root.name, at: root }, messageId: WRITING_MESSAGE, member: "" }];
-};
-
-const writeOfLeaf = (node: ESTree.Node, leaf: ESTree.Expression): readonly StateWrite[] =>
-  leaf.type === "Identifier"
-    ? [{ node, root: { name: leaf.name, at: leaf }, messageId: REBINDING_MESSAGE, member: "" }]
-    : memberWriteOf(node, leaf);
-
-const standsOnMockNamespace = (node: ESTree.Expression, lookup: NamespaceLookup): boolean => {
-  const written = unwrapSubject(node);
-  if (spellsMockNamespace(written, lookup)) return true;
-  if (written.type === "CallExpression") return standsOnMockNamespace(written.callee, lookup);
-  if (written.type === "MemberExpression") return standsOnMockNamespace(written.object, lookup);
-  return false;
-};
-
-const assignmentWrites = (
-  node: ESTree.AssignmentExpression,
-  lookup: NamespaceLookup,
-): readonly StateWrite[] =>
-  standsOnMockNamespace(node.right, lookup)
-    ? []
-    : writtenLeavesOf(node.left).flatMap((leaf) => writeOfLeaf(node, leaf));
-
-const updateWrites = (node: ESTree.UpdateExpression): readonly StateWrite[] =>
-  writeOfLeaf(node, unwrapSubject(node.argument));
-
-const deletionWrites = (node: ESTree.UnaryExpression): readonly StateWrite[] =>
-  node.operator === "delete" ? memberWriteOf(node, unwrapSubject(node.argument)) : [];
-
-const operationWrites = (node: ESTree.CallExpression): readonly StateWrite[] => {
-  const callee = unwrapSubject(node.callee);
-  if (callee.type !== "MemberExpression") return [];
-
-  const member = staticMemberName(callee);
-  if (member === null || !DESTRUCTIVE_OPERATIONS.has(member)) return [];
-
-  const root = memberRootOf(callee.object);
-  if (root === null) return [];
-  return [{ node, root: { name: root.name, at: root }, messageId: OPERATION_MESSAGE, member }];
-};
 
 const importedFrom = (definition: Definition): string | null => {
   const declaration = definition.parent;
@@ -147,6 +71,82 @@ const testRegionsIn = (
       ? testCallbacksOf(call)
       : []),
   ]);
+};
+
+const writtenLeavesOf = (
+  pattern:
+    | ESTree.AssignmentTargetMaybeDefault
+    | ESTree.AssignmentTargetProperty
+    | ESTree.AssignmentTargetRest,
+): readonly ESTree.Expression[] => {
+  if (pattern.type === "ArrayPattern") {
+    return pattern.elements.flatMap((held) => (held === null ? [] : writtenLeavesOf(held)));
+  }
+  if (pattern.type === "ObjectPattern") return pattern.properties.flatMap(writtenLeavesOf);
+  if (pattern.type === "Property") return writtenLeavesOf(pattern.value);
+  if (pattern.type === "RestElement") return writtenLeavesOf(pattern.argument);
+  if (pattern.type === "AssignmentPattern") return writtenLeavesOf(pattern.left);
+  return [unwrapSubject(pattern)];
+};
+
+const REBINDING_MESSAGE = "sharedBindingRebound";
+
+const WRITING_MESSAGE = "sharedValueWritten";
+
+type StateWrite = {
+  readonly node: ESTree.Node;
+  readonly root: { readonly name: string; readonly at: ESTree.Node };
+  readonly messageId: string;
+  readonly member: string;
+};
+
+const memberWriteOf = (node: ESTree.Node, leaf: ESTree.Expression): readonly StateWrite[] => {
+  if (leaf.type !== "MemberExpression") return [];
+
+  const root = memberRootOf(leaf);
+  if (root === null) return [];
+  return [{ node, root: { name: root.name, at: root }, messageId: WRITING_MESSAGE, member: "" }];
+};
+
+const writeOfLeaf = (node: ESTree.Node, leaf: ESTree.Expression): readonly StateWrite[] =>
+  leaf.type === "Identifier"
+    ? [{ node, root: { name: leaf.name, at: leaf }, messageId: REBINDING_MESSAGE, member: "" }]
+    : memberWriteOf(node, leaf);
+
+const standsOnMockNamespace = (node: ESTree.Expression, lookup: NamespaceLookup): boolean => {
+  const written = unwrapSubject(node);
+  if (spellsMockNamespace(written, lookup)) return true;
+  if (written.type === "CallExpression") return standsOnMockNamespace(written.callee, lookup);
+  if (written.type === "MemberExpression") return standsOnMockNamespace(written.object, lookup);
+  return false;
+};
+
+const assignmentWrites = (
+  node: ESTree.AssignmentExpression,
+  lookup: NamespaceLookup,
+): readonly StateWrite[] =>
+  standsOnMockNamespace(node.right, lookup)
+    ? []
+    : writtenLeavesOf(node.left).flatMap((leaf) => writeOfLeaf(node, leaf));
+
+const deletionWrites = (node: ESTree.UnaryExpression): readonly StateWrite[] =>
+  node.operator === "delete" ? memberWriteOf(node, unwrapSubject(node.argument)) : [];
+
+const updateWrites = (node: ESTree.UpdateExpression): readonly StateWrite[] =>
+  writeOfLeaf(node, unwrapSubject(node.argument));
+
+const OPERATION_MESSAGE = "sharedValueChangedByCall";
+
+const operationWrites = (node: ESTree.CallExpression): readonly StateWrite[] => {
+  const callee = unwrapSubject(node.callee);
+  if (callee.type !== "MemberExpression") return [];
+
+  const member = staticMemberName(callee);
+  if (member === null || !DESTRUCTIVE_OPERATIONS.has(member)) return [];
+
+  const root = memberRootOf(callee.object);
+  if (root === null) return [];
+  return [{ node, root: { name: root.name, at: root }, messageId: OPERATION_MESSAGE, member }];
 };
 
 const stateWritesIn = (

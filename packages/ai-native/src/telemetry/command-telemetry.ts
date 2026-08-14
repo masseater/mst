@@ -11,10 +11,7 @@ import { environmentCarryingContext, inheritedContext, startTelemetry } from "./
 
 import type { Command } from "../spool/parse-command.ts";
 
-const SERVICE_NAME = "mst-command";
 const INSTRUMENTATION_NAME = "@mst/ai-native";
-
-const instrumented = (): boolean => startTelemetry(SERVICE_NAME).enabled;
 
 const commandDuration = once(() =>
   metrics.getMeter(INSTRUMENTATION_NAME).createHistogram("command.duration", {
@@ -22,6 +19,10 @@ const commandDuration = once(() =>
     unit: "ms",
   }),
 );
+
+const SERVICE_NAME = "mst-command";
+
+const instrumented = (): boolean => startTelemetry(SERVICE_NAME).enabled;
 
 export const childEnvironment = (): NodeJS.ProcessEnv =>
   instrumented() ? environmentCarryingContext() : process.env;

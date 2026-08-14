@@ -29,8 +29,6 @@ import { runContextFsOnDisk } from "./run-context-fs.ts";
 
 import type { HandlerGithubClient } from "../handlers/github-client.ts";
 
-const UPDATE_CHECK_INTERVAL_MS = 15 * 60_000;
-
 const IDLE_RESTART_THRESHOLD_MS = 30 * 60_000;
 
 export type ModeRunRequest = {
@@ -44,6 +42,30 @@ export type ModeRunRequest = {
   readonly reviewerLogin: string;
   readonly bypassPermissions: boolean;
   readonly engineTimeoutMs: number;
+};
+
+const runtimeFor = (asked: ModeRunRequest): ComposedRuntime => {
+  const repoDir = resolveRepositoryRoot(process.cwd());
+  const engineCommand = readEnvVar("AUTO_DEVELOP_ENGINE_COMMAND");
+  return composeRuntime({
+    mode: asked.mode,
+    relayOrigin: asked.relayOrigin,
+    repoDir,
+    logDirectory: resolveLogDirectory(repoDir),
+    engineKind: DEFAULT_ENGINE,
+    ...(engineCommand === undefined ? {} : { engineOverride: engineCommand }),
+    engineTimeoutMs: asked.engineTimeoutMs,
+    bypassPermissions: asked.bypassPermissions,
+    concurrency: asked.concurrency,
+    prFilter: asked.prFilter,
+    githubToken: asked.githubToken,
+    setupWorktree: () => Promise.resolve(),
+  });
+};
+
+const pullNumberOf = (carried: unknown): number => {
+  const pullNumber = asRecord(carried)?.pullNumber;
+  return typeof pullNumber === "number" ? pullNumber : 0;
 };
 
 const promptFor = (build: {
@@ -78,30 +100,6 @@ const promptFor = (build: {
     runContextJsonPath: runContext.workflow.inventoryJsonPath,
     ...(build.reason === undefined ? {} : { reason: build.reason }),
   });
-};
-
-const runtimeFor = (asked: ModeRunRequest): ComposedRuntime => {
-  const repoDir = resolveRepositoryRoot(process.cwd());
-  const engineCommand = readEnvVar("AUTO_DEVELOP_ENGINE_COMMAND");
-  return composeRuntime({
-    mode: asked.mode,
-    relayOrigin: asked.relayOrigin,
-    repoDir,
-    logDirectory: resolveLogDirectory(repoDir),
-    engineKind: DEFAULT_ENGINE,
-    ...(engineCommand === undefined ? {} : { engineOverride: engineCommand }),
-    engineTimeoutMs: asked.engineTimeoutMs,
-    bypassPermissions: asked.bypassPermissions,
-    concurrency: asked.concurrency,
-    prFilter: asked.prFilter,
-    githubToken: asked.githubToken,
-    setupWorktree: () => Promise.resolve(),
-  });
-};
-
-const pullNumberOf = (carried: unknown): number => {
-  const pullNumber = asRecord(carried)?.pullNumber;
-  return typeof pullNumber === "number" ? pullNumber : 0;
 };
 
 const attachHandlers = (attaching: {
@@ -185,25 +183,6 @@ const attachHandlers = (attaching: {
   });
 };
 
-const paintStatusBar = (painting: {
-  readonly request: ModeRunRequest;
-  readonly runtime: ComposedRuntime;
-  readonly startedAtMs: number;
-}): void => {
-  const lines = renderStatusBar({
-    snapshot: {
-      mode: painting.request.mode,
-      engineCommand: DEFAULT_ENGINE,
-      connected: true,
-      runningLanes: painting.runtime.queue.runningLanes(),
-      waitingLanes: painting.runtime.queue.waitingLanes(),
-      uptimeMs: Date.now() - painting.startedAtMs,
-    },
-    width: process.stdout.columns,
-  });
-  for (const line of lines) painting.runtime.log.info({ statusBar: true }, line);
-};
-
 const announceStart = (announcing: {
   readonly request: ModeRunRequest;
   readonly runtime: ComposedRuntime;
@@ -255,6 +234,27 @@ const requestRestartWhenCodeMovedOn = async (checking: {
     "code update detected on the tracked remote branch",
   );
   checking.restart.request("code-updated");
+};
+
+const UPDATE_CHECK_INTERVAL_MS = 15 * 60_000;
+
+const paintStatusBar = (painting: {
+  readonly request: ModeRunRequest;
+  readonly runtime: ComposedRuntime;
+  readonly startedAtMs: number;
+}): void => {
+  const lines = renderStatusBar({
+    snapshot: {
+      mode: painting.request.mode,
+      engineCommand: DEFAULT_ENGINE,
+      connected: true,
+      runningLanes: painting.runtime.queue.runningLanes(),
+      waitingLanes: painting.runtime.queue.waitingLanes(),
+      uptimeMs: Date.now() - painting.startedAtMs,
+    },
+    width: process.stdout.columns,
+  });
+  for (const line of lines) painting.runtime.log.info({ statusBar: true }, line);
 };
 
 const startedSchedulers = (starting: {

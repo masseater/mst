@@ -3,7 +3,8 @@ import { staticMemberOf, type StaticMember } from "../lib/static-member.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
-const CONSOLE_OBJECT_NAME = "console";
+const identifierNameOf = (expression: ESTree.Expression): string | null =>
+  expression.type === "Identifier" ? expression.name : null;
 
 const PROCESS_OBJECT_NAME = "process";
 
@@ -19,12 +20,44 @@ export const PROCESS_IO_MEMBER = {
 
 const STREAM_WRITE_NAME = PROCESS_IO_MEMBER.write;
 
+const isStreamWrite = (member: StaticMember): boolean => {
+  if (member.name !== STREAM_WRITE_NAME) return false;
+  const stream = staticMemberOf(member.object);
+  if (stream === null) return false;
+  if (identifierNameOf(stream.object) !== PROCESS_OBJECT_NAME) return false;
+  return PROCESS_STREAM_NAMES.has(stream.name);
+};
+
+const CONSOLE_OBJECT_NAME = "console";
+
+const isOutputSinkCall = (node: ESTree.CallExpression): boolean => {
+  const member = staticMemberOf(node.callee);
+  if (member === null) return false;
+  if (identifierNameOf(member.object) === CONSOLE_OBJECT_NAME) return true;
+  return isStreamWrite(member);
+};
+
 const PROCESS_EXIT_NAME = PROCESS_IO_MEMBER.exit;
+
+const isProcessExitStatement = (statement: ESTree.Statement): boolean => {
+  if (statement.type !== "ExpressionStatement") return false;
+  const called = statement.expression;
+  if (called.type !== "CallExpression") return false;
+  const member = staticMemberOf(called.callee);
+  if (member === null || member.name !== PROCESS_EXIT_NAME) return false;
+  return identifierNameOf(member.object) === PROCESS_OBJECT_NAME;
+};
 
 const STOPPING_STATEMENT_TYPES: ReadonlySet<string> = new Set([
   "ReturnStatement",
   "ThrowStatement",
 ]);
+
+const stopsUnconditionally = (clause: ESTree.CatchClause): boolean =>
+  clause.body.body.some(
+    (statement) =>
+      STOPPING_STATEMENT_TYPES.has(statement.type) || isProcessExitStatement(statement),
+  );
 
 const OWN_BODY_NODE_TYPES: ReadonlySet<string> = new Set([
   "ArrowFunctionExpression",
@@ -36,39 +69,6 @@ const OWN_BODY_NODE_TYPES: ReadonlySet<string> = new Set([
   "TSDeclareFunction",
   "TSEmptyBodyFunctionExpression",
 ]);
-
-const identifierNameOf = (expression: ESTree.Expression): string | null =>
-  expression.type === "Identifier" ? expression.name : null;
-
-const isStreamWrite = (member: StaticMember): boolean => {
-  if (member.name !== STREAM_WRITE_NAME) return false;
-  const stream = staticMemberOf(member.object);
-  if (stream === null) return false;
-  if (identifierNameOf(stream.object) !== PROCESS_OBJECT_NAME) return false;
-  return PROCESS_STREAM_NAMES.has(stream.name);
-};
-
-const isOutputSinkCall = (node: ESTree.CallExpression): boolean => {
-  const member = staticMemberOf(node.callee);
-  if (member === null) return false;
-  if (identifierNameOf(member.object) === CONSOLE_OBJECT_NAME) return true;
-  return isStreamWrite(member);
-};
-
-const isProcessExitStatement = (statement: ESTree.Statement): boolean => {
-  if (statement.type !== "ExpressionStatement") return false;
-  const called = statement.expression;
-  if (called.type !== "CallExpression") return false;
-  const member = staticMemberOf(called.callee);
-  if (member === null || member.name !== PROCESS_EXIT_NAME) return false;
-  return identifierNameOf(member.object) === PROCESS_OBJECT_NAME;
-};
-
-const stopsUnconditionally = (clause: ESTree.CatchClause): boolean =>
-  clause.body.body.some(
-    (statement) =>
-      STOPPING_STATEMENT_TYPES.has(statement.type) || isProcessExitStatement(statement),
-  );
 
 const enclosingCatchClause = (node: ESTree.Node): ESTree.CatchClause | null => {
   const { parent } = node;

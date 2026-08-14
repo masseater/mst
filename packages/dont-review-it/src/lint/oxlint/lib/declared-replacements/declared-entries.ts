@@ -2,16 +2,6 @@ import { listedUnder } from "./option-lists.ts";
 
 import type { Options } from "@oxlint/plugins";
 
-export type DeclaredReplacement = {
-  readonly name: string;
-  readonly substitute: string;
-};
-
-export type ReplacementWithdrawal = {
-  readonly name: string;
-  readonly grounds: string;
-};
-
 export const DECLARED_REPLACEMENT_SCHEMA = {
   type: "array",
   items: {
@@ -32,11 +22,19 @@ export const REPLACEMENT_WITHDRAWAL_SCHEMA = {
   },
 } as const;
 
-export const DECLARED_OPTION = "declared";
-
-export const WITHDRAWN_OPTION = "withdrawn";
+export type DeclaredReplacement = {
+  readonly name: string;
+  readonly substitute: string;
+};
 
 export const DEFAULT_DECLARED_REPLACEMENTS: readonly DeclaredReplacement[] = [];
+
+export type ReplacementWithdrawal = {
+  readonly name: string;
+  readonly grounds: string;
+};
+
+export const WITHDRAWN_OPTION = "withdrawn";
 
 export const withdrawalsIn = (ruleOptions: Readonly<Options>): readonly ReplacementWithdrawal[] =>
   listedUnder(ruleOptions, WITHDRAWN_OPTION).flatMap(({ name, grounds }) =>
@@ -44,6 +42,8 @@ export const withdrawalsIn = (ruleOptions: Readonly<Options>): readonly Replacem
       ? [{ name, grounds: typeof grounds === "string" ? grounds.trim() : "" }]
       : [],
   );
+
+export const DECLARED_OPTION = "declared";
 
 export const declaredReplacementsIn = ({
   options,

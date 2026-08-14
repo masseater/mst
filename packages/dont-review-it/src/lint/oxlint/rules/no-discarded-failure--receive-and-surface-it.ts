@@ -5,20 +5,9 @@ import type { ESTree } from "@oxlint/plugins";
 
 const FAILURE_PAIR_CALLEE_NAMES: ReadonlySet<string> = new Set(["attempt", "attemptAsync"]);
 
-const CARRIED_THROUGH_TYPES: ReadonlySet<string> = new Set([
-  "AwaitExpression",
-  "ChainExpression",
-  "ParenthesizedExpression",
-  "TSAsExpression",
-  "TSNonNullExpression",
-  "TSSatisfiesExpression",
-]);
+const PLACEHOLDER_NAME_PATTERN = /^_+$/u;
 
 const FAILURE_ELEMENT_INDEX = 0;
-
-const RESULT_ELEMENT_INDEX = 1;
-
-const PLACEHOLDER_NAME_PATTERN = /^_+$/u;
 
 const bindsFailureKey = (property: ESTree.BindingProperty | ESTree.BindingRestElement): boolean => {
   if (property.type === "RestElement") return true;
@@ -38,10 +27,21 @@ const bindsFailure = (binding: ESTree.BindingPattern | ESTree.BindingRestElement
     : bindsFailure(failureElement);
 };
 
+const RESULT_ELEMENT_INDEX = 1;
+
 const readsResultElement = (member: ESTree.MemberExpression): boolean =>
   member.computed &&
   member.property.type === "Literal" &&
   member.property.value === RESULT_ELEMENT_INDEX;
+
+const CARRIED_THROUGH_TYPES: ReadonlySet<string> = new Set([
+  "AwaitExpression",
+  "ChainExpression",
+  "ParenthesizedExpression",
+  "TSAsExpression",
+  "TSNonNullExpression",
+  "TSSatisfiesExpression",
+]);
 
 const receiverOf = (node: ESTree.Node): ESTree.Node => {
   const parent = node.parent as ESTree.Node;

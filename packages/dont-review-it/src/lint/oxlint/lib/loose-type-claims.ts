@@ -2,8 +2,6 @@ import type { ESTree } from "@oxlint/plugins";
 
 export type LooseTypeNode = ESTree.TSAnyKeyword | ESTree.TSUnknownKeyword;
 
-const CONST_ASSERTION_NAME = "const";
-
 export const looseTypeNodeOf = (node: ESTree.TSType): LooseTypeNode | null => {
   switch (node.type) {
     case "TSAnyKeyword":
@@ -21,6 +19,8 @@ export const looseTypeNodeOf = (node: ESTree.TSType): LooseTypeNode | null => {
       return null;
   }
 };
+
+const CONST_ASSERTION_NAME = "const";
 
 const isConstAssertionType = (node: ESTree.TSType): boolean =>
   node.type === "TSTypeReference" &&

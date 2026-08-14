@@ -4,8 +4,6 @@ import { ABSENT_VALUE_PLACEHOLDER } from "../runtime/absent-value-placeholder.ts
 import type { EventQueue } from "./event-queue.ts";
 import type { SseFrame } from "./sse-frames.ts";
 
-const parseUnknownJson = (raw: string): unknown => JSON.parse(raw);
-
 export type FrameSink = {
   readonly process: (frame: SseFrame) => void;
 };
@@ -16,6 +14,8 @@ type FrameSinkWiring = {
   readonly diagnostics: { readonly write: (chunk: string) => void };
   readonly knownIdLimit: number;
 };
+
+const parseUnknownJson = (raw: string): unknown => JSON.parse(raw);
 
 class DedupingFrameSink {
   #knownIds: ReadonlySet<string> = new Set<string>();

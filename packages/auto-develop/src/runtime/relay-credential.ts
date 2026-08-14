@@ -7,6 +7,17 @@ import type { Logger } from "../logging/logger.ts";
 
 const RENEW_BEFORE_MS = 60_000;
 
+const assertAllowedOrigin = (check: {
+  readonly url: string;
+  readonly allowedOrigin: string;
+}): void => {
+  const requested = URL.parse(check.url)?.origin;
+  if (requested === check.allowedOrigin) return;
+  throw new CredentialTerminalError(
+    `refusing to present the relay credential to ${String(requested)}; only ${check.allowedOrigin} is allowed`,
+  );
+};
+
 export type RelayCredentialConfig = {
   readonly allowedOrigin: string;
   readonly issueSession: (issue: {
@@ -18,17 +29,6 @@ export type RelayCredentialConfig = {
 };
 
 type RelaySession = { readonly token: string; readonly expiresAtMs: number };
-
-const assertAllowedOrigin = (check: {
-  readonly url: string;
-  readonly allowedOrigin: string;
-}): void => {
-  const requested = URL.parse(check.url)?.origin;
-  if (requested === check.allowedOrigin) return;
-  throw new CredentialTerminalError(
-    `refusing to present the relay credential to ${String(requested)}; only ${check.allowedOrigin} is allowed`,
-  );
-};
 
 const issueRelaySession = async (config: RelayCredentialConfig): Promise<RelaySession> => {
   const githubToken = await config.resolveGithubToken();

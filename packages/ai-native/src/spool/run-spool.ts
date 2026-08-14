@@ -26,6 +26,8 @@ import { createEscapeStripper } from "./strip-escapes.ts";
 
 import type { Duplex, Readable, Writable } from "node:stream";
 
+const defaultIsPassthrough = (): boolean => isPassthroughSignalled(process.env.CI);
+
 export type SpoolDeps = {
   stdout: Writable;
   stderr: Writable;
@@ -45,8 +47,6 @@ type ResolvedDeps = {
   spoolRoot: () => string;
 };
 
-const defaultIsPassthrough = (): boolean => isPassthroughSignalled(process.env.CI);
-
 const resolveDeps = (deps: SpoolDeps): ResolvedDeps => ({
   stdout: deps.stdout,
   stderr: deps.stderr,
@@ -55,12 +55,6 @@ const resolveDeps = (deps: SpoolDeps): ResolvedDeps => ({
   uniqueSuffix: deps.uniqueSuffix ?? (() => randomBytes(4).toString("hex")),
   spoolRoot: deps.spoolRoot ?? defaultSpoolRoot,
 });
-
-const recordFailureSummary = (
-  commandLine: string,
-  written: { filePath: string; reason: unknown },
-): string =>
-  `spool: command: ${commandLine}\nspool: error: cannot record to ${written.filePath}: ${String(written.reason)}\n`;
 
 const openRecordFile = async (rootDir: string, filePath: string): Promise<WriteStream | Error> => {
   try {
@@ -72,6 +66,27 @@ const openRecordFile = async (rootDir: string, filePath: string): Promise<WriteS
     return caught as Error;
   }
 };
+
+const discardRecord = async (input: {
+  deps: ResolvedDeps;
+  commandLine: string;
+  filePath: string;
+  fileStream: WriteStream;
+  closed: Promise<ChildEnd>;
+  spawnError: Error;
+}): Promise<number> => {
+  await input.closed;
+  input.fileStream.destroy();
+  await unlink(input.filePath);
+  input.deps.stderr.write(startFailureSummary(input.commandLine, input.spawnError));
+  return 127;
+};
+
+const recordFailureSummary = (
+  commandLine: string,
+  written: { filePath: string; reason: unknown },
+): string =>
+  `spool: command: ${commandLine}\nspool: error: cannot record to ${written.filePath}: ${String(written.reason)}\n`;
 
 const excerptOf = (tail: Buffer): string => {
   const lines = tail.toString().split("\n");
@@ -173,21 +188,6 @@ class SpoolRecording {
     return excerptOf(Buffer.concat(this.tailParts));
   }
 }
-
-const discardRecord = async (input: {
-  deps: ResolvedDeps;
-  commandLine: string;
-  filePath: string;
-  fileStream: WriteStream;
-  closed: Promise<ChildEnd>;
-  spawnError: Error;
-}): Promise<number> => {
-  await input.closed;
-  input.fileStream.destroy();
-  await unlink(input.filePath);
-  input.deps.stderr.write(startFailureSummary(input.commandLine, input.spawnError));
-  return 127;
-};
 
 const reportCompletion = (input: {
   deps: ResolvedDeps;

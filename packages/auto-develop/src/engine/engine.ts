@@ -8,8 +8,6 @@ import { engineSessionName } from "./session-name.ts";
 import type { Logger } from "../logging/logger.ts";
 import type { TmuxRunRequest } from "./tmux-runner.ts";
 
-const IDLE_TIMEOUT_MS = 30 * 60_000;
-
 export type Engine = {
   readonly execute: (execution: {
     readonly prompt: string;
@@ -34,6 +32,24 @@ export type EngineConfig = {
   readonly log: Logger;
 };
 
+const reclassifyFailure = (config: EngineConfig, failure: unknown): unknown => {
+  if (!(failure instanceof ProcessFailedError)) return failure;
+  const matched = matchedAuthExpiryPattern({ engine: config.kind, output: failure.produced });
+  if (matched === null) return failure;
+  config.log.error(
+    { engine: config.kind, matchedPattern: matched },
+    "engine authentication expired; halting the queue",
+  );
+  const authError = new EngineAuthExpiredError({
+    engine: config.kind,
+    matchedPattern: matched,
+    cause: failure,
+  });
+  return authError;
+};
+
+const IDLE_TIMEOUT_MS = 30 * 60_000;
+
 const argsFor = async (
   config: EngineConfig,
   build: {
@@ -57,22 +73,6 @@ const argsFor = async (
     sharedGitDir: gitPaths.sharedGitDir,
     bypassPermissions: config.bypassPermissions,
   });
-};
-
-const reclassifyFailure = (config: EngineConfig, failure: unknown): unknown => {
-  if (!(failure instanceof ProcessFailedError)) return failure;
-  const matched = matchedAuthExpiryPattern({ engine: config.kind, output: failure.produced });
-  if (matched === null) return failure;
-  const authError = new EngineAuthExpiredError({
-    engine: config.kind,
-    matchedPattern: matched,
-    cause: failure,
-  });
-  config.log.error(
-    { engine: config.kind, matchedPattern: matched },
-    "engine authentication expired; halting the queue",
-  );
-  return authError;
 };
 
 const buildRunRequest = async (build: {

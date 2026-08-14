@@ -6,17 +6,9 @@ import type { ESTree } from "@oxlint/plugins";
 
 type DestinationTaker = ESTree.CallExpression | ESTree.NewExpression;
 
-const FETCH_NAME = "fetch";
-
 const SEND_BEACON_NAME = "sendBeacon";
 
 const NAVIGATOR_OBJECT_NAME = "navigator";
-
-const CONNECTION_CONSTRUCTOR_NAMES: ReadonlySet<string> = new Set([
-  "EventSource",
-  "Request",
-  "WebSocket",
-]);
 
 const isNavigatorSendBeacon = (callee: ESTree.Expression): boolean => {
   const member = staticMemberOf(callee);
@@ -25,11 +17,19 @@ const isNavigatorSendBeacon = (callee: ESTree.Expression): boolean => {
   return receiver.type === "Identifier" && receiver.name === NAVIGATOR_OBJECT_NAME;
 };
 
+const FETCH_NAME = "fetch";
+
 const isFetchCallee = (callee: ESTree.Expression): boolean => {
   const written = callee;
   if (written.type === "Identifier") return written.name === FETCH_NAME;
   return staticMemberOf(written)?.name === FETCH_NAME;
 };
+
+const CONNECTION_CONSTRUCTOR_NAMES: ReadonlySet<string> = new Set([
+  "EventSource",
+  "Request",
+  "WebSocket",
+]);
 
 const isConnectionConstructor = (callee: ESTree.Expression): boolean => {
   const written = callee;

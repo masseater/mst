@@ -194,6 +194,27 @@ AI 向けの指示が 1 か所にしかないことを見る。`AGENTS.md` が�
 - IF: 警告が指すワークスペースを preset の下に戻せた; THEN MUST: `off` を消す
   - 残った `off` は、いつか誰かが「元からそうだった」として読む
 
+## 出荷できるパッケージの検査
+
+`check` が、ワークスペースのマニフェストを読み、npm へ公開できるパッケージが公開された状態で解決できるかを見る。見るのは宣言だけで、成果物が実在するかは見ない。判断は [EDR 0066](../../docs/engineering-decision-logs/0066-replace-the-published-entries-and-bundle-the-internal-contract.md) にある。
+
+- 公開できるパッケージが、`private: true` のワークスペースを `dependencies` / `peerDependencies` / `optionalDependencies` で参照していない
+- 公開後に実行時が解決する入口が、型注釈を持つソースを指していない
+- 公開後の入口が指す場所を、`files` の許可リストが載せている
+
+入口は `publishConfig` が置き換えた後の姿で読む。型を渡すだけの `types` 条件は見ない。宣言ファイルでないソースをそこに置くのは正当である。
+
+- IF: 公開できるパッケージが `private: true` のワークスペースを必要とする; THEN
+  - MUST: `devDependencies` で参照し、成果物へ畳む
+  - PROHIBIT: `dependencies` で参照する
+    - レジストリはその名前を解決できず、install した側がそこで止まる
+- IF: 手元の参照をソースのままにしたい; THEN
+  - MUST: `publishConfig` に公開後の入口を書く
+  - PROHIBIT: 公開される入口をソースのままにする
+    - ワークスペースのリンクは実体のパスへ解決されるため、手元では動いて公開後だけ動かない
+- IF: 成果物が実在するかを検査したくなった; THEN PROHIBIT: この検査に足す
+  - ビルドの前後で同じコミットへの判定が変わる
+
 ## 公開パッケージの skill の検査
 
 `check` が、TanStack Intent の skill と package.json の宣言が食い違っていないことも読む。見るのは同梱と配布の配線だけで、両方向を検知する。

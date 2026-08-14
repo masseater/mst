@@ -20,6 +20,11 @@ type ContextFault = {
   readonly messageId: string;
 };
 
+const restFaultsIn = (pattern: ESTree.ObjectPattern): readonly ContextFault[] =>
+  pattern.properties.flatMap((property) =>
+    property.type === "RestElement" ? [{ node: property, messageId: "restContext" }] : [],
+  );
+
 const writtenBinding = (bound: ESTree.ParamPattern): ESTree.ParamPattern =>
   bound.type === "AssignmentPattern" ? bound.left : bound;
 
@@ -27,11 +32,6 @@ const objectPatternOf = (bound: ESTree.ParamPattern): ESTree.ObjectPattern | nul
   const written = writtenBinding(bound);
   return written.type === "ObjectPattern" ? written : null;
 };
-
-const restFaultsIn = (pattern: ESTree.ObjectPattern): readonly ContextFault[] =>
-  pattern.properties.flatMap((property) =>
-    property.type === "RestElement" ? [{ node: property, messageId: "restContext" }] : [],
-  );
 
 const computedKeyFaultsIn = (pattern: ESTree.ObjectPattern): readonly ContextFault[] =>
   pattern.properties.flatMap((property) => {

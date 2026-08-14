@@ -3,37 +3,6 @@ import { isNamedFields } from "../named-fields.ts";
 import type { Context, RuleMeta } from "@oxlint/plugins";
 import type { RuleMessage } from "../rule-message.ts";
 
-export type DeclaredCheck = {
-  readonly name: string;
-  readonly coveredPaths: readonly string[];
-  readonly excludedPaths: readonly string[];
-};
-
-export type RegistrationRow = {
-  readonly pattern: string;
-  readonly reason: string;
-  readonly receivers: readonly string[];
-};
-
-export type RegistrationTable = {
-  readonly name: string;
-  readonly consumedBy: string;
-  readonly rows: readonly RegistrationRow[];
-  readonly allowances: readonly RegistrationRow[];
-};
-
-export type ScopeRegistration = {
-  readonly name: string;
-  readonly registeredPaths: readonly string[];
-};
-
-export type CoverageDeclarations = {
-  readonly checks: readonly DeclaredCheck[];
-  readonly tables: readonly RegistrationTable[];
-  readonly uncheckedDeclarations: readonly RegistrationRow[];
-  readonly scopes: readonly ScopeRegistration[];
-};
-
 export type CoverageFinding = RuleMessage & { readonly heldPath: string | null };
 
 const REGISTRATION_ROW_SCHEMA = {
@@ -100,8 +69,11 @@ export const DECLARED_COVERAGE_SCHEMA: RuleMeta["schema"] = [
   },
 ];
 
-const fieldsOf = (held: unknown): Readonly<Record<string, unknown>> =>
-  isNamedFields(held) ? held : {};
+export type DeclaredCheck = {
+  readonly name: string;
+  readonly coveredPaths: readonly string[];
+  readonly excludedPaths: readonly string[];
+};
 
 const writtenTextOf = (held: unknown): string | null => {
   if (typeof held !== "string") return null;
@@ -114,21 +86,6 @@ const writtenTextsOf = (held: unknown): readonly string[] =>
     return written === null ? [] : [written];
   });
 
-const readEach = <Read>(
-  held: unknown,
-  readOne: (declared: Readonly<Record<string, unknown>>) => Read | null,
-): readonly Read[] =>
-  (Array.isArray(held) ? held : [])
-    .map((listed: unknown) => readOne(fieldsOf(listed)))
-    .filter((candidate) => candidate !== null);
-
-const rowOf = (declared: Readonly<Record<string, unknown>>): RegistrationRow | null => {
-  const pattern = writtenTextOf(declared.pattern);
-  const reason = writtenTextOf(declared.reason);
-  if (pattern === null || reason === null) return null;
-  return { pattern, reason, receivers: writtenTextsOf(declared.receivers) };
-};
-
 const checkOf = (declared: Readonly<Record<string, unknown>>): DeclaredCheck | null => {
   const spelled = writtenTextOf(declared.name);
   if (spelled === null) return null;
@@ -138,6 +95,37 @@ const checkOf = (declared: Readonly<Record<string, unknown>>): DeclaredCheck | n
     excludedPaths: writtenTextsOf(declared.excludedPaths),
   };
 };
+
+export type RegistrationRow = {
+  readonly pattern: string;
+  readonly reason: string;
+  readonly receivers: readonly string[];
+};
+
+export type RegistrationTable = {
+  readonly name: string;
+  readonly consumedBy: string;
+  readonly rows: readonly RegistrationRow[];
+  readonly allowances: readonly RegistrationRow[];
+};
+
+const rowOf = (declared: Readonly<Record<string, unknown>>): RegistrationRow | null => {
+  const pattern = writtenTextOf(declared.pattern);
+  const reason = writtenTextOf(declared.reason);
+  if (pattern === null || reason === null) return null;
+  return { pattern, reason, receivers: writtenTextsOf(declared.receivers) };
+};
+
+const fieldsOf = (held: unknown): Readonly<Record<string, unknown>> =>
+  isNamedFields(held) ? held : {};
+
+const readEach = <Read>(
+  held: unknown,
+  readOne: (declared: Readonly<Record<string, unknown>>) => Read | null,
+): readonly Read[] =>
+  (Array.isArray(held) ? held : [])
+    .map((listed: unknown) => readOne(fieldsOf(listed)))
+    .filter((candidate) => candidate !== null);
 
 const tableOf = (declared: Readonly<Record<string, unknown>>): RegistrationTable | null => {
   const spelled = writtenTextOf(declared.name);
@@ -151,10 +139,22 @@ const tableOf = (declared: Readonly<Record<string, unknown>>): RegistrationTable
   };
 };
 
+export type ScopeRegistration = {
+  readonly name: string;
+  readonly registeredPaths: readonly string[];
+};
+
 const scopeOf = (declared: Readonly<Record<string, unknown>>): ScopeRegistration | null => {
   const spelled = writtenTextOf(declared.name);
   if (spelled === null) return null;
   return { name: spelled, registeredPaths: writtenTextsOf(declared.registeredPaths) };
+};
+
+export type CoverageDeclarations = {
+  readonly checks: readonly DeclaredCheck[];
+  readonly tables: readonly RegistrationTable[];
+  readonly uncheckedDeclarations: readonly RegistrationRow[];
+  readonly scopes: readonly ScopeRegistration[];
 };
 
 export const coverageDeclarationsFrom = (ruleOptions: Context["options"]): CoverageDeclarations => {
