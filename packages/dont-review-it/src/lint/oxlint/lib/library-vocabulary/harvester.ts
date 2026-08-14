@@ -2,8 +2,8 @@ import { dirname, resolve } from "node:path";
 
 import { attempt, memoize } from "es-toolkit";
 import {
-  API,
   SymbolFlags,
+  type API,
   type Checker,
   type Snapshot,
   type Symbol as TypeSymbol,
@@ -30,28 +30,25 @@ type CheckedDependency = {
 const declaredVocabularyOf = (
   { checker, packageName }: CheckedDependency,
   exported: TypeSymbol,
-): LibraryVocabularyEntry | null => {
+): readonly LibraryVocabularyEntry[] => {
   const declaring =
     (exported.flags & SymbolFlags.Alias) === 0 ? exported : checker.getAliasedSymbol(exported);
   const declared = checker.getDeclaredTypeOfSymbol(declaring);
-  if (declared.isErrorType() || !declared.isUnionType()) return null;
+  if (declared.isErrorType() || !declared.isUnionType()) return [];
 
   const members = declared.getTypes();
   const admitted: readonly CanonicalValue[] = members.flatMap((member) =>
     member.isStringLiteralType() || member.isNumberLiteralType() ? [member.value] : [],
   );
-  if (admitted.length === 0) return null;
+  if (admitted.length === 0) return [];
 
-  const [declaration] = declaring.declarations;
-  if (declaration === undefined) return null;
-
-  return {
+  return declaring.declarations.slice(0, 1).map((declaration) => ({
     packageName,
     typeName: exported.name,
     declarationId: `${declaration.path}#${declaration.index}`,
     values: admitted,
     admitsUnnamedValues: admitted.length !== members.length,
-  };
+  }));
 };
 
 const vocabulariesExportedBy = (
@@ -60,16 +57,15 @@ const vocabulariesExportedBy = (
 ): readonly LibraryVocabularyEntry[] => {
   const project = snapshot.getDefaultProjectForFile(declarationsPath);
   if (project === undefined) return [];
-  const declarations = project.program.getSourceFile(declarationsPath);
-  if (declarations === undefined) return [];
-  const moduleSymbol = project.checker.getSymbolAtLocation(declarations);
-  if (moduleSymbol === undefined) return [];
 
   const dependency: CheckedDependency = { checker: project.checker, packageName };
-  return project.checker
-    .getExportsOfModule(moduleSymbol)
-    .map((exported) => declaredVocabularyOf(dependency, exported))
-    .filter((candidate) => candidate !== null);
+  return [project.program.getSourceFile(declarationsPath)]
+    .filter((declarations) => declarations !== undefined)
+    .flatMap((declarations) => {
+      const moduleSymbol = project.checker.getSymbolAtLocation(declarations);
+      return moduleSymbol === undefined ? [] : project.checker.getExportsOfModule(moduleSymbol);
+    })
+    .flatMap((exported) => declaredVocabularyOf(dependency, exported));
 };
 
 const harvestedFrom = (
@@ -95,24 +91,30 @@ const harvestedWith = (
   }
 };
 
-const harvestLibraryVocabulary = memoize((packageDirectory: string): LibraryVocabularyIndex => {
-  const typeEntries = dependencyTypeEntries(packageDirectory);
-  if (typeEntries.length === 0) return EMPTY_LIBRARY_VOCABULARY_INDEX;
+export const createLibraryVocabularyLoader = ({
+  openApi,
+}: {
+  readonly openApi: (packageDirectory: string) => API;
+}): LibraryVocabularyLoader => {
+  const harvestLibraryVocabulary = memoize((packageDirectory: string): LibraryVocabularyIndex => {
+    const typeEntries = dependencyTypeEntries(packageDirectory);
+    if (typeEntries.length === 0) return EMPTY_LIBRARY_VOCABULARY_INDEX;
 
-  const [unusableChecker, harvested] = attempt(() =>
-    harvestedWith(new API({ cwd: packageDirectory }), typeEntries),
-  );
-  if (harvested !== null) return harvested;
-  if (isEnvironmentFailure(unusableChecker)) return EMPTY_LIBRARY_VOCABULARY_INDEX;
-  throw unusableChecker;
-});
+    const [unusableChecker, harvested] = attempt(() =>
+      harvestedWith(openApi(packageDirectory), typeEntries),
+    );
+    if (harvested !== null) return harvested;
+    if (isEnvironmentFailure(unusableChecker)) return EMPTY_LIBRARY_VOCABULARY_INDEX;
+    throw unusableChecker;
+  });
 
-export const loadLibraryVocabulary: LibraryVocabularyLoader = ({ filename, repositoryRoot }) => {
-  const packageDirectory = nearestPackageDirectory(
-    dirname(resolve(filename)),
-    resolve(repositoryRoot),
-  );
-  return packageDirectory === null
-    ? EMPTY_LIBRARY_VOCABULARY_INDEX
-    : harvestLibraryVocabulary(packageDirectory);
+  return ({ filename, repositoryRoot }) => {
+    const packageDirectory = nearestPackageDirectory(
+      dirname(resolve(filename)),
+      resolve(repositoryRoot),
+    );
+    return packageDirectory === null
+      ? EMPTY_LIBRARY_VOCABULARY_INDEX
+      : harvestLibraryVocabulary(packageDirectory);
+  };
 };
