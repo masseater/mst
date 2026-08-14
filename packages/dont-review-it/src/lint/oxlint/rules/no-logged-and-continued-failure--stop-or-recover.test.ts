@@ -28,6 +28,7 @@ describe("dont-review-it/no-logged-and-continued-failure--stop-or-recover", () =
       },
       {
         name: "a catch clause that writes to a stream and then recovers is complete",
+        documented: true,
         code: "const read = () => {\n  try {\n    return run();\n  } catch (failure) {\n    process.stderr.write(String(failure));\n    return fallback();\n  }\n};",
       },
       {
@@ -48,6 +49,7 @@ describe("dont-review-it/no-logged-and-continued-failure--stop-or-recover", () =
       },
       {
         name: "writing in the finally block is not a report of a caught failure",
+        documented: true,
         code: "try {\n  run();\n} catch (failure) {\n  throw failure;\n} finally {\n  console.log('done');\n}",
       },
       {
@@ -62,6 +64,7 @@ describe("dont-review-it/no-logged-and-continued-failure--stop-or-recover", () =
     invalid: [
       {
         name: "a catch clause that writes the failure and carries on is reported",
+        documented: true,
         code: "try {\n  run();\n} catch (failure) {\n  console.error(failure);\n}",
         errors: [{ messageId: "loggedAndContinuedFailure" }],
       },
@@ -82,6 +85,7 @@ describe("dont-review-it/no-logged-and-continued-failure--stop-or-recover", () =
       },
       {
         name: "a stop that only happens inside a condition leaves the other paths carrying on",
+        documented: true,
         code: "try {\n  run();\n} catch (failure) {\n  console.error(failure);\n  if (isFatal(failure)) {\n    throw failure;\n  }\n}",
         errors: [{ messageId: "loggedAndContinuedFailure" }],
       },

@@ -1,74 +1,95 @@
+---
+description: "Disallow writing a caught failure to an output stream inside a catch clause that neither stops nor returns, so a failure that was caught either ends the work or produces a value the caller can use"
+---
+
 # no-logged-and-continued-failure--stop-or-recover
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-`catch` 節の中にある出力先への書き込みのうち、その `catch` 節が処理を止めも戻しもしていないもの。
+Disallow writing a caught failure to an output stream inside a catch clause that neither stops nor returns, so a failure that was caught either ends the work or produces a value the caller can use
 
-判定は 2 つの独立した問いでできている。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-logged-and-continued-failure--stop-or-recover.ts`](../../src/lint/oxlint/rules/no-logged-and-continued-failure--stop-or-recover.ts)
 
-**1. その呼び出しは出力先への書き込みか。** 次の 2 系統を出力先として扱う。
+<!-- END GENERATED rule-header -->
 
-- `console` を受け手とするメンバー呼び出し。プロパティ名は問わない（`console.error` / `console.warn` / `console.log` など、どれでも同じ）
-- `process.stdout.write(...)` / `process.stderr.write(...)`
+## Violation
 
-このリポジトリで失敗を書ける先はこの 2 つに尽きる。ロガーのライブラリは入っていない。導入されたら、その受け手をこの一覧に足す。
+A write to an output sink inside a `catch` clause where that `catch` clause neither stops nor recovers.
 
-**2. その `catch` 節は止めているか、戻しているか。** `catch` 節の本体の**直下の文**に、次のいずれかがあれば止めていると見なす。
+The judgment is two independent questions.
 
-- `throw` 文
-- `return` 文
-- `process.exit(...)` の式文
+**1. Is that call a write to an output sink?** Two families count as sinks.
 
-書き込みより前にあっても後にあってもよい。順序ではなく、その `catch` 節を通る全ての経路が最終的に止まるかどうかを見ている。
+- A member call whose receiver is `console`. The property name makes no difference (`console.error`, `console.warn`, `console.log` — all the same)
+- `process.stdout.write(...)` and `process.stderr.write(...)`
 
-条件の中にある `throw` は止めているとは見なさない。`if (isFatal(failure)) { throw failure; }` は、条件が偽の経路をそのまま通してしまう。通ってしまう経路こそがこのルールの対象なので、条件付きの停止は停止として数えない。
+Those two are the whole of where a failure can be written in this repository. No logger library is in it. Once one is introduced, adding its receiver to this list is the paired work.
 
-`break` と `continue` も止めているとは見なさない。どちらもループの次の反復か直後の文へ進むだけで、失敗した操作の結果を待っていた処理はそのまま動き続ける。
+**2. Does that `catch` clause stop, or recover?** It counts as stopping where any of these stands as **a statement directly in the `catch` clause's body**.
 
-### 走査の境界
+- A `throw` statement
+- A `return` statement
+- An expression statement of `process.exit(...)`
 
-書き込みの呼び出しから外側へ辿り、最初に見つかった `catch` 節を、その書き込みが属する `catch` 節とする。辿る途中で関数・クラス・static ブロックに入ったら、そこで打ち切って対象外とする。`catch` 節の中で定義しただけのコールバックは、その `catch` 節の実行中に走るとは限らないためである。
+Before the write or after it makes no difference. What is read is not the order but whether every path through that `catch` clause eventually stops.
 
-入れ子の `try` があるときは、内側の `catch` 節が内側の書き込みを持つ。外側が `throw` していても、内側は内側の文だけで判定する。
+A `throw` inside a condition does not count as stopping. `if (isFatal(failure)) { throw failure; }` lets the path where the condition is false through as it is, and that path is exactly what this rule is about, so a conditional stop is not counted as a stop.
 
-`try` ブロックの中と `finally` ブロックの中の書き込みは対象にならない。どちらも捕まえた失敗の報告ではない。
+`break` and `continue` do not count as stopping either. Both only advance to the loop's next iteration or to the statement after it, and whatever was waiting on the failed operation's result keeps running.
 
-### 既存の公式ルールとの境界
+### The boundary of the walk
 
-失敗を握り潰す形のうち、次の 2 つは oxlint の公式ルールが既に塞いでいる。
+The walk runs outward from the write call, and the first `catch` clause found is the one that write belongs to. Entering a function, a class or a static block ends the walk and takes it out of scope: a callback merely defined inside a `catch` clause does not necessarily run while that clause runs.
 
-| 形                            | 塞いでいるもの     |
-| ----------------------------- | ------------------ |
-| `catch { }`（本体が空）       | `no-empty`         |
-| `catch (e) { throw e; }` だけ | `no-useless-catch` |
+With nested `try`s, the inner `catch` clause holds the inner write. Even where the outer one throws, the inner one is judged on its own statements alone.
 
-残っていた穴が「書いて、そのまま進む」形である。このルールはそこだけを見る。
+Writes inside a `try` block and inside a `finally` block are out of scope. Neither is a report of a caught failure.
 
-失敗を表す値を受け取らずに捨てる形（`attempt` の分解で失敗側を受け取らない、など）は、構文としては `catch` 節ですらないため、このルールの対象外である。それは [no-discarded-failure--receive-and-surface-it](./no-discarded-failure--receive-and-surface-it.md) が扱う。
+### The boundary with the existing official rules
 
-ファイル種別による例外は持たない。テストコードも同じに扱う。
+Of the shapes that swallow a failure, two are already closed by oxlint's official rules.
 
-## なぜそれが要るか
+| Shape | What closes it |
+| --- | --- |
+| `catch { }` (an empty body) | `no-empty` |
+| `catch (e) { throw e; }` alone | `no-useless-catch` |
 
-守っている不変条件は「失敗した操作の後に続く処理は、その失敗を知っている」ことである。
+What was left is the shape "write, then carry on". This rule reads that alone.
 
-`catch` 節に到達したということは、`try` の中の操作が最後まで進まなかったということである。その操作が用意するはずだった値は無いか、途中までしかない。`catch` 節を抜けて次の文へ進むということは、その不完全な状態の上で処理を続けるということである。
+Discarding a value standing for a failure without receiving it (not binding the failure side when taking an `attempt` apart, say) is not syntactically even a `catch` clause and is out of this rule's scope. [no-discarded-failure--receive-and-surface-it](./no-discarded-failure--receive-and-surface-it.md) handles that.
 
-書き込みはこの状況を何も変えない。変わるのは、別のプロセスが読むかもしれないストリームの中身だけである。同じ関数の続きも、この関数を呼んだ側も、書き込みの有無を観測できない。呼び出し側から見ると、失敗した実行と成功した実行が同じ戻り値・同じ終了コードで返ってくる。
+There is no exemption by file kind. Test code is treated the same.
 
-壊れ方は 2 層ある。
+### The invariant
 
-1 層目は、失敗が呼び出し側に伝わらないことである。呼び出し側は返ってきた値を成功の値として使う。空の配列は「対象が 0 件だった」として扱われ、`null` は「未設定だった」として扱われる。読めなかったという事実は、値の形からは復元できない。
+Whatever runs after a failed operation knows about that failure.
 
-2 層目は、伝わらないことが検査で見つからないことである。テストは通り、型検査も通り、CI も緑になる。このリポジトリで最も嫌われる状態、つまり「lint が緑なのに検査されていない」がここから生まれる。ファイルが読めなかったディレクトリは空のディレクトリとして扱われ、その配下が丸ごと検査対象から消える。消えたことを知らせるのは、誰も読まないストリームの 1 行だけである。
+Reaching a `catch` clause means the operation inside the `try` did not run to the end. The value it was to prepare is absent, or only partly there. Leaving the `catch` clause for the next statement means continuing on top of that incomplete state.
 
-書き込みそのものが悪いのではない。書き込みが**処理の続行と同居している**ことが、この 2 層を作る。止めるか戻すかを決めれば、書き込みは何を足しても構わない。
+A write changes none of that. What changes is the contents of a stream some other process might read. Neither the rest of the same function nor whoever called it can observe whether the write happened. From the caller's side, a failed run and a successful run come back with the same return value and the same exit code.
 
-## どう直すか
+It breaks in two layers.
 
-その `catch` 節が何のためにあるかを決める。答えは 2 つしかない。
+The first is that the failure does not reach the caller. The caller uses the returned value as a success value. An empty array is treated as "there were none", and a `null` as "it was unset". The fact that it could not be read cannot be recovered from the shape of the value.
 
-**止める。** 失敗をそのまま再送出するか、この層の関与を名前にした失敗を投げる。判断は呼び出し側に渡る。
+The second is that the not-reaching is not found by any check. The tests pass, the type check passes, and CI goes green. The state this repository dislikes most — the lint is green and nothing was checked — is born here. A directory that could not be read is treated as an empty directory, and everything under it disappears from what is checked. The only notice of the disappearance is one line in a stream nobody reads.
+
+The write is not the problem in itself. It is the write **living beside continuing** that builds those two layers. Settle on stopping or recovering and any amount of writing is fine.
+
+### Configuration
+
+None. Only whether the rule is on or off is settled by the configuration. The list of output sinks is held by the rule. It is not something that varies per deployment target, and where it changes, the rule itself is repaired.
+
+## Fix
+
+Settle what that `catch` clause is for. There are only two answers.
+
+**Stop.** Rethrow the failure as it is, or throw a failure named after this layer's involvement. The judgment passes to the caller.
 
 ```ts
 try {
@@ -78,9 +99,9 @@ try {
 }
 ```
 
-`cause` を渡せば、元の失敗は失われない。書き込みで残そうとしていた情報は、ここに入れられる。
+Handing over `cause` keeps the original failure. Whatever the write was trying to preserve goes in here.
 
-**戻す。** 失敗したときに呼び出し側が使うべき値を返す。返す値は、失敗したことが分かる形にする。
+**Recover.** Return the value the caller should use on failure. Make the returned value one that shows a failure happened.
 
 ```ts
 const readCatalog = (path: string): Catalog | UnreadableCatalog => {
@@ -92,23 +113,89 @@ const readCatalog = (path: string): Catalog | UnreadableCatalog => {
 };
 ```
 
-「対象が無い」と「対象はあるが読めない」を同じ値に潰さないこと。潰すと、呼び出し側は 2 つを区別できないまま先へ進む。
+Do not collapse "there is nothing" and "there is something and it cannot be read" into one value. Collapse them and the caller moves on unable to tell the two apart.
 
-戻り値の型を変えたくないなら、それは止める側を選ぶべき状況である。
+Where you do not want to change the return type, that is a situation calling for the stopping side.
 
-**書き込みが失敗の報告ではなくプログラム自身の出力なら、`catch` 節から出す。** CLI が結果を書く行が `catch` 節に紛れているなら、それは配置の間違いである。
+**Where the write is the program's own output rather than a report of a failure, take it out of the `catch` clause.** A CLI's result line sitting inside a `catch` clause is a placement error.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- 条件の中に `throw` を置いて止めたことにする。条件が偽の経路は今までどおり進む。このルールは条件付きの停止を停止として数えない
-- `break` や `continue` に置き換える。ループの制御が変わるだけで、失敗した操作の結果を待っていた処理には何も伝わらない
-- 書き込みを `catch` 節の中で定義した関数の中に移す。走査は関数の境界で止まるので報告は消えるが、その関数がどこで走るかは読み手にも分からなくなり、状況は悪くなる
-- 受け手を変数に取ってから呼ぶ（`const write = console.error;` を `catch` の外に置く）。判定はメンバー呼び出しの綴りを見ているので報告は消える。書き込みと続行が同居している状態は変わらない
-- 添字記法で受け手を綴る（`console["error"](failure)`）。同上
-- 出力先をロガーのラッパーに差し替える。このルールが知っている受け手が増えていないだけで、失敗を書いて進んでいることは変わらない。ロガーを入れるなら、その受け手をこのルールに足すのが対になる作業である
-- `return undefined;` を足して止めたことにしたうえで、呼び出し側が戻り値を見ていない。文法上は戻しているが、呼び出し側が失敗を区別できる値を受け取っていない。戻す側を選ぶなら、返す値は失敗したことが分かる形にすること
-- 抑制ディレクティブ
+Code this rule rejects.
 
-## オプション
+```ts
+// a catch clause that writes the failure and carries on is reported
+try {
+  run();
+} catch (failure) {
+  console.error(failure);
+}
+```
 
-取らない。有効か無効かだけを設定側で決める。出力先の一覧はルールが持つ。配備先ごとに変わる性質のものではなく、変わったならルール本体を直す。
+```ts
+// a stop that only happens inside a condition leaves the other paths carrying on
+try {
+  run();
+} catch (failure) {
+  console.error(failure);
+  if (isFatal(failure)) {
+    throw failure;
+  }
+}
+```
+
+Code this rule accepts.
+
+```ts
+// a catch clause that writes to a stream and then recovers is complete
+const read = () => {
+  try {
+    return run();
+  } catch (failure) {
+    process.stderr.write(String(failure));
+    return fallback();
+  }
+};
+```
+
+```ts
+// writing in the finally block is not a report of a caught failure
+try {
+  run();
+} catch (failure) {
+  throw failure;
+} finally {
+  console.log('done');
+}
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Putting the `throw` inside a condition and calling it stopped. The path where the condition is false carries on as before, and this rule does not count a conditional stop as a stop
+- Replacing it with `break` or `continue`. Only the loop's control changes; nothing reaches whatever was waiting on the failed operation's result
+- Moving the write into a function defined inside the `catch` clause. The walk stops at the function boundary so the report clears, and where that function runs becomes unreadable too — the situation is worse
+- Taking the receiver into a variable and calling that (placing `const write = console.error;` outside the `catch`). The judgment reads the spelling of the member call, so the report clears. The write living beside continuing is unchanged
+- Spelling the receiver in subscript notation (`console["error"](failure)`). As above
+- Swapping the sink for a logger wrapper. All that changed is that this rule knows one fewer receiver; writing the failure and carrying on is unchanged. Where a logger is introduced, adding its receiver to this rule is the paired work
+- Adding `return undefined;` to call it stopped while the caller never reads the return. It returns by grammar, but the caller receives no value it can tell a failure from. Choosing the recovering side means returning a value that shows a failure happened
+- A suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `loggedAndContinuedFailure` | A catch clause must not write the failure to an output stream and then let the surrounding code carry on. Choose one of the two endings the caller can act on. Stop: rethrow the failure, or throw one that names this layer's part in it. Recover: return the value the caller should use in place of the missing one, at the same statement level as this write. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->
