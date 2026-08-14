@@ -8,10 +8,12 @@ describe("dont-review-it/no-promise-chain--use-async-await", () => {
     valid: [
       {
         name: "awaiting the value and handling failure in an enclosing try statement is the shape this rule keeps",
+        documented: true,
         code: "const load = async (fetchUser, release) => {\n  try {\n    const user = await fetchUser();\n    return user;\n  } catch (failure) {\n    throw failure;\n  } finally {\n    release();\n  }\n};",
       },
       {
         name: "composing with a static Promise method is a member call whose name is none of the three",
+        documented: true,
         code: "const both = async (first, second) => await Promise.all([first, second]);",
       },
       {
@@ -62,6 +64,7 @@ describe("dont-review-it/no-promise-chain--use-async-await", () => {
     invalid: [
       {
         name: "a then call is reported at the property name",
+        documented: true,
         code: "promise.then(handle);",
         errors: [{ messageId: "promiseChainCall" }],
       },
@@ -102,6 +105,7 @@ describe("dont-review-it/no-promise-chain--use-async-await", () => {
       },
       {
         name: "each link of a chain is reported on its own",
+        documented: true,
         code: "promise.then(handle).catch(recover).finally(close);",
         errors: [
           { messageId: "promiseChainCall" },

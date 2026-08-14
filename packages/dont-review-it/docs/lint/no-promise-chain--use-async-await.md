@@ -1,73 +1,88 @@
+---
+description: "Disallow calling a member named then, catch or finally, so the continuation and the failure handling of an asynchronous call stay on the enclosing function's own control flow"
+---
+
 # no-promise-chain--use-async-await
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-呼び出し式のうち、呼び出し先がメンバー参照であり、そのプロパティ名が静的に `then` / `catch` / `finally` のいずれかへ解決できるもの。判定はこの 2 点だけで決まる。レシーバが実際に Promise かどうかは見ない。
+Disallow calling a member named then, catch or finally, so the continuation and the failure handling of an asynchronous call stay on the enclosing function's own control flow
 
-プロパティ名の静的解決では次を同一視する。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-promise-chain--use-async-await.ts`](../../src/lint/oxlint/rules/no-promise-chain--use-async-await.ts)
 
-- ドット記法の識別子アクセス（`promise.then(handle)`）
-- 添字記法の文字列リテラル（`promise["then"](handle)`）
-- 添字記法の、式を含まないテンプレートリテラル（``promise[`then`](handle)``）
+<!-- END GENERATED rule-header -->
 
-呼び出しの形が違っても、メンバー呼び出しであることが変わらない限り同じく報告する。省略可能連結（`promise?.then(handle)`）、省略可能な呼び出し（`promise.then?.(handle)`）、レシーバへの非 null 表明（`promise!.then(handle)`）、呼び出し先を括弧で囲んだ形（`(promise.then)(handle)`）はいずれも対象になる。
+## Violation
 
-同じ式に該当する呼び出しが複数あるとき（`promise.then(a).catch(b).finally(c)` のような連結）は、それぞれを独立した違反として報告する。1 件にまとめると、1 つ直したあとに残りが見えず、直し切ったかどうかを判定できない。
+A call expression whose callee is a member reference and whose property name resolves statically to `then`, `catch` or `finally`. Those two points settle the judgment. Whether the receiver is actually a promise is not read.
 
-報告位置は呼び出し式全体ではなくプロパティ名そのもの。書き換えるべき箇所とエラー位置を一致させる。
+Static resolution of the property name treats these as the same.
 
-次は検出しない。
+- Identifier access in dot notation (`promise.then(handle)`)
+- A string literal in subscript notation (`promise["then"](handle)`)
+- A template literal carrying no expression, in subscript notation (``promise[`then`](handle)``)
 
-| 形 | 検出しない理由 |
+A different call shape is reported alike as long as it stays a member call. An optional chain (`promise?.then(handle)`), an optional invocation (`promise.then?.(handle)`), a non-null assertion on the receiver (`promise!.then(handle)`) and a parenthesized callee (`(promise.then)(handle)`) are all in scope.
+
+Where several such calls stand in one expression (a chain like `promise.then(a).catch(b).finally(c)`), each is reported as an independent violation. Collapse them into one and, after fixing one, the rest are invisible and whether it is fully fixed cannot be settled.
+
+The report stands on the property name itself rather than on the whole call expression, so the position of the error matches the place to rewrite.
+
+These are not detected.
+
+| Shape | Why it is not detected |
 | --- | --- |
-| `Promise.all([...])` / `Promise.race` / `Promise.allSettled` | メンバー呼び出しではあるが、名前が 3 語のいずれでもない |
-| `new Promise((resolve, reject) => ...)` | メンバー呼び出しではない |
-| `queue.thenable(handle)` / `queue.catchAll(handle)` | 3 語を含むだけで完全一致しない |
-| `queue[key](handle)` / `handlers[0](handle)` | プロパティ名が静的に文字列へ確定しない |
-| ``queue[`th${suffix}`](handle)`` | 式を含むテンプレートは静的に確定しない |
-| `queue["done"](handle)` | 静的に確定するが 3 語のいずれでもない |
-| `const continueWith = promise.then;` | 呼び出しを伴わないメンバー参照。発火位置を呼び出しに限っている |
-| `const box = { then(handle) { return handle; } };` | 定義側は見ない。見るのは呼び出し位置だけ |
-| `this.#then()` | プライベート識別子 `#then` は `then` とは別の名前で、衝突しえない |
-| `try { ... } catch (failure) { ... } finally { ... }` | 構文であってメンバー参照ではない。`catch` は予約語 |
+| `Promise.all([...])` / `Promise.race` / `Promise.allSettled` | A member call, but the name is none of the three |
+| `new Promise((resolve, reject) => ...)` | Not a member call |
+| `queue.thenable(handle)` / `queue.catchAll(handle)` | Merely contains one of the three; no exact match |
+| `queue[key](handle)` / `handlers[0](handle)` | The property name does not settle statically into a string |
+| ``queue[`th${suffix}`](handle)`` | A template carrying an expression does not settle statically |
+| `queue["done"](handle)` | Settles statically but is none of the three |
+| `const continueWith = promise.then;` | A member reference with no call. The firing position is limited to calls |
+| `const box = { then(handle) { return handle; } };` | The defining side is not read; only call positions are |
+| `this.#then()` | The private identifier `#then` is a different name from `then` and cannot collide |
+| `try { ... } catch (failure) { ... } finally { ... }` | Syntax rather than a member reference. `catch` is a reserved word |
 
-このうち根拠が 2 種類ある。「静的に確定しない添字アクセス」はプロパティ名が確定しないという事実に基づく除外で、「呼び出しを伴わないメンバー参照」は検出自体は可能だが発火位置を呼び出しに限るという設計判断に基づく除外である。どちらも書いてよいという意味ではない。後者は「禁じる回避策」で塞ぐ。
+Two kinds of grounds sit in that list. "A subscript that does not settle statically" is an exclusion resting on the fact that the property name is not settled; "a member reference with no call" is an exclusion resting on the design decision to limit the firing position to calls. Neither means it may be written. The latter is closed under forbidden bypasses.
 
-`await` を書けない文脈（非 async 関数の内側など）でも例外にしない。このルールは呼び出しの形だけを見て文脈を見ない。満たすには async 関数へ切り出す。
+A context where `await` cannot be written (inside a non-async function, say) is no exception either. This rule reads the shape of the call and not the context. Satisfying it means carving out an async function.
 
-適用対象のファイル種別で絞り込みもしない。検証コードも生成物も同じに扱う。どこで有効にするか、深刻度をどうするかは、このルールの仕様ではなく設定側の決定として扱う。
+There is no narrowing by file kind either. Verification code and generated output are treated the same. Where to enable it and at what severity are decisions for the configuration side rather than this rule's specification.
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「非同期処理の成功経路と失敗経路が、どちらも呼び出し元関数の字句的な制御フロー上に並んで見える」ことである。保つ形は 3 つに尽きる。非同期の値の取り出しは `await` で行い、結果は後続の文がそのまま使う。失敗時の処理はその `await` を囲む `catch` 節に置く。成否によらない後始末はその `await` を囲む `finally` 節に置く。これが成り立っていれば、ある非同期呼び出しが失敗したときに何が起きるかは、呼び出し位置から外側へ構文木をたどるだけで確定する。読み手も静的解析も、同じ手順で同じ答えに到達する。
+The success path and the failure path of asynchronous work both stand visible, side by side, on the calling function's lexical control flow. Three shapes are the whole of it: an asynchronous value is taken out with `await` and the result is used by the following statements; failure handling goes in the `catch` clause enclosing that `await`; and teardown that runs either way goes in the `finally` clause enclosing it. Hold that, and what happens when an asynchronous call fails is settled by walking the syntax tree outward from the call. A reader and a static analyser reach the same answer by the same steps.
 
-チェーン形式が壊すものは 2 層ある。
+What the chain form breaks has two layers.
 
-1 層目は、失敗処理の見かけと実体がずれることである。チェーンでは失敗ハンドラが引数として渡された関数の中に入る。ハンドラが 1 つ書いてあれば、レビューの読み手には「失敗は処理済み」と映る。実体としてはそのハンドラが受け取った値を捨てているだけ、という状態が、ごく短い書き方で成立してしまう。
+The first is that the appearance and the reality of failure handling drift apart. In a chain the failure handler goes inside a function passed as an argument. With one handler written, a reviewer reads "the failure is handled". The state where that handler merely discards the value it received is available in a very short spelling.
 
-2 層目は、その実体を機械が見に行けなくなることである。失敗処理の中身が妥当か（握りつぶしていないか、再送出や記録をしているか）を検査したいなら、検査対象の構文位置が 1 つに決まっている必要がある。`catch` 節の中身を監査する種類のルールは、その前提の上にしか成り立たない。ハンドラがコールバック引数として散ると、監査側は「どの関数が失敗ハンドラなのか」という別の問題を先に解くことになり、そこで漏れが出る。
+The second is that a machine can no longer go and read that reality. To check whether the failure handling is sound — is it swallowing, does it rethrow or record — the syntactic position under check has to be settled on one place. A rule auditing the contents of a `catch` clause stands only on that premise. Scatter the handlers into callback arguments and the auditing side has to solve "which function is the failure handler" first, and misses come out there.
 
-つまりこのルールの価値は、単体では書き方を揃えるだけに見えるが、実質は失敗処理を `catch` 節という 1 箇所へ集約し、その 1 箇所を別のルールが検査できる状態を作ることにある。
+So this rule's value looks like aligning a spelling on its own, while in substance it gathers failure handling into the one place a `catch` clause is and builds the state where another rule can check that one place.
 
-型を見ないことは意図した過検出である。Promise ではない流暢インターフェースがたまたま同名のメソッドを持つ場合も違反になる。これを許すと、読み手は呼び出しごとにレシーバの型を確認しないと「これは非同期の失敗経路か」を判定できず、不変条件が「読めば分かる」性質を失う。この場合の直し方はまだ決まっていない。別名に包む案はあるが、包む側の実装自体が同名のメンバー呼び出しを含むため、報告が呼び出し箇所からラッパー内部へ移るだけで解消しない。決まるまでは隠さず、その状況自体を報告して例外の要否を判断する材料にする。
+Not reading types is intended over-detection. A fluent interface that is not a promise but happens to carry a method of the same name is a violation too. Allow it and a reader has to confirm the receiver's type at each call to settle "is this an asynchronous failure path", and the invariant loses the property of being readable. The fix for that case has not been settled: wrapping under another name has been proposed, but the wrapper's own implementation contains a member call of the same name, so the report merely moves from the call site into the wrapper. Until it is settled, do not hide it; report the situation itself as material for deciding whether an exception is needed.
 
-## どう直すか
+### Configuration
 
-チェーンの各要素を、対応する構文へ置き換えるだけである。
+None. Only whether the rule is on or off is settled by the configuration.
 
-| チェーンの要素       | 置き換え先                                   |
-| -------------------- | -------------------------------------------- |
-| 結果を使うだけの継続 | `await` した戻り値を、以降の文でそのまま使う |
-| 失敗時の処理         | その `await` を囲む `try` の `catch` 節      |
-| 成否によらない後始末 | その `await` を囲む `try` の `finally` 節    |
+This invariant is valuable because the calling side takes only one shape. Leave room to loosen it in configuration and a reader has to check each loosened place individually, which collapses the premise itself. Whether to make it an option is decided once a case genuinely needing an exclusion list appears.
 
-```ts
-const loadUser = (userId: string): Promise<User> =>
-  fetchUser(userId)
-    .then((user) => normalizeUser(user))
-    .catch((failure) => recoverUser(failure))
-    .finally(() => releaseConnection());
-```
+## Fix
+
+Replace each element of the chain with the corresponding syntax.
+
+| Chain element | Replacement |
+| --- | --- |
+| A continuation that only uses the result | Use the `await`ed return value in the following statements |
+| Handling on failure | The `catch` clause of the `try` enclosing that `await` |
+| Teardown that runs either way | The `finally` clause of the `try` enclosing that `await` |
 
 ```ts
 const loadUser = async (userId: string): Promise<User> => {
@@ -82,7 +97,7 @@ const loadUser = async (userId: string): Promise<User> => {
 };
 ```
 
-失敗することを期待して呼ぶ場合（検証コードなど）は、即時実行関数の中で `try` / `catch` で受け、失敗が起きたかどうかを各経路から `return` する。戻り値は単一の `const` で束縛してから検査する。
+Where a call is made expecting a failure (in verification code, say), receive it with `try` / `catch` inside an immediately invoked function and `return` from each path whether a failure happened. Bind the return value to a single `const` before checking it.
 
 ```ts
 const rejection = await (async () => {
@@ -97,25 +112,74 @@ const rejection = await (async () => {
 expect(rejection).toBeInstanceOf(UserNotFoundError);
 ```
 
-この形なら `catch` 節を空にせずに済み、呼び出しが失敗しなかった場合も `null` として検知できる。失敗の有無を外側のスコープの変数へ記録して後から検査する形は採らない。理由は次節に書く。
+That shape avoids an empty `catch` clause and detects the case where the call did not fail, as `null`. Recording whether a failure happened into a variable in an enclosing scope and checking it later is not taken; the reason is in the next section.
 
-自動修正は提供しない。書き換えには囲む関数を `async` にする必要があり、`await` の導入で評価順序も変わるため、機械的に安全な変換にならない。
+There is no automatic fix. Rewriting requires making the enclosing function `async`, and introducing `await` changes the evaluation order, so it is not a mechanically safe transformation.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-いずれも「不変条件は満たさないが検出だけをすり抜ける」ものである。
+Code this rule rejects.
 
-- 失敗の有無を外側のスコープの変数へ記録し、あとから検査する。`let caught = false;` を置いて `catch` 節で書き換える形は、その宣言と書き込みが `no-reassign--use-spread-or-iife` の違反になる。前節の即時実行関数から返す形を使う
-- 3 語のいずれかを変数や動的なキーへ逃がし、添字で呼ぶ（`const key = "then"; promise[key](handle);`）。検出は外れるが、失敗経路がコールバックの中にある状態は何も変わらない
-- メンバー参照を値として取り出し、間接的に呼び出す（`const continueWith = promise.then; continueWith.call(promise, handle);`）。呼び出し位置で発火する検出を外れるだけである
-- 呼び出し先を型表明で包む（`(promise.then as Continuation)(handle);`）。このルールは呼び出し先を素のメンバー参照としてしか見ないので検出は外れる。不変条件の違反としては同じである
-- 式全体を `void` 演算子や代入で包んで形を変えたつもりになる。包んでもメンバー呼び出しの形は残るし、仮に検出を外せたとしても失敗経路はコールバックの中にある
-- ハンドラを別の補助関数へ切り出し、呼び出し側からチェーンだけを消す。失敗処理の位置が呼び出しから離れるため、元の問題がそのまま残る
+```ts
+// a then call is reported at the property name
+promise.then(handle);
+```
 
-回避したくなる状況が出たときは、隠さずにその状況自体を報告し、例外の要否を決める。
+```ts
+// each link of a chain is reported on its own
+promise.then(handle).catch(recover).finally(close);
+```
 
-## オプション
+Code this rule accepts.
 
-取らない。有効か無効かだけを設定側で決める。
+```ts
+// awaiting the value and handling failure in an enclosing try statement is the shape this rule keeps
+const load = async (fetchUser, release) => {
+  try {
+    const user = await fetchUser();
+    return user;
+  } catch (failure) {
+    throw failure;
+  } finally {
+    release();
+  }
+};
+```
 
-この不変条件は「呼び出し側が 1 つの形しか取らない」ことに価値がある。設定で緩められる余地があると、緩めた箇所を読み手が個別に確認することになり、前提そのものが崩れる。除外リストが要る事例が実際に出てから、オプション化するかどうかを決める。
+```ts
+// composing with a static Promise method is a member call whose name is none of the three
+const both = async (first, second) => await Promise.all([first, second]);
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+Each of these fails the invariant while slipping past the detection.
+
+- Recording whether a failure happened into a variable in an enclosing scope and checking it later. Placing `let caught = false;` and rewriting it in the `catch` clause makes that declaration and that write a violation of [no-reassign--use-spread-or-iife](./no-reassign--use-spread-or-iife.md). Use the immediately invoked function from the previous section
+- Escaping one of the three words into a variable or a dynamic key and calling through a subscript (`const key = "then"; promise[key](handle);`). The detection comes off, and the failure path is still inside a callback
+- Taking the member reference as a value and calling it indirectly (`const continueWith = promise.then; continueWith.call(promise, handle);`). It merely leaves a detection that fires at call positions
+- Wrapping the callee in a type assertion (`(promise.then as Continuation)(handle);`). This rule reads the callee only as a bare member reference, so the detection comes off. As a breach of the invariant it is the same
+- Wrapping the whole expression in a `void` operator or an assignment to think the shape changed. Wrapping leaves the member call shape, and even if the detection came off the failure path is still inside a callback
+- Carving the handlers into another helper and deleting only the chain from the call site. The position of the failure handling moves away from the call, so the original problem stays as it is
+
+Where a situation makes you want to evade, do not hide it: report the situation itself and decide whether an exception is needed.
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `promiseChainCall` | Calling a member named \`{{method}}\` is forbidden. Await the asynchronous value and let the following statements use it, and move the failure handling into the \`catch\` clause and the cleanup into the \`finally\` clause of a \`try\` statement that encloses that \`await\`. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->
