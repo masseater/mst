@@ -1,99 +1,151 @@
+---
+description: "Require a package to declare either the surface it is run through or the surface it is imported through, so which discipline owns the package is decided by its manifest instead of by whoever reaches into it next"
+---
+
 # no-mixed-package-surface--declare-one-surface
 
-このルールは出荷する preset に載っていない。使う側が名前を書いて初めて効く。理由は「既定で配らない理由」に書いた。
+<!-- BEGIN GENERATED rule-header -->
 
-## 何を検出するか
+Require a package to declare either the surface it is run through or the surface it is imported through, so which discipline owns the package is decided by its manifest instead of by whoever reaches into it next
 
-検査しているファイルを支配しているマニフェスト、つまりそのファイルから上に辿って最初に見つかる `package.json` を読み、そこに宣言された「面」を数える。面は 2 種類しかない。実行される面（実行可能エントリ）と、import される面（公開エントリと型の公開エントリ）である。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: no
+- Source: [`no-mixed-package-surface--declare-one-surface.ts`](../../src/lint/oxlint/rules/no-mixed-package-surface--declare-one-surface.ts)
 
-報告は 3 つある。
+<!-- END GENERATED rule-header -->
 
-- `mixedPackageSurface` — 区分の宣言が無いパッケージが、両方の面を宣言している
-- `importSurfaceOnRunnablePackage` — 実行専用として登録されたパッケージが、import される面を宣言している
-- `runnableEntryOnImportablePackage` — ライブラリとして登録されたパッケージが、実行可能エントリを宣言している
+## Violation
 
-マニフェスト自体は静的解析器の入力に入らないので、報告はそのマニフェストが支配するソースファイルの側に出る。同じパッケージの各ファイルにそれぞれ 1 件出る。1 箇所にまとめると、受け取った側が「自分のファイルの話ではない」と読む余地が生まれる。
+The manifest governing the file being checked — the first `package.json` found walking up from that file — is read, and the surfaces declared in it are counted. There are only two kinds of surface: the surface that is run (a runnable entry) and the surface that is imported (a public entry and a type entry).
 
-### 面として数える宣言
+Three reports.
 
-| マニフェストの欄                                    | 数える面        |
-| --------------------------------------------------- | --------------- |
-| `bin`                                               | 実行される面    |
-| `exports` / `main` / `module` / `types` / `typings` | import される面 |
+- `mixedPackageSurface` — a package declaring no classification declares both surfaces
+- `importSurfaceOnRunnablePackage` — a package registered as run-only declares an imported surface
+- `runnableEntryOnImportablePackage` — a package registered as a library declares a runnable entry
 
-`exports` は条件分岐と入れ子を辿り、実体を指す文字列に 1 つでも届けば宣言されているとみなす。配列で書かれた代替も辿る。入れ子が深くなりすぎたところで打ち切るのは、この判定が他のマニフェスト読み取りと同じ上限を共有しているためである。
+The manifest itself is not among the static analyser's inputs, so the report stands on the source files that manifest governs. One report per file of that package. Gather them into one place and whoever receives it has room to read it as "not about my file".
 
-### 意図的に対象にしない形
+### Declarations counted as a surface
 
-| 形 | 対象にしない理由 |
+| Manifest field | Surface counted |
 | --- | --- |
-| `scripts` のタスク定義 | タスクは面ではない。誰かが呼び出す手順であって、外から到達できる入口ではない |
-| `exports` がマニフェスト自身にしか届かない場合 | 公開しているのはマニフェストであって実装ではない。実行専用パッケージが持つ正常な形である |
-| 面として宣言されていない内部ファイル | テストや内部の型定義は、置いてあるだけでは入口にならない |
-| 空・空白だけの宣言 | 書かれているだけで何も指していない |
-| 実行可能エントリが複数あること | 見ているのは面の種別が 1 つであることで、1 つの面の中の入口の数は見ない |
-| 理由付きで例外として登録されたパッケージ | 登録された事実そのものが判断の記録になる |
+| `bin` | The surface that is run |
+| `exports` / `main` / `module` / `types` / `typings` | The surface that is imported |
 
-面の中身が適切か（公開しすぎていないか、内部実装が漏れていないか）と、どこまでを 1 パッケージにするかの分割粒度は、このルールの外にある。
+`exports` is walked through its conditions and nesting, and counts as declared where even one string reaching a real file is found. Alternatives written as arrays are walked too. The walk is cut off where the nesting grows too deep, because this judgment shares that cap with the other manifest readers.
 
-## なぜそれが要るか
+### Deliberately out of scope
 
-守っている不変条件は「1 つのパッケージが宣言する面は 1 種類だけ」である。
+| Shape | Why it is left out |
+| --- | --- |
+| Task definitions in `scripts` | A task is not a surface. It is a procedure somebody invokes, not a way in reachable from outside |
+| An `exports` reaching only the manifest itself | What is published is the manifest, not the implementation. This is the normal shape for a run-only package |
+| Internal files declared as no surface | Tests and internal type declarations are not ways in merely by sitting there |
+| An empty or whitespace-only declaration | Written but naming nothing |
+| Several runnable entries | What is read is that the kind of surface is one; the number of entries inside one surface is not read |
+| A package registered as an exception with a reason | The fact of the registration is itself the record of the judgment |
 
-観測される事象は、スクリプトを置くために作ったパッケージが、いつの間にか他所から import されるユーティリティ置き場になっていることである。
+Whether the contents of a surface are right (does it publish too much, does an internal implementation leak) and how coarsely to split packages both sit outside this rule.
 
-1 層目は、両方の面を持つパッケージがどちらの規律の下にあるか決まらないことである。実行専用なら公開面の互換を気にせず中身を動かせる。import される面を持った瞬間、他パッケージの都合が入って動かせなくなる。逆にライブラリへ実行可能エントリを足すと、その実行経路だけが依存の宣言から漏れる。実行される側は誰にも import されないので、依存元の宣言に現れないまま実行時に必要なものを増やしていく。
+### The invariant
 
-2 層目は、置き場所の禁止だけでは置き場所が移動して終わることである。リポジトリ直下のスクリプト置き場を禁じる規律が言う「所有者のあるパッケージへ移せ」は、移動先の形を決めていない。移した先が両面を持つと、リポジトリ直下の「何でも置ける場所」が名前を変えて復活する。復活したことは、置き場所を見ている側からは観測できない。
+One package declares one kind of surface.
 
-3 層目は、面の宣言がマニフェストのテキストであり、混在が静的に見えることである。見えているのに検査していない状態は、規律の主張と機構の間の空白そのものである。
+What is observed is a package made for holding scripts that has, at some point, become a utility store other places import.
 
-## どう直すか
+The first layer is that a package holding both surfaces has no settled discipline. Run-only means the contents can move without regard for the compatibility of a public surface. The moment it holds an imported surface, other packages' concerns enter and it stops moving. Conversely, adding a runnable entry to a library leaves that one execution route missing from the dependency declarations: what is run is imported by nobody, so it accumulates run-time requirements that never appear in a dependent's declaration.
 
-面を 2 つに割る。実行する部分を実行専用パッケージへ、共有される実装を import されるパッケージへ分け、前者が後者に依存する。分けた後、実行専用の側は `bin` だけを、実装の側は `exports` だけを宣言する。
+The second layer is that forbidding a location alone only relocates the location. The discipline forbidding a script store directly under the repository says "move it into a package with an owner" without settling the shape of the destination. Where the destination holds both surfaces, the "anything goes here" spot under the repository root is reborn under another name. That rebirth cannot be observed from the side watching locations.
 
-割る前に、そのパッケージが今どちらとして使われているかを数える。他のパッケージからの import が 1 件も無ければ、消すべきなのは `exports` の側である。実行経路が誰からも呼ばれていなければ、消すべきなのは `bin` の側である。どちらも使われているときだけ、割る作業が必要になる。
+The third layer is that surface declarations are text in the manifest, so the mixture is statically visible. Visible and unchecked is precisely the gap between what the discipline claims and what the mechanism does.
 
-区分を宣言しておくと、片方の面が後から足されたことも報告される。実行専用として登録したパッケージに `exports` が足されれば、両面が揃うのを待たずにその時点で報告が出る。
+### Configuration
 
-## 禁じる回避策
+A table of classifications and a table of exceptions. Both are written as pairs of a package name and a reason.
 
-- **import される面を宣言せずに、他パッケージから深いパスで直接読む。** 宣言が消えるだけで依存の実体は残る。パッケージ名から始まる深いパスは、正規化を経て同じパッケージへの到達として扱われる
-- **例外として登録して両面を持ち続ける。** 例外は割る作業の締め切りを持つときのもので、恒久的な区分ではない
-- **`main` を消して `types` だけ残す。** 型の公開エントリも import される面である
-- **実行可能エントリをタスク定義に書き換えて、外から呼べる状態を残す。** タスクは面ではないので報告は消えるが、その場合は本当にタスクとしてしか呼べなくなっていることを確かめる
+`runnablePackages` registers packages as run-only, and `importablePackages` registers them as libraries. A package with no classification is asked only not to hold both. The classification is split across two tables rather than written in one field so that the classification's value does not itself become vocabulary inside the configuration. Which table it is written in is the classification.
 
-## オプション
+`exceptions` are the packages whose reports are stopped. A registration whose reason is empty or whitespace-only does not count as an exception. Let an exception without a reason through and clearing a report becomes one line of configuration, with the clearing invisible in the check's output.
 
-区分の表と例外の表を持つ。どちらもパッケージ名と理由文の組で書く。
+On the classification tables, a registration with an empty reason stays alive. A classification registration only makes the check stricter, so dropping it because no reason was written would turn a configuration defect straight into a looser check. An empty reason is refused by the schema.
 
-`runnablePackages` は実行専用として登録するパッケージ、`importablePackages` はライブラリとして登録するパッケージである。区分を書いていないパッケージには「両面を持たない」だけを要求する。区分を 1 つの欄で書かずに 2 つの表に分けたのは、区分の値そのものが設定の中の語彙になるのを避けるためである。どちらの表に書いたかが区分になる。
+Package names are matched exactly against the manifest's `name`. A manifest declaring no `name` is called by its directory relative to the repository root.
 
-`exceptions` は報告を止めるパッケージである。理由文が空、または空白だけの登録は、例外として数えない。理由の無い例外を通すと、報告を消す操作が設定 1 行で書けて、しかも消えたことが検査の出力に現れなくなる。
+### Why it is not shipped in the preset
 
-区分の表の側では、理由文が空でも登録は生きたままにしてある。区分の登録は検査を厳しくする方向にしか働かないので、理由が書かれていないことを理由に登録を落とすと、設定の不備がそのまま検査の緩みになる。空の理由文はスキーマが弾く。
+This rule is not in the shipped preset; it takes effect only once a consumer writes its name.
 
-パッケージ名の照合は、マニフェストの `name` に対する完全一致である。`name` を宣言していないマニフェストは、リポジトリ根からの相対ディレクトリで呼ばれる。
+Enabling it reports any package that already declares both a runnable entry and a public entry. There are two ways to clear such a report, and both move the package's own structure: split the package in two so the run surface and the import surface are separate, or write a reason with a deadline and register an exception. Which to choose is a decision apart from whether to adopt this lint rule.
 
-## 導入時に測ったこと
+Putting it in the shipped preset would push that decision onto whoever adopts the preset. A repository already holding a package with both surfaces goes red the moment it `extends` the preset, and is forced to move its structure or write an exception before it has considered the rule at all. So it is left out, and a repository that has decided to keep one surface per package writes the name into `rules` to enable it.
 
-このリポジトリの 6 つのマニフェストに対してルールを走らせたところ、報告は 1 件だった。
+## Fix
 
-| パッケージ                 | 実行される面 | import される面 |
-| -------------------------- | ------------ | --------------- |
-| `mst`（根）                | 無し         | 無し            |
-| `website`                  | 無し         | 無し            |
-| `@mst/agentic-documents`   | `bin`        | 無し            |
-| `@mst/dont-review-it`      | `bin`        | `exports`       |
-| `@mst/lint-rule-authoring` | 無し         | `exports`       |
-| `@mst/repository-checks`   | 無し         | `exports`       |
+Split the surfaces in two. Move the running part into a run-only package and the shared implementation into an imported package, with the former depending on the latter. After the split, the run-only side declares only `bin` and the implementation side only `exports`.
 
-`@mst/agentic-documents` が報告されないのは、`exports` がマニフェスト自身にしか届いていないからである。`@mst/dont-review-it` は実行可能エントリと公開エントリを両方宣言しているため報告される。
+Before splitting, count which one the package is currently used as. With not one import from another package, what to delete is the `exports` side. With the execution route called by nobody, what to delete is the `bin` side. Only where both are in use is a split needed.
 
-## 既定で配らない理由
+Declaring the classification also reports a surface added later. Add `exports` to a package registered as run-only and the report comes out then, without waiting for both surfaces to line up.
 
-このルールを有効にすると、`@mst/dont-review-it` が報告される。上の表のとおり、このパッケージは実行可能エントリと公開エントリを両方宣言しているためである。
+<!-- BEGIN GENERATED examples -->
 
-報告を消す手段は 2 つあり、どちらもパッケージの構成そのものを動かす。パッケージを 2 つに割って実行される面と import される面を分けるか、期限付きの理由を書いて例外に登録するかである。どちらを選ぶかは、この lint ルールを入れるかどうかとは別の判断になる。
+Code this rule rejects.
 
-出荷する preset に載せるということは、この判断を採用者に押し付けることでもある。既に両方の面を持つパッケージを抱えているリポジトリは、preset を `extends` した時点で赤くなり、ルールの是非を検討する前に構成を動かすか例外を書くかを迫られる。載せないほうを選び、面を 1 つに保つ規律を採ると決めたリポジトリが `rules` に名前を書いて有効にする形にする。
+```ts
+// a manifest that declares a runnable entry and an import surface carries both
+export const shipped = true;
+
+```
+
+```ts
+// a package registered as importable is reported for the runnable entry it declares
+export const shipped = true;
+
+```
+
+Code this rule accepts.
+
+```ts
+// a package that declares one runnable entry and no import surface is the asked-for shape
+export const shipped = true;
+
+```
+
+```ts
+// task definitions are not a surface
+export const shipped = true;
+
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- **Declaring no imported surface and reading it from another package by a deep path.** Only the declaration disappears; the dependency stays real. A deep path starting from the package name is normalized and treated as reaching the same package
+- **Registering an exception and keeping both surfaces.** An exception is for holding a deadline on the splitting work, not for a permanent classification
+- **Deleting `main` and keeping only `types`.** A type entry is an imported surface too
+- **Rewriting the runnable entry as a task definition while it stays callable from outside.** A task is not a surface so the report clears, and in that case confirm it really has become callable only as a task
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `mixedPackageSurface` | A package must not declare both the surface it is run through and the surface it is imported through. \`{{packageName}}\` declares a runnable entry at {{runnableFields}} and an import surface at {{importableFields}} in \`{{manifestPath}}\`. Split the two surfaces into two packages, keep the runnable entry in the package that is only run, keep the import entries in the package that is only imported, and declare a dependency from the first on the second. |
+| `importSurfaceOnRunnablePackage` | A package registered as run-only must not declare an import surface. \`{{packageName}}\` is registered as a package that is only run, and \`{{manifestPath}}\` declares an import surface at {{importableFields}}. Move the shared implementation into a package that declares only import entries, declare a dependency on that package from here, and leave this manifest holding its runnable entry alone. |
+| `runnableEntryOnImportablePackage` | A package registered as importable must not declare a runnable entry. \`{{packageName}}\` is registered as a package that is only imported, and \`{{manifestPath}}\` declares a runnable entry at {{runnableFields}}. Move that entry into a package that declares only a runnable entry, and declare a dependency from that package on this one. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->
