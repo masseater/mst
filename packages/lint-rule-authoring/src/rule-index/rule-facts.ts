@@ -12,6 +12,7 @@ export type LintRuleFacts = {
   readonly fixable: boolean;
   readonly hasSuggestions: boolean;
   readonly configurable: boolean;
+  readonly shipped: boolean;
 };
 
 type ConstantsByName = ReadonlyMap<string, UnknownFields>;
@@ -138,13 +139,12 @@ const ruleNameOf = ({
 };
 
 const descriptionOf = ({
-  meta,
+  docs,
   constants,
 }: {
-  readonly meta: UnknownFields;
+  readonly docs: UnknownFields | null;
   readonly constants: ConstantsByName;
 }): string => {
-  const docs = propertyOf(meta, "docs");
   const descriptionNode = docs === null ? null : propertyOf(docs, "description");
   if (descriptionNode === null) return "";
   return resolveText({ node: descriptionNode, constants, visited: [] }) ?? "";
@@ -167,15 +167,18 @@ const factsOf = ({
 
   const schema = propertyOf(meta, "schema");
   const suggestionsFlag = propertyOf(meta, "hasSuggestions");
+  const docs = propertyOf(meta, "docs");
+  const shippedFlag = docs === null ? null : propertyOf(docs, "shipped");
 
   return [
     {
       name: ruleNameOf({ definition, constants, sourcePath }),
-      description: descriptionOf({ meta, constants }),
+      description: descriptionOf({ docs, constants }),
       sourcePath,
       fixable: propertyOf(meta, "fixable") !== null,
       hasSuggestions: suggestionsFlag?.value === true,
       configurable: schema !== null && Array.isArray(schema.elements) && schema.elements.length > 0,
+      shipped: shippedFlag?.value !== false,
     },
   ];
 };

@@ -60,6 +60,7 @@ export const noMixedPackageSurface = createDontReviewItRule({
       description:
         "Require a package to declare either the surface it is run through or the surface it is imported through, so which discipline owns the package is decided by its manifest instead of by whoever reaches into it next",
       relatedGuidelines: [],
+      shipped: false,
     },
     messages: {
       mixedPackageSurface:
