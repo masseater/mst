@@ -1,54 +1,77 @@
+---
+description: "Disallow assembling the subject of an assertion in the assertion itself or in a binding the spec filled with a value it wrote, so a comparison pins the shape the code under test produced rather than the bag the spec packed for it"
+---
+
 # no-expect-synthetic-subject--yield-from-fixture
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-spec ファイルの中の `expect(...)` について、第一引数に置かれた subject を見る。`expect.soft(...)` / `expect.poll(...)` も同じ入口として扱う。`expect.assertions(2)` のような名前空間のユーティリティ呼び出しは根が `expect` の呼び出しにならないので、構造的に外れる。
+Disallow assembling the subject of an assertion in the assertion itself or in a binding the spec filled with a value it wrote, so a comparison pins the shape the code under test produced rather than the bag the spec packed for it
 
-対象のファイルはファイル名の接尾辞で決める。既定は `.test.ts` と `.test.tsx` で、`specFileSuffixes` で差し替えられる。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-expect-synthetic-subject--yield-from-fixture.ts`](../../src/lint/oxlint/rules/no-expect-synthetic-subject--yield-from-fixture.ts)
 
-第一引数は、型アサーション・`satisfies`・非 null アサーション・括弧・オプショナルチェーン・`await` を剥いでから読む。剥いだ結果が次のいずれかであるとき報告する。
+<!-- END GENERATED rule-header -->
 
-| 剥いだ結果                 | 例                                     |
-| -------------------------- | -------------------------------------- |
-| オブジェクトリテラル       | `expect({ status, body })`             |
-| 配列リテラル               | `expect([first, second])`              |
-| リテラル                   | `expect("a")` / `expect(null)`         |
-| 置換を持たないテンプレート | ``expect(`a`)``                        |
-| `undefined` と `void` 式   | `expect(undefined)` / `expect(void 0)` |
-| 負号の付いたリテラル       | `expect(-1)`                           |
-| `new` 式                   | `expect(new Report(input))`            |
+## Violation
 
-短縮記法のプロパティ（`expect({ value })`）はオブジェクトリテラルとして読む。値を袋に入れる書き方であることは変わらない。
+For an `expect(...)` in a spec file, the subject placed in the first argument is read. `expect.soft(...)` and `expect.poll(...)` are treated as the same way in. A namespace utility call such as `expect.assertions(2)` does not have a call to `expect` at its root and falls out structurally.
 
-もう 1 つ、上のいずれかを初期化子に持つ束縛を subject にした形を報告する。束縛の探索はスコープをたどるので、`it` の中でも、囲む `describe` でも、ファイルの先頭でも同じに読む。初期化子が別の束縛である場合はそこからさらにたどり、最初に書き出された値に届いた時点で報告する。同じ束縛へ戻る初期化子は、値に届かないものとしてそこで打ち切る。
+The files in scope are settled by the file name suffix. The default is `.test.ts` and `.test.tsx`, replaceable through `specFileSuffixes`.
 
-報告は 2 通りに分かれる。値がアサーションの中に直接書かれている形と、束縛を経由してアサーションに渡っている形で、直し方の書き出しが変わる。
+The first argument is read with type assertions, `satisfies`, non-null assertions, parentheses, optional chains and `await` peeled off. The report stands where what is left is one of these.
 
-### 意図的に広げていない範囲
-
-| 形 | 対象にしない理由 |
+| What is left | Example |
 | --- | --- |
-| 裸の識別子で、初期化子が読めないもの | fixture から分割代入で受け取った subject がここに入る。この不変条件は満たされている |
-| 初期化子が呼び出しの結果である束縛 | 何が返るかは spec が書いた値ではない。SUT の出力を受けた束縛がここに入る |
-| 呼び出し式・タグ付きテンプレート | `no-expect-call-expression--yield-from-fixture` が引き受ける |
-| メンバー式 | `no-expect-projected-subject--use-tostrictequal-on-subject` が引き受ける |
-| マッチャの引数に置かれたリテラル | 期待値の側であって subject ではない。このルールが読むのは `expect(...)` の第一引数だけである |
-| 置換を持つテンプレート | 書き出された値ではなく、束縛から組み立てた値である |
-| 別ファイルで初期化された束縛 | 初期化子がこの実行系から読めない。読めないものを違反として扱わない |
+| An object literal | `expect({ status, body })` |
+| An array literal | `expect([first, second])` |
+| A literal | `expect("a")` / `expect(null)` |
+| A template carrying no substitution | ``expect(`a`)`` |
+| `undefined` and a `void` expression | `expect(undefined)` / `expect(void 0)` |
+| A literal carrying a minus sign | `expect(-1)` |
+| A `new` expression | `expect(new Report(input))` |
 
-最後の 1 つは実装の都合ではなく、静的解析の原理的な限界である。ここに隠せば検出は届かないが、届かないことは許していることを意味しない。禁じる回避策の節に名前を挙げてある。
+A shorthand property (`expect({ value })`) is read as an object literal. It is still a way of packing a value into a bag.
 
-## なぜそれが要るか
+One more shape is reported: a subject that is a binding whose initializer is any of the above. The search for a binding follows scope, so it reads the same inside an `it`, in an enclosing `describe`, and at the head of the file. Where the initializer is another binding, it is followed from there, and the report stands the moment a written-out value is reached. An initializer returning to the same binding is cut off there as not reaching a value.
 
-守っている不変条件は「アサーションの subject は fixture から受け取った既存の束縛である」ことである。
+Reports divide into two: a value written straight into the assertion, and a value reaching the assertion through a binding. The opening of the fix differs between them.
 
-`expect({ status, body })` と書けるなら、テストの作者は SUT の出力のうちどの部分を袋に入れるかをアサーションの中で選べる。選ばれなかったフィールドはアサーションの対象から外れ、増えても減っても改名されても落ちない。厳密比較のマッチャを当てていても、比較されているのは作者が組んだ袋であって SUT の出力ではない。テストが主張しているのは「この subject はこの形をしている」ではなく「私が今作った袋は、私が書いた期待値と等しい」になる。
+### Deliberately not widened
 
-袋を一度ローカル束縛に入れてから渡す形も同じである。アサーションの行だけが裸の識別子に見えるようになるだけで、袋を組んだのは spec のままである。この群の他のルールは「fixture が返した subject」を基準に判定するので、subject の出所が spec の中にあると判定の基盤ごと崩れる。
+| Shape | Why it is left out |
+| --- | --- |
+| A bare identifier whose initializer cannot be read | A subject destructured from the fixture lands here. This invariant already holds |
+| A binding whose initializer is the result of a call | What it returns is not a value the spec wrote. A binding receiving the subject under test's output lands here |
+| A call expression, a tagged template | [no-expect-call-expression--yield-from-fixture](./no-expect-call-expression--yield-from-fixture.md) takes them |
+| A member expression | [no-expect-projected-subject--use-tostrictequal-on-subject](./no-expect-projected-subject--use-tostrictequal-on-subject.md) takes it |
+| A literal placed in a matcher's argument | That is the expected side, not the subject. This rule reads only the first argument of `expect(...)` |
+| A template carrying a substitution | Not a written-out value but one assembled from bindings |
+| A binding initialized in another file | The initializer cannot be read by this runtime. What cannot be read is not treated as a violation |
 
-## どう直すか
+The last one is a limit of static analysis in principle rather than a convenience of the implementation. Hide there and the detection does not reach, but not reaching does not mean it is allowed. It is named in the forbidden bypasses section.
 
-袋に入れようとしていた値を fixture から返し、その束縛を厳密比較する。
+### The invariant
+
+The subject of an assertion is an existing binding received from the fixture.
+
+Where `expect({ status, body })` can be written, the test's author gets to choose inside the assertion which parts of the subject under test's output go into the bag. The fields not chosen fall outside what the assertion covers, and it does not fail when they are added, removed or renamed. Even with a strict matcher applied, what is being compared is the bag the author packed, not the output of the subject under test. What the test claims is not "this subject has this shape" but "the bag I just made equals the expected value I wrote".
+
+Putting the bag into a local binding first is the same. Only the assertion line comes to look like a bare identifier, while the spec is still what packed the bag. The other rules of this bundle judge against "the subject the fixture returned", so with the subject's origin inside the spec, the ground for those judgments collapses.
+
+### Configuration
+
+`specFileSuffixes` alone. The default is `.test.ts` and `.test.tsx`, shared as one range across the rules of this bundle.
+
+There is no setting for excluding individual cases. Make one mouth for excluding and moving the bag there becomes a way past this rule.
+
+## Fix
+
+Return the value you were about to bag from the fixture, and compare that binding strictly.
 
 ```ts
 const test = baseTest.extend("suffixes", () => DEFAULT_SPEC_FILE_SUFFIXES);
@@ -58,21 +81,76 @@ test("ships a suffix for each spec file extension", ({ suffixes }) => {
 });
 ```
 
-SUT が実際にはその形の値を返していないなら、アサーションの側で辻褄を合わせるのではなく、SUT の返り値か、アサーションの対象そのものを見直す。
+Where the subject under test does not actually return a value of that shape, rework the return value, or what the assertion is about, instead of making the assertion side add up.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- リテラルを spec のローカル変数に一度入れて、その束縛を渡す。初期化子までたどるので同じ違反として落ちる
-- 束縛を何段か経由させて初期化子を遠ざける。再束縛は最後までたどる
-- 型アサーション・`satisfies`・非 null アサーション・括弧・`await` で包んで見た目を変える。剥がされる
-- `not` / `resolves` / `rejects` を挟む。subject の位置は変わらない
-- オブジェクトリテラルを配列リテラルや `new` 式や置換のないテンプレートに置き換える。どれも subject の位置で作った値であることは変わらず、同じ範囲に入る
-- アサーションをフィールド単位に割って `expect(report.id)` の形に逃がす。射影の側のルールに当たる
-- 袋を組む処理を別ファイルに移し、その呼び出し結果を束縛に受ける。初期化子が読めなくなるので報告は消えるが、subject を spec が組んでいることは変わらない
-- 抑制ディレクティブ
+Code this rule rejects.
 
-## オプション
+```ts
+// an object literal in the subject position is a bag the spec packed
+// in report.test.ts
+test("carries the id", ({ status, body }) => {
+  expect({ status, body }).toStrictEqual({ status: 200, body: "a" });
+});
+```
 
-`specFileSuffixes` だけを取る。既定は `.test.ts` と `.test.tsx` で、この群のルールが同じ範囲を共有する。
+```ts
+// a binding filled in the test block carries the bag to the assertion
+// in report.test.ts
+test("carries the id", ({ status, body }) => {
+  const bag = { status, body };
+  expect(bag).toStrictEqual({ status: 200, body: "a" });
+});
+```
 
-個別のケースを外す設定は置かない。外せる口を 1 つ作れば、そこへ袋を移すだけでこのルールを通せるようになる。
+Code this rule accepts.
+
+```ts
+// a binding the fixture handed over is the subject this rule asks for
+// in report.test.ts
+test("carries the id", ({ report }) => {
+  expect(report).toStrictEqual({ id: "a" });
+});
+```
+
+```ts
+// a binding holding what a call returned is not a value the spec wrote
+// in report.test.ts
+const report = summarise(input);
+test("carries the id", () => {
+  expect(report).toStrictEqual({ id: "a" });
+});
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Putting the literal into a local variable in the spec first and handing that binding over. Initializers are followed, so it falls as the same violation
+- Routing through several bindings to put distance between it and the initializer. Rebindings are followed to the end
+- Wrapping in a type assertion, `satisfies`, a non-null assertion, parentheses or `await` to change the look. They are peeled
+- Inserting `not`, `resolves` or `rejects`. The subject's position does not move
+- Replacing the object literal with an array literal, a `new` expression or a template with no substitution. All of them are still values made in the subject position, and they fall in the same range
+- Splitting the assertion per field and escaping into `expect(report.id)`. That lands on the projection rule
+- Moving the bag-packing into another file and receiving its call result into a binding. The initializer becomes unreadable so the report clears, but the spec is still packing the subject
+- A suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `syntheticSubject` | The subject of an assertion must not be a value assembled inside \`expect\`. This one is {{shape}}. Move the value into a fixture, return it from there, and assert the binding the fixture hands over. Respelling the same value as an array literal, a template without substitutions or a \`new\` call is read the same way, and a type assertion, a non-null assertion or a chain modifier around it is stripped before this reading. |
+| `boundSyntheticSubject` | The subject of an assertion must not be a binding the spec filled with a value it wrote itself. \`{{name}}\` holds {{shape}}. Return that value from a fixture and assert the binding the fixture hands over. Splitting the value across further bindings leaves the same written-out value at the end of the chain. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

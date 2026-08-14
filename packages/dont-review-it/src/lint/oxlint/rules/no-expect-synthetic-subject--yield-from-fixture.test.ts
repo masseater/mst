@@ -18,11 +18,13 @@ describe("dont-review-it/no-expect-synthetic-subject--yield-from-fixture", () =>
     valid: [
       {
         name: "a binding the fixture handed over is the subject this rule asks for",
+        documented: true,
         filename: SPEC_FILE,
         code: 'test("carries the id", ({ report }) => {\n  expect(report).toStrictEqual({ id: "a" });\n});',
       },
       {
         name: "a binding holding what a call returned is not a value the spec wrote",
+        documented: true,
         filename: SPEC_FILE,
         code: 'const report = summarise(input);\ntest("carries the id", () => {\n  expect(report).toStrictEqual({ id: "a" });\n});',
       },
@@ -126,6 +128,7 @@ describe("dont-review-it/no-expect-synthetic-subject--yield-from-fixture", () =>
     invalid: [
       {
         name: "an object literal in the subject position is a bag the spec packed",
+        documented: true,
         filename: SPEC_FILE,
         code: 'test("carries the id", ({ status, body }) => {\n  expect({ status, body }).toStrictEqual({ status: 200, body: "a" });\n});',
         errors: [{ messageId: "syntheticSubject", data: { shape: OBJECT_LITERAL } }],
@@ -204,6 +207,7 @@ describe("dont-review-it/no-expect-synthetic-subject--yield-from-fixture", () =>
       },
       {
         name: "a binding filled in the test block carries the bag to the assertion",
+        documented: true,
         filename: SPEC_FILE,
         code: 'test("carries the id", ({ status, body }) => {\n  const bag = { status, body };\n  expect(bag).toStrictEqual({ status: 200, body: "a" });\n});',
         errors: [
