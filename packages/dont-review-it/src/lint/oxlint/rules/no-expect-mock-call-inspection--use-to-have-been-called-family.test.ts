@@ -10,6 +10,7 @@ describe("dont-review-it/no-expect-mock-call-inspection--use-to-have-been-called
     valid: [
       {
         name: "the arguments a mock was called with, claimed by the matcher that names them",
+        documented: true,
         filename: SPEC_FILE,
         code: 'test("addresses the recipient", ({ sendMail }) => {\n  expect(sendMail).toHaveBeenCalledWith("a@example.com");\n});',
       },
@@ -55,6 +56,7 @@ describe("dont-review-it/no-expect-mock-call-inspection--use-to-have-been-called
       },
       {
         name: "a fixture handing the mock binding itself back is the shape this rule asks for",
+        documented: true,
         filename: SPEC_FILE,
         code: 'const sendMail = vi.fn();\nconst test = baseTest.extend("sendMail", () => sendMail);\ntest("addresses the recipient", ({ sendMail }) => {\n  expect(sendMail).toHaveBeenCalledWith("a@example.com");\n});',
       },
@@ -150,6 +152,7 @@ describe("dont-review-it/no-expect-mock-call-inspection--use-to-have-been-called
     invalid: [
       {
         name: "the recorded calls compared as a value",
+        documented: true,
         filename: SPEC_FILE,
         code: 'const sendMail = vi.fn();\ntest("records the send", () => {\n  expect(sendMail.mock.calls).toStrictEqual([["a@example.com"]]);\n});',
         errors: [{ messageId: "inspectedCallRecord", data: { matcher: "toStrictEqual" } }],
@@ -332,6 +335,7 @@ describe("dont-review-it/no-expect-mock-call-inspection--use-to-have-been-called
       },
       {
         name: "a fixture handing the record back as its subject",
+        documented: true,
         filename: SPEC_FILE,
         code: 'const sendMail = vi.fn();\nconst test = baseTest.extend("sent", () => sendMail.mock.calls);',
         errors: [{ messageId: "fixtureYieldsCallRecord", data: { fixture: "sent" } }],
