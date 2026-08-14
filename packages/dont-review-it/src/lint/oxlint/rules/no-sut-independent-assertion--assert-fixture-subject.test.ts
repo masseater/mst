@@ -10,6 +10,7 @@ describe("dont-review-it/no-sut-independent-assertion--assert-fixture-subject", 
     valid: [
       {
         name: "a subject the fixture handed over is compared against a value written in the spec",
+        documented: true,
         filename: SPEC_FILE,
         code: 'test("carries the id", ({ report }) => {\n  expect(report).toStrictEqual({ id: "a" });\n});',
       },
@@ -20,6 +21,7 @@ describe("dont-review-it/no-sut-independent-assertion--assert-fixture-subject", 
       },
       {
         name: "a written-out subject compared against a value from the code still turns on the code",
+        documented: true,
         filename: SPEC_FILE,
         code: 'test("carries the id", ({ report }) => {\n  expect("a").toBe(report.id);\n});',
       },
@@ -98,6 +100,7 @@ describe("dont-review-it/no-sut-independent-assertion--assert-fixture-subject", 
     invalid: [
       {
         name: "a written-out value compared against a written-out value asks nothing of the code",
+        documented: true,
         filename: SPEC_FILE,
         code: 'test("holds", () => {\n  expect(true).toBe(true);\n});',
         errors: [{ messageId: "sutIndependentAssertion" }],
@@ -152,6 +155,7 @@ describe("dont-review-it/no-sut-independent-assertion--assert-fixture-subject", 
       },
       {
         name: "a subject compared against itself lands the same way whatever the code does",
+        documented: true,
         filename: SPEC_FILE,
         code: 'test("carries the id", ({ report }) => {\n  expect(report).toStrictEqual(report);\n});',
         errors: [{ messageId: "selfComparedSubject", data: { subject: "report" } }],
