@@ -46,11 +46,13 @@ describe("dont-review-it/no-spec-specific-shared-setup--keep-setup-uniform", () 
       },
       {
         name: "a shared setup handing every spec the same starting state passes",
+        documented: true,
         filename: SETUP_FILE,
         code: `beforeEach(() => { resetVolume({ "/tmp/held.json": "{}" }); });`,
       },
       {
         name: "a shared setup branching on the run environment keeps every spec uniform",
+        documented: true,
         filename: SETUP_FILE,
         code: `if (process.env["CI"] === "true") { widenTimeout(); }`,
       },
@@ -164,6 +166,7 @@ describe("dont-review-it/no-spec-specific-shared-setup--keep-setup-uniform", () 
     invalid: [
       {
         name: "a branch on the path of the running spec is reported where it is read",
+        documented: true,
         filename: SETUP_FILE,
         code: `if (expect.getState().testPath === chosen) { seedLegacy(); }`,
         errors: [{ messageId: "specIdentifyingBranch", data: { spelled: "testPath" } }],
@@ -230,6 +233,7 @@ describe("dont-review-it/no-spec-specific-shared-setup--keep-setup-uniform", () 
       },
       {
         name: "a branch on the path of an authored spec is reported",
+        documented: true,
         filename: SETUP_FILE,
         code: `if (path === "src/order.test.ts") { seedLegacy(); }`,
         errors: [{ messageId: "specNamingBranch", data: { spelled: "src/order.test.ts" } }],

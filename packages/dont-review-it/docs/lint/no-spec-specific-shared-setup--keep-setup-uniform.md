@@ -1,125 +1,192 @@
+---
+description: "Disallow a shared setup module or a runner configuration telling one spec from another, so the cleanup and the file system rules keep standing on a setup that hands every spec the same starting state"
+---
+
 # no-spec-specific-shared-setup--keep-setup-uniform
 
-## 前提
+<!-- BEGIN GENERATED rule-header -->
 
-このルールは、共有 setup を根拠に spec 側の記述を禁じる他のルールとセットで意味を持つ。`no-redundant-mock-reset--lift-mocks-into-fixture` は「共有設定が各テストの前に必ず後始末する」ことを根拠に手書きの後始末を禁じ、`no-local-file-system-mock--use-shared-fs` は「共有 setup が各テストの前に領域を作り直す」ことを根拠にローカルのダブルを禁じる。どちらの根拠も「全 spec に同じことをする」が成り立っている間だけ成立する。
+Disallow a shared setup module or a runner configuration telling one spec from another, so the cleanup and the file system rules keep standing on a setup that hands every spec the same starting state
 
-このルールが守るのはその前提そのものである。共有のテスト設定と共有 setup は、特定の spec・特定のテスト・特定のファイルパスを見分けて振る舞いを変える記述を持たない。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-spec-specific-shared-setup--keep-setup-uniform.ts`](../../src/lint/oxlint/rules/no-spec-specific-shared-setup--keep-setup-uniform.ts)
 
-## なぜそれが要るか
+<!-- END GENERATED rule-header -->
 
-1 層目は、分岐が spec からは見えないことである。spec は自分に何が適用されているかを知らないまま書かれる。共有 setup が spec ごとに分岐すると、その spec だけが違う初期状態で走るのに、その事実は spec のどこにも書かれない。
+## Violation
 
-2 層目は、分岐が禁じた回避策の抜け道になることである。ローカルのファイルシステムダブルを spec に書けないなら、共有 setup にその spec 専用の初期化を足せば同じことができる。spec の記述は無違反のまま、共有の抽象だけが一様でなくなる。spec だけを見るルールはこの経路を報告しない。
+Text in a shared setup, or in the runner's configuration, that tells one spec, one test or one file path apart and changes what it does.
 
-3 層目は並列実行である。初期状態が spec ごとに違えば、どの初期状態でテストが走るかは実行対象の組み合わせに依存する。共有設定の価値は「順序と対象に依存しない一様な保証」にあるので、1 つでも分岐があるとその価値は失われる。
+This rule means something only together with the rules that forbid text in a spec on the grounds of what a shared setup does. [no-redundant-mock-reset--lift-mocks-into-fixture](./no-redundant-mock-reset--lift-mocks-into-fixture.md) forbids hand-written teardown on the grounds that "the shared configuration always tears down before each test", and [no-local-file-system-mock--use-shared-fs](./no-local-file-system-mock--use-shared-fs.md) forbids a local double on the grounds that "the shared setup rebuilds the area before each test". Both grounds hold only while "it does the same thing to every spec" holds. This rule protects that premise itself.
 
-## 何を読むか
+### What is read
 
-読む対象は 2 つで、それぞれ別の入口を持つ。
+Two things, each with its own way in.
 
-**共有 setup。** ランナーの設定から setup として登録されているファイルを特定し、そこから値として読み込まれるモジュールを閉包で辿る。閉包に入ったファイルだけを検査する。
+**The shared setup.** The files registered as setup are identified from the runner's configuration, and the modules read from there as values are followed to a closure. Only files inside that closure are checked.
 
-登録の読み取りは、リポジトリ全体を走査して見つけた `vite.config.*` の既定 export（`defineConfig(...)` の包みは剥がす）の `test` ブロックから行う。読むキーは `setupFiles` と `globalSetup`、および `projects` の各要素が持つ `test` ブロックの同じキーである。値は文字列でも文字列の配列でもよく、同一ファイル内で 1 つの文字列に解決できる `const` の束縛でもよい。閉包の途中で spec ファイルに行き当たった場合はそこで止める。spec の中の分岐は他のルールの担当だからである。
+The registration is read from the default export of the `vite.config.*` found by walking the whole repository (the `defineConfig(...)` wrapper is peeled), inside its `test` block. The keys read are `setupFiles` and `globalSetup`, and the same keys in the `test` block of each element of `projects`. The value may be a string or an array of strings, and may be a `const` binding resolvable to one string inside the same file. Where the closure reaches a spec file, it stops there: branching inside a spec is another rule's business.
 
-ランナーの設定から導出できない構成では `sharedSetupFiles` でワークスペース root からの相対パスを明示する。空の配列を書いても導出に戻るだけで、集合を空にはできない。
+Where the configuration cannot be derived from the runner's setup, `sharedSetupFiles` names the paths relative to the workspace root. Writing an empty array only returns to derivation; the set cannot be emptied.
 
-**ランナーの設定。** `vite.config.*` そのものを検査する。読むのは既定 export の `test` ブロックの内側だけで、`lint` ブロックなど他の領域は別のルールの担当である。
+**The runner's configuration.** `vite.config.*` itself is checked. Only the inside of the default export's `test` block is read; other regions such as the `lint` block belong to other rules.
 
-## 何を検出するか
+### Branching on a value that identifies a test
 
-### テストの同定に使える値での分岐
+These spellings are read as values that identify a test. Both a plain identifier reference and a statically readable member name are in scope. A string-literal subscript reads as the same name.
 
-次の綴りをテストの同定に使える値として読む。素の識別子としての参照と、静的に読めるメンバ名の双方を対象にする。添字が文字列リテラルでも同じ名前として読む。
-
-| 綴り                                        | 何を指すか             |
-| ------------------------------------------- | ---------------------- |
-| `task` / `currentTest`                      | 実行中のテスト         |
-| `suite` / `currentSuite`                    | 実行中の `describe`    |
-| `testPath` / `filepath`                     | 実行中のファイルのパス |
-| `currentTestName` / `testName` / `fullName` | 実行中のテスト名       |
-| `suiteName`                                 | `describe` の名前      |
-| `tags`                                      | テストに付いたタグ     |
-
-実行中のファイルの拡張子で分かれる分岐は、拡張子を読む前にパスか名前を読むので、この表の綴りで捕まる。
-
-同定した読みが次のいずれかの位置に立っているときに報告する。読みが立っている位置で報告し、分岐や呼び出しの側では報告しない。
-
-- 分岐の条件。`if` / 三項 / `switch` の判定式、`case` の判定式、および短絡演算子の両辺
-- 呼び出しの引数。`new` を含む。分岐を関数の内側へ移しても同じことなので、引数の側で捉える
-
-読みが `const` の初期化子に立っているときは報告せず、その束縛の名前を同じ扱いに引き継ぐ。値を一度変数へ移してから分岐する形を、同じ 1 件として報告するためである。
-
-### spec のパスやディレクトリ名との突き合わせ
-
-リポジトリ全体を走査して authored な spec ファイルの一覧を作り、綴りがそのいずれかを名指ししているかで判定する。名指しとみなすのは、`*` `?` `+` `(` `)` `[` `]` `{` `}` `|` のいずれも含まない綴りのうち、
-
-- authored な spec ファイルのパスの末尾に一致するもの（`src/order.test.ts` / `order.test.ts`）
-- authored な spec を配下に持つディレクトリのパスに一致するもの（`src/legacy`）
-
-である。ディレクトリを名指しできるのは 2 セグメント以上を書いた場合に限る。1 語だけのディレクトリ名は、spec を指しているのか無関係な語なのかを綴りから決められない。
-
-文字列リテラル、置換を持たないテンプレートリテラル、正規表現リテラルを対象にする。正規表現はエスケープと前後のアンカーを外してから同じ判定にかける。突き合わせを正規表現や部分一致へ変えても綴りが残るためである。
-
-報告する位置は前節と同じ 2 つ（分岐の条件、呼び出しの引数）で、`const` の初期化子に立つ綴りは束縛名へ引き継ぐ。配列に詰めた spec のパスを別の場所で `includes` に渡す形は、この引き継ぎで報告される。
-
-### spec を書き出したランナーの設定
-
-`test` ブロックの内側に、前節と同じ基準で spec を名指しする文字列が書かれている場合に報告する。オブジェクトのキーでも配列の要素でも位置は問わない。環境ごとの割り当てを spec のパスで書き分ける記述、spec のパスで別の setup を割り当てる記述がここに落ちる。
-
-## 違反とみなさないもの
-
-| 形 | 対象にしない理由 |
+| Spelling | What it names |
 | --- | --- |
-| 実行環境で分かれる分岐 | ランナーの実行環境やプロジェクト単位の切り替えは spec の同定ではない。ただしその環境の値を spec のパスで割り当てているなら、割り当てている設定の側が報告される |
-| spec が自分で作る初期状態 | fixture の中で必要なファイルや値を用意する形が正しい形である |
-| 分岐も呼び出しも持たない記述 | 全 spec に同じことをするなら、共有 setup に何を書いてもよい |
-| 型の上での分岐と型引数 | 実行時の振る舞いを変えない。読みの位置を上へ辿る途中で型の節点を跨いだ時点で対象から外れる。値を運ぶ `as` / `satisfies` / `!` の包みは跨いだことにしない |
-| spec 側に書かれた分岐 | 共有 setup の一様性の問題ではない。spec の中の記述は他のルールが担当する |
-| 共有 setup の閉包に入らないファイル | 一様性を約束していない。閉包に入るのは、ランナーが setup として読み込むファイルと、そこから値として辿れるモジュールだけである |
-| メンバ名を計算した添字で読む形 | 名前を同定できない。文字列リテラルの添字は名前として読むので対象になる |
-| プロパティのキーとして書かれた同名の綴り | 値の読みではない。計算されたキーは値の読みなので対象になる |
-| 全 spec を覆うパターン、どの spec も覆わないパターン | `**/*.test.ts` も setup ファイル自身のパスも spec の名指しではない |
+| `task` / `currentTest` | The running test |
+| `suite` / `currentSuite` | The running `describe` |
+| `testPath` / `filepath` | The path of the running file |
+| `currentTestName` / `testName` / `fullName` | The name of the running test |
+| `suiteName` | The `describe`'s name |
+| `tags` | The tags on the test |
 
-## どう直すか
+A branch on the running file's extension reads a path or a name before the extension, so it is caught by a spelling in this table.
 
-分岐を消し、その spec が必要としていた準備を spec 側の fixture へ移す。共有 setup が持つのは、全 spec に共通の初期状態だけにする。
+The report stands where such a read stands in one of these positions, at the read itself rather than at the branch or the call.
 
-ある spec だけが特殊な初期状態を必要とするなら、それは共有の抽象が足りていない兆候である。その spec のための分岐を足すのではなく、抽象の側を全 spec にとって正しい形へ広げる。
+- A branch's condition: the subject of an `if`, a ternary or a `switch`, a `case`'s subject, and both sides of a short-circuit operator
+- A call's argument, `new` included. Moving the branch inside a function is the same thing, so it is caught at the argument
 
-ランナーの設定で spec を書き分けている場合も同じで、書き分けを消して全 spec に同じ設定を配る。
+A read standing in a `const`'s initializer is not reported; the binding's name inherits the same treatment. That reports the form of moving the value into a variable before branching as the same one violation.
 
-## 禁じる回避策
+### Matching against a spec's path or directory name
 
-- 分岐の条件を環境変数へ移し、その環境変数を spec ごとに割り当てる。割り当てている設定の側が報告される
-- 分岐を共有 setup から別モジュールへ追い出し、共有 setup からは呼ぶだけにする。閉包は読み込まれるモジュールまで辿る
-- spec のパスとの突き合わせを正規表現や部分一致へ変えて綴りを隠す。エスケープとアンカーを外してから判定する
-- 同定に使える値を一度変数へ移してから分岐する。束縛名へ引き継いで報告する
-- 分岐を関数の内側へ移し、共有 setup では引数を渡すだけにする。引数の位置で報告する
-- 検出器の設定やファイル単位の抑制コメントでこのルールを切る。`no-lint-suppression-in-spec--fix-the-violation` と `require-spec-lint-coverage--lint-every-spec-file` が報告する
+A list of authored spec files is built by walking the whole repository, and the judgment is whether a spelling names any of them. What counts as naming is a spelling containing none of `*`, `?`, `+`, `(`, `)`, `[`, `]`, `{`, `}`, `|`, and which is
 
-## 検出が届かない範囲
+- equal to the tail of an authored spec file's path (`src/order.test.ts` / `order.test.ts`), or
+- equal to the path of a directory holding authored specs beneath it (`src/legacy`)
 
-登録されている setup を実行時に組み立てた指定子で読み込む構成は辿れない。指定子の値が実行時にしか存在しないので、何が setup として読み込まれるかが決まらない。
+A directory may be named only where two or more segments are written. A one-word directory name cannot be settled from the spelling as pointing at specs rather than at an unrelated word.
 
-ランナーの設定を JSON や YAML で書いた構成、CLI の引数で setup を渡す運用は入力に入らない。読むのは `vite.config.*` の既定 export だけである。
+String literals, template literals with no substitution and regular expression literals are in scope. A regular expression has its escapes and leading and trailing anchors removed before the same judgment, because changing the match to a regular expression or a partial match leaves the spelling.
 
-`test` ブロックの外に置いた分岐で spec ごとの設定を組み立てる形は読まない。突き合わせは `test` ブロックの内側で閉じる。
+The report positions are the same two as above, and a spelling in a `const`'s initializer is inherited by the binding name. Packing spec paths into an array and handing it to `includes` elsewhere is reported through that inheritance.
 
-glob で spec の一部だけを覆うパターンは、ランナーの設定でも共有 setup でも報告しない。プロジェクト単位の切り替えと綴りの上で区別できないためである。書き出された spec のパスとディレクトリだけを列挙とみなす。
+### A runner configuration writing specs out
 
-テストの同定に使える値の綴りは固定の一覧である。ランナーが別の綴りで同じ値を配るようになった場合、その綴りは一覧に足すまで読まれない。逆に、無関係なオブジェクトが同じ綴りのメンバを持っていれば報告される。共有 setup は数が少なく、綴りが読める限り型情報に依存せず判定できることを優先している。
+Where a string naming a spec by the same standard is written inside the `test` block, it is reported. The position makes no difference — an object key or an array element alike. Writing per-environment assignments by spec path, and assigning a different setup by spec path, land here.
 
-同定に使える値を関数の引数として渡す形は、その関数が初期状態を作るのか記録を残すだけなのかを区別しない。どちらも報告する。
+### Not violations
 
-## オプション
+| Shape | Why it is left out |
+| --- | --- |
+| A branch on the run environment | Switching by the runner's environment or per project is not identifying a spec. Where the environment's value is assigned by spec path, though, the configuration doing the assigning is reported |
+| Initial state a spec builds itself | Preparing the files and values it needs inside a fixture is the right shape |
+| Text holding neither a branch nor a call | Where it does the same thing to every spec, anything may be written in a shared setup |
+| A branch in type space, and type arguments | They change no run-time behaviour. Crossing a type node while walking up from the read takes it out of scope. Value-carrying wrappers `as`, `satisfies` and `!` do not count as crossing |
+| A branch written on the spec side | Not a question of the shared setup's uniformity. Text inside a spec belongs to other rules |
+| A file outside the shared setup's closure | It promises no uniformity. The closure holds the files the runner loads as setup and the modules reachable from them as values |
+| Reading a member through a computed subscript | The name cannot be identified. A string-literal subscript is read as a name and is in scope |
+| The same spelling written as a property key | Not a read of a value. A computed key is a read of a value and is in scope |
+| A pattern covering every spec, and one covering none | `**/*.test.ts` and the setup file's own path are not namings of a spec |
 
-`sharedSetupFiles` だけを持つ。共有 setup として扱うファイルを、ワークスペース root からの相対パスで指定する。既定はランナーの設定からの導出で、導出できない構成でだけ書く。指定したファイルからの閉包も同じように辿る。
+### The invariant
 
-共有の設定の側は指定できない。ランナーの設定は `vite.config.*` という名前で同定するので、設定で差し替える余地を持たない。setup の登録を読む先とルール自身が検査する対象が同じ 1 つのファイルであることを、構成に依存させないためである。
+A shared test configuration and a shared setup hold no text that tells specific specs, tests or file paths apart and changes what they do.
 
-空の配列を書いても導出に戻る。集合を空にできる形にすると、このオプション自体がルールを切る経路になる。
+The first layer is that the branch is invisible from the spec. A spec is written without knowing what is applied to it. Branch in a shared setup per spec and that one spec runs from a different initial state, with the fact written nowhere in the spec.
 
-自動修正は提供しない。分岐が必要としていた準備をどの spec の fixture へ移すかは、その spec を読まなければ決まらない。
+The second layer is that the branch becomes a way out of the forbidden bypasses. Where a local file system double cannot be written in a spec, adding that spec's own initialization to the shared setup does the same thing. The spec's text stays clean and only the shared abstraction stops being uniform. A rule that reads only specs does not report that route.
 
-型情報は要らない。
+The third layer is parallel execution. With initial states differing per spec, which initial state a test runs under depends on the combination being run. The shared configuration's value lies in a uniform guarantee independent of order and target, and one branch destroys it.
+
+### Configuration
+
+`sharedSetupFiles` alone. It names the files treated as shared setup, by paths relative to the workspace root. The default is derivation from the runner's configuration; write it only where derivation is impossible. The closure from a named file is followed the same way.
+
+The shared configuration side cannot be named. The runner's configuration is identified by the name `vite.config.*`, so no room is left to replace it in configuration. That keeps "where the setup registration is read from" and "what the rule itself checks" one and the same file, independent of the setup.
+
+Writing an empty array returns to derivation. A shape that could empty the set would make this option itself a route for turning the rule off.
+
+There is no automatic fix. Which spec's fixture the preparation behind a branch moves into is not settled without reading that spec.
+
+Type information is not needed.
+
+### Where the detection does not reach
+
+A setup registered through a specifier assembled at run time cannot be followed: the specifier's value exists only at run time, so what gets loaded as setup is not settled.
+
+A runner configuration written in JSON or YAML, and an operation passing setup through CLI arguments, do not enter the input. Only the default export of `vite.config.*` is read.
+
+Assembling per-spec settings in a branch placed outside the `test` block is not read. The reconciliation closes inside the `test` block.
+
+A glob covering only part of the specs is reported in neither the runner's configuration nor a shared setup, because it cannot be told from per-project switching by spelling. Only spec paths and directories written out count as an enumeration.
+
+The spellings of values that identify a test are a fixed list. Where the runner starts distributing the same value under another spelling, that spelling is unread until it is added. Conversely, an unrelated object carrying a member of the same spelling is reported. Shared setups are few, and what matters more is that the judgment holds without type information as long as the spelling is readable.
+
+Handing an identifying value to a function does not distinguish whether that function builds initial state or merely records something. Both are reported.
+
+## Fix
+
+Delete the branch and move the preparation that spec needed into a fixture on the spec side. Leave the shared setup holding only the initial state common to every spec.
+
+Where one spec alone needs a special initial state, that is a sign the shared abstraction is insufficient. Rather than adding a branch for that spec, widen the abstraction into the shape right for every spec.
+
+The same holds where the runner's configuration writes specs apart: delete the split and distribute the same configuration to every spec.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// a branch on the path of the running spec is reported where it is read
+if (expect.getState().testPath === chosen) { seedLegacy(); }
+```
+
+```ts
+// a branch on the path of an authored spec is reported
+if (path === "src/order.test.ts") { seedLegacy(); }
+```
+
+Code this rule accepts.
+
+```ts
+// a shared setup handing every spec the same starting state passes
+beforeEach(() => { resetVolume({ "/tmp/held.json": "{}" }); });
+```
+
+```ts
+// a shared setup branching on the run environment keeps every spec uniform
+if (process.env["CI"] === "true") { widenTimeout(); }
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Moving the branch's condition into an environment variable and assigning that variable per spec. The configuration doing the assigning is reported
+- Pushing the branch out of the shared setup into another module and only calling it from the setup. The closure follows the modules it loads
+- Changing the match against a spec path into a regular expression or a partial match to hide the spelling. Escapes and anchors are removed before the judgment
+- Moving an identifying value into a variable before branching. It is inherited by the binding name and reported
+- Moving the branch inside a function and only handing over arguments in the shared setup. It is reported at the argument position
+- Turning this rule off through the detector's configuration or a per-file suppression comment. `no-lint-suppression-in-spec--fix-the-violation` and [require-spec-lint-coverage--lint-every-spec-file](./require-spec-lint-coverage--lint-every-spec-file.md) report it
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `specIdentifyingBranch` | A shared setup module must not branch on \`{{spelled}}\`, a value that tells the running spec from the others. Delete that branch and write the setup it guards into a fixture in the spec that needs it. |
+| `specIdentifyingArgument` | A shared setup module must not hand \`{{spelled}}\`, a value that tells the running spec from the others, to a function. Delete that argument and write the setup it selects into a fixture in the spec that needs it. |
+| `specNamingBranch` | A shared setup module must not branch on \`{{spelled}}\`, a path naming an authored spec. Delete that branch and write the setup it guards into a fixture in that spec. |
+| `specNamingArgument` | A shared setup module must not hand \`{{spelled}}\`, a path naming an authored spec, to a function. Delete that argument and write the setup it selects into a fixture in that spec. |
+| `specSpecificRunnerSetting` | A runner configuration must not write out \`{{spelled}}\`, a path naming an authored spec, inside the block that configures the run. Delete that entry and give every spec the same setting. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->
