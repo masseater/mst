@@ -10,6 +10,7 @@ describe("dont-review-it/no-expect-call-expression--yield-from-fixture", () => {
     valid: [
       {
         name: "a bare identifier is a subject that was produced before the assertion",
+        documented: true,
         filename: SPEC_FILE,
         code: 'test("carries the id", ({ report }) => {\n  expect(report).toStrictEqual({ id: "a" });\n});',
       },
@@ -20,6 +21,7 @@ describe("dont-review-it/no-expect-call-expression--yield-from-fixture", () => {
       },
       {
         name: "a thunk the fixture handed back takes no arguments and runs under the matcher",
+        documented: true,
         filename: SPEC_FILE,
         code: 'test("refuses an empty name", ({ attempt }) => {\n  expect(attempt).toThrowErrorMessage("name must not be empty");\n});',
       },
@@ -163,6 +165,7 @@ describe("dont-review-it/no-expect-call-expression--yield-from-fixture", () => {
     invalid: [
       {
         name: "a function called inside the assertion produces the subject there",
+        documented: true,
         filename: SPEC_FILE,
         code: 'test("carries the id", ({ input }) => {\n  expect(summarise(input)).toStrictEqual({ id: "a" });\n});',
         errors: [{ messageId: "producedSubject", data: { production: "calling a function" } }],
@@ -229,6 +232,7 @@ describe("dont-review-it/no-expect-call-expression--yield-from-fixture", () => {
       },
       {
         name: "a callable declared with a parameter carries the call it is about to make",
+        documented: true,
         filename: SPEC_FILE,
         code: 'const attempt = (name) => parse(name);\ntest("refuses an empty name", () => {\n  expect(attempt).toThrowErrorMessage("name must not be empty");\n});',
         errors: [{ messageId: "argumentTakingSubject", data: { subject: "attempt" } }],
