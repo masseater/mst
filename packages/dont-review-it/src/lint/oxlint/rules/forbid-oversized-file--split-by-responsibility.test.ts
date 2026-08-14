@@ -25,6 +25,7 @@ describe("dont-review-it/forbid-oversized-file--split-by-responsibility", () => 
       },
       {
         name: "a file exactly at the budget is not over it",
+        documented: true,
         code: sourceOfThreeLines,
         options: [{ maxLines: 3 }],
       },
@@ -45,6 +46,7 @@ describe("dont-review-it/forbid-oversized-file--split-by-responsibility", () => 
       },
       {
         name: "a line carrying only a line comment is not counted",
+        documented: true,
         code: "// what follows is the whole file\n// and this line too\nconst first = 1;\nconst second = 2;\nconst third = 3;",
         options: [{ maxLines: 3 }],
       },
@@ -101,6 +103,7 @@ describe("dont-review-it/forbid-oversized-file--split-by-responsibility", () => 
       },
       {
         name: "a lowered budget reports the whole program rather than a line inside it",
+        documented: true,
         code: sourceOfFourLines,
         options: [{ maxLines: 3 }],
         errors: [
@@ -122,6 +125,7 @@ describe("dont-review-it/forbid-oversized-file--split-by-responsibility", () => 
       },
       {
         name: "a template literal spanning lines counts every line it spans, blank ones included",
+        documented: true,
         code: "const letters = `a\n\nb`;",
         options: [{ maxLines: 2 }],
         errors: [{ messageId: "oversizedFile", data: { codeLines: 3, maxLines: 2 } }],
