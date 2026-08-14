@@ -1,71 +1,73 @@
+---
+description: "Require every path the required-file table registers to hold a file that is not empty, so a file whose readers sit outside the source keeps its place instead of leaving with the change that stopped mentioning it"
+---
+
 # require-registered-file--restore-it-at-the-registered-path
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-必須ファイルの表に登録された行のうち、次のいずれかになっている行を報告する。
+Require every path the required-file table registers to hold a file that is not empty, so a file whose readers sit outside the source keeps its place instead of leaving with the change that stopped mentioning it
 
-- 登録されたパスに一致するファイルが 1 つも無い
-- 一致するファイルはあるが、すべて空である
-- 行が所有者を名指ししているのに、その名前に当たるワークスペースが 1 つも無い
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`require-registered-file--restore-it-at-the-registered-path.ts`](../../src/lint/oxlint/rules/require-registered-file--restore-it-at-the-registered-path.ts)
 
-前の 2 つは「登録が満たされていない」という同じ 1 つの状態の別の現れ方で、3 つ目は行そのものが古いという別の診断である。3 つ目を欠落として報告すると、ファイルを作るという誤った直し方に読み手を送ることになる。
+<!-- END GENERATED rule-header -->
 
-判定の入力はワークツリーの走査結果である。行に書かれたパターンはリポジトリルートからの相対で解釈し、所有者が書かれている行では、所有者に当たる各ワークスペースのディレクトリからの相対で解釈する。パターンに一致するファイルが 1 つでも中身を持っていれば、その行は満たされている。空のファイルしか一致しなかった場合は、一致した各パスを報告する。
+## Violation
 
-空かどうかは、読み取った内容が空白だけかどうかで決める。改行 1 つだけのファイルは空として扱う。中身が何であるかは見ない。
+A row of the required-file table that has fallen into any of these is reported.
 
-### 報告の位置
+- Not one file matches the registered path
+- Files match, but every one of them is empty
+- The row names an owner, and not one workspace answers to that name
 
-報告は、検査中のファイルが属するワークスペースに出す。所有者を持つ行はそのワークスペースに、所有者を持たない行はリポジトリルートのワークスペースに出る。マニフェストが支配していないファイルを検査しているときは何も出さない。属する先が決まらないため、報告を受け取る相手も決まらないからである。
+The first two are two appearances of the single state "the registration is unmet"; the third is a separate diagnosis, that the row itself is stale. Report the third as an absence and the reader is sent to the wrong repair of creating a file.
 
-このルールはファイルの構文を見ない。報告位置はファイルの先頭になる。
+The input to the judgment is the result of walking the working tree. A pattern written in a row is read relative to the repository root, and on a row carrying an owner it is read relative to the directory of each workspace answering to that owner. Where one matching file carries contents, the row is met. Where only empty files matched, each matched path is reported.
 
-報告先を持たない状態が 2 つある。所有者を持たない行は、リポジトリルートを支配するマニフェストが無いと受け取り手が決まらない。どのワークスペースのファイルも検査経路から外れていると、そのワークスペースに向いた行は 1 件も出ない。どちらも「違反が無い」と同じ出力になるため、このルールの側からは見えない。検査経路に載っていないパスと、どの経路にも到達しない登録行は `no-unchecked-authored-path--include-it-in-every-declared-check` が受ける。
+Emptiness is settled by whether the contents read are whitespace alone. A file holding a single newline counts as empty. What the contents are is not read.
 
-### 意図的に対象にしない形
+### Where the report stands
 
-| 形 | 対象にしない理由 |
+The report goes to the workspace the file under check belongs to. A row carrying an owner goes to that workspace; a row carrying none goes to the workspace at the repository root. Where the file under check is governed by no manifest, nothing comes out: with no workspace to belong to, there is no settled recipient either.
+
+This rule reads no syntax, so the report stands at the head of the file.
+
+There are two states with no recipient. A row carrying no owner has no recipient settled unless a manifest governs the repository root. Where every file of a workspace falls off the checking route, not one row aimed at that workspace comes out. Both look exactly like "no violation" in the output, and are invisible from this rule's side. Paths off the checking route, and registered rows no route reaches, are taken by [no-unchecked-authored-path--include-it-in-every-declared-check](./no-unchecked-authored-path--include-it-in-every-declared-check.md).
+
+### Deliberately not widened
+
+| Shape | Why it is left out |
 | --- | --- |
-| 登録されたファイルの中身が要件を満たすか | 対象ごとに判定が違う。行に検査の名前を書き、その検査が受け持つ |
-| 登録されていないパスの不在 | この表は「危なそうな不在」を推測しない |
-| 空でないファイルの中身の薄さ | 非空の検査は通る。行に検査の名前を書かない限り、そこから先は誰も見ていない |
-| 走査の除外に入っているディレクトリ | 生成物や依存の置き場を歩かないという判断は、走査の側が 1 箇所で持つ |
+| Whether the registered file's contents meet a requirement | The judgment differs per subject. The row names the check, and that check takes it |
+| The absence of an unregistered path | This table guesses at no "absence that looks risky" |
+| Thin contents in a file that is not empty | The non-empty check passes. Unless the row names a check, nobody looks past that |
+| A directory inside the walk's exclusions | The decision not to walk where build output and dependencies live is held in one place, by the walk |
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「リポジトリの構造上そこに在らねばならないと決めたファイルが、登録されたパスに在る」ことである。
+What is held is that a file decided to have to be there by the structure of the repository is there, at the registered path.
 
-1 層目は、欠落が入力を持たないことである。存在してはならないファイルは、置かれた事実そのものが検査の入力になる。欠落は逆で、何も無い場所を誰も見に行かない。使われる頻度が低いファイルほど、無くなったことに気づくのが遅れる。
+The first layer is that an absence carries no input. A file that must not exist gives the check its input by the very fact of being placed. An absence is the reverse: nobody goes to look at a place where there is nothing. The less often a file is used, the later its disappearance is noticed.
 
-2 層目は、消える経路が削除の判断そのものに組み込まれていることである。設定ファイルや外部ツールから参照されるファイルは、ソースを検索しても使用箇所が出てこない。使用箇所が見つからないことが削除の根拠になる構造なので、「気をつけて消す」では止まらない。存在の要求を機構の側に置く以外に手が無い。
+The second layer is that the route by which it disappears is built into the deletion decision itself. A file referenced from a configuration file or an external tool turns up no use sites when the source is searched. Since finding no use site is what grounds the deletion, "delete carefully" does not stop it. There is no way other than putting the demand for existence on the machinery's side.
 
-3 層目は、表を読む人に「禁止しか書けない」と思わせないことである。存在の禁止と必須の要求は同じ形の行で書ける。向きが逆なだけの登録に受け手が無い状態は、表の使い方そのものを歪める。
+The third layer is not to leave whoever reads the table thinking only prohibitions can be written. A prohibition of existence and a demand for one are written as rows of the same shape. Leaving a registration with the direction reversed without a recipient distorts how the table is used at all.
 
-## どう直すか
+### Configuration
 
-登録されたパスにファイルを作り、行が求めているものを書く。
+`requiredFiles` is the required-file table. Not handed over, and when empty, this rule reports nothing. What is required is held by the configuration; the rule holds the detection alone.
 
-要らなくなったと判断したなら、ファイルを作るのではなく行を消す。どちらを選んだかとその理由はコミットログに残す。報告文が行の理由文をそのまま載せているのは、この判断を表を開かずに済ませるためである。
+A row carries four items.
 
-所有者に当たるワークスペースが無いと報告されたときは、行を消すか、その要求を引き継いだワークスペースを指すように所有者を書き直す。
-
-## 禁じる回避策
-
-- 検査を通すためだけに空のファイルを置く。空は違反として報告される
-- 検査を通すためだけに意味の無い中身を置く。非空の検査は通るので、この回避はこのルールでは止まらない。止めたい場合は、中身を見る検査の名前を行に書き、その検査に受けさせる
-- 行を一時的に無効化する。無効化された行は「登録されているのに 1 件も出ない」状態そのものになる
-- 抑制ディレクティブで黙らせる。`no-silent-suppression--fix-or-justify-inline` が受ける
-
-## オプション
-
-`requiredFiles` が必須ファイルの表である。渡されなかったとき、および空のとき、このルールは何も報告しない。何を必須とするかは設定側が持ち、ルールは検出だけを持つ。
-
-行は 4 つの項目を持つ。
-
-- `pattern`: 登録するパス。グロブを書ける。必須
-- `reason`: そのファイルが要る理由。報告文に差し込まれる。必須。理由の置き場が行から離れると、要求だけが残って理由が陳腐化する
-- `owner`: 所有者にあたるワークスペースのディレクトリ。グロブを書ける。省略した行はリポジトリルートに対する 1 つの要求になる
-- `contentChecks`: そのファイルの中身を見る検査の名前。省略した行は「存在と非空だけが保証されている」ことが表から読める
+- `pattern`: the path to register. A glob may be written. Required
+- `reason`: why that file is needed. It is set into the report. Required. Let the place for the reason drift away from the row and the demand stays while the reason goes stale
+- `owner`: the workspace directory answering as owner. A glob may be written. A row omitting it becomes one demand against the repository root
+- `contentChecks`: the names of the checks reading that file's contents. From a row omitting it, the table reads that existence and non-emptiness are all that is guaranteed
 
 ```json
 {
@@ -73,11 +75,60 @@
     {
       "pattern": "docs/lint/*.md",
       "owner": "packages/*",
-      "reason": "報告文が指す文書の到達先になる",
+      "reason": "it is where the document a report points at is reached",
       "contentChecks": []
     }
   ]
 }
 ```
 
-`unscannedDirectories` は走査が歩かないディレクトリ名で、既定は依存・生成物・キャッシュ・カバレッジ出力の置き場である。この既定はワークツリー走査の側が持ち、走査を使う検査はすべて同じ出どころを読む。走査ごとに別の除外を持つと、どの検査がどこを見ているかが検査ごとに変わる。
+`unscannedDirectories` is the directory names the walk does not enter, defaulting to where dependencies, build output, caches and coverage output live. That default is held by the working-tree walk, and every check using the walk reads the same source. Give each walk its own exclusions and where a check is looking changes from check to check.
+
+## Fix
+
+Create the file at the registered path and write what the row asks for.
+
+Where it is judged no longer needed, delete the row rather than create the file. Which was chosen, and why, stays in the commit log. The report carries the row's reason as written so that this decision can be made without opening the table.
+
+Where it is reported that no workspace answers to the owner, delete the row, or rewrite the owner to point at the workspace that took the demand over.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// a registered path with nothing at it is reported against the repository root
+export const shipped = true;
+
+```
+
+<!-- END GENERATED examples -->
+
+The subject of this rule is the paths the working tree holds rather than the source in front of you, so the code above is the file the report stands on, and what settles the judgment is what stands at the registered path.
+
+### Forbidden bypasses (do not do this)
+
+- Placing an empty file only to pass the check. Empty is reported as a violation
+- Placing meaningless contents only to pass the check. The non-empty check passes, so this bypass is not stopped by this rule. To stop it, name in the row a check that reads the contents, and let that check take it
+- Turning a row off for the time being. A row turned off is exactly the state of "registered, and not one report comes out"
+- Silencing it with a suppression directive. [no-silent-suppression--fix-or-justify-inline](./no-silent-suppression--fix-or-justify-inline.md) takes that
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `MISSING_REGISTERED_FILE_MESSAGE_ID` | A path the required-file table registers must not stand without a file. Write the file at \`{{registeredPath}}\`, which {{holder}} is registered to hold, and put in it what the row asks for: {{reason}}. Delete the row instead to retire the requirement, and record that judgement in the commit message. A file that holds nothing is reported the same way. {{contentGuarantee}} |
+| `EMPTY_REGISTERED_FILE_MESSAGE_ID` | A file the required-file table registers must not hold nothing. Write into \`{{registeredPath}}\` under {{holder}} what the row asks for: {{reason}}. Delete the file and the row instead to retire the requirement, and record that judgement in the commit message. {{contentGuarantee}} |
+| `DEAD_OWNER_REGISTRATION_MESSAGE_ID` | A row of the required-file table must not name an owner this repository does not have. Delete the row, or point it at the workspace that took over what the row asks for: {{reason}}. {{holder}} matches no workspace, so \`{{registeredPath}}\` is asked of nobody. Record that judgement in the commit message. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->
