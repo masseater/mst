@@ -104,6 +104,7 @@ describe("dont-review-it/no-dry-test-setup--inline-owned-setup", () => {
       },
       {
         name: "the module a spec tests is reachable from the public entry, so it is the subject",
+        documented: true,
         code: 'import { widget } from "./widget.ts";\n\nexport const under = widget;\n',
         filename: widgetSpec,
       },
@@ -114,6 +115,7 @@ describe("dont-review-it/no-dry-test-setup--inline-owned-setup", () => {
       },
       {
         name: "a type-only import carries no setup",
+        documented: true,
         code: 'import type { Shape } from "./shapes.ts";\n\nexport const size = (shape: Shape) => shape.size;\n',
         filename: widgetSpec,
       },
@@ -252,6 +254,7 @@ describe("dont-review-it/no-dry-test-setup--inline-owned-setup", () => {
     invalid: [
       {
         name: "a static import of a module named as shared setup is reported",
+        documented: true,
         code: 'import { build } from "./helpers.ts";\n\nexport const used = build;\n',
         filename: widgetSpec,
         errors: COUPLED_TO_WIDGET_HELPERS,
@@ -327,6 +330,7 @@ describe("dont-review-it/no-dry-test-setup--inline-owned-setup", () => {
       },
       {
         name: "another spec read as setup is a setup module",
+        documented: true,
         code: 'import { other } from "./other.test.ts";\n\nexport const used = other;\n',
         filename: widgetSpec,
         errors: [
