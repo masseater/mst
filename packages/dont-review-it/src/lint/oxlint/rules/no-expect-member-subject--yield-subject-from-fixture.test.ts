@@ -13,6 +13,7 @@ describe("dont-review-it/no-expect-member-subject--yield-subject-from-fixture", 
     valid: [
       {
         name: "the value a fixture handed over is the subject this rule asks for",
+        documented: true,
         filename: SPEC_FILE,
         code: 'test("carries the id", ({ report }) => {\n  expect(report).toStrictEqual({ id: "a" });\n});',
       },
@@ -28,6 +29,7 @@ describe("dont-review-it/no-expect-member-subject--yield-subject-from-fixture", 
       },
       {
         name: "the rest of the context holds fixtures rather than faces of one",
+        documented: true,
         filename: SPEC_FILE,
         code: 'test("carries the id", ({ input, ...rest }) => {\n  expect(rest.report).toStrictEqual({ id: "a" });\n});',
       },
@@ -106,6 +108,7 @@ describe("dont-review-it/no-expect-member-subject--yield-subject-from-fixture", 
     invalid: [
       {
         name: "a member written in the assertion names one face of the fixture value",
+        documented: true,
         filename: SPEC_FILE,
         code: 'test("carries the id", ({ report }) => {\n  expect(report.id).toBe("a");\n});',
         errors: [{ messageId: "memberSubject", data: { subject: "report.id" } }],
@@ -202,6 +205,7 @@ describe("dont-review-it/no-expect-member-subject--yield-subject-from-fixture", 
       },
       {
         name: "a pattern nested in the context takes a face out of the fixture value",
+        documented: true,
         filename: SPEC_FILE,
         code: 'test("carries the id", ({ report: { id } }) => {\n  expect(id).toBe("a");\n});',
         errors: [{ messageId: "destructuredMemberSubject", data: { subject: "id" } }],
