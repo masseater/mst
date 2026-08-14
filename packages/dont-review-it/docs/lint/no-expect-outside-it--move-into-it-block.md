@@ -1,87 +1,116 @@
+---
+description: "Disallow an assertion standing anywhere other than inside a test block the runner handed over under the configured spelling, so every assertion a suite runs answers for the behaviour one named block describes"
+---
+
 # no-expect-outside-it--move-into-it-block
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-`expect(...)` から上へ辿って最初に見つかるテストブロックが、正の綴りで宣言されていないもの。既定の正の綴りは `it`。囲むテストブロックが 1 つも無い `expect(...)` も同じく検出する。テストブロックの外に立っている assertion 数の宣言（`expect.assertions(n)` / `expect.hasAssertions()`）も検出する。
+Disallow an assertion standing anywhere other than inside a test block the runner handed over under the configured spelling, so every assertion a suite runs answers for the behaviour one named block describes
 
-起点として読むのは assertion の入口の呼び出しそのもので、マッチャが付いているかは見ない。派生した受け手（`expect.soft(...)` / `expect.poll(...)`）を経由した形も同じ起点として読む。入口かどうかは綴りだけでは決めない。テストランナーから別名で import した束縛も、ファイル内で入口を束ね直した束縛も同じ入口として読む。被験体も assertion 数も取らない名前空間のメンバ呼び出し（`expect.extend(...)` など）は起点にならない。
+- Tool: `oxlint`
+- Fixable: yes
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-expect-outside-it--move-into-it-block.ts`](../../src/lint/oxlint/rules/no-expect-outside-it--move-into-it-block.ts)
 
-テストブロックは形で認識する。第 1 引数が文字列リテラルまたはテンプレートリテラルで、引数のどこかに関数が渡されている呼び出しがテストブロックであり、その callee の根にある識別子を綴りとして読む。根は `require-test-block-spelling--use-configured-fn` と同じ修飾子の一覧を辿って得るので、`it.skip(...)` や `it.each(rows)(...)` は `it` に解決される。綴りが正であっても、その識別子がテストランナーに届かない束縛を指しているならテストブロックとして扱わない。
+<!-- END GENERATED rule-header -->
 
-アサーションを囲むブロックが複数ある場合は、最も内側のコールバックを持つものを見る。
+## Violation
 
-報告は 5 種類に分かれる。
+The first test block found walking up from an `expect(...)` not being declared under the canonical spelling. The canonical spelling defaults to `it`. An `expect(...)` with no enclosing test block at all is detected the same way, and so is an assertion-count declaration (`expect.assertions(n)` / `expect.hasAssertions()`) standing outside a test block.
 
-| 報告                         | 何が起きているか                                             |
-| ---------------------------- | ------------------------------------------------------------ |
-| `foreignTestBlockAssertion`  | テストランナー由来のテストブロックだが、綴りが正でない       |
-| `shadowedTestBlockAssertion` | 綴りは正だが、テストランナーに届かない束縛が宣言したブロック |
-| `groupingBlockAssertion`     | テストランナー由来ではないブロック（`describe` など）        |
-| `detachedAssertion`          | 囲むテストブロックが無い                                     |
-| `strayAssertionCount`        | assertion 数の宣言がテストブロックの外に立っている           |
+What is read as a starting point is the assertion entry call itself; whether a matcher follows is not read. A form going through a derived receiver (`expect.soft(...)` / `expect.poll(...)`) is read as the same starting point. Being an entry is not settled by spelling alone: a binding imported from the test runner under another name, and a binding rebound to the entry inside the file, are read as the same entry. A namespace member call taking neither a subject nor an assertion count (`expect.extend(...)` and the like) is not a starting point.
 
-「テストランナー由来」は名前の一覧では決めない。次の 3 つを根として、そこから `.extend(...)` で派生した束縛を追って決める。
+Test blocks are recognized by shape. A call whose first argument is a string literal or a template literal and which is handed a function somewhere in its arguments is a test block, and the identifier at the root of its callee is read as the spelling. The root is obtained by following the same list of modifiers as [require-test-block-spelling--use-configured-fn](./require-test-block-spelling--use-configured-fn.md), so `it.skip(...)` and `it.each(rows)(...)` resolve to `it`. Even under the canonical spelling, where that identifier names a binding that does not reach the test runner it is not treated as a test block.
 
-1. ファイル内で誰もその名前を取っていないグローバル注入の `it` / `test`
-2. テストランナーのモジュールから `it` / `test` の綴りで import した束縛
-3. import した束縛に `.extend(...)` を当てて作った束縛
+Where several blocks enclose the assertion, the innermost one carrying a callback is read.
 
-束縛名が任意である `test.extend(...)` のファクトリが 1 と 2 に入る。同じ名前をファイル内で別の値に束ね直すと、その名前はテストランナーに届かなくなる。テストランナーでないモジュールから `it` を import して**そのまま**ブロックを宣言した場合も届かない。
+Reports divide into five.
 
-テストランナーのモジュールから取るのは `it` / `test` の綴りだけである。`describe` まで取り込むと、グルーピングブロックの直下に立った assertion がテストブロックの中にあることになってしまう。
-
-3 は、import 先の宣言がこの実行系から読めないことへの答えである。共有のフィクスチャファクトリは別のファイルに置かれ、spec はそれを import して `.extend(...)` を重ねる。派生元がランナーに届いているかは import を辿らなければ判らず、辿れないものを違反として扱うと、規約どおりに書かれた spec が丸ごと落ちる。読めないものは違反にしない。`.extend(...)` を挟まずに import した束縛をそのままブロックとして使う形は 3 に当たらない。自前の関数を `it` と名付けた形（`const it = buildRunner()`）も、`.extend(...)` の呼び出しではないので当たらない。
-
-対象になる形。
-
-| 形 | 例 |
+| Report | What is happening |
 | --- | --- |
-| 別の綴りのテストブロック | `test("adds", () => { expect(sum).toBe(3); });` |
-| 別名に束ねたファクトリのテストブロック | `const spec = test.extend({});` の `spec("adds", fn)` |
-| グルーピングブロックの直下 | `describe("sums", () => { expect(sum).toBe(3); });` |
-| フック | `beforeEach(() => { expect(sum).toBe(3); });` |
-| module スコープのヘルパ関数の本体 | `const assertTotal = (total) => { expect(total).toBe(3); };` |
-| fixture ファクトリの本体 | `test.extend({ subject: async (c, use) => { expect(seed).toBe(1); ... } })` |
-| 派生した受け手を `it` の外で使った形 | `expect.soft(sum).toBe(3);` |
-| 別名に束ねた assertion の入口 | `import { expect as check } from "vite-plus/test";` の `check(sum).toBe(3)` |
-| 正の綴りを名乗る非ランナーの束縛 | `const it = buildRunner();` の `it("adds", fn)` |
-| テストブロックの外の assertion 数宣言 | `describe("sums", () => { expect.assertions(2); });` |
+| `foreignTestBlockAssertion` | A test block from the test runner, spelled other than canonically |
+| `shadowedTestBlockAssertion` | Canonically spelled, but declared by a binding that does not reach the test runner |
+| `groupingBlockAssertion` | A block not from the test runner (`describe` and the like) |
+| `detachedAssertion` | No enclosing test block |
+| `strayAssertionCount` | An assertion-count declaration standing outside a test block |
 
-ファイル名による絞り込みはしない。spec から取り込まれるヘルパファイルに書かれたアサーションもこのルールの対象であり、どのファイルに効かせるかは共有 lint 設定の glob が決める。
+"From the test runner" is not settled by a list of names. It is settled from three roots, following bindings derived from them through `.extend(...)`.
 
-### 意図的に広げていない範囲
+1. A globally injected `it` / `test` whose name nobody in the file has taken
+2. A binding imported from the test runner's module under the spelling `it` or `test`
+3. A binding built by applying `.extend(...)` to an imported binding
 
-| 形 | 対象にしない理由 |
+A `test.extend(...)` factory, whose binding name is arbitrary, enters through 1 and 2. Rebind the same name to another value inside the file and that name stops reaching the test runner. Importing `it` from a module that is not the test runner and declaring a block with it **as it stands** does not reach either.
+
+Only the spellings `it` and `test` are taken from the test runner's module. Take `describe` too and an assertion standing directly under a grouping block would count as being inside a test block.
+
+Point 3 answers the fact that this runtime cannot read a declaration behind an import. A shared fixture factory sits in another file, and a spec imports it and stacks `.extend(...)` on it. Whether the base reaches the runner cannot be known without following the import, and treating what cannot be followed as a violation would drop every spec written to the convention. What cannot be read is not a violation. Using an imported binding directly as a block without `.extend(...)` in between does not fall under 3. Naming a function of your own `it` (`const it = buildRunner()`) does not either, because it is not an `.extend(...)` call.
+
+Shapes in scope.
+
+| Shape | Example |
 | --- | --- |
-| `it.skip(...)` / `it.each(rows)(...)` / `it.skipIf(slow).concurrent(...)` | 根が正の綴りに解決される修飾形・カリー形 |
-| `it("adds", () => { rows.forEach((row) => { expect(row).toBe(1); }); });` | テスト用でないコールバックはそこで打ち切らず、さらに上のテストブロックを見る |
-| `it("adds", () => { expect(sum); });` | 所在は正しい。何も主張していないことは `no-matcherless-expect--assert-with-matcher` が持つ |
-| `it("adds", () => { const parsed = parse(raw); expect(parsed).toBe(3); });` | `it` 本体を主張だけに保つのは `require-it-only-expect--move-setup-into-fixture` が持つ |
-| `test("adds", () => {});` | アサーションが無いので所在の問題にならない。綴りそのものは `require-test-block-spelling--use-configured-fn` が持つ |
-| `expect.extend({ toBeReport });` / `expect.setState({});` | 被験体も assertion 数も取らない名前空間のメンバ呼び出し |
-| `test("adds", () => { expect.hasAssertions(); });` | assertion 数の宣言はテストブロックの中に立っている。綴りは `require-test-block-spelling--use-configured-fn` が持つ |
-| `runner.expect(sum).toBe(3);` | 名前空間 import 越しの入口は根が識別子に解決されない |
-| `it(1, () => { ... })` / `suite.test("adds", fn)` | 形として、または callee の根としてテストブロックに読めない。囲みが無い扱いになる |
+| A test block under another spelling | `test("adds", () => { expect(sum).toBe(3); });` |
+| A test block from a factory bound to another name | the `spec("adds", fn)` of `const spec = test.extend({});` |
+| Directly under a grouping block | `describe("sums", () => { expect(sum).toBe(3); });` |
+| A hook | `beforeEach(() => { expect(sum).toBe(3); });` |
+| The body of a module-scope helper | `const assertTotal = (total) => { expect(total).toBe(3); };` |
+| The body of a fixture factory | `test.extend({ subject: async (c, use) => { expect(seed).toBe(1); ... } })` |
+| A derived receiver used outside an `it` | `expect.soft(sum).toBe(3);` |
+| An assertion entry bound to another name | the `check(sum).toBe(3)` of `import { expect as check } from "vite-plus/test";` |
+| A non-runner binding claiming the canonical spelling | the `it("adds", fn)` of `const it = buildRunner();` |
+| An assertion-count declaration outside a test block | `describe("sums", () => { expect.assertions(2); });` |
 
-このルールが見るのは所在だけで、綴りそのものは見ない。`test` を `it` に揃える担当は `require-test-block-spelling--use-configured-fn` にあり、そちらは `test.extend(...)` の fixture 定義側には手を出さない。
+There is no narrowing by file name. An assertion written in a helper file a spec imports is in scope too, and which files this holds for is settled by the shared lint configuration's glob.
 
-## なぜそれが要るか
+### Deliberately not widened
 
-守っている不変条件は「アサーションは `it` の中だけに置かれる」ことである。
+| Shape | Why it is left out |
+| --- | --- |
+| `it.skip(...)` / `it.each(rows)(...)` / `it.skipIf(slow).concurrent(...)` | Modifier and curried forms whose root resolves to the canonical spelling |
+| `it("adds", () => { rows.forEach((row) => { expect(row).toBe(1); }); });` | A callback that is not for tests does not end the walk; the test block above it is read |
+| `it("adds", () => { expect(sum); });` | The position is right. That it claims nothing belongs to `no-matcherless-expect--assert-with-matcher` |
+| `it("adds", () => { const parsed = parse(raw); expect(parsed).toBe(3); });` | Keeping the `it` body to claims alone belongs to [require-it-only-expect--move-setup-into-fixture](./require-it-only-expect--move-setup-into-fixture.md) |
+| `test("adds", () => {});` | There is no assertion, so no question of position. The spelling itself belongs to `require-test-block-spelling--use-configured-fn` |
+| `expect.extend({ toBeReport });` / `expect.setState({});` | Namespace member calls taking neither a subject nor an assertion count |
+| `test("adds", () => { expect.hasAssertions(); });` | The count declaration stands inside a test block. The spelling belongs to `require-test-block-spelling--use-configured-fn` |
+| `runner.expect(sum).toBe(3);` | An entry through a namespace import; the root does not resolve to an identifier |
+| `it(1, () => { ... })` / `suite.test("adds", fn)` | Not readable as a test block by shape, or by the root of the callee. Treated as having no enclosure |
 
-これが成り立っていると、スイートの構造を機械で読める。すべての振る舞いの主張が名前の付いた `it` の下にあるので、失敗が必ず「記述された振る舞い」へ対応づく。読み手は落ちたブロックのタイトルを読むだけで、何の契約が壊れたかを復元できる。
+This rule reads position only, not the spelling itself. Aligning `test` to `it` belongs to `require-test-block-spelling--use-configured-fn`, which leaves the fixture-definition side of `test.extend(...)` alone.
 
-壊れ方は 2 層ある。
+### The invariant
 
-1 層目は、失敗の帰属が消えることである。`describe` の直下やヘルパ関数の本体に置かれたアサーションが落ちても、どの振る舞いの主張が破れたのかはタイトルから読めない。読み手はスタックを辿って呼び出し元を探すところから始めることになる。
+Assertions are placed inside `it` and nowhere else.
 
-2 層目は、隣接するルールの前提が崩れることである。`it` 本体をアサーションだけに保つルール、`it` の中のアサーションを数えるルール、被験体の名前を見るルールは、いずれも「アサーション解析は `it` を見れば足りる」という前提の上に立っている。アサーションがヘルパ関数の中へ移ると、その前提を置いた全員が対象を見失って黙る。黙ったことは報告の形では現れない。つまりこのルールは、それ自体の効用より、他のルールの土台としての効用が大きい。
+Hold that and the structure of the suite can be read by a machine. Every claim about behaviour sits under a named `it`, so a failure always corresponds to a described behaviour. The reader restores which contract broke by reading the title of the block that failed.
 
-テストランナー系プラグインが提供する同種のルールはこの用途に使えない。あれは `test.extend(...)` から派生した束縛をテストブロックとして認識できないため、規約どおりに書かれたコードを落とす。同種の上流ルールは共有設定に入れず、このルールだけを入れる。上流が拾えてこのルールが拾えない形が残らないよう、入口の別名・assertion 数の宣言・正の綴りを名乗る非ランナーの束縛まで検出範囲に含めてある。
+It breaks in two layers.
 
-## どう直すか
+The first is that the attribution of a failure disappears. An assertion placed directly under a `describe` or in the body of a helper fails without the title saying which claim about behaviour broke. The reader starts by walking the stack to find the caller.
 
-別の綴りで宣言されたテストブロックは、根の識別子を正の綴りへ置換する。グローバル注入された綴りで書かれている場合は自動修正が付く。
+The second is that the premises of the neighbouring rules collapse. The rule keeping the `it` body to assertions alone, the rule counting assertions inside an `it`, the rule reading the subject's name — all stand on the premise "reading `it` is enough for assertion analysis". Move an assertion into a helper function and everyone who placed that premise loses sight of the target and goes quiet. Going quiet takes no form in any report. So this rule matters less for itself than as ground for the others.
+
+The rule of the same kind offered by a test-runner plugin cannot serve this purpose: it cannot recognize a binding derived from `test.extend(...)` as a test block, so it drops code written to the convention. That upstream rule is kept out of the shared configuration and this one is used instead. So that no shape upstream catches is left uncaught here, the entry's aliases, assertion-count declarations, and non-runner bindings claiming the canonical spelling are all inside the detection range.
+
+### Configuration
+
+| Option | Default | What it settles |
+| --- | --- | --- |
+| `blockSpelling` | `"it"` | The canonical spelling |
+
+There is no option listing modules that ship shared fixture factories. A listing form picks up only imports written with a package specifier and misses the same factory imported by a relative path from inside the same package. Standing on the `.extend(...)` call reads both spellings alike.
+
+`blockSpelling` must carry the same value as the option of the same name on `require-test-block-spelling--use-configured-fn`. Split the settings and this rule drops a test block the spelling rule called canonical.
+
+Where the canonical spelling is changed to a name the test runner does not inject globally, no automatic fix is offered. The binding it would be replaced with cannot be guaranteed to resolve at that position, so only the report stands.
+
+## Fix
+
+For a test block declared under another spelling, replace the root identifier with the canonical spelling. Where it is written with a globally injected spelling, an automatic fix comes with it.
 
 ```ts
 it("adds", () => {
@@ -89,7 +118,7 @@ it("adds", () => {
 });
 ```
 
-別名に束ねた fixture ファクトリは、束縛名とその参照を正の綴りへ揃える。
+For a fixture factory bound to another name, align the binding name and its references to the canonical spelling.
 
 ```ts
 const it = test.extend({ subject: async (context, use) => use(1) });
@@ -99,39 +128,78 @@ it("adds through the factory", ({ subject }) => {
 });
 ```
 
-こちらも自動修正が付くが、次のいずれかに当たる場合は報告だけを出す。
+That one comes with an automatic fix too, except in these cases, where only the report stands.
 
-| 形 | 自動修正を出さない理由 |
+| Shape | Why no automatic fix |
 | --- | --- |
-| `const spec = it.extend({});` | 改名すると自分自身を参照する宣言になる。土台は `forbid-it-extend--use-test-extend` が持つ |
-| `const base = it.extend({}); const spec = base.extend({});` | 派生の根が正の綴りに届くので同じ |
-| 同じスコープに正の綴りの束縛が既にある | 改名すると宣言が衝突する |
-| `export const spec = test.extend({});` | 改名がこのファイルの外の参照を壊す。改名は同一ファイルに閉じる |
-| `import { it as check } from "vite-plus/test";` | import した束縛の改名は綴りルールの担当 |
+| `const spec = it.extend({});` | Renaming would make the declaration reference itself. The ground belongs to [forbid-it-extend--use-test-extend](./forbid-it-extend--use-test-extend.md) |
+| `const base = it.extend({}); const spec = base.extend({});` | The root of the derivation reaches the canonical spelling, so the same holds |
+| A canonical binding already in the same scope | Renaming would collide with the declaration |
+| `export const spec = test.extend({});` | Renaming would break references outside this file. Renaming closes inside one file |
+| `import { it as check } from "vite-plus/test";` | Renaming an imported binding belongs to the spelling rule |
 
-`describe` の直下に書かれたアサーションは、手で `it` の中へ移す。共有の setup ファクトリは共有のまま残し、具体的なテストファクトリだけを正の綴りに束ねる。段階的に `extend` を重ねる形はそのままでよい。
+An assertion written directly under a `describe` is moved into an `it` by hand. Leave the shared setup factory shared and bind only the concrete test factory to the canonical spelling. Stacking `extend` step by step is fine as it is.
 
-正の綴りを名乗る非ランナーの束縛は、その束縛を消してテストランナーの `it`、あるいは `test.extend(...)` から派生したファクトリでブロックを宣言し直す。テストブロックの外に立っている assertion 数の宣言は、数えたいアサーションが走る `it` の中へ移すか、消す。
+For a non-runner binding claiming the canonical spelling, delete that binding and redeclare the block with the test runner's `it`, or with a factory derived from `test.extend(...)`. An assertion-count declaration standing outside a test block is moved into the `it` that runs the assertions it counts, or deleted.
 
-別名に束ねた assertion の入口は、入口を `expect` の綴りのまま使う。入口の名前を替えても被験体の読み取りは変わらないので、替える理由がない。
+For an assertion entry bound to another name, use the entry under the spelling `expect`. Renaming the entry changes nothing about how the subject is read, so there is no reason to rename it.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- アサーションを spec の外のファイルへ移して報告を避ける。取り込み先まで対象になるので回避にならない
-- ヘルパ関数の中へアサーションを畳んでから `it` で呼ぶ。宣言の位置ごと報告される
-- 添字アクセスや実行時に決まる名前でテストブロックを宣言して、根の判定から外す
-- assertion の入口を別名に束ね直して起点の判定から外す
-- 正の綴りを自前の関数に束ね直して、ランナーのテストブロックのふりをする
-- 抑制ディレクティブ
+Code this rule rejects.
 
-## オプション
+```ts
+// an assertion written straight into a grouping block names no behaviour
+describe('sums', () => { expect(sum).toBe(3); });
+```
 
-| オプション      | 既定値 | 何を決めるか |
-| --------------- | ------ | ------------ |
-| `blockSpelling` | `"it"` | 正の綴り     |
+```ts
+// an assertion in a helper declared beside the suite stands in no block at all
+const check = (total) => { expect(total).toBe(3); };
+```
 
-共有のフィクスチャファクトリを出荷するモジュールを列挙するオプションは持たない。列挙する形はパッケージの指定子で書かれた import しか拾えず、同じパッケージの中から相対パスで取り込んだ同じファクトリを取りこぼす。`.extend(...)` の呼び出しを根拠にすれば、どちらの書き方も同じに読める。
+Code this rule accepts.
 
-`blockSpelling` は `require-test-block-spelling--use-configured-fn` の同名オプションと同じ値でなければならない。設定が分かれると、綴りルールが正としたテストブロックをこのルールが落とす。
+```ts
+// an assertion in the body of the canonical test block is where the rule wants it
+it('adds', () => { expect(sum).toBe(3); });
+```
 
-正の綴りをテストランナーがグローバル注入しない名前に変えた場合、自動修正は出ない。置換先の束縛がその位置で解決できることを保証できないため、報告だけを出す。
+```ts
+// a fixture factory bound to the canonical spelling declares canonical test blocks
+const it = test.extend({ subject: 1 });
+it('adds', ({ subject }) => { expect(subject).toBe(1); });
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Moving the assertion into a file outside the spec to avoid the report. Imported files are in scope too, so it is not an escape
+- Folding the assertion into a helper function and calling it from `it`. It is reported at the declaration's position
+- Declaring the test block through a subscript or a name settled at run time to leave the root judgment
+- Rebinding the assertion entry to another name to leave the starting-point judgment
+- Rebinding the canonical spelling to a function of your own to pose as the runner's test block
+- A suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `foreignTestBlockAssertion` | An assertion must not stand in a test block declared through \`{{written}}\`. Rename the root of that declaration to \`{{required}}\`. |
+| `shadowedTestBlockAssertion` | An assertion must not stand in a block declared through a binding of \`{{required}}\` that the test runner never handed over. Declare the block through the \`{{required}}\` the runner injects, or through a fixture derived from it. |
+| `groupingBlockAssertion` | An assertion must not stand in the block declared through \`{{written}}\`. Move this assertion into an \`{{required}}\` block that names the behaviour it checks. |
+| `detachedAssertion` | An assertion must not stand outside a test block. Move this assertion into the \`{{required}}\` block that names the behaviour it checks. |
+| `strayAssertionCount` | An assertion count must not be declared outside a test block. Move this declaration into the \`{{required}}\` block whose assertions it counts, or delete it. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->
