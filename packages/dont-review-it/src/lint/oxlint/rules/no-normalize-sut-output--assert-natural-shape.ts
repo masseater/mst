@@ -28,12 +28,6 @@ import {
 
 import type { ESTree } from "@oxlint/plugins";
 
-const PROPERTY_WRITE = "An assignment";
-
-const PROPERTY_REMOVAL = "A `delete`";
-
-const SPREADING_WRITE = "Object.assign";
-
 type Reading = {
   readonly module: ModuleDeclarations;
   readonly factory: SpecFunction | null;
@@ -46,18 +40,6 @@ type Origin = {
   readonly node: ESTree.Node;
   readonly name: string;
 } | null;
-
-type Finding = {
-  readonly node: ESTree.Node;
-  readonly messageId: string;
-  readonly data: Readonly<Record<string, string>>;
-};
-
-type Mutation = {
-  readonly node: ESTree.Node;
-  readonly root: string;
-  readonly operation: string;
-};
 
 type Walk = {
   readonly written: ESTree.Expression;
@@ -132,6 +114,12 @@ const resolvedName = (
   };
 };
 
+type Finding = {
+  readonly node: ESTree.Node;
+  readonly messageId: string;
+  readonly data: Readonly<Record<string, string>>;
+};
+
 const operationFinding = (input: {
   readonly node: ESTree.Node;
   readonly operation: string;
@@ -183,6 +171,19 @@ const findingsBehindCalledName = (
   );
 };
 
+const SPREADING_WRITE = "Object.assign";
+
+const spreadingWriteTarget = (call: ESTree.CallExpression): ESTree.Expression | null => {
+  const callee = unwrapSubject(call.callee);
+  if (callee.type !== "MemberExpression") return null;
+  if (staticMemberName(callee) !== SPREADING_ASSIGNMENT) return null;
+
+  const namespace = unwrapSubject(callee.object);
+  if (namespace.type !== "Identifier") return null;
+  if (namespace.name !== SPREADING_ASSIGNMENT_NAMESPACE) return null;
+  return handedValues(call.arguments).at(0) ?? null;
+};
+
 const findingsInCall = (call: ESTree.CallExpression, walk: Walk): readonly Finding[] => {
   if (spreadingWriteTarget(call) !== null) {
     return [operationFinding({ node: call, operation: SPREADING_WRITE, origin: walk.origin })];
@@ -203,15 +204,10 @@ const rootName = (node: ESTree.Expression): string | null => {
   return written.type === "MemberExpression" ? rootName(written.object) : null;
 };
 
-const spreadingWriteTarget = (call: ESTree.CallExpression): ESTree.Expression | null => {
-  const callee = unwrapSubject(call.callee);
-  if (callee.type !== "MemberExpression") return null;
-  if (staticMemberName(callee) !== SPREADING_ASSIGNMENT) return null;
-
-  const namespace = unwrapSubject(callee.object);
-  if (namespace.type !== "Identifier") return null;
-  if (namespace.name !== SPREADING_ASSIGNMENT_NAMESPACE) return null;
-  return handedValues(call.arguments).at(0) ?? null;
+type Mutation = {
+  readonly node: ESTree.Node;
+  readonly root: string;
+  readonly operation: string;
 };
 
 const mutationInCall = (call: ESTree.CallExpression): Mutation | null => {
@@ -231,12 +227,16 @@ const mutationInCall = (call: ESTree.CallExpression): Mutation | null => {
   return root === null ? null : { node: call, root, operation: `\`${member}\`` };
 };
 
+const PROPERTY_WRITE = "An assignment";
+
 const propertyWriteIn = (node: ESTree.AssignmentExpression): readonly Mutation[] => {
   if (node.left.type !== "MemberExpression") return [];
 
   const root = rootName(node.left.object);
   return root === null ? [] : [{ node, root, operation: PROPERTY_WRITE }];
 };
+
+const PROPERTY_REMOVAL = "A `delete`";
 
 const propertyRemovalIn = (node: ESTree.UnaryExpression): readonly Mutation[] => {
   if (node.operator !== "delete") return [];

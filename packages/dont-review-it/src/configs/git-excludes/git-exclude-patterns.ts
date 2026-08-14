@@ -5,14 +5,6 @@ import { readTextFile } from "../../lint/oxlint/lib/canonical-values/source-file
 import { gitOutput, type GitEnvironment } from "../../lint/oxlint/lib/git-output.ts";
 import { ignoreFilePatterns } from "./ignore-file-patterns.ts";
 
-/** @canonical-values dont-review-it.git-info-directory */
-const GIT_INFO_DIRECTORIES = ["info"] as const;
-
-const GIT_DIRECTORY_SEGMENT = {
-  info: GIT_INFO_DIRECTORIES[0],
-  exclude: "exclude",
-} as const;
-
 const configHomeOf = (environment: GitEnvironment): string => {
   const configHome = environment.env.XDG_CONFIG_HOME;
   if (configHome !== undefined && configHome !== "") return configHome;
@@ -30,6 +22,14 @@ const globalExcludeFile = (environment: GitEnvironment): string => {
 
   return join(configHomeOf(environment), "git", "ignore");
 };
+
+/** @canonical-values dont-review-it.git-info-directory */
+const GIT_INFO_DIRECTORIES = ["info"] as const;
+
+const GIT_DIRECTORY_SEGMENT = {
+  info: GIT_INFO_DIRECTORIES[0],
+  exclude: "exclude",
+} as const;
 
 const repositoryExcludeFiles = (environment: GitEnvironment): readonly string[] => {
   const revision = gitOutput(

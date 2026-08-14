@@ -5,6 +5,11 @@ export type AuthSessionResponse = {
   readonly expiresAt: string;
 };
 
+export const serializeAuthSession = (token: string, expiresAt: Date): AuthSessionResponse => ({
+  token,
+  expiresAt: expiresAt.toISOString(),
+});
+
 class InvalidAuthSessionError extends Error {
   override readonly name = "InvalidAuthSessionError";
 
@@ -12,11 +17,6 @@ class InvalidAuthSessionError extends Error {
     super("the auth session response does not match the contract shape");
   }
 }
-
-export const serializeAuthSession = (token: string, expiresAt: Date): AuthSessionResponse => ({
-  token,
-  expiresAt: expiresAt.toISOString(),
-});
 
 export const parseAuthSession = (candidate: unknown): AuthSessionResponse => {
   const session = asRecord(candidate);

@@ -4,13 +4,6 @@ import { DECLARED_MODE } from "../contract/vocabulary.ts";
 
 import type { Mode } from "./run-context.ts";
 
-const WORKFLOW_ROOT = ".repo-workflow";
-
-const RUN_ROOT_DIRECTORY: Readonly<Record<Mode, string>> = {
-  reviewer: "review",
-  author: DECLARED_MODE.author,
-};
-
 const timestampSlug = (isoTime: string): string =>
   isoTime.replaceAll(":", "-").replaceAll(".", "-");
 
@@ -24,6 +17,13 @@ export type RunContextLayout = {
   readonly plannedCommentsJsonPath: string;
   readonly runContextJsonPath: string;
   readonly runContextDir: string;
+};
+
+const WORKFLOW_ROOT = ".repo-workflow";
+
+const RUN_ROOT_DIRECTORY: Readonly<Record<Mode, string>> = {
+  reviewer: "review",
+  author: DECLARED_MODE.author,
 };
 
 export const runContextLayout = (build: {

@@ -5,7 +5,18 @@ import { boundNamesIn } from "./bound-names.ts";
 
 import type { ImportRoutes } from "./import-routes.ts";
 
+const PLACEHOLDER_PREFIX = "$";
+
 type Spelling = (name: string) => string;
+
+const asWritten: Spelling = (identifierName) => identifierName;
+
+const jsonTextOf: (held: unknown) => string = JSON.stringify;
+
+const MEMBER_NAME_FIELDS: ReadonlySet<string> = new Set(["key", "property"]);
+
+const namesAMember = (node: AstFields, field: string): boolean =>
+  MEMBER_NAME_FIELDS.has(field) && node.computed === false;
 
 const UNCOMPARED_FIELDS: ReadonlySet<string> = new Set([
   "end",
@@ -15,18 +26,7 @@ const UNCOMPARED_FIELDS: ReadonlySet<string> = new Set([
   "start",
 ]);
 
-const MEMBER_NAME_FIELDS: ReadonlySet<string> = new Set(["key", "property"]);
-
 const NAME_FIELD = "name";
-
-const PLACEHOLDER_PREFIX = "$";
-
-const asWritten: Spelling = (identifierName) => identifierName;
-
-const jsonTextOf: (held: unknown) => string = JSON.stringify;
-
-const namesAMember = (node: AstFields, field: string): boolean =>
-  MEMBER_NAME_FIELDS.has(field) && node.computed === false;
 
 const structureOf = (held: unknown, spell: Spelling): string => {
   if (Array.isArray(held)) return `[${held.map((child) => structureOf(child, spell)).join(",")}]`;

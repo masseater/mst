@@ -6,10 +6,6 @@ export type GitRunner = {
   }) => Promise<{ readonly stdout: string; readonly stderr: string }>;
 };
 
-const DETACHED_HEAD_MARKER = "is not a symbolic ref";
-
-const NOT_A_WORKING_TREE_MARKER = "is not a working tree";
-
 const carriesStderr = (failure: unknown): failure is { readonly stderr: string } =>
   typeof failure === "object" &&
   failure !== null &&
@@ -21,8 +17,12 @@ const gitFailureText = (failure: unknown): string => {
   return `${carriesStderr(failure) ? failure.stderr : ""}\n${failure.message}`;
 };
 
+const DETACHED_HEAD_MARKER = "is not a symbolic ref";
+
 export const indicatesDetachedHead = (failure: unknown): boolean =>
   gitFailureText(failure).includes(DETACHED_HEAD_MARKER);
+
+const NOT_A_WORKING_TREE_MARKER = "is not a working tree";
 
 export const indicatesNotAWorkingTree = (failure: unknown): boolean =>
   gitFailureText(failure).includes(NOT_A_WORKING_TREE_MARKER);

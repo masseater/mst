@@ -30,44 +30,6 @@ const SHARED_PARENT_KINDS: ReadonlySet<string> = new Set([
   "ExportNamedDeclaration",
 ]);
 
-const OWN_SPELLING_FIELD: ReadonlyMap<string, string> = new Map([
-  ["AccessorProperty", "key"],
-  ["MemberExpression", "property"],
-  ["MethodDefinition", "key"],
-  ["Property", "key"],
-  ["PropertyDefinition", "key"],
-]);
-
-const OWN_NAME_FIELD: ReadonlyMap<string, string> = new Map([
-  ["ClassDeclaration", "id"],
-  ["ClassExpression", "id"],
-  ["NewExpression", "callee"],
-]);
-
-const scopeNameOf = (visit: NodeVisit): string | null =>
-  [
-    ...heldNamesOf(visit),
-    ...visit.ancestors
-      .slice(-1)
-      .filter((parent) => parent.value === visit.node)
-      .flatMap((parent) => (parent.computed === true ? [] : [identifierNameOf(parent.key)]))
-      .flatMap((holderSpelling) => (holderSpelling === null ? [] : [holderSpelling])),
-  ][0] ?? null;
-
-const isDivertedUnder = (parent: AstFields, node: AstFields): boolean => {
-  const parentNodeType = nodeTypeOf(parent);
-  if (IMPORT_BINDING_NODE_TYPES.has(parentNodeType)) return false;
-
-  const spelling = OWN_SPELLING_FIELD.get(parentNodeType);
-  if (spelling !== undefined) return parent.computed === true || parent[spelling] !== node;
-
-  const named = OWN_NAME_FIELD.get(parentNodeType);
-  return named === undefined || parent[named] !== node;
-};
-
-const isDivertedReference = (visit: NodeVisit): boolean =>
-  visit.ancestors.slice(-1).some((parent) => isDivertedUnder(parent, visit.node));
-
 const declaredClassesIn = (visits: readonly NodeVisit[]): readonly DeclaredClass[] =>
   visits
     .filter((visit) => nodeTypeOf(visit.node) === "ClassDeclaration")
@@ -85,6 +47,16 @@ const declaredClassesIn = (visits: readonly NodeVisit[]): readonly DeclaredClass
         },
       ];
     });
+
+const scopeNameOf = (visit: NodeVisit): string | null =>
+  [
+    ...heldNamesOf(visit),
+    ...visit.ancestors
+      .slice(-1)
+      .filter((parent) => parent.value === visit.node)
+      .flatMap((parent) => (parent.computed === true ? [] : [identifierNameOf(parent.key)]))
+      .flatMap((holderSpelling) => (holderSpelling === null ? [] : [holderSpelling])),
+  ][0] ?? null;
 
 const constructionsIn = (visits: readonly NodeVisit[]): readonly ConstructionSite[] =>
   visits
@@ -106,6 +78,34 @@ const constructionsIn = (visits: readonly NodeVisit[]): readonly ConstructionSit
         },
       ];
     });
+
+const OWN_SPELLING_FIELD: ReadonlyMap<string, string> = new Map([
+  ["AccessorProperty", "key"],
+  ["MemberExpression", "property"],
+  ["MethodDefinition", "key"],
+  ["Property", "key"],
+  ["PropertyDefinition", "key"],
+]);
+
+const OWN_NAME_FIELD: ReadonlyMap<string, string> = new Map([
+  ["ClassDeclaration", "id"],
+  ["ClassExpression", "id"],
+  ["NewExpression", "callee"],
+]);
+
+const isDivertedUnder = (parent: AstFields, node: AstFields): boolean => {
+  const parentNodeType = nodeTypeOf(parent);
+  if (IMPORT_BINDING_NODE_TYPES.has(parentNodeType)) return false;
+
+  const spelling = OWN_SPELLING_FIELD.get(parentNodeType);
+  if (spelling !== undefined) return parent.computed === true || parent[spelling] !== node;
+
+  const named = OWN_NAME_FIELD.get(parentNodeType);
+  return named === undefined || parent[named] !== node;
+};
+
+const isDivertedReference = (visit: NodeVisit): boolean =>
+  visit.ancestors.slice(-1).some((parent) => isDivertedUnder(parent, visit.node));
 
 const divertedNamesIn = (visits: readonly NodeVisit[]): ReadonlySet<string> =>
   new Set(

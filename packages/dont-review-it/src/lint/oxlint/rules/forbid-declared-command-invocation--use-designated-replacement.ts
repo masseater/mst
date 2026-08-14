@@ -49,33 +49,6 @@ import {
 
 import type { Context, ESTree } from "@oxlint/plugins";
 
-type SpawnCall = ESTree.CallExpression | ESTree.TaggedTemplateExpression;
-
-type Reading = {
-  readonly routes: ReturnType<typeof spawnRoutesIn>;
-  readonly constants: ReadonlyMap<string, string>;
-};
-
-const targetNodeOf = (node: SpawnCall, form: SpawnForm): ESTree.Node =>
-  node.type === "TaggedTemplateExpression"
-    ? node.quasi
-    : (node.arguments.at(form.position) ?? node);
-
-const commandLineOf = ({
-  site,
-  target,
-  constants,
-}: {
-  readonly site: SpawnSite;
-  readonly target: string;
-  readonly constants: ReadonlyMap<string, string>;
-}): string | null => {
-  if (site.form.carries !== SPAWN_TARGET_NAME || !namesRunner(target)) return target;
-
-  const heldElements = handedTextsOf({ handed: site.handed, constants });
-  return heldElements === null ? null : [target, ...heldElements].join(" ");
-};
-
 const reportRegistrations = ({
   inspection,
   node,
@@ -139,6 +112,33 @@ const reportRetired = ({
     });
   }
 };
+
+const commandLineOf = ({
+  site,
+  target,
+  constants,
+}: {
+  readonly site: SpawnSite;
+  readonly target: string;
+  readonly constants: ReadonlyMap<string, string>;
+}): string | null => {
+  if (site.form.carries !== SPAWN_TARGET_NAME || !namesRunner(target)) return target;
+
+  const heldElements = handedTextsOf({ handed: site.handed, constants });
+  return heldElements === null ? null : [target, ...heldElements].join(" ");
+};
+
+type Reading = {
+  readonly routes: ReturnType<typeof spawnRoutesIn>;
+  readonly constants: ReadonlyMap<string, string>;
+};
+
+type SpawnCall = ESTree.CallExpression | ESTree.TaggedTemplateExpression;
+
+const targetNodeOf = (node: SpawnCall, form: SpawnForm): ESTree.Node =>
+  node.type === "TaggedTemplateExpression"
+    ? node.quasi
+    : (node.arguments.at(form.position) ?? node);
 
 const reportSite = ({
   inspection,

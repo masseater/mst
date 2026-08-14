@@ -10,13 +10,27 @@ import type { ESTree } from "@oxlint/plugins";
 import type { RuleMessage } from "../lib/rule-message.ts";
 import type { SpecStatement } from "../lib/spec-syntax/subject-expressions.ts";
 
-const SPREAD_SHAPE = "a spread of another value";
+type Reading = {
+  readonly declared: ReadonlyMap<string, ESTree.Expression>;
+  readonly reached: ReadonlySet<string>;
+};
 
-const CIRCULAR_NAME_SHAPE = "a chain of names that leads back to itself";
+const writtenOut = (node: ESTree.Expression): ESTree.Expression => {
+  return unwrapExpression(node);
+};
+
+type AssetsFinding = RuleMessage & { readonly node: ESTree.Node };
+
+const firstFinding = (found: readonly (AssetsFinding | null)[]): AssetsFinding | null =>
+  found.find((finding) => finding !== null) ?? null;
+
+const assembledFinding = (node: ESTree.Node, shape: string): AssetsFinding => ({
+  node,
+  messageId: "assetsAssembledValue",
+  data: { shape },
+});
 
 const LOADING_SHAPE = "a value this file works out as it loads";
-
-const RUNNING_STATEMENT_SHAPE = "a statement that runs";
 
 const ASSEMBLED_SHAPES: ReadonlyMap<string, string> = new Map([
   ["ArrowFunctionExpression", "a function"],
@@ -31,38 +45,6 @@ const ASSEMBLED_SHAPES: ReadonlyMap<string, string> = new Map([
   ["TaggedTemplateExpression", "a tagged template"],
   ["ThisExpression", "a value the caller supplies"],
 ]);
-
-const FOREIGN_STATEMENT_SHAPES: ReadonlyMap<string, string> = new Map([
-  ["ClassDeclaration", "a class declaration"],
-  ["ExportDefaultDeclaration", "a default export"],
-  ["FunctionDeclaration", "a function declaration"],
-  ["TSDeclareFunction", "a function signature"],
-  ["TSEnumDeclaration", "an enum declaration"],
-  ["TSExportAssignment", "an export assignment"],
-  ["TSGlobalDeclaration", "a global declaration"],
-  ["TSImportEqualsDeclaration", "an import assignment"],
-  ["TSModuleDeclaration", "a module declaration"],
-]);
-
-type AssetsFinding = RuleMessage & { readonly node: ESTree.Node };
-
-type Reading = {
-  readonly declared: ReadonlyMap<string, ESTree.Expression>;
-  readonly reached: ReadonlySet<string>;
-};
-
-const writtenOut = (node: ESTree.Expression): ESTree.Expression => {
-  return unwrapExpression(node);
-};
-
-const firstFinding = (found: readonly (AssetsFinding | null)[]): AssetsFinding | null =>
-  found.find((finding) => finding !== null) ?? null;
-
-const assembledFinding = (node: ESTree.Node, shape: string): AssetsFinding => ({
-  node,
-  messageId: "assetsAssembledValue",
-  data: { shape },
-});
 
 const groupedValueIn = (written: ESTree.Expression, reading: Reading): AssetsFinding | null => {
   if (written.type === "TemplateLiteral") {
@@ -87,6 +69,8 @@ const assembledValueIn = (node: ESTree.Expression, reading: Reading): AssetsFind
   return groupedValueIn(written, reading);
 };
 
+const CIRCULAR_NAME_SHAPE = "a chain of names that leads back to itself";
+
 const boundValueIn = (
   named: { readonly name: string; readonly node: ESTree.Node },
   reading: Reading,
@@ -105,6 +89,8 @@ const boundValueIn = (
   });
   return finding === null ? null : { ...finding, node };
 };
+
+const SPREAD_SHAPE = "a spread of another value";
 
 const elementValueIn = (
   held: ESTree.ArrayExpressionElement,
@@ -131,6 +117,22 @@ const propertyValueIn = (
   const keyFinding = property.computed ? keyValueIn(property.key, reading) : null;
   return keyFinding ?? assembledValueIn(property.value, reading);
 };
+
+const forwardedSpecifierOf = (statement: SpecStatement): string | null => {
+  if (statement.type === "ExportAllDeclaration") return statement.source.value;
+  if (statement.type === "ExportNamedDeclaration") return statement.source?.value ?? null;
+  return null;
+};
+
+const detachedExportFinding = (statement: ESTree.ExportNamedDeclaration): AssetsFinding => ({
+  node: statement,
+  messageId: "assetsDetachedExport",
+  data: {
+    names: statement.specifiers
+      .map((exported) => `\`${moduleExportSpelling(exported.exported)}\``)
+      .join(", "),
+  },
+});
 
 const declaratorFinding = (
   declarator: ESTree.VariableDeclarator,
@@ -168,21 +170,19 @@ const declarationFinding = (
   );
 };
 
-const forwardedSpecifierOf = (statement: SpecStatement): string | null => {
-  if (statement.type === "ExportAllDeclaration") return statement.source.value;
-  if (statement.type === "ExportNamedDeclaration") return statement.source?.value ?? null;
-  return null;
-};
+const RUNNING_STATEMENT_SHAPE = "a statement that runs";
 
-const detachedExportFinding = (statement: ESTree.ExportNamedDeclaration): AssetsFinding => ({
-  node: statement,
-  messageId: "assetsDetachedExport",
-  data: {
-    names: statement.specifiers
-      .map((exported) => `\`${moduleExportSpelling(exported.exported)}\``)
-      .join(", "),
-  },
-});
+const FOREIGN_STATEMENT_SHAPES: ReadonlyMap<string, string> = new Map([
+  ["ClassDeclaration", "a class declaration"],
+  ["ExportDefaultDeclaration", "a default export"],
+  ["FunctionDeclaration", "a function declaration"],
+  ["TSDeclareFunction", "a function signature"],
+  ["TSEnumDeclaration", "an enum declaration"],
+  ["TSExportAssignment", "an export assignment"],
+  ["TSGlobalDeclaration", "a global declaration"],
+  ["TSImportEqualsDeclaration", "an import assignment"],
+  ["TSModuleDeclaration", "a module declaration"],
+]);
 
 const writtenStatementFinding = (
   statement: SpecStatement,

@@ -5,14 +5,18 @@ import { parseSync } from "oxc-parser";
 
 import type { UnknownFields } from "../unknown-fields.ts";
 
-export type LintRuleFacts = {
-  readonly name: string;
-  readonly description: string;
-  readonly sourcePath: string;
-  readonly fixable: boolean;
-  readonly hasSuggestions: boolean;
-  readonly configurable: boolean;
-  readonly shipped: boolean;
+const isAstNode = (candidate: unknown): candidate is UnknownFields =>
+  typeof candidate === "object" && candidate !== null;
+
+const nodesIn = (candidate: unknown): readonly UnknownFields[] =>
+  Array.isArray(candidate) ? candidate.filter(isAstNode) : [];
+
+const templateTextOf = (node: UnknownFields): string | null => {
+  const expressions = node.expressions as readonly unknown[];
+  if (expressions.length > 0) return null;
+  return nodesIn(node.quasis)
+    .map((quasi) => (quasi.value as UnknownFields).cooked as string)
+    .join("");
 };
 
 type ConstantsByName = ReadonlyMap<string, UnknownFields>;
@@ -21,33 +25,6 @@ type ResolveInput = {
   readonly node: UnknownFields;
   readonly constants: ConstantsByName;
   readonly visited: readonly string[];
-};
-
-const isAstNode = (candidate: unknown): candidate is UnknownFields =>
-  typeof candidate === "object" && candidate !== null;
-
-const nodesIn = (candidate: unknown): readonly UnknownFields[] =>
-  Array.isArray(candidate) ? candidate.filter(isAstNode) : [];
-
-const keyNameOf = (property: UnknownFields): string | null => {
-  const named = property.key as UnknownFields;
-  if (named.type === "Identifier") return named.name as string;
-  if (named.type === "Literal" && typeof named.value === "string") return named.value;
-  return null;
-};
-
-const propertyOf = (objectNode: UnknownFields, propertyName: string): UnknownFields | null =>
-  nodesIn(objectNode.properties)
-    .filter((property) => property.type === "Property" && keyNameOf(property) === propertyName)
-    .map((property) => property.value as UnknownFields)
-    .at(0) ?? null;
-
-const templateTextOf = (node: UnknownFields): string | null => {
-  const expressions = node.expressions as readonly unknown[];
-  if (expressions.length > 0) return null;
-  return nodesIn(node.quasis)
-    .map((quasi) => (quasi.value as UnknownFields).cooked as string)
-    .join("");
 };
 
 const concatenatedTextOf = ({ node, constants, visited }: ResolveInput): string | null => {
@@ -121,6 +98,19 @@ const ruleCandidateOf = (initializer: UnknownFields): UnknownFields | null => {
 
 const GENERIC_FILE_STEMS: readonly string[] = ["index", "rule"];
 
+const keyNameOf = (property: UnknownFields): string | null => {
+  const named = property.key as UnknownFields;
+  if (named.type === "Identifier") return named.name as string;
+  if (named.type === "Literal" && typeof named.value === "string") return named.value;
+  return null;
+};
+
+const propertyOf = (objectNode: UnknownFields, propertyName: string): UnknownFields | null =>
+  nodesIn(objectNode.properties)
+    .filter((property) => property.type === "Property" && keyNameOf(property) === propertyName)
+    .map((property) => property.value as UnknownFields)
+    .at(0) ?? null;
+
 const ruleNameOf = ({
   definition,
   constants,
@@ -148,6 +138,16 @@ const descriptionOf = ({
   const descriptionNode = docs === null ? null : propertyOf(docs, "description");
   if (descriptionNode === null) return "";
   return resolveText({ node: descriptionNode, constants, visited: [] }) ?? "";
+};
+
+export type LintRuleFacts = {
+  readonly name: string;
+  readonly description: string;
+  readonly sourcePath: string;
+  readonly fixable: boolean;
+  readonly hasSuggestions: boolean;
+  readonly configurable: boolean;
+  readonly shipped: boolean;
 };
 
 const factsOf = ({

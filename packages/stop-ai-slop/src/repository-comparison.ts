@@ -73,8 +73,6 @@ const resolveRevisionObject = async (repositoryRoot: string, revision: string): 
   ).trim();
 };
 
-const sourceExtensions = [".cjs", ".cts", ".js", ".jsx", ".mjs", ".mts", ".ts", ".tsx"];
-
 const utf8SourceOf = (sourceBytes: Uint8Array): string | null => {
   const [undecodable, decoded] = attempt<string, Error>(() =>
     new TextDecoder("utf-8", { fatal: true }).decode(sourceBytes),
@@ -98,6 +96,8 @@ export type SideSources = Readonly<{
   base: (path: string) => Promise<string | null>;
   head: (path: string) => Promise<string | null>;
 }>;
+
+const sourceExtensions = [".cjs", ".cts", ".js", ".jsx", ".mjs", ".mts", ".ts", ".tsx"];
 
 const readSource = async ({
   sources,

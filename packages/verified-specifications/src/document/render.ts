@@ -1,5 +1,8 @@
 export const SPECIFICATIONS_FILE_NAME = "SPECIFICATIONS.md";
 
+const PROVENANCE_LINE =
+  "生成物。`vp run guard:fix` が `specs/` の仕様担保テストから再生成する。手で編集しない。";
+
 export type ListedSubject = {
   readonly subject: string;
   readonly claims: readonly string[];
@@ -11,9 +14,6 @@ type MergedSubject = {
   readonly claims: readonly string[];
   readonly sourceFiles: readonly string[];
 };
-
-const PROVENANCE_LINE =
-  "生成物。`vp run guard:fix` が `specs/` の仕様担保テストから再生成する。手で編集しない。";
 
 const mergedSubjects = (subjects: readonly ListedSubject[]): readonly MergedSubject[] =>
   subjects.reduce<readonly MergedSubject[]>((mergedOnes, listed) => {

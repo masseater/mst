@@ -9,14 +9,6 @@ export type EventEnvelope = {
   readonly payload: Readonly<Record<string, unknown>>;
 };
 
-class InvalidEnvelopeError extends Error {
-  override readonly name = "InvalidEnvelopeError";
-
-  constructor() {
-    super("イベント封筒が契約の形と一致しない");
-  }
-}
-
 export const sealEnvelope = (envelope: {
   readonly eventType: string;
   readonly deliveryId: string;
@@ -27,6 +19,14 @@ export const sealEnvelope = (envelope: {
   delivery_id: envelope.deliveryId,
   payload: envelope.payload,
 });
+
+class InvalidEnvelopeError extends Error {
+  override readonly name = "InvalidEnvelopeError";
+
+  constructor() {
+    super("イベント封筒が契約の形と一致しない");
+  }
+}
 
 export const unwrapEnvelope = (candidate: unknown): Readonly<Record<string, unknown>> => {
   const envelope = asRecord(candidate);

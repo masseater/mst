@@ -1,21 +1,3 @@
-const SEGMENT_SEPARATOR = /(\|\||&&|;|\||&|\n|\(|\))/u;
-
-const SURROUNDING_QUOTES = /^["']+|["']+$/gu;
-
-const ENVIRONMENT_BINDING = /^[A-Za-z_][A-Za-z0-9_]*=/u;
-
-const FLAG_MARK = "-";
-
-const RUN_TIME_SUBSTITUTION = /[$`]/u;
-
-const ADDRESS_TOKEN = /^[a-z][a-z0-9+.-]*:\/\//iu;
-
-const ADDRESS_ELEMENT_SEPARATOR = /[/@?]/u;
-
-const VERSION_MARK = "@";
-
-const PIPE = "|";
-
 const RUNNER_PREFIXES: readonly (readonly string[])[] = [
   ["npx"],
   ["bunx"],
@@ -29,34 +11,20 @@ const RUNNER_PREFIXES: readonly (readonly string[])[] = [
   ["zsh", "-c"],
 ];
 
-const SHELL_EVALUATORS: ReadonlySet<string> = new Set([
-  "bash",
-  "dash",
-  "ksh",
-  "sh",
-  "source",
-  "zsh",
-]);
+export const namesRunner = (token: string): boolean =>
+  RUNNER_PREFIXES.some(([head]) => head === token);
 
-const INLINE_EVALUATORS: ReadonlySet<string> = new Set(["eval"]);
+const VERSION_MARK = "@";
 
-type CommandSegment = {
-  readonly tokens: readonly string[];
-  readonly piped: boolean;
+const withoutVersion = (token: string): string => {
+  const scoped = token.startsWith(VERSION_MARK);
+  const marked = token.indexOf(VERSION_MARK, scoped ? 1 : 0);
+  return marked <= 0 ? token : token.slice(0, marked);
 };
 
-const tokensOf = (written: string): readonly string[] =>
-  written
-    .split(/\s+/u)
-    .map((token) => token.replace(SURROUNDING_QUOTES, ""))
-    .filter((token) => token !== "");
+const ENVIRONMENT_BINDING = /^[A-Za-z_][A-Za-z0-9_]*=/u;
 
-const segmentsOf = (line: string): readonly CommandSegment[] => {
-  const parts = line.split(SEGMENT_SEPARATOR);
-  return parts.flatMap((part, index) =>
-    index % 2 === 0 ? [{ tokens: tokensOf(part), piped: parts[index - 1] === PIPE }] : [],
-  );
-};
+const FLAG_MARK = "-";
 
 const withoutLeadingFlags = (tokens: readonly string[]): readonly string[] => {
   const [head, ...rest] = tokens;
@@ -79,11 +47,16 @@ const invokedTokenOf = (tokens: readonly string[]): string | null => {
   return behind === null ? head : invokedTokenOf(behind);
 };
 
-const withoutVersion = (token: string): string => {
-  const scoped = token.startsWith(VERSION_MARK);
-  const marked = token.indexOf(VERSION_MARK, scoped ? 1 : 0);
-  return marked <= 0 ? token : token.slice(0, marked);
+const RUN_TIME_SUBSTITUTION = /[$`]/u;
+
+type CommandSegment = {
+  readonly tokens: readonly string[];
+  readonly piped: boolean;
 };
+
+const ADDRESS_TOKEN = /^[a-z][a-z0-9+.-]*:\/\//iu;
+
+const ADDRESS_ELEMENT_SEPARATOR = /[/@?]/u;
 
 const addressElementsOf = (token: string): readonly string[] =>
   ADDRESS_TOKEN.test(token)
@@ -97,11 +70,38 @@ const namesUnderSegment = (segment: CommandSegment): readonly string[] => {
   return [...named, ...segment.tokens.flatMap(addressElementsOf)];
 };
 
-export const namesRunner = (token: string): boolean =>
-  RUNNER_PREFIXES.some(([head]) => head === token);
+const PIPE = "|";
+
+const SURROUNDING_QUOTES = /^["']+|["']+$/gu;
+
+const tokensOf = (written: string): readonly string[] =>
+  written
+    .split(/\s+/u)
+    .map((token) => token.replace(SURROUNDING_QUOTES, ""))
+    .filter((token) => token !== "");
+
+const SEGMENT_SEPARATOR = /(\|\||&&|;|\||&|\n|\(|\))/u;
+
+const segmentsOf = (line: string): readonly CommandSegment[] => {
+  const parts = line.split(SEGMENT_SEPARATOR);
+  return parts.flatMap((part, index) =>
+    index % 2 === 0 ? [{ tokens: tokensOf(part), piped: parts[index - 1] === PIPE }] : [],
+  );
+};
 
 export const invokedNamesIn = (line: string): readonly string[] =>
   segmentsOf(line).flatMap(namesUnderSegment);
+
+const SHELL_EVALUATORS: ReadonlySet<string> = new Set([
+  "bash",
+  "dash",
+  "ksh",
+  "sh",
+  "source",
+  "zsh",
+]);
+
+const INLINE_EVALUATORS: ReadonlySet<string> = new Set(["eval"]);
 
 export const carriesUndecidedTarget = (line: string): boolean =>
   segmentsOf(line).some((segment) => {

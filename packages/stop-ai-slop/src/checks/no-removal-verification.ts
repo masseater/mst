@@ -16,29 +16,24 @@ type RemovedFile = {
   readonly path: string;
 };
 
-type RemovedExport = {
-  readonly locator: string;
-  readonly modulePath: string;
-  readonly exportName: string;
-};
+const isTestFile = (path: string): boolean => /\.test\.[cm]?[jt]sx?$/u.test(path);
 
 const SOURCE_EXTENSION = /(\.[cm]?[jt]sx?)$/u;
 
-const isTestFile = (path: string): boolean => /\.test\.[cm]?[jt]sx?$/u.test(path);
-
 const isSourceFile = (path: string): boolean =>
   SOURCE_EXTENSION.test(path) && !/\.d\.[cm]?ts$/u.test(path) && !isTestFile(path);
-
-const testPathFor = (sourcePath: string): string => sourcePath.replace(SOURCE_EXTENSION, ".test$1");
-
-const byLocation = (left: CheckProblem, right: CheckProblem): number =>
-  left.file === right.file ? left.line - right.line : left.file.localeCompare(right.file);
 
 const removedFilesIn = (files: readonly ComparisonFile[]): readonly RemovedFile[] =>
   files.flatMap((file) => {
     if (file.kind !== "deleted" || !isSourceFile(file.beforePath)) return [];
     return [{ locator: `file:${file.beforePath}`, path: file.beforePath }];
   });
+
+type RemovedExport = {
+  readonly locator: string;
+  readonly modulePath: string;
+  readonly exportName: string;
+};
 
 const removedExportsIn = (files: readonly ComparisonFile[]): readonly RemovedExport[] =>
   files.flatMap((file) => {
@@ -117,6 +112,11 @@ const addedVerificationsIn = (
     return precedingCount < addedCount;
   });
 };
+
+const byLocation = (left: CheckProblem, right: CheckProblem): number =>
+  left.file === right.file ? left.line - right.line : left.file.localeCompare(right.file);
+
+const testPathFor = (sourcePath: string): string => sourcePath.replace(SOURCE_EXTENSION, ".test$1");
 
 const correspondingTestProblems = (
   files: readonly ComparisonFile[],

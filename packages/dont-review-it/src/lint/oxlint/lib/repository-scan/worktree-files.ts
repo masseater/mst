@@ -17,17 +17,17 @@ export const UNSCANNED_DIRECTORY_NAMES: ReadonlySet<string> = new Set([
   "node_modules",
 ]);
 
-export type Worktree = {
-  readonly root: string;
-  readonly unscannedDirectoryNames: ReadonlySet<string>;
-};
-
 export const unscannedDirectoryNamesFrom = (
   ruleOptions: Context["options"],
 ): ReadonlySet<string> => {
   const declared = ((ruleOptions[0] ?? {}) as { readonly unscannedDirectories?: readonly string[] })
     .unscannedDirectories;
   return declared === undefined ? UNSCANNED_DIRECTORY_NAMES : new Set(declared);
+};
+
+export type Worktree = {
+  readonly root: string;
+  readonly unscannedDirectoryNames: ReadonlySet<string>;
 };
 
 const filePathsUnder = (worktree: Worktree, directory: string): readonly string[] => {

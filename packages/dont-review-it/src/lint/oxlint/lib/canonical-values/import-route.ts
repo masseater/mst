@@ -14,16 +14,6 @@ import { isRelativeImportSpecifier } from "./import-specifier.ts";
 
 import type { CanonicalValuesCatalog, CanonicalValuesEntry } from "./catalog.ts";
 
-const SUBPATH_IMPORT_PREFIX = "#";
-
-const packageNameOf = (specifier: string): string => {
-  if (!specifier.startsWith("@")) return specifier.split("/")[0] as string;
-  return specifier.split("/").slice(0, 2).join("/");
-};
-
-const belongsToRegisteredPackage = (specifier: string, catalog: CanonicalValuesCatalog): boolean =>
-  catalog.packageNames.has(packageNameOf(specifier));
-
 const registeredEntriesForImportRoute = (
   query: ImportRouteQuery,
   catalog: CanonicalValuesCatalog,
@@ -37,6 +27,16 @@ const registeredEntriesForImportRoute = (
     ? resolvedDirectImportEntries(query, catalog.entries)
     : resolvedPublicImportEntries(query, publicEntries);
 };
+
+const SUBPATH_IMPORT_PREFIX = "#";
+
+const packageNameOf = (specifier: string): string => {
+  if (!specifier.startsWith("@")) return specifier.split("/")[0] as string;
+  return specifier.split("/").slice(0, 2).join("/");
+};
+
+const belongsToRegisteredPackage = (specifier: string, catalog: CanonicalValuesCatalog): boolean =>
+  catalog.packageNames.has(packageNameOf(specifier));
 
 const isKnownRepositorySpecifier = (
   query: ImportRouteQuery,

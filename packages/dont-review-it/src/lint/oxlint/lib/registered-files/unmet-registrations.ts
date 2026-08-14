@@ -11,19 +11,27 @@ import { worktreeFilePathsUnder } from "../repository-scan/worktree-files.ts";
 import type { RuleMessage } from "../rule-message.ts";
 import type { RequiredFileEntry } from "./required-file-entries.ts";
 
+const workspaceDirectoriesIn = (filePaths: readonly string[]): readonly string[] =>
+  filePaths.filter((path) => basename(path) === MANIFEST_FILE_NAME).map((path) => dirname(path));
+
+const holdingWorkspacesOf = (asked: {
+  readonly entry: RequiredFileEntry;
+  readonly workspaceDirectories: readonly string[];
+}): readonly string[] => {
+  const { owner } = asked.entry;
+  if (owner === null) return [REPOSITORY_ROOT_WORKSPACE];
+
+  return asked.workspaceDirectories.filter((workspace) =>
+    matchesAnchoredGlobPath({ relativePath: workspace, pattern: owner }),
+  );
+};
+
 export const MISSING_REGISTERED_FILE_MESSAGE_ID = "missingRegisteredFile";
 
 export const EMPTY_REGISTERED_FILE_MESSAGE_ID = "emptyRegisteredFile";
 
-export const DEAD_OWNER_REGISTRATION_MESSAGE_ID = "deadOwnerRegistration";
-
-export type UnmetRegistration = RuleMessage & { readonly workspace: string };
-
-export type RequiredFileRegistry = {
-  readonly repositoryRoot: string;
-  readonly entries: readonly RequiredFileEntry[];
-  readonly unscannedDirectoryNames: ReadonlySet<string>;
-};
+const holdsContent = (absolutePath: string): boolean =>
+  (readTextFile(absolutePath) ?? "").trim() !== "";
 
 type ScannedWorktree = {
   readonly repositoryRoot: string;
@@ -34,11 +42,6 @@ type ScannedWorktree = {
 const holderOf = (workspace: string): string =>
   workspace === REPOSITORY_ROOT_WORKSPACE ? "the repository root" : `\`${workspace}\``;
 
-const contentGuaranteeOf = (registration: RequiredFileEntry): string =>
-  registration.contentChecks.length === 0
-    ? "What this file holds is read by no check, so this row asks only that it exists and holds something."
-    : `What this file holds is read by ${registration.contentChecks.map((checkName) => `\`${checkName}\``).join(", ")}, so a file that merely exists leaves the row unmet.`;
-
 const registeredPathIn = (asked: {
   readonly workspace: string;
   readonly pattern: string;
@@ -46,6 +49,13 @@ const registeredPathIn = (asked: {
   asked.workspace === REPOSITORY_ROOT_WORKSPACE
     ? asked.pattern
     : `${asked.workspace}/${asked.pattern}`;
+
+export type UnmetRegistration = RuleMessage & { readonly workspace: string };
+
+const contentGuaranteeOf = (registration: RequiredFileEntry): string =>
+  registration.contentChecks.length === 0
+    ? "What this file holds is read by no check, so this row asks only that it exists and holds something."
+    : `What this file holds is read by ${registration.contentChecks.map((checkName) => `\`${checkName}\``).join(", ")}, so a file that merely exists leaves the row unmet.`;
 
 const reportOf = (asked: {
   readonly entry: RequiredFileEntry;
@@ -63,24 +73,6 @@ const reportOf = (asked: {
     contentGuarantee: contentGuaranteeOf(asked.entry),
   },
 });
-
-const holdsContent = (absolutePath: string): boolean =>
-  (readTextFile(absolutePath) ?? "").trim() !== "";
-
-const workspaceDirectoriesIn = (filePaths: readonly string[]): readonly string[] =>
-  filePaths.filter((path) => basename(path) === MANIFEST_FILE_NAME).map((path) => dirname(path));
-
-const holdingWorkspacesOf = (asked: {
-  readonly entry: RequiredFileEntry;
-  readonly workspaceDirectories: readonly string[];
-}): readonly string[] => {
-  const { owner } = asked.entry;
-  if (owner === null) return [REPOSITORY_ROOT_WORKSPACE];
-
-  return asked.workspaceDirectories.filter((workspace) =>
-    matchesAnchoredGlobPath({ relativePath: workspace, pattern: owner }),
-  );
-};
 
 const unmetInWorkspace = (
   scanned: ScannedWorktree,
@@ -104,6 +96,8 @@ const unmetInWorkspace = (
     reportOf({ ...held, messageId: EMPTY_REGISTERED_FILE_MESSAGE_ID, registeredPath: path }),
   );
 };
+
+export const DEAD_OWNER_REGISTRATION_MESSAGE_ID = "deadOwnerRegistration";
 
 const unmetFor = (
   scanned: ScannedWorktree,
@@ -129,6 +123,12 @@ const unmetFor = (
   return workspaces.flatMap((workspace) =>
     unmetInWorkspace(scanned, { entry: registration, workspace }),
   );
+};
+
+export type RequiredFileRegistry = {
+  readonly repositoryRoot: string;
+  readonly entries: readonly RequiredFileEntry[];
+  readonly unscannedDirectoryNames: ReadonlySet<string>;
 };
 
 const registryKeyOf = (registry: RequiredFileRegistry): string =>

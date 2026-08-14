@@ -10,34 +10,9 @@ import { rankOfLevel, SILENT_LEVEL, strongestLevelAmong } from "./severity-level
 import type { ESTree } from "@oxlint/plugins";
 import type { ConfiguredRule, ConfiguredRuleBlock } from "./configured-rule-blocks.ts";
 
-export const PARTIAL_RULE_SET_MESSAGE_ID = "partialRuleSet";
-
-export const SCOPED_PARTIAL_RULE_SET_MESSAGE_ID = "scopedPartialRuleSet";
-
-export const UNEVEN_SEVERITY_MESSAGE_ID = "unevenRuleSetSeverity";
-
-export const UNREADABLE_SEVERITY_MESSAGE_ID = "unreadableRuleSetSeverity";
-
-export const TYPELESS_RULE_SET_HOST_MESSAGE_ID = "typelessRuleSetHost";
-
-export type SetDeviation = {
-  readonly property: ESTree.ObjectProperty;
-  readonly messageId: string;
-  readonly data: Readonly<Record<string, string>>;
-};
-
 type NamedRule = {
   readonly configured: ConfiguredRule;
   readonly member: RuleSetMember;
-};
-
-type HeldRule = NamedRule & { readonly level: string };
-
-type SetReading = {
-  readonly set: RuleSet;
-  readonly block: ConfiguredRuleBlock;
-  readonly named: readonly NamedRule[];
-  readonly first: NamedRule;
 };
 
 const namedRulesIn = ({
@@ -54,6 +29,23 @@ const namedRulesIn = ({
 
 const scopeTextOf = (scope: readonly string[]): string =>
   scope.length === 0 ? "the paths it names" : scope.join(", ");
+
+export const PARTIAL_RULE_SET_MESSAGE_ID = "partialRuleSet";
+
+export const SCOPED_PARTIAL_RULE_SET_MESSAGE_ID = "scopedPartialRuleSet";
+
+export type SetDeviation = {
+  readonly property: ESTree.ObjectProperty;
+  readonly messageId: string;
+  readonly data: Readonly<Record<string, string>>;
+};
+
+type SetReading = {
+  readonly set: RuleSet;
+  readonly block: ConfiguredRuleBlock;
+  readonly named: readonly NamedRule[];
+  readonly first: NamedRule;
+};
 
 const partialDeviationsOf = (reading: SetReading): readonly SetDeviation[] => {
   const missing = reading.set.members.filter(
@@ -76,6 +68,8 @@ const partialDeviationsOf = (reading: SetReading): readonly SetDeviation[] => {
   return [{ property: reading.first.configured.property, messageId, data: carried }];
 };
 
+export const UNREADABLE_SEVERITY_MESSAGE_ID = "unreadableRuleSetSeverity";
+
 const unreadableDeviationsOf = (reading: SetReading): readonly SetDeviation[] =>
   reading.named
     .filter((named) => named.configured.level === null)
@@ -85,11 +79,15 @@ const unreadableDeviationsOf = (reading: SetReading): readonly SetDeviation[] =>
       data: { ruleSet: reading.set.name, ruleName: named.configured.ruleName },
     }));
 
+type HeldRule = NamedRule & { readonly level: string };
+
 const heldRulesIn = (named: readonly NamedRule[]): readonly HeldRule[] =>
   named.flatMap<HeldRule>((listed) => {
     const { level } = listed.configured;
     return level === null ? [] : [{ configured: listed.configured, member: listed.member, level }];
   });
+
+export const UNEVEN_SEVERITY_MESSAGE_ID = "unevenRuleSetSeverity";
 
 const unevenDeviationsOf = (reading: SetReading): readonly SetDeviation[] => {
   const held = heldRulesIn(reading.named);
@@ -111,6 +109,8 @@ const unevenDeviationsOf = (reading: SetReading): readonly SetDeviation[] => {
       },
     }));
 };
+
+export const TYPELESS_RULE_SET_HOST_MESSAGE_ID = "typelessRuleSetHost";
 
 const typelessDeviationsOf = (reading: SetReading): readonly SetDeviation[] => {
   if (reading.block.declaresTypeAwareness) return [];

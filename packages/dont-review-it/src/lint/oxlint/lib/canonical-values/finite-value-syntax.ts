@@ -2,26 +2,10 @@ import { canonicalValueKey, type CanonicalValue } from "./fingerprint.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
-const MIN_VOCABULARY_SIZE = 2;
-
 export const SCHEMA_ENUM_MEMBERS: ReadonlySet<string> = new Set(["enum", "picklist"]);
-const SCHEMA_LITERAL_MEMBER = "literal";
 export const SCHEMA_UNION_MEMBER = "union";
 export const JSON_SCHEMA_ENUM_KEY = "enum";
 export const SET_CONSTRUCTOR = "Set";
-
-export const unwrapExpression = (node: ESTree.Expression): ESTree.Expression =>
-  node.type === "TSAsExpression" ||
-  node.type === "TSSatisfiesExpression" ||
-  node.type === "TSTypeAssertion" ||
-  node.type === "TSNonNullExpression" ||
-  node.type === "ParenthesizedExpression" ||
-  node.type === "ChainExpression"
-    ? unwrapExpression(node.expression)
-    : node;
-
-export const unwrapType = (node: ESTree.TSType): ESTree.TSType =>
-  node.type === "TSParenthesizedType" ? unwrapType(node.typeAnnotation) : node;
 
 const templateSpelling = (
   quasis: readonly ESTree.TemplateElement[],
@@ -34,6 +18,16 @@ const literalSpelling = (literal: unknown): CanonicalValue | undefined => {
     ? literal
     : undefined;
 };
+
+export const unwrapExpression = (node: ESTree.Expression): ESTree.Expression =>
+  node.type === "TSAsExpression" ||
+  node.type === "TSSatisfiesExpression" ||
+  node.type === "TSTypeAssertion" ||
+  node.type === "TSNonNullExpression" ||
+  node.type === "ParenthesizedExpression" ||
+  node.type === "ChainExpression"
+    ? unwrapExpression(node.expression)
+    : node;
 
 const scalarLiteralValue = (node: ESTree.Expression): CanonicalValue | undefined => {
   const expression = unwrapExpression(node);
@@ -67,11 +61,16 @@ export const staticArrayValues = (
     : null;
 };
 
+const MIN_VOCABULARY_SIZE = 2;
+
 export const isFiniteVocabulary = (canonicalItems: readonly CanonicalValue[]): boolean => {
   const distinct = new Set(canonicalItems.map(canonicalValueKey));
   if (distinct.size < MIN_VOCABULARY_SIZE) return false;
   return !canonicalItems.every((canonicalItem) => typeof canonicalItem === "boolean");
 };
+
+export const unwrapType = (node: ESTree.TSType): ESTree.TSType =>
+  node.type === "TSParenthesizedType" ? unwrapType(node.typeAnnotation) : node;
 
 const literalTypeValue = (node: ESTree.TSType): CanonicalValue | undefined => {
   const typeNode = unwrapType(node);
@@ -108,6 +107,8 @@ export const calleeMemberName = (node: ESTree.Expression): string | null => {
   if (callee.type !== "MemberExpression" || callee.computed) return null;
   return (callee.property as ESTree.IdentifierName).name;
 };
+
+const SCHEMA_LITERAL_MEMBER = "literal";
 
 const schemaLiteralArgumentValue = (
   schemaMember: ESTree.ArrayExpression["elements"][number],

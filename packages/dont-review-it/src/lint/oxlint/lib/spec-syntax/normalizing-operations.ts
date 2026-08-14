@@ -19,15 +19,6 @@ export const NORMALIZING_METHODS: ReadonlySet<string> = new Set([
   "trimStart",
 ]);
 
-const DEFAULT_NORMALIZING_FUNCTIONS: readonly string[] = [
-  "orderBy",
-  "reduceAsync",
-  "sortBy",
-  "uniq",
-  "uniqBy",
-  "uniqWith",
-];
-
 export const DESTRUCTIVE_OPERATIONS: ReadonlySet<string> = new Set([
   "add",
   "clear",
@@ -49,6 +40,15 @@ export const SPREADING_ASSIGNMENT = "assign";
 export const SPREADING_ASSIGNMENT_NAMESPACE = "Object";
 
 const NORMALIZING_FUNCTIONS_OPTION = "normalizingFunctions";
+
+const DEFAULT_NORMALIZING_FUNCTIONS: readonly string[] = [
+  "orderBy",
+  "reduceAsync",
+  "sortBy",
+  "uniq",
+  "uniqBy",
+  "uniqWith",
+];
 
 export const normalizingFunctionsFrom = (ruleOptions: Readonly<Options>): ReadonlySet<string> => {
   const [first] = ruleOptions;

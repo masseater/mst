@@ -15,7 +15,8 @@ import { testBlockModifiersOf } from "../lib/spec-syntax/test-block-modifiers.ts
 
 import type { ESTree, Variable } from "@oxlint/plugins";
 
-const HANDED_SUBJECT_DEPTH = 1;
+const handsRowsToCallback = (call: ESTree.CallExpression): boolean =>
+  testBlockModifiersOf(call.callee).some((modifier) => TABLE_DRIVEN_MEMBERS.has(modifier.name));
 
 type HandedSite =
   | { readonly name: ESTree.BindingIdentifier; readonly depth: number; readonly kind: "handed" }
@@ -25,29 +26,6 @@ type HandedSite =
       readonly kind: "declared";
       readonly init: ESTree.Expression | null;
     };
-
-const MESSAGE_IDS: Readonly<Record<HandedSite["kind"], string>> = {
-  handed: "destructuredMemberSubject",
-  declared: "boundMemberSubject",
-};
-
-type SubjectReading = {
-  readonly depth: number;
-  readonly messageId: string;
-};
-
-type Lookup = {
-  readonly sites: readonly HandedSite[];
-  readonly scopeAt: ScopeLookup;
-};
-
-type Reading = {
-  readonly lookup: Lookup;
-  readonly walked: ReadonlySet<Variable>;
-};
-
-const handsRowsToCallback = (call: ESTree.CallExpression): boolean =>
-  testBlockModifiersOf(call.callee).some((modifier) => TABLE_DRIVEN_MEMBERS.has(modifier.name));
 
 const contextSitesOf = (specFunction: SpecFunction): readonly HandedSite[] => {
   const [parameter] = specFunction.params;
@@ -67,6 +45,16 @@ const declaredSitesOf = (declarator: ESTree.VariableDeclarator): readonly Handed
     init: declarator.init,
   }));
 
+type Lookup = {
+  readonly sites: readonly HandedSite[];
+  readonly scopeAt: ScopeLookup;
+};
+
+type Reading = {
+  readonly lookup: Lookup;
+  readonly walked: ReadonlySet<Variable>;
+};
+
 const depthOf = (at: ESTree.Expression, reading: Reading): number | null => {
   const written = unwrapSubject(at);
   if (written.type === "MemberExpression") {
@@ -83,6 +71,16 @@ const carriedDepthOf = (site: HandedSite, reading: Reading): number | null => {
 
   const carried = depthOf(site.init, reading);
   return carried === null ? null : carried + site.depth;
+};
+
+const MESSAGE_IDS: Readonly<Record<HandedSite["kind"], string>> = {
+  handed: "destructuredMemberSubject",
+  declared: "boundMemberSubject",
+};
+
+type SubjectReading = {
+  readonly depth: number;
+  readonly messageId: string;
 };
 
 const readingOfName = (
@@ -111,6 +109,8 @@ const readingOfSubject = (subject: ESTree.Expression, lookup: Lookup): SubjectRe
   }
   return subject.type === "Identifier" ? readingOfName(subject, reading) : null;
 };
+
+const HANDED_SUBJECT_DEPTH = 1;
 
 const reportedSubjectIn = (
   assertionCall: ESTree.CallExpression,

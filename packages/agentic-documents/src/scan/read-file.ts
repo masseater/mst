@@ -25,15 +25,6 @@ export const statOrNull = async (absolutePath: string): Promise<Stats | null> =>
   }
 };
 
-export const readTextOrNull = async (absolutePath: string): Promise<string | null> => {
-  try {
-    return await readFile(absolutePath, "utf-8");
-  } catch (failure) {
-    if (isAbsent(failure)) return null;
-    throw failure;
-  }
-};
-
 export const directoryNamesIn = async (absolutePath: string): Promise<readonly string[]> => {
   try {
     const directoryChildren = await readdir(absolutePath, { withFileTypes: true });
@@ -42,6 +33,15 @@ export const directoryNamesIn = async (absolutePath: string): Promise<readonly s
       .map((subdirectory) => subdirectory.name);
   } catch (failure) {
     if (isAbsent(failure)) return [];
+    throw failure;
+  }
+};
+
+export const readTextOrNull = async (absolutePath: string): Promise<string | null> => {
+  try {
+    return await readFile(absolutePath, "utf-8");
+  } catch (failure) {
+    if (isAbsent(failure)) return null;
     throw failure;
   }
 };

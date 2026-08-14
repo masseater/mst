@@ -19,40 +19,6 @@ import type { ESTree, Options } from "@oxlint/plugins";
 
 const SNAPSHOT_MATCHERS_OPTION = "snapshotMatchers";
 
-const DERIVED_SUBJECT = "derivedSubject";
-
-const OWNED_BY_ANOTHER_RULE: ReadonlySet<string> = new Set([
-  "CallExpression",
-  "NewExpression",
-  "ObjectExpression",
-  "TaggedTemplateExpression",
-]);
-
-const SUBJECT_SHAPES: ReadonlyMap<string, string> = new Map([
-  ["ArrayExpression", "bundledSubject"],
-  ["ArrowFunctionExpression", "inlineFunctionSubject"],
-  ["FunctionExpression", "inlineFunctionSubject"],
-  ["Literal", "writtenOutSubject"],
-  ["MemberExpression", "projectedSubject"],
-]);
-
-type BlockSite = {
-  readonly block: ESTree.CallExpression;
-  readonly siblings: ESTree.Node | null;
-};
-
-type Projection = {
-  readonly at: ESTree.Node;
-  readonly messageId: string;
-  readonly root: string | null;
-  readonly site: BlockSite | null;
-};
-
-type SnapshotPin = {
-  readonly root: string;
-  readonly site: BlockSite;
-};
-
 const snapshotMatchersFrom = (ruleOptions: Readonly<Options>): ReadonlySet<string> => {
   const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) return SNAPSHOT_MATCHERS;
@@ -78,6 +44,23 @@ const matcherCalledOn = (node: ESTree.Node): string | null => {
   return called.type === "CallExpression" && called.callee === parent ? member : null;
 };
 
+const DERIVED_SUBJECT = "derivedSubject";
+
+const OWNED_BY_ANOTHER_RULE: ReadonlySet<string> = new Set([
+  "CallExpression",
+  "NewExpression",
+  "ObjectExpression",
+  "TaggedTemplateExpression",
+]);
+
+const SUBJECT_SHAPES: ReadonlyMap<string, string> = new Map([
+  ["ArrayExpression", "bundledSubject"],
+  ["ArrowFunctionExpression", "inlineFunctionSubject"],
+  ["FunctionExpression", "inlineFunctionSubject"],
+  ["Literal", "writtenOutSubject"],
+  ["MemberExpression", "projectedSubject"],
+]);
+
 const messageIdFor = (subject: ESTree.Expression): string | null => {
   if (subject.type === "Identifier") return null;
   if (OWNED_BY_ANOTHER_RULE.has(subject.type)) return null;
@@ -90,6 +73,11 @@ const messageIdFor = (subject: ESTree.Expression): string | null => {
 const siblingListOf = (call: ESTree.CallExpression): ESTree.Node | null => {
   const statement = call.parent;
   return statement.type === "ExpressionStatement" ? statement.parent : null;
+};
+
+type BlockSite = {
+  readonly block: ESTree.CallExpression;
+  readonly siblings: ESTree.Node | null;
 };
 
 const blockSiteAround = (node: ESTree.Node, rootNames: ReadonlySet<string>): BlockSite | null => {
@@ -120,6 +108,13 @@ const handedTo = (
   return handed ?? null;
 };
 
+type Projection = {
+  readonly at: ESTree.Node;
+  readonly messageId: string;
+  readonly root: string | null;
+  readonly site: BlockSite | null;
+};
+
 const projectionOf = (
   assertionEntry: ESTree.CallExpression,
   rootNames: ReadonlySet<string>,
@@ -136,6 +131,11 @@ const projectionOf = (
 
   const site = blockSiteAround(assertionEntry, rootNames);
   return { at: subject, messageId, root: fixtureRootOf(subject, site), site };
+};
+
+type SnapshotPin = {
+  readonly root: string;
+  readonly site: BlockSite;
 };
 
 const excusedBy = (pin: SnapshotPin, projection: Projection): boolean =>

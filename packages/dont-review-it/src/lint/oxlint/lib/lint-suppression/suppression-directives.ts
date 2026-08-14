@@ -11,16 +11,7 @@ const LINE_SCOPED_SPELLINGS: ReadonlySet<string> = new Set([
 
 const WHOLE_FILE_SPELLINGS: ReadonlySet<string> = new Set(["eslint-disable", "oxlint-disable"]);
 
-const HOLLOW_GROUNDS_WORDS: ReadonlySet<string> = new Set([
-  "false",
-  "positive",
-  "positives",
-  "誤検出",
-]);
-
 const RULE_NAME_SEPARATORS = /[\s,]+/u;
-
-const GROUNDS_WORD_SEPARATORS = /[\s,.;:!?()[\]{}"'`]+/u;
 
 export type SuppressionDirective = {
   readonly spelling: string;
@@ -28,8 +19,6 @@ export type SuppressionDirective = {
   readonly ruleNames: readonly string[];
   readonly carriesGrounds: boolean;
 };
-
-export const bareRuleNameOf = (ruleName: string): string => ruleName.split("/").slice(-1).join("");
 
 const groundsSplitOf = (
   written: string,
@@ -41,6 +30,17 @@ const groundsSplitOf = (
     grounds: written.slice(separator.index + separator[0].length),
   };
 };
+
+const HOLLOW_GROUNDS_WORDS: ReadonlySet<string> = new Set([
+  "false",
+  "positive",
+  "positives",
+  "誤検出",
+]);
+
+const GROUNDS_WORD_SEPARATORS = /[\s,.;:!?()[\]{}"'`]+/u;
+
+export const bareRuleNameOf = (ruleName: string): string => ruleName.split("/").slice(-1).join("");
 
 const carriesContent = ({
   grounds,

@@ -17,6 +17,12 @@ type ImportOrigin =
   | typeof REPOSITORY_ORIGIN
   | typeof TYPE_ONLY_ORIGIN;
 
+type PlacedImport = {
+  readonly declaration: ESTree.ImportDeclaration;
+  readonly origin: ImportOrigin;
+  readonly sortKey: string;
+};
+
 const distanceOf = (specifier: string): ImportOrigin => {
   if (specifier.startsWith("node:")) return BUILTIN_ORIGIN;
   return specifier.startsWith(".") ? REPOSITORY_ORIGIN : INSTALLED_ORIGIN;
@@ -39,25 +45,6 @@ const sortKeyOf = (declaration: ESTree.ImportDeclaration): string => {
     : specifier;
 };
 
-const originNameOf = (origin: ImportOrigin): string => {
-  switch (origin) {
-    case BUILTIN_ORIGIN:
-      return "the runtime built-ins";
-    case INSTALLED_ORIGIN:
-      return "the installed packages";
-    case REPOSITORY_ORIGIN:
-      return "this repository";
-    case TYPE_ONLY_ORIGIN:
-      return "the type-only imports";
-  }
-};
-
-type PlacedImport = {
-  readonly declaration: ESTree.ImportDeclaration;
-  readonly origin: ImportOrigin;
-  readonly sortKey: string;
-};
-
 const placedImportsOf = (statements: readonly ESTree.Statement[]): readonly PlacedImport[] =>
   statements.flatMap((statement) =>
     statement.type === "ImportDeclaration" && statement.specifiers.length > 0
@@ -73,6 +60,19 @@ const placedImportsOf = (statements: readonly ESTree.Statement[]): readonly Plac
 
 const blankLinesBetween = (preceding: PlacedImport, placedImport: PlacedImport): number =>
   placedImport.declaration.loc.start.line - preceding.declaration.loc.end.line - 1;
+
+const originNameOf = (origin: ImportOrigin): string => {
+  switch (origin) {
+    case BUILTIN_ORIGIN:
+      return "the runtime built-ins";
+    case INSTALLED_ORIGIN:
+      return "the installed packages";
+    case REPOSITORY_ORIGIN:
+      return "this repository";
+    case TYPE_ONLY_ORIGIN:
+      return "the type-only imports";
+  }
+};
 
 const crossOriginMisplacement = (
   preceding: PlacedImport,

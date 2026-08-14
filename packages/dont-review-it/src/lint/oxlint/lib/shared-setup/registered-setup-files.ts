@@ -24,12 +24,6 @@ import { DEFAULT_SPEC_FILE_SUFFIXES, isSpecFile } from "../spec-syntax/spec-file
 
 import type { AstFields } from "../ast-node.ts";
 
-const REGISTERED_SETUP_KEYS: readonly string[] = ["setupFiles", "globalSetup"];
-
-export const RUNNER_BLOCK_KEY = "test";
-
-const PROJECT_LIST_KEY = "projects";
-
 export const isRunnerConfigurationFile = (filename: string): boolean =>
   LINT_CONFIGURATION_FILE.test(toPosixPath(filename));
 
@@ -59,6 +53,8 @@ const objectFrom = (written: AstFields | null): AstFields | null => {
   return handed === undefined ? null : objectFrom(handed);
 };
 
+export const RUNNER_BLOCK_KEY = "test";
+
 const runnerBlockIn = (program: AstFields): AstFields | null => {
   const exported = statementsOf(program).findLast(
     (statement) => nodeTypeOf(statement) === "ExportDefaultDeclaration",
@@ -81,6 +77,10 @@ const spelledEntriesOf = (
     return spelled === null ? [] : [spelled];
   });
 };
+
+const REGISTERED_SETUP_KEYS: readonly string[] = ["setupFiles", "globalSetup"];
+
+const PROJECT_LIST_KEY = "projects";
 
 const registeredEntriesIn = (
   runnerBlock: AstFields,

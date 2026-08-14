@@ -27,11 +27,6 @@ const PER_ITERATION_HEAD_STATEMENTS: ReadonlySet<string> = new Set([
   "ForOfStatement",
 ]);
 
-const MUTATING_PROPERTY_CALLS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
-  ["Object", new Set(["assign", "defineProperties", "defineProperty", "setPrototypeOf"])],
-  ["Reflect", new Set(["set"])],
-]);
-
 const unwrapSugar = (node: ESTree.Node): ESTree.Node => {
   switch (node.type) {
     case "ChainExpression":
@@ -105,6 +100,11 @@ const isAmbientDeclaration = (node: ESTree.Node): boolean => {
       return isAmbientDeclaration(node.parent);
   }
 };
+
+const MUTATING_PROPERTY_CALLS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
+  ["Object", new Set(["assign", "defineProperties", "defineProperty", "setPrototypeOf"])],
+  ["Reflect", new Set(["set"])],
+]);
 
 const mutatingCalleeName = (node: ESTree.CallExpression): string | null => {
   const { callee } = node;

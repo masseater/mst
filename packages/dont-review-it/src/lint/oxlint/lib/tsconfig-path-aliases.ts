@@ -7,8 +7,6 @@ import { listedTexts } from "./listed-texts.ts";
 import { namedFieldsOf } from "./named-fields.ts";
 import { parseJsonc, TSCONFIG_FILE_NAME } from "./nearest-tsconfig.ts";
 
-const WILDCARD = "*";
-
 const PLACE_NAMING_SPECIFIER = /^(?:\.{1,2}\/|#)/u;
 
 type PathAliases = {
@@ -66,6 +64,8 @@ const nearestAliasesFrom: (directory: string) => PathAliases | null = memoize(
     );
   },
 );
+
+const WILDCARD = "*";
 
 const filledTarget = (pathTemplate: string, captured: string): string =>
   pathTemplate.replace(WILDCARD, captured);

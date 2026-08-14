@@ -21,6 +21,15 @@ import type { GithubReader } from "./github-reader.ts";
 import type { RelayConfig } from "./relay-config.ts";
 import type { CursorStore, EventStore, SessionStore } from "./store.ts";
 
+export const respondJson = (produced: {
+  readonly res: ServerResponse;
+  readonly status: number;
+  readonly body: Readonly<Record<string, unknown>>;
+}): void => {
+  produced.res.writeHead(produced.status, { "content-type": "application/json" });
+  produced.res.end(JSON.stringify(produced.body));
+};
+
 export type RelayDependencies = {
   readonly config: RelayConfig;
   readonly events: EventStore;
@@ -33,8 +42,6 @@ export type RelayDependencies = {
   readonly keepaliveMs?: number;
 };
 
-const clockOf = (deps: RelayDependencies): (() => number) => deps.now ?? Date.now;
-
 export type RouteContext = {
   readonly req: IncomingMessage;
   readonly res: ServerResponse;
@@ -42,59 +49,20 @@ export type RouteContext = {
   readonly deps: RelayDependencies;
 };
 
-export const respondJson = (produced: {
-  readonly res: ServerResponse;
-  readonly status: number;
-  readonly body: Readonly<Record<string, unknown>>;
-}): void => {
-  produced.res.writeHead(produced.status, { "content-type": "application/json" });
-  produced.res.end(JSON.stringify(produced.body));
+export const handleHealthRoute = (carried: RouteContext): void => {
+  respondJson({ res: carried.res, status: 200, body: { status: "ok" } });
 };
-
-const requestBearer = (asked: IncomingMessage): string | undefined =>
-  extractBearer(
-    typeof asked.headers.authorization === "string" ? asked.headers.authorization : undefined,
-  );
 
 const requestBody = async (asked: IncomingMessage): Promise<string> => {
   const writtenChunks: readonly Buffer[] = await Array.fromAsync(asked);
   return Buffer.concat(writtenChunks).toString("utf8");
 };
 
-const respondAuthFailure = (rejection: {
-  readonly context: RouteContext;
-  readonly failure: unknown;
-}): void => {
-  const heldStatus = authFailureStatus(rejection.failure);
-  rejection.context.deps.log.warn(
-    { path: rejection.context.requestUrl.pathname, err: rejection.failure },
-    "authentication failed",
-  );
-  respondJson({
-    res: rejection.context.res,
-    status: heldStatus,
-    body: { error: heldStatus === 401 ? "Unauthorized" : "Service Unavailable" },
-  });
-};
+const clockOf = (deps: RelayDependencies): (() => number) => deps.now ?? Date.now;
 
-const operatorSubject = async (
-  carried: RouteContext,
-): Promise<{ readonly login: string; readonly mode: Mode } | null> => {
-  const principal = await authenticateOperator({
-    credential: requestBearer(carried.req),
-    sessions: carried.deps.sessions,
-    now: clockOf(carried.deps),
-  });
-  const modeCandidate = carried.requestUrl.searchParams.get("mode");
-  if (modeCandidate === null || !isMode(modeCandidate)) {
-    respondJson({ res: carried.res, status: 400, body: { error: "Invalid or missing mode" } });
-    return null;
-  }
-  return { login: principal.login, mode: modeCandidate };
-};
-
-export const handleHealthRoute = (carried: RouteContext): void => {
-  respondJson({ res: carried.res, status: 200, body: { status: "ok" } });
+const headerValue = (asked: IncomingMessage, spelled: string): string | undefined => {
+  const header = asked.headers[spelled];
+  return typeof header === "string" ? header : undefined;
 };
 
 export const handleWebhookRoute = async (carried: RouteContext): Promise<void> => {
@@ -114,10 +82,26 @@ export const handleWebhookRoute = async (carried: RouteContext): Promise<void> =
   respondJson({ res: carried.res, status: webhookResponse.status, body: webhookResponse.body });
 };
 
-const headerValue = (asked: IncomingMessage, spelled: string): string | undefined => {
-  const header = asked.headers[spelled];
-  return typeof header === "string" ? header : undefined;
+const respondAuthFailure = (rejection: {
+  readonly context: RouteContext;
+  readonly failure: unknown;
+}): void => {
+  const heldStatus = authFailureStatus(rejection.failure);
+  rejection.context.deps.log.warn(
+    { path: rejection.context.requestUrl.pathname, err: rejection.failure },
+    "authentication failed",
+  );
+  respondJson({
+    res: rejection.context.res,
+    status: heldStatus,
+    body: { error: heldStatus === 401 ? "Unauthorized" : "Service Unavailable" },
+  });
 };
+
+const requestBearer = (asked: IncomingMessage): string | undefined =>
+  extractBearer(
+    typeof asked.headers.authorization === "string" ? asked.headers.authorization : undefined,
+  );
 
 export const handleSessionRoute = async (carried: RouteContext): Promise<void> => {
   try {
@@ -130,6 +114,33 @@ export const handleSessionRoute = async (carried: RouteContext): Promise<void> =
     respondJson({ res: carried.res, status: 200, body: issued });
   } catch (failure) {
     respondAuthFailure({ context: carried, failure });
+  }
+};
+
+const operatorSubject = async (
+  carried: RouteContext,
+): Promise<{ readonly login: string; readonly mode: Mode } | null> => {
+  const principal = await authenticateOperator({
+    credential: requestBearer(carried.req),
+    sessions: carried.deps.sessions,
+    now: clockOf(carried.deps),
+  });
+  const modeCandidate = carried.requestUrl.searchParams.get("mode");
+  if (modeCandidate === null || !isMode(modeCandidate)) {
+    respondJson({ res: carried.res, status: 400, body: { error: "Invalid or missing mode" } });
+    return null;
+  }
+  return { login: principal.login, mode: modeCandidate };
+};
+
+const operatorSubjectOrRespond = async (
+  carried: RouteContext,
+): Promise<{ readonly login: string; readonly mode: Mode } | null> => {
+  try {
+    return await operatorSubject(carried);
+  } catch (failure) {
+    respondAuthFailure({ context: carried, failure });
+    return null;
   }
 };
 
@@ -146,17 +157,6 @@ export const handlePollRoute = async (carried: RouteContext): Promise<void> => {
   });
   carried.deps.log.info({ eventCount: envelopes.length }, "poll served");
   respondJson({ res: carried.res, status: 200, body: { events: envelopes } });
-};
-
-const operatorSubjectOrRespond = async (
-  carried: RouteContext,
-): Promise<{ readonly login: string; readonly mode: Mode } | null> => {
-  try {
-    return await operatorSubject(carried);
-  } catch (failure) {
-    respondAuthFailure({ context: carried, failure });
-    return null;
-  }
 };
 
 export const handleStartupDrainRoute = async (carried: RouteContext): Promise<void> => {

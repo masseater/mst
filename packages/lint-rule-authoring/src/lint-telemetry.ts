@@ -2,11 +2,7 @@ import { inheritedContext, startTelemetry } from "@mst/ai-native/telemetry";
 import { context, metrics, trace, type Context } from "@opentelemetry/api";
 import { once } from "es-toolkit";
 
-const SERVICE_NAME = "mst-lint";
-
 const INSTRUMENTATION_NAME = "@mst/lint-rule-authoring";
-
-const MILLISECONDS_PER_SECOND = 1000;
 
 const meter = once(() => metrics.getMeter(INSTRUMENTATION_NAME));
 
@@ -37,11 +33,6 @@ const runSpan = once(() =>
     .startSpan("lint", { startTime: performance.timeOrigin }, inheritedContext()),
 );
 
-const closeRun = (): void => {
-  runDuration().record(process.uptime() * MILLISECONDS_PER_SECOND);
-  runSpan().end();
-};
-
 const stageContext = (): Context => {
   const active = context.active();
   return trace.getSpan(active) === undefined ? trace.setSpan(active, runSpan()) : active;
@@ -58,6 +49,15 @@ export const measureStage = <Produced>(stage: string, run: () => Produced): Prod
       return produced;
     }),
   );
+};
+
+const SERVICE_NAME = "mst-lint";
+
+const MILLISECONDS_PER_SECOND = 1000;
+
+const closeRun = (): void => {
+  runDuration().record(process.uptime() * MILLISECONDS_PER_SECOND);
+  runSpan().end();
 };
 
 export const startLintTelemetry = once((): boolean => {

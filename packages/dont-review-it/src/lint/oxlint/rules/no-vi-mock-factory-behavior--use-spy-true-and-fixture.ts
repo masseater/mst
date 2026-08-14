@@ -80,6 +80,20 @@ const yieldsEmptyObjectOnly = (factory: SpecFunction): boolean => {
 const namesBuiltinModule = (specifier: string | null, prefixes: readonly string[]): boolean =>
   specifier !== null && prefixes.some((prefix) => specifier.startsWith(prefix));
 
+const yieldsImportedBinding = (
+  factory: SpecFunction,
+  scopeAt: (node: ESTree.Node) => Scope,
+): boolean =>
+  returnedExpressionsOf(factory)
+    .map((expression) => unwrapSubject(expression))
+    .some((written) => written.type === "Identifier" && spellsImportedBinding(written, scopeAt));
+
+const enclosingFactoryOf = (
+  call: ESTree.CallExpression,
+  factories: readonly SpecFunction[],
+): SpecFunction | null =>
+  factories.find((factory) => call.start >= factory.start && call.end <= factory.end) ?? null;
+
 const setsMockBehaviour = (call: ESTree.CallExpression): boolean => {
   const callee = unwrapSubject(call.callee);
   if (callee.type !== "MemberExpression") return false;
@@ -108,20 +122,6 @@ const callsImportedBinding = (
   const callee = unwrapSubject(call.callee);
   return callee.type === "Identifier" && spellsImportedBinding(callee, scopeAt);
 };
-
-const yieldsImportedBinding = (
-  factory: SpecFunction,
-  scopeAt: (node: ESTree.Node) => Scope,
-): boolean =>
-  returnedExpressionsOf(factory)
-    .map((expression) => unwrapSubject(expression))
-    .some((written) => written.type === "Identifier" && spellsImportedBinding(written, scopeAt));
-
-const enclosingFactoryOf = (
-  call: ESTree.CallExpression,
-  factories: readonly SpecFunction[],
-): SpecFunction | null =>
-  factories.find((factory) => call.start >= factory.start && call.end <= factory.end) ?? null;
 
 const settlesBehaviour = (call: ESTree.CallExpression, lookup: NamespaceLookup): boolean =>
   setsMockBehaviour(call) ||

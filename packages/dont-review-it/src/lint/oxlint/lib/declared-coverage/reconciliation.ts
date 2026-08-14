@@ -18,14 +18,6 @@ import {
 
 import type { CoverageDeclarations, CoverageFinding } from "./coverage-declarations.ts";
 
-export type CoverageReconciliation = {
-  readonly repositoryRoot: string;
-  readonly declarations: CoverageDeclarations;
-  readonly unscannedDirectoryNames: ReadonlySet<string>;
-};
-
-const UNCHECKED_DECLARATION_REGISTRY = "the declaration of paths no check reads";
-
 const heldWorkspaceOf = (asked: {
   readonly repositoryRoot: string;
   readonly heldPath: string | null;
@@ -41,6 +33,14 @@ const heldWorkspaceOf = (asked: {
     ? REPOSITORY_ROOT_WORKSPACE
     : workspaceDirectoryOf({ repositoryRoot, packageDirectory });
 };
+
+export type CoverageReconciliation = {
+  readonly repositoryRoot: string;
+  readonly declarations: CoverageDeclarations;
+  readonly unscannedDirectoryNames: ReadonlySet<string>;
+};
+
+const UNCHECKED_DECLARATION_REGISTRY = "the declaration of paths no check reads";
 
 const findingsIn = (reconciled: CoverageReconciliation): readonly CoverageFinding[] => {
   const { declarations, repositoryRoot } = reconciled;

@@ -9,15 +9,7 @@ import {
 } from "./coverage-declarations.ts";
 import { excludingPatternsOf, opensPath, pathsMatching } from "./uncovered-paths.ts";
 
-export const EXCLUDED_REGISTRATION_MESSAGE_ID = "excludedRegistration";
-
-export const UNOPENED_REGISTRATION_MESSAGE_ID = "unopenedRegistration";
-
 export const DEAD_REGISTRATION_MESSAGE_ID = "deadRegistration";
-
-export const UNDECLARED_RECEIVER_MESSAGE_ID = "undeclaredReceiver";
-
-const spelledRegistryOf = (table: RegistrationTable): string => `\`${table.name}\``;
 
 export const deadRowFindings = (asked: {
   readonly registry: string;
@@ -34,24 +26,11 @@ export const deadRowFindings = (asked: {
       data: { registry: asked.registry, pattern: lined.pattern, reason: lined.reason },
     }));
 
-const receiverFindings = (asked: {
-  readonly record: string;
-  readonly receivers: readonly string[];
-  readonly checks: readonly DeclaredCheck[];
-}): readonly CoverageFinding[] => {
-  const declaredNames = new Set(asked.checks.map((check) => check.name));
-  return asked.receivers
-    .filter((receiver) => !declaredNames.has(receiver))
-    .map((receiver) => ({
-      heldPath: null,
-      messageId: UNDECLARED_RECEIVER_MESSAGE_ID,
-      data: {
-        record: asked.record,
-        receiver,
-        declaredChecks: spelledNames([...declaredNames]),
-      },
-    }));
-};
+export const EXCLUDED_REGISTRATION_MESSAGE_ID = "excludedRegistration";
+
+export const UNOPENED_REGISTRATION_MESSAGE_ID = "unopenedRegistration";
+
+const spelledRegistryOf = (table: RegistrationTable): string => `\`${table.name}\``;
 
 const unreachableFindingOf = (asked: {
   readonly table: RegistrationTable;
@@ -86,6 +65,27 @@ const unreachableFindingOf = (asked: {
         messageId: EXCLUDED_REGISTRATION_MESSAGE_ID,
         data: { ...held, exclusion: spelledNames(excluded) },
       };
+};
+
+export const UNDECLARED_RECEIVER_MESSAGE_ID = "undeclaredReceiver";
+
+const receiverFindings = (asked: {
+  readonly record: string;
+  readonly receivers: readonly string[];
+  readonly checks: readonly DeclaredCheck[];
+}): readonly CoverageFinding[] => {
+  const declaredNames = new Set(asked.checks.map((check) => check.name));
+  return asked.receivers
+    .filter((receiver) => !declaredNames.has(receiver))
+    .map((receiver) => ({
+      heldPath: null,
+      messageId: UNDECLARED_RECEIVER_MESSAGE_ID,
+      data: {
+        record: asked.record,
+        receiver,
+        declaredChecks: spelledNames([...declaredNames]),
+      },
+    }));
 };
 
 const recordedReceiverFindings = (asked: {

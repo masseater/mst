@@ -31,14 +31,6 @@ const DEFAULT_FILE_SYSTEM_MODULES: readonly string[] = [
 
 const DEFAULT_IN_MEMORY_FILE_SYSTEM_PACKAGES: readonly string[] = ["memfs"];
 
-const ORIGINAL_WRAPPING_OPTION = "spy";
-
-const SYNCHRONOUS_READ_CALLEE = "require";
-
-const TYPE_IMPORT_KIND = "type";
-
-const LOCAL_DOUBLE_MESSAGE = "localFileSystemDouble";
-
 type Reading = {
   readonly scopeAt: (node: ESTree.Node) => Scope;
   readonly namespace: string;
@@ -78,6 +70,31 @@ const reachesNamespace = (node: ESTree.Expression, reading: Reading): boolean =>
   return binding.defs.some((definition) => definitionReachesNamespace(definition, traced));
 };
 
+const replacementMemberOf = (node: ESTree.Expression, reading: Reading): string | null => {
+  const written = unwrapSubject(node);
+  if (written.type === "MemberExpression") {
+    const member = staticMemberName(written);
+    if (member === null || !reading.replacementMembers.has(member)) return null;
+    return reachesNamespace(written.object, reading) ? member : null;
+  }
+  if (written.type !== "Identifier") return null;
+
+  const binding = resolveBinding(reading.scopeAt(written), written.name);
+  if (binding === null || reading.followed.includes(binding)) return null;
+
+  const traced = { ...reading, followed: [...reading.followed, binding] };
+  return (
+    binding.defs
+      .map((definition) => {
+        const initializer = constInitializerOf(definition);
+        return initializer === null ? null : replacementMemberOf(initializer, traced);
+      })
+      .find((found) => found !== null) ?? null
+  );
+};
+
+const LOCAL_DOUBLE_MESSAGE = "localFileSystemDouble";
+
 const staticSpecifierOf = (node: ESTree.Expression, reading: Reading): string | null => {
   const written = unwrapSubject(node);
   if (written.type === "ImportExpression") return staticSpecifierOf(written.source, reading);
@@ -113,6 +130,8 @@ const isTrueLiteral = (node: ESTree.Expression): boolean => {
   return written.type === "Literal" && written.value === true;
 };
 
+const ORIGINAL_WRAPPING_OPTION = "spy";
+
 const wrapsOriginal = (node: ESTree.Expression): boolean => {
   const written = unwrapSubject(node);
   if (written.type !== "ObjectExpression") return false;
@@ -122,29 +141,6 @@ const wrapsOriginal = (node: ESTree.Expression): boolean => {
       property.type === "Property" &&
       staticPropertyName(property) === ORIGINAL_WRAPPING_OPTION &&
       isTrueLiteral(property.value),
-  );
-};
-
-const replacementMemberOf = (node: ESTree.Expression, reading: Reading): string | null => {
-  const written = unwrapSubject(node);
-  if (written.type === "MemberExpression") {
-    const member = staticMemberName(written);
-    if (member === null || !reading.replacementMembers.has(member)) return null;
-    return reachesNamespace(written.object, reading) ? member : null;
-  }
-  if (written.type !== "Identifier") return null;
-
-  const binding = resolveBinding(reading.scopeAt(written), written.name);
-  if (binding === null || reading.followed.includes(binding)) return null;
-
-  const traced = { ...reading, followed: [...reading.followed, binding] };
-  return (
-    binding.defs
-      .map((definition) => {
-        const initializer = constInitializerOf(definition);
-        return initializer === null ? null : replacementMemberOf(initializer, traced);
-      })
-      .find((found) => found !== null) ?? null
   );
 };
 
@@ -174,6 +170,8 @@ const inMemoryMessage = (specifier: string | null, reading: Reading): RuleMessag
     ? null
     : { messageId: "inMemoryFileSystemTaken", data: { specifier } };
 
+const TYPE_IMPORT_KIND = "type";
+
 const carriesOnlyTypes = (node: ESTree.ImportDeclaration): boolean => {
   if (node.importKind === TYPE_IMPORT_KIND) return true;
   if (node.specifiers.length === 0) return false;
@@ -182,6 +180,8 @@ const carriesOnlyTypes = (node: ESTree.ImportDeclaration): boolean => {
       specifier.type === "ImportSpecifier" && specifier.importKind === TYPE_IMPORT_KIND,
   );
 };
+
+const SYNCHRONOUS_READ_CALLEE = "require";
 
 const readCallSpecifier = (call: ESTree.CallExpression): ESTree.Expression | null => {
   const callee = unwrapSubject(call.callee);

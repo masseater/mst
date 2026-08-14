@@ -22,21 +22,17 @@ import { resolveTypeScriptSymbol } from "./typescript-symbol.ts";
 
 import type { CanonicalValuesImportRoute } from "./catalog.ts";
 
-type ResolvedTarget = {
-  readonly exhaustive: boolean;
-  readonly sourceFiles: readonly string[];
-};
-
-type PackageManifest = Readonly<Record<string, unknown>> & { readonly name: string };
-
-const MODULE_VALUE_EXPORT_NAME = "<module>";
-
 const realPathIsInside = (parent: string, candidate: string): boolean => {
   const [failure, paths] = attempt(() => ({
     candidate: realpathSync.native(candidate),
     parent: realpathSync.native(parent),
   }));
   return failure === null && paths !== null && pathIsInside(paths.parent, paths.candidate);
+};
+
+type ResolvedTarget = {
+  readonly exhaustive: boolean;
+  readonly sourceFiles: readonly string[];
 };
 
 const unresolvedTarget = (): ResolvedTarget => ({ exhaustive: false, sourceFiles: [] });
@@ -127,6 +123,9 @@ const resolvedTarget = ({
     packageDirectory,
   });
 };
+
+const packageSpecifier = (packageName: string, subpath: string): string =>
+  subpath === "." ? packageName : `${packageName}/${subpath.replace(/^\.\//u, "")}`;
 
 const patternSurfaces = ({
   packageDirectory,
@@ -231,8 +230,7 @@ const packageSurfaces = ({
   });
 };
 
-const packageSpecifier = (packageName: string, subpath: string): string =>
-  subpath === "." ? packageName : `${packageName}/${subpath.replace(/^\.\//u, "")}`;
+type PackageManifest = Readonly<Record<string, unknown>> & { readonly name: string };
 
 const packageManifest = (packageDirectory: string): PackageManifest | null => {
   const manifest = readJsonFile(join(packageDirectory, MANIFEST_FILE_NAME));
@@ -277,6 +275,8 @@ const declaresSameBinding = (left: ts.Symbol, right: ts.Symbol): boolean => {
     leftDeclarations.has(declarationIdentity(declaration)),
   );
 };
+
+const MODULE_VALUE_EXPORT_NAME = "<module>";
 
 const ownerExportNames = ({
   checker,

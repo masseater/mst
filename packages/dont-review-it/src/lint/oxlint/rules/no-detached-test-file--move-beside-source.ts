@@ -10,8 +10,6 @@ import type { ESTree, Options } from "@oxlint/plugins";
 
 const DEFAULT_TEST_FILE_SUFFIXES = [".test.ts", ".test.tsx", ".spec.ts", ".spec.tsx"];
 
-const TEST_ONLY_DIRECTORY_NAMES = new Set(["test", "tests", "__tests__", "spec"]);
-
 const pathExists = memoize((path: string): boolean => existsSync(path));
 
 const stringsFrom = (
@@ -52,6 +50,8 @@ const isExemptPath = (pathSegments: readonly string[], exemptPaths: readonly str
   exemptPaths.some((exemptPath) =>
     containsSegmentRun(pathSegments, segmentsOf({ path: exemptPath, separator: "/" })),
   );
+
+const TEST_ONLY_DIRECTORY_NAMES = new Set(["test", "tests", "__tests__", "spec"]);
 
 const findingFor = (
   testPath: string,

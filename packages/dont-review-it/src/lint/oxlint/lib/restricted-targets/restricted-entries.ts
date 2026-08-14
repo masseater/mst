@@ -7,23 +7,6 @@ import { segmentsOf } from "../path-segments.ts";
 
 import type { Context, RuleMeta } from "@oxlint/plugins";
 
-export type RestrictedTargetEntry = {
-  readonly module: string;
-  readonly exports: readonly string[];
-  readonly allowedPositions: readonly string[];
-  readonly substitute: string;
-};
-
-export type InternalAlias = {
-  readonly prefix: string;
-  readonly directory: string;
-};
-
-export type ForwardedTarget = {
-  readonly specifier: string;
-  readonly exported: string | null;
-};
-
 export const RESTRICTED_TARGET_SCHEMA: RuleMeta["schema"] = [
   {
     type: "object",
@@ -69,6 +52,13 @@ const declaredListOf = (
   return Array.isArray(declared) ? declared : [];
 };
 
+export type RestrictedTargetEntry = {
+  readonly module: string;
+  readonly exports: readonly string[];
+  readonly allowedPositions: readonly string[];
+  readonly substitute: string;
+};
+
 const entryOf = (held: unknown): RestrictedTargetEntry | null => {
   if (!isNamedFields(held)) return null;
   const { module, substitute } = held;
@@ -83,19 +73,24 @@ const entryOf = (held: unknown): RestrictedTargetEntry | null => {
   };
 };
 
-const aliasOf = (held: unknown): InternalAlias | null => {
-  if (!isNamedFields(held)) return null;
-  const { prefix, directory } = held;
-  if (typeof prefix !== "string" || prefix === "") return null;
-  return typeof directory === "string" ? { prefix, directory } : null;
-};
-
 export const restrictedTargetsFrom = (
   ruleSettings: Context["options"],
 ): readonly RestrictedTargetEntry[] =>
   declaredListOf(ruleSettings, "restricted")
     .map(entryOf)
     .filter((restrictedTarget) => restrictedTarget !== null);
+
+export type InternalAlias = {
+  readonly prefix: string;
+  readonly directory: string;
+};
+
+const aliasOf = (held: unknown): InternalAlias | null => {
+  if (!isNamedFields(held)) return null;
+  const { prefix, directory } = held;
+  if (typeof prefix !== "string" || prefix === "") return null;
+  return typeof directory === "string" ? { prefix, directory } : null;
+};
 
 export const internalAliasesFrom = (ruleSettings: Context["options"]): readonly InternalAlias[] =>
   declaredListOf(ruleSettings, "internalAliases")
@@ -112,6 +107,11 @@ const coversExported = (
   restrictedTarget.exports.length === 0 ||
   exported === null ||
   restrictedTarget.exports.includes(exported);
+
+export type ForwardedTarget = {
+  readonly specifier: string;
+  readonly exported: string | null;
+};
 
 export const matchingRestrictedTarget = ({
   entries,

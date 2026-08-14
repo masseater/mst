@@ -5,11 +5,11 @@ import { declaredRangeOf, type DeclaredDependency } from "./declared-dependencie
 import type { CatalogEntryVersion } from "./catalog-entries.ts";
 import type { WorkspaceDependencies } from "./shared-dependency-index.ts";
 
+export type RangedDeclarationIndex = ReadonlyMap<string, readonly DeclaredDependency[]>;
+
 const EXACT_VERSION = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)*$/u;
 
 const VERSION_LEADING = /^[\d^~<>=*xX]/u;
-
-export type RangedDeclarationIndex = ReadonlyMap<string, readonly DeclaredDependency[]>;
 
 const isVersionRange = (declaredVersion: string): boolean => {
   const range = declaredRangeOf(declaredVersion);

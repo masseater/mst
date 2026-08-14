@@ -6,10 +6,6 @@ import { toPosixPath } from "../posix-path.ts";
 
 import type { DeclaredDependency } from "./declared-dependencies.ts";
 
-export const REPOSITORY_ROOT_WORKSPACE = ".";
-
-const SHARED_BY_AT_LEAST = 2;
-
 export type WorkspaceDependencies = {
   readonly relativeDir: string;
   readonly dependencies: readonly DeclaredDependency[];
@@ -19,17 +15,7 @@ export type WorkspaceDependenciesLoader = (options: {
   readonly repositoryRoot: string;
 }) => readonly WorkspaceDependencies[];
 
-export type DependencySite = {
-  readonly relativeDir: string;
-  readonly declaredVersion: string;
-};
-
-export type UnregisteredSharedDependency = {
-  readonly packageName: string;
-  readonly sites: readonly DependencySite[];
-};
-
-export type SharedDependencyIndex = ReadonlyMap<string, readonly UnregisteredSharedDependency[]>;
+export const REPOSITORY_ROOT_WORKSPACE = ".";
 
 export const workspaceDirectoryOf = (location: {
   readonly repositoryRoot: string;
@@ -37,6 +23,11 @@ export const workspaceDirectoryOf = (location: {
 }): string => {
   const within = toPosixPath(relative(location.repositoryRoot, location.packageDirectory));
   return within === "" ? REPOSITORY_ROOT_WORKSPACE : within;
+};
+
+export type DependencySite = {
+  readonly relativeDir: string;
+  readonly declaredVersion: string;
 };
 
 export const describeSites = (sites: readonly DependencySite[]): string =>
@@ -60,6 +51,13 @@ const siteOf = ({ relativeDir, declaredVersion }: PlacedDependency): DependencyS
   declaredVersion,
 });
 
+const SHARED_BY_AT_LEAST = 2;
+
+export type UnregisteredSharedDependency = {
+  readonly packageName: string;
+  readonly sites: readonly DependencySite[];
+};
+
 const unregisteredSharedIn = (tally: {
   readonly placed: readonly PlacedDependency[];
   readonly catalog: ReadonlySet<string>;
@@ -73,6 +71,8 @@ const unregisteredSharedIn = (tally: {
       packageName,
       sites: sortBy(placed.map(siteOf), ["relativeDir"]),
     }));
+
+export type SharedDependencyIndex = ReadonlyMap<string, readonly UnregisteredSharedDependency[]>;
 
 export const sharedDependencyIndex = (repository: {
   readonly workspaces: readonly WorkspaceDependencies[];

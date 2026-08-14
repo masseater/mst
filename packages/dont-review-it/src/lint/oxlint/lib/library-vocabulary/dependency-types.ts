@@ -14,25 +14,12 @@ export type DependencyTypeEntry = {
   readonly declarationsPath: string;
 };
 
-const TYPES_CONDITION = "types";
-
-const ROOT_SUBPATH = ".";
-
 const WORKSPACE_PROTOCOL = "workspace:";
 
 const NODE_MODULES_DIRECTORY_NAME = "node_modules";
 
-const DECLARATIONS_SUFFIX_PATTERN = /\.[cm]?tsx?$/u;
-
-const SCRIPT_SUFFIX_PATTERN = /\.([cm]?)js$/u;
-
 const isRecord = (held: unknown): held is Record<string, unknown> =>
   held !== null && typeof held === "object" && !Array.isArray(held);
-
-const stringFieldOf = (manifest: Record<string, unknown>, field: string): string | null => {
-  const declared = manifest[field];
-  return typeof declared === "string" ? declared : null;
-};
 
 const recordFieldOf = (
   manifest: Record<string, unknown>,
@@ -42,6 +29,8 @@ const recordFieldOf = (
   return isRecord(declared) ? declared : {};
 };
 
+const ROOT_SUBPATH = ".";
+
 const rootExportsOf = (exportsField: unknown): unknown => {
   if (typeof exportsField === "string") return exportsField;
   if (!isRecord(exportsField)) return null;
@@ -50,6 +39,8 @@ const rootExportsOf = (exportsField: unknown): unknown => {
   if (root !== undefined) return root[1];
   return subpaths.some(([subpath]) => subpath.startsWith(ROOT_SUBPATH)) ? null : exportsField;
 };
+
+const TYPES_CONDITION = "types";
 
 const typesConditionIn = (held: unknown, depth: number): string | null => {
   if (!isRecord(held) || depth > EXPORTS_CONDITION_DEPTH_LIMIT) return null;
@@ -75,6 +66,11 @@ const anyConditionIn = (held: unknown, depth: number): string | null => {
   return null;
 };
 
+const stringFieldOf = (manifest: Record<string, unknown>, field: string): string | null => {
+  const declared = manifest[field];
+  return typeof declared === "string" ? declared : null;
+};
+
 const entryPathsOf = (manifest: Record<string, unknown>): readonly string[] => {
   const rootExports = rootExportsOf(manifest.exports);
   return [
@@ -85,6 +81,10 @@ const entryPathsOf = (manifest: Record<string, unknown>): readonly string[] => {
     stringFieldOf(manifest, "main"),
   ].filter((path): path is string => path !== null);
 };
+
+const DECLARATIONS_SUFFIX_PATTERN = /\.[cm]?tsx?$/u;
+
+const SCRIPT_SUFFIX_PATTERN = /\.([cm]?)js$/u;
 
 const declarationsCandidateFor = (entryPath: string): string | null => {
   if (DECLARATIONS_SUFFIX_PATTERN.test(entryPath)) return entryPath;

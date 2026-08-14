@@ -155,12 +155,6 @@ export const analyzeCanonicalValuesRepository = ({
   });
 };
 
-const buildCanonicalValuesCatalog = ({
-  repositoryRoot,
-}: {
-  readonly repositoryRoot: string;
-}): CanonicalValuesCatalog => buildCatalogFor(repositoryInput(resolve(repositoryRoot)));
-
 type CanonicalValuesRepositoryInput = {
   readonly fingerprint: string;
   readonly repositoryFiles: RepositoryFiles;
@@ -179,18 +173,6 @@ const repositoryInput = (repositoryRoot: string): CanonicalValuesRepositoryInput
   };
 };
 
-const buildCatalogFor = (input: CanonicalValuesRepositoryInput): CanonicalValuesCatalog => {
-  const { fingerprint, repositoryFiles, repositoryRoot, sourceScope } = input;
-  const packageNames = packageNamesIn(repositoryFiles.manifests);
-  if (repositoryFiles.problems.length > 0 || repositoryFiles.declarationSources.length === 0) {
-    return buildCatalog([], { packageNames, sourceScope });
-  }
-
-  const cached = readCachedEntries(repositoryRoot, fingerprint);
-  if (cached !== null) return buildCatalog(cached, { packageNames, sourceScope });
-  return buildAndCacheCatalog({ fingerprint, repositoryFiles, repositoryRoot, sourceScope });
-};
-
 const buildAndCacheCatalog = (input: {
   readonly fingerprint: string;
   readonly repositoryFiles: RepositoryFiles;
@@ -204,6 +186,24 @@ const buildAndCacheCatalog = (input: {
   });
   return analyzed.catalog;
 };
+
+const buildCatalogFor = (input: CanonicalValuesRepositoryInput): CanonicalValuesCatalog => {
+  const { fingerprint, repositoryFiles, repositoryRoot, sourceScope } = input;
+  const packageNames = packageNamesIn(repositoryFiles.manifests);
+  if (repositoryFiles.problems.length > 0 || repositoryFiles.declarationSources.length === 0) {
+    return buildCatalog([], { packageNames, sourceScope });
+  }
+
+  const cached = readCachedEntries(repositoryRoot, fingerprint);
+  if (cached !== null) return buildCatalog(cached, { packageNames, sourceScope });
+  return buildAndCacheCatalog({ fingerprint, repositoryFiles, repositoryRoot, sourceScope });
+};
+
+const buildCanonicalValuesCatalog = ({
+  repositoryRoot,
+}: {
+  readonly repositoryRoot: string;
+}): CanonicalValuesCatalog => buildCatalogFor(repositoryInput(resolve(repositoryRoot)));
 
 export const loadCanonicalValuesCatalogSnapshot = memoize(buildCanonicalValuesCatalog, {
   getCacheKey: (catalogRequest) => resolve(catalogRequest.repositoryRoot),

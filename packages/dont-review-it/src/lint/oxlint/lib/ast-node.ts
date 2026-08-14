@@ -3,6 +3,8 @@ import type { ESTree } from "@oxlint/plugins";
 
 export const NODE_TYPE_FIELD = "type";
 
+export const BACK_REFERENCE_FIELD = "parent";
+
 export type AstFields = UnknownFields;
 
 export const isAstFields = (held: unknown): held is AstFields =>

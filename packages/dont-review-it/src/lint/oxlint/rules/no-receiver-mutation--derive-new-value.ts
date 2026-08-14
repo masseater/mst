@@ -67,7 +67,6 @@ export const noReceiverMutation = createDontReviewItRule({
     schema: [],
   },
   create(inspection) {
-    const scopeAt: ScopeLookup = (node) => inspection.sourceCode.getScope(node);
     const file = resolve(inspection.cwd, inspection.filename);
 
     const importedNames = memoize(() => importedNamesIn(inspection.sourceCode.ast.body));
@@ -94,11 +93,6 @@ export const noReceiverMutation = createDontReviewItRule({
       return found.length === 0 ? null : new Set(found);
     });
 
-    const writesReceiverThrough = (typeName: string): boolean =>
-      ownedNames().has(typeName)
-        ? (mutatingNamesOf(typeName)?.size ?? 0) > 0
-        : MUTATING_BUILTIN_TYPE_NAMES.has(typeName);
-
     const reportNamedReceiver = (namedReceiver: {
       readonly node: ESTree.MemberExpression;
       readonly type: string;
@@ -124,6 +118,11 @@ export const noReceiverMutation = createDontReviewItRule({
       });
     };
 
+    const scopeAt: ScopeLookup = (node) => inspection.sourceCode.getScope(node);
+    const writesReceiverThrough = (typeName: string): boolean =>
+      ownedNames().has(typeName)
+        ? (mutatingNamesOf(typeName)?.size ?? 0) > 0
+        : MUTATING_BUILTIN_TYPE_NAMES.has(typeName);
     const reportRuntimeKey = (node: ESTree.MemberExpression, receiver: JudgedReceiver): void => {
       if (receiver.kind !== "named" || !isCalledMember(node)) return;
       if (namesNumberKey(node, scopeAt)) return;

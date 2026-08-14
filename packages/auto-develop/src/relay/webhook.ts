@@ -9,9 +9,9 @@ import { verifyWebhookSignature } from "./signature.ts";
 import type { Logger } from "../logging/logger.ts";
 import type { EventStore } from "./store.ts";
 
-export type WebhookOutcome = {
-  readonly status: number;
-  readonly body: Readonly<Record<string, unknown>>;
+const parseJsonBody = (requestBody: string): Readonly<Record<string, unknown>> | undefined => {
+  const [parseFailure, parsedNode] = attempt((): unknown => JSON.parse(requestBody));
+  return parseFailure === null ? asRecord(parsedNode) : undefined;
 };
 
 export type WebhookRequest = {
@@ -23,6 +23,18 @@ export type WebhookRequest = {
   readonly events: EventStore;
   readonly log: Logger;
   readonly stampedNow?: () => number;
+};
+
+const requiredHeaders = (
+  asked: WebhookRequest,
+): { readonly eventType: string; readonly deliveryId: string } | null =>
+  asked.eventType !== undefined && asked.deliveryId !== undefined
+    ? { eventType: asked.eventType, deliveryId: asked.deliveryId }
+    : null;
+
+export type WebhookOutcome = {
+  readonly status: number;
+  readonly body: Readonly<Record<string, unknown>>;
 };
 
 const hasExclusionLabel = (carried: Readonly<Record<string, unknown>>): boolean => {
@@ -47,18 +59,6 @@ const skippedByExclusion = (webhook: {
   if (webhook.payload.action === "closed") return false;
   return !isExclusionLabelEdge(webhook.payload);
 };
-
-const parseJsonBody = (requestBody: string): Readonly<Record<string, unknown>> | undefined => {
-  const [parseFailure, parsedNode] = attempt((): unknown => JSON.parse(requestBody));
-  return parseFailure === null ? asRecord(parsedNode) : undefined;
-};
-
-const requiredHeaders = (
-  asked: WebhookRequest,
-): { readonly eventType: string; readonly deliveryId: string } | null =>
-  asked.eventType !== undefined && asked.deliveryId !== undefined
-    ? { eventType: asked.eventType, deliveryId: asked.deliveryId }
-    : null;
 
 const skippedResponse = (webhook: {
   readonly eventType: string;

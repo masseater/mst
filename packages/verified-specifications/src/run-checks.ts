@@ -17,10 +17,6 @@ import type { RepositoryProblem } from "@mst/repository-checks";
 
 const SPEC_FILE_PATTERN = "specs/*.spec.{ts,tsx}";
 
-const STALE_DOCUMENT = `A specification list must not fall behind the tests it is extracted from, because a reader would review claims the code no longer makes. Run \`verified-specifications check --write\` (wired as \`vp run guard:fix\`) to regenerate ${SPECIFICATIONS_FILE_NAME}.`;
-
-const ORPHAN_DOCUMENT = `A specification list must not outlive the specification tests it was extracted from, because it would keep promising behavior nothing verifies. Run \`verified-specifications check --write\` to delete this ${SPECIFICATIONS_FILE_NAME}, or restore the tests under specs/.`;
-
 const specFilesOf = async (workspaceDirectory: string): Promise<readonly string[]> => {
   const files = await Array.fromAsync(glob(SPEC_FILE_PATTERN, { cwd: workspaceDirectory }));
   return files.toSorted();
@@ -54,6 +50,8 @@ const claimsOf = async (input: {
   };
 };
 
+const ORPHAN_DOCUMENT = `A specification list must not outlive the specification tests it was extracted from, because it would keep promising behavior nothing verifies. Run \`verified-specifications check --write\` to delete this ${SPECIFICATIONS_FILE_NAME}, or restore the tests under specs/.`;
+
 const orphanProblemsOf = async (input: {
   readonly documentPath: string;
   readonly file: string;
@@ -65,6 +63,8 @@ const orphanProblemsOf = async (input: {
   await rm(input.documentPath);
   return [];
 };
+
+const STALE_DOCUMENT = `A specification list must not fall behind the tests it is extracted from, because a reader would review claims the code no longer makes. Run \`verified-specifications check --write\` (wired as \`vp run guard:fix\`) to regenerate ${SPECIFICATIONS_FILE_NAME}.`;
 
 const documentProblemsOf = async (input: {
   readonly repositoryRoot: string;

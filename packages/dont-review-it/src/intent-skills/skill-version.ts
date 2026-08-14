@@ -1,16 +1,14 @@
 import { attempt, isPlainObject } from "es-toolkit";
 import { parse } from "yaml";
 
-const FRONTMATTER_PATTERN = /^---\n(?<frontmatter>.*?)\n---/su;
-
-const LIBRARY_VERSION_LINE_PATTERN = /^(?<indent>\s*)library_version:.*$/u;
-
 const METADATA_KEY = "metadata";
 
 const LIBRARY_VERSION_KEY = "library_version";
 
 const declaredValueOf = (holder: unknown, named: string): unknown =>
   isPlainObject(holder) ? holder[named] : null;
+
+const FRONTMATTER_PATTERN = /^---\n(?<frontmatter>.*?)\n---/su;
 
 export const libraryVersionOf = (source: string): string | null => {
   const frontmatterText = FRONTMATTER_PATTERN.exec(source)?.groups?.frontmatter;
@@ -22,6 +20,8 @@ export const libraryVersionOf = (source: string): string | null => {
   const declared = declaredValueOf(declaredValueOf(frontmatter, METADATA_KEY), LIBRARY_VERSION_KEY);
   return typeof declared === "string" ? declared : null;
 };
+
+const LIBRARY_VERSION_LINE_PATTERN = /^(?<indent>\s*)library_version:.*$/u;
 
 export const lineOfLibraryVersion = (source: string): number | null => {
   const found = source.split("\n").findIndex((line) => LIBRARY_VERSION_LINE_PATTERN.test(line));

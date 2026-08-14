@@ -2,14 +2,14 @@ import { carriesHaltDisposition } from "../queue/halt-disposition.ts";
 import { CredentialTerminalError } from "../transport/credential-provider.ts";
 import { SseRequestRejectedError } from "../transport/sse-request-rejected-error.ts";
 
-const BASE_DELAY_MS = 3_000;
-
-const MAX_DELAY_MS = 5 * 60_000;
-
 export const needsOperatorIntervention = (failure: unknown): boolean =>
   failure instanceof CredentialTerminalError ||
   failure instanceof SseRequestRejectedError ||
   carriesHaltDisposition(failure);
+
+const BASE_DELAY_MS = 3_000;
+
+const MAX_DELAY_MS = 5 * 60_000;
 
 export const backoffAfterFailures = (backing: {
   readonly consecutiveFailures: number;

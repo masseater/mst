@@ -15,15 +15,6 @@ const ITEM_MARKER_PATTERN = /^(\d+)([.)])/u;
 
 const DECIMAL_MARKER_PATTERN = /^ {0,3}\d+(?:\.\d+)+[.)](?=\s|$)/u;
 
-const NON_CONTIGUOUS_MESSAGE =
-  "番号付き手順の番号が 1 から始まる連続した整数になっていない。番号を振り直す。原文の番号は、処理系を通さず読む読み手にとって順序の主張そのものである。";
-
-const DECIMAL_MESSAGE =
-  "小数の手順番号を割り込ませることは禁止されている。その手順を正しい位置へ入れ、以降の番号を振り直す。";
-
-const labelMessage = (word: string): string =>
-  `見出しや強調のラベルを \`${word} 0\` から始めることは禁止されている。1 から始まる番号に振り直す。`;
-
 const markerNumbersIn = ({
   source,
   startOffset,
@@ -61,6 +52,12 @@ const decimalMarkerLines = ({
     .flatMap((line, index) => (index > 0 && DECIMAL_MARKER_PATTERN.test(line) ? [index] : []))
     .map((lineIndex) => source.slice(0, startOffset).split("\n").length + lineIndex);
 
+const NON_CONTIGUOUS_MESSAGE =
+  "番号付き手順の番号が 1 から始まる連続した整数になっていない。番号を振り直す。原文の番号は、処理系を通さず読む読み手にとって順序の主張そのものである。";
+
+const DECIMAL_MESSAGE =
+  "小数の手順番号を割り込ませることは禁止されている。その手順を正しい位置へ入れ、以降の番号を振り直す。";
+
 const orderedListProblems = ({
   document,
 }: {
@@ -87,6 +84,9 @@ const orderedListProblems = ({
 
       return [...sequenceProblems, ...decimalProblems];
     });
+
+const labelMessage = (word: string): string =>
+  `見出しや強調のラベルを \`${word} 0\` から始めることは禁止されている。1 から始まる番号に振り直す。`;
 
 const zeroLabelProblems = ({
   document,

@@ -1,3 +1,6 @@
+const memberKeyOf = (member: { readonly type: string; readonly method: string }): string =>
+  `${member.type}.${member.method}`;
+
 export type MutatingBuiltinMember = {
   readonly type: string;
   readonly method: string;
@@ -10,6 +13,14 @@ type MemberGroup = {
   readonly methods: readonly string[];
   readonly derivation: string;
 };
+
+const membersOf = (
+  groupedSets: readonly MemberGroup[],
+  sink: boolean,
+): readonly MutatingBuiltinMember[] =>
+  groupedSets.flatMap(({ type, methods, derivation }) =>
+    methods.map((method) => ({ type, method, derivation, sink })),
+  );
 
 const MAP_DERIVATION =
   "Build the map you need in one expression: spread the entries of the old one into a new `Map`, or filter those entries before building it.";
@@ -110,17 +121,6 @@ const SINK_GROUPS: readonly MemberGroup[] = [
     derivation: SINK_DERIVATION,
   },
 ];
-
-const memberKeyOf = (member: { readonly type: string; readonly method: string }): string =>
-  `${member.type}.${member.method}`;
-
-const membersOf = (
-  groupedSets: readonly MemberGroup[],
-  sink: boolean,
-): readonly MutatingBuiltinMember[] =>
-  groupedSets.flatMap(({ type, methods, derivation }) =>
-    methods.map((method) => ({ type, method, derivation, sink })),
-  );
 
 const MUTATING_BUILTIN_MEMBERS: readonly MutatingBuiltinMember[] = [
   ...membersOf(DERIVED_VALUE_GROUPS, false),

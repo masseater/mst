@@ -18,41 +18,6 @@ import {
 import type { ESTree } from "@oxlint/plugins";
 import type { NamedReport } from "../lib/named-report.ts";
 
-const ANONYMOUS_DECLARATION_NAME = "default";
-
-type ScopeReading = {
-  readonly functions: readonly ESTree.Node[];
-  readonly groupingBodies: readonly ESTree.Node[];
-};
-
-type BindingReading = {
-  readonly lookup: ScopeLookup;
-  readonly source: string;
-};
-
-const spans = (holder: ESTree.Node, held: ESTree.Node): boolean =>
-  holder.start <= held.start && held.end <= holder.end;
-
-const innermostHolderOf = (
-  held: ESTree.Node,
-  holders: readonly ESTree.Node[],
-): ESTree.Node | null =>
-  holders
-    .filter((holder) => spans(holder, held) && !spans(held, holder))
-    .toSorted((first, second) => second.start - first.start)
-    .at(0) ?? null;
-
-const standsAtModuleScope = (held: ESTree.Node, reading: ScopeReading): boolean =>
-  innermostHolderOf(held, reading.functions) === null;
-
-const standsInHelperScope = (held: ESTree.Node, reading: ScopeReading): boolean => {
-  const holder = innermostHolderOf(held, reading.functions);
-  if (holder === null) return true;
-  return reading.groupingBodies.some(
-    (groupingBody) => groupingBody.start === holder.start && groupingBody.end === holder.end,
-  );
-};
-
 const heldFunctionsIn = (node: ESTree.Expression): readonly ESTree.Expression[] => {
   const written = unwrapSubject(node);
   return asSpecFunction(written) === null ? functionsInLiteral(written) : [written];
@@ -69,6 +34,71 @@ const functionsInLiteral = (written: ESTree.Expression): readonly ESTree.Express
     listed === null || listed.type === "SpreadElement" ? [] : heldFunctionsIn(listed),
   );
 };
+
+const fixtureReportsOf = (call: ESTree.CallExpression): readonly NamedReport[] =>
+  fixtureDeclarationsOf(call).flatMap((declaration) =>
+    declaration.subjects.flatMap((subject) => {
+      const handed = asSpecFunction(subject);
+      if (handed === null) return [];
+      return [
+        {
+          node: handed,
+          messageId: "handedHelperFixture",
+          data: { name: declaration.name },
+        },
+      ];
+    }),
+  );
+
+type ScopeReading = {
+  readonly functions: readonly ESTree.Node[];
+  readonly groupingBodies: readonly ESTree.Node[];
+};
+
+const scopeReadingIn = (program: ESTree.Program, rootNames: ReadonlySet<string>): ScopeReading => ({
+  functions: [
+    ...nodesOfType(program, "FunctionDeclaration"),
+    ...nodesOfType(program, "FunctionExpression"),
+    ...nodesOfType(program, "ArrowFunctionExpression"),
+  ],
+  groupingBodies: nodesOfType(program, "CallExpression")
+    .filter((call) => declaresTestBlock(call, rootNames))
+    .flatMap((call) => testCallbacksOf(call)),
+});
+
+const ANONYMOUS_DECLARATION_NAME = "default";
+
+const spans = (holder: ESTree.Node, held: ESTree.Node): boolean =>
+  holder.start <= held.start && held.end <= holder.end;
+
+const innermostHolderOf = (
+  held: ESTree.Node,
+  holders: readonly ESTree.Node[],
+): ESTree.Node | null =>
+  holders
+    .filter((holder) => spans(holder, held) && !spans(held, holder))
+    .toSorted((first, second) => second.start - first.start)
+    .at(0) ?? null;
+
+const standsInHelperScope = (held: ESTree.Node, reading: ScopeReading): boolean => {
+  const holder = innermostHolderOf(held, reading.functions);
+  if (holder === null) return true;
+  return reading.groupingBodies.some(
+    (groupingBody) => groupingBody.start === holder.start && groupingBody.end === holder.end,
+  );
+};
+
+const declarationReportsIn = (
+  program: ESTree.Program,
+  reading: ScopeReading,
+): readonly NamedReport[] =>
+  nodesOfType(program, "FunctionDeclaration")
+    .filter((declared) => standsInHelperScope(declared, reading))
+    .map((declared) => ({
+      node: declared,
+      messageId: "scopedHelperDeclaration",
+      data: { name: declared.id?.name ?? ANONYMOUS_DECLARATION_NAME },
+    }));
 
 const functionsHeldByLiteral = (initializer: ESTree.Expression): readonly ESTree.Expression[] => {
   const written = unwrapSubject(initializer);
@@ -123,6 +153,11 @@ const boundNameOf = (declaredId: ESTree.VariableDeclarator["id"], source: string
     ? declaredId.name
     : source.slice(declaredId.start, declaredId.end);
 
+type BindingReading = {
+  readonly lookup: ScopeLookup;
+  readonly source: string;
+};
+
 const bindingReportOf = (
   declarator: ESTree.VariableDeclarator,
   reading: BindingReading,
@@ -143,6 +178,15 @@ const bindingReportOf = (
   return null;
 };
 
+const bindingReportsIn = (read: {
+  readonly program: ESTree.Program;
+  readonly reading: ScopeReading;
+  readonly binding: BindingReading;
+}): readonly NamedReport[] =>
+  nodesOfType(read.program, "VariableDeclarator")
+    .filter((declarator) => standsInHelperScope(declarator, read.reading))
+    .flatMap((declarator) => bindingReportOf(declarator, read.binding) ?? []);
+
 const fixtureBindingReportOf = (
   declarator: ESTree.VariableDeclarator,
   source: string,
@@ -161,52 +205,8 @@ const fixtureBindingReportOf = (
   };
 };
 
-const fixtureReportsOf = (call: ESTree.CallExpression): readonly NamedReport[] =>
-  fixtureDeclarationsOf(call).flatMap((declaration) =>
-    declaration.subjects.flatMap((subject) => {
-      const handed = asSpecFunction(subject);
-      if (handed === null) return [];
-      return [
-        {
-          node: handed,
-          messageId: "handedHelperFixture",
-          data: { name: declaration.name },
-        },
-      ];
-    }),
-  );
-
-const scopeReadingIn = (program: ESTree.Program, rootNames: ReadonlySet<string>): ScopeReading => ({
-  functions: [
-    ...nodesOfType(program, "FunctionDeclaration"),
-    ...nodesOfType(program, "FunctionExpression"),
-    ...nodesOfType(program, "ArrowFunctionExpression"),
-  ],
-  groupingBodies: nodesOfType(program, "CallExpression")
-    .filter((call) => declaresTestBlock(call, rootNames))
-    .flatMap((call) => testCallbacksOf(call)),
-});
-
-const declarationReportsIn = (
-  program: ESTree.Program,
-  reading: ScopeReading,
-): readonly NamedReport[] =>
-  nodesOfType(program, "FunctionDeclaration")
-    .filter((declared) => standsInHelperScope(declared, reading))
-    .map((declared) => ({
-      node: declared,
-      messageId: "scopedHelperDeclaration",
-      data: { name: declared.id?.name ?? ANONYMOUS_DECLARATION_NAME },
-    }));
-
-const bindingReportsIn = (read: {
-  readonly program: ESTree.Program;
-  readonly reading: ScopeReading;
-  readonly binding: BindingReading;
-}): readonly NamedReport[] =>
-  nodesOfType(read.program, "VariableDeclarator")
-    .filter((declarator) => standsInHelperScope(declarator, read.reading))
-    .flatMap((declarator) => bindingReportOf(declarator, read.binding) ?? []);
+const standsAtModuleScope = (held: ESTree.Node, reading: ScopeReading): boolean =>
+  innermostHolderOf(held, reading.functions) === null;
 
 const fixtureBindingReportsIn = (read: {
   readonly program: ESTree.Program;

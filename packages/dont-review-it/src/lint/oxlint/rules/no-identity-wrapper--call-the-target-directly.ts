@@ -4,8 +4,6 @@ import { createDontReviewItRule } from "../../../create-rule.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
-type FunctionLike = ESTree.Function | ESTree.ArrowFunctionExpression;
-
 type ForwardedName = { readonly name: string; readonly spread: boolean };
 
 const forwardedParameter = (parameter: ESTree.ParamPattern): ForwardedName | null => {
@@ -28,6 +26,8 @@ const soleReturnedExpression = (writtenBody: ESTree.FunctionBody): ESTree.Expres
   if (statement?.type !== "ReturnStatement") return null;
   return statement.argument;
 };
+
+type FunctionLike = ESTree.Function | ESTree.ArrowFunctionExpression;
 
 const forwardedCall = (declared: FunctionLike): ESTree.CallExpression | null => {
   const writtenBody = declared.body as ESTree.FunctionBody | ESTree.Expression;

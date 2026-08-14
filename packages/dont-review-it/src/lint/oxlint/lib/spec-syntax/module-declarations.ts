@@ -28,9 +28,6 @@ export type ImportedDeclaration = {
   readonly declared: ESTree.Expression;
 };
 
-export const moduleExportSpelling = (spelled: ESTree.ModuleExportName): string =>
-  spelled.type === "Identifier" ? spelled.name : spelled.value;
-
 const declaredStatement = (statement: SpecStatement): SpecStatement =>
   statement.type === "ExportNamedDeclaration" && statement.declaration !== null
     ? statement.declaration
@@ -53,6 +50,9 @@ const boundNamesIn = (
     boundName(declarator.id.type === "Identifier" ? declarator.id : null, declarator.init),
   );
 };
+
+export const moduleExportSpelling = (spelled: ESTree.ModuleExportName): string =>
+  spelled.type === "Identifier" ? spelled.name : spelled.value;
 
 const importedNamesIn = (
   statement: SpecStatement,

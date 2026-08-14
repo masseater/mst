@@ -2,10 +2,6 @@ import { unwrapSubject } from "./subject-expressions.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
-const ABSENT_VALUE_NAME = "undefined";
-
-const ABSENT_VALUE_OPERATOR = "void";
-
 export const WRITTEN_OUT_SHAPE = "a value written out in the spec";
 
 const ASSEMBLED_SHAPES: ReadonlyMap<string, string> = new Map([
@@ -13,6 +9,10 @@ const ASSEMBLED_SHAPES: ReadonlyMap<string, string> = new Map([
   ["NewExpression", "a value a constructor built here"],
   ["ObjectExpression", "an object literal"],
 ]);
+
+const ABSENT_VALUE_NAME = "undefined";
+
+const ABSENT_VALUE_OPERATOR = "void";
 
 const isWrittenOutValue = (node: ESTree.Expression): boolean => {
   const written = unwrapSubject(node);

@@ -9,10 +9,6 @@ const RELATIVE_SPECIFIER = /^\.{1,2}\//u;
 
 const SCRIPT_EXTENSION = /\.[cm]?[jt]sx?$/u;
 
-const DEFAULT_IMPORT = "default";
-
-const WHOLE_MODULE_IMPORT = "*";
-
 const importedModuleOf = (input: {
   readonly specifier: string;
   readonly fromRelativePath: string;
@@ -21,6 +17,10 @@ const importedModuleOf = (input: {
   if (!RELATIVE_SPECIFIER.test(specifier)) return specifier;
   return toPosixPath(join(dirname(fromRelativePath), specifier)).replace(SCRIPT_EXTENSION, "");
 };
+
+const DEFAULT_IMPORT = "default";
+
+const WHOLE_MODULE_IMPORT = "*";
 
 const takenNameOf = (specifier: AstFields): string => {
   const nodeKind = specifier[NODE_TYPE_FIELD];

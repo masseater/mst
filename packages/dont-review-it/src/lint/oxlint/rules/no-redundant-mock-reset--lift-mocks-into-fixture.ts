@@ -11,6 +11,12 @@ import { unwrapSubject } from "../lib/spec-syntax/subject-expressions.ts";
 import type { Definition, ESTree, Options, Scope, Variable } from "@oxlint/plugins";
 import type { RuleMessage } from "../lib/rule-message.ts";
 
+type CleanupMembers = {
+  readonly perMock: ReadonlySet<string>;
+  readonly bulkReset: ReadonlySet<string>;
+  readonly bulkRelease: ReadonlySet<string>;
+};
+
 const PER_MOCK_RESET_MEMBERS_OPTION = "perMockResetMembers";
 
 const BULK_RESET_MEMBERS_OPTION = "bulkResetMembers";
@@ -27,31 +33,6 @@ const DEFAULT_BULK_RESET_MEMBERS: readonly string[] = [
 
 const DEFAULT_BULK_STUB_RELEASE_MEMBERS: readonly string[] = ["unstubAllEnvs", "unstubAllGlobals"];
 
-const MOCK_FACTORY_MEMBERS: ReadonlySet<string> = new Set(["fn", "mocked", "spyOn"]);
-
-const TYPEOF_OPERATOR = "typeof";
-
-const TAKEN_AS_VALUE_MESSAGE = "resetTakenAsValue";
-
-type ReachLookup = {
-  readonly scopeAt: (node: ESTree.Node) => Scope;
-  readonly seen: ReadonlySet<Variable>;
-  readonly isSource: (written: ESTree.Expression) => boolean;
-  readonly isImportedSource: (exported: string) => boolean;
-};
-
-type CleanupMembers = {
-  readonly perMock: ReadonlySet<string>;
-  readonly bulkReset: ReadonlySet<string>;
-  readonly bulkRelease: ReadonlySet<string>;
-};
-
-type Reading = {
-  readonly members: CleanupMembers;
-  readonly namespace: ReachLookup;
-  readonly mock: ReachLookup;
-};
-
 const cleanupMembersFrom = (ruleOptions: Readonly<Options>): CleanupMembers => ({
   perMock: spellingsFrom(ruleOptions, {
     option: PER_MOCK_RESET_MEMBERS_OPTION,
@@ -67,17 +48,16 @@ const cleanupMembersFrom = (ruleOptions: Readonly<Options>): CleanupMembers => (
   }),
 });
 
-const bulkMessageOf = (member: string, members: CleanupMembers): string | null => {
-  if (members.bulkReset.has(member)) return "bulkMockReset";
-  return members.bulkRelease.has(member) ? "bulkStubRelease" : null;
-};
-
-const namesCleanup = (member: string, members: CleanupMembers): boolean =>
-  members.perMock.has(member) || bulkMessageOf(member, members) !== null;
-
 const receiverOf = (member: ESTree.MemberExpression): ESTree.Expression | null => {
   const receiver = member.object;
   return receiver.type === "Super" ? null : receiver;
+};
+
+type ReachLookup = {
+  readonly scopeAt: (node: ESTree.Node) => Scope;
+  readonly seen: ReadonlySet<Variable>;
+  readonly isSource: (written: ESTree.Expression) => boolean;
+  readonly isImportedSource: (exported: string) => boolean;
 };
 
 const definitionReaches = (definition: Definition, lookup: ReachLookup): boolean => {
@@ -110,6 +90,8 @@ const reaches = (node: ESTree.Expression, lookup: ReachLookup): boolean => {
   return binding !== null && bindingReaches(binding, lookup);
 };
 
+const MOCK_FACTORY_MEMBERS: ReadonlySet<string> = new Set(["fn", "mocked", "spyOn"]);
+
 const producesMock = (call: ESTree.CallExpression, namespace: ReachLookup): boolean => {
   const callee = unwrapSubject(call.callee);
   if (callee.type !== "MemberExpression") return false;
@@ -121,32 +103,15 @@ const producesMock = (call: ESTree.CallExpression, namespace: ReachLookup): bool
   return receiver !== null && reaches(receiver, namespace);
 };
 
-const isWrapping = (
-  node: ESTree.Node,
-): node is
-  | ESTree.ChainExpression
-  | ESTree.ParenthesizedExpression
-  | ESTree.TSAsExpression
-  | ESTree.TSNonNullExpression
-  | ESTree.TSSatisfiesExpression
-  | ESTree.TSTypeAssertion => SUGARED_NODE_TYPES.has(node.type);
-
-const settledHolder = (holder: ESTree.Node): ESTree.Node =>
-  isWrapping(holder) ? settledHolder(holder.parent) : holder;
-
-const isCalledHere = (reference: ESTree.MemberExpression): boolean => {
-  const holder = settledHolder(reference.parent);
-  return holder.type === "CallExpression" && unwrapSubject(holder.callee) === reference;
+const bulkMessageOf = (member: string, members: CleanupMembers): string | null => {
+  if (members.bulkReset.has(member)) return "bulkMockReset";
+  return members.bulkRelease.has(member) ? "bulkStubRelease" : null;
 };
 
-const isTypeofOperandHere = (reference: ESTree.MemberExpression): boolean => {
-  const holder = settledHolder(reference.parent);
-  return holder.type === "UnaryExpression" && holder.operator === TYPEOF_OPERATOR;
-};
-
-const destructuredSource = (holder: ESTree.Node): ESTree.Expression | null => {
-  if (holder.type === "VariableDeclarator") return holder.init;
-  return holder.type === "AssignmentExpression" ? holder.right : null;
+type Reading = {
+  readonly members: CleanupMembers;
+  readonly namespace: ReachLookup;
+  readonly mock: ReachLookup;
 };
 
 const namedCallMessage = (
@@ -182,6 +147,36 @@ const calledMessage = (call: ESTree.CallExpression, reading: Reading): RuleMessa
   return namedCallMessage({ receiver, member }, reading);
 };
 
+const namesCleanup = (member: string, members: CleanupMembers): boolean =>
+  members.perMock.has(member) || bulkMessageOf(member, members) !== null;
+
+const isWrapping = (
+  node: ESTree.Node,
+): node is
+  | ESTree.ChainExpression
+  | ESTree.ParenthesizedExpression
+  | ESTree.TSAsExpression
+  | ESTree.TSNonNullExpression
+  | ESTree.TSSatisfiesExpression
+  | ESTree.TSTypeAssertion => SUGARED_NODE_TYPES.has(node.type);
+
+const settledHolder = (holder: ESTree.Node): ESTree.Node =>
+  isWrapping(holder) ? settledHolder(holder.parent) : holder;
+
+const isCalledHere = (reference: ESTree.MemberExpression): boolean => {
+  const holder = settledHolder(reference.parent);
+  return holder.type === "CallExpression" && unwrapSubject(holder.callee) === reference;
+};
+
+const TYPEOF_OPERATOR = "typeof";
+
+const isTypeofOperandHere = (reference: ESTree.MemberExpression): boolean => {
+  const holder = settledHolder(reference.parent);
+  return holder.type === "UnaryExpression" && holder.operator === TYPEOF_OPERATOR;
+};
+
+const TAKEN_AS_VALUE_MESSAGE = "resetTakenAsValue";
+
 const takenMemberMessage = (
   reference: ESTree.MemberExpression,
   reading: Reading,
@@ -195,6 +190,11 @@ const takenMemberMessage = (
 
   const taken = reading.members.perMock.has(member) || reaches(receiver, reading.namespace);
   return taken ? { messageId: TAKEN_AS_VALUE_MESSAGE, data: { member } } : null;
+};
+
+const destructuredSource = (holder: ESTree.Node): ESTree.Expression | null => {
+  if (holder.type === "VariableDeclarator") return holder.init;
+  return holder.type === "AssignmentExpression" ? holder.right : null;
 };
 
 const takenKeyMessage = (

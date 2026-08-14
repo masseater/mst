@@ -6,15 +6,7 @@ import { counted, pluralized } from "./pluralized.ts";
 
 import type { CheckOutcome } from "@mst/repository-checks";
 
-const PASS_MARK = "✓";
-
-const FAIL_MARK = "✗";
-
-const SKIP_MARK = "⊘";
-
 const INDENT = "  ";
-
-const GAP = "  ";
 
 type Palette = { readonly colored: boolean };
 
@@ -27,6 +19,12 @@ const painted = ({
   readonly text: string;
   readonly palette: Palette;
 }): string => (palette.colored ? styleText(color, text, { validateStream: false }) : text);
+
+const PASS_MARK = "✓";
+
+const FAIL_MARK = "✗";
+
+const SKIP_MARK = "⊘";
 
 const markOf = ({
   outcome: ranCheck,
@@ -62,6 +60,8 @@ const reportedCounts = ({
   ...(problems === 0 ? [] : [counted({ count: problems, noun: "problem" })]),
   ...(warnings === 0 ? [] : [counted({ count: warnings, noun: "warning" })]),
 ];
+
+const GAP = "  ";
 
 const tailOf = (ranCheck: CheckOutcome): string => {
   const reported = reportedCounts({

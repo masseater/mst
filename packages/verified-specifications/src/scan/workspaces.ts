@@ -9,25 +9,10 @@ import { fileTextOrNull } from "../file-text.ts";
 import type { Dirent } from "node:fs";
 import type { RepositoryProblem } from "@mst/repository-checks";
 
-export type Workspace = {
-  readonly directory: string;
-  readonly packageName: string;
-};
-
 const WORKSPACE_MANIFEST = "pnpm-workspace.yaml";
 
 const UNREADABLE_MANIFEST =
   "A workspace definition must not be unreadable while it exists, because a scan that silently covers fewer workspaces reports the same green as a scan that covers them all.";
-
-const NAMELESS_PACKAGE =
-  "A workspace must not go without a name in its package.json, because the generated specification list is titled with it. Name the package.";
-
-const packageNameOf = (manifestSource: string): string | null => {
-  const manifest: unknown = JSON.parse(manifestSource);
-  if (!isPlainObject(manifest)) return null;
-  const { name }: { readonly name?: unknown } = manifest;
-  return typeof name === "string" && name.length > 0 ? name : null;
-};
 
 const workspaceGlobsOf = (manifestSource: string): readonly string[] => {
   const manifest: unknown = parse(manifestSource);
@@ -47,6 +32,21 @@ const workspaceDirectoriesOf = async (input: {
   return listedEntries
     .filter((listed) => listed.isDirectory())
     .map((listed) => join(listed.parentPath, listed.name));
+};
+
+export type Workspace = {
+  readonly directory: string;
+  readonly packageName: string;
+};
+
+const NAMELESS_PACKAGE =
+  "A workspace must not go without a name in its package.json, because the generated specification list is titled with it. Name the package.";
+
+const packageNameOf = (manifestSource: string): string | null => {
+  const manifest: unknown = JSON.parse(manifestSource);
+  if (!isPlainObject(manifest)) return null;
+  const { name }: { readonly name?: unknown } = manifest;
+  return typeof name === "string" && name.length > 0 ? name : null;
 };
 
 const workspaceOf = async (

@@ -14,12 +14,6 @@ export type IndexedType = {
   readonly referencedNames: readonly string[];
 };
 
-export type ScannedTypeFile = {
-  readonly relativePath: string;
-  readonly workspacePath: string;
-  readonly declarations: readonly ScannedTypeDeclaration[];
-};
-
 export type TypeAuthorityIndex = {
   readonly typesByPath: ReadonlyMap<string, readonly IndexedType[]>;
   readonly sitesByWorkspaceName: ReadonlyMap<string, readonly IndexedType[]>;
@@ -62,6 +56,12 @@ const structureFormOf = (structure: TypeStructure): string =>
     structure.members.toSorted(),
     structure.annotation.toSorted(),
   ]);
+
+export type ScannedTypeFile = {
+  readonly relativePath: string;
+  readonly workspacePath: string;
+  readonly declarations: readonly ScannedTypeDeclaration[];
+};
 
 const unitOf = (
   file: ScannedTypeFile,

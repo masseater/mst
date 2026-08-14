@@ -5,14 +5,6 @@ import { testBlockRootName } from "./test-block-modifiers.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
-export const INJECTED_TEST_BLOCK_SPELLINGS: ReadonlySet<string> = new Set(["it", "test"]);
-
-export const INJECTED_GROUPING_BLOCK_SPELLINGS: ReadonlySet<string> = new Set(["describe"]);
-
-const DERIVED_BUILDER_MEMBER = "extend";
-
-export const RUNNER_MODULES: readonly string[] = ["vitest", "vite-plus/test"];
-
 const importedBlockNames = (
   declaration: ESTree.ImportDeclaration,
   spellings: ReadonlySet<string>,
@@ -23,6 +15,8 @@ const importedBlockNames = (
       specifier.imported.type === "Identifier" ? specifier.imported.name : specifier.imported.value;
     return spellings.has(exported) ? [specifier.local.name] : [];
   });
+
+const DERIVED_BUILDER_MEMBER = "extend";
 
 const boundRootName = (initializer: ESTree.Expression): string | null => {
   const written = unwrapSubject(initializer);
@@ -70,8 +64,12 @@ const rootNamesIn = (
   return settledNames(new Set([...spellings, ...imported]), initializersIn(program));
 };
 
+export const INJECTED_TEST_BLOCK_SPELLINGS: ReadonlySet<string> = new Set(["it", "test"]);
+
 export const testBlockRootNames = (program: ESTree.Program): ReadonlySet<string> =>
   rootNamesIn(program, INJECTED_TEST_BLOCK_SPELLINGS);
+
+export const INJECTED_GROUPING_BLOCK_SPELLINGS: ReadonlySet<string> = new Set(["describe"]);
 
 export const groupingBlockRootNames = (program: ESTree.Program): ReadonlySet<string> =>
   rootNamesIn(program, INJECTED_GROUPING_BLOCK_SPELLINGS);
@@ -117,6 +115,8 @@ const namesDerivedFromImports = (program: ESTree.Program): readonly string[] => 
     imported.has(derivedRootName(initializer) ?? "") ? [declaredName] : [],
   );
 };
+
+export const RUNNER_MODULES: readonly string[] = ["vitest", "vite-plus/test"];
 
 export const runnerRootedTestBlockRootNames = (program: ESTree.Program): ReadonlySet<string> => {
   const shadowed = shadowedNamesIn(program);

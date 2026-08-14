@@ -13,6 +13,13 @@ import type { ESTree } from "@oxlint/plugins";
 
 export const LINT_CONFIGURATION_FILE = /(?:^|\/)vite\.config\.[cm]?[jt]s$/u;
 
+export const lintBlockOf = (program: ProgramStatements): ESTree.ObjectExpression | null => {
+  const config = defaultExportedObject(program);
+  if (config === null) return null;
+  const lint = objectValueOf({ object: config, key: "lint" });
+  return lint === null ? null : objectExpressionOf(lint);
+};
+
 const FAILING_SPELLINGS: ReadonlySet<string> = new Set([LINT_SEVERITY.ERROR, "deny"]);
 
 const PASSING_SPELLINGS: ReadonlySet<string> = new Set([
@@ -23,24 +30,6 @@ const PASSING_SPELLINGS: ReadonlySet<string> = new Set([
 
 const LOWEST_FAILING_NUMBER = 2;
 
-export type WeakenedRule = {
-  readonly property: ESTree.ObjectProperty;
-  readonly ruleName: string;
-  readonly severity: string;
-};
-
-export type IgnoreEntry = {
-  readonly element: ESTree.Expression;
-  readonly pattern: string;
-};
-
-export const lintBlockOf = (program: ProgramStatements): ESTree.ObjectExpression | null => {
-  const config = defaultExportedObject(program);
-  if (config === null) return null;
-  const lint = objectValueOf({ object: config, key: "lint" });
-  return lint === null ? null : objectExpressionOf(lint);
-};
-
 const weakenedSeverityOf = (held: ESTree.Expression): string | null => {
   const spelled = spelledSeverityOf(held);
   if (spelled === null) return null;
@@ -49,6 +38,12 @@ const weakenedSeverityOf = (held: ESTree.Expression): string | null => {
   const numbered = Number(spelled);
   if (Number.isNaN(numbered)) return null;
   return numbered >= LOWEST_FAILING_NUMBER ? null : spelled;
+};
+
+export type WeakenedRule = {
+  readonly property: ESTree.ObjectProperty;
+  readonly ruleName: string;
+  readonly severity: string;
 };
 
 const weakenedRulesIn = ({
@@ -91,6 +86,11 @@ export const weakenedTargetRulesIn = ({
   readonly targetRules: readonly string[];
 }): readonly WeakenedRule[] =>
   ruleBlocksIn(lint).flatMap((rules) => weakenedRulesIn({ rules, targetRules }));
+
+export type IgnoreEntry = {
+  readonly element: ESTree.Expression;
+  readonly pattern: string;
+};
 
 export const ignoreEntriesIn = (lint: ESTree.ObjectExpression): readonly IgnoreEntry[] => {
   const patterns = objectValueOf({ object: lint, key: "ignorePatterns" });

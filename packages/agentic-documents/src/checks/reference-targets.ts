@@ -30,16 +30,6 @@ const missingAnchor = ({
 }): string =>
   `参照 \`${reference}\` が指す位置が \`${resolved}\` に無い。現在の見出しを指すか、位置の指定を消す。指していた節の内容が今どこにあるかを確かめる。`;
 
-const DOCUMENT_EXTENSION = ".md";
-
-const PLACEHOLDER_MARKS = ["*", "<", ">", "..."];
-
-type Reference = {
-  readonly target: string;
-  readonly fromRepositoryRoot: boolean;
-  readonly line: number | null;
-};
-
 const anchorOf = (checked: string): string | null => {
   const index = checked.indexOf("#");
   if (index === -1 || index === checked.length - 1) return null;
@@ -48,11 +38,6 @@ const anchorOf = (checked: string): string | null => {
   const [failure, decoded] = attempt(() => decodeURIComponent(encoded));
 
   return failure === null ? decoded : encoded;
-};
-
-const withoutAnchor = (checked: string): string => {
-  const index = checked.indexOf("#");
-  return index === -1 ? checked : checked.slice(0, index);
 };
 
 const headingAnchor = (heading: string): string =>
@@ -71,6 +56,15 @@ const headingAnchorsOf = (source: string): ReadonlySet<string> =>
       .map((line) => headingAnchor(line.replace(/^#{1,6}\s+/u, ""))),
   );
 
+const DOCUMENT_EXTENSION = ".md";
+
+const PLACEHOLDER_MARKS = ["*", "<", ">", "..."];
+
+const withoutAnchor = (checked: string): string => {
+  const index = checked.indexOf("#");
+  return index === -1 ? checked : checked.slice(0, index);
+};
+
 const isSkippable = (checked: string): boolean =>
   checked === "" ||
   checked.startsWith("#") ||
@@ -80,6 +74,12 @@ const isSkippable = (checked: string): boolean =>
   isAbsolute(checked) ||
   !withoutAnchor(checked).endsWith(DOCUMENT_EXTENSION) ||
   PLACEHOLDER_MARKS.some((mark) => checked.includes(mark));
+
+type Reference = {
+  readonly target: string;
+  readonly fromRepositoryRoot: boolean;
+  readonly line: number | null;
+};
 
 const referencesIn = ({
   document,

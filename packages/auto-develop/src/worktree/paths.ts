@@ -2,11 +2,7 @@ import { realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 
-const WORKTREE_ROOT_NAME = "auto-develop-worktree";
-
 export const LAST_USED_MARKER_NAME = ".auto-develop-last-used";
-
-const PR_DIRECTORY_PATTERN = /^pr-([1-9]\d*)$/;
 
 export const resolveRealPath = (candidate: string): string => {
   try {
@@ -17,6 +13,8 @@ export const resolveRealPath = (candidate: string): string => {
   }
 };
 
+const WORKTREE_ROOT_NAME = "auto-develop-worktree";
+
 const worktreeRoot = (): string => join(resolveRealPath(tmpdir()), WORKTREE_ROOT_NAME);
 
 export const worktreePathFor = (prNumber: number): string => {
@@ -25,6 +23,8 @@ export const worktreePathFor = (prNumber: number): string => {
   }
   return join(worktreeRoot(), `pr-${prNumber}`);
 };
+
+const PR_DIRECTORY_PATTERN = /^pr-([1-9]\d*)$/;
 
 const prNumberFromDirectoryName = (directoryName: string): number | null => {
   const matched = PR_DIRECTORY_PATTERN.exec(directoryName);

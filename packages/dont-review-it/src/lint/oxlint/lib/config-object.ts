@@ -1,23 +1,19 @@
 import { isAstFields, NODE_TYPE_FIELD, type AstFields } from "./ast-node.ts";
 
-const OBJECT_EXPRESSION = "ObjectExpression";
-
-const CALL_EXPRESSION = "CallExpression";
-
-export const LITERAL = "Literal";
-
-export const IDENTIFIER = "Identifier";
-
-const EXPORT_DEFAULT = "ExportDefaultDeclaration";
-
 export const fieldsIn = (held: unknown): readonly AstFields[] =>
   Array.isArray(held) ? held.filter(isAstFields) : [];
 
 export const nodeOfType = ({ held, type }: { readonly held: unknown; readonly type: string }) =>
   isAstFields(held) && String(held[NODE_TYPE_FIELD]) === type ? held : null;
 
+const OBJECT_EXPRESSION = "ObjectExpression";
+
 export const propertiesOf = (held: unknown): readonly AstFields[] =>
   fieldsIn(nodeOfType({ held, type: OBJECT_EXPRESSION })?.properties);
+
+export const LITERAL = "Literal";
+
+export const IDENTIFIER = "Identifier";
 
 export const keyNameOf = (property: AstFields): string | null => {
   const named = property.key;
@@ -30,10 +26,14 @@ export const keyNameOf = (property: AstFields): string | null => {
 export const valueAt = ({ held, key }: { readonly held: unknown; readonly key: string }): unknown =>
   propertiesOf(held).findLast((property) => keyNameOf(property) === key)?.value ?? null;
 
+const CALL_EXPRESSION = "CallExpression";
+
 export const unwrappedCall = (held: unknown): unknown => {
   const call = nodeOfType({ held, type: CALL_EXPRESSION });
   return call === null ? held : unwrappedCall(fieldsIn(call.arguments)[0]);
 };
+
+const EXPORT_DEFAULT = "ExportDefaultDeclaration";
 
 export const defaultExportedValue = (program: { readonly body: unknown }): unknown =>
   unwrappedCall(

@@ -34,6 +34,22 @@ const verifyIdToken = async (verification: {
   }
 };
 
+const admittedEmail = (admission: {
+  readonly verified: VerifiedIdToken;
+  readonly allowedEmails: readonly string[];
+}): string => {
+  if (!admission.verified.emailVerified) {
+    throw new UnauthenticatedError("email claim is not verified");
+  }
+  if (admission.verified.email === undefined) {
+    throw new UnauthenticatedError("email claim missing");
+  }
+  if (!admission.allowedEmails.includes(admission.verified.email)) {
+    throw new UnauthenticatedError("service account is not in the allowlist");
+  }
+  return admission.verified.email;
+};
+
 export const authenticateScheduler = async (auth: {
   readonly idToken: string | undefined;
   readonly audience: string | undefined;
@@ -53,20 +69,4 @@ export const authenticateScheduler = async (auth: {
     audience: auth.audience,
   });
   return { email: admittedEmail({ verified, allowedEmails: auth.allowedEmails }) };
-};
-
-const admittedEmail = (admission: {
-  readonly verified: VerifiedIdToken;
-  readonly allowedEmails: readonly string[];
-}): string => {
-  if (!admission.verified.emailVerified) {
-    throw new UnauthenticatedError("email claim is not verified");
-  }
-  if (admission.verified.email === undefined) {
-    throw new UnauthenticatedError("email claim missing");
-  }
-  if (!admission.allowedEmails.includes(admission.verified.email)) {
-    throw new UnauthenticatedError("service account is not in the allowlist");
-  }
-  return admission.verified.email;
 };

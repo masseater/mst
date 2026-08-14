@@ -7,15 +7,6 @@ import { collectWorkspaces, type WorkspaceEntry } from "../scan/workspaces.ts";
 import type { AgenticDocumentsConfig, WorkspaceListConfig } from "../config.ts";
 import type { DocumentProblem } from "../problem.ts";
 
-const missingDocument = (path: string): string =>
-  `ワークスペースの一覧 \`${path}\` が無い。文書を作り、生成の境界を置く。境界の内側は機械が書くので、人は前後の散文だけを書く。`;
-
-const missingRegion = (path: string): string =>
-  `\`${path}\` に生成の境界が無い。開始と終了の記述を置く。境界が無いと、機械がどこへ書けばよいかを決められない。`;
-
-const staleRegion = (path: string): string =>
-  `\`${path}\` の一覧が、ワークスペース定義から生成した内容と一致していない。書き込む様態で走らせて更新する。手で書き換えると次に増えたときに同じことが起きる。`;
-
 const incompleteWorkspace = ({
   directory,
   reason,
@@ -54,6 +45,12 @@ const regionOf = ({
   };
 };
 
+const missingDocument = (path: string): string =>
+  `ワークスペースの一覧 \`${path}\` が無い。文書を作り、生成の境界を置く。境界の内側は機械が書くので、人は前後の散文だけを書く。`;
+
+const missingRegion = (path: string): string =>
+  `\`${path}\` に生成の境界が無い。開始と終了の記述を置く。境界が無いと、機械がどこへ書けばよいかを決められない。`;
+
 const loadRegion = async ({
   repositoryRoot,
   listConfig,
@@ -80,6 +77,9 @@ const loadRegion = async ({
       }
     : { region };
 };
+
+const staleRegion = (path: string): string =>
+  `\`${path}\` の一覧が、ワークスペース定義から生成した内容と一致していない。書き込む様態で走らせて更新する。手で書き換えると次に増えたときに同じことが起きる。`;
 
 const reconcileRegion = async ({
   repositoryRoot,

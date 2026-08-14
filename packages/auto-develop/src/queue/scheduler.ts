@@ -4,8 +4,6 @@ import type { Logger } from "../logging/logger.ts";
 
 const DEFAULT_RESTART_CHECK_INTERVAL_MS = 60_000;
 
-const DEFAULT_CLEANUP_INTERVAL_MS = 30 * 60_000;
-
 type PeriodicCleanup = {
   readonly run: () => Promise<void>;
   readonly intervalMs?: number;
@@ -42,6 +40,8 @@ const nextCleanupRoundReached = (waiting: {
     );
   });
 
+const DEFAULT_CLEANUP_INTERVAL_MS = 30 * 60_000;
+
 const runCleanupRounds = async (rounds: {
   readonly cleanup: PeriodicCleanup;
   readonly log: Logger;
@@ -61,11 +61,11 @@ const runCleanupRounds = async (rounds: {
 };
 
 const startedScheduler = (schedule: PeriodicSchedule): PeriodicScheduler => {
-  const halt = new AbortController();
   const restartCheckTimer = setInterval(() => {
     schedule.checkRestart();
   }, schedule.restartCheckIntervalMs ?? DEFAULT_RESTART_CHECK_INTERVAL_MS);
   const cleanup = schedule.cleanup;
+  const halt = new AbortController();
   const cleanupRounds =
     cleanup === undefined
       ? Promise.resolve()

@@ -24,11 +24,6 @@ import { BatchSpanProcessor, TracerProvider } from "@opentelemetry/sdk-trace";
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import { once } from "es-toolkit";
 
-export type Telemetry = {
-  readonly enabled: boolean;
-  readonly shutdown: () => Promise<void>;
-};
-
 const ENABLE_VARIABLE = "MST_TELEMETRY";
 
 const DISABLE_VARIABLE = "OTEL_SDK_DISABLED";
@@ -110,6 +105,11 @@ const stopAfterEveryOtherExitHandler = (stop: () => Promise<void>): (() => Promi
     });
   });
   return shutdownOnce;
+};
+
+export type Telemetry = {
+  readonly enabled: boolean;
+  readonly shutdown: () => Promise<void>;
 };
 
 const notMeasuring: Telemetry = {

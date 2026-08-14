@@ -4,28 +4,16 @@ import { unwrapSubject } from "../spec-syntax/subject-expressions.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
-export type SpecNameReach = {
-  readonly boundValueOf: (written: ESTree.IdentifierReference) => ESTree.Expression | null;
-  readonly isDeclaredHere: (written: ESTree.IdentifierReference) => boolean;
-};
-
-const COMPOSED_FROM_PARTS: ReadonlySet<string> = new Set([
-  "ArrayExpression",
-  "BinaryExpression",
-  "ConditionalExpression",
-  "LogicalExpression",
-  "MemberExpression",
-  "ObjectExpression",
-  "SequenceExpression",
-  "TemplateLiteral",
-  "UnaryExpression",
-]);
-
 const WRITABLE_ONCE_HELD: ReadonlySet<string> = new Set([
   "ArrayExpression",
   "NewExpression",
   "ObjectExpression",
 ]);
+
+export type SpecNameReach = {
+  readonly boundValueOf: (written: ESTree.IdentifierReference) => ESTree.Expression | null;
+  readonly isDeclaredHere: (written: ESTree.IdentifierReference) => boolean;
+};
 
 const isClosedConstruction = (input: {
   readonly written: ESTree.NewExpression;
@@ -40,6 +28,18 @@ const isClosedConstruction = (input: {
 
 const pickedKeyOf = (written: ESTree.MemberExpression): readonly ESTree.Expression[] =>
   written.computed ? [written.property] : [];
+
+const COMPOSED_FROM_PARTS: ReadonlySet<string> = new Set([
+  "ArrayExpression",
+  "BinaryExpression",
+  "ConditionalExpression",
+  "LogicalExpression",
+  "MemberExpression",
+  "ObjectExpression",
+  "SequenceExpression",
+  "TemplateLiteral",
+  "UnaryExpression",
+]);
 
 const composedPartsOf = (written: ESTree.Expression): readonly ESTree.Expression[] | null => {
   if (!COMPOSED_FROM_PARTS.has(written.type)) return null;

@@ -148,6 +148,13 @@ export const FORBIDDEN_AMBIGUOUS_NAMES: readonly ForbiddenNamePattern[] = [
   { pattern: "^created$" },
 ];
 
+const isDigitsOnly = (word: string): boolean => /^\d+$/u.test(word);
+
+const withoutTrailingDigits = (parts: readonly string[]): readonly string[] =>
+  parts.length > 1 && isDigitsOnly(String(parts.at(-1)))
+    ? withoutTrailingDigits(parts.slice(0, -1))
+    : parts;
+
 const MEANINGLESS_QUALIFIERS: ReadonlySet<string> = new Set([
   "the",
   "a",
@@ -181,13 +188,6 @@ const MEANINGLESS_QUALIFIERS: ReadonlySet<string> = new Set([
   "previous",
   "next",
 ]);
-
-const isDigitsOnly = (word: string): boolean => /^\d+$/u.test(word);
-
-const withoutTrailingDigits = (parts: readonly string[]): readonly string[] =>
-  parts.length > 1 && isDigitsOnly(String(parts.at(-1)))
-    ? withoutTrailingDigits(parts.slice(0, -1))
-    : parts;
 
 const withoutLeadingQualifiers = (parts: readonly string[]): readonly string[] =>
   parts.length > 1 && MEANINGLESS_QUALIFIERS.has(String(parts.at(0)).toLowerCase())

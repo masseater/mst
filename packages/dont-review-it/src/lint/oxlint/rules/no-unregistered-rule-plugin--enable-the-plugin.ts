@@ -11,8 +11,6 @@ import { severityLevelOf, SILENT_LEVEL } from "../lib/rule-sets/severity-levels.
 
 import type { ESTree } from "@oxlint/plugins";
 
-const PLUGIN_SEPARATOR = "/";
-
 const listedPluginsOf = (ruleOptions: readonly unknown[]): readonly string[] => {
   const [held] = ruleOptions;
   if (held === null || typeof held !== "object") return [];
@@ -27,6 +25,8 @@ type NamedRule = {
   readonly plugin: string;
   readonly ruleName: string;
 };
+
+const PLUGIN_SEPARATOR = "/";
 
 const namedRulesIn = (rules: ESTree.ObjectExpression): readonly NamedRule[] =>
   rules.properties.flatMap<NamedRule>((property) => {

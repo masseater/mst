@@ -32,67 +32,6 @@ export type LocalFiniteValueBindings = {
   readonly objects: ReadonlyMap<string, ObjectBinding>;
 };
 
-type PositionInput = {
-  readonly bindings: LocalFiniteValueBindings;
-  readonly catalog: CanonicalValuesCatalog;
-  readonly scopeAt: ScopeLookup;
-};
-
-export type LocalFiniteValuePosition =
-  | {
-      readonly kind: "values";
-      readonly node: ESTree.Node;
-      readonly values: readonly CanonicalValue[];
-    }
-  | {
-      readonly importedName: string;
-      readonly kind: "import";
-      readonly name: string;
-      readonly node: ESTree.Node;
-      readonly specifier: string;
-    }
-  | { readonly kind: "unknown-owner-name"; readonly name: string; readonly node: ESTree.Node };
-
-const bindingAt = <Binding extends { readonly definition: ESTree.Node }>(input: {
-  readonly bindings: ReadonlyMap<string, Binding>;
-  readonly identifier: ESTree.IdentifierReference;
-  readonly position: PositionInput;
-}): Binding | null => {
-  const candidate = input.bindings.get(input.identifier.name);
-  if (candidate === undefined) return null;
-  const resolved = resolveBinding(input.position.scopeAt(input.identifier), input.identifier.name);
-  return resolved?.defs.length === 1 && resolved.defs[0]?.node === candidate.definition
-    ? candidate
-    : null;
-};
-
-const catalogOwnsImport = (catalog: CanonicalValuesCatalog, imported: ImportedBinding): boolean =>
-  catalog.entries.some(
-    (declaration) =>
-      declaration.binding === imported.importedName ||
-      declaration.importRoutes.some((route) => route.exportName === imported.importedName),
-  );
-
-const unknownOwnerPosition = (
-  input: PositionInput,
-  identifier: ESTree.IdentifierReference,
-): Extract<LocalFiniteValuePosition, { readonly kind: "unknown-owner-name" }> | null => {
-  const shadowedImport = input.bindings.imports.get(identifier.name);
-  return input.catalog.entries.some(
-    (declaration) =>
-      declaration.binding === identifier.name ||
-      declaration.importRoutes.some((route) => route.exportName === identifier.name),
-  ) ||
-    (shadowedImport !== undefined && catalogOwnsImport(input.catalog, shadowedImport))
-    ? { kind: "unknown-owner-name", name: identifier.name, node: identifier }
-    : null;
-};
-
-const importName = (specifier: ESTree.ImportSpecifier): string => {
-  const imported = specifier.imported;
-  return imported.type === "Identifier" ? imported.name : imported.value;
-};
-
 const staticBindingEntries = (
   statement: ESTree.Program["body"][number],
 ): readonly (
@@ -138,6 +77,11 @@ const staticBindingEntries = (
   );
 };
 
+const importName = (specifier: ESTree.ImportSpecifier): string => {
+  const imported = specifier.imported;
+  return imported.type === "Identifier" ? imported.name : imported.value;
+};
+
 const importBindingEntries = (
   statement: ESTree.Program["body"][number],
 ): readonly (readonly [string, ImportedBinding])[] => {
@@ -171,12 +115,20 @@ export const localFiniteValueBindings = (program: ESTree.Program): LocalFiniteVa
   };
 };
 
-export const firstFiniteValueArgument = (
-  node: ESTree.CallExpression | ESTree.NewExpression,
-): ESTree.Expression | null => {
-  const [argument] = node.arguments;
-  return argument === undefined || argument.type === "SpreadElement" ? null : argument;
-};
+export type LocalFiniteValuePosition =
+  | {
+      readonly kind: "values";
+      readonly node: ESTree.Node;
+      readonly values: readonly CanonicalValue[];
+    }
+  | {
+      readonly importedName: string;
+      readonly kind: "import";
+      readonly name: string;
+      readonly node: ESTree.Node;
+      readonly specifier: string;
+    }
+  | { readonly kind: "unknown-owner-name"; readonly name: string; readonly node: ESTree.Node };
 
 const arrayPosition = (
   arrayExpression: ESTree.ArrayExpression,
@@ -185,6 +137,63 @@ const arrayPosition = (
   return canonicalItems === null
     ? null
     : { kind: "values", node: arrayExpression, values: canonicalItems };
+};
+
+type PositionInput = {
+  readonly bindings: LocalFiniteValueBindings;
+  readonly catalog: CanonicalValuesCatalog;
+  readonly scopeAt: ScopeLookup;
+};
+
+const catalogOwnsImport = (catalog: CanonicalValuesCatalog, imported: ImportedBinding): boolean =>
+  catalog.entries.some(
+    (declaration) =>
+      declaration.binding === imported.importedName ||
+      declaration.importRoutes.some((route) => route.exportName === imported.importedName),
+  );
+
+const unknownOwnerPosition = (
+  input: PositionInput,
+  identifier: ESTree.IdentifierReference,
+): Extract<LocalFiniteValuePosition, { readonly kind: "unknown-owner-name" }> | null => {
+  const shadowedImport = input.bindings.imports.get(identifier.name);
+  return input.catalog.entries.some(
+    (declaration) =>
+      declaration.binding === identifier.name ||
+      declaration.importRoutes.some((route) => route.exportName === identifier.name),
+  ) ||
+    (shadowedImport !== undefined && catalogOwnsImport(input.catalog, shadowedImport))
+    ? { kind: "unknown-owner-name", name: identifier.name, node: identifier }
+    : null;
+};
+
+const bindingAt = <Binding extends { readonly definition: ESTree.Node }>(input: {
+  readonly bindings: ReadonlyMap<string, Binding>;
+  readonly identifier: ESTree.IdentifierReference;
+  readonly position: PositionInput;
+}): Binding | null => {
+  const candidate = input.bindings.get(input.identifier.name);
+  if (candidate === undefined) return null;
+  const resolved = resolveBinding(input.position.scopeAt(input.identifier), input.identifier.name);
+  return resolved?.defs.length === 1 && resolved.defs[0]?.node === candidate.definition
+    ? candidate
+    : null;
+};
+
+const localFiniteImportPosition = (
+  input: PositionInput,
+  identifier: ESTree.IdentifierReference,
+): Extract<LocalFiniteValuePosition, { readonly kind: "import" }> | null => {
+  const imported = bindingAt({ bindings: input.bindings.imports, identifier, position: input });
+  return imported === null
+    ? null
+    : {
+        importedName: imported.importedName,
+        kind: "import",
+        name: identifier.name,
+        node: identifier,
+        specifier: imported.specifier,
+      };
 };
 
 export const localFiniteIdentifierPosition = (
@@ -235,6 +244,13 @@ const identifierObjectKeysPosition = (
     : { kind: "values", node: candidate.call, values: canonicalItems };
 };
 
+export const firstFiniteValueArgument = (
+  node: ESTree.CallExpression | ESTree.NewExpression,
+): ESTree.Expression | null => {
+  const [argument] = node.arguments;
+  return argument === undefined || argument.type === "SpreadElement" ? null : argument;
+};
+
 const objectKeysSource = (call: ESTree.CallExpression): ESTree.Expression | null => {
   if (calleeMemberName(call.callee) !== "keys") return null;
   const callee = unwrapExpression(call.callee) as ESTree.MemberExpression;
@@ -264,20 +280,4 @@ export const localFiniteSchemaPosition = (
   return expression.type === "CallExpression"
     ? objectKeysPosition(input, expression)
     : localFiniteValuePosition(input, expression);
-};
-
-const localFiniteImportPosition = (
-  input: PositionInput,
-  identifier: ESTree.IdentifierReference,
-): Extract<LocalFiniteValuePosition, { readonly kind: "import" }> | null => {
-  const imported = bindingAt({ bindings: input.bindings.imports, identifier, position: input });
-  return imported === null
-    ? null
-    : {
-        importedName: imported.importedName,
-        kind: "import",
-        name: identifier.name,
-        node: identifier,
-        specifier: imported.specifier,
-      };
 };

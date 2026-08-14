@@ -12,12 +12,12 @@ export type CellClassIndex = {
 
 export type CellClassIndexLoader = (options: { readonly repositoryRoot: string }) => CellClassIndex;
 
+export const EMPTY_CELL_CLASS_INDEX: CellClassIndex = { findingsByPath: new Map() };
+
 export type ScannedSource = {
   readonly relativePath: string;
   readonly facts: SourceFacts;
 };
-
-export const EMPTY_CELL_CLASS_INDEX: CellClassIndex = { findingsByPath: new Map() };
 
 const namesConstructedElsewhere = (sources: readonly ScannedSource[]): ReadonlySet<string> =>
   new Set(

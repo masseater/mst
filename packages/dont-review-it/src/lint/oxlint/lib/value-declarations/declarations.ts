@@ -4,42 +4,6 @@ import { isAstFields, NODE_TYPE_FIELD, type AstFields } from "../ast-node.ts";
 import { importRoutesIn, type ImportRoutes } from "./import-routes.ts";
 import { normalizedBodyOf } from "./normalized-body.ts";
 
-export type ValueDeclaration = {
-  readonly name: string;
-  readonly line: number;
-  readonly exported: boolean;
-  readonly fingerprint: string;
-};
-
-type Reading = {
-  readonly source: string;
-  readonly routes: ImportRoutes;
-  readonly exportedNodes: ReadonlySet<AstFields>;
-};
-
-const BODY_BY_KIND: Readonly<Record<string, (node: AstFields) => unknown>> = {
-  ClassDeclaration: (node) => ({
-    body: node.body,
-    decorators: node.decorators,
-    implements: node.implements,
-    superClass: node.superClass,
-    superTypeArguments: node.superTypeArguments,
-    typeParameters: node.typeParameters,
-  }),
-  FunctionDeclaration: (node) => ({
-    async: node.async,
-    body: node.body,
-    generator: node.generator,
-    params: node.params,
-    returnType: node.returnType,
-    typeParameters: node.typeParameters,
-  }),
-  VariableDeclarator: (node) => ({
-    annotation: (node.id as AstFields).typeAnnotation,
-    init: node.init,
-  }),
-};
-
 const declaredNameOf = (node: AstFields): string | null => {
   const named = node.id;
   if (!isAstFields(named) || named[NODE_TYPE_FIELD] !== "Identifier") return null;
@@ -78,6 +42,42 @@ const exportedNodesIn = (statements: readonly AstFields[]): ReadonlySet<AstField
       });
     }),
   );
+};
+
+export type ValueDeclaration = {
+  readonly name: string;
+  readonly line: number;
+  readonly exported: boolean;
+  readonly fingerprint: string;
+};
+
+type Reading = {
+  readonly source: string;
+  readonly routes: ImportRoutes;
+  readonly exportedNodes: ReadonlySet<AstFields>;
+};
+
+const BODY_BY_KIND: Readonly<Record<string, (node: AstFields) => unknown>> = {
+  ClassDeclaration: (node) => ({
+    body: node.body,
+    decorators: node.decorators,
+    implements: node.implements,
+    superClass: node.superClass,
+    superTypeArguments: node.superTypeArguments,
+    typeParameters: node.typeParameters,
+  }),
+  FunctionDeclaration: (node) => ({
+    async: node.async,
+    body: node.body,
+    generator: node.generator,
+    params: node.params,
+    returnType: node.returnType,
+    typeParameters: node.typeParameters,
+  }),
+  VariableDeclarator: (node) => ({
+    annotation: (node.id as AstFields).typeAnnotation,
+    init: node.init,
+  }),
 };
 
 const valueDeclarationAt = (node: AstFields, reading: Reading): ValueDeclaration | null => {

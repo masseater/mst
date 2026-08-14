@@ -52,7 +52,6 @@ export const createJobQueue = (config: JobQueueConfig): JobQueue => {
   if (!Number.isInteger(config.concurrency) || config.concurrency < 1) {
     throw new Error("concurrency must be a positive integer");
   }
-  const log = config.log ?? silentLogger;
   const heldState: QueueSharedState = {
     ledger: createJobLedger(),
     flags: new Map([["halted", false]]),
@@ -61,6 +60,7 @@ export const createJobQueue = (config: JobQueueConfig): JobQueue => {
     handlerTable: new Map(Object.entries(config.handlers ?? {})),
     onHaltCell: new Map([["cb", config.onHalt]]),
   };
+  const log = config.log ?? silentLogger;
   const snapshotWriter = createSnapshotWriter({
     snapshotPath: resolveSnapshotPath({
       explicitPath: config.snapshotPath,

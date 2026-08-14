@@ -5,8 +5,6 @@ import { range } from "es-toolkit";
 
 import { segmentsOf } from "./path-segments.ts";
 
-const ANCHORED_PATTERN_PREFIXES = ["/", "./", "../"];
-
 const matchesSegments = (
   pathSegments: readonly string[],
   patternSegments: readonly string[],
@@ -36,6 +34,8 @@ export const matchesAnchoredGlobPath = ({
     segmentsOf({ path: relativePath, separator: "/" }),
     segmentsOf({ path: pattern, separator: "/" }),
   );
+
+const ANCHORED_PATTERN_PREFIXES = ["/", "./", "../"];
 
 export const matchesGlobPath = ({
   pathSegments,

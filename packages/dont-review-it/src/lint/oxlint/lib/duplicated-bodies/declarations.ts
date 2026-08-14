@@ -4,19 +4,17 @@ import { NODE_TYPE_FIELD } from "../ast-node.ts";
 
 import type { UnknownFields } from "@mst/lint-rule-authoring";
 
-export type BodyDeclaration = {
-  readonly name: string;
-  readonly line: number;
-  readonly structure: string;
-  readonly nodeCount: number;
-};
-
 export const DEFAULT_SOURCE_NAME = "source.tsx";
 
-const POSITION_FIELDS: ReadonlySet<string> = new Set(["start", "end", "range", "loc"]);
+const startOf = (statement: UnknownFields): number => Number(statement.start);
 
 const isNode = (syntaxField: unknown): syntaxField is UnknownFields =>
   syntaxField !== null && typeof syntaxField === "object" && !Array.isArray(syntaxField);
+
+const bindingsOf = (statement: UnknownFields): readonly UnknownFields[] =>
+  (statement.declarations as readonly unknown[]).filter(isNode);
+
+const POSITION_FIELDS: ReadonlySet<string> = new Set(["start", "end", "range", "loc"]);
 
 const namedFieldsOf = (node: UnknownFields): readonly (readonly [string, unknown])[] =>
   Object.entries(node).filter(
@@ -49,6 +47,13 @@ export const nodeCountOf = (syntaxField: unknown): number => {
   );
 };
 
+export type BodyDeclaration = {
+  readonly name: string;
+  readonly line: number;
+  readonly structure: string;
+  readonly nodeCount: number;
+};
+
 const declarationFrom = ({
   source,
   described,
@@ -62,9 +67,6 @@ const declarationFrom = ({
   nodeCount: nodeCountOf(described.body),
 });
 
-const bindingsOf = (statement: UnknownFields): readonly UnknownFields[] =>
-  (statement.declarations as readonly unknown[]).filter(isNode);
-
 const namedBindingIn = (binding: UnknownFields): string | null => {
   const bindingIdentifier = binding.id as UnknownFields;
   return bindingIdentifier[NODE_TYPE_FIELD] === "Identifier"
@@ -76,6 +78,25 @@ const bindingBodyOf = (binding: UnknownFields): unknown => ({
   typeAnnotation: (binding.id as UnknownFields).typeAnnotation,
   init: binding.init,
 });
+
+const bindingDeclarationsIn = (
+  source: string,
+  statement: UnknownFields,
+): readonly BodyDeclaration[] =>
+  bindingsOf(statement).flatMap((binding) => {
+    const declarationName = namedBindingIn(binding);
+    if (declarationName === null) return [];
+    return [
+      declarationFrom({
+        source,
+        described: {
+          name: declarationName,
+          start: startOf(statement),
+          body: bindingBodyOf(binding),
+        },
+      }),
+    ];
+  });
 
 const functionBodyOf = (statement: UnknownFields): unknown => ({
   typeParameters: statement.typeParameters,
@@ -105,27 +126,6 @@ const BODY_BY_STATEMENT_KIND: Readonly<Record<string, (statement: UnknownFields)
 
 const declaredNameOf = (statement: UnknownFields): string =>
   String((statement.id as UnknownFields).name);
-
-const startOf = (statement: UnknownFields): number => Number(statement.start);
-
-const bindingDeclarationsIn = (
-  source: string,
-  statement: UnknownFields,
-): readonly BodyDeclaration[] =>
-  bindingsOf(statement).flatMap((binding) => {
-    const declarationName = namedBindingIn(binding);
-    if (declarationName === null) return [];
-    return [
-      declarationFrom({
-        source,
-        described: {
-          name: declarationName,
-          start: startOf(statement),
-          body: bindingBodyOf(binding),
-        },
-      }),
-    ];
-  });
 
 const namedDeclarationsIn = (
   source: string,
