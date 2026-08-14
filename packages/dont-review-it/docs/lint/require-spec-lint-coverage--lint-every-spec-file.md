@@ -1,10 +1,27 @@
+---
+description: "Require every file declaring a test block to sit inside the reach of the spec discipline bundle, with those rules failing a run and their shared settings handed out from one declaration, so a run that reports nothing stands apart from a bundle that reaches nothing"
+---
+
 # require-spec-lint-coverage--lint-every-spec-file
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-テストの書き方を守る一群のルール（以下この束）が、テストブロックを宣言しているファイルすべてに届いていて、かつ失格の重さで有効になっていることを見る。届いていない側と、届いてはいけない側の両方を見る。報告は 4 種類ある。
+Require every file declaring a test block to sit inside the reach of the spec discipline bundle, with those rules failing a run and their shared settings handed out from one declaration, so a run that reports nothing stands apart from a bundle that reaches nothing
 
-この束に属するのは次のルールである。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`require-spec-lint-coverage--lint-every-spec-file.ts`](../../src/lint/oxlint/rules/require-spec-lint-coverage--lint-every-spec-file.ts)
+
+<!-- END GENERATED rule-header -->
+
+## Violation
+
+Whether the group of rules holding the way tests are written — this bundle, below — reaches every file declaring a test block, and stands there at a severity that fails a run. Both the side it does not reach and the side it must not reach are read. There are four reports.
+
+These are the rules of the bundle.
 
 - `require-test-block-spelling--use-configured-fn`
 - `forbid-it-extend--use-test-extend`
@@ -20,78 +37,133 @@
 - `no-lint-suppression-in-spec--fix-the-violation`
 - `require-spec-lint-coverage--lint-every-spec-file`
 
-### 取りこぼし
+### What is missed
 
-テストブロックを宣言しているのに、spec のファイル名を持たないファイル。`uncoveredSpecFile` で報告する。
+A file declaring a test block while carrying no spec file name. Reported as `uncoveredSpecFile`.
 
-この束のルールは自分でファイル名を見て、`.test.ts` と `.test.tsx` で終わるファイルにだけ働く。名前が合わなければ 1 件も報告しない。テストブロックの宣言は `it` / `test` の綴り、テストランナーから import した束縛（リネーム import を含む）、それらから派生した束縛のいずれかを根に持ち、文字列のタイトルとコールバックを渡している呼び出しを指す。`it.each(...)` のような修飾子を挟んだ形も同じ宣言として読む。
+The rules of this bundle read the file name themselves and work only on files ending in `.test.ts` and `.test.tsx`. Where the name does not match, not one report comes out. A test block declaration is a call handed a string title and a callback, rooted at the spelling `it` or `test`, at a binding imported from the test runner (a renamed import included), or at a binding derived from one of those. A form carrying a modifier such as `it.each(...)` reads as the same declaration.
 
-同じ名前がそのファイル自身の宣言に束縛されている場合は宣言として読まない。`const it = (title: string, run: () => void): void => { run(); };` のように別の意味を持たせたファイルは、テストブロックを宣言していない。
+Where the same name is bound by a declaration in that file itself, it is not read as a declaration. A file giving the name another meaning — `const it = (title: string, run: () => void): void => { run(); };` — declares no test block.
 
-`specs` ディレクトリの下にある `.spec.ts` と `.spec.tsx` は報告しない。仕様担保テストの規律は `@mst/verified-specifications` が配る lint 設定と検査コマンドが持っていて、この束の射程外にあることが正しい状態である。同じ綴りでも `specs` の外にあるファイルは、どちらの束にも届かないので報告する。
+`.spec.ts` and `.spec.tsx` under a `specs` directory are not reported. The discipline of specification-holding tests belongs to the lint configuration and the check command that `@mst/verified-specifications` ships, and being outside this bundle's reach is the correct state for them. A file of the same spelling standing outside `specs` is reported, since it reaches neither bundle.
 
-### 巻き込み
+### What is swept in
 
-spec のファイル名を持つのに、テストランナーの語彙をまったく使わず、`it` / `test` / `expect` を別の意味に束縛しているファイル。`unrelatedFileInScope` で報告する。
+A file carrying a spec file name while using none of the test runner's vocabulary and binding `it` / `test` / `expect` to another meaning. Reported as `unrelatedFileInScope`.
 
-束縛とみなすのは変数宣言・関数宣言・クラス宣言のうち、初期化子が関数・クラス・リテラル・オブジェクト・配列であるもの、あるいは初期化子を持たないものである。メンバのプロパティ位置に同じ名前が現れることは束縛ではない（`RuleTester.it` はこのルールにとって何でもない）。
+Counted as a binding: a variable, function or class declaration whose initialiser is a function, a class, a literal, an object or an array, or which carries no initialiser at all. The same name appearing in a member's property position is no binding (`RuleTester.it` is nothing to this rule).
 
-テストブロックの宣言が 1 つでもある、これらの名前を import している、これらの名前で呼び出していてその名前が別の意味に束縛されていない、のいずれかがあれば報告しない。テストブロックをまだ 1 つも書いていない spec は報告しない。
+Nothing is reported where any of these stands: one test block declaration, an import of these names, or a call on one of these names where that name is bound to no other meaning. A spec where not one test block has been written yet is not reported.
 
-### 無効化
+### Being turned off
 
-lint 設定がこの束のルールを、実行を失格させない重さに置いている状態。設定ファイル（`vite.config.*`）を検査したときに報告する。
+A state where the lint configuration places a rule of this bundle at a severity that does not fail a run. Reported when the configuration file (`vite.config.*`) is checked.
 
-- `disabledBundleRule`: `rules` の直下でこの束のルールが `off` / `warn` / `allow` / 2 未満の数値に置かれている
-- `scopedDisabledBundleRule`: `overrides` の 1 つが `files` で範囲を切った上で同じことをしている。報告にはその範囲を出す
-- `ignoredSpecFile`: `ignorePatterns` の 1 行が、実在する spec ファイルを覆っている。覆われたファイルのパスを出す
+- `disabledBundleRule`: directly under `rules`, a rule of this bundle sits at `off` / `warn` / `allow` / a number below 2
+- `scopedDisabledBundleRule`: one of the `overrides` does the same after cutting a range with `files`. The report carries that range
+- `ignoredSpecFile`: one line of `ignorePatterns` covers a spec file that exists. The covered file's path is carried
 
-`ignorePatterns` の照合は作業ツリーの走査で得たパスに対して行い、`dist` `coverage` `node_modules` `generated` `__snapshots__` と `.d.ts` は最初から候補に入らない。生成物と依存を lint の対象外にすることはこの束の管轄ではない。
+`ignorePatterns` is matched against the paths obtained by walking the working tree, and `dist`, `coverage`, `node_modules`, `generated`, `__snapshots__` and `.d.ts` are not candidates to begin with. Taking build output and dependencies out of the lint's range is not this bundle's business.
 
-### 設定の分岐
+### A setting that split
 
-複数のルールが共有しなければならない設定値が、1 つのルールのオプションに書かれている状態。`settingWrittenPerRule` で報告する。対象の設定名は `specFileSuffixes`・`blockSpelling`・`runnerModules`・`mockNamespace` である。
+A state where a setting value several rules have to share is written in the options of one rule. Reported as `settingWrittenPerRule`. The setting names in range are `specFileSuffixes`, `blockSpelling`, `runnerModules` and `mockNamespace`.
 
-値が一致しているかは見ない。1 箇所に書かれているかだけを見る。
+Whether the values agree is not read. Only whether it is written in one place.
 
-## なぜそれが要るか
+### The invariant
 
-観測される事象は、テストの書き方を守るルールがすべて緑なのに、規律が守られていない spec がリポジトリに増えていくことである。
+What is observed is specs that do not keep the discipline piling up in the repository while every rule holding the way tests are written is green.
 
-1 層目は、これらのルールが対象外のファイルについて例外を投げず、報告 0 件を返すことである。「対象に入っていなかった」と「違反が無かった」は出力の上でまったく同じ形をしていて、両者を区別する情報は出力側に存在しない。lint が緑であることを規律の証拠として使う以上、「届いていない spec が 0 件」を機械が言えなければ、その証拠は成立しない。
+The first layer is that these rules throw no exception about a file outside their range; they return zero reports. "It was not in range" and "there was no violation" have exactly the same shape in the output, and the information telling them apart does not exist on the output side. As long as a green lint is used as evidence of the discipline, that evidence does not stand unless a machine can say "zero specs are unreached".
 
-2 層目は、範囲のずれが正当な操作の副作用として起きることである。新しいディレクトリ、新しいパッケージ、名前を変えたファイル、性能のために足した無視パターン。どれも単体では理由を持つので、操作を止める方向では閉じない。結果としての被覆を検査するしかない。
+The second layer is that the range drifts as a side effect of legitimate operations. A new directory, a new package, a renamed file, an ignore pattern added for speed. Each has a reason on its own, so it does not close by stopping operations. The resulting coverage has to be checked instead.
 
-3 層目は、ずれが逆向きにも壊すことである。テストでないファイルまで対象に入ると、この束は誤った場所で鳴る。誤って鳴るルールは抑制の動機を作り、抑制が始まれば報告そのものの意味が失われる。範囲のずれは両方向とも、報告の信頼性を壊す。
+The third layer is that the drift breaks in the other direction too. Take files that are no tests into range and this bundle fires in the wrong place. A rule firing wrongly creates the motive to suppress, and once suppression starts the reports lose their meaning at all. Drift in either direction breaks the reports' trustworthiness.
 
-設定値の分岐も同じ壊れ方をする。同じ値を 2 箇所に書くと、片方を書き換えた瞬間にもう片方は対象を見失って 0 件を返す。0 件は「違反が無い」と同じ形をしているので、書き換えた本人にも分からない。守っているのは値の一致ではなく、一致が壊れない構造である。
+A split setting value breaks the same way. Write the same value in two places and the moment one is rewritten the other loses sight of its subject and returns zero. Zero has the same shape as "no violation", so not even whoever rewrote it can tell. What is held is not that the values agree but a structure in which the agreement cannot break.
 
-## どう直すか
+### Where the detection does not reach
 
-取りこぼしは、そのファイルを spec の名前に変えるか、テストブロックを spec のファイルへ移す。書こうとしているものが仕様担保テストなら、`specs` ディレクトリの下へ `.spec.ts` として移す。
+- In a configuration where not one rule of this bundle is turned on, this rule does not run either. A rule cannot report that it was not called
+- Reading the configuration sees only what appears in the syntax of the configuration file under check. What lies beyond an `extends`, and the contents of an entry assembled at run time, are not read
+- A form taking `it` / `test` / `expect` out by destructuring is not read as a binding
+- Test block declarations are settled by names and by following bindings. A binding that is the test runner's by type alone is not followed
 
-巻き込みは、その名前を別の語に変えるか、spec でないファイルの名前へ変える。
+### Configuration
 
-無効化は、下げた重さを戻して報告された違反を直す。範囲を切った override なら、その entry を消す。`ignorePatterns` なら、生成物だけを覆う形にパターンを狭める。
+None. Make the exceptions to the range expressible in configuration and those exceptions do the same work as what is missed. The spelling of spec file names, and every other setting value this bundle shares, is held in one place by the implementation.
 
-設定の分岐は、値を 1 箇所に置き、読むルール全部がそこから受け取る形にする。この束の既定値はルールの実装が持っているので、既定のまま使うのが最短の直し方である。
+## Fix
 
-自動修正は持たせない。ファイル名をどう変えるか、共有の値をどこに置くかは構成に属する判断で、機械が一意に決められない。
+For what is missed, rename that file to a spec name, or move the test block into a spec file. Where what is being written is a specification-holding test, move it under a `specs` directory as a `.spec.ts`.
 
-## 禁じる回避策
+For what is swept in, change the name to another word, or change the file's name to one that is no spec.
 
-- 報告されたファイルを個別に対象から外して 0 件に戻す。取りこぼしを固定するだけで、この不変条件が守ろうとしたものは何も戻らない
-- この束のルールを spec に対して `off` にしてから「違反が無い」と報告する。無効化の検出がその形をそのまま落とす
-- 共有すべき値を 2 箇所に書いたまま「今は一致しているから問題ない」と主張する
-- 抑制ディレクティブで黙らせる
+For being turned off, put the lowered severity back and fix the reported violations. For an override that cut a range, delete that entry. For `ignorePatterns`, narrow the pattern so it covers build output alone.
 
-## 検出が届かない範囲
+For a split setting, place the value in one place and have every rule that reads it receive it from there. This bundle's defaults are held by the rule implementations, so using them as they come is the shortest repair.
 
-- この束が 1 つも有効になっていない構成では、このルール自身も走らない。ルールは自分が呼ばれていないことを報告できない
-- 設定の読み取りは、検査している設定ファイルの構文に現れるものだけを見る。`extends` の先や、実行時に組み立てられる entry の中身は見ない
-- 分割代入で `it` / `test` / `expect` を取り出した形は束縛として読まない
-- テストブロックの宣言は名前と束縛の追跡で決める。型だけがテストランナーのものである束縛は追跡に入らない
+There is no automatic fix. How to rename a file and where to place a shared value are judgments belonging to the configuration, and a machine cannot settle them uniquely.
 
-## オプション
+<!-- BEGIN GENERATED examples -->
 
-持たない。範囲の例外を設定で表現できるようにすると、その例外が取りこぼしと同じ働きをする。spec のファイル名の綴りも、この束が共有する他の設定値も、実装が 1 箇所で持つ。
+Code this rule rejects.
+
+```ts
+// a source file that declares a test block sits outside the reach of this bundle
+// in packages/cart/src/basket.ts
+it("counts the basket", () => { expect(1).toBe(1); });
+```
+
+```ts
+// a bundle rule taken down to a level that passes a run is reported
+// in vite.config.ts
+export default { lint: { rules: { "dont-review-it/require-test-block-spelling--use-configured-fn": "off" } } };
+```
+
+Code this rule accepts.
+
+```ts
+// a spec file that declares a test block sits inside the reach of this bundle
+// in packages/cart/src/basket.test.ts
+it("counts the basket", () => { expect(1).toBe(1); });
+```
+
+```ts
+// a bundle rule held at the level that fails a run passes
+// in vite.config.ts
+export default { lint: { rules: { "dont-review-it/require-test-block-spelling--use-configured-fn": "error" } } };
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Taking the reported files out of range one by one to get back to zero. That only fixes what is missed in place, and nothing this invariant was holding comes back
+- Setting this bundle's rules to `off` for specs and then reporting "no violations". The detection of being turned off drops that shape as it is
+- Leaving a value that has to be shared written in two places and claiming "they agree at the moment, so there is no problem"
+- Silencing it with a suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `uncoveredSpecFile` | A file that declares a test block must not carry a name outside the spec file names this bundle reads. This declaration is rooted at \`{{blockName}}\`, and this file name ends with none of {{specSuffixes}}. Rename this file to end with one of them, or move the declaration into a file that already does. A green run of the other rules of this bundle stands for nothing while a file holding test blocks stays out of their reach. |
+| `unrelatedFileInScope` | A file that binds \`{{boundName}}\` to a value outside the test runner API must not carry a spec file name. Rename \`{{boundName}}\` to a word outside the test vocabulary, or rename this file to end with none of {{specSuffixes}}. |
+| `disabledBundleRule` | A lint configuration must not hold \`{{ruleName}}\`, a rule of the spec discipline bundle, at \`{{severity}}\`. Set that entry to \`error\` and rewrite the code the rule reports. A green run of this bundle stands for nothing while one of its rules stays quiet. |
+| `scopedDisabledBundleRule` | An override must not take \`{{ruleName}}\` down to \`{{severity}}\` over {{scope}}. Delete that entry and rewrite the code the rule reports over those paths. A green run of this bundle stands for nothing while its rules stay quiet over part of the tree. |
+| `ignoredSpecFile` | An ignore entry must not cover a file this bundle reads. \`{{pattern}}\` covers \`{{matchedPath}}\`, an authored spec file. Narrow that pattern to the generated paths it stands for, or delete it and rewrite the code the bundle reports. A green run of this bundle stands for nothing while a spec file sits under an ignore entry. |
+| `settingWrittenPerRule` | A setting that more than one rule reads must not sit in the options of a single rule entry. \`{{settingKey}}\` sits in the options of \`{{ruleName}}\`, and every other reader of that setting keeps its own default. Delete that entry and hand the value to every reader from one declaration. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->
