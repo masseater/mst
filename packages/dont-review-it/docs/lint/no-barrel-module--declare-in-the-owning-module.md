@@ -95,25 +95,25 @@ Code this rule rejects.
 
 ```ts
 // a file holding one named re-export and nothing else is reported
-export { total } from "./total.ts";
+export { total } from './total.ts';
 ```
 
 ```ts
 // one value among forwarded types is enough to carry values
-export { total, type Total } from "./total.ts";
+export { total, type Total } from './total.ts';
 ```
 
 Code this rule accepts.
 
 ```ts
 // a re-export beside a declaration leaves the file with something of its own
-export { sum } from "./sum.ts";
+export { sum } from './sum.ts';
 export const total = 1;
 ```
 
 ```ts
 // forwarding types alone leaves nothing behind once the build is done
-export type { Total } from "./total.ts";
+export type { Total } from './total.ts';
 ```
 
 <!-- END GENERATED examples -->

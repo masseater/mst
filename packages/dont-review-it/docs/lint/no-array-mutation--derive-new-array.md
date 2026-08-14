@@ -126,7 +126,7 @@ Code this rule rejects.
 ```ts
 // pushing onto an annotated array is an in-place change
 const items: string[] = [];
-items.push("a");
+items.push('a');
 ```
 
 ```ts

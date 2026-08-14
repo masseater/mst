@@ -109,7 +109,7 @@ export const total = 1 + 2;
 
 ```ts
 // giving an outward name to another module's default is the way across the boundary
-export { default as total } from "external-package";
+export { default as total } from 'external-package';
 ```
 
 <!-- END GENERATED examples -->

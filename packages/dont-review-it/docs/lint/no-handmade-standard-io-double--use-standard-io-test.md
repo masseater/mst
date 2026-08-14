@@ -65,11 +65,7 @@ Code this rule rejects.
 ```ts
 // an extend fixture named stdout is a handmade double
 // in /repo/src/cli.test.ts
-const ioTest = test.extend({
-  stdout: async ({}, use) => {
-    await use([]);
-  },
-});
+const ioTest = test.extend({ stdout: async ({}, use) => { await use([]); } });
 ```
 
 ```ts

@@ -83,22 +83,16 @@ Code this rule rejects.
 // a full threshold checked against the package total is reported
 // in vite.config.ts
 import { defineConfig } from "vite-plus";
-export default defineConfig({
-  test: {
-    coverage: { thresholds: { branches: 100, functions: 100, lines: 100, statements: 100 } },
-  },
-});
+export default defineConfig({ test: { coverage: { thresholds: { branches: 100, functions: 100, lines: 100, statements: 100 } } } });
+
 ```
 
 ```ts
 // a metric left out is reported on its own
 // in vite.config.ts
 import { defineConfig } from "vite-plus";
-export default defineConfig({
-  test: {
-    coverage: { thresholds: { functions: 100, lines: 100, statements: 100, perFile: true } },
-  },
-});
+export default defineConfig({ test: { coverage: { thresholds: { functions: 100, lines: 100, statements: 100, perFile: true } } } });
+
 ```
 
 Code this rule accepts.
@@ -107,13 +101,8 @@ Code this rule accepts.
 // every metric spelled out at full coverage, checked file by file, passes
 // in vite.config.ts
 import { defineConfig } from "vite-plus";
-export default defineConfig({
-  test: {
-    coverage: {
-      thresholds: { branches: 100, functions: 100, lines: 100, statements: 100, perFile: true },
-    },
-  },
-});
+export default defineConfig({ test: { coverage: { thresholds: { branches: 100, functions: 100, lines: 100, statements: 100, perFile: true } } } });
+
 ```
 
 ```ts
@@ -121,6 +110,7 @@ export default defineConfig({
 // in vite.config.ts
 import { defineConfig } from "vite-plus";
 export default defineConfig({ test: { coverage: { thresholds: { 100: true, perFile: true } } } });
+
 ```
 
 <!-- END GENERATED examples -->

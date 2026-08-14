@@ -99,16 +99,7 @@ Code this rule accepts.
 ```ts
 // this package's own rules carry their bans in their own options
 // in vite.config.ts
-export default {
-  lint: {
-    rules: {
-      "dont-review-it/forbid-declared-module-import--use-declared-replacement": [
-        "error",
-        { restricted: [{ module: "lodash" }] },
-      ],
-    },
-  },
-};
+export default { lint: { rules: { "dont-review-it/forbid-declared-module-import--use-declared-replacement": ["error", { restricted: [{ module: "lodash" }] }] } } };
 ```
 
 ```ts

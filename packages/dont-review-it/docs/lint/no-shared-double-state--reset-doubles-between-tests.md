@@ -88,6 +88,7 @@ Code this rule rejects.
 // in vite.config.ts
 import { defineConfig } from "vite-plus";
 export default defineConfig({ lint: {} });
+
 ```
 
 ```ts
@@ -95,6 +96,7 @@ export default defineConfig({ lint: {} });
 // in vite.config.ts
 import { defineConfig } from "vite-plus";
 export default defineConfig({ test: { mockReset: false, restoreMocks: true } });
+
 ```
 
 Code this rule accepts.
@@ -103,13 +105,8 @@ Code this rule accepts.
 // the settings declared beside the rest of the test options pass
 // in vite.config.ts
 import { defineConfig } from "vite-plus";
-export default defineConfig({
-  test: {
-    mockReset: true,
-    restoreMocks: true,
-    coverage: { thresholds: { 100: true, perFile: true } },
-  },
-});
+export default defineConfig({ test: { mockReset: true, restoreMocks: true, coverage: { thresholds: { 100: true, perFile: true } } } });
+
 ```
 
 ```ts
@@ -117,6 +114,7 @@ export default defineConfig({
 // in vitest.config.ts
 import { defineConfig } from "vitest/config";
 export default defineConfig({ test: { mockReset: true, restoreMocks: true } });
+
 ```
 
 <!-- END GENERATED examples -->

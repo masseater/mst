@@ -110,7 +110,8 @@ Code this rule rejects.
 // a catch clause with an empty body is reported
 try {
   run();
-} catch (failure) {}
+} catch (failure) {
+}
 ```
 
 ```ts

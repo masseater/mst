@@ -70,24 +70,24 @@ Code this rule rejects.
 
 ```ts
 // naming a re-export module by its file is reported
-import { total } from "./totals/index.ts";
+import { total } from './totals/index.ts';
 ```
 
 ```ts
 // importing for the side effect alone still runs the whole re-export module
-import "./totals/index.ts";
+import './totals/index.ts';
 ```
 
 Code this rule accepts.
 
 ```ts
 // naming the module that declares the binding is the shape this rule asks for
-import { total } from "./total.ts";
+import { total } from './total.ts';
 ```
 
 ```ts
 // taking types alone leaves nothing behind once the build is done
-import type { Total } from "./totals/index.ts";
+import type { Total } from './totals/index.ts';
 ```
 
 <!-- END GENERATED examples -->

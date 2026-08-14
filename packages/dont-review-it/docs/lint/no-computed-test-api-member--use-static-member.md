@@ -86,7 +86,7 @@ Code this rule rejects.
 
 ```ts
 // a modifier written out as a subscript is reported and rewritten as a static member
-it["skip"]("adds", () => {});
+it['skip']('adds', () => {});
 ```
 
 ```ts
@@ -98,12 +98,12 @@ Code this rule accepts.
 
 ```ts
 // a modifier written as a static member is the shape this rule asks for
-it.skip("adds", () => {});
+it.skip('adds', () => {});
 ```
 
 ```ts
 // a subscript on a value the suite owns is outside this rule
-it("adds", () => {
+it('adds', () => {
   expect(runSut()[key]).toBe(1);
 });
 ```

@@ -100,10 +100,7 @@ Code this rule accepts.
 // both blocks call the preset function that matches them
 import { dontReviewItPreset } from "@mst/dont-review-it";
 import { defineConfig } from "vite-plus";
-export default defineConfig({
-  fmt: dontReviewItPreset.fmt(),
-  lint: dontReviewItPreset.lint({ rules: {} }),
-});
+export default defineConfig({ fmt: dontReviewItPreset.fmt(), lint: dontReviewItPreset.lint({ rules: {} }) });
 ```
 
 ```ts

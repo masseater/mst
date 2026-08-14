@@ -74,15 +74,13 @@ Code this rule rejects.
 
 ```ts
 // two bindings in one const statement are reported
-const parsedCount = 1,
-  renderedLabel = "a";
+const parsedCount = 1, renderedLabel = 'a';
 ```
 
 ```ts
 // a for statement body is not the header, so the exemption does not reach it
 for (const entry of entries) {
-  const parsedCount = 1,
-    renderedLabel = "a";
+  const parsedCount = 1, renderedLabel = 'a';
 }
 ```
 
@@ -91,7 +89,7 @@ Code this rule accepts.
 ```ts
 // one binding per statement is the shape the rule asks for
 const parsedCount = 1;
-const renderedLabel = "a";
+const renderedLabel = 'a';
 ```
 
 ```ts
