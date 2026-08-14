@@ -48,6 +48,7 @@ describe("dont-review-it/no-vacuous-host-object-equality--assert-parsed-value", 
     valid: [
       {
         name: "reading the observable surface through the dedicated matcher is the shape this rule keeps",
+        documented: true,
         code: "expect(response).toHaveParsedFields({ status: 200, headers: {}, body: { id: 1 } });\nexpect(order).toStrictEqual({ id: 1, lines: [] });",
         filename: SPEC_FILENAME,
       },
@@ -73,6 +74,7 @@ describe("dont-review-it/no-vacuous-host-object-equality--assert-parsed-value", 
       },
       {
         name: "matchers that can still fall belong to whoever owns their family",
+        documented: true,
         code: "expect(responses).toContain(new Response('a'));\nexpect(responses).toContainEqual(new Response('a'));\nexpect(responses).toStrictEqual(expect.arrayContaining([new Response('a')]));\nexpect(subject).toBe(new Response('a'));",
         filename: SPEC_FILENAME,
       },
@@ -145,6 +147,7 @@ describe("dont-review-it/no-vacuous-host-object-equality--assert-parsed-value", 
     invalid: [
       {
         name: "a construction on either side is compared against whatever the other side holds",
+        documented: true,
         code: "expect(subject).toStrictEqual(new Response('a'));\nexpect(subject).toEqual(new Response('a'));\nexpect(new Response('a')).toStrictEqual(subject);\nexpect(new Response('a')).toStrictEqual();\nexpect().toStrictEqual(new Response('a'));\nexpect(read()).toStrictEqual(new Response('a'));\nexpect(order.body).toStrictEqual(new Response('a'));\nexpect(subject).toStrictEqual(new Request('https://example.test/'));",
         filename: SPEC_FILENAME,
         errors: [EQUALITY, EQUALITY, EQUALITY, EQUALITY, EQUALITY, EQUALITY, EQUALITY, EQUALITY],
@@ -181,6 +184,7 @@ describe("dont-review-it/no-vacuous-host-object-equality--assert-parsed-value", 
       },
       {
         name: "a record holding a constructor name and an empty body pins nothing",
+        documented: true,
         code: "expect(subject).toMatchInlineSnapshot(`Response {}`);\nexpect(subject).toMatchInlineSnapshot(`Request {}`);\nexpect(subject).toMatchInlineSnapshot('Response {}');\nexpect(subject).toMatchInlineSnapshot({ id: expect.any(Number) }, `Response {}`);\nexpect.soft(subject).toMatchInlineSnapshot(`Response {}`);",
         filename: SPEC_FILENAME,
         errors: [
