@@ -17,8 +17,7 @@
   },
   "files": [
     "dist",
-    "skills",
-    "src"
+    "skills"
   ],
   "type": "module",
   "sideEffects": false,
@@ -28,6 +27,20 @@
     "./package.json": "./package.json"
   },
   "publishConfig": {
+    "bin": {
+      "lint-rule-authoring": "./dist/cli.mjs"
+    },
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "./plugin": {
+        "types": "./dist/plugin.d.mts",
+        "default": "./dist/plugin.mjs"
+      },
+      "./package.json": "./package.json"
+    },
     "access": "public"
   },
   "scripts": {
@@ -40,7 +53,6 @@
   },
   "dependencies": {
     "@mst/ai-native": "workspace:*",
-    "@mst/repository-checks": "workspace:*",
     "@opentelemetry/api": "catalog:",
     "@oxlint/plugins": "catalog:",
     "es-toolkit": "catalog:",
@@ -49,6 +61,7 @@
     "yaml": "catalog:"
   },
   "devDependencies": {
+    "@mst/repository-checks": "workspace:*",
     "@opentelemetry/core": "catalog:",
     "@opentelemetry/exporter-metrics-otlp-http": "catalog:",
     "@opentelemetry/sdk-metrics": "catalog:",
@@ -58,6 +71,9 @@
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
+  },
+  "peerDependencies": {
+    "vite-plus": "^0.2.8"
   },
   "lintRules": [
     "src/lint/oxlint/rules"

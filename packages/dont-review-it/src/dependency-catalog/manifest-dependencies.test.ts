@@ -4,7 +4,7 @@ import { defaultDependencyCatalogChecksConfig } from "./config.ts";
 import { dependencyReferencesIn } from "./manifest-dependencies.ts";
 
 describe("dependencyReferencesIn", () => {
-  describe("a manifest declaring a dependency in every dependency field", () => {
+  describe("a manifest declaring a dependency in every field, the peer one included", () => {
     const it = test.extend("references", () =>
       dependencyReferencesIn({
         manifestPath: "packages/left/package.json",
@@ -17,7 +17,7 @@ describe("dependencyReferencesIn", () => {
         config: defaultDependencyCatalogChecksConfig,
       }));
 
-    it("collects the references from every field", ({ references }) => {
+    it("collects every field the catalog governs and leaves the peer one out", ({ references }) => {
       expect(references).toStrictEqual([
         {
           manifestPath: "packages/left/package.json",
@@ -28,11 +28,6 @@ describe("dependencyReferencesIn", () => {
           manifestPath: "packages/left/package.json",
           dependencyName: "typescript",
           specifier: "catalog:",
-        },
-        {
-          manifestPath: "packages/left/package.json",
-          dependencyName: "vite",
-          specifier: "^6.0.0",
         },
         {
           manifestPath: "packages/left/package.json",

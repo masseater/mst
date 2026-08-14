@@ -17,7 +17,6 @@
   "files": [
     "dist",
     "skills",
-    "src",
     "tsconfig"
   ],
   "type": "module",
@@ -30,6 +29,25 @@
     "./package.json": "./package.json"
   },
   "publishConfig": {
+    "bin": {
+      "dont-review-it": "./dist/cli.mjs"
+    },
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "./plugin": {
+        "types": "./dist/plugin.d.mts",
+        "default": "./dist/plugin.mjs"
+      },
+      "./vitest": {
+        "types": "./dist/vitest/standard-io-test.d.mts",
+        "default": "./dist/vitest/standard-io-test.mjs"
+      },
+      "./tsconfig/*": "./tsconfig/*",
+      "./package.json": "./package.json"
+    },
     "access": "public"
   },
   "scripts": {
@@ -41,8 +59,9 @@
     "typecheck": "spool -- tsc -p ."
   },
   "dependencies": {
+    "@mst/ai-native": "workspace:*",
     "@mst/lint-rule-authoring": "workspace:*",
-    "@mst/repository-checks": "workspace:*",
+    "@opentelemetry/api": "catalog:",
     "@oxlint/plugins": "catalog:",
     "citty": "catalog:",
     "es-toolkit": "catalog:",
@@ -56,12 +75,15 @@
     "yaml": "catalog:"
   },
   "devDependencies": {
-    "@mst/ai-native": "workspace:*",
+    "@mst/repository-checks": "workspace:*",
     "@tanstack/intent": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
+  },
+  "peerDependencies": {
+    "vite-plus": "^0.2.8"
   },
   "lintRules": [
     "src/lint/oxlint/rules"

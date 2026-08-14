@@ -16,8 +16,7 @@
   },
   "files": [
     "dist",
-    "skills",
-    "src"
+    "skills"
   ],
   "type": "module",
   "sideEffects": false,
@@ -25,6 +24,9 @@
     "./package.json": "./package.json"
   },
   "publishConfig": {
+    "bin": {
+      "stop-ai-slop": "./dist/cli.mjs"
+    },
     "access": "public"
   },
   "scripts": {
@@ -36,14 +38,15 @@
     "typecheck": "spool -- tsc -p ."
   },
   "dependencies": {
+    "@mst/ai-native": "workspace:*",
     "@mst/lint-rule-authoring": "workspace:*",
-    "@mst/repository-checks": "workspace:*",
+    "@opentelemetry/api": "catalog:",
     "es-toolkit": "catalog:",
     "oxc-parser": "catalog:",
     "parse-git-diff": "0.0.20"
   },
   "devDependencies": {
-    "@mst/ai-native": "workspace:*",
+    "@mst/repository-checks": "workspace:*",
     "@tanstack/intent": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",

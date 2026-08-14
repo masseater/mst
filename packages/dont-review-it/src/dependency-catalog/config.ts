@@ -19,7 +19,7 @@ export const defaultDependencyCatalogChecksConfig: DependencyCatalogChecksConfig
   namedCatalogsKey: "catalogs",
   overridesKey: "overrides",
   rootManifestSettingsKey: "pnpm",
-  dependencyFields: ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"],
+  dependencyFields: ["dependencies", "devDependencies", "optionalDependencies"],
   catalogProtocol: "catalog:",
   uncatalogableProtocols: ["workspace:", "link:", "file:"],
 };

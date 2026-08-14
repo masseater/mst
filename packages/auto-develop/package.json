@@ -16,8 +16,7 @@
   },
   "files": [
     "dist",
-    "skills",
-    "src"
+    "skills"
   ],
   "type": "module",
   "sideEffects": false,
@@ -26,6 +25,16 @@
     "./package.json": "./package.json"
   },
   "publishConfig": {
+    "bin": {
+      "auto-develop": "./dist/cli.mjs"
+    },
+    "exports": {
+      "./server": {
+        "types": "./dist/server.d.mts",
+        "default": "./dist/server.mjs"
+      },
+      "./package.json": "./package.json"
+    },
     "access": "public"
   },
   "scripts": {
@@ -37,7 +46,6 @@
     "typecheck": "spool -- tsc -p ."
   },
   "dependencies": {
-    "@mst/repository-checks": "workspace:*",
     "citty": "catalog:",
     "es-toolkit": "catalog:",
     "octokit": "5.0.5",
@@ -46,6 +54,7 @@
   "devDependencies": {
     "@mst/ai-native": "workspace:*",
     "@mst/dont-review-it": "workspace:*",
+    "@mst/repository-checks": "workspace:*",
     "@tanstack/intent": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",

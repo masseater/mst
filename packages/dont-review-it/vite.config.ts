@@ -20,7 +20,8 @@ export default defineConfig({
     unstubGlobals: true,
   },
   pack: {
-    entry: ["src/cli.ts", "src/index.ts", "src/plugin.ts"],
+    entry: ["src/cli.ts", "src/index.ts", "src/plugin.ts", "src/vitest/standard-io-test.ts"],
+    external: [/^vite-plus/],
     dts: {
       tsgo: true,
     },
