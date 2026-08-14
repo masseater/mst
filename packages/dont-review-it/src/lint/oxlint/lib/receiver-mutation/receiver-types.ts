@@ -10,12 +10,6 @@ export type JudgedReceiver =
   | { readonly kind: "named"; readonly type: string }
   | { readonly kind: "collapsed" };
 
-const COLLAPSED_RECEIVER: JudgedReceiver = { kind: "collapsed" };
-
-const IMPORTED_DEFAULT_NAME = "default";
-
-const IMPORTED_NAMESPACE_NAME = "*";
-
 const firstJudged = (judged: readonly (JudgedReceiver | null)[]): JudgedReceiver | null =>
   judged.find((one) => one !== null) ?? null;
 
@@ -25,6 +19,8 @@ const constraintDeclaredFor = (at: ESTree.Node, spelled: string): ESTree.TSType 
   );
   return declared.findLast((parameter) => parameter.name.name === spelled)?.constraint ?? null;
 };
+
+const COLLAPSED_RECEIVER: JudgedReceiver = { kind: "collapsed" };
 
 const judgedTypeOf = (asked: {
   readonly node: ESTree.TSType;
@@ -151,6 +147,10 @@ export const declaredTypeNamesIn = (writtenBody: ESTree.Program["body"]): Readon
       .map(declaringStatementOf)
       .flatMap((statement) => (statement === null ? [] : declaredNamesOf(statement))),
   );
+
+const IMPORTED_DEFAULT_NAME = "default";
+
+const IMPORTED_NAMESPACE_NAME = "*";
 
 const importedNameOf = (specifier: ESTree.ImportDeclarationSpecifier): string => {
   if (specifier.type === "ImportDefaultSpecifier") return IMPORTED_DEFAULT_NAME;

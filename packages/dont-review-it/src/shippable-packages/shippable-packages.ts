@@ -18,9 +18,6 @@ type ShippablePackage = {
   readonly config: ShippablePackagesConfig;
 };
 
-const packedSegmentOf = (specifier: string): string =>
-  specifier.replace(/^\.\//u, "").replace(/\/.*$/u, "");
-
 const withheldDependencies = ({
   workspace,
   withheldNames,
@@ -66,6 +63,9 @@ const typeStrippedEntries = (
       line: declaringLineOf(scope, published),
       message: `The published ${published.key} entry must not point at ${published.specifier}, because Node refuses to strip types from a file under node_modules and an installer finds nothing it can run there. Point it at the built output, through ${scope.config.publishConfigKey} when the local path has to stay on the source.`,
     }));
+
+const packedSegmentOf = (specifier: string): string =>
+  specifier.replace(/^\.\//u, "").replace(/\/.*$/u, "");
 
 const unpackedEntries = (
   scope: ShippablePackage,

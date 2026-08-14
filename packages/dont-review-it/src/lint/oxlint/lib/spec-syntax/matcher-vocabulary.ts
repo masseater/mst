@@ -61,6 +61,9 @@ type WeakMatcher = {
   readonly unverified: string;
 };
 
+const unverifiedRegionsOf = (matchers: readonly WeakMatcher[]): ReadonlyMap<string, string> =>
+  new Map(matchers.map((matcher): [string, string] => [matcher.name, matcher.unverified]));
+
 const WEAK_MATCHERS: readonly WeakMatcher[] = [
   {
     name: "toBeTruthy",
@@ -179,6 +182,9 @@ const WEAK_MATCHERS: readonly WeakMatcher[] = [
   },
 ];
 
+export const UNVERIFIED_REGION_BY_WEAK_MATCHER: ReadonlyMap<string, string> =
+  unverifiedRegionsOf(WEAK_MATCHERS);
+
 const WEAK_ASYMMETRIC_MATCHERS: readonly WeakMatcher[] = [
   {
     name: "anything",
@@ -232,12 +238,6 @@ const WEAK_ASYMMETRIC_MATCHERS: readonly WeakMatcher[] = [
     unverified: "every digit of the subject past the precision that was compared",
   },
 ];
-
-const unverifiedRegionsOf = (matchers: readonly WeakMatcher[]): ReadonlyMap<string, string> =>
-  new Map(matchers.map((matcher): [string, string] => [matcher.name, matcher.unverified]));
-
-export const UNVERIFIED_REGION_BY_WEAK_MATCHER: ReadonlyMap<string, string> =
-  unverifiedRegionsOf(WEAK_MATCHERS);
 
 export const UNVERIFIED_REGION_BY_WEAK_ASYMMETRIC_MATCHER: ReadonlyMap<string, string> =
   unverifiedRegionsOf(WEAK_ASYMMETRIC_MATCHERS);

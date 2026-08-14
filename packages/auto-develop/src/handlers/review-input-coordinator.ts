@@ -5,12 +5,6 @@ import type { LifecycleGate } from "../lifecycle/lifecycle-gate.ts";
 import type { Logger } from "../logging/logger.ts";
 import type { JobQueue } from "../queue/job-queue.ts";
 
-export type ReviewInputChangeEvent = {
-  readonly prNumber: number;
-  readonly endpoint: DiffEndpoint;
-  readonly deliveryId?: string;
-};
-
 export type ReviewInputCoordinatorConfig = {
   readonly gate: LifecycleGate;
   readonly queue: JobQueue;
@@ -29,6 +23,12 @@ const interruptOrOpen = (interrupting: {
     return;
   }
   interrupting.config.gate.openSignal(interrupting.prNumber);
+};
+
+export type ReviewInputChangeEvent = {
+  readonly prNumber: number;
+  readonly endpoint: DiffEndpoint;
+  readonly deliveryId?: string;
 };
 
 const admits = (admitting: {

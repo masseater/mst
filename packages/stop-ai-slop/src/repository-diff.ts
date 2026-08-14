@@ -1,32 +1,6 @@
 import { zip } from "es-toolkit";
 import parseGitDiff, { type AnyFileChange } from "parse-git-diff";
 
-export type RepositoryChange =
-  | Readonly<{
-      kind: "added";
-      beforePath: null;
-      afterPath: string;
-      addedLines: readonly number[];
-    }>
-  | Readonly<{
-      kind: "deleted";
-      beforePath: string;
-      afterPath: null;
-      addedLines: readonly number[];
-    }>
-  | Readonly<{
-      kind: "changed";
-      beforePath: string;
-      afterPath: string;
-      addedLines: readonly number[];
-    }>
-  | Readonly<{
-      kind: "renamed";
-      beforePath: string;
-      afterPath: string;
-      addedLines: readonly number[];
-    }>;
-
 type InventoryFile =
   | Readonly<{ kind: "added"; beforePath: null; afterPath: string }>
   | Readonly<{ kind: "deleted"; beforePath: string; afterPath: null }>
@@ -80,15 +54,6 @@ const parseDiffInventory = (produced: string): readonly InventoryFile[] => {
   return matches.map(inventoryFileFor);
 };
 
-const addedLinesIn = (file: AnyFileChange): readonly number[] =>
-  file.chunks.flatMap((writtenChunk) =>
-    "changes" in writtenChunk
-      ? writtenChunk.changes.flatMap((change) =>
-          change.type === "AddedLine" ? [change.lineAfter] : [],
-        )
-      : [],
-  );
-
 const parsedTypeFor = (
   nodeKind: Exclude<InventoryFile, { kind: "typeChanged" }>["kind"],
 ): AnyFileChange["type"] => {
@@ -123,6 +88,41 @@ const patchExpectationsFor = (
           producesChange: true,
         },
       ];
+
+export type RepositoryChange =
+  | Readonly<{
+      kind: "added";
+      beforePath: null;
+      afterPath: string;
+      addedLines: readonly number[];
+    }>
+  | Readonly<{
+      kind: "deleted";
+      beforePath: string;
+      afterPath: null;
+      addedLines: readonly number[];
+    }>
+  | Readonly<{
+      kind: "changed";
+      beforePath: string;
+      afterPath: string;
+      addedLines: readonly number[];
+    }>
+  | Readonly<{
+      kind: "renamed";
+      beforePath: string;
+      afterPath: string;
+      addedLines: readonly number[];
+    }>;
+
+const addedLinesIn = (file: AnyFileChange): readonly number[] =>
+  file.chunks.flatMap((writtenChunk) =>
+    "changes" in writtenChunk
+      ? writtenChunk.changes.flatMap((change) =>
+          change.type === "AddedLine" ? [change.lineAfter] : [],
+        )
+      : [],
+  );
 
 const repositoryChangeFor = ({
   inventoryFile,

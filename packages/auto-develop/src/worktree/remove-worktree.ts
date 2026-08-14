@@ -7,14 +7,6 @@ import { isProtectedBranch } from "./protected-branch.ts";
 import type { Logger } from "../logging/logger.ts";
 import type { WorktreeFs } from "./worktree-fs.ts";
 
-export type RemoveContext = {
-  readonly git: GitRunner;
-  readonly repoDir: string;
-  readonly sharedGitDir: string;
-  readonly fs: WorktreeFs;
-  readonly log: Logger;
-};
-
 const guardsReject = (guarding: {
   readonly worktreePath: string;
   readonly repoDir: string;
@@ -35,6 +27,14 @@ const guardsReject = (guarding: {
     return true;
   }
   return false;
+};
+
+export type RemoveContext = {
+  readonly git: GitRunner;
+  readonly repoDir: string;
+  readonly sharedGitDir: string;
+  readonly fs: WorktreeFs;
+  readonly log: Logger;
 };
 
 const isProtectedWorktree = async (protection: {

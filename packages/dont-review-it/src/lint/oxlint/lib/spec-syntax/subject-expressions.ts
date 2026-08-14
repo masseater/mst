@@ -2,10 +2,6 @@ import { unwrapExpression } from "../canonical-values/finite-value-syntax.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
-export type SpecFunction = ESTree.ArrowFunctionExpression | ESTree.Function;
-
-export type SpecStatement = ESTree.Directive | ESTree.Statement;
-
 export const unwrapSubject = (node: ESTree.Expression): ESTree.Expression => {
   const written = unwrapExpression(node);
   if (written.type === "AwaitExpression") return unwrapSubject(written.argument);
@@ -19,12 +15,16 @@ export const memberRootOf = (subject: ESTree.Expression): ESTree.IdentifierRefer
   return memberRootOf(written.object);
 };
 
+export type SpecFunction = ESTree.ArrowFunctionExpression | ESTree.Function;
+
 export const asSpecFunction = (node: ESTree.Expression): SpecFunction | null => {
   const written = unwrapSubject(node);
   if (written.type === "ArrowFunctionExpression") return written;
   if (written.type === "FunctionExpression") return written;
   return null;
 };
+
+export type SpecStatement = ESTree.Directive | ESTree.Statement;
 
 const carriedBodyOf = (statement: SpecStatement): readonly SpecStatement[] => {
   if (
@@ -66,9 +66,6 @@ const ownStatementsOf = (writtenBody: ESTree.FunctionBody): readonly SpecStateme
   return reached(writtenBody.body);
 };
 
-export const blockBodyOf = (takenFunction: SpecFunction): ESTree.FunctionBody | null =>
-  takenFunction.body?.type !== "BlockStatement" ? null : takenFunction.body;
-
 export const returnedExpressionsOf = (
   takenFunction: SpecFunction,
 ): readonly ESTree.Expression[] => {
@@ -78,6 +75,9 @@ export const returnedExpressionsOf = (
     statement.type === "ReturnStatement" && statement.argument !== null ? [statement.argument] : [],
   );
 };
+
+export const blockBodyOf = (takenFunction: SpecFunction): ESTree.FunctionBody | null =>
+  takenFunction.body?.type !== "BlockStatement" ? null : takenFunction.body;
 
 export const argumentsPassedTo = (
   takenFunction: SpecFunction,

@@ -23,11 +23,6 @@ export type PerRuleSetting = {
   readonly settingKey: string;
 };
 
-export type IgnoredSpecFile = {
-  readonly entry: IgnoreEntry;
-  readonly matchedPath: string;
-};
-
 const sharedSettingsIn = (asked: {
   readonly options: ESTree.ObjectExpression;
   readonly ruleName: string;
@@ -90,6 +85,11 @@ export const authoredSpecPathsUnder = (repositoryRoot: string): readonly string[
   })
     .filter((relativePath) => isSpecFile(relativePath, DEFAULT_SPEC_FILE_SUFFIXES))
     .filter((relativePath) => !isGeneratedPath(relativePath));
+
+export type IgnoredSpecFile = {
+  readonly entry: IgnoreEntry;
+  readonly matchedPath: string;
+};
 
 export const ignoredSpecFilesIn = (asked: {
   readonly lint: ESTree.ObjectExpression;

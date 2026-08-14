@@ -1,23 +1,10 @@
 import { uniqBy } from "es-toolkit";
 
-export type StyleClassSite = {
-  readonly name: string;
-  readonly line: number;
-};
-
-const NOISE_PATTERN = /\/\*[\s\S]*?\*\/|"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|url\([^)]*\)/gu;
-
 const PRINTED_CHARACTER = /[^\n]/gu;
 
-const AT_RULE_MARK = "@";
-
-const BLOCK_DELIMITER = /[{};]/gu;
-
-const BLOCK_OPENING = "{";
-
-const CLASS_SELECTOR = /\.-?[A-Za-z_][\w-]*/gu;
-
 const blanked = (writtenText: string): string => writtenText.replace(PRINTED_CHARACTER, " ");
+
+const NOISE_PATTERN = /\/\*[\s\S]*?\*\/|"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|url\([^)]*\)/gu;
 
 const withoutNoise = (source: string): string => source.replace(NOISE_PATTERN, blanked);
 
@@ -25,6 +12,10 @@ type Prelude = {
   readonly start: number;
   readonly text: string;
 };
+
+const BLOCK_DELIMITER = /[{};]/gu;
+
+const BLOCK_OPENING = "{";
 
 const preludesIn = (writtenText: string): readonly Prelude[] => {
   const delimiters = [...writtenText.matchAll(BLOCK_DELIMITER)];
@@ -36,7 +27,16 @@ const preludesIn = (writtenText: string): readonly Prelude[] => {
   });
 };
 
+const AT_RULE_MARK = "@";
+
 const isAtRule = (prelude: Prelude): boolean => prelude.text.trimStart().startsWith(AT_RULE_MARK);
+
+export type StyleClassSite = {
+  readonly name: string;
+  readonly line: number;
+};
+
+const CLASS_SELECTOR = /\.-?[A-Za-z_][\w-]*/gu;
 
 const classSitesInPrelude = (input: {
   readonly source: string;

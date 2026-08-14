@@ -3,6 +3,13 @@ import { severityLevelOf } from "./severity-levels.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
+export const ruleBlockObjectOf = (
+  holder: ESTree.ObjectExpression,
+): ESTree.ObjectExpression | null => {
+  const rules = objectValueOf({ object: holder, key: "rules" });
+  return rules?.type === "ObjectExpression" ? rules : null;
+};
+
 export type ConfiguredRule = {
   readonly property: ESTree.ObjectProperty;
   readonly ruleName: string;
@@ -38,13 +45,6 @@ const spellsTypeAwareness = (node: ESTree.Node): boolean => {
   if (ruleOptions?.type !== "ObjectExpression") return false;
   const declared = objectValueOf({ object: ruleOptions, key: "typeAware" });
   return declared?.type === "Literal" && declared.value === true;
-};
-
-export const ruleBlockObjectOf = (
-  holder: ESTree.ObjectExpression,
-): ESTree.ObjectExpression | null => {
-  const rules = objectValueOf({ object: holder, key: "rules" });
-  return rules?.type === "ObjectExpression" ? rules : null;
 };
 
 export const configuredRuleBlockOf = ({

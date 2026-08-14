@@ -43,16 +43,6 @@ const isGuardedElsewhere = (filename: string): boolean =>
     names: GUARDED_ELSEWHERE_DIRECTORY_NAMES,
   }) !== null;
 
-const declaresRunnerBlock = (asked: {
-  readonly call: ESTree.CallExpression;
-  readonly rootNames: ReadonlySet<string>;
-  readonly foreignNames: ReadonlyMap<string, ESTree.Node>;
-}): boolean => {
-  const root = testBlockRootIdentifier(asked.call.callee);
-  if (root === null || asked.foreignNames.has(root.name)) return false;
-  return testBlockBodyOf(asked.call, asked.rootNames) !== null;
-};
-
 const importedReservedNames = (declaration: ESTree.ImportDeclaration): readonly string[] =>
   declaration.specifiers.flatMap((specifier) =>
     RESERVED_SPEC_NAMES.has(specifier.local.name) ? [specifier.local.name] : [],
@@ -83,6 +73,16 @@ const foreignNamesIn = (program: ESTree.Program): ReadonlyMap<string, ESTree.Nod
   return new Map(
     sortBy(bound, ["start"]).map((held): readonly [string, ESTree.Node] => [held.name, held]),
   );
+};
+
+const declaresRunnerBlock = (asked: {
+  readonly call: ESTree.CallExpression;
+  readonly rootNames: ReadonlySet<string>;
+  readonly foreignNames: ReadonlyMap<string, ESTree.Node>;
+}): boolean => {
+  const root = testBlockRootIdentifier(asked.call.callee);
+  if (root === null || asked.foreignNames.has(root.name)) return false;
+  return testBlockBodyOf(asked.call, asked.rootNames) !== null;
 };
 
 const runnerBlockRootIn = (held: {

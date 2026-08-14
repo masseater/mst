@@ -12,12 +12,6 @@ export type LintRuleWorkspace = {
   readonly ruleDirectories: readonly string[];
 };
 
-const WORKSPACE_DEFINITION_FILE = "pnpm-workspace.yaml";
-
-const WORKSPACE_PATTERNS_FIELD = "packages";
-
-const RULE_DIRECTORIES_FIELD = "lintRules";
-
 const childDirectoryNamesIn = (parentPath: string): readonly string[] => {
   const dirents = readUnlessMissing(() => readdirSync(parentPath, { withFileTypes: true }));
   return (dirents ?? []).filter((dirent) => dirent.isDirectory()).map((dirent) => dirent.name);
@@ -38,6 +32,10 @@ const expandedPattern = ({
   );
 };
 
+const WORKSPACE_DEFINITION_FILE = "pnpm-workspace.yaml";
+
+const WORKSPACE_PATTERNS_FIELD = "packages";
+
 const declaredWorkspaceDirs = (repositoryRoot: string): readonly string[] => {
   const definitionText = textOrNull(join(repositoryRoot, WORKSPACE_DEFINITION_FILE));
   if (definitionText === null) return [];
@@ -57,6 +55,8 @@ const declaredWorkspaceDirs = (repositoryRoot: string): readonly string[] => {
     .filter((pattern): pattern is string => typeof pattern === "string")
     .flatMap((pattern) => expandedPattern({ repositoryRoot, pattern }));
 };
+
+const RULE_DIRECTORIES_FIELD = "lintRules";
 
 const ruleDirectoriesDeclaredAt = ({
   repositoryRoot,

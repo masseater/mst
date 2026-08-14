@@ -11,8 +11,6 @@ import { unwrapSubject, type SpecFunction } from "../lib/spec-syntax/subject-exp
 
 import type { Definition, ESTree, Options, Reference, Scope, Variable } from "@oxlint/plugins";
 
-const MOCK_NAMESPACE_MEMBER = "mock";
-
 const CALL_RECORD_MEMBERS_OPTION = "callRecordMembers";
 
 const DEFAULT_CALL_RECORD_MEMBERS: readonly string[] = [
@@ -22,23 +20,6 @@ const DEFAULT_CALL_RECORD_MEMBERS: readonly string[] = [
   "invocationCallOrder",
   "lastCall",
 ];
-
-type MockReach = {
-  readonly namespace: boolean;
-  readonly record: boolean;
-};
-
-const NOTHING_REACHED: MockReach = { namespace: false, record: false };
-
-const NAMESPACE_REACHED: MockReach = { namespace: true, record: false };
-
-const RECORD_REACHED: MockReach = { namespace: false, record: true };
-
-type RecordLookup = {
-  readonly scopeAt: (node: ESTree.Node) => Scope;
-  readonly recordMembers: ReadonlySet<string>;
-  readonly seenBindings: ReadonlySet<Variable>;
-};
 
 const callRecordMembersFrom = (ruleOptions: Readonly<Options>): ReadonlySet<string> => {
   const [first] = ruleOptions;
@@ -54,6 +35,13 @@ const callRecordMembersFrom = (ruleOptions: Readonly<Options>): ReadonlySet<stri
   );
   return new Set(spelled.length === 0 ? DEFAULT_CALL_RECORD_MEMBERS : spelled);
 };
+
+type MockReach = {
+  readonly namespace: boolean;
+  readonly record: boolean;
+};
+
+const NOTHING_REACHED: MockReach = { namespace: false, record: false };
 
 const firstReach = (reached: readonly MockReach[]): MockReach =>
   reached.find((reach) => reach.namespace || reach.record) ?? NOTHING_REACHED;
@@ -89,25 +77,16 @@ const callableOf = (node: ESTree.Node): SpecFunction | null => {
   return null;
 };
 
-const callableBindingName = (callable: SpecFunction): string | null => {
-  if (callable.id !== null) return callable.id.name;
-
-  const holder = callable.parent;
-  return holder.type === "VariableDeclarator" ? boundName(holder.id) : null;
-};
-
 const declaredParametersOf = (callable: SpecFunction): readonly (ESTree.BindingPattern | null)[] =>
   callable.params.map((parameter) =>
     parameter.type === "RestElement" || parameter.type === "TSParameterProperty" ? null : parameter,
   );
 
-const argumentsAt = (reference: Reference, index: number): readonly ESTree.Expression[] => {
-  const site = reference.identifier.parent;
-  if (site.type !== "CallExpression" || site.callee !== reference.identifier) return [];
+const MOCK_NAMESPACE_MEMBER = "mock";
 
-  const handed = site.arguments[index];
-  return handed === undefined || handed.type === "SpreadElement" ? [] : [handed];
-};
+const NAMESPACE_REACHED: MockReach = { namespace: true, record: false };
+
+const RECORD_REACHED: MockReach = { namespace: false, record: true };
 
 const memberOfReach = (
   member: string,
@@ -118,6 +97,12 @@ const memberOfReach = (
     return reached.recordMembers.has(member) ? RECORD_REACHED : NOTHING_REACHED;
   }
   return member === MOCK_NAMESPACE_MEMBER ? NAMESPACE_REACHED : NOTHING_REACHED;
+};
+
+type RecordLookup = {
+  readonly scopeAt: (node: ESTree.Node) => Scope;
+  readonly recordMembers: ReadonlySet<string>;
+  readonly seenBindings: ReadonlySet<Variable>;
 };
 
 const memberReach = (node: ESTree.MemberExpression, lookup: RecordLookup): MockReach => {
@@ -151,6 +136,21 @@ const patternReach = (
   const member = destructuredMemberOf(pattern, spelled);
   if (member === null) return NOTHING_REACHED;
   return memberOfReach(member, { source, recordMembers: lookup.recordMembers });
+};
+
+const callableBindingName = (callable: SpecFunction): string | null => {
+  if (callable.id !== null) return callable.id.name;
+
+  const holder = callable.parent;
+  return holder.type === "VariableDeclarator" ? boundName(holder.id) : null;
+};
+
+const argumentsAt = (reference: Reference, index: number): readonly ESTree.Expression[] => {
+  const site = reference.identifier.parent;
+  if (site.type !== "CallExpression" || site.callee !== reference.identifier) return [];
+
+  const handed = site.arguments[index];
+  return handed === undefined || handed.type === "SpreadElement" ? [] : [handed];
 };
 
 const handedToParameter = (

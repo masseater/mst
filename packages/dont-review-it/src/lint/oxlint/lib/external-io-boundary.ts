@@ -7,16 +7,16 @@ import { couplingEdgesOf, couplingTargetsOf } from "./setup-modules/entry-reacha
 import { publicEntryFilesOf } from "./setup-modules/package-entries.ts";
 import { resolveCoupling } from "./setup-modules/specifier-resolution.ts";
 
-export type ExternalIoVocabulary = {
-  readonly modules: ReadonlySet<string>;
-  readonly packages: ReadonlySet<string>;
-};
-
 export type ReplacedModule =
   | { readonly kind: "outsideTheRepository" }
   | { readonly kind: "ownsExternalIo" }
   | { readonly kind: "behindOwnModules"; readonly boundary: string }
   | { readonly kind: "determinedByItsInput" };
+
+export type ExternalIoVocabulary = {
+  readonly modules: ReadonlySet<string>;
+  readonly packages: ReadonlySet<string>;
+};
 
 const namesExternalIo = (specifier: string, vocabulary: ExternalIoVocabulary): boolean =>
   vocabulary.modules.has(specifier) ||

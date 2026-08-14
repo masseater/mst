@@ -2,6 +2,14 @@ import { spawnSync } from "node:child_process";
 
 import { attempt } from "es-toolkit";
 
+const combinedFailure = (primary: Error, fallback: Error | null): Error =>
+  fallback === null
+    ? primary
+    : new AggregateError(
+        [primary, fallback],
+        "Could not signal the command tree or its root process",
+      );
+
 type TaskkillExecutor = (invocation: {
   executable: string;
   handedArguments: readonly string[];
@@ -25,6 +33,14 @@ const signalProcess = (pid: number, signal: NodeJS.Signals): Error | null => {
 const executeTaskkill: TaskkillExecutor = (invocation) =>
   spawnSync(invocation.executable, [...invocation.handedArguments], invocation.spawnConfiguration);
 
+const resolvedDependencies = (
+  input: Partial<ProcessTreeDependencies> | undefined,
+): ProcessTreeDependencies => ({
+  platform: input?.platform ?? process.platform,
+  signalProcess: input?.signalProcess ?? signalProcess,
+  executeTaskkill: input?.executeTaskkill ?? executeTaskkill,
+});
+
 const runWindowsTaskkill = (pid: number, execute: TaskkillExecutor): Error | null => {
   const taskkillExit = execute({
     executable: "taskkill",
@@ -37,25 +53,6 @@ const runWindowsTaskkill = (pid: number, execute: TaskkillExecutor): Error | nul
     : new Error(`taskkill exited with code ${taskkillExit.status ?? "unknown"}`);
 };
 
-const combinedFailure = (primary: Error, fallback: Error | null): Error =>
-  fallback === null
-    ? primary
-    : new AggregateError(
-        [primary, fallback],
-        "Could not signal the command tree or its root process",
-      );
-
-const processIsMissing = (failure: Error): boolean =>
-  (failure as NodeJS.ErrnoException).code === "ESRCH";
-
-const resolvedDependencies = (
-  input: Partial<ProcessTreeDependencies> | undefined,
-): ProcessTreeDependencies => ({
-  platform: input?.platform ?? process.platform,
-  signalProcess: input?.signalProcess ?? signalProcess,
-  executeTaskkill: input?.executeTaskkill ?? executeTaskkill,
-});
-
 const treeSignalFailure = (input: {
   pid: number;
   signal: NodeJS.Signals;
@@ -64,6 +61,9 @@ const treeSignalFailure = (input: {
   input.dependencies.platform === "win32"
     ? runWindowsTaskkill(input.pid, input.dependencies.executeTaskkill)
     : input.dependencies.signalProcess(-input.pid, input.signal);
+
+const processIsMissing = (failure: Error): boolean =>
+  (failure as NodeJS.ErrnoException).code === "ESRCH";
 
 const shutdownCompleted = (input: {
   platform: NodeJS.Platform;

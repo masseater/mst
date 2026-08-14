@@ -20,8 +20,6 @@ import type { ESTree, Options, Range } from "@oxlint/plugins";
 
 const MAX_LINES_OPTION = "maxLines";
 
-const REPORTED_KEY_LIMIT = 3;
-
 const maxLinesFrom = (ruleOptions: Readonly<Options>): number => {
   const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) {
@@ -30,6 +28,8 @@ const maxLinesFrom = (ruleOptions: Readonly<Options>): number => {
   const configured = first[MAX_LINES_OPTION];
   return typeof configured === "number" ? configured : MAX_INLINE_RECORD_LINES;
 };
+
+const REPORTED_KEY_LIMIT = 3;
 
 const spelledKeys = (externalRecordKeys: readonly string[]): string =>
   externalRecordKeys.length <= REPORTED_KEY_LIMIT

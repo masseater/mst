@@ -5,11 +5,6 @@ export type ImportedBinding = {
   readonly namespaceNames: Set<string>;
 };
 
-export type ImportedTarget = {
-  readonly exportedName: string;
-  readonly binding: ImportedBinding;
-};
-
 export const newBinding = (): ImportedBinding => ({
   directNames: new Set<string>(),
   namespaceNames: new Set<string>(),
@@ -17,6 +12,11 @@ export const newBinding = (): ImportedBinding => ({
 
 export const importedNameOf = (specifier: ESTree.ImportSpecifier): string =>
   specifier.imported.type === "Literal" ? specifier.imported.value : specifier.imported.name;
+
+export type ImportedTarget = {
+  readonly exportedName: string;
+  readonly binding: ImportedBinding;
+};
 
 export const collectBinding = (node: ESTree.ImportDeclaration, checked: ImportedTarget): void => {
   for (const specifier of node.specifiers) {

@@ -27,9 +27,64 @@ import type { ESTree, Variable } from "@oxlint/plugins";
 
 const ASSERTION_RECEIVER = "expect";
 
+const isAssertionReceiver = (call: ESTree.CallExpression): boolean => {
+  const callee = unwrapSubject(call.callee);
+  if (callee.type === "Identifier") return callee.name === ASSERTION_RECEIVER;
+  if (callee.type !== "MemberExpression") return false;
+
+  const member = staticMemberName(callee);
+  if (member === null || !DERIVED_ASSERTION_RECEIVERS.has(member)) return false;
+
+  const receiver = unwrapSubject(callee.object);
+  return receiver.type === "Identifier" && receiver.name === ASSERTION_RECEIVER;
+};
+
+const assertionRootOf = (node: ESTree.Expression): ESTree.CallExpression | null => {
+  const written = unwrapSubject(node);
+  if (written.type === "CallExpression") return isAssertionReceiver(written) ? written : null;
+  if (written.type !== "MemberExpression") return null;
+
+  const member = staticMemberName(written);
+  if (member === null || !ASSERTION_CHAIN_MODIFIERS.has(member)) return null;
+  return assertionRootOf(written.object);
+};
+
+const firstValueOf = (call: ESTree.CallExpression): ESTree.Expression | null => {
+  const [handed] = call.arguments;
+  if (handed === undefined || handed.type === "SpreadElement") return null;
+  return handed;
+};
+
+const assertedSubjectOf = (call: ESTree.CallExpression): ESTree.IdentifierReference | null => {
+  const callee = unwrapSubject(call.callee);
+  if (callee.type !== "MemberExpression" || staticMemberName(callee) === null) return null;
+
+  const root = assertionRootOf(callee.object);
+  const handed = root === null ? null : firstValueOf(root);
+  const subject = handed === null ? null : unwrapSubject(handed);
+  return subject?.type === "Identifier" ? subject : null;
+};
+
 type MirrorCandidate = {
   readonly subject: ESTree.IdentifierReference;
   readonly expectedExpression: ESTree.Expression;
+};
+
+const candidateOf = (call: ESTree.CallExpression): MirrorCandidate | null => {
+  const subject = assertedSubjectOf(call);
+  const expectedExpression = subject === null ? null : firstValueOf(call);
+  return subject === null || expectedExpression === null ? null : { subject, expectedExpression };
+};
+
+const spreadSourcesOf = (
+  expectedExpression: ESTree.Expression,
+): readonly ESTree.IdentifierReference[] => {
+  if (expectedExpression.type !== "ObjectExpression") return [];
+  return expectedExpression.properties.flatMap((property) => {
+    if (property.type !== "SpreadElement") return [];
+    const source = unwrapSubject(property.argument);
+    return source.type === "Identifier" ? [source] : [];
+  });
 };
 
 type MirrorReport = {
@@ -37,21 +92,6 @@ type MirrorReport = {
   readonly messageId: string;
   readonly data: { readonly subject: string };
 };
-
-const caughtName = (attempt: ESTree.TryStatement): string | null => {
-  const caught = attempt.handler?.param;
-  return caught?.type === "Identifier" ? caught.name : null;
-};
-
-const thrownUnderCatch = (
-  factoryBody: ESTree.FunctionBody,
-  caughtErrorName: string,
-): readonly ESTree.Expression[] =>
-  factoryBody.body
-    .flatMap((statement) => (statement.type === "TryStatement" ? [statement] : []))
-    .filter((attempt) => caughtName(attempt) === caughtErrorName)
-    .flatMap((attempt) => attempt.block.body)
-    .flatMap((statement) => (statement.type === "ThrowStatement" ? [statement.argument] : []));
 
 const bindingAt = (scopeAt: ScopeLookup, written: ESTree.IdentifierReference): Variable | null =>
   resolveBinding(scopeAt(written), written.name);
@@ -117,6 +157,55 @@ const fixtureNameOf = (scopeAt: ScopeLookup, written: ESTree.IdentifierReference
   return declared[0]?.name ?? written.name;
 };
 
+const mirrorReportOf = (input: {
+  readonly scopeAt: ScopeLookup;
+  readonly shapesByFixture: ReadonlyMap<string, ReadonlySet<string>>;
+  readonly candidate: MirrorCandidate;
+}): MirrorReport | null => {
+  const { scopeAt, shapesByFixture, candidate } = input;
+  const { subject, expectedExpression } = candidate;
+  const reached = resolvedExpression({ scopeAt, written: expectedExpression });
+  const fixture = fixtureNameOf(scopeAt, subject);
+  const spreads = spreadSourcesOf(reached).some((source) =>
+    namesOneBinding({ scopeAt, left: source, right: subject }),
+  );
+  if (spreads) {
+    return { node: expectedExpression, messageId: "spreadSubject", data: { subject: fixture } };
+  }
+
+  const mirrored =
+    reached.type === "Identifier"
+      ? namesOneBinding({ scopeAt, left: reached, right: subject })
+      : boundExpressionAt(scopeAt, subject) === null &&
+        (shapesByFixture.get(fixture)?.has(syntaxShapeOf(reached)) ?? false);
+  if (!mirrored) return null;
+  return { node: expectedExpression, messageId: "mirroredSubject", data: { subject: fixture } };
+};
+
+const behindCall = (
+  scopeAt: ScopeLookup,
+  call: ESTree.CallExpression,
+): readonly ESTree.Expression[] => {
+  const called = resolvedExpression({ scopeAt, written: call.callee });
+  if (called.type !== "ArrowFunctionExpression" && called.type !== "FunctionExpression") return [];
+  return returnedExpressionsOf(called);
+};
+
+const caughtName = (attempt: ESTree.TryStatement): string | null => {
+  const caught = attempt.handler?.param;
+  return caught?.type === "Identifier" ? caught.name : null;
+};
+
+const thrownUnderCatch = (
+  factoryBody: ESTree.FunctionBody,
+  caughtErrorName: string,
+): readonly ESTree.Expression[] =>
+  factoryBody.body
+    .flatMap((statement) => (statement.type === "TryStatement" ? [statement] : []))
+    .filter((attempt) => caughtName(attempt) === caughtErrorName)
+    .flatMap((attempt) => attempt.block.body)
+    .flatMap((statement) => (statement.type === "ThrowStatement" ? [statement.argument] : []));
+
 const behindName = (input: {
   readonly scopeAt: ScopeLookup;
   readonly written: ESTree.IdentifierReference;
@@ -128,15 +217,6 @@ const behindName = (input: {
 
   const factoryBody = factory === null ? null : blockBodyOf(factory);
   return factoryBody === null ? [] : thrownUnderCatch(factoryBody, written.name);
-};
-
-const behindCall = (
-  scopeAt: ScopeLookup,
-  call: ESTree.CallExpression,
-): readonly ESTree.Expression[] => {
-  const called = resolvedExpression({ scopeAt, written: call.callee });
-  if (called.type !== "ArrowFunctionExpression" && called.type !== "FunctionExpression") return [];
-  return returnedExpressionsOf(called);
 };
 
 const constructionsBehind = (input: {
@@ -190,86 +270,6 @@ const constructionShapesOf = (input: {
       ),
     ]),
   );
-};
-
-const isAssertionReceiver = (call: ESTree.CallExpression): boolean => {
-  const callee = unwrapSubject(call.callee);
-  if (callee.type === "Identifier") return callee.name === ASSERTION_RECEIVER;
-  if (callee.type !== "MemberExpression") return false;
-
-  const member = staticMemberName(callee);
-  if (member === null || !DERIVED_ASSERTION_RECEIVERS.has(member)) return false;
-
-  const receiver = unwrapSubject(callee.object);
-  return receiver.type === "Identifier" && receiver.name === ASSERTION_RECEIVER;
-};
-
-const assertionRootOf = (node: ESTree.Expression): ESTree.CallExpression | null => {
-  const written = unwrapSubject(node);
-  if (written.type === "CallExpression") return isAssertionReceiver(written) ? written : null;
-  if (written.type !== "MemberExpression") return null;
-
-  const member = staticMemberName(written);
-  if (member === null || !ASSERTION_CHAIN_MODIFIERS.has(member)) return null;
-  return assertionRootOf(written.object);
-};
-
-const firstValueOf = (call: ESTree.CallExpression): ESTree.Expression | null => {
-  const [handed] = call.arguments;
-  if (handed === undefined || handed.type === "SpreadElement") return null;
-  return handed;
-};
-
-const assertedSubjectOf = (call: ESTree.CallExpression): ESTree.IdentifierReference | null => {
-  const callee = unwrapSubject(call.callee);
-  if (callee.type !== "MemberExpression" || staticMemberName(callee) === null) return null;
-
-  const root = assertionRootOf(callee.object);
-  const handed = root === null ? null : firstValueOf(root);
-  const subject = handed === null ? null : unwrapSubject(handed);
-  return subject?.type === "Identifier" ? subject : null;
-};
-
-const candidateOf = (call: ESTree.CallExpression): MirrorCandidate | null => {
-  const subject = assertedSubjectOf(call);
-  const expectedExpression = subject === null ? null : firstValueOf(call);
-  return subject === null || expectedExpression === null ? null : { subject, expectedExpression };
-};
-
-const spreadSourcesOf = (
-  expectedExpression: ESTree.Expression,
-): readonly ESTree.IdentifierReference[] => {
-  if (expectedExpression.type !== "ObjectExpression") return [];
-  return expectedExpression.properties.flatMap((property) => {
-    if (property.type !== "SpreadElement") return [];
-    const source = unwrapSubject(property.argument);
-    return source.type === "Identifier" ? [source] : [];
-  });
-};
-
-const mirrorReportOf = (input: {
-  readonly scopeAt: ScopeLookup;
-  readonly shapesByFixture: ReadonlyMap<string, ReadonlySet<string>>;
-  readonly candidate: MirrorCandidate;
-}): MirrorReport | null => {
-  const { scopeAt, shapesByFixture, candidate } = input;
-  const { subject, expectedExpression } = candidate;
-  const reached = resolvedExpression({ scopeAt, written: expectedExpression });
-  const fixture = fixtureNameOf(scopeAt, subject);
-  const spreads = spreadSourcesOf(reached).some((source) =>
-    namesOneBinding({ scopeAt, left: source, right: subject }),
-  );
-  if (spreads) {
-    return { node: expectedExpression, messageId: "spreadSubject", data: { subject: fixture } };
-  }
-
-  const mirrored =
-    reached.type === "Identifier"
-      ? namesOneBinding({ scopeAt, left: reached, right: subject })
-      : boundExpressionAt(scopeAt, subject) === null &&
-        (shapesByFixture.get(fixture)?.has(syntaxShapeOf(reached)) ?? false);
-  if (!mirrored) return null;
-  return { node: expectedExpression, messageId: "mirroredSubject", data: { subject: fixture } };
 };
 
 const mirrorReportsOf = (input: {

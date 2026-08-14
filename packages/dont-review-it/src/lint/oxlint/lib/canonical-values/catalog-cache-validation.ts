@@ -10,8 +10,6 @@ import {
 
 import type { CanonicalValuesEntry } from "./catalog.ts";
 
-export const CACHE_FORMAT_VERSION = 5;
-
 export type FingerprintedEntries = {
   readonly fingerprint: string;
   readonly entries: readonly CanonicalValuesEntry[];
@@ -21,6 +19,8 @@ export type CachedCatalog = FingerprintedEntries & {
   readonly integrity: string;
   readonly version: number;
 };
+
+export const CACHE_FORMAT_VERSION = 5;
 
 export const cacheIntegrity = ({ fingerprint, entries }: FingerprintedEntries): string =>
   createHash("sha256")
@@ -72,6 +72,14 @@ const hasValidEntryIdentity = (candidate: CanonicalValuesEntryFields): boolean =
   /^[a-f0-9]{32}$/u.test(candidate.fingerprint) &&
   isPackageName(candidate.packageName);
 
+const hasNonemptyStringProperty = (
+  candidate: object,
+  property: "exportName" | "specifier",
+): boolean => {
+  const propertyValue = (candidate as Partial<Record<typeof property, unknown>>)[property];
+  return typeof propertyValue === "string" && propertyValue.length > 0;
+};
+
 const staysWithinRepository = (path: string): boolean =>
   !isAbsolute(path) && !/^[A-Za-z]:\//u.test(path) && path !== ".." && !path.startsWith("../");
 
@@ -83,14 +91,6 @@ const isResolvedSourcePath = (candidate: unknown): candidate is string =>
   !candidate.includes("\\") &&
   posix.normalize(candidate) === candidate &&
   staysWithinRepository(candidate);
-
-const hasNonemptyStringProperty = (
-  candidate: object,
-  property: "exportName" | "specifier",
-): boolean => {
-  const propertyValue = (candidate as Partial<Record<typeof property, unknown>>)[property];
-  return typeof propertyValue === "string" && propertyValue.length > 0;
-};
 
 const hasResolvedSourcePaths = (candidate: object): boolean => {
   if (!("resolvedSourcePaths" in candidate)) return false;

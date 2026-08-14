@@ -2,10 +2,6 @@ import { optionsRecord } from "./rule-options.ts";
 
 import type { Options } from "@oxlint/plugins";
 
-const MOCK_NAMESPACE_OPTION = "mockNamespace";
-
-const DEFAULT_MOCK_NAMESPACE = "vi";
-
 export const spellingsFrom = (
   ruleConfiguration: Readonly<Options>,
   named: { readonly option: string; readonly fallback: readonly string[] },
@@ -24,6 +20,10 @@ const spellingFrom = (
   const configured = optionsRecord(ruleConfiguration)?.[named.option];
   return typeof configured === "string" && configured.length > 0 ? configured : named.fallback;
 };
+
+const MOCK_NAMESPACE_OPTION = "mockNamespace";
+
+const DEFAULT_MOCK_NAMESPACE = "vi";
 
 export const mockNamespaceFrom = (ruleConfiguration: Readonly<Options>): string =>
   spellingFrom(ruleConfiguration, {

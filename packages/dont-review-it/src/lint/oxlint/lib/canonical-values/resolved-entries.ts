@@ -24,11 +24,33 @@ export type CanonicalValuesDeclarationSite = CanonicalValuesDeclaration & {
   readonly relativePath: string;
 };
 
-export type CanonicalValuesSourceProblem = CanonicalValuesTextProblem extends infer Problem
-  ? Problem extends CanonicalValuesTextProblem
-    ? Problem & { readonly filePath: string }
-    : never
-  : never;
+const publicSourceFilesFor = (
+  declarations: readonly CanonicalValuesDeclarationSite[],
+  repositoryRoot: string,
+): readonly string[] =>
+  uniqBy(
+    declarations.flatMap((declaration) => {
+      const packageDirectory = nearestPackageDirectory(
+        dirname(declaration.absolutePath),
+        repositoryRoot,
+      );
+      if (packageDirectory === null) return [];
+      const [failure, packageExports] = attempt(() => publicPackageEntries(packageDirectory));
+      return failure === null && packageExports !== null
+        ? packageExports.map((packageExport) => packageExport.sourceFile)
+        : [];
+    }),
+    (sourceFile) => sourceFile,
+  );
+
+const configurationKey = (
+  declaration: CanonicalValuesDeclarationSite,
+  repositoryRoot: string,
+): string =>
+  canonicalValuesTypeScriptConfigPath({
+    repositoryRoot,
+    searchDirectory: dirname(declaration.absolutePath),
+  }) ?? "<default>";
 
 const variableDeclarationAt = (
   sourceFile: ts.SourceFile,
@@ -44,19 +66,6 @@ const normalizedItems = (canonicalItems: readonly CanonicalValue[]): readonly Ca
   uniqBy(canonicalItems, canonicalValueKey).toSorted((left, right) =>
     canonicalValueKey(left).localeCompare(canonicalValueKey(right)),
   );
-
-const literalValueFromType = (
-  checker: ts.TypeChecker,
-  literalType: ts.Type,
-): CanonicalValue | undefined => {
-  if ((literalType.flags & ts.TypeFlags.StringLiteral) !== 0)
-    return (literalType as ts.StringLiteralType).value;
-  if ((literalType.flags & ts.TypeFlags.NumberLiteral) !== 0)
-    return (literalType as ts.NumberLiteralType).value;
-  if ((literalType.flags & ts.TypeFlags.BooleanLiteral) !== 0)
-    return checker.typeToString(literalType) === "true";
-  return (literalType.flags & ts.TypeFlags.Null) !== 0 ? null : undefined;
-};
 
 const objectDomain = (input: {
   readonly bindingType: ts.Type;
@@ -82,6 +91,19 @@ const objectDomain = (input: {
     throw new Error(`${input.declaration.name.getText()}: canonical object keys must be finite`);
   }
   return normalizedItems(properties.map((property) => property.name));
+};
+
+const literalValueFromType = (
+  checker: ts.TypeChecker,
+  literalType: ts.Type,
+): CanonicalValue | undefined => {
+  if ((literalType.flags & ts.TypeFlags.StringLiteral) !== 0)
+    return (literalType as ts.StringLiteralType).value;
+  if ((literalType.flags & ts.TypeFlags.NumberLiteral) !== 0)
+    return (literalType as ts.NumberLiteralType).value;
+  if ((literalType.flags & ts.TypeFlags.BooleanLiteral) !== 0)
+    return checker.typeToString(literalType) === "true";
+  return (literalType.flags & ts.TypeFlags.Null) !== 0 ? null : undefined;
 };
 
 const arrayDomain = (input: {
@@ -218,24 +240,11 @@ const entryFor = (input: {
   };
 };
 
-const publicSourceFilesFor = (
-  declarations: readonly CanonicalValuesDeclarationSite[],
-  repositoryRoot: string,
-): readonly string[] =>
-  uniqBy(
-    declarations.flatMap((declaration) => {
-      const packageDirectory = nearestPackageDirectory(
-        dirname(declaration.absolutePath),
-        repositoryRoot,
-      );
-      if (packageDirectory === null) return [];
-      const [failure, packageExports] = attempt(() => publicPackageEntries(packageDirectory));
-      return failure === null && packageExports !== null
-        ? packageExports.map((packageExport) => packageExport.sourceFile)
-        : [];
-    }),
-    (sourceFile) => sourceFile,
-  );
+export type CanonicalValuesSourceProblem = CanonicalValuesTextProblem extends infer Problem
+  ? Problem extends CanonicalValuesTextProblem
+    ? Problem & { readonly filePath: string }
+    : never
+  : never;
 
 const problemFor = (declaration: CanonicalValuesDeclarationSite): CanonicalValuesSourceProblem => ({
   kind: "vocabulary-without-values",
@@ -243,15 +252,6 @@ const problemFor = (declaration: CanonicalValuesDeclarationSite): CanonicalValue
   line: declaration.line,
   conceptId: declaration.conceptId,
 });
-
-const configurationKey = (
-  declaration: CanonicalValuesDeclarationSite,
-  repositoryRoot: string,
-): string =>
-  canonicalValuesTypeScriptConfigPath({
-    repositoryRoot,
-    searchDirectory: dirname(declaration.absolutePath),
-  }) ?? "<default>";
 
 const resolveGroup = (input: {
   readonly declarations: readonly CanonicalValuesDeclarationSite[];

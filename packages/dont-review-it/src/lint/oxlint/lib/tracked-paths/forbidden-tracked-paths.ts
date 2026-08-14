@@ -2,18 +2,6 @@ import { namedFieldsOf } from "../named-fields.ts";
 
 import type { Options, RuleMeta } from "@oxlint/plugins";
 
-export type GroundedPattern = {
-  readonly pattern: string;
-  readonly reason: string;
-};
-
-export type ForbiddenTrackedPath = {
-  readonly pattern: string;
-  readonly reason: string;
-  readonly ignoreListing: boolean;
-  readonly exceptions: readonly GroundedPattern[];
-};
-
 const GROUNDED_PATTERN_SCHEMA = {
   type: "array",
   items: {
@@ -47,6 +35,18 @@ export const FORBIDDEN_TRACKED_PATH_SCHEMA: RuleMeta["schema"] = [
     additionalProperties: false,
   },
 ];
+
+export type GroundedPattern = {
+  readonly pattern: string;
+  readonly reason: string;
+};
+
+export type ForbiddenTrackedPath = {
+  readonly pattern: string;
+  readonly reason: string;
+  readonly ignoreListing: boolean;
+  readonly exceptions: readonly GroundedPattern[];
+};
 
 const DEFAULT_FORBIDDEN_TRACKED_PATHS: readonly ForbiddenTrackedPath[] = [
   {

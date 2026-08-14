@@ -28,8 +28,6 @@ const ARRAY_RETURNING_ARRAY_METHODS: ReadonlySet<string> = new Set([
 
 const ARRAY_GLOBAL_FACTORY_METHODS: ReadonlySet<string> = new Set(["from", "of"]);
 
-const ARRAY_TYPE_NAMES: ReadonlySet<string> = new Set(["Array", "ReadonlyArray"]);
-
 const staticPropertyName = (node: ESTree.MemberExpression): string | null => {
   if (!node.computed) return node.property.type === "Identifier" ? node.property.name : null;
 
@@ -58,6 +56,8 @@ const declaredTypeParameterConstraint = (
 
   return declaredTypeParameterConstraint(node.parent, spelled);
 };
+
+const ARRAY_TYPE_NAMES: ReadonlySet<string> = new Set(["Array", "ReadonlyArray"]);
 
 const isArrayLikeTypeReference = (
   node: ESTree.TSTypeReference,

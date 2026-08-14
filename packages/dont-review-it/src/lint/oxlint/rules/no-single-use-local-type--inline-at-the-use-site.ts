@@ -1,10 +1,9 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
 import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { isOutOfScopeSource } from "../lib/out-of-scope-source.ts";
+import { REFERENCES_A_SHARED_TYPE } from "../lib/shared-type-references.ts";
 
 import type { ESTree } from "@oxlint/plugins";
-
-const REFERENCES_A_SHARED_TYPE = 2;
 
 export const noSingleUseLocalType = createDontReviewItRule({
   name: "no-single-use-local-type--inline-at-the-use-site",

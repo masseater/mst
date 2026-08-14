@@ -1,0 +1,1 @@
+export const REFERENCES_A_SHARED_TYPE = 2;

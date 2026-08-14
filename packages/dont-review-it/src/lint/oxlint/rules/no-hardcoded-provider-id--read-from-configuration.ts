@@ -9,6 +9,30 @@ const PLATFORM_SPECIFIER_PREFIX = "node:";
 
 const LOCAL_SPECIFIER_PREFIXES = [".", "/", "#"];
 
+const isProviderPackage = (source: string): boolean => {
+  if (source === "" || source.startsWith(PLATFORM_SPECIFIER_PREFIX)) return false;
+  return !LOCAL_SPECIFIER_PREFIXES.some((prefix) => source.startsWith(prefix));
+};
+
+const providerBindingNamesIn = (program: ESTree.Program): readonly string[] =>
+  program.body.flatMap((statement) =>
+    statement.type === "ImportDeclaration" && isProviderPackage(statement.source.value)
+      ? statement.specifiers.map((specifier) => specifier.local.name)
+      : [],
+  );
+
+const isProviderConstructor = (
+  callee: ESTree.Expression,
+  providerBindings: ReadonlySet<string>,
+): boolean => {
+  const written = callee;
+  if (written.type === "Identifier") return providerBindings.has(written.name);
+  const member = staticMemberOf(written);
+  if (member === null) return false;
+  const receiver = member.object;
+  return receiver.type === "Identifier" && providerBindings.has(receiver.name);
+};
+
 const PROVIDER_IDENTITY_KEYS: ReadonlySet<string> = new Set([
   "accessKeyId",
   "accessToken",
@@ -31,18 +55,6 @@ const PROVIDER_IDENTITY_KEYS: ReadonlySet<string> = new Set([
   "token",
   "workspaceId",
 ]);
-
-const isProviderPackage = (source: string): boolean => {
-  if (source === "" || source.startsWith(PLATFORM_SPECIFIER_PREFIX)) return false;
-  return !LOCAL_SPECIFIER_PREFIXES.some((prefix) => source.startsWith(prefix));
-};
-
-const providerBindingNamesIn = (program: ESTree.Program): readonly string[] =>
-  program.body.flatMap((statement) =>
-    statement.type === "ImportDeclaration" && isProviderPackage(statement.source.value)
-      ? statement.specifiers.map((specifier) => specifier.local.name)
-      : [],
-  );
 
 const identityKeyNameOf = (property: ESTree.ObjectProperty): string | null => {
   const { key } = property;
@@ -68,18 +80,6 @@ const writtenOutIdentitiesIn = (expression: ESTree.Expression): readonly ESTree.
     const identity = writtenOutIdentityOf(property);
     return identity === null ? [] : [identity];
   });
-};
-
-const isProviderConstructor = (
-  callee: ESTree.Expression,
-  providerBindings: ReadonlySet<string>,
-): boolean => {
-  const written = callee;
-  if (written.type === "Identifier") return providerBindings.has(written.name);
-  const member = staticMemberOf(written);
-  if (member === null) return false;
-  const receiver = member.object;
-  return receiver.type === "Identifier" && providerBindings.has(receiver.name);
 };
 
 const writtenOutIdentitiesOf = (node: ESTree.NewExpression): readonly ESTree.Expression[] =>

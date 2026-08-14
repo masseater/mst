@@ -18,8 +18,8 @@ const optionObjectFrom = (ruleOptions: Readonly<Options>): Readonly<Record<strin
 const budgetFrom = (ruleOptions: Readonly<Options>, filename: string): number => {
   const configured = optionObjectFrom(ruleOptions);
   const spec = isSpecFile(filename, specFileSuffixesFrom(ruleOptions));
-  const budgetProperty = spec ? "maxSpecLines" : "maxLines";
   const fallback = spec ? DEFAULT_MAX_SPEC_LINES : DEFAULT_MAX_LINES;
+  const budgetProperty = spec ? "maxSpecLines" : "maxLines";
   const written = configured[budgetProperty];
   return typeof written === "number" ? written : fallback;
 };

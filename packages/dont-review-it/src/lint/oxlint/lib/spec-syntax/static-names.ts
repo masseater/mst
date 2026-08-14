@@ -19,12 +19,12 @@ const spelledOutKey = (named: ESTree.PropertyKey, computed: boolean): string | n
   return staticSpelling(named);
 };
 
-export const staticMemberName = (node: ESTree.MemberExpression): string | null =>
-  spelledOutKey(node.property, node.computed);
-
 export const staticPropertyName = (
   property: ESTree.ObjectProperty | ESTree.BindingProperty,
 ): string | null => spelledOutKey(property.key, property.computed);
+
+export const staticMemberName = (node: ESTree.MemberExpression): string | null =>
+  spelledOutKey(node.property, node.computed);
 
 export const staticCalleeName = (call: ESTree.CallExpression): string | null => {
   const callee = unwrapSubject(call.callee);

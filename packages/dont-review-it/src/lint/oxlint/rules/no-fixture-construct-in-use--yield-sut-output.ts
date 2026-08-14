@@ -14,23 +14,10 @@ import {
 
 import type { ESTree, Variable } from "@oxlint/plugins";
 
-const COMPOSING_CALL = "Object.assign";
-
 const INSTANCE_FACTORY_SHAPES: ReadonlyMap<string, string> = new Map([
   ["Object.create", "a value `Object.create` built here"],
   ["Reflect.construct", "a value `Reflect.construct` built here"],
 ]);
-
-type Assembly =
-  | { readonly kind: "built"; readonly shape: string; readonly boundAs: string | null }
-  | { readonly kind: "read"; readonly root: string };
-
-type Reading = {
-  readonly written: ESTree.Expression;
-  readonly scopeAt: ScopeLookup;
-  readonly walked: ReadonlySet<Variable>;
-  readonly calls: readonly ESTree.CallExpression[];
-};
 
 const qualifiedCalleeOf = (call: ESTree.CallExpression): string | null => {
   const callee = unwrapSubject(call.callee);
@@ -42,6 +29,8 @@ const qualifiedCalleeOf = (call: ESTree.CallExpression): string | null => {
   return `${namespace.name}.${member}`;
 };
 
+const COMPOSING_CALL = "Object.assign";
+
 const composedValueOf = (call: ESTree.CallExpression): ESTree.Expression | null => {
   if (qualifiedCalleeOf(call) !== COMPOSING_CALL) return null;
 
@@ -49,10 +38,11 @@ const composedValueOf = (call: ESTree.CallExpression): ESTree.Expression | null 
   return composed === undefined || composed.type === "SpreadElement" ? null : composed;
 };
 
-const declaredValueOf = (bound: Variable): ESTree.Expression | null => {
-  const [definition] = bound.defs;
-  if (definition?.node.type !== "VariableDeclarator") return null;
-  return definition.node.init;
+type Reading = {
+  readonly written: ESTree.Expression;
+  readonly scopeAt: ScopeLookup;
+  readonly walked: ReadonlySet<Variable>;
+  readonly calls: readonly ESTree.CallExpression[];
 };
 
 const filledByCall = (bound: Variable, reading: Reading): boolean =>
@@ -63,6 +53,28 @@ const filledByCall = (bound: Variable, reading: Reading): boolean =>
     const root = memberRootOf(callee.object);
     return root !== null && resolveBinding(reading.scopeAt(root), root.name) === bound;
   });
+
+const declaredValueOf = (bound: Variable): ESTree.Expression | null => {
+  const [definition] = bound.defs;
+  if (definition?.node.type !== "VariableDeclarator") return null;
+  return definition.node.init;
+};
+
+type Assembly =
+  | { readonly kind: "built"; readonly shape: string; readonly boundAs: string | null }
+  | { readonly kind: "read"; readonly root: string };
+
+const assemblyInMemberRead = (
+  member: ESTree.MemberExpression,
+  reading: Reading,
+): Assembly | null => {
+  const root = memberRootOf(member.object);
+  if (root === null) return null;
+
+  const bound = resolveBinding(reading.scopeAt(root), root.name);
+  if (bound === null || declaredValueOf(bound) === null) return null;
+  return { kind: "read", root: root.name };
+};
 
 const assemblyOf = (reading: Reading): Assembly | null => {
   const written = unwrapSubject(reading.written);
@@ -89,18 +101,6 @@ const assemblyInCall = (call: ESTree.CallExpression, reading: Reading): Assembly
   const qualified = qualifiedCalleeOf(call);
   const shape = qualified === null ? undefined : INSTANCE_FACTORY_SHAPES.get(qualified);
   return shape === undefined ? null : { kind: "built", shape, boundAs: null };
-};
-
-const assemblyInMemberRead = (
-  member: ESTree.MemberExpression,
-  reading: Reading,
-): Assembly | null => {
-  const root = memberRootOf(member.object);
-  if (root === null) return null;
-
-  const bound = resolveBinding(reading.scopeAt(root), root.name);
-  if (bound === null || declaredValueOf(bound) === null) return null;
-  return { kind: "read", root: root.name };
 };
 
 const assemblyBehindName = (

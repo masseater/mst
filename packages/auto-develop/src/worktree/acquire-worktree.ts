@@ -13,15 +13,6 @@ export type AcquireRequest = {
   readonly prNumber: number;
 };
 
-export type AcquireContext = {
-  readonly git: GitRunner;
-  readonly repoDir: string;
-  readonly sharedGitDir: string;
-  readonly fs: WorktreeFs;
-  readonly log: Logger;
-  readonly now: () => Date;
-};
-
 const fetchBranch = (fetching: {
   readonly git: GitRunner;
   readonly repoDir: string;
@@ -35,6 +26,15 @@ const fetchBranch = (fetching: {
     ],
     cwd: fetching.repoDir,
   });
+
+export type AcquireContext = {
+  readonly git: GitRunner;
+  readonly repoDir: string;
+  readonly sharedGitDir: string;
+  readonly fs: WorktreeFs;
+  readonly log: Logger;
+  readonly now: () => Date;
+};
 
 const resetAndMark = async (finishing: {
   readonly context: AcquireContext;

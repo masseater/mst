@@ -19,8 +19,8 @@ const PROPERTY_KIND = "Property";
 const MEMBER_KIND = "MemberExpression";
 
 const readPositionsOf = (node: AstFields): readonly unknown[] => {
-  const nodeKind = node[NODE_TYPE_FIELD];
   if (node.computed === true) return Object.values(node);
+  const nodeKind = node[NODE_TYPE_FIELD];
   if (nodeKind === PROPERTY_KIND) return [node.value];
   if (nodeKind === MEMBER_KIND) return [node.object];
   return Object.values(node);

@@ -9,8 +9,6 @@ import { runMode } from "./run-mode.ts";
 
 const DEFAULT_CONCURRENCY = "3";
 
-const ENGINE_TIMEOUT_MS = 72 * 60 * 60 * 1000;
-
 const runtimeArgs = {
   concurrency: {
     type: "string",
@@ -53,6 +51,8 @@ const positiveIntegerFrom = (raw: string, fallback: number): number => {
   const parsedNode = Number(raw);
   return Number.isInteger(parsedNode) && parsedNode > 0 ? parsedNode : fallback;
 };
+
+const ENGINE_TIMEOUT_MS = 72 * 60 * 60 * 1000;
 
 const startRuntime = async (start: {
   readonly mode: Mode;

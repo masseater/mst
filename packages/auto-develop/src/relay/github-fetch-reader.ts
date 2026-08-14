@@ -10,6 +10,43 @@ import {
 import { GithubRejectionError } from "./github-rejection-error.ts";
 import { GithubUnavailableError } from "./github-unavailable-error.ts";
 
+export type GithubApiAccess = {
+  readonly graphql: (
+    query: string,
+    variables: Readonly<Record<string, unknown>>,
+  ) => Promise<unknown>;
+  readonly authenticatedLogin: () => Promise<string>;
+  readonly repositoryIsPrivate: (target: {
+    readonly owner: string;
+    readonly repo: string;
+  }) => Promise<boolean>;
+};
+
+const octokitAccess = (client: {
+  readonly token: string;
+  readonly baseUrl: string;
+  readonly fetchImpl: typeof fetch;
+}): GithubApiAccess => {
+  const octokit = new Octokit({
+    auth: client.token,
+    baseUrl: client.baseUrl,
+    request: { fetch: client.fetchImpl },
+  });
+  return {
+    graphql: (query, variables) => octokit.graphql(query, variables),
+    authenticatedLogin: async () => (await octokit.rest.users.getAuthenticated()).data.login,
+    repositoryIsPrivate: async (checked) => (await octokit.rest.repos.get(checked)).data.private,
+  };
+};
+
+export const octokitAccessFor =
+  (client: {
+    readonly baseUrl: string;
+    readonly fetchImpl: typeof fetch;
+  }): ((token: string) => GithubApiAccess) =>
+  (token) =>
+    octokitAccess({ token, baseUrl: client.baseUrl, fetchImpl: client.fetchImpl });
+
 const PULL_SUMMARY_QUERY = `query($owner: String!, $name: String!) {
   repository(owner: $owner, name: $name) {
     pullRequests(states: OPEN, first: 100) {
@@ -159,43 +196,6 @@ const checkRunBucket = (node: Readonly<Record<string, unknown>>): readonly Check
 
 const toCheckBucket = (node: Readonly<Record<string, unknown>>): readonly CheckBucket[] =>
   typeof node.state === "string" ? statusContextBucket(node.state) : checkRunBucket(node);
-
-export type GithubApiAccess = {
-  readonly graphql: (
-    query: string,
-    variables: Readonly<Record<string, unknown>>,
-  ) => Promise<unknown>;
-  readonly authenticatedLogin: () => Promise<string>;
-  readonly repositoryIsPrivate: (target: {
-    readonly owner: string;
-    readonly repo: string;
-  }) => Promise<boolean>;
-};
-
-const octokitAccess = (client: {
-  readonly token: string;
-  readonly baseUrl: string;
-  readonly fetchImpl: typeof fetch;
-}): GithubApiAccess => {
-  const octokit = new Octokit({
-    auth: client.token,
-    baseUrl: client.baseUrl,
-    request: { fetch: client.fetchImpl },
-  });
-  return {
-    graphql: (query, variables) => octokit.graphql(query, variables),
-    authenticatedLogin: async () => (await octokit.rest.users.getAuthenticated()).data.login,
-    repositoryIsPrivate: async (checked) => (await octokit.rest.repos.get(checked)).data.private,
-  };
-};
-
-export const octokitAccessFor =
-  (client: {
-    readonly baseUrl: string;
-    readonly fetchImpl: typeof fetch;
-  }): ((token: string) => GithubApiAccess) =>
-  (token) =>
-    octokitAccess({ token, baseUrl: client.baseUrl, fetchImpl: client.fetchImpl });
 
 export const createGithubFetchReader = (access: {
   readonly repository: string;

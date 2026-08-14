@@ -15,13 +15,6 @@ import { tryLock, unlock } from "fs-native-extensions";
 import { tryAcquireFileLock } from "./acquire-file-lock.ts";
 import { failedWithCode, failureSpelling } from "./failure-codes.ts";
 
-export type SlotHold = { release: () => Promise<void> };
-
-export type AcquireConfiguration = {
-  slotDir: string;
-  limit: number;
-};
-
 const markerPath = (slotDir: string, index: number): string => join(slotDir, `slot-${index}`);
 
 const lockPath = (marker: string): string => `${marker}.lock`;
@@ -39,6 +32,8 @@ export const ensureSlots = (slotDir: string, limit: number): void => {
   }
 };
 
+export type SlotHold = { release: () => Promise<void> };
+
 const lockUnlessHeld = (marker: string): SlotHold | null => {
   return tryAcquireFileLock({
     path: lockPath(marker),
@@ -50,6 +45,11 @@ const lockUnlessHeld = (marker: string): SlotHold | null => {
       writeFileSync(marker, randomBytes(16).toString("hex"));
     },
   });
+};
+
+export type AcquireConfiguration = {
+  slotDir: string;
+  limit: number;
 };
 
 const firstFreeSlot = (configuration: AcquireConfiguration): SlotHold | null => {

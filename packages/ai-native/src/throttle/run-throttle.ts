@@ -6,7 +6,6 @@ import { ensureSlots, tryAcquireAny, type SlotHold } from "./slots.ts";
 import { parseInvocation } from "./usage.ts";
 import { waitForSlot, type WaitConfiguration } from "./wait-for-slot.ts";
 
-const DEFAULT_LIMIT = 1;
 const DEFAULT_WAIT_BUDGET_MS = 900_000;
 const DEFAULT_POLL_MS = 1_000;
 
@@ -18,6 +17,8 @@ export type ThrottleSeams = {
   isInteractive?: boolean;
   killGraceMs?: number;
 };
+
+const DEFAULT_LIMIT = 1;
 
 const limitFromEnvironment = (): number => {
   const raw = process.env.MST_THROTTLE_LIMIT;

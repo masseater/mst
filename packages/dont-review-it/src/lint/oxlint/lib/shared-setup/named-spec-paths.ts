@@ -4,17 +4,9 @@ import { DEFAULT_SPEC_FILE_SUFFIXES } from "../spec-syntax/spec-files.ts";
 
 import type { LiteralNode } from "../canonical-values/literal-position.ts";
 
-const LEADING_HERE = /^\.\//u;
-
-const TRAILING_SEPARATORS = /\/+$/u;
-
-const PATTERN_CHARACTERS = /[*?+()[\]{}|]/u;
-
 const PATTERN_ESCAPES = /\\/gu;
 
 const PATTERN_ANCHORS = /^\^|\$$/gu;
-
-const LEAST_WRITTEN_OUT_SEGMENTS = 2;
 
 const spelledPatternOf = (pattern: string): string =>
   pattern.replace(PATTERN_ESCAPES, "").replace(PATTERN_ANCHORS, "");
@@ -24,8 +16,16 @@ export const spelledPathIn = (node: LiteralNode): string | null => {
   return typeof node.value === "string" ? node.value : null;
 };
 
+const LEADING_HERE = /^\.\//u;
+
+const TRAILING_SEPARATORS = /\/+$/u;
+
 const writtenOutPath = (spelled: string): string =>
   toPosixPath(spelled).replace(LEADING_HERE, "").replace(TRAILING_SEPARATORS, "");
+
+const PATTERN_CHARACTERS = /[*?+()[\]{}|]/u;
+
+const LEAST_WRITTEN_OUT_SEGMENTS = 2;
 
 export const namesAuthoredSpec = ({
   spelled,

@@ -9,28 +9,6 @@ import {
 
 import type { ESTree } from "@oxlint/plugins";
 
-export const FIXTURE_BUILDER_MEMBER = "extend";
-
-const CUSTOM_MATCHER_RECEIVER = "expect";
-
-const FIXTURE_FORMS = ["builder", "object"] as const;
-
-export type FixtureDeclaration = {
-  readonly name: string;
-  readonly nameNode: ESTree.Node;
-  readonly form: (typeof FIXTURE_FORMS)[number];
-  readonly factory: SpecFunction | null;
-  readonly subjects: readonly ESTree.Expression[];
-};
-
-export type FixtureDependency = {
-  readonly name: string;
-  readonly boundAs: string | null;
-  readonly property: ESTree.BindingProperty;
-};
-
-const HANDOFF_PARAMETER_INDEX = 1;
-
 const parameterNameAt = (takenFunction: SpecFunction, index: number): string | null => {
   const parameter = takenFunction.params[index];
   if (parameter === undefined) return null;
@@ -39,6 +17,12 @@ const parameterNameAt = (takenFunction: SpecFunction, index: number): string | n
 
 export const fixtureContextParameterName = (takenFunction: SpecFunction): string | null =>
   parameterNameAt(takenFunction, 0);
+
+export type FixtureDependency = {
+  readonly name: string;
+  readonly boundAs: string | null;
+  readonly property: ESTree.BindingProperty;
+};
 
 export const fixtureDependenciesOf = (
   takenFunction: SpecFunction,
@@ -55,6 +39,10 @@ export const fixtureDependenciesOf = (
   });
 };
 
+export const FIXTURE_BUILDER_MEMBER = "extend";
+
+const CUSTOM_MATCHER_RECEIVER = "expect";
+
 export const isFixtureBuilderCall = (call: ESTree.CallExpression): boolean => {
   const callee = unwrapSubject(call.callee);
   if (callee.type !== "MemberExpression") return false;
@@ -62,6 +50,16 @@ export const isFixtureBuilderCall = (call: ESTree.CallExpression): boolean => {
 
   const receiver = unwrapSubject(callee.object);
   return !(receiver.type === "Identifier" && receiver.name === CUSTOM_MATCHER_RECEIVER);
+};
+
+const FIXTURE_FORMS = ["builder", "object"] as const;
+
+export type FixtureDeclaration = {
+  readonly name: string;
+  readonly nameNode: ESTree.Node;
+  readonly form: (typeof FIXTURE_FORMS)[number];
+  readonly factory: SpecFunction | null;
+  readonly subjects: readonly ESTree.Expression[];
 };
 
 const builderDeclaration = ({
@@ -97,6 +95,8 @@ const scopedFixtureExpression = (written: ESTree.Expression): ESTree.Expression 
   const [head] = bare.elements;
   return head === undefined || head === null || head.type === "SpreadElement" ? null : head;
 };
+
+const HANDOFF_PARAMETER_INDEX = 1;
 
 const objectDeclaration = ({
   name,

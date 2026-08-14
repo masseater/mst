@@ -9,9 +9,35 @@ import { spelledSeverityOf } from "../lib/spelled-lint-severity.ts";
 import type { ESTree, Options } from "@oxlint/plugins";
 import type { RuleMessage } from "../lib/rule-message.ts";
 
-const RESTRICTION_RULES_OPTION = "restrictionRules";
+const ENTRY_SCHEMA = {
+  type: "object",
+  properties: {
+    rule: { type: "string" },
+    substitute: { type: "string" },
+    reason: { type: "string" },
+  },
+  required: ["rule"],
+  additionalProperties: false,
+} as const;
 
-const EXCEPTIONS_OPTION = "exceptions";
+const DISABLED_SEVERITIES: ReadonlySet<string> = new Set([LINT_SEVERITY.OFF, "allow", "0"]);
+
+const ENABLED_SEVERITIES: ReadonlySet<string> = new Set([
+  LINT_SEVERITY.ERROR,
+  "deny",
+  LINT_SEVERITY.WARN,
+  "1",
+  "2",
+]);
+
+const holdsEnabledRule = (held: ESTree.Expression): boolean => {
+  const spelled = spelledSeverityOf(held);
+  if (spelled === null) return true;
+  if (DISABLED_SEVERITIES.has(spelled)) return false;
+  return ENABLED_SEVERITIES.has(spelled);
+};
+
+const RESTRICTION_RULES_OPTION = "restrictionRules";
 
 const RESTRICTION_RULES: readonly { readonly rule: string; readonly substitute: string }[] = [
   {
@@ -39,34 +65,6 @@ const RESTRICTION_RULES: readonly { readonly rule: string; readonly substitute: 
   { rule: "no-restricted-types", substitute: "" },
 ];
 
-const DISABLED_SEVERITIES: ReadonlySet<string> = new Set([LINT_SEVERITY.OFF, "allow", "0"]);
-
-const ENABLED_SEVERITIES: ReadonlySet<string> = new Set([
-  LINT_SEVERITY.ERROR,
-  "deny",
-  LINT_SEVERITY.WARN,
-  "1",
-  "2",
-]);
-
-const ENTRY_SCHEMA = {
-  type: "object",
-  properties: {
-    rule: { type: "string" },
-    substitute: { type: "string" },
-    reason: { type: "string" },
-  },
-  required: ["rule"],
-  additionalProperties: false,
-} as const;
-
-const holdsEnabledRule = (held: ESTree.Expression): boolean => {
-  const spelled = spelledSeverityOf(held);
-  if (spelled === null) return true;
-  if (DISABLED_SEVERITIES.has(spelled)) return false;
-  return ENABLED_SEVERITIES.has(spelled);
-};
-
 const restrictionRulesIn = (ruleOptions: Readonly<Options>): ReadonlyMap<string, string> => {
   const declared = listedUnder(ruleOptions, RESTRICTION_RULES_OPTION).flatMap(
     ({ rule, substitute }) =>
@@ -81,6 +79,8 @@ const restrictionRulesIn = (ruleOptions: Readonly<Options>): ReadonlyMap<string,
     ]),
   );
 };
+
+const EXCEPTIONS_OPTION = "exceptions";
 
 const exceptionGroundsIn = (ruleOptions: Readonly<Options>): ReadonlyMap<string, string> =>
   new Map(

@@ -13,19 +13,6 @@ const DEFAULT_ORDERING_ALIAS_PREFIXES: readonly string[] = ["_"];
 
 const ORDERING_ALIAS_PREFIXES_OPTION = "orderingAliasPrefixes";
 
-const DISCARDING_OPERATOR = "void";
-
-type Placement = {
-  readonly holder: ESTree.Node;
-  readonly held: ESTree.Node;
-};
-
-type OrderingReport = {
-  readonly node: ESTree.Node;
-  readonly messageId: string;
-  readonly data: { readonly dependency: string; readonly bound: string };
-};
-
 const orderingAliasPrefixesFrom = (ruleOptions: Readonly<Options>): readonly string[] => {
   const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) {
@@ -46,6 +33,11 @@ const isOrderingAlias = (input: {
   return boundAs !== name && prefixes.some((prefix) => boundAs.startsWith(prefix));
 };
 
+type Placement = {
+  readonly holder: ESTree.Node;
+  readonly held: ESTree.Node;
+};
+
 const placementOf = (reference: Reference): Placement => {
   const held = reference.identifier;
   const holder = held.parent;
@@ -53,6 +45,8 @@ const placementOf = (reference: Reference): Placement => {
     ? { holder: holder.parent, held: holder }
     : { holder, held };
 };
+
+const DISCARDING_OPERATOR = "void";
 
 const isDiscarded = ({ holder }: Placement): boolean =>
   holder.type === "ExpressionStatement" ||
@@ -95,6 +89,12 @@ const consumesValue = (input: {
         reached,
       });
     });
+};
+
+type OrderingReport = {
+  readonly node: ESTree.Node;
+  readonly messageId: string;
+  readonly data: { readonly dependency: string; readonly bound: string };
 };
 
 const reportFor = (input: {

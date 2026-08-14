@@ -10,8 +10,8 @@ const submittedReviewShape = (
   const pullNumber = asRecord(delivered.pull_request)?.number;
   const review = asRecord(delivered.review);
   const heldState = review?.state;
-  const writtenBody = review?.body;
   if (typeof pullNumber !== "number" || typeof heldState !== "string") return null;
+  const writtenBody = review?.body;
   if (typeof writtenBody !== "string" && writtenBody !== null) return null;
   return { pullNumber, state: heldState, body: writtenBody };
 };

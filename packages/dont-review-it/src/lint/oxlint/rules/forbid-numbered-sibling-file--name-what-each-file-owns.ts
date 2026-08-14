@@ -7,11 +7,11 @@ import { createDontReviewItRule } from "../../../create-rule.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
-const ORDINAL_NAME_PATTERN = /^(?<prefix>.+[-_])\d+$/u;
-
 const directoryEntries = memoize((directory: string): readonly string[] => readdirSync(directory));
 
 const baseNameOf = (fileName: string): string => fileName.split(".").slice(0, 1).join("");
+
+const ORDINAL_NAME_PATTERN = /^(?<prefix>.+[-_])\d+$/u;
 
 const ordinalPrefixOf = (fileName: string): string | null =>
   ORDINAL_NAME_PATTERN.exec(baseNameOf(fileName))?.groups?.prefix ?? null;

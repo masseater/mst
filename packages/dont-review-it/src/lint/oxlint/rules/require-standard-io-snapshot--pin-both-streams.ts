@@ -11,10 +11,6 @@ import { standardIoFixtureLocalNameOf } from "../lib/standard-io-fixture.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
-const CAPTURED_STREAM_NAMES = ["stdout", "stderr"] as const;
-
-const SNAPSHOT_MATCHER_NAMES = new Set(["toMatchInlineSnapshot", "toMatchSnapshot"]);
-
 const rootIdentifierName = (expression: ESTree.Expression): string | null => {
   const written = unwrapSubject(expression);
   if (written.type === "Identifier") return written.name;
@@ -29,16 +25,7 @@ const calleeRootNameOf = (callee: ESTree.Expression): string | null => {
   return callee.object.name;
 };
 
-const isDerivedFromFixture = (
-  expression: ESTree.Expression,
-  fixtureLocalNames: ReadonlySet<string>,
-): boolean => {
-  if (expression.type === "Identifier") return fixtureLocalNames.has(expression.name);
-  if (expression.type !== "CallExpression") return false;
-  const { callee } = expression;
-  if (callee.type !== "MemberExpression") return false;
-  return isDerivedFromFixture(callee.object, fixtureLocalNames);
-};
+const SNAPSHOT_MATCHER_NAMES = new Set(["toMatchInlineSnapshot", "toMatchSnapshot"]);
 
 const snapshotSubjectOf = (node: ESTree.CallExpression): ESTree.Expression | null => {
   const { callee } = node;
@@ -55,6 +42,8 @@ const declaredDependencyNames = (declaration: FixtureDeclaration): readonly stri
   if (declaration.factory === null) return [];
   return (fixtureDependenciesOf(declaration.factory) ?? []).map((dependency) => dependency.name);
 };
+
+const CAPTURED_STREAM_NAMES = ["stdout", "stderr"] as const;
 
 const streamsReachedBy = (
   reached: ReadonlyMap<string, ReadonlySet<string>>,
@@ -91,6 +80,17 @@ const streamsBehindNames = (program: ESTree.Program): ReadonlyMap<string, Readon
     ]),
   );
   return streamsReachedBy(new Map(), dependencies);
+};
+
+const isDerivedFromFixture = (
+  expression: ESTree.Expression,
+  fixtureLocalNames: ReadonlySet<string>,
+): boolean => {
+  if (expression.type === "Identifier") return fixtureLocalNames.has(expression.name);
+  if (expression.type !== "CallExpression") return false;
+  const { callee } = expression;
+  if (callee.type !== "MemberExpression") return false;
+  return isDerivedFromFixture(callee.object, fixtureLocalNames);
 };
 
 const fixtureLocalNamesIn = (program: ESTree.Program): ReadonlySet<string> => {

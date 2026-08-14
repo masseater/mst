@@ -3,26 +3,6 @@ import { unwrapSubject } from "./subject-expressions.ts";
 
 import type { ESTree, Options } from "@oxlint/plugins";
 
-const DEFAULT_HOST_OBJECT_TYPES: readonly string[] = ["Request", "Response"];
-
-const DEFAULT_RUNTIME_MODULES: readonly string[] = ["undici"];
-
-/** @canonical-values dont-review-it.response-factory-member */
-const RESPONSE_FACTORY_MEMBERS = ["error", "json", "redirect"] as const;
-
-const HOST_OBJECT_FACTORY_MEMBERS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
-  ["Response", new Set(RESPONSE_FACTORY_MEMBERS)],
-]);
-
-const HOST_OBJECT_TYPES_OPTION = "hostObjectTypes";
-
-const RUNTIME_MODULES_OPTION = "runtimeModules";
-
-export type HostTypeLookup = {
-  readonly named: (name: string, at: ESTree.Node) => string | null;
-  readonly qualified: (namespace: string, member: string) => string | null;
-};
-
 const spelledListFrom = (asked: {
   readonly options: Readonly<Options>;
   readonly key: string;
@@ -40,6 +20,10 @@ const spelledListFrom = (asked: {
   return spelled.length === 0 ? asked.fallback : spelled;
 };
 
+const DEFAULT_HOST_OBJECT_TYPES: readonly string[] = ["Request", "Response"];
+
+const HOST_OBJECT_TYPES_OPTION = "hostObjectTypes";
+
 export const hostObjectTypesFrom = (ruleOptions: Readonly<Options>): ReadonlySet<string> =>
   new Set(
     spelledListFrom({
@@ -49,6 +33,10 @@ export const hostObjectTypesFrom = (ruleOptions: Readonly<Options>): ReadonlySet
     }),
   );
 
+const DEFAULT_RUNTIME_MODULES: readonly string[] = ["undici"];
+
+const RUNTIME_MODULES_OPTION = "runtimeModules";
+
 export const runtimeModulesFrom = (ruleOptions: Readonly<Options>): ReadonlySet<string> =>
   new Set(
     spelledListFrom({
@@ -57,6 +45,11 @@ export const runtimeModulesFrom = (ruleOptions: Readonly<Options>): ReadonlySet<
       fallback: DEFAULT_RUNTIME_MODULES,
     }),
   );
+
+export type HostTypeLookup = {
+  readonly named: (name: string, at: ESTree.Node) => string | null;
+  readonly qualified: (namespace: string, member: string) => string | null;
+};
 
 const referencedHostTypeOf = (node: ESTree.Expression, lookup: HostTypeLookup): string | null => {
   const written = unwrapSubject(node);
@@ -68,6 +61,13 @@ const referencedHostTypeOf = (node: ESTree.Expression, lookup: HostTypeLookup): 
   if (member === null || owner.type !== "Identifier") return null;
   return lookup.qualified(owner.name, member);
 };
+
+/** @canonical-values dont-review-it.response-factory-member */
+const RESPONSE_FACTORY_MEMBERS = ["error", "json", "redirect"] as const;
+
+const HOST_OBJECT_FACTORY_MEMBERS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
+  ["Response", new Set(RESPONSE_FACTORY_MEMBERS)],
+]);
 
 const factoryHostTypeOf = (call: ESTree.CallExpression, lookup: HostTypeLookup): string | null => {
   const callee = unwrapSubject(call.callee);

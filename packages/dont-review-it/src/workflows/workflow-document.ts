@@ -42,12 +42,12 @@ export const lineOf = (document: WorkflowDocument, node: unknown): number => {
   return range === undefined || range === null ? 1 : lineAtOffset(document, range[0]);
 };
 
-export const entriesOf = (node: unknown): readonly Pair[] => (isMap(node) ? node.items : []);
-
 export const itemsOf = (node: unknown): readonly unknown[] => (isSeq(node) ? node.items : []);
 
 export const keyOf = (pair: Pair): string | null =>
   isScalar(pair.key) ? String(pair.key.value) : null;
+
+export const entriesOf = (node: unknown): readonly Pair[] => (isMap(node) ? node.items : []);
 
 export const entryOf = (node: unknown, named: string): Pair | null =>
   entriesOf(node).find((pair) => keyOf(pair) === named) ?? null;

@@ -9,24 +9,7 @@ import type { CredentialProvider } from "./credential-provider.ts";
 
 const DEFAULT_READ_TIMEOUT_MS = 60_000;
 
-const DEFAULT_RETRY_DEADLINE_MS = 60_000;
-
 const KNOWN_ID_LIMIT = 10_000;
-
-export type SseTransportConfig = {
-  readonly url: string;
-  readonly credentials: CredentialProvider;
-  readonly mode: Mode;
-  readonly reconnectOnClose?: boolean;
-  readonly readTimeoutMs?: number;
-  readonly retryDeadlineMs?: number;
-  readonly diagnostics?: { readonly write: (chunk: string) => void };
-  readonly fetchImpl?: typeof fetch;
-  readonly random?: () => number;
-  readonly now?: () => number;
-  readonly sleep?: (delayMs: number, signal: AbortSignal) => Promise<void>;
-  readonly knownIdLimit?: number;
-};
 
 export type SseTransport = {
   readonly connect: () => Promise<void>;
@@ -56,6 +39,23 @@ const defaultSleep = (delayMs: number, signal: AbortSignal): Promise<void> =>
       { once: true },
     );
   });
+
+const DEFAULT_RETRY_DEADLINE_MS = 60_000;
+
+export type SseTransportConfig = {
+  readonly url: string;
+  readonly credentials: CredentialProvider;
+  readonly mode: Mode;
+  readonly reconnectOnClose?: boolean;
+  readonly readTimeoutMs?: number;
+  readonly retryDeadlineMs?: number;
+  readonly diagnostics?: { readonly write: (chunk: string) => void };
+  readonly fetchImpl?: typeof fetch;
+  readonly random?: () => number;
+  readonly now?: () => number;
+  readonly sleep?: (delayMs: number, signal: AbortSignal) => Promise<void>;
+  readonly knownIdLimit?: number;
+};
 
 const resolveRuntime = (config: SseTransportConfig): ConnectionRuntime => {
   const streamUrl = new URL(config.url);

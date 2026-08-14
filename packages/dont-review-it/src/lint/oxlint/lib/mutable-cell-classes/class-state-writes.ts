@@ -2,10 +2,6 @@ import { SUGARED_NODE_TYPES } from "../node-kinds.ts";
 import { listedFieldsOf } from "../setup-modules/coupling-edges.ts";
 import { fieldOf, kindAt, nodeVisitsIn } from "./node-visits.ts";
 
-const PRIVATE_NAME_MARK = "#";
-
-const OWN_THIS_KINDS: ReadonlySet<string> = new Set(["FunctionDeclaration", "FunctionExpression"]);
-
 const HELD_STATE_MEMBER_KINDS: ReadonlySet<string> = new Set([
   "AccessorProperty",
   "PropertyDefinition",
@@ -20,6 +16,8 @@ const soleQuasiText = (named: unknown): string | null => {
     .map((held) => String(held.cooked));
   return listedFieldsOf(fieldOf(named, "expressions")).length === 0 ? spelled.join("") : null;
 };
+
+const PRIVATE_NAME_MARK = "#";
 
 const spelledKey = (member: unknown): string | null => {
   const named = fieldOf(member, "property");
@@ -54,6 +52,8 @@ const writtenTargetOf = (node: unknown): unknown => {
       return null;
   }
 };
+
+const OWN_THIS_KINDS: ReadonlySet<string> = new Set(["FunctionDeclaration", "FunctionExpression"]);
 
 const fieldsWrittenUnder = (root: unknown, deferralRequired: boolean): readonly string[] =>
   nodeVisitsIn(root).flatMap((visit) => {

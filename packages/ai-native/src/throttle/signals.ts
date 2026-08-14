@@ -1,9 +1,9 @@
-/** @canonical-values ai-native.interrupt-signal */
-const INTERRUPT_SIGNALS = ["SIGINT", "SIGTERM"] as const;
-
 export const raiseSignal = (signal: NodeJS.Signals): void => {
   process.kill(process.pid, signal);
 };
+
+/** @canonical-values ai-native.interrupt-signal */
+const INTERRUPT_SIGNALS = ["SIGINT", "SIGTERM"] as const;
 
 export const installInterruptHandler = (takenHandler: (signal: NodeJS.Signals) => void): void => {
   for (const signal of INTERRUPT_SIGNALS) process.once(signal, takenHandler);

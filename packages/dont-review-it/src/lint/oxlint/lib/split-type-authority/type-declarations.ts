@@ -9,20 +9,18 @@ import {
   type TypeParameterPlaceholders,
 } from "./canonical-text.ts";
 
+const SOURCE_NAME = "source.ts";
+
+const parameterTextsOf = (
+  parameters: unknown,
+  placeholders: TypeParameterPlaceholders,
+): readonly string[] => (parameters === null ? [] : [canonicalTextOf(parameters, placeholders)]);
+
 export type TypeStructure = {
   readonly parameters: readonly string[];
   readonly heritage: readonly string[];
   readonly members: readonly string[];
   readonly annotation: readonly string[];
-};
-
-export type ScannedTypeDeclaration = {
-  readonly name: string;
-  readonly line: number;
-  readonly kind: string;
-  readonly structure: TypeStructure;
-  readonly referencesNamedType: boolean;
-  readonly referencedNames: readonly string[];
 };
 
 type DeclaredShape = {
@@ -31,45 +29,6 @@ type DeclaredShape = {
   readonly memberNodes: readonly unknown[];
   readonly annotationNodes: readonly unknown[];
 };
-
-type ExportedTypeDeclaration = {
-  readonly statement: AstFields;
-  readonly shapeOf: (statement: AstFields) => DeclaredShape;
-};
-
-const SOURCE_NAME = "source.ts";
-
-const EXPORT_KIND = "ExportNamedDeclaration";
-
-const TYPE_LITERAL_KIND = "TSTypeLiteral";
-
-const shapeOfInterface = (statement: AstFields): DeclaredShape => ({
-  parameters: statement.typeParameters,
-  heritage: statement.extends as readonly unknown[],
-  memberNodes: (statement.body as AstFields).body as readonly unknown[],
-  annotationNodes: [],
-});
-
-const shapeOfTypeAlias = (statement: AstFields): DeclaredShape => {
-  const annotation = statement.typeAnnotation as AstFields;
-  const isObjectShaped = annotation[NODE_TYPE_FIELD] === TYPE_LITERAL_KIND;
-  return {
-    parameters: statement.typeParameters,
-    heritage: [],
-    memberNodes: isObjectShaped ? (annotation.members as readonly unknown[]) : [],
-    annotationNodes: isObjectShaped ? [] : [annotation],
-  };
-};
-
-const SHAPE_BY_KIND: ReadonlyMap<string, (statement: AstFields) => DeclaredShape> = new Map([
-  ["TSInterfaceDeclaration", shapeOfInterface],
-  ["TSTypeAliasDeclaration", shapeOfTypeAlias],
-]);
-
-const parameterTextsOf = (
-  parameters: unknown,
-  placeholders: TypeParameterPlaceholders,
-): readonly string[] => (parameters === null ? [] : [canonicalTextOf(parameters, placeholders)]);
 
 const structureOf = (
   shape: DeclaredShape,
@@ -80,6 +39,20 @@ const structureOf = (
   members: shape.memberNodes.map((node) => canonicalTextOf(node, placeholders)),
   annotation: shape.annotationNodes.map((node) => canonicalTextOf(node, placeholders)),
 });
+
+export type ScannedTypeDeclaration = {
+  readonly name: string;
+  readonly line: number;
+  readonly kind: string;
+  readonly structure: TypeStructure;
+  readonly referencesNamedType: boolean;
+  readonly referencedNames: readonly string[];
+};
+
+type ExportedTypeDeclaration = {
+  readonly statement: AstFields;
+  readonly shapeOf: (statement: AstFields) => DeclaredShape;
+};
 
 const declarationFrom = (
   source: string,
@@ -98,6 +71,33 @@ const declarationFrom = (
     referencedNames: uniq(referencedTypeNamesIn(statement).filter(isUnbound)),
   };
 };
+
+const shapeOfInterface = (statement: AstFields): DeclaredShape => ({
+  parameters: statement.typeParameters,
+  heritage: statement.extends as readonly unknown[],
+  memberNodes: (statement.body as AstFields).body as readonly unknown[],
+  annotationNodes: [],
+});
+
+const TYPE_LITERAL_KIND = "TSTypeLiteral";
+
+const shapeOfTypeAlias = (statement: AstFields): DeclaredShape => {
+  const annotation = statement.typeAnnotation as AstFields;
+  const isObjectShaped = annotation[NODE_TYPE_FIELD] === TYPE_LITERAL_KIND;
+  return {
+    parameters: statement.typeParameters,
+    heritage: [],
+    memberNodes: isObjectShaped ? (annotation.members as readonly unknown[]) : [],
+    annotationNodes: isObjectShaped ? [] : [annotation],
+  };
+};
+
+const SHAPE_BY_KIND: ReadonlyMap<string, (statement: AstFields) => DeclaredShape> = new Map([
+  ["TSInterfaceDeclaration", shapeOfInterface],
+  ["TSTypeAliasDeclaration", shapeOfTypeAlias],
+]);
+
+const EXPORT_KIND = "ExportNamedDeclaration";
 
 const exportedTypeDeclarationOf = (statement: unknown): ExportedTypeDeclaration | null => {
   if (!isAstFields(statement) || statement[NODE_TYPE_FIELD] !== EXPORT_KIND) return null;

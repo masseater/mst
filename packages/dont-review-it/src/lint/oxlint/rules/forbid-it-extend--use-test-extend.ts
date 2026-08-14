@@ -5,8 +5,6 @@ import { unwrapSubject } from "../lib/spec-syntax/subject-expressions.ts";
 
 import type { ESTree, Scope, SourceCode, Variable } from "@oxlint/plugins";
 
-const TEST_BLOCK_SPELLING = "it";
-
 const FIXTURE_FACTORY_BASE = "test";
 
 const variableNamed = (scope: Scope | null, spelled: string): Variable | null =>
@@ -16,6 +14,8 @@ const importedSpelling = (specifier: ESTree.ImportSpecifier): string | null =>
   specifier.imported.type === "Identifier"
     ? specifier.imported.name
     : staticSpelling(specifier.imported);
+
+const TEST_BLOCK_SPELLING = "it";
 
 const standsOnTestBlock = (
   identifier: ESTree.IdentifierReference,

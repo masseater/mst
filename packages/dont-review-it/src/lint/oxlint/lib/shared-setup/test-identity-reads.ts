@@ -2,20 +2,6 @@ import { staticMemberName } from "../spec-syntax/static-names.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
-export const TEST_IDENTIFYING_NAMES: ReadonlySet<string> = new Set([
-  "currentSuite",
-  "currentTest",
-  "currentTestName",
-  "filepath",
-  "fullName",
-  "suite",
-  "suiteName",
-  "tags",
-  "task",
-  "testName",
-  "testPath",
-]);
-
 const TYPE_NODE_PREFIX = "TS";
 
 const VALUE_CARRYING_TYPE_NODES: ReadonlySet<string> = new Set([
@@ -71,6 +57,20 @@ export const standsForOwnValue = ({
   if (parent.type === "Property") return parent.computed || parent.key !== held;
   return true;
 };
+
+export const TEST_IDENTIFYING_NAMES: ReadonlySet<string> = new Set([
+  "currentSuite",
+  "currentTest",
+  "currentTestName",
+  "filepath",
+  "fullName",
+  "suite",
+  "suiteName",
+  "tags",
+  "task",
+  "testName",
+  "testPath",
+]);
 
 const headIdentifiesTest = (expression: ESTree.Expression): boolean => {
   if (expression.type === "Identifier") return TEST_IDENTIFYING_NAMES.has(expression.name);

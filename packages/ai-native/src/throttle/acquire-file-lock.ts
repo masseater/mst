@@ -11,10 +11,6 @@ type FileLockRequest = {
   recordGeneration: () => void;
 };
 
-const releaseDescriptor = (fileLock: FileLockRequest, descriptor: number): void => {
-  releaseFileLock({ descriptor, unlock: fileLock.unlock, close: fileLock.close });
-};
-
 const lockedDescriptor = (fileLock: FileLockRequest): number | null => {
   const descriptor = fileLock.open(fileLock.path);
   const acquired = (() => {
@@ -33,6 +29,10 @@ const lockedDescriptor = (fileLock: FileLockRequest): number | null => {
     return null;
   }
   return descriptor;
+};
+
+const releaseDescriptor = (fileLock: FileLockRequest, descriptor: number): void => {
+  releaseFileLock({ descriptor, unlock: fileLock.unlock, close: fileLock.close });
 };
 
 const releaseAfterGenerationFailure = (input: {

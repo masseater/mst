@@ -60,18 +60,12 @@ const missingKeyword = ({ manifest, config }: SkillPackage): readonly Repository
   ];
 };
 
-const unexpectedSkillFiles = (scope: SkillPackage): readonly RepositoryProblem[] => {
-  const { manifest, config } = scope;
-  if (!shipsSkillFile(scope)) return [];
-
-  return [
-    {
-      file: manifest.file.relativePath,
-      line: lineOfProperty({ manifest, key: "private" }),
-      message: `A workspace-internal package must not carry TanStack Intent skills, because a skill that never ships trains agents on a surface nobody can install. Delete the ${config.skillsDirectory} directory, or let the package publish by removing "private": true.`,
-    },
-  ];
-};
+const missingProblems = (scope: SkillPackage): readonly RepositoryProblem[] => [
+  ...missingSkillFiles(scope),
+  ...missingFilesEntry(scope),
+  ...missingKeyword(scope),
+  ...publishedVersionProblems(scope),
+];
 
 const unexpectedFilesEntry = ({ manifest, config }: SkillPackage): readonly RepositoryProblem[] => {
   const declared = stringEntriesOf(propertyValueOf(manifest.root, "files")) ?? [];
@@ -82,6 +76,19 @@ const unexpectedFilesEntry = ({ manifest, config }: SkillPackage): readonly Repo
       file: manifest.file.relativePath,
       line: lineOfProperty({ manifest, key: "files" }),
       message: `The files allowlist of a workspace-internal package must not name the ${config.requiredFilesEntry} directory, because nothing is ever packed from a package that npm cannot publish. Remove "${config.requiredFilesEntry}" from files.`,
+    },
+  ];
+};
+
+const unexpectedSkillFiles = (scope: SkillPackage): readonly RepositoryProblem[] => {
+  const { manifest, config } = scope;
+  if (!shipsSkillFile(scope)) return [];
+
+  return [
+    {
+      file: manifest.file.relativePath,
+      line: lineOfProperty({ manifest, key: "private" }),
+      message: `A workspace-internal package must not carry TanStack Intent skills, because a skill that never ships trains agents on a surface nobody can install. Delete the ${config.skillsDirectory} directory, or let the package publish by removing "private": true.`,
     },
   ];
 };
@@ -98,13 +105,6 @@ const unexpectedKeyword = ({ manifest, config }: SkillPackage): readonly Reposit
     },
   ];
 };
-
-const missingProblems = (scope: SkillPackage): readonly RepositoryProblem[] => [
-  ...missingSkillFiles(scope),
-  ...missingFilesEntry(scope),
-  ...missingKeyword(scope),
-  ...publishedVersionProblems(scope),
-];
 
 const unexpectedProblems = (scope: SkillPackage): readonly RepositoryProblem[] => [
   ...unexpectedSkillFiles(scope),

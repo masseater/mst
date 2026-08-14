@@ -45,14 +45,6 @@ export type LocalFiniteValueDiagnostic =
       readonly values: readonly CanonicalValue[];
     };
 
-type AnalysisInput = {
-  readonly bindings: LocalFiniteValueBindings;
-  readonly catalog: CanonicalValuesCatalog;
-  readonly filename: string;
-  readonly repositoryRoot: string;
-  readonly scopeAt: ScopeLookup;
-};
-
 const vocabularyDiagnostic = (input: {
   readonly canonicalItems: readonly CanonicalValue[];
   readonly catalog: CanonicalValuesCatalog;
@@ -65,6 +57,14 @@ const vocabularyDiagnostic = (input: {
   return input.onlyWhenOwned && owners.length === 0
     ? []
     : [{ kind: "vocabulary", node: input.node, owners, values: input.canonicalItems }];
+};
+
+type AnalysisInput = {
+  readonly bindings: LocalFiniteValueBindings;
+  readonly catalog: CanonicalValuesCatalog;
+  readonly filename: string;
+  readonly repositoryRoot: string;
+  readonly scopeAt: ScopeLookup;
 };
 
 const routeDiagnostic = (
@@ -200,22 +200,6 @@ const indexedAccessDiagnostics = (
   });
 };
 
-const typeAliasDiagnostics = (
-  input: AnalysisInput,
-  node: ESTree.TSTypeAliasDeclaration,
-): readonly LocalFiniteValueDiagnostic[] => {
-  const canonicalItems = literalUnionValues(node.typeAnnotation);
-  if (canonicalItems !== null) {
-    return vocabularyDiagnostic({
-      canonicalItems,
-      catalog: input.catalog,
-      node: node.typeAnnotation,
-      onlyWhenOwned: false,
-    });
-  }
-  return keyofDiagnostics(input, node.typeAnnotation);
-};
-
 const importTypeName = (qualifier: ESTree.TSImportType["qualifier"]): string | null => {
   if (qualifier === null) return null;
   return qualifier.type === "Identifier" ? qualifier.name : qualifier.right.name;
@@ -245,6 +229,22 @@ const keyofDiagnostics = (
     node: operandType,
     specifier: operandType.source.value,
   });
+};
+
+const typeAliasDiagnostics = (
+  input: AnalysisInput,
+  node: ESTree.TSTypeAliasDeclaration,
+): readonly LocalFiniteValueDiagnostic[] => {
+  const canonicalItems = literalUnionValues(node.typeAnnotation);
+  if (canonicalItems !== null) {
+    return vocabularyDiagnostic({
+      canonicalItems,
+      catalog: input.catalog,
+      node: node.typeAnnotation,
+      onlyWhenOwned: false,
+    });
+  }
+  return keyofDiagnostics(input, node.typeAnnotation);
 };
 
 const diagnosticsForNode = (

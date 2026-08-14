@@ -2,7 +2,16 @@ import { isDeletion, parseNameStatus, type ChangedFile } from "./name-status.ts"
 
 import type { CommentContext, CiContext, PrContext } from "./pr-context.ts";
 
+export type PrContextGithub = {
+  readonly commentContext: (prNumber: number) => Promise<CommentContext>;
+  readonly ciContext: (fetch: {
+    readonly prNumber: number;
+    readonly failedLogsDir: string;
+  }) => Promise<CiContext>;
+};
+
 const MAX_CONTENT_BYTES = 1_000_000;
+
 const GITLINK_MODE = "160000";
 
 export type PrContextGit = {
@@ -16,14 +25,6 @@ export type PrContextGit = {
     readonly path: string;
   }) => Promise<string | null>;
   readonly showFile: (entry: { readonly ref: string; readonly path: string }) => Promise<string>;
-};
-
-export type PrContextGithub = {
-  readonly commentContext: (prNumber: number) => Promise<CommentContext>;
-  readonly ciContext: (fetch: {
-    readonly prNumber: number;
-    readonly failedLogsDir: string;
-  }) => Promise<CiContext>;
 };
 
 const resolveContent = async (resolve: {

@@ -9,56 +9,6 @@ import {
 import { readJsonFile } from "../canonical-values/read-json-file.ts";
 import { isFile, readTextFile } from "../canonical-values/source-files.ts";
 
-const RE_EXPORT_DEPTH_LIMIT = 4;
-
-const RELATIVE_SPECIFIER_PATTERN = /^\.\.?\//u;
-
-const RE_EXPORT_PATTERN =
-  /\bexport\s+(?:type\s+)?(?:\*(?:\s+as\s+[A-Za-z_$][\w$]*)?|\{[^}]*\})\s*from\s*["']([^"']+)["']/gu;
-
-const resolveRelativeSpecifier = (fromFile: string, specifier: string): string | null => {
-  if (!RELATIVE_SPECIFIER_PATTERN.test(specifier)) return null;
-  const base = resolve(dirname(fromFile), specifier);
-  const candidates = [
-    base,
-    base.replace(/\.js$/u, ".ts"),
-    base.replace(/\.mjs$/u, ".mts"),
-    `${base}.ts`,
-    `${base}.tsx`,
-    join(base, "index.ts"),
-    join(base, "index.tsx"),
-  ];
-  return candidates.find(isFile) ?? null;
-};
-
-const reExportTargetsOf = (file: string): readonly string[] => {
-  const moduleSource = readTextFile(file);
-  if (moduleSource === null) return [];
-  return [...moduleSource.matchAll(RE_EXPORT_PATTERN)].flatMap(
-    ([, specifier]) => resolveRelativeSpecifier(file, String(specifier)) ?? [],
-  );
-};
-
-const filesReachableByReExport = (entryFile: string): ReadonlySet<string> => {
-  const walk = (
-    file: string,
-    {
-      depth,
-      reachedBefore,
-    }: { readonly depth: number; readonly reachedBefore: ReadonlySet<string> },
-  ): ReadonlySet<string> => {
-    if (reachedBefore.has(file)) return reachedBefore;
-    const reachedWithFile: ReadonlySet<string> = new Set([...reachedBefore, file]);
-    if (depth >= RE_EXPORT_DEPTH_LIMIT) return reachedWithFile;
-    return reExportTargetsOf(file).reduce(
-      (reachedByEarlierTargets, reExportTarget) =>
-        walk(reExportTarget, { depth: depth + 1, reachedBefore: reachedByEarlierTargets }),
-      reachedWithFile,
-    );
-  };
-  return walk(entryFile, { depth: 0, reachedBefore: new Set() });
-};
-
 const subpathTargetPairsOf = (
   exportTarget: unknown,
   {
@@ -117,6 +67,56 @@ const manifestSurfaceOf = (
     packageName: manifest.name,
     exportsField: "exports" in manifest ? manifest.exports : undefined,
   };
+};
+
+const RE_EXPORT_DEPTH_LIMIT = 4;
+
+const RE_EXPORT_PATTERN =
+  /\bexport\s+(?:type\s+)?(?:\*(?:\s+as\s+[A-Za-z_$][\w$]*)?|\{[^}]*\})\s*from\s*["']([^"']+)["']/gu;
+
+const RELATIVE_SPECIFIER_PATTERN = /^\.\.?\//u;
+
+const resolveRelativeSpecifier = (fromFile: string, specifier: string): string | null => {
+  if (!RELATIVE_SPECIFIER_PATTERN.test(specifier)) return null;
+  const base = resolve(dirname(fromFile), specifier);
+  const candidates = [
+    base,
+    base.replace(/\.js$/u, ".ts"),
+    base.replace(/\.mjs$/u, ".mts"),
+    `${base}.ts`,
+    `${base}.tsx`,
+    join(base, "index.ts"),
+    join(base, "index.tsx"),
+  ];
+  return candidates.find(isFile) ?? null;
+};
+
+const reExportTargetsOf = (file: string): readonly string[] => {
+  const moduleSource = readTextFile(file);
+  if (moduleSource === null) return [];
+  return [...moduleSource.matchAll(RE_EXPORT_PATTERN)].flatMap(
+    ([, specifier]) => resolveRelativeSpecifier(file, String(specifier)) ?? [],
+  );
+};
+
+const filesReachableByReExport = (entryFile: string): ReadonlySet<string> => {
+  const walk = (
+    file: string,
+    {
+      depth,
+      reachedBefore,
+    }: { readonly depth: number; readonly reachedBefore: ReadonlySet<string> },
+  ): ReadonlySet<string> => {
+    if (reachedBefore.has(file)) return reachedBefore;
+    const reachedWithFile: ReadonlySet<string> = new Set([...reachedBefore, file]);
+    if (depth >= RE_EXPORT_DEPTH_LIMIT) return reachedWithFile;
+    return reExportTargetsOf(file).reduce(
+      (reachedByEarlierTargets, reExportTarget) =>
+        walk(reExportTarget, { depth: depth + 1, reachedBefore: reachedByEarlierTargets }),
+      reachedWithFile,
+    );
+  };
+  return walk(entryFile, { depth: 0, reachedBefore: new Set() });
 };
 
 const reachedFilePairsUnder = (

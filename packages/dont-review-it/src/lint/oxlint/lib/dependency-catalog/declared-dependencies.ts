@@ -1,19 +1,6 @@
 import { isNamedFields } from "../named-fields.ts";
 
-const DEPENDENCY_SECTIONS: readonly string[] = [
-  "dependencies",
-  "devDependencies",
-  "optionalDependencies",
-];
-
-const LOCAL_REFERENCE_PROTOCOLS: readonly string[] = ["workspace:", "link:", "file:"];
-
 const ALIAS_PROTOCOL = "npm:";
-
-export type DeclaredDependency = {
-  readonly packageName: string;
-  readonly declaredVersion: string;
-};
 
 const aliasPartsOf = (
   declaredVersion: string,
@@ -25,15 +12,17 @@ const aliasPartsOf = (
     : { targetName: checked, range: "" };
 };
 
-const aliasTargetOf = (declaredVersion: string): string | null => {
-  const { targetName } = aliasPartsOf(declaredVersion);
-  return targetName === "" ? null : targetName;
-};
-
 export const declaredRangeOf = (declaredVersion: string): string =>
   declaredVersion.startsWith(ALIAS_PROTOCOL)
     ? aliasPartsOf(declaredVersion).range
     : declaredVersion;
+
+const LOCAL_REFERENCE_PROTOCOLS: readonly string[] = ["workspace:", "link:", "file:"];
+
+const aliasTargetOf = (declaredVersion: string): string | null => {
+  const { targetName } = aliasPartsOf(declaredVersion);
+  return targetName === "" ? null : targetName;
+};
 
 const packageNameOf = (declaration: {
   readonly declaredName: string;
@@ -46,6 +35,11 @@ const packageNameOf = (declaration: {
   return declaredVersion.startsWith(ALIAS_PROTOCOL) ? aliasTargetOf(declaredVersion) : declaredName;
 };
 
+export type DeclaredDependency = {
+  readonly packageName: string;
+  readonly declaredVersion: string;
+};
+
 const sectionDependencies = (section: unknown): readonly DeclaredDependency[] => {
   if (!isNamedFields(section)) return [];
 
@@ -55,6 +49,12 @@ const sectionDependencies = (section: unknown): readonly DeclaredDependency[] =>
     return packageName === null ? [] : [{ packageName, declaredVersion: declaredValue }];
   });
 };
+
+const DEPENDENCY_SECTIONS: readonly string[] = [
+  "dependencies",
+  "devDependencies",
+  "optionalDependencies",
+];
 
 export const declaredDependenciesIn = (manifest: unknown): readonly DeclaredDependency[] =>
   isNamedFields(manifest)

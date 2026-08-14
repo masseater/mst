@@ -12,8 +12,29 @@ import type { NormativeDocument } from "../scan/normative-documents.ts";
 const MISSING_FRONTMATTER =
   "規範文書に前置きが無い。文書の先頭に区切り行で囲んだ前置きを置き、必須の項目を書く。一覧を機械で組むために、説明が同じ位置に同じ形である必要がある。";
 
+const frontmatterOf = (document: NormativeDocument): Record<string, unknown> | null => {
+  const [first] = document.tree.children;
+  if (first?.type !== "yaml") return null;
+
+  const parsedFrontmatter: unknown = parse(first.value);
+  return isPlainObject(parsedFrontmatter) ? parsedFrontmatter : null;
+};
+
 const missingField = (field: string): string =>
   `前置きの項目 \`${field}\` が無いか、値が空である。値を書く。`;
+
+const missingFieldProblems = ({
+  document,
+  frontmatter,
+  config,
+}: {
+  readonly document: NormativeDocument;
+  readonly frontmatter: Record<string, unknown>;
+  readonly config: AgenticDocumentsConfig;
+}): readonly DocumentProblem[] =>
+  config.requiredFrontmatterFields
+    .filter((field) => nonEmptyStringOrNull(frontmatter[field]) === null)
+    .map((field) => ({ file: document.file, line: 1, message: missingField(field) }));
 
 const mismatch = ({
   field,
@@ -25,14 +46,6 @@ const mismatch = ({
   readonly inManifest: string;
 }): string =>
   `前置きの \`${field}\` とマニフェストの説明が一致していない。前置き: "${inDocument}" / マニフェスト: "${inManifest}"。どちらが正しいかを決め、両方を同じ値に揃える。`;
-
-const frontmatterOf = (document: NormativeDocument): Record<string, unknown> | null => {
-  const [first] = document.tree.children;
-  if (first?.type !== "yaml") return null;
-
-  const parsedFrontmatter: unknown = parse(first.value);
-  return isPlainObject(parsedFrontmatter) ? parsedFrontmatter : null;
-};
 
 const manifestDescriptionOf = async ({
   repositoryRoot,
@@ -47,19 +60,6 @@ const manifestDescriptionOf = async ({
 
   return manifest === null ? null : nonEmptyStringOrNull(manifest.description);
 };
-
-const missingFieldProblems = ({
-  document,
-  frontmatter,
-  config,
-}: {
-  readonly document: NormativeDocument;
-  readonly frontmatter: Record<string, unknown>;
-  readonly config: AgenticDocumentsConfig;
-}): readonly DocumentProblem[] =>
-  config.requiredFrontmatterFields
-    .filter((field) => nonEmptyStringOrNull(frontmatter[field]) === null)
-    .map((field) => ({ file: document.file, line: 1, message: missingField(field) }));
 
 const mismatchProblems = async ({
   repositoryRoot,

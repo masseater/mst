@@ -20,11 +20,6 @@ export const INLINE_SPELLING_BY_EXTERNAL: ReadonlyMap<string, string> = new Map(
   ["toThrowErrorMatchingSnapshot", "toThrowErrorMatchingInlineSnapshot"],
 ]);
 
-export type SnapshotEntryKeys =
-  | { readonly kind: "spelled"; readonly keys: readonly string[] }
-  | { readonly kind: "unresolvable" }
-  | { readonly kind: "unreadable" };
-
 export type SnapshotMatcherSite = {
   readonly node: ESTree.CallExpression;
   readonly matcher: string;
@@ -36,17 +31,26 @@ export type SnapshotMatcherSite = {
   readonly orderBroken: boolean;
 };
 
-const ORDER_BREAKING_TYPES: ReadonlySet<string> = new Set([
-  "ConditionalExpression",
-  "DoWhileStatement",
-  "ForInStatement",
-  "ForOfStatement",
-  "ForStatement",
-  "IfStatement",
-  "LogicalExpression",
-  "SwitchStatement",
-  "WhileStatement",
-]);
+const hintOf = (
+  call: ESTree.CallExpression,
+  matcher: string,
+): Pick<SnapshotMatcherSite, "hintNode" | "hintText" | "hintRuntime"> => {
+  const bare = { hintNode: null, hintText: null, hintRuntime: false };
+  if (!INLINE_SPELLING_BY_EXTERNAL.has(matcher)) return bare;
+
+  const given = call.arguments.flatMap((argument) =>
+    argument.type === "SpreadElement" ? [] : [argument],
+  );
+  if (given.length !== call.arguments.length) return { ...bare, hintRuntime: true };
+
+  const last = given.at(-1);
+  if (last === undefined) return bare;
+
+  const spelled = staticSpelling(last);
+  if (spelled !== null) return { hintNode: last, hintText: spelled, hintRuntime: false };
+  if (given.length === 1 && unwrapSubject(last).type === "ObjectExpression") return bare;
+  return { ...bare, hintRuntime: true };
+};
 
 const tableOf = (callee: ESTree.Expression): ESTree.Expression | null => {
   const written = unwrapSubject(callee);
@@ -95,34 +99,25 @@ const titleScopeOf = (call: ESTree.CallExpression): TableDrivenTitles | null => 
     : tableDrivenTitlesOf(table, template);
 };
 
-const hintOf = (
-  call: ESTree.CallExpression,
-  matcher: string,
-): Pick<SnapshotMatcherSite, "hintNode" | "hintText" | "hintRuntime"> => {
-  const bare = { hintNode: null, hintText: null, hintRuntime: false };
-  if (!INLINE_SPELLING_BY_EXTERNAL.has(matcher)) return bare;
-
-  const given = call.arguments.flatMap((argument) =>
-    argument.type === "SpreadElement" ? [] : [argument],
-  );
-  if (given.length !== call.arguments.length) return { ...bare, hintRuntime: true };
-
-  const last = given.at(-1);
-  if (last === undefined) return bare;
-
-  const spelled = staticSpelling(last);
-  if (spelled !== null) return { hintNode: last, hintText: spelled, hintRuntime: false };
-  if (given.length === 1 && unwrapSubject(last).type === "ObjectExpression") return bare;
-  return { ...bare, hintRuntime: true };
-};
-
-const isTitleScope = (node: ESTree.Node): boolean =>
-  node.type === "CallExpression" && titleScopeOf(node) !== null;
-
 const scopesIn = (ancestors: readonly ESTree.Node[]): readonly TableDrivenTitles[] =>
   ancestors.flatMap((ancestor) =>
     ancestor.type === "CallExpression" ? (titleScopeOf(ancestor) ?? []) : [],
   );
+
+const isTitleScope = (node: ESTree.Node): boolean =>
+  node.type === "CallExpression" && titleScopeOf(node) !== null;
+
+const ORDER_BREAKING_TYPES: ReadonlySet<string> = new Set([
+  "ConditionalExpression",
+  "DoWhileStatement",
+  "ForInStatement",
+  "ForOfStatement",
+  "ForStatement",
+  "IfStatement",
+  "LogicalExpression",
+  "SwitchStatement",
+  "WhileStatement",
+]);
 
 const breaksOrder = (ancestors: readonly ESTree.Node[]): boolean => {
   const scopeAt = ancestors.findLastIndex(isTitleScope);
@@ -157,11 +152,7 @@ export const snapshotMatcherSiteOf = (
   };
 };
 
-type Placement = {
-  readonly site: SnapshotMatcherSite;
-  readonly titles: readonly string[];
-  readonly order: readonly number[];
-};
+const bucketKeyOf = (titles: readonly string[]): string => JSON.stringify(titles);
 
 type Combination = {
   readonly titles: readonly string[];
@@ -180,6 +171,12 @@ const combinationsOf = (titlesByScope: readonly (readonly string[])[]): readonly
     [{ titles: [], order: [] }],
   );
 
+type Placement = {
+  readonly site: SnapshotMatcherSite;
+  readonly titles: readonly string[];
+  readonly order: readonly number[];
+};
+
 const placementsOf = (site: SnapshotMatcherSite): readonly Placement[] => {
   const spelled = site.scopes.flatMap((scope) => (scope.kind === "spelled" ? [scope.titles] : []));
   if (spelled.length !== site.scopes.length) return [];
@@ -190,14 +187,6 @@ const placementsOf = (site: SnapshotMatcherSite): readonly Placement[] => {
     order: [...combination.order, site.node.start],
   }));
 };
-
-const byExecutionOrder = (left: Placement, right: Placement): number =>
-  zip(left.order, right.order).reduce(
-    (carried, [taken, rival]) => (carried === 0 ? taken - rival : carried),
-    0,
-  );
-
-const bucketKeyOf = (titles: readonly string[]): string => JSON.stringify(titles);
 
 const bucketedPlacements = (
   sites: readonly SnapshotMatcherSite[],
@@ -222,6 +211,12 @@ const keyedTitlesOf = (placement: Placement): readonly string[] =>
     : [...placement.titles, placement.site.hintText];
 
 type SpelledKeys = Map<SnapshotMatcherSite, readonly string[]>;
+
+const byExecutionOrder = (left: Placement, right: Placement): number =>
+  zip(left.order, right.order).reduce(
+    (carried, [taken, rival]) => (carried === 0 ? taken - rival : carried),
+    0,
+  );
 
 const bucketKeysIn = ({
   placements,
@@ -258,6 +253,11 @@ const spelledKeysBySite = (
   }
   return spelled;
 };
+
+export type SnapshotEntryKeys =
+  | { readonly kind: "spelled"; readonly keys: readonly string[] }
+  | { readonly kind: "unresolvable" }
+  | { readonly kind: "unreadable" };
 
 export const entryKeysOf = (
   sites: readonly SnapshotMatcherSite[],

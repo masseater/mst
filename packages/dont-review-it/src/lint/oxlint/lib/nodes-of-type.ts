@@ -1,4 +1,4 @@
-import { isAstFields, NODE_TYPE_FIELD } from "./ast-node.ts";
+import { BACK_REFERENCE_FIELD, isAstFields, NODE_TYPE_FIELD } from "./ast-node.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
@@ -9,8 +9,6 @@ type NodeOfType<T extends ESTree.Node["type"]> = ESTree.Node extends infer Held
       : never
     : never
   : never;
-
-const BACK_REFERENCE_FIELD = "parent";
 
 const isNodeOfType = <T extends ESTree.Node["type"]>(
   held: unknown,

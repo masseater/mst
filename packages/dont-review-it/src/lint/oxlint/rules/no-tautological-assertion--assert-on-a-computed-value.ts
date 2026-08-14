@@ -5,12 +5,6 @@ import { staticMemberOf } from "../lib/static-member.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
-const EXPECT_NAME = "expect";
-
-const EQUALITY_MATCHER_NAMES: ReadonlySet<string> = new Set(["toBe", "toEqual", "toStrictEqual"]);
-
-const MODIFIER_NAMES: ReadonlySet<string> = new Set(["not", "resolves", "rejects"]);
-
 const fixedValueOf = (expression: ESTree.Expression): { readonly held: unknown } | null => {
   const written = expression;
 
@@ -27,6 +21,8 @@ const fixedValueOf = (expression: ESTree.Expression): { readonly held: unknown }
   return { held: -negated.held };
 };
 
+const EXPECT_NAME = "expect";
+
 const soleExpectArgumentOf = (call: ESTree.CallExpression): ESTree.Expression | null => {
   const callee = call.callee;
   if (callee.type !== "Identifier" || callee.name !== EXPECT_NAME) return null;
@@ -34,6 +30,8 @@ const soleExpectArgumentOf = (call: ESTree.CallExpression): ESTree.Expression | 
   if (subject === undefined || call.arguments.length !== 1) return null;
   return subject.type === "SpreadElement" ? null : subject;
 };
+
+const MODIFIER_NAMES: ReadonlySet<string> = new Set(["not", "resolves", "rejects"]);
 
 const subjectOfExpect = (expression: ESTree.Expression): ESTree.Expression | null => {
   const asserted = expression;
@@ -43,6 +41,8 @@ const subjectOfExpect = (expression: ESTree.Expression): ESTree.Expression | nul
   if (member === null || !MODIFIER_NAMES.has(member.name)) return null;
   return subjectOfExpect(member.object);
 };
+
+const EQUALITY_MATCHER_NAMES: ReadonlySet<string> = new Set(["toBe", "toEqual", "toStrictEqual"]);
 
 const equalityOperandsOf = (
   node: ESTree.CallExpression,

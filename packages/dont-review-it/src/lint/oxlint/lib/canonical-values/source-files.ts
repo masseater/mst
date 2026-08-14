@@ -19,53 +19,23 @@ import { pathIsInside } from "../path-is-inside.ts";
 import { toPosixPath } from "../posix-path.ts";
 import { MANIFEST_FILE_NAME } from "./package-manifest.ts";
 
-export type ScannedFile = {
-  readonly absolutePath: string;
-  readonly relativePath: string;
-  readonly realPathIdentity: string;
-  readonly size: number;
-  readonly symbolicLinkTarget: string | null;
-  readonly mtimeMs: number;
+const statOf = (path: string): Stats | null => readUnlessMissing(() => statSync(path));
+
+export const isFile = (path: string): boolean => statOf(path)?.isFile() === true;
+
+export const nearestPackageDirectory = (
+  fileDirectory: string,
+  repositoryRoot: string,
+): string | null => {
+  if (isFile(join(fileDirectory, MANIFEST_FILE_NAME))) return fileDirectory;
+  if (fileDirectory === repositoryRoot) return null;
+
+  const parent = dirname(fileDirectory);
+  return parent === fileDirectory ? null : nearestPackageDirectory(parent, repositoryRoot);
 };
 
-export type RepositoryFiles = {
-  readonly cacheInputs: readonly ScannedFile[];
-  readonly declarationSources: readonly ScannedFile[];
-  readonly commentSources: readonly ScannedFile[];
-  readonly styleSheets: readonly ScannedFile[];
-  readonly markupSources: readonly ScannedFile[];
-  readonly manifests: readonly ScannedFile[];
-  readonly problems: readonly RepositoryFileProblem[];
-};
-
-export type RepositoryFileProblem = {
-  readonly kind: "unsafe-symbolic-link";
-  readonly line: 1;
-  readonly filePath: string;
-};
-
-type ScannedFiles = {
-  readonly files: readonly ScannedFile[];
-  readonly problems: readonly RepositoryFileProblem[];
-};
-
-const UNSCANNED_DIRECTORY_NAMES: ReadonlySet<string> = new Set([
-  ".cache",
-  ".git",
-  ".local-agents",
-  "coverage",
-  "dist",
-  "dist-ssr",
-  "node_modules",
-]);
-
-const UNCACHED_DIRECTORY_NAMES: ReadonlySet<string> = new Set([
-  ".cache",
-  ".git",
-  ".local-agents",
-  "coverage",
-  "node_modules",
-]);
+export const readTextFile = (path: string): string | null =>
+  readUnlessMissing(() => readFileSync(path, "utf8"));
 
 const SCRIPT_FILE_NAME_PATTERN = /\.[cm]?[jt]sx?$/u;
 
@@ -81,33 +51,64 @@ const DEPENDENCY_INPUT_FILE_NAMES: ReadonlySet<string> = new Set([
   "yarn.lock",
 ]);
 
-const DECLARATION_SOURCE_NAME_PATTERN = /\.[cm]?tsx?$/u;
-
-const TYPE_DECLARATION_FILE_NAME_PATTERN = /\.d\.[cm]?ts$/u;
-
 const STYLE_SHEET_EXTENSION = ".css";
 
 const MARKUP_SOURCE_NAME_PATTERN = /\.(?:html|svg)$/u;
 
-const statOf = (path: string): Stats | null => readUnlessMissing(() => statSync(path));
+const isScannedName = (fileName: string): boolean =>
+  SCRIPT_FILE_NAME_PATTERN.test(fileName) ||
+  fileName.endsWith(STYLE_SHEET_EXTENSION) ||
+  MARKUP_SOURCE_NAME_PATTERN.test(fileName) ||
+  fileName.endsWith(".json") ||
+  DEPENDENCY_INPUT_FILE_NAMES.has(fileName);
 
-export const isFile = (path: string): boolean => statOf(path)?.isFile() === true;
-
-export const isDirectory = (path: string): boolean => statOf(path)?.isDirectory() === true;
-
-export const nearestPackageDirectory = (
-  fileDirectory: string,
-  repositoryRoot: string,
-): string | null => {
-  if (isFile(join(fileDirectory, MANIFEST_FILE_NAME))) return fileDirectory;
-  if (fileDirectory === repositoryRoot) return null;
-
-  const parent = dirname(fileDirectory);
-  return parent === fileDirectory ? null : nearestPackageDirectory(parent, repositoryRoot);
+export type RepositoryFileProblem = {
+  readonly kind: "unsafe-symbolic-link";
+  readonly line: 1;
+  readonly filePath: string;
 };
 
-export const readTextFile = (path: string): string | null =>
-  readUnlessMissing(() => readFileSync(path, "utf8"));
+export type ScannedFile = {
+  readonly absolutePath: string;
+  readonly relativePath: string;
+  readonly realPathIdentity: string;
+  readonly size: number;
+  readonly symbolicLinkTarget: string | null;
+  readonly mtimeMs: number;
+};
+
+type ScannedFiles = {
+  readonly files: readonly ScannedFile[];
+  readonly problems: readonly RepositoryFileProblem[];
+};
+
+const unsafeLinkAt = (repositoryRoot: string, absolutePath: string): ScannedFiles => ({
+  files: [],
+  problems: [
+    {
+      kind: "unsafe-symbolic-link",
+      line: 1,
+      filePath: toPosixPath(relative(repositoryRoot, absolutePath)),
+    },
+  ],
+});
+
+type ScanDirectoryInput = {
+  readonly ancestry: ReadonlySet<string>;
+  readonly directory: string;
+  readonly includesFileName: (name: string) => boolean;
+  readonly ignoredDirectoryNames: ReadonlySet<string>;
+  readonly sourceScope: GitSourceScope;
+  readonly realRepositoryRoot: string;
+  readonly repositoryRoot: string;
+};
+
+const resolvedSymbolicTarget = (input: ScanDirectoryInput, absolutePath: string): string | null => {
+  const [failure, resolvedTargetPath] = attempt(() => realpathSync.native(absolutePath));
+  if (failure !== null || resolvedTargetPath === null) return null;
+  if (!pathIsInside(input.realRepositoryRoot, resolvedTargetPath)) return null;
+  return input.ancestry.has(resolvedTargetPath) ? null : resolvedTargetPath;
+};
 
 const scannedFileAt = (input: {
   readonly absolutePath: string;
@@ -130,41 +131,25 @@ const scannedFileAt = (input: {
   };
 };
 
-const isScannedName = (fileName: string): boolean =>
-  SCRIPT_FILE_NAME_PATTERN.test(fileName) ||
-  fileName.endsWith(STYLE_SHEET_EXTENSION) ||
-  MARKUP_SOURCE_NAME_PATTERN.test(fileName) ||
-  fileName.endsWith(".json") ||
-  DEPENDENCY_INPUT_FILE_NAMES.has(fileName);
-
 const EMPTY_SCANNED_FILES: ScannedFiles = { files: [], problems: [] };
 
-const unsafeLinkAt = (repositoryRoot: string, absolutePath: string): ScannedFiles => ({
-  files: [],
-  problems: [
-    {
-      kind: "unsafe-symbolic-link",
-      line: 1,
-      filePath: toPosixPath(relative(repositoryRoot, absolutePath)),
-    },
-  ],
-});
-
-const resolvedSymbolicTarget = (input: ScanDirectoryInput, absolutePath: string): string | null => {
-  const [failure, resolvedTargetPath] = attempt(() => realpathSync.native(absolutePath));
-  if (failure !== null || resolvedTargetPath === null) return null;
-  if (!pathIsInside(input.realRepositoryRoot, resolvedTargetPath)) return null;
-  return input.ancestry.has(resolvedTargetPath) ? null : resolvedTargetPath;
-};
-
-type ScanDirectoryInput = {
-  readonly ancestry: ReadonlySet<string>;
-  readonly directory: string;
-  readonly includesFileName: (name: string) => boolean;
-  readonly ignoredDirectoryNames: ReadonlySet<string>;
-  readonly sourceScope: GitSourceScope;
-  readonly realRepositoryRoot: string;
-  readonly repositoryRoot: string;
+const scannedSymbolicFile = (
+  input: ScanDirectoryInput,
+  candidate: {
+    readonly absolutePath: string;
+    readonly directoryEntry: Dirent;
+    readonly isFile: boolean;
+  },
+): ScannedFiles => {
+  if (!candidate.isFile || !input.includesFileName(candidate.directoryEntry.name)) {
+    return EMPTY_SCANNED_FILES;
+  }
+  const scanned = scannedFileAt({
+    absolutePath: candidate.absolutePath,
+    realRepositoryRoot: input.realRepositoryRoot,
+    repositoryRoot: input.repositoryRoot,
+  });
+  return { files: [scanned], problems: [] };
 };
 
 const scannedSymbolicLink = (input: ScanDirectoryInput, directoryEntry: Dirent): ScannedFiles => {
@@ -187,19 +172,9 @@ const scannedSymbolicLink = (input: ScanDirectoryInput, directoryEntry: Dirent):
   });
 };
 
-const scannedSymbolicFile = (
-  input: ScanDirectoryInput,
-  candidate: {
-    readonly absolutePath: string;
-    readonly directoryEntry: Dirent;
-    readonly isFile: boolean;
-  },
-): ScannedFiles => {
-  if (!candidate.isFile || !input.includesFileName(candidate.directoryEntry.name)) {
-    return EMPTY_SCANNED_FILES;
-  }
+const scannedRegularFile = (input: ScanDirectoryInput, absolutePath: string): ScannedFiles => {
   const scanned = scannedFileAt({
-    absolutePath: candidate.absolutePath,
+    absolutePath,
     realRepositoryRoot: input.realRepositoryRoot,
     repositoryRoot: input.repositoryRoot,
   });
@@ -222,15 +197,6 @@ const scannedDirectoryEntry = (input: ScanDirectoryInput, directoryEntry: Dirent
     return EMPTY_SCANNED_FILES;
   }
   return scannedRegularFile(input, absolutePath);
-};
-
-const scannedRegularFile = (input: ScanDirectoryInput, absolutePath: string): ScannedFiles => {
-  const scanned = scannedFileAt({
-    absolutePath,
-    realRepositoryRoot: input.realRepositoryRoot,
-    repositoryRoot: input.repositoryRoot,
-  });
-  return { files: [scanned], problems: [] };
 };
 
 const scannedFilesUnder = ({
@@ -274,11 +240,25 @@ const isStyleSheet = (file: ScannedFile): boolean =>
 const isMarkupSource = (file: ScannedFile): boolean =>
   MARKUP_SOURCE_NAME_PATTERN.test(basename(file.absolutePath));
 
+const UNSCANNED_DIRECTORY_NAMES: ReadonlySet<string> = new Set([
+  ".cache",
+  ".git",
+  ".local-agents",
+  "coverage",
+  "dist",
+  "dist-ssr",
+  "node_modules",
+]);
+
 const isScannedSourcePath = (file: ScannedFile): boolean =>
   !file.relativePath
     .split("/")
     .slice(0, -1)
     .some((segment) => UNSCANNED_DIRECTORY_NAMES.has(segment));
+
+const DECLARATION_SOURCE_NAME_PATTERN = /\.[cm]?tsx?$/u;
+
+const TYPE_DECLARATION_FILE_NAME_PATTERN = /\.d\.[cm]?ts$/u;
 
 const isDeclarationSource = (file: ScannedFile): boolean => {
   const fileName = basename(file.absolutePath);
@@ -296,6 +276,16 @@ const uniquePhysicalFiles = (files: readonly ScannedFile[]): readonly ScannedFil
     (file) => file.realPathIdentity,
   );
 
+export type RepositoryFiles = {
+  readonly cacheInputs: readonly ScannedFile[];
+  readonly declarationSources: readonly ScannedFile[];
+  readonly commentSources: readonly ScannedFile[];
+  readonly styleSheets: readonly ScannedFile[];
+  readonly markupSources: readonly ScannedFile[];
+  readonly manifests: readonly ScannedFile[];
+  readonly problems: readonly RepositoryFileProblem[];
+};
+
 const NO_REPOSITORY_FILES: RepositoryFiles = {
   cacheInputs: [],
   declarationSources: [],
@@ -305,6 +295,16 @@ const NO_REPOSITORY_FILES: RepositoryFiles = {
   manifests: [],
   problems: [],
 };
+
+const UNCACHED_DIRECTORY_NAMES: ReadonlySet<string> = new Set([
+  ".cache",
+  ".git",
+  ".local-agents",
+  "coverage",
+  "node_modules",
+]);
+
+export const isDirectory = (path: string): boolean => statOf(path)?.isDirectory() === true;
 
 export const listRepositoryFiles = (
   repositoryRoot: string,

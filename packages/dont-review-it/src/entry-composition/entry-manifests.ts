@@ -12,19 +12,6 @@ import { recordOf } from "../dependency-catalog/record-fields.ts";
 
 import type { EntryCompositionConfig, EntryCompositionLayer } from "./config.ts";
 
-export type EntryManifest = {
-  readonly relativePath: string;
-  readonly absolutePath: string;
-  readonly source: string;
-  readonly root: Node;
-  readonly layer: EntryCompositionLayer;
-};
-
-export type EntryManifestListing = {
-  readonly manifests: readonly EntryManifest[];
-  readonly failures: readonly string[];
-};
-
 const readOutcomeOf = (
   absolutePath: string,
 ):
@@ -40,6 +27,19 @@ const readOutcomeOf = (
 
 const unreadableFailureOf = (relativePath: string): string =>
   `${relativePath} exists but cannot be read, so the entry composition check did not run.`;
+
+export type EntryManifest = {
+  readonly relativePath: string;
+  readonly absolutePath: string;
+  readonly source: string;
+  readonly root: Node;
+  readonly layer: EntryCompositionLayer;
+};
+
+export type EntryManifestListing = {
+  readonly manifests: readonly EntryManifest[];
+  readonly failures: readonly string[];
+};
 
 const EMPTY_LISTING: EntryManifestListing = { manifests: [], failures: [] };
 

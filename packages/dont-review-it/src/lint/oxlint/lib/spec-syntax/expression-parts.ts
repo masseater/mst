@@ -18,10 +18,6 @@ const receiverOf = (call: ESTree.CallExpression): readonly ESTree.Expression[] =
 const objectPartsOf = (property: ESTree.ObjectPropertyKind): readonly ESTree.Expression[] =>
   property.type === "SpreadElement" ? [property.argument] : [property.value];
 
-const valuePartsOf = (
-  node: ESTree.Expression | ESTree.PrivateIdentifier,
-): readonly ESTree.Expression[] => (node.type === "PrivateIdentifier" ? [] : [node]);
-
 const producedPartsOf = (node: ESTree.Expression): readonly ESTree.Expression[] | null => {
   switch (node.type) {
     case "CallExpression":
@@ -44,6 +40,10 @@ const producedPartsOf = (node: ESTree.Expression): readonly ESTree.Expression[] 
       return null;
   }
 };
+
+const valuePartsOf = (
+  node: ESTree.Expression | ESTree.PrivateIdentifier,
+): readonly ESTree.Expression[] => (node.type === "PrivateIdentifier" ? [] : [node]);
 
 const carriedPartsOf = (node: ESTree.Expression): readonly ESTree.Expression[] => {
   switch (node.type) {

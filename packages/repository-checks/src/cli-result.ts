@@ -2,17 +2,17 @@ import { attemptAsync } from "es-toolkit";
 
 import { measureCheck } from "./check-telemetry.ts";
 
-export type CliResult = {
-  readonly exitCode: number;
-  readonly out: string;
-  readonly error: string;
-};
-
 export const EXIT_SUCCESS = 0;
 
 export const EXIT_PROBLEMS_FOUND = 1;
 
 export const EXIT_MISUSE = 2;
+
+export type CliResult = {
+  readonly exitCode: number;
+  readonly out: string;
+  readonly error: string;
+};
 
 const safelyRunCli = async (operation: () => Promise<CliResult>): Promise<CliResult> => {
   const [failure, completedRun] = await attemptAsync(operation);

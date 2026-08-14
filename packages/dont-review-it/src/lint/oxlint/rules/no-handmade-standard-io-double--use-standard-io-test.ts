@@ -8,38 +8,14 @@ import { PROCESS_IO_MEMBER } from "./no-logged-and-continued-failure--stop-or-re
 import type { ESTree } from "@oxlint/plugins";
 import type { NamedReport } from "../lib/named-report.ts";
 
-const CAPTURED_STREAM_NAMES = new Set(["stdout", "stderr"]);
-
-const STREAM_CLASS_NAMES = new Set(["Writable", "Duplex", "Transform", "PassThrough"]);
-
 const TEST_FILE_SUFFIXES = [".test.ts", ".test.tsx", ".spec.ts", ".spec.tsx"];
-
-const isExtendCall = (callee: ESTree.Expression): boolean =>
-  staticMemberOf(callee)?.name === "extend";
-
-const isFunctionValued = (propertyValue: ESTree.Expression): boolean =>
-  propertyValue.type === "FunctionExpression" || propertyValue.type === "ArrowFunctionExpression";
-
-const isWriteShapedDouble = (propertyValue: ESTree.Expression): boolean => {
-  if (propertyValue.type === "NewExpression") {
-    return (
-      propertyValue.callee.type === "Identifier" &&
-      STREAM_CLASS_NAMES.has(propertyValue.callee.name)
-    );
-  }
-  if (propertyValue.type !== "ObjectExpression") return false;
-  return propertyValue.properties.some(
-    (property) =>
-      property.type === "Property" &&
-      propertyKeyOf(property) === PROCESS_IO_MEMBER.write &&
-      isFunctionValued(property.value),
-  );
-};
 
 type NamedStreamProperty = {
   readonly property: ESTree.ObjectProperty;
   readonly streamName: string;
 };
+
+const CAPTURED_STREAM_NAMES = new Set(["stdout", "stderr"]);
 
 const capturedStreamPropertiesOf = (
   definition: ESTree.ObjectExpression,
@@ -50,6 +26,9 @@ const capturedStreamPropertiesOf = (
     if (streamName === null || !CAPTURED_STREAM_NAMES.has(streamName)) return [];
     return [{ property, streamName }];
   });
+
+const isExtendCall = (callee: ESTree.Expression): boolean =>
+  staticMemberOf(callee)?.name === "extend";
 
 const ownFixtureReportsOf = (call: ESTree.CallExpression): readonly NamedReport[] => {
   if (!isExtendCall(call.callee)) return [];
@@ -76,6 +55,27 @@ const directStreamReportOf = (node: ESTree.MemberExpression): NamedReport | null
   if (member.object.type !== "Identifier" || member.object.name !== "process") return null;
   if (!CAPTURED_STREAM_NAMES.has(member.name)) return null;
   return { node, messageId: "directStream", data: { name: member.name } };
+};
+
+const isFunctionValued = (propertyValue: ESTree.Expression): boolean =>
+  propertyValue.type === "FunctionExpression" || propertyValue.type === "ArrowFunctionExpression";
+
+const STREAM_CLASS_NAMES = new Set(["Writable", "Duplex", "Transform", "PassThrough"]);
+
+const isWriteShapedDouble = (propertyValue: ESTree.Expression): boolean => {
+  if (propertyValue.type === "NewExpression") {
+    return (
+      propertyValue.callee.type === "Identifier" &&
+      STREAM_CLASS_NAMES.has(propertyValue.callee.name)
+    );
+  }
+  if (propertyValue.type !== "ObjectExpression") return false;
+  return propertyValue.properties.some(
+    (property) =>
+      property.type === "Property" &&
+      propertyKeyOf(property) === PROCESS_IO_MEMBER.write &&
+      isFunctionValued(property.value),
+  );
 };
 
 const streamShapedDoubleReportsOf = (node: ESTree.ObjectExpression): readonly NamedReport[] =>

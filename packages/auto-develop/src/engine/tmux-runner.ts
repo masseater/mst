@@ -7,36 +7,6 @@ import { UnresponsiveError } from "./unresponsive-error.ts";
 
 import type { Logger } from "../logging/logger.ts";
 
-const DEFAULT_POLL_INTERVAL_MS = 200;
-
-export type TmuxRunRequest = {
-  readonly binary: string;
-  readonly args: readonly string[];
-  readonly cwd: string;
-  readonly sessionName: string;
-  readonly timeoutMs: number;
-  readonly idleTimeoutMs?: number;
-  readonly pollIntervalMs?: number;
-  readonly signal?: AbortSignal;
-};
-
-export type TmuxRunnerDeps = {
-  readonly exec: CommandExecutor;
-  readonly fs: TailFs;
-  readonly now: () => number;
-  readonly sleep: (ms: number) => Promise<void>;
-  readonly log: Logger;
-};
-
-const innerCommand = (build: {
-  readonly binary: string;
-  readonly args: readonly string[];
-  readonly exitPath: string;
-}): string => {
-  const quoted = [build.binary, ...build.args].map(shellQuote).join(" ");
-  return `${quoted}; printf '%s' "$?" > ${shellQuote(build.exitPath)}`;
-};
-
 type TailState = {
   readonly offsets: Map<string, number>;
   readonly flags: Map<string, boolean>;
@@ -60,6 +30,25 @@ const readExit = (finalize: {
     );
   }
   throw new ProcessFailedError({ command: finalize.binary, exitCode, output: produced });
+};
+
+export type TmuxRunRequest = {
+  readonly binary: string;
+  readonly args: readonly string[];
+  readonly cwd: string;
+  readonly sessionName: string;
+  readonly timeoutMs: number;
+  readonly idleTimeoutMs?: number;
+  readonly pollIntervalMs?: number;
+  readonly signal?: AbortSignal;
+};
+
+export type TmuxRunnerDeps = {
+  readonly exec: CommandExecutor;
+  readonly fs: TailFs;
+  readonly now: () => number;
+  readonly sleep: (ms: number) => Promise<void>;
+  readonly log: Logger;
 };
 
 const finalizeRun = (settle: {
@@ -87,26 +76,6 @@ const finalizeRun = (settle: {
   });
 };
 
-const shouldStop = (check: {
-  readonly state: TailState;
-  readonly request: TmuxRunRequest;
-  readonly deps: TmuxRunnerDeps;
-  readonly startedAtMs: number;
-}): boolean => {
-  const { state: heldState, request, deps } = check;
-  if (request.signal?.aborted === true) return true;
-  if (deps.now() - check.startedAtMs > request.timeoutMs) {
-    heldState.flags.set("timedOut", true);
-    return true;
-  }
-  const lastOutputMs = heldState.times.get("lastOutput") ?? check.startedAtMs;
-  if (request.idleTimeoutMs !== undefined && deps.now() - lastOutputMs > request.idleTimeoutMs) {
-    heldState.times.set("idleMs", request.idleTimeoutMs);
-    return true;
-  }
-  return false;
-};
-
 const drainNewOutput = function* (draining: {
   readonly state: TailState;
   readonly deps: TmuxRunnerDeps;
@@ -127,6 +96,26 @@ const drainNewOutput = function* (draining: {
   yield writtenChunk;
 };
 
+const shouldStop = (check: {
+  readonly state: TailState;
+  readonly request: TmuxRunRequest;
+  readonly deps: TmuxRunnerDeps;
+  readonly startedAtMs: number;
+}): boolean => {
+  const { state: heldState, request, deps } = check;
+  if (request.signal?.aborted === true) return true;
+  if (deps.now() - check.startedAtMs > request.timeoutMs) {
+    heldState.flags.set("timedOut", true);
+    return true;
+  }
+  const lastOutputMs = heldState.times.get("lastOutput") ?? check.startedAtMs;
+  if (request.idleTimeoutMs !== undefined && deps.now() - lastOutputMs > request.idleTimeoutMs) {
+    heldState.times.set("idleMs", request.idleTimeoutMs);
+    return true;
+  }
+  return false;
+};
+
 const sessionEnded = async (checking: {
   readonly state: TailState;
   readonly request: TmuxRunRequest;
@@ -144,6 +133,8 @@ const sessionEnded = async (checking: {
   });
   return alive.exitCode !== 0;
 };
+
+const DEFAULT_POLL_INTERVAL_MS = 200;
 
 const tailLoop = async function* (loop: {
   readonly state: TailState;
@@ -182,6 +173,15 @@ const killStaleSession = async (killing: {
       "killing a stale tmux session failed",
     );
   }
+};
+
+const innerCommand = (build: {
+  readonly binary: string;
+  readonly args: readonly string[];
+  readonly exitPath: string;
+}): string => {
+  const quoted = [build.binary, ...build.args].map(shellQuote).join(" ");
+  return `${quoted}; printf '%s' "$?" > ${shellQuote(build.exitPath)}`;
 };
 
 const startSession = async (starting: {

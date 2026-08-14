@@ -2,6 +2,35 @@ import { createLintRuleAuthoringRule } from "../../../create-rule.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
+const staticKeyOf = (property: ESTree.ObjectProperty): string | null => {
+  const { key } = property;
+  if (key.type === "Identifier") return property.computed ? null : key.name;
+  return key.type === "Literal" && !property.computed ? String(key.value) : null;
+};
+
+const namedPropertyOf = (
+  properties: ESTree.ObjectExpression["properties"],
+  spelled: string,
+): ESTree.ObjectProperty | null => {
+  for (const property of properties) {
+    if (property.type !== "Property") continue;
+    if (staticKeyOf(property) === spelled) return property;
+  }
+  return null;
+};
+
+const proseOf = (node: ESTree.Node): string | null => {
+  if (node.type === "Literal") return typeof node.value === "string" ? node.value : null;
+  if (node.type !== "TemplateLiteral") return null;
+  return node.quasis.map((quasi) => quasi.value.raw).join(" ");
+};
+
+const descriptionOf = (docs: ESTree.ObjectProperty): string => {
+  if (docs.value.type !== "ObjectExpression") return "";
+  const description = namedPropertyOf(docs.value.properties, "description");
+  return description === null ? "" : (proseOf(description.value) ?? "");
+};
+
 const PROHIBITION_MARKER = /\b(?:must not|is forbidden|are forbidden)\b/iu;
 
 const RATIONALE_MARKER = /\b(?:because|since|so that|therefore|which means|as a result)\b/iu;
@@ -14,6 +43,9 @@ const ESCAPE_MARKER =
 const NON_ENGLISH_CHARACTER = /[^ -~]/u;
 
 const HAND_WRITTEN_DOC_POINTER = /\.md\b/u;
+
+const inspectableOf = (prose: string): string =>
+  prose.replace(/`[^`]*`/gu, " ").replace(/\{\{[^}]*\}\}/gu, " ");
 
 const FIX_VERBS = new Set([
   "Add",
@@ -74,21 +106,6 @@ const FIX_VERBS = new Set([
   "Write",
 ]);
 
-const staticKeyOf = (property: ESTree.ObjectProperty): string | null => {
-  const { key } = property;
-  if (key.type === "Identifier") return property.computed ? null : key.name;
-  return key.type === "Literal" && !property.computed ? String(key.value) : null;
-};
-
-const proseOf = (node: ESTree.Node): string | null => {
-  if (node.type === "Literal") return typeof node.value === "string" ? node.value : null;
-  if (node.type !== "TemplateLiteral") return null;
-  return node.quasis.map((quasi) => quasi.value.raw).join(" ");
-};
-
-const inspectableOf = (prose: string): string =>
-  prose.replace(/`[^`]*`/gu, " ").replace(/\{\{[^}]*\}\}/gu, " ");
-
 const opensWithFixVerb = (inspectable: string): boolean =>
   inspectable.split(/(?<=[.!?])\s+/u).some((sentence) =>
     FIX_VERBS.has(
@@ -98,23 +115,6 @@ const opensWithFixVerb = (inspectable: string): boolean =>
         .join(""),
     ),
   );
-
-const namedPropertyOf = (
-  properties: ESTree.ObjectExpression["properties"],
-  spelled: string,
-): ESTree.ObjectProperty | null => {
-  for (const property of properties) {
-    if (property.type !== "Property") continue;
-    if (staticKeyOf(property) === spelled) return property;
-  }
-  return null;
-};
-
-const descriptionOf = (docs: ESTree.ObjectProperty): string => {
-  if (docs.value.type !== "ObjectExpression") return "";
-  const description = namedPropertyOf(docs.value.properties, "description");
-  return description === null ? "" : (proseOf(description.value) ?? "");
-};
 
 const violationsOf = (
   prose: string,

@@ -22,11 +22,11 @@ import {
   type RouteContext,
 } from "./routes.ts";
 
+const DRAIN_BUDGET_MS = 1000;
+
 const HEALTH_PATH = "/health";
 
 const WEBHOOK_PATH = "/webhook";
-
-const DRAIN_BUDGET_MS = 1000;
 
 const routeTable = new Map<string, (context: RouteContext) => Promise<void> | void>([
   [`GET ${HEALTH_PATH}`, handleHealthRoute],
@@ -58,6 +58,8 @@ export type RelayServer = {
 };
 
 export const createRelayServer = (deps: RelayDependencies): RelayServer => {
+  const server = createServer();
+
   const serve = async (serving: {
     readonly req: IncomingMessage;
     readonly res: ServerResponse;
@@ -76,9 +78,6 @@ export const createRelayServer = (deps: RelayDependencies): RelayServer => {
       serving.res.end();
     }
   };
-
-  const server = createServer();
-
   const acceptRequests = async (accepting: {
     readonly arrivals: AsyncIterator<readonly [IncomingMessage, ServerResponse]>;
   }): Promise<void> => {

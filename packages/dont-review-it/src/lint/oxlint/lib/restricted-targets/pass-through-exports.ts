@@ -9,28 +9,8 @@ export type PassThroughExport<Statement> = {
   readonly exposed: string;
 };
 
-type ForwardedName = {
-  readonly specifier: string;
-  readonly exported: string | null;
-  readonly exposed: string;
-};
-
-type ImportedBinding = {
-  readonly specifier: string;
-  readonly exported: string | null;
-};
-
-const WHOLE_SURFACE = "*";
-
-const DEFAULT_EXPORT_NAME = "default";
-
 const fieldListOf = (held: unknown): readonly AstFields[] =>
   Array.isArray(held) ? held.map(astFieldsOf).filter((candidate) => candidate !== null) : [];
-
-const specifierTextOf = (held: unknown): string | null => {
-  const source = astFieldsOf(held);
-  return typeof source?.value === "string" ? source.value : null;
-};
 
 const nameOf = (held: unknown): string | null => {
   const named = astFieldsOf(held);
@@ -38,6 +18,13 @@ const nameOf = (held: unknown): string | null => {
   if (nodeTypeOf(named) === "Identifier") return typeof named.name === "string" ? named.name : null;
   return typeof named.value === "string" ? named.value : null;
 };
+
+type ImportedBinding = {
+  readonly specifier: string;
+  readonly exported: string | null;
+};
+
+const DEFAULT_EXPORT_NAME = "default";
 
 const importedBindingOf = (
   imported: AstFields,
@@ -53,6 +40,11 @@ const importedBindingOf = (
     return [[local, { specifier, exported: DEFAULT_EXPORT_NAME }] as const];
   }
   return [[local, { specifier, exported: nameOf(imported.imported) }] as const];
+};
+
+const specifierTextOf = (held: unknown): string | null => {
+  const source = astFieldsOf(held);
+  return typeof source?.value === "string" ? source.value : null;
 };
 
 const requiredBindingOf = (
@@ -80,6 +72,14 @@ const importedBindingsIn = (
     importedBindingOf(imported, specifier),
   );
 };
+
+type ForwardedName = {
+  readonly specifier: string;
+  readonly exported: string | null;
+  readonly exposed: string;
+};
+
+const WHOLE_SURFACE = "*";
 
 const forwardedFromSource = (statement: AstFields): readonly ForwardedName[] => {
   const specifier = specifierTextOf(statement.source);

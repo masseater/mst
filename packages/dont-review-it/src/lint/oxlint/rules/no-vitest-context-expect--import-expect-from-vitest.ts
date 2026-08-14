@@ -16,8 +16,6 @@ import {
 
 import type { ESTree } from "@oxlint/plugins";
 
-const ASSERTION_ENTRY = "expect";
-
 const contextPatternOf = (taker: SpecFunction): ESTree.ObjectPattern | null => {
   const [parameter] = taker.params;
   if (parameter === undefined) return null;
@@ -25,6 +23,8 @@ const contextPatternOf = (taker: SpecFunction): ESTree.ObjectPattern | null => {
   const written = parameter.type === "AssignmentPattern" ? parameter.left : parameter;
   return written.type === "ObjectPattern" ? written : null;
 };
+
+const ASSERTION_ENTRY = "expect";
 
 const takenAssertionEntry = (pattern: ESTree.ObjectPattern): ESTree.BindingProperty | null => {
   const named = pattern.properties.flatMap((property) =>

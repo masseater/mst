@@ -51,14 +51,6 @@ export const catalogReferencingOverridesIn = ({
       dependencyName: overrideTargetName(overrideKey),
     }));
 
-export const parsedWorkspaceDefinitionOrNull = (definitionSource: {
-  readonly source: string;
-  readonly config: DependencyCatalogChecksConfig;
-}): WorkspaceDefinition | null => {
-  const [unparsableSource, definition] = attempt(() => parseWorkspaceDefinition(definitionSource));
-  return unparsableSource === null ? definition : null;
-};
-
 const parseWorkspaceDefinition = ({
   source,
   config,
@@ -93,4 +85,12 @@ const parseWorkspaceDefinition = ({
       config,
     }),
   };
+};
+
+export const parsedWorkspaceDefinitionOrNull = (definitionSource: {
+  readonly source: string;
+  readonly config: DependencyCatalogChecksConfig;
+}): WorkspaceDefinition | null => {
+  const [unparsableSource, definition] = attempt(() => parseWorkspaceDefinition(definitionSource));
+  return unparsableSource === null ? definition : null;
 };

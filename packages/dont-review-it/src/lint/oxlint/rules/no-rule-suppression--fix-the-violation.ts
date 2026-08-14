@@ -25,6 +25,16 @@ import { DEFAULT_SPEC_FILE_SUFFIXES, isSpecFile } from "../lib/spec-syntax/spec-
 
 import type { Comment, ESTree, Options } from "@oxlint/plugins";
 
+const SILENCED_LEVELS: ReadonlySet<string> = new Set([LINT_SEVERITY.OFF, LINT_SEVERITY.WARN]);
+
+const DIRECTIVE_RESPECT_KEY = "respectEslintDisableDirectives";
+
+const GATE_SCHEMA = {
+  type: "object",
+  properties: { targetRules: { type: "array", items: { type: "string" } } },
+  additionalProperties: false,
+} as const;
+
 const RULE_NAME = "no-rule-suppression--fix-the-violation";
 
 const DETERMINISM_GATE_RULES: readonly string[] = [
@@ -38,20 +48,6 @@ const DETERMINISM_GATE_RULES: readonly string[] = [
   RULE_NAME,
 ];
 
-const RANGE_REOPENING_SPELLINGS: readonly string[] = ["eslint-enable", "oxlint-enable"];
-
-const SILENCED_LEVELS: ReadonlySet<string> = new Set([LINT_SEVERITY.OFF, LINT_SEVERITY.WARN]);
-
-const EVERY_RULE_REACHING_HERE = "every rule reaching this file (this gate among them)";
-
-const DIRECTIVE_RESPECT_KEY = "respectEslintDisableDirectives";
-
-const GATE_SCHEMA = {
-  type: "object",
-  properties: { targetRules: { type: "array", items: { type: "string" } } },
-  additionalProperties: false,
-} as const;
-
 const targetRulesFrom = (ruleOptions: Readonly<Options>): readonly string[] => {
   const [declared] = ruleOptions;
   if (typeof declared !== "object" || declared === null || Array.isArray(declared)) {
@@ -64,10 +60,14 @@ const targetRulesFrom = (ruleOptions: Readonly<Options>): readonly string[] => {
   return uniq([...DETERMINISM_GATE_RULES, ...added]);
 };
 
+const RANGE_REOPENING_SPELLINGS: readonly string[] = ["eslint-enable", "oxlint-enable"];
+
 const messageIdFor = (directive: SuppressionDirective): string => {
   if (RANGE_REOPENING_SPELLINGS.includes(directive.spelling)) return "suppressionRangeEnd";
   return directive.coversWholeFile ? "fileScopedSuppression" : "lineScopedSuppression";
 };
+
+const EVERY_RULE_REACHING_HERE = "every rule reaching this file (this gate among them)";
 
 const silencedSpellingOf = ({
   directive,

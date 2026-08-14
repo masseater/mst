@@ -17,18 +17,12 @@ import { levelOfSpelling, SILENT_LEVEL } from "../lint/oxlint/lib/rule-sets/seve
 
 import type { PresetAdoptionConfig } from "./config.ts";
 
-export type DisabledRuleDeclaration = {
-  readonly ruleId: string;
-  readonly line: number;
-  readonly filePatterns: readonly string[];
-};
-
-const MEMBER_EXPRESSION = "MemberExpression";
-
 const stringLiteralsIn = (held: unknown): readonly string[] =>
   fieldsIn(nodeOfType({ held, type: ARRAY_EXPRESSION })?.elements)
     .filter((held) => String(held[NODE_TYPE_FIELD]) === LITERAL)
     .map((held) => String(held.value));
+
+const MEMBER_EXPRESSION = "MemberExpression";
 
 const severitySpellingOf = (held: unknown): string | null => {
   const head = fieldsIn(nodeOfType({ held, type: ARRAY_EXPRESSION })?.elements)[0] ?? held;
@@ -37,6 +31,12 @@ const severitySpellingOf = (held: unknown): string | null => {
   const member = nodeOfType({ held: head, type: MEMBER_EXPRESSION });
   const named = nodeOfType({ held: member?.property, type: IDENTIFIER });
   return named === null || member?.computed === true ? null : String(named.name).toLowerCase();
+};
+
+export type DisabledRuleDeclaration = {
+  readonly ruleId: string;
+  readonly line: number;
+  readonly filePatterns: readonly string[];
 };
 
 const disabledEntriesIn = ({

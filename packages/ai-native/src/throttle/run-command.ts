@@ -20,32 +20,12 @@ import type { Invocation } from "./usage.ts";
 
 const KILL_GRACE_MS = 5_000;
 
-type Settled =
-  | { kind: "start-failure"; failure: Error }
-  | {
-      kind: typeof CHILD_PROCESS_EVENT.exit;
-      exitCode: number | null;
-      bySignal: NodeJS.Signals | null;
-    };
-
-type Verdict = { settled: Settled; timedOut: boolean };
-
 type RunCommandDependencies = {
   platform: NodeJS.Platform;
   signalTree: (input: { pid: number; signal: NodeJS.Signals }) => Error | null;
   spawnChild: (input: { executable: string; args: readonly string[] }) => ChildProcess;
   killGraceMs: number;
 };
-
-const settledChild = (child: ChildProcess): Promise<Settled> =>
-  new Promise((resolve) => {
-    child.once(CHILD_PROCESS_EVENT.failure, (failure) => {
-      resolve({ kind: "start-failure", failure });
-    });
-    child.once(CHILD_PROCESS_EVENT.exit, (code, signal) => {
-      resolve({ kind: CHILD_PROCESS_EVENT.exit, exitCode: code, bySignal: signal });
-    });
-  });
 
 const timeoutFired = async (parameters: {
   childPid: number;
@@ -80,6 +60,16 @@ const reportTreeTerminationFailure = (failure: Error): void => {
   );
 };
 
+type Settled =
+  | { kind: "start-failure"; failure: Error }
+  | {
+      kind: typeof CHILD_PROCESS_EVENT.exit;
+      exitCode: number | null;
+      bySignal: NodeJS.Signals | null;
+    };
+
+type Verdict = { settled: Settled; timedOut: boolean };
+
 const guardChild = async (input: {
   childPid: number;
   settling: Promise<Settled>;
@@ -111,6 +101,14 @@ const guardChild = async (input: {
     timedOut: timeout.fired,
     terminationFailure: timeout.terminationFailure,
   };
+};
+
+const releaseFailureOf = async (hold: SlotHold): Promise<unknown> => {
+  const [releaseFailure] = await attemptAsync(async () => {
+    await hold.release();
+    return true;
+  });
+  return releaseFailure;
 };
 
 const reportChildEnd = (
@@ -147,14 +145,6 @@ const reportReleaseFailure = (failure: unknown): number => {
   return 1;
 };
 
-const releaseFailureOf = async (hold: SlotHold): Promise<unknown> => {
-  const [releaseFailure] = await attemptAsync(async () => {
-    await hold.release();
-    return true;
-  });
-  return releaseFailure;
-};
-
 const reportRunEnd = (input: {
   invocation: Invocation;
   verdict: Verdict & { terminationFailure: Error | null };
@@ -166,6 +156,16 @@ const reportRunEnd = (input: {
   const verdictCode = reportVerdict(input.invocation, input.verdict);
   return input.releaseFailure === null ? verdictCode : reportReleaseFailure(input.releaseFailure);
 };
+
+const settledChild = (child: ChildProcess): Promise<Settled> =>
+  new Promise((resolve) => {
+    child.once(CHILD_PROCESS_EVENT.failure, (failure) => {
+      resolve({ kind: "start-failure", failure });
+    });
+    child.once(CHILD_PROCESS_EVENT.exit, (code, signal) => {
+      resolve({ kind: CHILD_PROCESS_EVENT.exit, exitCode: code, bySignal: signal });
+    });
+  });
 
 const spawnUnderHeldInterrupt = async (input: {
   invocation: Invocation;

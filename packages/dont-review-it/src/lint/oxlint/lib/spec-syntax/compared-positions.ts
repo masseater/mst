@@ -7,12 +7,12 @@ import type { ESTree } from "@oxlint/plugins";
 
 export type ComparedSide = ESTree.Expression | null;
 
-export type SideResolution = (node: ESTree.Expression) => ESTree.Expression;
-
 export type ComparedPair = {
   readonly left: ComparedSide;
   readonly right: ComparedSide;
 };
+
+export type SideResolution = (node: ESTree.Expression) => ESTree.Expression;
 
 export type Comparison = {
   readonly left: ComparedSide;

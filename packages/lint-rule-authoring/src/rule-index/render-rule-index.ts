@@ -1,7 +1,5 @@
 import type { LintRuleFacts } from "./rule-facts.ts";
 
-const TABLE_HEAD = "| ルール | 説明 | ツール | 補足 |\n| --- | --- | --- | --- |";
-
 const NOTICE_LEGEND =
   "補足の記号 — 🔧: 自動修正あり / 💡: エディタの修正候補あり / ⚙️: オプションあり";
 
@@ -21,6 +19,8 @@ const escapePipes = (writtenText: string): string => writtenText.replaceAll("|",
 
 const rowOf = (rule: LintRuleFacts): string =>
   `| [${rule.name}](./${rule.name}.md) | ${escapePipes(rule.description)} | ${toolOf(rule.sourcePath)} | ${noticesOf(rule)} |`;
+
+const TABLE_HEAD = "| ルール | 説明 | ツール | 補足 |\n| --- | --- | --- | --- |";
 
 const tableOf = (rules: readonly LintRuleFacts[]): string =>
   [TABLE_HEAD, ...rules.map(rowOf)].join("\n");

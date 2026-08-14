@@ -33,6 +33,7 @@ import { createNoClassAsMutableCell } from "./lint/oxlint/rules/no-class-as-muta
 import { noComputedTestApiMember } from "./lint/oxlint/rules/no-computed-test-api-member--use-static-member.ts";
 import { noCrossSpecAssetsImport } from "./lint/oxlint/rules/no-cross-spec-assets-import--use-own-assets.ts";
 import { noDefaultExport } from "./lint/oxlint/rules/no-default-export--use-named-export.ts";
+import { noDetachedDeclaration } from "./lint/oxlint/rules/no-detached-declaration--declare-it-next-to-its-use.ts";
 import { noDetachedRationale } from "./lint/oxlint/rules/no-detached-rationale--comment-at-explained-line.ts";
 import { noDetachedTestFile } from "./lint/oxlint/rules/no-detached-test-file--move-beside-source.ts";
 import { noDiscardedFailure } from "./lint/oxlint/rules/no-discarded-failure--receive-and-surface-it.ts";
@@ -187,6 +188,7 @@ const plugin: Plugin = {
     [noComputedTestApiMember.name]: noComputedTestApiMember,
     [noCrossSpecAssetsImport.name]: noCrossSpecAssetsImport,
     [noDefaultExport.name]: noDefaultExport,
+    [noDetachedDeclaration.name]: noDetachedDeclaration,
     [noDetachedRationale.name]: noDetachedRationale,
     [noDetachedTestFile.name]: noDetachedTestFile,
     [noDiscardedFailure.name]: noDiscardedFailure,

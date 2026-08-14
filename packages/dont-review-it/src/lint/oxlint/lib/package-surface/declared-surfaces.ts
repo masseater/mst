@@ -19,18 +19,6 @@ export type PackageSurfaces = {
   readonly importableFields: readonly string[];
 };
 
-const RUNNABLE_SURFACE_FIELDS: readonly string[] = ["bin"];
-
-const IMPORTABLE_SURFACE_FIELDS: readonly string[] = [
-  "exports",
-  "main",
-  "module",
-  "types",
-  "typings",
-];
-
-const REPOSITORY_ROOT_PACKAGE = ".";
-
 const MANIFEST_SELF_SUBPATH = `./${MANIFEST_FILE_NAME}`;
 
 const declaresTarget = (declared: unknown, depth: number): boolean => {
@@ -53,6 +41,16 @@ const declaredNameOf = (read: Readonly<Record<string, unknown>>): string | null 
   return typeof name === "string" && name.trim() !== "" ? name : null;
 };
 
+const RUNNABLE_SURFACE_FIELDS: readonly string[] = ["bin"];
+
+const IMPORTABLE_SURFACE_FIELDS: readonly string[] = [
+  "exports",
+  "main",
+  "module",
+  "types",
+  "typings",
+];
+
 const declaredFieldsAt = memoize(
   (
     packageDirectory: string,
@@ -71,6 +69,8 @@ const declaredFieldsAt = memoize(
     };
   },
 );
+
+const REPOSITORY_ROOT_PACKAGE = ".";
 
 const withinRepository = (location: {
   readonly repositoryRoot: string;
