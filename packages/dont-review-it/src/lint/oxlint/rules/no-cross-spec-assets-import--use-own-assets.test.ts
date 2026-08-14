@@ -88,11 +88,13 @@ describe("dont-review-it/no-cross-spec-assets-import--use-own-assets", () => {
     valid: [
       {
         name: "the spec of the same stem in the same directory owns the test data it reads",
+        documented: true,
         code: 'import { rows } from "./order.assets.ts";',
         filename: join(fixtureDir, "owner/order.test.ts"),
       },
       {
         name: "the owner is recognised through a specifier that carries no extension",
+        documented: true,
         code: 'import { rows } from "./order.assets";',
         filename: join(fixtureDir, "owner/order.test.ts"),
       },
@@ -140,6 +142,7 @@ describe("dont-review-it/no-cross-spec-assets-import--use-own-assets", () => {
     invalid: [
       {
         name: "another spec in the same directory is not the owner",
+        documented: true,
         code: 'import { rows } from "./order.assets.ts";',
         filename: join(fixtureDir, "owner/checkout.test.ts"),
         errors: [
@@ -205,6 +208,7 @@ describe("dont-review-it/no-cross-spec-assets-import--use-own-assets", () => {
       },
       {
         name: "a file that forwards the data is followed through to what it forwards",
+        documented: true,
         code: 'import { rows } from "./relay.ts";',
         filename: join(fixtureDir, "owner/checkout.test.ts"),
         errors: [
