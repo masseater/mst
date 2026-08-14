@@ -16,7 +16,7 @@ import {
 
 import type { UnknownFields } from "../unknown-fields.ts";
 
-export type LintRuleMessage = {
+type LintRuleMessage = {
   readonly messageId: string;
   readonly template: string;
 };
