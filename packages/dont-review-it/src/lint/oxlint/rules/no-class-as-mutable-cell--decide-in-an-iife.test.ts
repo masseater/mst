@@ -65,11 +65,13 @@ describe("dont-review-it/no-class-as-mutable-cell--decide-in-an-iife", () => {
       },
       {
         name: "a class expression carries no declared name to match",
+        documented: true,
         code: "const Tally = class {\n  total = 0;\n};\n",
         filename: subjectFilename,
       },
       {
         name: "a class handed to the module surface with no name of its own carries nothing to match",
+        documented: true,
         code: "export default class {\n  total = 0;\n}\n",
         filename: subjectFilename,
       },
@@ -77,6 +79,7 @@ describe("dont-review-it/no-class-as-mutable-cell--decide-in-an-iife", () => {
     invalid: [
       {
         name: "a class the index found standing in for a local variable is reported",
+        documented: true,
         code: TALLY,
         filename: subjectFilename,
         errors: [{ messageId: "containedMutableCell" }],
@@ -89,6 +92,7 @@ describe("dont-review-it/no-class-as-mutable-cell--decide-in-an-iife", () => {
     invalid: [
       {
         name: "a class built inside a function with no name of its own is reported in place",
+        documented: true,
         code: TALLY,
         filename: subjectFilename,
         errors: [{ messageId: "containedMutableCellInPlace" }],
