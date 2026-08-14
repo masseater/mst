@@ -12,6 +12,7 @@ describe("dont-review-it/no-redundant-mock-reset--lift-mocks-into-fixture", () =
     valid: [
       {
         name: "a fixture handing a mock binding to the test carries no cleanup of its own",
+        documented: true,
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("sendMail", () => vi.fn());\ntest("addresses the recipient", ({ sendMail }) => {\n  expect(sendMail).toHaveBeenCalledWith("a@example.com");\n});',
       },
@@ -22,6 +23,7 @@ describe("dont-review-it/no-redundant-mock-reset--lift-mocks-into-fixture", () =
       },
       {
         name: "putting a global in place is not the release of one",
+        documented: true,
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("clock", () => {\n  vi.stubGlobal("Date", frozenClock);\n  return frozenClock;\n});',
       },
@@ -138,6 +140,7 @@ describe("dont-review-it/no-redundant-mock-reset--lift-mocks-into-fixture", () =
     invalid: [
       {
         name: "the call record of one mock cleared by hand",
+        documented: true,
         filename: SPEC_FILE,
         code: "const sendMail = vi.fn();\nsendMail.mockClear();",
         errors: [{ messageId: "perMockReset", data: { member: "mockClear" } }],
@@ -204,6 +207,7 @@ describe("dont-review-it/no-redundant-mock-reset--lift-mocks-into-fixture", () =
       },
       {
         name: "every mock cleared at once by hand",
+        documented: true,
         filename: SPEC_FILE,
         code: "vi.clearAllMocks();",
         errors: [{ messageId: "bulkMockReset", data: { member: "clearAllMocks" } }],
