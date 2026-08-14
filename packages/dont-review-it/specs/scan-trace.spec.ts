@@ -56,6 +56,7 @@ describe("検査の走査証跡", () => {
       ["required-file-form", 1],
       ["preset-adoption", 0],
       ["telemetry-wiring", 0],
+      ["shippable-packages", 0],
       ["intent-skills", 0],
     ]);
   });
@@ -106,9 +107,10 @@ describe("検査の走査証跡", () => {
         ✓ required-file-form       1 package root
         ⊘ preset-adoption          skipped — no toolchain configuration
         ✓ telemetry-wiring         0 package roots
+        ✓ shippable-packages       0 manifests
         ✓ intent-skills            0 manifests
 
-        12 checks ran, nothing to report
+        13 checks ran, nothing to report
       "
     `);
   });
@@ -132,6 +134,7 @@ describe("検査の走査証跡", () => {
       checked required-file-form 1 package root 0 problems 0 warnings
       skipped preset-adoption no toolchain configuration
       checked telemetry-wiring 0 package roots 0 problems 0 warnings
+      checked shippable-packages 0 manifests 0 problems 0 warnings
       checked intent-skills 0 manifests 0 problems 0 warnings
       "
     `);

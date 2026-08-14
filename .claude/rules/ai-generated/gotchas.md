@@ -192,3 +192,13 @@ pack: { exports: { customExports: { './tsconfig/*': './tsconfig/*' } } }
 
 - IF: ルールの `meta.schema` を別モジュールの定数から渡そうとしている; THEN PROHIBIT: 渡す
   - 索引が「設定を持たないルール」として生成され、lint も検査も緑のまま通る
+
+## ワークスペースのリンクは、公開すると動かない入口を手元では動かす
+
+- 症状: `bin` と `exports` が `./src/*.ts` を指すパッケージが、手元では起動する。同じものを install した先では `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING` で落ちる
+- 原因: pnpm のリンクは実体のパスへ解決されるため、手元で Node が開くのは `packages/<名前>/src/*.ts` になる。node_modules の下ではないので型注釈が剥がされる。公開すると同じファイルが node_modules の下へ置かれ、Node は剥がすことを拒む
+- 実測: 26.7.0 でも 24.19.0 でも拒まれる。tarball を展開して直接叩いても同じ
+- 対処: `publishConfig` に公開後の `bin` と `exports` を書く。pnpm が公開されるマニフェストの同名の欄を置き換える。判断は [EDR 0066](../../../docs/engineering-decision-logs/0066-replace-the-published-entries-and-bundle-the-internal-contract.md)
+
+- IF: 手元で入口が動くことを確かめた; THEN PROHIBIT: それを公開後も動く根拠とする
+  - 手元で開かれているファイルは、公開後に開かれるファイルと同じ内容で、違う場所にある

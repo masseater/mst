@@ -18,8 +18,7 @@
   },
   "files": [
     "dist",
-    "skills",
-    "src"
+    "skills"
   ],
   "type": "module",
   "sideEffects": false,
@@ -29,6 +28,22 @@
     "./package.json": "./package.json"
   },
   "publishConfig": {
+    "bin": {
+      "spool": "./dist/spool/cli.mjs",
+      "throttle": "./dist/throttle/cli.mjs",
+      "unabridged": "./dist/unabridged/cli.mjs"
+    },
+    "exports": {
+      "./telemetry": {
+        "types": "./dist/telemetry/telemetry.d.mts",
+        "default": "./dist/telemetry/telemetry.mjs"
+      },
+      "./vitest-sdk": {
+        "types": "./dist/telemetry/vitest-sdk.d.mts",
+        "default": "./dist/telemetry/vitest-sdk.mjs"
+      },
+      "./package.json": "./package.json"
+    },
     "access": "public"
   },
   "scripts": {

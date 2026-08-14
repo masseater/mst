@@ -28,6 +28,7 @@ export default defineConfig({
       "src/spool/cli.ts",
       "src/unabridged/cli.ts",
       "src/telemetry/telemetry.ts",
+      "src/telemetry/vitest-sdk.ts",
     ],
     dts: {
       tsgo: true,

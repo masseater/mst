@@ -24,6 +24,8 @@ import { runPresetAdoptionChecks } from "./preset-adoption/run-preset-adoption-c
 import { formatRepositoryProblem } from "./problem.ts";
 import { defaultRequiredFileFormConfig } from "./required-file-form/config.ts";
 import { runRequiredFileFormChecks } from "./required-file-form/run-required-file-form-checks.ts";
+import { defaultShippablePackagesConfig } from "./shippable-packages/config.ts";
+import { shippablePackagesProblems } from "./shippable-packages/shippable-packages.ts";
 import { defaultTelemetryWiringConfig } from "./telemetry-wiring/config.ts";
 import { runTelemetryWiringChecks } from "./telemetry-wiring/run-telemetry-wiring-checks.ts";
 import { defaultWorkflowChecksConfig } from "./workflows/config.ts";
@@ -85,6 +87,33 @@ const sourceScanOutcomes = (repositoryRoot: string): readonly CheckOutcome[] => 
   ];
 };
 
+const manifestScanOutcomes = (repositoryRoot: string): readonly CheckOutcome[] => {
+  const shippablePackages = shippablePackagesProblems({
+    repositoryRoot,
+    config: defaultShippablePackagesConfig,
+  });
+  const skills = shippedSkillsProblems({ repositoryRoot, config: defaultIntentSkillsConfig });
+
+  return [
+    {
+      check: "shippable-packages",
+      unit: "manifest",
+      count: shippablePackages.scanned,
+      skippedReason: null,
+      problems: shippablePackages.problems.map(formatRepositoryProblem).toSorted(),
+      warnings: [],
+    },
+    {
+      check: "intent-skills",
+      unit: "manifest",
+      count: skills.scanned,
+      skippedReason: null,
+      problems: skills.problems.map(formatRepositoryProblem).toSorted(),
+      warnings: [],
+    },
+  ];
+};
+
 export const runChecks = (repositoryRoot: string): CheckReport => {
   const dependencyCatalog = runDependencyCatalogChecks({
     repositoryRoot,
@@ -98,7 +127,6 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
     repositoryRoot,
     config: defaultWorkflowChecksConfig,
   });
-  const skills = shippedSkillsProblems({ repositoryRoot, config: defaultIntentSkillsConfig });
   const presetAdoption = runPresetAdoptionChecks({
     repositoryRoot,
     config: defaultPresetAdoptionConfig,
@@ -183,14 +211,7 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
       problems: telemetryWiring.problems.map(formatRepositoryProblem).toSorted(),
       warnings: [],
     },
-    {
-      check: "intent-skills",
-      unit: "manifest",
-      count: skills.scanned,
-      skippedReason: null,
-      problems: skills.problems.map(formatRepositoryProblem).toSorted(),
-      warnings: [],
-    },
+    ...manifestScanOutcomes(repositoryRoot),
   ];
 
   return {
