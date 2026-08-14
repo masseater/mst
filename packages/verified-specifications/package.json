@@ -22,7 +22,6 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -37,12 +36,10 @@
     "typecheck": "spool -- tsc -p ."
   },
   "dependencies": {
-    "@mst/lint-rule-authoring": "workspace:*",
     "@mst/repository-checks": "workspace:*",
     "es-toolkit": "catalog:",
     "jsonc-parser": "catalog:",
     "oxc-parser": "catalog:",
-    "oxlint": "catalog:",
     "yaml": "catalog:"
   },
   "devDependencies": {

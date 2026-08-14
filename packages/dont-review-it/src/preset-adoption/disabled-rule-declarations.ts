@@ -1,8 +1,8 @@
-import { LINT_SEVERITY } from "@mst/lint-rule-authoring";
 import { parseSync } from "oxc-parser";
 
 import { isAstFields, NODE_TYPE_FIELD, type AstFields } from "../lint/oxlint/lib/ast-node.ts";
 import { ARRAY_EXPRESSION } from "../lint/oxlint/lib/node-kinds.ts";
+import { levelOfSpelling, SILENT_LEVEL } from "../lint/oxlint/lib/rule-sets/severity-levels.ts";
 
 import type { PresetAdoptionConfig } from "./config.ts";
 
@@ -19,6 +19,8 @@ const CALL_EXPRESSION = "CallExpression";
 const LITERAL = "Literal";
 
 const IDENTIFIER = "Identifier";
+
+const MEMBER_EXPRESSION = "MemberExpression";
 
 const EXPORT_DEFAULT = "ExportDefaultDeclaration";
 
@@ -52,6 +54,15 @@ const stringLiteralsIn = (held: unknown): readonly string[] =>
     .filter((held) => String(held[NODE_TYPE_FIELD]) === LITERAL)
     .map((held) => String(held.value));
 
+const severitySpellingOf = (held: unknown): string | null => {
+  const head = fieldsIn(nodeOfType({ held, type: ARRAY_EXPRESSION })?.elements)[0] ?? held;
+  const literal = nodeOfType({ held: head, type: LITERAL });
+  if (literal !== null) return String(literal.value).toLowerCase();
+  const member = nodeOfType({ held: head, type: MEMBER_EXPRESSION });
+  const named = nodeOfType({ held: member?.property, type: IDENTIFIER });
+  return named === null || member?.computed === true ? null : String(named.name).toLowerCase();
+};
+
 const disabledEntriesIn = ({
   rules,
   source,
@@ -61,9 +72,9 @@ const disabledEntriesIn = ({
 }): readonly Omit<DisabledRuleDeclaration, "filePatterns">[] =>
   propertiesOf(rules).flatMap((property) => {
     const ruleId = keyNameOf(property);
-    const severity = nodeOfType({ held: property.value, type: LITERAL });
-    if (ruleId === null || severity === null) return [];
-    if (String(severity.value) !== LINT_SEVERITY.OFF) return [];
+    const spelled = severitySpellingOf(property.value);
+    if (ruleId === null || spelled === null) return [];
+    if (levelOfSpelling(spelled) !== SILENT_LEVEL) return [];
     return [{ ruleId, line: source.slice(0, Number(property.start)).split("\n").length }];
   });
 

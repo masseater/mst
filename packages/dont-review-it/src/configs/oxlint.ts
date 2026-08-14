@@ -106,6 +106,7 @@ import {
   noUnusedStyleClass,
   requireCatalogEntry,
 } from "../plugin.ts";
+import { specDirectoryOverrides } from "./spec-directory-overrides.ts";
 import { UPSTREAM_PLUGINS, UPSTREAM_RULES, UPSTREAM_TEST_RULES } from "./upstream-rules.ts";
 
 const PLUGIN_NAME = "dont-review-it";
@@ -150,6 +151,7 @@ export const oxlint: OxlintConfig = defineConfig({
         "max-statements": LINT_SEVERITY.OFF,
       },
     },
+    ...specDirectoryOverrides,
   ],
   rules: {
     ...UPSTREAM_RULES,
