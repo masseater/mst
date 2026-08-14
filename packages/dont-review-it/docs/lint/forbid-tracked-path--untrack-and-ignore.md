@@ -1,57 +1,59 @@
+---
+description: "Require every path registered as untrackable to stay out of the tracked file list and to stand in the ignore settings, so values that belong to one machine and output that a build produces never ride a commit into another clone"
+---
+
 # forbid-tracked-path--untrack-and-ignore
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-追跡禁止として登録されたパスの表を読み、次の 2 つを見る。
+Require every path registered as untrackable to stay out of the tracked file list and to stand in the ignore settings, so values that belong to one machine and output that a build produces never ride a commit into another clone
 
-- 表のいずれかの行に一致するパスが、バージョン管理の追跡対象一覧に現れること
-- 表の行のパターンが、リポジトリの無視設定に載っていないこと
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`forbid-tracked-path--untrack-and-ignore.ts`](../../src/lint/oxlint/rules/forbid-tracked-path--untrack-and-ignore.ts)
 
-判定の入力は「作業ツリーにファイルが在るか」ではなく「追跡されているか」である。追跡対象一覧はバージョン管理に尋ねて得る。無視設定はリポジトリ直下の `.gitignore` を読む。機械ごとに違う大域の除外設定と `.git/info/exclude` は見ない。どちらもクローンに付いて来ないため、そこに書かれた無視は他の作業環境では効かない。
+<!-- END GENERATED rule-header -->
 
-表の行は 4 つの項目を持つ。パターン、理由文、無視設定への記載要求、例外の並びである。既定の表は次の 4 行で、消費側が書いた行はこれに加わる。
+## Violation
 
-- `**/node_modules/**` — 依存のツリーはマニフェストとロックファイルから復元する
-- `**/dist/**` — ビルド出力は隣にあるソースから作られる
-- `**/coverage/**` — カバレッジ出力はテスト実行が作る
-- `**/.env` — 環境ごとの値は、そのコードを走らせる機械のものである
+The table of paths registered as forbidden to track is read, and two things are looked at.
 
-既定の行を外したいときは、解除の行を書く。解除は理由文を伴う追加操作なので、消費側の設定を読めば「自分が書いていない禁止のうち、どれを外したか」が一覧になる。理由文の無い解除は行そのものを報告し、しかも何も外さない。
+- A path matching any row of the table appearing in version control's list of tracked files
+- A row's pattern not appearing in the repository's ignore settings
 
-解除が効くのは既定の 4 行に対してだけである。既定に無いパターンを指す解除は、死んだ解除として報告する。消費側が自分で書いた行を外す手段は解除ではなく、その行を消すことである。自分で書いた行の解除を書いても行は効いたまま残り、解除だけが死んだ行として報告される。
+The input to the judgment is not "is the file present in the working tree" but "is it tracked". The tracked list is obtained by asking version control. The ignore settings are read from the `.gitignore` at the repository root. The global exclusion settings, which differ per machine, and `.git/info/exclude` are not read. Neither travels with a clone, so an ignore written there does not hold in another working environment.
 
-例外の行も理由文が必須である。理由文の無い例外は登録として報告され、覆っているはずのパスも免除しない。
+A row of the table carries four items: the pattern, the reason, whether an ignore entry is required, and a list of exceptions. The default table is these four rows, and rows the consumer writes are added to them.
 
-報告はワークスペース直下に置かれた、検査対象のファイルに乗る。この規律の判定単位はリポジトリ全体であって 1 つのファイルの構文ではないため、報告の位置は「表と無視設定が置かれている場所」に寄せてある。ワークスペース直下より下のファイルを検査している間、この規則は何も見ない。
+- `**/node_modules/**` — a dependency tree is restored from the manifest and the lockfile
+- `**/dist/**` — build output is made from the source beside it
+- `**/coverage/**` — coverage output is made by running the tests
+- `**/.env` — a per-environment value belongs to the machine that runs the code
 
-## なぜそれが要るか
+To lift a default row, write a release. A release is an addition carrying a reason, so reading the consumer's configuration gives a list of "which of the prohibitions I did not write have I lifted". A release with no reason reports the row itself and lifts nothing.
 
-観測される事象は、手元にしか無いはずのもの（環境ごとの設定、生成物、キャッシュ）がコミットに混ざり、他の作業環境の挙動を変えることである。
+A release holds only against the four default rows. A release naming a pattern the defaults do not carry is reported as a dead release. The way to lift a row the consumer wrote is not a release but deleting that row. Write a release for your own row and the row keeps holding while the release alone is reported as dead.
 
-1 層目の理由は、追跡された時点でそのファイルが全員の作業ツリーに配られることである。環境ごとに違うべき値が固定され、生成物は「生成しなくても在る」状態になる。生成する側を差し替えても古い出力が残るので、どちらが本物かがリポジトリの中で決まらなくなる。
+An exception row requires a reason too. An exception with no reason is reported as a registration and exempts none of the paths it should have covered.
 
-2 層目の理由は、無視設定が「既定で無視する」だけで、強制指定した追加を止めないことである。しかも一度追跡されたファイルは、その後に無視設定へ書き足しても追跡され続ける。無視設定に書いてあることは、追跡されていないことを何も保証しない。この非対称が、無視設定を見て安心する運用を生む。
+Reports stand on the file being checked directly under the workspace root. The unit of judgment for this discipline is the whole repository rather than the syntax of one file, so the position of the report is drawn to "where the table and the ignore settings sit". While a file below the workspace root is being checked, this rule reads nothing.
 
-3 層目の理由は、作業ツリーの走査ではこの違反を検出できないことである。ファイルはそこに存在してよく、存在は違反ではない。判定の入力が「追跡されているか」である以上、ファイルの有無を見る検査とは別の入力が要る。
+### The invariant
 
-無視設定への記載を同時に求めるのは、記載が無い行は「いま追跡されていない」だけの状態であり、次に誰かがまとめて追加した瞬間に追跡へ倒れるためである。
+What is observed is something that should exist only locally — a per-environment setting, a build product, a cache — mixed into a commit and changing how another working environment behaves.
 
-## どう直すか
+The first layer is that the moment a file is tracked, it is handed to everyone's working tree. A value that ought to differ per environment gets fixed, and a build product enters the state of "present without being built". Swap out what builds it and the old output stays, so which one is real is no longer settled inside the repository.
 
-追跡から外し、無視設定に載せる。ファイルは作業ツリーに残したままでよい。
+The second layer is that ignore settings only "ignore by default" — they do not stop a forced addition. And once a file is tracked, adding it to the ignore settings afterwards leaves it tracked. What is written in the ignore settings guarantees nothing about not being tracked. That asymmetry breeds an operation that reads the ignore settings and feels safe.
 
-値が要るなら、値を含まないテンプレートを別名で追跡する。生成物なら、生成のタスクを整えて必要な場面で作る。
+The third layer is that walking the working tree cannot detect this violation. The file is allowed to be there, and being there is not the violation. Since the input to the judgment is "is it tracked", it needs a different input from a check that reads whether a file exists.
 
-無視設定に載っていないと報告されたときは、表の行が綴っているとおりのパターンを無視設定に書く。表の行と無視設定の綴りを揃えることそのものを、この検査は求めている。片方だけを書き換えると、次に読む人が 2 つの綴りのどちらが正しいかを決められなくなる。
+An ignore entry is required at the same time because a row with no entry is only in the state of "not tracked right now", and it falls into being tracked the moment somebody adds files in bulk.
 
-## 禁じる回避策
-
-- 無視設定にだけ書き足して、既に追跡されているファイルを放置すること。無視設定は追跡中のファイルに効かない
-- 中身を空にして追跡し続けること。追跡されている事実は変わらない。**この形はこの検査では落ちない。**中身を見ないので、空のファイルも追跡されている 1 行として報告されるだけである
-- 消費側が書いた行を消して通すこと。**この形もこの検査では落ちない。**既定の行は解除の登録が要るので差分に現れるが、消費側が自分で書いた行を消す操作は、設定から行が 1 つ減るという形でしか現れない
-- 例外の理由文に、後で決めるという趣旨だけを書くこと。理由文は、そのパスが表の外に出てよい根拠を書く場所である
-
-## オプション
+### Configuration
 
 ```jsonc
 [
@@ -60,25 +62,90 @@
     "forbidden": [
       {
         "pattern": "**/*.tsbuildinfo",
-        "reason": "型検査の途中結果は検査を走らせた機械のものである",
+        "reason": "an intermediate result of type checking belongs to the machine that ran it",
         "ignoreListing": true,
-        "exceptions": [{ "pattern": "vendor/**", "reason": "上流が配布物しか出していない" }],
+        "exceptions": [{ "pattern": "vendor/**", "reason": "upstream publishes only the built form" }],
       },
     ],
-    "released": [{ "pattern": "**/coverage/**", "reason": "計測結果を配布物として同梱している" }],
+    "released": [{ "pattern": "**/coverage/**", "reason": "the measured result ships inside the package" }],
   },
 ]
 ```
 
-`forbidden` は表に加える行の並びである。`pattern` と `reason` は必須で、`pattern` はリポジトリルートからのグロブとして照合する。`ignoreListing` を `false` にすると、その行は追跡だけを禁じ、無視設定への記載を求めない。`exceptions` は、その行の中で追跡を認めるパスをグロブと理由文の組で並べる。
+`forbidden` is a list of rows added to the table. `pattern` and `reason` are required, and `pattern` is matched as a glob from the repository root. Setting `ignoreListing` to `false` makes that row forbid tracking alone and ask for no ignore entry. `exceptions` lists paths within that row where tracking is allowed, as pairs of a glob and a reason.
 
-`released` は、既定の行を外すための解除の並びである。`pattern` は外したい既定の行の綴りと完全に一致させる。既定に無いパターンを書いた解除は死んだ解除として報告する。
+`released` is a list of releases lifting default rows. `pattern` must match the spelling of the default row exactly. A release writing a pattern the defaults do not carry is reported as a dead release.
 
-既定の 4 行は常に出発点であり、`forbidden` はそこへ加わる。置換にしていないのは、消費側の 1 行で既定を丸ごと消せる形にすると、その操作が「何も報告されない」という結果としてしか現れないためである。
+The four default rows are always the starting point, and `forbidden` is added to them. It is not a replacement because a shape where one consumer line erases the whole default would show up only as the result "nothing is reported".
 
-## この検査が引き受けないもの
+### What this check does not take on
 
-- 追跡されているファイルの中身が機密かどうか。中身は見ない。守るのは「そのパスが追跡されていないこと」だけで、どのパスを表に載せるかは人が決める
-- 既に履歴に入った内容の扱い。履歴の書き換えはバージョン管理の操作であり、検出の範囲外である
-- バージョン管理の下に無い作業ツリー。追跡対象一覧が得られないので、追跡の検査は何も報告しない。無視設定の記載の検査はそのまま働く
-- 表の行が実際に何かを覆っているかの棚卸し。どの検査経路にも届かない登録行を見つけるのは、登録簿と対象範囲を突き合わせる検査の担当である
+- Whether the contents of a tracked file are secret. Contents are not read. What is protected is only "that path is not tracked", and which paths go in the table is decided by a person
+- What to do about content already in the history. Rewriting history is a version control operation and outside the range of detection
+- A working tree not under version control. The tracked list cannot be obtained, so the tracking check reports nothing. The ignore-entry check works as it stands
+- Stock-taking of whether a table row actually covers anything. Finding registration rows that reach no check route belongs to the check that reconciles the register against the range of targets
+
+## Fix
+
+Take it out of tracking and put it in the ignore settings. The file may stay in the working tree.
+
+Where a value is needed, track a template carrying no value under another name. Where it is a build product, get the build task in order and make it when it is needed.
+
+Where the report says a pattern is missing from the ignore settings, write into the ignore settings the pattern exactly as the table row spells it. Lining up the spelling of the table row with the ignore settings is precisely what this check asks for. Rewrite only one of them and the next reader cannot settle which of the two spellings is right.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// an environment file that reached the index is reported
+export const total = 1;
+```
+
+```ts
+// a registered pattern missing from the ignore settings is reported
+export const total = 1;
+```
+
+Code this rule accepts.
+
+```ts
+// an untracked file of the same name is left where it stands
+export const total = 1;
+```
+
+```ts
+// a tracked path outside every registered pattern is left alone
+export const total = 1;
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Adding to the ignore settings alone and leaving an already-tracked file where it is. Ignore settings do not hold against a tracked file
+- Emptying the contents and keeping it tracked. That it is tracked does not change. **This shape does not fall to this check.** Contents are not read, so an empty file is simply reported as one more tracked row
+- Deleting a row the consumer wrote to get past it. **This shape does not fall to this check either.** A default row needs a registered release and so appears in the diff, but deleting a row the consumer wrote themselves shows up only as one fewer row in the configuration
+- Writing an exception reason that says only "to be decided later". The reason is where the grounds go for that path standing outside the table
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `trackedForbiddenPath` | A path registered as untrackable must not stand among the tracked files. \`{{path}}\` is tracked, and its row reads: {{reason}}. Remove it from the index, list its pattern in the ignore settings, and leave the file in the working tree. Move whatever another clone needs into a template tracked under a different name. Deleting the file is not the repair. |
+| `unignoredForbiddenPattern` | A pattern registered as untrackable must not stay out of the ignore settings. \`{{pattern}}\` matches no entry of \`{{ignoreFile}}\`, and its row reads: {{reason}}. Add \`{{pattern}}\` to that file, spelled the way the row spells it. |
+| `groundlessException` | An exception row that carries no grounds must not stand in the table. The row excepting \`{{excepted}}\` under \`{{pattern}}\` leaves its reason empty. Write the grounds into that row, or delete the row and untrack the paths it covers. |
+| `groundlessRelease` | A release row that carries no grounds must not stand in the configuration. The row releasing \`{{pattern}}\` leaves its reason empty. Write the grounds into that row, or delete the row and leave the registered pattern in force. |
+| `deadRelease` | A release row that names a pattern outside the default table must not stand in the configuration. No default row carries the released \`{{pattern}}\`. Delete the row, and delete the configured row itself to drop a pattern this configuration added. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->
