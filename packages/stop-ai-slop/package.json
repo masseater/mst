@@ -1,0 +1,62 @@
+{
+  "name": "@mst/stop-ai-slop",
+  "version": "0.0.0",
+  "description": "Machine-enforced checks for recurring low-value patterns in AI-authored changes.",
+  "keywords": [
+    "tanstack-intent"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/masseater/mst.git",
+    "directory": "packages/stop-ai-slop"
+  },
+  "bin": {
+    "stop-ai-slop": "./src/cli.ts"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "src"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "bin": {
+      "stop-ai-slop": "./dist/cli.mjs"
+    },
+    "exports": {
+      "./package.json": "./package.json"
+    },
+    "access": "public"
+  },
+  "scripts": {
+    "build": "spool -- vp pack",
+    "dev": "vp pack --watch",
+    "test": "spool -- vp test",
+    "check": "spool -- vp check",
+    "check:skills": "intent validate"
+  },
+  "dependencies": {
+    "es-toolkit": "catalog:",
+    "oxc-parser": "catalog:",
+    "parse-git-diff": "0.0.20"
+  },
+  "devDependencies": {
+    "@mst/ai-native": "workspace:*",
+    "@mst/lint-rule-authoring": "workspace:*",
+    "@mst/repository-checks": "workspace:*",
+    "@tanstack/intent": "catalog:",
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "engines": {
+    "node": ">=26.0.0"
+  }
+}

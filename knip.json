@@ -2,10 +2,13 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "includeEntryExports": true,
   "ignoreBinaries": ["mkfifo"],
-  "ignoreDependencies": ["vite", "@mst/agentic-documents"],
+  "ignoreDependencies": ["vite", "@mst/agentic-documents", "@mst/stop-ai-slop"],
   "workspaces": {
     "packages/dont-review-it": {
       "project": ["**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}!", "!src/vitest/async-process.ts!"]
+    },
+    "packages/stop-ai-slop": {
+      "project": ["src/**/*.ts!", "!src/check-test-repository.ts!", "!src/test-repository.ts!"]
     }
   }
 }

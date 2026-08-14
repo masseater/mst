@@ -1,4 +1,5 @@
-import { describe, expect, onTestFinished, test, vi } from "vite-plus/test";
+import { standardIoTest } from "@mst/dont-review-it/vitest";
+import { describe, expect, onTestFinished, vi } from "vite-plus/test";
 
 import type { CliResult } from "@mst/repository-checks";
 
@@ -9,29 +10,12 @@ const runAgenticDocumentsMock = vi.hoisted(() =>
 vi.mock(import("./run-cli.ts"), () => ({ runAgenticDocuments: runAgenticDocumentsMock }));
 
 describe("cli entrypoint", () => {
-  test.each([
-    {
-      name: "it passes arguments through and publishes both output channels",
-      answer: { exitCode: 7, out: "problems\n", error: "diagnostic\n" },
-      stdoutCalls: [["problems\n"]],
-      stderrCalls: [["diagnostic\n"]],
-    },
-    {
-      name: "it writes neither channel for empty output",
-      answer: { exitCode: 0, out: "", error: "" },
-      stdoutCalls: [],
-      stderrCalls: [],
-    },
-  ])("$name", async ({ answer, stdoutCalls, stderrCalls }) => {
+  const runEntry = async (answer: CliResult): Promise<void> => {
     const previousExitCode = process.exitCode;
     const expectedArguments = process.argv.slice(2);
     vi.resetModules();
     runAgenticDocumentsMock.mockResolvedValue(answer);
-    const stdoutWrite = vi.spyOn(process.stdout, "write").mockReturnValue(true);
-    const stderrWrite = vi.spyOn(process.stderr, "write").mockReturnValue(true);
     onTestFinished(() => {
-      stdoutWrite.mockRestore();
-      stderrWrite.mockRestore();
       runAgenticDocumentsMock.mockReset();
       process.exitCode = previousExitCode;
     });
@@ -39,8 +23,23 @@ describe("cli entrypoint", () => {
     await import("./cli.ts");
 
     expect(runAgenticDocumentsMock).toHaveBeenCalledExactlyOnceWith(expectedArguments);
-    expect(stdoutWrite.mock.calls).toStrictEqual(stdoutCalls);
-    expect(stderrWrite.mock.calls).toStrictEqual(stderrCalls);
     expect(process.exitCode).toBe(answer.exitCode);
+  };
+
+  standardIoTest(
+    "it passes arguments through and publishes both output channels",
+    async ({ stdout, stderr }) => {
+      await runEntry({ exitCode: 7, out: "problems\n", error: "diagnostic\n" });
+
+      expect(stdout.text).toMatchInlineSnapshot(`"problems\n"`);
+      expect(stderr.text).toMatchInlineSnapshot(`"diagnostic\n"`);
+    },
+  );
+
+  standardIoTest("it writes neither channel for empty output", async ({ stdout, stderr }) => {
+    await runEntry({ exitCode: 0, out: "", error: "" });
+
+    expect(stdout.text).toMatchInlineSnapshot(`""`);
+    expect(stderr.text).toMatchInlineSnapshot(`""`);
   });
 });

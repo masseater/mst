@@ -1,12 +1,19 @@
 const SHELL_TOKEN =
   /(?:\d*(?:<<<|>>|<<|<>|>\||>&|<&|>|<)|&>>?)|(?:\\[\s\S]|"(?:\\[\s\S]|[^"\\])*"|'[^']*'|[^ \t\\'";&|<>\n])+|&&|\|\||[;&|\n]/gu;
 
-const COMMAND_SEPARATORS: ReadonlySet<string> = new Set(["&&", "||", ";", "&", "|", "\n"]);
+const COMMAND_SEPARATORS = ["&&", "||", ";", "&", "|", "\n"] as const;
+
+type CommandSeparator = (typeof COMMAND_SEPARATORS)[number];
+
+const isCommandSeparator = (token: string): token is CommandSeparator =>
+  COMMAND_SEPARATORS.includes(token as CommandSeparator);
 
 const REDIRECTION = /^(?:\d*(?:<<<|>>|<<|<>|>\||>&|<&|>|<)|&>>?)$/u;
 
-type ShellCommandSegment = {
+export type ShellCommandSegment = {
   readonly command: readonly string[];
+  readonly hasRedirection: boolean;
+  readonly terminator: CommandSeparator | null;
   readonly terminated: boolean;
   readonly staticallyInspectable: boolean;
 };
@@ -227,15 +234,19 @@ const decodedWord = (
 const emptySegment = (): SegmentState => ({
   command: [],
   expectsRedirectionTarget: false,
+  hasRedirection: false,
+  terminator: null,
   terminated: false,
   staticallyInspectable: true,
 });
 
-const completedState = (state: ParserState): ParserState => ({
+const completedState = (state: ParserState, terminator: CommandSeparator): ParserState => ({
   complete: [
     ...state.complete,
     {
       command: state.current.command,
+      hasRedirection: state.current.hasRedirection,
+      terminator,
       terminated: true,
       staticallyInspectable:
         state.current.staticallyInspectable && !state.current.expectsRedirectionTarget,
@@ -249,6 +260,7 @@ const stateAfterRedirection = (state: ParserState, token: ShellToken): ParserSta
   current: {
     ...state.current,
     expectsRedirectionTarget: true,
+    hasRedirection: true,
     staticallyInspectable:
       state.current.staticallyInspectable &&
       !state.current.expectsRedirectionTarget &&
@@ -311,7 +323,7 @@ const stateAfterWord = (state: ParserState, token: ShellToken): ParserState => {
 };
 
 const stateAfterToken = (state: ParserState, token: ShellToken): ParserState => {
-  if (COMMAND_SEPARATORS.has(token.raw)) return completedState(state);
+  if (isCommandSeparator(token.raw)) return completedState(state, token.raw);
   return REDIRECTION.test(token.raw)
     ? stateAfterRedirection(state, token)
     : stateAfterWord(state, token);
@@ -330,6 +342,8 @@ export const shellCommandSegmentsIn = (source: string): readonly ShellCommandSeg
     ...parsed.complete,
     {
       command: parsed.current.command,
+      hasRedirection: parsed.current.hasRedirection,
+      terminator: null,
       terminated: false,
       staticallyInspectable:
         parsed.current.staticallyInspectable &&

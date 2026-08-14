@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { EXIT_MISUSE, EXIT_PROBLEMS_FOUND } from "@mst/repository-checks";
+import { EXIT_MISUSE, EXIT_PROBLEMS_FOUND, EXIT_SUCCESS } from "@mst/repository-checks";
 import { runCommand } from "citty";
 import { describe, expect, onTestFinished, it } from "vite-plus/test";
 
@@ -60,6 +60,39 @@ describe("リポジトリ検査の入口", () => {
     process.exitCode = 0;
   });
 
+  it("vite.config.ts が preset を root lint.extends から直接採用していなければ報告して失敗する", async () => {
+    const repositoryRoot = repositoryWith({
+      "vite.config.ts": `export default { lint: { extends: [] } };`,
+    });
+
+    expect(runChecks(repositoryRoot).problems.join("\n")).toContain(
+      "statically imported oxlint value exactly once",
+    );
+
+    process.exitCode = 0;
+    await runCommand(dontReviewItCommand, {
+      rawArgs: ["check", "--repository-root", repositoryRoot],
+    });
+
+    expect(process.exitCode).toBe(EXIT_PROBLEMS_FOUND);
+    process.exitCode = 0;
+  });
+
+  it("vite.config.ts が preset を root lint.extends から直接採用していれば check を成功させる", async () => {
+    const repositoryRoot = repositoryWith({
+      "vite.config.ts": `import { oxlint } from "@mst/dont-review-it";
+export default { lint: { extends: [oxlint] } };`,
+    });
+
+    process.exitCode = 0;
+    await runCommand(dontReviewItCommand, {
+      rawArgs: ["check", "--repository-root", repositoryRoot],
+    });
+
+    expect(process.exitCode).toBe(EXIT_SUCCESS);
+    process.exitCode = 0;
+  });
+
   it("test command が config を差し替える経路を報告して失敗する", async () => {
     const repositoryRoot = repositoryWith({
       "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
@@ -87,6 +120,31 @@ describe("リポジトリ検査の入口", () => {
     const reported = runChecks(repositoryRoot).problems.join("\n");
     expect(reported).toContain("must not override coverage settings");
     expect(reported).toContain("reduce the coverage source universe");
+
+    process.exitCode = 0;
+    await runCommand(dontReviewItCommand, {
+      rawArgs: ["check", "--repository-root", repositoryRoot],
+    });
+
+    expect(process.exitCode).toBe(EXIT_PROBLEMS_FOUND);
+    process.exitCode = 0;
+  });
+
+  it("root guard が再帰 test へ安全な coverage と worker 上限以外を転送する経路を報告して失敗する", async () => {
+    const repositoryRoot = repositoryWith({
+      "package.json": JSON.stringify({
+        private: true,
+        scripts: {
+          guard: "throttle --timeout 1800 -- spool -- vp run guard:all",
+          "guard:all":
+            "vp run -r --concurrency-limit 1 test --coverage --maxWorkers 2 --config alternate.ts",
+        },
+      }),
+    });
+
+    const reported = runChecks(repositoryRoot).problems.join("\n");
+    expect(reported).toContain("The root `guard:all` script must not omit, delegate");
+    expect(reported).toContain("only `--coverage` and `--maxWorkers 2` may be forwarded");
 
     process.exitCode = 0;
     await runCommand(dontReviewItCommand, {
@@ -180,7 +238,7 @@ describe("リポジトリ検査の入口", () => {
 
   it("check --write が安全な entry composition を修復して再検査を通す", async () => {
     const repositoryRoot = repositoryWith({
-      "package.json": `{"scripts": {"guard": "vp run guard:all"}}`,
+      "package.json": `{"scripts":{"guard":"vp run guard:all","guard:all":"vp run -r --concurrency-limit 1 test --coverage --maxWorkers 2"}}`,
     });
 
     process.exitCode = 0;

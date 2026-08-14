@@ -50,6 +50,7 @@ describe("検査の走査証跡", () => {
       ["lint-rule-index", 0],
       ["dependency-declarations", 0],
       ["test-execution", 0],
+      ["preset-adoption", 0],
       ["intent-skills", 0],
     ]);
   });
@@ -61,7 +62,10 @@ describe("検査の走査証跡", () => {
       .outcomes.filter((outcome) => outcome.skippedReason !== null)
       .map((outcome) => [outcome.check, outcome.skippedReason]);
 
-    expect(skipped).toStrictEqual([["dependency-declarations", "no workspace definition"]]);
+    expect(skipped).toStrictEqual([
+      ["dependency-declarations", "no workspace definition"],
+      ["preset-adoption", "no toolchain configuration"],
+    ]);
   });
 
   it("人間が読む形では、状態の記号と対象の規模を観点ごとに桁で揃えて並べる", async () => {
@@ -77,9 +81,10 @@ describe("検査の走査証跡", () => {
         ✓ lint-rule-index          0 workspaces
         ⊘ dependency-declarations  skipped — no workspace definition
         ✓ test-execution           0 manifests
+        ⊘ preset-adoption          skipped — no toolchain configuration
         ✓ intent-skills            0 manifests
 
-        9 checks ran, nothing to report
+        10 checks ran, nothing to report
       "
     `);
   });
@@ -97,6 +102,7 @@ describe("検査の走査証跡", () => {
       checked lint-rule-index 0 workspaces 0 problems 0 warnings
       skipped dependency-declarations no workspace definition
       checked test-execution 0 manifests 0 problems 0 warnings
+      skipped preset-adoption no toolchain configuration
       checked intent-skills 0 manifests 0 problems 0 warnings
       "
     `);

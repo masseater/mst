@@ -1,13 +1,12 @@
 import { globSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { attempt } from "es-toolkit";
-
 import { defaultDependencyCatalogChecksConfig } from "../dependency-catalog/config.ts";
 import { readWorkspaceManifests } from "../dependency-catalog/manifest-files.ts";
 import { recordOf } from "../dependency-catalog/record-fields.ts";
-import { parseWorkspaceDefinition } from "../dependency-catalog/workspace-definition.ts";
+import { parsedWorkspaceDefinitionOrNull } from "../dependency-catalog/workspace-definition.ts";
 import { isFile, readTextFile } from "../lint/oxlint/lib/canonical-values/source-files.ts";
+import { rootTestInvocationMessagesIn } from "./root-test-invocation.ts";
 import { type CommandResolution, testCommandResolutionsIn } from "./test-command-resolution.ts";
 
 import type { RepositoryProblem, ScannedProblems } from "@mst/repository-checks";
@@ -77,10 +76,11 @@ const violationMessagesIn = (command: string, scriptName: string): readonly stri
 };
 
 const packagePatternsIn = (source: string): readonly string[] | null => {
-  const [failure, definition] = attempt(() =>
-    parseWorkspaceDefinition({ source, config: defaultDependencyCatalogChecksConfig }),
-  );
-  return failure === null && definition !== null ? definition.packagePatterns : null;
+  const definition = parsedWorkspaceDefinitionOrNull({
+    source,
+    config: defaultDependencyCatalogChecksConfig,
+  });
+  return definition?.packagePatterns ?? null;
 };
 
 const problemFor = (relativePath: string, message: string): RepositoryProblem => ({
@@ -118,6 +118,11 @@ const problemsForManifest = ({
 }): readonly RepositoryProblem[] => {
   const scripts = recordOf(recordOf(manifest).scripts);
   const testEntry = scripts.test;
+  const rootGuardProblems =
+    relativePath === rootManifestFileName &&
+    (Object.hasOwn(scripts, "guard") || Object.hasOwn(scripts, "guard:all"))
+      ? rootTestInvocationMessagesIn(scripts).map((message) => problemFor(relativePath, message))
+      : [];
   const coverageTarget = ownsTestConfig({
     repositoryRoot,
     relativePath,
@@ -133,15 +138,16 @@ const problemsForManifest = ({
       : [];
   if (typeof testEntry === "string") {
     return [
+      ...rootGuardProblems,
       ...lifecycleProblems,
       ...violationMessagesIn(testEntry, "test").map((message) => problemFor(relativePath, message)),
     ];
   }
-  if (!coverageTarget) return lifecycleProblems;
+  if (!coverageTarget) return [...rootGuardProblems, ...lifecycleProblems];
   const entryMessage = Object.hasOwn(scripts, "test")
     ? nonStringTestEntryMessage
     : missingTestEntryMessage;
-  return [...lifecycleProblems, problemFor(relativePath, entryMessage)];
+  return [...rootGuardProblems, ...lifecycleProblems, problemFor(relativePath, entryMessage)];
 };
 
 export const testCommandOverrideProblems = (repositoryRoot: string): ScannedProblems => {

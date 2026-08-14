@@ -19,8 +19,11 @@
 - check 以外の命令を名指しで拒否する
 - 存在しない場所を検査対象に取らない
 - 依存バージョンの食い違いを報告して失敗する
+- vite.config.ts が preset を root lint.extends から直接採用していなければ報告して失敗する
+- vite.config.ts が preset を root lint.extends から直接採用していれば check を成功させる
 - test command が config を差し替える経路を報告して失敗する
 - test command が coverage 設定を上書きするか対象を変更ファイルだけに絞る経路を報告して失敗する
+- root guard が再帰 test へ安全な coverage と worker 上限以外を転送する経路を報告して失敗する
 - test entry が別 package へ委譲する経路と通常run以外のrunner引数を報告して失敗する
 - test entry の前後に pretest と posttest の別経路を置く構成を報告して失敗する
 - test config を持つ workspace の scripts.test 欠落と非文字列を報告して失敗する
@@ -65,6 +68,19 @@
 
 - 呼び手が書いた除外パターンを、git 由来の除外の後ろに残す
 - 除外を書いていない呼び手の設定にも、除外パターンの配列を与える
+
+## preset の適用範囲の検査
+
+[`specs/preset-adoption.spec.ts`](specs/preset-adoption.spec.ts)
+
+- vite.config.ts があるリポジトリでは値として静的 import した preset を root lint.extends から直接ちょうど 1 回参照させる
+- named alias と namespace のどちらでも正規 module から直接参照する preset を採用済みとみなす
+- type-only import と別 module と動的 import と local relay と computed member と spread と重複を preset の直接採用として通さない
+- preset rule を off と allow と 0 またはそれらを先頭に置く配列で止めた宣言をすべて検出する
+- EDR に記録された 2 workspace と 1 rule の完全一致だけを warning に留める
+- EDR の完全一致以外で止めた preset rule を warning ではなく problem にする
+- rules と overrides と severity と files と excludeFiles の有効値を静的に追えない設定を problem にする
+- vite.config.ts が無いリポジトリには preset の導入を要求しない
 
 ## 検査の走査証跡
 

@@ -113,6 +113,7 @@ describe("run-throttle", () => {
     expect(await runThrottle(["--"])).toBe(2);
 
     expect(stderrText()).toContain("Usage: throttle");
+    expect(stderrText()).toMatch(/default wait budget is 1900\s+seconds/);
   });
 
   test("a non-integer timeout is refused naming the value, before any slot exists", async () => {

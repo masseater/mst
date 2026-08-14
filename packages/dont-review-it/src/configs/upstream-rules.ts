@@ -224,7 +224,7 @@ export const UPSTREAM_TEST_RULES: NonNullable<OxlintConfig["rules"]> = {
   "vitest/no-mocks-import": LINT_SEVERITY.ERROR,
   "vitest/no-standalone-expect": [
     LINT_SEVERITY.ERROR,
-    { additionalTestBlockFunctions: ["standardIoTest"] },
+    { additionalTestBlockFunctions: ["it", "standardIoTest"] },
   ],
   "vitest/no-test-return-statement": LINT_SEVERITY.ERROR,
   "vitest/no-unneeded-async-expect-function": LINT_SEVERITY.ERROR,

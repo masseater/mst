@@ -20,6 +20,8 @@ import {
 import { duplicatedClustersIn } from "./lint/oxlint/lib/duplicated-bodies/body-index.ts";
 import { buildRepositoryBodyIndex } from "./lint/oxlint/lib/duplicated-bodies/builder.ts";
 import { formatDuplicatedCluster } from "./lint/oxlint/lib/duplicated-bodies/site-report.ts";
+import { defaultPresetAdoptionConfig } from "./preset-adoption/config.ts";
+import { runPresetAdoptionChecks } from "./preset-adoption/run-preset-adoption-checks.ts";
 import { formatRepositoryProblem } from "./problem.ts";
 import {
   formatTestCommandOverrideProblem,
@@ -39,7 +41,22 @@ export type CheckReport = {
 
 const NO_WORKSPACE_DEFINITION = "no workspace definition";
 
+const NO_TOOLCHAIN_CONFIG = "no toolchain configuration";
+
 const UNREADABLE_WORKSPACE_DEFINITION = "workspace definition does not parse";
+
+const checkReportFrom = ({
+  outcomes,
+  failures,
+}: {
+  readonly outcomes: readonly CheckOutcome[];
+  readonly failures: readonly string[];
+}): CheckReport => ({
+  outcomes,
+  problems: outcomes.flatMap((outcome) => outcome.problems).toSorted(),
+  warnings: outcomes.flatMap((outcome) => outcome.warnings).toSorted(),
+  failures: failures.toSorted(),
+});
 
 export const runChecks = (repositoryRoot: string): CheckReport => {
   const dependencyCatalog = runDependencyCatalogChecks({
@@ -55,97 +72,105 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
   const workflows = runWorkflowChecks({ repositoryRoot, config: defaultWorkflowChecksConfig });
   const skills = shippedSkillsProblems({ repositoryRoot, config: defaultIntentSkillsConfig });
   const testExecution = testCommandOverrideProblems(repositoryRoot);
+  const presetAdoption = runPresetAdoptionChecks({
+    repositoryRoot,
+    config: defaultPresetAdoptionConfig,
+  });
   const ruleIndex = dependencyCatalog.definitionUnreadable
     ? { problems: [], scanned: 0 }
     : lintRuleIndexProblems({ repositoryRoot, write: false });
 
-  const outcomes: readonly CheckOutcome[] = [
-    {
-      check: "entry-composition",
-      unit: "manifest",
-      count: entryComposition.scanned,
-      skippedReason: null,
-      problems: entryComposition.problems.map(formatRepositoryProblem).toSorted(),
-      warnings: [],
-    },
-    {
-      check: "canonical-values",
-      unit: "source file",
-      count: repositoryFiles.commentSources.length,
-      skippedReason: null,
-      problems: verifyCanonicalValues({ repositoryRoot })
-        .map(formatCanonicalValuesProblem)
-        .toSorted(),
-      warnings: [],
-    },
-    {
-      check: "equivalent-concepts",
-      unit: "concept",
-      count: catalog.entries.length,
-      skippedReason: null,
-      problems: findEquivalentConcepts(catalog.entries)
-        .map(formatEquivalentConceptGroup)
-        .toSorted(),
-      warnings: [],
-    },
-    {
-      check: "duplicated-bodies",
-      unit: "declaration source",
-      count: repositoryFiles.declarationSources.length,
-      skippedReason: null,
-      problems: duplicatedClustersIn(buildRepositoryBodyIndex({ repositoryRoot }))
-        .map(formatDuplicatedCluster)
-        .toSorted(),
-      warnings: [],
-    },
-    {
-      check: "workflow-definitions",
-      unit: "definition",
-      count: workflows.scanned,
-      skippedReason: null,
-      problems: workflows.problems.map(formatRepositoryProblem).toSorted(),
-      warnings: [],
-    },
-    {
-      check: "lint-rule-index",
-      unit: "workspace",
-      count: ruleIndex.scanned,
-      skippedReason: dependencyCatalog.definitionUnreadable
-        ? UNREADABLE_WORKSPACE_DEFINITION
-        : null,
-      problems: ruleIndex.problems.map(formatLintRuleIndexProblem).toSorted(),
-      warnings: [],
-    },
-    {
-      check: "dependency-declarations",
-      unit: "manifest",
-      count: dependencyCatalog.scanned,
-      skippedReason: dependencyCatalog.definitionMissing ? NO_WORKSPACE_DEFINITION : null,
-      problems: dependencyCatalog.problems.map(formatDependencyCatalogProblem).toSorted(),
-      warnings: [],
-    },
-    {
-      check: "test-execution",
-      unit: "manifest",
-      count: testExecution.scanned,
-      skippedReason: null,
-      problems: testExecution.problems.map(formatTestCommandOverrideProblem).toSorted(),
-      warnings: [],
-    },
-    {
-      check: "intent-skills",
-      unit: "manifest",
-      count: skills.scanned,
-      skippedReason: null,
-      problems: skills.problems.map(formatRepositoryProblem).toSorted(),
-      warnings: [],
-    },
-  ];
-
-  return {
-    outcomes,
-    problems: outcomes.flatMap((outcome) => outcome.problems).toSorted(),
-    warnings: outcomes.flatMap((outcome) => outcome.warnings).toSorted(),
-    failures: entryComposition.failures.toSorted(),
-  };
+  return checkReportFrom({
+    outcomes: [
+      {
+        check: "entry-composition",
+        unit: "manifest",
+        count: entryComposition.scanned,
+        skippedReason: null,
+        problems: entryComposition.problems.map(formatRepositoryProblem).toSorted(),
+        warnings: [],
+      },
+      {
+        check: "canonical-values",
+        unit: "source file",
+        count: repositoryFiles.commentSources.length,
+        skippedReason: null,
+        problems: verifyCanonicalValues({ repositoryRoot })
+          .map(formatCanonicalValuesProblem)
+          .toSorted(),
+        warnings: [],
+      },
+      {
+        check: "equivalent-concepts",
+        unit: "concept",
+        count: catalog.entries.length,
+        skippedReason: null,
+        problems: findEquivalentConcepts(catalog.entries)
+          .map(formatEquivalentConceptGroup)
+          .toSorted(),
+        warnings: [],
+      },
+      {
+        check: "duplicated-bodies",
+        unit: "declaration source",
+        count: repositoryFiles.declarationSources.length,
+        skippedReason: null,
+        problems: duplicatedClustersIn(buildRepositoryBodyIndex({ repositoryRoot }))
+          .map(formatDuplicatedCluster)
+          .toSorted(),
+        warnings: [],
+      },
+      {
+        check: "workflow-definitions",
+        unit: "definition",
+        count: workflows.scanned,
+        skippedReason: null,
+        problems: workflows.problems.map(formatRepositoryProblem).toSorted(),
+        warnings: [],
+      },
+      {
+        check: "lint-rule-index",
+        unit: "workspace",
+        count: ruleIndex.scanned,
+        skippedReason: dependencyCatalog.definitionUnreadable
+          ? UNREADABLE_WORKSPACE_DEFINITION
+          : null,
+        problems: ruleIndex.problems.map(formatLintRuleIndexProblem).toSorted(),
+        warnings: [],
+      },
+      {
+        check: "dependency-declarations",
+        unit: "manifest",
+        count: dependencyCatalog.scanned,
+        skippedReason: dependencyCatalog.definitionMissing ? NO_WORKSPACE_DEFINITION : null,
+        problems: dependencyCatalog.problems.map(formatDependencyCatalogProblem).toSorted(),
+        warnings: [],
+      },
+      {
+        check: "test-execution",
+        unit: "manifest",
+        count: testExecution.scanned,
+        skippedReason: null,
+        problems: testExecution.problems.map(formatTestCommandOverrideProblem).toSorted(),
+        warnings: [],
+      },
+      {
+        check: "preset-adoption",
+        unit: "workspace",
+        count: presetAdoption.scanned,
+        skippedReason: presetAdoption.configMissing ? NO_TOOLCHAIN_CONFIG : null,
+        problems: presetAdoption.problems.map(formatRepositoryProblem).toSorted(),
+        warnings: presetAdoption.warnings.map(formatRepositoryProblem).toSorted(),
+      },
+      {
+        check: "intent-skills",
+        unit: "manifest",
+        count: skills.scanned,
+        skippedReason: null,
+        problems: skills.problems.map(formatRepositoryProblem).toSorted(),
+        warnings: [],
+      },
+    ],
+    failures: entryComposition.failures,
+  });
 };

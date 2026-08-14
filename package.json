@@ -9,7 +9,7 @@
   "type": "module",
   "scripts": {
     "guard": "throttle --timeout 1800 -- spool -- vp run guard:all",
-    "guard:all": "vp check && vp run -r test --coverage && vp run -r build && vp run knip && vp run knip --production && vp exec dont-review-it check && vp exec agentic-documents check && vp exec verified-specifications check && vp run -r check:skills",
+    "guard:all": "vp check && vp run -r --concurrency-limit 1 test --coverage --maxWorkers 2 && vp run -r build && vp run knip && vp run knip --production && vp exec dont-review-it check && vp exec agentic-documents check && vp exec verified-specifications check && vp exec stop-ai-slop check && vp run -r check:skills",
     "guard:fix": "vp exec lint-rule-authoring check --write && vp check --fix && vp exec agentic-documents check --write && vp exec verified-specifications check --write && vp exec dont-review-it check --write",
     "dev": "vp run website#dev",
     "knip": "knip",
@@ -20,10 +20,11 @@
     "@mst/ai-native": "workspace:*",
     "@mst/dont-review-it": "workspace:*",
     "@mst/lint-rule-authoring": "workspace:*",
+    "@mst/stop-ai-slop": "workspace:*",
     "@mst/verified-specifications": "workspace:*",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
-    "knip": "^6.32.0",
+    "knip": "6.32.0",
     "vite": "catalog:",
     "vite-plus": "catalog:"
   },

@@ -1,13 +1,15 @@
 import { parseArgs } from "node:util";
 
 const MAXIMUM_TIMEOUT_SECONDS = 2_147_483;
+export const DEFAULT_WAIT_BUDGET_MS = 1_900_000;
 
 const USAGE = `Usage: throttle [--timeout <seconds>] -- <command> [args...]
 
 Runs the command while keeping the number of simultaneous executions that
 share this host and namespace at or below the limit. When every slot is held
 the wrapper joins a wait queue, reports its position on stderr, and retries
-every slot on each poll, for at most the wait budget. A slot whose holder
+every slot on each poll. The default wait budget is ${DEFAULT_WAIT_BUDGET_MS / 1000}
+seconds. A slot whose holder
 exits is released by the operating system. A live holder keeps its slot until
 its command ends or its timeout stops the command. Do not nest throttle inside
 a command it wraps: the inner call counts as one more competitor and consumes

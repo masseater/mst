@@ -288,7 +288,7 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
     "check --write repairs the entry composition and exits zero",
     async ({ stdout, stderr }) => {
       const root = repositoryWith({
-        "package.json": `{ "scripts": { "guard": "vp check" } }`,
+        "package.json": `{ "scripts": { "guard": "vp run guard:all", "guard:all": "vp run -r --concurrency-limit 1 test --coverage --maxWorkers 2" } }`,
         "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
         "packages/web/package.json": `{ "scripts": { "test": "vp test" } }`,
       });
@@ -297,7 +297,7 @@ export const ORDER_STATUSES = ["draft", "published"] as const;
       expect(stdout.text).toBe("");
       expect(stderr.text).toContain("entry-composition");
       expect(readFileSync(join(root, "package.json"), "utf8")).toContain(
-        "throttle --timeout 1800 -- spool -- vp check",
+        "throttle --timeout 1800 -- spool -- vp run guard:all",
       );
     },
   );

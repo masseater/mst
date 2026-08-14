@@ -314,6 +314,38 @@ describe("testCommandOverrideProblems", () => {
     expect(problemsFor(root)).toHaveLength(2);
   });
 
+  test("the root guard forwards only the canonical coverage and worker budget", () => {
+    const root = repositoryWith({
+      "package.json": JSON.stringify({
+        scripts: {
+          guard: "throttle --timeout 1800 -- spool -- vp run guard:all",
+          "guard:all":
+            "vp check && vp run -r --concurrency-limit 1 test --coverage --maxWorkers 2 && vp run -r build",
+        },
+      }),
+    });
+
+    expect(testCommandOverrideProblems(root)).toStrictEqual({ problems: [], scanned: 1 });
+  });
+
+  test("the root guard reports unsafe arguments forwarded after the recursive test task", () => {
+    const root = repositoryWith({
+      "package.json": JSON.stringify({
+        scripts: {
+          guard: "throttle --timeout 1800 -- spool -- vp run guard:all",
+          "guard:all":
+            "vp run -r --concurrency-limit 1 test --coverage --maxWorkers 2 --changed HEAD",
+        },
+      }),
+    });
+    const report = testCommandOverrideProblems(root);
+
+    expect(report.scanned).toBe(1);
+    expect(report.problems.map(formatTestCommandOverrideProblem)).toStrictEqual([
+      expect.stringContaining("only `--coverage` and `--maxWorkers 2` may be forwarded"),
+    ]);
+  });
+
   test("recursive workspace patterns include nested packages and apply negations", () => {
     const root = repositoryWith({
       "pnpm-workspace.yaml": "packages:\n  - packages/**\n  - '!packages/ignored/**'\n",

@@ -1,0 +1,7 @@
+.git
+.local-agents
+.spool
+**/.local-agents
+**/coverage
+**/dist
+**/node_modules

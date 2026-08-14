@@ -1,14 +1,15 @@
 # CLI の作り方
 
-bin を公開するパッケージが守る規範。機械で止められるものは CLI 向け config（`oxlintCli`）のルールが止める。ここに並ぶのは、lint では検出できないが同じ強さで守るものである。検出されないことは許されていることを意味しない。
+bin を公開するパッケージが守る規範。機械で止められるものは `oxlint` の preset が止める。ここに並ぶのは、lint では検出できないが同じ強さで守るものである。検出されないことは許されていることを意味しない。
 
 ## 採用
 
-- IF: パッケージが実行可能エントリ（`bin`）を公開する; THEN
-  - MUST: lint 設定の extends を `oxlint` ではなく `oxlintCli` にする
-  - PROHIBIT: `oxlintCli` から一部のルールだけを外して使う
-    - `oxlintCli` は全部入り config の上位集合であり、採用は「CLI パッケージかどうか」の 1 回の判断で終わる
-- IF: パッケージが bin を公開しない; THEN MUST: `oxlint` のままにする
+採用の判断は無い。`oxlint` を `extends` した時点で、CLI 固有のルールを含めて全部が効く。CLI であるかどうかはルールの側が見る。判断は [EDR 0042](../../../docs/engineering-decision-logs/0042-apply-one-preset-at-the-root-and-report-the-exception-the-toolchain-forces.md) にある。
+
+- IF: preset のルールを一部だけ止めたくなった; THEN
+  - PROHIBIT: 黙って `overrides` で off にする
+  - MUST: 止めた理由を EDR に残す
+    - 適用範囲の検査が off を毎回報告する。理由が無い off は、載せ忘れと区別が付かない
 
 ## コマンドの骨格
 
@@ -58,7 +59,7 @@ bin を公開するパッケージが守る規範。機械で止められるも�
 - IF: 検査を走らせるコマンドが、どの観点をどれだけ開いたかを残す; THEN
   - MUST: 走査証跡を stderr に書く
   - PROHIBIT: stdout に混ぜる
-    - 走査の事実は結果ではない。判断は [EDR 0041](../../../docs/engineering-decision-logs/0041-write-the-scan-trace-to-stderr-and-read-the-reader-from-the-runtime.md) にある
+    - 走査の事実は結果ではない。判断は [EDR 0050](../../../docs/engineering-decision-logs/0050-write-the-scan-trace-to-stderr-and-read-the-reader-from-the-runtime.md) にある
   - MUST: 対象を開かなかった観点を、開いて何も見つからなかった観点と別の形で書く
   - PROHIBIT: 対象がゼロだったことを理由に終了コードを変える
 - IF: 読み手が人間か AI かで出力の形を変える; THEN

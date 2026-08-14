@@ -1,0 +1,64 @@
+{
+  "name": "@mst/auto-develop",
+  "version": "0.0.0",
+  "description": "A pull-request review loop that keeps running without a human starting it.",
+  "keywords": [
+    "tanstack-intent"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/masseater/mst.git",
+    "directory": "packages/auto-develop"
+  },
+  "bin": {
+    "auto-develop": "./src/cli.ts"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "src"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./package.json": "./package.json",
+    "./server": "./src/server.ts"
+  },
+  "publishConfig": {
+    "bin": {
+      "auto-develop": "./dist/cli.mjs"
+    },
+    "exports": {
+      "./package.json": "./package.json",
+      "./server": "./dist/server.mjs"
+    },
+    "access": "public"
+  },
+  "scripts": {
+    "build": "spool -- vp pack",
+    "dev": "vp pack --watch",
+    "test": "spool -- vp test",
+    "check": "spool -- vp check",
+    "check:skills": "intent validate"
+  },
+  "dependencies": {
+    "citty": "catalog:",
+    "es-toolkit": "catalog:",
+    "octokit": "5.0.5",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@mst/dont-review-it": "workspace:*",
+    "@mst/repository-checks": "workspace:*",
+    "@tanstack/intent": "catalog:",
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "engines": {
+    "node": ">=26.0.0"
+  }
+}
