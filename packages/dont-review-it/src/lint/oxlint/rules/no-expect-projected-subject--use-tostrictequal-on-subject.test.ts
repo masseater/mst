@@ -12,6 +12,7 @@ describe("dont-review-it/no-expect-projected-subject--use-tostrictequal-on-subje
     valid: [
       {
         name: "the bare binding a fixture handed back is the subject the rule asks for",
+        documented: true,
         filename: SPEC_FILE,
         code: `${FIXTURE}test("carries both fields", ({ report }) => {\n  expect(report).toStrictEqual({ id: "a", total: 2 });\n});`,
       },
@@ -47,6 +48,7 @@ describe("dont-review-it/no-expect-projected-subject--use-tostrictequal-on-subje
       },
       {
         name: "a projection standing beside a snapshot of the same fixture under the same describe",
+        documented: true,
         filename: SPEC_FILE,
         code: `${FIXTURE}describe("report", () => {\n  test("records the whole report", ({ report }) => {\n    expect(report).toMatchSnapshot();\n  });\n  test("marks the total", ({ report }) => {\n    expect(report.total).toBe(2);\n  });\n});`,
       },
@@ -127,6 +129,7 @@ describe("dont-review-it/no-expect-projected-subject--use-tostrictequal-on-subje
     invalid: [
       {
         name: "a field read off the binding leaves every other field of it unpinned",
+        documented: true,
         filename: SPEC_FILE,
         code: `${FIXTURE}test("marks the total", ({ report }) => {\n  expect(report.total).toBe(2);\n});`,
         errors: [{ messageId: "projectedSubject" }],
@@ -157,6 +160,7 @@ describe("dont-review-it/no-expect-projected-subject--use-tostrictequal-on-subje
       },
       {
         name: "fields bundled into a list are still fields picked one by one",
+        documented: true,
         filename: SPEC_FILE,
         code: `${FIXTURE}test("carries both fields", ({ report }) => {\n  expect([report.id, report.total]).toStrictEqual(["a", 2]);\n});`,
         errors: [{ messageId: "bundledSubject" }],
