@@ -21,6 +21,7 @@ describe("dont-review-it/no-normalize-sut-output--assert-natural-shape", () => {
     valid: [
       {
         name: "a fixture that hands back the call under test hands back what the code produced",
+        documented: true,
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("rows", () => summarise(input));',
       },
@@ -158,6 +159,7 @@ describe("dont-review-it/no-normalize-sut-output--assert-natural-shape", () => {
       },
       {
         name: "an operation another module writes inside its own body is that module's own shape",
+        documented: true,
         filename: IMPORTING_SPEC_FILE,
         code: 'import { ordered } from "./shape.ts";\nconst test = baseTest.extend("rows", () => ordered(summarise(input)));',
       },
@@ -170,6 +172,7 @@ describe("dont-review-it/no-normalize-sut-output--assert-natural-shape", () => {
     invalid: [
       {
         name: "ordering the produced collection reshapes it on the way out",
+        documented: true,
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("rows", () => summarise(input).sort());',
         errors: [{ messageId: "normalizedSubject", data: { operation: "sort" } }],
@@ -298,6 +301,7 @@ describe("dont-review-it/no-normalize-sut-output--assert-natural-shape", () => {
       },
       {
         name: "ordering the binding in place rewrites the value before it is handed back",
+        documented: true,
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("rows", () => {\n  const produced = summarise(input);\n  produced.sort();\n  return produced;\n});',
         errors: [
