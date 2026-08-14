@@ -52,6 +52,7 @@ describe("dont-review-it/forbid-numbered-sibling-file--name-what-each-file-owns"
     valid: [
       {
         name: "digits attached to a word without a separator carry meaning of their own",
+        documented: true,
         code: "export const total = 1;",
         filename: join(fixtureDir, "word-digit/oauth2.ts"),
       },
@@ -67,6 +68,7 @@ describe("dont-review-it/forbid-numbered-sibling-file--name-what-each-file-owns"
       },
       {
         name: "a single letter after the separator can name an axis, so it is left to review",
+        documented: true,
         code: "export const total = 1;",
         filename: join(fixtureDir, "letter/grid-x.ts"),
       },
@@ -84,6 +86,7 @@ describe("dont-review-it/forbid-numbered-sibling-file--name-what-each-file-owns"
     invalid: [
       {
         name: "two files that differ only by an ordinal are one responsibility in two places",
+        documented: true,
         code: "export const total = 1;",
         filename: join(fixtureDir, "ordinal/order-1.ts"),
         errors: [{ messageId: "numberedSiblingFile", data: { sibling: "order-2.ts" } }],
@@ -96,6 +99,7 @@ describe("dont-review-it/forbid-numbered-sibling-file--name-what-each-file-owns"
       },
       {
         name: "the ordinal is found before the suffix chain, so numbered test files are caught",
+        documented: true,
         code: "export const total = 1;",
         filename: join(fixtureDir, "suffix-chain/parser-1.test.ts"),
         errors: [{ messageId: "numberedSiblingFile", data: { sibling: "parser-2.test.ts" } }],

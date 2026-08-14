@@ -1,31 +1,54 @@
+---
+description: "Disallow a declaration statement that introduces more than one binding, so every binding has a statement of its own to be read, moved and deleted at"
+---
+
 # no-multi-binding-declaration--declare-one-binding-per-statement
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-宣言文のうち、宣言子を 2 つ以上持つもの。`const` / `let` / `var` のどれで書かれていても同じく報告する。初期化子の有無も見ない。
+Disallow a declaration statement that introduces more than one binding, so every binding has a statement of its own to be read, moved and deleted at
 
-報告は宣言文 1 つにつき 1 件で、宣言子ごとには出さない。直す単位が文だからである。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-multi-binding-declaration--declare-one-binding-per-statement.ts`](../../src/lint/oxlint/rules/no-multi-binding-declaration--declare-one-binding-per-statement.ts)
 
-次は検出しない。
+<!-- END GENERATED rule-header -->
 
-- 宣言子が 1 つの文。名前が分割代入パターンで何個の束縛を導入していても、束縛が生まれる場所は 1 つなので対象にならない。
-- `for` 文のヘッダにある宣言。`for (let index = 0, limit = 10; ...)` の位置には文を 2 つ置けない。分けろと言っても従える形が存在しないため、機構として除外する。`for-of` と `for-in` のヘッダは元から宣言子を 1 つしか取れないので、この除外の対象にならない。
+## Violation
 
-`for` 文の本体は除外に含まれない。ヘッダの制約は本体には及ばない。
+A declaration statement carrying two or more declarators. `const`, `let` and `var` are reported alike, and whether the declarators carry initialisers is not read.
 
-## なぜそれが要るか
+One report is raised per declaration statement rather than per declarator, because the statement is the unit that gets fixed.
 
-守っている不変条件は「1 つの束縛は、1 つの文として読み・動かし・消せる」ことである。
+Two shapes are not detected:
 
-1 層目は編集の単位が合わなくなることである。カンマでつないだ宣言は、束縛ごとの境界を持たない。1 つを別の位置へ動かすには残りを巻き込むか、カンマとインデントを手で組み直すことになる。1 つを消すと、残ったカンマかセミコロンの修復が付いてくる。束縛を足すときも同じで、既存の行を編集しないと足せない。
+- A statement carrying one declarator. However many bindings the name introduces through a destructuring pattern, there is one place where bindings come into being, so it is not a target
+- A declaration in the header of a `for` statement. Two statements cannot stand in the position of `for (let index = 0, limit = 10; ...)`. Telling somebody to split them leaves no shape to comply with, so the mechanism excludes it. `for-of` and `for-in` headers take only one declarator to begin with, so the exclusion does not reach them
 
-2 層目は、その編集の単位のずれが履歴に出ることである。1 つの束縛だけを触った変更でも、差分は文全体を触ったものとして残る。次にこの箇所を読む人は、どの束縛が変わったのかを差分からは決められず、前後を読み直すことになる。取り消したいときも同じで、束縛単位では戻せない。
+The body of a `for` statement is not part of that exclusion. The constraint on the header does not extend to the body.
 
-つまり費用は、書いた時点の字数ではなく、以降その文を触るたびに発生し続ける。文を分けるのは見た目を揃えるためではなく、編集の単位を束縛の単位に戻すために要る。
+### The invariant
 
-## どう直すか
+One binding can be read, moved and deleted as one statement.
 
-宣言キーワードを繰り返して、束縛ごとに文を書く。
+The first layer is that the unit of editing stops matching. Declarations joined by commas carry no boundary per binding. Moving one elsewhere means dragging the rest along or rebuilding the commas and the indentation by hand. Deleting one comes with repairing whatever comma or semicolon is left. Adding one is the same: it cannot be added without editing an existing line.
+
+The second layer is that the mismatched unit of editing shows up in the history. A change touching one binding is left in the diff as a change touching the whole statement. Whoever reads the place next cannot settle from the diff which binding changed and has to read around it. Reverting has the same problem: it cannot be done per binding.
+
+The cost, then, is not the characters saved when it was written; it recurs every time anybody touches that statement afterwards. Splitting statements is not about making things look uniform — it is what returns the unit of editing to the unit of binding.
+
+### Configuration
+
+None. Whether the rule is on or off is settled by the configuration, and nothing else about the judgment is.
+
+No exception is expressible as a setting, because the value of this invariant lies in every declaration statement having the same shape. Loosening it in configuration would make a reader check the loosened places one at a time, which breaks the premise that the statement is the unit of editing.
+
+## Fix
+
+Repeat the declaration keyword and write one statement per binding.
 
 ```ts
 const parsedCount = 1,
@@ -37,27 +60,69 @@ const parsedCount = 1;
 const renderedLabel = "a";
 ```
 
-まとまりを表現したいなら、並べた宣言ではなく 1 つの値として表す。
-
-```ts
-const parsedCount = 1;
-const renderedLabel = "a";
-```
+Where the point was to express that things belong together, express that as one value rather than as declarations standing side by side.
 
 ```ts
 const summary = { parsedCount: 1, renderedLabel: "a" };
 ```
 
-自動修正は提供しない。分けた結果どの順に並べるかは、初期化子どうしの依存で決まる場合があり、機械的に決められない。
+No automatic fix is offered. What order the split statements go in can follow from dependencies between the initialisers, and that does not settle mechanically.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- 分割代入パターンに包んで宣言子を 1 つに見せる。`const { a, b } = { a: 1, b: 2 };` は束縛の数を減らしていない。パターンが正当なのは、右辺が既にある 1 つの値のときだけである。
-- `for` 文のヘッダへ関係のない束縛を移す。除外はヘッダに文を置けないという制約に対するもので、置き場所として使ってよいという意味ではない。
-- 該当箇所の lint 無効化。
+Code this rule rejects.
 
-## オプション
+```ts
+// two bindings in one const statement are reported
+const parsedCount = 1,
+  renderedLabel = "a";
+```
 
-取らない。有効か無効かだけを設定側で決める。
+```ts
+// a for statement body is not the header, so the exemption does not reach it
+for (const entry of entries) {
+  const parsedCount = 1,
+    renderedLabel = "a";
+}
+```
 
-例外を設定で持たない理由は、この不変条件が「どの宣言文も同じ形をしている」ことに価値があるからである。設定で緩められると、緩めた箇所を読み手が個別に確認することになり、編集の単位が文だという前提そのものが崩れる。
+Code this rule accepts.
+
+```ts
+// one binding per statement is the shape the rule asks for
+const parsedCount = 1;
+const renderedLabel = "a";
+```
+
+```ts
+// a for statement header has nowhere to put a second statement
+for (let index = 0, limit = 10; index < limit; index += 1) {
+  report(index);
+}
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Wrapping them in a destructuring pattern to look like one declarator. `const { a, b } = { a: 1, b: 2 };` has not reduced the number of bindings. A pattern stands only where the right-hand side is a value that already exists
+- Moving unrelated bindings into a `for` header. The exclusion answers the constraint that no statement can stand in a header; it does not make the header a place to put things
+- Disabling the lint at the site
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `multiBindingDeclaration` | A declaration statement must not introduce more than one binding, and this one introduces {{count}}. Give each binding its own statement, repeating the declaration keyword. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->
