@@ -21,10 +21,12 @@ describe("dont-review-it/no-vi-mock-factory-behavior--use-spy-true-and-fixture",
       },
       {
         name: "handing the wrapping option over passes",
+        documented: true,
         code: 'vi.mock("./module.ts", { spy: true });',
       },
       {
         name: "a factory that returns an empty object passes",
+        documented: true,
         code: 'vi.mock("./module.ts", () => ({}));',
       },
       {
@@ -130,6 +132,7 @@ describe("dont-review-it/no-vi-mock-factory-behavior--use-spy-true-and-fixture",
     invalid: [
       {
         name: "a factory that returns a container is reported",
+        documented: true,
         code: 'vi.mock("./module.ts", () => ({ read: vi.fn() }));',
         errors: [{ messageId: "factoryShape" }],
       },
@@ -140,6 +143,7 @@ describe("dont-review-it/no-vi-mock-factory-behavior--use-spy-true-and-fixture",
       },
       {
         name: "settling what a mock hands back is reported beside the shape",
+        documented: true,
         code: 'vi.mock("./module.ts", () => ({ read: vi.fn().mockReturnValue(1) }));',
         errors: [{ messageId: "factoryShape" }, { messageId: "factoryBehaviour" }],
       },

@@ -1,114 +1,179 @@
+---
+description: "Disallow a module replacement declaration from carrying a factory, so what a replaced module hands back is declared by the fixture of the test that reads it instead of being fixed once for every test in the file"
+---
+
 # no-vi-mock-factory-behavior--use-spy-true-and-fixture
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-モジュール差し替え宣言、すなわちモックの名前空間に対する `mock` 呼び出しに、第 2 引数としてファクトリ（アロー関数または関数式）が渡されている形を見る。
+Disallow a module replacement declaration from carrying a factory, so what a replaced module hands back is declared by the fixture of the test that reads it instead of being fixed once for every test in the file
 
-独立した 2 つの条件で判定する。報告位置はどちらもファクトリ自身で、メッセージは条件ごとに分かれる。条件 1 は「ファクトリを書いてよいか」という形を問い、条件 2 は「本体に何を書いてよいか」という内容を問う。除外を持つのは条件 1 だけである。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-vi-mock-factory-behavior--use-spy-true-and-fixture.ts`](../../src/lint/oxlint/rules/no-vi-mock-factory-behavior--use-spy-true-and-fixture.ts)
 
-### 条件 1: 形の違反（`factoryShape`）
+<!-- END GENERATED rule-header -->
 
-次をすべて満たすファクトリを報告する。
+## Violation
 
-- 第 2 引数が関数である
-- そのファクトリが「空オブジェクトだけ」以外の何かを返す。`return` を持たない本体、値を返さない `return`、副作用だけの本体も含む
-- 第 1 引数の指定子が、静的に読める文字列として組み込みモジュールの接頭辞（既定は `node:`）で始まっていない
-- 宣言の直上の連続コメントブロックに、理由を伴う例外コメントがない
+A module replacement declaration — a `mock` call on the mock namespace — handed a factory (an arrow function or a function expression) as its second argument.
 
-### 条件 2: 内容の違反（`factoryBehaviour`）
+Two independent conditions decide it. Both report on the factory itself, and the messages are separate. Condition 1 asks about the shape, "may a factory be written here at all". Condition 2 asks about the contents, "what may be written in the body". Only condition 1 carries exemptions.
 
-ファクトリの本体が次のいずれかを含むものを報告する。除外は一つもない。組み込みモジュールを指す宣言でも、例外コメントの付いた宣言でも、空オブジェクトだけを返す宣言でも報告する。
+### Condition 1: a violation of the shape (`factoryShape`)
 
-- 挙動設定メソッドの呼び出し。`mockReturnValue` / `mockReturnValueOnce` / `mockResolvedValue` / `mockResolvedValueOnce` / `mockRejectedValue` / `mockRejectedValueOnce` / `mockImplementation` / `mockImplementationOnce` / `withImplementation` / `mockReturnThis` の 10 個で、採用しているテストランナーのモック API から引いてある。レシーバは問わず、メソッド名だけで判定する
-- モック生成呼び出し（名前空間の `fn`）に渡された引数。引数のない生成は器を作るだけなので対象にしない
-- spec の外から取り込んだ束縛の呼び出し、またはその束縛をそのまま返す式
+A factory meeting all of these is reported.
 
-条件 2 は返り値を見ない。本体で生成と設定を済ませてから空オブジェクトを返す形は、返り値だけを見る判定では条件 1 の除外にも置き場所ルールの許可領域にも落ち、どちらのルールも見ない経路になる。
+- The second argument is a function
+- That factory returns something other than an empty object alone. A body carrying no `return`, a `return` handing back no value, and a body of side effects alone all count
+- The first argument's specifier does not, as a statically readable string, begin with a builtin module prefix (`node:` by default)
+- The run of comments immediately above the declaration carries no exemption comment with grounds
 
-「除外は一つもない」は、条件 1 の除外（組み込みモジュールの接頭辞と例外コメント）が条件 2 には効かないという意味である。同定そのものの限界は条件 2 にも同じようにある。ファクトリの本体に書かれた計算された添字での呼び出し（`double[chosen](1)`）は、メソッド名を読めないので条件 2 も報告しない。名前を実行時に決める形をここで拾うには型の解決が要り、このルールは型情報を使わない。ただし差し替え宣言そのものを添字で隠す経路は塞いである。文字列リテラルの添字は名前として読む。
+### Condition 2: a violation of the contents (`factoryBehaviour`)
 
-1 つのファクトリに挙動が何個並んでいても `factoryBehaviour` の報告は 1 件である。2 つの条件は独立なので、同じファクトリに両方が立つことはある。
+A factory whose body holds any of these is reported. There is not one exemption. A declaration naming a builtin module, a declaration carrying an exemption comment, and a declaration returning an empty object alone are all reported.
 
-### 例外コメント
+- A call to a behaviour-settling method. Ten of them — `mockReturnValue`, `mockReturnValueOnce`, `mockResolvedValue`, `mockResolvedValueOnce`, `mockRejectedValue`, `mockRejectedValueOnce`, `mockImplementation`, `mockImplementationOnce`, `withImplementation` and `mockReturnThis` — taken from the mock API of the test runner in use. The receiver is not read; the method name alone settles it
+- An argument handed to a mock creation call (`fn` on the namespace). A creation carrying no argument only builds a container, so it stays out of range
+- A call to a binding imported from outside the spec, or an expression handing that binding straight back
 
-例外は行ローカルのコメントに限る。宣言の直上の連続コメントブロックに置き、先頭トークンを `mock-factory-exemption` とし、続けてこのルール名、`--` の後ろに具体的な理由を書く。
+Condition 2 does not read the return value. A body that finishes creating and settling before returning an empty object would, under a judgment reading the return value alone, fall into condition 1's exemption and into the permitted region of the placement rule — a route neither rule looks at.
+
+"Not one exemption" means condition 1's exemptions (the builtin module prefix and the exemption comment) do not carry over to condition 2. The limits of identification itself apply to condition 2 just the same. A call written in the factory body through a computed subscript (`double[chosen](1)`) leaves the method name unreadable, so condition 2 does not report it either. Catching a name settled at run time here would require resolving types, and this rule uses no type information. The route of hiding the replacement declaration itself behind a subscript is closed, though, and a string literal subscript is read as a name.
+
+However many behaviours stand in one factory, `factoryBehaviour` reports once. The two conditions are independent, so both may stand on the same factory.
+
+### The exemption comment
+
+An exemption is confined to a line-local comment. It goes in the run of comments immediately above the declaration, opens with the token `mock-factory-exemption`, names this rule, and writes concrete grounds after `--`.
 
 ```ts
 // mock-factory-exemption no-vi-mock-factory-behavior--use-spy-true-and-fixture -- this unit test replaces the child module boundary on purpose
 vi.mock("./child.ts", () => ({ read: vi.fn() }));
 ```
 
-区切りは前後を空白で挟んだ `--` である。ルール名自体が `--` を含むため、最初の `--` で切ると理由を読み違える。理由が空のコメントは例外として成立せず、コメント自体を `unreasonedExemption` で報告したうえで、条件 1 も併せて報告する。他の行ローカル指示を同じコメントブロックに重ねて書いてよい。
+The separator is a `--` with whitespace on both sides. The rule name itself holds a `--`, so cutting at the first one would misread the grounds. A comment with empty grounds stands as no exemption: the comment itself is reported as `unreasonedExemption` and condition 1 is reported alongside it. Other line-local directives may be stacked in the same comment run.
 
-例外が外すのは条件 1 だけである。例外を認めた宣言の本体に書かれた挙動は条件 2 が報告する。
+What an exemption lifts is condition 1 alone. Behaviour written in the body of an exempted declaration is reported by condition 2.
 
-### 意図的に広げていない範囲
+### Deliberately not widened
 
-| 形 | 対象にしない理由 |
+| Shape | Why it is left out |
 | --- | --- |
-| 第 2 引数のない宣言 | 構造の宣言だけなので正しい形である |
-| 第 2 引数がオプションのオブジェクト | `{ spy: true }` を渡す推奨形がこれにあたる |
-| 空オブジェクトだけを返すファクトリ | 読み込み時に挙動が固定されない。条件 1 でも条件 2 でも報告しない |
-| 器を作って返すだけのファクトリ | 条件 1 では報告するが、条件 2 では報告しない |
-| 計算された添字での呼び出し | 名前を同定できない。文字列リテラルの添字は名前として読むので対象になる |
-| 巻き上げられない差し替え呼び出し | `mock` 以外の綴りは、テストごとに評価される経路であり置き場所のルールが持つ |
-| 第 2 引数が関数以外の識別子である宣言 | 条件 1 は第 2 引数が関数であることを要求する。ファクトリを別モジュールから受け取る形は判定していない |
-| ファクトリ本体の計算された添字 | メソッド名を読めない。型情報を使わずに拾える範囲の外にある |
-| ファイルシステムモジュールの差し替え | 推奨形が逆向きになる。`no-local-file-system-mock--use-shared-fs` が差し替えそのものを禁じる |
+| A declaration carrying no second argument | It declares structure alone, which is the right shape |
+| A second argument that is an options object | Handing over `{ spy: true }`, the recommended shape, falls here |
+| A factory returning an empty object alone | It settles no behaviour at load time. Neither condition reports it |
+| A factory that only builds containers and returns them | Condition 1 reports it; condition 2 does not |
+| A call through a computed subscript | The name cannot be identified. A string literal subscript is read as a name and stays in range |
+| A replacement call that is not hoisted | A spelling other than `mock` runs a route evaluated per test, which the placement rule owns |
+| A declaration whose second argument is an identifier that is no function | Condition 1 requires the second argument to be a function. Receiving a factory from another module is not judged |
+| A computed subscript in a factory body | The method name cannot be read. It sits outside what can be caught without type information |
+| A replacement of the file system module | The recommended shape runs the other way. [no-local-file-system-mock--use-shared-fs](./no-local-file-system-mock--use-shared-fs.md) forbids the replacement itself |
 
-ファイル種別による絞り込みはしない。どのファイルにこのルールを効かせるかは共有 lint 設定の glob が決める。
+There is no narrowing by file kind. Which files this rule holds for is settled by the shared lint configuration's glob.
 
-名前空間の同定は共有の定義（`src/lint/oxlint/lib/spec-syntax/mock-namespace.ts`）に従う。素の識別子の綴りが一致する場合に加えて、同一ファイル内で束縛の宣言まで辿り、辿った先がモックの名前空間であれば一致とみなす。別名を付けた import も、いったん変数へ受け直した参照も、名前空間 import 越しの参照も同じ扱いになる。
+The namespace is identified by the shared definition (`src/lint/oxlint/lib/spec-syntax/mock-namespace.ts`). Besides a bare identifier spelling that matches, a binding is followed to its declaration inside the same file, and a declaration landing on the mock namespace counts as a match. An aliased import, a reference taken into a variable first, and a reference through a namespace import are all handled the same way.
 
-条件 2 の 1 つ目はレシーバを問わないので、モックでないオブジェクトが同名のメソッドを持っていれば報告される。名前が読める限り型情報に依存せず判定できることを優先した、意図した過剰検出である。同じ理由で、生成の入口を名前空間からではなく直接 import して呼ぶ形も、外部束縛の呼び出しとして報告される。生成は名前空間経由で書くこと。
+The first item of condition 2 does not read the receiver, so an object that is no mock but carries a method of the same name is reported. That is deliberate over-detection, chosen so the judgment holds without type information wherever a name is readable. For the same reason, calling the creation entry point imported directly instead of through the namespace is reported as a call to an outside binding. Creation is written through the namespace.
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「モジュールスコープに書かれる差し替え宣言は、どのモジュールを差し替えるかという構造の宣言だけを担う」ことである。差し替えた結果が何を返すかは、そのテストが受け取る fixture の中で宣言される。
+What is held is that a replacement declaration written at module scope carries the declaration of structure alone — which module is replaced. What the replacement hands back is declared inside the fixture that test receives.
 
-差し替え宣言に渡されたファクトリは、ファイルの読み込み時に一度だけ評価される。そこに書かれた実装は、そのファイルの全テストが暗黙に共有する 1 つの実体になる。あるテストのモックが実際に何を返すのかを知るには、テストの記述から離れたファイル冒頭まで戻らなければならない。テストがファイル単位でも `it` 単位でも並列に走る前提の下では、共有された設定は「次に走るテスト」が何かによって結果を変える。失敗は再現しない形で現れる。
+A factory handed to a replacement declaration is evaluated once, when the file is loaded. The implementation written there becomes one instance implicitly shared by every test in that file. To learn what a given test's mock actually returns, a reader has to go back to the top of the file, away from where the test is written. Under the assumption that tests run in parallel by file and by `it`, a shared setting changes its result according to which test runs next. Failures appear in a form that does not reproduce.
 
-構造の宣言だけに留め、実体をラップする指定を使えば、元のモジュールは読み込まれたうえで各エクスポートがスパイになる。テストごとの結果は fixture の中で宣言でき、宣言はそれを使うテストの近くに置かれる。
+Keep it to a declaration of structure and hand over the wrapping option, and the original module is loaded while each export becomes a spy. The per-test result can be declared inside the fixture, and the declaration sits next to the test using it.
 
-除外を条件 1 だけに留めているのは、除外域の内側が規律の空白になるからである。ラップ形が取れないモジュールであっても、ファクトリの評価が読み込み時に一度きりであることは変わらない。「ラップできない」は形の除外の理由にはなるが、共有された挙動を許す理由にはならない。
+Exemptions are confined to condition 1 because the inside of an exempted region is a blank in the discipline. Even for a module that cannot take the wrapping shape, the factory is still evaluated once at load time. "It cannot be wrapped" is grounds for exempting the shape; it is no grounds for allowing shared behaviour.
 
-一方、挙動を持たない器を本体で作ることは不変条件と矛盾しない。器は読み込み時に一度だけ作られるが、共有設定が各テストの前に呼び出し記録と実装をクリアするので、テスト間に持ち越される状態を持たない。このルールは、その共有設定が入っていることとセットで成立する。
+Building a container carrying no behaviour in the body, on the other hand, does not contradict the invariant. The container is built once at load time, but the shared setting clears call records and implementations before each test, so it holds no state carried between tests. This rule stands together with that shared setting being in place.
 
-## どう直すか
+### Configuration
 
-宣言を構造だけにして、ラップする指定を渡す。
+| Name | Default | What it settles |
+| --- | --- | --- |
+| `builtinModulePrefixes` | `["node:"]` | The module specifier prefixes falling into condition 1's exemption |
+
+`builtinModulePrefixes` replaces rather than adds. Handed an empty array, the default stays.
+
+The exemption holds only where the prefix is statically readable. A builtin module written without its prefix, and a specifier assembled at run time, are both reported by condition 1. Widening the exemption side loosens the discipline, so it is not levelled up to. A legitimate case passes through the exemption comment.
+
+The vocabulary of behaviour-settling methods, the spelling of the creation call, the spelling of the replacement declaration and the spelling of the namespace are not movable by configuration. They are vocabulary shared with the other rules of this group, and splitting them in configuration leaves one side losing sight of its subject and going quiet.
+
+## Fix
+
+Keep the declaration to structure and hand over the wrapping option.
 
 ```ts
 vi.mock("./reader.ts", { spy: true });
 ```
 
-テストごとの結果は、そのテストが受け取る fixture の中で「この一回だけ」の形で宣言する。テストが呼び出しを検証するなら、fixture がモック取得の結果を返し、テストはそれをパラメータとして受け取る。
+Declare the per-test result inside the fixture that test receives, in a "this once" form. Where the test verifies a call, the fixture hands back the result of taking the mock, and the test receives it as a parameter.
 
-組み込みモジュールの shim のように形の除外に落ちる宣言でも、本体に書けるのは器だけである。器は本体で作り、挙動は fixture が設定する。
+Even for a declaration falling into the shape exemption, such as a shim for a builtin module, what may be written in the body is containers alone. Containers are built in the body, and behaviour is settled by the fixture.
 
 ```ts
 vi.mock("node:fs", () => ({ readFileSync: vi.fn() }));
 ```
 
-自動修正は持たせない。ファクトリを消すと、そこに書かれていた挙動の行き先を決める判断が要る。器だけのファクトリなのか、fixture へ移すべき挙動なのかは書き手にしか決められない。
+There is no automatic fix. Deleting the factory requires deciding where the behaviour written there is to go, and only the writer can settle whether it was a container-only factory or behaviour that belongs in a fixture.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- 検出器の設定でルールを無効化する形、およびファイル単位での無効化。例外は行ローカルに閉じる。`no-rule-suppression--fix-the-violation` が報告する
-- 理由を書かずに例外コメントだけを置く形。例外として成立せず、コメント自体も報告される
-- 例外コメントを付けたうえで、ファクトリの本体にテストごとの挙動を書く形。例外が外すのは条件 1 だけである
-- ファクトリの中身を別モジュールに追い出して見えなくする形。本体が spec の外から取り込んだ束縛を呼ぶこと、そのまま返すことは条件 2 が報告する
-- 本体で生成と設定を済ませてから空オブジェクトを返す形。条件 2 は返り値を見ない
-- 名前空間に別名を付ける、変数へ受け直す、文字列リテラルの添字で書くなど、綴りを変えて宣言を隠す形。共有の同定が束縛まで辿る
+Code this rule rejects.
 
-## オプション
+```ts
+// a factory that returns a container is reported
+vi.mock("./module.ts", () => ({ read: vi.fn() }));
+```
 
-| 名前                    | 既定値      | 何を決めるか                                  |
-| ----------------------- | ----------- | --------------------------------------------- |
-| `builtinModulePrefixes` | `["node:"]` | 条件 1 の除外に落ちるモジュール指定子の接頭辞 |
+```ts
+// settling what a mock hands back is reported beside the shape
+vi.mock("./module.ts", () => ({ read: vi.fn().mockReturnValue(1) }));
+```
 
-`builtinModulePrefixes` は置き換えであり、追加ではない。空の配列を渡した場合は既定値が残る。
+Code this rule accepts.
 
-除外は接頭辞が静的に読める場合だけに効く。接頭辞を付けずに書かれた組み込みモジュールも、実行時に組み立てた指定子も条件 1 で報告する。除外の側を広げると規律が緩むので、そちらへは揃えない。正当なケースは例外コメントで通す。
+```ts
+// handing the wrapping option over passes
+vi.mock("./module.ts", { spy: true });
+```
 
-挙動設定メソッドの語彙、生成呼び出しの綴り、差し替え宣言の綴り、名前空間の綴りは設定で動かせない。これらは同じ群の他のルールと共有する語彙であり、設定で分かれると片方だけが対象を見失って黙る。
+```ts
+// a factory that returns an empty object passes
+vi.mock("./module.ts", () => ({}));
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Turning the rule off in the detector's configuration, or turning it off for a file. Exemptions stay line-local. [no-rule-suppression--fix-the-violation](./no-rule-suppression--fix-the-violation.md) reports that
+- Placing an exemption comment without writing grounds. It stands as no exemption, and the comment itself is reported
+- Writing per-test behaviour in the factory body under an exemption comment. What an exemption lifts is condition 1 alone
+- Pushing the factory's contents into another module to take them out of sight. A body calling a binding imported from outside the spec, or handing it straight back, is reported by condition 2
+- Finishing the creating and settling in the body before returning an empty object. Condition 2 does not read the return value
+- Changing the spelling to hide the declaration — aliasing the namespace, taking it into a variable, writing it as a string literal subscript. The shared identification follows bindings
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `factoryShape` | A module replacement declaration must not hand over a factory. Pass \`{ spy: true }\` as the second argument and let the replaced module answer, so the replacement records how it was called and settles nothing. |
+| `factoryBehaviour` | The body of a module replacement factory must not settle what a mock hands back. Delete every return value, resolved value, rejected value and implementation written here, and leave the replacement a pass-through that only records how it was called. |
+| `unreasonedExemption` | An exemption comment must not stand without grounds. Write the grounds for this exemption after \`--\`, and name there the boundary this spec replaces by hand. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->
