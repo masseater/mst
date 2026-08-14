@@ -48,6 +48,15 @@ const remainingPlaceholder = (token: string): string =>
 const noExample = (testPath: string): string =>
   `A rule document must not go without an example. Mark the test cases to publish with \`documented: true\` in \`${testPath}\`.`;
 
+const unspellableExample = ({
+  caseName,
+  testPath,
+}: {
+  readonly caseName: string;
+  readonly testPath: string;
+}): string =>
+  `A test case marked to publish must not build its code from values this reader cannot settle. "${caseName}" in \`${testPath}\` resolves to no text. Write its code as a literal, or take the mark off it.`;
+
 type RenderedRegion = {
   readonly region: string;
   readonly content: string;
@@ -197,6 +206,9 @@ const ruleDocProblems = ({
     ...generatedProblems({ source, rule, rendered, write, absolutePath }),
     ...PLACEHOLDER_TOKENS.filter((token) => source.includes(token)).map(remainingPlaceholder),
     ...(hasNoExample(examples) ? [noExample(testFilePathFor(rule.sourcePath))] : []),
+    ...examples.unspellable.map((caseName) =>
+      unspellableExample({ caseName, testPath: testFilePathFor(rule.sourcePath) }),
+    ),
   ];
   return complaints.map((complaint) => ({ file, message: complaint }));
 };

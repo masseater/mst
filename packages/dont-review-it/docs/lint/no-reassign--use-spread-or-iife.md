@@ -176,6 +176,36 @@ const first = 1,
   second = 2;
 ```
 
+```ts
+// a class writes its own state through a direct this or super target
+class Holder {
+  count = 0;
+  reset = () => {
+    this.count = 0;
+  };
+  accessor clear = () => {
+    this.count = 0;
+  };
+  static registry = 0;
+  static {
+    this.registry = 1;
+  }
+  constructor(count: number) {
+    this.count = count;
+  }
+  bump() {
+    this.count++;
+    this['count'] += 1;
+  }
+  get current() {
+    return this.count;
+  }
+  set current(next: number) {
+    this.count = next;
+  }
+}
+```
+
 <!-- END GENERATED examples -->
 
 ### Forbidden bypasses (do not do this)

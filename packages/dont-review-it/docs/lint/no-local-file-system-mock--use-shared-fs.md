@@ -141,7 +141,26 @@ vi.mock('node:fs', { spy: true });
 vi.mock('fs', { 'spy': true });
 ```
 
+```ts
+// importing the in-memory implementation binds the spec to a choice the shared setup owns
+// in mailer.test.ts
+import { Volume } from 'memfs';
+import memfs from 'memfs';
+import 'memfs';
+import { Volume as Held, type IFs } from 'memfs';
+import { Volume as Sub } from 'memfs/lib/volume';
+```
+
 Code this rule accepts.
+
+```ts
+// the standard file system API used as it stands is the shape this rule keeps
+// in mailer.test.ts
+import { writeFileSync } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
+writeFileSync('/inbox/note.txt', 'body');
+await writeFile('/inbox/other.txt', 'body');
+```
 
 ```ts
 // a type-only import binds no value at run time

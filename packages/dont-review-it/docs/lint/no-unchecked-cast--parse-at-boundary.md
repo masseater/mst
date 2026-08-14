@@ -106,6 +106,12 @@ Where a value inside the process has become `any`, fix the upstream making that 
 Code this rule rejects.
 
 ```ts
+// an any value handed a named type by assertion is reported
+const loose: any = read();
+const row = loose as Row;
+```
+
+```ts
 // a predicate whose body never reads the parameter is reported
 const isRow = (value: unknown): value is Row => true;
 ```

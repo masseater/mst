@@ -87,6 +87,11 @@ const parseUser = (input: unknown): User | null => (isUser(input) ? input : null
 Code this rule rejects.
 
 ```ts
+// an assertion routed through unknown is reported
+const total = input as unknown as number;
+```
+
+```ts
 // three stacked assertions report each step that stands on an assertion
 const total = input as Loose as Source as Target;
 ```

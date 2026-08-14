@@ -25,7 +25,6 @@ describe("dont-review-it/forbid-oversized-file--split-by-responsibility", () => 
       },
       {
         name: "a file exactly at the budget is not over it",
-        documented: true,
         code: sourceOfThreeLines,
         options: [{ maxLines: 3 }],
       },
@@ -103,7 +102,6 @@ describe("dont-review-it/forbid-oversized-file--split-by-responsibility", () => 
       },
       {
         name: "a lowered budget reports the whole program rather than a line inside it",
-        documented: true,
         code: sourceOfFourLines,
         options: [{ maxLines: 3 }],
         errors: [

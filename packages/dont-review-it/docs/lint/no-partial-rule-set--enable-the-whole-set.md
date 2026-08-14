@@ -118,6 +118,23 @@ Code this rule rejects.
 export default { lint: { rules: { "no-reassign--use-spread-or-iife": "error" } } };
 ```
 
+```ts
+// a rule belonging to two sets is reported once for each set it splits
+export default { lint: { rules: { "no-promise-chain--use-async-await": "off" } } };
+```
+
+Code this rule accepts.
+
+```ts
+// a rules block naming only rules outside every set is another rule's business
+export default { lint: { rules: { "no-console": "error", "max-params": ["error", { max: 2 }] } } };
+```
+
+```ts
+// a rule name a configuration assembles at run time names no rule of a set
+export default { lint: { rules: { [chosenRule]: "off" } } };
+```
+
 <!-- END GENERATED examples -->
 
 ### Forbidden bypasses (do not do this)

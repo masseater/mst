@@ -58,11 +58,41 @@ const referencedTextOf = ({
   return resolveText({ node: referenced, constants, visited: [...visited, referencedName] });
 };
 
+const listedTextsOf = ({ node, constants, visited }: ResolveInput): readonly string[] | null => {
+  if (node.type === "Identifier") {
+    const referencedName = node.name as string;
+    const referenced = constants.get(referencedName);
+    if (referenced === undefined || visited.includes(referencedName)) return null;
+    return listedTextsOf({ node: referenced, constants, visited: [...visited, referencedName] });
+  }
+  if (node.type !== "ArrayExpression") return null;
+  const written = nodesIn(node.elements).map((part) =>
+    resolveText({ node: part, constants, visited }),
+  );
+  return written.includes(null) ? null : (written as readonly string[]);
+};
+
+const DEFAULT_SEPARATOR = ",";
+
+const joinedTextOf = ({ node, constants, visited }: ResolveInput): string | null => {
+  const callee = node.callee as UnknownFields;
+  if (callee.type !== "MemberExpression" || callee.computed === true) return null;
+  const named = callee.property as UnknownFields;
+  if (named.type !== "Identifier" || named.name !== "join") return null;
+  const listed = listedTextsOf({ node: callee.object as UnknownFields, constants, visited });
+  if (listed === null) return null;
+  const [given] = nodesIn(node.arguments);
+  const separator =
+    given === undefined ? DEFAULT_SEPARATOR : resolveText({ node: given, constants, visited });
+  return separator === null ? null : listed.join(separator);
+};
+
 export const resolveText = (input: ResolveInput): string | null => {
   const { node, constants, visited } = input;
   if (node.type === "Literal") return typeof node.value === "string" ? node.value : null;
   if (node.type === "TemplateLiteral") return templateTextOf(input);
   if (node.type === "BinaryExpression" && node.operator === "+") return concatenatedTextOf(input);
+  if (node.type === "CallExpression") return joinedTextOf(input);
   if (node.type === "Identifier") {
     return referencedTextOf({ referencedName: node.name as string, constants, visited });
   }

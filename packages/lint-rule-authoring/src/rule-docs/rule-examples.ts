@@ -23,6 +23,7 @@ export type LintRuleExample = {
 export type LintRuleExamples = {
   readonly valid: readonly LintRuleExample[];
   readonly invalid: readonly LintRuleExample[];
+  readonly unspellable: readonly string[];
 };
 
 const TESTER_NAME = "testLintRule";
@@ -54,6 +55,19 @@ const isMarked = (testCase: UnknownFields): boolean => {
   return marker?.type === "Literal" && marker.value === true;
 };
 
+const fieldTextOf = ({
+  testCase,
+  fieldName,
+  constants,
+}: {
+  readonly testCase: UnknownFields;
+  readonly fieldName: string;
+  readonly constants: ConstantsByName;
+}): string | null => {
+  const written = propertyOf(testCase, fieldName);
+  return written === null ? null : resolveText({ node: written, constants, visited: [] });
+};
+
 const exampleOf = ({
   testCase,
   constants,
@@ -61,34 +75,40 @@ const exampleOf = ({
   readonly testCase: UnknownFields;
   readonly constants: ConstantsByName;
 }): readonly LintRuleExample[] => {
-  const namedAs = propertyOf(testCase, "name");
-  const written = propertyOf(testCase, "code");
-  const placedAt = propertyOf(testCase, "filename");
-  const caseName = namedAs === null ? null : resolveText({ node: namedAs, constants, visited: [] });
-  const code = written === null ? null : resolveText({ node: written, constants, visited: [] });
-  const filename =
-    placedAt === null ? null : resolveText({ node: placedAt, constants, visited: [] });
+  const caseName = fieldTextOf({ testCase, fieldName: "name", constants });
+  const code = fieldTextOf({ testCase, fieldName: "code", constants });
+  const filename = fieldTextOf({ testCase, fieldName: "filename", constants });
   return caseName === null || code === null ? [] : [{ name: caseName, code, filename }];
 };
 
-const markedExamplesIn = ({
+const markedCasesIn = ({
   cases,
   field,
-  constants,
 }: {
   readonly cases: UnknownFields;
   readonly field: string;
-  readonly constants: ConstantsByName;
-}): readonly LintRuleExample[] => {
+}): readonly UnknownFields[] => {
   const listed = propertyOf(cases, field);
   if (listed === null) return [];
   return nodesIn(listed.elements)
     .filter((listedCase) => listedCase.type === "ObjectExpression")
-    .filter(isMarked)
-    .flatMap((testCase) => exampleOf({ testCase, constants }));
+    .filter(isMarked);
 };
 
-const NO_EXAMPLES: LintRuleExamples = { valid: [], invalid: [] };
+const UNNAMED_CASE = "a case that spells out no name";
+
+const unspellableNamesIn = ({
+  marked,
+  constants,
+}: {
+  readonly marked: readonly UnknownFields[];
+  readonly constants: ConstantsByName;
+}): readonly string[] =>
+  marked
+    .filter((testCase) => exampleOf({ testCase, constants }).length === 0)
+    .map((testCase) => fieldTextOf({ testCase, fieldName: "name", constants }) ?? UNNAMED_CASE);
+
+const NO_EXAMPLES: LintRuleExamples = { valid: [], invalid: [], unspellable: [] };
 
 export const testFilePathFor = (sourcePath: string): string =>
   sourcePath.replace(/\.ts$/u, ".test.ts");
@@ -109,8 +129,11 @@ export const lintRuleExamplesIn = ({
   if (declared.length === 0) return NO_EXAMPLES;
 
   const constants = moduleConstantsIn(statements);
+  const validCases = declared.flatMap((cases) => markedCasesIn({ cases, field: "valid" }));
+  const invalidCases = declared.flatMap((cases) => markedCasesIn({ cases, field: "invalid" }));
   return {
-    valid: declared.flatMap((cases) => markedExamplesIn({ cases, field: "valid", constants })),
-    invalid: declared.flatMap((cases) => markedExamplesIn({ cases, field: "invalid", constants })),
+    valid: validCases.flatMap((testCase) => exampleOf({ testCase, constants })),
+    invalid: invalidCases.flatMap((testCase) => exampleOf({ testCase, constants })),
+    unspellable: unspellableNamesIn({ marked: [...validCases, ...invalidCases], constants }),
   };
 };

@@ -25,13 +25,17 @@ const MISSING_INDEX = `packages/example/docs/lint/index.md A workspace that decl
 
 const MISSING_DOC = `packages/example/docs/lint/no-thing--allow-it.md A rule must not go without its document. Seed it with \`vp run guard:fix\`, then write the sections it leaves for you.\n`;
 
-const SEEDED_SECTIONS_LEFT_AS_WRITTEN = [
+const SEEDED_SECTIONS = [
   `packages/example/docs/lint/no-thing--allow-it.md A seeded section must not be left as it was written. Replace "State what this rule rejects, why the invariant behind it holds, and where the detection stops short.".`,
   `packages/example/docs/lint/no-thing--allow-it.md A seeded section must not be left as it was written. Replace "State the change that resolves a report.".`,
   `packages/example/docs/lint/no-thing--allow-it.md A seeded section must not be left as it was written. Replace "Name the ways a report can be silenced without being resolved.".`,
-  `packages/example/docs/lint/no-thing--allow-it.md A rule document must not go without an example. Mark the test cases to publish with \`documented: true\` in \`src/rules/no-thing--allow-it.test.ts\`.`,
-  "",
-].join("\n");
+];
+
+const NO_EXAMPLE = `packages/example/docs/lint/no-thing--allow-it.md A rule document must not go without an example. Mark the test cases to publish with \`documented: true\` in \`src/rules/no-thing--allow-it.test.ts\`.`;
+
+const UNSPELLABLE_EXAMPLE = `packages/example/docs/lint/no-thing--allow-it.md A test case marked to publish must not build its code from values this reader cannot settle. "a case whose code is read at run time" in \`src/rules/no-thing--allow-it.test.ts\` resolves to no text. Write its code as a literal, or take the mark off it.`;
+
+const SEEDED_SECTIONS_LEFT_AS_WRITTEN = [...SEEDED_SECTIONS, NO_EXAMPLE, ""].join("\n");
 
 const DECLARED_RULE = `export const rule = {
   name: "no-thing--allow-it",
@@ -40,7 +44,49 @@ const DECLARED_RULE = `export const rule = {
 };
 `;
 
+const UNSPELLABLE_TEST = `testLintRule(rule, {
+  valid: [{ name: "a case whose code is read at run time", documented: true, code: readCode() }],
+  invalid: [],
+});
+`;
+
+const JOINED_TEST = `const ANNOTATION = [":", "any"].join(" ");
+
+testLintRule(rule, {
+  valid: [
+    {
+      name: "a value that names no loose type passes",
+      documented: true,
+      code: \`const held\${ANNOTATION} = read();\`,
+    },
+  ],
+  invalid: [],
+});
+`;
+
+const TEST_FILE_PATH = "packages/example/src/rules/no-thing--allow-it.test.ts";
+
 describe("runLintRuleAuthoring", () => {
+  const testInADeclaringRepository = test.extend("declaringRepository", ({}, { onCleanup }) => {
+    const root = mkdtempSync(join(tmpdir(), "lint-rule-authoring-cli-"));
+    onCleanup(() => {
+      rmSync(root, { recursive: true, force: true });
+    });
+    writeFileSync(join(root, "pnpm-workspace.yaml"), "packages:\n  - packages/*\n", "utf8");
+    mkdirSync(join(root, "packages/example/src/rules"), { recursive: true });
+    writeFileSync(
+      join(root, "packages/example/package.json"),
+      JSON.stringify({ lintRules: ["src/rules"] }),
+      "utf8",
+    );
+    writeFileSync(
+      join(root, "packages/example/src/rules/no-thing--allow-it.ts"),
+      DECLARED_RULE,
+      "utf8",
+    );
+    return root;
+  });
+
   describe("a repository that declares no lint rules", () => {
     const testInAnEmptyRepository = test.extend("emptyRepository", ({}, { onCleanup }) => {
       const root = mkdtempSync(join(tmpdir(), "lint-rule-authoring-cli-"));
@@ -79,26 +125,6 @@ describe("runLintRuleAuthoring", () => {
   });
 
   describe("a repository that declares lint rules and carries no index", () => {
-    const testInADeclaringRepository = test.extend("declaringRepository", ({}, { onCleanup }) => {
-      const root = mkdtempSync(join(tmpdir(), "lint-rule-authoring-cli-"));
-      onCleanup(() => {
-        rmSync(root, { recursive: true, force: true });
-      });
-      writeFileSync(join(root, "pnpm-workspace.yaml"), "packages:\n  - packages/*\n", "utf8");
-      mkdirSync(join(root, "packages/example/src/rules"), { recursive: true });
-      writeFileSync(
-        join(root, "packages/example/package.json"),
-        JSON.stringify({ lintRules: ["src/rules"] }),
-        "utf8",
-      );
-      writeFileSync(
-        join(root, "packages/example/src/rules/no-thing--allow-it.ts"),
-        DECLARED_RULE,
-        "utf8",
-      );
-      return root;
-    });
-
     describe("a check of it", () => {
       const it = testInADeclaringRepository.extend("theRun", ({ declaringRepository }) =>
         runLintRuleAuthoring(["check", "--repository-root", declaringRepository]),
@@ -143,6 +169,36 @@ describe("runLintRuleAuthoring", () => {
           out: SEEDED_SECTIONS_LEFT_AS_WRITTEN,
           error: "",
         });
+      });
+    });
+  });
+
+  describe("a repository whose test marks a case it builds at run time", () => {
+    const it = testInADeclaringRepository.extend("theRun", ({ declaringRepository }) => {
+      writeFileSync(join(declaringRepository, TEST_FILE_PATH), UNSPELLABLE_TEST, "utf8");
+      return runLintRuleAuthoring(["check", "--write", "--repository-root", declaringRepository]);
+    });
+
+    it("names the marked case it could not spell out beside the missing example", ({ theRun }) => {
+      expect(theRun).toStrictEqual({
+        exitCode: 1,
+        out: [...SEEDED_SECTIONS, NO_EXAMPLE, UNSPELLABLE_EXAMPLE, ""].join("\n"),
+        error: "",
+      });
+    });
+  });
+
+  describe("a repository whose test marks a case built from a joined constant", () => {
+    const it = testInADeclaringRepository.extend("theRun", ({ declaringRepository }) => {
+      writeFileSync(join(declaringRepository, TEST_FILE_PATH), JOINED_TEST, "utf8");
+      return runLintRuleAuthoring(["check", "--write", "--repository-root", declaringRepository]);
+    });
+
+    it("publishes the case and asks only for the sections it seeded", ({ theRun }) => {
+      expect(theRun).toStrictEqual({
+        exitCode: 1,
+        out: [...SEEDED_SECTIONS, ""].join("\n"),
+        error: "",
       });
     });
   });

@@ -49,7 +49,6 @@ describe("dont-review-it/no-partial-rule-set--enable-the-whole-set", () => {
       { name: "source holding no lint configuration passes", code: "export const total = 1;" },
       {
         name: "a configuration holding every rule of every set at one severity passes",
-        documented: true,
         code: `export default { lint: { options: { typeAware: true }, rules: { ${WHOLE_SET_AT_ERROR} } } };`,
       },
       {
@@ -58,7 +57,6 @@ describe("dont-review-it/no-partial-rule-set--enable-the-whole-set", () => {
       },
       {
         name: "a configuration turning every rule of every set off passes",
-        documented: true,
         code: `export default { lint: { rules: { ${WHOLE_SET_AT_OFF} } } };`,
       },
       {
@@ -67,6 +65,7 @@ describe("dont-review-it/no-partial-rule-set--enable-the-whole-set", () => {
       },
       {
         name: "a rules block naming only rules outside every set is another rule's business",
+        documented: true,
         code: `export default { lint: { rules: { "no-console": "error", "max-params": ["error", { max: 2 }] } } };`,
       },
       {
@@ -79,6 +78,7 @@ describe("dont-review-it/no-partial-rule-set--enable-the-whole-set", () => {
       },
       {
         name: "a rule name a configuration assembles at run time names no rule of a set",
+        documented: true,
         code: `export default { lint: { rules: { [chosenRule]: "off" } } };`,
       },
     ],
@@ -91,6 +91,7 @@ describe("dont-review-it/no-partial-rule-set--enable-the-whole-set", () => {
       },
       {
         name: "a rule belonging to two sets is reported once for each set it splits",
+        documented: true,
         code: `export default { lint: { rules: { "no-promise-chain--use-async-await": "off" } } };`,
         errors: [{ messageId: "partialRuleSet" }, { messageId: "partialRuleSet" }],
       },
@@ -101,7 +102,6 @@ describe("dont-review-it/no-partial-rule-set--enable-the-whole-set", () => {
       },
       {
         name: "a set held at two severities is reported on the rule sitting at the weaker one",
-        documented: true,
         code: `export default { lint: { options: { typeAware: true }, rules: { ${WHOLE_SET_WITH_ARRAY_MUTATION_AT_WARN} } } };`,
         errors: [{ messageId: "unevenRuleSetSeverity" }],
       },
