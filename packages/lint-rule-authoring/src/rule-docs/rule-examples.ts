@@ -38,7 +38,7 @@ const nodesUnder = (node: UnknownFields): readonly UnknownFields[] => [
   }),
 ];
 
-const casesObjectIn = (statements: readonly UnknownFields[]): UnknownFields | null =>
+const casesObjectsIn = (statements: readonly UnknownFields[]): readonly UnknownFields[] =>
   statements
     .flatMap(nodesUnder)
     .filter((node) => node.type === "CallExpression")
@@ -46,8 +46,8 @@ const casesObjectIn = (statements: readonly UnknownFields[]): UnknownFields | nu
       const callee = call.callee as UnknownFields;
       return callee.type === "Identifier" && callee.name === TESTER_NAME;
     })
-    .map((call) => nodesIn(call.arguments).at(1) ?? null)
-    .find((argument) => argument?.type === "ObjectExpression") ?? null;
+    .flatMap((call) => nodesIn(call.arguments).slice(1, 2))
+    .filter((argument) => argument.type === "ObjectExpression");
 
 const isMarked = (testCase: UnknownFields): boolean => {
   const marker = propertyOf(testCase, "documented");
@@ -105,12 +105,12 @@ export const lintRuleExamplesIn = ({
   if (!existsSync(absolutePath)) return NO_EXAMPLES;
 
   const statements = nodesIn(parseSync(testPath, readFileSync(absolutePath, "utf8")).program.body);
-  const cases = casesObjectIn(statements);
-  if (cases === null) return NO_EXAMPLES;
+  const declared = casesObjectsIn(statements);
+  if (declared.length === 0) return NO_EXAMPLES;
 
   const constants = moduleConstantsIn(statements);
   return {
-    valid: markedExamplesIn({ cases, field: "valid", constants }),
-    invalid: markedExamplesIn({ cases, field: "invalid", constants }),
+    valid: declared.flatMap((cases) => markedExamplesIn({ cases, field: "valid", constants })),
+    invalid: declared.flatMap((cases) => markedExamplesIn({ cases, field: "invalid", constants })),
   };
 };

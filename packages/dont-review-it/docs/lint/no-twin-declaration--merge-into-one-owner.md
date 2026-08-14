@@ -77,11 +77,28 @@ Where you judge that the same name really names two different concepts, rename o
 
 <!-- BEGIN GENERATED examples -->
 
+Code this rule rejects.
+
+```ts
+// a declaration the index places past the end of the file is reported on the file
+const MANIFEST_FILE_NAME = "package.json";
+```
+
+```ts
+// a declaration that shares both its name and its body is reported although the body is short
+const MANIFEST_FILE_NAME = "package.json";
+```
+
 Code this rule accepts.
 
 ```ts
 // a declaration that shares only its body with another one passes
 const PACKAGE_FILE_NAME = "package.json";
+```
+
+```ts
+// a declaration that shares only its name with another one passes
+const MANIFEST_FILE_NAME = "pnpm-workspace.yaml";
 ```
 
 <!-- END GENERATED examples -->
