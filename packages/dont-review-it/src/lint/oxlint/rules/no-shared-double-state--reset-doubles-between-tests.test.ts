@@ -15,11 +15,13 @@ describe("dont-review-it/no-shared-double-state--reset-doubles-between-tests", (
       },
       {
         name: "the settings declared beside the rest of the test options pass",
+        documented: true,
         code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { mockReset: true, restoreMocks: true, coverage: { thresholds: { 100: true, perFile: true } } } });\n`,
         filename: "vite.config.ts",
       },
       {
         name: "a vitest config outside a vite-plus setup is held to the same demand",
+        documented: true,
         code: `import { defineConfig } from "vitest/config";\nexport default defineConfig({ test: ${RESET_AND_RESTORED} });\n`,
         filename: "vitest.config.ts",
       },
@@ -52,6 +54,7 @@ describe("dont-review-it/no-shared-double-state--reset-doubles-between-tests", (
     invalid: [
       {
         name: "a config that declares no test block is reported once",
+        documented: true,
         code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ lint: {} });\n`,
         filename: "vite.config.ts",
         errors: [{ messageId: "missingTestBlock" }],
@@ -82,6 +85,7 @@ describe("dont-review-it/no-shared-double-state--reset-doubles-between-tests", (
       },
       {
         name: "a setting declared false is reported where it stands",
+        documented: true,
         code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { mockReset: false, restoreMocks: true } });\n`,
         filename: "vite.config.ts",
         errors: [{ messageId: "sharedDoubleState" }],

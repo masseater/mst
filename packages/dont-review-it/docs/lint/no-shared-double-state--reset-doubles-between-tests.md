@@ -1,38 +1,67 @@
+---
+description: "Require the test config to declare that doubles are reset and restored before each test, so a spec that passes on the state its neighbour installed is impossible rather than merely unlikely"
+---
+
 # no-shared-double-state--reset-doubles-between-tests
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-テストランナの設定ファイル（`vite.config.*` と `vitest.config.*`）のうち、`test` ブロックが `mockReset` と `restoreMocks` を `true` として宣言していないものを報告する。
+Require the test config to declare that doubles are reset and restored before each test, so a spec that passes on the state its neighbour installed is impossible rather than merely unlikely
 
-判定はファイル 1 枚を読んで決まる。既定の export をたどり、`defineConfig(...)` のような呼び出しに包まれていればその引数を開いて、`test` の下に置かれた 2 つの値を見る。値は真偽値のリテラルだけを宣言として数える。変数参照でもスプレッドでも、そのファイルを読んだだけでは何が入るか決まらないため、宣言されていないものとして扱う。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-shared-double-state--reset-doubles-between-tests.ts`](../../src/lint/oxlint/rules/no-shared-double-state--reset-doubles-between-tests.ts)
 
-`test` ブロックが無い設定も報告する。このリポジトリで設定ファイルを持つワークスペースはテストを走らせるワークスペースであり、`test` を書かないことは「隔離を宣言しない」ことと同じ結果になる。
+<!-- END GENERATED rule-header -->
 
-キーは識別子でも文字列リテラルでも同じキーとして扱う。同じキーが 2 度書かれていれば後ろが勝つ。
+## Violation
 
-設定ファイル以外は一切見ない。名前がたまたま設定ファイルの名前で終わるだけのファイル（`legacy-vite.config.ts`）も対象外である。
+A test runner configuration (`vite.config.*`, `vitest.config.*`) whose `test` block does not declare `mockReset` and `restoreMocks` as `true`.
 
-## なぜそれが要るか
+The judgment is settled by reading one file. The default export is followed, the argument is opened where it is wrapped in a call such as `defineConfig(...)`, and the two values under `test` are read. Only boolean literals count as declarations: a variable reference or a spread does not settle what goes in from reading that file, so it counts as undeclared.
 
-守っている不変条件は「あるテストが立てたダブルが、次のテストに残らない」ことである。
+A configuration with no `test` block is reported as well. In this repository a workspace carrying a configuration file is a workspace that runs tests, and not writing `test` has the same result as not declaring the isolation.
 
-テストランナは、戻す設定を書かなければ戻さない。差し替えた実装も、積み上がった呼び出し記録も、同じファイル内の次のテストにそのまま引き継がれる。引き継がれた状態の上で通るテストは、自分が用意していない前提の上で緑になっている。順序を変えるか、隣のテストを消すかした瞬間に落ちるが、それがいつ起きるかは書いた人には見えない。
+A key is read the same whether it is an identifier or a string literal, and where the same key is written twice the later one wins.
 
-ダブルの扱いを縛るルール群は、この設定が入っていることを前提に成立している。`no-vi-mock-factory-behavior--use-spy-true-and-fixture` の文書は「器は読み込み時に一度だけ作られるが、共有設定が各テストの前に呼び出し記録と実装をクリアするので、テスト間に持ち越される状態を持たない」と、その前提を自分で宣言している。`no-redundant-mock-reset--lift-mocks-into-fixture` が個別のリセット呼び出しを禁じているのも、共有設定が同じことをしているからである。前提が欠けたままこの 2 本だけが効いている状態は、「個別に戻すな」と言いながらどこも戻していない状態になる。
+Nothing but configuration files is read. A file whose name merely ends in a configuration file's name (`legacy-vite.config.ts`) is out of reach.
 
-そして欠けていることはテストの結果に出ない。全部緑のまま、検査されていない前提の上に積み上がる。このリポジトリが最も嫌う形である。
+### The invariant
 
-### なぜ設定ファイルごとに書かせるのか
+A double one test set up does not survive into the next.
 
-ルートの `vite.config.ts` に書いた `test` ブロックがワークスペースの実行に伝播しないことは [EDR 0017](../../../../docs/engineering-decision-logs/0017-demand-full-coverage-in-every-test-config.md) が実測で確かめている。カバレッジの下限を全設定ファイルに書かせているのと同じ理由で、この 2 つも各設定ファイルが自分で宣言する。
+The test runner does not put anything back unless told to. A swapped implementation and an accumulated call record both carry straight into the next test in the same file. A test that passes on top of inherited state is green on a premise it did not set up itself. It fails the moment the order changes or the neighbouring test is deleted, and when that happens is invisible to whoever wrote it.
 
-`lint` と `fmt` のように preset の関数から配る形は採れない。配るには利用側が `@mst/dont-review-it` をワークスペース依存に持つ必要があり、`dont-review-it` が依存しているパッケージと、`dont-review-it` を含む全パッケージが依存している `@mst/ai-native` の両方向で、タスクグラフが循環する。これは上流の欠陥（[vite-task#411](https://github.com/voidzero-dev/vite-task/issues/411)、修正は [vite-task#414](https://github.com/voidzero-dev/vite-task/pull/414)）であり、[EDR 0042](../../../../docs/engineering-decision-logs/0042-apply-one-preset-at-the-root-and-report-the-exception-the-toolchain-forces.md) が「上流に修正がある一時的な欠陥を避けるためにパッケージの構成を恒久的に組み替えない」と決めている。
+The rules constraining how doubles are used stand on this setting being in place. The document for `no-vi-mock-factory-behavior--use-spy-true-and-fixture` declares that premise itself, saying the vessel is built once at load while the shared setting clears the call record and the implementation before each test, so nothing carries between tests. `no-redundant-mock-reset--lift-mocks-into-fixture` forbids individual reset calls for the same reason: the shared setting already does it. With the premise missing and only those two in force, the state is "do not put anything back individually" while nothing puts anything back at all.
 
-書き写しになることは承知のうえで、要求する値はルールが持ち、設定ファイル側は「要求を満たしている」ことだけを書く。値が変わればルールが全設定ファイルを一斉に赤くする。
+And the absence does not show in the test results. Everything stays green, piling up on an unchecked premise. That is the shape this repository dislikes most.
 
-## どう直すか
+### Why every configuration file writes it
 
-`test` ブロックに 2 つを並べる。
+A `test` block written in the root `vite.config.ts` does not propagate to a workspace's run, as [EDR 0017](../../../../docs/engineering-decision-logs/0017-demand-full-coverage-in-every-test-config.md) confirmed by measurement. For the same reason the coverage floor is written into every configuration file, these two are declared by each configuration file itself.
+
+Handing them out from a preset function, as `lint` and `fmt` are, is not available. Doing so would require the consumer to carry `@mst/dont-review-it` as a workspace dependency, and the task graph then cycles in both directions — through the packages `dont-review-it` depends on, and through `@mst/ai-native`, which every package including `dont-review-it` depends on. That is an upstream defect ([vite-task#411](https://github.com/voidzero-dev/vite-task/issues/411), fixed in [vite-task#414](https://github.com/voidzero-dev/vite-task/pull/414)), and [EDR 0042](../../../../docs/engineering-decision-logs/0042-apply-one-preset-at-the-root-and-report-the-exception-the-toolchain-forces.md) settles that package structure is not permanently rearranged to dodge a temporary defect with a fix upstream.
+
+The copying is accepted knowingly: the rule carries the demanded values and the configuration files say only that the demand is met. When the values change, the rule turns every configuration file red at once.
+
+### What is not a violation
+
+- Files that are not configuration files
+- A file whose name merely ends in a configuration file's name
+- Declaring both and adding whatever a particular test setup needs inside `test`
+
+### Configuration
+
+None. Whether the rule is on or off is settled by the configuration, and nothing else about the judgment is.
+
+The only judgment this rule carries is whether both are declared `true`. Making one of them switchable would mean a configuration could be written where the state of the switched-off side survives between tests.
+
+## Fix
+
+Put the two in the `test` block.
 
 ```ts
 import { defineConfig } from "vite-plus";
@@ -48,23 +77,72 @@ export default defineConfig({
 });
 ```
 
-`mockReset` は各テストの前に呼び出し記録を捨て、実装を元に戻す。`restoreMocks` は差し込んだ spy そのものを外して、対象を元の姿に戻す。2 つは対象が違うので、片方だけでは「戻った」と言えない。
+`mockReset` drops the call record and returns the implementation before each test. `restoreMocks` removes the spy that was inserted and returns the subject to what it was. The two act on different things, so one alone does not amount to putting things back.
 
-## 違反にならないもの
+<!-- BEGIN GENERATED examples -->
 
-- 設定ファイル以外のファイル
-- 名前が設定ファイルの名前で終わるだけのファイル
-- 2 つを宣言したうえで、テストごとの都合を `test` の中に足すこと
+Code this rule rejects.
 
-## 禁じる回避策
+```ts
+// a config that declares no test block is reported once
+// in vite.config.ts
+import { defineConfig } from "vite-plus";
+export default defineConfig({ lint: {} });
+```
 
-- 共有のセットアップファイルの中で毎回戻す。設定ファイルを読んだだけでは隔離が効いているか決まらなくなり、判定がファイル 1 枚で閉じなくなる
-- 値を変数やスプレッドで外から流し込む。宣言と認めない
-- `test` ブロックごと消す。ブロックが無い設定も報告する
-- 抑制ディレクティブ
+```ts
+// a setting declared false is reported where it stands
+// in vite.config.ts
+import { defineConfig } from "vite-plus";
+export default defineConfig({ test: { mockReset: false, restoreMocks: true } });
+```
 
-## オプション
+Code this rule accepts.
 
-取らない。有効か無効かだけを設定側で決める。
+```ts
+// the settings declared beside the rest of the test options pass
+// in vite.config.ts
+import { defineConfig } from "vite-plus";
+export default defineConfig({
+  test: {
+    mockReset: true,
+    restoreMocks: true,
+    coverage: { thresholds: { 100: true, perFile: true } },
+  },
+});
+```
 
-このルールが持つ判断は「2 つが `true` として宣言されているか」だけである。片方を切れるようにすれば、切った側の状態がテスト間に残る構成を設定で作れることになる。
+```ts
+// a vitest config outside a vite-plus setup is held to the same demand
+// in vitest.config.ts
+import { defineConfig } from "vitest/config";
+export default defineConfig({ test: { mockReset: true, restoreMocks: true } });
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Putting things back every time inside a shared setup file. Reading the configuration file stops settling whether the isolation is in force, and the judgment stops closing over one file
+- Pouring the values in from outside through a variable or a spread. That is not accepted as a declaration
+- Deleting the `test` block entirely. A configuration with no block is reported too
+- A suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `missingTestBlock` | A test config must not leave the doubles a test installs standing for the next test. \`{{path}}\` is absent from this config, so nothing takes them down. Add it and declare {{settings}} as \`true\`. |
+| `sharedDoubleState` | A double installed by one test must not be left standing for the next one. \`{{setting}}\` is not declared \`true\` in \`test\`, so the call records and the implementations one test set are what the next test starts from. Declare \`{{setting}}: true\`. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->
