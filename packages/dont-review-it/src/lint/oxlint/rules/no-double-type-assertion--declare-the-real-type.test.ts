@@ -16,6 +16,7 @@ describe("dont-review-it/no-double-type-assertion--declare-the-real-type", () =>
       },
       {
         name: "a single assertion is still checked by the type checker",
+        documented: true,
         code: "const total = input as number;",
       },
       {
@@ -28,6 +29,7 @@ describe("dont-review-it/no-double-type-assertion--declare-the-real-type", () =>
       },
       {
         name: "an assertion applied to a satisfies expression keeps the checked step",
+        documented: true,
         code: "const total = (input satisfies Source) as number;",
       },
       {
@@ -46,6 +48,7 @@ describe("dont-review-it/no-double-type-assertion--declare-the-real-type", () =>
     invalid: [
       {
         name: "an assertion routed through unknown is reported",
+        documented: true,
         code: `const total = input ${THROUGH_UNKNOWN} as number;`,
         errors: [{ messageId: "stackedTypeAssertion" }],
       },
@@ -81,6 +84,7 @@ describe("dont-review-it/no-double-type-assertion--declare-the-real-type", () =>
       },
       {
         name: "three stacked assertions report each step that stands on an assertion",
+        documented: true,
         code: "const total = input as Loose as Source as Target;",
         errors: [{ messageId: "stackedTypeAssertion" }, { messageId: "stackedTypeAssertion" }],
       },
