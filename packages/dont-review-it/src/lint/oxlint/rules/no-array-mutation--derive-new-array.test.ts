@@ -56,6 +56,7 @@ describe("dont-review-it/no-array-mutation--derive-new-array", () => {
       },
       {
         name: "a non-destructive derivation on an array is the accepted form",
+        documented: true,
         code: "const items: string[] = [];\nconst shouted = items.map((entry) => entry.toUpperCase());",
       },
       {
@@ -120,6 +121,7 @@ describe("dont-review-it/no-array-mutation--derive-new-array", () => {
       },
       {
         name: "ordering through the copy-by-change method is an accepted derivation",
+        documented: true,
         code: "const publish = (items: readonly string[]) => items.toSorted();",
       },
       {
@@ -138,6 +140,7 @@ describe("dont-review-it/no-array-mutation--derive-new-array", () => {
     invalid: [
       {
         name: "pushing onto an annotated array is an in-place change",
+        documented: true,
         code: "const items: string[] = [];\nitems.push('a');",
         errors: [{ messageId: "inPlaceArrayMutation" }],
       },
@@ -198,6 +201,7 @@ describe("dont-review-it/no-array-mutation--derive-new-array", () => {
       },
       {
         name: "a copy made by spreading gets no exemption from where it came from",
+        documented: true,
         code: "const items: string[] = [];\nconst ordered = [...items].sort();",
         errors: [{ messageId: "inPlaceArrayMutation" }],
       },

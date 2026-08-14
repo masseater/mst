@@ -8,6 +8,7 @@ describe("dont-review-it/require-test-block-spelling--use-configured-fn", () => 
     valid: [
       {
         name: "a block declared with the required spelling is the form this rule asks for",
+        documented: true,
         code: 'it("names a behaviour", () => {});',
       },
       {
@@ -36,6 +37,7 @@ describe("dont-review-it/require-test-block-spelling--use-configured-fn", () => 
       },
       {
         name: "a derived builder bound to the required spelling is the agreed form",
+        documented: true,
         code: 'const it = test.extend({ subject: 1 });\nit("names a behaviour", () => {});',
       },
       {
@@ -87,6 +89,7 @@ describe("dont-review-it/require-test-block-spelling--use-configured-fn", () => 
     invalid: [
       {
         name: "a bare block declared with the other injected spelling is reported and renamed",
+        documented: true,
         code: 'test("names a behaviour", () => {});',
         errors: [{ messageId: "foreignBlockSpelling" }],
         output: 'it("names a behaviour", () => {});',
@@ -169,6 +172,7 @@ describe("dont-review-it/require-test-block-spelling--use-configured-fn", () => 
       },
       {
         name: "a derived builder bound to another name is reported at the binding",
+        documented: true,
         code: 'const spec = test.extend({ subject: 1 });\nspec("names a behaviour", () => {});',
         errors: [{ messageId: "foreignBlockBinding" }],
       },

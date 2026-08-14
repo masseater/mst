@@ -1,84 +1,169 @@
+---
+description: "Disallow a spec file naming a test hook, so every subject an assertion reads is born in the fixture the test block asked for"
+---
+
 # forbid-test-hook--move-setup-into-fixture
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-仕様ファイルの中に、ランナーの前処理・後処理フック（`beforeEach` / `afterEach` / `beforeAll` / `afterAll`）に解決される名前が現れること。
+Disallow a spec file naming a test hook, so every subject an assertion reads is born in the fixture the test block asked for
 
-判定は綴りの一致ではなく束縛の出所で行う。グローバル注入で使う構成でも、`import { beforeEach } from "vitest"` で持ち込む構成でも、`import { beforeEach as before }` と名前を変える構成でも、同じ違反になる。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`forbid-test-hook--move-setup-into-fixture.ts`](../../src/lint/oxlint/rules/forbid-test-hook--move-setup-into-fixture.ts)
 
-置き場所は問わない。ファイル直下でも、`describe` の中でも、入れ子の `describe` の中でも、仕様ファイル内のヘルパ関数の中でも同じである。
+<!-- END GENERATED rule-header -->
 
-呼び出しの形も問わない。フックに解決される識別子が現れた時点で報告する。配列に入れてから回す形、条件の下でだけ呼ぶ形、import しただけで一度も呼ばない形も、どれも識別子が現れているので報告される。呼び出しの形だけを見ると、グローバル注入の構成では束縛が残らないため、識別子を一段変数へ移すだけで手掛かりが消える。
+## Violation
 
-報告する形は 4 つある。
+A name resolving to one of the runner's setup and teardown hooks (`beforeEach`, `afterEach`, `beforeAll`, `afterAll`) appearing inside a spec file.
 
-| messageId | 報告する位置 | 何が起きているか |
+The judgment runs on where the binding came from, not on matching spellings. A setup using global injection, one bringing them in with `import { beforeEach } from "vitest"`, and one renaming them with `import { beforeEach as before }` are all the same violation.
+
+Where it stands makes no difference: straight under the file, inside a `describe`, inside a nested `describe`, inside a helper function declared in the spec file — all the same.
+
+The shape of the call makes no difference either. The report stands the moment an identifier resolving to a hook appears. Putting them in an array and looping, calling one only under a condition, and importing one without ever calling it are all reported, because the identifier appeared. Read the call shape alone and, under global injection, no binding is left, so moving the identifier one step into a variable erases the trail.
+
+There are four shapes of report.
+
+| messageId | Where it stands | What is happening |
 | --- | --- | --- |
-| `testHook` | フックに解決される識別子 | フックの名前が仕様ファイルに現れている |
-| `aliasedTestHook` | フックを束ねた名前と、その参照 | フックを別名に束ね直している |
-| `namespaceTestHook` | 名前空間越しのメンバ式 | ランナーの名前空間 import からフックを取り出している |
-| `testHookThroughCallee` | 仕様ファイルに書かれた呼び出しの式 | その呼び先が、宣言されたモジュールの中でフックに届く |
+| `testHook` | The identifier resolving to a hook | A hook's name appears in the spec file |
+| `aliasedTestHook` | The name a hook was bound to, and its references | A hook is being rebound to another name |
+| `namespaceTestHook` | The member expression through the namespace | A hook is being taken out of the runner's namespace import |
+| `testHookThroughCallee` | The call expression written in the spec file | Its target reaches a hook inside the module it is declared in |
 
-フックを束ねた名前は、束ね元の識別子・束ねた名前の宣言・その名前の参照がそれぞれ報告される。`import` した形も、束縛の位置と参照の位置がそれぞれ報告される。フックが現れた位置はどれも書き換えの対象になるので、位置ごとに 1 件立てる。
+For a name a hook was bound to, the source identifier, the declaration of the bound name and each reference to it are reported separately. An imported form reports the position of the binding and the position of each reference. Every position where a hook appeared is something to rewrite, so one report stands per position.
 
-名前を束ね直す形は、フック自身も名前空間も同じように辿る。`const before = beforeEach` と束ね直した名前も、`const hooks = runner` と名前空間を束ね直した先の `hooks.beforeEach` も、束縛を段数の上限なく辿って同じ違反になる。段数で打ち切ると、そこを 1 段超えるだけで検出を外せる。
+Rebinding is followed the same way for a hook itself and for a namespace. A name rebound as `const before = beforeEach`, and the `hooks.beforeEach` behind `const hooks = runner`, are followed through bindings with no cap on the number of steps and reach the same violation. Stop at a step count and stepping one past it takes the detection off.
 
-`testHookThroughCallee` は、仕様ファイルが import した名前を呼び出しており、その名前が解決するモジュールの宣言がフックに届くときに立つ。届く経路は、そのモジュールがフックを import している形、グローバル注入のフックをそのまま呼ぶ形、さらに別のモジュールの宣言を経由する形を辿る。辿った先は訪問済みのモジュールを覚えて打ち切るので、循環しても止まる。
+`testHookThroughCallee` stands where the spec file calls a name it imported and the declaration in the module that name resolves to reaches a hook. The routes followed are: that module importing a hook, that module calling a globally injected hook as it stands, and that module going through the declaration of yet another module. The walk remembers visited modules and stops, so a cycle terminates.
 
-### 意図的に広げていない範囲
+### Deliberately not widened
 
-| 形 | 対象にしない理由 |
+| Shape | Why it is left out |
 | --- | --- |
-| 共有のランナー設定ファイル | 適用範囲は `specFileSuffixes` が決める。設定ファイルはこの接尾辞を持たないので、名指しの除外を別に持たない |
-| fixture の本体に書かれた準備と後始末 | fixture はフックを呼ばない。`use` の前後に書く準備と後始末は fixture の仕組みそのもので、フックの呼び出しではない |
-| 仕様ファイル自身が宣言した同じ綴りの名前 | その名前はランナーのフックに解決されない。注入されたフックは覆い隠されていて呼べない |
-| ランナーの名前空間ではない受け手のメンバ | `harness.beforeEach(...)` の受け手が名前空間 import でなければ、フックには解決されない |
-| 呼び先のモジュールが名前空間 import からフックを取り出す形 | 呼び先の解決は名前ごとの import 束縛で行う。名前空間 import は束縛の一覧に載らないため、この経路は届かない |
-| 呼び先のモジュールがトップレベルでフックを呼ぶ形 | 仕様ファイル側に呼び出しが残らない。import の副作用でフックを仕掛ける共有ハーネスは、この検出の外側にある |
-| 仕様ファイル以外のファイル | 適用範囲は `specFileSuffixes` が決める |
+| The shared runner configuration file | The range is settled by `specFileSuffixes`. A configuration file does not carry that suffix, so no named exclusion is held for it |
+| Preparation and teardown written in a fixture's body | A fixture does not call hooks. What is written around `use` is the fixture mechanism itself, not a hook call |
+| A name of the same spelling the spec file declares itself | That name does not resolve to a runner hook. The injected hook is shadowed and cannot be called |
+| A member on a receiver that is not the runner's namespace | Where the receiver of `harness.beforeEach(...)` is not a namespace import, it does not resolve to a hook |
+| The target module taking a hook out of a namespace import | Target resolution runs on per-name import bindings. A namespace import does not appear in the list of bindings, so this route does not reach |
+| The target module calling a hook at its top level | No call is left on the spec file's side. A shared harness that installs hooks through an import side effect sits outside this detection |
+| A file that is not a spec file | The range is settled by `specFileSuffixes` |
 
-最後の 2 つは、この検出が届かないだけであって、許している形ではない。仕様が所有する setup を共有ハーネスへ出すこと自体を禁じる規律が別に立っている。
+The last two are places this detection does not reach, not shapes that are allowed. A separate discipline stands against moving setup a spec owns into a shared harness at all.
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「仕様ファイルにテストの準備と後始末を行うフックが現れない」ことである。準備は fixture が持ち、後始末は共有のランナー設定が持つ。テストブロックから見た subject の出所は fixture 以外にない。
+No hook that prepares or tears a test down appears in a spec file. Preparation is held by the fixture and teardown by the shared runner configuration. Seen from a test block, the subject comes from nowhere but the fixture.
 
-理由は 3 つある。
+Three reasons.
 
-1 つめ。`require-it-only-expect--move-setup-into-fixture` が塞ぐのは「準備をテストブロックの本体に書く」形だけである。フックが開いていれば、準備はそこへ逃げる。逃げた先はテストブロックからも fixture からも見えない位置で、この束の他の検出（expected が subject の構築式を写していないか、subject が裸の識別子か、モックの呼び出し記録を値として覗いていないか）はいずれも「fixture が返した subject」を起点にしているため、起点ごと失われる。フックを禁じないと、規律は「テストブロックに書くな」だけになり、検証の強さは戻らない。
+First. [require-it-only-expect--move-setup-into-fixture](./require-it-only-expect--move-setup-into-fixture.md) closes only the shape "write the preparation in the test block's body". Leave hooks open and the preparation escapes there. Where it escapes is a position visible neither from the test block nor from the fixture, and the other detections in this bundle — whether the expected value mirrors the subject's construction, whether the subject is a bare identifier, whether a mock's call record is being read as a value — all start from "the subject the fixture returned", so the starting point itself is lost. Without forbidding hooks the discipline reduces to "do not write it in the test block", and the strength of the verification does not come back.
 
-2 つめ。フックは実行順への依存を作る。宣言順と入れ子で決まる暗黙の順序に乗った準備は、テストブロックを並べ替えたり `describe` を一段足したりしただけで壊れる。壊れ方が「触っていない別のテストブロックが落ちる」なので、原因の特定に時間がかかる。fixture はテストブロックごとに評価されるため、この依存を持たない。
+Second. Hooks create a dependence on execution order. Preparation riding on an implicit order settled by declaration order and nesting breaks as soon as the test blocks are reordered or a `describe` is added. It breaks as "an unrelated test block you did not touch fails", which takes time to trace. A fixture is evaluated per test block and carries no such dependence.
 
-3 つめ。後始末は共有のランナー設定が持つ前提なので、フックに書く後始末は二重になる。どちらが効いているかはコードから読めず、片方を消してよいかも読めない。
+Third. Teardown is held by the shared runner configuration, so teardown written in a hook is doubled. Which one is in effect cannot be read from the code, and neither can whether one of them may be deleted.
 
-## どう直すか
+### Configuration
 
-各テストの前に流していた準備は fixture に移し、subject を返す。fixture はテストブロックごとに評価されるので、フックが担っていた「テストごとにやり直す」性質はそのまま残る。
-
-テスト全体で一度だけ行っていた準備は、共有のランナー設定へ出すか、そもそも要らない。仕様が所有する setup を共有ハーネスへ出さない、という規範側の要求と衝突するなら、要らない側に倒す。
-
-後始末は書かない。テストごとの自動クリア／復元は共有のランナー設定が持っており、個別の後始末呼び出しは別のルールが禁じている。
-
-このリポジトリのルールのテストは、その分け方をすでに取っている。`testLintRule` に渡す 1 件のケース（コード・ファイル名・オプション・期待する報告）は宣言として並び、テストブロックの中に残るのは突き合わせだけである。一時ファイルを要するケースも、フックではなくファイル先頭の宣言で書き出してある。
-
-## 禁じる回避策
-
-- フックを別名に束ねて呼ぶ。束縛の出所で見るので落ちる
-- フックの呼び出しを仕様ファイル内のヘルパ関数に隠す。ヘルパの中に識別子が現れるので落ちる
-- フックの呼び出しを別のモジュールのヘルパ関数に隠す。呼び先を辿るので落ちる
-- 実行時の分岐や配列を経由してフックを呼ぶ。呼び出しの形ではなく、フックに解決される識別子が現れたことで報告するので落ちる
-- ランナーの名前空間 import からフックを取り出す。名前空間の束縛を見るので落ちる
-- ランナーの名前空間を別の名前に束ね直してからフックを取り出す。束縛を段数の上限なく辿るので落ちる
-- 準備をテストブロックの本体に戻す。`require-it-only-expect--move-setup-into-fixture` に当たる
-- 抑制ディレクティブ
-
-## オプション
-
-| 名前 | 既定値 | 何を決めるか |
+| Name | Default | What it settles |
 | --- | --- | --- |
-| `hookNames` | `["afterAll", "afterEach", "beforeAll", "beforeEach"]` | フックとして扱う名前 |
-| `specFileSuffixes` | `[".test.ts", ".test.tsx"]` | このルールを適用するファイルの接尾辞 |
+| `hookNames` | `["afterAll", "afterEach", "beforeAll", "beforeEach"]` | The names treated as hooks |
+| `specFileSuffixes` | `[".test.ts", ".test.tsx"]` | The suffixes of the files this rule applies to |
 
-`hookNames` は置き換えであり、追加ではない。既定値に載っているのは、各テストの前・各テストの後・ファイル全体の前・ファイル全体の後にあたる 4 つで、ランナーが提供する前処理・後処理フックの全部である。テストブロックの中から後始末を予約する API（実行中のテストが終わったときに呼ばれるもの）は、テストブロックの本体に書く時点で `require-it-only-expect--move-setup-into-fixture` が引き受けるため、ここには載せない。
+`hookNames` replaces rather than adds. What the default carries is the four covering before each test, after each test, before the whole file and after the whole file — every setup and teardown hook the runner offers. The API for registering teardown from inside a test block (the one called when the running test finishes) is not listed here, because writing it in the test block's body is taken by `require-it-only-expect--move-setup-into-fixture`.
 
-`specFileSuffixes` は束の 9 本で同じものを使う。このルールだけ別の範囲を持つと、範囲を変えたときに片方だけが空振りする。
+`specFileSuffixes` is the same across the nine rules of this bundle. Give this rule a range of its own and changing the range leaves one side firing at nothing.
+
+## Fix
+
+Move the preparation that ran before each test into the fixture and return the subject. A fixture is evaluated per test block, so the "redo it for every test" property the hook carried stays exactly as it was.
+
+Preparation that ran once for the whole suite goes out to the shared runner configuration, or is not needed at all. Where that collides with the norm against moving setup a spec owns into a shared harness, fall on the side of not needing it.
+
+Do not write teardown. Per-test clearing and restoring is held by the shared runner configuration, and individual teardown calls are forbidden by another rule.
+
+The rule tests in this repository already take that division. One case handed to `testLintRule` — code, filename, options, expected reports — stands as a declaration, and what stays inside the test block is the comparison alone. Cases needing a temporary file are written out from declarations at the head of the file rather than from a hook.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// a hook the runner injects is reported where it is named
+// in order.test.ts
+beforeEach(() => {
+  seed();
+});
+```
+
+```ts
+// a hook hidden in a helper declared in this spec is reported inside that helper
+// in order.test.ts
+const install = () => {
+  beforeEach(() => {
+    seed();
+  });
+};
+install();
+```
+
+Code this rule accepts.
+
+```ts
+// a spec that leaves preparation to its fixture names no hook
+// in order.test.ts
+const check = test.extend({ order: async ({}, use) => { await use(build()); } });
+check('totals the lines', ({ order }) => {
+  expect(order).toBe(3);
+});
+```
+
+```ts
+// a name the spec declares itself is not the runner hook it shadows
+// in order.test.ts
+const beforeEach = (run) => {
+  run();
+};
+beforeEach(() => {
+  seed();
+});
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Binding a hook to another name and calling that. The origin of the binding is read, so it falls
+- Hiding the hook call in a helper function inside the spec file. The identifier appears inside the helper, so it falls
+- Hiding the hook call in a helper function in another module. The target is followed, so it falls
+- Calling the hook through a run-time branch or an array. The report stands on an identifier resolving to a hook appearing, not on the shape of the call, so it falls
+- Taking the hook out of the runner's namespace import. The namespace binding is read, so it falls
+- Rebinding the runner's namespace to another name and taking the hook out of that. Bindings are followed with no cap on the number of steps, so it falls
+- Putting the preparation back in the test block's body. That lands on `require-it-only-expect--move-setup-into-fixture`
+- A suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `testHook` | A spec file must not name the test hook \`{{hook}}\`. Every other check in this bundle starts from the subject a fixture hands to the test block, and preparation parked in a hook is born off that path, leaving a mirrored expected value, a projected subject and an inspected mock record unexamined. Move the preparation this hook carries into the fixture and have the fixture hand the subject back to the test block. Delete the cleanup it carries; the shared runner configuration already restores every test. |
+| `aliasedTestHook` | A spec file must not name the test hook \`{{hook}}\` under a binding of its own. A renamed hook still prepares the subject off the path every other check in this bundle reads, the one running from a fixture to the test block that consumes it. Move the preparation this hook carries into the fixture, have the fixture hand the subject back to the test block, and delete this binding together with the hook. Cleanup stays unwritten; the shared runner configuration already restores every test. |
+| `namespaceTestHook` | A spec file must not reach the test hook \`{{hook}}\` through the runner namespace. A hook taken off the namespace prepares the subject off the path every other check in this bundle reads, the one running from a fixture to the test block that consumes it. Move the preparation this hook carries into the fixture and have the fixture hand the subject back to the test block. Delete the cleanup it carries; the shared runner configuration already restores every test. |
+| `testHookThroughCallee` | A spec file must not reach a test hook, and the call to \`{{through}}\` reaches one in the module that declares it. A hook hidden behind a call still prepares the subject off the path every other check in this bundle reads, the one running from a fixture to the test block that consumes it. Inline the preparation that module carries into the fixture and have the fixture hand the subject back to the test block. Delete the cleanup it carries; the shared runner configuration already restores every test. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

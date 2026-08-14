@@ -1,22 +1,48 @@
+---
+description: "Disallow a `run` handler on a citty command that declares `subCommands`, so a matched subcommand's output is never followed by the parent's"
+---
+
 # no-citty-parent-run--move-run-into-a-subcommand
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-citty の `defineCommand` に渡すオブジェクトが、`subCommands` と `run` を同時に宣言している形を検出する。報告位置は `run` プロパティそのもの。
+Disallow a `run` handler on a citty command that declares `subCommands`, so a matched subcommand's output is never followed by the parent's
 
-`defineCommand` の判定は import に基づく。`"citty"` から import された `defineCommand`（改名 import と名前空間 import を含む）の呼び出しだけを見るので、同名の別ライブラリの API や自前関数には反応しない。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-citty-parent-run--move-run-into-a-subcommand.ts`](../../src/lint/oxlint/rules/no-citty-parent-run--move-run-into-a-subcommand.ts)
 
-## なぜそれが要るか
+<!-- END GENERATED rule-header -->
 
-citty の `runCommand` は、サブコマンドの実行を終えたあとに必ず親コマンドの処理へ戻り、親に `run` があればそれを実行する（[v0.2.2 の `src/command.ts`](https://github.com/unjs/citty/blob/v0.2.2/src/command.ts) で確認できる。main も同じ）。つまり `subCommands` を持つ親に `run` を置くと、サブコマンドが成功するたびに親の `run` の出力が後ろに混ざり、パイプで消費できるはずだった stdout が汚れる。
+## Violation
 
-逆に親に `run` が無ければ、サブコマンド名の指定が無い呼び出しは `E_NO_COMMAND` で失敗する。これはサブコマンド式 CLI として望ましい挙動であり、「引数無しで呼んだら usage が出て非ゼロで終わる」という利用者の期待に一致する。
+An object handed to citty's `defineCommand` declaring `subCommands` and `run` at once. The report points at the `run` property.
 
-引数無しの呼び出しに既定の動作を与えたい場合のために、citty は `default` プロパティを持つ。`default` はサブコマンド名を指名する形なので、既定の動作も名前を持ったサブコマンドとして表に出る。なお `default` と `run` の同時指定は citty 自身が `E_DEFAULT_CONFLICT` で拒否する。拒否されないのは `subCommands` と `run` の組だけであり、その組こそが出力を汚す。書き手が意図した結果になることのない形なので、機械で止める。
+Whether a call is `defineCommand` is settled from the imports. Only calls to a `defineCommand` imported from `"citty"` are read, renamed imports and namespace imports included, so an API of the same name from another library and a function of one's own are left alone.
 
-## どう直すか
+### The invariant
 
-親の `run` を削除し、やらせたかったことをサブコマンドとして切り出す。
+citty's `runCommand` always returns to the parent command after a subcommand finishes, and runs the parent's `run` when there is one (visible in [`src/command.ts` at v0.2.2](https://github.com/unjs/citty/blob/v0.2.2/src/command.ts), and unchanged on main). Putting `run` on a parent carrying `subCommands` therefore mixes the parent's output in behind every successful subcommand, dirtying a stdout that was supposed to be consumable through a pipe.
+
+With no `run` on the parent, an invocation naming no subcommand fails with `E_NO_COMMAND` instead. That is the wanted behaviour for a CLI built out of subcommands, and it matches what a user expects: called with no arguments, print the usage and exit non-zero.
+
+For giving the bare invocation a default behaviour, citty carries a `default` property. `default` names a subcommand, so the default behaviour surfaces as a subcommand carrying a name. Declaring `default` and `run` together is refused by citty itself with `E_DEFAULT_CONFLICT`. The one pair citty does not refuse is `subCommands` with `run`, and that is precisely the pair that dirties the output. Since it never produces what the writer intended, a machine stops it.
+
+### What is not a violation
+
+- `run` on a command carrying no subcommands. A leaf command's `run` is its body
+- A parent carrying `subCommands` alone. Where validation or shared context is needed, `setup` is available
+- `subCommands` with `default`. The default behaviour surfaces as a named subcommand, which is the fix this rule pushes for
+- An API of the same name imported from somewhere other than citty, or a call to a `defineCommand` defined locally
+
+Where the machine reaches and where the discipline reaches are not the same. Detection is the floor under the invariant, not the ceiling.
+
+## Fix
+
+Delete the parent's `run` and carve out what it was doing as a subcommand.
 
 ```ts
 import { defineCommand } from "citty";
@@ -34,19 +60,60 @@ export const dontReviewItCommand = defineCommand({
 });
 ```
 
-引数無しの呼び出しに既定の動作を与えたいなら、暗黙の親 `run` に埋めず、`default: "check"` のようにサブコマンドを指名する。
+To give the bare invocation a default behaviour, name a subcommand with `default: "check"` rather than burying it in an implicit parent `run`.
 
-## 違反にならないもの
+<!-- BEGIN GENERATED examples -->
 
-- サブコマンドを持たないコマンドの `run`。葉のコマンドは `run` が本体である
-- `subCommands` だけを持つ親。バリデーションや文脈共有が要るなら `setup` が使える
-- `subCommands` と `default` の組。既定の動作が名前を持ったサブコマンドとして表に出ている形であり、このルールが推す直し方そのもの
-- citty 以外から import した同名 API や、自前で定義した `defineCommand` の呼び出し
+Code this rule rejects.
 
-## 禁じる回避策
+```ts
+// a parent that declares both subCommands and run is reported
+import { defineCommand } from "citty";
+const main = defineCommand({ subCommands: { check }, run() {} });
+```
 
-- `run` の中身を関数に切り出して `run: dispatchFallback` のように参照で渡す。宣言の形は同じであり検出されるが、仮に検出を外れる書き方を見つけても、サブコマンド成功後に親の処理が走る事実は変わらない
-- スプレッドで `run` を持つオブジェクトを合成して静的検出を外す。出来上がるコマンドの挙動は同じである
-- 親の `run` の代わりに `setup` へ本体の処理を移す。`setup` はどのサブコマンドの前にも走るため、全サブコマンドの出力を汚す形に悪化する
+```ts
+// declaring default does not excuse the parent run
+import { defineCommand } from "citty";
+const main = defineCommand({ subCommands: { check }, default: "check", run() {} });
+```
 
-機械検出の範囲と規律の範囲は一致しない。検出は不変条件を守るための下限であって、上限ではない。
+Code this rule accepts.
+
+```ts
+// a parent that only dispatches leaves the bare invocation to the framework
+import { defineCommand } from "citty";
+const main = defineCommand({ meta: { name: "cli" }, subCommands: { check } });
+```
+
+```ts
+// a parent names its bare-invocation behavior through default
+import { defineCommand } from "citty";
+const main = defineCommand({ meta: { name: "cli" }, subCommands: { check }, default: "check" });
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Lifting the body of `run` into a function and handing it over by reference, as `run: dispatchFallback`. The declaration has the same shape and is still detected — and were a spelling found that escapes detection, the parent still runs after a subcommand succeeds
+- Composing the object from a spread carrying `run` to escape the static judgment. The command that comes out behaves the same
+- Moving the body into `setup` instead of the parent's `run`. `setup` runs before every subcommand, which makes it worse: now every subcommand's output is dirtied
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `parentRun` | A citty command that declares \`subCommands\` must not register \`run\`. Delete the parent \`run\` and move its behavior into a subcommand of its own. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

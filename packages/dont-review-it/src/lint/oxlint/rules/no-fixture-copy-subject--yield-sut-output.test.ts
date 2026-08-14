@@ -12,6 +12,7 @@ describe("dont-review-it/no-fixture-copy-subject--yield-sut-output", () => {
     valid: [
       {
         name: "a fixture handing back what the code under test produced carries its shape unchanged",
+        documented: true,
         code: "const it = test.extend('report', () => summarise(entries));",
         filename: SPEC_FILENAME,
       },
@@ -32,6 +33,7 @@ describe("dont-review-it/no-fixture-copy-subject--yield-sut-output", () => {
       },
       {
         name: "an object whose every key is spelled apart from the value it reads is not a copy of a shape",
+        documented: true,
         code: "const it = test.extend('report', () => ({ count: source.total, at: source.recordedAt }));",
         filename: SPEC_FILENAME,
       },
@@ -89,6 +91,7 @@ describe("dont-review-it/no-fixture-copy-subject--yield-sut-output", () => {
     invalid: [
       {
         name: "an object written as the arrow body copies the shape it reads from",
+        documented: true,
         code: "const it = test.extend('report', () => ({ total: source.total }));",
         filename: SPEC_FILENAME,
         errors: [{ messageId: "copiedSubject", data: { fixture: "report", properties: "total" } }],
@@ -125,6 +128,7 @@ describe("dont-review-it/no-fixture-copy-subject--yield-sut-output", () => {
       },
       {
         name: "renaming every key but one leaves the copy in place",
+        documented: true,
         code: "const it = test.extend('report', () => ({ count: source.entries, total: source.total }));",
         filename: SPEC_FILENAME,
         errors: [{ messageId: "copiedSubject", data: { fixture: "report", properties: "total" } }],

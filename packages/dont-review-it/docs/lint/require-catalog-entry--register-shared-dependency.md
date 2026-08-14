@@ -1,54 +1,81 @@
+---
+description: "Require every package that more than one workspace declares to be registered in the catalog, so the version they resolve to is decided in one place instead of workspace by workspace"
+---
+
 # require-catalog-entry--register-shared-dependency
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-リポジトリ内のすべてのマニフェストを突き合わせ、次を全部満たす名前を報告する。
+Require every package that more than one workspace declares to be registered in the catalog, so the version they resolve to is decided in one place instead of workspace by workspace
 
-- 通常依存・開発依存・任意依存のいずれかに現れる
-- 2 つ以上の異なるワークスペースに現れる
-- 外部パッケージを指している
-- カタログに登録されていない
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`require-catalog-entry--register-shared-dependency.ts`](../../src/lint/oxlint/rules/require-catalog-entry--register-shared-dependency.ts)
 
-報告はその名前を宣言しているワークスペースそれぞれに出る。1 箇所にまとめると、受け取った側が「自分のワークスペースの話ではない」と読む余地が生まれる。報告位置は、そのワークスペースが持つ検査対象のファイルである。マニフェスト自体は検査経路に載らないので、そのマニフェストが支配するファイルの側に出す。
+<!-- END GENERATED rule-header -->
 
-### 名前の数え方
+## Violation
 
-数える単位は宣言の鍵ではなく、その宣言が解決するパッケージ名である。値が別名解決の形をとっているときは、値の中に書かれた解決先の名前で数える。同じパッケージを片方だけ別名で宣言すると 2 つの名前に見えるが、この数え方では同じ 1 つの名前に集まる。
+Every manifest in the repository is reconciled, and a name meeting all of these is reported.
 
-1 つのワークスペースが同じ名前を複数のセクションで宣言していても、そのワークスペースは 1 と数える。報告に載る版は、通常依存・開発依存・任意依存の順で最初に見つかったものである。
+- It appears among the regular, development or optional dependencies
+- It appears in two or more different workspaces
+- It points at an external package
+- It is not registered in the catalog
 
-登録を求める下限は 2 で固定する。設定で 3 に上げられるようにすると、2 つのワークスペースでの分岐が設定によって正当化される。
+The report comes out in each workspace declaring that name. Gather it in one place and the receiver is left room to read it as "not about my workspace". The report stands on a file that workspace holds and that the check opens: a manifest itself is not on the checking route, so the report goes to the files that manifest governs.
 
-### 意図的に対象にしない形
+### How names are counted
 
-| 形 | 対象にしない理由 |
+The unit counted is the package name a declaration resolves to, not the key of the declaration. Where the value takes the shape of an alias resolution, the resolved name written inside the value does the counting. Declare the same package under an alias in one place only and it looks like two names; counted this way it gathers into one.
+
+Where one workspace declares the same name in several sections, that workspace counts as one. The version carried into the report is the first found, in the order regular, development, optional.
+
+The threshold for asking for registration is fixed at two. Allow the configuration to raise it to three and a split across two workspaces becomes justified by configuration.
+
+### Deliberately not widened
+
+| Shape | Why it is left out |
 | --- | --- |
-| ピア依存の宣言 | 範囲を広く取るのが設計上正しく、単一バージョンに寄せる対象ではない |
-| 1 つのワークスペースしか使っていない名前 | 分岐する相手がいない |
-| `workspace:` / `link:` / `file:` の値 | 外部のバージョンを持たない |
-| すでにカタログに登録されている名前 | そこから先は参照の形を `require-catalog-protocol--use-catalog-literal` が見る |
-| 逸脱として登録済みの、ワークスペースと名前の組 | 登録された事実そのものが判断の記録になる |
-| 値が文字列でない宣言 | 有効なマニフェストでは起こらない。起きているならスキーマ検証の担当領域である |
+| A peer dependency declaration | Taking a wide range is the correct design there, and it is no subject for pinning to a single version |
+| A name only one workspace uses | There is nothing for it to split from |
+| A `workspace:`, `link:` or `file:` value | It holds no external version |
+| A name already registered in the catalog | From there on, the shape of the reference is read by [require-catalog-protocol--use-catalog-literal](./require-catalog-protocol--use-catalog-literal.md) |
+| A workspace-and-name pair registered as a deviation | The fact of the registration is itself the record of the judgment |
+| A declaration whose value is not a string | It does not happen in a valid manifest. Where it does, that is the schema validation's ground |
 
-インストール後にツリーを書き換える処理、モジュール解決に割り込む実行時のフック、ビルド時に実体を差し替えるコードは、この検出の外にある。どのパッケージが実際に共有されるかがその処理を走らせた結果としてしか決まらず、宣言を読んでいる時点では値が存在しないためである。条件を工夫すれば拾えるという種類の見逃しではない。
+Processing that rewrites the tree after installation, a run-time hook cutting into module resolution, and code swapping the real thing in at build time all sit outside this detection. Which packages are actually shared is settled only as the result of running that processing, and at the moment the declarations are read the value does not exist. It is not the kind of miss a cleverer condition would catch.
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「2 つ以上のワークスペースが依存している外部パッケージの名前は、カタログに登録されている」ことである。守るのはカタログの守備範囲そのものに漏れがないことで、各ワークスペースがカタログを見ているかどうかは `require-catalog-protocol--use-catalog-literal` が守る。
+What is held is that the name of an external package two or more workspaces depend on is registered in the catalog. What is held here is that the catalog's own range of cover has no gaps; whether each workspace looks at the catalog is held by [require-catalog-protocol--use-catalog-literal](./require-catalog-protocol--use-catalog-literal.md).
 
-カタログ参照を強制するルールは、カタログに載っている名前についてしか働かない。担当範囲が設定の中身で決まる、という性質を持っている。
+The rule enforcing catalog references works only on names the catalog holds. Its ground is settled by the contents of a configuration file.
 
-1 層目は、登録が依存を足す人の任意だということである。新しいパッケージを 2 つ目のワークスペースで使い始めるとき、登録しないほうが手数は少なく、少ないほうが選ばれる。
+The first layer is that registering is at the discretion of whoever adds the dependency. Starting to use a new package in a second workspace takes fewer steps without registering it, and the shorter route is the one taken.
 
-2 層目は、登録されなかった名前が参照を強制するルールの母集団に入らないことである。ここで起きているのは「違反が見逃される」ではなく「守る側の範囲が縮む」である。しかも範囲が縮んだこと自体は誰の目にも触れない。設定を書き足さなかったという不作為は、コードのどこにも痕跡を残さないからである。
+The second layer is that a name left unregistered never enters the population of the rule enforcing references. What happens is not "a violation is missed" but "the range of what defends shrinks". And the shrinking itself meets nobody's eye, because an omission — not having written a line of configuration — leaves no trace anywhere in the code.
 
-範囲が設定の厚みに比例する構造を残す限り、一元管理は「登録した分だけ効く」ものであり続ける。このルールは、その範囲のほうを機械的に決める。
+Leave in place a structure whose range is proportional to the thickness of a configuration file and centralisation stays a thing that "works as far as it was registered". This rule settles that range by machine instead.
 
-## どう直すか
+### Configuration
 
-その名前をカタログに登録し、各ワークスペースの値をカタログ参照リテラルに置き換える。順序がある。登録する前に、各ワークスペースが現在どのバージョンを指しているかを見て、揃える先を決める。揃っていない状態のまま登録すると、どちらかのワークスペースの解決バージョンが黙って変わる。報告文が各ワークスペースの現在の版を並べているのは、この判断を他のファイルを開かずに済ませるためである。
+This rule reads no configuration file of its own. Of the material the judgment needs, what amounts to policy comes from the configuration, and what amounts to a fact about the repository comes from the reader of the workspace list.
 
-このリポジトリでは登録先が `pnpm-workspace.yaml` の `catalog` キーで、参照側は `"catalog:"` だけを書く。
+`catalog` is the list of registered names. Empty, or not handed over at all, and nothing is reported. With no configuration it guesses nothing.
+
+`deviations` lists, per workspace relative directory, the names registration is not asked for, matched exactly. The default is empty. A deviation clears the report for that workspace alone. Other workspaces declaring the same name are still asked to register it.
+
+The workspace list and the contents of each manifest are supplied by the reader handed in when the rule is built. Looking at one file alone cannot settle "two or more workspaces use it", so that material sits outside the rule body.
+
+## Fix
+
+Register the name in the catalog and replace each workspace's value with a catalog reference literal. There is an order to it. Before registering, look at which version each workspace currently points at and settle what to level to. Register while they are uneven and one workspace's resolved version changes silently. The report lays out each workspace's current version so that this decision can be made without opening another file.
+
+In this repository the registry is the `catalog` key of `pnpm-workspace.yaml`, and the reference side writes `"catalog:"` alone.
 
 ```yaml
 catalog:
@@ -63,22 +90,44 @@ catalog:
 }
 ```
 
-揃えられない事情がある場合は、ワークスペースと名前の組を逸脱として登録し、なぜ必要かとどうなったら消せるかを併記する。
+Where circumstances prevent levelling, register the workspace-and-name pair as a deviation, writing both why it is needed and what would have to happen for it to go.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- 片方のワークスペースから依存宣言を消し、実体は親や兄弟から解決させて使い続ける。宣言のない依存に対してはどちらのルールも比較対象を持たない。宣言を消すことは範囲の外へ出る操作であって、共有をやめる操作ではない
-- 一方を別名で宣言し、同じパッケージを別々の名前に見せる。解決先の名前で数えるので外れない
-- 共有している側のワークスペースを畳んで、見かけ上 1 ワークスペースにする。ワークスペースの分け方は依存管理の都合で決めるものではない
-- 抑制ディレクティブで黙らせる。`no-broad-lint-disable--use-next-line-with-reason` が受ける
-- インストール後・実行時・ビルド時に解決を差し替える。この形だけは検出条件を持てない。同じ迂回が繰り返されるなら、その処理を置いているファイルの存在そのものを禁止する側に落とす
+Code this rule rejects.
 
-## オプション
+```ts
+// a name shared with two other workspaces is reported in the root workspace
+export const shipped = true;
 
-このルールは設定ファイルを自分で読まない。判定に要る材料のうち、方針にあたるものは設定から、リポジトリの事実にあたるものはワークスペース一覧の読み手から受け取る。
+```
 
-`catalog` は登録済みの名前の一覧である。空、または渡されていないときは何も報告しない。設定がない状態で推測しない。
+<!-- END GENERATED examples -->
 
-`deviations` はワークスペースの相対ディレクトリごとに、登録を求めない名前を厳密一致で列挙する。既定は空。逸脱はそのワークスペースの報告だけを消す。同じ名前を宣言している他のワークスペースは引き続き登録を求められる。
+The subject of this rule is the repository's manifests rather than the source in front of you, so the code above is the file the report stands on, and what settles the judgment is which workspace holds it.
 
-ワークスペース一覧とそれぞれのマニフェストの内容は、ルール生成時に渡す読み手が供給する。1 つのファイルだけを見ても「2 つ以上のワークスペースが使っている」は判定できないため、この材料はルール本体の外にある。
+### Forbidden bypasses (do not do this)
+
+- Deleting the dependency declaration from one workspace and going on using it, resolved from a parent or a sibling. Against an undeclared dependency neither rule holds anything to compare. Deleting the declaration is a move out of range, not a move away from sharing
+- Declaring one side under an alias so the same package looks like two names. Counting by the resolved name does not come off
+- Folding the sharing workspace away so it appears to be one workspace. How workspaces are divided is not settled by the convenience of dependency management
+- Silencing it with a suppression directive. [no-broad-lint-disable--use-next-line-with-reason](./no-broad-lint-disable--use-next-line-with-reason.md) takes that
+- Swapping resolution out after installation, at run time or at build time. That shape alone can carry no detection condition. Where the same bypass repeats, it falls to forbidding the existence of the file holding that processing
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `unregisteredSharedDependency` | A package that more than one workspace declares must not stay outside the catalog. \`{{packageName}}\` is declared by {{sites}}. Decide which version all of them take, register \`{{packageName}}\` in the catalog at that version, then replace every declared value with the catalog reference. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

@@ -1,52 +1,115 @@
+---
+description: "Disallow a lint configuration naming a rule of a plugin that no plugin list it can reach enables, so a rule left standing on a dropped plugin is reported instead of resolving to nothing"
+---
+
 # no-unregistered-rule-plugin--enable-the-plugin
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-lint 設定が名指しするルールのうち、`プラグイン名/ルール名` の形をしていて、そのプラグイン名がどこにも有効化されていないものを報告する。
+Disallow a lint configuration naming a rule of a plugin that no plugin list it can reach enables, so a rule left standing on a dropped plugin is reported instead of resolving to nothing
 
-有効化されているとみなすのは 3 つの経路である。ルールのオプションが受け取ったプラグイン名、同じファイルに書かれた `plugins` 配列の文字列、同じファイルに書かれた `jsPlugins` の各要素が持つ `name` である。3 つのどれにも無いプラグイン名を持つルールが報告の対象になる。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-unregistered-rule-plugin--enable-the-plugin.ts`](../../src/lint/oxlint/rules/no-unregistered-rule-plugin--enable-the-plugin.ts)
 
-ルールの並びの同定は 2 経路ある。オブジェクトの `rules` プロパティが持つオブジェクトと、`OxlintConfig["rules"]` を指す型注釈が付いた宣言の初期値である。後者があるのは、このリポジトリが上流のルールの並びを設定オブジェクトの外に置いているためで、その位置に置かれたものも同じ並びとして読む。
+<!-- END GENERATED rule-header -->
 
-重大度が `off` のものは報告しない。無効化するだけならプラグインは要らない。
+## Violation
 
-## なぜそれが要るか
+A rule named by the lint configuration in the form `plugin/rule` whose plugin is enabled nowhere.
 
-守っている不変条件は「ルールを名指しした設定が、そのルールを実際に走らせている」ことである。
+Three routes count as enabling a plugin: the plugin names handed to this rule's options, the strings in a `plugins` array written in the same file, and the `name` of each entry of a `jsPlugins` written in the same file. A rule whose plugin appears in none of the three is reported.
 
-oxlint では、有効にするプラグインの一覧と、重大度を与えるルールの一覧が別々の宣言になっている。片方だけを削っても、もう片方は文法として正しいまま残る。残ったルール名は解決の時点で消え、実行時に何も起きない。
+A block of rules is recognised through two routes: the object held by an object's `rules` property, and the initialiser of a declaration annotated with a type reaching `OxlintConfig["rules"]`. The second exists because this repository keeps the upstream rule block outside the configuration object, and what sits in that position is read as the same block.
 
-このリポジトリで実測した結果は次のとおりである。`UPSTREAM_PLUGINS` から `import` の 1 行を抜くと、`UPSTREAM_RULES` が `error` で名指ししている `import/default`、`import/export`、`import/namespace`、`import/no-named-as-default`、`import/no-named-as-default-member` の 5 本が解決後の設定から消えた。解決されたルールは 255 本から 250 本になり、終了コードは 0 のままで、警告も出なかった。
+A rule whose severity is `off` is not reported. Turning something off needs no plugin.
 
-消えた側は「違反が無かった」と区別が付かない。[強制の機構](../../../docs/guidelines/enforcement.md)が「走らなかった検査を成功と数えない」として置いている形そのもので、宣言が 2 か所に分かれている限り、片側を削る変更は何も落とさずに通る。
+### The invariant
 
-この不変条件を型でも検証コマンドでもなく lint で止めた判断と、そこで受け入れた限界は [EDR 0056](../../../docs/engineering-decision-logs/0056-report-the-rule-whose-plugin-no-list-enables.md) にある。
+A configuration that names a rule is actually running that rule.
 
-## どう直すか
+In oxlint, the list of enabled plugins and the list of rules given a severity are separate declarations. Dropping one leaves the other grammatically valid. The rule names left behind disappear at resolution, and nothing happens at run time.
 
-そのプラグインを有効にするか、ルールを消すかのどちらかを選ぶ。
+Measured in this repository: removing the single `import` line from `UPSTREAM_PLUGINS` made the five rules `UPSTREAM_RULES` names at `error` — `import/default`, `import/export`, `import/namespace`, `import/no-named-as-default` and `import/no-named-as-default-member` — disappear from the resolved configuration. The resolved rule count went from 255 to 250, the exit status stayed zero, and no warning was printed.
 
-ルールを走らせたいなら、プラグイン名をそのファイルの `plugins` に足す。設定が preset から配られている場合は、preset が持つプラグインの一覧に足す。
+What disappeared is indistinguishable from "there were no violations". That is exactly the shape [the enforcement guideline](../../../docs/guidelines/enforcement.md) rules out when it says a check that did not run is not counted as a success, and as long as the declaration is split across two places, a change removing one side passes without dropping anything visible.
 
-そのルールを走らせるつもりが無いなら、ルール名の側を消す。重大度を `off` にして残すのは、その設定を読む人に「無効にした」と伝えたいときだけにする。
+The decision to stop this with a lint rule rather than a type or a verification command, and the limits accepted in doing so, are in [EDR 0056](../../../docs/engineering-decision-logs/0056-report-the-rule-whose-plugin-no-list-enables.md).
 
-## 違反にならないもの
+### What is not a violation
 
-- 重大度が `off` のルール
-- `eqeqeq` のように、プラグイン名の接頭辞を持たない組み込みのルール
-- 計算されたキーで書かれたルール名。その場では何を指すか決まらない
-- 展開だけで組み立てられた並び。その場に書かれたルール名が無い
-- `rules` という名前で参照されていない、ただのオブジェクト
+- A rule whose severity is `off`
+- A built-in rule carrying no plugin prefix, such as `eqeqeq`
+- A rule name written as a computed key. What it points at is not settled there
+- A block assembled from spreads alone. No rule name is written there
+- A plain object that nothing refers to as `rules`
 
-## 禁じる回避策
+### Configuration
 
-- 有効なプラグインの一覧を、実際に有効化している宣言とは別に手で書き足す。名前の出どころが 2 つになり、実際の一覧から消えたプラグインが報告されなくなる。オプションへは、プラグインを有効にしている宣言そのものを渡す
-- 走らせるつもりのあるルールを `off` にして報告を消す
-- ルール名を計算されたキーに書き換えて、その場から読めなくする
-- 抑制ディレクティブ
+`plugins` takes the plugin names this configuration enables. It defaults to empty, in which case the `plugins` and `jsPlugins` written in the file are the only grounds for being enabled.
 
-## オプション
+In this repository the preset hands over `UPSTREAM_PLUGINS` and its own js plugin names as they stand. A name leaving that list leaves the option with it, so the names keep one origin.
 
-`plugins` に、この設定が有効にしているプラグイン名を渡す。既定は空で、その場合はファイルに書かれた `plugins` と `jsPlugins` だけが有効化の根拠になる。
+## Fix
 
-このリポジトリでは preset が `UPSTREAM_PLUGINS` と自分の js プラグイン名をそのまま渡している。一覧から名前が消えればオプションからも消えるため、名前の出どころは 1 つに保たれる。
+Choose one: enable the plugin, or remove the rule.
+
+To run the rule, add the plugin name to that file's `plugins`. Where the configuration is handed down from a preset, add it to the plugin list the preset carries.
+
+Where the rule was never meant to run, remove the rule name. Keeping it at severity `off` is for when you want to tell whoever reads the configuration that it was turned off deliberately.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// a rule of a plugin nothing enables is reported
+export const config = { rules: { "vitest/no-focused-tests": "error" } };
+```
+
+```ts
+// a rule kept at warn still asks for its plugin
+export const config = { rules: { "import/default": "warn" } };
+```
+
+Code this rule accepts.
+
+```ts
+// a plugin list beside the rules enables the plugin
+export const config = { plugins: ["vitest"], rules: { "vitest/no-focused-tests": "error" } };
+```
+
+```ts
+// a rule turned off asks for no plugin
+export const config = { rules: { "vitest/no-focused-tests": "off" } };
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Writing the list of enabled plugins into the options by hand, separately from the declaration that actually enables them. The names then have two origins, and a plugin dropped from the real list stops being reported. Hand the options the very declaration that enables the plugins
+- Setting a rule you do mean to run to `off` to clear the report
+- Rewriting the rule name as a computed key so it cannot be read there
+- A suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `unregisteredRulePlugin` | A lint configuration must not name \`{{ruleName}}\` while the \`{{plugin}}\` plugin stands outside every plugin list it hands out. Add \`{{plugin}}\` to that plugin list, or delete the rule. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

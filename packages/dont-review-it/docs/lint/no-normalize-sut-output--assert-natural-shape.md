@@ -1,89 +1,122 @@
+---
+description: "Disallow reshaping the value a fixture hands back, so an assertion is written against the shape the code under test produced rather than the shape the spec tidied it into"
+---
+
 # no-normalize-sut-output--assert-natural-shape
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-spec ファイルの中の fixture 宣言について、その fixture が返す被験体の由来を読む。
+Disallow reshaping the value a fixture hands back, so an assertion is written against the shape the code under test produced rather than the shape the spec tidied it into
 
-対象のファイルはファイル名の接尾辞で決める。既定は `.test.ts` と `.test.tsx` で、`specFileSuffixes` で差し替えられる。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-normalize-sut-output--assert-natural-shape.ts`](../../src/lint/oxlint/rules/no-normalize-sut-output--assert-natural-shape.ts)
 
-読む位置は 2 つある。ビルダ形式 `test.extend("name", factory)` の `return` に到達する式木と、オブジェクト形式 `test.extend({ name: (context, use) => use(subject) })` で `use` に渡る第一引数である。`expect.extend(...)` は綴りを共有するが fixture を宣言しないので、構造的に外れる。
+<!-- END GENERATED rule-header -->
 
-### 返却経路の中に立っている操作
+## Violation
 
-被験体の式木を丸ごと走査する。トップレベルにある必要はない。後段の変換に埋もれた形も、入れ子の呼び出し引数の中にある形も拾う。
+For a fixture declaration in a spec file, where the subject it hands back came from is read.
 
-語彙はカテゴリごとに持つ。メソッド名はこのルールが持ち、関数名は `normalizingFunctions` が持つ。
+The files in scope are settled by the file name suffix. The default is `.test.ts` and `.test.tsx`, replaceable through `specFileSuffixes`.
 
-| カテゴリ | メソッド名 | 関数名（既定） |
+Two positions are read: the expression tree reaching the `return` of the builder form `test.extend("name", factory)`, and the first argument reaching `use` in the object form `test.extend({ name: (context, use) => use(subject) })`. `expect.extend(...)` shares the spelling but declares no fixture and falls out structurally.
+
+### Operations standing on the way out
+
+The subject's whole expression tree is walked. Nothing has to be at the top level: a form buried under a later transform, and a form inside a nested call argument, are both picked up.
+
+The vocabulary is held per category. Method names are held by this rule, and function names by `normalizingFunctions`.
+
+| Category | Method names | Function names (default) |
 | --- | --- | --- |
-| 並べ替え | `sort` / `toSorted` | `sortBy` / `orderBy` |
-| 反転 | `reverse` / `toReversed` | なし |
-| 重複除去 | なし | `uniq` / `uniqBy` / `uniqWith` |
-| キー順の揃え直し | なし | なし |
-| 書式の統一 | `normalize` / `trim` / `trimStart` / `trimEnd` / `toLowerCase` / `toUpperCase` / `toLocaleLowerCase` / `toLocaleUpperCase` / `replace` / `replaceAll` | なし |
-| 反復畳み込みによる組み立て直し | `reduce` / `reduceRight` | `reduceAsync` |
+| Ordering | `sort` / `toSorted` | `sortBy` / `orderBy` |
+| Reversing | `reverse` / `toReversed` | None |
+| Dropping duplicates | None | `uniq` / `uniqBy` / `uniqWith` |
+| Realigning key order | None | None |
+| Unifying formatting | `normalize` / `trim` / `trimStart` / `trimEnd` / `toLowerCase` / `toUpperCase` / `toLocaleLowerCase` / `toLocaleUpperCase` / `replace` / `replaceAll` | None |
+| Rebuilding by folding | `reduce` / `reduceRight` | `reduceAsync` |
 
-2 つに分けているのは、依存によって変わるものと変わらないものが違うからである。メソッド名は言語が定める綴りなので、どの依存を採っても同じである。関数名はユーティリティ群の命名に従うので、依存が変われば変わる。標準の手段だけで書く方針を採れば、関数名の語彙は空になりメソッド名だけが残る。
+They are split in two because what changes with dependencies and what does not are different. Method names are spellings the language settles, so they are the same whichever dependency is taken. Function names follow a utility library's naming and change when the dependency does. Adopt a policy of writing with standard means alone and the function-name vocabulary empties, leaving the method names.
 
-キー順の揃え直しに専用の名前が無いのは、この依存構成に該当する関数が無いためである。この操作は `Object.entries(...)` を並べ替えて組み立て直す形で書かれるので、並べ替えの名前が受ける。
+Realigning key order has no dedicated name because no function in this dependency setup does it. That operation is written by ordering `Object.entries(...)` and rebuilding, so the ordering names catch it.
 
-`Object.assign` の第一引数に被験体が立つ呼び出しも、返却経路の中にあれば同じ扱いで報告する。返る値は書き換えられた第一引数そのものだからである。
+A call to `Object.assign` with the subject in the first argument is reported the same way where it stands on the way out, because what returns is the rewritten first argument itself.
 
-名前の読み方は、ドット記法・文字列リテラルのキーの角括弧記法・補間の無いテンプレートリテラルのキーを同じ名前として扱う。受け手がメソッドか名前空間かは区別しない。
+Names are read alike in dot notation, bracket notation with a string-literal key, and a template-literal key with no interpolation. Whether the receiver is a method or a namespace is not distinguished.
 
-走査は式木の全体に及ぶので、被験体そのものの由来だけでなく、コードへ渡す引数の位置に立つ名前の由来も辿る。spec に書かれた形で入力を正規化してから渡す形もこの読みに入る。
+The walk covers the whole expression tree, so it follows not only where the subject came from but also the origin of names standing in the argument positions handed to the code. Normalizing an input in a form written in the spec before handing it over enters this reading too.
 
-### 束縛と宣言を辿った先にある操作
+### Operations behind bindings and declarations
 
-被験体が名前に置かれていても、由来を辿る。辿るのは fixture 本体の `const` と `function` 宣言、およびそのファイル直下の `const` と `function` 宣言である。
+Even where the subject sits in a name, its origin is followed. What is followed is `const` and `function` declarations in the fixture body, and `const` and `function` declarations directly under that file.
 
-fixture の仮引数が束縛する名前ではそこで止まる。他の fixture から受け取る依存がここに入る。同じ綴りの束縛がファイル直下にあっても、受け取った値はその束縛ではないからである。宣言を辿った先でも同じで、辿り込んだ関数の仮引数が束縛する名前で止まる。
+A name bound by a fixture's parameter ends the walk there. A dependency received from another fixture lands here: even where a binding of the same spelling exists directly under the file, the value received is not that binding. The same holds inside a followed declaration, where a name bound by that function's parameter ends the walk.
 
-呼び出し先の名前が**このファイルの宣言**に解決できるなら、その宣言の返却経路に同じ判定を再帰的に適用する。辿るのは spec ファイルの中で閉じる範囲だけで、**ファイル境界を越えたらそこで止める**。
+Where a callee's name resolves to **a declaration in this file**, the same judgment is applied recursively to that declaration's return path. The walk covers only what closes inside the spec file and **stops at a file boundary**.
 
-境界をファイルに置くのは、別のファイルの中にある並べ替えや重複除去がそのファイルの契約だからである。spec がそれを呼ぶことは、整形された値を要求したという意味であって、spec が整形したという意味ではない。境界を越えて辿ると、順序非依存の正準形を作る関数や、重複を畳んで索引を作る関数を検証しているテストが、そのすべてで「fixture が出力を作り変えた」と報告される。fixture 側には直せるものが何も無いので、報告は指示として成立しない。
+The boundary is placed at the file because an ordering or a deduplication inside another file is that file's contract. A spec calling it means the spec demanded a shaped value, not that the spec shaped it. Cross the boundary and every test verifying a function that builds an order-independent canonical form, or one that folds duplicates into an index, gets reported as "the fixture reshaped the output". There is nothing the fixture side can fix, so the report does not hold as an instruction.
 
-判定に使うのは spec に書かれた綴りだけである。`sut(...).toSorted()` も `sortBy(sut(...))` も spec に立っているので報告する。`sortBy` の実装を読みに行く必要は無い。名前がこのルールの語彙にあれば、その場で決まる。
+Only the spelling written in the spec is used for the judgment. `sut(...).toSorted()` and `sortBy(sut(...))` both stand in the spec and are reported. There is no need to read `sortBy`'s implementation: where the name is in this rule's vocabulary, it settles on the spot.
 
-宣言を辿って見つけた操作は、辿る起点になった呼び出しまたは名前の位置で報告する。報告位置は必ず検査中のファイルの中に落ちる。
+An operation found by following a declaration is reported at the position of the call or the name that started the walk. The report position always lands inside the file being checked.
 
-### 返す前に走る破壊的な書き換え
+### Destructive rewrites running before the handover
 
-被験体が解決される束縛について、fixture 本体のうち被験体の式より前にある書き換えを見る。分岐やループの内側にあっても、被験体の式より前にあれば入る。被験体の式より後ろに走る処理は、アサーションが読む値に届かないので対象にしない。
+For the binding the subject resolves to, rewrites in the fixture body standing before the subject's expression are read. Inside a branch or a loop counts, as long as it stands before the subject's expression. Work running after the subject's expression does not reach the value the assertion reads and is out of scope.
 
-見る形は 3 つある。束縛またはその要素・プロパティに対する `add` / `clear` / `copyWithin` / `delete` / `fill` / `pop` / `push` / `reverse` / `set` / `shift` / `sort` / `splice` / `unshift` の呼び出し、プロパティへの代入と `delete`、そして `Object.assign` の第一引数に束縛が立っている形である。
+Three shapes are read: calls to `add`, `clear`, `copyWithin`, `delete`, `fill`, `pop`, `push`, `reverse`, `set`, `shift`, `sort`, `splice` or `unshift` on the binding or on its elements and properties; assignment to and `delete` of a property; and `Object.assign` with the binding in the first argument.
 
-### 意図的に広げていない範囲
+### Deliberately not widened
 
-| 形 | 対象にしない理由 |
+| Shape | Why it is left out |
 | --- | --- |
-| `it` 本体と `expect(...)` の中の正規化 | fixture の外にある。`require-it-only-expect--move-setup-into-fixture` と `no-expect-call-expression--yield-from-fixture` が引き受け、追い出された先で改めてこの読みに入る |
-| 返却経路の中に書かれた関数リテラルの本体 | 比較器やコードへ渡すコールバックが入る位置である。実行の有無と回数は呼び先が決めるので、被験体の形を作る位置ではない |
-| 実行時に決まる呼び先の名前 | 名前として読めない。`no-computed-callee-name--write-name-literally` が別途落とす |
-| spec の中で新しく組み立てたコレクション | 返却値の由来が構築になる。`no-fixture-construct-in-use--yield-sut-output` が引き受ける |
-| 束縛を別の関数へ渡し、その中で書き換える形 | 呼び先の仮引数がその束縛と同じ値かどうかを追わない |
-| 依存パッケージの中の宣言 | 読みに行かない。名前だけで判定する |
-| 入れ子の分割代入で受け取った依存 | `({ report: { rows } }) => ...` のように取り出した名前は、依存の名前として読めない。同じ綴りの束縛がファイル直下にあると、そちらの由来を辿ってしまう |
+| Normalization inside an `it` body or inside `expect(...)` | Outside the fixture. [require-it-only-expect--move-setup-into-fixture](./require-it-only-expect--move-setup-into-fixture.md) and [no-expect-call-expression--yield-from-fixture](./no-expect-call-expression--yield-from-fixture.md) take them, and once evicted the result enters this reading afresh |
+| The body of a function literal written on the way out | That position holds comparators and callbacks handed to the code. Whether and how often it runs is settled by the callee, so it is not a position that shapes the subject |
+| A callee name settled at run time | It cannot be read as a name. `no-computed-callee-name--write-name-literally` drops it separately |
+| A collection newly assembled in the spec | The returned value's origin becomes construction. [no-fixture-construct-in-use--yield-sut-output](./no-fixture-construct-in-use--yield-sut-output.md) takes it |
+| Handing a binding to another function and rewriting inside it | Whether the callee's parameter is the same value as that binding is not followed |
+| A declaration inside a dependency package | Not read. The judgment runs on names alone |
+| A dependency received through a nested destructuring | A name taken out as in `({ report: { rows } }) => ...` cannot be read as the dependency's name. Where a binding of the same spelling exists directly under the file, that one's origin gets followed instead |
 
-依存パッケージの中と、束縛を別の関数へ渡す形は、実装の都合ではなくこの読みが持たない情報である。届かないことは許していることを意味しないので、禁じる回避策の節に名前を挙げてある。
+The inside of a dependency package, and handing a binding to another function, are information this reading does not hold rather than conveniences of the implementation. Not reaching does not mean it is allowed, so they are named in the forbidden bypasses section.
 
-「その手続きが並べ替えであるかどうか」という意味の判定も行わない。任意の手続きが置換と順序関係を満たすかは実行してみるまで決まらないからである。ただしこの問いに答えられなくても検出は成立する。守っているのは「fixture が返す形が SUT の出した形であること」であって、「その手続きが並べ替えであること」ではない。手続きで書いた正規化は必ず 3 つの形のどれかを取り、いずれも塞がっている。語彙にある呼び出しを使う形はこのルールが、spec の中で新しいコレクションを組み立てる形は構築のルールが、SUT 出力そのものを書き換える形は上の破壊的な書き換えの条件が落とす。
+The meaning question "is that procedure an ordering" is not answered either, because whether an arbitrary procedure is a permutation preserving an order relation is not settled until it runs. The detection holds without answering it: what is protected is "the shape a fixture returns is the shape the code produced", not "that procedure is an ordering". Normalization written as a procedure always takes one of three shapes, and all three are closed. Using a call in the vocabulary falls to this rule; assembling a new collection in the spec falls to the construction rule; and rewriting the subject under test's output itself falls to the destructive-rewrite condition above.
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「fixture が返す被験体は、コードが実際に生成した形そのものである」ことである。
+The subject a fixture hands back is the shape the code actually produced.
 
-並べ替えてから比較しているという事実自体が、アサーションの形と契約の形がずれている証拠になる。ずれ方は 2 通りしかない。
+That something is ordered before being compared is itself evidence that the assertion's shape and the contract's shape have drifted. There are only two ways they drift.
 
-順序が契約の一部である場合、SUT が出す順序をそのまま突き合わせるべきである。並べ替えは、コードが満たさねばならない正確な形を消してしまう。順序が契約でない場合、そもそもコレクション全体の等値比較が誤りで、要素ごとの事実・所属・射影した特定のプロパティを見るべきである。
+Where order is part of the contract, the order the subject under test emits should be compared as it stands; ordering erases the exact shape the code has to satisfy. Where order is not the contract, comparing the whole collection for equality was wrong to begin with, and what should be read is a per-element fact, membership, or a specific projected property.
 
-どちらであっても、fixture 内の正規化はこのズレを隠したまま緑にする。テストが主張するのは「作者が決めた正規化の後の形」になり、本来の不変条件はどこにも書かれていない状態になる。並べ替え以外の正規化も、比較の前に形へ手を入れるという点で同じ性質を持つ。
+Either way, normalization inside a fixture hides the drift and stays green. What the test claims becomes "the shape after the normalization its author chose", and the real invariant is written nowhere.
 
-壊れ方はもう 1 層ある。正規化が入った時点で、そのアサーションは失敗しなくなる方向へ動く。落ちないテストは、収集されるどの信号でも通っているテストと区別が付かない。カバレッジは実行が到達したことしか見ないからである。
+There is one more layer. The moment normalization is inserted, that assertion moves toward never failing. A test that does not fail cannot be told apart from a passing test by any signal collected, because coverage sees only that execution reached it.
 
-## どう直すか
+### Configuration
 
-順序が契約なら、fixture は生の出力を返し、`it` 側で期待する順序を直接ピンする。
+`specFileSuffixes` and `normalizingFunctions`.
+
+`specFileSuffixes` defaults to `.test.ts` and `.test.tsx`, sharing one range with the other rules of this bundle.
+
+`normalizingFunctions` defaults to `orderBy`, `reduceAsync`, `sortBy`, `uniq`, `uniqBy`, `uniqWith`, and naming it replaces the default. That list is in the configuration because the names depend on a utility library's naming. The method names are not exposed: spellings the language settles do not vary with the dependency setup, and making them removable would let a respelling get past this rule.
+
+### Where the detection does not reach
+
+**Normalization inside a function placed in another file.** Where a spec writes `tidy(sut(...))` and `tidy` orders in `./tidy.ts`, this rule does not report it. That is the price of placing the boundary at the file.
+
+The price is paid because what is lost by crossing it is greater. Cross the boundary and every test verifying a function that builds an order-independent canonical form, one that folds duplicates into an index, or one that drops whitespace to read a value, gets reported. What those tests verify is precisely that ordering or that deduplication. There is nothing the reported side can fix, and the only way to comply is "do not call that function". A rule that does not hold as an instruction is worse than a rule with one way out left.
+
+Whether that way out was actually used can be read from the spec. A fixture returning a value after passing it through a function other than the subject under test is visible to the eye and is something review picks up. That is not "sending to review what a mechanism could catch"; it names what lies outside the mechanism's boundary.
+
+## Fix
+
+Where order is the contract, have the fixture return the raw output and pin the expected order directly on the `it` side.
 
 ```ts
 const test = baseTest.extend("suffixes", () =>
@@ -95,7 +128,7 @@ test("keeps the configured suffixes in the order they were written", ({ suffixes
 });
 ```
 
-順序が契約でないなら、順不同であることをアサーション側で表現する。要素ごとに `it` を分ける、個々の期待値の所属を見る、実測値と期待値の双方を集合に包んで内容比較する、といった形になる。
+Where order is not the contract, express the order-independence on the assertion side: split into an `it` per element, read the membership of each expected value, or wrap both the measured and the expected value in a set and compare contents.
 
 ```ts
 const test = baseTest.extend("names", () => normalizingFunctionsFrom([]));
@@ -107,31 +140,71 @@ test("carries every function name the vocabulary starts with", ({ names }) => {
 });
 ```
 
-返す前に書き換えていた場合は、書き換えが準備していた主張をアサーションの側に書く。書き換えが必要に見えるのは、たいてい 1 つの fixture が複数の面を持たされているときなので、fixture を面ごとに分けると書き換えは消える。
+Where it was rewritten before being handed over, write the claim the rewrite was preparing on the assertion side. A rewrite usually looks necessary when one fixture has been given several faces, so splitting the fixture per face makes the rewrite disappear.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- 正規化を spec ファイルの中の別名の関数に押し出す。同一ファイルの宣言は辿るので、押し出しても報告される。そもそもその形は [no-spec-file-helper-function--inline-or-use-fixture](./no-spec-file-helper-function--inline-or-use-fixture.md) が別に報告する
-- SUT 出力を破壊的に書き換えてから素のまま返し、返却経路の式木から正規化を消す。返却値に解決される束縛への書き換えも見る
-- 正規化を手続き（ループ、畳み込み、自前の走査）で書き直して語彙から外す。新しいコレクションを組み立てる形は fixture の中での構築として落ちる
-- 「順不同だから」を理由に並べ替えてから全体等値比較する。これは順不同契約の表現ではない
-- 束縛を別の関数へ渡し、その中で書き換えてから返す。この読みからは消えるが、アサーションが受け取るのは書き換えられた値のままである
-- 正規化を依存パッケージへ移し、語彙に載っていない名前で公開する。依存の中は読まないので報告は消えるが、被験体が加工されていることは変わらない
-- `normalizingFunctions` から名前を外して語彙を空にする
-- 抑制ディレクティブ
+Code this rule rejects.
 
-## 検出が届かない範囲
+```ts
+// ordering the produced collection reshapes it on the way out
+// in report.test.ts
+const test = baseTest.extend("rows", () => summarise(input).sort());
+```
 
-**別のファイルに置いた関数の中の正規化。** spec が `tidy(sut(...))` と書き、`tidy` が `./tidy.ts` で並べ替えているなら、この規則は報告しない。境界をファイルに置いた代償である。
+```ts
+// ordering the binding in place rewrites the value before it is handed back
+// in report.test.ts
+const test = baseTest.extend("rows", () => {
+  const produced = summarise(input);
+  produced.sort();
+  return produced;
+});
+```
 
-代償を払う理由は、越えたときに失うもののほうが大きいからである。境界を越えて辿ると、順序非依存の正準形を作る関数、重複を畳んで索引を作る関数、空白を落として値を読む関数を検証しているテストが、そのすべてで報告される。それらのテストが検証しているのは、まさにその並べ替えや重複除去そのものである。報告された側に直せるものは無く、唯一の従い方は「その関数を呼ばない」になる。規則が指示として成立しない状態は、抜け道が 1 つ残る状態より悪い。
+Code this rule accepts.
 
-この抜け道が実際に使われたかどうかは、spec を読めば分かる。fixture が SUT 以外の関数を通してから値を返している形は目で見えるので、レビューで拾う対象になる。これは「機構で落とせるものをレビューに回す」ことではなく、機構の境界の外にあるものを名指ししている。
+```ts
+// a fixture that hands back the call under test hands back what the code produced
+// in report.test.ts
+const test = baseTest.extend("rows", () => summarise(input));
+```
 
-## オプション
+```ts
+// an operation another module writes inside its own body is that module's own shape
+import { ordered } from "./shape.ts";
+const test = baseTest.extend("rows", () => ordered(summarise(input)));
+```
 
-`specFileSuffixes` と `normalizingFunctions` を取る。
+<!-- END GENERATED examples -->
 
-`specFileSuffixes` の既定は `.test.ts` と `.test.tsx` で、この群の他のルールと同じ範囲を共有する。
+### Forbidden bypasses (do not do this)
 
-`normalizingFunctions` の既定は `orderBy` / `reduceAsync` / `sortBy` / `uniq` / `uniqBy` / `uniqWith` で、指定すると既定を置き換える。この一覧が設定に出ているのは、名前がユーティリティ群の命名に依存するからである。メソッド名の側は設定に出さない。言語が定める綴りは依存構成によって変わらず、外せるようにすると綴りを言い換えるだけでこのルールを通せるようになる。
+- Pushing the normalization into a differently named function inside the spec file. Declarations in the same file are followed, so it is still reported. That shape is separately reported by [no-spec-file-helper-function--inline-or-use-fixture](./no-spec-file-helper-function--inline-or-use-fixture.md) anyway
+- Rewriting the subject under test's output destructively and returning it bare, so the return path's expression tree holds no normalization. Rewrites of the binding the return value resolves to are read too
+- Rewriting the normalization as a procedure (a loop, a fold, a hand-written walk) to leave the vocabulary. Assembling a new collection falls as construction inside a fixture
+- Ordering "because it is unordered" and then comparing the whole thing for equality. That is not an expression of an unordered contract
+- Handing the binding to another function, rewriting inside it and returning. It disappears from this reading, and the assertion still receives the rewritten value
+- Moving the normalization into a dependency package and publishing it under a name absent from the vocabulary. The inside of a dependency is not read so the report clears, and the subject is still processed
+- Emptying the vocabulary by removing names from `normalizingFunctions`
+- A suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `normalizedSubject` | A fixture must not reshape the value the code under test produced before handing it back. \`{{operation}}\` reshapes it on the way out. Return the produced value untouched, and state the claim about order, duplication or formatting in the assertion itself: give each element its own \`it\`, assert that each expected element belongs to the collection, or wrap both sides in a set before comparing them. |
+| `normalizedBehindName` | A fixture must not reshape the value the code under test produced before handing it back. \`{{name}}\` reaches \`{{operation}}\` on the way out. Return the produced value untouched, and state the claim about order, duplication or formatting in the assertion itself: give each element its own \`it\`, assert that each expected element belongs to the collection, or wrap both sides in a set before comparing them. |
+| `mutatedSubject` | A fixture must not write over the value the code under test produced before handing it back. {{operation}} rewrites \`{{subject}}\` on the way out. Keep the produced value untouched, and state what this rewriting was preparing for in the assertion itself. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

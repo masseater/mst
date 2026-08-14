@@ -1,65 +1,91 @@
+---
+description: "Require every test block declaration to be rooted at one configured spelling, so a scan of the test surface settles what an identifier means without reading the block behind it"
+---
+
 # require-test-block-spelling--use-configured-fn
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-テストブロックの宣言のうち、その根にある識別子が正の綴りでないもの。既定の正の綴りは `it`。
+Require every test block declaration to be rooted at one configured spelling, so a scan of the test surface settles what an identifier means without reading the block behind it
 
-根は、テストブロックの修飾子を再帰的にたどって得る。修飾子として扱うのは `concurrent` / `each` / `fails` / `for` / `only` / `runIf` / `sequential` / `shuffle` / `skip` / `skipIf` / `todo` の 11 個で、`extend` は含まない。呼び出し式とタグ付きテンプレートの双方を見る。
+- Tool: `oxlint`
+- Fixable: yes
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`require-test-block-spelling--use-configured-fn.ts`](../../src/lint/oxlint/rules/require-test-block-spelling--use-configured-fn.ts)
 
-報告と修正は根の識別子 1 箇所だけに出る。修飾子を何段重ねても 1 件。
+<!-- END GENERATED rule-header -->
 
-対象になる形。
+## Violation
 
-| 形                                       | 例                                             |
-| ---------------------------------------- | ---------------------------------------------- |
-| 裸の呼び出し                             | `test("names a behaviour", () => {});`         |
-| 修飾子メンバ経由                         | `test.skip("names a behaviour", () => {});`    |
-| 修飾子の重ね掛け                         | `test.skipIf(slow).concurrent("...", fn);`     |
-| 表駆動の修飾子が返す関数の呼び出し       | `test.each(rows)("...", (row) => {});`         |
-| そのタグ付きテンプレート表記             | ``test.each`a \| b`;``                         |
-| コールバックを取らない宣言形             | `test.todo("names a behaviour");`              |
-| 静的に名前が決まる添字アクセス           | `test["skip"]("names a behaviour", () => {});` |
-| グルーピングブロックの中にネストした宣言 | `describe("...", () => { test("...", fn); });` |
+A test block declaration whose root identifier is not the required spelling. The required spelling is `it` by default.
 
-根が「テストランナー由来のテストブロック宣言」かどうかは、名前だけでは決めない。スコープをたどって束縛を解決してから決める。
+The root is obtained by following the test block's modifiers recursively. Eleven things count as modifiers — `concurrent`, `each`, `fails`, `for`, `only`, `runIf`, `sequential`, `shuffle`, `skip`, `skipIf`, `todo` — and `extend` is not among them. Both call expressions and tagged templates are read.
 
-1. 束縛が見つからない識別子は、ランナーがグローバル注入した綴り（`it` と `test`）であればテストブロック宣言とみなす
-2. `runnerModules` に挙げたモジュールから `it` / `test` を import した束縛。リネーム import も含む
-3. 上記のいずれか、または `.extend(...)` の結果で初期化された束縛。再束縛は何段でもたどる
+The report and the repair land on the root identifier alone. However many modifiers are stacked, it is one report.
 
-2 と 3 に当たる束縛は、束縛名が正の綴りでなければ報告する。`import { it as spec } from "vitest";` の `spec(...)` や、`const derived = test.extend({ subject: 1 });` の `derived(...)` がここに落ちる。
+The shapes in range.
 
-### 意図的に広げていない範囲
-
-| 形 | 対象にしない理由 |
+| Shape | Example |
 | --- | --- |
-| `test.extend({ subject: 1 })` | fixture ファクトリであってテストブロックの宣言ではない。`extend` を修飾子として扱わないので根に到達しない |
-| `it.extend({ subject: 1 })` | 同上。`it` を土台にしてよいかは `forbid-it-extend--use-test-extend` が持つ |
-| `it(...)` / `it.skip(...)` / `it["skip"](...)` | 正の綴りで書かれている |
-| `test[chosen]("...", fn)` | どの修飾子に解決されるかが実行時にしか決まらない。名前としては判定しない。形そのものは `no-computed-test-api-member--use-static-member` が落とす |
-| `suite.test("...", fn)` | レシーバを持つ同名メソッドの呼び出し |
-| `const it = test.extend({ subject: 1 });` | 正の綴りに束縛された派生ビルダー。規約どおりの形 |
-| `describe(...)` / `import { describe as group }` | テストブロック以外の宣言 API |
-| `const run = (test) => { test("...", fn); };` | 引数に束縛された識別子。ランナーの API には解決されない |
-| `import { test as spec } from "./helpers.ts";` | `runnerModules` にないモジュールからの import |
+| A bare call | `test("names a behaviour", () => {});` |
+| Through a modifier member | `test.skip("names a behaviour", () => {});` |
+| Modifiers stacked | `test.skipIf(slow).concurrent("...", fn);` |
+| A call on the function a table modifier returns | `test.each(rows)("...", (row) => {});` |
+| Its tagged template spelling | ``test.each`a \| b`;`` |
+| A declaration taking no callback | `test.todo("names a behaviour");` |
+| A subscript whose name is settled statically | `test["skip"]("names a behaviour", () => {});` |
+| A declaration nested inside a grouping block | `describe("...", () => { test("...", fn); });` |
 
-ファイル名による絞り込みはしない。このルールはファイル名のポリシーを持たず、どのファイルに効かせるかは共有 lint 設定の glob が決める。
+Whether the root is "a test block declaration coming from the test runner" is not settled by name alone. The scope is followed and the binding resolved first.
 
-## なぜそれが要るか
+1. An identifier whose binding is not found counts as a test block declaration where it is one of the spellings the runner injects globally (`it` and `test`)
+2. A binding importing `it` / `test` from a module listed in `runnerModules`. A renamed import is included
+3. A binding initialised with any of the above, or with the result of `.extend(...)`. Rebindings are followed through any number of steps
 
-守っている不変条件は「名前と役割が 1 対 1 に対応している」ことである。`it` はテストブロックの宣言だけを意味し、`test` は fixture ファクトリの土台だけを意味する。
+A binding falling under 2 or 3 is reported where the binding's name is not the required spelling. The `spec(...)` of `import { it as spec } from "vitest";` and the `derived(...)` of `const derived = test.extend({ subject: 1 });` fall here.
 
-壊れ方は 2 層ある。
+### Deliberately not widened
 
-1 層目は、走査する側が分岐を抱えることである。スイートを機械で走査するのは人だけではない。他の lint ルール、codemod、grep、IDE の一括リネームが、識別子を見ただけで役割を確定できる状態に乗っている。2 綴りが混在した瞬間、その全員が「両方を見る」コストを負う。
+| Shape | Why it is left out |
+| --- | --- |
+| `test.extend({ subject: 1 })` | It is a fixture factory, not a test block declaration. `extend` is not treated as a modifier, so the root is never reached |
+| `it.extend({ subject: 1 })` | As above. Whether `it` may be the base belongs to [forbid-it-extend--use-test-extend](./forbid-it-extend--use-test-extend.md) |
+| `it(...)` / `it.skip(...)` / `it["skip"](...)` | Written with the required spelling |
+| `test[chosen]("...", fn)` | Which modifier it resolves to is settled only at run time. It is not judged as a name. The shape itself is dropped by [no-computed-test-api-member--use-static-member](./no-computed-test-api-member--use-static-member.md) |
+| `suite.test("...", fn)` | A call of a same-named method carrying a receiver |
+| `const it = test.extend({ subject: 1 });` | A derived builder bound to the required spelling. The agreed shape |
+| `describe(...)` / `import { describe as group }` | A declaration API that is no test block |
+| `const run = (test) => { test("...", fn); };` | An identifier bound to a parameter. It resolves to no API of the runner |
+| `import { test as spec } from "./helpers.ts";` | An import from a module absent from `runnerModules` |
 
-2 層目は、その分岐が書かれないことである。書かれなければ片方の綴りは変換から漏れる。漏れたことは変換が失敗した形では現れない。テストは緑のまま、片方だけが古い形で残る。気付くのは、その古い形に触る必要が出た次の誰かである。
+There is no narrowing by file name. This rule holds no policy about file names, and which files it holds for is settled by the shared lint configuration's glob.
 
-テストランナー系プラグインが提供する綴り統一ルールはこの用途に使えない。あれは `test.extend` を `test` 系の呼び出しとして数えて報告するので、fixture ファクトリを `test.extend` に寄せる規約と正面から衝突する。このルールはその隙間だけを埋める。
+### The invariant
 
-## どう直すか
+What is held is that names and roles correspond one to one. `it` means the declaration of a test block and nothing else; `test` means the base of a fixture factory and nothing else.
 
-根の識別子を正の綴りへ置換する。`it` と `test` はランナーの同一 API なので、置換で挙動は変わらない。
+The breakage has two layers.
+
+The first is that whoever walks the suite carries a branch. People are not the only ones walking a suite by machine. Other lint rules, codemods, grep and an IDE's bulk rename all stand on a state where a role is settled by looking at the identifier. The moment two spellings mix, every one of them takes on the cost of "reading both".
+
+The second is that the branch does not get written. Unwritten, one of the spellings escapes the transformation. Having escaped shows up in no shape resembling a failed transformation. The tests stay green and one side stays in the old shape. Whoever notices is the next person who has to touch that old shape.
+
+The spelling-unification rule the test runner's plugin ships cannot be used for this purpose. It counts `test.extend` as a `test`-family call and reports it, colliding head-on with the convention of putting fixture factories on `test.extend`. This rule fills exactly that gap.
+
+### Configuration
+
+| Option | Default | What it settles |
+| --- | --- | --- |
+| `blockSpelling` | `"it"` | The required spelling |
+| `runnerModules` | `["vitest", "vite-plus/test"]` | The import sources treated as the test runner |
+
+Where `blockSpelling` is moved off its default, it has to share the value with the neighbouring rules that identify `it` blocks. Let the settings split and the neighbouring rules lose sight of their subject and go quiet the moment the spelling changes.
+
+## Fix
+
+Replace the root identifier with the required spelling. `it` and `test` are the same API of the runner, so the replacement changes no behaviour.
 
 ```ts
 it("counts what the parser reached", () => {});
@@ -67,9 +93,9 @@ it.skip("counts what the parser reached", () => {});
 it.each(rows)("counts what the parser reached", (row) => {});
 ```
 
-グローバル注入された綴りで書かれている場合は自動修正が付く。
+Where it is written with a globally injected spelling, an automatic fix comes with it.
 
-リネーム import や別名の派生ビルダーで宣言していた場合は、束縛名そのものを正の綴りへ揃える。
+Where the declaration went through a renamed import or a derived builder under another name, level the binding's own name to the required spelling.
 
 ```ts
 const it = test.extend({ subject: 1 });
@@ -77,20 +103,60 @@ const it = test.extend({ subject: 1 });
 it("counts what the parser reached", ({ subject }) => {});
 ```
 
-こちらは宣言と参照の両方を書き換える必要があるため、自動修正は出さない。
+That side needs both the declaration and the references rewritten, so no automatic fix is offered.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- 添字アクセスへ書き換えて名前の判定を外す（`test[chosen](...)`）。このルールの判定からは外れるが、`no-computed-test-api-member--use-static-member` が形として落とす
-- 一度別の名前へ受け直してから宣言する（`const spec = test;`）。束縛の初期化子をたどるので根は変わらない
-- 派生ビルダーを経由させる（`const spec = test.extend({ subject: 1 });`）。`.extend` の土台まで下りるので同じところに落ちる
-- 抑制ディレクティブ
+Code this rule rejects.
 
-## オプション
+```ts
+// a bare block declared with the other injected spelling is reported and renamed
+test("names a behaviour", () => {});
+```
 
-| オプション      | 既定値                         | 何を決めるか                       |
-| --------------- | ------------------------------ | ---------------------------------- |
-| `blockSpelling` | `"it"`                         | 正の綴り                           |
-| `runnerModules` | `["vitest", "vite-plus/test"]` | テストランナーとして扱う import 元 |
+```ts
+// a derived builder bound to another name is reported at the binding
+const spec = test.extend({ subject: 1 });
+spec("names a behaviour", () => {});
+```
 
-`blockSpelling` を既定から変える場合、`it` ブロックを識別する隣接ルールと同じ値を共有しなければならない。設定が分かれると、綴りを変えた瞬間に隣接ルールが対象を見失って黙る。
+Code this rule accepts.
+
+```ts
+// a block declared with the required spelling is the form this rule asks for
+it("names a behaviour", () => {});
+```
+
+```ts
+// a derived builder bound to the required spelling is the agreed form
+const it = test.extend({ subject: 1 });
+it("names a behaviour", () => {});
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Rewriting it as a subscript to slip the name judgment (`test[chosen](...)`). It falls out of this rule's judgment, and [no-computed-test-api-member--use-static-member](./no-computed-test-api-member--use-static-member.md) drops the shape
+- Receiving it into another name first and declaring from there (`const spec = test;`). A binding's initialiser is followed, so the root does not change
+- Going through a derived builder (`const spec = test.extend({ subject: 1 });`). It descends to the base of the `.extend`, so it lands in the same place
+- A suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `foreignBlockSpelling` | A test block must not be declared through \`{{written}}\`. Rename the root of this declaration to \`{{required}}\`. |
+| `foreignBlockBinding` | A test block must not be declared through the binding \`{{written}}\`. Rename that binding to \`{{required}}\` at its declaration and at every reference to it. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

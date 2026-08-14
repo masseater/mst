@@ -1,21 +1,38 @@
+---
+description: "Disallow an external snapshot whose recorded value fits within the shared inline budget, so where a recorded value lives follows from its size rather than from the taste of whoever wrote the assertion"
+---
+
 # no-undersized-external-snapshot--use-inline-snapshot
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-外部スナップショットを記録するマッチャの呼び出しのうち、対応する記録値の内容行数が共有の上限以下のもの。既定の上限は 12 行。
+Disallow an external snapshot whose recorded value fits within the shared inline budget, so where a recorded value lives follows from its size rather than from the taste of whoever wrote the assertion
 
-対象のマッチャは `toMatchSnapshot` / `toThrowErrorMatchingSnapshot` / `matchSnapshot` の 3 つ。いずれもディスク上の記録ファイル（`__snapshots__/<spec ファイル名>.snap`）にエントリを書く。
+- Tool: `oxlint`
+- Fixable: yes
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-undersized-external-snapshot--use-inline-snapshot.ts`](../../src/lint/oxlint/rules/no-undersized-external-snapshot--use-inline-snapshot.ts)
 
-### 記録値をどう引くか
+<!-- END GENERATED rule-header -->
 
-記録ファイルのキーは、囲んでいるブロックのタイトルを `>` で連ねたものに、末尾の連番を足した形になっている。スナップショットヒントを渡した呼び出しでは、ヒントが連番の直前にもう 1 段のタイトルとして入る。
+## Violation
+
+A call to a matcher that records an external snapshot, where the recorded value it corresponds to holds no more content lines than the shared budget. The budget is 12 lines by default.
+
+Three matchers are in scope: `toMatchSnapshot`, `toThrowErrorMatchingSnapshot` and `matchSnapshot`. Each writes an entry into a record file on disk (`__snapshots__/<spec file name>.snap`).
+
+### How the recorded value is looked up
+
+A key in the record file is the titles of the enclosing blocks strung together with `>`, followed by a running number. For a call handed a snapshot hint, the hint enters as one more title stage just before the number.
 
 ```
 exports[`outer > names a behaviour 1`] = `"alpha"`;
 exports[`outer > names a behaviour > the hint 1`] = `"beta"`;
 ```
 
-連番は、テストランナーがスナップショット状態を通すマッチャすべてを数える。インライン記録もファイル出力の記録も同じカウンタを進めるため、同じテスト内に先行するインライン記録があると、後続の外部記録の番号がその分だけ後ろにずれる。
+The running number counts every matcher the test runner passes snapshot state through. Inline records and file records advance the same counter, so an inline record standing earlier in the same test pushes the number of a later external record along by that much.
 
 ```ts
 it("names a behaviour", () => {
@@ -24,67 +41,78 @@ it("names a behaviour", () => {
 });
 ```
 
-この `toMatchSnapshot` が引くのは `outer > names a behaviour 2` である。ヒント付きの呼び出しは別のキーの並びを持つので、ヒントなしの呼び出しとは連番を共有しない。
+That `toMatchSnapshot` looks up `outer > names a behaviour 2`. A hinted call carries its own run of keys, so it shares no numbering with an unhinted call.
 
-### タイトルの読み方
+### How titles are read
 
-ブロックの認識は呼び先の名前ではなく形で行う。第 1 引数が静的に読める文字列で、末尾の引数が関数である呼び出しをタイトルの 1 段として数える。グルーピングブロックもテストブロックも同じ形なので、両方が同じ規則でキーに入る。修飾子を重ねた宣言もこの形を保つ。
+A block is recognised by its shape rather than by the name it is called on. A call whose first argument is a statically readable string and whose last argument is a function counts as one title stage. A grouping block and a test block have the same shape, so both enter the key by the same rule. A declaration carrying modifiers keeps that shape.
 
-表駆動の宣言（`.each` / `.for`）は、表が配列リテラルで、その各ケースが静的に読める値だけでできているとき、ケースごとのタイトルを組み立てて解決する。組み立てに使える置換は次のとおり。
+A table-driven declaration (`.each` / `.for`) is resolved by building each case's title, when the table is an array literal and every case is made of statically readable values. These are the substitutions available.
 
-| 置換  | 何に置き換わるか                                   |
-| ----- | -------------------------------------------------- |
-| `%s`  | ケースの値をそのまま（文字列は引用符なし）         |
-| `%d`  | ケースの数値                                       |
-| `%i`  | ケースの数値を整数に切り詰めたもの                 |
-| `%#`  | 0 から数えたケース番号                             |
-| `%$`  | 1 から数えたケース番号                             |
-| `%%`  | 1 個の `%`                                         |
-| `$名` | オブジェクトのケースが持つ値（文字列は引用符付き） |
-
-### 解決できない呼び出し
-
-次の形は記録値を測れないので、測れないこと自体を報告する。
-
-| 形                                       | 例                                            |
-| ---------------------------------------- | --------------------------------------------- |
-| タイトルが実行時の値から作られる         | ``it(`names ${behaviour}`, fn)``              |
-| 表が実行時に決まる                       | `it.each(rows)("scalar %s", fn)`              |
-| ヒントが実行時に決まる                   | `expect(subject).toMatchSnapshot(chosenHint)` |
-| 呼び出しがループの中にある               | `for (const value of rows) { ... }`           |
-| 呼び出しが分岐の中にある                 | `if (ready) { ... }`                          |
-| 呼び出しが入れ子のコールバックの中にある | `rows.forEach((value) => { ... })`            |
-
-ループ・分岐・入れ子のコールバックは、ソース上の出現順と実行順が一致しない。同じテストの中でそうした呼び出しより後ろにある呼び出しも、連番が確定しないので同じく報告する。
-
-### 違反とみなさないもの
-
-| 形 | 対象にしない理由 |
+| Substitution | What it stands for |
 | --- | --- |
-| 記録ファイルがまだ無い spec | 測る対象が無い |
-| 解決したキーが記録ファイルに無い | 測る対象が無い |
-| 上限を超える大きさの外部記録 | それが正しい置き場所 |
-| インライン記録 | `no-oversized-inline-snapshot--use-external-snapshot` の担当 |
-| ファイル出力の記録（`toMatchFileSnapshot`） | 記録ファイルにエントリを持たない。連番だけ進める |
-| どのテストブロックにも囲まれていない呼び出し | キーが立たない。`no-expect-outside-it--move-into-it-block` の担当 |
-| 表駆動でケースの一部しか記録されていない | 全ケースが揃うまで大きさを比べられない |
-| 置換や値が上表の範囲を外れた表駆動 | タイトルを組み立てられない。書き手の書き方ではなくこのルールの範囲の問題 |
+| `%s` | The case's value as written (a string without quotes) |
+| `%d` | The case's number |
+| `%i` | The case's number truncated to an integer |
+| `%#` | The case index counted from zero |
+| `%$` | The case index counted from one |
+| `%%` | One `%` |
+| `$name` | A value the object case carries (a string with quotes) |
 
-スナップショットを使ってよいかどうかは見ない。それは `no-scalar-snapshot--assert-exact-value` と `require-non-snapshot-assertion--assert-behavior-explicitly` の担当で、このルールは「使うと決まった値をどこに置くか」だけを決める。
+### A call that cannot be resolved
 
-## なぜそれが要るか
+These shapes leave the recorded value unmeasurable, so the fact that it cannot be measured is itself reported.
 
-守っている不変条件は「記録値が、それをピンするアサーションの隣で読める」ことである。
+| Shape | Example |
+| --- | --- |
+| A title built from a value settled at run time | ``it(`names ${behaviour}`, fn)`` |
+| A table settled at run time | `it.each(rows)("scalar %s", fn)` |
+| A hint settled at run time | `expect(subject).toMatchSnapshot(chosenHint)` |
+| A call standing inside a loop | `for (const value of rows) { ... }` |
+| A call standing inside a branch | `if (ready) { ... }` |
+| A call standing inside a nested callback | `rows.forEach((value) => { ... })` |
 
-外部ファイルにある記録値はアサーションからは見えない。値が小さいとき、この分離は何も買わない。`it` ブロックだけを読んでも何を検証しているか分からず、読み手は記録ファイルを開いてキーを手で突き合わせることになる。この突き合わせは人間だけの負担ではない。キーはタイトルの連結と連番でできているので、タイトルを 1 語変えるだけで対応が切れる。
+In a loop, a branch and a nested callback, the order on the page does not match the order at run time. A call standing after one of those inside the same test is reported as well, because its number is no longer settled.
 
-逆向きのコストは `no-oversized-inline-snapshot--use-external-snapshot` が引き受ける。2 本で 1 つの上限を挟むことで、置き場所は値の大きさだけの関数になり、書き手の判断が入らなくなる。上限は両方向に効く単一の定数なので、片方だけを都合よく緩めることはできない。
+### Deliberately not widened
 
-上限の 12 行は、このリポジトリの spec を数えて決めた。`it` の本体は中央値 1 行、上位 10% でも 6 行である。`require-it-only-expect--move-setup-into-fixture` が `it` をアサーションだけに保つので、この分布は今後も大きくは動かない。記録値がその倍を超えると、ブロックの中身の大半が記録値になり、何を主張しているかが記録値に埋もれる。
+| Shape | Why it is left out |
+| --- | --- |
+| A spec carrying no record file yet | There is nothing to measure |
+| A resolved key the record file does not hold | There is nothing to measure |
+| An external record larger than the budget | That is the right place for it |
+| An inline record | That belongs to [no-oversized-inline-snapshot--use-external-snapshot](./no-oversized-inline-snapshot--use-external-snapshot.md) |
+| A file record (`toMatchFileSnapshot`) | It holds no entry in the record file. It only advances the number |
+| A call enclosed by no test block | No key stands. That belongs to [no-expect-outside-it--move-into-it-block](./no-expect-outside-it--move-into-it-block.md) |
+| A table-driven declaration only some of whose cases are recorded | Sizes cannot be compared until every case is there |
+| A table-driven declaration whose substitutions or values fall outside the table above | The title cannot be built. That is this rule's range falling short, not the writer's spelling |
 
-## どう直すか
+Whether a snapshot may be used at all is not read here. That belongs to [no-scalar-snapshot--assert-exact-value](./no-scalar-snapshot--assert-exact-value.md) and [require-non-snapshot-assertion--assert-behavior-explicitly](./require-non-snapshot-assertion--assert-behavior-explicitly.md); this rule only settles where a value already decided on goes.
 
-マッチャをインライン記録へ置き換え、スナップショット更新付きでテストを走らせる。値がアサーションの隣に書き込まれ、外部側の要らなくなったエントリは更新時に落ちる。
+### The invariant
+
+What is held is that a recorded value is readable beside the assertion that pins it.
+
+A recorded value sitting in an external file is invisible from the assertion. Where the value is small, that separation buys nothing. Reading the `it` block alone tells nobody what is being checked, and the reader ends up opening the record file and matching keys by hand. That matching is not a burden on people only: a key is made of strung-together titles and a running number, so changing one word of a title severs the correspondence.
+
+The cost in the other direction is carried by [no-oversized-inline-snapshot--use-external-snapshot](./no-oversized-inline-snapshot--use-external-snapshot.md). With two rules holding one budget between them, where a value goes becomes a function of its size alone, and the writer's judgment stops entering into it. The budget is a single constant working in both directions, so neither side can be loosened on its own.
+
+### Configuration
+
+| Option | Default | What it settles |
+| --- | --- | --- |
+| `maxLines` | `12` | The number of lines up to which a recorded value stays inline |
+| `specFileSuffixes` | `[".test.ts", ".test.tsx"]` | The file name endings counted as a spec |
+
+`maxLines` must carry the same value as [no-oversized-inline-snapshot--use-external-snapshot](./no-oversized-inline-snapshot--use-external-snapshot.md). Let the two read different values and a recorded value that is a violation in either place becomes expressible, and an automatic fix bounces between the two without settling.
+
+The boundary leans to the inline side. A recorded value exactly at the budget stays inline, and external placement starts one line above it.
+
+Where the budget is moved off its default, hand both rules the same value in the shared lint configuration.
+
+## Fix
+
+Replace the matcher with its inline spelling and run the tests with snapshots updated. The value is written in beside the assertion, and the external entry that is no longer wanted is dropped by that update.
 
 ```ts
 it("names a behaviour", () => {
@@ -92,29 +120,83 @@ it("names a behaviour", () => {
 });
 ```
 
-`toThrowErrorMatchingSnapshot` は `toThrowErrorMatchingInlineSnapshot` へ置き換える。
+`toThrowErrorMatchingSnapshot` is replaced with `toThrowErrorMatchingInlineSnapshot`.
 
-自動修正が行うのはマッチャの置換までである。ヒントを渡していた場合は、インライン記録がキーを持たないのでヒントも一緒に落とす。値を実際に動かすのは後続のスナップショット更新の実行になる。
+What the automatic fix does reaches as far as replacing the matcher. Where a hint was handed over, the hint is dropped with it, because an inline record carries no key. Moving the value itself is the snapshot update that follows.
 
-表駆動の宣言では、ケースごとに記録値が違うと 1 つのインライン記録に収まらない。ケースごとにテストブロックを分けてから、それぞれをインライン記録にする。この形には自動修正を出さない。
+In a table-driven declaration, recorded values that differ case by case do not fit into one inline record. Split it into a test block per case, then make each one an inline record. No automatic fix is offered for that shape.
 
-解決不能として報告された呼び出しは、タイトルとヒントを字句で書き、ループ・分岐・入れ子のコールバックの外へ呼び出しを出す。
+For a call reported as unresolvable, write the title and the hint as literals, and lift the call out of the loop, the branch or the nested callback.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- 上限を下げて外部配置を正当化する。上限は双方向に効くので、片方だけを緩めることはできない
-- タイトルを実行時に組み立てて解決不能にする。解決不能そのものが報告される
-- ヒントを実行時に決めて解決不能にする。同上
-- 呼び出しをループや入れ子のコールバックへ移して位置を隠す。同上
-- 抑制ディレクティブ
+Code this rule rejects.
 
-## オプション
+```ts
+// a record inside the budget is reported and moved to an inline record
+describe("outer", () => {
+  it("names a behaviour", () => {
+    expect(subject).toMatchSnapshot();
+  });
+});
+```
 
-| オプション         | 既定値                      | 何を決めるか                       |
-| ------------------ | --------------------------- | ---------------------------------- |
-| `maxLines`         | `12`                        | 記録値がインラインに留まる上限行数 |
-| `specFileSuffixes` | `[".test.ts", ".test.tsx"]` | spec とみなすファイル名の末尾      |
+```ts
+// an inline record ahead of it shifts which entry the call is measured against
+describe("outer", () => {
+  it("names a behaviour", () => {
+    expect(first).toMatchInlineSnapshot(`"first"`);
+    expect(subject).toMatchSnapshot();
+  });
+});
+```
 
-`maxLines` は `no-oversized-inline-snapshot--use-external-snapshot` と同じ値でなければならない。2 本が別の値を読むと、どちらの置き場所でも違反になる記録値が表現可能になり、自動修正が往復して止まらなくなる。境界はインライン側に倒してある。上限ちょうどの記録値はインラインに留まり、外部配置は上限の 1 つ上から始まる。
+Code this rule accepts.
 
-上限を既定から変える場合は、共有 lint 設定で両方のルールに同じ値を渡すこと。
+```ts
+// a record past the budget is already in the right place
+describe("outer", () => {
+  it("names a behaviour", () => {
+expect(subject).toMatchSnapshot();
+  });
+});
+```
+
+```ts
+// an inline record is the other rule's subject
+describe("outer", () => {
+  it("names a behaviour", () => {
+expect(subject).toMatchInlineSnapshot(`"alpha"`);
+  });
+});
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Lowering the budget to justify leaving a value outside. The budget works in both directions, so neither side can be loosened alone
+- Building the title at run time so the call cannot be resolved. Being unresolvable is itself what gets reported
+- Settling the hint at run time so the call cannot be resolved. As above
+- Moving the call into a loop or a nested callback to hide its position. As above
+- Silencing it with a suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `undersizedExternalSnapshot` | A recorded value of {{recordedLines}} lines must not sit in an external snapshot file against a shared budget of {{maxLines}} lines for a value that belongs beside its assertion. Replace \`{{matcher}}\` with \`{{inlineSpelling}}\`, drop any snapshot hint, and rerun the suite with snapshot updating turned on to carry the value at \`{{key}}\` into this spec. |
+| `undersizedTableDrivenSnapshot` | A recorded value of {{recordedLines}} lines must not sit in an external snapshot file against a shared budget of {{maxLines}} lines for a value that belongs beside its assertion. Split this table-driven declaration into one test block per case, replace \`{{matcher}}\` with \`{{inlineSpelling}}\` in each block, and rerun the suite with snapshot updating turned on to carry the values at \`{{key}}\` into this spec. |
+| `unresolvableExternalSnapshot` | An external snapshot must not be recorded under a key that cannot be spelled out from this spec alone. Write every enclosing title as a literal string, write the snapshot hint as a literal string, and lift this call out of the loop, branch or nested callback that hides its position among the recorded values. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

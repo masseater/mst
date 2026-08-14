@@ -1,38 +1,66 @@
+---
+description: "Require the lint and fmt blocks of a Vite+ configuration to be what the matching `dontReviewItPreset` function returns, so the rule set, the formatting decisions, and what git is told to ignore all arrive without the caller restating them"
+---
+
 # no-unwrapped-toolchain-config--call-the-preset-for-the-block
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-Vite+ の `defineConfig` に渡すオブジェクトが持つ `lint` と `fmt` のうち、値がそのブロックに対応する preset 関数の呼び出し（`dontReviewItPreset.lint(...)` と `dontReviewItPreset.fmt(...)`）になっていないものを報告する。
+Require the lint and fmt blocks of a Vite+ configuration to be what the matching `dontReviewItPreset` function returns, so the rule set, the formatting decisions, and what git is told to ignore all arrive without the caller restating them
 
-`defineConfig` の同定は import で行う。`vite-plus` から入ってきた名前だけを見るため、名前付き import（`import { defineConfig } from "vite-plus"`）でも名前空間 import（`import * as vitePlus from "vite-plus"` に対する `vitePlus.defineConfig`）でも同じく捕まえる。ローカルで別名を付けても、束縛をたどるので変わらない。`vite-plus` 以外から来た `defineConfig` は別の関数であり、対象にしない。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-unwrapped-toolchain-config--call-the-preset-for-the-block.ts`](../../src/lint/oxlint/rules/no-unwrapped-toolchain-config--call-the-preset-for-the-block.ts)
 
-preset の同定も同じで、`@mst/dont-review-it` から入ってきた `dontReviewItPreset` だけを認める。名前空間経由でも別名付きでも認める一方、綴りが同じでも別のモジュールから来た値、`Object.freeze(...)` のような別の呼び出し、括り出した変数を名前で渡す形（`defineConfig({ lint })`）はいずれも通らない。preset を通った値かどうかは、その場に書かれた呼び出しからしか判定できないためである。
+<!-- END GENERATED rule-header -->
 
-呼び出しているメンバがブロックの名前と一致していることまで見る。`fmt` に `dontReviewItPreset.lint(...)` を置いた形は、preset を通ってはいるが別の種類の設定を返すので報告する。計算されたメンバ（`dontReviewItPreset["lint"]`）は静的に確定しないものとして扱い、認めない。
+## Violation
 
-キーは識別子でも文字列リテラル（`"lint"`）でも同じキーとして扱う。計算されたキーは対象外にする。
+A `lint` or `fmt` block, in the object handed to Vite+'s `defineConfig`, whose value is not a call to the preset function matching that block (`dontReviewItPreset.lint(...)` and `dontReviewItPreset.fmt(...)`).
 
-`lint` も `fmt` も書かれていない設定は報告しない。ワークスペース側の `vite.config.ts` は `pack` だけを書くのが普通で、そこに空の `lint` を足させる理由はない。したがってこのルールが守るのは「書くなら必ず preset を通す」であって、「必ず書く」ではない。
+`defineConfig` is identified through the imports. Only names that came in from `vite-plus` are read, so a named import (`import { defineConfig } from "vite-plus"`) and a namespace import (`vitePlus.defineConfig` against `import * as vitePlus from "vite-plus"`) are caught alike. Renaming it locally changes nothing, because the binding is followed. A `defineConfig` from anywhere else is a different function and is not a target.
 
-## なぜそれが要るか
+The preset is identified the same way: only a `dontReviewItPreset` that came in from `@mst/dont-review-it` is accepted. Reaching it through a namespace or under another name is accepted, while a value of the same spelling from another module, some other call such as `Object.freeze(...)`, and handing over a variable by name (`defineConfig({ lint })`) are all refused. Whether a value went through the preset can only be settled from the call written there.
 
-守っている不変条件は 2 つある。「git が無視しろと言っているものを、linter と formatter が読みに行かない」ことと、「このリポジトリのルール集合と整形の選択が、呼び出し側の書き写しなしに届く」ことである。
+The member being called has to match the block's name. Placing `dontReviewItPreset.lint(...)` on `fmt` did go through the preset while returning a different kind of configuration, so it is reported. A computed member (`dontReviewItPreset["lint"]`) does not settle statically and is not accepted.
 
-oxlint はリポジトリの `.gitignore` と `$GIT_DIR/info/exclude` を歩く時点で尊重するが、`core.excludesFile` が指すマシン全体の ignore だけは見ない。したがってエージェントの作業ディレクトリや個人用のスクラッチ置き場のように、リポジトリに書かず手元のグローバル設定で無視しているものは、そのまま lint 対象に入り込む。formatter も同じで、無視しているはずのディレクトリの中身を書き換える。
+A key is read the same whether it is an identifier or a string literal (`"lint"`). Computed keys are out of reach.
 
-その差を埋めるのが `ignorePatterns` だが、oxlint は `extends` で名指しした設定が持つ `ignorePatterns` を捨て、`extends` を書いた側の設定に書かれたものだけを使う。`rules` や `overrides` や `plugins` は継承されるのに、`ignorePatterns` だけが継承されない。つまり preset をいくら整えても、`extends` の口からこのパターン列を配ることはできない。パターン列は、必ず `defineConfig` に直接渡すオブジェクト自身が持っていなければならない。
+A configuration writing neither `lint` nor `fmt` is not reported. A workspace's `vite.config.ts` normally writes only `pack`, and there is no reason to make it add an empty `lint`. What this rule holds is "if you write one, it goes through the preset", not "you must write one".
 
-oxfmt にはそもそも `extends` が無い。整形の選択も同じく、`defineConfig` に直接渡すオブジェクト自身が持つしかない。
+### The invariant
 
-`dontReviewItPreset` の 2 つの関数は、この「直接渡すオブジェクトでなければ効かないもの」をまとめて載せて返す。git の ignore 設定（グローバル → `$GIT_DIR/info/exclude` → リポジトリの `.gitignore` の順、gitignore の last-match-wins に合わせてある）から作ったパターン列、`lint` にはルール集合、`fmt` には整形の選択が入る。呼び出し側が書くべきことは何もなく、忘れたときだけこのルールが報告する。
+Two things are held: that the linter and the formatter do not go reading what git said to ignore, and that this repository's rule set and formatting choices arrive without the caller copying them out.
 
-埋めたい穴はグローバルの 1 経路だけだが、読むのは 3 経路すべてである。パターンの優先順位は経路をまたいで決まるため、1 か所に並べないと、グローバル側の指定をリポジトリ側の `!` が打ち消す関係を表現できない。
+oxlint respects the repository's `.gitignore` and `$GIT_DIR/info/exclude` while walking, and the one thing it does not read is the machine-wide ignore that `core.excludesFile` points at. So an agent's working directory, or a personal scratch space — anything ignored through the local global settings rather than written into the repository — walks straight into the lint targets. The formatter does the same, rewriting the contents of a directory that was supposed to be ignored.
 
-preset を忘れても lint は緑のまま通る。無視されるはずのファイルが増え、ルールが 1 本も効かなくなるだけで、失敗として現れない。人間が気づく契機がないため、機械が見張る。
+`ignorePatterns` is what closes that gap, but oxlint discards the `ignorePatterns` of a configuration named through `extends` and uses only what the extending side wrote. `rules`, `overrides` and `plugins` are inherited; `ignorePatterns` alone is not. However well the preset is arranged, this list of patterns cannot be handed out through `extends`. It has to be carried by the object handed directly to `defineConfig`.
 
-## どう直すか
+oxfmt has no `extends` at all, so the formatting choices likewise have to be carried by the object handed directly to `defineConfig`.
 
-該当のブロックを、そのブロックの名前を持つ preset 関数で包む。追加のルールや設定は引数にそのまま渡せる。
+The two functions of `dontReviewItPreset` gather everything that only works on a directly handed object and return it: a pattern list built from git's ignore settings (global, then `$GIT_DIR/info/exclude`, then the repository's `.gitignore`, ordered to match gitignore's last-match-wins), the rule set for `lint`, and the formatting choices for `fmt`. There is nothing for the caller to write, and this rule reports only when the call is forgotten.
+
+The gap to close is the one global route, and all three routes are read, because priority between patterns is settled across the routes. Without them in one list, there is no way to express a repository-side `!` cancelling something the global side specified.
+
+Forgetting the preset leaves the lint green. Files that should have been ignored multiply and no rule reaches them, and none of it surfaces as a failure. There is no occasion for a human to notice, so a machine watches.
+
+### What is not a violation
+
+- A configuration carrying neither `lint` nor `fmt`
+- An object that never reaches `defineConfig`. A value that merely carries a key named `lint` is not a configuration
+- A call to a `defineConfig` imported from anywhere other than `vite-plus`
+- A call through a `dontReviewItPreset` imported under another name. The spelling does not matter as long as the binding is the same
+
+### Configuration
+
+None.
+
+## Fix
+
+Wrap the block in the preset function carrying that block's name. Extra rules and settings can be handed to it as arguments.
 
 ```ts
 import * as dontReviewIt from "@mst/dont-review-it";
@@ -46,21 +74,65 @@ export default defineConfig({
 });
 ```
 
-`ignorePatterns` を自分でも書きたい場合はそのまま渡せばよい。preset は git 由来のパターンを前に置くだけなので、後ろに残る手書きのパターンが優先される。`extends` に別の preset を足したい場合も同じで、渡した分は自前の preset の後ろに並ぶ。
+To write `ignorePatterns` of your own as well, hand them over as they are. The preset only puts the git-derived patterns in front, so the hand-written ones that follow take priority. Adding another preset to `extends` works the same way: what is handed over lines up behind this preset's own.
 
-## 違反にならないもの
+<!-- BEGIN GENERATED examples -->
 
-- `lint` も `fmt` も持たない設定
-- `defineConfig` に渡らないオブジェクト。`lint` というキーを持つだけの値は設定ではない
-- `vite-plus` 以外から import した `defineConfig` の呼び出し
-- `dontReviewItPreset` を別名で import した呼び出し。束縛が同じであれば綴りは問わない
+Code this rule rejects.
 
-## 禁じる回避策
+```ts
+// both bare blocks are reported separately
+import { dontReviewItPreset } from "@mst/dont-review-it";
+import { defineConfig } from "vite-plus";
+export default defineConfig({ fmt: {}, lint: {} });
+```
 
-- preset の代わりに `ignorePatterns` やルール集合を手で書き写す。書いた時点の写しでしかなく、preset が変わった瞬間にずれる。ずれても lint は緑のまま通る
-- `defineConfig` を経由しない別の口から設定を組み立てて、このルールの視界から外す
-- 抑制ディレクティブ
+```ts
+// the preset function for the other block does not stand in
+import { dontReviewItPreset } from "@mst/dont-review-it";
+import { defineConfig } from "vite-plus";
+export default defineConfig({ fmt: dontReviewItPreset.lint({}) });
+```
 
-## オプション
+Code this rule accepts.
 
-取らない。
+```ts
+// both blocks call the preset function that matches them
+import { dontReviewItPreset } from "@mst/dont-review-it";
+import { defineConfig } from "vite-plus";
+export default defineConfig({ fmt: dontReviewItPreset.fmt(), lint: dontReviewItPreset.lint({ rules: {} }) });
+```
+
+```ts
+// a configuration that declares neither block has nothing to wrap
+import { dontReviewItPreset } from "@mst/dont-review-it";
+import { defineConfig } from "vite-plus";
+export default defineConfig({ pack: { entry: ["src/index.ts"] } });
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Copying out `ignorePatterns` or the rule set by hand instead of calling the preset. It is a copy of one moment and drifts the instant the preset changes, and the lint stays green while it drifts
+- Assembling the configuration through some route that does not pass through `defineConfig`, to leave this rule's field of view
+- A suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `unwrappedLint` | The \`lint\` block handed to Vite+'s \`defineConfig\` must not skip \`dontReviewItPreset.lint\`. Wrap the block, keeping the additions where they are: \`lint: dontReviewItPreset.lint({ rules: { ... } })\`. |
+| `unwrappedFmt` | The \`fmt\` block handed to Vite+'s \`defineConfig\` must not skip \`dontReviewItPreset.fmt\`. Wrap the block: \`fmt: dontReviewItPreset.fmt()\`. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

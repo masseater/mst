@@ -1,76 +1,142 @@
+---
+description: "Disallow a test callback or a fixture factory holding the test context as anything but a pattern of statically readable fixture names, so the fixtures a test depends on stay listed in its parameter and the rules that read those names keep deciding"
+---
+
 # no-test-context-escape--destructure-fixtures-by-name
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-テストコンテキストを受け取る位置は 2 つある。テストブロック宣言に渡されたコールバックの第 1 引数と、fixture factory の第 1 引数である。どちらについても、受け取り方が次の形になっているものを見る。
+Disallow a test callback or a fixture factory holding the test context as anything but a pattern of statically readable fixture names, so the fixtures a test depends on stay listed in its parameter and the rules that read those names keep deciding
 
-- rest 要素を含む分割代入（`({ subject, ...rest })`）
-- 分割代入ではない束縛。識別子で受ける形（`(ctx) => ...`）、配列パターン（`([subject]) => ...`）、引数全体にデフォルト値だけを与える形（`(ctx = {}) => ...`）、rest 引数（`(...handed) => ...`）
-- 分割代入パターンの中の計算キー（`({ [chosen]: bound })` / `({ ["expect"]: assert })`）。ネストした段のキーも同じく見る
-- 識別子で受けたコンテキストに対する、名前を実行時に決める取り出し。添字アクセス、`for...in` での列挙、オブジェクトリテラルへのスプレッド、呼び出しや `new` への受け渡し（`inspect(ctx)` / `inspect(...ctx)` / `Object.keys(ctx)` / `use(ctx)`）
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-test-context-escape--destructure-fixtures-by-name.ts`](../../src/lint/oxlint/rules/no-test-context-escape--destructure-fixtures-by-name.ts)
 
-識別子で受けている形は、受け取り方そのものと、その識別子から実行時に取り出している箇所の両方が報告される。前者は「名前で並べ直せ」と言い、後者は並べ直したときに何を書き下す必要があるかを指す。
+<!-- END GENERATED rule-header -->
 
-「テストブロック宣言」の判定は 1 箇所に置いてある（`src/lint/oxlint/lib/spec-syntax/test-block-declarations.ts`）。次のいずれかを根とする呼び出しを宣言とみなす。
+## Violation
 
-- グローバル注入されたテストブロックの綴り（`it` / `test`）
-- テストブロックの綴りを import した束縛。リネーム import も含む
-- 上記のいずれか、あるいは `test.extend(...)` の結果で初期化されたローカル束縛。束縛から束縛への受け直しは何段でもたどる
+There are two positions receiving the test context: the first parameter of the callback handed to a test block declaration, and the first parameter of a fixture factory. For both, these ways of receiving are read.
 
-根は修飾子メンバ（`skip` / `each` など）、表駆動の呼び出し、タグ付きテンプレートを越えてたどる。fixture factory は `extend` 呼び出しの宣言読み取り（`src/lint/oxlint/lib/spec-syntax/fixture-declarations.ts`）から取る。オブジェクトを渡す形と、名前と factory を並べて渡すビルダー形の双方を見る。
+- A destructuring carrying a rest element (`({ subject, ...rest })`)
+- A binding that is not a destructuring: receiving as an identifier (`(ctx) => ...`), an array pattern (`([subject]) => ...`), a form giving only a default to the whole parameter (`(ctx = {}) => ...`), a rest parameter (`(...handed) => ...`)
+- A computed key inside a destructuring pattern (`({ [chosen]: bound })` / `({ ["expect"]: assert })`). Keys in nested stages are read the same way
+- Extraction from a context received as an identifier, by a name settled at run time: subscript access, enumeration with `for...in`, spreading into an object literal, and handing it to a call or a `new` (`inspect(ctx)` / `inspect(...ctx)` / `Object.keys(ctx)` / `use(ctx)`)
 
-テストブロックにも `extend` にも、関数の代わりにラッパー呼び出しを渡してある場合は、その呼び出しに渡された関数まで剥がして判定する。剥がしは何段でも追う。
+For a form received as an identifier, both the way of receiving and each place extracting from that identifier at run time are reported. The former says "line them up by name"; the latter points at what has to be written out when they are lined up.
 
-### 意図的に広げていない範囲
+Whether something is a "test block declaration" is settled in one place (`src/lint/oxlint/lib/spec-syntax/test-block-declarations.ts`). A call rooted at any of these counts as a declaration.
 
-| 形 | 対象にしない理由 |
+- A globally injected test block spelling (`it` / `test`)
+- A binding importing a test block spelling, renamed imports included
+- A local binding initialized with any of the above, or with the result of `test.extend(...)`. Binding-to-binding rebindings are followed through any number of steps
+
+The root is followed across modifier members (`skip`, `each` and the like), table-driven calls and tagged templates. Fixture factories are taken from the declaration reading of `extend` calls (`src/lint/oxlint/lib/spec-syntax/fixture-declarations.ts`), covering both the object form and the builder form pairing a name with a factory.
+
+Where a wrapper call is handed to a test block or to `extend` in place of a function, the function handed to that call is peeled before the judgment. Peeling follows any number of steps.
+
+### Deliberately not widened
+
+| Shape | Why it is left out |
 | --- | --- |
-| `({ options: { ...spread } })` | rest がかかっているのは fixture の値であって、コンテキストから何を取り出したかは `options` として読める |
-| `({ subject: bound })` / `({ "subject": bound })` | 取り出す名前が静的に読める。別名を付けても取り出した名前は変わらない |
-| `options[chosen]` / `{ ...options }` | コンテキストではない値の扱いはこのルールの管轄ではない |
-| `subject.field` | 非計算のメンバアクセスは名前が書かれている |
-| 引数を宣言していないコールバック / factory | コンテキストを受けていない |
-| `expect.extend({ ... })` | fixture の宣言ではない |
-| グルーピングブロックのコールバック | テストブロックの宣言ではない |
-| 配列リテラルへのスプレッド（`[...ctx]`） | コンテキストは反復可能ではないので、この形は実行時に落ちる |
-| `runner.it(...)` のような名前空間経由 | 共通定義が根を識別子まで解決できない |
+| `({ options: { ...spread } })` | The rest covers a fixture's value; what was taken out of the context is still readable as `options` |
+| `({ subject: bound })` / `({ "subject": bound })` | The extracted name is statically readable. An alias does not change the name taken out |
+| `options[chosen]` / `{ ...options }` | What is done with a value that is not the context is out of this rule's remit |
+| `subject.field` | A non-computed member access has the name written |
+| A callback or factory declaring no parameter | It receives no context |
+| `expect.extend({ ... })` | Not a fixture declaration |
+| A grouping block's callback | Not a test block declaration |
+| Spreading into an array literal (`[...ctx]`) | The context is not iterable, so this shape fails at run time |
+| A namespace route such as `runner.it(...)` | The shared definition cannot resolve the root to an identifier |
 
-ファイル種別による絞り込みはしない。どのファイルにこのルールを効かせるかは共有 lint 設定の glob が決める。
+There is no narrowing by file kind. Which files this rule holds for is settled by the shared lint configuration's glob.
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「テストコンテキストは、使う fixture を名前で 1 つずつ分割代入して受け取る」ことである。
+The test context is received by destructuring, by name, one fixture at a time.
 
-1 層目は、この束の他のルールが成立しなくなることである。`no-vitest-context-expect--import-expect-from-vitest` は「コンテキストから `expect` を取り出していないこと」を見て、`no-fixture-forward-subject--yield-sut-output` は「どの fixture 依存を返しているか」を見る。どちらも取り出された名前を読めることが前提で、rest でまとめた別名や実行時の走査を挟まれると名前を言えない。名前を言えないルールは黙るのではなく「違反でない」と答える。報告が出ないことと違反が無いことが区別できなくなり、緑が意味を失う。
+The first layer is that the other rules of this bundle stop holding. [no-vitest-context-expect--import-expect-from-vitest](./no-vitest-context-expect--import-expect-from-vitest.md) reads "no `expect` was taken out of the context", and [no-fixture-forward-subject--yield-sut-output](./no-fixture-forward-subject--yield-sut-output.md) reads "which fixture dependency is being returned". Both presume the extracted names are readable, and inserting a rest-gathered alias or a run-time walk leaves the name unsayable. A rule that cannot say the name does not go quiet; it answers "not a violation". Reports not coming out and violations not existing become indistinguishable, and green loses its meaning.
 
-2 層目は、判定が外れたことに気付く経路が無いことである。抜けた側のルールは沈黙するので、抜けたテストは「そのルールを守っているテスト」として集計に混ざる。壊れたのは検出であって実行結果ではないから、赤は出ない。形そのものを落とすのは、名前を追いかけることを諦めた代わりに、追いかけられない形が入ってこないことを保証するためである。
+The second layer is that there is no route by which the lapsed judgment is noticed. The rule that fell through stays silent, so the escaping test is counted among "tests that keep that rule". What broke is the detection rather than the run's result, so no red appears. The shape itself is dropped so that, having given up on chasing names, no shape that cannot be chased gets in.
 
-読み手にも同じ効果がある。コールバックの引数を見れば、そのテストがどの fixture に依存しているかが列挙されている。
+A reader gets the same benefit: reading the callback's parameter enumerates which fixtures that test depends on.
 
-## どう直すか
+### Configuration
 
-実際に使う fixture の名前だけを並べた分割代入へ書き直す。このリポジトリのルールのテストが取っている形がそのまま直した形になる。
+None. Only whether the rule is on or off is settled by the configuration.
+
+Make an exception expressible in configuration and that setting is itself a hole meaning "in this file the names need not be statically readable". The hole's location is written only in the configuration, so the rules reading names keep answering "not a violation" without knowing it exists.
+
+Where an inner function rebinds the same name as the identifier that received the context, the inner uses are read as reaching the context too. The judgment runs on range containment rather than binding resolution, and this shape appears only inside a position already reported as an identifier binding.
+
+## Fix
+
+Rewrite it as a destructuring listing only the names of the fixtures actually used. The rule tests in this repository already take the fixed shape.
 
 ```ts
 it("names a behaviour", ({ subject, options }) => {});
 ```
 
-rest で受けていたものは、使っている名前を列挙する形へ展開する。走査していた場合は、取り出したかった名前を書き下す。
+What was received by a rest is expanded into an enumeration of the names being used. Where something was being walked, write out the names you wanted to take.
 
-自動修正は持たせない。rest や走査を名前の列挙へ展開するには「実際に何を使っているか」を決める必要があり、その決定は書き手の意図に属するためである。
+There is no automatic fix. Expanding a rest or a walk into an enumeration of names requires settling "what is actually being used", and that decision belongs to the writer's intent.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- コンテキストを受ける関数を 1 枚挟んでから、内側で丸ごと受け直す。剥がしの前処理があるので、挟んだ関数の引数も同じ判定にかかる
-- コンテキストを別の束縛へ受け直してから走査する（`const inner = ctx;`）。受け直しの手前にある識別子束縛そのものが報告されるので、報告は消えない
-- コールバックを別の場所で宣言し、テストブロックには識別子だけを渡す（`it("names a behaviour", handler)`）。剥がしは関数リテラルとその呼び出しまでしか追わないので、この形の引数はこのルールから見えない。テストのコールバックはテストブロックの引数として書くこと
-- 引数を宣言しない関数式にして `arguments` からコンテキストを読む。引数が無いので受け取り方としては報告されない。関数式でテストを書くならコンテキストは引数で受けること
-- 抑制ディレクティブで黙らせる。コンテキストの受け取り方はスイート全体に対する規律であり、1 ファイルの都合で外れるものではない
+Code this rule rejects.
 
-## オプション
+```ts
+// binding the context as one name is reported
+it("names a behaviour", (ctx) => {});
+```
 
-取らない。有効か無効かだけを設定側で決める。
+```ts
+// gathering the rest of the context is reported
+it("names a behaviour", ({ subject, ...rest }) => {});
+```
 
-例外を設定で表現できるようにすると、その設定自体が「このファイルでは名前を静的に読めなくてよい」という穴になる。穴の場所は設定にしか書かれないので、名前を読む側のルールは穴の存在を知らないまま「違反でない」と答え続ける。
+Code this rule accepts.
 
-コンテキストを受けた識別子と同じ名前を内側の関数が束縛し直している場合、内側の使用もコンテキストへの到達として読む。束縛の解決ではなく範囲の包含で判定しているためで、この形は識別子束縛としてすでに報告されている位置の内側にしか現れない。
+```ts
+// taking fixtures apart by name passes
+it("names a behaviour", ({ subject, options }) => {});
+```
+
+```ts
+// a rest over a fixture value is not a rest over the context
+it("names a behaviour", ({ options: { ...spread } }) => {});
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Interposing one function that receives the context and receiving it whole inside. Peeling runs as a pre-step, so the interposed function's parameter meets the same judgment
+- Receiving the context into another binding and walking that (`const inner = ctx;`). The identifier binding before the rebinding is itself reported, so the report does not clear
+- Declaring the callback elsewhere and handing only an identifier to the test block (`it("names a behaviour", handler)`). Peeling follows only function literals and their calls, so this shape's parameter is invisible to this rule. Write a test's callback as the test block's argument
+- Using a function expression declaring no parameter and reading the context out of `arguments`. With no parameter there is nothing to report as a way of receiving. Where a test is written as a function expression, receive the context in a parameter
+- Silencing it with a suppression directive. How the context is received is a discipline over the whole suite and does not come off for one file's convenience
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `restContext` | A test context must not be gathered into a rest binding. List the fixtures this test uses as separate names in the pattern. |
+| `wholeContext` | A test context must not be bound as a whole. List the fixtures this test uses in an object pattern, and take each one out by name. |
+| `computedContextKey` | A key of a test context pattern must not be written as a subscript. Name the fixture this key stands for as a static key. |
+| `traversedContext` | A test context must not be spread, enumerated, subscripted, or handed to another function. List the fixtures \`{{held}}\` stands for in an object pattern, and take each one out by name. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

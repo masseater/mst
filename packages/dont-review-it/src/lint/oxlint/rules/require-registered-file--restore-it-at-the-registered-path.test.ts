@@ -140,6 +140,7 @@ describe("dont-review-it/require-registered-file--restore-it-at-the-registered-p
     invalid: [
       {
         name: "a registered path with nothing at it is reported against the repository root",
+        documented: true,
         code: MODULE_SOURCE,
         filename: absentEntry,
         options: CHANGELOG_ROW,

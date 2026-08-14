@@ -20,6 +20,7 @@ test("counts two", () => {
       },
       {
         name: "two tests that share only their body pass",
+        documented: true,
         code: `test("counts one", () => {
   expect(total).toBe(1);
 });
@@ -30,6 +31,7 @@ it("counts the same total", () => {
       },
       {
         name: "two tests that share only their title pass",
+        documented: true,
         code: `test("counts one", () => {
   expect(total).toBe(1);
 });
@@ -81,6 +83,7 @@ runners[0]("counts one", () => {
     invalid: [
       {
         name: "two tests that share both title and body are both reported",
+        documented: true,
         code: `test("counts one", () => {
   expect(total).toBe(1);
 });
@@ -111,6 +114,7 @@ test("counts one", () => {
       },
       {
         name: "a runner reached through a modifier is compared with the plain one",
+        documented: true,
         code: `test("counts one", () => {
   expect(total).toBe(1);
 });

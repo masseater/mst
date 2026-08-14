@@ -52,6 +52,7 @@ describe("dont-review-it/require-spec-lint-coverage--lint-every-spec-file", () =
       },
       {
         name: "a spec file that declares a test block sits inside the reach of this bundle",
+        documented: true,
         code: `it("counts the basket", () => { expect(1).toBe(1); });`,
         filename: SPEC_FILE,
       },
@@ -72,6 +73,7 @@ describe("dont-review-it/require-spec-lint-coverage--lint-every-spec-file", () =
       },
       {
         name: "a bundle rule held at the level that fails a run passes",
+        documented: true,
         code: `export default { lint: { rules: { "${BUNDLE_RULE}": "error" } } };`,
         filename: CONFIG_FILE,
       },
@@ -145,6 +147,7 @@ describe("dont-review-it/require-spec-lint-coverage--lint-every-spec-file", () =
       },
       {
         name: "a source file that declares a test block sits outside the reach of this bundle",
+        documented: true,
         code: `it("counts the basket", () => { expect(1).toBe(1); });`,
         filename: SOURCE_FILE,
         errors: [
@@ -211,6 +214,7 @@ describe("dont-review-it/require-spec-lint-coverage--lint-every-spec-file", () =
       },
       {
         name: "a bundle rule taken down to a level that passes a run is reported",
+        documented: true,
         code: `export default { lint: { rules: { "${BUNDLE_RULE}": "off" } } };`,
         filename: CONFIG_FILE,
         errors: [

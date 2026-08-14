@@ -19,11 +19,13 @@ describe("dont-review-it/forbid-declared-command-invocation--use-designated-repl
     valid: [
       {
         name: "a command no declaration retires is started as it stands",
+        documented: true,
         code: 'import { execFile } from "node:child_process";\nexecFile("git", ["status"]);',
         options: [RETIRED_LERNA],
       },
       {
         name: "a retired name written inside a path is not what starts",
+        documented: true,
         code: 'import { execFile } from "node:child_process";\nexecFile("node", ["./node_modules/lerna/cli.js"]);',
         options: [RETIRED_LERNA],
       },
@@ -84,6 +86,7 @@ describe("dont-review-it/forbid-declared-command-invocation--use-designated-repl
       },
       {
         name: "a retired command named as the target of a start is started",
+        documented: true,
         code: 'import { spawn } from "node:child_process";\nspawn("lerna", ["run"]);',
         options: [RETIRED_LERNA],
         errors: [STARTED_LERNA],
@@ -102,6 +105,7 @@ describe("dont-review-it/forbid-declared-command-invocation--use-designated-repl
       },
       {
         name: "a runner written in front of a retired command starts it",
+        documented: true,
         code: 'import { exec } from "node:child_process";\nexec("npx lerna run build");',
         options: [RETIRED_LERNA],
         errors: [STARTED_LERNA],

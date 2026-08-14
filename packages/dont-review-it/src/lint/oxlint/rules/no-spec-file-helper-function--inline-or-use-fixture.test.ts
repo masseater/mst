@@ -12,6 +12,7 @@ describe("dont-review-it/no-spec-file-helper-function--inline-or-use-fixture", (
     valid: [
       {
         name: "a function declared in a test block stays inside the one test that runs it",
+        documented: true,
         code: 'it("names a behaviour", () => {\n  function build() {\n    return 1;\n  }\n  expect(build()).toBe(1);\n});',
         filename: SPEC_FILENAME,
       },
@@ -27,6 +28,7 @@ describe("dont-review-it/no-spec-file-helper-function--inline-or-use-fixture", (
       },
       {
         name: "a fixture builder declared in the body of a grouping block stands beside the tests that read it",
+        documented: true,
         code: 'describe("a report", () => {\n  const it = test.extend("report", () => summarise(rows));\n});',
         filename: SPEC_FILENAME,
       },
@@ -109,6 +111,7 @@ describe("dont-review-it/no-spec-file-helper-function--inline-or-use-fixture", (
     invalid: [
       {
         name: "a function declared at module scope is reached by every test in the file",
+        documented: true,
         code: "function build() {\n  return 1;\n}",
         filename: SPEC_FILENAME,
         errors: [{ messageId: "scopedHelperDeclaration", data: { name: "build" } }],
@@ -310,6 +313,7 @@ describe("dont-review-it/no-spec-file-helper-function--inline-or-use-fixture", (
       },
       {
         name: "a fixture builder at module scope is reached by every test in the file",
+        documented: true,
         code: 'const it = test.extend("report", () => summarise(rows));',
         filename: SPEC_FILENAME,
         errors: [{ messageId: "moduleScopeFixtureBinding", data: { name: "it" } }],

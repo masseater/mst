@@ -1,88 +1,109 @@
+---
+description: "Disallow text written out in the source at the destination argument of a call that opens a connection, so where a deployment talks to is decided by its configuration rather than by the file that performs the request"
+---
+
 # no-hardcoded-endpoint--read-from-configuration
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-通信を開く呼び出しの**宛先の引数**に、ソースへ書き出された文字列が現れているもの。
+Disallow text written out in the source at the destination argument of a call that opens a connection, so where a deployment talks to is decided by its configuration rather than by the file that performs the request
 
-### 渡される先で判定する
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-hardcoded-endpoint--read-from-configuration.ts`](../../src/lint/oxlint/rules/no-hardcoded-endpoint--read-from-configuration.ts)
 
-判定はリテラルの形では行わない。そのリテラルが**渡される先**だけを見る。宛先の位置にソースへ書き出された文字列が現れたら報告し、その文字列が URL に見えるか識別子に見えるかは一切見ない。
+<!-- END GENERATED rule-header -->
 
-この方針を採る理由は実測にある。このリポジトリで URL の形をしたリテラルは 8 件あり、6 件はスキャフォールドが生成したランディングページの外部リンク、2 件は文書 URL の組み立てを確かめるテストの期待値である。`AGENTS.md` はスキャフォールド生成物を独自設計に置き換えることを禁じているので、形で判定する版は入れた瞬間に規約と衝突する。識別子の形（20 文字以上の英数字）をしたリテラルは 264 件あるが、そのすべてがルール名・メッセージ ID・AST のノード種別名で、provider の ID は 1 件も無い。形で判定するルールは、直すべきものに 1 件も当たらないまま、直してはいけないものを全件報告する。渡される先で判定すれば、報告されるのは実際に外へ出ていく値だけになり、対象の一覧をオプションとして設定側に持つ必要も無くなる。
+## Violation
 
-`no-hardcoded-provider-id--read-from-configuration` も同じ方針で書かれている。2 本は見る位置が違うだけで、判定の考え方は同一である。
+A string written out in the source appearing in the **destination argument** of a call that opens a connection.
 
-### 何を通信の宛先とみなすか
+### The judgment runs on where it is handed, not on how it looks
 
-次の呼び出しの**第 1 引数**を宛先とする。いずれもプラットフォームが持つもので、依存を足さなくても存在する。
+The judgment never reads the shape of the literal. It reads only **where that literal is handed**. Where a string written out in the source stands in the destination position, the report stands, and whether that string looks like a URL or like an identifier is not read at all.
 
-| 呼び出し                    | 宛先      |
-| --------------------------- | --------- |
-| `fetch(...)`                | 第 1 引数 |
-| `<受け手>.fetch(...)`       | 第 1 引数 |
-| `navigator.sendBeacon(...)` | 第 1 引数 |
-| `new Request(...)`          | 第 1 引数 |
-| `new WebSocket(...)`        | 第 1 引数 |
-| `new EventSource(...)`      | 第 1 引数 |
+A shape-based judgment does not work here. Most URL-shaped literals in a repository are external links in scaffold-generated pages and expected values in tests that check how a document URL is assembled — and a scaffold's output must not be replaced with a design of one's own, so a shape-based version collides with the norms the moment it is added. Identifier-shaped literals are overwhelmingly rule names, message ids and AST node kinds. A shape-based rule hits none of what should be fixed while reporting all of what must not be. Judge on where it is handed and only values that actually leave are reported, and no list of targets has to be held as an option on the configuration side.
 
-`<受け手>.fetch(...)` はプロパティ名だけを見る。`globalThis.fetch(...)` も `window.fetch(...)` も同じ呼び出しとして扱う。
+[no-hardcoded-provider-id--read-from-configuration](./no-hardcoded-provider-id--read-from-configuration.md) is written on the same policy. The two differ only in which position they read.
 
-Node の `http.request` / `https.request` は宛先をオプションオブジェクトで受ける形が主で、判定の入口が違う。HTTP クライアントのライブラリはこのリポジトリに入っていない。どちらも使うようになったら、その形をこの一覧に足すのが対になる作業である。
+### What counts as a connection destination
 
-### 何を書き出された文字列とみなすか
+The **first argument** of these calls is the destination. All are platform-provided and exist without adding a dependency.
 
-宛先の式に、次のいずれかが 1 つでも含まれていれば書き出されているとみなす。
+| Call | Destination |
+| --- | --- |
+| `fetch(...)` | First argument |
+| `<receiver>.fetch(...)` | First argument |
+| `navigator.sendBeacon(...)` | First argument |
+| `new Request(...)` | First argument |
+| `new WebSocket(...)` | First argument |
+| `new EventSource(...)` | First argument |
 
-- 文字列リテラル
-- テンプレートリテラルの、中身のある静的部分
-- `+` による連結の、いずれかの側にある上記
+`<receiver>.fetch(...)` reads the property name alone. `globalThis.fetch(...)` and `window.fetch(...)` are treated as the same call.
 
-したがって ``fetch(`${config.origin}/api/catalog`)`` は報告される。オリジンが設定から来ていても、パスはこのファイルに焼き込まれているためである。``fetch(`${origin}${path}`)`` は報告されない。静的部分が空で、宛先を決めているのは値だけだからである。
+Node's `http.request` / `https.request` mostly take the destination in an options object, which is a different way in. HTTP client libraries are not in this repository. Once either is used, adding that shape to this list is the paired work.
 
-括弧は外して見る。`fetch(('https://example.test'))` は `fetch('https://example.test')` と同じに扱う。
+### What counts as a string written out
 
-### マークアップ上のリンク表記
+The destination expression counts as written out where it contains even one of these.
 
-対象外である。除外は一覧による特例ではなく、判定の構造から出る。
+- A string literal
+- A non-empty static part of a template literal
+- Either side of a `+` concatenation holding one of the above
+
+So ``fetch(`${config.origin}/api/catalog`)`` is reported: the origin comes from configuration, but the path is baked into this file. ``fetch(`${origin}${path}`)`` is not reported: the static parts are empty and the destination is settled by values alone.
+
+Parentheses are peeled. `fetch(('https://example.test'))` is treated as `fetch('https://example.test')`.
+
+### Link notation in markup
+
+Out of scope. The exclusion comes out of the structure of the judgment rather than from a list of special cases.
 
 ```ts
 document.body.innerHTML = `<a href="https://vite.dev/" target="_blank">Vite</a>`;
 ```
 
-この `https://vite.dev/` は通信を開く呼び出しの引数ではない。テンプレートリテラルの中の文字であり、ブラウザが辿るかどうかは利用者の操作で決まる。判定の入口に入らないので、報告されることがない。同じ理由で、属性への代入（`anchor.href = '...'`）も、テストの期待値として書かれた URL も、どこにも渡していない定数も対象外である。
+That `https://vite.dev/` is not an argument of a call that opens a connection. It is text inside a template literal, and whether a browser follows it is settled by the user's action. It never enters the way in, so it is never reported. For the same reason an assignment to an attribute (`anchor.href = '...'`), a URL written as a test's expected value, and a constant handed nowhere are all out of scope.
 
-### 走査の境界
+### The boundary of the walk
 
-ファイル種別による例外は持たない。テストコードも同じに扱う。テストが実際の宛先へ繋いでよい理由は無く、繋ぐならその宛先はテストの設定から来るべきである。
+There is no exemption by file kind. Test code is treated the same. There is no reason a test may connect to a real destination, and where it does, that destination should come from the test's configuration.
 
-宛先を一度変数に取ってから渡す形（`const url = 'https://...'; fetch(url);`）は報告されない。判定は宛先の位置に置かれた式だけを見ており、その式が別の場所から来ている場合は追わない。これは「禁じる回避策」に挙げてある。
+Taking the destination into a variable before handing it over (`const url = 'https://...'; fetch(url);`) is not reported. The judgment reads only the expression standing in the destination position and does not follow where that expression came from. That is named under forbidden bypasses.
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「どこへ繋ぐかは、繋ぐコードではなく、そのコードを動かす設定が決める」ことである。
+Where to connect is settled by the configuration that runs the code, not by the code that connects.
 
-リクエストのうち、環境ごとに必ず違うのは宛先である。同じソースが、テストではローカルのスタブへ、レビューではステージングのホストへ、本番では本物のホストへ繋がらなければならない。呼び出しに焼き込まれた文字列は、そのどれか 1 つにしかなれない。他の 2 つになるには、ソースを書き換えて別のビルドを作るしかない。
+Of everything in a request, the destination is what necessarily differs per environment. The same source has to reach a local stub in tests, a staging host in review and the real host in production. A string baked into a call can only ever be one of those. Becoming either of the other two means rewriting the source and producing a different build.
 
-壊れ方は 2 層ある。
+It breaks in two layers.
 
-1 層目は、成果物が環境を 1 つしか持てなくなることである。ビルドは、それを作った人が動かした場所でしか正しく動かない。デプロイのたびに書き換えるか、環境ごとに別のビルドを持つかのどちらかになり、どちらも「動いているものと検証したものが別」という状態を作る。
+The first is that an artefact can hold only one environment. A build works correctly only where the person who made it ran it. It becomes either "rewrite on each deploy" or "a separate build per environment", and both create the state where what is running and what was verified are different things.
 
-2 層目は、宛先の誤りをどの検査も見つけられないことである。宛先は型を持たない文字列で、どこへ繋がるかは実際に繋いでみるまで分からない。型検査は通り、テストも通る。テストが通ってしまうのは、テストが本物の宛先へ繋いでいるか、そのテストのためだけに宛先を書き換えているかのどちらかだからで、後者ならテストは製品と違うコードを検査している。ここでも、このリポジトリが最も嫌う「lint が緑なのに検査されていない」が生まれる。
+The second is that no check can find a wrong destination. A destination is an untyped string, and where it connects is not known until it connects. The type check passes and the tests pass. The tests pass because either they connect to the real destination or the destination was rewritten just for them, and in the latter case the tests are checking code that differs from the product. Here too arises what this repository dislikes most: the lint is green and nothing was checked.
 
-書き出された文字列そのものが悪いのではない。その文字列が**通信の宛先の位置にある**ことが、この 2 層を作る。
+The string written out is not the problem in itself. It is that string **standing in a connection destination** that builds those two layers.
 
-## どう直すか
+### Configuration
 
-宛先を設定から読み、渡す。取り方は 2 つある。
+None. Only whether the rule is on or off is settled by the configuration. The list of calls that open a connection is held by the rule. It is not something that varies per deployment target, and where it changes, the rule itself is repaired.
 
-**プロセスを起動した環境から取る。** 配備ごとに違う値は、配備ごとに違う場所に置く。
+## Fix
+
+Read the destination from configuration and hand it over. Two ways to take it.
+
+**Take it from the environment that started the process.** Values that differ per deployment go where deployments differ.
 
 ```ts
 const catalogEndpoint = process.env.CATALOG_ENDPOINT;
 const response = await fetch(catalogEndpoint);
 ```
 
-**関数の引数として受け取る。** どこへ繋ぐかを呼び出し側が決められるようにする。テストはスタブの宛先を渡せばよく、製品のコードは設定から読んだ値を渡せばよい。
+**Take it as a function parameter.** Let the caller settle where to connect. A test hands over the stub's destination, and the product code hands over the value it read from configuration.
 
 ```ts
 const readCatalog = async (endpoint: string): Promise<Catalog> => {
@@ -91,18 +112,60 @@ const readCatalog = async (endpoint: string): Promise<Catalog> => {
 };
 ```
 
-宛先の一部だけを設定から取る形（`` `${origin}/api/catalog` ``）は解決になっていない。パスも宛先の一部であり、繋ぎ先が変われば変わる。宛先は 1 つの値として設定から来るようにする。
+Taking only part of the destination from configuration (`` `${origin}/api/catalog` ``) is not a solution. The path is part of the destination too, and it changes when the connection target changes. Have the destination arrive from configuration as one value.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- 宛先を変数に取ってから渡す（`const url = 'https://...'; fetch(url);`）。判定は宛先の位置に置かれた式だけを見るので報告は消える。宛先がこのファイルに焼き込まれている状態は変わらず、読み手にとっては書き出された場所が呼び出しから離れた分だけ悪くなる
-- 宛先を関数に包んで、その関数を呼ぶ（`fetch(catalogEndpoint())` で、その関数が文字列を返す）。同上。設定から読んでいない関数は、宛先を移しただけである
-- パスだけを書き出して、オリジンを設定から取る。宛先の一部が焼き込まれていることに変わりはなく、パスの構造が違うホストへは繋げない
-- 文字列を分割して連結する（`'https://' + 'example.test'`）。連結はどちらの側も見る
-- `fetch` を別名で包んでから呼ぶ。判定が知っている呼び出しが増えていないだけで、宛先が焼き込まれていることは変わらない。クライアントを包むなら、その包みをこのルールの一覧に足すのが対になる作業である
-- テストだから、開発用だから、という理由で残す。ファイル種別による例外は持たない。テストが宛先を必要とするなら、それはテストの設定から渡す
-- 抑制ディレクティブ
+Code this rule rejects.
 
-## オプション
+```ts
+// a written out destination passed to fetch is reported
+fetch('https://example.test/catalog');
+```
 
-取らない。有効か無効かだけを設定側で決める。通信を開く呼び出しの一覧はルールが持つ。配備先ごとに変わる性質のものではなく、変わったならルール本体を直す。
+```ts
+// a written out path appended to a configured origin is still written out text
+fetch(`${config.origin}/api/catalog`);
+```
+
+Code this rule accepts.
+
+```ts
+// a destination read from configuration passes
+fetch(config.catalogEndpoint);
+```
+
+```ts
+// a link written in markup is not an argument of a call that opens a connection
+document.body.innerHTML = `<a href="https://vite.dev/" target="_blank">Vite</a>`;
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Taking the destination into a variable before handing it over (`const url = 'https://...'; fetch(url);`). The judgment reads only the expression in the destination position, so the report clears. The destination is still baked into this file, and for a reader it is worse by the distance between where it was written and the call
+- Wrapping the destination in a function and calling that (`fetch(catalogEndpoint())` where that function returns a string). As above. A function that does not read from configuration has only moved the destination
+- Writing out only the path and taking the origin from configuration. Part of the destination is still baked in, and it cannot connect to a host with a different path structure
+- Splitting the string and concatenating (`'https://' + 'example.test'`). Concatenation reads both sides
+- Wrapping `fetch` under another name and calling that. All that changed is that the judgment knows one fewer call; the destination is still baked in. Where a client is wrapped, adding that wrapper to this rule's list is the paired work
+- Keeping it because it is a test, or because it is for development. There is no exemption by file kind. Where a test needs a destination, it comes from the test's configuration
+- A suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `hardcodedEndpoint` | A call that opens a connection must not take its destination from text written out in this file. Read the destination from configuration and pass it in: take it from the environment the process was started with, or accept it as a parameter of the function that performs the request. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

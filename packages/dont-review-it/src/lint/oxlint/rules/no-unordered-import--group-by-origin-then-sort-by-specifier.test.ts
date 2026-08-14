@@ -12,6 +12,7 @@ describe("dont-review-it/no-unordered-import--group-by-origin-then-sort-by-speci
       },
       {
         name: "the four origins in order, each block separated by one blank line",
+        documented: true,
         code: 'import { join } from "node:path";\n\nimport { memoize } from "es-toolkit";\n\nimport { report } from "./report.ts";\n\nimport type { Entry } from "./entry.ts";',
       },
       {
@@ -28,6 +29,7 @@ describe("dont-review-it/no-unordered-import--group-by-origin-then-sort-by-speci
       },
       {
         name: "a side-effect import carries no bindings and is left where its evaluation order puts it",
+        documented: true,
         code: 'import "./style.css";\nimport heroImage from "./assets/hero.png";\nimport { report } from "./report.ts";',
       },
       {
@@ -42,6 +44,7 @@ describe("dont-review-it/no-unordered-import--group-by-origin-then-sort-by-speci
     invalid: [
       {
         name: "an installed package placed above a runtime built-in is reported",
+        documented: true,
         code: 'import { memoize } from "es-toolkit";\n\nimport { join } from "node:path";',
         errors: [{ messageId: "originOutOfOrder" }],
       },
@@ -62,6 +65,7 @@ describe("dont-review-it/no-unordered-import--group-by-origin-then-sort-by-speci
       },
       {
         name: "two blocks written without a blank line between them are reported",
+        documented: true,
         code: 'import { join } from "node:path";\nimport { memoize } from "es-toolkit";',
         errors: [{ messageId: "missingBlankLineBetweenOrigins" }],
       },

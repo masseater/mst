@@ -65,6 +65,7 @@ describe("dont-review-it/no-partial-rule-set--enable-the-whole-set", () => {
       },
       {
         name: "a rules block naming only rules outside every set is another rule's business",
+        documented: true,
         code: `export default { lint: { rules: { "no-console": "error", "max-params": ["error", { max: 2 }] } } };`,
       },
       {
@@ -77,17 +78,20 @@ describe("dont-review-it/no-partial-rule-set--enable-the-whole-set", () => {
       },
       {
         name: "a rule name a configuration assembles at run time names no rule of a set",
+        documented: true,
         code: `export default { lint: { rules: { [chosenRule]: "off" } } };`,
       },
     ],
     invalid: [
       {
         name: "a configuration naming one rule of a set is reported with the rules it leaves out",
+        documented: true,
         code: `export default { lint: { rules: { "${REASSIGN_RULE}": "error" } } };`,
         errors: [{ messageId: "partialRuleSet" }],
       },
       {
         name: "a rule belonging to two sets is reported once for each set it splits",
+        documented: true,
         code: `export default { lint: { rules: { "no-promise-chain--use-async-await": "off" } } };`,
         errors: [{ messageId: "partialRuleSet" }, { messageId: "partialRuleSet" }],
       },

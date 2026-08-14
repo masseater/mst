@@ -1,80 +1,79 @@
+---
+description: "Disallow a catch clause whose body carries no statement, so catching a failure is a decision about what happens next instead of a place for the failure to stop being visible"
+---
+
 # no-empty-catch--throw-or-handle
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-本体に文が 1 つも無い `catch` 節。失敗を束縛しているかどうかは問わない。`catch {}` も `catch (failure) {}` も同じ形として扱う。
+Disallow a catch clause whose body carries no statement, so catching a failure is a decision about what happens next instead of a place for the failure to stop being visible
 
-「文が 1 つも無い」の判定は本体の直下だけを見る。次の 3 つを、文が無い本体として扱う。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-empty-catch--throw-or-handle.ts`](../../src/lint/oxlint/rules/no-empty-catch--throw-or-handle.ts)
 
-- 本体が空である（`catch (failure) {}`）
-- 本体に空文しか無い（`catch (failure) { ; }`）
-- 本体に、中身が同じ条件を満たすブロックしか無い（`catch (failure) { {} }` / `catch (failure) { { ; } }`）
+<!-- END GENERATED rule-header -->
 
-コメントは文ではない。コメントだけを書いた本体は、文が無い本体として報告する。
+## Violation
 
-仕事を持つ文が 1 つでもあれば、その中身は見ない。`register(() => {});` は渡した関数の本体が空でも、`catch` 節から見れば仕事が 1 つある。`void failure;` も仕事である。置かれた文が失敗をどこにも届けていないかどうかは [no-silent-catch--rethrow-or-handle](./no-silent-catch--rethrow-or-handle.md) が見る。この 2 本の境界は「本体に仕事があるか」と「あるものが失敗を届けているか」で切れている。
+A `catch` clause whose body carries no statement. Whether the clause binds the failure makes no difference: `catch {}` and `catch (failure) {}` are the same shape to this rule.
 
-上の判定は 2 本が共有する 1 つの述語で行う。文の数で切ると、`catch (failure) { ; }` のように構文木の上では文を持つが仕事を持たない本体が両方の入口に入り、同じ節に 2 本が別々の修正を求めることになる。
+"Carries no statement" is decided from the statements directly under the body. Three bodies count as carrying none.
 
-### 走査の境界
+- The body is empty (`catch (failure) {}`)
+- The body holds nothing but empty statements (`catch (failure) { ; }`)
+- The body holds nothing but a block whose contents meet the same condition (`catch (failure) { {} }`, `catch (failure) { { ; } }`)
 
-`try` ブロックと `finally` ブロックは対象にならない。どちらが空でも報告しない。空の `try` は捕まえる対象を持たないだけであり、空の `finally` は後始末が無いだけである。どちらも、捕まえた失敗をどうするかという問いではない。
+A comment is not a statement. A body written with comments alone is reported.
 
-入れ子の `try` があるときは、それぞれの `catch` 節を自分の本体だけで判定する。外側が文を持っていても、内側の本体が空なら内側を報告する。
+One statement that does work is enough, and its contents are not read. `register(() => {});` does work as far as the clause is concerned, even though the function handed over is empty, and `void failure;` does work as well. Whether the statement standing there carries the failure anywhere is what [no-silent-catch--rethrow-or-handle](./no-silent-catch--rethrow-or-handle.md) reads. The two rules divide on "does the body do work" against "does what it does carry the failure".
 
-`catch` 節の中で定義した関数の本体には入らない。走査の境界は本体の直下に並ぶ文までで、その文の内側は見ない。
+Both rules decide that question through one shared predicate. Splitting on the number of statements would let a body like `catch (failure) { ; }` — one that holds a statement in the syntax tree while doing no work — enter both, and one clause would be asked for two different fixes at once.
 
-### 既存の公式ルールとの境界
+The `try` block and the `finally` block are not read. Neither is reported when empty. An empty `try` has nothing to catch, and an empty `finally` has no cleanup, and neither answers the question of what happens to a failure that was caught.
 
-`no-empty` は空のブロック文をどこでも報告する。したがって `catch (failure) {}` は `no-empty` と本ルールの両方が報告する。二重に出るのは、`no-empty` が空のブロックという構文を見て、本ルールが `catch` 節という位置を見ているためである。片方を直せば両方消える。
+Nested `try` statements are judged one clause at a time, each against its own body. An inner body that carries nothing is reported even when the outer one carries statements.
 
-`no-empty` が通し、本ルールが報告する形が 3 つある。
+Functions defined inside a `catch` clause are not entered. The scan stops at the statements standing directly in the body.
 
-| 形                                       | `no-empty` の扱い                                    |
-| ---------------------------------------- | ---------------------------------------------------- |
-| `catch (failure) { /* コメントだけ */ }` | 通す                                                 |
-| `catch (failure) { ; }`                  | 通す                                                 |
-| `catch (failure) { {} }`                 | 内側のブロックだけを報告し、`catch` 節を名指ししない |
+The invariant behind the rule is that the place which catches a failure is the place that settles where the failure goes.
 
-`no-empty` が添える修正案内は「このブロックを消すか、中にコメントを入れる」である。コメント 1 行で緑になる道が案内に含まれている以上、`no-empty` を有効にしただけでは、失敗を握り潰した `catch` 節が緑のまま残る。この差が、束が本ルールを別に持つ理由である。
+Control reaching a `catch` clause means the operations inside `try` did not run to the end. A body with no statement means nothing has been settled about that fact. Control moves to the statement after the `try`, and from there the run follows exactly the path a successful one would.
 
-失敗を握り潰す形は 5 本で分担している。
+That breaks in two layers. The first is that the failure never reaches the caller. Whatever `try` was going to produce is absent or half-built, and every statement after the empty clause runs on that state. When the function returns a value, a failed run and a successful one return the same one, and the caller cannot tell them apart from the shape of what it received.
 
-| 形                                        | 見ているもの                                       |
-| ----------------------------------------- | -------------------------------------------------- |
-| 本体に文が 1 つも無い `catch` 節          | 本ルール                                           |
-| 失敗をどこにも記録しない `catch` 節       | `no-silent-catch--rethrow-or-handle`               |
-| 失敗を出力先に書いてから続行する          | `no-logged-and-continued-failure--stop-or-recover` |
-| 失敗を受け取らずに捨てる                  | `no-discarded-failure--receive-and-surface-it`     |
-| `catch (failure) { throw failure; }` だけ | `no-useless-catch`                                 |
+The second is that the failure not arriving never shows up in a check. The exception is gone, the exit status is zero, and the tests, the type checker and CI all pass. This is where a green lint over an unchecked repository comes from.
 
-本体が空で束縛も無い `catch {}` は、本ルールと `no-empty` に加えて `no-discarded-failure--receive-and-surface-it` も報告する。3 本はそれぞれ本体・ブロック構文・束縛を見ているので、報告が重なっても直す先は 1 つである。
+The shape survives because it costs the least to write. Settling where a failure goes means reading what the operation was going to produce and how the caller uses it. Leaving the body empty defers that reading while the syntax is already complete, and the deferral leaves no trace: an empty body reads equally as "nothing happens here, and that was decided" and as "this was never decided". A machine stops it because those two cannot be told apart.
 
-ファイル種別による例外は持たない。テストコードも同じに扱う。
+An option to change any of this is not offered. What counts as a body carrying no statement is settled inside the rule, and there is no threshold, no vocabulary and no per-target exception for a configuration to pass in. Changing the judgment means changing the rule.
 
-## なぜそれが要るか
+### Where it overlaps the off-the-shelf rules
 
-守っている不変条件は「失敗を捕まえた場所が、その失敗の行き先を決めている」ことである。
+`no-empty` reports an empty block statement anywhere, so `catch (failure) {}` is reported by both. The overlap is there because `no-empty` reads the syntax of an empty block while this rule reads the position of a `catch` clause. Fixing one clears both.
 
-`catch` 節に制御が移ったということは、`try` の中の操作が最後まで進まなかったということである。本体に文が無いということは、その事実に対して何も決めていないということである。制御は `try` 文の次の文へ進み、以降は成功したときとまったく同じ経路をたどる。
+Three shapes pass `no-empty` and are reported here: a body holding only a comment, a body holding only `;`, and `catch (failure) { {} }`, where `no-empty` names the inner block instead of the clause.
 
-壊れ方は 2 層ある。
+The fix `no-empty` suggests is to remove the block or put a comment in it. With a single comment offered as a way to green, enabling `no-empty` alone leaves a clause that swallowed a failure passing. That difference is why the bundle carries this rule separately.
 
-1 層目は、失敗が呼び出し側に届かないことである。`try` が用意するはずだった値は、無いか途中までしかない。空の `catch` 節を抜けた後の文は、その不完全な状態の上で動く。関数が値を返すなら、失敗した実行と成功した実行が同じ戻り値で返る。呼び出し側は戻り値の形から、どちらだったのかを復元できない。
+Swallowing a failure is divided across five rules. A body with no statement belongs here. A clause that records the failure nowhere belongs to `no-silent-catch--rethrow-or-handle`. Writing the failure to an output and carrying on belongs to `no-logged-and-continued-failure--stop-or-recover`. Discarding a failure without receiving it belongs to `no-discarded-failure--receive-and-surface-it`. A clause that only rethrows belongs to `no-useless-catch`.
 
-2 層目は、届かないことが検査に現れないことである。例外は消え、終了コードは 0 になり、テストも型検査も CI も通る。このリポジトリが最も嫌う「lint が緑なのに検査されていない」は、ここから生まれる。
+A `catch {}` with an empty body and no binding is reported by this rule, by `no-empty` and by `no-discarded-failure--receive-and-surface-it`. The three read the body, the block syntax and the binding, so the reports pile up while what has to change stays one thing.
 
-なぜこの形が残り続けるのかは、書くのに最も手数が要らないからである。失敗の行き先を決めるには、その操作が何を用意するはずだったか、呼び出し側がそれをどう使うかを読む必要がある。本体を空のままにすれば、その読み取りを先送りしたまま構文としては完成する。しかも先送りされたことは、後からその行を読んでも分からない。空の本体は「ここでは何もしないと決めた」とも「まだ決めていない」とも読めるからである。機械で止めるのは、この 2 つが読み分けられないためである。
+No file kind is exempt. Test code is read the same way.
 
-## どう直すか
+## Fix
 
-`catch` 節に入ったときに呼び出し側へ何を渡すのかを決め、それを本体に書く。答えは 2 つで、片方は必ず選べる。
+Settle what the caller receives when control enters the clause, and write that in the body. There are two answers and one of them always applies.
 
-**止める。** 失敗をそのまま再送出するか、この層の関与を名前にした失敗を投げ、元の失敗を `cause` に渡す。判断は呼び出し側へ移る。
+**Stop.** Rethrow the failure as it stands, or throw one named after this layer's part in it and hand the original over as `cause`. The decision moves to the caller.
 
-**戻す。** 失敗したときに呼び出し側が使うべき値を返す。返す値は、その操作が完了しなかったと分かる形にする。
+**Return.** Return the value the caller should use when the operation fails. Shape that value so the caller can tell the operation did not complete.
 
-このリポジトリでは、`packages/agentic-documents/src/scan/read-file.ts` が 1 つの `catch` 節で両方を使い分けている。
+In this repository, one clause in `packages/agentic-documents/src/scan/read-file.ts` does both:
 
 ```ts
 export const statOrNull = async (absolutePath: string): Promise<Stats | null> => {
@@ -87,7 +86,7 @@ export const statOrNull = async (absolutePath: string): Promise<Stats | null> =>
 };
 ```
 
-戻す側に回してよいのは、正常な入力として起こる不在だけである。その振り分けは失敗が持つ `code` で行う。
+Only an absence that arises from normal input belongs on the returning side, and the failure's `code` is what sorts it:
 
 ```ts
 const ABSENT_CODES: ReadonlySet<string> = new Set([NOT_FOUND_CODE, NOT_A_DIRECTORY_CODE]);
@@ -99,25 +98,80 @@ const isAbsent = (failure: unknown): boolean =>
   ABSENT_CODES.has(failure.code);
 ```
 
-「そこに無い」と「あるが読めない」を同じ戻り値に潰さないこと。潰すと、呼び出し側は 2 つを区別できないまま先へ進む。
+Do not collapse "it is not there" and "it is there and cannot be read" into one returned value. Collapsed, the caller carries on unable to tell them apart.
 
-**そこで決めることが無いなら、`try` ごと消す。** `catch` 節を空にする理由が「ここでは扱えない」なら、扱える場所まで失敗を通すのが正しい。`try` と `catch` を消せば失敗は呼び出し側へ伝わり、決める場所はそこへ移る。
+**When there is nothing to settle here, remove the `try` as well.** If the clause is empty because this place cannot handle the failure, then carrying it to a place that can is the right answer. Removing `try` and `catch` sends the failure to the caller, and the decision moves there with it.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- 本体にコメントを書いて埋めたことにする。コメントは文ではない。`no-empty` はこれで通るが、本ルールは通さない
-- 空文（`;`）を置く。文の並びには載るが、本体が何も持たないことは変わらない
-- 空のブロック（`{}`）を置く。入れ子にしても中を辿るので、同じ判定に当たる
-- 意味を持たない文を 1 つ置いて本体を埋める（`void failure;` / `failure;` / 中身の無いコールバックを渡す呼び出し）。本体は文を 1 つ持つので本ルールの入口からは外れるが、失敗はどこにも届いていない。[no-silent-catch--rethrow-or-handle](./no-silent-catch--rethrow-or-handle.md) が受け取る
-- `return;` だけを置いて戻したことにする。文法上は戻しているが、呼び出し側は成功したときの戻り値と区別できない。戻す側を選ぶなら、返す値は完了しなかったと分かる形にすること
-- 空の `catch` 節を、本ルールを名指ししていない設定層の下へ移す。束の一部だけを持つ層は [no-partial-rule-set--enable-the-whole-set](./no-partial-rule-set--enable-the-whole-set.md) が報告する
-- `try` / `catch` を `promise.catch(() => {})` に書き換える。`catch` 節ではなくなるので本ルールの入口から外れる。[no-promise-chain--use-async-await](./no-promise-chain--use-async-await.md) が受け取る
-- 抑制ディレクティブ
+Code this rule rejects.
 
-## オプション
+```ts
+// a catch clause with an empty body is reported
+try {
+  run();
+} catch (failure) {
+}
+```
 
-取らない。有効か無効かだけを設定側で決める。
+```ts
+// a body holding only a comment carries no statement
+try {
+  run();
+} catch (failure) {
+  // the catalog is optional here
+}
+```
 
-何を「文が無い本体」とみなすかはルールが持つ。閾値も、対象の語彙も、対象種別ごとの例外も持たないので、設定から渡すものが無い。判定を変えたくなったなら、それはルール本体を直す作業である。
+Code this rule accepts.
 
-型情報は要らない。
+```ts
+// a catch clause that rethrows carries a statement
+try {
+  run();
+} catch (failure) {
+  throw failure;
+}
+```
+
+```ts
+// a catch clause that returns a substitute carries a statement
+const read = () => {
+  try {
+    return run();
+  } catch (failure) {
+    return null;
+  }
+};
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Filling the body with a comment. A comment is not a statement. This passes `no-empty` and does not pass here
+- Placing an empty statement (`;`). It joins the list of statements while the body still holds nothing
+- Placing an empty block (`{}`). Nesting is followed, so it meets the same judgment
+- Placing one statement that means nothing (`void failure;`, `failure;`, a call handed an empty callback). The body now holds a statement and leaves this rule's reach, while the failure still arrives nowhere. [no-silent-catch--rethrow-or-handle](./no-silent-catch--rethrow-or-handle.md) receives it
+- Placing a bare `return;` and calling it returning. It returns as far as the grammar goes, while the caller cannot tell the result from a successful one. Returning means returning a value that shows the operation did not complete
+- Moving the clause under a configuration layer that does not name this rule. A layer carrying part of the bundle is reported by [no-partial-rule-set--enable-the-whole-set](./no-partial-rule-set--enable-the-whole-set.md)
+- Rewriting `try` / `catch` into `promise.catch(() => {})`. It is no longer a `catch` clause and leaves this rule's reach. [no-promise-chain--use-async-await](./no-promise-chain--use-async-await.md) receives it
+- A suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `emptyCatch` | A catch clause must not stand with a body that carries no statement. Write the ending the caller can act on into this body: rethrow the failure, throw one that names this layer's part in it with the original passed as \`cause\`, or return the value the caller should use in place of the one that never arrived. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

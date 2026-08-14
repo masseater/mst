@@ -157,8 +157,14 @@ describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-va
         {
           code: 'import { INTERNAL_SPELLINGS } from "./internal.ts";\nexport type Spelling = (typeof INTERNAL_SPELLINGS)[number];',
         },
-        { code: 'export type Loose = string | "draft";' },
         {
+          name: "a union that also admits any string names no finite vocabulary",
+          documented: true,
+          code: 'export type Loose = string | "draft";',
+        },
+        {
+          name: "a spec file is not a production source",
+          documented: true,
           code: 'export type Status = "draft" | "published";',
           filename: "/repo/src/status.test.ts",
           cwd: "/repo",
@@ -166,6 +172,8 @@ describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-va
       ],
       invalid: [
         {
+          name: "a finite vocabulary written into a schema call defines it here",
+          documented: true,
           code: 'export const schema = z.enum(["draft", "published"]);',
           errors: [{ messageId: "localFiniteValueSetWithOwnerCandidates" }],
         },
@@ -174,6 +182,8 @@ describe("dont-review-it/no-local-finite-value-set--use-or-register-canonical-va
           errors: [{ messageId: "localFiniteValueSetWithOwnerCandidates" }],
         },
         {
+          name: "a literal union type defines the same vocabulary over again",
+          documented: true,
           code: 'export type Status = "draft" | "published";',
           errors: [{ messageId: "localFiniteValueSetWithOwnerCandidates" }],
         },

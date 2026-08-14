@@ -1,63 +1,111 @@
+---
+description: "Disallow splitting a file into siblings distinguished only by a number, so every file name states the responsibility that file owns"
+---
+
 # forbid-numbered-sibling-file--name-what-each-file-owns
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-lint 対象のファイルの名前が区切り文字に続く数字で終わっていて、同じディレクトリにその相方が実在すること。両方が報告されるので、2 つに割ったなら 2 件出る。
+Disallow splitting a file into siblings distinguished only by a number, so every file name states the responsibility that file owns
 
-名前の判定は、ファイル名を最初のドットで切った先だけを見る。`parser-1.test.ts` が見られるのは `parser-1` の部分で、接尾辞の連なりは判定に入らない。分割ルールの文書が回避策として最初に名指ししているのがテストファイルの番号分割（`foo-1.test.ts` / `foo-2.test.ts`）なので、その形を素通りさせないため。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`forbid-numbered-sibling-file--name-what-each-file-owns.ts`](../../src/lint/oxlint/rules/forbid-numbered-sibling-file--name-what-each-file-owns.ts)
 
-区切り文字と認めるのはハイフンとアンダースコアの 2 つ。数字が区切りを伴わずに語に続いている形（`oauth2` / `base64` / `http2`）は対象にならない。この位置の数字は語の一部であって、分割の順番ではないため。
+<!-- END GENERATED rule-header -->
 
-相方と認めるのは、同じディレクトリにある次のどちらかである。
+## Violation
 
-- 同じ前置きに別の数字が続く名前（`order-1.ts` に対する `order-2.ts`）
-- 前置きから区切り文字を落とした名前（`handler-1.ts` に対する `handler.ts`）
+A linted file whose name ends in a separator followed by digits, with its counterpart standing in the same directory. Both halves are reported, so splitting something in two raises two reports.
 
-自分と同じ名前を持つファイルは相方にならない。`widget-1.ts` の隣にある `widget-1.test.ts` は、そのファイルのテストであって分割の片割れではないため。前置きが違えば相方にならないので、`alpha-1.ts` と `beta-2.ts` が同居していても報告しない。
+The name is judged on what stands before the first dot. What is read of `parser-1.test.ts` is `parser-1`; the chain of suffixes is left out. The oversized-file rule names splitting a test file by number (`foo-1.test.ts`, `foo-2.test.ts`) as the first of its forbidden bypasses, and reading only up to the first dot keeps that shape from passing through.
 
-報告は 1 ファイルにつき 1 件で、位置はファイル全体（Program ノード）になる。指すべき行がファイルの中に無いため。
+Two characters count as separators: the hyphen and the underscore. Digits following a word with no separator (`oauth2`, `base64`, `http2`) are not targets. Digits in that position are part of the word, not the order of a split.
 
-ディレクトリの一覧はファイルシステムに問い合わせ、その答えはプロセスが生きている間だけ覚える。lint の実行中に相方を作ったり消したりしても、そのプロセスの答えは変わらない。変わるのは次に lint を起動したときである。
+A counterpart is either of these, in the same directory:
 
-## 何を検出しないか
+- The same prefix followed by different digits (`order-2.ts` against `order-1.ts`)
+- The prefix with the separator dropped (`handler.ts` against `handler-1.ts`)
 
-**区切り文字に続く 1 文字で割った形。** `grid-x.ts` と `grid-y.ts` は報告しない。この位置の 1 文字は軸や次元を表す正当な命名でありうるので、構文だけでは番号の言い換えと区別できない。数字を letter に置き換えて逃げた形は、後述のとおり回避策として扱う。
+A file carrying the same name is not a counterpart. `widget-1.test.ts` beside `widget-1.ts` is that file's test, not the other half of a split. A different prefix is not a counterpart either, so `alpha-1.ts` and `beta-2.ts` living together are not reported.
 
-**相方のいない番号付きの名前。** `report-1.ts` が 1 つだけ置かれている状態は報告しない。このルールが見ているのは分割の痕跡であって、名前の良し悪しではない。
+One report is raised per file, covering the whole file (the Program node), because there is no line to point at inside it.
 
-**識別子の番号付け。** `handleA` / `handleB` や `step1` / `step2` は対象外である。これはファイル境界の規律であって命名の規律であり、名前そのものは別のルールが担当する。1 本のルールが両方を判定すると、片方だけ緩めたいときにもう片方まで一緒に外れる。
+The directory listing is asked of the file system, and the answer is remembered for as long as the process lives. Creating or deleting a counterpart mid-run does not change that process's answer; the next run does.
 
-**ファイルの中身。** 2 つのファイルが実際に同じ責務を持っているかは見ない。責務の数を機械が判定する手段はないので、名前という代理指標だけで止める。通ったことは「良い」ではなく「このルールでは何も言えない」を意味する。
+### What is not detected
 
-## なぜそれが要るか
+**A split by one character after the separator.** `grid-x.ts` and `grid-y.ts` are not reported. One character in that position can legitimately name an axis or a dimension, and the syntax alone cannot tell that from a number in disguise. Escaping by swapping digits for letters is treated as a bypass, below.
 
-[forbid-oversized-file--split-by-responsibility](./forbid-oversized-file--split-by-responsibility.md) は上限を超えたファイルに分割を促す。促された側が最も安く上限を下回る方法は、中身を半分に切って連番を付けることである。行数は確実に減り、責務は 1 ミリも動かない。
+**A numbered name with no counterpart.** `report-1.ts` standing alone is not reported. What this rule watches is the trace of a split, not whether a name is good.
 
-その状態は分割ルールでは検出できない。分割後のどちらのファイルも上限を下回っているので、ルールから見れば解決済みに見える。だから分割ルールの文書は、この形を「禁じる回避策」の 1 つ目として名指ししている。しかし名指ししているだけで、機械は何も見ていなかった。
+**Numbering on identifiers.** `handleA` / `handleB` and `step1` / `step2` are out of reach. This is a discipline about file boundaries, while those are about naming, and another rule carries names. One rule judging both would mean loosening one loosens the other with it.
 
-上限を持つルールを入れた以上、上限から逃げる最短経路も同時に塞がないと、上限は責務を数え直させる装置ではなく、番号を振らせる装置になる。
+**The contents of the files.** Whether two files really carry one responsibility is not read. A machine has no way to count responsibilities, so this stops at the name as a proxy. Passing means "this rule has nothing to say", not "this is fine".
 
-番号が名前として無価値であることが、このルールが番号だけを見る理由である。`order-1` と `order-2` を読んだ人は、探している振る舞いがどちらにあるかを名前から決められない。両方を開いて確かめることになり、分割前に 1 つのファイルを読んでいたときより読む量が増えている。
+### The invariant
 
-## どう直すか
+[forbid-oversized-file--split-by-responsibility](./forbid-oversized-file--split-by-responsibility.md) pushes a file over its budget to be split. The cheapest way for whoever was pushed to get back under it is cutting the contents in half and numbering them. The line count certainly falls, and the responsibilities do not move an inch.
 
-2 つのファイルがそれぞれ何を所有しているかを名前で言い切る。言い切れたなら、その名前に変える。分割後の各ファイルは、名前が所有物を説明していて、他のモジュールがその理由で import する状態でなければならない。
+That state is invisible to the oversized-file rule: both halves are under the budget, so from that rule's angle it looks solved. This is why its document names the shape as the first of its forbidden bypasses — but naming it was all that happened, and no machine was watching.
 
-言い切ろうとして 1 つしか出てこないなら、その分割は何も生んでいない。2 つを 1 つのファイルに戻し、そのうえでファイルがやっていることを減らす。戻した結果として行数の上限に当たるなら、当たったところから責務を数え直すのが正しい順序で、番号で割るのはその代わりにならない。
+Once a rule carrying a budget exists, the shortest route out from under that budget has to be closed at the same time, or the budget stops being a device that makes responsibilities be recounted and becomes a device that makes numbers be added.
 
-テストファイルでは、分割ではなくシナリオ数そのものを減らすことも正しい直し方になる。同じことを別の入り口から二度確かめている検証は落とす。
+A number being worthless as a name is why this rule watches numbers alone. Somebody reading `order-1` and `order-2` cannot decide from the names which one carries the behaviour they are after. They open both to find out, which is more reading than the single file before the split.
 
-## 禁じる回避策
+### Configuration
 
-- 数字を 1 文字の英字に置き換える（`order-a.ts` / `order-b.ts`）。構文では止まらないが、名前が所有物を説明していない状態は何も変わっていない。規約上は違反として扱いレビューで拒否する
-- 数字を序数の語に置き換える（`order-first.ts` / `order-second.ts`）。同じ理由で違反として扱う
-- 片方を別のディレクトリへ動かして同居を解く。ディレクトリの一覧しか見ないので報告は消えるが、責務が 1 つのまま 2 か所に散っている状態は悪化している
-- 数字を語の側にくっつけて区切りを消す（`order1.ts` / `order2.ts`）。このルールは区切りを要求するので報告は消える。判定が区切りに寄りすぎている合図なので、逃げた側ではなく判定を直す
-- 中身を移さずに、再 export だけのファイルを足して見かけ上の分割にする。分割されたのは名前だけで、責務は元のファイルに残っている
-- そのファイルだけ抑制ディレクティブで黙らせる。責務が 2 つに分かれている根拠が示されないまま、分割が固定される
+None. Whether the rule is on or off is settled by the configuration, and nothing else about the judgment is.
 
-## オプション
+Which files it targets is not left to the consumer, because this norm does not depend on how a deployment is arranged. In any directory, siblings that differ only by a number have names that are not doing any work. Requiring a target list would leave the rule silently inert in a repository that forgot to write one.
 
-取らない。有効か無効かだけを設定側で決める。
+## Fix
 
-対象を利用側が選ぶ形にしていないのは、これが配備先の構成に依存しない規範だからである。どのディレクトリでも、番号だけが違う兄弟は名前が仕事をしていない。対象指定を必須にすると、指定を書き忘れたリポジトリで黙って無効になる。
+State in the name what each of the two files owns. Where you can state it, rename them to that. Each file after a split has to have a name that describes what it owns, and other modules have to import it for that reason.
+
+Where trying to state it produces only one name, the split produced nothing. Put the two back into one file, then reduce what the file does. If putting them back runs into the line budget, recounting responsibilities from there is the right order, and splitting by number does not stand in for it.
+
+In test files, reducing the number of scenarios is also a correct fix. Drop verification that confirms the same thing twice through two entrances.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// two files that differ only by an ordinal are one responsibility in two places
+export const total = 1;
+```
+
+<!-- END GENERATED examples -->
+
+The subject of this rule is the names a directory holds rather than the source in front of you, so the code above is the file the report stands on, and what settles the judgment is what that file is called and what stands beside it.
+
+### Forbidden bypasses (do not do this)
+
+- Swapping the digits for a single letter (`order-a.ts`, `order-b.ts`). The syntax does not stop it, and nothing has changed about names that do not describe what they own. It is a violation under the guidelines and is rejected in review
+- Swapping the digits for ordinal words (`order-first.ts`, `order-second.ts`). A violation for the same reason
+- Moving one half into another directory so they no longer live together. Only the directory listing is read, so the report clears, while one responsibility scattered across two places has got worse
+- Attaching the digits to the word to remove the separator (`order1.ts`, `order2.ts`). This rule requires a separator, so the report clears. That is a signal that the judgment leans too hard on the separator: fix the judgment rather than the escape
+- Adding a re-export-only file for the appearance of a split without moving anything. Only the name was split; the responsibility stayed in the original file
+- Silencing that one file with a suppression directive. The split gets pinned in place with no grounds given for the responsibilities being two
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `numberedSiblingFile` | Splitting a file into siblings that differ only by a number is forbidden. \`{{sibling}}\` sits in this directory under the same name with a different number. List what each file owns and rename each file after what it owns. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

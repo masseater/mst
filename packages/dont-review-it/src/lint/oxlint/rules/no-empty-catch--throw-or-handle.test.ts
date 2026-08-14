@@ -9,10 +9,12 @@ describe("dont-review-it/no-empty-catch--throw-or-handle", () => {
       {
         name: "a catch clause that rethrows carries a statement",
         code: "try {\n  run();\n} catch (failure) {\n  throw failure;\n}",
+        documented: true,
       },
       {
         name: "a catch clause that returns a substitute carries a statement",
         code: "const read = () => {\n  try {\n    return run();\n  } catch (failure) {\n    return null;\n  }\n};",
+        documented: true,
       },
       {
         name: "a catch clause that evaluates the failure to nothing still carries a statement",
@@ -52,6 +54,7 @@ describe("dont-review-it/no-empty-catch--throw-or-handle", () => {
         name: "a catch clause with an empty body is reported",
         code: "try {\n  run();\n} catch (failure) {\n}",
         errors: [{ messageId: "emptyCatch" }],
+        documented: true,
       },
       {
         name: "leaving the failure unbound does not change the shape",
@@ -62,6 +65,7 @@ describe("dont-review-it/no-empty-catch--throw-or-handle", () => {
         name: "a body holding only a comment carries no statement",
         code: "try {\n  run();\n} catch (failure) {\n  // the catalog is optional here\n}",
         errors: [{ messageId: "emptyCatch" }],
+        documented: true,
       },
       {
         name: "a body holding only a block comment carries no statement",

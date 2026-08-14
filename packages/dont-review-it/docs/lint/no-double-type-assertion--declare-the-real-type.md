@@ -1,74 +1,137 @@
+---
+description: "Disallow asserting the type of an expression that is already the result of a type assertion, so no value arrives at its declared type through a route the type checker was told to stop checking"
+---
+
 # no-double-type-assertion--declare-the-real-type
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-型アサーション式のうち、アサーションの対象そのものが型アサーション式であるもの。対象は括弧を剥がしてから判定する。
+Disallow asserting the type of an expression that is already the result of a type assertion, so no value arrives at its declared type through a route the type checker was told to stop checking
 
-アサーションとして扱うのは 2 つの構文である。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-double-type-assertion--declare-the-real-type.ts`](../../src/lint/oxlint/rules/no-double-type-assertion--declare-the-real-type.ts)
 
-- `expr as T`（`TSAsExpression`）
-- `<T>expr`（`TSTypeAssertion`）
+<!-- END GENERATED rule-header -->
 
-この 2 つは互いに入れ替え可能なので、組み合わせも区別しない。`x as A as B`、`<B>(x as A)`、`<A>x as B`、`(x as A) as B` はすべて同じ違反として報告する。片方の綴りだけを塞ぐと、もう片方がそのまま抜け道になる。
+## Violation
 
-中間の型が何であるかは見ない。`unknown` を経由するものも、`any` を経由するものも、具体的な型を 2 つ並べたものも同じに扱う。`any` を書くこと自体は `typescript/no-explicit-any` が別に塞いでいるが、このルールが `any` の有無で判定を変えることはない。中間の型が何であれ、2 段目のアサーションの意味は「1 段目の結果に対する検査を無効にする」ことで一定である。
+A type assertion expression whose own target is a type assertion expression. The target is judged with parentheses peeled off.
 
-段数が 3 以上のとき（`x as A as B as C`）は、アサーションの上に立っているステップごとに 1 件ずつ報告する。上の例では 2 件出る。1 件にまとめると、1 つ直したあとに残りが見えず、直し切ったかどうかを判定できない。
+Two syntaxes count as an assertion.
 
-次は検出しない。
+- `expr as T` (`TSAsExpression`)
+- `<T>expr` (`TSTypeAssertion`)
 
-| 形 | 検出しない理由 |
+The two are interchangeable, so combinations are not distinguished either. `x as A as B`, `<B>(x as A)`, `<A>x as B` and `(x as A) as B` are all reported as the same violation. Close one spelling only and the other stays as a way out.
+
+What the intermediate type is is not read. Going through `unknown`, going through `any`, and two concrete types side by side are treated alike. Writing `any` at all is closed separately by `typescript/no-explicit-any`, but this rule never changes its judgment on the presence of `any`. Whatever the intermediate type, the meaning of the second assertion is constant: it disables the check on the result of the first.
+
+At three steps or more (`x as A as B as C`), one report stands per step standing on an assertion. The example above produces two. Collapse them into one and, after fixing one, the rest are invisible and whether it is fully fixed cannot be settled.
+
+These are not detected.
+
+| Shape | Why it is not detected |
 | --- | --- |
-| `x as T` / `<T>x` | 単発のアサーション。重なりが型検査器の拒否を消す条件が成立していない |
-| `[1, 2] as const` | 対象がリテラルであってアサーションではない。単発と同じ |
-| `(x satisfies T) as U` | 対象は `satisfies` 式。`satisfies` は検査を消さないので 1 段目が生きている |
-| `x! as T` | 対象は非 null 表明。型の主張を重ねてはいない |
-| `const a = x as T;` が 2 文 | それぞれが単発のアサーション |
+| `x as T` / `<T>x` | A single assertion. The condition where stacking erases the type checker's refusal does not hold |
+| `[1, 2] as const` | The target is a literal, not an assertion. Same as a single one |
+| `(x satisfies T) as U` | The target is a `satisfies` expression. `satisfies` erases no check, so the first step is alive |
+| `x! as T` | The target is a non-null assertion. No claim about a type is stacked |
+| `const a = x as T;` across two statements | Each is a single assertion |
 
-一方で `[1, 2] as const as number[]` は報告する。`as const` が単発なら対象外だが、その上にもう 1 段乗った時点で、成立しているのは「重なりによって検査が消えている」状態そのものである。
+On the other hand `[1, 2] as const as number[]` is reported. `as const` alone is out of scope, but the moment another step rides on it, what holds is precisely the state of "the check has been erased by stacking".
 
-ファイル種別による例外は持たない。テストコードも同じに扱う。
+There is no exemption by file kind. Test code is treated the same.
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「ある値がある型として扱われているなら、その対応づけを型検査器が一度は見ている」ことである。
+Where a value is being treated as some type, the type checker has looked at that correspondence at least once.
 
-単発のアサーションはこの不変条件を壊さない。`x as T` は、`x` の型と `T` に重なりがあるときだけ通り、無関係な型の組（`string as number` など）は型検査器が拒否する。書き手が持っている情報を検査器に伝える手段であって、検査そのものを外す手段ではない。
+A single assertion does not break this. `x as T` passes only where the type of `x` and `T` overlap, and an unrelated pair (`string as number`, say) is refused by the type checker. It is a means of telling the checker what the writer knows, not a means of removing the check itself.
 
-二段になると性質が変わる。1 段目で `unknown` や `any` のような、あらゆる型と重なる型へ移してしまえば、2 段目のアサーションは何を主張しても通る。`string` の値を `Buffer` と宣言することも、`null` を `User` と宣言することもできる。中間の型を具体的な型にしても事情は同じで、`A` と `B` が直接は重ならなくても、`A` と重なる `M`、`M` と重なる `B` を選べば経路ができる。二段のアサーションは、書き手の知識を伝える構文ではなく、検査の要求を回避する構文である。
+At two steps the property changes. Move to a type overlapping everything — `unknown` or `any` — at the first step, and the second assertion passes whatever it claims. A `string` value can be declared a `Buffer`; a `null` can be declared a `User`. Making the intermediate type concrete changes nothing: even where `A` and `B` do not overlap directly, choosing an `M` overlapping `A` and overlapping `B` builds the route. A two-step assertion is not syntax for conveying the writer's knowledge; it is syntax for evading what the check demands.
 
-壊れ方は 2 層ある。
+It breaks in two layers.
 
-1 層目は、宣言と実体がずれることである。`as` の右に書いた型が、以後その値の型として扱われる。実体が違っても、違っていることを知っている場所はどこにもない。
+The first is that the declaration and the actual value drift apart. The type written to the right of `as` is treated as that value's type from then on. Where the actual value differs, nowhere holds the knowledge that it differs.
 
-2 層目は、そのずれがこの行では現れないことである。誤った型の宣言は、その値を使う側で初めて壊れる。プロパティ参照が `undefined` を返し、渡した先の関数が別の形を期待し、失敗はアサーションを書いた行から離れた場所で起きる。原因の行には何の印も残っていない。型検査器はこの行で「調べるな」と指示されているので、以後どこまで矛盾が広がっても報告しない。
+The second is that the drift does not surface on this line. A wrong type declaration first breaks on the side that uses the value. A property reference returns `undefined`, the function it was handed to expects another shape, and the failure happens far from the line where the assertion was written. No mark is left on the line that caused it. The type checker was told "do not look" on this line, so however far the contradiction spreads afterwards, it reports nothing.
 
-だからこの構文は、レビューで個別に判断する対象ではなく、機械が止める対象になる。二段のアサーションが妥当な状況は、どのみち「実体の型を宣言できていない」状況の言い換えである。
+So this syntax is not something to judge case by case in review; it is something for a machine to stop. Situations where a two-step assertion is warranted are, in any case, a restatement of "the actual type has not been declared".
 
-## どう直すか
+### Configuration
 
-そのアサーションが何を主張しようとしているかで、3 通りに分かれる。
+None. Only whether the rule is on or off is settled by the configuration.
 
-**値の出どころが自分の管理下にある場合**、出どころに型を書く。関数の戻り値、変数の宣言、パラメータの型注釈のいずれかを直せば、呼び出し側でアサーションを書く理由が消える。
+## Fix
 
-**値が本当に不定の場合**、境界の型を `unknown` にして、そこから 1 段の検査で狭める。型ガードを書くか、パーサに通して失敗を値として返す。
+Three routes, depending on what the assertion is trying to claim.
+
+**Where the value's origin is under your control**, write the type at the origin. Repair the function's return type, the variable's declaration or a parameter's type annotation, and the reason for writing an assertion at the call site disappears.
+
+**Where the value really is indeterminate**, make the boundary type `unknown` and narrow from there in one checked step. Write a type guard, or run it through a parser that returns a failure as a value.
 
 ```ts
 const parseUser = (input: unknown): User | null => (isUser(input) ? input : null);
 ```
 
-`isUser` は値を実際に見る述語である。`input is User` の型述語を書いた関数の中身が値を検査していれば、宣言と実体のずれは検査した瞬間に現れる。
+`isUser` is a predicate that actually looks at the value. Where the body of a function carrying the type predicate `input is User` inspects the value, drift between declaration and reality surfaces at the moment of inspection.
 
-**外部ライブラリの型が実態と違う場合**、その差を型の側で表す。`declare module` による拡張、ジェネリック引数の明示、ライブラリが用意している型引数のいずれかで表現できることが多い。表現できない場合は、境界に 1 つだけ関数を置き、その関数の中で `unknown` から検査して返す。境界が 1 箇所になっていれば、ライブラリが直ったときに直す場所も 1 箇所になる。
+**Where an external library's types differ from reality**, express that difference on the type side. Augmenting through `declare module`, spelling out a generic argument, or a type parameter the library already offers will usually express it. Where it cannot be expressed, put exactly one function at the boundary and check from `unknown` inside it. With the boundary in one place, the place to fix when the library is fixed is one place too.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- アサーションを 2 文に割る（`const raw = x as unknown;` のあとに `const user = raw as User;`）。このルールは式の入れ子を見るので報告は消えるが、検査が消える経路はそのまま残っている。読み手にとっては、消えた検査が 2 行に散った分だけ見つけにくくなる
-- 恒等関数を挟んで段を分ける（`identity(x as A) as B`）。関数呼び出しを 1 つ挟んだだけで、通っている型の経路は同じである。挟んだ関数は `no-identity-wrapper--call-the-target-directly` に当たる
-- 中間の型を `unknown` や `any` 以外の具体的な型にして、二段に見えなくする。このルールは中間の型を見ないので報告は変わらない
-- `satisfies` を挟んで見た目を変える。`satisfies` は検査を消さないため、`(x as A) satisfies B` は型が合わなければ落ちる。落ちない形にするために `as` を足せば、また報告される
-- 抑制ディレクティブ。二段のアサーションは「型が分からない」ことの表明であり、抑止理由として書けることは、このルールが指しているものと同じ内容にしかならない
+Code this rule rejects.
 
-## オプション
+```ts
+// an assertion routed through unknown is reported
+const total = input as unknown as number;
+```
 
-取らない。有効か無効かだけを設定側で決める。
+```ts
+// three stacked assertions report each step that stands on an assertion
+const total = input as Loose as Source as Target;
+```
+
+Code this rule accepts.
+
+```ts
+// a single assertion is still checked by the type checker
+const total = input as number;
+```
+
+```ts
+// an assertion applied to a satisfies expression keeps the checked step
+const total = (input satisfies Source) as number;
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Splitting the assertion across two statements (`const raw = x as unknown;` then `const user = raw as User;`). This rule reads expression nesting, so the report clears while the route that erases the check stays exactly as it was. For a reader it is harder to find, by the amount the erased check has scattered across two lines
+- Separating the steps with an identity function (`identity(x as A) as B`). One call was inserted; the type route travelled is the same. The inserted function lands on [no-identity-wrapper--call-the-target-directly](./no-identity-wrapper--call-the-target-directly.md)
+- Making the intermediate type concrete rather than `unknown` or `any` so it does not look like two steps. This rule does not read the intermediate type, so the report is unchanged
+- Inserting `satisfies` to change the look. `satisfies` erases no check, so `(x as A) satisfies B` fails where the types do not line up. Add an `as` to make it pass and it is reported again
+- A suppression directive. A two-step assertion is a statement that the type is not known, and anything writable as a suppression reason says the same thing this rule is already pointing at
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `stackedTypeAssertion` | A type assertion must not be applied to an expression that is already a type assertion. Declare the type the value really has: annotate the place the value comes from, narrow it with a guard that inspects the value, or parse it into the target type and let the parse fail on input that does not match. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

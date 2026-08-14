@@ -118,6 +118,7 @@ describe("dont-review-it/no-detached-test-file--move-beside-source", () => {
       },
       {
         name: "a test file parked in an isolation directory is reported",
+        documented: true,
         code: "export const total = 1;",
         filename: join(fixtureDir, "isolated-tests", "orphan.test.ts"),
         errors: [

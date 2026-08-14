@@ -8,6 +8,7 @@ describe("dont-review-it/no-hardcoded-provider-id--read-from-configuration", () 
     valid: [
       {
         name: "an identity read from configuration passes",
+        documented: true,
         code: "import Provider from 'provider-sdk';\nnew Provider({ projectId: config.projectId });",
       },
       {
@@ -36,6 +37,7 @@ describe("dont-review-it/no-hardcoded-provider-id--read-from-configuration", () 
       },
       {
         name: "a setting that is not an identity may be written out",
+        documented: true,
         code: "import { RuleTester } from '@oxlint/plugins';\nnew RuleTester({ languageOptions: { parserOptions: { lang: 'ts' } } });",
       },
       {
@@ -74,6 +76,7 @@ describe("dont-review-it/no-hardcoded-provider-id--read-from-configuration", () 
     invalid: [
       {
         name: "a written out project identifier passed to a provider client is reported",
+        documented: true,
         code: "import Provider from 'provider-sdk';\nnew Provider({ projectId: 'acme-production' });",
         errors: [{ messageId: "hardcodedProviderId" }],
       },
@@ -104,6 +107,7 @@ describe("dont-review-it/no-hardcoded-provider-id--read-from-configuration", () 
       },
       {
         name: "an identity assembled with a written out prefix is still written out",
+        documented: true,
         code: "import Provider from 'provider-sdk';\nnew Provider({ projectId: `acme-${stage}` });",
         errors: [{ messageId: "hardcodedProviderId" }],
       },

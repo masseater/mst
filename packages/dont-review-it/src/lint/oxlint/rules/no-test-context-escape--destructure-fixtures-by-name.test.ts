@@ -8,6 +8,7 @@ describe("dont-review-it/no-test-context-escape--destructure-fixtures-by-name", 
     valid: [
       {
         name: "taking fixtures apart by name passes",
+        documented: true,
         code: 'it("names a behaviour", ({ subject, options }) => {});',
       },
       {
@@ -28,6 +29,7 @@ describe("dont-review-it/no-test-context-escape--destructure-fixtures-by-name", 
       },
       {
         name: "a rest over a fixture value is not a rest over the context",
+        documented: true,
         code: 'it("names a behaviour", ({ options: { ...spread } }) => {});',
       },
       {
@@ -102,6 +104,7 @@ describe("dont-review-it/no-test-context-escape--destructure-fixtures-by-name", 
     invalid: [
       {
         name: "binding the context as one name is reported",
+        documented: true,
         code: 'it("names a behaviour", (ctx) => {});',
         errors: [{ messageId: "wholeContext" }],
       },
@@ -127,6 +130,7 @@ describe("dont-review-it/no-test-context-escape--destructure-fixtures-by-name", 
       },
       {
         name: "gathering the rest of the context is reported",
+        documented: true,
         code: 'it("names a behaviour", ({ subject, ...rest }) => {});',
         errors: [{ messageId: "restContext" }],
       },

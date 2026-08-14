@@ -2,6 +2,7 @@ import { defineConfig, type OxfmtConfig } from "oxfmt";
 
 export const oxfmt: OxfmtConfig = defineConfig({
   proseWrap: "never",
+  ignorePatterns: ["**/docs/lint/*.md"],
   sortImports: {
     customGroups: [
       { groupName: "typeBuiltin", selector: "type", elementNamePattern: ["node:*"] },

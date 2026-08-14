@@ -1,6 +1,10 @@
 import { resolve } from "node:path";
 
-import { formatLintRuleIndexProblem, lintRuleIndexProblems } from "@mst/lint-rule-authoring";
+import {
+  formatLintRuleProblem,
+  lintRuleDocProblems,
+  lintRuleIndexProblems,
+} from "@mst/lint-rule-authoring";
 
 import { defaultDependencyCatalogChecksConfig } from "./dependency-catalog/config.ts";
 import { formatDependencyCatalogProblem } from "./dependency-catalog/problem.ts";
@@ -87,6 +91,21 @@ const sourceScanOutcomes = (repositoryRoot: string): readonly CheckOutcome[] => 
   ];
 };
 
+const lintRuleOutcomesOf = ({
+  repositoryRoot,
+  unreadable,
+}: {
+  readonly repositoryRoot: string;
+  readonly unreadable: boolean;
+}) => ({
+  index: unreadable
+    ? { problems: [], scanned: 0 }
+    : lintRuleIndexProblems({ repositoryRoot, write: false }),
+  docs: unreadable
+    ? { problems: [], scanned: 0 }
+    : lintRuleDocProblems({ repositoryRoot, write: false }),
+});
+
 const manifestScanOutcomes = (repositoryRoot: string): readonly CheckOutcome[] => {
   const shippablePackages = shippablePackagesProblems({
     repositoryRoot,
@@ -139,9 +158,10 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
     repositoryRoot,
     config: defaultTelemetryWiringConfig,
   });
-  const ruleIndex = dependencyCatalog.definitionUnreadable
-    ? { problems: [], scanned: 0 }
-    : lintRuleIndexProblems({ repositoryRoot, write: false });
+  const lintRules = lintRuleOutcomesOf({
+    repositoryRoot,
+    unreadable: dependencyCatalog.definitionUnreadable,
+  });
 
   const outcomes: readonly CheckOutcome[] = [
     {
@@ -172,11 +192,21 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
     {
       check: "lint-rule-index",
       unit: "workspace",
-      count: ruleIndex.scanned,
+      count: lintRules.index.scanned,
       skippedReason: dependencyCatalog.definitionUnreadable
         ? UNREADABLE_WORKSPACE_DEFINITION
         : null,
-      problems: ruleIndex.problems.map(formatLintRuleIndexProblem).toSorted(),
+      problems: lintRules.index.problems.map(formatLintRuleProblem).toSorted(),
+      warnings: [],
+    },
+    {
+      check: "lint-rule-docs",
+      unit: "rule",
+      count: lintRules.docs.scanned,
+      skippedReason: dependencyCatalog.definitionUnreadable
+        ? UNREADABLE_WORKSPACE_DEFINITION
+        : null,
+      problems: lintRules.docs.problems.map(formatLintRuleProblem).toSorted(),
       warnings: [],
     },
     {

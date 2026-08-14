@@ -1,60 +1,105 @@
+---
+description: "Disallow any lint suppression that fails to name its rule, to stop at the one statement below it, to carry its grounds, or to stand against a row in the repository ledger, so what a run has stopped saying and whose name it was stopped under can be read off the source alone"
+---
+
 # no-blanket-suppression--name-and-record
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-リンタの検出を止めるコメントのうち、止めた対象・理由・承認者のどれかが機械から読めない状態にあるもの。対象のルールを問わず、すべての抑制コメントが入口に入る。
+Disallow any lint suppression that fails to name its rule, to stop at the one statement below it, to carry its grounds, or to stand against a row in the repository ledger, so what a run has stopped saying and whose name it was stopped under can be read off the source alone
 
-抑制が受理される形は 1 つだけで、次の 4 条件を同時に満たすものである。どれか 1 つでも欠ければ報告する。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-blanket-suppression--name-and-record.ts`](../../src/lint/oxlint/rules/no-blanket-suppression--name-and-record.ts)
 
-1. 止めるルールの名前を挙げている
-2. 綴りが `oxlint-disable-next-line` または `eslint-disable-next-line` である。直後の 1 文だけを覆う
-3. `--` の後ろに理由が書かれている
-4. リポジトリのルートに置いた `approved-lint-suppressions.json` が、そのファイルのパス・そのルール・理由・承認者を持つ行を 1 つ持っている
+<!-- END GENERATED rule-header -->
 
-見るものは 2 系統ある。
+## Violation
 
-**抑制ディレクティブ。** どのファイルでも、コメントの先頭トークンが `eslint-disable` / `oxlint-disable` の系列であるものを読む。1 つのコメントについて、上の 4 条件を上から順に見て、最初に欠けたものを 1 件報告する。
+A comment that stops a linter's detection where what was stopped, why, or who approved it cannot be read by a machine. Every suppression comment enters, whatever rule it names.
 
-- ルール名を 1 つも挙げないもの。ファイル全体の綴りでも次行の綴りでも、名前を挙げない時点で報告する。何を止めたのかが残らないためである
-- ルール名を挙げていて、綴りがファイル全体または同じ行を覆うもの。理由が併記されていても報告する。覆う範囲が 1 文を超えると、後から入った別の違反まで一緒に黙る
-- 理由が書かれていないもの。`--` が無い、`--` の後ろが空白だけ、ルール名の再掲だけ、`false positive` / `誤検出` の類だけ、のいずれも理由として数えない
-- 台帳に行の無いもの。ディレクティブが挙げたルール 1 本につき 1 件報告する。台帳の行があっても `grounds` か `approver` が空なら、その行は記録として成立しない
+Exactly one shape of suppression is accepted, meeting all four conditions at once. Missing any one of them is reported.
 
-**承認台帳。** ファイル名が `vite.config` で始まり拡張子が `.ts` / `.mts` / `.cts` / `.js` / `.mjs` / `.cjs` のファイルを読むときだけ、台帳の側からも突合する。台帳の各行が名指しするファイルを読み、その行に対応するディレクティブが残っているかを見る。
+1. It names the rules it stops
+2. It is spelled `oxlint-disable-next-line` or `eslint-disable-next-line`, covering the one statement below it
+3. Grounds are written after `--`
+4. `approved-lint-suppressions.json` at the repository root carries one row holding that file's path, that rule, the grounds and an approver
 
-- 行が名指しするパスにファイルが無いもの
-- ファイルはあるが、そのルールを名指しするディレクティブをもう持たないもの
+Two things are read.
 
-消し忘れた行は、抑制が消えた後も承認が残っている状態を作る。次に同じ場所へ抑制を書いた者が、誰の判断も経ずに受理される。
+**Suppression directives.** In every file, comments whose first token is in the `eslint-disable` or `oxlint-disable` family are read. For one comment the four conditions are checked in order, and the first one missing raises one report.
 
-ルール名の照合は最後の `/` 以降で行うので、`dont-review-it/` を付けた綴りでも付けない綴りでも同じ 1 本を指す。台帳のパスはリポジトリのルートからの相対パスで書く。
+- Naming no rule at all. Whether spelled for the whole file or for the next line, naming nothing is reported, because no record survives of what was stopped
+- Naming a rule while the spelling covers the whole file or the same line. It is reported even with grounds beside it: once the cover exceeds one statement, violations that arrive later fall silent along with it
+- Carrying no grounds. No `--`, whitespace after `--`, a restatement of the rule name, and `false positive` or the like all fail to count as grounds
+- Carrying no row in the ledger. One report per rule the directive names. A row that is there but leaves `grounds` or `approver` empty does not stand as a record
 
-本ルール自身を名指しした抑制にも、同じ 4 条件をそのまま適用する。自分だけを特別扱いすると、そこが抜け道になる。
+**The approval ledger.** Only when reading a file whose name starts with `vite.config` and whose extension is one of `.ts`, `.mts`, `.cts`, `.js`, `.mjs`, `.cjs`, the reconciliation also runs from the ledger's side: the file each row names is read to see whether the directive that row stands for is still there.
 
-## なぜそれが要るか
+- A row naming a path where no file exists
+- A row whose file exists but no longer carries a directive naming that rule
 
-抑制の穴は、検出条件の穴より深い。検出条件の穴は特定の構文形にしか効かないが、抑制の穴はすべてのルールに一様に効く。ルールをどれだけ足しても、名前を挙げない無効化コメント 1 行で全部が黙るなら、足した分はすべて無効になる。
+A row left behind creates a state where the approval outlives the suppression, and whoever next writes a suppression in that place is accepted without anyone's judgment.
 
-「汎用の無効化は受け付けない」をリンタの挙動に期待すると、期待が外れていることに気付けない。ある無効化コメントが個々のルールに効くかどうかは実装依存であり、ルールの側からは観測できない。そこで、効くかどうかを問う代わりに、そういうコメントがソースに書かれていること自体を報告する。書かれていなければ、効くかどうかは結果に影響しない。
+Rule names are matched after the last `/`, so a spelling carrying `dont-review-it/` and one without point at the same rule. Ledger paths are written relative to the repository root.
 
-承認をレビューの会話やチケットの状態に置くと、機械から観測できなくなる。観測できないものは受理条件にできず、運用側の手続きとして残る。運用側の手続きは、その日その差分を読む人がその手続きを知っていることに依存する。台帳をリポジトリの中に置けば、ディレクティブと記録の突合が走査で閉じる。これは承認という行為を機械化するのではなく、承認の記録が置かれる場所を観測できる位置へ移す変更である。
+A suppression naming this rule itself is held to the same four conditions. Treating itself specially would make that the way around.
 
-理由の併記だけでは足りないのは、理由が読まれる場所がその行の周辺のままだからである。台帳の行はリポジトリの共有部分に差分として現れ、誰の名前で決めたかが残る。
+### The invariant
 
-## どう直すか
+A hole in suppression runs deeper than a hole in a detection condition. A hole in a detection condition bites on one syntactic shape; a hole in suppression bites on every rule uniformly. However many rules are added, if one disable comment naming nothing silences them all, everything added is void.
 
-直す。それが最初の選択肢である。
+Expecting "generic disables are not accepted" from the linter's behaviour leaves no way to notice when the expectation is wrong. Whether a given disable comment bites on an individual rule is implementation-dependent and cannot be observed from a rule's side. So instead of asking whether it bites, what is reported is that such a comment is written in the source at all. Not written, and whether it bites has no effect on the outcome.
 
-報告が誤りだと思うなら、次に疑うのは検出条件である。同種の抑制が何件も出るなら、抑制を増やす前に条件の側を直す。誤検出は条件を直す対象であって、抑制で覆う対象ではない。
+Putting the approval in a review conversation or a ticket's state makes it unobservable to a machine. What cannot be observed cannot be a condition of acceptance and survives as a procedure on the operations side, which depends on whoever reads that diff on that day knowing the procedure. Putting the ledger inside the repository closes the reconciliation of directives against records inside the walk. This does not mechanise the act of approving; it moves where the record of approval sits to somewhere observable.
 
-どちらでもなく、構造的に避けられないと判断したときだけ、抑制を書く。
+Grounds beside the directive are not enough, because grounds are read only around that line. A ledger row appears as a diff in a shared part of the repository, and whose name settled it stays there.
+
+### Where detection does not reach
+
+Reconciliation from the ledger's side runs only when reading `vite.config`. In an operation that never points the linter at that file, rows left behind go unreported.
+
+Whether a row is still live is judged by reading the comments of the file it names. A directive spelling written inside a string literal makes the row count as live. That error runs in the direction of fewer reports.
+
+Configuration written in JSON or YAML, and the suppression formats used there, are not part of the input.
+
+Where the ledger is loaded from is fixed to one place at the repository root. It cannot be split per workspace.
+
+### How it overlaps other rules reading the same comment
+
+Up to four rules including this one can fire on one suppression comment. The overlap is intended and the strictest conclusion is what stands.
+
+[no-silent-suppression--fix-or-justify-inline](no-silent-suppression--fix-or-justify-inline.md) forbids the reports of the rules keeping one declaration in one place from disappearing quietly, and leaves a line-level suppression carrying grounds as the way out. This rule demands a ledger row on top, so a suppression that passed there can stop here.
+
+[no-inline-suppression-of-protected-rule--register-the-exception-in-configuration](no-inline-suppression-of-protected-rule--register-the-exception-in-configuration.md) lets no suppression of a rule registered as protected through, grounds and ledger or not. For a rule in its scope, meeting these four conditions still does not let the suppression stand.
+
+`no-broad-lint-disable--use-next-line-with-reason` in `@mst/lint-rule-authoring` reports the spellings that bite wider than a line, whatever the rule. It overlaps this rule's `wideSuppression` on the same comment.
+
+### Configuration
+
+None.
+
+Carrying a condition such as "in this directory, disables naming nothing are allowed" as a setting would put that directory outside this discipline: adoption in parts, which stops the bundle standing. Where the ledger lives is fixed for the same reason — a choosable location is a route for taking the ledger outside the walk.
+
+No automatic fix is offered either. Whether to delete the suppression or rewrite it into the sanctioned shape follows from what is happening at that place.
+
+## Fix
+
+Fix it. That is the first option.
+
+If you think the report is wrong, the next thing to doubt is the detection condition. Where several suppressions of the same kind pile up, fix the condition before adding suppressions. A false report is something to fix in the condition, not something to cover with a suppression.
+
+Only when it is neither, and you judge it structurally unavoidable, write the suppression.
 
 ```ts
 // oxlint-disable-next-line no-reassign--use-spread-or-iife -- the platform interface writes the total back into the element
 element.total = 1;
 ```
 
-そのうえで、リポジトリのルートの `approved-lint-suppressions.json` に行を足す。
+Then add a row to `approved-lint-suppressions.json` at the repository root.
 
 ```jsonc
 [
@@ -67,43 +112,57 @@ element.total = 1;
 ]
 ```
 
-`path` はリポジトリのルートからの相対パス、`rule` は止めるルール名、`grounds` は理由、`approver` は承認した者の名前である。行の照合はパスとルール名の組で行うので、行番号は書かない。抑制を消したら行も消す。
+`path` is relative to the repository root, `rule` is the rule being stopped, `grounds` is the reason and `approver` is the name of whoever approved it. Rows are matched on the pair of path and rule name, so no line number is written. Delete the row when the suppression goes.
 
-機械が見るのは `grounds` と `approver` が空でないことだけで、書かれた内容が妥当かどうかは見ない。そこは `approver` に名前が載っている者が見る部分である。**4 条件を満たした抑制が機械的に通ることは、その抑制が妥当であることの根拠にはならない。**
+What the machine reads is only that `grounds` and `approver` are non-empty; whether what is written is sound it does not read. That part is read by whoever's name is on `approver`. **A suppression passing mechanically on the four conditions is no grounds for that suppression being sound.**
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- 対象を 1 文に限る条件を、その 1 文を巨大にすることで実質的に広げる。1 文に複数の違反が入る形は、それ自体が別の観点の対象になる
-- 台帳に形だけの行を足す。`grounds` に意味を持たない文字列を書けば機械は通すが、`approver` に名前が載る以上、通ったことの責任は残る
-- ファイル全体を覆う綴りにルール名と理由を添えて、次行の綴りの代わりにする。範囲が 1 文を超える時点で報告する
-- 同じ行を覆う綴りを次行の綴りの代わりにする。覆うのは直後の 1 文ではないので報告する
-- リンタの設定側でルールを無効化して、抑制コメントを書かずに済ませる。設定側の重大度と適用範囲は [no-inline-suppression-of-protected-rule--register-the-exception-in-configuration](no-inline-suppression-of-protected-rule--register-the-exception-in-configuration.md) が見る
-- 本ルールを名指しした抑制で本ルールを止める。4 条件は自分自身にも同じようにかかる
+Code this rule rejects.
 
-## 検出が届かない範囲
+```ts
+// a whole-file directive naming no rule is reported for naming none
+// oxlint-disable
+element.total = 1;
+```
 
-台帳の側からの突合は `vite.config` を読むときだけ動く。リンタをそのファイルに向けて起動しない運用では、消し忘れた行は報告されない。
+```ts
+// a directive the ledger does not record is reported for the missing row
+// oxlint-disable-next-line no-reassign--use-spread-or-iife -- the platform interface writes the total back into the element
+element.total = 1;
+```
 
-台帳の行が残っているかどうかは、名指しされたファイルのコメントを読んで判定する。文字列リテラルの中にディレクティブと同じ綴りが書かれていれば、行はまだ生きているものとして扱われる。この向きの誤りは報告を減らす側に出る。
+Code this rule accepts.
 
-JSON や YAML で書かれた設定と、そこに書かれた抑制の形式は入力に入らない。
+```ts
+// a rule name carrying its plugin prefix reaches the row that names it bare
+// oxlint-disable-next-line dont-review-it/no-reassign--use-spread-or-iife -- the platform interface writes the total back into the element
+element.total = 1;
+```
 
-台帳を読み込む先はリポジトリのルート 1 箇所に固定されている。ワークスペースごとに台帳を分けることはできない。
+<!-- END GENERATED examples -->
 
-## 同じコメントを見る他のルールとの関係
+### Forbidden bypasses (do not do this)
 
-1 つの抑制コメントに対して、本ルールを含めて最大 4 本が同時に発火することがある。重なりは意図したもので、いちばん厳しい結論が残る。
+- Widening the one-statement cover in effect by making that statement enormous. Several violations inside one statement is itself the target of another angle
+- Adding a row to the ledger for the shape of it. Writing a meaningless string in `grounds` gets it through the machine, and with a name on `approver` the responsibility for it getting through remains
+- Using a whole-file spelling with a rule name and grounds attached in place of the next-line spelling. Covering more than one statement is reported
+- Using a same-line spelling in place of the next-line spelling. What it covers is not the one statement below, so it is reported
+- Disabling the rule in the linter's configuration to avoid writing a suppression comment. Severity and scope on the configuration side are watched by [no-inline-suppression-of-protected-rule--register-the-exception-in-configuration](no-inline-suppression-of-protected-rule--register-the-exception-in-configuration.md)
+- Stopping this rule with a suppression naming this rule. The four conditions apply to itself the same way
 
-[no-silent-suppression--fix-or-justify-inline](no-silent-suppression--fix-or-justify-inline.md) は、同じ宣言を 1 箇所に保つルール群の報告が黙って消えることを禁じ、理由を併記した行単位の抑制を逃げ道として残す。本ルールはそこにさらに台帳の行を要求するので、前者を通った抑制がここで止まることがある。
+## Messages
 
-[no-inline-suppression-of-protected-rule--register-the-exception-in-configuration](no-inline-suppression-of-protected-rule--register-the-exception-in-configuration.md) は、保護対象として登録されたルールへの抑制を、理由や台帳の有無に関わらず通さない。そちらの対象になっているルールについては、本ルールの 4 条件を満たしても抑制は残せない。
+<!-- BEGIN GENERATED messages -->
 
-`@mst/lint-rule-authoring` の `no-broad-lint-disable--use-next-line-with-reason` は、ルールを問わず、行より広く効く綴りそのものを報告する。本ルールの `wideSuppression` と同じコメントで重なる。
+This rule declares no message of its own. A report carries the rule name alone.
 
-## オプション
+<!-- END GENERATED messages -->
 
-持たない。
+## Runtime Selection
 
-「このディレクトリでは名前を挙げない無効化を許す」といった条件付けを設定として持たせると、そのディレクトリがこの規律の外に出る。規律の分割採用であり、束として成立しなくなる。台帳の置き場所も固定しているのは同じ理由で、置き場所を選べると、走査の外へ台帳を出す経路ができる。
+<!-- BEGIN GENERATED runtime -->
 
-自動修正も提供しない。抑制を消すか正規の形へ書き直すかは、その箇所で何が起きているかによって決まる。
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

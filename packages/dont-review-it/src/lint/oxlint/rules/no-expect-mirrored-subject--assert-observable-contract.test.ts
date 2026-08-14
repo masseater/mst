@@ -10,11 +10,13 @@ describe("dont-review-it/no-expect-mirrored-subject--assert-observable-contract"
     valid: [
       {
         name: "an expected value the fixture never built stands on its own",
+        documented: true,
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("report", () => summarise({ id: "a", total: 2 }));\ntest("counts what it was handed", ({ report }) => {\n  expect(report).toStrictEqual({ id: "a", entries: 2 });\n});',
       },
       {
         name: "an expected value built through another route is out of this reading",
+        documented: true,
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("report", () => ({ id: "a" }));\ntest("carries the id", ({ report }) => {\n  expect(report).toStrictEqual(storedReport());\n});',
       },
@@ -213,6 +215,7 @@ describe("dont-review-it/no-expect-mirrored-subject--assert-observable-contract"
     invalid: [
       {
         name: "an object literal the fixture returns, written again as the expected value",
+        documented: true,
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("report", () => ({ id: "a", total: 2 }));\ntest("carries both fields", ({ report }) => {\n  expect(report).toStrictEqual({ id: "a", total: 2 });\n});',
         errors: [{ messageId: "mirroredSubject", data: { subject: "report" } }],
@@ -366,6 +369,7 @@ describe("dont-review-it/no-expect-mirrored-subject--assert-observable-contract"
       },
       {
         name: "spreading the subject into the expected value pins only what is overridden",
+        documented: true,
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("report", () => summarise());\ntest("marks itself settled", ({ report }) => {\n  expect(report).toStrictEqual({ ...report, settled: true });\n});',
         errors: [{ messageId: "spreadSubject", data: { subject: "report" } }],

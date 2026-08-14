@@ -8,6 +8,7 @@ describe("dont-review-it/require-vitest-extend-builder--infer-fixture-type", () 
     valid: [
       {
         name: "a fixture named beside its factory reads its type off what the factory returns",
+        documented: true,
         code: 'const test = baseTest.extend("report", () => summarise());',
       },
       {
@@ -16,6 +17,7 @@ describe("dont-review-it/require-vitest-extend-builder--infer-fixture-type", () 
       },
       {
         name: "a scoped fixture takes its options between the name and the factory",
+        documented: true,
         code: 'const test = baseTest.extend("db", { scope: "file" }, () => openDb());',
       },
       {
@@ -54,6 +56,7 @@ describe("dont-review-it/require-vitest-extend-builder--infer-fixture-type", () 
     invalid: [
       {
         name: "an object of fixtures becomes one builder call carrying the factory",
+        documented: true,
         code: "const test = baseTest.extend({ report: async ({}, use) => { await use(summarise()); } });",
         output: 'const test = baseTest.extend("report", async ({}) => summarise());',
         errors: [{ messageId: "objectFixtureDeclaration" }],
@@ -336,6 +339,7 @@ describe("dont-review-it/require-vitest-extend-builder--infer-fixture-type", () 
       },
       {
         name: "a written out type argument beside a named fixture is reported on its own",
+        documented: true,
         code: 'baseTest.extend<{ report: Report }>("report", () => summarise());',
         errors: [{ messageId: "handWrittenFixtureType" }],
       },

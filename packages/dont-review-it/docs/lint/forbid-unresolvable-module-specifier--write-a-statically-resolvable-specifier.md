@@ -1,74 +1,142 @@
+---
+description: "Disallow a module specifier whose value is decided while the program runs, so every specifier in the source is one string the checks that read specifiers can match"
+---
+
 # forbid-unresolvable-module-specifier--write-a-statically-resolvable-specifier
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-モジュール要求の指定子位置に置かれた式のうち、静的に 1 つの文字列へ畳み込めないもの。
+Disallow a module specifier whose value is decided while the program runs, so every specifier in the source is one string the checks that read specifiers can match
 
-指定子が式を取れる位置は 2 つある。動的 `import(...)` と `require(...)` である。残りの到達経路（静的 import 宣言、指定子付きの再 export、ワイルドカードの再 export、import-equals 形式、型位置の import 型参照）は文法上そこに文字列リテラルしか置けないため、この検査が走るまでもなく 1 つの文字列に決まっている。**見ていないのではなく、見る必要が無い。**
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`forbid-unresolvable-module-specifier--write-a-statically-resolvable-specifier.ts`](../../src/lint/oxlint/rules/forbid-unresolvable-module-specifier--write-a-statically-resolvable-specifier.ts)
 
-畳み込める形は次のとおりで、これらは違反ではない。
+<!-- END GENERATED rule-header -->
 
-- 書き出された文字列
-- 埋め込みがすべて畳み込めるテンプレートリテラル
-- 文字列同士の連結
-- 同じファイルで `const` に束縛され、その初期化式が畳み込めるもの。束縛は宣言の順に解決するので、上で束縛した定数から下で組み立てた定数も畳み込む
+## Violation
 
-畳み込めない形が違反になる。束縛から読む値、引数として渡ってきた値、オブジェクトのプロパティ、呼び出しの戻り値、条件式の結果である。
+An expression standing in the specifier position of a module request that does not fold to one string before the run.
 
-条件式は、候補がその場に 2 つ書かれていても違反として扱う。守るのは「指定子が 1 つの文字列に決まっていること」であって、「候補が読めること」ではない。候補を列挙したいなら分岐ごとに要求を書く。分岐の側に置かれた要求はそれぞれが 1 つの文字列を持つので、いずれも報告されない。
+There are two positions where a specifier can take an expression: dynamic `import(...)` and `require(...)`. Every other route (a static `import` declaration, a named re-export, a wildcard re-export, the import-equals form, an import type reference in type position) can hold nothing but a string literal by grammar, so it is already settled on one string before this check runs. **They are not unread — there is nothing to read.**
 
-自モジュールの位置を基準に解決する形は、表に登録されたものだけを認める。既定は `URL` と `import.meta.resolve` の 2 つで、`new URL("./worker.ts", import.meta.url).href` と `import.meta.resolve("./worker.ts")` がこれに当たる。**認めるのは、その形の頭が表に載っていて、かつ渡している引数のどれかが畳み込める場合だけである。**表への登録は「この形は静的に解決される」という宣言だが、位置を書き出していない呼び出しまで通すと、登録された形の内側へ変数を 1 つ入れるだけで検査を外せる。
+These shapes fold, and are not violations.
 
-例外として登録されたパスに置かれたファイルは、理由文を持つ行に覆われている間だけ免除になる。理由文の無い行は登録として不正であり、その行が覆うファイルで登録そのものを報告する。**理由の無い行は免除もしない。**
+- A written-out string
+- A template literal whose every substitution folds
+- A concatenation of strings
+- A value bound to a `const` in the same file whose initializer folds. Bindings resolve in declaration order, so a constant assembled below out of a constant bound above folds too
 
-報告はモジュール要求そのものを指し、メッセージには指定子位置に書かれた式をそのまま載せる。
+Shapes that do not fold are violations: a value read from a binding, a value arriving as an argument, a property of an object, the return of a call, the result of a conditional expression.
 
-## なぜそれが要るか
+A conditional expression is treated as a violation even where both candidates are written right there. What is protected is "the specifier is settled on one string", not "the candidates are readable". To enumerate candidates, write a request per branch. A request placed on a branch carries one string, so none of them is reported.
 
-指定子を読む検査は、どれも指定子の文字列を入力にしている。値が実行時にしか決まらない指定子に対して、照合の結果は「一致しなかった」ではなく「判定できなかった」になる。判定できなかったことを違反にしない設計では、それはそのまま「違反なし」として出力される。**検査の出力からは、照合して一致しなかった緑と、そもそも照合できなかった緑が区別できない。**
+Forms that resolve relative to this module's own position are allowed only where they are registered in the table. The default is two — `URL` and `import.meta.resolve` — covering `new URL("./worker.ts", import.meta.url).href` and `import.meta.resolve("./worker.ts")`. **They are allowed only where the head of the form is in the table and at least one of the arguments handed to it folds.** Registering a form declares "this form resolves before the run", but letting through a call that never writes the position out would take the check off by putting one variable inside a registered form.
 
-区別できない状態は、禁止の強さを書き手の善意と同じところまで落とす。迂回はテンプレートリテラルに変数を 1 つ入れるだけで書けるので、禁止を強くするほど、残った 1 本の経路に圧力が集まる。強い禁止と 1 行の抜け道が同居している状態が最も悪い。
+A file placed at a registered exception path is exempt only while it is covered by a row carrying a reason. A row with no reason is an invalid registration, and the registration itself is reported at the files that row covers. **A row with no reason exempts nothing.**
 
-そして、到達先を実行時に決めなければならない要求は実際には稀である。候補が閉じているなら分岐ごとのリテラルで書けるし、閉じていないなら、それはモジュール解決ではなく登録表で表現すべきものである。稀な要求のために、すべての指定子が読めない可能性を残す取引にはなっていない。
+The report points at the module request itself, and the message carries the expression written in the specifier position as it stands.
 
-## どう直すか
+### The invariant
 
-候補を分岐で列挙し、それぞれをリテラルで書く。分岐が書けるということは候補が閉じているということなので、この形に落ちるものがほとんどである。
+Every check that reads specifiers takes the specifier's string as its input. Against a specifier whose value settles only while the program runs, the result of matching is not "did not match" but "could not be judged". In a design that does not make "could not be judged" a violation, that comes out as "no violation".
 
-候補が閉じないなら、モジュール解決から登録表へ移す。実装を明示的に import し、名前から実装を引く表を作って、実行時に決まるのは表を引く名前だけにする。表に無い名前は表を読んだ側の失敗として扱えるようになり、到達先の集合はソースを読めば分かる。
+**From a check's output, a green that matched nothing and a green that could not match at all cannot be told apart.**
 
-自モジュールの位置を基準に解決したいだけなら、登録された形で書く。位置はリテラルで書き、基準だけをモジュール自身から取る。
+Being unable to tell drops the strength of a prohibition down to the level of the writer's goodwill. The detour is one variable inside a template literal, so the stronger the prohibition, the more pressure gathers on the one route still open. A strong prohibition living beside a one-line way out is the worst state of all.
 
-例外として登録できるのは、候補の集合が外部の設定で決まる構成だけである。登録する行には、何が候補を決めているのかを理由文として書く。
+And requests that genuinely have to settle their destination at run time are rare. Where the candidates are closed, they can be written as a literal per branch; where they are not closed, that belongs in a registry rather than in module resolution. Leaving every specifier possibly unreadable is not a trade worth making for a rare request.
 
-## 禁じる回避策
-
-- 指定子を組み立てる処理を別の関数やモジュールへ移し、要求の行からリテラルでない式を消すこと。移した先で組み立てている事実は変わらず、移した先の要求が同じ違反として報告される
-- 抑制コメントで黙らせること。例外の置き場は設定であって、ソースの行ではない
-- `require` を別の名前へ束ね直して呼ぶこと。要求かどうかは呼び出しの綴りで見分けるので、束ね直した呼び出しは報告されない。**報告されないことは、許されていることを意味しない**
-- 「そう書いた方が短い」を理由に例外へ登録すること。例外が認められるのは候補が外部で決まる場合だけで、理由文はその外部が何かを書く場所である
-- 理由文を空にしたまま例外を登録すること。免除されないうえ、登録そのものが報告される
-
-## オプション
+### Configuration
 
 ```jsonc
 [
   "error",
   {
     "staticallyResolvedForms": ["URL", "import.meta.resolve"],
-    "exceptions": [{ "path": "apps/*/plugin-host/**", "reason": "候補はデプロイ時の設定が決める" }],
+    "exceptions": [{ "path": "apps/*/plugin-host/**", "reason": "the deployment configuration settles the candidates" }],
   },
 ]
 ```
 
-`staticallyResolvedForms` は、解決先が静的に決まると宣言する形の頭を並べる。頭は呼び出しの被呼び出し側の綴りで、`new URL(...)` なら `URL`、`import.meta.resolve(...)` なら `import.meta.resolve` になる。省略すると既定の 2 つが効く。
+`staticallyResolvedForms` lists the heads of forms declared to resolve before the run. The head is the spelling of the call's callee: `URL` for `new URL(...)`, `import.meta.resolve` for `import.meta.resolve(...)`. Omitting it leaves the default two in effect.
 
-`exceptions` は、パスと理由文を 1 組で持つ行の列である。`path` はグロブで、`reason` が空の行は登録として不正になる。
+`exceptions` is a list of rows pairing a path with a reason. `path` is a glob, and a row whose `reason` is empty is an invalid registration.
 
-検査対象を絞る指定はこのルールが持たない。範囲の指定は lint 設定の `overrides` が表現するもので、ルール側に分岐を置くとファイル種別の定義が 2 箇所に分かれる。既定はリポジトリ全体である。
+This rule holds no setting for narrowing what is checked. Narrowing a range is what the lint configuration's `overrides` expresses; putting the branch in the rule would split the definition of a file kind across two places. The default is the whole repository.
 
-## この検査が引き受けないもの
+### What this check does not take on
 
-- 畳み込んだ結果がどのモジュールに解決されるか。畳み込みはこのルールが行い、その先の照合は指定子を読む他の検査が行う
-- 別のファイルで宣言された定数を辿って畳み込むこと。畳み込みは 1 つのファイルの中で閉じる。ファイルをまたいだ到達は、モジュールグラフを判定単位に持つ検査の担当である
-- 例外の行が実際に使われているかの棚卸し。どの検査経路にも届かない登録行を見つけるのは、登録簿と対象範囲を突き合わせる検査の担当である
+- Which module the folded result resolves to. The folding is this rule's; matching what lies past it belongs to the other checks that read specifiers
+- Folding by following a constant declared in another file. Folding closes inside one file. Reach across files belongs to the check whose unit of judgment is the module graph
+- Stock-taking of whether an exception row is actually used. Finding registration rows that reach no check route belongs to the check that reconciles the register against the range of targets
+
+## Fix
+
+Enumerate the candidates as branches and write each as a literal. Being able to write the branches means the candidates are closed, and almost everything lands in this shape.
+
+Where the candidates are not closed, move it out of module resolution and into a registry. Import the implementations explicitly, build a table mapping a name to an implementation, and leave only the lookup name settled at run time. A name absent from the table then becomes a failure on the side that read the table, and the set of destinations can be learned by reading the source.
+
+Where you only want to resolve relative to this module's own position, write it in a registered form. Write the position as a literal and take only the base from the module itself.
+
+What may be registered as an exception is only a setup where the set of candidates is settled by external configuration. Write in the row's reason what that external thing is.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// a specifier read from a binding is decided while the program runs
+export const loaded = import(chosen);
+```
+
+```ts
+// a specifier chosen by a condition is more than one string
+export const loaded = import(wide ? "./wide.ts" : "./narrow.ts");
+```
+
+Code this rule accepts.
+
+```ts
+// a template filled from a constant of this file folds to one string
+const STEM = "reader";
+export const loaded = import(`./${STEM}.ts`);
+```
+
+```ts
+// candidates written as a literal in each branch are each one string at rest
+export const load = async (wide: boolean) =>
+  wide ? await import("./wide.ts") : await import("./narrow.ts");
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Moving the assembly of the specifier into another function or module so that the request line holds no non-literal expression. That it is assembled where it moved to does not change, and the request there is reported as the same violation
+- Silencing it with a suppression comment. Exceptions live in the configuration, not on a line of source
+- Rebinding `require` to another name and calling that. Whether something is a request is told from the spelling of the call, so a rebound call is not reported. **Not being reported does not mean it is allowed**
+- Registering an exception on the grounds that "it is shorter written that way". An exception holds only where the candidates are settled externally, and the reason is where that external thing goes
+- Registering an exception while leaving the reason empty. It grants no exemption, and the registration itself is reported
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `unresolvableModuleSpecifier` | A module specifier must not be an expression decided while the program runs. \`{{written}}\` leaves this request unchecked against the modules this repository refuses. Write one literal specifier in each branch, or import every implementation and pick one by name from a table. Register a specifier that has to stay this way in this rule's \`exceptions\` option with the grounds it stays, never in a suppression comment. |
+| `groundlessSpecifierException` | A registered exception must not stand without grounds. \`{{path}}\` carries none. Write what decides the candidates outside this repository into that entry, or delete the entry and write specifiers the source spells out. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

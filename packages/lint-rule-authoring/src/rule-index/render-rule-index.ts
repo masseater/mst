@@ -1,14 +1,9 @@
+import { lintToolOf } from "../lint-tool.ts";
+
 import type { LintRuleFacts } from "./rule-facts.ts";
 
 const NOTICE_LEGEND =
   "補足の記号 — 🔧: 自動修正あり / 💡: エディタの修正候補あり / ⚙️: オプションあり";
-
-const toolOf = (sourcePath: string): string => {
-  const segments = sourcePath.split("/");
-  const lintSegmentAt = segments.indexOf("lint");
-  if (lintSegmentAt === -1) return "-";
-  return segments[lintSegmentAt + 1] ?? "-";
-};
 
 const noticesOf = (rule: LintRuleFacts): string =>
   [rule.fixable ? "🔧" : "", rule.hasSuggestions ? "💡" : "", rule.configurable ? "⚙️" : ""]
@@ -18,7 +13,7 @@ const noticesOf = (rule: LintRuleFacts): string =>
 const escapePipes = (writtenText: string): string => writtenText.replaceAll("|", "\\|");
 
 const rowOf = (rule: LintRuleFacts): string =>
-  `| [${rule.name}](./${rule.name}.md) | ${escapePipes(rule.description)} | ${toolOf(rule.sourcePath)} | ${noticesOf(rule)} |`;
+  `| [${rule.name}](./${rule.name}.md) | ${escapePipes(rule.description)} | ${lintToolOf(rule.sourcePath)} | ${noticesOf(rule)} |`;
 
 const TABLE_HEAD = "| ルール | 説明 | ツール | 補足 |\n| --- | --- | --- | --- |";
 

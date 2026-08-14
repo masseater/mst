@@ -139,6 +139,7 @@ describe("dont-review-it/no-duplicate-value-declaration--reuse-authoritative-val
     invalid: [
       {
         name: "an exported value another file exports under the same name with the same body is reported",
+        documented: true,
         code: MANIFEST_SOURCE,
         filename: subjectFilename,
         errors: [{ messageId: "duplicateValueDeclaration" }],

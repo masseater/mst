@@ -8,6 +8,7 @@ describe("dont-review-it/no-detached-declaration--declare-it-next-to-its-use", (
     valid: [
       {
         name: "a declaration standing right in front of the declaration that uses it passes",
+        documented: true,
         code: "const limit = 200;\nexport const truncate = (lines: readonly string[]) => lines.slice(0, limit);",
       },
       {
@@ -49,6 +50,7 @@ describe("dont-review-it/no-detached-declaration--declare-it-next-to-its-use", (
       },
       {
         name: "a value read before a write that clears what it read keeps its position",
+        documented: true,
         code: "export const wake = (queue: { waiters: readonly (() => void)[] }) => {\n  const woken = queue.waiters;\n  queue.waiters = [];\n  return woken;\n};",
       },
       {
@@ -79,6 +81,7 @@ describe("dont-review-it/no-detached-declaration--declare-it-next-to-its-use", (
     invalid: [
       {
         name: "a value separated from its use by a declaration that use does not name is reported",
+        documented: true,
         code: "const limit = 200;\nexport const read = () => 1;\nexport const truncate = (lines: readonly string[]) => lines.slice(0, limit);",
         output:
           "export const read = () => 1;\nconst limit = 200;\n\nexport const truncate = (lines: readonly string[]) => lines.slice(0, limit);",
@@ -100,6 +103,7 @@ describe("dont-review-it/no-detached-declaration--declare-it-next-to-its-use", (
       },
       {
         name: "a declaration standing after the declaration that uses it is reported without a fix",
+        documented: true,
         code: "export const walk = () => step();\nexport const read = () => 1;\nconst step = () => 2;",
         errors: [{ messageId: "detachedDeclaration" }],
       },

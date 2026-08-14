@@ -23,6 +23,7 @@ describe("dont-review-it/forbid-generic-restriction-rule--use-the-declared-rule"
       },
       {
         name: "this package's own rules carry their bans in their own options",
+        documented: true,
         code: `export default { lint: { rules: { "dont-review-it/${MODULE_IMPORT_RULE}": ["error", { restricted: [{ module: "lodash" }] }] } } };`,
         filename: CONFIG_FILE,
       },
@@ -67,6 +68,7 @@ describe("dont-review-it/forbid-generic-restriction-rule--use-the-declared-rule"
       },
       {
         name: "a registered exception carrying grounds is the path this rule leaves open",
+        documented: true,
         code: `export default { lint: { rules: { "no-restricted-syntax": "error" } } };`,
         filename: CONFIG_FILE,
         options: [
@@ -84,6 +86,7 @@ describe("dont-review-it/forbid-generic-restriction-rule--use-the-declared-rule"
     invalid: [
       {
         name: "a listed rule enabled in the lint configuration names where its bans belong",
+        documented: true,
         code: `export default { lint: { rules: { "no-restricted-imports": ["error", { paths: ["lodash"] }] } } };`,
         filename: CONFIG_FILE,
         errors: [
@@ -106,6 +109,7 @@ describe("dont-review-it/forbid-generic-restriction-rule--use-the-declared-rule"
       },
       {
         name: "a rule left at a level that only warns still holds the ban",
+        documented: true,
         code: `export default { lint: { rules: { "no-restricted-globals": "warn" } } };`,
         filename: CONFIG_FILE,
         errors: [

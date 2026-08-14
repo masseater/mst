@@ -1,59 +1,83 @@
+---
+description: "Disallow a fixture handing back a binding it was given, a member read off an existing value, or a value derived from a binding it was given, so the subject a fixture owns is the whole output of the code it exercises rather than a narrower view of something that already existed"
+---
+
 # no-fixture-forward-subject--yield-sut-output
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-spec ファイルの中の fixture 宣言について、その fixture が subject として渡す値を見る。
+Disallow a fixture handing back a binding it was given, a member read off an existing value, or a value derived from a binding it was given, so the subject a fixture owns is the whole output of the code it exercises rather than a narrower view of something that already existed
 
-宣言の読み取りは共有の fixture 宣言解析に従う。`extend` の呼び出しに名前と factory を並べる builder 形式と、オブジェクトの各プロパティに factory を置く旧形式の両方を読む。builder 形式では factory の `return` が渡す値、旧形式では引き渡し用の第 2 引数へ渡した値が subject にあたる。factory が読み取れない宣言（値そのものを fixture として登録した形）は subject を持たないので読まない。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-fixture-forward-subject--yield-sut-output.ts`](../../src/lint/oxlint/rules/no-fixture-forward-subject--yield-sut-output.ts)
 
-「渡された束縛」は、factory の第 1 引数から入ってくる名前を指す。第 1 引数が分割代入なら、そこで取り出した各名前がそれにあたる。第 1 引数を 1 つの識別子で受けているなら、その識別子自身がそれにあたる。
+<!-- END GENERATED rule-header -->
 
-subject は次の順で正規化してから読む。
+## Violation
 
-1. 設定で名前を挙げたラッパー呼び出しを剥がし、最後の引数に置かれた関数が返す値を subject として読み直す。ラッパー呼び出し自体は subject ではない。ネストしていれば繰り返し剥がす
-2. 型アサーション・非 null アサーション・オプショナルチェーン・`await` を剥がす
-3. 識別子なら、factory 本体とラッパー内側の本体に置かれた `const` の初期化子をたどる。同じ名前に戻ったところで止める
+For a fixture declaration in a spec file, the value that fixture hands over as the subject is read.
 
-正規化した subject の形ごとに、報告する内容が変わる。
+Reading declarations follows the shared fixture-declaration analysis. Both the builder form, which lines a name and a factory up in an `extend` call, and the older form, which puts a factory on each property of an object, are read. In the builder form the subject is the value the factory's `return` hands over; in the older form it is the value handed to the second argument used for passing along. A declaration with no readable factory — a value registered directly as the fixture — carries no subject and is not read.
 
-- 渡された束縛そのもの — `forwardedSubject`
-- メンバ式 — `projectedSubject`。根が渡された束縛でも、fixture 内で受けた局所束縛でも、同じ報告になる
-- 渡された束縛を引数に含む呼び出し — `derivedSubject`。スプレッドで渡した形も引数として数える
-- 渡された束縛をスプレッドで取り込んだオブジェクトリテラル・配列リテラル — `spreadSubject`
+"A given binding" means a name arriving through the factory's first parameter. Where the first parameter is a destructuring, each name taken out there is one. Where the first parameter is received as a single identifier, that identifier itself is one.
 
-報告位置は subject を書いた場所である。局所束縛を経由した形でも、報告は fixture が値を渡す位置に出る。報告文が名指しするのは根の束縛であって、宣言された依存名ではない。第 1 引数を 1 つの識別子で受けている fixture では、どの依存を渡しているかが決まらないため、そこで名指しできるのはその識別子だけになる。
+The subject is normalized in this order before it is read.
 
-### 違反としない形
+1. Wrapper calls named in the configuration are peeled, and the value returned by the function in the last argument is re-read as the subject. The wrapper call itself is not the subject. Nested wrappers are peeled repeatedly
+2. Type assertions, non-null assertions, optional chains and `await` are peeled
+3. Where it is an identifier, the initializer of a `const` in the factory body or inside a wrapper body is followed. The walk stops on returning to the same name
 
-- 局所束縛をそのまま渡す形。これが求めている形である
-- 局所束縛に対するメソッド呼び出し。呼び出しは新しい値を生むので subject になり得る
-- 渡された束縛に対するメソッド呼び出し。同じ理由で subject になり得る
-- 渡された束縛を名指さないオブジェクトリテラル・配列リテラル
-- `new` 式。渡された束縛を引数に取っていても読まない
+The report differs by the shape of the normalized subject.
 
-### 他のルールが担当する形
+- A given binding itself — `forwardedSubject`
+- A member expression — `projectedSubject`. The same report stands whether the root is a given binding or a local binding received inside the fixture
+- A call carrying a given binding among its arguments — `derivedSubject`. Handing it over as a spread counts as an argument too
+- An object literal or an array literal taking a given binding in through a spread — `spreadSubject`
 
-- リテラル・`new` 式・それらを局所束縛に隠した形は、fixture が subject を組み立てる形を禁じるルールが担当する
-- 既存の値から同名プロパティを写してオブジェクトを組む形は、複製した subject を禁じるルールが担当する
-- assertion 側でメンバ式を subject にする形は `no-expect-projected-subject--use-tostrictequal-on-subject` が担当する
+The report stands where the subject was written. Even through a local binding, the report comes out at the position where the fixture hands the value over. What the message names is the root binding, not the declared dependency name. In a fixture receiving the first parameter as one identifier, which dependency is being handed over is not settled, so all that can be named there is that identifier.
 
-局所束縛のメンバ射影は、組み立てを禁じるルールと担当が重なる。重複した報告はどちらの直し方も同じ（根を丸ごと渡す）ため、ここでは狭めていない。
+### Not violations
 
-## なぜそれが要るか
+- Handing a local binding over as it stands. This is the shape being asked for
+- A method call on a local binding. A call produces a new value and so can be a subject
+- A method call on a given binding. A subject for the same reason
+- An object literal or an array literal naming no given binding
+- A `new` expression. Not read even where it takes a given binding as an argument
 
-守っている不変条件は「fixture が渡す subject が、その fixture 自身がテスト対象としている値の全体である」ことである。
+### Shapes other rules take
 
-壊れ方は 2 通りある。
+- A literal, a `new` expression, and those hidden in a local binding are taken by the rule forbidding a fixture from assembling the subject
+- Assembling an object by copying same-named properties off an existing value is taken by the rule forbidding a copied subject
+- Making a member expression the subject on the assertion side is taken by [no-expect-projected-subject--use-tostrictequal-on-subject](./no-expect-projected-subject--use-tostrictequal-on-subject.md)
 
-1 通り目は、契約の持ち主が消えることである。fixture が受け取った束縛をそのまま渡すと、その fixture を名指したテストが何を検証しているのかを言えなくなる。テストの引数には新しい名前が付くが、値は上流の fixture が作ったものであり、この fixture は何も主張していない。読み手は「元の subject を見ているのか、この fixture を見ているのか」を判定できない。渡された束縛から派生させた呼び出しも同じで、派生の手続きは上流の値に属していて、この fixture の名前が指す対象にはなっていない。
+A member projection of a local binding overlaps with the rule forbidding assembly. The duplicate reports share one fix (hand the root over whole), so nothing is narrowed here.
 
-2 通り目は、検証範囲がテストの外側で狭まることである。fixture が出力の一部だけを渡すと、渡さなかった部分はその fixture を使うすべての assertion から見えなくなる。assertion 側で `expect(response.status)` と書くことは禁じられているが、fixture が `response.status` を渡してしまえば assertion は裸の識別子を受け取る。禁じたはずの射影が fixture 側から入ってきて、しかも報告されないまま緑になる。射影を fixture 側で作れなくして初めて、assertion 側の禁止が閉じる。
+### The invariant
 
-スプレッドで取り込んだリテラルを別扱いしないのも同じ理由である。`{ ...base }` は形の上ではリテラルだが、値の出所は渡された束縛のままで、subject の持ち主は移らない。
+The subject a fixture hands over is the whole of the value that fixture itself has under test.
 
-## どう直すか
+It breaks in two ways.
 
-fixture が実際に動かしたコードの出力を、丸ごと渡す。
+The first is that the owner of the contract disappears. Hand over a binding the fixture received, and a test naming that fixture can no longer say what it verifies. The test's parameter gets a new name, but the value was made by the upstream fixture and this one claims nothing. A reader cannot settle "am I looking at the original subject, or at this fixture". A call derived from a given binding is the same: the derivation belongs to the upstream value and is not what this fixture's name points at.
+
+The second is that the verified range narrows outside the test. Hand over only part of the output and the rest becomes invisible to every assertion using that fixture. Writing `expect(response.status)` is forbidden on the assertion side, but have the fixture hand over `response.status` and the assertion receives a bare identifier. The projection that was supposed to be forbidden comes in from the fixture side, and goes green unreported. Only by making projections unbuildable on the fixture side does the assertion-side prohibition close.
+
+A literal taking one in through a spread is not treated apart for the same reason. `{ ...base }` is a literal in shape, but the value's origin is still the given binding, and ownership of the subject does not move.
+
+### Configuration
+
+- `handlerScopingWrappers` — the names of wrapper calls peeled before the subject is read. The default is empty, so there is nothing to peel. Where a wrapper that only creates a handler's scope and returns what the inner function returned is in use, name it here. A name matches both an identifier call and a member call
+- `specFileSuffixes` — the suffixes taken as spec files. The default is `.test.ts` and `.test.tsx`
+
+There is no option narrowing the scope to "a straight pass-through of a given binding". What is protected is "the subject is the whole of the fixture's own output", and a pass-through is only one way of breaking it. Allow the narrowing and the same invariant can be broken by moving to a projection or a derived call.
+
+## Fix
+
+Hand over, whole, the output of the code this fixture actually ran.
 
 ```ts
 const test = baseTest.extend("response", async () => {
@@ -62,26 +86,75 @@ const test = baseTest.extend("response", async () => {
 });
 ```
 
-射影が要るなら assertion 側で読む。渡された束縛を丸ごと見たいなら、その束縛を持っている fixture をテストが直接名指す。
+Where a projection is needed, read it on the assertion side. Where the given binding is what you want to look at whole, have the test name the fixture holding that binding directly.
 
-メンバ射影は機械的な置き換えが効く形ではある。射影を根に戻すだけなら自動でできる。それでも自動修正は用意しない。置き換えただけでは fixture の名前・テストの引数名・assertion が射影を名指したままになり、契約の言い直しが済まない。言い直しが要ることを残す手段（コード内のマーカーや抑制ディレクティブ）はこのパッケージが両方とも禁じているので、途中まで書き換わった状態を残さずに済ませる方法がない。半分だけ直った spec を staged の自動修正で作らないために、報告だけを出す。
+A member projection is a shape a mechanical replacement would fit: returning the projection to its root could be done automatically. Even so, no automatic fix is offered. Replacing alone leaves the fixture's name, the test's parameter name and the assertion still naming the projection, and the contract has not been restated. Both means of leaving "a restatement is needed" behind — a marker in the code and a suppression directive — are forbidden by this package, so there is no way to avoid leaving a half-rewritten state. To keep a staged automatic fix from producing a half-fixed spec, only the report stands.
 
-渡された束縛の素通しと派生呼び出しは、そもそも置き換え先が一意に決まらない。同じ識別子を返し直しても違反は消えず、派生呼び出しは元の値が複数あり得る。
+A straight pass-through of a given binding and a derived call have no uniquely settled replacement in the first place. Returning the same identifier again does not clear the violation, and a derived call may have had several original values.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- 射影を一度局所束縛に入れてから渡す。`const` の初期化子をたどるので同じ報告になる
-- 射影を型アサーションや非 null アサーションで包む。剥いでから読む
-- 射影を設定で名前を挙げたラッパー呼び出しの内側に隠す。ラッパーを剥がしてから読む
-- 渡された束縛を `{ ...base }` や `[...base]` に入れ替えて形だけ変える。スプレッドは取り込みとして読む
-- 派生呼び出しの引数を一度局所束縛に移して `summarise(entries)` を `summarise(copied)` にする。引数は書かれたまま読むので、この形は報告されない。それでも subject の持ち主が上流のままであることは変わらないので、直し方は同じである
-- ラッパーを `handlerScopingWrappers` から外して射影を隠す。設定でこのルールの読みを狭めない
-- fixture を旧形式で書き直して検査を外す。旧形式も同じに読む
-- 抑制ディレクティブ
+Code this rule rejects.
 
-## オプション
+```ts
+// a dependency handed straight back leaves this fixture stating nothing of its own
+// in report.test.ts
+const test = baseTest.extend("report", async ({ summarised }) => summarised);
+```
 
-- `handlerScopingWrappers` — subject を読む前に剥がすラッパー呼び出しの名前。既定は空で、剥がすものを持たない。ハンドラの有効範囲を作るだけで、内側の関数が返した値をそのまま返すラッパーを使っているなら、その名前をここに挙げる。名前は識別子呼び出しとメンバ呼び出しの両方に当たる
-- `specFileSuffixes` — spec ファイルと見なす接尾辞。既定は `.test.ts` と `.test.tsx`
+```ts
+// a member read off a dependency drops the rest of that dependency
+// in report.test.ts
+const test = baseTest.extend("path", async ({ lockOptions }) => lockOptions.lockPath);
+```
 
-対象を「渡された束縛の素通しだけ」に狭めるオプションは持たない。守っているのは「subject が fixture 自身の出力の全体であること」であって、素通しはその破り方の 1 つにすぎない。狭められるようにすると、射影や派生呼び出しに置き換えるだけで同じ不変条件を破れる。
+Code this rule accepts.
+
+```ts
+// a local binding handed back whole carries every field the code produced
+// in report.test.ts
+const test = baseTest.extend("report", async () => {
+  const report = await summarise(entries);
+  return report;
+});
+```
+
+```ts
+// a method call on a dependency produces a new value
+// in report.test.ts
+const test = baseTest.extend("record", async ({ store }) => store.load());
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Putting the projection into a local binding before handing it over. `const` initializers are followed, so the same report stands
+- Wrapping the projection in a type assertion or a non-null assertion. They are peeled before reading
+- Hiding the projection inside a wrapper call named in the configuration. Wrappers are peeled before reading
+- Swapping a given binding for `{ ...base }` or `[...base]` to change only the shape. A spread is read as taking it in
+- Moving a derived call's argument into a local binding first, turning `summarise(entries)` into `summarise(copied)`. Arguments are read as written, so this shape is not reported. Ownership of the subject is still upstream all the same, and the fix is the same
+- Taking a wrapper out of `handlerScopingWrappers` to hide the projection. Do not narrow this rule's reading through configuration
+- Rewriting the fixture in the older form to leave the check. The older form is read the same way
+- A suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `forwardedSubject` | A fixture must not hand back a binding it was given. \`{{subject}}\` arrives through the fixture context and leaves this fixture unchanged. Return the output of the code this fixture exercises, and take \`{{subject}}\` apart in the assertion that needs it. |
+| `projectedSubject` | A fixture must not hand back a member read off an existing value. \`{{subject}}\` is the whole value that member comes from. Return \`{{subject}}\` itself, rename this fixture and the test parameter after the whole value, and read the member in the assertion. |
+| `derivedSubject` | A fixture must not hand back the value of a call built out of a binding it was given. \`{{subject}}\` is passed into that call. Move the call into the fixture that owns \`{{subject}}\`, and return the output of the code this fixture exercises. |
+| `spreadSubject` | A fixture must not hand back a literal built by spreading a binding it was given. \`{{subject}}\` is spread into that literal. Return the output of the code this fixture exercises, and take \`{{subject}}\` apart in the assertion that needs it. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

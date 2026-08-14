@@ -3,58 +3,30 @@ import { dirname, join } from "node:path";
 
 import { countBy } from "es-toolkit";
 
+import {
+  blockOf,
+  normalizedContent,
+  regionIn,
+  withRefreshedRegion,
+  type GeneratedRegion,
+} from "../generated-region.ts";
+import { REGENERATE_COMMAND } from "../regenerate-command.ts";
 import { lintRuleWorkspacesIn, type LintRuleWorkspace } from "./lint-rule-workspaces.ts";
 import { textOrNull } from "./read-text.ts";
 import { renderRuleIndex } from "./render-rule-index.ts";
-import { lintRuleFactsIn, type LintRuleFacts } from "./rule-facts.ts";
-import { ruleSourceFilesIn } from "./rule-source-files.ts";
+import { workspaceRulesOf } from "./workspace-rules.ts";
 
-export type LintRuleIndexProblem = {
-  readonly file: string;
-  readonly message: string;
-};
-
-export const formatLintRuleIndexProblem = ({ file, message }: LintRuleIndexProblem): string =>
-  `${file} ${message}`;
-
-const duplicatedRuleName = ({
-  ruleName,
-  workspaceDir,
-}: {
-  readonly ruleName: string;
-  readonly workspaceDir: string;
-}): string =>
-  `Two rules in \`${workspaceDir}\` must not share the name \`${ruleName}\`; they claim the same document. Rename one of them.`;
-
-type GeneratedRegion = {
-  readonly head: string;
-  readonly body: string;
-  readonly tail: string;
-};
+import type { LintRuleCheckReport, LintRuleProblem } from "../lint-rule-problem.ts";
 
 const BEGIN_MARKER = "<!-- BEGIN GENERATED lint-rules -->";
 
 const END_MARKER = "<!-- END GENERATED lint-rules -->";
 
-const regionIn = (source: string): GeneratedRegion | null => {
-  const beginAt = source.indexOf(BEGIN_MARKER);
-  const endAt = source.indexOf(END_MARKER, beginAt + BEGIN_MARKER.length);
-  if (beginAt === -1 || endAt === -1) return null;
-
-  return {
-    head: source.slice(0, beginAt + BEGIN_MARKER.length),
-    body: source.slice(beginAt + BEGIN_MARKER.length, endAt),
-    tail: source.slice(endAt),
-  };
-};
-
-const REGENERATE_COMMAND = "vp run guard:fix";
-
-const blockOf = (writtenContent: string): string =>
-  `${BEGIN_MARKER}\n\n${writtenContent}\n\n${END_MARKER}`;
+const wrappedBlockOf = (writtenContent: string): string =>
+  blockOf({ begin: BEGIN_MARKER, content: writtenContent, end: END_MARKER });
 
 const scaffoldOf = (writtenContent: string): string =>
-  `# lint ルール索引\n\nこのワークスペースの自前 lint ルールの一覧。ルール実装から生成される。手で書き換えない。更新は \`${REGENERATE_COMMAND}\` で行う。\n\n${blockOf(writtenContent)}\n`;
+  `# lint ルール索引\n\nこのワークスペースの自前 lint ルールの一覧。ルール実装から生成される。手で書き換えない。更新は \`${REGENERATE_COMMAND}\` で行う。\n\n${wrappedBlockOf(writtenContent)}\n`;
 
 type ReconcileTarget = {
   readonly absolutePath: string;
@@ -71,15 +43,12 @@ const absentIndexProblems = ({
   file,
   expected,
   write,
-}: ReconcileTarget): readonly LintRuleIndexProblem[] => {
+}: ReconcileTarget): readonly LintRuleProblem[] => {
   if (!write) return [{ file, message: missingIndex(file) }];
   mkdirSync(dirname(absolutePath), { recursive: true });
   writeFileSync(absolutePath, scaffoldOf(expected), "utf8");
   return [];
 };
-
-const missingMarkers = (file: string): string =>
-  `\`${file}\` must not lose its generated region. Put \`${BEGIN_MARKER}\` and \`${END_MARKER}\` back, or delete the file and regenerate it with \`${REGENERATE_COMMAND}\`.`;
 
 const FRONTMATTER_FENCE = "---\n";
 
@@ -93,11 +62,14 @@ const withInsertedRegion = ({
   const fenceClosesAt = source.startsWith(FRONTMATTER_FENCE)
     ? source.indexOf(`\n${FRONTMATTER_FENCE}`, FRONTMATTER_FENCE.length)
     : -1;
-  if (fenceClosesAt === -1) return `${blockOf(writtenContent)}\n\n${source}`;
+  if (fenceClosesAt === -1) return `${wrappedBlockOf(writtenContent)}\n\n${source}`;
 
   const frontmatterEndsAt = fenceClosesAt + `\n${FRONTMATTER_FENCE}`.length;
-  return `${source.slice(0, frontmatterEndsAt)}\n${blockOf(writtenContent)}\n\n${source.slice(frontmatterEndsAt)}`;
+  return `${source.slice(0, frontmatterEndsAt)}\n${wrappedBlockOf(writtenContent)}\n\n${source.slice(frontmatterEndsAt)}`;
 };
+
+const missingMarkers = (file: string): string =>
+  `\`${file}\` must not lose its generated region. Put \`${BEGIN_MARKER}\` and \`${END_MARKER}\` back, or delete the file and regenerate it with \`${REGENERATE_COMMAND}\`.`;
 
 const unmarkedIndexProblems = ({
   target,
@@ -105,7 +77,7 @@ const unmarkedIndexProblems = ({
 }: {
   readonly target: ReconcileTarget;
   readonly source: string;
-}): readonly LintRuleIndexProblem[] => {
+}): readonly LintRuleProblem[] => {
   if (!target.write) return [{ file: target.file, message: missingMarkers(target.file) }];
   writeFileSync(
     target.absolutePath,
@@ -118,30 +90,18 @@ const unmarkedIndexProblems = ({
 const staleIndex = (file: string): string =>
   `\`${file}\` must not fall behind the rule implementations. Regenerate it with \`${REGENERATE_COMMAND}\`.`;
 
-const normalizedContent = (writtenText: string): string =>
-  writtenText
-    .split("\n")
-    .map((line) =>
-      line
-        .trim()
-        .replaceAll(/[ \t]+/gu, " ")
-        .replaceAll(/-{3,}/gu, "---"),
-    )
-    .filter((line) => line !== "")
-    .join("\n");
-
 const staleIndexProblems = ({
   target,
   region,
 }: {
   readonly target: ReconcileTarget;
   readonly region: GeneratedRegion;
-}): readonly LintRuleIndexProblem[] => {
+}): readonly LintRuleProblem[] => {
   if (normalizedContent(region.body) === normalizedContent(target.expected)) return [];
   if (!target.write) return [{ file: target.file, message: staleIndex(target.file) }];
   writeFileSync(
     target.absolutePath,
-    `${region.head}\n\n${target.expected}\n\n${region.tail}`,
+    withRefreshedRegion({ region, content: target.expected }),
     "utf8",
   );
   return [];
@@ -157,29 +117,24 @@ const contentProblems = ({
   readonly file: string;
   readonly expected: string;
   readonly write: boolean;
-}): readonly LintRuleIndexProblem[] => {
+}): readonly LintRuleProblem[] => {
   const checked = { absolutePath: join(repositoryRoot, file), file, expected, write };
   const source = textOrNull(checked.absolutePath);
   if (source === null) return absentIndexProblems(checked);
 
-  const region = regionIn(source);
+  const region = regionIn({ source, begin: BEGIN_MARKER, end: END_MARKER });
   if (region === null) return unmarkedIndexProblems({ target: checked, source });
   return staleIndexProblems({ target: checked, region });
 };
 
-const workspaceRulesOf = ({
-  repositoryRoot,
-  workspace,
+const duplicatedRuleName = ({
+  ruleName,
+  workspaceDir,
 }: {
-  readonly repositoryRoot: string;
-  readonly workspace: LintRuleWorkspace;
-}): readonly LintRuleFacts[] =>
-  ruleSourceFilesIn({ repositoryRoot, workspace }).flatMap((sourcePath) =>
-    lintRuleFactsIn({
-      workspaceRoot: join(repositoryRoot, workspace.workspaceDir),
-      sourcePath,
-    }),
-  );
+  readonly ruleName: string;
+  readonly workspaceDir: string;
+}): string =>
+  `Two rules in \`${workspaceDir}\` must not share the name \`${ruleName}\`; they claim the same document. Rename one of them.`;
 
 const reconcileWorkspace = ({
   repositoryRoot,
@@ -189,7 +144,7 @@ const reconcileWorkspace = ({
   readonly repositoryRoot: string;
   readonly workspace: LintRuleWorkspace;
   readonly write: boolean;
-}): readonly LintRuleIndexProblem[] => {
+}): readonly LintRuleProblem[] => {
   const file = join(workspace.workspaceDir, "docs", "lint", "index.md");
   const rules = workspaceRulesOf({ repositoryRoot, workspace });
 
@@ -206,18 +161,13 @@ const reconcileWorkspace = ({
   ];
 };
 
-export type LintRuleIndexReport = {
-  readonly problems: readonly LintRuleIndexProblem[];
-  readonly scanned: number;
-};
-
 export const lintRuleIndexProblems = ({
   repositoryRoot,
   write,
 }: {
   readonly repositoryRoot: string;
   readonly write: boolean;
-}): LintRuleIndexReport => {
+}): LintRuleCheckReport => {
   const workspaces = lintRuleWorkspacesIn(repositoryRoot);
   return {
     problems: workspaces.flatMap((workspace) =>

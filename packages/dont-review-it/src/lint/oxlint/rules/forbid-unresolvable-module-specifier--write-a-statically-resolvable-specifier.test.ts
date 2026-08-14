@@ -30,6 +30,7 @@ describe("dont-review-it/forbid-unresolvable-module-specifier--write-a-staticall
       },
       {
         name: "a template filled from a constant of this file folds to one string",
+        documented: true,
         code: 'const STEM = "reader";\nexport const loaded = import(`./${STEM}.ts`);',
       },
       {
@@ -42,6 +43,7 @@ describe("dont-review-it/forbid-unresolvable-module-specifier--write-a-staticall
       },
       {
         name: "candidates written as a literal in each branch are each one string at rest",
+        documented: true,
         code: 'export const load = async (wide: boolean) =>\n  wide ? await import("./wide.ts") : await import("./narrow.ts");',
       },
       {
@@ -83,6 +85,7 @@ describe("dont-review-it/forbid-unresolvable-module-specifier--write-a-staticall
     invalid: [
       {
         name: "a specifier read from a binding is decided while the program runs",
+        documented: true,
         code: "export const loaded = import(chosen);",
         errors: [{ messageId: "unresolvableModuleSpecifier", data: { written: "chosen" } }],
       },
@@ -108,6 +111,7 @@ describe("dont-review-it/forbid-unresolvable-module-specifier--write-a-staticall
       },
       {
         name: "a specifier chosen by a condition is more than one string",
+        documented: true,
         code: 'export const loaded = import(wide ? "./wide.ts" : "./narrow.ts");',
         errors: [
           {

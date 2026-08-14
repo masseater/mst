@@ -1,76 +1,104 @@
+---
+description: "Disallow clearing, resetting, restoring or releasing mock state by hand, so the state a test starts from is decided by one shared runner configuration instead of by cleanup calls spread across the specs"
+---
+
 # no-redundant-mock-reset--lift-mocks-into-fixture
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-モックの状態をテストの外に戻す記述。呼び出されたメソッドの名前で判定し、4 系統ある。
+Disallow clearing, resetting, restoring or releasing mock state by hand, so the state a test starts from is decided by one shared runner configuration instead of by cleanup calls spread across the specs
 
-1. **個別のモックの後始末。** 呼び出し記録のクリア、実装のリセット、元実装の復元。既定では `mockClear` / `mockReset` / `mockRestore`。レシーバは問わない
-2. **一括のモック後始末。** モック名前空間に対する全モックのクリア・リセット・復元。既定では `clearAllMocks` / `resetAllMocks` / `restoreAllMocks`
-3. **一括のスタブ解除。** モック名前空間に対するグローバルと環境変数の一括復元。既定では `unstubAllEnvs` / `unstubAllGlobals`
-4. **後始末系メソッドの値としての取り出し。** 呼び出さずに参照だけを書く形。変数への束縛、配列やオブジェクトへの格納、引数としての受け渡し、分割代入での取り出しが該当する
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-redundant-mock-reset--lift-mocks-into-fixture.ts`](../../src/lint/oxlint/rules/no-redundant-mock-reset--lift-mocks-into-fixture.ts)
 
-書かれている場所は問わない。モジュールのトップレベルでも、fixture の本体でも、`it` の本体でも、setup フックの中でも同じ違反になる。「ここに書けば許される」場所を作らないことがこのルールの要点であり、そのためテスト宣言ファイルかどうかも見ていない。適用範囲は検出器の設定が決める。
+<!-- END GENERATED rule-header -->
 
-### 名前空間とメソッド名の読み方
+## Violation
 
-一括系（2 と 3）だけがレシーバを見る。レシーバの束縛を同一ファイルの中で辿り、辿り着いた先がモック名前空間である場合に限って報告する。
+Text returning a mock's state to what it was before the test. The judgment runs on the name of the method called, in four families.
 
-- 素の識別子の綴りが `vi` に一致する形
-- 別名を付けた import（`import { vi as runner } from "vitest"`、`import { "vi" as runner } from "vitest"`）
-- 名前空間を入れ直した束縛（`const runner = vi`、`let runner; runner = vi`）
+1. **Teardown of one mock.** Clearing the call record, resetting the implementation, restoring the original. By default `mockClear` / `mockReset` / `mockRestore`. The receiver is not read
+2. **Bulk teardown of mocks.** Clearing, resetting or restoring every mock, on the mock namespace. By default `clearAllMocks` / `resetAllMocks` / `restoreAllMocks`
+3. **Bulk release of stubs.** Restoring globals and environment variables in bulk, on the mock namespace. By default `unstubAllEnvs` / `unstubAllGlobals`
+4. **Taking a teardown method as a value.** Writing the reference without calling it: binding it to a variable, storing it in an array or an object, handing it over as an argument, taking it out by destructuring
 
-メソッド名は、プロパティ名のほか、文字列リテラルと置換を持たないテンプレートリテラルの添字も名前として読む。レシーバは型アサーション・括弧・非 null 表明・オプショナルチェーンを剥がしてから判定する。
+Where it is written makes no difference. At the module's top level, in a fixture body, in an `it` body, inside a setup hook — all the same violation. Making no place where it is allowed is this rule's point, and for that reason whether the file is a test declaration file is not read either. The range is settled by the detector's configuration.
 
-### 計算された添字
+### How the namespace and method names are read
 
-名前が読めない添字アクセスは、レシーバがモック名前空間かモックに行き着く場合に限って報告する。型情報を持たない実行系なので、「モックである」ことは束縛の追跡で決める。名前空間の追跡は上と同じで、モックは名前空間の生成 API（`fn` / `mocked` / `spyOn`）の呼び出しに行き着くかどうかで決める。
+Only the bulk families (2 and 3) read the receiver. The receiver's binding is followed inside the same file, and the report stands only where it lands on the mock namespace.
 
-添字を変数に置き換えるだけで 1 から 3 を抜けられる状態を残さないための条件であり、報告文が求めるのは「メンバ名を書き下すこと」である。
+- A plain identifier spelled `vi`
+- An import taken under another name (`import { vi as runner } from "vitest"`, `import { "vi" as runner } from "vitest"`)
+- A binding the namespace was put into (`const runner = vi`, `let runner; runner = vi`)
 
-### 意図的に広げていない範囲
+Method names are read from property names, and from string-literal and substitution-free template-literal subscripts. The receiver is read with type assertions, parentheses, non-null assertions and optional chains peeled off.
 
-| 形 | 対象にしない理由 |
+### A computed subscript
+
+A subscript whose name cannot be read is reported only where the receiver reaches the mock namespace or a mock. The runtime holds no type information, so "is a mock" is settled by following bindings. Namespace following is as above, and a mock is settled by whether it reaches a call to the namespace's creation APIs (`fn` / `mocked` / `spyOn`).
+
+That condition exists so that no state is left where replacing a subscript with a variable escapes families 1 to 3, and what the message asks for is "write the member name out".
+
+### Deliberately not widened
+
+| Shape | Why it is left out |
 | --- | --- |
-| `vi.stubEnv(...)` / `vi.stubGlobal(...)` | 差し替えそのもの。禁じているのは解除であって差し替えではない。差し替えは、それを必要とする fixture に置く |
-| `sendMail.mockReturnValue(...)` | モックの挙動設定。置き場所を見るのは別のルールで、こちらは後始末だけを見る |
-| `typeof sendMail.mockClear` | 実行されない。型注釈に書かれた同名のメンバも構文が別物なので現れない |
-| `super.mockClear()` / `this.#mockClear()` | 親クラス経由のメンバと private のメンバ。同じ綴りでも別物 |
-| `recorder.clearAllMocks()`（`recorder` は名前空間に行き着かない） | 一括系はレシーバを名前空間まで辿る。たまたま同名のメンバを持つ無関係なオブジェクトは外れる |
-| `recorder[named]()`（`recorder` は名前空間にもモックにも行き着かない） | 添字の値も対象も同定できない |
-| fixture のパラメータとして受け取ったモックへの添字アクセス | 呼び出し元が実行時に決まるので、モックであることを静的に決められない |
-| `import * as runner from "vitest"` 経由の `runner.vi` | 名前空間の同定は識別子の束縛の追跡だけで行う。名前空間 import は辿らない |
-| 別ファイルの宣言を経由した束縛 | 同一ファイルの中で閉じた追跡に限っている |
+| `vi.stubEnv(...)` / `vi.stubGlobal(...)` | The replacement itself. What is forbidden is the release, not the replacement. Put the replacement in the fixture that needs it |
+| `sendMail.mockReturnValue(...)` | Settling a mock's behaviour. Another rule reads where that is written; this one reads teardown alone |
+| `typeof sendMail.mockClear` | It does not run. A member of the same name written in a type annotation is a different syntax and does not appear either |
+| `super.mockClear()` / `this.#mockClear()` | A member through a parent class and a private member. The same spelling is a different thing |
+| `recorder.clearAllMocks()` where `recorder` reaches no namespace | The bulk families follow the receiver to the namespace. An unrelated object that happens to carry a member of the same name falls out |
+| `recorder[named]()` where `recorder` reaches neither the namespace nor a mock | Neither the subscript's value nor the target can be identified |
+| A subscript on a mock received as a fixture parameter | The caller is settled at run time, so being a mock cannot be settled statically |
+| `runner.vi` through `import * as runner from "vitest"` | The namespace is identified by following identifier bindings alone. Namespace imports are not followed |
+| A binding through a declaration in another file | The tracking is limited to what closes inside one file |
 
-個別系（1 と 4 の per-mock 側）はレシーバを一切見ない。モックでないオブジェクトが同じ綴りのメンバを持てば報告される。これは意図した過剰検出で、名前が読める限り型情報に依存せず判定できることを優先している。
+The per-mock families (1, and the per-mock side of 4) read no receiver at all. A non-mock object carrying a member of the same spelling is reported. That over-detection is intended: what matters more is that the judgment holds without type information as long as the name is readable.
 
-### 前提となる共有設定
+### The shared configuration it presumes
 
-このルールは、テストランナーの共有設定が後始末を引き受けていることとセットでのみ成立する。vitest では次の 4 つである。
+This rule holds only together with the test runner's shared configuration taking over the teardown. In vitest that is four settings.
 
-| 設定            | 各テストの前に起きること                     |
-| --------------- | -------------------------------------------- |
-| `clearMocks`    | すべてのモックの呼び出し記録をクリアする     |
-| `restoreMocks`  | スパイが差し替えた元の実装を復元する         |
-| `unstubGlobals` | `vi.stubGlobal` で差し替えたグローバルを戻す |
-| `unstubEnvs`    | `vi.stubEnv` で差し替えた環境変数を戻す      |
+| Setting | What happens before each test |
+| --- | --- |
+| `clearMocks` | Every mock's call record is cleared |
+| `restoreMocks` | The original implementation a spy replaced is restored |
+| `unstubGlobals` | Globals replaced through `vi.stubGlobal` are put back |
+| `unstubEnvs` | Environment variables replaced through `vi.stubEnv` are put back |
 
-4 つを先に入れ、実際に効いていることを確かめてからこのルールを有効にする。順序を逆にすると、後始末を消した spec が一斉に壊れる。ルールを適用するファイルの集合と、この設定が効くファイルの集合を一致させるのも設定側の仕事で、ルールは自分で範囲を絞らない。
+Put the four in first, confirm they are in effect, and only then enable this rule. Reverse the order and every spec whose teardown was deleted breaks at once. Matching the set of files this rule applies to with the set of files those settings hold for is the configuration side's job; the rule does not narrow its own range.
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「テスト間のモック状態の後始末は、共有のテスト設定が一箇所で行う」ことである。
+Teardown of mock state between tests is done in one place, by the shared test configuration.
 
-1 層目は、手で書かれた後始末が上の設定と重複していることである。重複しているだけなら害は小さい。問題は「重複していない」と感じられる場合にあり、後始末を消すと落ちるテストは、テスト境界の外に共有されたモック状態が存在することを示している。後始末の呼び出しは原因ではなく症状で、直すべきはモックの置き場所である。
+The first layer is that hand-written teardown duplicates those settings. Duplication alone does little harm. The problem is where it feels *not* duplicated: a test that breaks when the teardown is deleted shows that mock state shared beyond the test boundary exists. The teardown call is a symptom rather than the cause, and what needs fixing is where the mock is placed.
 
-2 層目は並列実行である。テストはファイル単位でも同一ファイル内の `it` 単位でも並列に走る前提で書かれる。どの後始末がどのテストの前後で走るかは実行順に依存するので、順序が安定しない前提では、手書きの後始末を根拠にした独立性は成立しない。共有設定による「各テストの前に必ず」という一様な保証だけが順序に依存しない。
+The second layer is parallel execution. Tests are written assuming they run in parallel both per file and per `it` inside one file. Which teardown runs before and after which test depends on execution order, so on a premise where the order is not stable, independence grounded in hand-written teardown does not hold. Only the shared configuration's uniform guarantee — "before every test, always" — is independent of order.
 
-3 層目は、後始末を書ける場所を 1 つでも認めると規律が場所の議論になることである。fixture の末尾なら許す、setup フックなら許すと決めた瞬間に、モジュールスコープに置かれたモックがその場所を根拠に生き延びる。場所を問わないことで、直し方が「消す」の一つに定まる。
+The third layer is that admitting even one place where teardown may be written turns the discipline into an argument about places. The moment "the end of a fixture is fine" or "a setup hook is fine" is settled, a mock placed at module scope survives on those grounds. Reading no place at all fixes the fix to one thing: delete it.
 
-## どう直すか
+### Configuration
 
-まず消す。消してテストが通るなら、それが重複だった証拠である。
+| Name | Default | Meaning |
+| --- | --- | --- |
+| `mockNamespace` | `"vi"` | The identifier spelling read as the mock namespace |
+| `perMockResetMembers` | `["mockClear", "mockReset", "mockRestore"]` | The member names taken as teardown of one mock |
+| `bulkResetMembers` | `["clearAllMocks", "resetAllMocks", "restoreAllMocks"]` | The member names taken as bulk mock teardown |
+| `bulkStubReleaseMembers` | `["unstubAllEnvs", "unstubAllGlobals"]` | The member names taken as bulk stub release |
 
-消して落ちる場合は、モジュールスコープに置かれたモックを、fixture がバインディングを返す形に組み替える。fixture は各テストのために評価され直すので設定が毎回適用され、共有設定が毎回クリアするので後始末は要らなくなる。
+Each member-name set replaces its default wholesale. Handing over an empty array leaves the default in place. The contents are derived from the test runner's public API; change runners and all four are revisited.
+
+## Fix
+
+Delete it first. If the tests pass with it gone, that is the proof it was duplication.
+
+Where deleting makes them fail, rework the mock placed at module scope into a fixture returning the binding. A fixture is re-evaluated for each test so the configuration is applied each time, and the shared configuration clears each time, so no teardown is needed.
 
 ```ts
 const test = baseTest.extend("sendMail", () => {
@@ -84,28 +112,78 @@ test("addresses the recipient", ({ sendMail }) => {
 });
 ```
 
-実在オブジェクトのメソッドを差し替えた場合の復元も共有設定が担うので、fixture 末尾の復元呼び出しは削除する。グローバルや環境変数の差し替えは、それを必要とする fixture の中に置く。解除は書かない。
+Restoring a real object's replaced method is the shared configuration's job too, so the restore call at the end of a fixture is deleted. Put a global or environment variable replacement inside the fixture that needs it, and do not write the release.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- **メソッドを別名の変数に束ねてから呼ぶ。** 取り出しそのものを系統 4 が報告する
-- **分割代入でメソッドを取り出す。** 宣言でも代入でも、パターンのキーを読むので落ちる
-- **参照を配列やオブジェクトに詰めて別の場所から呼ぶ。** 呼び出しの側は追わない。取り出した時点で報告する
-- **型を緩めてから呼ぶ。** レシーバの型アサーションは剥がしてから判定する
-- **添字アクセスで呼ぶ。** 文字列リテラルとテンプレートリテラルの添字は名前として読む。名前が読めない添字も、レシーバが名前空間かモックに行き着くなら報告する
-- **名前空間に別名を付けて import する。** 束縛を辿るので落ちる
-- **後始末を別ファイルのヘルパへ移す。** 同一ファイルの中で閉じた追跡なので報告は消えるが、テスト境界の外に状態が残ることは変わらない。書かない
-- **抑制ディレクティブ**
+Code this rule rejects.
 
-消すこと以外の対応は認めない。
+```ts
+// the call record of one mock cleared by hand
+// in send-mail.test.ts
+const sendMail = vi.fn();
+sendMail.mockClear();
+```
 
-## オプション
+```ts
+// every mock cleared at once by hand
+// in send-mail.test.ts
+vi.clearAllMocks();
+```
 
-| 名前 | 既定値 | 意味 |
-| --- | --- | --- |
-| `mockNamespace` | `"vi"` | モック名前空間として読む識別子の綴り |
-| `perMockResetMembers` | `["mockClear", "mockReset", "mockRestore"]` | 個別のモックの後始末とみなすメンバ名の集合 |
-| `bulkResetMembers` | `["clearAllMocks", "resetAllMocks", "restoreAllMocks"]` | 一括のモック後始末とみなすメンバ名の集合 |
-| `bulkStubReleaseMembers` | `["unstubAllEnvs", "unstubAllGlobals"]` | 一括のスタブ解除とみなすメンバ名の集合 |
+Code this rule accepts.
 
-メンバ名の集合は既定値を丸ごと置き換える。空の配列を渡した場合は既定値のままになる。集合の中身はテストランナーの公開 API から導出するものであり、ランナーを替えるなら 4 つとも見直す。
+```ts
+// a fixture handing a mock binding to the test carries no cleanup of its own
+// in send-mail.test.ts
+const test = baseTest.extend("sendMail", () => vi.fn());
+test("addresses the recipient", ({ sendMail }) => {
+  expect(sendMail).toHaveBeenCalledWith("a@example.com");
+});
+```
+
+```ts
+// putting a global in place is not the release of one
+// in send-mail.test.ts
+const test = baseTest.extend("clock", () => {
+  vi.stubGlobal("Date", frozenClock);
+  return frozenClock;
+});
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- **Binding the method to another name and calling that.** The extraction itself is reported by family 4
+- **Taking the method out by destructuring.** In a declaration or an assignment, the pattern's key is read, so it falls
+- **Stuffing the reference into an array or an object and calling it elsewhere.** The calling side is not followed; the report stands where it was taken out
+- **Loosening the type before calling.** A type assertion on the receiver is peeled before the judgment
+- **Calling through a subscript.** String-literal and template-literal subscripts are read as names, and a subscript whose name cannot be read is reported where the receiver reaches the namespace or a mock
+- **Importing the namespace under another name.** Bindings are followed, so it falls
+- **Moving the teardown into a helper in another file.** The tracking closes inside one file so the report clears, and state still remains beyond the test boundary. Do not write it
+- **A suppression directive**
+
+Nothing other than deleting is accepted.
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `perMockReset` | Clearing, resetting or restoring a mock by hand is forbidden. Delete this \`{{member}}\` call and move the mock into a fixture that hands its binding to the test. |
+| `bulkMockReset` | Clearing, resetting or restoring every mock by hand is forbidden. Delete this \`{{member}}\` call and move each mock into a fixture that hands its binding to the test. |
+| `bulkStubRelease` | Releasing stubbed globals or environment variables by hand is forbidden. Delete this \`{{member}}\` call and move each stub into the fixture that needs it. |
+| `resetTakenAsValue` | Taking \`{{member}}\` as a value is forbidden. Delete the reference and move the mock into a fixture that hands its binding to the test. |
+| `computedMockMember` | Reaching a member of a mock or of the mock namespace through a computed key is forbidden. Write the member name out at this call site. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

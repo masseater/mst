@@ -1,84 +1,156 @@
+---
+description: "Require every report from the rules that keep one declaration in one place to end in a repair, a registered deviation, or a suppression that carries its grounds, so what the linter stops saying is a decision somebody wrote down"
+---
+
 # no-silent-suppression--fix-or-justify-inline
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-「同じ宣言が 2 箇所にないこと」を守るルール群の報告が、直されないまま消えている状態。消えてよい形は 3 つだけで、それ以外の消え方を報告する。
+Require every report from the rules that keep one declaration in one place to end in a repair, a registered deviation, or a suppression that carries its grounds, so what the linter stops saying is a decision somebody wrote down
 
-消えてよい形は、直すこと、そのルールが持つ逸脱の登録に載せること、理由を併記した行単位の抑制を置くことである。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-silent-suppression--fix-or-justify-inline.ts`](../../src/lint/oxlint/rules/no-silent-suppression--fix-or-justify-inline.ts)
 
-対象になるルールの集合は `guardedRules` が持つ。既定は本ルール自身を含む 9 本で、既定値はルール本体にある。
+<!-- END GENERATED rule-header -->
 
-見るものは 2 系統ある。
+## Violation
 
-**抑制ディレクティブ。** どのファイルでも、コメントの先頭トークンが `eslint-disable` / `oxlint-disable` の系列であるものを読む。トークンの後ろに書かれたルール名の並びと、前後に空白を置いた `--` の後ろに書かれた理由を取り出し、次の形を報告する。
+A report from the rule group protecting "no declaration stands in two places" disappearing without being fixed. Only three ways of disappearing are allowed; every other way is reported.
 
-- 行単位の抑制（`oxlint-disable-next-line` / `oxlint-disable-line` とその `eslint-` 綴り）が、対象ルールを覆っていて、理由を伴わないもの
-- 行より広く効く抑制（`oxlint-disable` / `eslint-disable`）が、対象ルールを覆っているもの。理由が併記されていても報告する
-- 本ルール自身の名前を挙げた抑制。行単位でも、理由が併記されていても報告する
+The allowed ways are fixing it, listing it in the deviation register that rule holds, and placing a line-scoped suppression carrying a reason.
 
-覆っているかどうかは、並べられたルール名で決まる。ルール名を 1 つも挙げていない抑制はすべてのルールを覆うので、対象ルールも覆う。挙げられた名前は最後の `/` 以降で照合するので、`dont-review-it/` を付けた綴りでも付けない綴りでも同じ 1 本を指す。対象ルールを 1 本も覆わない抑制は担当外として通す。
+The set of rules in scope is held by `guardedRules`. The default is nine, this rule included, and the default lives in the rule itself.
 
-**リンタの設定。** ファイル名が `vite.config` で始まり拡張子が `.ts` / `.mts` / `.cts` / `.js` / `.mjs` / `.cjs` のファイルだけを、設定として追加で読む。default export された式まで降り、それが関数呼び出しで包まれていれば第 1 引数まで降りる。`lint` の値も同じように包みを外す。`dontReviewItPreset.lint(...)` で包まれた設定は、この経路で中身が見える。
+Two families are read.
 
-そこから見るのは次の 3 つである。
+**Suppression directives.** In any file, comments whose opening token belongs to the `eslint-disable` / `oxlint-disable` families are read. The list of rule names after the token, and the reason after a `--` surrounded by whitespace, are taken out, and these shapes are reported.
 
-- `rules` と `overrides[].rules` に書かれた対象ルールのうち、実行を失敗させない水準に置かれているもの。`off` / `allow` / `warn` と、2 未満の数値がこれにあたる。`[水準, 設定]` の形なら先頭を見る。`LINT_SEVERITY.OFF` のように名前付き定数のメンバーとして書かれていれば、そのメンバー名を水準として読む
-- `ignorePatterns` に書かれた文字列のうち、`excludedRegions` が挙げる領域名をセグメントに 1 つも含まないもの
-- `ignorePatterns` に書かれた文字列のうち、`forbiddenPaths` に登録された禁止パスに届くもの
+- A line-scoped suppression (`oxlint-disable-next-line` / `oxlint-disable-line` and their `eslint-` spellings) covering a guarded rule and carrying no reason
+- A suppression holding wider than a line (`oxlint-disable` / `eslint-disable`) covering a guarded rule. Reported even where a reason is written
+- A suppression naming this rule itself. Reported even line-scoped, even with a reason
 
-後ろ 2 つは設定どうしの突き合わせで決まる。除外してよい領域の定義も、禁止パスとして登録された集合も、どちらも設定に書かれているからである。判定に使うのは設定の現在の状態だけで、変更前との比較は要らない。
+Whether it covers is settled by the rule names listed. A suppression listing no rule name covers every rule and therefore covers the guarded ones. Listed names are matched after the last `/`, so a spelling with `dont-review-it/` and one without name the same rule. A suppression covering not one guarded rule passes as somebody else's business.
 
-## なぜそれが要るか
+**The linter's configuration.** Only files whose name starts with `vite.config` and whose extension is `.ts`, `.mts`, `.cts`, `.js`, `.mjs` or `.cjs` are additionally read as configuration. The walk descends to the default-exported expression, and where that is wrapped in a function call, to its first argument. The value of `lint` is unwrapped the same way, so a configuration wrapped in `dontReviewItPreset.lint(...)` has its contents visible through this route.
 
-1 層目は、抑制が違反を直すより安いことである。報告を受け取った側にとって、抑制は 1 行で終わる。集約や逸脱の登録は設計判断を要する。締切の前では安いほうが選ばれる。
+Three things are read from there.
 
-2 層目は、抑制されたコードが以後どのルールの目にも入らなくなることである。違反が「無い」のではなく「見えない」状態になり、見えないこと自体が見えない。検出範囲が狭いことは範囲を読めば分かるが、抑制で欠けた分は報告 0 件と区別が付かない。
+- Guarded rules written in `rules` and `overrides[].rules` sitting at a level that does not fail a run: `off`, `allow`, `warn`, and numbers below 2. For the `[level, options]` form the head is read. Written as a member of a named constant such as `LINT_SEVERITY.OFF`, the member name is read as the level
+- Strings in `ignorePatterns` carrying no segment naming a region listed in `excludedRegions`
+- Strings in `ignorePatterns` reaching a forbidden path registered in `forbiddenPaths`
 
-3 層目は、抑制がすべてのルールに共通の抜け道であることである。個々のルールがどれだけ回避策を潰しても、抑制が野放しならまとめて 1 行で外せる。だから抑制を受ける担当を 1 本置き、そこを塞ぐ。
+The last two are settled by reconciling configuration against configuration: both the definition of regions that may be excluded and the set registered as forbidden paths are written in the configuration. Only the configuration's current state is used; no comparison with a previous state is needed.
 
-理由の併記を求めるのは、抑制を減らすためではなく、抑制を読めるものにするためである。理由が書かれていれば後から見た人がそれを評価できる。書かれていなければ、評価する材料がないまま残り続ける。
+### The invariant
 
-ファイル全体に効く抑制を、理由が併記されていても報告するのは、それが「いまそこにある違反」だけでなく「これから書かれる違反」も先回りして消すからである。書いた本人が評価できるのは前者だけで、後者について書かれた理由は存在しえない。
+The first layer is that a suppression is cheaper than fixing the violation. For whoever received the report, a suppression takes one line, while consolidating or registering a deviation demands a design judgment. Before a deadline the cheaper one gets chosen.
 
-本ルール自身への抑制を通さないのは、それが抑制の禁止を 1 手で無効化する操作だからである。通せば本ルールは存在しないのと同じになる。
+The second layer is that suppressed code drops out of every rule's sight afterwards. The violation is not absent but invisible, and the invisibility is itself invisible. A narrow detection range can be learnt by reading the range; what a suppression removed is indistinguishable from a report count of zero.
 
-## どう直すか
+The third layer is that suppression is a way out shared by every rule. However thoroughly each rule closes its own bypasses, an unchecked suppression takes them all off in one line. So one rule is placed to receive suppressions, and that place is closed.
 
-直す。それが最初の選択肢である。
+Asking for a reason is not for reducing suppressions but for making them readable. With a reason written, somebody looking later can evaluate it. Without one, it stays with no material to evaluate.
 
-直せない事情があるなら、そのルールが持つ逸脱の登録に載せる。載せるときは、なぜ必要かと、どうなったら消せるかを併記する。逸脱を「消える予定のあるもの」に保つための条件である。カタログ参照ルールの逸脱リストと、ファイル機構の許可リストがこれにあたる。
+A suppression holding over a whole file is reported even with a reason because it erases, ahead of time, not only the violations standing there now but the violations to be written later. Whoever wrote it can evaluate only the former; a reason about the latter cannot exist.
 
-どちらも取れない場合に限り、理由を併記した行単位の抑制を置く。書式は `// oxlint-disable-next-line <ルール名> -- <理由>` で、対象の 1 行の直上に置く。理由には、なぜこの箇所が例外なのかを書く。何がその 1 行を他と違うものにしているのか、その事情が消えるとしたら何が起きたときかを書けば足りる。
+A suppression of this rule itself does not pass because it voids the prohibition on suppression in one move. Let it through and this rule may as well not exist.
 
-設定側の報告についても順序は同じである。水準を下げて通すのではなく、報告されたコードを直す。直せないなら逸脱として登録する。無視設定に載せた領域が生成物・取得済みの依存・バージョン管理の内部領域のいずれかであるなら、それは抑制ではなく母集団の定義なので、`excludedRegions` に領域名を足して定義の側を更新する。
+### Configuration
 
-## 禁じる回避策
-
-- 理由欄に内容のない文字列を書き、形式だけ整える。ルール名だけ、あるいは「誤検出」「false positive」だけを書いたものは理由として扱わないが、それらしく見える無内容な文字列は機械では見分けられない。読み手に評価されるのは書いた本人ではなく理由の中身である
-- 対象ルールの重大度を、報告は出るが失敗にはならない水準へ落とし、報告を残したまま無視する運用にする。設定に書かれた水準は読むが、`vp lint` に渡す引数で下げた場合は設定に痕跡が残らない
-- 違反のあるファイルを、母集団の除外領域に見えるパスへ移す。移した先が生成物の置き場に見えるだけで、コードは 1 行も直っていない
-- 水準や無視パターンを設定ファイルの外の変数へ逃がす。式が読めなければ本ルールは何も報告しないので、逃がした先は判定の外に出る。水準と無視パターンは設定ファイルに直接書く
-- `extends` の先にある設定や、別の綴りの設定ファイルへ移す。本ルールが読むのは `vite.config` から始まる 1 ファイルの現在の状態だけである
-- 対象ルールを `guardedRules` から外して通す。外した瞬間、そのルールの報告は黙って消せるようになる
-
-## 検出が届かない範囲
-
-`extends` の先にある設定、CLI の引数で与えた水準、リンタを起動しない運用は、いずれも `vite.config` の中身を読むだけでは見えない。ここに落ちたものは検出されないが、許されているわけではない。
-
-## 上流の同種ルールとの関係
-
-[@mst/lint-rule-authoring](../../../lint-rule-authoring/src/lint/oxlint/rules/no-broad-lint-disable--use-next-line-with-reason.ts) の `no-broad-lint-disable--use-next-line-with-reason` は、ルールを問わず、行より広く効く抑制の綴りそのものを報告する。本ルールが見るのは、対象ルールの報告が消えているかどうかである。1 つのコメントに両方が発火することがあり、それは意図した重なりである。前者は抑制の書き方を、後者は抑制の可否を決めている。
-
-## オプション
-
-- `guardedRules`（文字列の配列、任意）: 報告が消えることを禁じるルール名の集合。既定は「同じ宣言が 2 箇所にないこと」を守る 8 本と本ルール自身の計 9 本
-- `excludedRegions`（文字列の配列、任意）: 走査から除外してよい領域の名前。無視設定に載った指定が母集団の定義なのか抑制なのかを、この定義との照合で分ける。既定は `.git` / `node_modules` / `dist` / `coverage`
-- `forbiddenPaths`（文字列の配列、任意）: ファイル機構が禁止パスとして登録したパスの集合。既定は空
+- `guardedRules` (a list of strings, optional): the set of rule names whose reports may not disappear. The default is the eight protecting "no declaration stands in two places" plus this rule, nine in all
+- `excludedRegions` (a list of strings, optional): the names of regions that may be excluded from the walk. A specification in the ignore settings is divided into "a definition of the population" and "a suppression" by reconciling against this definition. The default is `.git`, `node_modules`, `dist`, `coverage`
+- `forbiddenPaths` (a list of strings, optional): the set of paths the file mechanism registered as forbidden. The default is empty
 
 ```jsonc
 ["error", { "excludedRegions": [".git", "node_modules", "dist", "coverage", "generated"] }]
 ```
 
-「このルールだけは黙らせてよい」という一覧は持たない。持たせると、規律の分割採用がそこから始まる。
+There is no list of "rules that may be silenced". Hold one and partial adoption of the discipline starts there.
 
-理由の書式を選べる口も持たない。位置は対象行の直上、区切りは前後に空白を置いた `--` の 1 通りに固定する。書式が複数あると、どれで書いたかを読み手が先に判定することになる。
+There is no way in for choosing the reason's format either. The position is fixed to directly above the target line, and the separator to one form — a `--` surrounded by whitespace. With several formats, a reader has to settle which one was used before reading.
+
+### Where the detection does not reach
+
+A configuration reached through `extends`, a level given as a CLI argument, and an operation that never starts the linter are all invisible from reading `vite.config` alone. What falls here is not detected, and it is not permitted.
+
+### Its relationship with the upstream rule of the same kind
+
+`no-broad-lint-disable--use-next-line-with-reason` in [@mst/lint-rule-authoring](../../../lint-rule-authoring/src/lint/oxlint/rules/no-broad-lint-disable--use-next-line-with-reason.ts) reports the spelling of any suppression holding wider than a line, whatever the rule. This rule reads whether a guarded rule's report has disappeared. Both can fire on one comment, and the overlap is intended: the former settles how a suppression is written, the latter whether it is permissible.
+
+## Fix
+
+Fix it. That is the first option.
+
+Where there is a reason it cannot be fixed, list it in the deviation register that rule holds. When listing, write both why it is needed and what would let it be removed — the condition for keeping a deviation something with a plan to disappear. The canonical-values rule's deviation list and the file mechanism's allow list are those registers.
+
+Only where neither is available, place a line-scoped suppression carrying a reason. The format is `// oxlint-disable-next-line <rule name> -- <reason>`, placed directly above the one target line. Write in the reason why that place is an exception: what makes that one line different from the others, and what would have to happen for that circumstance to disappear.
+
+The order is the same for reports about the configuration. Rather than lowering a level to get through, repair the reported code; where it cannot be repaired, register a deviation. Where a region put in the ignore settings is a build product, a fetched dependency or a version control internal, that is a definition of the population rather than a suppression, so update the definition by adding the region name to `excludedRegions`.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// a next-line suppression of a guarded rule without grounds is reported
+// oxlint-disable-next-line no-duplicate-exported-type--reuse-authoritative-type
+export type Cart = { readonly total: number };
+```
+
+```ts
+// a whole-file suppression of a guarded rule is reported even with grounds
+/* oxlint-disable no-duplicate-exported-type--reuse-authoritative-type -- the generator writes both copies */
+export type Cart = { readonly total: number };
+```
+
+Code this rule accepts.
+
+```ts
+// a next-line suppression carrying grounds is the path this rule leaves open
+// oxlint-disable-next-line no-duplicate-exported-type--reuse-authoritative-type -- the generator writes both copies from one schema
+export type Cart = { readonly total: number };
+```
+
+```ts
+// a suppression naming only rules outside the guarded set is another rule's business
+// oxlint-disable-next-line no-console
+console.log(1);
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Writing an empty string in the reason field to satisfy the form. A rule name alone, or "false positive" alone, is not treated as a reason; a plausible-looking but empty string cannot be told apart by a machine. What gets evaluated by a reader is the reason's contents, not whoever wrote it
+- Lowering a guarded rule's severity to a level that reports without failing, and operating by ignoring the reports. Levels written in the configuration are read, but one lowered through an argument to `vp lint` leaves no trace in the configuration
+- Moving the offending file to a path that looks like an excluded region of the population. Only the destination looks like a build product; not one line of code has been fixed
+- Escaping levels or ignore patterns into a variable outside the configuration file. This rule reports nothing where the expression cannot be read, so what escapes there leaves the judgment. Write levels and ignore patterns directly in the configuration file
+- Moving them into a configuration reached through `extends`, or into a configuration file under another spelling. What this rule reads is the current state of one file starting with `vite.config`
+- Taking a guarded rule out of `guardedRules` to get through. The moment it is out, that rule's reports can be made to disappear silently
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `groundlessSuppression` | A \`{{spelling}}\` comment covering {{covered}} must not stand without grounds. Rewrite the code that rule reports, register the deviation in the list that rule keeps, or write after \`--\` what makes this line an exception. |
+| `wholeFileSuppression` | A \`{{spelling}}\` comment covering {{covered}} must not reach past the line below it. Rewrite the code that rule reports, register the deviation in the list that rule keeps, or replace this comment with \`oxlint-disable-next-line\` above the one line, naming the rule and writing its grounds after \`--\`. |
+| `selfSuppression` | A suppression naming \`{{ruleName}}\` must not stay in the source. Rewrite the code the covered rule reports, or register the deviation in the list that rule keeps. |
+| `weakenedRule` | A lint configuration must not hold \`{{ruleName}}\` at \`{{severity}}\`, a level that leaves a run green. Set it to \`error\`, rewrite the code that rule reports, or register the deviation in the list that rule keeps. |
+| `undeclaredIgnoredRegion` | An ignore pattern must not name \`{{pattern}}\`, a place outside the regions this repository excludes from the walk. Delete the pattern and rewrite the code it hides, or declare the region in the definition this configuration receives. |
+| `ignoredForbiddenPath` | An ignore pattern must not cover \`{{forbiddenPath}}\`, a path registered as forbidden. Delete the pattern, and delete that file or move it to the place its owner spelledNames. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

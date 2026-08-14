@@ -12,6 +12,7 @@ describe("dont-review-it/no-floating-promise--await-the-result", () => {
     valid: [
       {
         name: "awaiting the call connects it to the enclosing control flow",
+        documented: true,
         code: "const fetchUser = async () => 1;\nconst load = async () => {\n  await fetchUser();\n};",
       },
       {
@@ -28,6 +29,7 @@ describe("dont-review-it/no-floating-promise--await-the-result", () => {
       },
       {
         name: "handing the calls to a composition and awaiting the composition connects them",
+        documented: true,
         code: "const fetchUser = async () => 1;\nconst load = async () => {\n  await Promise.all([fetchUser(), fetchUser()]);\n};",
       },
       {
@@ -130,6 +132,7 @@ describe("dont-review-it/no-floating-promise--await-the-result", () => {
     invalid: [
       {
         name: "a call to an async arrow standing alone as a statement is reported",
+        documented: true,
         code: "const fetchUser = async () => 1;\nfetchUser();",
         errors: [{ messageId: "floatingPromiseStatement" }],
       },
@@ -213,6 +216,7 @@ describe("dont-review-it/no-floating-promise--await-the-result", () => {
       },
       {
         name: "voiding the call states an intent instead of connecting the promise",
+        documented: true,
         code: "const fetchUser = async () => 1;\nvoid fetchUser();",
         errors: [{ messageId: "voidedPromise" }],
       },

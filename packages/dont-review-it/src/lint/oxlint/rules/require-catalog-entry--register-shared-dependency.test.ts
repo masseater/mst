@@ -202,6 +202,7 @@ describe("dont-review-it/require-catalog-entry--register-shared-dependency", () 
     invalid: [
       {
         name: "a name shared with two other workspaces is reported in the root workspace",
+        documented: true,
         code: MODULE_SOURCE,
         filename: rootEntry,
         options: CATALOG,

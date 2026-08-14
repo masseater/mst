@@ -8,6 +8,7 @@ describe("dont-review-it/no-silent-catch--rethrow-or-handle", () => {
     valid: [
       {
         name: "a catch clause that rethrows hands the failure to the caller",
+        documented: true,
         code: "try {\n  run();\n} catch (failure) {\n  release();\n  throw failure;\n}",
       },
       {
@@ -28,6 +29,7 @@ describe("dont-review-it/no-silent-catch--rethrow-or-handle", () => {
       },
       {
         name: "a failure read in a condition and rethrown afterwards is still carried",
+        documented: true,
         code: "try {\n  run();\n} catch (failure) {\n  if (isTransient(failure)) {\n    retry();\n  }\n  throw failure;\n}",
       },
       {
@@ -70,11 +72,13 @@ describe("dont-review-it/no-silent-catch--rethrow-or-handle", () => {
     invalid: [
       {
         name: "a catch clause that never names the failure again is reported",
+        documented: true,
         code: "try {\n  run();\n} catch (failure) {\n  retry();\n}",
         errors: [{ messageId: "silentCatch" }],
       },
       {
         name: "a failure read only in the condition of an if is not carried anywhere",
+        documented: true,
         code: "try {\n  run();\n} catch (failure) {\n  if (isTransient(failure)) {\n    retry();\n  }\n}",
         errors: [{ messageId: "silentCatch" }],
       },

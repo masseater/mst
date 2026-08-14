@@ -1,35 +1,107 @@
+---
+description: "Require a JSDoc block to carry tag content only, so an explanation never drifts above a signature instead of sitting on the code it explains"
+---
+
 # no-detached-rationale--comment-at-explained-line
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-JSDoc ブロック（`/**` で始まるブロックコメント）のうち、最初の `@tag` より前に空でない行があるもの。
+Require a JSDoc block to carry tag content only, so an explanation never drifts above a signature instead of sitting on the code it explains
 
-判定は行単位で行う。各行から先頭の `*` と空白を落とし、最初に `@` で始まる行を探す。その行より前に残る空でない行が「説明散文」であり、1 つでもあれば報告する。`@tag` が 1 つも無い JSDoc ブロックは、全行が説明散文にあたる。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-detached-rationale--comment-at-explained-line.ts`](../../src/lint/oxlint/rules/no-detached-rationale--comment-at-explained-line.ts)
 
-タグの折り返し継続行も `@` で始まらないが、最初のタグより後ろにあるため対象にならない。タグより後ろはすべて、そのタグが所有する内容として扱う。
+<!-- END GENERATED rule-header -->
 
-報告位置は、最初の説明散文がある行からブロックの終わりまで。
+## Violation
 
-JSDoc ではないコメントは対象外。[no-explanatory-comment--delete-or-move-to-commit-message](./no-explanatory-comment--delete-or-move-to-commit-message.md) が担当する。
+A JSDoc block (a block comment opening with `/**`) that carries a non-empty line before its first `@tag`.
 
-## なぜそれが要るか
+The judgment runs line by line. The leading `*` and whitespace are dropped from each line, and the first line starting with `@` is found. Whatever non-empty lines remain before it are description prose, and one is enough to be reported. A JSDoc block with no `@tag` at all is description prose from end to end.
 
-シグネチャの上に置かれた説明散文は、どの行を説明しているのかを持たない。関数の中身が 3 つの判断を含んでいても、散文はその塊全体の手前に 1 つあるだけで、どの判断に対応するのかは読み手が推測することになる。中身が変わっても散文は動かないので、対応関係は時間とともに崩れる。
+A wrapped continuation line under a tag does not start with `@` either, and is not reported: it stands after the first tag, and everything after the first tag is read as content that tag owns.
 
-`@tag` の内容にはこの問題がない。`@param count` は `count` を説明していることが構文で決まっており、`count` が消えれば宙に浮いた記述として目に入る。説明の対象が構文で固定されていることが、散文とタグの違いである。
+The report covers the range from the first line of description prose to the end of the block.
 
-## どう直すか
+Comments that are not JSDoc are out of reach. [no-explanatory-comment--delete-or-move-to-commit-message](./no-explanatory-comment--delete-or-move-to-commit-message.md) carries those.
 
-公開される契約の説明であれば、それを所有するタグの下に移す。`@param` / `@returns` / `@throws` / `@example` / `@see` / `@remarks` のいずれかに属さない契約の説明は、たいてい契約の説明ではない。
+Description prose placed above a signature carries no statement of which line it explains. A function body may hold three separate decisions while a single paragraph stands in front of the whole block, and which decision it answers to is left for the reader to guess. The body changes and the prose does not move, so the correspondence decays on its own.
 
-実装の判断についての説明であれば、コメントとして残さずコミットメッセージの本文に書く。残りは削除する。
+Tag content does not have that problem. `@param count` explains `count` because the syntax says so, and once `count` is gone the entry stands out as describing nothing. Having the subject fixed by the syntax is the whole difference between prose and a tag.
 
-## 禁じる回避策
+No option is offered. Whether the rule is on or off is settled by the configuration, and nothing else about the judgment is.
 
-- 説明散文の先頭に `@` を付けてタグの体裁にする。タグとして意味を持たない綴りを置いても、対象が構文で固定されていない点は変わらない
-- 説明散文を JSDoc の外の行コメントに移す。`no-explanatory-comment--delete-or-move-to-commit-message` が受け持つので、移した先で報告される
-- 説明散文を最初のタグより後ろに移して、どのタグにも属さない位置に置く。検出は外れるが、対象が決まらない記述である点は変わらない
+## Fix
 
-## オプション
+If the prose explains a contract that is published, move it under the tag that owns it. An explanation of a contract that fits none of `@param`, `@returns`, `@throws`, `@example`, `@see` or `@remarks` is usually not an explanation of a contract at all.
 
-取らない。有効か無効かだけを設定側で決める。
+If the prose explains a decision made in the implementation, do not keep it as a comment. Write it in the body of the commit message. Delete whatever is left.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// description prose above the first tag is reported
+/**
+ * Takes the rows the caller asked for.
+ * @param count how many rows to take
+ */
+export const take = (count: number) => count;
+```
+
+```ts
+// a single line JSDoc block carrying prose is reported
+/** Takes the rows the caller asked for. */
+export const take = 1;
+```
+
+Code this rule accepts.
+
+```ts
+// a JSDoc block that carries tag content only passes
+/**
+ * @param count how many rows to take
+ * @returns the taken rows
+ */
+export const take = (count: number) => count;
+```
+
+```ts
+// prose wrapped under a tag belongs to that tag
+/**
+ * @remarks
+ *   the caller owns the cursor, so the rows are taken eagerly
+ */
+export const take = 1;
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Prefixing the description prose with `@` to give it the shape of a tag. A spelling that means nothing as a tag still leaves the subject unfixed by the syntax
+- Moving the prose out of the JSDoc block into a line comment. `no-explanatory-comment--delete-or-move-to-commit-message` carries that, so it is reported where it lands
+- Moving the prose after the first tag, into a position that belongs to no tag. Detection falls away while the writing still names no subject
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `jsdocDescriptionProse` | Free description prose must not sit above a signature. Move contract prose under the JSDoc tag that owns it (\`@param\`, \`@returns\`, \`@throws\`, \`@example\`, \`@see\`, \`@remarks\`), and delete the rest. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

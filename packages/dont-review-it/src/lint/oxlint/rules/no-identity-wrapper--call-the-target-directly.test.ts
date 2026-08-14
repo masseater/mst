@@ -56,6 +56,7 @@ describe("dont-review-it/no-identity-wrapper--call-the-target-directly", () => {
       },
       {
         name: "a return type annotation declares a contract at this boundary",
+        documented: true,
         code: "const parseUser = (input: string): User => parse(input);",
       },
       {
@@ -112,12 +113,14 @@ describe("dont-review-it/no-identity-wrapper--call-the-target-directly", () => {
       },
       {
         name: "re-exporting the name forwards the definition instead of copying its shape",
+        documented: true,
         code: "export { parseUser } from './parse-user.ts';",
       },
     ],
     invalid: [
       {
         name: "an arrow that forwards its only parameter is reported",
+        documented: true,
         code: "const parseUser = (input) => parse(input);",
         errors: [{ messageId: "identityWrapper" }],
       },
@@ -168,6 +171,7 @@ describe("dont-review-it/no-identity-wrapper--call-the-target-directly", () => {
       },
       {
         name: "renaming an imported name through a wrapper is reported, not exempted",
+        documented: true,
         code: "import { parse } from './parse.ts';\nexport const parseUser = (input) => parse(input);",
         errors: [{ messageId: "identityWrapper" }],
       },

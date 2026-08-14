@@ -1,96 +1,88 @@
+---
+description: "Require every authored path to sit inside a check this repository declares, and every registration row to sit inside the check that consumes it, so a check that opens nothing is reported instead of passing for a check that found nothing"
+---
+
 # no-unchecked-authored-path--include-it-in-every-declared-check
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-リポジトリが宣言した検査の対象範囲と、リポジトリが持つ登録簿の各行を突き合わせ、どちらかが空振りしている箇所を報告する。ファイルの中身は読まない。入力は 3 つで、作業ツリーの走査で得た著作面のパス一覧、`declaredChecks` が宣言する各検査の対象範囲、`registries` と `uncheckedDeclarations` と `scopeRegistrations` が持つ行である。
+Require every authored path to sit inside a check this repository declares, and every registration row to sit inside the check that consumes it, so a check that opens nothing is reported instead of passing for a check that found nothing
 
-`declaredChecks` が空なら、突き合わせる相手が無いのでこのルールは何も報告しない。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-unchecked-authored-path--include-it-in-every-declared-check.ts`](../../src/lint/oxlint/rules/no-unchecked-authored-path--include-it-in-every-declared-check.ts)
 
-著作面は走査がそのまま定義する。`unscannedDirectories` に挙げたディレクトリ（既定は `.cache` `.git` `coverage` `dist` `dist-ssr` `node_modules`）の下は走査に入らないため、依存・ビルド出力・キャッシュは最初から対象外になる。除外を足すことで著作面が縮む構造であることは意図した設計で、除外リストが膨らんだら著作面の定義がずれている合図として読む。
+<!-- END GENERATED rule-header -->
 
-報告は 4 種類あり、メッセージがどれであるかを最初の 1 文で区別する。
+## Violation
 
-### 被覆の穴
+The ranges the repository's declared checks cover are reconciled against each row of the repository's registers, and wherever either side fires at nothing it is reported. File contents are not read. There are three inputs: the list of authored-surface paths obtained by walking the working tree, the range each check declares in `declaredChecks`, and the rows held by `registries`, `uncheckedDeclarations` and `scopeRegistrations`.
 
-著作面のパスのうち、どの検査の対象にも入らず、どの検査も読まないと宣言もされていないもの。`uncheckedAuthoredPath` で報告する。
+Where `declaredChecks` is empty there is nothing to reconcile against, and this rule reports nothing.
 
-検査がそのパスを開くかどうかは `coveredPaths` に当たり `excludedPaths` に当たらないことで決まる。同じパスが複数の検査に入っていることは問題にしない。重複は防御であって穴ではない。
+The authored surface is defined by the walk itself. Anything under a directory listed in `unscannedDirectories` (by default `.cache`, `.git`, `coverage`, `dist`, `dist-ssr`, `node_modules`) does not enter the walk, so dependencies, build output and caches are out of scope from the start. That adding an exclusion shrinks the authored surface is intended; a swelling exclusion list is read as a signal that the definition of the authored surface has drifted.
 
-`uncheckedDeclarations` は「どの検査も読まない」と宣言する行で、パターンと理由文を 1 組で持つ。宣言されていない種別のファイルが現れたら、宣言し忘れなのか対象に入れ忘れなのかを機械は決められないため、被覆の穴として報告する。判断は人が行い、結果は行として残る。
+Four kinds of report, distinguished by their opening sentence.
 
-宣言の書き方は拡張子（`**/*.md` のように最後の区切りが `*.<拡張子>` の形）か、ワイルドカードを持たない具体的なパスに限る。`docs/**` のようにディレクトリ全体を覆う書き方は `broadUncheckedDeclaration` で報告する。ディレクトリ単位の宣言を認めると、そのディレクトリに後から何を置いても報告が出なくなり、宣言が「今ここにある種別」ではなく「これから置くもの」まで免除してしまう。
+### A hole in the coverage
 
-### 到達しない登録行
+An authored-surface path entering no check's range and declared read by no check. Reported as `uncheckedAuthoredPath`.
 
-登録簿の行が実在するパスに当たっているのに、その行を消費する検査（`consumedBy`）がそのパスを 1 つも開いていないもの。報告は 2 つに分かれる。
+Whether a check opens that path is settled by hitting `coveredPaths` and not hitting `excludedPaths`. The same path entering several checks is no problem: overlap is defence, not a hole.
 
-- `excludedRegistration`: 検査の `excludedPaths` がそのパスを外している。行と、交差している除外指定の両方を出す
-- `unopenedRegistration`: 検査の `coveredPaths` がそもそもそのパスを含んでいない。行と、その検査が開いている範囲の両方を出す
+`uncheckedDeclarations` are the rows declaring "no check reads this", paired as a pattern and a reason. Where a file kind nobody declared appears, a machine cannot settle whether the declaration was forgotten or the inclusion was, so it is reported as a hole in the coverage. A person makes the judgment, and the result stays as a row.
 
-片方だけを出すと、行を動かすのか除外を外すのかが決まらない。両方を出すのはそのためである。
+Declarations may be written only as an extension (`**/*.md`, where the last segment is `*.<extension>`) or as a concrete path carrying no wildcard. A form covering a whole directory such as `docs/**` is reported as `broadUncheckedDeclaration`. Allow directory-level declarations and nothing placed in that directory afterwards produces a report, so the declaration exempts not "the kinds standing here now" but whatever gets placed later.
 
-行が 1 つのパスにも当たっていない場合は報告しない。禁止の行が空振りしているのは、禁止したい対象が存在しないという正しい状態であって、行が届いていない状態と区別がつく。
+### A registration row that does not reach
 
-### 死んだ行
+A register's row hitting a path that exists, where the check consuming that row (`consumedBy`) opens not one of those paths. Two reports.
 
-`allowances` に置いた行と `uncheckedDeclarations` の行のうち、一致するファイルが 1 つも存在しないもの。`deadRegistration` で報告する。
+- `excludedRegistration`: the check's `excludedPaths` takes that path out. Both the row and the intersecting exclusion are printed
+- `unopenedRegistration`: the check's `coveredPaths` never contained that path. Both the row and the range that check opens are printed
 
-許可・例外・解除にあたる行は、対象が存在することを前提にしている。対象が消えた後も行が残ると、次に同じ名前のファイルが現れたときに誰も意図していない免除が復活する。禁止の行と向きが逆なので、空振りの意味も逆になる。
+Print only one and whether to move the row or drop the exclusion is unsettled. That is why both are printed.
 
-受け手の名前も同じ扱いで見る。`consumedBy` と行の `receivers` が挙げた名前が `declaredChecks` のどれとも一致しなければ `undeclaredReceiver` で報告する。委譲先を書いた記録は、その受け手が実在して初めて委譲になる。
+Where a row hits not one path, nothing is reported. A prohibition row firing at nothing is the correct state of "there is nothing to prohibit", and it is distinguishable from a row that does not reach.
 
-### スコープ登録の漏れ
+### A dead row
 
-`scopeRegistrations` が「登録されたパスの中だけで走る」検査の範囲を持つ。登録されたファイルから相対指定子で到達できるファイルが登録されていなければ `unregisteredScopeReach` で報告する。到達は推移的に辿り、循環は訪問済みで打ち切る。報告には、到達している側のファイルと到達された側のファイルの両方を出す。
+A row in `allowances` and a row in `uncheckedDeclarations` matching not one existing file. Reported as `deadRegistration`.
 
-到達先が著作面の外にある場合は報告しない。登録できる対象ではないためである。
+Rows that permit, except or release presume their target exists. Leave the row after the target is gone and an exemption nobody intended revives the next time a file of that name appears. The direction is the reverse of a prohibition row, so the meaning of firing at nothing is reversed too.
 
-### どこに報告するか
+Receiver names are read the same way. Where a name given in `consumedBy` or a row's `receivers` matches none of `declaredChecks`, it is reported as `undeclaredReceiver`. A record naming a delegate becomes a delegation only once that receiver exists.
 
-報告はパスを持つものとそうでないものに分かれる。パスを持つ報告（被覆の穴、到達しない登録行、スコープ登録の漏れ）は、そのパスを所有するワークスペースの側に立ち、そのワークスペースのファイルを検査したときに出る。パスを持たない報告（死んだ行、実在しない受け手、ディレクトリ全体を覆う宣言）はリポジトリルートの側に立つ。
+### A gap in a scope registration
 
-## なぜそれが要るか
+`scopeRegistrations` holds the range of a check that runs only inside registered paths. Where a file reachable from a registered file by a relative specifier is not registered, it is reported as `unregisteredScopeReach`. Reach is followed transitively and cycles are cut with a visited set. Both the reaching file and the reached file are printed.
 
-観測される事象は、検査がすべて緑なのに違反が通ることである。
+Where the destination lies outside the authored surface, nothing is reported: it is not something that can be registered.
 
-1 層目は、対象範囲が設定で決まり、対象外のファイルについて検査が「違反なし」を出すことである。「対象外だった」と「違反が無かった」は出力の上でまったく同じ形をしていて、両者を区別する情報は検査の出力側に存在しない。
+### Where the report stands
 
-2 層目は、範囲の穴が正当な追加の積み重ねで生まれることである。範囲を決める設定は複数あり、別の目的で別のタイミングに更新される。無視パターンは速度のために、除外リストは生成物のために足される。どの追加も単体では理由を持つので、追加を止める方向では閉じない。結果としての被覆を検査するしかない。
+Reports divide into those carrying a path and those not. Those carrying a path (a coverage hole, a registration row that does not reach, a gap in a scope registration) stand on the workspace owning that path, and come out when that workspace's files are checked. Those carrying no path (a dead row, a receiver that does not exist, a declaration covering a whole directory) stand at the repository root.
 
-3 層目は、禁止を設定の表へ外出しする設計が「表の行が実際に効く」ことを前提にしていることである。行を足した人は禁止したつもりでも、その行が到達しない検査に載っていれば 1 件も出ない。前提を検査しない限り、外出しは安全ではなく安全の見かけになる。
+### The invariant
 
-## どう直すか
+What is observed is a violation getting through while every check is green.
 
-被覆の穴は、そのパスをいずれかの検査の対象に入れる。入れられないなら、拡張子か具体的なパスで「どの検査も読まない」と宣言し、行に理由文を書く。
+The first layer is that the range is settled by configuration, and a check answers "no violation" about a file outside its range. "It was out of range" and "there was no violation" have exactly the same shape in the output, and the information telling them apart does not exist on the check's side.
 
-到達しない登録行は、その行を、対象のパスを開いている検査が消費する登録簿へ移すか、その検査の除外指定を外す。どちらを選ぶかは、そのパスを検査に開かせてよいかで決まる。
+The second layer is that holes in the range arise from an accumulation of legitimate additions. Several settings decide the range and are updated for different purposes at different times. Ignore patterns are added for speed, exclusion lists for build products. Each addition has a reason on its own, so it does not close by stopping additions. The resulting coverage has to be checked instead.
 
-死んだ行は消す。行が守っていた対象が別のパスへ移ったのなら、パターンをその移動先に向ける。実在しない受け手は、受け手を `declaredChecks` に加えるか、委譲の記録ごと消して責任を戻す。
+The third layer is that a design pushing prohibitions out into configuration tables presumes those rows actually hold. Whoever added a row meant to prohibit something, and if that row sits on a check that does not reach, not one report comes out. Without checking the premise, pushing it out is not safety but the appearance of safety.
 
-スコープ登録の漏れは、到達されている側を登録に加えるか、到達している結合そのものを断つ。
+### Configuration
 
-## 禁じる回避策
-
-- 「どの検査も読まない」の宣言でディレクトリ全体を覆う。宣言は拡張子か具体的なパスで書く
-- 被覆の穴を消すために、そのパスを `unscannedDirectories` へ移す。著作面の定義を歪めているだけで、そのファイルは著作されたままである
-- 到達しない登録行を、報告を消すためだけに削除する。禁止したかった対象は残っているので、行を消すと禁止そのものが消える
-- 拡張子だけを検査の対象に含まれる形へ変え、中身を検査が読めないまま残す。対象範囲に入れることと検査が成立することは別なので、この形では被覆の穴が消えたように見えて何も変わらない
-- 抑制ディレクティブで黙らせる
-
-## 検出が届かない範囲
-
-- 各検査が正しく実装されているかは見ない。対象範囲に入っていることまでを見る。実装が誤って何も報告しない状態は、この突き合わせでは区別できない。そこを受け持つのはルールごとのテストである
-- `declaredChecks` に現れない外部ツールの対象範囲は入力に無い。宣言されていない検査は、この照合にとって存在しない
-- このルール自身が静的解析器のルールとして走るため、解析器が 1 つも開かないワークスペースは自分の報告を載せる場所を持たない。報告はリポジトリルート側と、そのワークスペースを検査したときに出る
-- スコープの到達は相対指定子と、リポジトリ内のパッケージの公開エントリで解決できるものだけを辿る。実行時に組み立てられる指定子は辿らない
-
-## オプション
-
-- `declaredChecks`（配列、既定は空）: この照合が知っている検査。`name` は報告に出る名前で、行が受け手として名指しできる名前でもある。`coveredPaths` と `excludedPaths` はリポジトリルートからのグロブで、`excludedPaths` に当たるパスはその検査が開かないものとして扱う
-- `registries`（配列、既定は空）: 登録簿。`consumedBy` はその登録簿を読む検査の名前。`rows` は禁止の行で到達可能性を見る。`allowances` は許可・例外・解除の行で、一致するファイルがあることを見る。どちらの行も `pattern` と `reason` が必須で、`receivers` に委譲先の名前を書ける
-- `uncheckedDeclarations`（配列、既定は空）: どの検査も読まないと宣言する行。`pattern` と `reason` が必須
-- `scopeRegistrations`（配列、既定は空）: 登録されたパスの中だけで走る検査の範囲。`registeredPaths` から相対指定子で到達できるファイルが登録されていることを見る
-- `unscannedDirectories`（文字列の配列、任意）: 走査に入らないディレクトリ名。指定した場合は**置き換え**になる
+- `declaredChecks` (an array, default empty): the checks this reconciliation knows about. `name` is the name printed in reports and the name a row may give as a receiver. `coveredPaths` and `excludedPaths` are globs from the repository root, and a path hitting `excludedPaths` is treated as one that check does not open
+- `registries` (an array, default empty): the registers. `consumedBy` is the name of the check that reads that register. `rows` are prohibition rows, read for reachability. `allowances` are permission, exception and release rows, read for the existence of matching files. Both kinds require `pattern` and `reason`, and may carry delegate names in `receivers`
+- `uncheckedDeclarations` (an array, default empty): the rows declaring no check reads them. `pattern` and `reason` are required
+- `scopeRegistrations` (an array, default empty): the range of a check running only inside registered paths. Read for whether every file reachable from `registeredPaths` by a relative specifier is registered
+- `unscannedDirectories` (a list of strings, optional): the directory names that do not enter the walk. Naming it **replaces** the default
 
 ```jsonc
 [
@@ -129,4 +121,67 @@
 ]
 ```
 
-行ごとの免除を設定で書けるようにはしていない。免除は `uncheckedDeclarations` の 1 行として理由文つきで残り、対象が消えれば死んだ行として報告される。報告を個別に黙らせる経路を持たせると、免除が理由も期限も持たないまま残る。
+Per-row exemptions are not writable in the configuration. An exemption stays as one row of `uncheckedDeclarations` carrying a reason, and is reported as a dead row once its target disappears. Give it a route for silencing reports individually and exemptions stay with neither a reason nor a deadline.
+
+### Where the detection does not reach
+
+- Whether each check is implemented correctly is not read; only that it is in range. A state where a broken implementation reports nothing cannot be told apart by this reconciliation. That is covered by each rule's own tests
+- The range of an external tool absent from `declaredChecks` is not in the input. An undeclared check does not exist for this reconciliation
+- This rule runs as a rule of the static analyser, so a workspace the analyser opens nothing in has nowhere to place its own report. Reports come out at the repository root and when that workspace is checked
+- Scope reach follows only relative specifiers and what resolves through the published entry of a package inside the repository. A specifier assembled at run time is not followed
+
+## Fix
+
+For a coverage hole, put that path into some check's range. Where it cannot go in, declare "no check reads this" by extension or by a concrete path, and write a reason on the row.
+
+For a registration row that does not reach, move the row into a register consumed by a check that opens the target path, or drop that check's exclusion. Which to choose is settled by whether the path may be opened to the check.
+
+Delete a dead row. Where what the row protected moved to another path, point the pattern at the destination. For a receiver that does not exist, add it to `declaredChecks`, or delete the delegation record and take the responsibility back.
+
+For a gap in a scope registration, add the reached side to the registration, or cut the coupling doing the reaching.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// an authored path no declared check opens
+export const shipped = true;
+
+```
+
+<!-- END GENERATED examples -->
+
+The subject of this rule is the repository's paths and registers rather than the source in front of you, so the code above is the file the report stands on, and what settles the judgment is where that file sits.
+
+### Forbidden bypasses (do not do this)
+
+- Covering a whole directory with a "no check reads this" declaration. Declarations are written by extension or by a concrete path
+- Moving a path into `unscannedDirectories` to clear a coverage hole. It only distorts the definition of the authored surface; the file is still authored
+- Deleting a registration row that does not reach, just to clear the report. What it wanted to prohibit remains, so deleting the row deletes the prohibition
+- Changing only the extension into a form that falls inside a check's range while the contents stay unreadable to it. Being in range and being checked are different, so this shape makes a coverage hole look gone while nothing changed
+- Silencing it with a suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `UNCHECKED_AUTHORED_PATH_MESSAGE_ID` | An authored path must not sit outside every check this repository declares. \`{{authoredPath}}\` is opened by none of {{declaredChecks}}. Add it to the paths one of those checks opens, or declare its extension among the paths no check reads and write the reason on that declaration. |
+| `BROAD_UNCHECKED_DECLARATION_MESSAGE_ID` | A declaration of paths no check reads must not cover a whole directory. \`{{pattern}}\` names a directory rather than an extension or a single path. Split it into the extensions carried under that directory, or name each path this repository leaves unread. |
+| `EXCLUDED_REGISTRATION_MESSAGE_ID` | A registration row must not aim at paths the check that consumes it leaves out. Row \`{{pattern}}\` of {{registry}} matches \`{{matchedPath}}\`, and \`{{check}}\` leaves that path out through {{exclusion}}. Move the row to a registry that a check reading those paths consumes, or take that exclusion out of \`{{check}}\`. |
+| `UNOPENED_REGISTRATION_MESSAGE_ID` | A registration row must not aim at paths the check that consumes it never opens. Row \`{{pattern}}\` of {{registry}} matches \`{{matchedPath}}\`, and \`{{check}}\` opens only {{coveredPaths}}. Move the row to a registry that a check reading those paths consumes, or add that path to the paths \`{{check}}\` opens. |
+| `DEAD_REGISTRATION_MESSAGE_ID` | A row that allows an exception must not stand for files this repository does not hold. Row \`{{pattern}}\` of {{registry}} matches no authored path, and it states: {{reason}}. Delete the row, or move the pattern to the path that took the exception over. |
+| `UNDECLARED_RECEIVER_MESSAGE_ID` | A record must not name a receiver this repository does not declare. {{record}} names \`{{receiver}}\`, and the declared checks are {{declaredChecks}}. Declare that receiver among them, or delete the record and take the duty back. |
+| `UNREGISTERED_SCOPE_REACH_MESSAGE_ID` | A file that a registered file reaches must not stay outside the scope registration. \`{{reachingPath}}\` reaches \`{{reachedPath}}\`, and the registration for \`{{scope}}\` leaves it out. Register the reached path in that scope, or delete the coupling that reaches it. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

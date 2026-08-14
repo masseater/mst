@@ -1,49 +1,74 @@
+---
+description: "Disallow every dependency version that matches more than one release, in workspace manifests and in the catalog alike, so the release a workspace installs is decided by the declaration instead of by the moment the install ran"
+---
+
 # no-version-range--pin-the-exact-version
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-リポジトリ内のすべてのマニフェストとワークスペース定義の catalog を読み、宣言された値が 1 つのリリースに定まっていないものを報告する。
+Disallow every dependency version that matches more than one release, in workspace manifests and in the catalog alike, so the release a workspace installs is decided by the declaration instead of by the moment the install ran
 
-報告は 2 種類ある。マニフェストの宣言は、それを宣言しているワークスペースに出る。catalog のエントリはリポジトリのルートのワークスペースに出る。直す先のファイルがそこにあるためで、catalog の宣言はどのワークスペースのものでもない。報告位置は、そのワークスペースが持つ検査対象のファイルである。マニフェストもワークスペース定義も検査経路に載らないので、それらが支配するファイルの側に出す。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-version-range--pin-the-exact-version.ts`](../../src/lint/oxlint/rules/no-version-range--pin-the-exact-version.ts)
 
-### 値の読み方
+<!-- END GENERATED rule-header -->
 
-見るのは通常依存・開発依存・任意依存の 3 セクションと、既定の catalog および名前付き catalog のすべてのエントリである。
+## Violation
 
-値が別名解決の形をとっているときは、解決先の名前で報告し、`@` の後ろに書かれた部分を版として読む。`npm:left-pad@^1.0.0` は `left-pad` の `^1.0.0` として扱う。
+A declared value that does not settle on one release, read from every manifest in the repository and from the catalog of the workspace definition.
 
-1 つのリリースに定まっている値とは、`1.2.3` の形をとり、必要ならその後ろに事前リリース識別子とビルドメタデータが続くものである。`1.2.3-beta.1` と `1.2.3+build.5` はこれに当たる。
+There are two reports. A manifest's declaration is reported against the workspace declaring it. A catalog entry is reported against the repository's root workspace, because that is where the file to fix lives and a catalog declaration belongs to no workspace in particular. The report stands on a checked file that workspace holds: neither manifests nor the workspace definition ride the checking route, so the report goes to the files they govern.
 
-### 意図的に対象にしない形
+### How values are read
 
-| 形 | 対象にしない理由 |
+The three sections read are the regular, development and optional dependencies, along with every entry of the default catalog and of the named catalogs.
+
+Where a value takes the alias form, it is reported under the name it resolves to and what follows `@` is read as the version. `npm:left-pad@^1.0.0` is treated as `^1.0.0` of `left-pad`.
+
+A value settling on one release takes the shape `1.2.3`, optionally followed by pre-release identifiers and build metadata. `1.2.3-beta.1` and `1.2.3+build.5` both qualify.
+
+### Shapes deliberately left out
+
+| Shape | Why it is not a target |
 | --- | --- |
-| ピア依存の宣言 | 範囲を広く取るのが設計上正しく、単一のリリースに寄せる対象ではない |
-| `workspace:` / `link:` / `file:` の値 | 外部のリリースを指していない |
-| `catalog:` の参照 | 版を持たない参照であり、指している先の catalog エントリを直接見る |
-| 配布タグ、リポジトリの URL、ホスト名で書いた値 | 版の構文を持たず、どのリリースへ寄せるかが宣言の中から決まらない |
-| 意図的な範囲として登録済みの名前 | 登録された事実そのものが判断の記録になる |
-| 値が文字列でない宣言 | 有効なマニフェストでは起こらない。起きているならスキーマ検証の担当領域である |
+| Peer dependency declarations | Taking a wide range is the correct design there, and they are not something to pin to one release |
+| `workspace:`, `link:` and `file:` values | They point at no external release |
+| A `catalog:` reference | A reference carrying no version; the catalog entry it points at is read directly |
+| Distribution tags, repository URLs and values written as a host | They carry no version syntax, so which release to pin to is not settled from within the declaration |
+| Names registered as intentional ranges | The registration itself is the record of the decision |
+| A declaration whose value is not a string | It cannot happen in a valid manifest. Where it does, that is schema validation's territory |
 
-インストール後にツリーを書き換える処理と、実行時にモジュール解決へ割り込むフックは、この検出の外にある。どのリリースが実際に入るかがその処理を走らせた結果としてしか決まらず、宣言を読んでいる時点では値が存在しないためである。
+Processes that rewrite the tree after installation, and hooks that intercept module resolution at run time, stand outside this detection: which release actually lands is settled only by running that process, and no value exists at the moment the declaration is read.
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「どのリリースが入るかが、宣言を読めば決まる」ことである。
+Which release lands is settled by reading the declaration.
 
-範囲で書かれた宣言は、同じコミットに対して複数の答えを持つ。どれになるかを決めているのはロックファイルであって、宣言ではない。ロックファイルがある限りリリースは固定されるので、範囲であることは日常の作業では見えない。
+A declaration written as a range holds several answers for one commit. What decides among them is the lockfile, not the declaration. As long as the lockfile is there the release is fixed, so being a range is invisible in everyday work.
 
-1 層目は、範囲がロックファイルの外で効く場面があることである。ロックファイルを更新する操作、ロックファイルを持たない依存元からの解決、`--no-frozen-lockfile` で走るインストールは、そのとき公開されている最新の適合リリースを取る。宣言が範囲であるほど、この経路で入るリリースの幅が広がる。
+The first layer is that a range does take effect outside the lockfile. Updating the lockfile, resolving from a dependency source that carries none, and an installation running with `--no-frozen-lockfile` all take the newest matching release published at that moment. The wider the declaration, the wider the span of releases that can land through those routes.
 
-2 層目は、幅が広がったこと自体が誰の目にも触れないことである。範囲の宣言はコミットの時点では何も変えない。差が現れるのは、後になって別の環境が別のリリースを引いたときで、そこでは宣言も更新の履歴も「変わっていない」ように読める。原因を宣言まで遡るには、いつ・どの経路で解決が走ったかを再構成することになる。
+The second layer is that the widening itself is seen by nobody. A range declaration changes nothing at the moment of the commit. The difference appears later, when another environment pulls another release, and at that point both the declaration and the update history read as "unchanged". Tracing the cause back to the declaration means reconstructing when and through which route the resolution ran.
 
-版を上げる操作を宣言の書き換えとして残せば、この再構成は要らなくなる。どのリリースがいつ入ったかは履歴が持ち、宣言は現在の答えだけを持つ。
+Leaving version bumps as rewrites of the declaration removes that reconstruction. Which release landed when is held by the history, and the declaration holds only the current answer.
 
-## どう直すか
+### Configuration
 
-その宣言を、いま入っているリリースの版に書き換える。版はロックファイルが持っている。書き換えたあとインストールを走らせ、ロックファイルの宣言側が新しい値に揃うことを確かめる。
+This rule does not read a configuration file itself. Of the material the judgment needs, what amounts to policy comes from the configuration and what amounts to facts about the repository comes from the readers of the workspace list and the catalog.
 
-このリポジトリでは、マニフェストの直書きは各ワークスペースの `package.json` に、共有される版は `pnpm-workspace.yaml` の `catalog` にある。どちらに書くかは `dont-review-it check` の依存宣言の検査が決める。
+`intentionalRanges` lists, by exact match, the names that may stay as ranges. It defaults to empty, and while empty every declaration is asked for a version. A registered name is reported neither in a manifest declaration nor as a catalog entry.
+
+The workspace list, the contents of each manifest and the catalog entries are supplied by the readers handed in when the rule is created. Neither a manifest declaration nor a catalog registration can be read from one file alone, so that material lives outside the rule itself.
+
+## Fix
+
+Rewrite the declaration to the version of the release that is actually installed. The lockfile holds that version. After rewriting, run the installation and confirm that the declaration side of the lockfile lines up with the new value.
+
+In this repository, versions written straight into a manifest live in each workspace's `package.json`, and shared versions live in the `catalog` of `pnpm-workspace.yaml`. Which of the two a version belongs in is settled by the dependency declaration check in `dont-review-it check`.
 
 ```json
 {
@@ -53,20 +78,45 @@
 }
 ```
 
-範囲でなければならない事情がある場合は、その名前を意図的な範囲として登録し、なぜ範囲が要るかとどうなったら消せるかを併記する。
+Where circumstances genuinely require a range, register that name as an intentional range and write alongside it why the range is needed and what would let it go.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- 宣言を消し、実体を親や兄弟のワークスペースから解決させて使い続ける。宣言のない依存に対してこのルールは比較対象を持たない。宣言を消すことは範囲の外へ出る操作であって、版を決める操作ではない
-- 版を別名解決の後ろへ隠す。解決先の版として読むので外れない
-- 配布タグに置き換える。範囲としては報告されなくなるが、決まっていないという性質はむしろ強まる。タグを検出条件に含めていないのは、どのリリースへ寄せるかが宣言の中から決まらないためであって、許しているためではない
-- 抑制ディレクティブで黙らせる。`no-broad-lint-disable--use-next-line-with-reason` が受ける
-- インストール後・実行時に解決を差し替える。この形だけは検出条件を持てない。同じ迂回が繰り返されるなら、その処理を置いているファイルの存在そのものを禁止する側に落とす
+Code this rule rejects.
 
-## オプション
+```ts
+// the root workspace carries both its own ranges and the ones the catalog registers
+export const shipped = true;
 
-このルールは設定ファイルを自分で読まない。判定に要る材料のうち、方針にあたるものは設定から、リポジトリの事実にあたるものはワークスペース一覧と catalog の読み手から受け取る。
+```
 
-`intentionalRanges` は、範囲のままでよい名前を厳密一致で列挙する。既定は空で、空のときはすべての宣言が版を求められる。登録した名前は、マニフェストの宣言でも catalog のエントリでも報告されない。
+<!-- END GENERATED examples -->
 
-ワークスペース一覧とそれぞれのマニフェストの内容、および catalog のエントリは、ルール生成時に渡す読み手が供給する。1 つのファイルだけを見てもマニフェストの宣言も catalog の登録も読めないため、この材料はルール本体の外にある。
+The subject of this rule is the repository's manifests rather than the source in front of you, so the code above is the file the report stands on, and what settles the judgment is the versions those manifests declare.
+
+### Forbidden bypasses (do not do this)
+
+- Deleting the declaration and carrying on by resolving the package from a parent or sibling workspace. This rule has nothing to compare against for a dependency that is not declared. Deleting a declaration leaves the range behind; it does not settle a version
+- Hiding the version behind an alias. It is read as the version of what it resolves to, so it does not escape
+- Replacing it with a distribution tag. It stops being reported as a range while being even less settled. Tags are outside the detection because which release to pin to is not settled from within the declaration, not because they are permitted
+- Silencing it with a suppression directive. `no-broad-lint-disable--use-next-line-with-reason` receives that
+- Swapping the resolution after installation or at run time. This one shape cannot be given a detection condition. If the same detour keeps recurring, the answer is to forbid the existence of the file carrying that process
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `rangedManifestVersion` | A dependency version that matches more than one release must not stand in a manifest. \`{{packageName}}\` is declared as \`{{declaredVersion}}\` in \`{{workspace}}\`. Write the single release this repository installs in place of the range. |
+| `rangedCatalogVersion` | A catalog listed that matches more than one release is forbidden. \`{{packageName}}\` is registered as \`{{declaredVersion}}\`. Write the single release this repository installs in place of the range. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

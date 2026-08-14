@@ -23,6 +23,7 @@ describe("dont-review-it/no-lint-suppression-in-spec--fix-the-violation", () => 
       },
       {
         name: "a line direction to the type checker is not a lint suppression",
+        documented: true,
         code: `// @ts-ignore the parse rejects this shape\nconst row = readRow(1);`,
       },
       {
@@ -43,6 +44,7 @@ describe("dont-review-it/no-lint-suppression-in-spec--fix-the-violation", () => 
       },
       {
         name: "prose naming a directive spelling past the opening token passes",
+        documented: true,
         code: `// this spec used to carry an oxlint-disable comment\n${ASSERTION}`,
       },
     ],
@@ -60,6 +62,7 @@ describe("dont-review-it/no-lint-suppression-in-spec--fix-the-violation", () => 
       },
       {
         name: "grounds written after the separator leave the suppression standing",
+        documented: true,
         code: `// oxlint-disable-next-line ${BUNDLE_RULE} -- the matcher reads a floating clock\n${ASSERTION}`,
         errors: [
           {
@@ -165,6 +168,7 @@ describe("dont-review-it/no-lint-suppression-in-spec--fix-the-violation", () => 
       },
       {
         name: "the closing end of a suppression range is reported on its own",
+        documented: true,
         code: `${ASSERTION}\n/* oxlint-enable ${BUNDLE_RULE} */`,
         errors: [{ messageId: "suppressionRangeEnd", data: { spelling: "oxlint-enable" } }],
         output: `${ASSERTION}\n`,

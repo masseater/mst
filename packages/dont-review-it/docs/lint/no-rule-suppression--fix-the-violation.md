@@ -1,103 +1,179 @@
+---
+description: "Disallow taking a rule of the parallel determinism gate out of a run through a suppression comment, a lowered severity, or an ignore entry, leaving the code the rule stands on as the only place a report ends"
+---
+
 # no-rule-suppression--fix-the-violation
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-並列実行の決定性を守るルール群（以下「この群」）が、spec の記述を直す以外の方法で外されている記述を報告する。対象は 4 経路ある。
+Disallow taking a rule of the parallel determinism gate out of a run through a suppression comment, a lowered severity, or an ignore entry, leaving the code the rule stands on as the only place a report ends
 
-### 1. 抑制コメント
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-rule-suppression--fix-the-violation.ts`](../../src/lint/oxlint/rules/no-rule-suppression--fix-the-violation.ts)
 
-コメントを字句として読み、先頭トークンが lint の抑制を指示する綴りであるものを見る。
+<!-- END GENERATED rule-header -->
 
-| 抑制の範囲 | 綴り | 報告 |
+## Violation
+
+Text taking the rules that protect the determinism of parallel execution (below, "this gate") off by any means other than repairing what the spec wrote. Four routes are in scope.
+
+### 1. Suppression comments
+
+Comments are read lexically, and those whose opening token is a spelling that directs a lint suppression are read.
+
+| The suppression's range | Spelling | Report |
 | --- | --- | --- |
-| その行 | `oxlint-disable-line` / `eslint-disable-line` | `lineScopedSuppression` |
-| 次の行 | `oxlint-disable-next-line` / `eslint-disable-next-line` | `lineScopedSuppression` |
-| ファイル全体、および範囲の開始 | `oxlint-disable` / `eslint-disable` | `fileScopedSuppression` |
-| 範囲の終了 | `oxlint-enable` / `eslint-enable` | `suppressionRangeEnd` |
+| That line | `oxlint-disable-line` / `eslint-disable-line` | `lineScopedSuppression` |
+| The next line | `oxlint-disable-next-line` / `eslint-disable-next-line` | `lineScopedSuppression` |
+| The whole file, and the start of a range | `oxlint-disable` / `eslint-disable` | `fileScopedSuppression` |
+| The end of a range | `oxlint-enable` / `eslint-enable` | `suppressionRangeEnd` |
 
-報告するかどうかは、その指示が対象集合のルールを覆うかで決まる。
+Whether it is reported is settled by whether the directive covers a rule of the target set.
 
-- ルール名を並べていて、その中にこの群のルールがある場合、どのファイルに置かれていても報告する。名前を書いたこと自体が、そのルールがそのファイルに届いている証拠になる
-- ルール名を並べていない場合、覆う範囲は「そのファイルが検査される全ルール」になる。この場合は、この群が読むファイル（spec ファイル、および lint 設定ファイル）に置かれたものだけを報告する
-- ルール名を並べていて、その中にこの群のルールが 1 つも無い場合は報告しない
+- Where it lists rule names and one of them belongs to this gate, it is reported wherever it stands. Writing the name is itself proof that the rule reaches that file
+- Where it lists no rule name, its range covers "every rule that checks that file". Then only those placed in a file this gate reads (a spec file, or a lint configuration file) are reported
+- Where it lists rule names and none belongs to this gate, it is not reported
 
-`--` の後ろに根拠が書かれていても報告は変わらない。根拠の有無を条件にすると、根拠を書けば通る経路が残る。
+Grounds written after `--` do not change the report. Condition it on grounds and a route stays open where writing a reason lets it through.
 
-### 2. 設定でのルールの重大度
+### 2. A rule's severity in the configuration
 
-`rules` を持つオブジェクトリテラルを見て、この群のルール名を持つ項目の重大度を読む。
+Object literals carrying `rules` are read, and the severity of entries whose name belongs to this gate is read.
 
-| 書かれている重大度                    | 扱い                                     |
-| ------------------------------------- | ---------------------------------------- |
-| `error` / `deny` / `2` 以上           | 報告しない                               |
-| `off` / `allow` / `0` / `warn` / `1`  | `weakenedRule`                           |
-| 上記を `files` を持つ祖先の内側で指定 | `scopedWeakenedRule`（対象パスを載せる） |
-| リテラルとして読めない値              | `unreadableSeverity`                     |
-
-判定はファイル名を条件にしない。`rules` を持つオブジェクトは、ランナーの設定ファイル本体でも、そこから読み込まれる共有の設定でも、パッケージごとの上書きでも同じ形で現れる。import を辿らずに 3 つとも同じ 1 本の経路で読めるのはこのためである。この群のルール名を持つ項目にしか反応しないので、`rules` という名前を別の意味で使っているオブジェクトは巻き込まない。
-
-読めない重大度を報告するのは、値を別の場所で組み立てて渡す形が「設定を読んでも、この群が動いているかどうか分からない」状態を作るためである。この群は宣言された rule set ではないので、`no-partial-rule-set--enable-the-whole-set` はここを見ない。
-
-### 3. 走査対象を絞る設定
-
-ランナーの設定ファイルで、無視パターンが作業ツリー内の spec ファイルを覆っている場合に `ignoredSpecFile` を報告する。パターンと、実際に覆われたファイルのパスを報告に載せる。
-
-### 4. 抑制コメントに効力を戻す設定
-
-`respectEslintDisableDirectives` を `true` にしている記述を `respectedDisableDirectives` として報告する。
-
-このパッケージの共有 lint 設定はこの値を `false` にしている。抑制コメントが検査器の側で無効化されているからこそ、上の 1 がコメントを報告できる。`true` に戻すと、この群のルール名を書いた抑制コメントが再び効き始め、同時に上の 1 の報告そのものも消える。ルール名を 1 つも書き換えずにゲートを全部外せる経路がここにあるので、経路の側を報告する。
-
-### 意図的に広げていない範囲
-
-| 形 | 対象にしない理由 |
+| The severity written | Handling |
 | --- | --- |
-| この群以外のルール名だけを並べた抑制 | 担当が違う。覆う範囲にこの群が入っていない |
-| `mock-factory-exemption` で始まるコメント | lint ランナーが解釈する抑制ではなく、1 本のルールが読む例外の登録である。付けても不変条件は外れない |
-| `@ts-nocheck` などの型チェッカへの指示 | lint の抑制ではない |
-| この群が読まないファイルに置かれた、名前を書かない抑制 | そのファイルではこの群のルールが 1 本も動いていない |
-| 設定でこの群のルールを `error` として有効にする記述 | ゲートが立っている状態そのものである |
-| ルールを有効にする範囲を狭い対象パターンへ寄せる書き方 | 基準になる設定を読まないと「狭められた」ことが決まらない。禁止事項として下に名指しする |
-| 抑制の綴りを別名に変えて、その別名を設定側で登録する形 | 綴りの登録は設定の側に現れる。この群のルールの重大度を下げずに登録だけを足す形は、下の禁止事項として名指しする |
+| `error` / `deny` / `2` or above | Not reported |
+| `off` / `allow` / `0` / `warn` / `1` | `weakenedRule` |
+| Any of the above inside an ancestor carrying `files` | `scopedWeakenedRule` (the covered paths ride along) |
+| A value not readable as a literal | `unreadableSeverity` |
 
-## なぜそれが要るか
+The judgment does not condition on the file name. An object carrying `rules` takes the same shape in the runner's own configuration file, in a shared configuration it loads, and in a per-package override. That is why all three are read through one route without following imports. Only entries whose name belongs to this gate get a reaction, so an object using the name `rules` for something else is not swept in.
 
-守っている不変条件は「この群のルールは、spec の記述を直す以外の方法では外れない」ことである。
+An unreadable severity is reported because assembling the value elsewhere and handing it over builds the state where "reading the configuration does not say whether this gate is running". This gate is not a declared rule set, so [no-partial-rule-set--enable-the-whole-set](./no-partial-rule-set--enable-the-whole-set.md) does not read here.
 
-1 層目は、この群の他のルールが何を見ているかである。どれも spec の中の違反した記述だけを見る。設定を書き換える経路と抑制コメントを置く経路は、違反した記述を一行も直さずに規律を無効化でき、記述だけを見るルールはどれも報告しない。
+### 3. Configuration narrowing what is walked
 
-2 層目は、外された状態が後からどう見えるかである。抑制された違反は検査の出力に現れないので、存在に気づく経路が消える。違反そのものは出力に残るので次に触った人が直せるが、抑制された違反は誰の目にも触れない。この差は、抑制が違反より悪いことを意味する。
+Where an ignore pattern in the runner's configuration covers a spec file in the working tree, `ignoredSpecFile` is reported. The pattern and the paths actually covered ride along in the report.
 
-3 層目は、この群が何を守っているかである。並列実行で壊れるテストは再現しない形で落ちる。再現しない失敗は、原因を突き止める手掛かりが検査の出力しかない。気づく経路を消すことの代償が他の群より大きいのはこのためである。
+### 4. Configuration giving suppression comments their force back
 
-このルールが報告するのは「ゲートが外れていること」であって、外された先にある違反ではない。抑制を消せば、元のルールが本来の違反を報告する。
+Text setting `respectEslintDisableDirectives` to `true` is reported as `respectedDisableDirectives`.
 
-## どう直すか
+This package's shared lint configuration keeps that value `false`. Suppression comments being disabled at the checker is exactly what lets route 1 report a comment. Set it back to `true` and suppression comments naming this gate's rules start working again — and route 1's own reports disappear with them. That is a route for taking every gate off without rewriting one rule name, so the route itself is reported.
 
-抑制を消し、そこで報告される違反を直す。直し方は各ルールの文書にある。
+### Deliberately not widened
 
-ルールそのものが規律として誤っていると判断したなら、ルールの定義を変える。spec や設定の側で個別に外すことでは行わない。
+| Shape | Why it is left out |
+| --- | --- |
+| A suppression listing only rules outside this gate | A different owner. This gate is not in its range |
+| A comment opening with `mock-factory-exemption` | Not a suppression the lint runner interprets, but an exception registration one rule reads. Adding it does not take the invariant off |
+| A directive to the type checker such as `@ts-nocheck` | Not a lint suppression |
+| A suppression naming no rule, placed in a file this gate does not read | Not one rule of this gate runs in that file |
+| Text enabling this gate's rules at `error` in the configuration | That is the gate standing |
+| Narrowing the range a rule is enabled over to a tighter target pattern | Whether it was narrowed cannot be settled without reading the baseline configuration. Named below as a prohibition |
+| Renaming the suppression spelling and registering the alias in the configuration | The registration appears on the configuration side. Adding a registration without lowering this gate's severities is named below as a prohibition |
 
-抑制コメントの削除に自動修正を持たせていない。1 つのコメントが複数のルール名を並べている場合、コメントごと消すとこの群以外のルールの抑制まで一緒に消える。どの名前を残すかは書き手が決めるものであり、機械的には決まらない。
+### The invariant
 
-## 禁じる回避策
+The rules of this gate do not come off by any means other than repairing what the spec wrote.
 
-- このルール自体を抑制する。対象集合はこのルール自身を含んでおり、設定でこのルールを外した記述も報告する
-- spec を走査対象の外へ移動して報告を消す。無視パターンを対象に含めているのはこのためである
-- 違反を含む記述を spec の外のヘルパーへ移し、spec からは呼ぶだけにする。この経路は各ルールが個別に塞いでいる。このルールが担うのは、そうして広げた走査範囲がさらに設定で外されていないことの確認である
-- 重大度の値を別のモジュールで組み立てて渡す。読めない値は `unreadableSeverity` として報告する
-- 抑制コメントに効力を戻し、コメントの側でこの群を黙らせる。設定の側を `respectedDisableDirectives` として報告する
-- この群のルールを有効にする対象パターンを狭め、spec のディレクトリをその外に置く。基準になる設定を読まないと判定できないため検出していない
-- 抑制の綴りを別名として lint 設定側に登録し、その別名でコメントを書く。登録された綴りは設定の側に現れる
+The first layer is what the other rules of this gate read: each reads only the offending text inside a spec. The route of rewriting configuration and the route of placing a suppression comment can void the discipline without repairing one line of the offending text, and no rule that reads text alone reports them.
 
-## オプション
+The second layer is how the state of being taken off looks afterwards. A suppressed violation does not appear in the check's output, so the route by which anybody notices it is gone. The violation itself stays in the output for whoever touches it next; a suppressed violation meets nobody's eye. That difference is what makes a suppression worse than a violation.
 
-対象とするルール名の集合だけを持つ。
+The third layer is what this gate protects. A test that breaks under parallel execution fails in a form that does not reproduce, and the only handle on a non-reproducing failure is the check's output. That is why erasing the route by which it is noticed costs more here than in other groups.
 
-| キー          | 型         | 既定                   |
-| ------------- | ---------- | ---------------------- |
-| `targetRules` | `string[]` | この群の全ルールの名前 |
+What this rule reports is that the gate is off, not the violation beyond it. Delete the suppression and the original rule reports its own violation.
 
-書かれた名前は既定の集合に足される。既定の集合から名前を取り除く形は持たない。集合を空にする指定も、書かれた名前だけに置き換える指定も受け付けない。ルールを 1 つずつ対象から外せる形にすると、このオプション自体が抑制の経路になる。
+### Configuration
 
-ルール名は接頭辞を落として突き合わせるので、`dont-review-it/` を付けた綴りも同じ名前として扱う。
+Only the set of target rule names.
+
+| Key | Type | Default |
+| --- | --- | --- |
+| `targetRules` | `string[]` | The names of every rule of this gate |
+
+Names written are added to the default set. There is no shape for removing a name from the default, no specification emptying the set, and none replacing it with the names written. Make rules removable one at a time and this option is itself a suppression route.
+
+Rule names are matched with the prefix dropped, so a spelling with `dont-review-it/` is the same name.
+
+## Fix
+
+Delete the suppression and repair the violation reported there. The fix is in each rule's document.
+
+Where you judge the rule itself wrong as a discipline, change the rule's definition. Do not do it by taking it off case by case on the spec or the configuration side.
+
+There is no automatic fix for deleting a suppression comment. Where one comment lists several rule names, deleting the comment deletes the suppression of rules outside this gate with it. Which names to keep is the writer's decision and does not settle mechanically.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// grounds written after the separator leave the report standing
+// in packages/cart/src/basket.test.ts
+// eslint-disable-next-line no-redundant-mock-reset--lift-mocks-into-fixture -- the shared setup lands later
+export const total = 1;
+```
+
+```ts
+// a configuration turning a gate rule off is reported
+// in vite.config.ts
+export default { lint: { rules: { "dont-review-it/no-redundant-mock-reset--lift-mocks-into-fixture": "off" } } };
+```
+
+Code this rule accepts.
+
+```ts
+// a suppression naming only a rule outside this gate is another rule's business
+// in packages/cart/src/basket.test.ts
+/* eslint-disable no-console */
+export const total = 1;
+```
+
+```ts
+// a configuration holding a gate rule at error passes
+// in vite.config.ts
+export default { lint: { rules: { "dont-review-it/no-redundant-mock-reset--lift-mocks-into-fixture": "error" } } };
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Suppressing this rule itself. The target set includes this rule, and text taking this rule off in the configuration is reported too
+- Moving the spec outside what is walked to clear the report. Ignore patterns are in scope for exactly that reason
+- Moving the offending text into a helper outside the spec and only calling it from the spec. Each rule closes that route individually; what this rule takes on is confirming that the range widened that way has not then been taken off in the configuration
+- Assembling the severity value in another module and handing it over. An unreadable value is reported as `unreadableSeverity`
+- Giving suppression comments their force back and silencing this gate from the comment side. The configuration side is reported as `respectedDisableDirectives`
+- Tightening the target pattern this gate's rules are enabled over and putting the spec directory outside it. Not detected, because it cannot be judged without reading the baseline configuration
+- Registering the suppression spelling as an alias on the lint configuration side and writing comments with the alias. A registered spelling appears on the configuration side
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `fileScopedSuppression` | A \`{{spelling}}\` comment must not stand over a file this gate reads. It takes {{silenced}} out of the run for every line of the file, and the invariants those rules carry go unchecked here. Delete the comment, then rewrite the code the reopened reports stand on. Rewrite the definition of a rule to change the discipline it carries. |
+| `lineScopedSuppression` | A \`{{spelling}}\` comment must not stand in a file this gate reads. It takes {{silenced}} out of the run at the line it covers, and the invariants those rules carry go unchecked there. Delete the comment, then rewrite the code the reopened report stands on. Rewrite the definition of a rule to change the discipline it carries. |
+| `suppressionRangeEnd` | A \`{{spelling}}\` comment must not stand in a file this gate reads. It closes a range that takes {{silenced}} out of the run, and the invariants those rules carry go unchecked across that range. Delete both ends of the range, then rewrite the code the reopened reports stand on. Rewrite the definition of a rule to change the discipline it carries. |
+| `weakenedRule` | A lint configuration must not hold \`{{ruleName}}\`, a rule of the parallel determinism gate, at \`{{severity}}\`. This entry takes the rule out of every run, and the invariant it carries goes unchecked across the whole tree. Set this entry to \`error\`, then rewrite the code the rule reports. |
+| `scopedWeakenedRule` | An override must not hold \`{{ruleName}}\`, a rule of the parallel determinism gate, at \`{{severity}}\` over {{scope}}. Those paths keep the code the rule reports and lose the report itself. Delete this entry, then rewrite the code the rule reports over those paths. |
+| `unreadableSeverity` | A severity this rule cannot read must not stand on \`{{ruleName}}\`, a rule of the parallel determinism gate. A value assembled elsewhere hides the level this gate runs at. Write the severity of this entry as the literal \`error\`. |
+| `respectedDisableDirectives` | A lint configuration must not hand the suppression comments of a run back their force. Every comment naming a rule of the parallel determinism gate starts taking that rule out of the run again. Set this entry to \`false\`, then delete the comments it was standing for. |
+| `ignoredSpecFile` | An ignore entry must not cover a file this gate reads. \`{{pattern}}\` covers \`{{matchedPath}}\`, an authored spec file, and every rule of the gate stops reporting over it. Narrow that pattern to the generated paths it stands for, or delete it and rewrite the code the gate reports. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

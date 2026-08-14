@@ -20,6 +20,7 @@ describe("dont-review-it/no-replaced-double-behaviour--let-the-replaced-module-a
     valid: [
       {
         name: "a double the spec created itself is a test input and may answer",
+        documented: true,
         code: "const send = vi.fn();\nsend.mockReturnValue(1);",
         filename: SPEC_FILE,
       },
@@ -50,6 +51,7 @@ describe("dont-review-it/no-replaced-double-behaviour--let-the-replaced-module-a
       },
       {
         name: "grounds written above the call carry the exemption",
+        documented: true,
         code: `${IMPORTED_DOUBLE}${GROUNDED_EXEMPTION}\nsend.mockRejectedValue(1);`,
         filename: SPEC_FILE,
       },
@@ -112,6 +114,7 @@ describe("dont-review-it/no-replaced-double-behaviour--let-the-replaced-module-a
     invalid: [
       {
         name: "a return value written on an imported double is reported",
+        documented: true,
         code: `${IMPORTED_DOUBLE}send.mockReturnValue(1);`,
         filename: SPEC_FILE,
         errors: [{ messageId: "replacedDoubleBehaviour" }],
@@ -136,6 +139,7 @@ describe("dont-review-it/no-replaced-double-behaviour--let-the-replaced-module-a
       },
       {
         name: "a setting inside a fixture is reported the same as one outside",
+        documented: true,
         code: `${IMPORTED_DOUBLE}const it = test.extend("theSent", () => {\n  send.mockReturnValue(1);\n  return send;\n});`,
         filename: SPEC_FILE,
         errors: [{ messageId: "replacedDoubleBehaviour" }],

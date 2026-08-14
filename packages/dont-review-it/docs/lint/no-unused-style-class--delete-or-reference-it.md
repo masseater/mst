@@ -1,66 +1,119 @@
+---
+description: "Disallow a style sheet class that no script and no markup in the repository spells, so the style sheet keeps only the classes that reach the rendered page"
+---
+
 # no-unused-style-class--delete-or-reference-it
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-TypeScript から import されているスタイルシートが定義しているクラスのうち、リポジトリのどのスクリプトにもどのマークアップにも綴りが現れないもの。
+Disallow a style sheet class that no script and no markup in the repository spells, so the style sheet keeps only the classes that reach the rendered page
 
-報告はスタイルシートではなく、それを import している文の上に出る。oxlint はスタイルシートを訪れないので、CSS の中に報告位置を置けない。import 文はそのスタイルシートをページに載せている当事者なので、そこが宛先になる。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-unused-style-class--delete-or-reference-it.ts`](../../src/lint/oxlint/rules/no-unused-style-class--delete-or-reference-it.ts)
 
-### クラス定義の読み取り
+<!-- END GENERATED rule-header -->
 
-スタイルシートからコメント・引用符付きの文字列・`url(...)` を伏せたうえで、ブロックを開く `{` の手前に立っている綴りだけをセレクタとして読む。`@` で始まるものは at-rule の頭書きなので読まない。at-rule の中身は読む。伏せる操作は行を保つので、報告に出る行番号は元のスタイルシートの行と一致する。
+## Violation
 
-宣言の値は `;` で切れるため、`0.1` や `1.5px` のような小数はセレクタの位置に立たない。`url(./hero.png)` の `.png` も、`content: ".ghost"` の `.ghost` も同じ理由で読まれない。
+A class defined by a style sheet imported from TypeScript whose name is spelled in no script and no markup anywhere in the repository.
 
-同じ名前が複数のセレクタに現れても、そのクラスは 1 つとして数える。
+The report stands on the statement importing the style sheet rather than on the style sheet. oxlint never visits a style sheet, so no report position can be placed inside the CSS. The import statement is what puts that style sheet on the page, so that is the address.
 
-### 索引の範囲
+### Reading the class definitions
 
-索引はリポジトリ根から作る。根は lint の実行ディレクトリから上に辿って決める。
+Comments, quoted strings and `url(...)` are masked out of the style sheet, and only the spellings standing in front of an opening `{` are read as selectors. Anything opening with `@` is the head of an at-rule and is not read; the contents of an at-rule are. Masking preserves the lines, so the line numbers in a report match the lines of the original style sheet.
 
-定義の側として読むのは `.css`。参照の側として読むのは `.js` `.jsx` `.ts` `.tsx` とその `.c` / `.m` 付きの綴り、および `.html` と `.svg` である。
+Declaration values end at `;`, so decimals such as `0.1` and `1.5px` never stand in selector position. The `.png` in `url(./hero.png)` and the `.ghost` in `content: ".ghost"` go unread for the same reason.
 
-テストファイルも参照の側に入る。[no-duplicated-body--import-the-existing-declaration](./no-duplicated-body--import-the-existing-declaration.md) と [no-twin-declaration--merge-into-one-owner](./no-twin-declaration--merge-into-one-owner.md) はテストを索引から外すが、このルールは外さない。あちらは索引に入れると重複の隠し場所になるが、こちらは参照源を減らすと誤検知が増える方向にしか働かない。
+A name appearing in several selectors counts as one class.
 
-### 参照の判定
+### The range of the index
 
-クラス名が、参照の側のファイルのテキストのどこかに部分文字列として現れれば、参照されているものとして扱う。属性の位置か、文字列の中か、識別子の一部かは問わない。
+The index is built from the repository root, found by walking up from the directory the lint ran in.
 
-加えて、クラス名をハイフンで区切った各段の接頭辞も同じ扱いにする。`ui-primary` なら `ui-` が現れるだけで参照されているものとする。`` `ui-${kind}` `` のように接頭辞と補間でクラス名を組み立てる書き方を、綴りが揃わないという理由で消させないため。
+`.css` is read as the defining side. `.js`, `.jsx`, `.ts`, `.tsx` and their `.c` / `.m` spellings, plus `.html` and `.svg`, are read as the referencing side.
 
-参照テキストは 1 つに繋いでから照合するが、繋ぎ目には改行を置く。クラス名は改行を含まないので、2 つのファイルが端を持ち寄って名前を作ることはない。
+Test files join the referencing side. [no-duplicated-body--import-the-existing-declaration](./no-duplicated-body--import-the-existing-declaration.md) and [no-twin-declaration--merge-into-one-owner](./no-twin-declaration--merge-into-one-owner.md) hold tests out of their index; this rule does not. There, including tests would make them a hiding place for duplication; here, removing referencing sources only pushes toward false reports.
 
-この判定は取りこぼす側に倒してある。参照されていないクラスのうち、名前がどこかの綴りに埋もれているものは報告されない。スタイルを消す指示を誤って出すより、消し損ねる方が安いという判断である。
+### Deciding that something is referenced
 
-## なぜそれが要るか
+A class name is taken as referenced when it appears anywhere in the text of a file on the referencing side, as a substring. Whether it sits in an attribute, inside a string, or as part of an identifier makes no difference.
 
-使われていないクラスは、読み手にとっては使われているクラスと見分けが付かない。スタイルシートを読む人は、そこに書かれた見た目がどこかに出ていると考えて読む。出ていないものが混ざっていると、画面に現れない見た目の指定を頼りに設計を推測することになる。
+On top of that, every prefix formed by cutting the class name at its hyphens is treated the same way: for `ui-primary`, `ui-` appearing is enough. That keeps a spelling like `` `ui-${kind}` ``, where a class name is assembled out of a prefix and an interpolation, from being deleted for the spellings failing to line up.
 
-このずれは静かに広がる。マークアップからクラスを外すとき、スタイルシートの側は何も言わない。型検査もテストもビルドも通る。残されたクラスは次に触る人にとって「まだ使われている何か」に見える。
+The referencing texts are joined before matching, with newlines at the seams. Class names carry no newline, so two files cannot lend each other their ends to form a name.
 
-自動修正を持たないのは、消すのが正しいのか、参照を足すのが正しいのかを機械が決められないから。クラスを書いた側が意図した見た目が、まだマークアップに載っていないだけということがある。
+The judgment errs toward missing violations. An unreferenced class whose name happens to be buried inside some other spelling is not reported. Failing to delete a style is cheaper than wrongly directing somebody to delete one.
 
-## どう直すか
+### The invariant
 
-報告に並んだクラスを、スタイルシートの該当行で 1 つずつ読む。
+An unused class is indistinguishable from a used one to a reader. Somebody reading a style sheet takes the appearance written there to be showing up somewhere. With things that never show mixed in, they end up inferring the design from appearance rules that never reach a screen.
 
-その見た目がもう要らないなら、スタイルシートから消す。入れ子になったセレクタの中にあるなら、外側が空になるかどうかまで見る。
+The drift spreads quietly. Removing a class from markup makes the style sheet say nothing. The type check, the tests and the build all pass. The class left behind looks, to whoever touches it next, like something still in use.
 
-その見た目がまだ要るなら、それを必要とするマークアップから綴る。クラス名を組み立てて渡している箇所があるなら、組み立ての接頭辞をクラス名と揃える。
+No automatic fix is offered, because a machine cannot settle whether deleting or adding a reference is right. The appearance whoever wrote the class intended may simply not have reached the markup yet.
 
-スタイルシート自体がもう要らないなら、import ごと消す。
+### What is not detected
 
-## 禁じる回避策
+- A style sheet imported from no script. There is no report position, so nothing is said
+- A class standing only in markup that no style sheet defines. A misspelling is not something this rule can tell
+- Id selectors, element selectors and custom properties. Names other than classes are not read
+- A class whose name is buried as a substring inside some other spelling. That follows from erring toward missing violations, and is not permission
 
-- クラス名をコメントやドキュメントに書いて綴りを作る。参照の側として読むのはスクリプトとマークアップだけなので効かないが、効かせようとする書き換えを禁じる
-- 使わない参照をコードに置いて綴りを作る。クラスは死んだまま、報告だけが消える
-- スタイルシートを import せず、`link` タグや別のスタイルシートの `@import` で読み込んで報告位置を消す
-- クラス名を短くして、既存の綴りに埋もれさせる
-- ルールごとの除外、パッケージごとの除外、クラスごとの除外タグ。どれも用意しない
+## Fix
 
-## 何を検出しないか
+Read the classes listed in the report one at a time, at their lines in the style sheet.
 
-- どのスクリプトからも import されていないスタイルシート。報告位置が無いので黙る
-- スタイルシートが定義していない、マークアップの側だけに立っているクラス。綴りの間違いはこのルールでは分からない
-- id セレクタ、要素セレクタ、カスタムプロパティ。クラス以外の名前は読まない
-- 名前がどこかの綴りに部分文字列として埋もれているクラス。参照の判定を取りこぼす側に倒した結果であって、許しているのではない
+Where the appearance is no longer wanted, delete it from the style sheet. Where it sits inside a nested selector, check whether the outer one is left empty.
+
+Where the appearance is still wanted, spell it from the markup that needs it. Where a class name is assembled and handed over somewhere, line the assembly's prefix up with the class name.
+
+Where the style sheet itself is no longer wanted, delete the import with it.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// an import of a style sheet that defines a class nothing spells is reported
+import "./style.css";
+```
+
+Code this rule accepts.
+
+```ts
+// an import of a module the index holds no unused class for is left alone
+import { setupCounter } from "./counter.ts";
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Writing the class name in a comment or a document to produce the spelling. Only scripts and markup are read as the referencing side so it has no effect, and rewriting things to give it effect is forbidden
+- Placing a reference nothing uses in the code to produce the spelling. The class stays dead and only the report goes away
+- Loading the style sheet through a `link` tag or another style sheet's `@import` instead of importing it, to remove the report position
+- Shortening the class name until it is buried inside an existing spelling
+- Per-rule exclusions, per-package exclusions, per-class exclusion tags. None of them is offered
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `unusedStyleClass` | An imported style sheet must not define a class that nothing in this repository spells. \`{{styleSheet}}\` defines {{classes}}. Delete each of them from the style sheet, or spell each in the markup that needs it. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

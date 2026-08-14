@@ -1,60 +1,83 @@
+---
+description: "Disallow handing an assertion a member reached off the value a fixture handed over, so the faces of that value the spec never names cannot pass unread"
+---
+
 # no-expect-member-subject--yield-subject-from-fixture
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-spec ファイルの中の `expect(...)` について、第一引数に置かれた subject を見る。`expect.soft(...)` / `expect.poll(...)` も同じ入口として扱う。matcher が続いているかどうかは見ない。matcher を外した `expect(report.id);` も同じ位置の subject として読む。
+Disallow handing an assertion a member reached off the value a fixture handed over, so the faces of that value the spec never names cannot pass unread
 
-対象のファイルはファイル名の接尾辞で決める。既定は `.test.ts` と `.test.tsx` で、`specFileSuffixes` で差し替えられる。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-expect-member-subject--yield-subject-from-fixture.ts`](../../src/lint/oxlint/rules/no-expect-member-subject--yield-subject-from-fixture.ts)
 
-subject は、型アサーション・`satisfies`・非 null アサーション・括弧・オプショナルチェーン・`await` を剥いでから読む。`not` / `resolves` / `rejects` は subject の位置を変えないので関係しない。
+<!-- END GENERATED rule-header -->
 
-判定は、テストブロックのコールバックが受け取る値からの距離で行う。
+## Violation
 
-| 距離   | 何を指すか                                              | 判定       |
-| ------ | ------------------------------------------------------- | ---------- |
-| 0      | テストコンテキストそのもの（`(context) => ...`）        | 報告しない |
-| 1      | fixture が返した値（`({ report }) => ...` の `report`） | 報告しない |
-| 2 以上 | fixture が返した値の中の一つの面                        | 報告する   |
+For an `expect(...)` in a spec file, the subject placed in the first argument is read. `expect.soft(...)` and `expect.poll(...)` are treated as the same way in. Whether a matcher follows is not read: `expect(report.id);` with the matcher dropped is read as the same subject in the same position.
 
-距離は次のように積み上げる。
+The files in scope are settled by the file name suffix. The default is `.test.ts` and `.test.tsx`, replaceable through `specFileSuffixes`.
 
-- メンバアクセスは 1 段。ドット記法・角括弧記法・添字のいずれも同じで、キーが実行時に決まる形（`report[key]`）も同じ 1 段として数える。
-- 分割代入のキーは 1 段。`({ report })` の `report` は 1、`({ report: { id } })` の `id` は 2 になる。改名しても、既定値を書いても段数は変わらない。
-- 残余（`...rest`）は 0 段。`({ report, ...rest })` の `rest` はコンテキストと同じ距離に立つので、`rest.report` は fixture が返した値であって面ではない。
-- 束縛は初期化子の距離を引き継ぐ。`const id = report.id` の `id` は 2、`const held = report` の `held` は 1 になる。束縛の連鎖は最後までたどる。
+The subject is read with type assertions, `satisfies`, non-null assertions, parentheses, optional chains and `await` peeled off. `not`, `resolves` and `rejects` do not move the subject's position and are irrelevant.
 
-報告は 3 通りに分かれる。メンバをアサーションの位置で書いた形、メンバを保持する束縛を渡した形、コンテキストの入れ子分割代入で受け取った名前を渡した形で、直し方の書き出しが変わる。
+The judgment runs on the distance from the value the test block's callback receives.
 
-### 意図的に広げていない範囲
+| Distance | What it names | Judgment |
+| --- | --- | --- |
+| 0 | The test context itself (`(context) => ...`) | Not reported |
+| 1 | A value the fixture returned (the `report` of `({ report }) => ...`) | Not reported |
+| 2 or more | One face of a value the fixture returned | Reported |
 
-| 形 | 対象にしない理由 |
+Distance accumulates like this.
+
+- A member access is one step. Dot notation, bracket notation and an index are alike, and a form whose key settles at run time (`report[key]`) counts as the same one step
+- A destructuring key is one step. The `report` of `({ report })` is 1; the `id` of `({ report: { id } })` is 2. Renaming, and writing a default, do not change the count
+- A rest (`...rest`) is zero steps. The `rest` of `({ report, ...rest })` stands at the same distance as the context, so `rest.report` is a value the fixture returned rather than a face
+- A binding inherits its initializer's distance. The `id` of `const id = report.id` is 2, and the `held` of `const held = report` is 1. A chain of bindings is followed to the end
+
+Reports divide into three: a member written at the assertion, a binding holding a member handed over, and a name received through a nested destructuring of the context. The opening of the fix differs between them.
+
+### Deliberately not widened
+
+| Shape | Why it is left out |
 | --- | --- |
-| fixture が返した値そのものを渡す形 | これが求めている形である |
-| コンテキストのトップレベルのキーを分割代入した名前 | fixture の名前であって、面ではない |
-| matcher の引数に現れるメンバアクセス | 期待値は spec が書くものである。読むのは `expect(...)` の第一引数だけである |
-| 複合値を丸ごと渡す形 | 丸ごと突き合わせる限り、無検査の面は残らない |
-| fixture にたどり着かない値のメンバアクセス | 別ファイルから取り込んだ定数、spec が書き下した定数、呼び出しの結果を受けた束縛はここに入る |
-| 初期化子を持たない束縛 | 距離をたどれない。たどれないものを違反として扱わない |
-| テーブル駆動のブロック（`each` / `for`） | コールバックが受け取る第一引数が行であってコンテキストではない。行の形は呼び出し側の表に従って変わる |
-| `describe` のコールバックの引数 | グルーピングのブロックは fixture を渡さない |
+| Handing over the value the fixture returned itself | This is the shape being asked for |
+| A name destructured from a top-level key of the context | A fixture's name, not a face |
+| A member access appearing in a matcher's argument | The expected value is what the spec writes. Only the first argument of `expect(...)` is read |
+| Handing over a compound value whole | As long as it is matched whole, no unchecked face is left |
+| A member access on a value that does not reach a fixture | A constant imported from another file, a constant the spec wrote out, and a binding receiving the result of a call land here |
+| A binding with no initializer | The distance cannot be followed. What cannot be followed is not treated as a violation |
+| A table-driven block (`each` / `for`) | The first argument the callback receives is a row rather than the context. The row's shape follows the caller's table |
+| The parameter of a `describe` callback | A grouping block hands over no fixture |
 
-最後の 2 つは検出の穴でもある。テーブル駆動のブロックがコンテキストを別の引数で受け取る形は、この読み方では距離をたどれない。届かないことは許していることを意味しないので、禁じる回避策の節に名前を挙げてある。
+The last two are also holes in the detection. Where a table-driven block receives the context in another parameter, this reading cannot follow the distance. Not reaching does not mean it is allowed, so they are named in the forbidden bypasses section.
 
-subject が fixture にたどり着かないメンバアクセスであることは、このルールにとっては対象外というだけである。subject が根そのものであることは別のルールが subject の形だけで見ている。
+That the subject is a member access not reaching a fixture is, for this rule, simply out of scope. Whether the subject is the root itself is read by another rule from the subject's shape alone.
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「`expect(...)` の subject が、fixture が返した値そのものである」ことである。
+The subject of `expect(...)` is the value the fixture returned itself.
 
-fixture がその spec の被験体を返しているなら、テストブロックは受け取った値をそのままアサーションできる。メンバを取り出さないと検査したいものに届かないということは、fixture が返しているのが被験体ではなく、被験体を含む入れ物だということである。
+Where the fixture returns that spec's subject, the test block can assert on the value it received as it stands. Having to take a member out to reach what you want to check means what the fixture returns is not the subject but a container holding it.
 
-入れ物から面を一つ取り出して比較すると、取り出さなかった面は無検査のまま緑になる。フィールドが増えても、改名されても、別の面の値がずれても落ちない。面ごとにアサーションを増やしても同じで、名指ししなかった面は最後まで未検証のまま残る。
+Take one face out of a container and compare it, and the faces you did not take stay unverified and green. It does not fail when a field is added, when one is renamed, or when another face's value drifts. Adding an assertion per face is the same: the faces nobody named stay unverified to the end.
 
-もう 1 つは、名前で判定するルールとの関係である。被験体の名前を見るルールは「複数の結果を詰めた袋」を名前から見つける代理指標として置かれている。複合値が 1 つの被験体なのか袋なのかは値の意味であって型にも構文にも現れないが、袋を袋として使う形——複合値のメンバ経路を subject にする形——は構文に現れる。意味を判定しないまま使い方の側で塞げるので、名前だけ回避的に変えて中身を袋のまま残す形が残らない。
+There is a second point, about the relationship with the rule that judges by name. The rule reading the subject's name is placed as a proxy for finding "a bag with several results in it" from the name. Whether a compound value is one subject or a bag is a question of what the value means and appears in neither the type nor the syntax — but using a bag as a bag, making a member path of a compound value the subject, does appear in the syntax. Closing it on the usage side without judging meaning leaves no room for changing only the name evasively while the contents stay a bag.
 
-## どう直すか
+### Configuration
 
-面ごとに fixture を分け、テストブロックが受け取った値をそのままアサーションする。
+`specFileSuffixes` alone. The default is `.test.ts` and `.test.tsx`, shared as one range with the rules that read subjects.
+
+There is no setting for excluding individual cases. Make one mouth for excluding and moving the face there becomes a way past this rule.
+
+## Fix
+
+Split the fixture per face and assert on the value the test block received as it stands.
 
 ```ts
 const test = baseTest.extend("reading", () =>
@@ -72,27 +95,81 @@ test("names what is left of the same value", ({ reading }) => {
 });
 ```
 
-複合値が 1 つの被験体なら、丸ごと完全一致で固定する。書かなかったフィールドを無検査にしない。
+Where the compound value is one subject, pin it whole with an exact match. Do not leave the fields you did not write unverified.
 
-コレクションの要素を添字で取り出していた場合も同じで、要素ごとに fixture を分けるか、コレクションを丸ごと固定する。丸ごと固定するのが現実的でない大きさなら、それは fixture が被験体を返していない兆候なので、fixture の側を分けて解く。
+The same holds for taking a collection's element out by index: split the fixture per element, or pin the collection whole. Where pinning whole is impractical because of size, that is a sign the fixture is not returning a subject, so solve it by splitting the fixture.
 
-対象ホストオブジェクトの観測面は、専用の matcher で読む。値としてメンバを覗かない。
+Read the observable face of a host object with the matcher dedicated to it. Do not peek at a member as a value.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- メンバをテストブロックの中で局所束縛に受けてから渡す。初期化子までたどるので同じ違反として落ちる
-- 束縛を何段か経由させて初期化子を遠ざける。再束縛は最後までたどる
-- コンテキストの入れ子分割代入で名前を変えて、メンバ経路を fixture の名前に見せる。導入元の段数で判定する
-- メンバの取り出しを fixture 側へ押し戻す。fixture が別の値やそのメンバを素通し・射影して返す形は別のルールが落とす
-- matcher を外して `expect(subject);` だけにする。起点は `expect(...)` の呼び出しそのものである
-- 型アサーション・非 null アサーション・括弧・`await` で包んで見た目を変える。剥がされる
-- `not` / `resolves` / `rejects` を挟む。subject の位置は変わらない
-- 面ごとにアサーションを割って、名指しするフィールドを増やす。名指ししなかった面は残ったままで、報告が増えるだけになる
-- テーブル駆動のブロックに移し、コンテキストを第二引数以降で受け取る。距離をたどれなくなるので報告は消えるが、subject が面であることは変わらない
-- 抑制ディレクティブ
+Code this rule rejects.
 
-## オプション
+```ts
+// a member written in the assertion names one face of the fixture value
+// in report.test.ts
+test("carries the id", ({ report }) => {
+  expect(report.id).toBe("a");
+});
+```
 
-`specFileSuffixes` だけを取る。既定は `.test.ts` と `.test.tsx` で、subject を読むルールが同じ範囲を共有する。
+```ts
+// a pattern nested in the context takes a face out of the fixture value
+// in report.test.ts
+test("carries the id", ({ report: { id } }) => {
+  expect(id).toBe("a");
+});
+```
 
-個別のケースを外す設定は置かない。外せる口を 1 つ作れば、そこへ面を移すだけでこのルールを通せるようになる。
+Code this rule accepts.
+
+```ts
+// the value a fixture handed over is the subject this rule asks for
+// in report.test.ts
+test("carries the id", ({ report }) => {
+  expect(report).toStrictEqual({ id: "a" });
+});
+```
+
+```ts
+// the rest of the context holds fixtures rather than faces of one
+// in report.test.ts
+test("carries the id", ({ input, ...rest }) => {
+  expect(rest.report).toStrictEqual({ id: "a" });
+});
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Receiving the member into a local binding inside the test block and handing that over. Initializers are followed, so it falls as the same violation
+- Routing through several bindings to put distance between it and the initializer. Rebindings are followed to the end
+- Renaming through a nested destructuring of the context to make a member path look like a fixture's name. The judgment runs on the step count at the point of introduction
+- Pushing the member extraction back into the fixture. A fixture returning another value, or a member of one, passed through or projected falls to another rule
+- Dropping the matcher to leave only `expect(subject);`. The starting point is the `expect(...)` call itself
+- Wrapping in a type assertion, a non-null assertion, parentheses or `await` to change the look. They are peeled
+- Inserting `not`, `resolves` or `rejects`. The subject's position does not move
+- Splitting into an assertion per face to name more fields. The faces you did not name stay, and all that grows is the number of reports
+- Moving into a table-driven block and receiving the context in the second parameter or later. The distance becomes unfollowable so the report clears, but the subject being a face is unchanged
+- A suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `memberSubject` | The subject of an assertion must not be a member reached off the value a fixture handed over. \`{{subject}}\` names one face of that value, and every face left unnamed here passes unread. Split the fixture into one fixture per face, or assert the whole value the fixture hands over with an exact matcher. Pushing the member read into the fixture leaves the same narrowed subject standing. |
+| `boundMemberSubject` | The subject of an assertion must not be a binding that holds a member reached off the value a fixture handed over. \`{{subject}}\` arrives at that member through the bindings this spec declares, and every face left unnamed here passes unread. Split the fixture into one fixture per face, or assert the whole value the fixture hands over with an exact matcher. |
+| `destructuredMemberSubject` | The subject of an assertion must not be a binding taken out of a pattern nested inside the test context. \`{{subject}}\` names one face of the value a fixture handed over, and every face left unnamed here passes unread. Take the fixture value whole in the callback parameter, and split the fixture into one fixture per face or assert the whole value with an exact matcher. Renaming the binding in the pattern leaves the face it names unchanged. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

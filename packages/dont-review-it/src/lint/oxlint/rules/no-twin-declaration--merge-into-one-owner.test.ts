@@ -154,6 +154,7 @@ describe("dont-review-it/no-twin-declaration--merge-into-one-owner", () => {
     valid: [
       {
         name: "a declaration that shares only its body with another one passes",
+        documented: true,
         code: `const PACKAGE_FILE_NAME = "package.json";`,
         filename: subjectFilename,
       },
@@ -165,6 +166,7 @@ describe("dont-review-it/no-twin-declaration--merge-into-one-owner", () => {
     valid: [
       {
         name: "a declaration that shares only its name with another one passes",
+        documented: true,
         code: `const MANIFEST_FILE_NAME = "pnpm-workspace.yaml";`,
         filename: subjectFilename,
       },
@@ -188,6 +190,7 @@ describe("dont-review-it/no-twin-declaration--merge-into-one-owner", () => {
     invalid: [
       {
         name: "a declaration the index places past the end of the file is reported on the file",
+        documented: true,
         code: `const MANIFEST_FILE_NAME = "package.json";`,
         filename: subjectFilename,
         errors: [{ messageId: "twinDeclaration" }],

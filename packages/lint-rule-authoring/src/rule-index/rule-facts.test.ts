@@ -46,6 +46,7 @@ export const full = createRule({
           hasSuggestions: true,
           configurable: true,
           shipped: true,
+          messages: [{ messageId: "report", template: "The thing must not be done. Stop." }],
         },
       ]);
     });
@@ -87,6 +88,7 @@ export const full = createRule({
           hasSuggestions: false,
           configurable: false,
           shipped: true,
+          messages: [{ messageId: "report", template: "It is forbidden." }],
         },
       ]);
     });
@@ -401,7 +403,9 @@ export const borrowedDocs = {
       return lintRuleFactsIn({ workspaceRoot: root, sourcePath });
     });
 
-    it("reads as no description", ({ facts }) => {
+    it("reads as no description, and a schema it cannot open still declares options", ({
+      facts,
+    }) => {
       expect(facts).toStrictEqual([
         {
           name: "no-borrowed-docs--inline-them",
@@ -409,8 +413,47 @@ export const borrowedDocs = {
           sourcePath: "src/rules/borrowed-docs.ts",
           fixable: false,
           hasSuggestions: false,
+          configurable: true,
+          shipped: true,
+          messages: [{ messageId: "report", template: "No." }],
+        },
+      ]);
+    });
+  });
+
+  describe("a schema named by a constant of the same file", () => {
+    const it = test.extend("facts", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "rule-facts-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      const sourcePath = "src/rules/named-schema.ts";
+      mkdirSync(dirname(join(root, sourcePath)), { recursive: true });
+      writeFileSync(
+        join(root, sourcePath),
+        `const EMPTY_SCHEMA = [];
+export const namedSchema = {
+  name: "no-named-schema--read-it",
+  meta: { messages: { report: "No." }, schema: EMPTY_SCHEMA },
+  create: () => ({}),
+};
+`,
+        "utf8",
+      );
+      return lintRuleFactsIn({ workspaceRoot: root, sourcePath });
+    });
+
+    it("takes the constant it names as the schema it declares", ({ facts }) => {
+      expect(facts).toStrictEqual([
+        {
+          name: "no-named-schema--read-it",
+          description: "",
+          sourcePath: "src/rules/named-schema.ts",
+          fixable: false,
+          hasSuggestions: false,
           configurable: false,
           shipped: true,
+          messages: [{ messageId: "report", template: "No." }],
         },
       ]);
     });
@@ -496,6 +539,37 @@ export const second = {
       expect(ruleNamesFromPairedExports).toStrictEqual([
         "no-first--merge-them",
         "no-second--merge-them",
+      ]);
+    });
+  });
+
+  describe("messages whose name or whose text is settled while the program runs", () => {
+    const it = test.extend("readMessages", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "rule-facts-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      const sourcePath = "src/rules/settled.ts";
+      mkdirSync(dirname(join(root, sourcePath)), { recursive: true });
+      writeFileSync(
+        join(root, sourcePath),
+        `export const settled = {
+  name: "no-settled--write-it-out",
+  meta: {
+    docs: { description: "Disallow settling at run time" },
+    messages: { 1: "No.", report: phrase(), spelled: "It is forbidden. Write it out." },
+  },
+  create: () => ({}),
+};
+`,
+        "utf8",
+      );
+      return lintRuleFactsIn({ workspaceRoot: root, sourcePath }).flatMap((rule) => rule.messages);
+    });
+
+    it("keeps the one written out and passes over the two it cannot read", ({ readMessages }) => {
+      expect(readMessages).toStrictEqual([
+        { messageId: "spelled", template: "It is forbidden. Write it out." },
       ]);
     });
   });

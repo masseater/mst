@@ -1,35 +1,120 @@
+---
+description: "Disallow a test that another test in the same file spells with the same title and the same body, so one behaviour keeps one place that pins it"
+---
+
 # no-duplicated-test--delete-the-copy
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-同じファイルの中で、`test` または `it` に渡した題名と本体の両方が、同じ `describe` の連なりの下にある別のテストと同じ綴りになっているもの。一致した箇所すべてに報告する。
+Disallow a test that another test in the same file spells with the same title and the same body, so one behaviour keeps one place that pins it
 
-題名は文字列で書かれたものだけを見る。本体は渡した関数の中身を構文として比べ、位置情報だけを落とす。`test.only` や `test.each` のようにメンバーを挟む形も、根の名前が `test` か `it` であれば対象になる。`test.extend("cleanRun", ...)` は fixture の宣言であってテストではないので対象にしない。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-duplicated-test--delete-the-copy.ts`](../../src/lint/oxlint/rules/no-duplicated-test--delete-the-copy.ts)
 
-囲んでいる `describe` の題名も同一性に含める。テストが何を固定しているかは、題名と本体だけでは決まらないためである。fixture が SUT を走らせて出力を丸ごと返す形では、入力は `describe` ごとの fixture にあり、`it` の本体は期待値を突き合わせるだけになる。期待値が同じ 2 つの状況は、別々の入力を固定していても本体が一字一句同じ綴りになる。囲みを見ずに題名と本体だけで判定すると、この形で書かれた spec は互いに別の主張を写しとして報告し合う。
+<!-- END GENERATED rule-header -->
 
-見るのは 1 つのファイルの中だけである。別のファイルにある同じ綴りのテストは対象にしない。テストが呼ぶ対象はファイルごとに違い、同じ綴りでも別の対象を固定していることがあるためである。
+## Violation
 
-## なぜそれが要るか
+Within one file, a test whose title and body are both spelled the same as another test standing under the same chain of `describe` blocks. Every match is reported.
 
-テストの setup が似ることは許されている。共有を避けることでテスト同士が結合せず、1 本を書き換えても他が動かなくなることがない。[no-duplicated-body--import-the-existing-declaration](./no-duplicated-body--import-the-existing-declaration.md) と [no-twin-declaration--merge-into-one-owner](./no-twin-declaration--merge-into-one-owner.md) がテストのソースを対象から外しているのはそのためである。
+Only a title written out as a string is read. A body is compared as syntax, with position information dropped. A form reaching the runner through a member, such as `test.only` or `test.each`, counts as long as the name at the root is `test` or `it`. `test.extend("cleanRun", ...)` declares a fixture rather than a test and is left alone.
 
-一方、同じファイルの中に題名も本体も同じテストが 2 本あることは setup の重複とは別の事象になる。同じ対象を同じ言葉で 2 回主張しているので、片方だけが直され、もう片方が古い主張のまま残る。落ちたときにどちらを見ればよいかも決まらない。テストの本数は増えるのに、固定できている振る舞いは増えていない。
+The titles of the enclosing `describe` blocks are part of the identity. What a test pins is not settled by its title and body alone: where a fixture runs the code under test and hands back its whole output, the input lives in the fixture belonging to each `describe`, and the body of the `it` does nothing but compare against an expected value. Two situations expecting the same value come out spelled identically even while pinning different inputs. Judging on title and body without the enclosing blocks would make specs written that way report each other's distinct claims as copies.
 
-題名と本体の両方が一致する場合だけを見るのは、片方だけの一致には正当な形があるためである。本体だけが同じテストは、別の主張を同じ手順で確かめている。題名だけが同じテストは、同じ言葉で別のことを確かめている。
+Only one file is read at a time. A test spelled the same way in another file is left alone, because what a test calls differs from file to file and the same spelling can pin a different subject.
 
-## どう直すか
+### The invariant
 
-最初の 1 本を残し、後続の写しを削除する。
+Test setup is allowed to look alike. Not sharing it keeps tests from coupling, so rewriting one never stops another from running. That is why [no-duplicated-body--import-the-existing-declaration](./no-duplicated-body--import-the-existing-declaration.md) and [no-twin-declaration--merge-into-one-owner](./no-twin-declaration--merge-into-one-owner.md) hold test sources out of their reach.
 
-別のことを確かめているつもりだったなら、題名か本体のどちらかが実際には違うはずである。何が違うかを本体に書く。
+Two tests in one file sharing both title and body are a different matter. The same subject is claimed twice in the same words, so one of them gets fixed and the other stays behind stating something that is no longer true. Which one to read when the suite goes red is not settled either. The number of tests grows while the behaviour being pinned does not.
 
-## 禁じる回避策
+Only a match on both title and body counts, because a match on one alone has forms that stand. Two tests sharing a body confirm different claims through the same steps. Two tests sharing a title confirm different things in the same words.
 
-- 題名だけを書き換えて残す。同じ本体が 2 箇所に残ることは変わらず、片方だけが直される状態も変わらない
-- 本体に意味のない行を足して構造をずらす
-- 写しを別のファイルへ移す。判定はファイル単位だが、対象が同じであれば移した先で同じ主張が 2 つある状態は変わらない
+No option is offered.
 
-## オプション
+## Fix
 
-取らない。
+Keep the first one and delete the copies that follow.
+
+If they were meant to confirm different things, then either the title or the body is actually different. Write that difference into the body.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// two tests that share both title and body are both reported
+// in /repository/packages/dont-review-it/src/subject.test.ts
+test("counts one", () => {
+  expect(total).toBe(1);
+});
+test("counts one", () => {
+  expect(total).toBe(1);
+});
+```
+
+```ts
+// a runner reached through a modifier is compared with the plain one
+// in /repository/packages/dont-review-it/src/subject.test.ts
+test("counts one", () => {
+  expect(total).toBe(1);
+});
+test.only("counts one", () => {
+  expect(total).toBe(1);
+});
+```
+
+Code this rule accepts.
+
+```ts
+// two tests that share only their body pass
+// in /repository/packages/dont-review-it/src/subject.test.ts
+test("counts one", () => {
+  expect(total).toBe(1);
+});
+it("counts the same total", () => {
+  expect(total).toBe(1);
+});
+```
+
+```ts
+// two tests that share only their title pass
+// in /repository/packages/dont-review-it/src/subject.test.ts
+test("counts one", () => {
+  expect(total).toBe(1);
+});
+test("counts one", () => {
+  expect(other).toBe(1);
+});
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Rewriting the title alone and keeping both. The same body still stands in two places, and one of them still gets fixed while the other does not
+- Adding a meaningless line to the body to shift its structure
+- Moving the copy into another file. The judgment closes over one file, but where the subject is the same, two identical claims still stand
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `duplicatedTest` | A test must not carry both the title and the body of another test in this file. Delete the \`{{title}}\` that starts on line {{line}}. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

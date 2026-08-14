@@ -94,6 +94,7 @@ describe("dont-review-it/forbid-restricted-target-relay--delete-the-relay", () =
       },
       {
         name: "a boundary that publishes its own vocabulary keeps the target off its surface",
+        documented: true,
         code: 'import { readFile } from "retired-lib";\nexport const read = (path: string) => readFile(path);',
         filename: join(fixtureDir, "relay/own-boundary.ts"),
         options: restrictedRetiredLib,
@@ -112,6 +113,7 @@ describe("dont-review-it/forbid-restricted-target-relay--delete-the-relay", () =
       },
       {
         name: "reading a boundary that transforms the binding reaches nothing",
+        documented: true,
         code: 'import { read } from "./boundary.ts";',
         filename: join(fixtureDir, "relay/reader.ts"),
         options: restrictedRetiredLib,
@@ -168,6 +170,7 @@ describe("dont-review-it/forbid-restricted-target-relay--delete-the-relay", () =
     invalid: [
       {
         name: "a named re-export puts the target on this module's surface",
+        documented: true,
         code: 'export { readFile } from "retired-lib";',
         filename: join(fixtureDir, "relay/reader.ts"),
         options: restrictedRetiredLib,
@@ -221,6 +224,7 @@ describe("dont-review-it/forbid-restricted-target-relay--delete-the-relay", () =
       },
       {
         name: "reading a module that forwards the target reaches the target",
+        documented: true,
         code: 'import { readFile } from "./star-forward.ts";',
         filename: join(fixtureDir, "relay/reader.ts"),
         options: restrictedRetiredLib,

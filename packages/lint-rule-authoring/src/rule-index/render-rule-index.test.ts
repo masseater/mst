@@ -12,6 +12,7 @@ const plainRule: LintRuleFacts = {
   hasSuggestions: false,
   configurable: false,
   shipped: true,
+  messages: [],
 };
 
 describe("renderRuleIndex", () => {

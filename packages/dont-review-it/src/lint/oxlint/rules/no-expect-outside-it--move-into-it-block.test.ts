@@ -8,6 +8,7 @@ describe("dont-review-it/no-expect-outside-it--move-into-it-block", () => {
     valid: [
       {
         name: "an assertion in the body of the canonical test block is where the rule wants it",
+        documented: true,
         code: "it('adds', () => { expect(sum).toBe(3); });",
       },
       {
@@ -64,6 +65,7 @@ describe("dont-review-it/no-expect-outside-it--move-into-it-block", () => {
       },
       {
         name: "a fixture factory bound to the canonical spelling declares canonical test blocks",
+        documented: true,
         code: "const it = test.extend({ subject: 1 });\nit('adds', ({ subject }) => { expect(subject).toBe(1); });",
       },
       {
@@ -207,11 +209,13 @@ describe("dont-review-it/no-expect-outside-it--move-into-it-block", () => {
       },
       {
         name: "an assertion written straight into a grouping block names no behaviour",
+        documented: true,
         code: "describe('sums', () => { expect(sum).toBe(3); });",
         errors: [{ messageId: "groupingBlockAssertion" }],
       },
       {
         name: "an assertion in a helper declared beside the suite stands in no block at all",
+        documented: true,
         code: "const check = (total) => { expect(total).toBe(3); };",
         errors: [{ messageId: "detachedAssertion" }],
       },

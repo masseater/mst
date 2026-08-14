@@ -1,74 +1,134 @@
+---
+description: "Disallow a fixture factory that stands on the test block spelling, so the name that declares test blocks carries that one role and everything scanning the suite can settle what that name means by reading it"
+---
+
 # forbid-it-extend--use-test-extend
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-プロパティ名が `extend` であるメンバアクセスのうち、その手前が、テストブロックの綴り `it` に解決される識別子であるもの。
+Disallow a fixture factory that stands on the test block spelling, so the name that declares test blocks carries that one role and everything scanning the suite can settle what that name means by reading it
 
-プロパティ名は、コードに書かれた綴りがそのまま最終的なプロパティ名になる 3 つの形を同じ名前として読む。非計算メンバ（`it.extend`）、文字列リテラルの添字（`it['extend']`）、式を含まないテンプレートリテラルの添字（``it[`extend`]``）である。静的に読めるなら書き方の違いは違反の有無を変えない。
+- Tool: `oxlint`
+- Fixable: yes
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`forbid-it-extend--use-test-extend.ts`](../../src/lint/oxlint/rules/forbid-it-extend--use-test-extend.ts)
 
-手前の識別子は束縛をたどって解決する。たどり先は 4 通りある。
+<!-- END GENERATED rule-header -->
 
-- 束縛が 1 つも見つからない識別子。共有テスト設定がテストブロック API をグローバルに注入している前提のもとで、綴りがそのまま解決先になる
-- テストランナーからテストブロック API を import した束縛（`import { it } from "vite-plus/test"`）
-- 同じ import を別名で受けた束縛（`import { it as check }`、および文字列で書いた `import { 'it' as check }`）。解決先を決めるのは import 元の名前であって、ローカルの綴りではない
-- 上記のいずれかを再束縛したもの（`const check = it`）。段数は問わずたどる
+## Violation
 
-呼び出しの有無は問わない。`const derive = it.extend;` のように値として取り出すだけのメンバ参照も報告する。`extend` に渡す引数の形も問わない。見ているのは土台の識別子だけである。
+A member access whose property name is `extend` and whose base is an identifier resolving to `it`, the spelling that declares test blocks.
 
-報告は土台の識別子 1 つに置く。`it.extend({ a: 1 }).extend({ b: 2 })` の外側の `.extend` は手前が呼び出し式であって識別子ではないため、連鎖していても報告は根の 1 回だけになる。グルーピングブロックの中にあるかどうかは見ない。
+The property name is read in the three shapes where what is written is what the property ends up being: a non-computed member (`it.extend`), a string-literal subscript (`it['extend']`), and a template-literal subscript carrying no expression (``it[`extend`]``). Where the name can be read before the run, how it was spelled changes nothing.
 
-## なぜそれが要るか
+The base identifier is resolved by following its binding. There are four places it lands.
 
-守っている不変条件は「名前と役割が 1 対 1 で対応している」ことである。`it` はテストブロックの宣言だけを意味し、fixture ファクトリの土台は `test` だけが担う。
+| Base | How it resolves |
+| --- | --- |
+| An identifier with no binding at all | The spelling is the answer; the shared test setup injects the test block API globally |
+| A binding imported from the test runner (`import { it } from "vite-plus/test"`) | The imported name |
+| The same import taken under another name (`import { it as check }`, and `import { 'it' as check }`) | The name at the import, not the local spelling |
+| A rebinding of any of the above (`const check = it`) | Followed through any number of steps |
 
-テストランナーは `extend` を `it` にも `test` にも生やしている。だから `it.extend(...)` は動く。動くことが問題である。`it` が「テストブロックの宣言」と「fixture ファクトリの土台」の 2 役を持った瞬間、`it` を走査する側は全員が「この `it` はどちらか」を判定する分岐を抱えることになる。走査する側とは、`it` ブロックの中身を見る他の lint ルール、綴りを揃える codemod、影響範囲を数える grep、IDE の一括リネームである。
+Whether it is called makes no difference. `const derive = it.extend;`, which only takes the member as a value, is reported. What is handed to `extend` makes no difference either. Only the base identifier is read.
 
-壊れ方は 2 層ある。
+The report stands on the one base identifier. In `it.extend({ a: 1 }).extend({ b: 2 })` the outer `.extend` has a call expression in front of it rather than an identifier, so a chain is reported once, at its root. Whether it sits inside a grouping block is not read.
 
-1 層目は、その分岐が書かれないことである。`it` を見つけたら次の引数はテスト名でありコールバックである、という前提で書かれた走査は、`it.extend` の 1 箇所だけを取りこぼす。取りこぼしは例外にならず、走査が静かに 1 件少ない答えを返す形で現れる。
+These are not reported.
 
-2 層目は、取りこぼしが検出されないことである。走査する側は「対象を見つけられなかった」と「対象が無かった」を区別できない。数が合わないことに気付ける人は、`it` の 2 役を知っている人だけになる。知識を持っている人だけが正しく読める状態は、その知識が失われた時点で誰も気付かない状態と同じである。
+- `test.extend(...)`. This is the shape being asked for
+- Members of `it` other than `extend` (`it.skip`, `it.each` and the rest of the test block modifiers), and a bare `it(...)`
+- `.extend` on an identifier that does not resolve to `it`: one resolving to `test`, a value the suite or a fixture owns, and a form behind a receiver (`runner.it.extend`). A binding whose local spelling alone is `it` (`import { test as it }`) is not a violation either, because the name at the import is `test`
+- Access through the private field syntax (`this.#extend()`)
+- A subscript that only settles at run time (`it[member]`, ``it[`ext${suffix}`]``). It cannot be said before the run that it names `extend`, so this rule makes no judgment. That shape itself is taken by [no-computed-test-api-member--use-static-member](./no-computed-test-api-member--use-static-member.md)
+- A binding whose initializer is not an identifier. Resolution stops there. A binding that received the result of `test.extend(...)` lands here, so naming that binding `it` and writing `it.extend(...)` after it produces no report — the base is still `test`
+- An `it` that did not come from the test runner: a parameter, a catch binding, a function name
 
-曖昧さを消費側で吸収するのではなく、発生源で消す。土台を `test` に固定すれば、この分岐は誰も書かなくてよい。
+### The invariant
 
-## どう直すか
+A name and a role correspond one to one. `it` means the declaration of a test block and nothing else; the base of a fixture factory is carried by `test` alone.
 
-土台の `it` を `test` へ置換する。テストランナーが同一 API として提供しているので、置換で挙動は変わらない。
+The test runner grows `extend` on both `it` and `test`, so `it.extend(...)` works. Working is the problem. The moment `it` carries both "declares a test block" and "base of a fixture factory", everyone who scans `it` has to carry a branch deciding which one this `it` is. The scanners are the other lint rules that read what is inside an `it` block, the codemods that align spellings, the greps that count the reach of a change, and the IDE's bulk rename.
+
+It breaks in two layers. The first is that the branch does not get written. A scan built on "having found `it`, the next argument is a test name and a callback" misses the one `it.extend` site. A miss does not raise; it shows up as the scan quietly returning an answer one short.
+
+The second is that the miss is not detected. The scanning side cannot tell "could not find the target" from "there was no target". The only person who can notice the count is off is the person who knows `it` has two roles. A state only the knowledgeable read correctly is the same state as one nobody notices, once that knowledge is gone.
+
+Rather than absorbing the ambiguity in every consumer, remove it at the source. Fix the base to `test` and nobody has to write the branch.
+
+### Configuration
+
+None. `it` and `test` are carried by the rule.
+
+Making the spellings configurable splits the setting between this rule, which reads `it` as a base, and the other rules that read `it` as the declaration of a test block. With the setting split, changing a spelling leaves the side that did not follow blind to its target — answering that there is no violation rather than missing one. Make the spellings configurable only once those rules share one setting.
+
+## Fix
+
+Replace the base `it` with `test`. The test runner offers them as the same API, so the replacement does not change behaviour. The binding that receives the result keeps the name `it`, which is what the suite writes its blocks with.
+
+The automatic fix performs this replacement only where replacing is the whole edit. Three conditions.
+
+- It is written as a non-computed member. Where it is written as a subscript, repair the shape first through [no-computed-test-api-member--use-static-member](./no-computed-test-api-member--use-static-member.md) and then replace. Replacing only the base would leave the subscript violation standing
+- The base is spelled `it` itself. Rewriting a binding brought in under another name (the `check` of `import { it as check }`) to `test` leaves the import statement that supplied that name dangling, and what to do with it has to be decided. That decision is not a replacement
+- `test` reaches that position after the replacement. Where `it` has no binding at all, the test block API is injected globally and `test` reaches just as well. Where `it` was brought in by an import or a local binding, `test` reaches only when a binding for it exists in the same scope
+
+The shape that fails the third condition — a file that imports `it` without importing `test` — gets the report alone, handed to the writer. Replacing there would produce code where `test` is bound nowhere, and the premise that behaviour does not change would break. Import `test` and run the fix again, or rewrite both by hand.
+
+The name of the binding that receives `test.extend(...)` is left alone. Only the base is rewritten, and a binding named `it` is the shape the convention asks for.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
 
 ```ts
-const it = test.extend("subject", () => runSut());
+// the fixture builder on the test block spelling is reported and rewritten onto the base
+it.extend({ subject: async ({}, use) => use(runSut()) });
 ```
 
-自動修正がこの置換を行うのは、置換だけで書き換えが完結する形に限る。条件は 3 つある。
+```ts
+// a rebinding of the test block spelling is followed to the spelling it came from
+const check = it;
+check.extend({ a: 1 });
+```
 
-- 非計算メンバで書かれていること。添字で書かれている場合は `no-computed-test-api-member--use-static-member` の修正で非計算メンバへ直してから置換する。土台だけを先に置換しても、添字という形の違反はその場に残るためである
-- 土台の綴りが `it` そのものであること。別名で持ち込んだ束縛（`import { it as check }` の `check` など）を `test` に書き換えると、その名前を供給していた import 文が宙に浮き、その扱いを決める必要が出る。この決定は置換ではない
-- 置換後の `test` がその位置から届くこと。`it` に束縛が 1 つも無ければ、テストブロック API はグローバルに注入されているので `test` も同じく届く。`it` を import や局所束縛で持ち込んでいる場合は、同じスコープに `test` の束縛があるときだけ届く
+Code this rule accepts.
 
-3 つめを満たさない形、つまり `it` を import しておきながら `test` を import していないファイルでは、報告だけを出して書き手に渡す。ここで置換すると `test` がどこにも束縛されていないコードができ上がり、「挙動は変わらない」という置換の前提が崩れるためである。`test` を import してから修正を流し直すか、手で両方を書き換える。
+```ts
+// the fixture factory standing on test is the shape this rule asks for
+const it = test.extend({ subject: async ({}, use) => use(runSut()) });
+```
 
-`test.extend(...)` の結果を受ける束縛の名前は変えない。書き換える対象は土台側だけであり、束縛名が `it` であるのは規約どおりの形である。
+```ts
+// a member other than the builder on the test block spelling is left alone
+it.each([1, 2])('adds %i', () => {});
+```
 
-## 違反にならないもの
+<!-- END GENERATED examples -->
 
-- `test.extend(...)`。これが正の形
-- `it` の `extend` 以外のメンバ（`it.skip` / `it.each` などテストブロックの修飾子）と、裸の `it(...)`
-- 手前が `it` に解決されない識別子の `.extend`。`test` に解決される識別子、SUT や fixture が持つ値、レシーバを挟んだ形（`runner.it.extend`）が該当する。`import { test as it }` のようにローカルの綴りだけが `it` である束縛も、import 元の名前が `test` なので違反にならない
-- private フィールド構文でのアクセス（`this.#extend()`）
-- 実行時にしか名前が定まらない添字（`it[member]`、``it[`ext${suffix}`]``）。`extend` を指していると静的には言えないためこのルールは判定しない。その形自体は `no-computed-test-api-member--use-static-member` が落とす
-- 初期化子が識別子でない束縛。そこで解決を打ち切る。`test.extend(...)` の結果を受けた束縛はここに当たるので、その束縛を `it` と名付けて `it.extend(...)` と続けても報告は出ない。土台は `test` のままだからである
-- 引数・catch 束縛・関数名など、テストランナー由来でない `it`
+### Forbidden bypasses (do not do this)
 
-## 禁じる回避策
+- Writing `extend` as a subscript to dodge the name judgment. A subscript readable before the run is read as a name by this rule itself, and one that settles at run time is taken as a shape by `no-computed-test-api-member--use-static-member`
+- Binding `it` to another name and writing `.extend` on that. Rebindings are followed through any number of steps
+- Taking `it` back as a function parameter and writing `.extend` on the parameter. What the parameter holds is decided by the caller, so this rule stops resolving and no report comes out. Not being detected does not mean it is allowed: the base of the fixture factory is still `it`, and `it` still carries two roles
+- Tying `it` to the runner's API through a type annotation alone and writing `.extend` on it. This rule reads only initializers and import sources, so no report comes out, while the two roles hold just the same
+- A suppression directive
 
-- 添字形式で `extend` を書いて名前の判定を外す。静的に読める添字はこのルール自身が名前として読み、実行時に決まる添字は `no-computed-test-api-member--use-static-member` が形として落とす
-- `it` を別の名前へ束縛してから `.extend` を書く。再束縛は段数を問わずたどられる
-- `it` を関数の引数として受け直し、その引数に対して `.extend` を書く。引数の中身は呼び出し側が決めるのでこのルールは解決を打ち切り、報告は出ない。検出されないことは許していることを意味しない。fixture ファクトリの土台が `it` であることは変わらず、`it` は 2 役を持ったままになる
-- `it` を型注釈だけでテストランナーの API に結び付けた束縛から `.extend` を書く。このルールは束縛の初期化子と import 元しか見ないため報告は出ないが、`it` の 2 役は同じように成立している
-- 抑制ディレクティブ
+## Messages
 
-## オプション
+<!-- BEGIN GENERATED messages -->
 
-取らない。`it` と `test` はルールが持つ。
+| messageId | Text |
+| --- | --- |
+| `itExtend` | A fixture factory must not stand on \`it\`, the spelling reserved for declaring test blocks. Replace \`{{base}}\` with \`test\` and leave the rest of the chain alone. |
 
-綴りを設定で選べるようにすると、`it` を土台として見るこのルールと、`it` をテストブロックの宣言として見る他のルールとで設定が分かれる。分かれた状態で綴りを変えると、変更に追随しなかった側だけが対象を見失い、違反を見逃すのではなく違反が無いと答えるようになる。綴りを可変にするなら、それらが 1 つの設定を共有する形にしてから入れる。
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

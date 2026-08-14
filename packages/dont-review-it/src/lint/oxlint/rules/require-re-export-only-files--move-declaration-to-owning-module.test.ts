@@ -35,6 +35,7 @@ describe("dont-review-it/require-re-export-only-files--move-declaration-to-ownin
       },
       {
         name: "a named re-export names the module that owns the declaration",
+        documented: true,
         code: 'export { total } from "./total.ts";',
         filename: "src/index.ts",
         options: listedAsSurface,
@@ -65,6 +66,7 @@ describe("dont-review-it/require-re-export-only-files--move-declaration-to-ownin
       },
       {
         name: "several re-exports stand together in any order",
+        documented: true,
         code: 'export * from "./sum.ts";\nexport { total } from "./total.ts";\nexport type { Total } from "./total.ts";',
         filename: "src/index.ts",
         options: listedAsSurface,
@@ -91,6 +93,7 @@ describe("dont-review-it/require-re-export-only-files--move-declaration-to-ownin
     invalid: [
       {
         name: "an exported declaration on a listed file is reported",
+        documented: true,
         code: 'export const total = 1;\nexport * from "./sum.ts";',
         filename: "src/index.ts",
         options: listedAsSurface,
@@ -147,6 +150,7 @@ describe("dont-review-it/require-re-export-only-files--move-declaration-to-ownin
       },
       {
         name: "an import paired with a source-less export is reported on both statements",
+        documented: true,
         code: 'import { total } from "./total.ts";\nexport { total };\nexport * from "./sum.ts";',
         filename: "src/index.ts",
         options: listedAsSurface,

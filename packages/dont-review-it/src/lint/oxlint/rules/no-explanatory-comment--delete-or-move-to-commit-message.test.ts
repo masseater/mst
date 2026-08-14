@@ -9,6 +9,7 @@ describe("dont-review-it/no-explanatory-comment--delete-or-move-to-commit-messag
       { name: "source without any comment passes", code: "const total = 1 + 2;" },
       {
         name: "a lint suppression directive is a declaration a machine reads",
+        documented: true,
         code: "// oxlint-disable-next-line no-console -- the CLI writes its result here\nconsole.log(1);",
       },
       {
@@ -21,6 +22,7 @@ describe("dont-review-it/no-explanatory-comment--delete-or-move-to-commit-messag
       },
       {
         name: "a JSDoc block is judged by no-detached-rationale instead",
+        documented: true,
         code: "/**\n * @returns the total\n */\nexport const total = 1;",
       },
       {
@@ -31,6 +33,7 @@ describe("dont-review-it/no-explanatory-comment--delete-or-move-to-commit-messag
     invalid: [
       {
         name: "a line comment explaining the next statement is reported",
+        documented: true,
         code: "// add the two operands\nconst total = 1 + 2;",
         errors: [{ messageId: "explanatoryComment" }],
       },
@@ -46,6 +49,7 @@ describe("dont-review-it/no-explanatory-comment--delete-or-move-to-commit-messag
       },
       {
         name: "a commented out statement is reported",
+        documented: true,
         code: "// const previous = 1;\nconst total = 2;",
         errors: [{ messageId: "explanatoryComment" }],
       },

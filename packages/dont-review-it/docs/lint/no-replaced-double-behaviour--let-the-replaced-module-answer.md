@@ -1,45 +1,74 @@
+---
+description: "Disallow settling what a double taken from a replaced module hands back, so a replacement records how the code under test called out and never answers in place of the module it stands for"
+---
+
 # no-replaced-double-behaviour--let-the-replaced-module-answer
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-spec ファイルの中で、差し替えたモジュール由来のダブルに対して返す値や実装を設定している呼び出しを報告する。設定として数える member は `mockReturnValue` 族・`mockResolvedValue` 族・`mockRejectedValue` 族・`mockImplementation` 族・`mockReturnThis`・`withImplementation` である。
+Disallow settling what a double taken from a replaced module hands back, so a replacement records how the code under test called out and never answers in place of the module it stands for
 
-「差し替えたモジュール由来」の同定は束縛の出どころで行う。設定の受け手をたどり、import で入ってきた名前に行き着けば差し替えたモジュールのものとして扱う。たどる経路は 3 つある。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-replaced-double-behaviour--let-the-replaced-module-answer.ts`](../../src/lint/oxlint/rules/no-replaced-double-behaviour--let-the-replaced-module-answer.ts)
 
-- import した名前そのもの（`send.mockReturnValue(1)`）
-- import した名前のメンバ（`mailer.send.mockReturnValue(1)`）
-- 実行時に型を付け替えるための呼び出しを通したもの（`vi.mocked(send).mockReturnValue(1)`）
+<!-- END GENERATED rule-header -->
 
-途中に置かれた束縛もたどる。`const double = vi.mocked(send);` を経由しても同じ設定として読む。
+## Violation
 
-`vi.fn()` でその場に作ったダブルは対象にしない。テストが引数として渡すダブルは置き換えではなくテストの入力であり、走らなくなる本物が存在しないためである。
+A call inside a spec file settling the value or the implementation a double from a replaced module returns. The members counted as settings are the `mockReturnValue` family, the `mockResolvedValue` family, the `mockRejectedValue` family, the `mockImplementation` family, `mockReturnThis` and `withImplementation`.
 
-member が実行時にしか決まらない形（`double[member](1)`）は読まない。呼び出しの位置から何を設定したかが確定しないため、報告しない。
+"From a replaced module" is identified by where the binding came from. The setting's receiver is followed, and landing on a name that arrived through an import makes it one of the replaced module's. Three routes are followed.
 
-## なぜそれが要るか
+- The imported name itself (`send.mockReturnValue(1)`)
+- A member of the imported name (`mailer.send.mockReturnValue(1)`)
+- One going through the call that retypes it at run time (`vi.mocked(send).mockReturnValue(1)`)
 
-守っている不変条件は「差し替えたモジュールは、どう呼ばれたかを記録するだけで、答えない」ことである。
+Bindings placed in between are followed too. Going through `const double = vi.mocked(send);` reads as the same setting.
 
-モジュールを差し替えてよいのは、そこが外部 I/O の境界だからである（[no-non-boundary-double--replace-at-the-external-boundary](./no-non-boundary-double--replace-at-the-external-boundary.md)）。境界を差し替えるのは、テストが外へ出ないようにするためであって、境界の向こうから返ってくる値をテストが決めるためではない。
+A double made on the spot with `vi.fn()` is out of scope. A double the test hands over as an argument is the test's input rather than a replacement, and no real thing has stopped running.
 
-返す値を設定した時点で、そのテストが読み戻すのは自分で書いた値になる。差し替えた側は一度も走らず、設定した値と期待値が一致することだけが確かめられる。これは対象の振る舞いについて何も言っていない。テストは緑になり、消えた検証は誰の目にも触れない。
+A member settled only at run time (`double[member](1)`) is not read. What was settled cannot be established from the call position, so it is not reported.
 
-呼び出し記録は残る。どう呼ばれたかは `toHaveBeenCalledWith` 族で主張できるので、境界に対して「何を渡したか」を確かめる道は閉じていない。閉じるのは「何が返ってきたことにするか」を spec が決める道だけである。
+### The invariant
 
-### 他のルールとの境界
+A replaced module records how it was called and does not answer.
 
-| 形 | 見ているもの |
+A module may be replaced because that is an external I/O boundary ([no-non-boundary-double--replace-at-the-external-boundary](./no-non-boundary-double--replace-at-the-external-boundary.md)). Replacing a boundary is for keeping the test from leaving the process, not for letting the test settle what comes back from beyond the boundary.
+
+The moment a return value is settled, what that test reads back is a value it wrote itself. The replaced side never runs, and all that is confirmed is that the settled value equals the expected value. That says nothing about the subject's behaviour. The test goes green, and the verification that vanished meets nobody's eye.
+
+The call record remains. How it was called can be claimed with the `toHaveBeenCalledWith` family, so the route of confirming "what was handed to the boundary" stays open. What closes is only the route where the spec settles "what shall be treated as having come back".
+
+### The boundary with the other rules
+
+| Shape | What reads it |
 | --- | --- |
-| 差し替えてよい対象か | `no-non-boundary-double--replace-at-the-external-boundary` |
-| 差し替えの宣言がファクトリを渡しているか | `no-vi-mock-factory-behavior--use-spy-true-and-fixture` |
-| ダブルを立てる位置と設定する位置 | `no-module-scope-mock-config--lift-into-fixture` |
-| 差し替えたダブルが答えているか | 本ルール |
+| Whether the target may be replaced | `no-non-boundary-double--replace-at-the-external-boundary` |
+| Whether the replacement declaration hands over a factory | [no-vi-mock-factory-behavior--use-spy-true-and-fixture](./no-vi-mock-factory-behavior--use-spy-true-and-fixture.md) |
+| Where a double is stood up and where it is settled | [no-module-scope-mock-config--lift-into-fixture](./no-module-scope-mock-config--lift-into-fixture.md) |
+| Whether a replaced double answers | This rule |
 
-`no-module-scope-mock-config` は設定の**位置**を見ており、fixture の中へ移すことを求める。差し替えたモジュール由来のダブルについては、移した先でも本ルールが報告する。2 本が同時に出たときは、設定そのものを消せば両方が消える。
+`no-module-scope-mock-config` reads the **position** of a setting and asks for it to move into a fixture. For a double from a replaced module, this rule reports it where it moved to as well. When both fire, deleting the setting itself clears both.
 
-## どう直すか
+### Configuration
 
-設定を消す。差し替えたモジュールは素通しのまま残り、テストは呼ばれ方だけを主張する。
+- `specFileSuffixes` — the suffixes read as spec files
+
+### Not violations
+
+- A double made on the spot with `vi.fn()` and handed to the subject as an argument
+- Claims about the call record (the `toHaveBeenCalledWith` family)
+- Clearing the call record (`mockClear`). It settles nothing about what is returned
+- A file that is not a spec
+- A setting with a line-local directive carrying grounds written above it
+
+## Fix
+
+Delete the setting. The replaced module stays a pass-through, and the test claims how it was called and nothing else.
 
 ```ts
 vi.mock(import("./transport.ts"), { spy: true });
@@ -51,35 +80,82 @@ it("hands the message to the transport", ({ theDeliveryOfOneMessage }) => {
 });
 ```
 
-テストが特定の値を必要としているなら、その値は差し替えたモジュールからではなく、対象の引数から渡す。渡せる形になっていないときは、注入境界を作るのが実装の側の設計変更であり、その条件は[テストの書き方](../../../../docs/guidelines/tests.md)が持っている。
+Where the test needs a particular value, hand that value in through the subject's arguments rather than from the replaced module. Where it is not in a shape that accepts one, building an injection boundary is a design change on the implementation side, and [how tests are written](../../../../docs/guidelines/tests.md) holds the conditions.
 
-### 設定しなければ書けないとき
+### Where it cannot be written without settling
 
-境界の向こうにしか答えが無く、外から決められない場合がある。そのときは、その行の上に理由付きの指示を残す。
+Sometimes the answer exists only beyond the boundary and cannot be settled from outside. There, leave a directive with grounds on the line above.
 
 ```ts
 // mock-factory-exemption no-replaced-double-behaviour--let-the-replaced-module-answer -- whether the pipeline started is settled inside the boundary this spec replaces
 vi.mocked(startLintTelemetry).mockReturnValue(false);
 ```
 
-指示は行ローカルで、理由が空なら例外として成立せず、指示そのものが報告される。理由には「何が外から決められないか」を書く。ルール名を書くのは、1 つの指示が他のルールまで黙らせないためである。
+The directive is line-local, and with an empty reason it does not hold as an exception and the directive itself is reported. Write in the reason what cannot be settled from outside. The rule name is written so that one directive does not silence other rules as well.
 
-## 違反にならないもの
+<!-- BEGIN GENERATED examples -->
 
-- `vi.fn()` でその場に作り、対象へ引数として渡すダブル
-- 呼び出し記録に対する主張（`toHaveBeenCalledWith` 族）
-- 呼び出し記録を消す操作（`mockClear`）。何を返すかを決めていない
-- spec でないファイル
-- 理由を伴う行ローカルの指示が上に置かれた設定
+Code this rule rejects.
 
-## 禁じる回避策
+```ts
+// a return value written on an imported double is reported
+// in packages/mailer/src/send.test.ts
+import { send } from "./mailer.ts";
+send.mockReturnValue(1);
+```
 
-- 設定を fixture の中へ移す。位置は関係しない。差し替えたダブルが答えていることは変わらない
-- 差し替えたダブルを別の名前に束ね直してから設定する。束縛はたどる
-- member を実行時に組み立てて読めなくする。判定は消えるが、差し替えた側が走らないことは変わらない
-- 理由を書かない指示を置く。指示そのものが報告される
-- 抑制ディレクティブ
+```ts
+// a setting inside a fixture is reported the same as one outside
+// in packages/mailer/src/send.test.ts
+import { send } from "./mailer.ts";
+const it = test.extend("theSent", () => {
+  send.mockReturnValue(1);
+  return send;
+});
+```
 
-## オプション
+Code this rule accepts.
 
-- `specFileSuffixes` — spec ファイルとして読む接尾辞
+```ts
+// a double the spec created itself is a test input and may answer
+// in packages/mailer/src/send.test.ts
+const send = vi.fn();
+send.mockReturnValue(1);
+```
+
+```ts
+// grounds written above the call carry the exemption
+// in packages/mailer/src/send.test.ts
+import { send } from "./mailer.ts";
+// mock-factory-exemption no-replaced-double-behaviour--let-the-replaced-module-answer -- the transport cannot be made to fail from outside
+send.mockRejectedValue(1);
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Moving the setting into a fixture. Position is irrelevant; the replaced double is still answering
+- Rebinding the replaced double to another name before settling it. Bindings are followed
+- Assembling the member at run time so it cannot be read. The judgment disappears, and the replaced side still does not run
+- Placing a directive with no reason. The directive itself is reported
+- A suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `replacedDoubleBehaviour` | A double taken from a replaced module must not be told what to hand back. \`{{member}}\` settles the answer the replaced module was going to give, so the spec reads back the value it wrote itself and the module it replaced never runs. Delete this call and leave the replacement a pass-through that only records how it was called. |
+| `unreasonedExemption` | An exemption comment must not stand without grounds. Write the grounds for this exemption after \`--\`, and name there what this spec cannot reach without settling the answer. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

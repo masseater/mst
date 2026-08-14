@@ -1,57 +1,75 @@
+---
+description: "Require every lint message to carry a prohibition and an imperative repair direction and nothing else, so the first thing a reader meets is the action that clears the report"
+---
+
 # no-explained-lint-message--state-prohibition-then-fix
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-オブジェクトリテラルのうち、`docs` と `messages` を直接持つもの。ルール定義の `meta` がこの形をしている。その `messages` の各値のうち、文字列リテラルとテンプレートリテラルを検査する。
+Require every lint message to carry a prohibition and an imperative repair direction and nothing else, so the first thing a reader meets is the action that clears the report
 
-検査の前に、本文からコード片（バッククォートで囲まれた範囲）と差し込み（`{{ }}` の差し込み、テンプレートリテラルの式）を伏せる。伏せた後の散文に対して次の 8 点を見る。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-explained-lint-message--state-prohibition-then-fix.ts`](../../src/lint/oxlint/rules/no-explained-lint-message--state-prohibition-then-fix.ts)
 
-- 禁止の言い切りが無い
-- 命令形の修正指示が無い
-- 理由の接続表現がある
-- 条件語がある
-- 逃げ道を勧める言い回しがある
-- 文書への参照が手書きされている
-- 印字可能 ASCII の外の文字がある
-- 本文が `meta.docs.description` と一致する
+<!-- END GENERATED rule-header -->
 
-語彙はこのルールが持つ。
+## Violation
 
-- 禁止の言い切り: `must not` / `is forbidden` / `are forbidden`
-- 理由の接続表現: `because` / `since` / `so that` / `therefore` / `which means` / `as a result`
-- 条件語: `if` / `when` / `unless` / `whenever` / `once` / `otherwise`
-- 逃げ道: 抑制・無効化・免除の追加・見送りを勧める言い回し
-- 命令動詞: 修正指示の文頭に立てる動詞の一覧
+Object literals carrying `docs` and `messages` directly are read; a rule definition's `meta` takes that shape. Among the values of that `messages`, string literals and template literals are checked.
 
-命令形の判定は、本文を文に切り、いずれかの文の先頭語が命令動詞の一覧にあるかで行う。一覧に無い動詞で書きたくなったときは、その動詞を一覧に足す。一覧はこのルールが所有しているので、足す場所はこのルールのソース 1 箇所である。
+Before the check, code spans (the ranges enclosed in backticks) and interpolations (the `{{ }}` placeholders, and a template literal's expressions) are masked out of the text. The prose that remains is read on eight points.
 
-次は検出しない。
+- No outright prohibition
+- No imperative repair direction
+- A connective introducing a reason is there
+- A conditional word is there
+- A turn of phrase recommending a way out is there
+- A pointer to the document is written by hand
+- A character outside printable ASCII is there
+- The text is identical to `meta.docs.description`
 
-- `docs` と `messages` の一方しか持たないオブジェクト。ルールの `meta` ではない
-- 値が文字列でないメッセージ。本文が実行時に決まるため、静的には読めない
+The vocabulary is held by this rule.
 
-報告位置はメッセージの定義そのもの。理由・条件・逃げ道については、引っかかった語が報告に入る。
+- Outright prohibition: `must not` / `is forbidden` / `are forbidden`
+- Reason connectives: `because` / `since` / `so that` / `therefore` / `which means` / `as a result`
+- Conditional words: `if` / `when` / `unless` / `whenever` / `once` / `otherwise`
+- Ways out: turns of phrase recommending suppression, disabling, adding an exemption, or deferring
+- Imperative verbs: the list of verbs that may open a repair direction
 
-## なぜそれが要るか
+The imperative judgment cuts the text into sentences and asks whether the first word of any sentence is in the list of imperative verbs. Wanting to write with a verb absent from the list, add that verb to the list. The list is owned by this rule, so the place to add it is one spot in this rule's source.
 
-守っている不変条件は「報告文だけで次の 1 手が決まる」ことである。
+### Deliberately not widened
 
-1 層目は、報告文が読まれる位置である。報告文は、違反した人が最初に読む修正指示である。そこへ理由を畳み込むと、修正指示は段落の後ろへ移動する。読み手は禁止の一文を読んだところで長さに気圧され、修正指示に届く前に別の手段を探し始める。実際に選ばれるのは、報告を消す最短の操作、つまり抑制である。
+| Shape | Why it is left out |
+| --- | --- |
+| An object carrying only one of `docs` and `messages` | It is no rule `meta` |
+| A message whose value is no string | The text is settled at run time, so it cannot be read statically |
 
-2 層目は、理由の置き場所である。理由をメッセージにも文書にも書くと、片方だけが更新されて別々に古くなる。このパッケージは「説明の権威が 1 箇所にある」を不変条件として持っているので、散文は `docs/lint/` の文書だけが持つ。メッセージ末尾の参照は factory が付けるため、報告から文書へは常に辿れる。
+The report stands on the message's definition itself. For a reason, a condition or a way out, the word that caught is carried into the report.
 
-3 層目は、条件を書いたときに起きることである。修正指示が場合分けを持つと、どの枝に当たるかの判断が読み手に戻る。判断できなければ枝は選ばれず、報告は残る。場合分けが要るほど直し方が分かれるなら、それは文書が扱う分量であって、1 行の報告が扱う分量ではない。
+### The invariant
 
-## どう直すか
+What is held is that the report alone settles the next move.
 
-禁止を言い切り、続けて命令形で修正を述べる。理由・場合分け・禁じる回避策は、この文書の対応する節へ移す。
+The first layer is where a report is read. A report is the first repair direction the violator reads. Fold a reason into it and the repair direction moves to the back of the paragraph. The reader, having read the prohibiting sentence, is put off by the length and starts looking for another means before reaching the repair. What actually gets chosen is the shortest operation that clears the report — that is, suppression.
 
-```ts
-messages: {
-  detachedTestFile:
-    "A test file must sit beside the source it tests, because the path is the only thing that ties the pair together. Move this file into the directory of the source it tests. If nothing owns the behaviour any more, delete it.",
-},
-```
+The second layer is where the reason belongs. Write the reason both in the message and in the document and only one of them gets updated, and they go stale separately. This package holds "the authority for an explanation sits in one place" as an invariant, so the prose is held by the `docs/lint/` document alone. The pointer at the end of a message is appended by the factory, so the document is always reachable from a report.
+
+The third layer is what happens once a condition is written. Give the repair direction a case split and the judgment of which branch applies goes back to the reader. Unable to judge, they choose no branch and the report stays. Where the repair splits enough to need a case split, that is a quantity for the document to carry, not for one line of report.
+
+### Configuration
+
+None. Only whether the rule is on or off is settled by the configuration.
+
+The vocabulary is not made replaceable by configuration. Make it replaceable and what counts as a prohibition changes per workspace, and the very premise that report texts share one shape falls apart.
+
+## Fix
+
+State the prohibition outright, then state the repair in the imperative. Move the reason, the case split and the forbidden bypasses into the corresponding sections of this document.
 
 ```ts
 messages: {
@@ -60,16 +78,65 @@ messages: {
 },
 ```
 
-## 禁じる回避策
+What the earlier text carried — that the path is the only thing tying the pair together, and what to do where nothing owns the behaviour any more — belongs to the "Violation" and "Fix" sections of the document, not to the report.
 
-- **理由を条件語に言い換える。** 「なぜ」を「どの場合に」へ書き換えても、報告文が修正指示以外を抱える状態は変わらない。どちらも文書へ移す
-- **理由をコード片の中に入れて伏せる。** 伏せる処理はメッセージが引用するコードのためにある。散文を隠す場所ではない
-- **`meta.docs.description` を短く書き換えて本文一致の検出を外す。** 検出しているのは、本文が説明文の写しでしかない状態である。説明文の側を削っても本文は修正指示を持たないままになる
-- **メッセージを 2 つに割り、片方を禁止だけ、もう片方を修正だけにする。** 報告は 1 件ずつ読まれるので、1 件ごとに禁止と修正の両方が要る
-- **報告文を短くするために修正指示を落とす。** 落としてよいのは理由と場合分けであって、修正指示ではない
+<!-- BEGIN GENERATED examples -->
 
-## オプション
+Code this rule rejects.
 
-取らない。有効か無効かだけを設定側で決める。
+```ts
+// a because clause argues for the rule
+const rule = createRule({ name: "a-rule", meta: { docs: { description: "Disallow a default export" }, messages: { defaultExport: "A module must not use a default export, because every importing file then invents a name. Name the value and export the name." } } });
+```
 
-語彙を設定で差し替えられるようにしない。差し替えられると、ワークスペースごとに「禁止と認める言い回し」が変わり、報告文の形が揃っているという前提そのものが崩れる。
+```ts
+// a message that stops at the prohibition names no repair
+const rule = createRule({ name: "a-rule", meta: { docs: { description: "Disallow a default export" }, messages: { defaultExport: "A module must not put a value out under the name default." } } });
+```
+
+Code this rule accepts.
+
+```ts
+// a prohibition followed by an imperative repair direction is the sanctioned shape
+const rule = createRule({ name: "a-rule", meta: { docs: { description: "Disallow a default export" }, messages: { defaultExport: "A module must not put a value out under the name default. Name the value and export the name." } } });
+```
+
+```ts
+// a condition word inside a code span is part of the quoted code, not a branch
+const rule = createRule({ name: "a-rule", meta: { docs: { description: "Disallow a bare conditional" }, messages: { bareConditional: "A statement must not be written as `if (ready) run();`. Move the branch into its own block." } } });
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- **Rewriting the reason as a conditional word.** Turning "why" into "in which case" leaves the report carrying something other than a repair direction. Both move to the document
+- **Putting the reason inside a code span to mask it.** The masking is there for the code a message quotes. It is no place to hide prose
+- **Shortening `meta.docs.description` to slip the identical-text detection.** What is detected is a text that is nothing but a copy of the description. Trim the description and the text still carries no repair direction
+- **Splitting the message in two, one carrying the prohibition and the other the repair.** Reports are read one at a time, so each one needs both the prohibition and the repair
+- **Dropping the repair direction to make the report shorter.** What may be dropped is the reason and the case split, not the repair direction
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `missingProhibition` | Lint message \`{{messageId}}\` must not leave the rejected pattern unmarked. Add \`must not\` or \`is forbidden\` to the sentence that names that pattern. |
+| `missingFixDirection` | Lint message \`{{messageId}}\` must not stop at the prohibition. Add a sentence that opens with an imperative verb and names the repair. |
+| `rationaleStatement` | Lint message \`{{messageId}}\` must not argue for the rule. Delete \`{{phrase}}\` and the clause it opens, and leave the prohibition and the repair direction standing. |
+| `conditionStatement` | Lint message \`{{messageId}}\` must not make the repair conditional. Delete \`{{phrase}}\` and the branch it opens, and state one repair direction. |
+| `escapeHatchPhrase` | Lint message \`{{messageId}}\` must not offer a way around the rule. Delete \`{{phrase}}\` and the passage it belongs to. |
+| `handWrittenDocPointer` | Lint message \`{{messageId}}\` must not carry a hand-written document pointer. Delete the pointer and build this rule through the workspace lint-rule factory. |
+| `nonEnglishMessage` | Lint message \`{{messageId}}\` must not carry characters outside printable ASCII. Rewrite the whole message in English. |
+| `descriptionEcho` | Lint message \`{{messageId}}\` must not repeat \`meta.docs.description\`. Rewrite the message as a prohibition followed by a repair direction. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

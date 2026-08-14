@@ -1,68 +1,91 @@
+---
+description: "Disallow a promise-valued expression that reaches no await, no return, no binding that is later awaited and no composition, so the place a failed asynchronous call lands is fixed by the call site's own control flow"
+---
+
 # no-floating-promise--await-the-result
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-promise を生む式のうち、その値がどこにも接続されていないもの。接続とは次の 4 つを指す。
+Disallow a promise-valued expression that reaches no await, no return, no binding that is later awaited and no composition, so the place a failed asynchronous call lands is fixed by the call site's own control flow
 
-- `await` されている
-- `return` されている（接続を呼び出し元に委ねる）
-- 束縛に代入され、その束縛が後で上のいずれかに到達する
-- `Promise.all` などの合成に渡され、その合成の結果が上のいずれかに到達する
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-floating-promise--await-the-result.ts`](../../src/lint/oxlint/rules/no-floating-promise--await-the-result.ts)
 
-報告する形は 4 つで、報告メッセージも 4 つに分かれている。書き換える場所が形ごとに違うためである。
+<!-- END GENERATED rule-header -->
 
-| 形 | messageId | 何が起きているか |
+## Violation
+
+An expression producing a promise whose value is connected to nothing. Connection means one of four things.
+
+- It is `await`ed
+- It is `return`ed (leaving the connection to the caller)
+- It is assigned to a binding, and that binding later reaches one of the above
+- It is handed to a composition such as `Promise.all`, and that composition's result reaches one of the above
+
+Four shapes are reported, with four report messages, because the place to rewrite differs by shape.
+
+| Shape | messageId | What is happening |
 | --- | --- | --- |
-| `fetchUser();`（呼び出しが文として単独） | `floatingPromiseStatement` | 値を捨てる位置に非同期呼び出しが置かれている |
-| `runEach(async (name) => { ... })`（同期戻り値のコールバック位置） | `floatingPromiseCallback` | 受け取る側が待たないので、失敗は必ず落ちる |
-| `void fetchUser();` | `voidedPromise` | 待たない意図の表明であって、接続ではない |
-| `widened();`（宣言型が `any` / `unknown`、実体は非同期） | `widenedAsyncCall` | 型が広がっていても、たどり着く宣言は非同期のままである |
+| `fetchUser();` (a call standing alone as a statement) | `floatingPromiseStatement` | An asynchronous call stands where a value is discarded |
+| `runEach(async (name) => { ... })` (a callback position declaring a synchronous return) | `floatingPromiseCallback` | The receiver does not wait, so the failure always drops |
+| `void fetchUser();` | `voidedPromise` | A statement of intent not to wait, which is not a connection |
+| `widened();` (a declared type of `any` / `unknown` over an asynchronous body) | `widenedAsyncCall` | The type was widened; the declaration reached is still asynchronous |
 
-### promise を生む式の判定
+### Settling what produces a promise
 
-型チェッカは使わない。oxlint の JavaScript プラグインには型情報が渡らないので、判定は **宣言の読み取り** で行う。呼び先を単一代入の束縛としてたどり、次のいずれかに当たれば promise を生むとみなす。
+The type checker is not used. oxlint's JavaScript plugin receives no type information, so the judgment runs by **reading declarations**. The callee is followed as a single-assignment binding, and it counts as producing a promise where any of these holds.
 
-- たどり着いた関数宣言が `async` である
-- たどり着いた宣言の戻り値の型注釈が `Promise` / `PromiseLike` / `Thenable` を名指ししている。合併型・交差型はいずれかの構成要素が名指ししていれば当たる
-- 束縛の型注釈が関数型で、その戻り値の型が上を名指ししている
+- The function declaration reached is `async`
+- The return type annotation of the declaration reached names `Promise`, `PromiseLike` or `Thenable`. A union or an intersection hits where any constituent names one
+- The binding's type annotation is a function type whose return type names one of the above
 - `new Promise(...)`
-- `Promise.all` / `Promise.allSettled` / `Promise.any` / `Promise.race` / `Promise.resolve` / `Promise.reject` / `Promise.try` の呼び出し
+- A call to `Promise.all`, `Promise.allSettled`, `Promise.any`, `Promise.race`, `Promise.resolve`, `Promise.reject` or `Promise.try`
 
-丸括弧・省略可能連鎖・非 null アサーション・インスタンス化式は、値がどこへ届くかを変えないので、辿って内側で判定する。型アサーションは、アサート先が `any` / `unknown` なら **型を広げたという事実** を持ったまま内側をたどり続け（4 番目の形）、それ以外の型なら内側の宣言をそのまま使う。
+Parentheses, optional chains, non-null assertions and instantiation expressions do not change where the value arrives, so they are followed and the inside is judged. A type assertion whose target is `any` or `unknown` keeps **the fact that the type was widened** and keeps following inward (the fourth shape); any other target type uses the inner declaration as it stands.
 
-`void` で包んだ形（3 番目）だけは、呼び出しでない式も対象になる。`void` は必ず値を捨てるので、束縛が後で待たれる可能性を考える必要が無い。型注釈が promise を名指ししている束縛と、初期化子が promise を生む呼び出しである束縛の両方を報告する。
+Only the `void`-wrapped shape (the third) also covers expressions that are not calls. `void` always discards the value, so there is no need to consider a binding being awaited later. Both a binding whose type annotation names a promise and a binding whose initializer is a promise-producing call are reported.
 
-単一代入は [no-reassign--use-spread-or-iife](./no-reassign--use-spread-or-iife.md) が保証している。だから宣言から辿るだけで束縛の最終値が確定し、この判定に到達可能性の解析は要らない。
+Single assignment is guaranteed by [no-reassign--use-spread-or-iife](./no-reassign--use-spread-or-iife.md). So following declarations settles a binding's final value, and this judgment needs no reachability analysis.
 
-### 報告しない形
+### Not reported
 
-- 上の 4 つの接続のいずれかを持つ promise
-- 同期的な関数の呼び出し。promise を生まない型は対象にならない
-- `await` した結果に対する後続の操作。すでに接続済みである
-- 非同期関数の定義そのもの。見るのは呼び出し位置と受け渡し位置だけである
-- コールバック位置のうち、受け取る側の引数が promise を返す関数型を宣言しているもの。受け取る側が待つと宣言している
-- コールバック位置のうち、引数の型注釈が無い・関数型でない・戻り値が `any` / `unknown` であるもの。同期的な戻り値を宣言していると確定できない
-- 残余引数の位置と、スプレッドで渡した引数。どの宣言位置に着地するかが確定しない
+- A promise holding any of the four connections above
+- A call to a synchronous function. A type producing no promise is out of scope
+- Operations following an `await`ed result. Already connected
+- The definition of an asynchronous function itself. Only call positions and hand-over positions are read
+- A callback position where the receiving parameter declares a function type returning a promise. The receiver has declared that it waits
+- A callback position where the parameter carries no type annotation, is not a function type, or returns `any` / `unknown`. It cannot be settled that a synchronous return was declared
+- A rest parameter position, and arguments handed over by a spread. Which declared position they land in is not settled
 
-意図的に待たない呼び出しを明示する手段は、まだ決まっていない。決まるまでこの例外に該当する形は存在せず、実装は例外を一切受理しない。
+A means of marking a call as deliberately unawaited has not been settled. Until it is, no shape falls under that exception and the implementation accepts none.
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「非同期の呼び出しは、その結果が呼び出し元の制御フローに接続されている」ことである。ある非同期呼び出しを目にしたとき、その失敗がどこで受け止められるかは、呼び出し位置から外側へ構文木をたどれば確定する。「結果は要らない」という要求もこの不変条件の外には出ない。要らないなら要らないと明示的に書き、そのうえで失敗経路の行き先を決める。
+An asynchronous call has its result connected to the caller's control flow. Seeing an asynchronous call, where its failure is caught is settled by walking the syntax tree outward from the call. The demand "I do not need the result" does not leave this invariant either: write plainly that it is not needed, and settle where the failure goes.
 
-このルールが要る理由は 2 層ある。
+Two layers of reason.
 
-1 層目は、[no-promise-chain--use-async-await](./no-promise-chain--use-async-await.md) が作る直接の帰結である。チェーン形式を禁じると、チェーンを消す最も安い方法は `.catch()` ごと消すことになる。残るのは **失敗処理を持たず、かつ待たない呼び出し** で、この形はチェーンではないので同ルールの検出条件に当たらない。担当を置かなければ、チェーンを禁じたことが失敗処理を丸ごと消す方向へ書き手を押し出すだけになる。禁止が別の穴を作る形であり、これは元の状態より悪い。
+The first is a direct consequence of [no-promise-chain--use-async-await](./no-promise-chain--use-async-await.md). Forbid the chain form and the cheapest way to remove a chain is to remove the `.catch()` with it. What is left is **a call with no failure handling that is not awaited**, and that shape is not a chain, so it does not meet that rule's detection condition. With nobody responsible, forbidding chains only pushes the writer toward deleting failure handling entirely. That is a prohibition creating another hole, which is worse than the original state.
 
-2 層目は、その形が読み手からも機械からも見えないことである。待たない呼び出しは同期的な文と見分けがつかず、その失敗は呼び出し元のどの `catch` にも届かない。処理系によっては警告すら出ず、失敗が観測されないまま処理が続く。no-promise-chain--use-async-await が「失敗経路を `catch` 節という 1 箇所へ集約し、そこを別のルールが検査できる状態を作る」ためにあるなら、集約から漏れる経路を残すことはその設計目的そのものを崩す。
+The second is that the shape is invisible to a reader and to a machine alike. An unawaited call is indistinguishable from a synchronous statement, and its failure reaches no `catch` in the caller. Some runtimes do not even warn, and processing continues with the failure unobserved. If `no-promise-chain--use-async-await` exists to "gather failure routes into the one place a `catch` clause is, so another rule can check there", leaving a route that escapes the gathering breaks that design purpose itself.
 
-このルールは単体で有効化しない。同じ不変条件を分担する束の 1 本であり、委譲先が無効な構成では、委譲元は「その形を検出しない」と宣言しただけの状態になる。
+This rule is not enabled on its own. It is one of a bundle sharing an invariant, and in a setup where the rule it delegates to is disabled, the delegating rule has merely declared that it does not detect that shape.
 
-## どう直すか
+### Configuration
 
-結果をどう扱いたいかで 4 つに分かれる。
+None. Only whether the rule is on or off is settled by the configuration.
 
-**結果が要る。** `await` して、後続の文がその値を使う。
+Give it conditions such as "in this file you need not wait" or "this module is out of scope" and a configuration file settles where failures drop, leaving a reader unable to judge where a failure goes from the call site. The spellings `Promise` / `PromiseLike` / `Thenable` used in the judgment, and the list of promise-producing statics, are held by the rule. Introduce a thenable under another spelling and adding that spelling to this rule is the paired work.
+
+## Fix
+
+Four routes, by what you want done with the result.
+
+**The result is needed.** `await` it and let the following statements use the value.
 
 ```ts
 const load = async (repositoryRoot: string): Promise<BodyIndex> => {
@@ -71,43 +94,94 @@ const load = async (repositoryRoot: string): Promise<BodyIndex> => {
 };
 ```
 
-**呼び出し元に委ねる。** `return` する。接続を決めるのは呼び出し元になる。
+**Leave it to the caller.** `return` it. The caller settles the connection.
 
 ```ts
 const load = (repositoryRoot: string): Promise<BodyIndex> =>
   buildRepositoryBodyIndex({ repositoryRoot });
 ```
 
-**複数を並行に走らせる。** 合成に渡し、合成の結果を `await` する。個々の呼び出しは合成に接続され、合成は `await` に接続される。
+**Run several in parallel.** Hand them to a composition and `await` the composition. Each call is connected to the composition, and the composition to the `await`.
 
 ```ts
 const loadBoth = async (roots: readonly string[]): Promise<readonly BodyIndex[]> =>
   await Promise.all(roots.map((repositoryRoot) => buildRepositoryBodyIndex({ repositoryRoot })));
 ```
 
-**本当に結果が要らない。** 要らないのは **結果** であって **失敗** ではない。`await` して `try` / `catch` で受け、失敗の行き先をその場で決める。何を決めるかは [no-discarded-failure--receive-and-surface-it](./no-discarded-failure--receive-and-surface-it.md) と [no-logged-and-continued-failure--stop-or-recover](./no-logged-and-continued-failure--stop-or-recover.md) が扱う。
+**The result is genuinely not needed.** What is not needed is the **result**, not the **failure**. `await` it, receive it with `try` / `catch`, and settle where the failure goes on the spot. What to settle is handled by [no-discarded-failure--receive-and-surface-it](./no-discarded-failure--receive-and-surface-it.md) and [no-logged-and-continued-failure--stop-or-recover](./no-logged-and-continued-failure--stop-or-recover.md).
 
-コールバック位置（`floatingPromiseCallback`）は、受け取る側を直す。引数の型を promise を返す関数型として宣言し、受け取る側で `await` する。待てない位置なら、コールバックを同期的なものに戻す。
+For a callback position (`floatingPromiseCallback`), repair the receiving side. Declare the parameter's type as a function type returning a promise and `await` on the receiving side. Where waiting is impossible there, return the callback to a synchronous one.
 
-自動修正は提供しない。`await` の挿入は囲む関数を `async` にする必要があり、評価順序も変わる。
+There is no automatic fix. Inserting `await` requires making the enclosing function `async`, and it changes the evaluation order.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-いずれも「不変条件は満たさないが検出だけをすり抜ける」ものである。検出できないことは、書いてよいことを意味しない。
+Code this rule rejects.
 
-- 結果を使わない束縛に受ける（`const ignored = fetchUser();` を置いて、その束縛をどこでも待たない）。判定は値を捨てる位置に置かれた呼び出しで行うので報告は消えるが、失敗の行き先が無いことは変わらない
-- 束縛だけを文として置く（`const pending = fetchUser();` の後に `pending;`）。同上
-- `void` 演算子で包む。3 番目の形が報告する。包むことは接続ではない
-- 空のハンドラをチェーンで足して形を整える。[no-promise-chain--use-async-await](./no-promise-chain--use-async-await.md) が報告する
-- 非同期関数を同期的なコールバック位置へ渡して呼び出し文を消す。2 番目の形が報告する
-- 戻り値の型を `any` / `unknown` に広げて判定から隠す。4 番目の形が報告する
-- 型注釈を持たない引数のコールバック位置へ逃がす。引数の宣言が読めないので報告は消える。受け取る側に型を書くのが対になる作業である
-- 依存パッケージの組み込みメソッドへ逃がす（`items.forEach(async (item) => { ... })`）。組み込みの宣言はソースから読めないので報告は消える。この形は、待たない呼び出しが最も出やすい位置である
-- 非同期関数を別モジュールへ移し、import した名前で呼ぶ。判定はこのファイルの中で宣言を辿るので、import した名前の実体は読めない
-- 抑制ディレクティブ。[no-silent-suppression--fix-or-justify-inline](./no-silent-suppression--fix-or-justify-inline.md) と [no-inline-suppression-of-protected-rule--register-the-exception-in-configuration](./no-inline-suppression-of-protected-rule--register-the-exception-in-configuration.md) が受理条件を持つ
+```ts
+// a call to an async arrow standing alone as a statement is reported
+const fetchUser = async () => 1;
+fetchUser();
+```
 
-## オプション
+```ts
+// voiding the call states an intent instead of connecting the promise
+const fetchUser = async () => 1;
+void fetchUser();
+```
 
-取らない。有効か無効かだけを設定側で決める。
+Code this rule accepts.
 
-「このファイルでは待たなくてよい」「このモジュールは対象外」といった条件付けを設定として持たせると、失敗が落ちる場所を設定ファイルが決めることになり、読み手は呼び出し位置を見ても失敗の行き先を判定できなくなる。判定に使う `Promise` / `PromiseLike` / `Thenable` の綴りと、promise を生む静的メソッドの一覧はルールが持つ。別の綴りの thenable を入れたなら、その綴りをこのルールに足すのが対になる作業である。
+```ts
+// awaiting the call connects it to the enclosing control flow
+const fetchUser = async () => 1;
+const load = async () => {
+  await fetchUser();
+};
+```
+
+```ts
+// handing the calls to a composition and awaiting the composition connects them
+const fetchUser = async () => 1;
+const load = async () => {
+  await Promise.all([fetchUser(), fetchUser()]);
+};
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+Each of these fails the invariant while slipping past the detection. Not being detectable does not mean it may be written.
+
+- Receiving it into a binding nothing uses (placing `const ignored = fetchUser();` and never awaiting that binding anywhere). The judgment runs on a call standing where a value is discarded, so the report clears, and the failure still has nowhere to go
+- Placing the binding alone as a statement (`const pending = fetchUser();` followed by `pending;`). As above
+- Wrapping in the `void` operator. The third shape reports it. Wrapping is not connecting
+- Adding an empty handler in a chain to tidy the shape. `no-promise-chain--use-async-await` reports it
+- Handing an asynchronous function to a synchronous callback position to remove the call statement. The second shape reports it
+- Widening the return type to `any` / `unknown` to hide from the judgment. The fourth shape reports it
+- Escaping into a callback position whose parameter carries no type annotation. The parameter's declaration cannot be read so the report clears; writing the type on the receiving side is the paired work
+- Escaping into a built-in method of a dependency package (`items.forEach(async (item) => { ... })`). A built-in's declaration cannot be read from the source so the report clears. This is the position where unawaited calls arise most
+- Moving the asynchronous function to another module and calling the imported name. The judgment follows declarations inside this file, so an imported name's body cannot be read
+- A suppression directive. [no-silent-suppression--fix-or-justify-inline](./no-silent-suppression--fix-or-justify-inline.md) and [no-inline-suppression-of-protected-rule--register-the-exception-in-configuration](./no-inline-suppression-of-protected-rule--register-the-exception-in-configuration.md) hold the conditions for accepting one
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `floatingPromiseStatement` | A promise-valued expression must not stand alone as a statement. Nothing receives the promise and its failure reaches no \`catch\` clause. Use one of the four connections: \`await\` the call, \`return\` it to the caller, bind it and \`await\` that binding, or hand it to a composition such as \`Promise.all\` and \`await\` the composition. Not needing the result is not the same as not needing the failure. Decide where the failure goes: \`await\` the call inside a \`try\` statement and act on it in the \`catch\` clause. |
+| `floatingPromiseCallback` | A promise-valued argument must not be handed to a parameter that declares a synchronous return. The receiver drops the promise and its failure reaches no \`catch\` clause. Declare the parameter as a function returning a promise and \`await\` what it hands back, or keep the callback synchronous. Use one of the four connections inside the receiver: \`await\` the call, \`return\` it to the caller, bind it and \`await\` that binding, or hand it to a composition such as \`Promise.all\` and \`await\` the composition. Not needing the result is not the same as not needing the failure. |
+| `voidedPromise` | \`void\` in front of a promise-valued expression must not stand in for a connection. The promise still reaches nothing and its failure reaches no \`catch\` clause. Drop the \`void\` and use one of the four connections: \`await\` the expression, \`return\` it to the caller, bind it and \`await\` that binding, or hand it to a composition such as \`Promise.all\` and \`await\` the composition. Not needing the result is not the same as not needing the failure. |
+| `widenedAsyncCall` | A call whose declared type is widened to \`any\` or \`unknown\` must not stand alone as a statement while the declaration it resolves to is asynchronous. Nothing receives the promise and its failure reaches no \`catch\` clause. Declare a type that names what the call yields, then use one of the four connections: \`await\` the call, \`return\` it to the caller, bind it and \`await\` that binding, or hand it to a composition such as \`Promise.all\` and \`await\` the composition. Not needing the result is not the same as not needing the failure. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

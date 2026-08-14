@@ -1,85 +1,163 @@
+---
+description: "Require an assets file to carry nothing but const declarations of written-out data, so setup cannot leave the spec that owns it under the name of test data"
+---
+
 # require-test-assets-constants--move-setup-to-spec
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-assets ファイルと判定した各ファイルについて、ファイル全体の形を読む。トップレベルの文が「`const` 宣言であり、識別子 1 つへの束縛であり、初期化子が書き下された値である」以外のものを報告する。`export` が宣言に付いていてもよい。
+Require an assets file to carry nothing but const declarations of written-out data, so setup cannot leave the spec that owns it under the name of test data
 
-assets かどうかはファイル名で決まる。既定では `<stem>.assets.<拡張子>` に当たる名前、つまり最後から 2 番目のドット区切りが `assets` であるファイルが対象になる。stem が空のもの（`assets.ts` そのもの）は対象外。判定にディレクトリは関わらないので、spec 用ディレクトリの内側か外側かを問わず同じに効く。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`require-test-assets-constants--move-setup-to-spec.ts`](../../src/lint/oxlint/rules/require-test-assets-constants--move-setup-to-spec.ts)
 
-### 書き下された値とみなすもの
+<!-- END GENERATED rule-header -->
 
-- リテラル
-- 配列リテラルとオブジェクトリテラル。要素とプロパティ値が再帰的に書き下されていること
-- テンプレートリテラル。埋め込み式が書き下されていること
-- 型アサーション、`satisfies`、非 null 表明で包んだ書き下し
-- 単項演算子を付けた書き下し（負数など）
-- **同一ファイル内で宣言された `const` への識別子参照**で、その `const` の初期化子が書き下されているもの
+## Violation
 
-最後の 1 つは綴りの一致ではなく束縛の解決で決める。ファイル直下の `const` を名前で引き、その初期化子を同じ判定にかける。多段の中継もたどり、たどった先が自分に戻ってくる場合はそこで止めて報告する。参照が書き下しに解決できなかったときの報告位置は、解決先ではなく**参照を書いた位置**になる。
+For each file judged to be an assets file, the shape of the whole file is read. Any top-level statement that is not "a `const` declaration, binding one identifier, whose initialiser is a written-out value" is reported. The declaration may carry `export`.
 
-### 報告するもの
+Whether a file is assets is settled by its name. By default the target is a name of the form `<stem>.assets.<extension>` — a file whose second-to-last dot-separated part is `assets`. One with an empty stem (`assets.ts` itself) is out of range. Directories play no part in the judgment, so it holds the same inside and outside a spec directory.
 
-| 形                                                           | 報告                        |
-| ------------------------------------------------------------ | --------------------------- |
-| `import` 文（型のみの import を含む）                        | `assetsImport`              |
-| `export ... from` と `export *`                              | `assetsReExport`            |
-| 宣言を伴わない `export { ... }`                              | `assetsDetachedExport`      |
-| 型エイリアスと interface                                     | `assetsTypeDeclaration`     |
-| 関数・クラス・enum・`let` / `var`・値を持たない宣言・走る文  | `assetsForeignStatement`    |
-| 分割代入による宣言                                           | `assetsDestructuredBinding` |
-| 呼び出し・スプレッド・関数式・読み出し・解決できない名前など | `assetsAssembledValue`      |
+### What counts as a written-out value
 
-`assetsForeignStatement` と `assetsAssembledValue` は、何が書かれていたかをメッセージの中で名指しする。列挙にない形は「このファイルが読み込みの過程で組み立てる値」という一般の言い方に落ちる。判定は列挙への一致ではなく、書き下しの列に**当たらないこと**で決まるため、列挙から漏れた構文が素通りすることはない。
+- A literal
+- An array literal and an object literal, where the elements and property values are recursively written out
+- A template literal, where the embedded expressions are written out
+- A written-out value wrapped in a type assertion, a `satisfies`, or a non-null assertion
+- A written-out value carrying a unary operator (a negative number, say)
+- **An identifier reference to a `const` declared in the same file**, where that `const`'s initialiser is written out
 
-宣言 1 つにつき報告は 1 件で、位置は最初に見つかった書き下されていない箇所になる。1 つ直すと次が現れる。
+The last is settled by resolving the binding rather than by matching spellings. The `const` directly under the file is looked up by name and its initialiser meets the same judgment. Relays of several steps are followed too, and a chain leading back to itself stops there and is reported. Where a reference cannot be resolved to a written-out value, the report stands **at the reference** rather than at what it resolved to.
 
-### 意図的に広げていない範囲
+### What is reported
 
-| 形 | 対象にしない理由 |
+| Shape | Report |
 | --- | --- |
-| assets 以外のファイル | 判定はファイル名で行う。同じ中身でも spec ファイルなら対象外で、spec の中身は別の群が受け持つ |
-| 所有者の spec が存在するかどうか | `require-spec-file-for-assets--create-matching-spec` が受け持つ |
-| 誰がこの assets を読んでいるか | `no-cross-spec-assets-import--use-own-assets` が受け持つ |
-| 他のファイルに書かれた `const` への参照 | 参照するには import が要る。import 自体を報告するので、解決を隣のファイルへ広げる必要がない |
+| An `import` statement (a type-only import included) | `assetsImport` |
+| `export ... from` and `export *` | `assetsReExport` |
+| An `export { ... }` carrying no declaration | `assetsDetachedExport` |
+| A type alias and an interface | `assetsTypeDeclaration` |
+| A function, a class, an enum, a `let` / `var`, a declaration holding no value, a statement that runs | `assetsForeignStatement` |
+| A declaration binding by destructuring | `assetsDestructuredBinding` |
+| A call, a spread, a function expression, a read, a name that cannot be resolved | `assetsAssembledValue` |
 
-## なぜそれが要るか
+`assetsForeignStatement` and `assetsAssembledValue` name in the message what was written there. A shape absent from the list falls back to the general phrasing of "a value this file assembles as it loads". The judgment is settled by **not** falling into the run of written-out shapes rather than by matching the list, so no syntax missing from the list passes through.
 
-assets を spec の外に置いてよいとした根拠は、それが不活性なデータだったことである。`import`・型宣言・生成処理が入った瞬間、それは spec の外に置かれた実行可能な setup になり、`no-dry-test-setup--inline-owned-setup` が守っている境界を assets という名前で迂回したことになる。データの外出しは許可、setup の外出しは禁止という線を、ファイルの中身のレベルで担保する。
+One declaration gets one report, standing at the first place found that is not written out. Fix one and the next appears.
 
-壊れ方はもう 1 層ある。assets が実行される側に回ると、それを読む複数の spec が同じ実行の結果を共有する。テストは並列実行が既定なので、共有された可変状態とモック設定は spec の境界を越えて漏れる。不活性なデータであるかぎり、同じ値を何人が読んでも順序に依存しない。
+### Deliberately not widened
 
-束縛の解決までたどるのは、値の出どころを名前で隠せてしまうからである。実行時にしか決まらない値をいったん名前で受け、「識別子参照だから静的だ」と主張する形が成立すると、この判定は形式だけのものになる。どこにも宣言のない名前と実行環境が与えるグローバル（`undefined` や `NaN` を含む）を書き下しとみなさないのはこのためで、値の不在を表したいなら `null` を書くか、そのプロパティを置かない。
+| Shape | Why it is left out |
+| --- | --- |
+| A file that is not assets | The judgment runs on the file name. The same contents in a spec file are out of range, and the contents of a spec are held by another group |
+| Whether the owning spec exists | That belongs to [require-spec-file-for-assets--create-matching-spec](./require-spec-file-for-assets--create-matching-spec.md) |
+| Who is reading this assets file | That belongs to [no-cross-spec-assets-import--use-own-assets](./no-cross-spec-assets-import--use-own-assets.md) |
+| A reference to a `const` written in another file | Referencing one takes an import, and the import itself is reported, so resolution has no need to reach into the neighbouring file |
 
-## どう直すか
+### The invariant
 
-`import`・型・ビルダ・ファイルシステム操作を、その assets を所有する spec の fixture へ移す。assets にはリテラルだけを残す。型注釈が要る場合も、型は読み手である spec 側で付ける。
+The grounds for allowing assets outside the spec were that they are inert data. The moment an `import`, a type declaration or a generating step goes in, they become an executable setup placed outside the spec, and the boundary [no-dry-test-setup--inline-owned-setup](./no-dry-test-setup--inline-owned-setup.md) holds has been bypassed under the name of assets. The line — moving data out is allowed, moving setup out is forbidden — is held at the level of what the file contains.
 
-公開は宣言に `export` を付ける形だけを採る。先に宣言してから `export { ... }` でまとめて公開する形は、宣言と公開が離れた分だけ「このファイルに何があるか」を 2 か所読ませることになるので、報告する。
+There is another layer to the breakage. Once assets move to the side that runs, the several specs reading them share the result of one execution. Tests run in parallel by default, so shared mutable state and mock settings leak across spec boundaries. As long as they are inert data, no number of readers of the same value makes it depend on order.
 
-生成された値をそのまま置きたい場合は、生成した結果を書き下す。書き下せないほど大きいなら、それは assets に置くべき大きさを超えており、spec の fixture が組み立てるべき対象である。
+Resolving bindings is done because the origin of a value can otherwise be hidden behind a name. Let a value settled only at run time be received into a name first and the claim "it is an identifier reference, so it is static" go through, and this judgment becomes a matter of form alone. That is why a name declared nowhere, and a global the runtime supplies (`undefined` and `NaN` included), do not count as written out. To express the absence of a value, write `null` or leave the property out.
 
-## 禁じる回避策
+### Configuration
 
-- 生成処理を別ファイルへ出して assets から import する。import 自体が禁止されている
-- ファイル名を assets 以外にして spec 用ディレクトリへ置く。`require-spec-or-assets-only-in-spec-directory--move-out-or-inline` が第三のファイル種別として報告する
-- 生成済みの値を手で書き下すのではなく、生成処理を spec の外の production コードへ寄せて import する。assets からの import である限り同じく禁止される
-- 当該 assets を解析対象から外す。対象集合はファイル名規約から決まる
-- 生成した値をグローバルや外部から与えられる名前で受け、識別子参照だから書き下しだと主張する。束縛を解決できない名前は書き下しとみなさない
-- 名前を何段も経由させて出どころを遠ざける。中継は最後までたどる
-- 抑制ディレクティブ
-
-## オプション
-
-- `assetsNameMarkers`（文字列の配列、任意）: assets とみなす名前の標識。既定は `assets` の 1 つで、指定すると**置き換わる**。エントリはファイル名の最後から 2 番目のドット区切りと完全一致で照合する
+- `assetsNameMarkers` (an array of strings, optional): the markers of names counted as assets. The default is the single `assets`, and naming it **replaces** the default. An entry is matched exactly against the second-to-last dot-separated part of the file name
 
 ```jsonc
 ["error", { "assetsNameMarkers": ["assets", "fixtures"] }]
 ```
 
-この語彙は assets を見る 3 つのルールで共有する。片方だけ別の綴りにすると、所有者の要求と中身の要求が別々のファイル集合に掛かることになるため、標識を変えるときは 3 つとも同じ値にする。
+This vocabulary is shared by the three rules that read assets. Give one of them a different spelling and the demand on the owner and the demand on the contents fall on different sets of files, so where the marker is changed all three take the same value.
 
-個別の例外を許す設定は持たない。1 つの assets だけ実行可能にしてよい理由があるなら、それはもう assets ではなく setup であり、置き場所は所有者の spec の中である。
+There is no setting permitting individual exceptions. Where there are grounds for making one assets file executable, it is no longer assets but setup, and its place is inside the owning spec.
 
-## この判定が及ばないところ
+### Where the detection does not reach
 
-このルールは、oxlint が訪問したファイルだけを読む。ファイル名の規約に当たる assets が解析対象の外にあるとき、この構文検査は走らない。対象集合を規約から導いてリポジトリ全域の assets を必ず訪問させることは、ルール本体ではなく、このルールを配線する側が持つ責務になる。`no-cross-spec-assets-import--use-own-assets` が「assets 自身が書き手であるケース」をこのルールへ委ねている以上、配線が済むまではその委譲に穴が残る。
+This rule reads only the files oxlint visited. Where an assets file matching the naming convention sits outside the analysis, this syntax check does not run. Deriving the target set from the convention so that every assets file in the repository is visited is a duty of whoever wires this rule up, not of the rule body. As long as [no-cross-spec-assets-import--use-own-assets](./no-cross-spec-assets-import--use-own-assets.md) delegates the case of "the assets file is itself the writer" to this rule, a hole remains in that delegation until the wiring is done.
+
+## Fix
+
+Move the `import`, the types, the builders and the file system operations into the fixture of the spec that owns those assets. Leave literals alone in the assets file. Where a type annotation is wanted, the type is written by the spec that reads it.
+
+Publishing takes only the shape of an `export` on the declaration. Declaring first and publishing together with `export { ... }` puts the declaration and the publication apart, making "what is in this file" a thing read in two places, so it is reported.
+
+To keep a generated value as it stands, write the generated result out. Where it is too large to write out, it is past the size that belongs in assets and is a thing for the spec's fixture to assemble.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// an import is reported whatever it names
+// in report.assets.ts
+import { build } from "./builder.ts";
+export const REPORT_ID = "a";
+```
+
+```ts
+// a call that generates the value is reported
+// in report.assets.ts
+export const REPORT = buildReport();
+```
+
+Code this rule accepts.
+
+```ts
+// an assets file holding written-out literals is the shape this rule asks for
+// in report.assets.ts
+export const REPORT_ID = "a";
+const COUNT = 2;
+export const TOTAL = COUNT;
+```
+
+```ts
+// a chain of constants this file declares resolves to written-out data
+// in report.assets.ts
+const NAME = "a";
+const ID = NAME;
+export const REPORT = { id: ID };
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Pushing the generating step into another file and importing it from the assets. The import itself is forbidden
+- Naming the file something other than assets and placing it in a spec directory. [require-spec-or-assets-only-in-spec-directory--move-out-or-inline](./require-spec-or-assets-only-in-spec-directory--move-out-or-inline.md) reports it as a third kind of file
+- Instead of writing the generated value out by hand, moving the generating step into production code outside the spec and importing it. It is forbidden all the same as an import from the assets
+- Taking that assets file out of the analysis. The target set follows from the file naming convention
+- Receiving a generated value through a global or a name supplied from outside and claiming it is written out because it is an identifier reference. A name whose binding cannot be resolved does not count as written out
+- Relaying a name through several steps to push the origin further away. Relays are followed to the end
+- A suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `assetsImport` | An assets file must not import anything. This file imports \`{{specifier}}\`. Move the work behind that import into the fixture of the spec that owns this file. |
+| `assetsReExport` | An assets file must not forward another module. This statement re-exports from \`{{specifier}}\`. Delete it and write out the data this file holds. |
+| `assetsDetachedExport` | An assets file must not publish a name away from its declaration. This statement exports {{names}}. Write \`export\` on each declaration and delete this statement. |
+| `assetsTypeDeclaration` | An assets file must not declare a type. This file declares \`{{name}}\`. Move the type to the spec that reads this file and keep the data here written out. |
+| `assetsForeignStatement` | An assets file must not carry anything but a \`const\` declaration of written-out data. This file carries {{shape}}. Move it into the fixture of the spec that owns this file. |
+| `assetsDestructuredBinding` | An assets file must not bind a pattern. This declaration takes its names out of another value. Declare each value on a \`const\` of its own and write that value out. |
+| `assetsAssembledValue` | An assets file must not hold a value assembled as the file loads. This declaration holds {{shape}}. Move that work into the fixture of the spec that owns this file and write the settled value out here. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

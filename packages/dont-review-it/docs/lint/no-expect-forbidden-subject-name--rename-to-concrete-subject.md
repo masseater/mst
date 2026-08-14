@@ -1,51 +1,82 @@
+---
+description: "Disallow naming the subject of an assertion by one of the configured forbidden-name patterns, so a reader settles what the assertion pins from the assertion alone rather than from the fixture behind it"
+---
+
 # no-expect-forbidden-subject-name--rename-to-concrete-subject
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-spec ファイルの中の `expect(...)` 呼び出しについて、第一引数の中に現れる識別子の名前を見る。設定された禁止パターンのいずれかに一致する名前があれば、その識別子の位置で報告する。
+Disallow naming the subject of an assertion by one of the configured forbidden-name patterns, so a reader settles what the assertion pins from the assertion alone rather than from the fixture behind it
 
-起点は `expect(...)` の呼び出しそのもので、matcher が呼ばれているかどうかは見ない。`expect(data);` のようにアサーションが成立していない形も対象に入る。matcher を外せば名前の検査から抜けられる、という逃げ道を残さないためである。ここで見るのは名前だけで、matcher が何を主張しているかは見ない。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-expect-forbidden-subject-name--rename-to-concrete-subject.ts`](../../src/lint/oxlint/rules/no-expect-forbidden-subject-name--rename-to-concrete-subject.ts)
 
-`expect.soft(...)` と `expect.poll(...)` も同じ起点として読む。メンバーの綴りは静的に読める形なら記法を問わないので、`expect["soft"](...)` も同じ扱いになる。`expect.assertions(2)` のような名前空間のユーティリティ呼び出しは、派生した受け手ではないので構造的に外れる。
+<!-- END GENERATED rule-header -->
 
-対象のファイルはファイル名の接尾辞で決める。既定は `.test.ts` と `.test.tsx` で、`specFileSuffixes` で差し替えられる。
+## Violation
 
-第一引数は歩いて調べる。型アサーション・`satisfies`・非 null アサーション・オプショナルチェーン・`await` は剥いでから読む。歩く位置と歩かない位置は次の通り。
+For an `expect(...)` call in a spec file, the names of the identifiers appearing inside the first argument are read. Where a name matches any of the configured forbidden patterns, the report stands at that identifier.
 
-| 位置                                 | 例                           | 見るか       |
-| ------------------------------------ | ---------------------------- | ------------ |
-| 裸の識別子                           | `expect(data)`               | 見る         |
-| メンバーアクセスの受け手             | `expect(result.id)`          | 受け手を見る |
-| 計算メンバーのキー                   | `expect(report[data])`       | 見る         |
-| オブジェクトの値・スプレッド         | `expect({ id: data })`       | 見る         |
-| 計算プロパティキー                   | `expect({ [data]: 1 })`      | 見る         |
-| 配列の要素                           | `expect([data])`             | 見る         |
-| 呼び出し・`new` の引数               | `expect(normalise(data))`    | 見る         |
-| 呼び出しの受け手                     | `expect(result.at(0))`       | 受け手を見る |
-| テンプレートの補間                   | ``expect(`${data}`)``        | 見る         |
-| 条件式・論理式・二項式・単項式の各項 | `expect(data ?? fallback)`   | 見る         |
-| サンクが返す式                       | `expect.poll(() => data)`    | 見る         |
-| 非計算のプロパティキー               | `expect({ data: response })` | 見ない       |
-| 非計算のメンバー名                   | `expect(response.result)`    | 見ない       |
-| 呼び出し先・タグの名前               | `expect(toResult(response))` | 見ない       |
+The starting point is the `expect(...)` call itself; whether a matcher was called is not read. A form where no assertion was completed, such as `expect(data);`, is in scope, so that dropping the matcher is not a way out of the name check. Only the name is read here — what the matcher claims is not.
 
-計算キーを見るのは、それが実行時に評価される式だからである。逆に非計算のキーとメンバー名はラベルであって、アサーションが受け取る値の名前ではない。呼び出し先の名前も同じで、そこに現れるのは subject ではなく手続きの名前である。`expect` の中で呼び出しが起きること自体は `no-expect-call-expression--yield-from-fixture` が引き受ける。
+`expect.soft(...)` and `expect.poll(...)` are read as the same starting point. Member spellings are read in any notation that settles before the run, so `expect["soft"](...)` is treated the same. A namespace utility call such as `expect.assertions(2)` is not a derived receiver and falls out structurally.
 
-一致判定は大文字小文字を区別しない。パターンにアンカーが無ければ接尾辞一致になり、`parseResult` のような複合語も落ちる。
+The files in scope are settled by the file name suffix. The default is `.test.ts` and `.test.tsx`, replaceable through `specFileSuffixes`.
 
-## なぜそれが要るか
+The first argument is walked. Type assertions, `satisfies`, non-null assertions, optional chains and `await` are peeled before reading. Where the walk goes and where it does not:
 
-被験体の名前は、そのアサーションが何をピンしているかを示す手がかりとして最も強い。名前が総称的だと、アサーションは自分が何を検証しているかを言わなくなり、読み手は fixture を逆算して名前の指すものを突き止めることになる。
+| Position | Example | Read |
+| --- | --- | --- |
+| A bare identifier | `expect(data)` | Yes |
+| The receiver of a member access | `expect(result.id)` | The receiver |
+| A computed member key | `expect(report[data])` | Yes |
+| An object's values and spreads | `expect({ id: data })` | Yes |
+| A computed property key | `expect({ [data]: 1 })` | Yes |
+| An array element | `expect([data])` | Yes |
+| An argument of a call or `new` | `expect(normalise(data))` | Yes |
+| The receiver of a call | `expect(result.at(0))` | The receiver |
+| A template interpolation | ``expect(`${data}`)`` | Yes |
+| Each term of a conditional, logical, binary or unary expression | `expect(data ?? fallback)` | Yes |
+| The expression a thunk returns | `expect.poll(() => data)` | Yes |
+| A non-computed property key | `expect({ data: response })` | No |
+| A non-computed member name | `expect(response.result)` | No |
+| The name of a callee or a tag | `expect(toResult(response))` | No |
 
-総称名が出てくる原因はたいてい名前の付け方ではなく、その手前にある。fixture が具体的な被験体ではなく複数の結果をまとめた値を返している、というのが典型である。形の側は別のルールが引き受けている。fixture が返した複合値からメンバーを取り出して被験体にする形は `no-expect-projected-subject--use-tostrictequal-on-subject` が、`it` の中で値を組み立ててから渡す形は `require-it-only-expect--move-setup-into-fixture` が落とす。
+A computed key is read because it is an expression evaluated at run time. A non-computed key and a member name are labels rather than the name of the value the assertion receives. A callee name is the same: what appears there is the name of a procedure, not the subject. That a call happens inside `expect` at all is taken by [no-expect-call-expression--yield-from-fixture](./no-expect-call-expression--yield-from-fixture.md).
 
-そのうえで残るのが、複合値を丸ごと完全一致でピンしている形である。この形には無検査の面が無いので、他のルールはどれも鳴らない。しかし読み手にはそのアサーションが何を主張しているのか伝わらない。このルールが担当しているのはそこで、構造上の問題の代理ではなく読み取りやすさそのものを見ている。
+Matching ignores case. With no anchor in the pattern it becomes a suffix match, so a compound word such as `parseResult` falls too.
 
-「その複合値が一つの被験体なのか、無関係な結果を詰めた袋なのか」は値の意味であって、型にも構文にも現れない。この区別が付かないままでも検出は成立する。区別が付かないことで残る害が「名前が読み手に何も伝えない」ことだけだからである。
+### The invariant
 
-## どう直すか
+The subject's name is the strongest available clue to what an assertion pins down. Where the name is generic, the assertion stops saying what it verifies and the reader has to work backwards from the fixture to find what the name points at.
 
-fixture を、それが返す具体的な被験体の名前に改名し、アサーションはその束縛を受け取る。
+The cause of a generic name is usually not the naming but something earlier: typically the fixture returning a value bundling several results instead of one concrete subject. The structural side is taken by other rules. Taking a member out of a compound value the fixture returned and making it the subject falls to [no-expect-projected-subject--use-tostrictequal-on-subject](./no-expect-projected-subject--use-tostrictequal-on-subject.md); assembling a value inside the `it` before handing it over falls to [require-it-only-expect--move-setup-into-fixture](./require-it-only-expect--move-setup-into-fixture.md).
+
+What is left after those is a compound value pinned whole with an exact match. That shape has no unchecked face, so none of the other rules fires. Yet the reader is told nothing about what the assertion claims. That is what this rule takes: readability itself, rather than standing proxy for a structural problem.
+
+"Is this compound value one subject, or a bag with unrelated results in it" is a question of what the value means, and it appears in neither the type nor the syntax. The detection holds without settling that, because the only harm left from not settling it is that the name tells the reader nothing.
+
+### Configuration
+
+`forbiddenSubjectNames` and `specFileSuffixes`.
+
+```ts
+[{ forbiddenSubjectNames: [{ pattern: "^data$" }, { pattern: "result$" }] }];
+```
+
+Each item of `forbiddenSubjectNames` is an object carrying exactly one `pattern`, a regular expression source string without delimiters, matched against identifier names. The presence of anchors settles how it matches: `^data$` matches only where the whole identifier is `data`, while `result$` also matches a compound word ending in that word. Keys other than `pattern` are refused by the schema.
+
+`forbiddenSubjectNames` only adds to the default vocabulary; the default cannot be removed. With no configuration passed, the check runs on the default vocabulary. The vocabulary lives in `FORBIDDEN_AMBIGUOUS_NAMES` in `src/lint/oxlint/lib/forbidden-ambiguous-names.ts`, and [no-ambiguous-variable-name--rename-to-concrete-noun](./no-ambiguous-variable-name--rename-to-concrete-noun.md), which reads declaration positions, reads the same list — so adding a word touches one place. Split the vocabulary in two and the same name starts passing at a declaration and failing at an assertion, or the reverse. The normalization that strips a name's decorations before matching is shared between both rules too.
+
+`specFileSuffixes` settles the range of files in scope. The default is `.test.ts` and `.test.tsx`, shared with the other rules that read specs.
+
+## Fix
+
+Rename the fixture to the name of the concrete subject it returns, and let the assertion receive that binding.
 
 ```ts
 const test = baseTest.extend("stem", () =>
@@ -57,27 +88,64 @@ test("drops the suffix from the file name", ({ stem }) => {
 });
 ```
 
-名前が袋を指しているなら、改名では済まない。袋を解体して被験体ごとの fixture に分け、`it` はそれぞれの被験体を直接アサーションする。名前の候補が複数出てきて決めきれないなら、その fixture が複数の仕事をしている。
+Where the name points at a bag, renaming is not enough. Break the bag up into a fixture per subject and have the `it` assert each subject directly. Where several candidate names come up and none can be settled on, that fixture is doing several jobs.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- 名前だけ回避的に変えて、中身は複数の結果を詰めた値のまま残す（`data` を `parsedData` に変えるなど）。一致判定は外れるが、アサーションが何をピンしているか伝わらない状態は変わらない
-- 禁止語で束縛してからアサーションの直前で具体名に移し替える。移し替えた先の宣言は `no-ambiguous-variable-name--rename-to-concrete-noun` が同じ語彙で見る
-- 禁止語をプロパティキーやメンバー名の位置へ押し出す。これらを見ないのは、名前を spec が選んでいない位置だからであって、総称名の置き場所として空けているわけではない
-- matcher を外して `expect(data);` だけにする。起点は `expect(...)` の呼び出しなので外れない
-- 個別の違反を消すために語彙から語を外す。語彙は設定なので変更できるが、それは「この語は主題を語る」という語彙全体への判断であり、1 箇所を通すための操作ではない
-- 抑制ディレクティブ
-
-## オプション
-
-`forbiddenSubjectNames` と `specFileSuffixes` を取る。
+Code this rule rejects.
 
 ```ts
-[{ forbiddenSubjectNames: [{ pattern: "^data$" }, { pattern: "result$" }] }];
+// a container word handed to an assertion is reported on the name itself
+// in report.test.ts
+expect(data).toBe(1);
 ```
 
-`forbiddenSubjectNames` の各項目は `pattern` を 1 つだけ持つオブジェクトで、値は識別子名に照合する区切り記号なしの正規表現ソース文字列。アンカーの有無が一致の仕方を決める。`^data$` は識別子全体が `data` のときだけ一致し、`result$` はその語で終わる複合語にも一致する。`pattern` 以外のキーはスキーマが拒否する。
+```ts
+// a compound name ending in a bag word is reported
+// in report.test.ts
+expect(parseResult).toStrictEqual({ id: "a" });
+```
 
-`forbiddenSubjectNames` は既定の語彙に足すだけで、既定を削ることはできない。設定を渡さなくても既定の語彙で検査する。語彙の実体は `src/lint/oxlint/lib/forbidden-ambiguous-names.ts` の `FORBIDDEN_AMBIGUOUS_NAMES` にあり、宣言の位置を見る `no-ambiguous-variable-name--rename-to-concrete-noun` が同じ一覧を読むので、語を足すときは一覧の一箇所だけを触る。語彙が二箇所に分かれると、同じ名前が宣言では通ってアサーションでは落ちる、あるいはその逆が生まれる。照合前に名前の飾りを剥がす正規化も両方のルールで共通である。
+Code this rule accepts.
 
-`specFileSuffixes` は対象ファイルの範囲を決める。既定は `.test.ts` と `.test.tsx` で、spec を見る他のルールと同じ範囲を共有する。
+```ts
+// a subject named after the artefact it holds is read as a subject
+// in report.test.ts
+expect(fetchedReport).toStrictEqual({ status: 200 });
+expect(renderedText).toBe("ok");
+```
+
+```ts
+// a property key is a label rather than the subject
+// in report.test.ts
+expect({ data: fetchedReport }).toStrictEqual({ data: 1 });
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Changing only the name evasively while the contents stay a value with several results in it (turning `data` into `parsedData`). The match comes off, and the state where the assertion says nothing about what it pins is unchanged
+- Binding under a forbidden word and moving it to a concrete name just before the assertion. The declaration it moved to is read by `no-ambiguous-variable-name--rename-to-concrete-noun` with the same vocabulary
+- Pushing the forbidden word out into a property key or a member name. Those are unread because the spec did not choose the name there, not because they are free space for generic names
+- Dropping the matcher to leave only `expect(data);`. The starting point is the `expect(...)` call, so it does not come off
+- Removing a word from the vocabulary to clear one violation. The vocabulary is configuration and can be changed, but that is a judgment about the whole vocabulary — "this word does talk about the subject" — not an operation for letting one site through
+- A suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `forbiddenSubjectName` | The subject of an assertion must not be named \`{{name}}\`. Rename the fixture and the binding it hands over to the concrete value this assertion pins. Split a fixture that hands over a bag of separate results into one fixture per subject. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

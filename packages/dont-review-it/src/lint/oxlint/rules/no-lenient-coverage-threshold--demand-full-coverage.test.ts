@@ -11,11 +11,13 @@ describe("dont-review-it/no-lenient-coverage-threshold--demand-full-coverage", (
     valid: [
       {
         name: "every metric spelled out at full coverage, checked file by file, passes",
+        documented: true,
         code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { coverage: { thresholds: ${FULL_THRESHOLDS} } } });\n`,
         filename: "vite.config.ts",
       },
       {
         name: "the shorthand that demands full coverage on every metric at once passes",
+        documented: true,
         code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { coverage: { thresholds: { 100: true, perFile: true } } } });\n`,
         filename: "vite.config.ts",
       },
@@ -121,6 +123,7 @@ describe("dont-review-it/no-lenient-coverage-threshold--demand-full-coverage", (
       },
       {
         name: "a full threshold checked against the package total is reported",
+        documented: true,
         code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { coverage: { thresholds: { branches: 100, functions: 100, lines: 100, statements: 100 } } } });\n`,
         filename: "vite.config.ts",
         errors: [{ messageId: "aggregateCoverageThreshold" }],
@@ -145,6 +148,7 @@ describe("dont-review-it/no-lenient-coverage-threshold--demand-full-coverage", (
       },
       {
         name: "a metric left out is reported on its own",
+        documented: true,
         code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { coverage: { thresholds: { functions: 100, lines: 100, statements: 100, perFile: true } } } });\n`,
         filename: "vite.config.ts",
         errors: [{ messageId: "unsetCoverageThreshold" }],

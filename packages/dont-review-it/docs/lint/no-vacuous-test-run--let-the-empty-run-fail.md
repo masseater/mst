@@ -1,58 +1,129 @@
+---
+description: "Disallow a test config that lets a run finding no test file report success, so a suite that stopped being collected reaches the gate as a failure instead of as a green run"
+---
+
 # no-vacuous-test-run--let-the-empty-run-fail
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-テストランナーの設定ファイルが、テストファイルを 1 つも見つけなかった実行を成功として終わらせる宣言を持っているかを見る。
+Disallow a test config that lets a run finding no test file report success, so a suite that stopped being collected reaches the gate as a failure instead of as a green run
 
-対象になるのはファイル名が `vite.config` または `vitest.config` で始まり、拡張子が `.ts` / `.mts` / `.cts` / `.js` / `.mjs` / `.cjs` のいずれかであるファイルだけである。それ以外のファイルは一切見ない。判定に使うファイル名の集合はカバレッジの下限を要求する [no-lenient-coverage-threshold--demand-full-coverage](./no-lenient-coverage-threshold--demand-full-coverage.md) と共有していて、テスト設定として認識される範囲が 2 つのルールでずれることはない。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-vacuous-test-run--let-the-empty-run-fail.ts`](../../src/lint/oxlint/rules/no-vacuous-test-run--let-the-empty-run-fail.ts)
 
-読むのは、そのファイルが default export している式である。`defineConfig({ ... })` のように関数呼び出しで包まれている場合は第 1 引数まで降りる。そこから `test` のオブジェクトリテラルへ降り、`passWithNoTests` プロパティだけを見る。
+<!-- END GENERATED rule-header -->
 
-報告は 2 種類ある。
+## Violation
 
-`passWithNoTests` が `true` の場合は、そのプロパティを報告する。これが Vitest に「テストファイルが 0 件でも成功で終われ」と伝える宣言そのものである。
+A test runner configuration carrying a declaration that lets a run finding no test file end in success.
 
-`passWithNoTests` が `false` 以外の何かで、その値をこのファイルだけでは読めない場合も、同じプロパティを報告する。変数参照、短縮記法、実行時に評価される式、真偽値でないリテラルがこれにあたる。設定ファイルの外に値が置かれていると、そのファイルを読んだだけでは空の実行がどちらに転ぶかが確定しない。
+Only files whose name starts with `vite.config` or `vitest.config` and whose extension is one of `.ts`, `.mts`, `.cts`, `.js`, `.mjs`, `.cjs` are read. Nothing else is looked at. The set of file names used for that judgment is shared with [no-lenient-coverage-threshold--demand-full-coverage](./no-lenient-coverage-threshold--demand-full-coverage.md), which demands a coverage floor, so what counts as a test configuration never drifts apart between the two.
 
-`passWithNoTests: false` は通す。既定と同じ宣言だが、空の実行を失敗として扱うことを書き手が明示した形であり、このルールが要求する状態と一致する。プロパティが無い場合も同じく通す。
+What is read is the expression the file default-exports. Where it is wrapped in a call such as `defineConfig({ ... })`, the first argument is entered. From there the `test` object literal is entered, and the `passWithNoTests` property alone is read.
 
-`test` に降りられない設定は何も報告しない。default export が無い、default export が変数を指している、`test` がオブジェクトリテラルでない、のいずれもここに含まれる。読めない設定を報告する役目は、同じファイルに対してカバレッジの下限を要求するルールが既に持っている。同じ「読めなさ」を 2 本のルールが別々に報告すると、1 つの原因に対して直し方が 2 通り並ぶ。
+There are two reports.
 
-`test` の外にある同名のキーは見ない。Vitest がこの選択を読むのは `test` の下だけであり、他の位置にある同じ綴りは別の設定である。
+Where `passWithNoTests` is `true`, that property is reported. That is the declaration telling Vitest to end in success with zero test files.
 
-## なぜそれが要るか
+Where `passWithNoTests` is something other than `false` whose value cannot be read from this file alone, the same property is reported. A reference to a variable, shorthand, an expression evaluated at run time and a non-boolean literal all land here. With the value living outside the configuration file, reading that file settles nothing about which way an empty run falls.
 
-1 層目は、テストが 1 件も走らなかった実行と、テストが全部通った実行が、この宣言によって同じ結果になる点である。ゲートが読むのは終了コードだけなので、両者は区別されない。`vp run -r test` が緑で返ってきたとき、そのワークスペースで何が確かめられたのかは、終了コードからは何も分からなくなる。
+`passWithNoTests: false` passes. It is the same as the default, and it is a writer stating outright that an empty run counts as a failure, which is the state this rule asks for. The property being absent passes as well.
 
-2 層目は、この宣言が入る典型的な経路が「実行が落ちたから止めた」である点である。空の実行が落ちるのは、テストが 1 件も収集されなかったときで、原因はテストを書いていないか、収集の設定を壊したかのどちらかである。どちらも直す対象は設定ではなくテストと収集である。`passWithNoTests: true` は、その 2 つを直さずに赤を消す最短の 1 行になっていて、しかも消えた赤が何だったのかを後から読み取れない。
+A configuration the `test` block cannot be entered from is not reported at all: no default export, a default export pointing at a variable, a `test` that is not an object literal. Reporting an unreadable configuration already belongs to the rule demanding a coverage floor over the same file. Two rules reporting the same unreadability would put two fixes side by side for one cause.
 
-3 層目は、収集の設定が壊れたことに気付く機会が、この宣言によって永久に失われる点である。テストが実際に存在するワークスペースでも、glob や `include` の変更でファイルが収集対象から外れることはある。宣言が無ければ次の実行が即座に落ちるが、宣言があると、テストが 0 件になったことは緑の実行として通過する。落ちたテストは誰かが直すが、走らなくなったテストは誰も気付かない。
+A key of the same name outside `test` is not read. Vitest reads this choice under `test` alone, and the same spelling elsewhere is a different setting.
 
-4 層目は、この宣言がリポジトリの中で伝染しやすい点である。1 つのワークスペースで空の実行を許すと、「テストを持たないワークスペースがあってよい」という前提が設定ファイルに書き込まれる。次にワークスペースを足す人は、それを既存の作法として写す。テストを持たないパッケージが増えても、ゲートは緑のままなので、増えたこと自体がどこにも現れない。
+### The invariant
 
-「走らなかった検査を成功と数えない」は [強制の機構](../../../../docs/guidelines/enforcement.md) が既に持っている規範であり、このルールはそれをテストランナーの設定に対して強制する側にあたる。
+The first layer is that this declaration makes a run where no test ran and a run where every test passed come out the same. A gate reads the exit status alone, so the two are not told apart. When `vp run -r test` comes back green, nothing about what was actually confirmed in that workspace can be read from the status.
 
-## どう直すか
+The second layer is the route this declaration typically arrives by: the run failed, so it was stopped. An empty run fails when no test was collected, and the cause is either that no test was written or that the collection settings were broken. Both are fixed in the tests and the collection, not in the configuration. `passWithNoTests: true` is the shortest line that clears the red without touching either, and what the red was cannot be recovered afterwards.
 
-`passWithNoTests` を設定から削除する。そのうえで、空の実行になっていた原因を直す。
+The third layer is that this declaration permanently removes the chance of noticing that collection broke. Even in a workspace where tests really exist, a change to a glob or to `include` can drop files out of collection. Without the declaration the next run fails immediately; with it, the tests reaching zero passes as a green run. A failing test gets fixed by somebody; a test that stopped running is noticed by nobody.
 
-テストを書いていないなら書く。そのワークスペースが公開している振る舞いのうち、壊れたときに他のワークスペースが壊れるものから 1 つ選び、それを主張するテストを 1 本置く。1 本あれば実行は空でなくなり、そこから先はカバレッジの下限が残りを要求する。
+The fourth layer is that this declaration spreads easily through a repository. Allowing an empty run in one workspace writes the premise "a workspace may carry no tests" into the configuration, and the next person adding a workspace copies it as the established practice. Packages without tests can multiply while the gate stays green, so the multiplying shows up nowhere.
 
-テストは書いてあるが収集されていないなら、収集の設定を直す。テストファイルの置き場所とファイル名の綴りが、ランナーが探す範囲と一致しているかを確かめる。このリポジトリではテストは対象ソースと同じディレクトリに置く決まりなので、収集の範囲がソースツリーを覆っているかを見る。
+"A check that did not run is not counted as a success" is a norm [the enforcement guideline](../../../../docs/guidelines/enforcement.md) already carries, and this rule is what enforces it over the test runner's configuration.
 
-そのワークスペースがテストを持つべきでないなら、消すのはテストの実行そのものである。マニフェストから `test` のスクリプトを外せば、そのワークスペースはテストを実行しないワークスペースとして明示され、空の実行を成功として数える必要もなくなる。宣言で空の実行を許す形は、「テストを実行する」と言いながら「実行しなくてよい」と言っている状態で、どちらが正なのかを設定から読み取れない。
+### Configuration
 
-## 禁じる回避策
+None. There is no workspace where an empty run may count as a success, so there is no axis to loosen.
 
-- コマンドライン引数 `--passWithNoTests` を渡して同じ効果を得る。このルールは設定ファイルしか読まないので検出されないが、空の実行が緑になる性質は何も変わらない。しかも起動の記述はマニフェスト・CI 定義・手元のシェル履歴に散るため、設定ファイルに書くよりも「いつからそうなっていたか」を追いにくくなる
-- 値を別ファイルの定数や環境変数に逃がす。このルールはこのファイルだけで値が確定しないものを報告するので、この形は検出される。仮に検出を外れる書き方を見つけたとしても、空の実行がどちらに転ぶかを設定ファイルから読めない状態が残る
-- 中身が空のテストファイルを置いて実行を空でなくする。収集されるファイルは 1 件になるので実行は落ちなくなるが、確かめている振る舞いは 0 件のままである。テストブロックの無いテストファイルと、主張の無いテストブロックは、それぞれ別のルールが報告する
-- `test.projects` の中へ移して名前を隠す。Vitest がこの選択を読むのはプロジェクトの外側だけなので、移した先では宣言が効かない。効かない宣言を残すと、次に読む人が「空の実行は許されている」と読む
-- テストの実行をゲートから外して赤を消す。走らせない検査は、空の実行よりさらに何も見ていない。ゲートに含める経路の話は [強制の機構](../../../../docs/guidelines/enforcement.md) が持つ
-- そのファイルだけ抑制ディレクティブで黙らせる。空の実行を成功と数えないことはリポジトリ全体に対する合意なので、ファイル単位の免除はそのまま合意の無効化になる
+Tests being present is not required. This rule reads the declaration in the configuration file alone, and whether test files exist cannot be told without reading the file system. Judging the declaration and the reality in one rule would leave both violations controllable only through one setting.
 
-## オプション
+## Fix
 
-持たない。空の実行を成功として数えてよいワークスペースは無く、緩める軸が存在しないため。
+Delete `passWithNoTests` from the configuration, then fix what made the run empty.
 
-テストが存在することは要求しない。このルールが見るのは設定ファイルの宣言だけで、テストファイルの有無はファイルシステムを見ないと分からない。宣言と実体の両方を 1 本のルールで判定すると、どちらの違反も同じ 1 本の設定でしか制御できなくなる。
+Where no test was written, write one. Pick one behaviour the workspace publishes whose breaking would break another workspace, and place one test claiming it. One is enough to make the run non-empty, and from there the coverage floor demands the rest.
+
+Where tests are written but not collected, fix the collection. Check that where test files sit and how they are spelled match what the runner looks for. In this repository tests sit in the same directory as the source they test, so check that the collection range covers the source tree.
+
+Where the workspace should carry no tests, what to remove is the test run itself. Dropping the `test` script from the manifest states outright that the workspace runs no tests, and nothing has to count an empty run as a success. Allowing it by declaration says "this runs tests" and "it need not run" at once, and the configuration cannot say which is true.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// a run told to pass when it found no test file is reported
+// in vite.config.ts
+import { defineConfig } from "vite-plus";
+export default defineConfig({ test: { passWithNoTests: true } });
+```
+
+```ts
+// the outcome handed over by a binding is reported
+// in vite.config.ts
+import { passWithNoTests } from "./shared.ts";
+export default { test: { passWithNoTests } };
+```
+
+Code this rule accepts.
+
+```ts
+// an empty run spelled out as a failure passes
+// in vite.config.ts
+import { defineConfig } from "vite-plus";
+export default defineConfig({ test: { passWithNoTests: false } });
+```
+
+```ts
+// the same key outside the test block is not the option the run reads
+// in vite.config.ts
+export default { passWithNoTests: true, test: {} };
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Passing `--passWithNoTests` on the command line for the same effect. This rule reads configuration files alone, so it is not detected, while nothing changes about an empty run coming out green. Worse, invocations are scattered across the manifest, the CI definition and shell history, which makes "since when has it been like this" harder to trace than writing it in the configuration
+- Escaping the value into a constant in another file or an environment variable. This rule reports anything whose value is not settled in this file, so this shape is detected. Even were a spelling found that escapes detection, the configuration file still cannot say which way an empty run falls
+- Placing an empty test file to make the run non-empty. One file is collected so the run stops failing, while the behaviours being confirmed stay at zero. A test file with no test block, and a test block with no claim, are each reported by another rule
+- Moving it inside `test.projects` to hide the name. Vitest reads this choice outside the projects only, so the declaration does nothing where it landed. A declaration that does nothing reads, to whoever comes next, as "empty runs are allowed"
+- Taking the test run out of the gate to clear the red. A check that does not run sees even less than an empty one. How something joins the gate belongs to [the enforcement guideline](../../../../docs/guidelines/enforcement.md)
+- Silencing that one file with a suppression directive. Not counting an empty run as a success is an agreement across the whole repository, so an exemption per file is that agreement being voided
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `vacuousTestRun` | A test config must not let a run that found no test file report success. Delete \`passWithNoTests\` from the test config. |
+| `unsettledEmptyRunOutcome` | A test config must not spell \`passWithNoTests\` as a value other than \`false\`. Delete \`passWithNoTests\` from the test config. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

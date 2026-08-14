@@ -1,73 +1,158 @@
+---
+description: "Disallow a test block reaching more assertions than the budget set for it, counting the ones its callees carry as well, so a failing block names one behaviour and one cause"
+---
+
 # forbid-multi-expect-it--split-into-separate-it
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-テストブロック 1 つが到達するアサーションの本数が、そのブロックに与えた上限を超えていること。
+Disallow a test block reaching more assertions than the budget set for it, counting the ones its callees carry as well, so a failing block names one behaviour and one cause
 
-アサーション 1 本は「matcher の呼び出しまで到達した `expect` チェーン 1 つ」である。`not` / `resolves` / `rejects` を挟んでいても 1 本。`expect.soft(...)` / `expect.poll(...)` から始まるチェーンも 1 本。`expect.assertions(...)` のような `expect` 名前空間のユーティリティ呼び出しは、何も主張しないので数に入らない。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`forbid-multi-expect-it--split-into-separate-it.ts`](../../src/lint/oxlint/rules/forbid-multi-expect-it--split-into-separate-it.ts)
 
-テストブロックの判定は共有の起点判定（`lib/spec-syntax/test-block-declarations.ts`）に従う。`it.skip` / `it.each(rows)(...)` のような修飾形も、別名で import した束縛も、fixture ビルダから派生した束縛も同じブロックとして扱う。修飾の一覧はこのルールが持たない。
+<!-- END GENERATED rule-header -->
 
-数えるのは**到達本数**である。ブロックの本体に直接書かれた分に加えて、そのブロックから静的に辿れる呼び先に書かれた分を足す。
+## Violation
 
-- ブロック本体の中の無名コールバック（配列の反復など）に書かれたアサーション。最も近い祖先のブロックが同じなので、直接本数に入る
-- ブロック本体から名前で呼ばれている関数の中のアサーション。呼び先はスコープ解決で引き当てる。関数から関数への呼び出しも辿る
-- そのブロックが消費する fixture の本体にあるアサーション。fixture が依存する fixture、fixture が呼ぶ関数も辿る
+A test block reaching more assertions than the budget set for it.
 
-同じ呼び先は 1 度だけ数え、循環はそこで打ち切る。同じ関数を複数のブロックが呼んでいる場合は、それぞれのブロックに足す。関数の側には報告を出さない。
+One assertion is one `expect` chain that reached a matcher call. A chain is one whether or not `not`, `resolves` or `rejects` stands in it, and a chain opening with `expect.soft(...)` or `expect.poll(...)` is one as well. Utility calls in the `expect` namespace, such as `expect.assertions(...)`, claim nothing and do not join the count.
 
-上限を超えた分は 1 本ごとに報告する。上限が 1 で到達本数が 3 なら 2 件出る。報告位置はブロックの内側に置く。直接書かれたアサーションはその位置、呼び先から来た分はブロック本体にある呼び出しの位置、fixture から来た分はブロックのコールバックが fixture を受け取っている位置である。「3 本ある」と言われた書き手が、本体を見ても 1 本しか見つけられない状態にしない。
+Whether something is a test block follows the shared entry judgment (`lib/spec-syntax/test-block-declarations.ts`). Modified forms such as `it.skip` and `it.each(rows)(...)`, bindings imported under another name, and bindings derived from a fixture builder are all the same block. The list of modifiers is not this rule's to carry.
 
-報告文には到達本数と、そのうち本体に書かれた本数、そして残りがどの関数・どの fixture から何本来たかを載せる。
+What is counted is what a run **reaches**: what is written directly in the block's body, plus what is written in whatever that block can statically be followed into.
 
-### 意図的に広げていない範囲
+- Assertions written in an anonymous callback inside the block's body, such as an iteration over an array. The nearest ancestor block is the same, so they join the direct count
+- Assertions inside a function called by name from the block's body. Callees are found through scope resolution, and calls from function to function are followed
+- Assertions in the body of a fixture the block consumes. Fixtures that fixture depends on, and functions that fixture calls, are followed too
 
-| 形 | 対象にしない理由 |
+The same callee is counted once and a cycle stops there. Where several blocks call one function, it is added to each of them, and no report is raised at the function.
+
+Everything over the budget is reported one assertion at a time: a budget of 1 with 3 reached raises 2 reports. The reports stand inside the block — at its position for an assertion written directly, at the call in the block's body for one coming from a callee, and at the place the block's callback receives the fixture for one coming from a fixture. Nobody told "there are 3" should be left finding only 1 in the body.
+
+The message carries how many were reached, how many of those are written in the body, and where the rest came from — which function, which fixture, and how many from each.
+
+### What is deliberately left out of reach
+
+| Shape | Why it is not a target |
 | --- | --- |
-| 到達本数が上限以内のブロック | 上限だけを見る。下限は `forbid-expectless-it--assert-or-delete-it` が持つ |
-| どのブロックからも名前で呼ばれていない関数の中の expect | どのブロックに帰属するか決められない。関数の側では報告しない |
-| 関数を値として渡して呼ぶ形（`rows.forEach(check)`） | 呼び先が実行時に決まる。静的解析の原理的な限界であって、許しているという意味ではない |
-| 条件で差し替わる束縛を経由した呼び出し | 同上 |
-| 別ファイルの関数の中の expect | この実行系がファイルを跨ぐ解決を持たない。下の「禁じる回避策」に名指しで書いてある |
-| 1 つのブロックから複数件の報告が出ること | 上限を超えた分を 1 本ごとに報告した結果であって、報告の重複ではない |
-| 仕様ファイル以外 | `specFileSuffixes` が拾う拡張子の外は見ない |
+| A block within the budget | Only the upper bound is watched here. The lower bound belongs to `forbid-expectless-it--assert-or-delete-it` |
+| An `expect` in a function no block calls by name | Which block it belongs to cannot be settled. No report is raised at the function |
+| Calling a function handed over as a value (`rows.forEach(check)`) | The callee is settled at run time. That is a limit of static analysis in principle, and not permission |
+| A call through a binding swapped by a condition | As above |
+| An `expect` in a function in another file | This runtime carries no cross-file resolution. It is named outright under the forbidden bypasses below |
+| Several reports from one block | That is the result of reporting each assertion over the budget, not duplicated reporting |
+| Anything but a spec file | Outside the extensions `specFileSuffixes` picks up, nothing is read |
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「1 つのブロックが失敗したとき、失敗の原因が一意に決まる」ことである。
+When a block fails, the cause of the failure is settled uniquely.
 
-1 層目は、失敗レポートが伝える情報量である。独立した事実を複数まとめて 1 つの名前の下に置くと、レポートは「その名前のブロックが落ちた」としか言わない。原因は事実の数だけありうる。落ちた行は出るが、その行が何を主張していたかはブロック名に書かれていないので、読み手はコードを開き直して残りの主張との関係を組み立て直すことになる。
+The first layer is how much a failure report tells you. Gathering several independent facts under one name leaves the report saying only that the block of that name failed. There are as many possible causes as facts. The failing line is printed, and what that line was claiming is not in the block's name, so a reader reopens the code and reconstructs its relation to the remaining claims.
 
-2 層目は、ブロック名が嘘をつくことである。名前は 1 つの振る舞いを名乗っているのに、中では別の振る舞いも検証している。名乗っていない検証は、名前から探せない。あとで振る舞いが 1 つ消えたとき、対応するアサーションだけを消せばブロックは残り、名前は残った振る舞いを名乗り続ける。ずれは差分としては小さく、レビューで見えない。
+The second layer is the block name lying. The name announces one behaviour while other behaviours are verified inside. Verification that was never announced cannot be found from the name. When one of the behaviours is later removed, deleting only its assertion leaves the block standing, and the name keeps announcing the behaviour that remains. The drift is a small diff and invisible in review.
 
-3 層目は、回帰の切り分けにかかるコストである。原因が一意に決まらないブロックは、落ちるたびに二分の作業を要求する。その作業は回帰のたびに繰り返し発生し、ブロックを分けるコストは 1 度きりである。
+The third layer is the cost of isolating a regression. A block whose cause is not settled uniquely demands a bisection every time it fails. That work recurs with every regression; splitting the block costs once.
 
-上限を 1 に置くのは、この束の他のルールが押している形と同じ場所に着地するからである。値そのものとの完全一致を要求し、subject の射影を禁じ、本体を expect の文だけに絞ると、1 つのブロックに残るのは「fixture が返した値を 1 本の完全一致で固定する」形になる。上限 1 はその形を名指ししたものであって、別の規律を足したものではない。
+The budget is 1 because that lands in the same place the other rules of this bundle push toward. Demanding an exact match against the value itself, forbidding projections of the subject, and narrowing the body to expect statements leaves one shape in a block: pinning the value a fixture returned with one exact match. A budget of 1 names that shape rather than adding a separate discipline.
 
-このリポジトリの仕様ファイル 113 本に対して上限ごとの報告数を測ると、1 で 129 件 / 28 ファイル、2 で 43 件 / 14 ファイル、3 で 18 件 / 4 ファイル、4 で 12 件 / 3 ファイルだった。上限を上げるほどこのルールは安全網に退く。
+Measured over the 113 spec files in this repository, the reports per budget were 129 across 28 files at 1, 43 across 14 files at 2, 18 across 4 files at 3, and 12 across 3 files at 4. The higher the budget, the further this rule retreats into being a safety net.
 
-## どう直すか
+### Configuration
 
-振る舞いごとにブロックを分け、それぞれのブロックにその振る舞いを名乗る名前を付ける。
+- `maxAssertions`: how many assertions one block may reach. Defaults to 1. An integer of 1 or more
+- `specFileSuffixes`: the extensions treated as spec files. The same value is used across the nine rules of this bundle
 
-`packages/dont-review-it/src/lint/oxlint/lib/spec-syntax/test-block-modifiers.test.ts` の「a name the runner does not chain onto a block is not a modifier」は、`extend` / `override` / `scoped` の 3 つについて別々の事実を 1 つの名前の下で主張している。3 つは独立しているので、3 つのブロックに分かれる。
+## Fix
 
-分けようとして「複数の主張が同じ 1 つの返り値について語っている」と気付いたら、それは分割ではなく統合の合図である。同じファイルの「every modifier the runner chains onto a block is named as a modifier」は、修飾を全部繋いだブロック 1 つから読み取った並びという 1 つの返り値を 1 本の `toStrictEqual` で固定していて、これが着地点の形である。fixture にその値を返させ、完全一致 1 本で固定する。
+Split into a block per behaviour and give each block a name that announces that behaviour.
 
-呼び先から本数が来ている場合、直し方は同じである。呼び先に置いたアサーションはブロックが走るときに走り、ブロックの名前の下で落ちる。置き場所を変えても、1 つの名前が複数の事実を抱えている状態は変わらない。
+In `packages/dont-review-it/src/lint/oxlint/lib/spec-syntax/test-block-modifiers.test.ts`, "a name the runner does not chain onto a block is not a modifier" claims separate facts about `extend`, `override` and `scoped` under one name. The three are independent, so they become three blocks.
 
-## 禁じる回避策
+Where trying to split reveals that the several claims are all about one return value, that is a signal to merge rather than split. In the same file, "every modifier the runner chains onto a block is named as a modifier" pins, with one `toStrictEqual`, the single return value that is the list read off one block with every modifier chained onto it — and that is the shape to land on. Let the fixture return that value and pin it with one exact match.
 
-- **複数の expect を「形を検証するヘルパ」に押し込み、ブロックからは 1 回呼ぶ。** 呼び先を辿って帰属させるので本数は減らない。加えて、ブロック本体に置いた呼び出しは `require-it-only-expect--move-setup-into-fixture` に当たる
-- **expect を fixture の本体に移す。** 消費するブロックに足すので本数は減らない
-- **ヘルパを別ファイルに移す。** この実行系はファイルを跨ぐ解決を持たないため、現状この形は報告されない。報告されないことは許していることを意味しない。アサーションの置き場はブロックの中である
-- **ヘルパを値として渡して呼ぶ。** 呼び先が実行時に決まるので報告されない。上に同じ
-- **複数の expect を 1 本の緩い matcher にまとめて本数を減らす。** `forbid-weak-matcher--use-exact-matcher` に当たる
-- **上限を引き上げて報告を消す。** 上限は取り込み時に 1 つ決めるためのもので、報告が出た側が動かすものではない
-- **実行を抑制する修飾を付けて残す。** 抑制されていても到達本数は変わらないので報告は消えない
-- **抑制ディレクティブ**
+Where the count comes from a callee, the fix is the same. Assertions placed in a callee run when the block runs and fail under the block's name. Moving where they sit does not change one name carrying several facts.
 
-## オプション
+<!-- BEGIN GENERATED examples -->
 
-- `maxAssertions`: 1 つのブロックが到達してよいアサーションの本数。既定は 1。1 以上の整数
-- `specFileSuffixes`: 仕様ファイルとして扱う拡張子。この束の 9 本で同じ値を使う
+Code this rule rejects.
+
+```ts
+// two claims written under one name
+// in report.test.ts
+it("carries both fields", ({ report }) => {
+  expect(report.id).toBe("a");
+  expect(report.total).toBe(2);
+});
+```
+
+```ts
+// assertions pushed into a helper are still reached by the block
+// in report.test.ts
+const expectShape = (subject) => {
+  expect(subject.id).toBe("a");
+  expect(subject.total).toBe(2);
+};
+it("carries the shape", ({ report }) => {
+  expectShape(report);
+});
+```
+
+Code this rule accepts.
+
+```ts
+// one exact comparison pins the one behaviour the block names
+// in report.test.ts
+const test = baseTest.extend("report", () => summarise());
+it("carries what it summarised", ({ report }) => {
+  expect(report).toStrictEqual({ id: "a", counted: 2 });
+});
+```
+
+```ts
+// each behaviour in a block of its own keeps every block inside the budget
+// in report.test.ts
+it("carries the id", ({ report }) => {
+  expect(report.id).toBe("a");
+});
+it("carries the total", ({ report }) => {
+  expect(report.total).toBe(2);
+});
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- **Pushing several expects into a "shape verification helper" and calling it once from the block.** The callee is followed and attributed, so the count does not fall. On top of that, a helper call placed in the block's body runs into `require-it-only-expect--move-setup-into-fixture`
+- **Moving the expects into a fixture's body.** They are added to the blocks that consume it, so the count does not fall
+- **Moving the helper into another file.** This runtime carries no cross-file resolution, so this shape currently goes unreported. Not being reported is not permission. Assertions belong inside the block
+- **Handing the helper over as a value and calling it.** The callee is settled at run time, so it goes unreported. As above
+- **Collapsing several expects into one loose matcher to lower the count.** That runs into `forbid-weak-matcher--use-exact-matcher`
+- **Raising the budget to clear the report.** The budget is settled once at adoption; it is not something the side receiving a report moves
+- **Keeping it with a modifier that suppresses the run.** Suppressed or not, the reached count is unchanged and the report stands
+- **A suppression directive**
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `multiExpectIt` | A test block must not reach more than {{limit}} assertion. This block reaches {{attributed}}. Split it into one block per behaviour and name each block after the behaviour it pins. Merge the claims that all speak about a single returned value: have the fixture hand that value back and pin it whole with one exact comparison. |
+| `multiExpectItThroughCallees` | A test block must not reach more than {{limit}} assertion, counting the assertions carried by every helper and fixture it reaches. This block reaches {{attributed}}: {{direct}} written in its body and {{elsewhere}}. Split it into one block per behaviour and name each block after the behaviour it pins. Keep every assertion in the block that claims it; assertions parked in a helper or a fixture still run under this block's name. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

@@ -1,86 +1,114 @@
+---
+description: "Disallow comparing or recording a host object that keeps its state in internal slots, so an assertion about an HTTP request or response fails once the code stops producing the contract it was written for"
+---
+
 # no-vacuous-host-object-equality--assert-parsed-value
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-spec ファイルの中で、状態を内部スロットに持つホストオブジェクトを比較したり記録したりしているアサーション。既定の対象は `Request` と `Response` の 2 つで、オプションで差し替えられる。
+Disallow comparing or recording a host object that keeps its state in internal slots, so an assertion about an HTTP request or response fails once the code stops producing the contract it was written for
 
-対象の spec ファイルは、既定では `.test.ts` と `.test.tsx` で終わる名前を持つもの。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-vacuous-host-object-equality--assert-parsed-value.ts`](../../src/lint/oxlint/rules/no-vacuous-host-object-equality--assert-parsed-value.ts)
 
-検出する形は 3 つある。
+<!-- END GENERATED rule-header -->
 
-- **構造比較**（`toEqual` / `toStrictEqual`）の一方の辺が、対象ホストオブジェクトの構築であるもの
-- **構造を歩く部分一致**（`toMatchObject` と `expect.objectContaining(...)`）の期待値が、対象ホストオブジェクトの構築であるもの
-- **記録値がコンストラクタ名と空の本体だけ**（`Response {}` の形）であるスナップショット
+## Violation
 
-構築として読むのは `new Response(...)` のようなコンストラクタ呼び出しと、同じ値を作る標準の静的ファクトリ（`Response.json` / `Response.redirect` / `Response.error`）である。`Request` には対応する静的ファクトリが無い。
+An assertion inside a spec file that compares or records a host object holding its state in internal slots. The roster is `Request` and `Response` by default, and the configuration can replace it.
 
-受け手の派生形（`expect.soft` / `expect.poll`）、修飾子（`not` / `resolves` / `rejects`）、静的に読める角括弧記法とテンプレートリテラルのマッチャ名は、いずれも剥いでから根を確かめる。型アサーション・`satisfies`・非 null アサーション・オプショナルチェーン・`await` は値を変えないので剥ぐ。
+The spec files in range are, by default, those whose names end in `.test.ts` or `.test.tsx`.
 
-比較する値が名前に束ねられていても、このファイルの中で 1 つの `const` 宣言だけが綴る名前なら段数を限らずに辿る。単一の値を返す `const` 束縛の関数を通した構築も、その関数の返却式まで辿る。
+Three shapes are detected.
 
-### どのホストオブジェクトを対象にするか
+- A **structural comparison** (`toEqual` / `toStrictEqual`) one side of which is a construction of a rostered host object
+- A **partial shape walk** (`toMatchObject` and `expect.objectContaining(...)`) whose expected value is a construction of a rostered host object
+- A **snapshot whose recorded value is a constructor name and an empty body** (the `Response {}` shape)
 
-対象に入れる基準は「構造比較とスナップショットの両方の逃げ道を同時に失うか」である。この判定はランタイムとテストランナーの版に依存するので、導入時に実測して確かめる。この版で確かめた結果は次のとおりで、両方を失うのは `Request` と `Response` だけだった。
+Read as a construction: a constructor call such as `new Response(...)`, and the standard static factories building the same value (`Response.json` / `Response.redirect` / `Response.error`). `Request` carries no corresponding static factory.
 
-| 型                | 内容の違う 2 つの値の完全一致比較 | スナップショットに残るもの |
-| ----------------- | --------------------------------- | -------------------------- |
-| `Response`        | 通る                              | `Response {}`              |
-| `Request`         | 通る                              | `Request {}`               |
-| `Headers`         | 落ちる                            | `Headers {}`               |
-| `URLSearchParams` | 落ちる                            | `URLSearchParams {}`       |
-| `URL`             | 落ちる                            | 文字列に展開された URL     |
-| `Blob`            | 通る                              | 長さと型を持つ本体         |
-| `FormData`        | 落ちる                            | —                          |
+Derived entry points (`expect.soft` / `expect.poll`), modifiers (`not` / `resolves` / `rejects`), and matcher names written as a statically readable subscript or template literal are all peeled before the root is settled. Type assertions, `satisfies`, non-null assertions, optional chaining and `await` do not change the value, so they are peeled too.
 
-片方でも生きていれば専用マッチャなしでも契約をピンできるので、対象にしない。新しい型を足すのも、両方を失うことを実測で示してからにする。
+Where the compared value is bound to a name, that name is followed through any number of steps as long as exactly one `const` declaration in this file spells it. A construction reached through a `const`-bound function that returns a single value is followed to that function's returned expression.
 
-### どの宣言をランタイムのものとみなすか
+### Which host objects are rostered
 
-同じ名前でも、利用者が書いた宣言に解決されるクラスは自前の列挙可能な状態を持つので、構造比較が正しく落ちる。そこで構築の判定は名前ではなく**宣言の出所**で行う。
+The test for entering the roster is whether both the structural comparison and the snapshot lose their footing at once. That answer depends on the versions of the runtime and the test runner, so it is measured at the point of adoption. Measured on these versions, only `Request` and `Response` lose both.
 
-- どの束縛にも解決されない名前（グローバル）はランタイム提供として扱う
-- `runtimeModules` に挙げた指定子から取り込んだ名前もランタイム提供として扱う。別名で受けても、取り込み元の名前で判定する
-- 名前空間として取り込んだ場合（`import * as undici from 'undici'`）、その名前空間越しの構築も同じに扱う
-- それ以外の束縛（ファイル内のクラス宣言、リポジトリ内からの取り込み、`runtimeModules` に無いパッケージからの取り込み）は利用者の宣言として扱い、報告しない
+| Type | An exact comparison of two values with different contents | What the snapshot keeps |
+| --- | --- | --- |
+| `Response` | passes | `Response {}` |
+| `Request` | passes | `Request {}` |
+| `Headers` | falls | `Headers {}` |
+| `URLSearchParams` | falls | `URLSearchParams {}` |
+| `URL` | falls | the URL spelled out as a string |
+| `Blob` | passes | a body carrying a length and a type |
+| `FormData` | falls | — |
 
-### 入れ子の対応付け
+Where either one still lives, the contract can be pinned without a dedicated matcher, so the type stays off the roster. Adding a new type waits on a measurement showing that both are lost.
 
-オブジェクトリテラルと配列リテラルの中に入れ子になった構築も見る。ただし対応する位置どうしを突き合わせてから判定する。キーは JavaScript が行うキー変換と同じ読み方で対応付けるので、`{ 1: x }` と `{ '1': x }` は同じ位置になる。
+### Which declarations count as the runtime's
 
-相手側の形が既に食い違っていれば、外側の比較がそれだけで落ちるので報告しない。キー集合の不一致、配列長の不一致、穴と要素の食い違い、片方だけがプリミティブ・別種のコンテナ・関数・別コンストラクタの構築であるもの、がこれに当たる。スプレッドや実行時に決まるキーが混ざって対応位置を確定できなくなったら、推測せずに対応付けを諦める。
+Under the same name, a class resolving to a declaration the caller wrote carries enumerable state of its own, so the structural comparison falls correctly. A construction is therefore settled by **where the declaration comes from** rather than by its name.
 
-相手側が識別子・メンバ経路・呼び出しの結果のように静的に何も言えないものなら、対応する位置は開いたままとみなして報告を維持する。
+- A name resolving to no binding (a global) is treated as the runtime's
+- A name imported from a specifier listed in `runtimeModules` is treated as the runtime's too. Received under an alias, it is judged by the name at the import
+- Imported as a namespace (`import * as undici from 'undici'`), a construction through that namespace is treated the same way
+- Every other binding — a class declared in the file, an import from inside the repository, an import from a package absent from `runtimeModules` — is treated as the caller's own declaration and is not reported
 
-### スナップショットの読み方
+### Lining up nested positions
 
-記録値は 3 か所から読む。インラインの記録は引数から、外部の記録は `__snapshots__/<spec ファイル名>.snap` から、ファイル記録は名指しされたパスから読む。外部の記録を引き当てるエントリの解決は、スナップショットの綴りを見る他のルールと同じ仕組みを共有する。
+Constructions nested inside object literals and array literals are read as well, but only after the corresponding positions on the two sides are lined up. Keys are matched by the same key conversion JavaScript performs, so `{ 1: x }` and `{ '1': x }` land in the same position.
 
-エントリ番号はテストブロック内でスナップショット系マッチャが呼ばれた順に振られる。インライン記録もファイル記録も同じ番号を消費するので、勘定に入れる。ブロックのタイトルが実行時にしか決まらない場合や、ループ・分岐を通って呼び出し順が確定しない場合は、エントリを引き当てずに黙る。
+Where the other side's shape already differs, the outer comparison falls on that alone and nothing is reported. A key set that does not match, an array length that does not match, a hole against an element, and a position where only one side is a primitive, a container of another kind, a function or a construction of another constructor all fall here. Once a spread or a key settled at run time makes the corresponding position unsettleable, the lining-up is given up rather than guessed.
 
-記録テキストだけでなく被験体の側も見る。列挙可能プロパティを持たない値は何であれ同じ空本体にシリアライズされるので、被験体が記録されたコンストラクタと静的に非互換なら報告を落とす。書き出された値、別コンストラクタの構築、利用者が宣言した同名クラスの構築が、これに当たる。
+Where the other side is an identifier, a member path or the result of a call — something nothing static can be said about — the corresponding position is treated as open and the report stands.
 
-### 意図的に広げていない範囲
+### How a snapshot is read
 
-| 形 | 対象にしない理由 |
+A recorded value is read from three places: an inline record from its argument, an external record from `__snapshots__/<spec file name>.snap`, and a file record from the path it names. Resolving the entry an external record answers to shares the machinery with the other rules that read snapshot spelling.
+
+Entry numbers are handed out in the order the snapshot matchers run inside a test block. Inline records and file records consume the same numbers, so they are counted. Where a block's title is settled only at run time, or where a loop or a branch leaves the call order unsettled, no entry is looked up and the rule stays quiet.
+
+The subject is read too, not only the recorded text. Any value carrying no enumerable properties serialises to the same empty body, so where the subject is statically incompatible with the recorded constructor the report is dropped. A written-out value, a construction of another constructor, and a construction of a same-named class the caller declared all fall here.
+
+### Deliberately not widened
+
+| Shape | Why it is left out |
 | --- | --- |
-| `expect(subject).toBe(new Response('a'))` | 同一性の比較は 2 つの構築のあいだで決して成立しない。空虚ではなく常に落ちる |
-| `expect(list).toContain(new Response('a'))` | 参照や所属を見るマッチャは正しく落ちうる。マッチャの弱さは `forbid-weak-matcher--use-exact-matcher` の担当 |
-| `{ ...new Response('a') }` | 列挙可能な自前プロパティが無いので、スプレッドの結果はただの空オブジェクトである |
-| 補間を含むスナップショット引数 | 記録値ではない。値が埋まっていない空のインライン記録も同じ |
-| 実行時に決まるコンストラクタ名 | 静的に何も名指ししていない。この形は `no-computed-callee-name--write-name-literally` が落とす |
-| 別ファイルで宣言された束縛 | 束縛を辿るのはこのファイルの中に閉じる |
+| `expect(subject).toBe(new Response('a'))` | An identity comparison never holds between two constructions. It is not vacuous but always falling |
+| `expect(list).toContain(new Response('a'))` | Matchers reading reference or membership can fall correctly. A weak matcher belongs to [forbid-weak-matcher--use-exact-matcher](./forbid-weak-matcher--use-exact-matcher.md) |
+| `{ ...new Response('a') }` | There are no enumerable own properties, so the spread's result is a plain empty object |
+| A snapshot argument carrying an interpolation | It is not a recorded value. An empty inline record with no value filled in is the same |
+| A constructor name settled at run time | It names nothing statically. That shape falls to [no-computed-callee-name--write-name-literally](./no-computed-callee-name--write-name-literally.md) |
+| A binding declared in another file | Following bindings stays inside this file |
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「HTTP のリクエスト／レスポンスに相当する値についてのアサーションは、コードがその契約を満たさなくなったときに落ちる」ことである。
+What is held is that an assertion about a value standing for an HTTP request or response falls when the code stops meeting that contract.
 
-1 層目は、これらの型が何を公開しているかである。状態は内部スロットに入っていて、列挙可能な自前プロパティは 1 つも出てこない。テストランナーの構造比較は自前の列挙可能プロパティとプロトタイプを歩くので、中身がまったく違う 2 つが「同じ空の面」として一致する。スナップショットのシリアライザも同じ理由で、コンストラクタ名だけの空の本体に落とす。つまりこの型に対しては、構造比較もスナップショットも何も検査していないアサーションになる。
+The first layer is what these types expose. Their state sits in internal slots, and not one enumerable own property comes out. The test runner's structural comparison walks own enumerable properties and the prototype, so two values with entirely different contents match as "the same empty surface". The snapshot serialiser lands, for the same reason, on a constructor name and an empty body. For these types, then, both a structural comparison and a snapshot are assertions checking nothing.
 
-2 層目は、それが他のどの信号にも映らないことである。カバレッジはその経路を実行済みと数えるので、決して落ちないテストと本当に通っているテストの区別がつかない。アサーションの本数も、テストの本数も、緑であることも動く。壊れたときに落ちるはずのものだけが落ちない。
+The second layer is that this reaches no other signal. Coverage counts the path as run, so a test that never falls cannot be told from one that genuinely passes. The number of assertions moves, the number of tests moves, and green moves. The only thing that does not move is the one that should have fallen when something broke.
 
-## どう直すか
+### Configuration
 
-被験体を専用マッチャで検査する。マッチャが内部スロットから観測面を読み出し、テスト側は読み出された値を書き出す。
+| Name | Default | What it settles |
+| --- | --- | --- |
+| `hostObjectTypes` | `["Request", "Response"]` | The names of the host objects in range |
+| `runtimeModules` | `["undici"]` | The import specifiers treated as re-exporting the runtime's implementation |
+| `parsedValueMatcher` | `"toHaveParsedFields"` | The matcher name the report names as the repair |
+| `specFileSuffixes` | `[".test.ts", ".test.tsx"]` | The file name endings this check applies to |
+
+`hostObjectTypes` must be handed the same value as the rule forbidding a fixture from reading a host object apart. Keep it in two places and a type in range on the comparison side falls out of range on the fixture side. `specFileSuffixes` must be handed the same value as the other rules of the bundle.
+
+## Fix
+
+Check the subject through the dedicated matcher. The matcher reads the observable surface out of the internal slots, and the test writes out what was read.
 
 ```ts
 const test = baseTest.extend("response", () => handle(new Request("https://example.test/orders")));
@@ -94,34 +122,90 @@ test("answers with the order", async ({ response }) => {
 });
 ```
 
-マッチャの名前は `parsedValueMatcher` オプションで差し替えられる。報告メッセージはこのオプションの値を名指しする。
+The matcher's name is replaceable through the `parsedValueMatcher` option, and the report names whatever that option holds.
 
-マッチャ側にも守るべき契約がある。ルールと一組で入れないと、唯一の代替手段が無い状態で既存の書き方だけを禁じることになる。
+The matcher carries a contract of its own. Ship it apart from the rule and the existing spelling is forbidden while the only alternative does not exist.
 
-- **全フィールド必須・全フィールド完全一致。** 省略可能にすると、書かなかったフィールドが無検査で通り、このルールが塞いだ穴が開き直す。空の値も明示して書く
-- **ヘッダは被験体のヘッダ集合と過不足なく一致すること。** フレームワークが自動で付けるものも書き出す。同じフィールドが複数回現れる場合は反復順の配列として観測する
-- **JSON 本文はキー順の正規化だけを行った形で比較する。** 並べ替えは安定で、同じキーが重複していても書かれた順を保つ。数値の字面・重複キー・エスケープの綴りは保存する。JSON として不正な本文はそのままの生テキストとして比較する
-- **本文は「無い」と「空」を区別する。** 本文スロットを持たない応答と空の本文を持つ応答は、テキストとして読み出すとどちらも空文字になる。だからスロットを先に見る
+- **Every field required, every field exactly matched.** Make one optional and a field nobody wrote passes unchecked, which reopens the hole this rule closed. Empty values are written out too
+- **Headers match the subject's header set with nothing over and nothing short.** What the framework adds by itself is written out as well. Where one field appears several times, it is observed as an array in the order of repetition
+- **A JSON body is compared in a form normalised by key order alone.** The sort is stable, and duplicate keys keep the order they were written in. The spelling of numbers, duplicate keys and the spelling of escapes are preserved. A body that is not valid JSON is compared as the raw text it is
+- **A body distinguishes "absent" from "empty".** A response carrying no body slot and a response carrying an empty body both read as an empty string as text, so the slot is read first
 
-実行ごとに変わる値（生成 ID、コミットハッシュ）は、それを生んだ式を通してアサーションする。
+A value that differs from run to run (a generated id, a commit hash) is asserted through the expression that produced it.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- **fixture の中でホストオブジェクトからレコードを組み立て直す。** メンバ射影も、呼び出しを介した再構成も、本文を読み出してプレーンな値にしてから返すことも、この禁止に当たる。fixture は検査対象が作ったものをそのまま返し、読み出しはマッチャに任せる
-- **`toMatchObject` や `expect.objectContaining(...)` に緩める。** ホストオブジェクトが関わる空虚さは、マッチャの綴りによらずこのルールが引き受ける
-- **スナップショットに置き換える。** インライン記録も外部記録もファイル記録も同じ空の本体になる
-- **記録を消して取り直す。** 次の記録も同じ空の本体である
-- **構築を名前に束ねる、または関数の向こうへ押し出す。** 束縛と単一返却の関数はこのファイルの中で辿る
-- **呼び先の名前を実行時に決める。** `no-computed-callee-name--write-name-literally` が落とす
-- **抑制ディレクティブ**
+Code this rule rejects.
 
-## オプション
+```ts
+// a construction on either side is compared against whatever the other side holds
+// in order.test.ts
+expect(subject).toStrictEqual(new Response('a'));
+expect(subject).toEqual(new Response('a'));
+expect(new Response('a')).toStrictEqual(subject);
+expect(new Response('a')).toStrictEqual();
+expect().toStrictEqual(new Response('a'));
+expect(read()).toStrictEqual(new Response('a'));
+expect(order.body).toStrictEqual(new Response('a'));
+expect(subject).toStrictEqual(new Request('https://example.test/'));
+```
 
-| 名前 | 既定値 | 何を決めるか |
-| --- | --- | --- |
-| `hostObjectTypes` | `["Request", "Response"]` | 対象とするホストオブジェクトの名前 |
-| `runtimeModules` | `["undici"]` | ランタイムの実装を再輸出しているとみなす取り込み指定子 |
-| `parsedValueMatcher` | `"toHaveParsedFields"` | 報告メッセージが直し方として名指しするマッチャの名前 |
-| `specFileSuffixes` | `[".test.ts", ".test.tsx"]` | この検査を適用するファイル名の接尾辞 |
+```ts
+// a record holding a constructor name and an empty body pins nothing
+// in order.test.ts
+expect(subject).toMatchInlineSnapshot(`Response {}`);
+expect(subject).toMatchInlineSnapshot(`Request {}`);
+expect(subject).toMatchInlineSnapshot('Response {}');
+expect(subject).toMatchInlineSnapshot({ id: expect.any(Number) }, `Response {}`);
+expect.soft(subject).toMatchInlineSnapshot(`Response {}`);
+```
 
-`hostObjectTypes` は、fixture の側でホストオブジェクトを読み出すことを禁じるルールと同じ値を渡すこと。二箇所で管理すると、比較の側で対象の型が fixture の側では対象外になる。`specFileSuffixes` も束の他のルールと同じ値を渡すこと。
+Code this rule accepts.
+
+```ts
+// reading the observable surface through the dedicated matcher is the shape this rule keeps
+// in order.test.ts
+expect(response).toHaveParsedFields({ status: 200, headers: {}, body: { id: 1 } });
+expect(order).toStrictEqual({ id: 1, lines: [] });
+```
+
+```ts
+// matchers that can still fall belong to whoever owns their family
+// in order.test.ts
+expect(responses).toContain(new Response('a'));
+expect(responses).toContainEqual(new Response('a'));
+expect(responses).toStrictEqual(expect.arrayContaining([new Response('a')]));
+expect(subject).toBe(new Response('a'));
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- **Rebuilding a record from the host object inside a fixture.** Projecting members, reassembling through a call, and reading the body out into plain values before returning all fall under this prohibition. A fixture hands back what the code under test built, and leaves the reading to the matcher
+- **Loosening to `toMatchObject` or `expect.objectContaining(...)`.** Vacuity involving a host object is taken by this rule whatever the matcher is spelled as
+- **Switching to a snapshot.** An inline record, an external record and a file record all come out as the same empty body
+- **Deleting the record and taking it again.** The next record is the same empty body
+- **Binding the construction to a name, or pushing it behind a function.** Bindings and single-return functions are followed inside this file
+- **Settling the callee's name at run time.** [no-computed-callee-name--write-name-literally](./no-computed-callee-name--write-name-literally.md) drops that
+- **A suppression directive**
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `vacuousStructuralEquality` | A structural comparison must not stand a \`{{hostType}}\` construction against a value that may be another one. Assert the parsed value: hand the subject the fixture returned to \`{{matcher}}\` and write out every field it reads, including the ones the framework fills in. Reading the body inside the fixture and comparing the plain value it yields is forbidden as a repair. |
+| `vacuousPartialShape` | A partial-shape comparison must not name a \`{{hostType}}\` construction as its expected value. Assert the parsed value: hand the subject the fixture returned to \`{{matcher}}\` and write out every field it reads, including the ones the framework fills in. Narrowing the comparison to a single field is forbidden as a repair. |
+| `vacuousSnapshotRecord` | A snapshot must not stand in for an assertion about a \`{{hostType}}\`. The record \`{{record}}\` holds a constructor name and an empty body. Assert the parsed value: hand the subject the fixture returned to \`{{matcher}}\` and write out every field it reads, including the ones the framework fills in. Re-recording the snapshot is forbidden as a repair. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

@@ -1,96 +1,155 @@
+---
+description: "Disallow a declaration that stands apart from the statement that uses it, so a reader reaches the shape of a name without leaving the line that names it"
+---
+
 # no-detached-declaration--declare-it-next-to-its-use
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-production の TypeScript ソースで、宣言と、それを最初に使う文の間に、その使用と無関係な文が立っている状態。
+Disallow a declaration that stands apart from the statement that uses it, so a reader reaches the shape of a name without leaving the line that names it
 
-文の並びとして見るのは、ファイルのトップレベルと、関数やブロックの本体である。宣言はその並びの中でだけ動く。使用箇所が 1 つの関数の中に閉じていても、宣言をその関数の中へ入れることは要求しない。
+- Tool: `oxlint`
+- Fixable: yes
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-detached-declaration--declare-it-next-to-its-use.ts`](../../src/lint/oxlint/rules/no-detached-declaration--declare-it-next-to-its-use.ts)
 
-宣言として見るのは、変数・関数・クラス・enum・型エイリアス・インターフェースで、export されているかどうかは問わない。
+<!-- END GENERATED rule-header -->
 
-### 何を無関係と数えるか
+## Violation
 
-宣言 D と、D を最初に使う文 S の間に立つ文 T が、S へ繋がっていなければ無関係と数える。繋がっているかは間接でも数える。T が宣言したものを U が使い、U が宣言したものを S が使うなら、T は S へ繋がっている。
+In production TypeScript sources, a state where a statement unrelated to that use stands between a declaration and the first statement using it.
 
-同じ文が使う宣言が 2 つ並んでいる状態は通る。両方を S の直前に置くことはできないので、片方はもう片方を挟むことになる。
+What is read as a run of statements is the top level of a file and the body of a function or a block. A declaration moves only inside that run. Where every use is closed inside one function, moving the declaration into that function is not asked for.
 
-距離を行数や文の個数で測らない。何行までなら近いのかを決めずに済ませるためで、間に立つものが S に関係しているかどうかだけを見る。
+Read as declarations: variables, functions, classes, enums, type aliases and interfaces, whether or not they are exported.
 
-### 使用箇所より後ろに立つ宣言
+### What counts as unrelated
 
-宣言が、それを使う文より後ろに立っている状態も検出する。並びの上では隣り合っていても検出する。
+A statement T standing between a declaration D and the first statement S that uses D counts as unrelated when T does not connect to S. The connection counts indirectly too: where U uses what T declared and S uses what U declared, T connects to S.
 
-この状態を通すと、報告を消す最短の手段が「宣言を使用箇所より後ろへ動かす」になる。位置についてのルールが、位置を変えることで無効になる。
+Two declarations the same statement uses standing together passes. Both cannot be directly in front of S, so one is bound to sit outside the other.
 
-### 循環している宣言
+Distance is not measured in lines or in number of statements. That is to avoid settling how many lines counts as near; what is read is only whether what stands between relates to S.
 
-互いを名指ししている宣言は検出しない。2 つでも、3 つ以上の輪でも同じである。どちらを先に置いても相手より後になるので、置き場所が 1 つに決まらない。
+### A declaration standing after its use
 
-`packages/ai-native/src/spool/strip-escapes.ts` の状態機械がこの形をしている。`ground` が `escapeLead` を指し、`escapeLead` から辿ると `ground` へ戻る。
+A declaration standing after the statement that uses it is detected too, even where they are neighbours in the run.
 
-### またぐ先に処理が走る文があるとき
+Let that state pass and the shortest way to clear a report becomes "move the declaration after its use". A rule about position would be voided by changing position.
 
-宣言が動く先までの間に、その場で処理が走る文が 1 つでもあれば検出しない。呼び出し・`await`・代入・増減がこれにあたる。
+### Declarations naming each other
 
-位置を動かすと、その宣言が読む値が変わることがある。`const woken = this.#waiters;` を `this.#waiters = [];` の後ろへ動かすと、読むのは空になった配列になる。読む対象を書き換えるのが呼び出しであることもあるので、代入だけでなく呼び出しも同じ扱いにする。
+Declarations naming one another are not detected — two of them, or a ring of three or more. Whichever goes first ends up after the other, so no single place is settled.
 
-この宣言はもう「名前を付けただけのもの」ではなく、手続きの 1 段である。段の位置は読みやすさではなく実行の順序が決めている。
+The state machine in `packages/ai-native/src/spool/strip-escapes.ts` has that shape: `ground` names `escapeLead`, and following `escapeLead` comes back to `ground`.
 
-宣言自身がその場で処理を走らせる場合も、同じ理由で検出しない。`const startedAt = performance.now();` を使用箇所の直前へ動かすと、計測している区間が変わる。
+### When something runs between here and there
 
-## なぜそれが要るか
+Where one statement that runs something stands between the declaration and where it would move to, nothing is detected. A call, an `await`, an assignment and an increment all count.
 
-名前を読んだ人は、その名前が何なのかを知るために宣言まで移動する。移動した先で読み、また戻ってくる。間に無関係なものが立っているほど、この往復は長くなる。
+Moving the position can change the value that declaration reads. Move `const woken = this.#waiters;` after `this.#waiters = [];` and what it reads is the emptied array. What rewrites the read target is sometimes a call, so calls are treated the same way as assignments.
 
-宣言を使用箇所の隣に置くと、往復そのものが消える。読んでいる行の 1 つ上に答えがある。
+Such a declaration is no longer "a name put on something"; it is one step of a procedure. The position of a step is settled by the order of execution rather than by readability.
 
-冒頭にまとめて宣言を置く書き方は、書き手にとっては楽である。何がどこにあるかを考えずに済み、書いている途中で並びを直さなくてよい。読み手はその楽をした分を往復で払う。
+Where the declaration itself runs something, it is not detected for the same reason. Move `const startedAt = performance.now();` directly in front of its use and the interval being measured changes.
 
-閾値を持たせなかったのは、何行までなら近いのかに答えが無いためである。3 行ならよくて 4 行はだめ、という線を引ける根拠が無い。間に立つものが関係しているかどうかは、参照の有無で決まるので線が引ける。
+### Deliberately not widened
 
-## どう直すか
+| Shape | Why it is left out |
+| --- | --- |
+| An import statement | Their order belongs to [no-unordered-import--group-by-origin-then-sort-by-specifier](./no-unordered-import--group-by-origin-then-sort-by-specifier.md) |
+| A declaration never used inside that file | That it goes unused is watched by knip and by [no-single-use-local-type--inline-at-the-use-site](./no-single-use-local-type--inline-at-the-use-site.md) |
+| A type that is not exported and carries fewer than two type references in the file | [no-single-use-local-type--inline-at-the-use-site](./no-single-use-local-type--inline-at-the-use-site.md) tells that declaration to go. Let both land on one declaration and "delete it" and "move it" come out together, handing the choice back to the reader |
+| Declarations naming each other | As above, no place is settled |
+| A declaration that runs something, and a move across a statement that runs something | As above, moving changes the value read and the order things run in |
+| Moving a declaration inside a scope | Even where every use is closed inside one function, the declaration may stay outside it |
 
-宣言を、それを最初に使う文の直前へ動かす。間に立っていた無関係な文は、その宣言の前に残る。
+The last one is not a hole in the detection but the current reach. Put inside a function, a declaration such as `new Set(...)` is rebuilt on every call, and a regular expression carrying `g` changes even what `test` returns. What may move inward is settled separately.
 
-使用箇所より後ろに立っている宣言は、その文の前へ動かす。
+### The invariant
 
-同じ文が使う宣言が複数あるなら、まとめてその文の前に並べる。順序は問わない。
+Whoever reads a name travels to its declaration to learn what that name is, reads it there, and comes back. The more unrelated things stand between, the longer that round trip.
 
-### 自動修正が動かすもの
+Put the declaration next to its use and the round trip disappears: the answer is one line above the line being read.
 
-このルールは自動修正を持つ。動かすのは、使用箇所より前に立っている宣言だけである。
+Gathering declarations at the top is easy for the writer. Nothing has to be decided about where things go, and the run never has to be rearranged while writing. The reader pays for that ease in round trips.
 
-使用箇所より後ろに立っている宣言は動かさない。上へ動かすと、その宣言自身が名指ししているものより前に出ることがある。報告だけを出すので、人が動かす。
+No threshold was given because there is no answer to how many lines counts as near. There are no grounds for a line where three is fine and four is not. Whether what stands between relates is settled by the presence of a reference, so that line can be drawn.
 
-## 禁じる回避策
+### Configuration
 
-- 宣言を使用箇所より後ろへ動かして報告を消す。この状態も検出する
-- 型に `export` を付けて報告から外す。export された型も検出する
-- 使い捨ての参照を無関係な文に足して、関係しているように見せる。参照は増えるが、読み手の往復は短くなっていない
-- 宣言を別ファイルへ移して import する。往復がファイルをまたぐだけになる
-- ルールごとの除外、ファイルごとの除外、宣言ごとの除外タグ。どれも用意しない
+None. There is no per-rule exclusion, no per-file exclusion and no per-declaration exemption tag.
 
-## 何を検出しないか
+## Fix
 
-- import 文。並び順は [no-unordered-import--group-by-origin-then-sort-by-specifier](no-unordered-import--group-by-origin-then-sort-by-specifier.md) が持つ
-- そのファイルの中で 1 度も使われていない宣言。使われていないことは knip と [no-single-use-local-type--inline-at-the-use-site](no-single-use-local-type--inline-at-the-use-site.md) が見ている
-- export されていない型で、ファイルの中の型参照が 2 未満のもの。[no-single-use-local-type--inline-at-the-use-site](no-single-use-local-type--inline-at-the-use-site.md) がその宣言を消せと言う。2 本が同じ宣言に当たると「消せ」と「動かせ」が同時に出て、どちらに従うかが読み手に戻る
-- 互いを名指ししている宣言。前述のとおり置き場所が決まらない
-- その場で処理が走る宣言と、そういう文をまたぐ移動。前述のとおり、動かすと読む値と走る順序が変わる
-- 宣言をスコープの内側へ動かすこと。使用箇所が 1 つの関数の中に閉じていても、宣言はその関数の外に立ったままでよい
+Move the declaration directly in front of the first statement that uses it. The unrelated statements that stood between stay in front of that declaration.
 
-最後の 1 つは検出の穴ではなく、いまの射程である。関数の中へ入れると、`new Set(...)` のような宣言は呼ばれるたびに作り直され、`g` を持つ正規表現は `test` の返り値まで変わる。何を内側へ入れてよいかは別に決める。
+A declaration standing after its use moves in front of that statement.
 
-## 導入時に直した数
+Where one statement uses several declarations, line them up together in front of it. The order among them does not matter.
 
-最初の形で当てたときは 955 件、262 ファイルが該当した。うち module のトップレベルが 853、関数やブロックの本体が 102。宣言が使用箇所より後ろに立っていたものが 17。パッケージ別では `dont-review-it` が 689 で、全体の 7 割を占めた。ルールを 1 本ずつファイルに持つ構成で、ファイルの冒頭に定数と型を集め、下へ向かって関数を並べる書き方をしていたためである。
+There is an automatic fix, and what it moves is only a declaration standing before its use. A declaration standing after its use is not moved: taking it upward can put it in front of what it itself names. Only the report comes out, and a person moves it.
 
-そこから「その場で処理が走る宣言」と「処理が走る文をまたぐ移動」を対象から外し、残りを全部直した。直した結果、243 ファイルが変わった。
+<!-- BEGIN GENERATED examples -->
 
-対象を外す前に自動修正を走らせた段階で、4 か所が壊れた。いずれも、読んでいる状態を書き換える文の後ろへ宣言が動いたものである。
+Code this rule rejects.
 
-- `packages/auto-develop/src/relay/memory-event-store.ts` — 削除件数を数える宣言が、`this.#eventsById` を差し替える文の後ろへ動き、常に 0 を返した
-- `packages/auto-develop/src/transport/event-queue.ts` — 待ち行列を読む宣言が、その行列を空にする文の後ろへ動き、誰も起こさなくなった。2 か所
-- `packages/auto-develop/src/queue/job-execution.ts` — 同じ形で、待っている仕事を 1 つも待たなくなった
+```ts
+// a value separated from its use by a declaration that use does not name is reported
+const limit = 200;
+export const read = () => 1;
+export const truncate = (lines: readonly string[]) => lines.slice(0, limit);
+```
 
-どれも `auto-develop` のテストが落ちて分かった。ここから「またぐ先に処理が走る文があれば動かさない」を足している。
+```ts
+// a declaration standing after the declaration that uses it is reported without a fix
+export const walk = () => step();
+export const read = () => 1;
+const step = () => 2;
+```
+
+Code this rule accepts.
+
+```ts
+// a declaration standing right in front of the declaration that uses it passes
+const limit = 200;
+export const truncate = (lines: readonly string[]) => lines.slice(0, limit);
+```
+
+```ts
+// a value read before a write that clears what it read keeps its position
+export const wake = (queue: { waiters: readonly (() => void)[] }) => {
+  const woken = queue.waiters;
+  queue.waiters = [];
+  return woken;
+};
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Moving the declaration after its use to clear the report. That state is detected too
+- Putting `export` on a type to take it out of range. An exported type is detected as well
+- Adding a throwaway reference to an unrelated statement so it looks related. The references grow while the reader's round trip has not shortened
+- Moving the declaration into another file and importing it. The round trip merely crosses a file boundary
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `detachedDeclaration` | A declaration must not stand apart from the statement that uses it. Move \`{{name}}\` directly in front of the statement on line {{line}}. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

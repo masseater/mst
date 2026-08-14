@@ -4,7 +4,8 @@ import { dirname, join } from "node:path";
 
 import { describe, expect, test } from "vite-plus/test";
 
-import { formatLintRuleIndexProblem, lintRuleIndexProblems } from "./reconcile-rule-index.ts";
+import { formatLintRuleProblem } from "../lint-rule-problem.ts";
+import { lintRuleIndexProblems } from "./reconcile-rule-index.ts";
 
 const WORKSPACE_DEFINITION = "packages:\n  - packages/*\n";
 
@@ -497,10 +498,10 @@ describe("lintRuleIndexProblems", () => {
   });
 });
 
-describe("formatLintRuleIndexProblem", () => {
+describe("formatLintRuleProblem", () => {
   describe("a problem naming the index it was found against", () => {
     const it = test.extend("formattedProblem", () =>
-      formatLintRuleIndexProblem({ file: INDEX_PATH, message: MISSING_INDEX }));
+      formatLintRuleProblem({ file: INDEX_PATH, message: MISSING_INDEX }));
 
     it("spells the path first and the message after it", ({ formattedProblem }) => {
       expect(formattedProblem).toBe(`${INDEX_PATH} ${MISSING_INDEX}`);

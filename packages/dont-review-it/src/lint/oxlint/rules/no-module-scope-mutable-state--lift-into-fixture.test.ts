@@ -12,6 +12,7 @@ describe("dont-review-it/no-module-scope-mutable-state--lift-into-fixture", () =
     valid: [
       {
         name: "state built inside the fixture and handed back is the shape this rule keeps",
+        documented: true,
         code: "const it = test.extend('entries', () => {\n  const entries = [];\n  entries.push('opening');\n  return entries;\n});",
         filename: SPEC_FILENAME,
       },
@@ -27,6 +28,7 @@ describe("dont-review-it/no-module-scope-mutable-state--lift-into-fixture", () =
       },
       {
         name: "a module scope value that tests only read is not shared state anybody writes",
+        documented: true,
         code: "const opening = ['a', 'b'];\nit('counts what it was given', () => {\n  expect(!opening.length).toBe(false);\n});",
         filename: SPEC_FILENAME,
       },
@@ -114,6 +116,7 @@ describe("dont-review-it/no-module-scope-mutable-state--lift-into-fixture", () =
     invalid: [
       {
         name: "a module scope let reassigned from the test block is one counter for the whole file",
+        documented: true,
         code: "let calls = 0;\nit('counts the call', () => {\n  calls = calls + 1;\n  expect(calls).toBe(1);\n});",
         filename: SPEC_FILENAME,
         errors: [{ messageId: "sharedBindingRebound" }],
@@ -144,6 +147,7 @@ describe("dont-review-it/no-module-scope-mutable-state--lift-into-fixture", () =
       },
       {
         name: "wrapping the counter in a const object keeps the single instance the file shares",
+        documented: true,
         code: "const held = { calls: 0 };\nit('counts the call', () => {\n  held.calls += 1;\n  expect(held.calls).toBe(1);\n});",
         filename: SPEC_FILENAME,
         errors: [{ messageId: "sharedValueWritten" }],

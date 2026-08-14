@@ -141,6 +141,7 @@ describe("dont-review-it/no-version-range--pin-the-exact-version", () => {
     invalid: [
       {
         name: "the root workspace carries both its own ranges and the ones the catalog registers",
+        documented: true,
         code: MODULE_SOURCE,
         filename: rangedRootEntry,
         errors: [

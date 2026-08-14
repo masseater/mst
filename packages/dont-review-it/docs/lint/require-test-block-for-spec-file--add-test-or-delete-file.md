@@ -1,88 +1,165 @@
+---
+description: "Require a file named as a spec to declare at least one test block that runs, so naming a file a spec costs a check that actually executes rather than buying the standing of a spec for free"
+---
+
 # require-test-block-for-spec-file--add-test-or-delete-file
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-spec の綴りを名乗るファイルに、実行されるテストブロックの宣言が 1 つも無いこと。
+Require a file named as a spec to declare at least one test block that runs, so naming a file a spec costs a check that actually executes rather than buying the standing of a spec for free
 
-対象は `specFileSuffixes` に当たる名前のファイルである。報告位置はファイル全体（`Program` ノード）で、指し示せる行がファイルの中に無いためこの位置になる。何をもって「1 つも無い」と読んだかで、出るメッセージが 3 つに分かれる。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`require-test-block-for-spec-file--add-test-or-delete-file.ts`](../../src/lint/oxlint/rules/require-test-block-for-spec-file--add-test-or-delete-file.ts)
 
-- `noTestBlock`: テストブロックもグルーピングブロックも 1 つも無い
-- `onlyGroupingBlocks`: グルーピングブロックはあるが、その内側のどこにもテストブロックが無い
-- `heldBackTestBlocks`: テストブロックはあるが、どれも実行されない
+<!-- END GENERATED rule-header -->
 
-テストブロックの判定は共有の起点判定（`lib/spec-syntax/test-block-declarations.ts`）に従う。綴りではなく束縛の解決で見るので、グローバルへ注入された `it` / `test`、`import { it as check } from "vite-plus/test"` で別名にした束縛、`const check = test.extend({ ... })` で派生させた束縛は同じテストブロックとして扱う。名前が文字列で書かれていることは条件にしない。ここで見るのは実行されるかどうかであって、名前の形は別のルールが持つ。
+## Violation
 
-実行されるかどうかは次のように読む。
+A file carrying the spelling of a spec while declaring not one test block that runs.
 
-- 修飾の連鎖のどこかに `skip` か `todo` があれば実行されない。`skipIf` / `runIf` は実行時に分岐するので、実行される経路が構文の上に残っているとみなす
-- グルーピングブロックに `skip` か `todo` が付いていれば、その内側に書かれたブロックも実行されない
-- コールバックを渡していない宣言（`it("carries the id")`）は実行されない。ランナーはこれを todo として報告する
-- テーブル駆動（`each` / `for`）は、テーブルがその場に書かれた配列リテラルで要素が 1 つ以上あれば実行される。`it.each([])(...)` は 1 件も実行しないので、実行されない側に入る
+The subjects are files whose names answer to `specFileSuffixes`. The report stands on the whole file (the `Program` node), because there is no line inside the file to point at. Which message comes out depends on how "not one" was read.
 
-**報告は「実行されるテストが 1 つも無い」と言い切れたときだけ出る。** 読み切れない形が 1 つでも混じっていれば、そのファイルについては黙る。0 件だと確定できないことと、0 件でないことは別である。
+- `noTestBlock`: not one test block and not one grouping block
+- `onlyGroupingBlocks`: grouping blocks are there, and nowhere inside them is a test block
+- `heldBackTestBlocks`: test blocks are there, and not one of them runs
 
-### 別のモジュールへ届く呼び出し
+Whether something is a test block follows the shared root reading (`lib/spec-syntax/test-block-declarations.ts`). It is read by resolving bindings rather than by spelling, so an `it` / `test` injected globally, a binding renamed with `import { it as check } from "vite-plus/test"`, and a binding derived with `const check = test.extend({ ... })` are all the same test block. The name being written as a string is not a condition: what is read here is whether it runs, and the shape of the name belongs to another rule.
 
-このリポジトリの lint ルールの spec は、テストブロックを自分で書かず `testLintRule` に宣言させている。ファイルの中に `it` は 1 つも無いが、実行すればテストは走る。この形を報告しないために、収集時に走る位置から別のモジュールへ届く呼び出しが 1 つでもあれば、そのファイルは読み切れないものとして扱う。
+Whether it runs is read like this.
 
-判定は 3 つの条件で絞る。
+- A `skip` or a `todo` anywhere in the chain of modifiers means it does not run. `skipIf` / `runIf` branch at run time, so a running path is taken to remain in the syntax
+- Where a grouping block carries a `skip` or a `todo`, the blocks written inside it do not run either
+- A declaration handed no callback (`it("carries the id")`) does not run. The runner reports it as a todo
+- A table-driven declaration (`each` / `for`) runs where the table is an array literal written in place carrying one or more elements. `it.each([])(...)` runs nothing, so it lands on the side that does not run
 
-- 呼び先の根が import で束縛された名前であること。名前空間 import 経由のメンバ呼び出しも、import した名前をローカルの束縛へ渡し直した形も、束縛を辿って同じに扱う
-- テストブロックとグルーピングブロックの束縛は除く。除かないと `describe` を import した時点でどのファイルも読めなくなる
-- テストブロックの束縛を根に持つ呼び出しの内側は除く。ブロックの本体と fixture の初期化子が走るのはテストの実行時であって収集時ではないので、そこから別のモジュールへ届いてもテストは増えない。全部 skip したファイルが本体から SUT を呼んでいても報告は出る
+**The report comes out only where "not one test runs" can be said outright.** Where one shape it cannot read through is mixed in, it stays quiet about that file. Being unable to settle that the count is zero, and the count not being zero, are different things.
 
-この読みは報告を消す方向にしか働かない。読み切れないと判断したファイルが黙るだけで、この判定が原因で新しい報告が出ることはない。
+### A call reaching another module
 
-### 意図的に広げていない範囲
+The specs of the lint rules in this repository write no test block themselves and have `testLintRule` declare them. Not one `it` stands in the file, and running it runs tests. So that this shape is not reported, one call reaching another module from a position that runs at collection time is enough for that file to be treated as one it cannot read through.
 
-| 形 | 対象にしない理由 |
+The judgment is narrowed by three conditions.
+
+- The callee's root is a name bound by an import. A member call through a namespace import, and a form handing an imported name on to a local binding, are followed to the binding and treated the same
+- Bindings of test blocks and grouping blocks are excluded. Without that, importing `describe` would leave every file unreadable
+- The inside of a call rooted at a test block binding is excluded. A block's body and a fixture's initialiser run at test time rather than at collection time, so reaching another module from there adds no test. A file with everything skipped still gets its report even where the body calls the code under test
+
+This reading works only in the direction of clearing reports. A file judged unreadable goes quiet, and no new report ever comes out because of this judgment.
+
+### Deliberately not widened
+
+| Shape | Why it is left out |
 | --- | --- |
-| 実行時に決まるテーブル（`it.each(rows)(...)`） | 要素数が実行時にしか決まらない。0 件だと確定できない |
-| タグ付きテンプレートで書いたテーブル | 行を読まない。同じく 0 件だと確定できない |
-| 引数を spread した宣言（`it("carries the id", ...declaration)`） | 渡された引数を読めない |
-| 本体の位置に名前を渡した宣言（`it("carries the id", carriesTheId)`） | その名前が指す関数を読まない。実行されない側に倒すと誤検出になる |
-| 実行時に決まる修飾（`it[chosen](...)`） | 起点が解決できないのでテストブロックとして数えない。他に宣言が無ければ「ブロックが無い」と読まれる。この形自体は `no-computed-test-api-member--use-static-member` が禁じている |
-| どこからも呼ばれない関数の中に書かれたブロック | 宣言が構文の上にある限り数える。到達可能性は見ない |
-| spec の綴りに当たらないファイル | `specFileSuffixes` の外は見ない |
+| A table settled at run time (`it.each(rows)(...)`) | The element count is settled only at run time. Zero cannot be settled |
+| A table written as a tagged template | The rows are not read. Zero cannot be settled either |
+| A declaration whose arguments are spread (`it("carries the id", ...declaration)`) | The arguments handed over cannot be read |
+| A declaration handed a name in the body position (`it("carries the id", carriesTheId)`) | The function that name stands for is not read. Leaning it to the side that does not run would misreport |
+| A modifier settled at run time (`it[chosen](...)`) | The root cannot be resolved, so it is not counted as a test block. With no other declaration it reads as "there is no block". That shape itself is forbidden by [no-computed-test-api-member--use-static-member](./no-computed-test-api-member--use-static-member.md) |
+| A block written inside a function nobody calls | A declaration standing in the syntax counts. Reachability is not read |
+| A file that does not answer to the spec spelling | Outside `specFileSuffixes` nothing is read |
 
-判定は**訪問したファイルごと**に行う。したがって、当該ファイルを解析対象から外せばこのルールは発火しない。対象集合をリポジトリの木の走査から決めて対象指定から独立させることは、oxlint の JS プラグインが報告位置を「今検査しているファイルの中のノード」に限っているため、ルール単体では実現できない。判定そのものは訪問したファイルの構文だけで決まる純粋な読みなので、走査を入口にする実行形態を足すときはそのまま呼べる。
+The judgment runs **per visited file**. Take the file out of the analysis, therefore, and this rule does not fire. Deriving the target set from a walk of the repository tree, independent of the target naming, cannot be done by the rule alone, because oxlint's JS plugins confine a report's position to a node inside the file under check. The judgment itself is a pure reading of the visited file's syntax, so it can be called as it stands once a form of execution entered through a walk is added.
 
-このリポジトリの spec ファイル 234 本に対してこのルールを走らせると、報告は 0 件だった。既存の spec を直させるためのルールではなく、これから置かれる空の spec を止めるためのルールである。
+This is not a rule for making existing specs change; it is a rule for stopping the empty spec about to be placed.
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「spec を名乗ることには、実行されるテストを持つという対価が付く」ことである。
+What is held is that carrying the name of a spec comes at the price of holding a test that runs.
 
-1 層目は、テストデータの所有者が実体を持つことである。`require-spec-file-for-assets--create-matching-spec` は、所有者がいるかどうかをファイル名の一致だけで確かめる。中身が空の spec を語幹に合わせて置けば、その検査は通る。通ってしまうと、所有とは「誰かが実際にそのデータを使って確かめている」ことだという意味が抜け落ちて、名前が揃っているだけの状態が所有と呼ばれる。存在の検査と中身の検査を 2 本に分けたまま、両方を機構に載せることで、名前だけ合わせる回避が閉じる。
+The first layer is that the owner of test data has substance. [require-spec-file-for-assets--create-matching-spec](./require-spec-file-for-assets--create-matching-spec.md) confirms whether an owner exists by matching file names alone. Place an empty spec with the matching stem and that check passes. Once it does, the meaning of ownership — that somebody actually confirms something with that data — drops out, and a state of names merely agreeing gets called ownership. Keeping the existence check and the contents check as two rules while putting both on the machinery closes the bypass of matching the name alone.
 
-2 層目は、spec を名乗ることが分類の資格になっていることである。この束の他のルールは、spec ファイルを「テストデータの所有者になれるもの」「spec 用のディレクトリに置いてよいもの」として分類する。テストを 1 つも持たないファイルが spec を名乗ると、実体のない所有者が生まれ、ディレクトリに置ける種別の制限も名前だけで満たされる。名乗ることに対価を付けると、この分類が名前では買えなくなる。
+The second layer is that carrying the name of a spec is a qualification for a classification. The other rules of this bundle classify a spec file as "something that may own test data" and "something that may sit in a spec directory". Let a file holding not one test carry the name of a spec and an owner without substance is born, and the restriction on what kinds may sit in the directory is met by a name too. Put a price on the name and this classification stops being purchasable with names.
 
-3 層目は、実行されない検証は通ったのか走らなかったのかを区別できないことである。恒久的に止められたブロックだけが残ったファイルは、レポートに名前を並べながら何も確かめない。green の意味を薄めるだけで、回帰を検出する能力は持たない。
+The third layer is that a verification that does not run cannot be told from one that passed. A file left holding permanently stopped blocks lines names up in the report while confirming nothing. It only thins the meaning of green, and holds no power to detect a regression.
 
-## どう直すか
+### Configuration
 
-そのファイルが名乗っている対象について、実際に確かめるブロックを書く。何を確かめるべきかがその場で決まらないなら、ファイルを消す。
-
-消すときは、同じ語幹のテストデータのファイルも一緒に消す。所有者が消えたテストデータは、次にテストデータ側のルールが孤児として報告する。片方だけ消すと、報告が別のファイルへ移るだけになる。
-
-## 禁じる回避策
-
-- **名前だけ合わせた空の spec を置いてテストデータの所有者に見せる。** 存在の検査は通るが、このルールが中身を見る
-- **中身を全て `skip` / `todo` にして残す。** 止められたブロックは実行されるテストとして数えない。グループの側に `skip` を付けて一括で止める形も同じに扱う
-- **`describe` の区分けだけを置く。** グルーピングブロックはそれ自体では何も確かめない
-- **テストブロックを別名の束縛へ移して判定を外す。** 綴りではなく束縛の解決で見る
-- **spec の綴りから外して対象から降りる。** 降りた時点でテストデータの所有者がいなくなるので、テストデータ側のルールが報告する
-- **テーブルを実行時に決まる形へ書き換えて確定を外す。** 報告は消えるが、これは検出できない範囲であって、空のテーブルを置いてよいという許可ではない
-- **引数を spread して読めなくする。** 同じく検出できない範囲である
-- **空の spec の中で、import した名前を 1 つ呼んでおく。** 収集時に別のモジュールへ届く呼び出しがあるとこのルールは黙る。これも検出できない範囲であって、許可ではない
-- **抑制ディレクティブ**
-
-## オプション
-
-- `specFileSuffixes`（文字列の配列、任意）: spec として扱う接尾辞。既定は `[".test.ts", ".test.tsx"]` で、指定すると**置き換える**（加算ではない）。空配列を渡した場合は既定に戻る。この束の他のルールと同じ名前・同じ意味で、リポジトリ全体で 1 つの綴りに揃える前提で持っている
+- `specFileSuffixes` (an array of strings, optional): the suffixes treated as a spec. The default is `[".test.ts", ".test.tsx"]`, and naming it **replaces** it (it does not add). Handed an empty array, the default comes back. It carries the same name and the same meaning as in the other rules of this bundle, on the premise that one spelling is levelled across the repository
 
 ```jsonc
 ["error", { "specFileSuffixes": [".test.ts"] }]
 ```
 
-免除リストは持たない。「このファイルだけテストが無くてよい」は、実行されない spec が 1 つあってよいという意味になり、規律そのものと矛盾する。実行されるテストを何本要求するかもオプションにしていない。下限を 0 にできる設定は、設定を書き換えるだけでこのルールを無効にできることと同じである。
+There is no exemption list. "This one file may hold no test" means one spec that does not run may exist, which contradicts the discipline itself. How many running tests are demanded is not an option either: a setting able to take the lower bound to zero is the same as being able to turn this rule off by editing a setting.
+
+## Fix
+
+Write a block that actually confirms something about what that file names. Where what should be confirmed cannot be settled on the spot, delete the file.
+
+Deleting it, delete the test data file of the same stem with it. Test data whose owner is gone is reported next as an orphan by the rule on the test data side. Delete one alone and the report only moves to another file.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// a file with nothing in it names a spec that checks nothing
+// in report.test.ts
+
+```
+
+```ts
+// blocks marked as skipped run nothing
+// in report.test.ts
+it.skip("carries the id", () => {
+  expect(summarise("a").id).toBe("a");
+});
+```
+
+Code this rule accepts.
+
+```ts
+// a block that runs carries the file
+// in report.test.ts
+it("carries the id", ({ report }) => {
+  expect(report.id).toBe("a");
+});
+```
+
+```ts
+// one block that runs is enough, however many are held back beside it
+// in report.test.ts
+it.skip("carries the id", () => {});
+it.todo("carries the total");
+it("carries the name", ({ report }) => {
+  expect(report.name).toBe("a");
+});
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- **Placing an empty spec with a matching name to look like the owner of test data.** The existence check passes, and this rule reads the contents
+- **Leaving the contents entirely as `skip` / `todo`.** Stopped blocks are not counted as running tests. Stopping them together by marking the group is handled the same way
+- **Placing only the divisions of a `describe`.** A grouping block confirms nothing by itself
+- **Moving the test block to a binding of another name to slip the judgment.** It is read by resolving bindings, not by spelling
+- **Stepping off the spec spelling to leave the target set.** The moment you step off, the test data has no owner, so the rule on the test data side reports it
+- **Rewriting the table into a form settled at run time to lose the certainty.** The report clears, but that is a range the detection cannot reach and no permission to place an empty table
+- **Spreading the arguments so they cannot be read.** A range the detection cannot reach, likewise
+- **Calling one imported name inside an empty spec.** With a call reaching another module at collection time, this rule goes quiet. A range the detection cannot reach, and no permission
+- **A suppression directive**
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `noTestBlock` | A file named as a spec must not stand without a test block that runs. This one declares no block at all. Write the block that checks what the subject is expected to do, or delete this file together with the test data named after its stem. |
+| `onlyGroupingBlocks` | A file named as a spec must not stand on grouping blocks alone. The groups here hold no test block, and a group checks nothing of its own. Write the block each group promises, or delete this file together with the test data named after its stem. |
+| `heldBackTestBlocks` | A file named as a spec must not stand on test blocks that are all held back. Every block here is marked as skipped or as todo, left standing without a body, or driven by a table written out empty. Write a block that runs, or delete this file together with the test data named after its stem. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

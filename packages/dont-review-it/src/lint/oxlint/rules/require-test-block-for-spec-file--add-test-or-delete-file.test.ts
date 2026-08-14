@@ -10,6 +10,7 @@ describe("dont-review-it/require-test-block-for-spec-file--add-test-or-delete-fi
     valid: [
       {
         name: "a block that runs carries the file",
+        documented: true,
         filename: SPEC_FILE,
         code: 'it("carries the id", ({ report }) => {\n  expect(report.id).toBe("a");\n});',
       },
@@ -20,6 +21,7 @@ describe("dont-review-it/require-test-block-for-spec-file--add-test-or-delete-fi
       },
       {
         name: "one block that runs is enough, however many are held back beside it",
+        documented: true,
         filename: SPEC_FILE,
         code: 'it.skip("carries the id", () => {});\nit.todo("carries the total");\nit("carries the name", ({ report }) => {\n  expect(report.name).toBe("a");\n});',
       },
@@ -113,6 +115,7 @@ describe("dont-review-it/require-test-block-for-spec-file--add-test-or-delete-fi
     invalid: [
       {
         name: "a file with nothing in it names a spec that checks nothing",
+        documented: true,
         filename: SPEC_FILE,
         code: "",
         errors: [{ messageId: "noTestBlock" }],
@@ -167,6 +170,7 @@ describe("dont-review-it/require-test-block-for-spec-file--add-test-or-delete-fi
       },
       {
         name: "blocks marked as skipped run nothing",
+        documented: true,
         filename: SPEC_FILE,
         code: 'it.skip("carries the id", () => {\n  expect(summarise("a").id).toBe("a");\n});',
         errors: [{ messageId: "heldBackTestBlocks" }],

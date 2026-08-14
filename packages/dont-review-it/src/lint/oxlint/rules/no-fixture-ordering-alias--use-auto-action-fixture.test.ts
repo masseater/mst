@@ -10,11 +10,13 @@ describe("dont-review-it/no-fixture-ordering-alias--use-auto-action-fixture", ()
     valid: [
       {
         name: "a dependency taken apart under its own name and read in the body is the flow it declares",
+        documented: true,
         filename: SPEC_FILE,
         code: `const test = baseTest.extend("report", ({ port }) => summarise(port));`,
       },
       {
         name: "a renamed dependency read in the body is a dependency the fixture uses",
+        documented: true,
         filename: SPEC_FILE,
         code: `const test = baseTest.extend("report", ({ port: chosen }) => summarise(chosen));`,
       },
@@ -150,6 +152,7 @@ describe("dont-review-it/no-fixture-ordering-alias--use-auto-action-fixture", ()
     invalid: [
       {
         name: "a name marked as unused confesses a dependency declared for order alone",
+        documented: true,
         filename: SPEC_FILE,
         code: `const test = baseTest.extend("report", ({ port: _port }) => summarise(_port));`,
         errors: [{ messageId: "orderingAlias" }],
@@ -162,6 +165,7 @@ describe("dont-review-it/no-fixture-ordering-alias--use-auto-action-fixture", ()
       },
       {
         name: "a dependency taken apart under its own name and never read declares an order",
+        documented: true,
         filename: SPEC_FILE,
         code: `const test = baseTest.extend("report", ({ port }) => summarise());`,
         errors: [{ messageId: "unconsumedDependency" }],

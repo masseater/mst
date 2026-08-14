@@ -1,59 +1,118 @@
+---
+description: "Disallow a module specifier that names a re-export module while the statement takes a value through it, so the module a binding is taken from is the module that declares it"
+---
+
 # no-barrel-import--import-from-the-owning-module
 
-このルールは出荷する preset に載っていない。使う側が名前を書いて初めて効く。理由は「既定で配らない理由」に書いた。
+<!-- BEGIN GENERATED rule-header -->
 
-## 何を検出するか
+Disallow a module specifier that names a re-export module while the statement takes a value through it, so the module a binding is taken from is the module that declares it
 
-再エクスポート専用モジュールを名指しした指定子のうち、その文が値を取っているもの。報告は指定子そのものに出す。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: no
+- Source: [`no-barrel-import--import-from-the-owning-module.ts`](../../src/lint/oxlint/rules/no-barrel-import--import-from-the-owning-module.ts)
 
-見る文は 4 つである。
+<!-- END GENERATED rule-header -->
+
+## Violation
+
+A specifier naming a re-export-only module, in a statement that takes values from it. The report points at the specifier.
+
+Four statements are read:
 
 - `import ... from "..."`
-- `export ... from "..."` / `export * from "..."`
+- `export ... from "..."` and `export * from "..."`
 - `import("...")`
 
-指定子が再エクスポート専用モジュールを名指ししていると判定するのは、次の 2 つを両方満たすときである。
+A specifier is taken to name a re-export-only module when both hold:
 
-- 相対指定である。`.` `..` そのものか、`./` `../` で始まる
-- 最後のセグメントの拡張子を落とした綴りが `index` である。あるいは指定子がディレクトリで終わっている（`.` `..` そのもの、または `/` で終わる）
+- It is relative: `.` or `..` themselves, or something starting with `./` or `../`
+- Its last segment, with the extension dropped, is spelled `index`; or the specifier ends at a directory (`.` or `..` themselves, or a trailing `/`)
 
-値を取っているかは、[no-barrel-module--declare-in-the-owning-module](no-barrel-module--declare-in-the-owning-module.md) と同じ規則で判定する。`import type { ... } from "..."` と、すべての specifier に `type` が付いた形は値を取らない。名前を 1 つも束縛しない副作用のためだけの import は、モジュールを実行するので値を取る側に数える。
+Whether values are taken is settled by the same rules as in [no-barrel-module--declare-in-the-owning-module](no-barrel-module--declare-in-the-owning-module.md). `import type { ... } from "..."`, and a form where every specifier carries `type`, take no values. An import for side effects alone, binding no name, counts as taking values, because it runs the module.
 
-## なぜそれが要るか
+### The invariant
 
-理由は [no-barrel-module--declare-in-the-owning-module](no-barrel-module--declare-in-the-owning-module.md) と同じである。値の解決が転送を通ることで、バンドラが転送先を全部残し、開発時の解決が転送先を全部読み、名前とその所有者の対応が読めなくなる。
+The reasons are the same as in [no-barrel-module--declare-in-the-owning-module](no-barrel-module--declare-in-the-owning-module.md): resolving values through a forward keeps everything the barrel forwards to in the bundle, makes development-time resolution read all of it, and leaves the correspondence between a name and its owner unreadable.
 
-2 本に分かれているのは、直し方が違うためである。転送だけのファイルを置いた側の直し方は「そのファイルを消す」で、そこを読んだ側の直し方は「宣言しているモジュールを名指しする」になる。片方だけを有効にする選択もある。自分のリポジトリでは面を持たないが、依存しているパッケージが面を持っている場合、読む側だけを止めることになる。
+The two are separate rules because the fixes differ. On the side that placed a forward-only file the fix is deleting the file; on the side that read it the fix is naming the declaring module. Enabling only one is a real choice: where your own repository keeps no surface while a package you depend on does, only the reading side can be stopped.
 
-## どう直すか
+### Where detection does not reach
 
-指定子を、その名前を宣言しているモジュールに書き換える。転送先が何を宣言しているかは、名指ししている再エクスポート専用モジュールを開けば読める。
+What a specifier points at is not read. A forward-only file under a name other than `index` is not reported when named, and a module carrying declarations under the name `index` is reported when named. The judgment rides the naming convention rather than the contents.
 
-パッケージの外から公開エントリを読んでいる場合、その指定子はパッケージ名で書かれるので相対指定にならず、このルールの入口に入らない。報告が出ているということは、同じパッケージの中から自分の面を経由して読んでいるということである。この形は面が本来持っている役目とも関係が無いので、宣言しているモジュールを名指しする。
+A relative specifier with no extension is not reported. `./models` could resolve to `models.ts` or to `models/index.ts`, and the syntax does not settle which.
 
-## 禁じる回避策
+External packages are not read. Whether such a package keeps a surface or not, the reader has no way to rearrange it.
 
-- 抑制ディレクティブで黙らせ、指定子を残す
-- 再エクスポート専用モジュールの名前を `index` 以外に変える。このルールは指定子の綴りだけを見るので報告は消えるが、値の解決が転送を通ることは変わらない
-- 拡張子を落として `./models` と書く。解決先が転送だけのファイルかどうかを、このルールは読まない
-- 転送だけのファイルをもう 1 段挟み、そちらを `index` 以外の名前にする
+A specifier assembled while the program runs is not read. That shape is reported separately by [forbid-unresolvable-module-specifier--write-a-statically-resolvable-specifier](forbid-unresolvable-module-specifier--write-a-statically-resolvable-specifier.md).
 
-## オプション
+### Configuration
 
-持たない。
+None. The only material this rule judges on is the spelling of the specifier, and it carries no threshold and no vocabulary. Opening an exclusion would be the entry point for writing "this one forward may pass" into a setting. Holding a package's published entry out is a decision belonging to the side that places the surface, and [no-barrel-module--declare-in-the-owning-module](no-barrel-module--declare-in-the-owning-module.md) carries it as `exclude`.
 
-このルールが判定に使う材料は指定子の綴りだけで、閾値も語彙も持たない。除外の口を開けると、それが「この転送だけは通ってよい」を設定に書く入口になる。パッケージの公開エントリを外す判断は、面を置く側の [no-barrel-module--declare-in-the-owning-module](no-barrel-module--declare-in-the-owning-module.md) が `exclude` として持っている。
+### Why it is not shipped by default
 
-## 既定で配らない理由
+The same reason as [no-barrel-module--declare-in-the-owning-module](no-barrel-module--declare-in-the-owning-module.md). This repository expresses its published surface as re-exports in `src/index.ts`, and forbidding reads through that surface contradicts keeping the surface at all. Naming it in `rules` is what turns it on.
 
-[no-barrel-module--declare-in-the-owning-module](no-barrel-module--declare-in-the-owning-module.md) と同じである。このリポジトリは公開面を `src/index.ts` の再エクスポートで表しており、その面を経由して読む形を禁じると、面を持つ構成そのものと食い違う。
+## Fix
 
-## 検出が届かない範囲
+Rewrite the specifier to the module declaring the name. What the forward points at can be read by opening the re-export-only module being named.
 
-指定子の指し先を読まない。`index` 以外の名前を持つ転送だけのファイルは、名指ししても報告されない。逆に、`index` という名前でありながら宣言を持つモジュールを名指しした場合は報告される。名前の慣習に乗った判定であり、実体を見た判定ではない。
+Reading a published entry from outside the package spells the specifier as a package name, which is not relative and never enters this rule. A report therefore means something inside the same package is reading through its own surface. That shape has nothing to do with what a surface is for, so name the declaring module.
 
-拡張子を書かない相対指定は報告しない。`./models` は `models.ts` にも `models/index.ts` にも解決されうるので、どちらであるかを構文から決められない。
+<!-- BEGIN GENERATED examples -->
 
-外部パッケージは見ない。そのパッケージが面を持っているかどうかに関わらず、読む側に組み替える手段が無い。
+Code this rule rejects.
 
-指定子が実行時に組み立てられる形は読まない。この形は [forbid-unresolvable-module-specifier--write-a-statically-resolvable-specifier](forbid-unresolvable-module-specifier--write-a-statically-resolvable-specifier.md) が別に報告する。
+```ts
+// naming a re-export module by its file is reported
+import { total } from './totals/index.ts';
+```
+
+```ts
+// importing for the side effect alone still runs the whole re-export module
+import './totals/index.ts';
+```
+
+Code this rule accepts.
+
+```ts
+// naming the module that declares the binding is the shape this rule asks for
+import { total } from './total.ts';
+```
+
+```ts
+// taking types alone leaves nothing behind once the build is done
+import type { Total } from './totals/index.ts';
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Silencing it with a suppression directive and keeping the specifier
+- Renaming the re-export-only module to something other than `index`. This rule reads the spelling of the specifier alone, so the report clears while values still resolve through a forward
+- Dropping the extension and writing `./models`. Whether that resolves to a forward-only file is not read here
+- Adding one more forward-only file and giving that one a name other than `index`
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `barrelImport` | A module specifier that names a re-export module is forbidden. Name the module that declares the binding this statement takes. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

@@ -192,6 +192,7 @@ describe("dont-review-it/no-unchecked-authored-path--include-it-in-every-declare
     invalid: [
       {
         name: "an authored path no declared check opens",
+        documented: true,
         code: MODULE_SOURCE,
         filename: holeEntry,
         options: [{ declaredChecks: DECLARED_CHECKS }],

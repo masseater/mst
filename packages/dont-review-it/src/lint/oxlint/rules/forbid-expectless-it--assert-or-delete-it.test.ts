@@ -10,6 +10,7 @@ describe("dont-review-it/forbid-expectless-it--assert-or-delete-it", () => {
     valid: [
       {
         name: "a block that pins its subject writes the claim its name promises",
+        documented: true,
         filename: SPEC_FILE,
         code: 'it("carries what it summarised", ({ report }) => {\n  expect(report).toStrictEqual({ id: "a", total: 2 });\n});',
       },
@@ -20,6 +21,7 @@ describe("dont-review-it/forbid-expectless-it--assert-or-delete-it", () => {
       },
       {
         name: "a claim written inside a callback of the block stands in the block",
+        documented: true,
         filename: SPEC_FILE,
         code: 'it("carries every row", ({ rows }) => {\n  rows.forEach((row) => {\n    expect(row).toBe("a");\n  });\n});',
       },
@@ -115,6 +117,7 @@ describe("dont-review-it/forbid-expectless-it--assert-or-delete-it", () => {
       },
       {
         name: "declaring how many assertions the block carries is no claim",
+        documented: true,
         filename: SPEC_FILE,
         code: 'it("carries the id", () => {\n  expect.assertions(1);\n});\nit("carries the total", () => {\n  expect.hasAssertions();\n});',
         errors: [{ messageId: "expectlessIt" }, { messageId: "expectlessIt" }],
@@ -161,6 +164,7 @@ describe("dont-review-it/forbid-expectless-it--assert-or-delete-it", () => {
       },
       {
         name: "a claim parked in a helper leaves the block claiming nothing",
+        documented: true,
         filename: SPEC_FILE,
         code: 'const expectShape = (subject) => {\n  expect(subject.id).toBe("a");\n};\nit("carries the shape", ({ report }) => {\n  expectShape(report);\n});',
         errors: [{ messageId: "expectlessIt" }],

@@ -1,85 +1,148 @@
+---
+description: "Disallow an equality assertion whose expected value and whose subject are the same written-out literal, so every assertion in the suite compares something the code under test produced"
+---
+
 # no-tautological-assertion--assert-on-a-computed-value
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-等値アサーションのうち、`expect` に渡した値と matcher に渡した期待値が、どちらも書き下したリテラルであり、同じ値であるもの。
+Disallow an equality assertion whose expected value and whose subject are the same written-out literal, so every assertion in the suite compares something the code under test produced
 
-対象の matcher は 3 つ。`toBe` / `toEqual` / `toStrictEqual`。いずれも引数を 1 つ取る呼び出しに限る。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-tautological-assertion--assert-on-a-computed-value.ts`](../../src/lint/oxlint/rules/no-tautological-assertion--assert-on-a-computed-value.ts)
 
-受け手は `expect(...)` の呼び出しに解決できるものに限る。間に `not` / `resolves` / `rejects` が挟まっていても辿る。`assertion(1).toBe(1)` のように `expect` でない関数の結果に対する呼び出しは対象外。
+<!-- END GENERATED rule-header -->
 
-「書き下したリテラル」として扱うのは次のもの。
+## Violation
 
-- 文字列・数値・真偽値・`null`・BigInt のリテラル
-- 式を含まないテンプレートリテラル（``expect(`parsed`).toBe("parsed")`` は同じ値）
-- 数値リテラルへの単項マイナス（`-1`）
+An equality assertion where the value handed to `expect` and the expected value handed to the matcher are both written-out literals and are the same value.
 
-同じ値かどうかは値で比べる。綴りは見ない。`expect(1).toBe(1.0)` は同じ値なので報告する。型が違えば別の値である。`expect("1").toBe(1)` は報告しない。
+Three matchers are in scope: `toBe`, `toEqual`, `toStrictEqual`, each limited to a call taking one argument.
 
-`not` を挟んだ形（`expect(1).not.toBe(1)`）も報告する。この場合は必ず失敗する側に倒れるが、どちらの向きであっても、検査対象のコードを 1 行も動かさずに結果が決まっていることは同じである。
+The receiver is limited to what resolves to a call to `expect(...)`. A `not`, `resolves` or `rejects` in between is followed. A call on the result of a function that is not `expect`, such as `assertion(1).toBe(1)`, is out of scope.
 
-### 意図的に広げていない範囲
+These count as a written-out literal.
 
-| 形 | 対象にしない理由 |
+- String, number, boolean, `null` and BigInt literals
+- A template literal carrying no expression (``expect(`parsed`).toBe("parsed")`` is the same value)
+- A unary minus on a number literal (`-1`)
+
+Sameness is compared by value; the spelling is not read. `expect(1).toBe(1.0)` is the same value and is reported. Different types are different values: `expect("1").toBe(1)` is not reported.
+
+A form with `not` in between (`expect(1).not.toBe(1)`) is reported too. That one falls on the always-failing side, but in either direction the result is settled without moving one line of the code under test.
+
+### Deliberately not widened
+
+| Shape | Why it is left out |
 | --- | --- |
-| アサーションを 1 つも持たないテスト | 有効済みの `vitest/expect-expect` が既に見ている。責務が重複する |
-| `expect({ total: 1 }).toEqual({ total: 1 })` | オブジェクトリテラル・配列リテラルは「書き下したリテラル」に含めていない。判定を同一リテラルの比較に絞っている |
-| `expect(/a/).toEqual(/a/)` | 正規表現リテラルは参照が別なので、この比較は**必ず失敗する**。「絶対に失敗しない」とは別の欠陥で、実行すれば分かる |
-| `expect(1).toBe(2)` | 値が違う。実行すれば落ちるので、緑のまま隠れることはない |
-| `expect(total(1, 2)).toBe(3)` | 左が呼び出し。検査対象が動いている |
-| `expect(parsed).toBe(3)` | 左が束縛。値はどこか別の場所で決まっている |
+| A test holding no assertion at all | The already-enabled `vitest/expect-expect` reads that. The responsibility would duplicate |
+| `expect({ total: 1 }).toEqual({ total: 1 })` | Object and array literals are not among the written-out literals. The judgment is narrowed to comparisons of identical literals |
+| `expect(/a/).toEqual(/a/)` | Regular expression literals are compared by reference, so this comparison **always fails**. That is a different defect from "never fails", and running it shows it |
+| `expect(1).toBe(2)` | The values differ. It fails when run, so it does not hide behind green |
+| `expect(total(1, 2)).toBe(3)` | The left side is a call. The code under test runs |
+| `expect(parsed).toBe(3)` | The left side is a binding. The value was settled somewhere else |
 
-このルールは無意味なテストの全体を扱うものではない。同一リテラルどうしの比較という、決定的に判定できる 1 点だけを扱う。
+This rule does not take on meaningless tests as a whole. It takes the one point that can be settled deterministically: a comparison between identical literals.
 
-ファイル種別による絞り込みもしない。`.test.ts` の外に書かれた同じ形も報告する。テストの外にあるなら、それはアサーションが置かれる場所を間違えている。
+There is no narrowing by file kind. The same shape written outside a `.test.ts` is reported. Outside a test, the assertion has been placed in the wrong location.
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「テストケースは、検査対象のコードの振る舞いを観測している」ことである。
+A test case observes the behaviour of the code under test.
 
-`expect(1).toBe(1)` はこれを満たさない。左辺も右辺もこのファイルの中で決まっていて、検査対象のコードは 1 行も走らない。このアサーションは、プログラムがどう書き換えられても同じ結果を返す。
+`expect(1).toBe(1)` does not meet that. Both sides are settled inside this file and not one line of the code under test runs. That assertion returns the same result however the program is rewritten.
 
-壊れ方は 2 層ある。
+It breaks in two layers.
 
-1 層目は、テストが目的を果たしていないことである。ケース名には「合計を計算する」と書いてあり、中身は 1 と 1 を比べている。名前が主張している検査は行われていない。
+The first is that the test does not do its job. The case name says "computes the total", and the body compares 1 with 1. The check the name claims is not performed.
 
-2 層目は、行われていないことが緑として現れることである。テストの数は増え、カバレッジの数字も（ケースがどこかを通っていれば）動く。人が見るのは「通った件数」であって、各ケースが何を観測したかではない。壊れたときに落ちるはずのケースが落ちない。それが分かるのは、本番で壊れたあとにテストを読み直したときである。
+The second is that not performing it shows up as green. The test count grows and the coverage number moves (if the case passes through anywhere). What a person sees is "how many passed", not what each case observed. The case that should fail when something breaks does not. That is learnt when the tests are reread after production broke.
 
-この形は、書き手が手を抜いた結果というより、書く順序の帰結として出る。何を検査すべきかが決まる前に、テストの器だけを先に置くと、器を通すために両辺へ同じ値を書くことになる。器は残り、埋めるつもりだった中身は忘れられる。
+The shape arises less from a writer cutting corners than as a consequence of the order of writing. Place the test's vessel before settling what to check and the vessel gets filled with the same value on both sides just to make it pass. The vessel stays, and the contents it was meant to hold are forgotten.
 
-## どう直すか
+### Configuration
 
-そのケースが何を検査するはずだったかを決め、その主語を左辺に置く。
+None. Only whether the rule is on or off is settled by the configuration.
 
-**戻り値を検査する場合**、検査対象の関数を呼んでその結果をアサートする。
+## Fix
+
+Settle what that case was supposed to check, and put that subject on the left.
+
+**To check a return value**, call the function under test and assert on its result.
 
 ```ts
 expect(total([1, 2])).toBe(3);
 ```
 
-**状態を検査する場合**、操作を実行してから、残った状態を読む。
+**To check state**, run the operation and then read the state that remains.
 
 ```ts
 addTo(basket, item);
 expect(basket.items).toHaveLength(1);
 ```
 
-**協調相手への呼び出しを検査する場合**、渡された引数をアサートする。
+**To check a call to a collaborator**, assert on the arguments it received.
 
-いずれも書けない場合、そのケースには主語が無い。その値を作る経路がプログラムに無いということなので、ケースを消すか、検査すべき振る舞いを先に決める。器だけを残さないこと。
+Where none of them can be written, that case has no subject. There is no route in the program producing that value, so delete the case, or settle first what behaviour should be checked. Do not leave the vessel alone.
 
-期待値の側を定数に切り出すのは直し方ではない。`expect(EXPECTED).toBe(EXPECTED)` は綴りが変わっただけで、検査対象が動いていないことは同じである。
+Extracting the expected side into a constant is not a fix. `expect(EXPECTED).toBe(EXPECTED)` merely changes the spelling; the code under test is still not running.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- 片方を定数や変数に置き換える（`const expected = 1; expect(expected).toBe(1);`）。このルールは書き下したリテラルどうしだけを見るので報告は消えるが、検査対象のコードは相変わらず動いていない
-- 値を式で組み立てて綴りをずらす（`expect(1).toBe(0 + 1)`）。同上
-- 片方をオブジェクトリテラルで包む（`expect({ total: 1 }).toEqual({ total: 1 })`）。判定の範囲外に出るだけで、両辺がこのファイルで決まっていることは変わらない
-- 恒等関数を通して呼び出しの形にする（`expect(identity(1)).toBe(1)`）。左辺が呼び出しになるので報告は消える。通した関数は `no-identity-wrapper--call-the-target-directly` に当たる
-- matcher を対象外のものに変える（`toBeCloseTo` など）。比べているものが同じである以上、結果が固定であることは変わらない
-- ケースごと `it.skip` にする。検査されていない状態は同じで、緑であることだけが保たれる
-- 抑制ディレクティブ
+Code this rule rejects.
 
-## オプション
+```ts
+// a number compared with the same number is reported
+expect(1).toBe(1);
+```
 
-取らない。有効か無効かだけを設定側で決める。
+```ts
+// the same value written two ways is still the same value
+expect(1).toBe(1.0);
+```
+
+Code this rule accepts.
+
+```ts
+// asserting on what the function under test returned passes
+expect(total(1, 2)).toBe(3);
+```
+
+```ts
+// two different literals compare something even if the code never runs
+expect(1).toBe(2);
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Replacing one side with a constant or a variable (`const expected = 1; expect(expected).toBe(1);`). This rule reads written-out literals against written-out literals, so the report clears, and the code under test is still not running
+- Assembling the value with an expression to shift the spelling (`expect(1).toBe(0 + 1)`). As above
+- Wrapping one side in an object literal (`expect({ total: 1 }).toEqual({ total: 1 })`). It merely leaves the judgment's range; both sides are still settled in this file
+- Passing through an identity function to make it a call (`expect(identity(1)).toBe(1)`). The left side becomes a call so the report clears. The function you passed through lands on [no-identity-wrapper--call-the-target-directly](./no-identity-wrapper--call-the-target-directly.md)
+- Changing to a matcher out of scope (`toBeCloseTo` and the like). As long as what is compared is the same, the result stays fixed
+- Making the case `it.skip`. Nothing is checked either way, and only the green is preserved
+- A suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `tautologicalAssertion` | An equality assertion must not compare a written-out literal against the same written-out literal. Put the subject the test is about on the left: call the function under test and assert on what it returned, read the state the operation left behind, or assert on the argument a collaborator was called with. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

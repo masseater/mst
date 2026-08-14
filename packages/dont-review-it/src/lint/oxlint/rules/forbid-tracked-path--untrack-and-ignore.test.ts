@@ -213,6 +213,7 @@ describe("dont-review-it/forbid-tracked-path--untrack-and-ignore", () => {
     invalid: [
       {
         name: "an environment file that reached the index is reported",
+        documented: true,
         code: HOST_CODE,
         filename: join(trackedEnv, HOST_FILE_NAME),
         errors: [{ messageId: "trackedForbiddenPath" }],

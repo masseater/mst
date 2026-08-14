@@ -8,6 +8,7 @@ describe("dont-review-it/forbid-it-extend--use-test-extend", () => {
     valid: [
       {
         name: "the fixture factory standing on test is the shape this rule asks for",
+        documented: true,
         code: "const it = test.extend({ subject: async ({}, use) => use(runSut()) });",
       },
       {
@@ -76,12 +77,14 @@ describe("dont-review-it/forbid-it-extend--use-test-extend", () => {
       },
       {
         name: "a member other than the builder on the test block spelling is left alone",
+        documented: true,
         code: "it.each([1, 2])('adds %i', () => {});",
       },
     ],
     invalid: [
       {
         name: "the fixture builder on the test block spelling is reported and rewritten onto the base",
+        documented: true,
         code: "it.extend({ subject: async ({}, use) => use(runSut()) });",
         output: "test.extend({ subject: async ({}, use) => use(runSut()) });",
         errors: [{ messageId: "itExtend" }],
@@ -125,6 +128,7 @@ describe("dont-review-it/forbid-it-extend--use-test-extend", () => {
       },
       {
         name: "a rebinding of the test block spelling is followed to the spelling it came from",
+        documented: true,
         code: "const check = it;\ncheck.extend({ a: 1 });",
         errors: [{ messageId: "itExtend" }],
       },

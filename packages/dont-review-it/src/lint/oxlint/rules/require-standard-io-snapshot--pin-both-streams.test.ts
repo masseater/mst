@@ -24,6 +24,7 @@ ${STDERR_SNAPSHOT}`,
       },
       {
         name: "the stream bindings standing as the subjects pin both streams",
+        documented: true,
         code: `${FIXTURE_IMPORT}
 const it = standardIoTest.extend("theRun", { auto: true }, () => {
   runTheCli();
@@ -77,6 +78,7 @@ standardIoTest("pins stderr", ({ stderr }) => {
       },
       {
         name: "a stream reached through a chain of fixtures still counts as pinned",
+        documented: true,
         code: `${FIXTURE_IMPORT}
 const it = standardIoTest
   .extend("theRun", ({ stdout }) => runTheCli(stdout))
@@ -169,6 +171,7 @@ standardIoTest("asserts content only", ({ stdout }) => {
       },
       {
         name: "pinning stdout alone leaves stderr unpinned",
+        documented: true,
         code: `${FIXTURE_IMPORT}
 ${STDOUT_SNAPSHOT}`,
         errors: [{ messageId: "missingSnapshot" }],
@@ -244,6 +247,7 @@ standardIoTest("loses the subjects", ({ stdout, stderr }) => {
       },
       {
         name: "a snapshot rooted at a binding unrelated to the streams pins neither of them",
+        documented: true,
         code: `${FIXTURE_IMPORT}
 standardIoTest("snapshots an unrelated subject", ({ stdout, stderr }) => {
   expect(buffer.text).toMatchInlineSnapshot();

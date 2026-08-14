@@ -1,138 +1,218 @@
+---
+description: "Disallow calling a method that writes to a receiver which is not an array - a collection, a moment, a query string, a form, a sink, or a class of one's own whose body writes to `this` - so a changed value always appears as a newly derived binding"
+---
+
 # no-receiver-mutation--derive-new-value
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-メンバ式のうち、レシーバの型とメンバ名の組が「レシーバ自身を書き換える」と確定できるもの。報告位置は式全体ではなくメソッド名そのもの。
+Disallow calling a method that writes to a receiver which is not an array - a collection, a moment, a query string, a form, a sink, or a class of one's own whose body writes to `this` - so a changed value always appears as a newly derived binding
 
-呼び出しの形に限らない。メソッドを値として取り出す形（`const write = counts.set;`）も、`call` / `apply` / `bind` を経由する形（`counts.set.call(counts, 'a', 1)`）も、同じメンバ式なのでその場で報告する。取り出した時点で報告するので、関数値として渡してから呼ぶ経路は最初から作れない。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-receiver-mutation--derive-new-value.ts`](../../src/lint/oxlint/rules/no-receiver-mutation--derive-new-value.ts)
 
-判定の経路は 3 つあり、報告メッセージがどれで当たったかを区別する。
+<!-- END GENERATED rule-header -->
 
-**1. 組み込みの型とメソッドの固定列挙**
+## Violation
 
-型名とメソッド名の組で持つ。名前だけの一致では報告しない。
+A member expression where the pair of the receiver's type and the member name can be settled as "writing to the receiver itself". The report stands on the method name rather than on the whole expression.
 
-| 型 | 書き換えるメソッド |
+Not limited to the call shape. Taking the method as a value (`const write = counts.set;`), and going through `call` / `apply` / `bind` (`counts.set.call(counts, 'a', 1)`), are the same member expression and are reported on the spot. Reporting at the moment it is taken out means the route of passing it on as a function value and calling it later cannot be built at all.
+
+There are three judgment routes, and the message distinguishes which one hit.
+
+**1. A fixed enumeration of built-in types and methods**
+
+Held as pairs of a type name and a method name. A name match alone is not reported.
+
+| Type | Writing methods |
 | --- | --- |
 | `Map` / `WeakMap` | `set` / `delete` / `clear` |
 | `Set` / `WeakSet` | `add` / `delete` / `clear` |
-| `Date` | `setTime` と各単位のセッター（`setFullYear` から `setUTCSeconds` まで） |
+| `Date` | `setTime` and the per-unit setters (from `setFullYear` through `setUTCSeconds`) |
 | `URLSearchParams` | `append` / `set` / `delete` / `sort` |
 | `FormData` / `Headers` | `append` / `set` / `delete` |
-| `DataView` | `setInt8` から `setBigUint64` までの書き込み系 |
+| `DataView` | The writing family from `setInt8` through `setBigUint64` |
 | `WritableStreamDefaultWriter` | `write` / `close` / `abort` |
 | `ReadableStreamDefaultController` / `ReadableByteStreamController` | `enqueue` / `close` / `error` |
 | `TransformStreamDefaultController` | `enqueue` / `terminate` / `error` |
 
-後半 4 つは投入口（sink）として別のメッセージで報告する。導出に書き換えられない形なので、直し方が違う。
+The last four are reported as sinks, with a different message. They cannot be rewritten as derivations, so the fix differs.
 
-この列挙は閉じている。実行環境が備える他の可変オブジェクトを足すかは配備時に決める。足すときの置き場所はこの表であって、免除の一覧ではない。
+The enumeration is closed. Whether to add other mutable objects the runtime offers is settled at deployment. Where they go is this table, not an exemption list.
 
-**2. このリポジトリで本体を読めるクラスの、本体解析**
+**2. Body analysis of a class whose body this repository can read**
 
-レシーバの型がこのファイルで宣言されたクラス、または相対指定の import でこのリポジトリ内のファイルに解決できるクラスであるとき、そのメソッドの本体を読む。本体が `this` へ書き込む（代入・複合代入・増減・プロパティ削除）なら、レシーバを書き換えるメソッドとみなす。
+Where the receiver's type is a class declared in this file, or one resolvable to a file inside this repository through a relative import, that method's body is read. Where the body writes to `this` (assignment, compound assignment, update, property deletion), the method counts as writing to the receiver.
 
-**判定は推移的に閉じる。** そのメソッドが `this` の別のメソッドを呼び、その先が `this` を書き換えるなら、呼び出し元のメソッドも書き換えるものとみなす。1 段で止めると、書き込みを 1 つ内側のメソッドへ押し込むだけで報告が消える。メンバ集合は有限なので不動点で停止し、互いに呼び合う形は既訪印で扱う。
+**The judgment closes transitively.** Where that method calls another method of `this` and that one writes to `this`, the calling method counts as writing too. Stop at one step and pushing the write one method inward clears the report. The member set is finite, so it stops at a fixed point, and mutually calling methods are handled with a visited marker.
 
-コンストラクタ、フィールド初期化子、アクセサ（getter / setter）が書く分は数えない。呼び出しの形をとらないためで、これらは代入を見るルールの側の話になる。自身の `this` を持つ通常の関数の中の書き込みも数えない。アロー関数は外側の `this` を継承するので数える。
+What a constructor, a field initializer or an accessor writes is not counted: they do not take the call shape, and they belong to the rule that reads assignments. A write inside an ordinary function carrying its own `this` is not counted either. An arrow function inherits the enclosing `this` and is counted.
 
-**3. 型が潰れているレシーバ**
+**3. A receiver whose type has collapsed**
 
-レシーバの注釈が `any` または `unknown` のとき、1 の列挙にある**メソッド名の一致だけ**で報告する。組で判定できないが、確定できないことは許可の根拠にならないので安全側に倒す。メッセージは「書き換えると確定した」ではなく「書き換えないと確定できなかった」ことを伝える。
+Where the receiver's annotation is `any` or `unknown`, the report stands on **a method name match alone** against the enumeration in 1. It cannot be judged as a pair, but being unsettleable is no grounds for permission, so it falls on the safe side. The message says "could not be settled as not writing" rather than "settled as writing".
 
-**実行時にしか決まらないキー**
+**A key settled only at run time**
 
-上の判定でレシーバの型が確定し、その型が書き換えるメソッドを持つとき、静的に確定しないキーによる呼び出し（`counts[picked]('a', 1)`）を報告する。ただしキーが数値リテラルであるか、数値の注釈を持つ束縛であるか、数値リテラルで初期化された束縛であるときは報告しない。その形は関数を要素に持つコレクションの要素呼び出しであってメソッド呼び出しではない。
+Where the judgments above settle the receiver's type and that type carries writing methods, a call through a key that does not settle statically (`counts[picked]('a', 1)`) is reported. Not, however, where the key is a numeric literal, a binding carrying a numeric annotation, or a binding initialized with a numeric literal. That shape is an element call on a collection holding functions rather than a method call.
 
-**名前と包みの扱い**
+**Names and wrappers**
 
-メソッド名は静的に確定できる 3 つの書き方を同じものとして扱う。ドット記法（`counts.set(...)`）、文字列リテラルによる添字アクセス（`counts["set"](...)`）、置換を含まないテンプレートリテラルによる添字アクセス（``counts[`set`](...)``）。
+Method names are read alike in the three spellings that settle statically: dot notation (`counts.set(...)`), a string-literal subscript (`counts["set"](...)`), and a template-literal subscript with no substitution (``counts[`set`](...)``).
 
-型アサーション・`satisfies`・非 null 表明・省略可能連結は剥がしてから判定する。包む前の式から型が読めればそれを使い、読めないときはアサーションが名指しした型を使う。包むだけで検出を外せる状態を残さない。
+Type assertions, `satisfies`, non-null assertions and optional chains are peeled before the judgment. Where the type is readable from the expression before the wrapper, that is used; where it is not, the type the assertion names is used. No state is left where wrapping alone takes the detection off.
 
-出自による免除は持たない。その場で作ったばかりの値に対する書き込み（`new Date().setHours(0)`）も報告する。
+There is no exemption by origin. A write to a value just made on the spot (`new Date().setHours(0)`) is reported.
 
-### 型情報を使わないこと
+### Not using type information
 
-不変条件の記述は「レシーバの静的型」で判定すると定めている。このリポジトリの oxlint JS plugin には型情報が無いので、その判定を**構文で確定できる範囲に絞って**実装している。範囲は次のとおり。
+The statement of the invariant settles the judgment on "the receiver's static type". This repository's oxlint JS plugin has no type information, so that judgment is implemented **narrowed to what syntax can settle**. The range:
 
-- `new` 式のコンストラクタ名（`const counts = new Map<string, number>();`）
-- 束縛の型注釈（`const publish = (counts: Map<string, number>) => ...`）。合併型・交差型は構成要素の 1 つでも当たれば対象にする
-- 型引数の制約（`<Counts extends Map<string, number>>`）。制約を辿って判定する
-- 同じファイル内の束縛。宣言の注釈と初期化式を辿る
+- The constructor name of a `new` expression (`const counts = new Map<string, number>();`)
+- A binding's type annotation (`const publish = (counts: Map<string, number>) => ...`). A union or an intersection is in scope where any constituent hits
+- A type parameter's constraint (`<Counts extends Map<string, number>>`), followed through the constraint
+- A binding inside the same file, following the declaration's annotation and its initializer
 
-型名がこのファイルの宣言や import に束縛されているときは、組み込みの列挙を引かない。名前が同じでも別物だからである。その場合に見るのは経路 2 だけで、クラスの本体が読めなければ何も報告しない。
+Where a type name is bound to a declaration or an import in this file, the built-in enumeration is not consulted: the same name is a different thing. Only route 2 is read there, and where the class's body cannot be read, nothing is reported.
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「束縛された値は、それを受け取ったメソッド呼び出しによって書き換えられない」ことである。ある名前が指すオブジェクトを目にしたとき、その中身は作られた時点のままだと仮定してよい。この仮定は型が何であっても成り立つ。
+A bound value is not rewritten by a method call it receives. Seeing an object a name points at, one may assume its contents are as they were when it was made. The assumption holds whatever the type.
 
-理由は 2 層ある。1 層目は、変更の事実が呼び出し行の形に現れないことである。`counts.set('a', 1)` は返り値ではなくレシーバを変えるので、その行を読んだだけでは何が変わったのかが分からず、メソッド名を 1 つずつ破壊的かどうか分類しながら読むことになる。2 層目は、その影響が呼び出し箇所の外に出ることである。参照を共有している側は、書き換えた側のコードを読まない限り追えない形で変わる。
+Two layers of reason. The first is that the fact of the change does not appear in the shape of the calling line. `counts.set('a', 1)` changes the receiver rather than the return value, so reading that line does not say what changed, and reading becomes a matter of classifying method names one by one as destructive or not. The second is that the effect leaves the call site: whoever shares the reference is changed in a way they cannot follow without reading the code that wrote.
 
-このルールは同じ不変条件を 3 本で分担するうちの 1 本である。[no-reassign--use-spread-or-iife](./no-reassign--use-spread-or-iife.md) が代入の形を型を見ずに担当し、[no-array-mutation--derive-new-array](./no-array-mutation--derive-new-array.md) が配列レシーバへのメソッド呼び出しを担当し、配列以外のレシーバへのメソッド呼び出しがここに来る。担当を置かないと、同じ操作を連想配列や集合や自前クラスに持ち替えるだけで規律の外に出られる。3 本は揃えて有効化する。
+This rule is one of three dividing the same invariant. [no-reassign--use-spread-or-iife](./no-reassign--use-spread-or-iife.md) takes the assignment shape without reading types, [no-array-mutation--derive-new-array](./no-array-mutation--derive-new-array.md) takes method calls on array receivers, and method calls on non-array receivers arrive here. Without one of them, the same operation leaves the discipline by moving to a map, a set or a class of your own. Enable the three together.
 
-破壊的かどうかを名前だけで決めないのも同じ理由である。`set` `add` `append` `delete` は書き換えない API にも広く使われる。型とメソッド名の組で判定することがこのルール成立の前提になる。
+Not settling destructiveness by name alone is the same reason. `set`, `add`, `append` and `delete` are widely used by APIs that write nothing. Judging on the pair of type and method name is the premise this rule stands on.
 
-## どう直すか
+### Configuration
 
-元の値を変えず、必要な形の新しい値を作って束縛する。
+None. Only the on / off switch is offered: no adding or excluding target types and methods, and no narrowing by file.
 
-| レシーバ | 導出の形 |
+Make exceptions expressible as configuration and the room to judge "does this count as an exception" returns per violation, losing the very purpose of fixing the spelling to one. An argument that an exception is needed is treated as an argument about whether to enable this rule, not about a setting's value.
+
+This rule is part of a set. Enable it at the same severity and at the same time as [no-reassign--use-spread-or-iife](./no-reassign--use-spread-or-iife.md) and [no-array-mutation--derive-new-array](./no-array-mutation--derive-new-array.md). Introduce only part and a period arises where only some shapes of one invariant are enforced.
+
+### Not violations
+
+Two groups, on different grounds.
+
+**(a) Deliberately not violations**
+
+- Method calls that do not write to the receiver: reading, searching, transforming, deriving a new value. `counts.get('a')` and `seen.has('a')` are out of scope
+- Calling an enumerated name on a receiver whose type is not enumerated. The judgment is by pair, so a name match with a type mismatch is not reported
+- Method calls on an array-like receiver. `no-array-mutation--derive-new-array` takes them; two rules do not report one call twice
+- Mutation shaped as an assignment (`held.at = stamp` / `items[0] = x`). `no-reassign--use-spread-or-iife` takes it
+- A write to `this` inside a method body for a class to initialize and maintain its own state. This rule reads call positions, not definition positions
+- An element call through a key whose static type is assignable to a number (`handlers[0]()`). That is element access rather than a method call
+- A type name bound to a declaration or an import in this file. The built-in enumeration is not consulted
+
+**(b) Not detected, and not permitted**
+
+Drop this label and both the implementer and the writer misread it as permission. The shapes here are ones this rule does not report; they may not be written. By the norms they are violations and are refused in review.
+
+Because type information is not used, this range is wider than the statement of the invariant assumed.
+
+- **A receiver reached through a property** (`this.counts.set(...)` / `state.counts.set(...)`). The property's type lives on the declaring side and cannot be read from the call expression
+- **A function's return used directly as the receiver** (`loadCounts().set('a', 1)`). A call expression carries no type annotation
+- **An annotation through a type alias** (`counts: Counts` against `type Counts = Map<string, number>`). Following an alias needs type resolution
+- **An unannotated parameter or binding**, and a binding taken out by destructuring or by iteration
+- **A class taken in from a package.** The inside of `node_modules` is not read, so body analysis does not apply. Crossing one or more re-exports is the same
+- **An external type with a declaration and no body.** The statement of the invariant placed a safe-side route here for "a method returning `void` or the receiver's own type", but in an environment without type information the return shape cannot be read, so it is not implemented. Where such a shape needs catching, add it to the built-in enumeration
+- **Binding a type carrying writing methods to another name outside this file and using that**
+
+## Fix
+
+Leave the original value alone and build a new value of the shape you need, then bind it.
+
+| Receiver | The derivation |
 | --- | --- |
-| 連想配列 | 元の中身を展開して新しい `Map` を作る。要素を除くなら、元から絞り込んだ列を作ってから組み立てる |
-| 集合 | 同じく展開して新しい `Set` を作る |
-| 日時 | セッターで進めるのではなく、必要な時刻を持つ新しい `Date` を作る |
-| クエリ文字列・フォーム・ヘッダ | 組み上がった状態を一度に作る。空で作ってから足す形にしない |
-| バイト列の view | 新しいバッファを作り、新しい view から読む |
-| 自前クラス | 状態を書き換えるメソッドではなく、新しいインスタンスを返すメソッドにする |
+| A map | Spread the original contents into a new `Map`. To drop an entry, build a narrowed sequence from the original and assemble from that |
+| A set | Spread likewise into a new `Set` |
+| A moment | Rather than advancing with setters, make a new `Date` holding the time you need |
+| A query string, a form, headers | Build the assembled state in one go. Do not make an empty one and add to it |
+| A view over bytes | Make a new buffer and read from a new view |
+| A class of your own | Make the method return a new instance rather than rewrite state |
 
-このパッケージ自身の `lib/receiver-mutation/mutating-members.ts` が後者の形をとっている。列挙を組み立てるとき、空の `Map` を作って `set` を並べるのではなく、組を並べた配列から `new Map(...)` を一度に作っている。読み手は宣言行だけでその中身を確定できる。
+This package's own `lib/receiver-mutation/mutating-members.ts` takes the latter shape: assembling the enumeration builds `new Map(...)` in one go from an array of pairs rather than making an empty `Map` and lining `set` calls up. A reader settles its contents from the declaration line alone.
 
-投入口（sink）への書き込みは導出に書き換えられない。外界への出力であって、束縛された値の書き換えとは意味が違うためである。この形が出たときは抑制の正規手順に乗せる。抑制は理由を書いた専用のディレクティブに限り、汎用の無効化コメントは [no-silent-suppression--fix-or-justify-inline](./no-silent-suppression--fix-or-justify-inline.md) が報告する。理由の記述と承認の記録が要るという条件は、抑制を書く側の心得ではなく機械の受理条件である。
+A write to a sink cannot be rewritten as a derivation: it is output to the outside world and means something different from rewriting a bound value. Where that shape appears, put it through the proper suppression procedure. A suppression is limited to a dedicated directive carrying a reason, and a general disabling comment is reported by [no-silent-suppression--fix-or-justify-inline](./no-silent-suppression--fix-or-justify-inline.md). Requiring a reason and a record of approval is the machine's condition for accepting it, not advice for whoever writes one.
 
-自動修正は提供しない。どの形の新しい値を作るかの選択を伴い、機械的に一意へ定まらない。
+There is no automatic fix. It involves choosing what shape of new value to build, which does not settle mechanically on one answer.
 
-## 違反とみなさないもの
+<!-- BEGIN GENERATED examples -->
 
-根拠が違うので 2 つに分けて扱う。
+Code this rule rejects.
 
-### (a) 意図的に違反としないもの
+```ts
+// setting an entry writes to the associative collection
+const counts = new Map<string, number>();
+counts.set('a', 1);
+```
 
-- レシーバを書き換えないメソッド呼び出し全般。読み取り、検索、変換、新しい値を返す導出系。`counts.get('a')` も `seen.has('a')` も対象外
-- 列挙にある名前を、列挙にない型のレシーバに対して呼ぶ形。判定は組で行うので、名前が一致しても型が一致しなければ報告しない
-- 配列的なレシーバへのメソッド呼び出し。[no-array-mutation--derive-new-array](./no-array-mutation--derive-new-array.md) が担当する。2 本で同じ呼び出しを二重に報告しない
-- 代入の形をとる変異（`held.at = stamp` / `items[0] = x`）。[no-reassign--use-spread-or-iife](./no-reassign--use-spread-or-iife.md) が担当する
-- クラスが自身の状態を初期化・維持するための、メソッド本体の中の `this` への書き込み。このルールが見るのは呼び出し位置であって定義位置ではない
-- 静的型が数値へ代入可能なキーによる要素呼び出し（`handlers[0]()`）。メソッド呼び出しではなく要素アクセスである
-- 型名がこのファイルの宣言や import に束縛されている形。組み込みの列挙は引かない
+```ts
+// a write pushed one method deeper is still a write to the instance
+class Bag {
+  held: string = '';
+  add(entry: string) {
+    this.keep(entry);
+  }
+  keep(entry: string) {
+    this.held = entry;
+  }
+}
+const bag = new Bag();
+bag.add('a');
+```
 
-### (b) 検出されないが、許可ではないもの
+Code this rule accepts.
 
-このラベルを外すと、実装者にも書き手にも「許可」と誤読される。ここに挙げた形は、このルールが報告しないというだけであって、書いてよいという意味ではない。規約上は違反であり、レビューで拒否する。
+```ts
+// reading an entry out of an associative collection leaves it as it was
+const counts = new Map<string, number>();
+counts.get('a');
+```
 
-型情報を使わないため、不変条件の記述が想定していたよりこの範囲は広い。
+```ts
+// a writing method name on a type outside the enumeration is another operation
+const store = new CookieStore();
+store.set('a', 'b');
+```
 
-- **プロパティ経由のレシーバ**（`this.counts.set(...)` / `state.counts.set(...)`）。プロパティの型は宣言側にあり、呼び出し式からは読めない
-- **関数の返り値をそのままレシーバにした形**（`loadCounts().set('a', 1)`）。呼び出し式に型注釈が無い
-- **型エイリアスを経由した注釈**（`type Counts = Map<string, number>` に対する `counts: Counts`）。別名を辿るには型解決が要る
-- **注釈の無い引数・束縛**、および分割代入や反復で取り出した束縛
-- **パッケージから取り込んだクラス**。`node_modules` の中は読まないので、本体解析に乗らない。再輸出を 1 段以上またぐ形も同じ
-- **宣言だけがあって本体が無い外部の型**。不変条件の記述はここに「返り値が `void` かレシーバ自身の型であるメソッド」を安全側で拾う経路を置いていたが、型情報が無い環境では返り値の形を読めないため実装していない。拾いたい形が出たときは組み込みの列挙に足す
-- **書き換えるメソッドを持つ型を、このファイルの外で別名に束縛してから使う形**
+<!-- END GENERATED examples -->
 
-## 禁じる回避策
+### Forbidden bypasses (do not do this)
 
-- **メソッドを値として取り出してから呼ぶ、`call` / `apply` / `bind` で適用する、実行時に決まるキーで引く。** いずれも報告する。取り出しの位置とキーの位置の両方を見ている
-- **レシーバをアサーションで包んで判定から隠す。** 包みを剥がしてから判定する
-- **同じ操作を配列や添字代入に持ち替える。** 束の別の 2 本が報告する
-- **書き込みを 1 つ内側のメソッドへ押し込む。** 本体解析は推移的に閉じているので報告は消えない
-- **報告を止めることだけを目的にクラスへ包み直す。** 利用側がそのミューテータを呼ぶ形はこのルールが報告する
-- **汎用の lint 無効化コメントで黙らせる。** [no-silent-suppression--fix-or-justify-inline](./no-silent-suppression--fix-or-justify-inline.md) が報告する
+- **Taking the method as a value and calling it, applying it through `call` / `apply` / `bind`, or looking it up by a key settled at run time.** All are reported; both the extraction position and the key position are read
+- **Wrapping the receiver in an assertion to hide it from the judgment.** Wrappers are peeled before the judgment
+- **Moving the same operation onto an array or an index assignment.** The other two rules of the set report it
+- **Pushing the write one method inward.** Body analysis closes transitively, so the report does not clear
+- **Rewrapping into a class solely to stop a report.** The consumer calling that mutator is reported by this rule
+- **Silencing it with a general lint-disabling comment.** [no-silent-suppression--fix-or-justify-inline](./no-silent-suppression--fix-or-justify-inline.md) reports it
 
-## オプション
+## Messages
 
-取らない。有効か無効かの切り替えだけを提供し、対象の型やメソッドの追加・除外、対象ファイルの絞り込みは持たせない。
+<!-- BEGIN GENERATED messages -->
 
-例外を設定として表現できるようにすると、違反ごとに「これは例外に該当するか」を判断する余地が戻り、書き方を 1 つに固定するという目的そのものが失われる。例外が要るという議論は、設定値の議論ではなく、このルールを有効にするかどうかの議論として扱う。
+| messageId | Text |
+| --- | --- |
+| `builtinReceiverMutation` | \`{{method}}\` must not be called on a \`{{type}}\`: it writes to the receiver in place of handing back a new value. Derive the value you need and bind it. {{derivation}} The pair of the type and the method name settles this report, not the name on its own. Carrying the same write over to an array or to an index write is reported by \`no-array-mutation--derive-new-array\` and \`no-reassign--use-spread-or-iife\`. |
+| `sinkReceiverMutation` | \`{{method}}\` must not be called on a \`{{type}}\`: it writes to the receiver, and a write that leaves the program has no new value to derive. Build the whole payload and hand it to whoever owns the sink. |
+| `declaredClassMutation` | \`{{method}}\` must not be called on a \`{{type}}\`: its body writes to \`this\`, and the call changes the receiver where it stands. Return a new \`{{type}}\` from that method and bind what it returns. The judgement follows the body, so moving the write into a method that one calls leaves this report standing, and holding the same state in a collection is reported too. |
+| `collapsedReceiverMutation` | \`{{method}}\` names a method that writes to its receiver, and a receiver typed \`any\` or \`unknown\` must not carry a name from that list. Give the receiver a settled type, and derive a new value in place of writing to the one at hand. This report stands on a receiver that could not be settled, not on one settled as a writer. |
+| `runtimeKeyReceiverMutation` | A method of a \`{{type}}\` must not be reached through a key that settles only while the program runs: the name being called cannot be read here, and the writing methods of \`{{type}}\` are reachable this way. Write the method name out, or derive a new value in place of writing to the one at hand. |
 
-このルールは束の一部である。[no-reassign--use-spread-or-iife](./no-reassign--use-spread-or-iife.md) と [no-array-mutation--derive-new-array](./no-array-mutation--derive-new-array.md) と重大度を揃えて同時に有効化する。一部だけを入れると、同じ不変条件のうち一部の形状だけが強制される期間が生まれる。
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

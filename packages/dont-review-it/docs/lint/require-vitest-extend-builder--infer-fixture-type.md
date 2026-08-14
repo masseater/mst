@@ -1,35 +1,67 @@
+---
+description: "Require every fixture to be declared as its own builder call whose type is inferred from what the factory returns, so the shape a test destructures is the shape the factory produces rather than a hand-written copy that drifts away from it"
+---
+
 # require-vitest-extend-builder--infer-fixture-type
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-プロパティ名が `extend` であるメンバ呼び出しのうち、手前が `expect` でないもの、つまり fixture ビルダの呼び出しを見る。報告する形は 2 つある。
+Require every fixture to be declared as its own builder call whose type is inferred from what the factory returns, so the shape a test destructures is the shape the factory produces rather than a hand-written copy that drifts away from it
 
-- **第 1 引数がオブジェクトリテラルである呼び出し**。fixture をまとめて 1 つのオブジェクトに書き、値は `use(...)` コールバックに渡す旧来の形である。報告はそのオブジェクトリテラルに置く
-- **型引数が書かれている呼び出し**。第 1 引数が fixture 名の文字列であっても、型引数を書いた時点で型は factory の返り値から推論されていない。連鎖するビルダ呼び出しは 1 段が 1 つの呼び出しなので、どの段に書かれていてもその段で報告する。報告は最初の型引数に置く
+- Tool: `oxlint`
+- Fixable: yes
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`require-vitest-extend-builder--infer-fixture-type.ts`](../../src/lint/oxlint/rules/require-vitest-extend-builder--infer-fixture-type.ts)
 
-両方に当たる呼び出し（`test.extend<{ seed: number }>({ seed: 1 })`）は、オブジェクトの形として 1 回だけ報告する。自動修正がこの呼び出しを丸ごと書き換え、型引数もそこで消えるためである。
+<!-- END GENERATED rule-header -->
 
-プロパティ名は、コードに書かれた綴りがそのまま最終的なプロパティ名になる 3 つの形を同じ名前として読む。非計算メンバ（`test.extend`）、文字列リテラルの添字（`test['extend']`）、式を含まないテンプレートリテラルの添字（``test[`extend`]``）である。
+## Violation
 
-手前が何であるかは見ない。`test` でも `it` でも、スイートが自分で作った値でも、引数の形だけで判定する。fixture ビルダの土台をどの綴りに固定するかは `forbid-it-extend--use-test-extend` が担当する。このルールが適用されるのは共有 lint 設定が spec とみなしたファイルだけで、その中で `.extend({ ... })` と書かれるものはテストランナーのビルダ以外に想定していない。
+Member calls whose property name is `extend` and whose receiver is not `expect` — the fixture builder calls — are read. Two shapes are reported.
 
-## なぜそれが要るか
+- **A call whose first argument is an object literal.** The older shape, writing the fixtures gathered into one object and handing values to a `use(...)` callback. The report stands on that object literal
+- **A call carrying a type argument.** Even where the first argument is a fixture name string, writing a type argument means the type is no longer inferred from what the factory returns. Chained builder calls are one call per stage, so whichever stage carries it is reported at that stage. The report stands on the first type argument
 
-守っている不変条件は「fixture の型が実装から読み取られている」ことである。
+A call falling into both (`test.extend<{ seed: number }>({ seed: 1 })`) is reported once, as the object shape, because the automatic fix rewrites that whole call and the type argument goes with it.
 
-型引数は fixture の形の手作業の複製である。factory が返す値が変われば、型引数は書き換えられない限り古いままになる。壊れ方は 2 層ある。
+Property names are read as the same name across the three shapes where the spelling written in the code is itself the final property name: a non-computed member (`test.extend`), a string literal subscript (`test['extend']`), and a template literal subscript carrying no expression (``test[`extend`]``).
 
-1 層目は、複製がずれても何も起きないことである。型引数と factory の返り値は別々に書かれた 2 つの記述で、片方を変えても他方は変わらない。ずれた瞬間にエラーになる箇所がどこにもない。
+What stands before it is not read. `test`, `it`, or a value the suite built itself — the judgment runs on the shape of the arguments alone. Which spelling the fixture builder's base is fixed to belongs to [forbid-it-extend--use-test-extend](./forbid-it-extend--use-test-extend.md). This rule applies only to the files the shared lint configuration counts as specs, and inside those, `.extend({ ... })` is expected to be nothing but the test runner's builder.
 
-2 層目は、ずれた側が型検査の基準になることである。`it` が受け取る fixture の型は型引数から来るので、テストは「factory が実際に返す形」ではなく「作者が書いた形」に対して検査される。テストが実装の変化に気付く仕組みだったはずのものが、実装を見ていない記述に対して緑を出す。この束の他のルールが subject の**値**が SUT 由来かを守っているのに対し、こちらは subject の**型**が実装由来かを守っている。
+### What is no violation
 
-副次的な効果として、`use(...)` コールバックという配管が消える。fixture がどんな形で書かれ得るかが 1 系統に収束するので、fixture を読む他のルールが 2 通りの形を検査し続けなくてよくなる。
+- Registering a custom matcher (`expect.extend({ toBeReport })`). A different API merely sharing the name `extend`, whose only shape takes one object of matchers. It is not reported even carrying a type argument
+- A builder call naming a fixture beside its factory, carrying no type argument (`test.extend("report", () => summarise())`)
+- A builder call carrying options (`test.extend("db", { scope: "file" }, () => openDb())`)
+- The spelling of the builder's base. `it.extend("report", () => summarise())` is not reported here. Fixing the base at `test` belongs to [forbid-it-extend--use-test-extend](./forbid-it-extend--use-test-extend.md)
+- An `extend` call handed no argument at all, and one handed only a spread, carrying no type argument. The fixtures declared cannot be read by this rule, so it is not judged as the object shape. Carrying a type argument, it is reported as the type argument shape
+- A member other than `extend` (`test.each` and the like)
 
-## どう直すか
+### The invariant
 
-fixture 1 つにつきビルダ呼び出し 1 つを書く。名前を第 1 引数に置き、factory は依存を分割代入で受け取り、subject を返り値として返す。型は返り値から推論される。
+What is held is that a fixture's type is read off the implementation.
 
-自動修正がある。`vp lint --fix` を対象ファイルに流すと、決定的に書き換えられる形が連鎖するビルダ呼び出しに変換される。
+A type argument is a hand-made copy of the fixture's shape. Change what the factory returns and the type argument stays old unless it is rewritten. The breakage has two layers.
+
+The first is that nothing happens when the copy drifts. The type argument and the factory's return are two separately written statements, and changing one changes nothing about the other. There is no place anywhere that errors the moment they drift.
+
+The second is that the drifted side becomes the type check's standard. The type of the fixture an `it` receives comes from the type argument, so the test is checked against "the shape the author wrote" rather than "the shape the factory actually returns". What was meant to be the mechanism by which a test notices a change in the implementation turns green against a statement that is not looking at the implementation. Where the other rules of this bundle hold that the subject's **value** comes from the code under test, this one holds that the subject's **type** comes from the implementation.
+
+As a side effect, the plumbing of the `use(...)` callback disappears. The shapes a fixture may be written in converge on one, so the other rules reading fixtures no longer have to keep checking two.
+
+### Configuration
+
+None.
+
+This invariant admits no exception of "this one fixture may write its type by hand". Make an exception expressible in configuration and the fixture carrying it is the one whose type drifts, and the drift is not reported either. That is the same as not having this rule.
+
+## Fix
+
+Write one builder call per fixture. Put the name in the first argument, have the factory receive its dependencies by destructuring, and return the subject as the return value. The type is inferred from the return.
+
+There is an automatic fix. Run `vp lint --fix` over the target files and the shapes that can be rewritten deterministically become chained builder calls.
 
 ```ts
 const it = test.extend({
@@ -52,52 +84,84 @@ const it = test.extend("seed", { id: "a" }).extend("report", async ({ seed }, { 
 });
 ```
 
-書き換えの中身は 4 つである。
+The rewrite does four things.
 
-- 直接の値はそのまま値として渡す形へ
-- factory は `use(...)` に渡していた式を返り値へ移し、`use` の引数を落とす
-- `use(...)` より後ろの文はクリーンアップ登録の中へ移す。factory は `{ onCleanup }` を第 2 引数で受け取る
-- タプルで書かれたオプション付き fixture は、名前とオプションと fixture を並べたビルダ呼び出しへ
+- A direct value is handed over as a value
+- A factory moves the expression it handed to `use(...)` into the return, and drops `use` from the arguments
+- Statements after `use(...)` move inside a cleanup registration. The factory receives `{ onCleanup }` as its second argument
+- A fixture with options written as a tuple becomes a builder call lining up the name, the options and the fixture
 
-fixture 同士の依存も見る。ある fixture が別の fixture を分割代入で受けている場合、依存される側が前の段に来るように並べ替えてから連鎖を組む。
+Dependencies between fixtures are read too. Where one fixture receives another by destructuring, they are reordered so the depended-on side comes at an earlier stage before the chain is built.
 
-自動修正は呼び出しの本文を組み立てるだけで字下げは整えない。`vp check --fix` の 1 回では書き換えた箇所の字下げが戻らないので、もう一度流すか `vp fmt` を走らせる。
+The automatic fix only assembles the call's text; it does not tidy the indentation. One pass of `vp check --fix` leaves the rewritten places unindented, so run it again or run `vp fmt`.
 
-書き換えは fixture の値の決まり方を 1 つだけ変える。旧来の形では `use(x)` に渡した `x` がそのまま fixture の値になるが、ビルダの形では factory が返した値をランナーが await する。`use` に Promise を渡していた場合、書き換え後の fixture は解決済みの値になる。
+The rewrite changes exactly one thing about how a fixture's value is settled. In the older shape the `x` handed to `use(x)` becomes the fixture's value as it is, while in the builder shape the runner awaits the value the factory returned. Where a Promise was handed to `use`, the fixture after the rewrite is the resolved value.
 
-**自動修正が出ない形がある**。次のいずれかに当たると報告だけが出る。手で書き換える。
+**Some shapes get no automatic fix.** Falling into any of these, only the report comes out. Rewrite them by hand.
 
-- スプレッドプロパティ、計算プロパティキー、数値のキー
-- メソッド記法のプロパティ、getter / setter
-- 同じ名前の fixture が 2 つ
-- fixture 同士の依存が循環している
-- `use(...)` が 2 回以上ある、条件分岐やネストした関数の中にしかない、引数を 1 つ取っていない
-- factory が `use(...)` のほかに値を `return` している
-- `use(...)` より後ろに式文でない文がある
-- factory がアロー関数でない、引数がコンテキストと `use` の 2 つでない
-- fixture の値が識別子や呼び出し式で書かれていて、それが関数かどうかを静的に決められない。旧来の形は関数値を factory として扱うので、値として渡し直すと意味が変わり得る
-- ビルダの手前が型アサーションで包まれている、あるいはビルダ自体がオプショナル呼び出しで書かれている
+- A spread property, a computed property key, a numeric key
+- A property written as a method, a getter or a setter
+- Two fixtures under the same name
+- A cycle among fixture dependencies
+- `use(...)` appearing twice or more, standing only inside a branch or a nested function, or not taking exactly one argument
+- A factory that `return`s a value besides calling `use(...)`
+- A statement after `use(...)` that is no expression statement
+- A factory that is no arrow function, or whose parameters are not exactly the context and `use`
+- A fixture value written as an identifier or a call expression, where whether it is a function cannot be settled statically. The older shape treats a function value as a factory, so handing it back as a value could change the meaning
+- The builder's receiver wrapped in a type assertion, or the builder itself written as an optional call
 
-自動修正が出なかったことを「このケースは対象外」と読み替えてはいけない。報告が出ている以上、不変条件は破られている。
+Getting no automatic fix must not be read as "this case is out of range". As long as a report comes out, the invariant is broken.
 
-## 違反にならないもの
+<!-- BEGIN GENERATED examples -->
 
-- カスタムマッチャの登録（`expect.extend({ toBeReport })`）。`extend` という名前を共有しているだけの別の API で、マッチャのオブジェクトを 1 つ受け取る形しか持たない。型引数が書かれていても報告しない
-- 名前と factory を並べたビルダ呼び出しで、型引数を伴わないもの（`test.extend("report", () => summarise())`）
-- オプション付きのビルダ呼び出し（`test.extend("db", { scope: "file" }, () => openDb())`）
-- ビルダの土台の綴り。`it.extend("report", () => summarise())` はこのルールでは報告しない。土台を `test` に固定するのは `forbid-it-extend--use-test-extend` の担当である
-- 引数を 1 つも渡していない `extend` の呼び出しと、引数がスプレッドだけの呼び出しのうち、型引数を伴わないもの。宣言されている fixture をこのルールが読めないため、オブジェクトの形としては判定しない。型引数が書かれていれば型引数の形として報告する
-- `extend` 以外のメンバ（`test.each` など）
+Code this rule rejects.
 
-## 禁じる回避策
+```ts
+// an object of fixtures becomes one builder call carrying the factory
+const test = baseTest.extend({ report: async ({}, use) => { await use(summarise()); } });
+```
 
-- 型引数を残したまま形だけビルダに寄せる。型引数の有無そのものが検出条件なので報告は消えない
-- fixture をオブジェクトごと別の束縛に移してから `extend` に渡す。第 1 引数がオブジェクトリテラルでなくなるのでこのルールは黙るが、旧来の形はそのまま残っており、fixture の型は factory の返り値から推論されていない。型引数を添えればそちらで報告が出る
-- 自動修正が出ないケースを lint の抑制ディレクティブで黙らせる
-- 報告されたファイルを共有 lint 設定の対象から外す
+```ts
+// a written out type argument beside a named fixture is reported on its own
+baseTest.extend<{ report: Report }>("report", () => summarise());
+```
 
-## オプション
+Code this rule accepts.
 
-取らない。
+```ts
+// a fixture named beside its factory reads its type off what the factory returns
+const test = baseTest.extend("report", () => summarise());
+```
 
-この不変条件に「この fixture だけは型を手で書いてよい」という例外は無い。例外を設定で表現できるようにすると、その例外が付いた fixture だけ型がドリフトし、しかもドリフトしていることが報告されなくなる。それはこのルールが無い状態と同じである。
+```ts
+// a scoped fixture takes its options between the name and the factory
+const test = baseTest.extend("db", { scope: "file" }, () => openDb());
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Moving to the builder in form while leaving the type argument. The presence of a type argument is itself a detection condition, so the report does not clear
+- Moving the fixtures into another binding as an object and handing that to `extend`. The first argument stops being an object literal so this rule goes quiet, but the older shape stands as it was and the fixture's type is not inferred from the factory's return. Add a type argument and the report comes out on that side
+- Silencing a case that gets no automatic fix with a lint suppression directive
+- Taking the reported file out of the shared lint configuration's range
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `objectFixtureDeclaration` | A fixture must not be declared by handing an object of fixtures to the builder. Declare each fixture as its own builder call naming the fixture and then its factory, so the fixture type is read off what that factory returns. |
+| `handWrittenFixtureType` | A fixture builder call must not carry a written out type argument. Delete \`{{written}}\` and let each fixture type be read off what its own factory returns. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

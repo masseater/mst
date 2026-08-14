@@ -193,6 +193,7 @@ describe("dont-review-it/no-mixed-package-surface--declare-one-surface", () => {
     invalid: [
       {
         name: "a manifest that declares a runnable entry and an import surface carries both",
+        documented: true,
         code: MODULE_SOURCE,
         filename: bothEntry,
         errors: [

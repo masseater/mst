@@ -1,82 +1,165 @@
+---
+description: "Disallow a statement other than an assertion in the body of a test block, so the subject every assertion reads is the one its fixture handed over"
+---
+
 # require-it-only-expect--move-setup-into-fixture
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-テストブロック（呼び出し連鎖の根が `it` に解決される呼び出し）のコールバック本体に、アサーション以外の文が現れること。
+Disallow a statement other than an assertion in the body of a test block, so the subject every assertion reads is the one its fixture handed over
 
-通すのは 2 つだけである。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`require-it-only-expect--move-setup-into-fixture.ts`](../../src/lint/oxlint/rules/require-it-only-expect--move-setup-into-fixture.ts)
 
-- matcher 呼び出しまで到達した `expect` チェーンの式文。`await` を付けた形、`not` / `resolves` / `rejects` を挟んだ形、`expect.soft(...)` / `expect.poll(...)` から入った形を含む。
-- 列挙した `expect` 名前空間のユーティリティ呼び出しの式文。既定は `expect.assertions(...)` と `expect.hasAssertions()` の 2 つ。
+<!-- END GENERATED rule-header -->
 
-ブロックでない簡潔形のアロー本体は、その式自体が上の 2 つのどちらかであること。`return` で返す形も、返している式が上の 2 つのどちらかであれば通る。
+## Violation
 
-テストブロックの判定は共有の起点判定に従い、修飾形を列挙しない。`it.skip` / `it.only` / `it.each(table)(...)` のいずれも、根が `it` に解決される時点でテストブロックとして本体を読む。列挙すると、列挙外の修飾を付けるだけで本体の検査を外せる。
+A statement other than an assertion appearing in the callback body of a test block — a call whose chain root resolves to `it`.
 
-コールバックは、名前の後ろに並ぶ引数のうち最後の関数値を取る。`it(name, fn)` / `it(name, options, fn)` / `it(name, fn, timeout)` のどれでも同じコールバックに行き着く。
+Only two things pass.
 
-報告する形は 3 つある。
+- An expression statement of an `expect` chain that reaches a matcher call. Written with `await`, with `not` / `resolves` / `rejects` in between, or entered through `expect.soft(...)` / `expect.poll(...)`, it is the same thing
+- An expression statement calling one of the listed utilities of the `expect` namespace. By default two of them: `expect.assertions(...)` and `expect.hasAssertions()`
 
-| messageId | 報告する位置 | 何が起きているか |
+For a concise arrow body that is no block, that expression itself has to be one of the two. Handing it back with `return` passes too, as long as the expression returned is one of the two.
+
+Whether something is a test block follows the shared root reading, and modified spellings are not enumerated. `it.skip`, `it.only` and `it.each(table)(...)` all have their bodies read the moment the root resolves to `it`. Enumerate them and the body check comes off by adding a modifier nobody enumerated.
+
+The callback is taken as the last function value among the arguments standing after the name. `it(name, fn)`, `it(name, options, fn)` and `it(name, fn, timeout)` all arrive at the same callback.
+
+Three shapes are reported.
+
+| messageId | Where it reports | What is happening |
 | --- | --- | --- |
-| `setupStatement` | ブロック本体の中の文 | アサーションでもユーティリティでもない文が本体にある |
-| `nonAssertionBody` | 簡潔形のアロー本体の式 | 本体の式がアサーションでもユーティリティでもない |
-| `utilityArgument` | ユーティリティ呼び出し | 通したユーティリティの引数に呼び出し・`new` 式・代入が入っている |
+| `setupStatement` | A statement inside a block body | A statement that is neither an assertion nor a utility stands in the body |
+| `nonAssertionBody` | The expression of a concise arrow body | The body's expression is neither an assertion nor a utility |
+| `utilityArgument` | The utility call | An argument of a passed utility holds a call, a `new` expression or an assignment |
 
-落ちる具体形は、準備のための変数宣言、実行の呼び出し、分割代入、分岐、例外捕捉、繰り返し、ログ出力、値だけの式文、matcher に到達しない `expect` 呼び出し、matcher を値として取り出した式、そしてアサーションでない式を返す簡潔形アローである。
+Concretely, what falls: a variable declaration preparing something, a call that runs the code under test, a destructuring, a branch, a caught exception, a loop, logging, an expression statement that is only a value, an `expect` call that reaches no matcher, an expression taking a matcher out as a value, and a concise arrow returning an expression that is no assertion.
 
-### 意図的に広げていない範囲
+### Deliberately not widened
 
-| 形 | 対象にしない理由 |
+| Shape | Why it is left out |
 | --- | --- |
-| 本体が空のテストブロック | 本数の下限は `forbid-expectless-it--assert-or-delete-it` が持つ。ここは本体の形だけを見る |
-| アサーションが 2 本以上ある本体 | 本数の上限は `forbid-multi-expect-it--split-into-separate-it` が持つ |
-| `expect(build()).toStrictEqual(...)` | subject を `expect` の中で作る形は `no-expect-call-expression--yield-from-fixture` が持つ |
-| テストブロックの外に置かれた宣言 | このルールが読むのはコールバック本体だけ。ファイル直下や `describe` 直下の宣言は触らない |
-| fixture ファクトリの本体 | 根が `it` に解決されないため構造的に外れる |
-| 前処理・後処理フックの本体 | `forbid-test-hook--move-setup-into-fixture` が持つ |
-| 名前が文字列で書かれていない呼び出し | テストブロックの判定は「第一引数が文字列」を要求する。満たさないものはテストブロックではない |
-| 仕様ファイル以外のファイル | 適用範囲は `specFileSuffixes` が決める |
+| A test block with an empty body | The lower bound on the count belongs to [forbid-expectless-it--assert-or-delete-it](./forbid-expectless-it--assert-or-delete-it.md). This rule reads the shape of the body alone |
+| A body carrying two or more assertions | The upper bound on the count belongs to [forbid-multi-expect-it--split-into-separate-it](./forbid-multi-expect-it--split-into-separate-it.md) |
+| `expect(build()).toStrictEqual(...)` | Building the subject inside `expect` belongs to [no-expect-call-expression--yield-from-fixture](./no-expect-call-expression--yield-from-fixture.md) |
+| A declaration standing outside the test block | What this rule reads is the callback body. Declarations at file level or directly inside a grouping block are left alone |
+| The body of a fixture factory | The root does not resolve to `it`, so it is structurally out |
+| The body of a setup or teardown hook | That belongs to [forbid-test-hook--move-setup-into-fixture](./forbid-test-hook--move-setup-into-fixture.md) |
+| A call whose name is not written as a string | The test block reading requires a string first argument. What does not meet it is no test block |
+| A file that is no spec | The range is settled by `specFileSuffixes` |
 
-後始末の文が無いこと自体は、このルールが要求しているものではない。後始末は共有のランナー設定が持つ前提であり、その前提の無い環境にこのルールだけ持ち込むと、必要な後始末を書けなくなる。取り込みの単位は `forbid-test-hook--move-setup-into-fixture` と、テストごとの自動クリア／復元を有効にした共有設定を含む。
+That no teardown statement stands there is not something this rule asks for. Teardown is a premise the shared runner configuration holds, and carrying this rule alone into an environment without that premise would leave the necessary teardown unwritable. The unit of adoption includes [forbid-test-hook--move-setup-into-fixture](./forbid-test-hook--move-setup-into-fixture.md) and a shared configuration with per-test clearing and restoring turned on.
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「it の本体はアサーションだけで構成され、準備と実行は fixture が持つ」ことである。
+What is held is that the body of an `it` is made of assertions alone, and that preparation and execution belong to the fixture.
 
-このルールは束の土台にあたる。同じ束の他のルール（expected が subject の構築式を写していないか、subject が裸の識別子か、モックの呼び出し記録を値として覗いていないか）は、いずれも「fixture が返した subject」を起点に判定する。準備を it の本体に書けると、subject は it の中の変数になり、起点そのものが消える。土台が緩いと、上に乗っている検出は空振りしていることすら見えない。
+This rule is the floor the bundle stands on. The other rules of the bundle — whether the expected value copies the subject's construction, whether the subject is a bare identifier, whether a mock's call record is being peeked at as a value — all judge starting from "the subject the fixture returned". Allow preparation in the body of an `it` and the subject becomes a variable inside the `it`, so that starting point disappears. With a loose floor, the detections standing on it cannot even be seen to be firing at nothing.
 
-読み手から見た理由は別にある。it が「この subject はこの性質を持つ」という宣言に留まるかどうかである。準備が混ざると、何が検証対象なのかを行単位で状態を追わないと決められなくなり、テスト名が主張していることとコードが確かめていることの対応が読めなくなる。
+The reason a reader has is a different one: whether an `it` stays a declaration that "this subject carries this property". Mix preparation in and what is under test can no longer be settled without tracking state line by line, and the correspondence between what the test name claims and what the code confirms stops being readable.
 
-setup の所有も理由の一つである。setup はその仕様ファイルが所有し、共有のハーネスに出さない。独立した仕様どうしで setup が重複することは許容する。fixture は「仕様が所有する setup」の置き場であり、it の中・ファイル内のヘルパ・共有モジュールへ散らさないことで、一つの仕様を一ファイルで読み切れる状態が保たれる。
+Ownership of setup is another reason. A setup is owned by its spec file and is not pushed out into a shared harness. Setup duplicated between independent specs is accepted. A fixture is where "the setup a spec owns" lives, and by not scattering it into the `it`, into helpers in the file, or into shared modules, one spec stays readable in one file.
 
-## どう直すか
+### Configuration
 
-準備・中間の束縛・実行の呼び出しを fixture に移し、subject を返す。it には subject に対するアサーションだけを残す。
-
-このリポジトリのルールのテストは、その分け方をすでに取っている。`testLintRule` に渡す 1 件のケース（コード・ファイル名・オプション・期待する報告）はテストブロックの外の宣言に置かれ、テストブロックの中に残るのは突き合わせだけである。準備の置き場が呼び出し側の宣言に固定されているので、どのケースが何を検証しているかは一覧を読めば決まる。
-
-例外を検証する場合は、fixture が引数なしのサンクを返し、it はその識別子を渡す。渡っているのは識別子であって呼び出し式ではないので、本体は 1 文のアサーションのままになる。
-
-アサーションの本数を宣言したい場合は `expect.assertions(...)` を使えるが、その引数は書き下した値にする。数を計算する呼び出しを引数に置くと、そこが準備の隠し場所になる。
-
-## 禁じる回避策
-
-- 準備を 1 行に畳んで `expect` の引数に押し込む。実行なら `no-expect-call-expression--yield-from-fixture`、組み立てなら合成 subject を禁じるルール、配列に束ねる形なら `no-expect-projected-subject--use-tostrictequal-on-subject` に当たる
-- 準備を仕様ファイル内のヘルパ関数に出して it から一度呼ぶ。呼び出しはアサーションの文ではないのでこのルールで落ちる
-- 準備を `expect` 名前空間のユーティリティ呼び出しの引数に押し込む。通すユーティリティは名前で列挙してあり、引数の形も見る
-- 準備を前処理・後処理フックに出す。`forbid-test-hook--move-setup-into-fixture` が落とす
-- 後始末をフックや it に書き足す。共有設定が既に行っており、個別の後始末呼び出しは別のルールが禁止している
-- テストブロックに修飾を付けて本体の検査を外す。修飾形を列挙していないため、根が `it` に解決される限り本体を読む
-- 抑制ディレクティブ
-
-## オプション
-
-| 名前 | 既定値 | 何を決めるか |
+| Name | Default | What it settles |
 | --- | --- | --- |
-| `allowedExpectUtilities` | `["assertions", "hasAssertions"]` | 本体に置いてよい `expect` 名前空間のユーティリティの名前 |
-| `specFileSuffixes` | `[".test.ts", ".test.tsx"]` | このルールを適用するファイルの接尾辞 |
+| `allowedExpectUtilities` | `["assertions", "hasAssertions"]` | The names of `expect` namespace utilities that may stand in a body |
+| `specFileSuffixes` | `[".test.ts", ".test.tsx"]` | The file suffixes this rule applies to |
 
-`allowedExpectUtilities` は置き換えであり、追加ではない。既定値に載っているのは、テストブロック自身のアサーション本数を宣言する 2 つだけである。名前空間の残り（カスタムマッチャの登録、等価判定の追加、シリアライザの追加、ランナー状態の読み書き）は、テストブロックの中で呼べば準備そのものになるため既定では通さない。ランナーの API が増えたときは、この一覧に追随させる。
+`allowedExpectUtilities` replaces rather than adds. What the default carries is the two that declare how many assertions the test block itself holds. The rest of the namespace — registering a custom matcher, adding an equality test, adding a serialiser, reading and writing runner state — is preparation itself once called inside a test block, so the default does not pass it. When the runner's API grows, this list is kept up with it.
 
-「連鎖の根が `expect` なら通す」で済ませていないのは、名前空間の任意の呼び出しの引数に準備を押し込めるためである。
+Settling it as "pass anything whose chain root is `expect`" is not enough, because preparation can be pushed into the argument of any call on the namespace.
+
+## Fix
+
+Move the preparation, the intermediate bindings and the call that runs the code under test into a fixture, and return the subject. Leave in the `it` only the assertion about that subject.
+
+The rule tests in this repository already take that division. One case handed to `testLintRule` — its code, file name, options and expected reports — sits in a declaration outside the test block, and what stays inside the test block is the reconciliation alone. Because the place for preparation is fixed at the caller's declaration, which case checks what is settled by reading the list.
+
+To check an exception, the fixture returns a thunk taking no argument and the `it` hands that identifier over. What is handed over is an identifier rather than a call expression, so the body stays a single assertion statement.
+
+To declare the number of assertions, `expect.assertions(...)` is available, but its argument is a written-out value. Put a call that computes the number in the argument and that becomes a hiding place for preparation.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// a binding that prepares the subject is reported
+// in order.test.ts
+it('totals the lines', () => {
+  const order = build();
+  expect(order).toBe(3);
+});
+```
+
+```ts
+// the call under test written as a statement is reported
+// in order.test.ts
+it('totals the lines', () => {
+  save(order);
+  expect(order).toBe(3);
+});
+```
+
+Code this rule accepts.
+
+```ts
+// a body holding one assertion against the subject is the shape this rule keeps
+// in order.test.ts
+it('totals the lines', () => {
+  expect(total).toStrictEqual({ amount: 3 });
+});
+```
+
+```ts
+// preparation standing outside the test block is where this rule wants it
+// in order.test.ts
+const order = build();
+describe('order', () => {
+  const paid = pay(order);
+  it('totals the lines', () => {
+    expect(paid).toBe(3);
+  });
+});
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Folding the preparation into one line and pushing it into `expect`'s argument. Running lands on [no-expect-call-expression--yield-from-fixture](./no-expect-call-expression--yield-from-fixture.md), assembling on the rule forbidding a synthetic subject, and bundling into an array on [no-expect-projected-subject--use-tostrictequal-on-subject](./no-expect-projected-subject--use-tostrictequal-on-subject.md)
+- Pushing the preparation into a helper function in the spec file and calling it once from the `it`. A call is no assertion statement, so it falls here
+- Pushing the preparation into the argument of an `expect` namespace utility call. The utilities that pass are enumerated by name, and the shape of the arguments is read too
+- Pushing the preparation into a setup or teardown hook. [forbid-test-hook--move-setup-into-fixture](./forbid-test-hook--move-setup-into-fixture.md) drops that
+- Adding teardown to a hook or to the `it`. The shared configuration already does it, and individual teardown calls are forbidden by another rule
+- Adding a modifier to the test block to take the body out of the check. Modified spellings are not enumerated, so the body is read as long as the root resolves to `it`
+- A suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `setupStatement` | The body of \`it\` must not carry a statement other than an assertion. Move the preparation, the intermediate bindings and the call under test into the fixture, have the fixture hand back the subject, and leave the assertions against that subject standing here. Folding the same preparation into an argument of \`expect\`, into a helper declared in this spec file, or into a test hook keeps the same statement out of the fixture and is forbidden as well. Cleanup belongs to the shared runner configuration and must not be written back into \`it\`. |
+| `nonAssertionBody` | The body of \`it\` must not be an expression other than an assertion. Move the work this expression performs into the fixture, and write an assertion against the subject the fixture hands back. |
+| `utilityArgument` | An argument handed to an \`expect\` namespace utility must not carry a call, a construction or an assignment. Move that work into the fixture, and hand the utility a value spelled out here. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

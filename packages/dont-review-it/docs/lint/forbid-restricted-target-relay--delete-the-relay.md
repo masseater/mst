@@ -1,80 +1,81 @@
+---
+description: "Disallow a local module passing a restricted target straight to its own public surface and disallow reading a restricted target through such a module, so a target held out of reach in one file stays out of reach behind a chain of local modules"
+---
+
 # forbid-restricted-target-relay--delete-the-relay
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-設定に登録された到達禁止対象（`restricted` のエントリ）に対して、独立した 2 種類の違反を見る。エントリが 1 つも登録されていなければ、このルールは何も報告しない。
+Disallow a local module passing a restricted target straight to its own public surface and disallow reading a restricted target through such a module, so a target held out of reach in one file stays out of reach behind a chain of local modules
 
-### 中継の作成
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`forbid-restricted-target-relay--delete-the-relay.ts`](../../src/lint/oxlint/rules/forbid-restricted-target-relay--delete-the-relay.ts)
 
-検査中のファイルが、禁止対象を自分の公開面へそのまま通していること。次の 5 つの形が該当する。
+<!-- END GENERATED rule-header -->
 
-- `export { readFile } from "retired-lib";`（指定子付きの再エクスポート）
-- `export * from "retired-lib";`（ワイルドカードの再エクスポート）
-- `export * as retired from "retired-lib";`（名前空間ごとの再エクスポート）
-- `import { readFile } from "retired-lib";` と `export { readFile };` の 2 文に分けた形
-- `import retired from "retired-lib";` と `export default retired;` の 2 文に分けた形
+## Violation
 
-2 文に分ける形と `as` による改名は、いずれも通している束縛が同じなので同じ違反になる。判定は束縛の同一性で行い、外に出るときの綴りは見ない。
+Two independent violations against the restricted targets registered in the configuration (the `restricted` entries). With no entry registered, this rule reports nothing.
 
-**中継の作成は、そのファイルが許可位置（`allowedPositions`）の内側にあっても違反である。**エントリの許可位置は「そこで使ってよい」を意味するのであって、「そこから外へ通してよい」を意味しない。公開面はファイルの位置と無関係に届くので、境界の内側で使う自由と、境界の外へ通す自由は別物として扱う。したがってこの判定にはエントリの全件を使い、許可位置による絞り込みをかけない。
+### Building a relay
 
-### 中継越しの到達
+The file being checked passing a restricted target straight through to its own published surface. Five shapes count.
 
-検査中のファイルがリポジトリ内を指す指定子で要求している先を実際に解決して辿り、その先で禁止対象へ到達していること。相対パス、`tsconfig` の `paths` に書かれた別名、`internalAliases` に登録した接頭辞、ワークスペースパッケージの公開エントリが辿る対象になる。
+- `export { readFile } from "retired-lib";` (a named re-export)
+- `export * from "retired-lib";` (a wildcard re-export)
+- `export * as retired from "retired-lib";` (a re-export of the whole namespace)
+- `import { readFile } from "retired-lib";` and `export { readFile };` split across two statements
+- `import retired from "retired-lib";` and `export default retired;` split across two statements
 
-辿るのはリポジトリ内のファイルだけで、インストール済みパッケージの内部は追わない。中継が何段あっても段数は判定に影響せず、循環は訪問済み集合で切るので走査は必ず停止する。
+Splitting into two statements and renaming with `as` are the same violation, because the binding passed through is the same. The judgment runs on binding identity; the spelling it leaves under is not read.
 
-**この判定に使うエントリは、中継の位置ではなく検査中のファイル（最終的な利用位置）で決まる。**同じ中継でも、エントリが許可した位置から読むなら報告されない。
+**Building a relay is a violation even where the file sits inside an allowed position (`allowedPositions`).** An entry's allowed positions mean "you may use it here", not "you may pass it out from here". A published surface reaches regardless of where the file sits, so the freedom to use inside a boundary and the freedom to pass out of it are treated as separate. This judgment therefore uses every entry and applies no narrowing by allowed position.
 
-### 照合の単位
+### Reaching through a relay
 
-指定子とエントリの `module` は 3 段で照合する。
+The file being checked requesting, through a specifier that points inside the repository, something that is actually resolved and followed, and reaching a restricted target at the end. Relative paths, aliases written in `tsconfig`'s `paths`, prefixes registered under `internalAliases`, and the published entry of a workspace package are all followed.
 
-- 完全一致
-- サブパス前方一致。`retired-lib/deep/inner.js` は `retired-lib` のエントリに一致する。一致させるのは `名前 + "/"` で始まる場合だけで、`retired-lib-extra` のような派生した別名は巻き込まない。派生パッケージを禁じたければ独立したエントリとして書く
-- 名前付きエクスポート単位。エントリに `exports` を書くと、そのモジュール全体は許したまま、名前を挙げたエクスポートへの到達だけを禁じる。ワイルドカードの再エクスポートは名前を絞れないため、`exports` を持つエントリにも一致する
+Only files inside the repository are followed; the inside of an installed package is not. However many relays there are, the count does not affect the judgment, and cycles are cut with a visited set so the walk always stops.
 
-### 見る到達経路
+**The entries used for this judgment are settled by the file being checked (the final position of use), not by the relay's position.** Read the same relay from a position the entry allows and nothing is reported.
 
-静的 import 宣言（型のみの import を含む）、指定子付きの再エクスポート、ワイルドカードの再エクスポート、動的 `import(...)`、CommonJS の `require(...)`、`import x = require(...)`、型位置の `import("...")` を見る。**この一覧に抜けを作らない。**1 つでも見ていない構文があれば、その構文が中継への入口として残る。
+### The unit of matching
 
-型のみの import も除外しない。型として参照するだけの箇所も、そのモジュールの型構造に依存した状態を残し、いずれ値の import に育つ。
+A specifier and an entry's `module` are matched in three steps.
 
-指定子は畳み込んでから照合する。同じファイルで `const` に束縛した文字列と、埋め込みがすべて畳み込めるテンプレートリテラルは、1 つの文字列に決めてから解決に渡す。畳み込めない指定子は辿れないが、それは `forbid-unresolvable-module-specifier--write-a-statically-resolvable-specifier` が別の違反として報告するので沈黙にはならない。
+- Whole equality
+- Subpath prefix. `retired-lib/deep/inner.js` matches the `retired-lib` entry. Only what starts with `name + "/"` matches, so a derived name such as `retired-lib-extra` is not swept in. To forbid a derived package, write it as its own entry
+- Per named export. Writing `exports` on an entry leaves the module as a whole allowed and forbids reaching only the exports named. A wildcard re-export cannot narrow names, so it matches an entry carrying `exports` too
 
-### 報告
+### The routes read
 
-中継の作成には、通している禁止対象の名前と、外に出ている綴りを載せる。中継越しの到達には、**辿った経路をすべて載せる。**利用側の指定子だけを出すと、読み手はなぜ違反なのかを追えない。中継の連鎖と最終到達先を `->` で並べる。
+Static `import` declarations (including type-only imports), named re-exports, wildcard re-exports, dynamic `import(...)`, CommonJS `require(...)`, `import x = require(...)`, and `import("...")` in type position. **This list is kept without a gap.** One unread syntax left is one way into a relay left open.
 
-どちらの報告にも、エントリに書かれた代替の指示文が入る。
+Type-only imports are not excluded either. A place that only references a type still leaves the state depending on that module's type structure, and it grows into a value import eventually.
 
-## なぜそれが要るか
+Specifiers are folded before matching. A string bound to a `const` in the same file, and a template literal whose every substitution folds, are settled into one string before being handed to resolution. An unfoldable specifier cannot be followed, but that is reported as a separate violation by [forbid-unresolvable-module-specifier--write-a-statically-resolvable-specifier](./forbid-unresolvable-module-specifier--write-a-statically-resolvable-specifier.md), so it is not silence.
 
-観測される事象は、禁止したモジュールを使い続けるコードが、検査を緑にしたまま残ることである。
+### What the report carries
 
-1 層目の理由は、指定子を読む検査が「1 ファイルの中に書かれた指定子」を判定単位にしていることである。中継を 1 つ挟むと、利用側の指定子はローカルの相対パスになり、どのエントリにも一致しない。中継ファイル自身は禁止対象を import しているが、そのファイルが許可位置や検査対象の外にあれば、そこでも発火しない。**2 ファイルあれば、到達が 1 件も報告されない状態を作れる。**
+Building a relay carries the name of the restricted target being passed through and the spelling it leaves under. Reaching through a relay carries **every module the walk went through.** Printing only the consumer's specifier leaves the reader unable to follow why this is a violation. The chain of relays and the final target are laid out with `->`.
 
-2 層目の理由は、中継が迂回の意図なしに生まれることである。薄いラッパを作るのは日常的な設計行為であり、書いた本人には違反に見えない。意図の有無で分けられない以上、構造として塞ぐしかない。
+Both reports carry the substitute instruction written on the entry.
 
-3 層目の理由は、指定子を読む検査がすべて同じ穴を共有していることである。共有の原因は判定単位が同じであることなので、どれを強化しても穴は残る。**判定単位をリポジトリのモジュールグラフに変えた受け手を 1 本立てることが、すべてに効く唯一の対処である。**
+### The invariant
 
-## どう直すか
+What is observed is code that keeps using a forbidden module, staying green through the checks.
 
-中継を消し、利用側をエントリの代替へ書き換える。
+The first layer is that a check reading specifiers takes "a specifier written inside one file" as its unit of judgment. Put one relay in between and the consumer's specifier becomes a local relative path matching no entry. The relay file itself imports the restricted target, but where that file sits in an allowed position or outside the checked set, nothing fires there either. **Two files are enough to build a state where not one reach is reported.**
 
-包む層が要るなら、素通しではなく自分の語彙を公開する境界として作り直す。`export { readFile } from "retired-lib";` ではなく、`retired-lib` の関数を内側で呼び、このモジュールが決めた名前と引数で公開する。束縛が変換されていれば、このルールは到達として数えない。
+The second layer is that relays come into being without any intent to evade. Making a thin wrapper is an everyday design act, and it does not look like a violation to whoever wrote it. With intent unavailable as a divider, the only way to close it is structurally.
 
-その位置でどうしてもその対象が要るなら、エントリの `allowedPositions` に位置を足す。ただし許可位置の内側でも、そこから外へ通す形は報告され続ける。
+The third layer is that every check reading specifiers shares the same hole. The hole is shared because the unit of judgment is shared, so strengthening any one of them leaves it. **Standing up one receiver whose unit of judgment is the repository's module graph is the only response that reaches all of them.**
 
-## 禁じる回避策
-
-- 中継を 2 段以上にすること。段数は判定に影響しない
-- 中継の中で名前を変えてエクスポートすること。束縛の同一性で追うので一致する
-- 中継をデモや例示として検査の除外範囲に置くこと。除外は利用位置の判定には効かない
-- 中継を別パッケージとして切り出し、依存として宣言すること。**その依存名は禁止リストに載っていないので依存欄を読む検査の視野には入らないが、公開面が禁止対象を素通ししている性質は変わらない。**見つけたときの正しい対応は、その依存名を禁止リストに足すことである
-- 抑制コメントで黙らせること。例外の置き場は設定であって、ソースの行ではない
-
-## オプション
+### Configuration
 
 ```jsonc
 [
@@ -85,7 +86,7 @@
         "module": "retired-lib",
         "exports": ["readFile"],
         "allowedPositions": ["packages/*/src/adapters/**"],
-        "substitute": "共有リーダから同じ値を取ること。",
+        "substitute": "take the same value from the shared reader.",
       },
     ],
     "internalAliases": [{ "prefix": "~/", "directory": "src" }],
@@ -93,22 +94,87 @@
 ]
 ```
 
-`restricted` は到達禁止対象の列である。`module` と `substitute` が必須で、`exports` と `allowedPositions` は省略できる。
+`restricted` is a list of restricted targets. `module` and `substitute` are required; `exports` and `allowedPositions` may be omitted.
 
-- `module` は禁止するモジュールの名前。サブパスは書かない。深いパスは前方一致で同じエントリに一致する
-- `exports` を書くと、名前を挙げたエクスポートへの到達だけが禁止になる。省略するとモジュール全体が対象になる
-- `allowedPositions` はグロブの列で、そこに置かれたファイルからの**読み取り**を免除する。**通す形は免除しない**
-- `substitute` は報告メッセージに入る代替の指示文。禁止を足した人が理由と行き先を書き忘れられない位置に置いてある
+- `module` is the name of the module to forbid. Do not write a subpath — a deep path matches the same entry by prefix
+- Writing `exports` forbids reaching only the exports named. Omitting it puts the whole module in scope
+- `allowedPositions` is a list of globs exempting **reading** from files placed there. It does **not** exempt passing through
+- `substitute` is the replacement instruction placed in the report. It sits where whoever added the prohibition cannot forget to write the reason and the destination
 
-`internalAliases` は、相対パスでも `tsconfig` の `paths` でもない形でリポジトリ内を指す接頭辞を登録する。`prefix` に一致した指定子は、`directory` をワークスペースルートからの位置として解決してから辿る。
+`internalAliases` registers a prefix that points inside the repository in a form that is neither a relative path nor `tsconfig`'s `paths`. A specifier matching `prefix` is resolved with `directory` taken as a position from the workspace root, and then followed.
 
-このルールは禁止対象の既定値を持たない。**同じ禁止の列を、指定子を読む他の検査と 1 つの配列で共有すること。**配列が 2 つに分かれると、同じ名前が経路によって効いたり効かなかったりする。
+This rule carries no default restricted targets. **Share one array of restrictions with the other checks that read specifiers.** Split the array in two and the same name starts holding on one route and not on another.
 
-## この検査が引き受けないもの
+### What this check does not take on
 
-- **境界そのものの公開面。**境界は素の API を通さず自分の語彙で公開するので、束縛が変換されている。判定は「禁止対象の束縛がそのまま外へ出ているか」で行うため、境界が定義した関数や型を通して出るものは到達として数えない
-- **ラッパが薄すぎないかという質の判断。**素通しは束縛の同一性で捕まるので、ここに残るのは「変換はしているが意味の薄いラッパ」だけである。この判断を持つ検査はどこにも無く、人が読んで決める
-- **インストール済みパッケージの内部で行われている再エクスポート。**走査対象はリポジトリ内のファイルだけである
-- **到達しているが、その利用位置では禁止されていない対象**
-- **畳み込めない指定子の先。**辿る入口が無いため走査が始まらない。指定子そのものは `forbid-unresolvable-module-specifier--write-a-statically-resolvable-specifier` が違反として報告する
-- **禁止対象を 1 ファイルの中で直接名指しすること。**利用側の指定子がエントリに一致する場合は、指定子を読む検査の担当である。このルールは中継を挟んだ先だけを見る
+- **A boundary's own published surface.** A boundary publishes its own vocabulary rather than passing the raw API through, so the binding is transformed. The judgment is "does the restricted binding leave as it is", so what leaves through a function or a type the boundary defined does not count as a reach
+- **Whether a wrapper is too thin to mean anything.** Passing straight through is caught by binding identity, so what is left here is only "transformed but barely meaningful". No check holds that judgment; a person reads it and decides
+- **Re-exports happening inside an installed package.** The walk covers files inside the repository only
+- **A target being reached where it is not forbidden at that position of use**
+- **What lies past an unfoldable specifier.** There is no way in to start the walk. The specifier itself is reported as a violation by `forbid-unresolvable-module-specifier--write-a-statically-resolvable-specifier`
+- **Naming the restricted target directly inside one file.** Where the consumer's specifier matches an entry, that belongs to the check that matches specifiers. This rule reads only what lies past a relay
+
+## Fix
+
+Delete the relay and rewrite the consumer to the entry's substitute.
+
+Where a wrapping layer is needed, rebuild it as a boundary that publishes its own vocabulary instead of passing through. Rather than `export { readFile } from "retired-lib";`, call the `retired-lib` function inside and publish under the name and the parameters this module decided. With the binding transformed, this rule does not count it as a reach.
+
+Where that target is genuinely needed at that position, add the position to the entry's `allowedPositions`. Even inside an allowed position, the shape that passes it out keeps being reported.
+
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// a named re-export puts the target on this module's surface
+export { readFile } from "retired-lib";
+```
+
+```ts
+// reading a module that forwards the target reaches the target
+import { readFile } from "./star-forward.ts";
+```
+
+Code this rule accepts.
+
+```ts
+// a boundary that publishes its own vocabulary keeps the target off its surface
+import { readFile } from "retired-lib";
+export const read = (path: string) => readFile(path);
+```
+
+```ts
+// reading a boundary that transforms the binding reaches nothing
+import { read } from "./boundary.ts";
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Making the relay two steps or more. The count does not affect the judgment
+- Exporting under a changed name inside the relay. Binding identity is what is followed, so it matches
+- Placing the relay in a range excluded from the check as a demo or an illustration. An exclusion does not carry into the judgment at the position of use
+- Carving the relay out as a separate package and declaring it as a dependency. **That dependency name is not on the restriction list, so it stays outside the view of the check that reads the dependency field, but nothing changes about a published surface passing a restricted target through.** The correct response on finding this is to add that dependency name to the restriction list
+- Silencing it with a suppression comment. Exceptions live in the configuration, not on a line of source
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `restrictedTargetForward` | A local module must not pass a restricted target straight to its own public surface. This module exposes \`{{target}}\` as \`{{exposed}}\`. Delete this forward, or rebuild this module as a boundary that publishes its own vocabulary. {{substitute}} Register an exception as an entry in the lint configuration. |
+| `relayedTargetForward` | A local module must not pass a restricted target straight to its own public surface. This module exposes \`{{target}}\` as \`{{exposed}}\` through \`{{relays}}\`. Delete this forward, or rebuild this module as a boundary that publishes its own vocabulary. {{substitute}} Register an exception as an entry in the lint configuration. |
+| `relayedTargetReach` | A module must not read a restricted target through a local module that forwards it. \`{{specifier}}\` reaches \`{{target}}\` through \`{{relays}}\`. Delete the forwarding module, or rebuild it as a boundary that publishes its own vocabulary. {{substitute}} Register an exception as an entry in the lint configuration. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

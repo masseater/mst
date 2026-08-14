@@ -10,6 +10,7 @@ describe("lint-rule-authoring/forbid-symbol-prefixed-name--rename-to-alphanumeri
     valid: [
       {
         name: "every segment of a nested path starts with a letter",
+        documented: true,
         code: "const total = 1;",
         filename: "packages/lint-rule-authoring/src/lint/oxlint/rules/some-rule.ts",
       },
@@ -20,6 +21,7 @@ describe("lint-rule-authoring/forbid-symbol-prefixed-name--rename-to-alphanumeri
       },
       {
         name: "a name the deployment listed is allowed to start with a symbol",
+        documented: true,
         code: "const total = 1;",
         filename: ".config/tooling/setup.ts",
         options: [{ allowedNames: [".config"] }],
@@ -66,6 +68,7 @@ describe("lint-rule-authoring/forbid-symbol-prefixed-name--rename-to-alphanumeri
       },
       {
         name: "a directory name starting with an underscore is reported",
+        documented: true,
         code: "const total = 1;",
         filename: "packages/lint-rule-authoring/_internal/helper.ts",
         errors: [
@@ -161,6 +164,7 @@ describe("lint-rule-authoring/forbid-symbol-prefixed-name--rename-to-alphanumeri
       },
       {
         name: "an allowed name does not carry the allowance down to the names under it",
+        documented: true,
         code: "const total = 1;",
         filename: "packages/_ui/_legacy/index.ts",
         options: [{ allowedNames: ["_ui"] }],

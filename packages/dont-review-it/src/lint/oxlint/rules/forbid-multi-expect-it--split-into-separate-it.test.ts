@@ -10,6 +10,7 @@ describe("dont-review-it/forbid-multi-expect-it--split-into-separate-it", () => 
     valid: [
       {
         name: "one exact comparison pins the one behaviour the block names",
+        documented: true,
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("report", () => summarise());\nit("carries what it summarised", ({ report }) => {\n  expect(report).toStrictEqual({ id: "a", counted: 2 });\n});',
       },
@@ -31,6 +32,7 @@ describe("dont-review-it/forbid-multi-expect-it--split-into-separate-it", () => 
       },
       {
         name: "each behaviour in a block of its own keeps every block inside the budget",
+        documented: true,
         filename: SPEC_FILE,
         code: 'it("carries the id", ({ report }) => {\n  expect(report.id).toBe("a");\n});\nit("carries the total", ({ report }) => {\n  expect(report.total).toBe(2);\n});',
       },
@@ -110,6 +112,7 @@ describe("dont-review-it/forbid-multi-expect-it--split-into-separate-it", () => 
     invalid: [
       {
         name: "two claims written under one name",
+        documented: true,
         filename: SPEC_FILE,
         code: 'it("carries both fields", ({ report }) => {\n  expect(report.id).toBe("a");\n  expect(report.total).toBe(2);\n});',
         errors: [
@@ -163,6 +166,7 @@ describe("dont-review-it/forbid-multi-expect-it--split-into-separate-it", () => 
       },
       {
         name: "assertions pushed into a helper are still reached by the block",
+        documented: true,
         filename: SPEC_FILE,
         code: 'const expectShape = (subject) => {\n  expect(subject.id).toBe("a");\n  expect(subject.total).toBe(2);\n};\nit("carries the shape", ({ report }) => {\n  expectShape(report);\n});',
         errors: [

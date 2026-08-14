@@ -1,62 +1,86 @@
+---
+description: "Disallow a fixture taking apart a dependency whose value it never consumes, so the dependency graph a spec declares is the data flow it has rather than an order somebody wanted the fixtures to run in"
+---
+
 # no-fixture-ordering-alias--use-auto-action-fixture
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-spec ファイルの中で、fixture ビルダーが宣言した fixture の factory が、第一パラメータのオブジェクトパターンで受け取っている依存。報告はプロパティ 1 つにつき 1 件で、依存名と束縛名の両方を示す。
+Disallow a fixture taking apart a dependency whose value it never consumes, so the dependency graph a spec declares is the data flow it has rather than an order somebody wanted the fixtures to run in
 
-対象にする fixture の書き方は 2 つある。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-fixture-ordering-alias--use-auto-action-fixture.ts`](../../src/lint/oxlint/rules/no-fixture-ordering-alias--use-auto-action-fixture.ts)
 
-- 名前付きのビルダー形式。`extend` の第一引数が文字列で、factory が第二引数、オプションを挟む場合は第三引数に来る形
-- プロパティごとに factory を並べる旧形式。`extend` の第一引数がオブジェクトで、値が factory になっている形
+<!-- END GENERATED rule-header -->
 
-どちらも `extend` の呼び出しの形から同定する。factory の第二パラメータが何という名前かは見ない。`extend` を通らない関数は fixture ではないので、普通のコールバックがアンダースコア別名で分割代入していても報告しない。`expect.extend` はカスタムマッチャの登録であって fixture の宣言ではないため、同じ名前のメソッドでも対象外になる。
+## Violation
 
-判定は独立した 2 つの条件で行い、片方だけを満たす場合も報告する。
+A dependency a fixture factory declared by a fixture builder receives in the object pattern of its first parameter, inside a spec file. One report stands per property, naming both the dependency name and the binding name.
 
-### 条件 1、命名の合図
+Two ways of writing a fixture are in scope.
 
-キー名と束縛名が異なり、束縛名が `orderingAliasPrefixes` に挙がった接頭辞のどれかで始まるとき、`orderingAlias` を報告する。本体で値を読んでいるかどうかは問わない。
+- The named builder form: `extend`'s first argument is a string, the factory comes second, or third where options sit in between
+- The older form lining a factory up per property: `extend`'s first argument is an object whose values are factories
 
-### 条件 2、消費の不在
+Both are identified from the shape of the `extend` call. What the factory's second parameter is called is not read. A function that does not go through `extend` is not a fixture, so an ordinary callback destructuring with an underscore alias is not reported. `expect.extend` registers a custom matcher rather than declaring a fixture, so despite the shared method name it is out of scope.
 
-束縛の値を factory の本体が消費していないとき、`unconsumedDependency` を報告する。別名かどうか、接頭辞で始まるかどうかは問わない。次のいずれかにあたるとき、消費していないとみなす。
+The judgment runs on two independent conditions, and meeting only one of them is still reported.
 
-- 本体が値を一度も読まない
-- 値を読むすべての参照が、単独の識別子として置かれた式文であるか、`void` のオペランドであるか、同じ基準で消費されていない別の束縛への代入である
+### Condition 1: the naming signal
 
-数えるのは値を読む参照だけで、束縛への書き込みは数えない。`await` を挟んでも同じに読むので、`await` した結果をその場で捨てる式文は消費にならない。
+Where the key name and the binding name differ and the binding name starts with one of the prefixes listed in `orderingAliasPrefixes`, `orderingAlias` is reported. Whether the body reads the value is not read.
 
-判定は同じ factory の本体に閉じる。値を他の呼び出しの引数として渡す形、プロパティを読む形、返り値に含める形、factory が登録した後始末のコールバックの中で読む形は、いずれも消費とみなす。代入の連鎖は追いかけるので、渡した先の束縛が同じ基準で捨てられていれば元の依存も消費されていない。追いかけた先がこのファイルで宣言されていない名前だったときは、そこで消費されたものとして扱う。
+### Condition 2: the absence of consumption
 
-両方の条件を満たすプロパティは 1 件だけ報告し、命名の合図の側を出す。どちらの直し方も同じなので、同じプロパティに 2 件を並べない。
+Where the factory's body does not consume the binding's value, `unconsumedDependency` is reported, regardless of aliasing or prefixes. It counts as unconsumed where either of these holds.
 
-### 対象にならない形
+- The body never reads the value
+- Every reference reading the value is an expression statement standing as a lone identifier, the operand of `void`, or an assignment to another binding unconsumed by the same standard
 
-- 実行時に決まるキー、数値リテラルのキー。依存名を静的に同定できない
-- 識別子以外への分割代入。ネストしたパターンも、既定値を付けた受け取りも、束縛名が 1 つに決まらない
-- rest 要素。どの依存を指しているかが書かれていない
-- 第一パラメータがオブジェクトパターンでない factory と、パラメータを取らない factory
-- factory ではなく値そのものを渡した fixture。読む本体がない
+Only references reading the value are counted; writes to the binding are not. `await` in between reads the same, so an expression statement discarding an awaited result on the spot is not consumption.
 
-## なぜそれが要るか
+The judgment closes inside the same factory's body. Handing the value to another call as an argument, reading a property, including it in the return value, and reading it inside a teardown callback the factory registered all count as consumption. Chains of assignment are followed, so where the binding it was handed to is discarded by the same standard, the original dependency is unconsumed too. Where the walk reaches a name not declared in this file, it is treated as consumed there.
 
-守っている不変条件は「fixture 間の依存は、値を実際に消費することによってのみ発生する」ことである。
+A property meeting both conditions gets one report, on the naming-signal side. Both fixes are the same, so two reports are not lined up on one property.
 
-fixture は参照されたときに評価される。この性質があるので、「先にあの処理を走らせたい」という順序の要求を、使いもしない依存を宣言することで書けてしまう。書いた側から見れば依存の宣言は順序の指定であり、値は最初から要らない。
+### Not in scope
 
-壊れ方は 2 層ある。
+- A key settled at run time, and a numeric literal key. The dependency name cannot be identified statically
+- A destructuring to anything but an identifier. A nested pattern, and a reception carrying a default, do not settle on one binding name
+- A rest element. Which dependency it names is not written
+- A factory whose first parameter is not an object pattern, and a factory taking no parameter
+- A fixture handed a value rather than a factory. There is no body to read
 
-1 層目は、依存グラフが実際のデータフローと食い違うことである。読み手は「この fixture は上流の値を入力として使っている」と読むが、実際には使っていない。上流の fixture を消したとき、順序を入れ替えたとき、上流が返す値の形を変えたときに何が壊れるかが、記述から判断できなくなる。
+### The invariant
 
-2 層目は、本当の要求がどこにも書かれないことである。欲しかったのは「対象の処理が先に走ること」なのに、書かれているのは「上流の値を受け取ること」である。要求が依存の形に化けているので、順序を保証したい処理が何なのかを記述から取り出せない。そしてその要求は、一つの action fixture を常時実行にすれば正しく書ける。順序を作るための中間 fixture はそこで不要になる。
+A dependency between fixtures arises only through actually consuming a value.
 
-条件 2 を条件 1 と別に持つのは、命名の合図だけを見るゲートが 2 つの経路で抜けられるからである。接頭辞を外して別名を変えるだけで合図は消せるし、合図を最初から使わずに素の名前で未使用の依存を宣言することもできる。どちらも不変条件は破っている。
+A fixture is evaluated when it is referenced. Because of that property, the demand "I want that work to run first" can be written by declaring a dependency nobody uses. From the writer's side, declaring the dependency is specifying an order, and the value was never wanted.
 
-この 2 つを未使用変数の検出に任せることはしない。未使用の検出はアンダースコアで始まる名前を除外する設定を持つのが普通で、条件 1 が見ている形はまさにその除外に落ちる。値を受け取って捨てる形（単独の式文、`void`、捨てられる束縛への代入）は、そもそも束縛が使われているので未使用の検出にはかからない。条件 2 はどちらの共有設定にも依存しない。
+It breaks in two layers.
 
-## どう直すか
+The first is that the dependency graph disagrees with the actual data flow. A reader reads "this fixture uses the upstream value as input" while it does not. What breaks when the upstream fixture is deleted, when the order is swapped, or when the shape of what upstream returns changes, can no longer be judged from what is written.
 
-順序を保証したい処理を一つの action fixture にまとめ、常時実行を指定する。アサーション用の fixture はその fixture の出力を消費し、順序を作るためだけに存在していた中間 fixture は削除する。
+The second is that the real demand is written nowhere. What was wanted is "that work runs first", and what is written is "receive the upstream value". The demand has turned into a dependency, so the work whose order needs guaranteeing cannot be recovered from what is written. And that demand can be written correctly by making one action fixture always run. The intermediate fixture that existed to create an order becomes unnecessary there.
+
+Condition 2 stands apart from condition 1 because a gate reading only the naming signal can be left by two routes: drop the prefix and change the alias, and the signal is gone; or never use the signal and declare an unused dependency under a plain name. Both break the invariant.
+
+The two are not left to unused-variable detection. Unused detection normally carries a setting excluding names starting with an underscore, and the shape condition 1 reads falls exactly into that exclusion. The shape of receiving a value and discarding it (a lone expression statement, `void`, an assignment to a discarded binding) does not trip unused detection at all, because the binding is used. Condition 2 depends on neither shared setting.
+
+### Configuration
+
+- `orderingAliasPrefixes` — the prefixes read as a binding name declaring "this value will not be used". The default is one: `_`. Handing over an empty array removes condition 1 and leaves condition 2 alone
+- `specFileSuffixes` — the suffixes taken as spec files. The default is `.test.ts` and `.test.tsx`
+
+There is no option turning condition 2 off. What is protected is "a dependency arises only through consuming a value", and the naming signal is only its most legible breach. Allow it to be turned off and the same invariant can be broken without using the signal.
+
+## Fix
+
+Gather the work whose order needs guaranteeing into one action fixture and mark it as always running. The assertion fixture consumes that fixture's output, and the intermediate fixture that existed only to create an order is deleted.
 
 ```ts
 const test = baseTest
@@ -64,22 +88,66 @@ const test = baseTest
   .extend("report", ({ store }) => summarise(store.entries));
 ```
 
-`store` は `{ auto: true }` を持つので、`report` が参照しなくても毎回走る。`report` は `store` を受け取ったうえで実際にその値を読んでいるので、宣言された依存と実際のデータフローが一致する。
+`store` carries `{ auto: true }`, so it runs every time whether or not `report` references it. `report` receives `store` and actually reads its value, so the declared dependency and the actual data flow line up.
 
-値を使うつもりで受け取ったのに読んでいなかった場合は、読むか、依存の宣言を消すかのどちらかにする。読まない依存を残す形は、名前をどう付けても報告される。
+Where a value was received intending to use it and then not read, either read it or delete the dependency declaration. Leaving an unread dependency is reported however it is named.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- 接頭辞を外して別名だけ変え、依存を使わないまま残す。条件 2 が報告する
-- 命名の合図を最初から使わず、素の名前で未使用の依存を宣言する。条件 2 が報告する
-- 受け取った値を無意味に参照して、使っているように見せる。単独の識別子の式文、`void` のオペランド、`await` してその場で捨てる式文、そのまま捨てられる束縛への代入は、いずれも消費とみなさない
-- 順序のためだけの依存を、計算されたキー・ネストしたパターン・既定値付きの受け取り・rest 要素で書く。これらは依存名か束縛名を静的に同定できないので報告されないが、不変条件は同じように破れる。順序が欲しいときはこの形を選ばない
-- 依存を宣言せず、factory の本体から上流の fixture の実体を直接呼ぶ。順序の要求が依存の宣言から消えるだけで、どこにも書かれていない状態は変わらない
-- 抑制ディレクティブでこのルールを切る。切ったこと自体はこのルールでは報告されない
+Code this rule rejects.
 
-## オプション
+```ts
+// a name marked as unused confesses a dependency declared for order alone
+// in report.test.ts
+const test = baseTest.extend("report", ({ port: _port }) => summarise(_port));
+```
 
-- `orderingAliasPrefixes` — 束縛名が「この値は使わない」を宣言していると読む接頭辞。既定は `_` の 1 つ。空の配列を渡すと条件 1 が無くなり、条件 2 だけが残る
-- `specFileSuffixes` — spec ファイルと見なす接尾辞。既定は `.test.ts` と `.test.tsx`
+```ts
+// a dependency taken apart under its own name and never read declares an order
+// in report.test.ts
+const test = baseTest.extend("report", ({ port }) => summarise());
+```
 
-条件 2 を切るオプションは持たない。守っているのは「依存は値の消費によってのみ発生する」ことであって、命名の合図はその最も分かりやすい破り方にすぎない。切れるようにすると、合図を使わずに同じ不変条件を破れる。
+Code this rule accepts.
+
+```ts
+// a dependency taken apart under its own name and read in the body is the flow it declares
+// in report.test.ts
+const test = baseTest.extend("report", ({ port }) => summarise(port));
+```
+
+```ts
+// a renamed dependency read in the body is a dependency the fixture uses
+// in report.test.ts
+const test = baseTest.extend("report", ({ port: chosen }) => summarise(chosen));
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Dropping the prefix, changing only the alias, and leaving the dependency unused. Condition 2 reports it
+- Never using the naming signal and declaring an unused dependency under a plain name. Condition 2 reports it
+- Referencing the received value meaninglessly to look like it is used. A lone identifier expression statement, the operand of `void`, an expression statement discarding an awaited result on the spot, and an assignment to a binding that is itself discarded are none of them consumption
+- Writing an order-only dependency with a computed key, a nested pattern, a reception with a default, or a rest element. Those are not reported because the dependency name or the binding name cannot be identified statically, but the invariant breaks the same way. Do not choose this shape when you want an order
+- Declaring no dependency and calling the upstream fixture's implementation directly from the factory body. The order demand merely leaves the dependency declaration; it is still written nowhere
+- Turning this rule off with a suppression directive. That it was turned off is not itself reported by this rule
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `orderingAlias` | A fixture must not take a dependency apart into a name marked as unused. \`{{dependency}}\` is bound as \`{{bound}}\`. Delete the dependency, move the work it was ordering into one action fixture declared with \`{ auto: true }\`, and take apart only the values a fixture hands back for the assertions. Dropping the prefix and leaving the dependency unread, and spelling the same unread dependency without a prefix from the start, are reported all the same. |
+| `unconsumedDependency` | A fixture must not declare a dependency whose value it never consumes. \`{{dependency}}\` is bound as \`{{bound}}\`, and every reference to it drops the value. Delete the dependency, move the work it was ordering into one action fixture declared with \`{ auto: true }\`, and take apart only the values a fixture hands back for the assertions. Naming the binding on a line of its own, handing it to \`void\`, and assigning it to another binding that is dropped the same way all leave it unconsumed. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

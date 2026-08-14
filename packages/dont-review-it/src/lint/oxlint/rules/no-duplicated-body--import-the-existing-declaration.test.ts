@@ -164,6 +164,7 @@ describe("dont-review-it/no-duplicated-body--import-the-existing-declaration", (
     invalid: [
       {
         name: "a declaration whose body is spelled the same elsewhere is reported",
+        documented: true,
         code: "const twice = (value: number): number => value * 2;",
         filename: subjectFilename,
         errors: [{ messageId: "duplicatedBody" }],

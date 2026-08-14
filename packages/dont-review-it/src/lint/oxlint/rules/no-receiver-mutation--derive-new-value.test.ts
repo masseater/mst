@@ -8,6 +8,7 @@ describe("dont-review-it/no-receiver-mutation--derive-new-value", () => {
     valid: [
       {
         name: "reading an entry out of an associative collection leaves it as it was",
+        documented: true,
         code: "const counts = new Map<string, number>();\ncounts.get('a');",
       },
       {
@@ -20,6 +21,7 @@ describe("dont-review-it/no-receiver-mutation--derive-new-value", () => {
       },
       {
         name: "a writing method name on a type outside the enumeration is another operation",
+        documented: true,
         code: "const store = new CookieStore();\nstore.set('a', 'b');",
       },
       {
@@ -106,6 +108,7 @@ describe("dont-review-it/no-receiver-mutation--derive-new-value", () => {
     invalid: [
       {
         name: "setting an entry writes to the associative collection",
+        documented: true,
         code: "const counts = new Map<string, number>();\ncounts.set('a', 1);",
         errors: [{ messageId: "builtinReceiverMutation" }],
       },
@@ -201,6 +204,7 @@ describe("dont-review-it/no-receiver-mutation--derive-new-value", () => {
       },
       {
         name: "a write pushed one method deeper is still a write to the instance",
+        documented: true,
         code: "class Bag {\n  held: string = '';\n  add(entry: string) {\n    this.keep(entry);\n  }\n  keep(entry: string) {\n    this.held = entry;\n  }\n}\nconst bag = new Bag();\nbag.add('a');",
         errors: [{ messageId: "declaredClassMutation" }],
       },

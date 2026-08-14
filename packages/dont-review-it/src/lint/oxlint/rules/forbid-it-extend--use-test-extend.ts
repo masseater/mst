@@ -50,7 +50,7 @@ export const forbidItExtend = createDontReviewItRule({
     type: "problem",
     docs: {
       description:
-        "Disallow a fixture factory that stands on the test block spelling, so the spelled that declares test blocks carries that one role and everything scanning the suite can settle what a spelled means by reading it",
+        "Disallow a fixture factory that stands on the test block spelling, so the name that declares test blocks carries that one role and everything scanning the suite can settle what that name means by reading it",
       relatedGuidelines: [],
     },
     messages: {

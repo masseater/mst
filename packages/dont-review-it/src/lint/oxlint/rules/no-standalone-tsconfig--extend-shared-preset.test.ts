@@ -159,6 +159,7 @@ describe("dont-review-it/no-standalone-tsconfig--extend-shared-preset", () => {
     invalid: [
       {
         name: "a tsconfig that writes its own compilerOptions is reported",
+        documented: true,
         code: "export const total = 1;",
         filename: standalone,
         options: [sharedPresets],

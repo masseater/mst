@@ -8,6 +8,7 @@ describe("dont-review-it/no-multi-binding-declaration--declare-one-binding-per-s
     valid: [
       {
         name: "one binding per statement is the shape the rule asks for",
+        documented: true,
         code: "const parsedCount = 1;\nconst renderedLabel = 'a';",
       },
       {
@@ -24,6 +25,7 @@ describe("dont-review-it/no-multi-binding-declaration--declare-one-binding-per-s
       },
       {
         name: "a for statement header has nowhere to put a second statement",
+        documented: true,
         code: "for (let index = 0, limit = 10; index < limit; index += 1) {\n  report(index);\n}",
       },
       {
@@ -34,6 +36,7 @@ describe("dont-review-it/no-multi-binding-declaration--declare-one-binding-per-s
     invalid: [
       {
         name: "two bindings in one const statement are reported",
+        documented: true,
         code: "const parsedCount = 1, renderedLabel = 'a';",
         errors: [{ messageId: "multiBindingDeclaration" }],
       },
@@ -64,6 +67,7 @@ describe("dont-review-it/no-multi-binding-declaration--declare-one-binding-per-s
       },
       {
         name: "a for statement body is not the header, so the exemption does not reach it",
+        documented: true,
         code: "for (const entry of entries) {\n  const parsedCount = 1, renderedLabel = 'a';\n}",
         errors: [{ messageId: "multiBindingDeclaration" }],
       },

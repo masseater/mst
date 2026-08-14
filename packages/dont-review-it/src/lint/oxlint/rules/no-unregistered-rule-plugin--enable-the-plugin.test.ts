@@ -17,6 +17,7 @@ describe("dont-review-it/no-unregistered-rule-plugin--enable-the-plugin", () => 
       },
       {
         name: "a plugin list beside the rules enables the plugin",
+        documented: true,
         code: 'export const config = { plugins: ["vitest"], rules: { "vitest/no-focused-tests": "error" } };',
         options: ENABLES_NOTHING,
       },
@@ -37,6 +38,7 @@ describe("dont-review-it/no-unregistered-rule-plugin--enable-the-plugin", () => 
       },
       {
         name: "a rule turned off asks for no plugin",
+        documented: true,
         code: 'export const config = { rules: { "vitest/no-focused-tests": "off" } };',
         options: ENABLES_NOTHING,
       },
@@ -123,6 +125,7 @@ describe("dont-review-it/no-unregistered-rule-plugin--enable-the-plugin", () => 
     invalid: [
       {
         name: "a rule of a plugin nothing enables is reported",
+        documented: true,
         code: 'export const config = { rules: { "vitest/no-focused-tests": "error" } };',
         options: ENABLES_NOTHING,
         errors: [{ messageId: "unregisteredRulePlugin" }],
@@ -159,6 +162,7 @@ describe("dont-review-it/no-unregistered-rule-plugin--enable-the-plugin", () => 
       },
       {
         name: "a rule kept at warn still asks for its plugin",
+        documented: true,
         code: 'export const config = { rules: { "import/default": "warn" } };',
         options: ENABLES_VITEST,
         errors: [{ messageId: "unregisteredRulePlugin" }],

@@ -8,6 +8,7 @@ describe("dont-review-it/no-default-export--use-named-export", () => {
     valid: [
       {
         name: "a named export keeps the defined name at the module boundary",
+        documented: true,
         code: "export const total = 1 + 2;",
       },
       {
@@ -45,6 +46,7 @@ describe("dont-review-it/no-default-export--use-named-export", () => {
       },
       {
         name: "giving an outward name to another module's default is the way across the boundary",
+        documented: true,
         code: "export { default as total } from 'external-package';",
       },
       {
@@ -70,11 +72,13 @@ describe("dont-review-it/no-default-export--use-named-export", () => {
       },
       {
         name: "a default exported anonymous expression is reported",
+        documented: true,
         code: "export default () => 1;",
         errors: [{ messageId: "defaultExport" }],
       },
       {
         name: "renaming a local binding to default on the way out is reported",
+        documented: true,
         code: "const total = 1;\nexport { total as default };",
         errors: [{ messageId: "defaultAliasReExport" }],
       },

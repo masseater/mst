@@ -89,6 +89,7 @@ describe("dont-review-it/require-spec-file-for-assets--create-matching-spec", ()
     invalid: [
       {
         name: "test data with no spec of its stem anywhere",
+        documented: true,
         code: ASSETS_SOURCE,
         filename: join(fixtureDir, "orphan/order.assets.ts"),
         errors: [{ messageId: "unownedAssets", data: { ownerNames: ORDER_OWNER_NAMES } }],

@@ -1,66 +1,95 @@
+---
+description: "Disallow creating a mock or settling what it does anywhere but a module replacement factory and the body of a fixture, so the instance a test reads was stood up and settled for that test alone"
+---
+
 # no-module-scope-mock-config--lift-into-fixture
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-テスト宣言ファイルの中で、モックを立てる呼び出しとモックの挙動を決める呼び出しが、許可された 2 領域の外に書かれている形。
+Disallow creating a mock or settling what it does anywhere but a module replacement factory and the body of a fixture, so the instance a test reads was stood up and settled for that test alone
 
-許可された領域は 2 つだけである。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-module-scope-mock-config--lift-into-fixture.ts`](../../src/lint/oxlint/rules/no-module-scope-mock-config--lift-into-fixture.ts)
 
-1. モジュール差し替え宣言（既定では `vi.mock` / `vi.doMock`）に渡されたファクトリの内側
-2. fixture 関数の本体の内側
+<!-- END GENERATED rule-header -->
 
-判定はスコープの見え方ではなく AST の包含関係で行う。したがってモジュールのトップレベル、`describe` の本体、hoisted コンテナ（`vi.hoisted`）の中、`it` の本体はいずれも許可領域ではない。
+## Violation
 
-### 対象となる 3 系統
+A call that stands a mock up, or a call that settles what a mock does, written outside the two permitted areas inside a test declaration file.
 
-| 系統 | 何を見るか |
+There are only two permitted areas.
+
+1. Inside a factory handed to a module replacement declaration (by default `vi.mock` / `vi.doMock`)
+2. Inside the body of a fixture function
+
+The judgment runs on AST containment rather than on how scope looks. So the module's top level, a `describe` body, the inside of a hoisted container (`vi.hoisted`) and an `it` body are none of them permitted areas.
+
+### The three families in scope
+
+| Family | What is read |
 | --- | --- |
-| モックを立てる呼び出し | モック名前空間に対する `fn` / `mocked` / `spyOn` の呼び出し。名前空間は束縛まで辿って同定する |
-| 挙動を決める呼び出し | 挙動設定系のメソッド名の呼び出し。レシーバは問わず、メソッド名だけで判定する |
-| 添字による呼び出し | 名前が静的に読めない添字での呼び出しのうち、レシーバがモックまたは名前空間に行き着くもの |
+| Calls that stand a mock up | `fn` / `mocked` / `spyOn` on the mock namespace. The namespace is identified by following bindings |
+| Calls that settle behaviour | Calls to behaviour-setting method names. The receiver is not read; the method name settles it |
+| Calls through a subscript | A call through a subscript whose name cannot be read statically, where the receiver reaches a mock or the namespace |
 
-挙動設定系として扱うメソッド名は vitest 4 の `MockInstance` の公開 API から取った。`mockImplementation` / `mockImplementationOnce` / `withImplementation` / `mockReturnThis` / `mockReturnValue` / `mockReturnValueOnce` / `mockResolvedValue` / `mockResolvedValueOnce` / `mockRejectedValue` / `mockRejectedValueOnce` / `mockThrow` / `mockThrowOnce` の 12 個である。
+The method names treated as behaviour-setting are taken from the public API of vitest 4's `MockInstance`: `mockImplementation`, `mockImplementationOnce`, `withImplementation`, `mockReturnThis`, `mockReturnValue`, `mockReturnValueOnce`, `mockResolvedValue`, `mockResolvedValueOnce`, `mockRejectedValue`, `mockRejectedValueOnce`, `mockThrow`, `mockThrowOnce` — twelve in all.
 
-### 名前空間とレシーバの読み方
+### How the namespace and the receiver are read
 
-- **名前空間。** 素の識別子の綴りが一致する場合に加えて、同一ファイル内で束縛の宣言まで辿り、辿った先が名前空間なら一致とみなす。別名を付けた import（`import { vi as runner }`）、変数への入れ直し（`const runner = vi`）、モジュール全体の import 越し（`import * as runner` からの `runner.vi`）はすべて同じ判定になる。グローバル注入の構成でも明示 import の構成でも変わらない
-- **メソッド名。** プロパティ名のほか、文字列リテラルと置換を持たないテンプレートリテラルの添字も名前として読む。`vi['fn']()` は `vi.fn()` と同じに扱い、テンプレートリテラルで綴った添字も同じに扱う
-- **レシーバ。** 型アサーション、`satisfies`、非 null 表明、オプショナルチェーン、`await` の包みは剥がしてから判定する
-- **チェーン。** 立てた直後に決める形（`vi.fn().mockReturnValue(1)`）は外側の 1 件だけを報告する。内側の生成呼び出しは二重に報告しない。間にプロパティを挟む形（`vi.mocked(mailer).send.mockResolvedValue(1)`）も同じく 1 件になる
+- **The namespace.** Beyond a plain identifier spelling match, bindings are followed to their declaration inside the same file, and a declaration landing on the namespace counts as a match. An import taken under another name (`import { vi as runner }`), a re-binding into a variable (`const runner = vi`), and access through a whole-module import (`runner.vi` from `import * as runner`) all give the same judgment. A globally injected setup and an explicit-import setup read the same
+- **Method names.** Besides property names, a string-literal subscript and a template-literal subscript with no substitution are read as names. `vi['fn']()` is treated as `vi.fn()`, and a template-literal subscript the same
+- **The receiver.** Wrapping in a type assertion, `satisfies`, a non-null assertion, an optional chain or `await` is peeled before the judgment
+- **Chains.** Settling right after standing up (`vi.fn().mockReturnValue(1)`) is reported once, at the outer call. The inner creation call is not reported twice. A form with a property in between (`vi.mocked(mailer).send.mockResolvedValue(1)`) is likewise one report
 
-### fixture 領域の同定
+### Identifying the fixture area
 
-`extend` というメソッド名だけでは許可領域にしない。レシーバのチェーンの根まで辿り、それがテストブロックの束縛（`test` / `it`、それらの別名 import、それらから `extend` で派生した束縛）である場合に限って fixture 呼び出しとみなす。同名のメソッドを持つ無関係な API の引数の内側は許可領域ではない。
+The method name `extend` alone does not make a permitted area. The receiver's chain is followed to its root, and only where that root is a test block binding (`test` / `it`, their aliased imports, or bindings derived from them through `extend`) does it count as a fixture call. The inside of an argument to an unrelated API carrying a method of the same name is not a permitted area.
 
-許可されるのは fixture 関数そのものの本体だけである。`extend` に渡すオプションのオブジェクトの内側は許可領域に落ちない。
+What is permitted is only the body of the fixture function itself. The inside of an options object handed to `extend` does not land in the permitted area.
 
-適用範囲はテスト宣言ファイルに限る。既定では `.test.ts` / `.test.tsx` で終わるファイル。
+The range is limited to test declaration files: by default, files ending in `.test.ts` or `.test.tsx`.
 
-### 意図的に広げていない範囲
+### Deliberately not widened
 
-| 形 | 対象にしない理由 |
+| Shape | Why it is left out |
 | --- | --- |
-| `sendMail.mockClear()` / `vi.clearAllMocks()` などの後始末 | `no-redundant-mock-reset--lift-mocks-into-fixture` の担当。あちらは置き場所ではなく「そもそも書かないこと」を強制する |
-| 計算された添字のうち、レシーバがモックにも名前空間にも行き着かないもの | 名前も対象も同定できない。無関係なオブジェクトへの添字アクセスを巻き込まないため |
-| private identifier のメソッド呼び出し | 同名でも別物 |
-| モジュール差し替え宣言のファクトリの内側 | このルールでは常に許可する。そのファクトリに挙動を書いてよいかは `no-vi-mock-factory-behavior--use-spy-true-and-fixture` が判定する |
-| 呼ばずに参照だけを取る形（`const build = vi.fn;`） | 呼び出しを見ているため。取り出した参照が呼ばれる位置は、その呼び出しの側で判定される |
+| Teardown such as `sendMail.mockClear()` or `vi.clearAllMocks()` | [no-redundant-mock-reset--lift-mocks-into-fixture](./no-redundant-mock-reset--lift-mocks-into-fixture.md) takes it. That one enforces not writing it at all rather than where it is written |
+| A computed subscript whose receiver reaches neither a mock nor the namespace | Neither the name nor the target can be identified. This keeps subscript access on unrelated objects from being swept in |
+| A method call on a private identifier | The same name is a different thing |
+| The inside of a module replacement declaration's factory | Always permitted by this rule. Whether behaviour may be written in that factory is judged by [no-vi-mock-factory-behavior--use-spy-true-and-fixture](./no-vi-mock-factory-behavior--use-spy-true-and-fixture.md) |
+| Taking a reference without calling it (`const build = vi.fn;`) | Calls are what is read. Where the extracted reference is called is judged at that call |
 
-なお、挙動設定系を名前だけで判定する結果として、モックでないオブジェクトが同名のメソッドを持っていれば報告される。これは意図した過剰検出で、名前が読める限り型情報に依存せずに判定できることを優先している。型に相当する情報を使うのは添字の系統だけで、そこでは逆に、モックか名前空間に行き着く場合しか報告しないことで誤検出を避けている。
+One consequence of settling behaviour-setting by name alone is that a non-mock object carrying a method of the same name is reported. That over-detection is intended: what matters more is that the judgment holds without type information as long as the name is readable. Something standing in for type information is used only in the subscript family, and there the opposite applies — only what reaches a mock or the namespace is reported, avoiding false positives.
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「テストが読むモックの実体は、そのテストのために立てられ、そのテストのために設定された」ことである。
+The mock a test reads was stood up for that test and configured for that test.
 
-1 層目は共有である。モジュールスコープで立てたモックは、そのファイルの全テストが触る単一の実体になる。あるテストが決めた戻り値は次のテストにも残り、呼び出し記録も積み上がる。テストはファイル単位でも同一ファイル内の `it` 単位でも並列に走る前提で書かれるので、「次のテスト」が何かは実行のたびに変わる。結果として失敗は再現しない形で現れ、落ちたテスト自身の記述を読んでも原因が分からない。
+The first layer is sharing. A mock stood up at module scope is one instance every test in the file touches. A return value one test settled stays for the next, and the call record accumulates. Tests are written assuming they run in parallel both per file and per `it` inside one file, so what "the next test" is changes from run to run. The failure appears in a form that does not reproduce, and reading the failing test's own text does not give the cause.
 
-2 層目は再現性の作り方である。fixture の中に置けば、テストは自分が要求した設定が適用済みの状態でモックを受け取る。fixture は各テストのために評価され直すので、設定はテストごとに再適用される。共有設定が各テストの前に呼び出し記録を消すことと合わせて、実行順に依存しない状態になる。
+The second layer is how reproducibility is built. Placed inside a fixture, the test receives the mock with the configuration it asked for already applied. A fixture is re-evaluated for each test, so the configuration is re-applied per test. Together with the shared configuration clearing call records before each test, the state stops depending on execution order.
 
-3 層目は spec が単体で読めることである。モックが何を返すのかを知るためにファイル冒頭まで戻らなければならない状態では、spec は仕様書として読めない。`it` の本体での設定を禁じるのは同じ理由の裏返しで、`it` に準備が入り込むと、そのテストが何を検証しているかがアサーション以外の行に埋もれる。
+The third layer is that a spec reads on its own. Where learning what a mock returns means going back to the head of the file, a spec cannot be read as a specification. Forbidding configuration in an `it` body is the same reason inverted: let preparation into an `it` and what that test verifies is buried among lines that are not assertions.
 
-## どう直すか
+### Configuration
 
-モックを立てる呼び出しと挙動を決める呼び出しを fixture の本体へ移し、その fixture がモックの束縛を返す。テストはパラメータとして受け取り、アサーションだけを書く。
+| Name | Default | Meaning |
+| --- | --- | --- |
+| `mockNamespaceSpellings` | `["vi"]` | The spellings identified as the mock namespace |
+| `mockCreationMembers` | `["fn", "mocked", "spyOn"]` | The namespace members that stand a mock up |
+| `mockBehaviorMembers` | The twelve taken from vitest 4's `MockInstance` (above) | The method names that settle behaviour |
+| `moduleReplacementMembers` | `["mock", "doMock"]` | The namespace members whose factory interior becomes a permitted area |
+| `specFileSuffixes` | `[".test.ts", ".test.tsx"]` | The suffixes taken as test declaration files |
+
+Each replaces its default wholesale. Handing over an empty array leaves the default in place. Teardown method names are not in the default of `mockBehaviorMembers`; including them would change what this rule is responsible for and produce duplicate reports with `no-redundant-mock-reset--lift-mocks-into-fixture`.
+
+## Fix
+
+Move the calls that stand a mock up and settle its behaviour into a fixture body, and have that fixture return the mock's binding. The test receives it as a parameter and writes assertions alone.
 
 ```ts
 const test = baseTest.extend("report", () => {
@@ -70,27 +99,74 @@ const test = baseTest.extend("report", () => {
 });
 ```
 
-モジュール差し替え宣言は構造の宣言だけに留め、テストごとの結果は fixture の中で決める。差し替え宣言のファクトリに何を書いてよいかは `no-vi-mock-factory-behavior--use-spy-true-and-fixture` が別に判定する。
+Keep a module replacement declaration to declaring structure, and settle per-test results inside the fixture. What may be written in a replacement declaration's factory is judged separately by `no-vi-mock-factory-behavior--use-spy-true-and-fixture`.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- **hoisted コンテナに実体を置き、fixture からは触るだけにする。** 実体が共有されている事実は変わらない。hoisted コンテナは許可領域ではないので、そこに書かれた生成呼び出しは報告される。モックでない実体をモジュールスコープに置いてテストから書き換える形は `no-module-scope-mutable-state--lift-into-fixture` が報告する
-- **添字アクセスで検出を避ける。** 文字列リテラルと置換のないテンプレートリテラルの添字は名前として読む。名前が読めない添字も、レシーバがモックか名前空間に行き着くなら報告する
-- **名前空間に別名を付けて import する、いったん変数へ入れ直す。** 束縛の宣言まで辿るので落ちる
-- **型を緩めてからレシーバに置く。** 型アサーション・`satisfies`・非 null 表明は剥がしてから判定する
-- **設定を `it` の本体へ下ろす。** 置き場所の問題を別の禁止領域へ移しただけであり、同じ違反として報告される
-- **`extend` という名前のメソッドを持つ別の API の引数に書く。** レシーバのチェーンの根まで辿るので、テストブロックの束縛に行き着かないものは許可領域にならない
-- **`extend` に渡すオプションのオブジェクトに書く。** 許可されるのは fixture 関数の本体だけである
-- **抑制ディレクティブ。** `no-rule-suppression--fix-the-violation` が報告する
+Code this rule rejects.
 
-## オプション
+```ts
+// a mock built at module scope is one instance every test in the file shares
+// in mailer.test.ts
+const sendMail = vi.fn();
+```
 
-| 名前 | 既定値 | 意味 |
-| --- | --- | --- |
-| `mockNamespaceSpellings` | `["vi"]` | モック名前空間として同定する綴り |
-| `mockCreationMembers` | `["fn", "mocked", "spyOn"]` | モックを立てる名前空間メンバー |
-| `mockBehaviorMembers` | vitest 4 の `MockInstance` から取った 12 個（上記） | 挙動を決めるメソッド名 |
-| `moduleReplacementMembers` | `["mock", "doMock"]` | ファクトリの内側を許可領域にする名前空間メンバー |
-| `specFileSuffixes` | `[".test.ts", ".test.tsx"]` | テスト宣言ファイルとみなす接尾辞 |
+```ts
+// a setting written in the body of a test block buries what the test verifies
+// in mailer.test.ts
+it('accepts the address', () => {
+  sendMail.mockReturnValue(1);
+  expect(sendMail).toHaveBeenCalled();
+});
+```
 
-いずれも既定値を丸ごと置き換える。空の配列を渡した場合は既定値のままになる。後始末系のメソッド名は `mockBehaviorMembers` の既定値に含めない。含めるとこのルールの担当範囲が変わり、`no-redundant-mock-reset--lift-mocks-into-fixture` と二重に報告する。
+Code this rule accepts.
+
+```ts
+// a mock built inside the fixture that hands it back is the shape this rule keeps
+// in mailer.test.ts
+const it = test.extend('sendMail', () => vi.fn());
+```
+
+```ts
+// what the mock does, settled inside the fixture body, is applied for each test on its own
+// in mailer.test.ts
+const it = test.extend('sendMail', () => {
+  const sendMail = vi.fn();
+  sendMail.mockResolvedValue({ accepted: 1 });
+  return sendMail;
+});
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- **Putting the instance in a hoisted container and only touching it from the fixture.** That the instance is shared does not change. A hoisted container is not a permitted area, so a creation call written there is reported. Putting a non-mock instance at module scope and rewriting it from tests is reported by [no-module-scope-mutable-state--lift-into-fixture](./no-module-scope-mutable-state--lift-into-fixture.md)
+- **Avoiding detection with subscript access.** String-literal and substitution-free template-literal subscripts are read as names. A subscript whose name cannot be read is reported too where the receiver reaches a mock or the namespace
+- **Importing the namespace under another name, or re-binding it into a variable.** Bindings are followed to their declaration, so it falls
+- **Loosening the type before placing it as the receiver.** Type assertions, `satisfies` and non-null assertions are peeled before the judgment
+- **Moving the configuration down into an `it` body.** That only moves the placement problem into another forbidden area, and it is reported as the same violation
+- **Writing it in the argument of another API carrying a method named `extend`.** The receiver's chain is followed to its root, so what does not reach a test block binding is not a permitted area
+- **Writing it in the options object handed to `extend`.** What is permitted is the fixture function's body alone
+- **A suppression directive.** [no-rule-suppression--fix-the-violation](./no-rule-suppression--fix-the-violation.md) reports it
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `mockCreationOutsideFixture` | A mock must not be stood up outside a fixture. Move \`{{member}}\` into the body of the fixture the test takes its subject from, return the mock binding from there, and let the test block receive it as a parameter. Only the factory of a module replacement declaration and the body of a fixture function may hold this call. Parking the instance in a hoisted container, importing the mock namespace under another name, reaching the member through a subscript, and dropping the call into the body of the test block are each reported the same way. |
+| `mockBehaviorOutsideFixture` | What a mock does must not be settled outside a fixture. Move \`{{member}}\` into the body of the fixture that returns the mock, leaving every test to run with the setting applied for it alone. Only the factory of a module replacement declaration and the body of a fixture function may hold this call. Moving the call into the body of the test block, behind a renamed binding, and behind a subscript are each reported the same way, and clearing or restoring the mock afterwards is not the answer either: the shared runner configuration owns that. |
+| `subscriptedMockWriting` | A method reached on a mock through a subscript that only settles at run time must not be called outside a fixture. Write the member out by name and move the call into the body of the fixture that returns the mock. Only the factory of a module replacement declaration and the body of a fixture function may hold this call. A subscript spelled out in full is read as the member it names, so moving that spelling into a binding changes nothing. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

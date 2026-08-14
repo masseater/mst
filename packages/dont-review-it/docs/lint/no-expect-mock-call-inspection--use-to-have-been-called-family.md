@@ -1,70 +1,96 @@
+---
+description: "Disallow reading the call record of a mock as a value, in the subject of an assertion or in what a fixture hands back, so a claim about how a function was called is stated by the matcher that names it"
+---
+
 # no-expect-mock-call-inspection--use-to-have-been-called-family
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-テスト宣言ファイルの中で、モックの「呼び出し記録」が値として 2 か所のいずれかに現れる形。
+Disallow reading the call record of a mock as a value, in the subject of an assertion or in what a fixture hands back, so a claim about how a function was called is stated by the matcher that names it
 
-1. **アサーションの受け手。** `expect(受け手).<matcher>(...)` の受け手が呼び出し記録に行き着くもの
-2. **fixture が返す subject。** fixture が返す式が呼び出し記録に行き着くもの
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-expect-mock-call-inspection--use-to-have-been-called-family.ts`](../../src/lint/oxlint/rules/no-expect-mock-call-inspection--use-to-have-been-called-family.ts)
 
-呼び出し記録とみなすのは、モック名前空間プロパティ `mock` の直下にある「どう呼ばれたか」のプロパティである。既定値は `calls` / `contexts` / `instances` / `invocationCallOrder` / `lastCall` の 5 つ。
+<!-- END GENERATED rule-header -->
 
-matcher の集合は持たない。受け手が呼び出し記録に行き着くかどうかだけで判定する。`toHaveBeenCalled*` 系は受け手がモック束縛そのものになるため、集合を持たなくても構造的に外れる。
+## Violation
 
-### 記録に行き着くかの辿り方
+A mock's call record appearing as a value in one of two places inside a test declaration file.
 
-`mock` とその直下のプロパティという隣接した 2 段が、アクセス連鎖のどこかに現れれば記録とみなす。派生形はその先に何段重なっても記録のままである。
+1. **The receiver of an assertion.** The receiver of `expect(receiver).<matcher>(...)` reaching a call record
+2. **The subject a fixture returns.** The expression a fixture returns reaching a call record
 
-- 添字アクセス（`sendMail.mock.calls[0][0]`）
-- 長さ（`sendMail.mock.calls.length`）
-- 写像（`sendMail.mock.calls.map((call) => call[0])`）
-- 型アサーション・非 null アサーション・括弧・オプショナルチェーン・`await` の包み
+A call record is a "how it was called" property directly under the mock namespace property `mock`. The default set is five: `calls`, `contexts`, `instances`, `invocationCallOrder`, `lastCall`.
 
-識別子は、束縛の出所まで辿る。辿る条件と深さはアサーション側と fixture 側で同じものを使う。
+No set of matchers is held. The judgment is only whether the receiver reaches a call record. The `toHaveBeenCalled*` family has the mock binding itself as its receiver, so it falls out structurally without needing a set.
 
-- 中間変数への束縛
-- 分割代入での取り出し（`const { calls } = sendMail.mock;`、`const [first] = sendMail.mock.calls;`）
-- 名前空間そのものの取り出し（`const { mock } = sendMail;`）
-- 多段の転送（`const record = sendMail.mock; const sent = record.calls;`）
-- デフォルト値を伴う束縛（`const { calls = [] } = sendMail.mock;`、`(sent = []) => ...`）
-- 再代入。すべての代入の右辺を見て、1 つでも記録に行き着けば違反
-- 関数パラメータ。同一ファイル内で静的に解決できる呼び出し元の実引数まで辿る
+### How the walk to a record runs
 
-### 意図的に広げていない範囲
+Where the two adjacent steps of `mock` and a property directly under it appear anywhere in an access chain, it counts as a record. Derived forms stay records however many steps ride on top.
 
-| 形 | 対象にしない理由 |
+- Index access (`sendMail.mock.calls[0][0]`)
+- Length (`sendMail.mock.calls.length`)
+- Mapping (`sendMail.mock.calls.map((call) => call[0])`)
+- Wrapping in a type assertion, a non-null assertion, parentheses, an optional chain or `await`
+
+Identifiers are followed to the origin of the binding. The conditions and depth of the walk are the same on the assertion side and the fixture side.
+
+- Binding to an intermediate variable
+- Extraction by destructuring (`const { calls } = sendMail.mock;`, `const [first] = sendMail.mock.calls;`)
+- Extraction of the namespace itself (`const { mock } = sendMail;`)
+- Multi-step forwarding (`const record = sendMail.mock; const sent = record.calls;`)
+- A binding carrying a default (`const { calls = [] } = sendMail.mock;`, `(sent = []) => ...`)
+- Reassignment. The right side of every assignment is read, and one reaching a record is a violation
+- A function parameter. The caller's actual argument is followed where the call site resolves statically inside the same file
+
+### Deliberately not widened
+
+| Shape | Why it is left out |
 | --- | --- |
-| `sendMail.mock.results` / `sendMail.mock.settledResults` | 「何を返したか」の記録。このルールの対象は「どう呼ばれたか」に限っている |
-| `expect(sendMail).toHaveBeenCalledWith(...)` | 受け手がモック束縛そのもので、記録に行き着かない |
-| 制御フローのためだけに取り出した記録 | 見ているのはアサーションの受け手と fixture が返す subject の 2 か所だけ。取り出したこと自体は違反ではない。fixture 間で受け渡す形も同じ |
-| `expect({ calls: sendMail.mock.calls })` | 記録をオブジェクトや配列に包んだ形。連鎖と束縛だけを辿り、リテラルの内側には降りない。この形は fixture 側の別ルールが落とす |
-| 実行時にしか呼び出し元が決まらない経路 | 条件で差し替わる関数束縛を通した受け渡し、実行時に決まる呼び出し元からのパラメータ。辿るべき呼び出し元が静的に決まらない |
-| 可変長パラメータ・展開した実引数・計算されたプロパティ名 | 実引数とパラメータを突き合わせる位置が静的に決まらない。`(...sent) => ...`、`observe(...args)`、`const { [named]: sent } = sendMail.mock;` が該当する |
-| `expect(sendMail.mock)` | 名前空間そのものとの比較。記録プロパティが現れないため、綴りだけで見分けると無関係な `mock` プロパティを巻き込む |
-| 別ファイルの宣言を経由した転送 | 実行系がファイルを跨ぐ解決を提供しない。同一ファイルの中で閉じた追跡に限っている |
+| `sendMail.mock.results` / `sendMail.mock.settledResults` | A record of "what it returned". This rule's scope is limited to "how it was called" |
+| `expect(sendMail).toHaveBeenCalledWith(...)` | The receiver is the mock binding itself and reaches no record |
+| A record taken out purely for control flow | Only two places are read: the assertion's receiver and the subject a fixture returns. Taking it out is not itself a violation. Passing it between fixtures is the same |
+| `expect({ calls: sendMail.mock.calls })` | A record wrapped in an object or an array. Only chains and bindings are followed; the walk does not descend inside a literal. That shape falls to another rule on the fixture side |
+| A route whose caller settles only at run time | Passing through a function binding swapped by a condition, and a parameter from a caller settled at run time. The caller to follow does not settle statically |
+| A rest parameter, spread arguments, a computed property name | The position where actual arguments and parameters are matched does not settle statically. `(...sent) => ...`, `observe(...args)` and `const { [named]: sent } = sendMail.mock;` land here |
+| `expect(sendMail.mock)` | A comparison against the namespace itself. No record property appears, and telling it apart by spelling alone would sweep in unrelated `mock` properties |
+| Forwarding through a declaration in another file | The runtime offers no cross-file resolution. The tracking is limited to what closes inside one file |
 
-適用範囲はテスト宣言ファイルに限る。既定では `.test.ts` / `.test.tsx` で終わるファイル。
+The range is limited to test declaration files: by default, files ending in `.test.ts` or `.test.tsx`.
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「『その関数がどう呼ばれたか』を主張するアサーションは、matcher の名前でそれを主張する」ことである。
+An assertion claiming "how that function was called" makes that claim through the matcher's name.
 
-1 層目は失敗時の可読性である。`toHaveBeenCalled*` 系は、失敗メッセージが「何回呼ばれたか」「どの引数で呼ばれたか」の言葉で出る。同じ検査を呼び出し記録の配列比較に落とすと、失敗は無名の配列に対する一般的な等価エラーになる。読み手は「何を検証していたテストなのか」をコードから復元する羽目になる。
+The first layer is readability on failure. The `toHaveBeenCalled*` family produces failure messages in the words "how many times" and "with which arguments". Reduce the same check to an array comparison over the call record and the failure becomes a generic equality error over an anonymous array. The reader is left reconstructing what the test was verifying from the code.
 
-2 層目は意図の置き場所である。fixture が記録を返すと、fixture が返すものが「検査対象が生んだ出力」ではなく「観測の中間表現」になる。fixture の意味そのものが壊れ、fixture が SUT 出力を返している前提で判定している他のルールも道連れになる。
+The second layer is where the intent sits. Let a fixture return a record and what the fixture returns stops being "the output the subject under test produced" and becomes "an intermediate representation of an observation". The meaning of a fixture breaks, and the other rules that judge on the premise that a fixture returns the subject's output go down with it.
 
-3 層目は、回避のしやすさである。matcher の集合で禁止すると、集合外の matcher（プロパティパスを指定するもの、名前空間そのものとの比較）へ載せ替えるだけで同じ検査を続けられる。受け手の形だけで判定することで、載せ替えでは外れなくなる。
+The third layer is how easy it is to evade. Forbid by a set of matchers and the same check continues by moving onto a matcher outside the set — one taking a property path, or a comparison against the namespace itself. Judging on the shape of the receiver alone means moving matchers does not take it off.
 
-## どう直すか
+### Configuration
 
-アサーション側は、モック束縛そのものを `expect` に渡し、意図を matcher に移す。
+| Name | Default | Meaning |
+| --- | --- | --- |
+| `callRecordMembers` | `["calls", "contexts", "instances", "invocationCallOrder", "lastCall"]` | The set of property names taken as call records |
+| `specFileSuffixes` | `[".test.ts", ".test.tsx"]` | The file name suffixes taken as test declaration files |
 
-- 引数の主張: `toHaveBeenCalledWith` / `toHaveBeenCalledExactlyOnceWith` / `toHaveBeenLastCalledWith` / `toHaveBeenNthCalledWith`
-- 回数の主張: `toHaveBeenCalledTimes` / `toHaveBeenCalledOnce`
-- 存在の主張: `toHaveBeenCalled`
-- 非存在の主張: 同じ名前を `not` の後ろに置く
+`callRecordMembers` replaces the default wholesale. Handing it an empty array leaves the default in place. The "what it returned" property names (`results`, `settledResults`) are not in the default; including them would change what this rule is responsible for.
 
-fixture 側は、記録ではなくモック束縛そのものを返す。
+## Fix
+
+On the assertion side, hand the mock binding itself to `expect` and move the intent into the matcher.
+
+- Claiming arguments: `toHaveBeenCalledWith` / `toHaveBeenCalledExactlyOnceWith` / `toHaveBeenLastCalledWith` / `toHaveBeenNthCalledWith`
+- Claiming a count: `toHaveBeenCalledTimes` / `toHaveBeenCalledOnce`
+- Claiming existence: `toHaveBeenCalled`
+- Claiming absence: the same names behind `not`
+
+On the fixture side, return the mock binding itself rather than a record.
 
 ```ts
 const test = baseTest.extend("sendMail", () => sendMail);
@@ -73,25 +99,77 @@ test("addresses the recipient", ({ sendMail }) => {
 });
 ```
 
-この直し方は、各テストの前に呼び出し記録をクリアする共有のランナー設定（vitest の `clearMocks`）が入っていることを前提にする。クリアされないと、生きたモックにテスト間の呼び出しが累積し、回数のアサーションが実行順に依存して壊れる。設定を入れずにこのルールだけを有効にしない。
+This fix assumes a shared runner configuration that clears call records before each test (vitest's `clearMocks`). Without clearing, calls accumulate across tests on a live mock and a count assertion breaks depending on execution order. Do not enable this rule alone without that configuration.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- **記録を中間変数に束ねる。** 束縛の出所まで辿るので落ちる
-- **分割代入で記録や名前空間を取り出す。** 取り出したプロパティ名を見るので落ちる
-- **多段の転送を挟む。** 段数の上限を置いていないので落ちる
-- **パラメータや再代入される束縛に一度入れ直す。** 呼び出し元の実引数と、すべての代入の右辺を辿るので落ちる
-- **別の matcher に載せ替えて同じ検査を続ける。** matcher の集合を持たないので落ちる
-- **記録をオブジェクトや配列に包んで fixture から返す。** このルールは報告しないが、許しているわけではない。fixture 側で別の値から subject を組み直す形は別のルールが落とす
-- **`expect(sendMail.mock)` のように名前空間そのものを比較する。** 型情報が無い実行系では無関係な `mock` プロパティと区別できないため報告しないが、これは検出の限界であって許可ではない。呼び出し記録の比較として書かない
-- **記録の読み出しを別ファイルのヘルパへ移す。** 同一ファイルの中で閉じた追跡なので報告は消えるが、subject が記録であることは変わらない
-- **抑制ディレクティブ**
+Code this rule rejects.
 
-## オプション
+```ts
+// the recorded calls compared as a value
+// in send-mail.test.ts
+const sendMail = vi.fn();
+test("records the send", () => {
+  expect(sendMail.mock.calls).toStrictEqual([["a@example.com"]]);
+});
+```
 
-| 名前 | 既定値 | 意味 |
-| --- | --- | --- |
-| `callRecordMembers` | `["calls", "contexts", "instances", "invocationCallOrder", "lastCall"]` | 呼び出し記録とみなすプロパティ名の集合 |
-| `specFileSuffixes` | `[".test.ts", ".test.tsx"]` | テスト宣言ファイルとみなすファイル名の接尾辞 |
+```ts
+// a fixture handing the record back as its subject
+// in send-mail.test.ts
+const sendMail = vi.fn();
+const test = baseTest.extend("sent", () => sendMail.mock.calls);
+```
 
-`callRecordMembers` は既定値を丸ごと置き換える。空の配列を渡した場合は既定値のままになる。「何を返したか」側のプロパティ名（`results` / `settledResults`）は既定値に含めない。含めるとこのルールの担当範囲が変わる。
+Code this rule accepts.
+
+```ts
+// the arguments a mock was called with, claimed by the matcher that names them
+// in send-mail.test.ts
+test("addresses the recipient", ({ sendMail }) => {
+  expect(sendMail).toHaveBeenCalledWith("a@example.com");
+});
+```
+
+```ts
+// a fixture handing the mock binding itself back is the shape this rule asks for
+// in send-mail.test.ts
+const sendMail = vi.fn();
+const test = baseTest.extend("sendMail", () => sendMail);
+test("addresses the recipient", ({ sendMail }) => {
+  expect(sendMail).toHaveBeenCalledWith("a@example.com");
+});
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- **Binding the record to an intermediate variable.** The origin of the binding is followed, so it falls
+- **Taking the record or the namespace out by destructuring.** The extracted property name is read, so it falls
+- **Inserting multi-step forwarding.** No cap is placed on the number of steps, so it falls
+- **Passing it once through a parameter or a reassigned binding.** The caller's actual arguments and the right side of every assignment are followed, so it falls
+- **Moving onto another matcher to continue the same check.** No set of matchers is held, so it falls
+- **Wrapping the record in an object or an array and returning it from a fixture.** This rule does not report it, which is not the same as allowing it. Reassembling a subject from another value on the fixture side falls to another rule
+- **Comparing the namespace itself, as in `expect(sendMail.mock)`.** In a runtime with no type information this cannot be told apart from an unrelated `mock` property, so it is not reported — that is a limit of the detection, not permission. Do not write it as a comparison of call records
+- **Moving the record read into a helper in another file.** The tracking closes inside one file so the report clears, but the subject is still a record
+- **A suppression directive**
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `inspectedCallRecord` | The call record of a mock must not be the subject of an assertion. Pass the mock itself to \`expect\` and put the claim in the matcher that names it: \`toHaveBeenCalledWith\` or \`toHaveBeenCalledExactlyOnceWith\` for the arguments, \`toHaveBeenCalledTimes\` or \`toHaveBeenCalledOnce\` for the count, \`toHaveBeenCalled\` for the call itself, and the same names behind \`not\` for the absence of a call. \`{{matcher}}\` is receiving that record. Names bound to the record, destructurings, parameters, reassignments and other matchers carrying the same comparison are forbidden detours; each is followed back to the record. |
+| `fixtureYieldsCallRecord` | A fixture must not hand back the call record of a mock. Return the mock binding itself and leave the claim to \`toHaveBeenCalledWith\`, \`toHaveBeenCalledTimes\` or \`toHaveBeenCalled\` in the assertion. The fixture \`{{fixture}}\` is handing that record back. Names bound in the factory, destructurings, parameters and reassignments between the mock and the value handed back are forbidden detours; each is followed back to the record. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

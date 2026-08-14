@@ -12,6 +12,7 @@ describe("dont-review-it/no-fixture-forward-subject--yield-sut-output", () => {
     valid: [
       {
         name: "a local binding handed back whole carries every field the code produced",
+        documented: true,
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("report", async () => {\n  const report = await summarise(entries);\n  return report;\n});',
       },
@@ -27,6 +28,7 @@ describe("dont-review-it/no-fixture-forward-subject--yield-sut-output", () => {
       },
       {
         name: "a method call on a dependency produces a new value",
+        documented: true,
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("record", async ({ store }) => store.load());',
       },
@@ -129,6 +131,7 @@ describe("dont-review-it/no-fixture-forward-subject--yield-sut-output", () => {
     invalid: [
       {
         name: "a dependency handed straight back leaves this fixture stating nothing of its own",
+        documented: true,
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("report", async ({ summarised }) => summarised);',
         errors: [{ messageId: "forwardedSubject", data: { subject: "summarised" } }],
@@ -147,6 +150,7 @@ describe("dont-review-it/no-fixture-forward-subject--yield-sut-output", () => {
       },
       {
         name: "a member read off a dependency drops the rest of that dependency",
+        documented: true,
         filename: SPEC_FILE,
         code: 'const test = baseTest.extend("path", async ({ lockOptions }) => lockOptions.lockPath);',
         errors: [{ messageId: "projectedSubject", data: { subject: "lockOptions" } }],

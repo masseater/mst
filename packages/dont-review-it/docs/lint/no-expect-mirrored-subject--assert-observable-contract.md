@@ -1,70 +1,91 @@
+---
+description: "Disallow writing the expression a fixture built the subject from as the expected value of an assertion, so a passing assertion states something about the code rather than that one expression evaluates to itself"
+---
+
 # no-expect-mirrored-subject--assert-observable-contract
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-spec ファイルの中の、`expect(subject).matcher(expected)` という形のアサーション。`subject` の出どころである fixture が subject を組み立てた式と、`expected` が同じ式であるものを報告する。
+Disallow writing the expression a fixture built the subject from as the expected value of an assertion, so a passing assertion states something about the code rather than that one expression evaluates to itself
 
-対象の spec ファイルは、既定では `.test.ts` と `.test.tsx` で終わる名前を持つもの。オプションで差し替えられる。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: yes
+- Shipped in the preset: yes
+- Source: [`no-expect-mirrored-subject--assert-observable-contract.ts`](../../src/lint/oxlint/rules/no-expect-mirrored-subject--assert-observable-contract.ts)
 
-subject として見るのは、`expect` に渡された裸の識別子だけ。修飾子（`not` / `resolves` / `rejects`）と受け手の派生形（`expect.soft` / `expect.poll`）は剥いでから根を確かめる。matcher の名前は問わない。完全一致でも部分一致でも自前の matcher でも同じに扱う。
+<!-- END GENERATED rule-header -->
 
-fixture の引き当ては、識別子の綴りではなく、その識別子が解決する宣言で行う。テスト本体の仮引数を分割代入で `({ report: summary })` と別名に受けても、束縛の宣言から `report` の fixture に行き着く。同じ綴りの名前が別のテスト本体で別の fixture を指していても、それぞれの束縛に解決するので取り違えない。
+## Violation
 
-fixture が subject に至る経路は次を辿る。
+An assertion in a spec file of the shape `expect(subject).matcher(expected)` where the expression the fixture that produced `subject` built it from, and `expected`, are the same expression.
 
-- 式をそのまま返す
-- ローカルの `const` に束ねてから返す
-- `try` ブロックの直下で投げ、`catch` で受けたものを返す
-- その場で実行する関数を通して組み立てる
-- このファイルの中で解決できるヘルパ呼び出しを通す
-- 名前付きのビルダ形式と、旧来のオブジェクト形式で受け渡し用の引数に渡す形の、どちらの記法でも読む
+The spec files in scope are, by default, those whose names end in `.test.ts` or `.test.tsx`. Replaceable through the options.
 
-期待値の側も同じ条件で束縛を辿る。辿るのは、宣言が 1 つだけで、その宣言が識別子に式を与えていて、初期化のほかに代入を受けていない名前である。段数の上限は置かない。1 段挟んでも多段挟んでも、辿り着く式が同じなら報告する。束縛の解決はスコープで行うので、同じ綴りの名前が別のスコープにあっても混ざらない。
+Only a bare identifier handed to `expect` is read as the subject. Modifiers (`not`, `resolves`, `rejects`) and derived receivers (`expect.soft`, `expect.poll`) are peeled before the root is confirmed. The matcher's name is not read: an exact match, a partial match and a matcher of your own are treated alike.
 
-比較は文字列ではなく構文木の形で行う。次の表記差は吸収する。
+The fixture is looked up by the declaration the identifier resolves to rather than by its spelling. Take the test body's parameter under another name with `({ report: summary })` and the binding's declaration still leads to the `report` fixture. Where the same spelling names a different fixture in another test body, each resolves to its own binding, so they are not mixed up.
 
-- 空白・改行・字下げ
-- 括弧
-- 引用符の種類（置換を持たないテンプレートリテラルを含む）
-- 数値の表記（`2` と `2.0` と `0x2`）
-- オブジェクトのプロパティが書かれた順序
-- 末尾のカンマ
-- プロパティの短縮記法
-- 型アサーション・`satisfies`・非 null アサーション・オプショナルチェーン・`await`
+The route from the fixture to the subject follows these.
 
-識別子・プロパティ名・呼び出し先・配列要素の順序は正規化しない。ここを揃えてしまうと、別の値を書いた期待値まで同じものとして報告することになる。
+- Returning the expression as it stands
+- Binding to a local `const` and returning that
+- Throwing directly inside a `try` block and returning what the `catch` received
+- Building it through a function run on the spot
+- Going through a helper call resolvable inside this file
+- Both notations: the named builder form, and the older object form where it is handed to an argument for passing along
 
-期待値が subject を spread しているオブジェクトのときは、式の一致を待たずに報告する。上書きしたキー以外は自分自身と比較されるため、実質的に上書き分しか固定していない。この形には別のメッセージが出る。
+The expected side follows bindings under the same conditions. What is followed is a name with exactly one declaration, where that declaration gives the identifier an expression, and which receives no assignment beyond its initialization. No cap is placed on the number of steps: one step or many, the report stands where the expression reached is the same. Binding resolution runs on scope, so the same spelling in another scope does not get mixed in.
 
-### 意図的に広げていない範囲
+Comparison runs on the shape of the syntax tree rather than on strings. These notational differences are absorbed.
 
-| 形 | 対象にしない理由 |
+- Whitespace, newlines and indentation
+- Parentheses
+- The kind of quote (including a template literal carrying no substitution)
+- Number notation (`2`, `2.0`, `0x2`)
+- The order an object's properties are written in
+- A trailing comma
+- Property shorthand
+- Type assertions, `satisfies`, non-null assertions, optional chains and `await`
+
+Identifiers, property names, callees and the order of array elements are not normalized. Align those and an expected value that wrote a different value would be reported as the same thing.
+
+Where the expected value is an object spreading the subject, the report stands without waiting for the expressions to match. Every key except the overridden ones is compared against itself, so in effect only the overrides are pinned. That shape gets a message of its own.
+
+### Deliberately not widened
+
+| Shape | Why it is left out |
 | --- | --- |
-| `expect(report.id).toStrictEqual(...)` | subject が裸の識別子でない。`no-expect-projected-subject--use-tostrictequal-on-subject` が止める |
-| 引数を取らない matcher | 比較する相手がない。matcher の弱さは `forbid-weak-matcher--use-exact-matcher` の担当 |
-| `try` の中の内側の関数が投げた例外 | 伝播そのものを検証するテストを巻き込まないため、`try` 直下の `throw` だけを拾う |
-| 構文が違い、実行時に同じ値へ評価される期待値 | 値が等しいかどうかは評価しないと決まらない。表記の違いは構文木の正規化が吸収するので、ここに残るのは組み立ての手順が本当に違う場合だけ |
-| 別ファイルで宣言された fixture | 1 ファイルの構文で完結しないため、この lint ルールの検査は届かない |
-| 初期化のあとに別の式を代入される名前 | その名前が 1 つの式を指すとは言えないため辿らない |
-| 分割代入で取り出された名前 | 取り出し元の式そのものではないため辿らない |
+| `expect(report.id).toStrictEqual(...)` | The subject is not a bare identifier. [no-expect-projected-subject--use-tostrictequal-on-subject](./no-expect-projected-subject--use-tostrictequal-on-subject.md) stops it |
+| A matcher taking no argument | There is nothing to compare against. A matcher's weakness belongs to [forbid-weak-matcher--use-exact-matcher](./forbid-weak-matcher--use-exact-matcher.md) |
+| An exception thrown by an inner function inside the `try` | Only a `throw` directly under the `try` is picked up, so that a test verifying propagation itself is not swept in |
+| An expected value of different syntax evaluating to the same value at run time | Whether values are equal is not settled without evaluating. Notational differences are absorbed by normalizing the syntax tree, so what is left here is where the construction steps really differ |
+| A fixture declared in another file | It does not close inside one file's syntax, so this lint rule's check does not reach |
+| A name assigned another expression after initialization | That name cannot be said to stand for one expression, so it is not followed |
+| A name taken out by destructuring | It is not the extraction source's expression itself, so it is not followed |
 
-## なぜそれが要るか
+### The invariant
 
-守っている不変条件は「期待値は、fixture が subject を組み立てた式とは独立に書かれている」ことである。
+The expected value is written independently of the expression the fixture built the subject from.
 
-1 層目は、このアサーションが何を示すかである。fixture がある構築式を返し、テストが同じ構築式を期待値に書いたとき、通ったことが示すのは「同じ式を 2 回評価すると等しい値になる」ことだけである。計算されたフィールド、バリデーション、派生プロパティ、生成器を通した同一性は、どれも固定されない。
+The first layer is what the assertion shows. Where the fixture returns some construction expression and the test writes the same construction expression as the expected value, passing shows only that "evaluating the same expression twice gives equal values". Computed fields, validation, derived properties and identity through a generator are none of them pinned.
 
-2 層目は、それがどう見えるかである。期待値には具体的な値が書いてあるので、読み手には手厚いテストに見える。実際に落ちるのは、式の評価が非決定的なとき（時刻・乱数・共有状態・副作用）か、片方だけが例外を投げたときだけで、コードの誤りでは落ちない。テストの本数もカバレッジの数字も動くのに、壊れたときに落ちるはずのアサーションが落ちない。
+The second layer is how it looks. The expected value has concrete values written in it, so it reads as a thorough test. It actually fails only where evaluating the expression is non-deterministic (a clock, a random number, shared state, a side effect) or where only one side threw. It does not fail on an error in the code. The test count moves and the coverage number moves, while the assertion that should fail when something breaks does not.
 
-この束の他のルールが「どこまでの一致を要求するか」を締めても、両側に同じ式が書かれている限り、要求の強さは意味を持たない。完全一致を強いることが、そのまま無条件に通るアサーションを作ることになる。
+Tighten "how much of a match is demanded" in the other rules of this bundle and, as long as the same expression is written on both sides, the strength of the demand means nothing. Forcing an exact match becomes, in itself, a way to build an assertion that passes unconditionally.
 
-## どう直すか
+### Configuration
 
-そのテストが本当は何を主張したいのかを決めて、期待値を構築式の外側から書く。
+`specFileSuffixes` alone. It replaces the file name suffixes this check applies to, from the default `.test.ts` and `.test.tsx`. Pass the same value as the other rules of the bundle. Split the range per rule and a user can no longer follow which check is running on which file.
 
-同じ `describe` の中に、より強い主張（振る舞いの検証、生成された値の検証）が既にあるなら、そのテストを消す。「渡した引数がそのまま入っている」は言語の意味論からの帰結で、単独のテストに値しないことが多い。
+## Fix
 
-主張が派生値（フラグ、計算されたフィールド）についてなら、その派生値そのものを fixture が返すようにして、リテラルと比較する。fixture が観測したいものを直接返し、テスト本体はアサーション 1 本だけを持つ形になる。
+Settle what the test actually wants to claim, and write the expected value from outside the construction expression.
+
+Where a stronger claim (verifying behaviour, verifying a generated value) already stands in the same `describe`, delete the test. "The argument handed in is in there as it was" follows from the language's semantics and often does not warrant a test of its own.
+
+Where the claim is about a derived value (a flag, a computed field), have the fixture return that derived value itself and compare it with a literal. The fixture returns exactly what you want to observe, and the test body holds one assertion.
 
 ```ts
 const test = baseTest.extend("entries", () => summarise(rows).entries);
@@ -74,17 +95,76 @@ test("counts what it was handed", ({ entries }) => {
 });
 ```
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- **期待値のインデントや改行を変える。** 構文木の形で比べているので、表記だけを変えても同じ式のままである
-- **期待値を一度変数に束ねる。** 束縛は段数を限らずに辿る
-- **subject を分割代入で別名に受ける。** fixture の引き当ては綴りではなく、その名前が解決する宣言で行う
-- **`expect(subject.フィールド)` に書き換える。** `no-expect-projected-subject--use-tostrictequal-on-subject` に当たる
-- **matcher を部分一致や自前のものに変える。** matcher の種類は見ていない
-- **fixture が subject をインライン構築しているのをそのままにして、期待値だけをずらす。** fixture 側の構築は別のルールが見ている。fixture は検査対象が生んだ値を返すもので、リテラルやコンストラクタ呼び出しで subject を作る場所ではない
-- **fixture を別のファイルへ移す。** この lint ルールは 1 ファイルの構文しか読まないため報告は消えるが、期待値が構築式の写しであることは変わらない。ファイルを跨ぐ突き合わせは検証コマンドの領分で、この形は現状どの検査も見ていない
-- **抑制ディレクティブ**
+Code this rule rejects.
 
-## オプション
+```ts
+// an object literal the fixture returns, written again as the expected value
+// in report.test.ts
+const test = baseTest.extend("report", () => ({ id: "a", total: 2 }));
+test("carries both fields", ({ report }) => {
+  expect(report).toStrictEqual({ id: "a", total: 2 });
+});
+```
 
-`specFileSuffixes` だけを取る。この検査を適用するファイル名の接尾辞を、既定の `.test.ts` と `.test.tsx` から差し替える。束の他のルールと同じ値を渡すこと。範囲がルールごとに割れると、どのファイルでどの検査が動いているかを利用者が追えなくなる。
+```ts
+// spreading the subject into the expected value pins only what is overridden
+// in report.test.ts
+const test = baseTest.extend("report", () => summarise());
+test("marks itself settled", ({ report }) => {
+  expect(report).toStrictEqual({ ...report, settled: true });
+});
+```
+
+Code this rule accepts.
+
+```ts
+// an expected value the fixture never built stands on its own
+// in report.test.ts
+const test = baseTest.extend("report", () => summarise({ id: "a", total: 2 }));
+test("counts what it was handed", ({ report }) => {
+  expect(report).toStrictEqual({ id: "a", entries: 2 });
+});
+```
+
+```ts
+// an expected value built through another route is out of this reading
+// in report.test.ts
+const test = baseTest.extend("report", () => ({ id: "a" }));
+test("carries the id", ({ report }) => {
+  expect(report).toStrictEqual(storedReport());
+});
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- **Changing the expected value's indentation or line breaks.** The comparison runs on the shape of the syntax tree, so changing only the notation leaves the same expression
+- **Binding the expected value to a variable first.** Bindings are followed without a cap on the number of steps
+- **Taking the subject under another name by destructuring.** The fixture is looked up by the declaration the name resolves to, not by spelling
+- **Rewriting as `expect(subject.field)`.** That lands on `no-expect-projected-subject--use-tostrictequal-on-subject`
+- **Changing the matcher to a partial match or one of your own.** The kind of matcher is not read
+- **Leaving the fixture constructing the subject inline and only shifting the expected value.** Construction on the fixture side is read by another rule. A fixture returns the value the subject under test produced; it is not a place to build the subject from a literal or a constructor call
+- **Moving the fixture to another file.** This lint rule reads only one file's syntax so the report clears, but the expected value is still a copy of the construction expression. Cross-file reconciliation is the verification command's territory, and no check currently reads this shape
+- **A suppression directive**
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `mirroredSubject` | An expected value must not repeat the expression the fixture \`{{subject}}\` built the subject from. Decide what this assertion claims about the code, then write the expected value from outside that expression: the concrete value the code has to produce, or a derived value the fixture hands back for comparison against a literal. Drop the assertion altogether where a stronger claim about the same subject already stands beside it. |
+| `spreadSubject` | An expected value must not spread the subject into itself, leaving every key it does not override compared against itself. Write the whole expected value from outside the expression that built the fixture \`{{subject}}\`: the concrete value the code has to produce, or the overridden keys as derived values the fixture hands back for comparison against literals. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads options declared on `meta.schema` in the source linked above.
+
+<!-- END GENERATED runtime -->

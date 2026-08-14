@@ -1,98 +1,106 @@
+---
+description: "Disallow a catch clause whose body never carries the failure it bound out of the clause, so a failure that was caught reaches something able to act on it instead of ending where it was caught"
+---
+
 # no-silent-catch--rethrow-or-handle
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-束縛を持ち、本体が仕事を持つ `catch` 節のうち、捕まえた失敗が節の外へ一度も出ていないもの。
+Disallow a catch clause whose body never carries the failure it bound out of the clause, so a failure that was caught reaches something able to act on it instead of ending where it was caught
 
-「仕事を持つ」の判定は [no-empty-catch--throw-or-handle](./no-empty-catch--throw-or-handle.md) と同じものを使う。2 本が同じ述語を共有しているので、片方が空とみなす本体をもう片方が「文がある」と読むずれは起きない。空文だけの本体（`catch (failure) { ; }`）や、中身が空のブロックしか無い本体（`catch (failure) { {} }`）は、構文木の上では文を持つが仕事を持たないので、本ルールの入口には入らない。
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-silent-catch--rethrow-or-handle.ts`](../../src/lint/oxlint/rules/no-silent-catch--rethrow-or-handle.ts)
 
-### 何をもって「記録した」とみなすか
+<!-- END GENERATED rule-header -->
 
-束縛への読み取りの参照を 1 つ取り、そこから外側へ辿って `catch` 節に届くまでの経路を見る。その経路が条件の位置を通らずに `catch` 節へ届いたなら、その参照は失敗をどこかへ運んでいる。運んでいる参照が 1 つでもあれば、その `catch` 節は失敗を記録している。
+## Violation
 
-運んでいると数える形は次のとおり。綴りは違うが、判定はどれも同じ 1 つの問いで済んでいる。
+A `catch` clause carrying a binding and a body that does work, where the caught failure never leaves the clause.
 
-- 再送出する（`throw failure`）
-- この層を名指しした失敗に元の失敗を入れて投げる（`throw new Error("reading the catalog failed", { cause: failure })`）
-- 呼び出しへ渡す（`report(failure)`、`console.error(failure)`）
-- 返す値に入れる（`return { unreadable: path, cause: failure }`）
-- 宣言した値に入れる（`const unreadable = { at: "catalog", cause: failure };`）
-- 節の中で作った関数へ渡す（`register(() => report(failure))`）
+"Does work" is settled by the same predicate [no-empty-catch--throw-or-handle](./no-empty-catch--throw-or-handle.md) uses. The two share one predicate, so there is no drift where one treats a body as empty and the other reads it as carrying statements. A body of an empty statement alone (`catch (failure) { ; }`) and a body of nothing but an empty block (`catch (failure) { {} }`) carry statements in the syntax tree but do no work, so they never enter this rule's way in.
 
-運んでいると数えない形は次のとおり。
+### What counts as "recorded"
 
-- 条件の位置でだけ読む。`if` / `while` / `do while` / `for` の条件、三項の条件、`switch` の判定式がここに入る。条件は失敗を見て経路を選ぶだけで、失敗そのものは節の中に留まる
-- 書き込みだけの参照（`failure = null`）。束縛が指していた失敗はそこで消える
+Each read reference to the binding is taken, and the route walked outward from it to the `catch` clause is read. Where that route reaches the `catch` clause without passing through a condition position, that reference is carrying the failure somewhere. One carrying reference is enough for the clause to have recorded the failure.
 
-束縛の解決はスコープで行う。節の中で同じ綴りの別の束縛を作っても、その参照は捕まえた失敗の参照として数えない。
+Shapes counted as carrying — different spellings, all settled by the same one question:
 
-このリポジトリの `packages/agentic-documents/src/scan/read-file.ts` にある形が、参照 2 つの内訳をそのまま示している。
+- Rethrowing (`throw failure`)
+- Throwing a failure named after this layer with the original inside (`throw new Error("reading the catalog failed", { cause: failure })`)
+- Handing it to a call (`report(failure)`, `console.error(failure)`)
+- Putting it in the returned value (`return { unreadable: path, cause: failure }`)
+- Putting it in a declared value (`const unreadable = { at: "catalog", cause: failure };`)
+- Handing it to a function made inside the clause (`register(() => report(failure))`)
 
-```ts
-export const statOrNull = async (absolutePath: string): Promise<Stats | null> => {
-  try {
-    return await lstat(absolutePath);
-  } catch (failure) {
-    if (isAbsent(failure)) return null;
-    throw failure;
-  }
-};
-```
+Shapes not counted as carrying:
 
-この節は束縛を 2 回読んでいる。`isAbsent(failure)` は条件の位置なので数えず、`throw failure` が数えられる。条件の位置の読み取りしか無ければ、この節は報告される。
+- A read in a condition position alone: the condition of an `if`, a `while`, a `do while` or a `for`, the condition of a ternary, and a `switch`'s subject. A condition looks at the failure to choose a route and leaves the failure inside the clause
+- A write-only reference (`failure = null`). The failure the binding pointed at disappears there
 
-### 走査の境界
+Bindings are resolved by scope. Making another binding of the same spelling inside the clause does not count its references as references to the caught failure.
 
-参照から外側へ辿る経路は、最初に見つかった `catch` 節で終わる。節の中で作った関数の中にある参照も、関数の境界を跨いで辿る。失敗を渡された関数がいつ走るかは分からないが、渡した時点で失敗は節の外の何かに届いている。
+### The boundary of the walk
 
-入れ子の `try` があるときは、内側の `catch` 節が内側の束縛を持つ。外側が再送出していても、内側は内側の参照だけで判定する。
+The route walked outward from a reference ends at the first `catch` clause found. A reference inside a function made in the clause is walked across the function boundary: when the failure runs is unknown, but at the moment it is handed over the failure has reached something outside the clause.
 
-条件の中に置いた再送出（`if (isFatal(failure)) throw failure;`）は、その `throw` の参照が数えられるので通る。条件が偽の経路に何も残らないことは、このルールでは見ていない。
+With nested `try`s, the inner `catch` clause holds the inner binding. Even where the outer one rethrows, the inner one is judged on its own references alone.
 
-### 他のルールとの境界
+A rethrow placed inside a condition (`if (isFatal(failure)) throw failure;`) passes, because that `throw`'s reference is counted. That nothing is left on the path where the condition is false is not read by this rule.
 
-失敗を握り潰す形は、見ているものが違う 5 本で分担している。
+### The boundary with the other rules
 
-| 形                                        | 見ているもの                                       |
-| ----------------------------------------- | -------------------------------------------------- |
-| `catch (failure) { }`（本体が空）         | `no-empty-catch--throw-or-handle` と `no-empty`    |
-| `catch { ... }`（束縛が無い）             | `no-discarded-failure--receive-and-surface-it`     |
-| `catch (failure) { throw failure; }` だけ | `no-useless-catch`                                 |
-| 失敗を出力先へ書いてから続行する          | `no-logged-and-continued-failure--stop-or-recover` |
-| 束縛も本体もあるが、失敗が節の外へ出ない  | 本ルール                                           |
+Shapes swallowing a failure divide across five, each reading something different.
 
-仕事を持たない本体の `catch` は本ルールの対象にしない。そちらは `no-empty-catch--throw-or-handle` が見ており、何を書くかの指示もそちらが持つ。同じ `catch` に 2 本のルールが同じ修正を求める状態を作らないための境界である。本ルールが見るのは、仕事が入っているのに失敗が外へ出ていない節だけである。
+| Shape | What reads it |
+| --- | --- |
+| `catch (failure) { }` (an empty body) | `no-empty-catch--throw-or-handle` and `no-empty` |
+| `catch { ... }` (no binding) | [no-discarded-failure--receive-and-surface-it](./no-discarded-failure--receive-and-surface-it.md) |
+| `catch (failure) { throw failure; }` alone | `no-useless-catch` |
+| Writing the failure to an output sink and carrying on | [no-logged-and-continued-failure--stop-or-recover](./no-logged-and-continued-failure--stop-or-recover.md) |
+| A binding and a body, with the failure never leaving the clause | This rule |
 
-境界は 2 本が共有する 1 つの述語で切れている。文の数で切ると、`catch (failure) { ; }` のように構文木の上では文を持つが仕事を持たない本体が両方の入口に入り、同じ節に 2 本が別々の修正を求めることになる。
+A `catch` whose body does no work is out of scope here. `no-empty-catch--throw-or-handle` reads that and holds the instruction for what to write. The boundary keeps two rules from asking for the same repair on one `catch`.
 
-束縛を持たない `catch` も対象にしない。運ぶべき名前が無いところで「運べ」と言っても、直し方が一意に決まらない。束縛を付けろと言うのは `no-discarded-failure--receive-and-surface-it` の報告で、付けた後に失敗が外へ出ていなければ本ルールが報告する。
+The boundary is cut by the one predicate the two share. Cut it by counting statements and a body that carries statements in the syntax tree but does no work, such as `catch (failure) { ; }`, enters both ways in, and two rules ask one clause for different repairs.
 
-同じ節に 2 件出る組み合わせが 2 つある。どちらも見ているものが違い、片方だけを直しても残る。
+A `catch` with no binding is out of scope too. Where there is no name to carry, telling somebody to "carry it" does not settle on one fix. Telling them to add a binding is `no-discarded-failure--receive-and-surface-it`'s report, and where the failure does not leave after the binding is added, this rule reports it.
 
-- 下線だけで綴った束縛（`catch (_) { retry(); }`）。`no-discarded-failure--receive-and-surface-it` は束縛の綴りを見て「読むつもりが無い」と報告し、本ルールは失敗の行き先を見て報告する
-- 失敗を含まない文字列を書いて続行する（`catch (failure) { console.error("failed"); }`）。`no-logged-and-continued-failure--stop-or-recover` は書き込みと続行の同居を見て「止めるか戻せ」と言い、本ルールは失敗が外へ出ていないことを見て「失敗を運べ」と言う
+Two combinations produce two reports on one clause. Each reads something different, and fixing one leaves the other.
 
-ファイル種別による例外は持たない。テストコードも同じに扱う。
+- A binding spelled with underscores alone (`catch (_) { retry(); }`). `no-discarded-failure--receive-and-surface-it` reads the binding's spelling and reports "no intent to read"; this rule reads where the failure goes
+- Writing a string that does not carry the failure and carrying on (`catch (failure) { console.error("failed"); }`). `no-logged-and-continued-failure--stop-or-recover` reads writing living beside continuing and says "stop or recover"; this rule reads that the failure did not leave and says "carry it"
 
-## なぜそれが要るか
+There is no exemption by file kind. Test code is treated the same.
 
-守っている不変条件は「捕まえた失敗の跡が、それを捕まえた `catch` 節の外に残る」ことである。
+### The invariant
 
-`catch` 節は、失敗を消す場所ではなく、失敗の行き先を決める場所である。行き先は 2 種類しかない。呼び出し側へ返すか、失敗を受け取って動く何かへ渡すか、である。どちらも選ばなかった節は、失敗を握ったまま終わり、束縛が消えるのと同時に失敗も消える。
+A trace of a caught failure remains outside the `catch` clause that caught it.
 
-壊れ方は 2 層ある。
+A `catch` clause is where the failure's destination is settled, not where the failure is erased. There are only two destinations: return it to the caller, or hand it to something that acts on receiving it. A clause choosing neither ends holding the failure, and the failure disappears with the binding.
 
-1 層目は、失敗した実行と成功した実行が、外から同じに見えることである。`try` の中の操作は最後まで進まなかったのに、`catch` 節を抜けた後の処理は成功したときと同じ経路を進む。呼び出し側が受け取る値も、プロセスの終了コードも、失敗しなかったときと変わらない。呼び出し側には、区別するための材料が 1 つも渡っていない。
+It breaks in two layers.
 
-2 層目は、材料が無いことが検査に現れないことである。テストは書かれたとおりに通り、型検査も通り、CI も緑になる。このリポジトリが最も嫌う「lint が緑なのに検査されていない」は、値の不足ではなく材料の不足から生まれる。何が失敗したかを誰も持っていない状態は、後から復元できない。
+The first is that a failed run and a successful run look the same from outside. The operation inside the `try` did not run to the end, yet what follows the `catch` clause takes the same route as on success. The value the caller receives and the process's exit code are what they would have been without the failure. Not one piece of material for telling them apart reached the caller.
 
-本体が空でないことが、この状態を見えにくくする。空の `catch` は読み手に怪しさが伝わるが、文が 1 つ入った途端に「何かしている」と読まれる。`retry();` だけを持つ節は、やり直しを 1 回試したことしか表しておらず、そのやり直しも失敗したときに何が起きたかは残らない。条件で振り分けている節も同じで、`if (isTransient(failure))` は失敗を見てはいるが、見た結果はその場の分岐に使われて消える。
+The second is that the absence of material does not appear in any check. The tests pass as written, the type check passes, and CI goes green. What this repository dislikes most — the lint is green and nothing was checked — arises here from a lack of material rather than a lack of values. A state where nobody holds what failed cannot be reconstructed later.
 
-## どう直すか
+A non-empty body is what makes this state hard to see. An empty `catch` reads as suspicious; the moment one statement goes in, it reads as "something is being done". A clause holding only `retry();` states only that one retry was attempted, and nothing remains about what happened when that retry failed too. A clause branching on a condition is the same: `if (isTransient(failure))` does look at the failure, and the result of looking is used by that branch and disappears.
 
-その `catch` 節で捕まえた失敗の行き先を 1 つ決める。「記録した」と数えるのは、失敗が節の外へ出る形だけである。
+### Configuration
 
-**呼び出し側へ返す。** そのまま再送出するか、この層の関与を名前にした失敗に元の失敗を入れて投げる。
+None. Only whether the rule is on or off is settled by the configuration.
+
+The judgment this rule holds is only "did the failure leave the clause", and the answer follows from the position of the reference. It carries no threshold, no per-target vocabulary and no exception list. Opening a setting that counts a condition position as recording would mean a route for erasing failures could be built in the configuration, so it is not opened.
+
+## Fix
+
+Settle one destination for the failure caught in that clause. Only shapes where the failure leaves the clause count as "recorded".
+
+**Return it to the caller.** Rethrow it as it stands, or throw a failure named after this layer's involvement with the original inside.
 
 ```ts
 try {
@@ -102,11 +110,11 @@ try {
 }
 ```
 
-`cause` に入れれば、元の失敗は失われない。文字列に潰して渡すのではなく、失敗そのものを入れること。
+Put it in `cause` and the original failure is not lost. Hand over the failure itself rather than flattening it into a string.
 
-**失敗を受け取って動く何かへ渡す。** 渡す先は、失敗を持って次の判断ができるものに限る。
+**Hand it to something that acts on receiving it.** Limited to something that can make the next judgment holding the failure.
 
-**不在だけを値にして、それ以外は返す。** 条件で振り分けるなら、振り分けた先のそれぞれで行き先を決める。`packages/agentic-documents/src/scan/read-file.ts` がこの形である。
+**Make only absence a value and return the rest.** Where you branch on a condition, settle a destination on each side of the branch.
 
 ```ts
 export const directoryNamesIn = async (absolutePath: string): Promise<readonly string[]> => {
@@ -120,25 +128,87 @@ export const directoryNamesIn = async (absolutePath: string): Promise<readonly s
 };
 ```
 
-`ENOENT` と `ENOTDIR` は「そこに無い」であり、正常な入力なので値にしてよい。それ以外は「あるが読めない」であり、正常な入力ではないので再送出する。条件を書いた時点で失敗を扱ったことにはならず、条件の後の各経路に行き先が要る。
+`ENOENT` and `ENOTDIR` mean "it is not there" and are normal input, so they may become a value. Anything else means "it is there and cannot be read" and is not normal input, so it is rethrown. Writing a condition does not amount to handling the failure; each path after the condition needs a destination.
 
-**戻り値の型を変えたくない、という理由で値に潰したくなったら、それは返す側を選ぶべき状況である。** 失敗を区別できない値を返すことは、失敗を消すことと同じである。
+**Where "I do not want to change the return type" makes you want to flatten it into a value, that is a situation calling for the returning side.** Returning a value that cannot be told from a success is the same as erasing the failure.
 
-## 禁じる回避策
+<!-- BEGIN GENERATED examples -->
 
-- 束縛を 1 度書くだけの文を置く（`failure;` / `void failure;`）。参照は数えられて報告は消えるが、失敗はその文の外へ出ていない
-- 束縛を値に受けて、その値を誰も読まない（`const noted = failure;` で終わる）。同上
-- 何もしない呼び出しへ渡す（`ignore(failure)`）。同上
-- 条件の中でだけ再送出して、条件が偽の経路には何も残さない（`if (isFatal(failure)) throw failure;`）。判定は参照の位置を見ているので報告は消える。偽の経路で失敗が消えることは変わらない
-- 条件を変数へ取り出してから分岐する（`const missing = codeOf(failure) === "ENOENT";` を書いてから `if (missing)`）。宣言の位置に現れた参照は運んだものとして数えられるので報告は消える。失敗が節の外へ出ていないことは変わらない
-- 束縛を消して `catch { ... }` にする。本ルールは黙るが `no-discarded-failure--receive-and-surface-it` が報告する
-- 本体を空にして黙らせる。本ルールは黙るが `no-empty-catch--throw-or-handle` と `no-empty` が報告する
-- 失敗を文字列に潰してから渡し、元の失敗を捨てる（`report(String(failure))`）。判定は参照が外へ出たかを見ているので通る。`cause` に入れて渡せば、潰さずに同じことができる
-- `try` / `catch` の範囲を広げて、失敗が起きうる操作を 1 つの節でまとめて黙らせる。節の数は減るが、どの操作が失敗したのかが分からなくなる
-- 抑制ディレクティブ
+Code this rule rejects.
 
-## オプション
+```ts
+// a catch clause that never names the failure again is reported
+try {
+  run();
+} catch (failure) {
+  retry();
+}
+```
 
-取らない。有効か無効かだけを設定側で決める。
+```ts
+// a failure read only in the condition of an if is not carried anywhere
+try {
+  run();
+} catch (failure) {
+  if (isTransient(failure)) {
+    retry();
+  }
+}
+```
 
-このルールが持つ判断は「失敗が節の外へ出たか」だけで、その答えは参照の位置から決まる。閾値も、対象ごとに変わる語彙も、例外の一覧も持たない。条件の位置を記録として数える設定を開ければ、それは失敗を消す経路を設定で作れるということなので、開けない。
+Code this rule accepts.
+
+```ts
+// a catch clause that rethrows hands the failure to the caller
+try {
+  run();
+} catch (failure) {
+  release();
+  throw failure;
+}
+```
+
+```ts
+// a failure read in a condition and rethrown afterwards is still carried
+try {
+  run();
+} catch (failure) {
+  if (isTransient(failure)) {
+    retry();
+  }
+  throw failure;
+}
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- Placing a statement that merely writes the binding once (`failure;` / `void failure;`). The reference is counted and the report clears, and the failure has not left that statement
+- Receiving the binding into a value nobody reads (`const noted = failure;` and nothing more). As above
+- Handing it to a call that does nothing (`ignore(failure)`). As above
+- Rethrowing only inside a condition and leaving nothing on the false path (`if (isFatal(failure)) throw failure;`). The judgment reads the reference's position so the report clears; the failure still disappears on the false path
+- Taking the condition into a variable and branching on that (writing `const missing = codeOf(failure) === "ENOENT";` then `if (missing)`). A reference appearing at a declaration position counts as carrying, so the report clears; the failure still has not left the clause
+- Deleting the binding to make it `catch { ... }`. This rule goes quiet and `no-discarded-failure--receive-and-surface-it` reports it
+- Emptying the body to silence it. This rule goes quiet and `no-empty-catch--throw-or-handle` and `no-empty` report it
+- Flattening the failure into a string before handing it over and discarding the original (`report(String(failure))`). The judgment reads whether the reference left, so it passes. Handing it over in `cause` does the same thing without flattening
+- Widening the `try` / `catch` range to silence several failing operations in one clause. The number of clauses drops and which operation failed becomes unknowable
+- A suppression directive
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `silentCatch` | A catch clause must not end without carrying the failure it bound out of the clause. Choose an ending that takes the failure with it: rethrow it, throw a failure that names this layer's part in it with the original passed as \`cause\`, hand it to the call that acts on it, or return a value that holds it. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

@@ -21,6 +21,7 @@ describe("dont-review-it/no-expect-forbidden-subject-name--rename-to-concrete-su
       },
       {
         name: "a subject named after the artefact it holds is read as a subject",
+        documented: true,
         filename: SPEC_FILE,
         code: 'expect(fetchedReport).toStrictEqual({ status: 200 });\nexpect(renderedText).toBe("ok");',
         options: [SHARED_VOCABULARY],
@@ -33,6 +34,7 @@ describe("dont-review-it/no-expect-forbidden-subject-name--rename-to-concrete-su
       },
       {
         name: "a property key is a label rather than the subject",
+        documented: true,
         filename: SPEC_FILE,
         code: "expect({ data: fetchedReport }).toStrictEqual({ data: 1 });",
         options: [SHARED_VOCABULARY],
@@ -83,6 +85,7 @@ describe("dont-review-it/no-expect-forbidden-subject-name--rename-to-concrete-su
     invalid: [
       {
         name: "a container word handed to an assertion is reported on the name itself",
+        documented: true,
         filename: SPEC_FILE,
         code: "expect(data).toBe(1);",
         options: [SHARED_VOCABULARY],
@@ -125,6 +128,7 @@ describe("dont-review-it/no-expect-forbidden-subject-name--rename-to-concrete-su
       },
       {
         name: "a compound name ending in a bag word is reported",
+        documented: true,
         filename: SPEC_FILE,
         code: 'expect(parseResult).toStrictEqual({ id: "a" });',
         options: [SHARED_VOCABULARY],

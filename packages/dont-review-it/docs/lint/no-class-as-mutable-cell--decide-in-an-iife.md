@@ -1,124 +1,189 @@
+---
+description: "Disallow a class whose only instance is built inside one function and never leaves it while its fields keep being written after construction, so a local mutable variable cannot be laundered into class syntax"
+---
+
 # no-class-as-mutable-cell--decide-in-an-iife
 
-## 何を検出するか
+<!-- BEGIN GENERATED rule-header -->
 
-クラス宣言のうち、次を **すべて** 満たすもの。報告位置はクラス名そのもの。3 つが連言であることが誤検出を出さないための設計であり、どれか 1 つでも外すと、再利用される部品か局所変数の言い換えかを区別できなくなる。
+Disallow a class whose only instance is built inside one function and never leaves it while its fields keep being written after construction, so a local mutable variable cannot be laundered into class syntax
 
-**1. コンストラクタの外でインスタンスの状態を書き換えるメンバを 1 つ以上持つ**
+- Tool: `oxlint`
+- Fixable: no
+- Suggestions: no
+- Options: no
+- Shipped in the preset: yes
+- Source: [`no-class-as-mutable-cell--decide-in-an-iife.ts`](../../src/lint/oxlint/rules/no-class-as-mutable-cell--decide-in-an-iife.ts)
 
-代入・複合代入・増減・プロパティ削除を区別しない。書き込み先は `this` を根とするものに限り、`this.total = x` も `this.seen.at = x` も対象で、報告には根の直後のフィールド名（後者なら `seen`）が載る。クラスの外から触れないフィールド（`this.#count`）も同じく数え、報告には `#` を付けた名前が載る。キーの書き方は 3 形を同一視する。ドット記法、文字列リテラルによる添字、置換を含まないテンプレートリテラルによる添字。
+<!-- END GENERATED rule-header -->
 
-「コンストラクタの外」は実行の時点で決める。
+## Violation
 
-- メソッド・getter・setter の本体に直接書かれた書き込みは対象
-- コンストラクタ本体とフィールド初期化子に直接書かれた書き込みは対象外。初期化が終わった時点で状態は確定しており、局所変数の代用にならない
-- 上のどこに書かれていても、アロー関数の内側に置かれた書き込みは対象。コンストラクタが `this` に積んだハンドラも、フィールドに持たせた関数も、実際に走るのは初期化のあとだから
-- 自前の `this` を持つ関数（関数宣言・関数式）の内側は対象外。そこの `this` はインスタンスではない
-- `static` を付けたメンバと static 初期化ブロックは対象外。クラス自身が持つ状態であって、インスタンス 1 つ分の可変状態ではない
+A class declaration meeting **all** of the following. The report points at the class name. The three being a conjunction is what keeps false reports out: drop any one and a reusable component can no longer be told from a local variable in disguise.
 
-**2. インスタンスを作る箇所が、ちょうど 1 つの関数スコープに閉じている**
+**1. It carries at least one member that writes instance state outside the constructor.**
 
-同じ関数の中で何度作られてもよい。次はどれも対象から外れる。
+Assignment, compound assignment, increment and decrement, and property deletion are not distinguished. Only writes rooted at `this` count, so both `this.total = x` and `this.seen.at = x` are targets, and the report carries the field name directly under the root (`seen` for the latter). A field unreachable from outside the class (`this.#count`) counts the same and is reported with its `#`. Three spellings of a key are treated as one: dot notation, a subscript written as a string literal, and a subscript written as a template literal carrying no substitution.
 
-- 一度も作られないクラス
-- モジュールのトップレベル、フィールド初期化子、static 初期化ブロックで作られるクラス（どれも関数スコープではない）
-- 2 つ以上の関数スコープから作られるクラス
+"Outside the constructor" is settled by when it runs.
 
-**3. 作られたインスタンスがそのスコープの外へ出ない**
+- A write written directly in the body of a method, a getter or a setter is a target
+- A write written directly in the constructor body or in a field initialiser is not. Once initialisation is done the state is settled, and it does not stand in for a local variable
+- A write placed inside an arrow function is a target wherever it was written. A handler the constructor put on `this`, and a function held in a field, both actually run after initialisation
+- The inside of a function carrying its own `this` (a function declaration or a function expression) is not a target. The `this` there is not the instance
+- Members carrying `static`, and static initialisation blocks, are not targets. That is state the class itself holds, not the mutable state of one instance
 
-インスタンスを受けた束縛への参照を 1 つずつ見て、値が外へ渡る位置に立っていないかを判定する。次のいずれかに当たれば「外へ出た」とみなし、対象から外す。
+**2. Instances are built inside exactly one function scope.**
 
-- `return` / `throw` / `yield` の値の一部になっている
-- 代入の右辺になっている
-- 別の束縛の初期値になっている（別名を作る形）
-- 呼び出し・`new`・タグ付きテンプレートの引数の一部になっている
-- モジュールの公開面に載っている
-- 内側の関数に捕まえられ、**その関数自身が上のどれかで外へ出る**
+Any number of times inside that one function is fine. These are all out of reach:
 
-条件・論理演算・列・配列リテラル・オブジェクトリテラル・スプレッド・型の付け替え（アサーション、`satisfies`、非 null 表明、省略可能連結、テンプレートリテラル）は値を運ぶだけとみなし、包みを剥がして外側の位置で判定する。逆に、メンバアクセスの対象になっているだけの参照（`tally.add(row)` / `tally.total`）は外へ出ていない。渡っているのはプロパティの値であってインスタンスではない。
+- A class never built at all
+- A class built at a module's top level, in a field initialiser, or in a static initialisation block (none of which is a function scope)
+- A class built from two or more function scopes
 
-内側の関数の扱いだけは 2 段になっている。捕まえただけでは外へ出たことにならず、その関数がどこかへ渡って初めて外へ出たことになる。局所のヘルパを 1 つ挟んだだけで報告が消える状態を作らないためで、これが無いと `const bump = () => tally.add(1);` と書くだけで抜けられる。
+**3. The instances built never leave that scope.**
 
-### 3 条件の手前に置いた 3 つの足切り
+Every reference to the binding that received an instance is read one at a time to see whether it stands where the value travels outward. Any of these counts as having left, and takes the class out of reach:
 
-条件 1〜3 は「このクラスが局所変数の言い換えである」ことの記述であって、「このクラス**だけ**がそう使われている」ことの保証にはならない。型情報が無い環境では名前の一致でしか同一性を追えないため、別のクラスの利用を取り違えて報告する余地が残る。次の 3 つを先に外して、その余地を閉じている。いずれも報告を減らす方向にしか効かない。
+- It is part of the value of a `return`, a `throw` or a `yield`
+- It is the right-hand side of an assignment
+- It is the initialiser of another binding (making an alias)
+- It is part of an argument to a call, a `new`, or a tagged template
+- It stands on the module's published surface
+- It is captured by an inner function, **and that function itself leaves by any of the above**
 
-- **モジュールの公開面に載っているクラス。** 外から作られうるので、この走査が数えた箇所が全部とは言えない
-- **構築以外の位置でその名前が読まれているファイル。** 基底クラスにする、値として関数に渡す、別の名前に束ねる、公開面の一覧に並べる、のいずれも、見えないところで作られる経路になる。型の位置に書かれた名前（注釈・型引数・実装リスト）はここに数えない。走査が型を担う枝をたどらないため、`const tally: Tally = new Tally();` は足切りに掛からない
-- **同じ名前のクラスを自分では宣言していないファイルで、その名前が構築されているとき。** そのファイルの `new` が指しているのは別のクラスかもしれず、こちらのクラスかもしれない。どちらとも決められないので報告しない。同名のクラスをそれぞれのファイルが自分で宣言している場合は取り違えが起きないので、両方とも判定に進む
+Conditionals, logical operators, sequences, array literals, object literals, spreads and changes of type (assertions, `satisfies`, non-null assertions, optional chains, template literals) are taken as merely carrying the value: the wrapper is peeled and the position outside it is judged. Conversely, a reference that is only the target of a member access (`tally.add(row)`, `tally.total`) has not left. What travels there is the property's value, not the instance.
 
-### 型情報を使わないこと
+Only the inner-function case is two-staged: being captured is not leaving, and it leaves only once that function travels somewhere. That keeps one local helper from clearing the report — without it, writing `const bump = () => tally.add(1);` would be enough to escape.
 
-不変条件の記述は、インスタンスの流出を「渡された先の型」から追うと定めている。このリポジトリの oxlint JS plugin には型情報が無いので、その判定を **束縛への参照の位置** で置き換えている。上の「3」に並べた位置がその範囲である。
+### Three cut-offs standing in front of the three conditions
 
-差は報告の向きに出る。参照の位置から流出を確定できない形（引数として渡す、内側の関数が外へ渡る）はすべて「外へ出た」側に寄せてあるので、この置き換えで新しい誤検出は増えない。減るのは報告のほうで、実際には閉じているのに外へ出たと読まれる形（コールバックを受け取って即座に呼ぶだけの反復メソッドへ渡す形など）は対象から外れる。
+Conditions 1 to 3 describe "this class is a local variable in disguise" and do not guarantee that **only** this class is used that way. With no type information, identity can only be tracked by matching names, which leaves room to mistake another class's use for this one's. Three cut-offs run first and close that room. All three only ever reduce reports.
 
-リポジトリ全体の走査は使う。対象ファイル外の構築箇所を数え、足切りの 3 つ目を判定するために要る。走査の入口は検証ファイルを含まないので、テストの中だけで作られるクラスは「一度も作られない」と数えて報告しない。
+- **A class on the module's published surface.** It can be built from outside, so what this walk counted cannot be claimed to be all of it
+- **A file where that name is read anywhere but at a construction.** Using it as a base class, handing it to a function as a value, binding it to another name, listing it on a published surface — each is a route to being built out of sight. A name written in type position (an annotation, a type argument, an implements list) does not count here, because the walk does not follow the branches carrying types, so `const tally: Tally = new Tally();` is not cut off
+- **That name being constructed in a file that does not itself declare a class of that name.** That file's `new` might point at another class, or at this one. Neither can be settled, so nothing is reported. Where each file declares its own class of the same name, no mix-up is possible and both proceed to the judgment
 
-## なぜそれが要るか
+### Why the type checker is not used
 
-守っている不変条件は「クラスは、状態を持つ抽象を作るためにある」ことである。クラス宣言を目にした読み手は、それが再利用される部品だと仮定してよい。
+The invariant is stated by tracing an instance's escape through the types it was handed to. The oxlint JS plugin in this repository has no type information, so that judgment is replaced by **the positions of references to the binding**, and the positions listed under 3 are that range.
 
-理由は 2 層ある。
+The difference shows in the direction of reports. Every shape whose escape cannot be settled from the position of a reference (being passed as an argument, an inner function travelling outward) is pushed to the "has left" side, so the replacement adds no new false reports. What it loses is reports: shapes that are in fact closed but read as having left — such as handing it to an iteration method that takes a callback and calls it immediately — fall out of reach.
 
-1 層目は、[no-reassign--use-spread-or-iife](./no-reassign--use-spread-or-iife.md) が構文上の例外を 1 つだけ持っていることである。クラスが自身の状態を初期化・維持するための直接の `this` への書き込みは、そのルールの報告対象から外れている。この例外はクラスに状態を持たせる書き方を機械的に通すために要るが、同時に確実な逃げ道になる。禁じられた再代入を、その場でクラスに包んで `this` のフィールドにするだけで報告が止まるからである。
+A walk of the whole repository is used. It is needed to count constructions outside the file being checked, and to judge the third cut-off. The walk's entry points exclude verification files, so a class built only inside tests is counted as never built and is not reported.
 
-2 層目は、その逃げ道を散文で塞げないことである。「報告を止めることだけを目的に導入されたクラスは認めない」は意図の記述であり、意図は静的解析の対象にならない。塞ぐには、意図ではなく形を見る条件が要る。局所変数を包み直した結果には形がある。インスタンスが 1 つの関数スコープの中でだけ作られ、そこから外へ出ない。本来の可変境界は、コールバックやフレームワーク制御下の呼び出しをまたいで状態を保つために作られるので、必ずスコープの外へ渡るか、複数箇所から使われる。この差は静的に判定できる。
+### The invariant
 
-3 条件が揃った形は、定義上、その関数の中でだけ生きて消える可変状態である。これは局所変数と同じものであり、クラス構文が値の生存範囲について何も足していない。
+A class exists to build an abstraction that holds state. A reader meeting a class declaration may assume it is a reusable component.
 
-## どう直すか
+The first layer is that [no-reassign--use-spread-or-iife](./no-reassign--use-spread-or-iife.md) carries exactly one syntactic exception: direct writes to `this` by which a class initialises and maintains its own state are out of that rule's reach. That exception is needed to let writing stateful classes pass mechanically, and it is simultaneously a certain way out — a forbidden reassignment stops being reported by being wrapped, on the spot, into a class and made a field on `this`.
 
-クラスに包む前にやろうとしていたことへ戻って、そちらの直し方を採る。直し方は [no-reassign--use-spread-or-iife](./no-reassign--use-spread-or-iife.md) が「値が後で決まる」に対して示している形と同じである。
+The second layer is that prose cannot close that route. "A class introduced solely to stop a report is not accepted" describes an intent, and intent is not something static analysis reads. Closing it takes a condition that reads a shape rather than an intent. Rewrapping a local variable has a shape: the instance is built only inside one function scope and never leaves it. A genuine mutable boundary is built to hold state across callbacks or calls under a framework's control, so it always travels out of the scope or is used from several places. That difference can be settled statically.
 
-- 分岐・探索・集約・例外処理で値が決まる → 即時実行関数の中で決め、各経路から return する
-- 反復で積み上がる → `reduce` に置き換える
-- 本当にコールバックをまたいで状態を保つ必要がある → クラスのままでよい。ただし再利用される部品としてスコープの外へ出すこと。出た時点で条件 3 が崩れ、報告は消える。出した先で利用側が状態を書き換えるなら、そちらは [no-receiver-mutation--derive-new-value](./no-receiver-mutation--derive-new-value.md) が呼び出し位置で報告する
+A shape meeting all three conditions is, by definition, mutable state that lives and dies inside that function. That is the same thing as a local variable, and the class syntax has added nothing about the value's lifetime.
 
-自動修正は提供しない。即時実行関数への書き換えはどの値を返すかの選択を伴い、機械的に一意へ定まらない。この帰結として、書き手が直し方を知る経路は報告メッセージとこの文書になる。
+### What is deliberately not a violation
 
-報告メッセージは「クラスを消せ」ではなく「値の決め方を変えろ」と読める形にしてある。クラスそのものが咎められていると読まれると、書き手は同じ可変状態を別の入れ物へ移すだけになり、その先は束の別のルールに当たる。ここで避けたいのは、報告を消す形を探して束の中を回遊することである。
+- A class instantiated from two or more places, or from several function scopes. That is a reusable component and what tidying mutable boundaries is for
+- A class whose instances leave the scope. Holding state across callbacks and handlers lives here
+- A class whose state is settled by the constructor and field initialisers alone. It does not change after initialisation and does not stand in for a local variable
+- A class holding no state, gathering methods alone. Nothing to do with mutability
+- State the class itself holds (`static` members and static initialisation blocks). Not the mutable state of one instance
+- A local suppression carrying its grounds. The conditions of acceptance are the same as for the other rules of this bundle and are checked by [no-blanket-suppression--name-and-record](./no-blanket-suppression--name-and-record.md). Until the directive notation is settled no suppression is accepted at all, so this implementation reads none
 
-## 違反とみなさないもの
+### What is not detected and still not allowed
 
-根拠が違うので 3 つに分けて扱う。
+Nothing below is permitted. Each is a shape this rule does not report, and each is a violation under the guidelines, rejected in review.
 
-### (a) 意図的に違反としないもの
+- **A class on the module's published surface**, and **a class in a file where the name is read anywhere but at a construction**. These are the cut-offs above: putting something on a published surface does not justify local mutable state
+- **A class of the same name being constructed from another file.** Identity cannot be settled from the name alone, so nothing is said
+- **Using an instance without binding it to a name**, built and dropped on the spot. Condition 1 may hold while the state is never read, which is a different problem — building a value nobody uses
+- **Writing instance state through a key settled at run time** (`this[key] = 1`). The field name of condition 1 does not settle, so it is not counted as a write
+- **Handing the instance to a local helper function as an argument.** Even where the callee is closed, it is pushed to the "has left" side and falls out of reach
+- **A class expression** (`const Held = class { ... }`). Not a declaration, so it cannot be tied to the name at a construction
+- **A class built only inside verification files.** The walk's entry points exclude them
 
-- 2 箇所以上から、あるいは複数の関数スコープからインスタンス化されるクラス。再利用される部品であり、可変境界としての整理が対象とするものである
-- インスタンスがスコープの外へ出るクラス。コールバックやハンドラをまたいで状態を保つ用途がここに入る
-- コンストラクタとフィールド初期化子だけで状態が確定するクラス。初期化後に変わらないので局所変数の代用にならない
-- 状態を持たないクラス（メソッドだけを束ねたもの）。可変性の話に当たらない
-- クラス自身が持つ状態（`static` メンバと static 初期化ブロック）。インスタンス 1 つ分の可変状態ではない
-- 理由を明記した局所抑制。受理条件は束の他のルールと同一で、[no-blanket-suppression--name-and-record](./no-blanket-suppression--name-and-record.md) が検査する。ディレクティブの記法が確定するまで抑制は一切受理されないので、この実装は抑制を読まない
+### Left open for now
 
-### (b) 検出されないが、許可ではないもの
+- **Settling identity by resolving relative specifiers.** The cut-offs currently match on names alone and do not follow `import` specifiers to settle which file's class it is. Adding resolution would move the first two of the undetected shapes onto the reporting side, and would require settling how far the workspace's resolution rules are reproduced
 
-ここに挙げた形はこのルールが報告しないというだけで、書いてよいという意味ではない。規約上は違反であり、レビューで拒否する。
+### Configuration
 
-- **モジュールの公開面に載せたクラス**、および **構築以外の位置でその名前が読まれているファイルのクラス**。上の「足切り」に挙げた形で、公開面に出しただけで局所の可変状態が正当化されるわけではない
-- **同名のクラスが別のファイルからも構築されているとき**。名前だけでは同一性を決められないので黙る
-- **インスタンスを名前に束ねずに使う形**のうち、その場で作って捨てるもの。条件 1 は満たしても状態が読まれないので、使われない値を作る形としてこのルールとは別の問題になる
-- **実行時にしか決まらないキーでインスタンスの状態を書く形**（`this[key] = 1`）。条件 1 のフィールド名が確定せず、書き込みとして数えられない
-- **インスタンスを局所のヘルパ関数に引数として渡す形**。渡した先が閉じていても「外へ出た」に寄せているため、対象から外れる
-- **クラス式**（`const Held = class { ... }`）。宣言ではないので構築箇所の名前と結びつけられない
-- **検証ファイルの中だけで作られるクラス**。走査の入口が検証ファイルを含まない
+None; only on or off is offered. Making any of the three conditions switchable would, the moment one is switched off, make either a false report or a miss the normal state.
 
-### (c) 現時点で範囲外とし、拡張するかを未決とするもの
+This rule is one of a bundle and is not something to enable on its own. Its severity and the timing of its enablement line up with [no-reassign--use-spread-or-iife](./no-reassign--use-spread-or-iife.md), and that they line up is checked by [no-partial-rule-set--enable-the-whole-set](./no-partial-rule-set--enable-the-whole-set.md) through its walk of the lint configuration.
 
-- **相対指定子の解決による同一性判定。** 現在の足切りは名前の一致だけを見ており、`import` の指定子をたどってどのファイルのクラスかを確定させてはいない。解決を入れると (b) の 1 つ目と 2 つ目が報告側へ移るが、ワークスペースの解決規則をどこまで再現するかを決める必要がある
+The judgment presumes a walk of the whole repository, assembled once per repository and reused.
 
-## 禁じる回避策
+## Fix
 
-- **インスタンスをどこにも使わない形だけ残して条件 3 を外す。** 使われない値を作る形そのものが別の問題であり、この束の目的からも外れる
-- **同じ局所状態を、クラスではなく単一要素の可変コレクションや連想配列に包み直す。** 添字で入れ替える形は [no-reassign--use-spread-or-iife](./no-reassign--use-spread-or-iife.md) が、メソッドで入れ替える形は [no-array-mutation--derive-new-array](./no-array-mutation--derive-new-array.md) と [no-receiver-mutation--derive-new-value](./no-receiver-mutation--derive-new-value.md) が報告する
-- **報告を消すためだけにクラスを公開面へ出す。** (b) の 1 つ目にあたる。機械は黙るが、可変状態は消えていない
-- **汎用の lint 無効化コメントで黙らせる。** [no-blanket-suppression--name-and-record](./no-blanket-suppression--name-and-record.md) が報告する
+Go back to what you were trying to do before wrapping it in a class, and take that fix instead. The fixes are the same ones [no-reassign--use-spread-or-iife](./no-reassign--use-spread-or-iife.md) offers for "the value is settled later".
 
-## オプション
+- Settled by a branch, a search, an aggregation or error handling: settle it inside an immediately invoked function and return from each path
+- Accumulated by iteration: replace it with `reduce`
+- Genuinely needing to hold state across callbacks: a class is right. Move it out of the scope as a reusable component. The moment it leaves, condition 3 breaks and the report clears. Where the consumer then writes to its state, [no-receiver-mutation--derive-new-value](./no-receiver-mutation--derive-new-value.md) reports that at the call site
 
-取らない。有効か無効かの切り替えだけを提供する。3 条件のどれかを設定で外せるようにすると、外した瞬間に誤検出か見逃しのどちらかが常態化する。
+No automatic fix is offered. Rewriting into an immediately invoked function carries a choice of which value to return and does not settle mechanically. As a consequence, the routes by which a writer learns the fix are the report message and this document.
 
-このルールは束の 1 本であり、単体で有効化してよいものではない。重大度と有効化のタイミングは [no-reassign--use-spread-or-iife](./no-reassign--use-spread-or-iife.md) と揃える。揃っていることは [no-partial-rule-set--enable-the-whole-set](./no-partial-rule-set--enable-the-whole-set.md) が lint 設定の走査で検査する。
+The report message is written to read as "change how the value is settled" rather than "delete the class". Read as an accusation against the class itself, a writer moves the same mutable state into another container and runs into another rule of the bundle. What is to be avoided here is touring the bundle in search of a shape that clears the report.
 
-判定はリポジトリ全体の走査を前提とする。走査結果はリポジトリごとに一度だけ組み立てて使い回す。
+<!-- BEGIN GENERATED examples -->
+
+Code this rule rejects.
+
+```ts
+// a class the index found standing in for a local variable is reported
+class Tally {
+  total = 0;
+  add(row: number) {
+    this.total += row;
+  }
+}
+
+```
+
+Code this rule accepts.
+
+```ts
+// a class expression carries no declared name to match
+const Tally = class {
+  total = 0;
+};
+
+```
+
+```ts
+// a class handed to the module surface with no name of its own carries nothing to match
+export default class {
+  total = 0;
+}
+
+```
+
+<!-- END GENERATED examples -->
+
+### Forbidden bypasses (do not do this)
+
+- **Leaving only a form where the instance is used nowhere, to break condition 3.** Building a value nobody uses is a problem in itself and outside what this bundle is for
+- **Rewrapping the same local state in a single-element mutable collection or a map instead of a class.** Swapping through a subscript is reported by [no-reassign--use-spread-or-iife](./no-reassign--use-spread-or-iife.md), and swapping through a method by [no-array-mutation--derive-new-array](./no-array-mutation--derive-new-array.md) and [no-receiver-mutation--derive-new-value](./no-receiver-mutation--derive-new-value.md)
+- **Putting the class on a published surface solely to clear the report.** That is the first of the cut-offs. The machine goes quiet and the mutable state has not gone
+- **Silencing it with a generic lint disable comment.** [no-blanket-suppression--name-and-record](./no-blanket-suppression--name-and-record.md) reports that
+
+## Messages
+
+<!-- BEGIN GENERATED messages -->
+
+| messageId | Text |
+| --- | --- |
+| `containedMutableCell` | A class must not stand in for a mutable local variable. \`{{className}}\` writes {{fields}} after construction, its only instance is built inside \`{{scope}}\`, and that instance never leaves that scope. Decide the value this class stands in for inside an immediately invoked function that returns from each branch, or fold the iteration into a \`reduce\`. Keep a mutable boundary as a reused part that leaves this scope and hands its users a read-only face. Take this report as an instruction to write the derivation, not as a verdict on the design. |
+| `containedMutableCellInPlace` | A class must not stand in for a mutable local variable. \`{{className}}\` writes {{fields}} after construction, its only instance is built inside a single unnamed function, and that instance never leaves that scope. Decide the value this class stands in for inside an immediately invoked function that returns from each branch, or fold the iteration into a \`reduce\`. Keep a mutable boundary as a reused part that leaves this scope and hands its users a read-only face. Take this report as an instruction to write the derivation, not as a verdict on the design. |
+
+<!-- END GENERATED messages -->
+
+## Runtime Selection
+
+<!-- BEGIN GENERATED runtime -->
+
+This rule runs as an oxlint JS plugin, in the same pass as every other rule the workspace ships. It reads no options. A consumer turns it on or off as a whole.
+
+<!-- END GENERATED runtime -->

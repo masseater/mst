@@ -8,6 +8,7 @@ describe("dont-review-it/no-tautological-assertion--assert-on-a-computed-value",
     valid: [
       {
         name: "asserting on what the function under test returned passes",
+        documented: true,
         code: "expect(total(1, 2)).toBe(3);",
       },
       {
@@ -52,6 +53,7 @@ describe("dont-review-it/no-tautological-assertion--assert-on-a-computed-value",
       },
       {
         name: "two different literals compare something even if the code never runs",
+        documented: true,
         code: "expect(1).toBe(2);",
       },
       {
@@ -90,6 +92,7 @@ describe("dont-review-it/no-tautological-assertion--assert-on-a-computed-value",
     invalid: [
       {
         name: "a number compared with the same number is reported",
+        documented: true,
         code: "expect(1).toBe(1);",
         errors: [{ messageId: "tautologicalAssertion" }],
       },
@@ -120,6 +123,7 @@ describe("dont-review-it/no-tautological-assertion--assert-on-a-computed-value",
       },
       {
         name: "the same value written two ways is still the same value",
+        documented: true,
         code: "expect(1).toBe(1.0);",
         errors: [{ messageId: "tautologicalAssertion" }],
       },
