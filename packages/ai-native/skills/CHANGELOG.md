@@ -6,3 +6,6 @@ What each published version changes for the packages that install it, and for th
 
 - `throttle` caps how many wrapped commands run at once per host and namespace, reclaims slots held by processes that died, and can kill a command's whole process group on a timeout. Preparing the slots discards anything left at a lock's path that is not the directory the lock library creates, so a slot directory polluted by something else does not block every later run.
 - `spool` diverts a child's merged output into a log file under `.spool/` and prints a fixed-size summary in its place, passing the child's exit code through. In CI it streams the output instead and writes no file.
+- `unabridged`, a Claude Code `PreToolUse` hook that denies a Bash call when `head` or `tail` stands at a command position of the command line, and says nothing otherwise.
+- `@mst/ai-native/telemetry`, the one place a process starts its OpenTelemetry provider. The first caller fixes `service.name`, `MST_TELEMETRY` turns measurement on, `OTEL_SDK_DISABLED` turns it back off, and shutdown runs after every other `beforeExit` handler.
+- `@mst/ai-native/vitest-sdk`, the entry Vitest's `experimental.openTelemetry.sdkPath` is pointed at.

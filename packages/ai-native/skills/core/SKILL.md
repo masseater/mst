@@ -49,7 +49,9 @@ Wrap the entry point every caller already runs, and let the wrapped script own t
 
 ```sh
 spool -- vp run -r test
-# spool: log .spool/<name>.log (412 KB)
+# spool: command: vp run -r test
+# spool: log: /<repo>/.spool/20260815T030615Z-vp-run-df438630.log (10979 bytes, 187 lines)
+# spool: exit: 0 (6m05s)
 ```
 
 Open the named file with an editor or a file-reading tool. A second run with a filter attached pays the command's cost again and observes a different execution, so a non-deterministic failure recorded the first time is absent from the second.
