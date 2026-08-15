@@ -16,7 +16,7 @@ const BEGIN_MARKER = "<!-- BEGIN GENERATED lint-rules -->";
 const END_MARKER = "<!-- END GENERATED lint-rules -->";
 
 const scaffoldOf = (block: string): string =>
-  `# lint ルール索引\n\nこのワークスペースの自前 lint ルールの一覧。ルール実装から生成される。手で書き換えない。更新は \`${REGENERATE_COMMAND}\` で行う。\n\n${block}\n`;
+  `# Lint rule index\n\nEvery lint rule this workspace implements. Generated from the rule sources; refresh it with \`${REGENERATE_COMMAND}\` rather than editing it.\n\n${block}\n`;
 
 const missingIndex = (file: string): string =>
   `A workspace that declares lint rules must not go without \`${file}\`. Generate it with \`${REGENERATE_COMMAND}\`.`;

@@ -19,54 +19,11 @@ Disallow a declaration statement that introduces more than one binding, so every
 
 ## Violation
 
-A declaration statement carrying two or more declarators. `const`, `let` and `var` are reported alike, and whether the declarators carry initialisers is not read.
-
-One report is raised per declaration statement rather than per declarator, because the statement is the unit that gets fixed.
-
-Two shapes are not detected:
-
-- A statement carrying one declarator. However many bindings the name introduces through a destructuring pattern, there is one place where bindings come into being, so it is not a target
-- A declaration in the header of a `for` statement. Two statements cannot stand in the position of `for (let index = 0, limit = 10; ...)`. Telling somebody to split them leaves no shape to comply with, so the mechanism excludes it. `for-of` and `for-in` headers take only one declarator to begin with, so the exclusion does not reach them
-
-The body of a `for` statement is not part of that exclusion. The constraint on the header does not extend to the body.
-
-### The invariant
-
-One binding can be read, moved and deleted as one statement.
-
-The first layer is that the unit of editing stops matching. Declarations joined by commas carry no boundary per binding. Moving one elsewhere means dragging the rest along or rebuilding the commas and the indentation by hand. Deleting one comes with repairing whatever comma or semicolon is left. Adding one is the same: it cannot be added without editing an existing line.
-
-The second layer is that the mismatched unit of editing shows up in the history. A change touching one binding is left in the diff as a change touching the whole statement. Whoever reads the place next cannot settle from the diff which binding changed and has to read around it. Reverting has the same problem: it cannot be done per binding.
-
-The cost, then, is not the characters saved when it was written; it recurs every time anybody touches that statement afterwards. Splitting statements is not about making things look uniform — it is what returns the unit of editing to the unit of binding.
-
-### Configuration
-
-None. Whether the rule is on or off is settled by the configuration, and nothing else about the judgment is.
-
-No exception is expressible as a setting, because the value of this invariant lies in every declaration statement having the same shape. Loosening it in configuration would make a reader check the loosened places one at a time, which breaks the premise that the statement is the unit of editing.
+A declaration statement carrying two or more declarators. The initializer of a `for` statement is left alone, because the grammar gives it no other place to put them.
 
 ## Fix
 
-Repeat the declaration keyword and write one statement per binding.
-
-```ts
-const parsedCount = 1,
-  renderedLabel = "a";
-```
-
-```ts
-const parsedCount = 1;
-const renderedLabel = "a";
-```
-
-Where the point was to express that things belong together, express that as one value rather than as declarations standing side by side.
-
-```ts
-const summary = { parsedCount: 1, renderedLabel: "a" };
-```
-
-No automatic fix is offered. What order the split statements go in can follow from dependencies between the initialisers, and that does not settle mechanically.
+Give each declarator its own statement, repeating the declaration keyword.
 
 <!-- BEGIN GENERATED examples -->
 
@@ -103,9 +60,7 @@ for (let index = 0, limit = 10; index < limit; index += 1) {
 
 ### Forbidden bypasses (do not do this)
 
-- Wrapping them in a destructuring pattern to look like one declarator. `const { a, b } = { a: 1, b: 2 };` has not reduced the number of bindings. A pattern stands only where the right-hand side is a value that already exists
-- Moving unrelated bindings into a `for` header. The exclusion answers the constraint that no statement can stand in a header; it does not make the header a place to put things
-- Disabling the lint at the site
+- Chaining the declarators onto one line with commas rather than splitting the statement
 
 ## Messages
 

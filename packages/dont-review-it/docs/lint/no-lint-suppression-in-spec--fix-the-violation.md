@@ -19,54 +19,15 @@ Disallow a lint suppression comment in the files these rules run on, so a report
 
 ## Violation
 
-A comment in the file whose first token is a spelling that directs a lint suppression.
+A comment whose first token directs a lint suppression: the line, next-line and whole-file spellings of the `eslint-` and `oxlint-` families, and the `-enable` spelling that closes a range. Whether rule names are listed, whether grounds follow `--`, and whether the suppression actually silences anything are none of them conditions.
 
-| What the suppression covers | Spelling |
-| --- | --- |
-| That line | `oxlint-disable-line` / `eslint-disable-line` |
-| The next line | `oxlint-disable-next-line` / `eslint-disable-next-line` |
-| The whole file, and the opening of a range | `oxlint-disable` / `eslint-disable` |
-| The closing of a range | `oxlint-enable` / `eslint-enable` |
+A direction to the type checker, the `mock-factory-exemption` registration and prose that merely names a spelling past the first token are all left alone. No filtering by file kind is done; which files this reaches is settled by the shared lint configuration.
 
-Whether rule names are listed is not a condition of detection. Where names are written the report carries them; where they are not, it says the suppression covers every rule the file is checked by. Whatever the names point at, and whether or not they belong to this bundle, it is reported.
-
-Grounds written after `--` change nothing. What is held here is not "a suppression carries grounds" but "there is no suppression". Demanding grounds belongs to `no-silent-suppression--fix-or-justify-inline`, which watches the territory where a suppression can stand at all.
-
-Whether the suppression actually silences anything is not a condition either. Residue whose direction reaches no report is reported the same way. The judgment reads the comment as tokens and does not interpret how far the suppression reaches. A range's closing end is reported on its own because a ranged suppression is written as two comments, and removing only the opening leaves the closing behind as residue.
-
-No filtering by file kind is done. Which files this rule reaches is settled by the glob in the shared lint configuration.
-
-### What is deliberately left out of reach
-
-| Shape | Why it is not a target |
-| --- | --- |
-| `@ts-ignore` / `@ts-expect-error` / `@ts-nocheck` | A direction to the type checker, not a lint suppression. Verifying type errors is part of what a test does |
-| A comment opening with `mock-factory-exemption` | Not a direction the lint runner interprets, but a registration one rule reads. Whether to accept it is that rule's decision |
-| Prose carrying a suppression spelling anywhere but the first token | The judgment reads the first token alone |
-| A shebang | Its first token cannot be a suppression spelling |
-| A suppression comment in a file outside the applied range | Outside the glob is outside this rule's jurisdiction |
-
-### The invariant
-
-No comment that erases a machine's output stands in a file the bundle's rules reach.
-
-The first layer is what a reported spec is. Every rule in this bundle watches whether a test mirrors the implementation. A spec that raised a report is a spec that failed to mirror it, and a suppression removes that fact from the report while the failure stays in the code.
-
-The second layer is how an erased report looks afterwards. To a reader skimming past the suppression comment, a spec that erased its report and a spec that never violated anything look the same. This bundle uses a green lint as evidence of the discipline. As long as a route exists for a writer to selectively erase the machine's output, green is not evidence.
-
-The third layer is what a suppression comment brings into the code. A suppression is a negotiation — "let this one through" — and the only place to push back is a review. Not having to raise the same question in review again is what this package is for, so leaving a place for that negotiation works against the purpose.
-
-### Configuration
-
-None. Whether the rule is on or off is settled by the configuration, and nothing else about the judgment is.
-
-No setting expresses a conditional exception. Such a setting is itself a new suppression channel, moving the negotiation out of the code and into a configuration file. If there is a file where a suppression should stand, that is a question about the applied range, and the range is watched by `require-spec-lint-coverage--lint-every-spec-file`.
+An automatic fix deletes the comment.
 
 ## Fix
 
-Fix the violation being reported. If it cannot be fixed, then the rule's detection is picking up something that is not a violation, so fix the rule's specification. Those two are the only ways a report ends.
-
-Deleting the suppression comment is settled mechanically, so an automatic fix is offered that deletes it. The fix removes the comment's range alone. Once deleted, the reports it had been silencing stand again, and that is the correct state.
+Fix the violation being reported. Where the report is wrong, fix what the rule detects. Those two are the only ways a report ends.
 
 <!-- BEGIN GENERATED examples -->
 
@@ -108,12 +69,9 @@ it("adds", () => {
 
 ### Forbidden bypasses (do not do this)
 
-- Placing a blanket suppression naming no rule at the head of the file. Whether names are there is not a condition of detection
-- Writing grounds after `--` and keeping the suppression. Whether grounds are there is not a condition either
-- Removing only the opening of a range and leaving the closing comment. The closing is reported on its own
-- Placing a suppression naming this rule. Names are not a condition, so it is reported exactly like any other
-- Renaming the suppression spelling and registering that alias as a suppression in the lint configuration. The registered spelling surfaces on the configuration side, where `require-spec-lint-coverage--lint-every-spec-file` compares the range against the settings
-- Moving the suppression into an exclusion on the configuration side, whether a per-file disable or a rule set to off. `require-spec-lint-coverage--lint-every-spec-file` fails it where it lands
+- Naming no rule, or writing grounds after `--`. Neither is a condition of detection
+- Removing only the opening of a range. The closing comment is reported on its own
+- Moving the suppression into a per-file exclusion in the configuration. `require-spec-lint-coverage--lint-every-spec-file` fails it where it lands
 
 ## Messages
 

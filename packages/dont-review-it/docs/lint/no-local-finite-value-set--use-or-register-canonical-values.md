@@ -19,105 +19,24 @@ Disallow defining a finite value set inside a file that does not own it, so one 
 
 ## Violation
 
-Syntax in a production TypeScript source that newly defines a finite vocabulary made of strings, numbers, booleans and `null`.
+Syntax in a production source that defines a finite vocabulary of strings, numbers, booleans and `null`. Six shapes are read.
 
-- A static scalar array handed to a call whose member name is `enum` or `picklist`
+- A static scalar array handed to a call whose member is `enum` or `picklist`
 - A type alias that is a union of scalar literals
-- A static array of scalar `literal` calls handed to a call whose member name is `union`
-- A static scalar array handed to a non-computed `enum` property of a JSON Schema
-- A static `Set` initializer matching a catalog fingerprint
-- A `typeof ARRAY[number]` matching a catalog fingerprint
-- A `keyof` referencing a named import or an `import()` type
-- An `Object.keys` over a static object or a named import, handed to a schema call
+- A static array of `literal` calls handed to a call whose member is `union`
+- A static scalar array at a non-computed `enum` property of a JSON Schema
+- A `Set` initializer, and a `typeof ARRAY[number]`, reported only where the values match a catalog owner
+- A `keyof` over a named import or an `import()` type, and an `Object.keys` handed to a schema call, reported where the import route is not one the catalog registered
 
-A schema array covers both an array written inline and one placed in a module-scope identifier binding in the same file. `Object.keys` covers a module-scope object binding in the same file and a named import. Type assertions, `satisfies`, non-null assertions and parentheses are peeled before the value is read. A set of fewer than two values, and a set of `true` / `false` alone, are not vocabularies.
+Fewer than two distinct values, and a set of booleans alone, are not vocabularies. The report names the owner to derive from, the candidates where several match, or the fact that no owner exists.
 
-`Set` and indexed access also appear in ordinary local sets, so they are reported only where they match a catalog fingerprint. A schema, a literal union and a JSON Schema are themselves syntax defining a finite vocabulary, so they are reported even where no catalog owner exists yet.
-
-There is no automatic fix. The same spelling can belong to a different concept, and which owner to derive from cannot be settled from the values alone.
-
-### The order of analysis
-
-The rule analyses the whole source once before returning its visitor.
-
-1. Index module-scope static array and object bindings and named imports from the Oxc AST
-2. Enumerate the target syntax across the whole source
-3. Settle the diagnostics by matching local value ranges, catalog fingerprints and import routes
-4. Leave the `Program` visitor doing nothing but reporting finished diagnostics
-
-Binding state is never rewritten in the order the visitor arrives. Callback execution, standard API return values, collection mutation and general alias chains are not evaluated. Widening the targets means adding an explicit syntax contract and durable tests, not building a JavaScript runtime inside the lint.
-
-### Confirming the import route
-
-Where the target syntax receives a named import's binding, that import has to resolve to a public route the catalog registered, or to the owner declaration itself.
-
-A public route holds all of this identity.
-
-- The package specifier
-- The exported name
-- The runtime source path the package's `exports` resolved to
-
-The consuming side resolves the real source through TypeScript module resolution too. The same specifier under a different export name, a different source, an unregistered subpath, or an alias where `paths` points at a shadow source is unregistered. A relative import must match the real path and the imported name exactly against the owner's declaration path and binding.
-
-An ambient or local binding of the same name as a catalog owner is not taken as the owner on spelling alone. Hand a same-named binding with no runtime source identity to a target sink and it is reported as an unregistered route.
-
-An external package is not a repository route and is outside this route check.
-
-### Registering an owner
-
-A `@canonical-values` owner must satisfy all of this.
-
-- It is a module-scope JSDoc in a production TypeScript source
-- Exactly one canonical tag stands in the JSDoc
-- A single variable statement follows the JSDoc with nothing but whitespace between
-- The variable statement carries a single identifier binding and a runtime initializer
-- The concept id is lowercase alphanumeric words joined by `-` or `.`
-
-A line comment, an ordinary block comment, a nested annotation, an intervening token, an ambient declaration, a multi-binding, a destructuring, a type alias, an enum, a function, a class, an import, a re-export and a control statement are none of them owners.
-
-Owner candidates are gathered per nearest TypeScript configuration, and one `typescript-6` Program is built per configuration. The value range is derived from the type the checker resolved for that binding.
-
-- An array's range is the literal union of its numeric index type
-- An object's range is its closed property names, provided it carries no index signature
-- Strings, numbers, booleans, `null` and negative numbers are handled
-- Imports and spreads the checker can resolve are handled
-- Empty, widened, scalar and non-literal domains, and directly written duplicate values, become problems
-
-A duplicate concept removes every colliding declaration from the catalog. Strict verification uses no cache and fails where there is even one invalid, duplicate, out-of-scope, or range-derivation failure.
-
-### The lint exemption
-
-The exemption is created not by the annotation existing but only where the catalog entry and the current source's declaration identity match.
-
-- The declaration path from the repository root
-- The concept id and the binding
-- The annotation start, the binding start, the declaration start and the declaration end
-
-Only the canonical domain inside a matched owner declaration is exempt. Outside the declaration in the same file, another path, another binding, a stale cached range, and declarations that are invalid, duplicated, out of scope or failed to derive a range carry no exemption.
-
-### Git ignore and the production scope
-
-Files whose name carries `.fixture.`, `.mock.`, `.test.`, `.spec.`, `.stories.` or `.story.`, and anything under `__fixtures__`, `__mocks__`, `__stories__`, `__tests__`, `.cache`, `.local-agents`, `coverage`, `dist`, `dist-ssr`, `fixtures`, `test` or `tests`, are not production sources.
-
-The repository scan and the import-route judgment follow the same source scope, built before the lint starts from `git ls-files --others --ignored --exclude-standard --directory`. Untracked files, directories and symlink ancestors that Git excludes are taken into neither the catalog input nor the repository routes. A file already tracked stays a repository source even where it later matches an ignore pattern. The source scope and the catalog are immutable for the life of the lint process, and no visitor or import-route lookup re-runs Git or re-scans the repository.
-
-### The invariant
-
-Where the same finite set is written independently in several places, changing only the owner fails neither the type check nor the tests. Derive the schema, the type and the membership check from one runtime binding and the supply of a vocabulary change is fixed to one place.
-
-The value range of an owner candidate is left entirely to the TypeScript checker. Evaluate imports, spreads and public aliases from the Oxc AST independently and the meaning diverges from TypeScript's, opening another way out between the catalog and its consumers.
-
-### Configuration
-
-`ownershipPolicy` is taken as a string. It only rides along in the report message to state how ownership is assigned, and does not change what is detected.
+An owner is registered with a `@canonical-values` JSDoc directly above a single exported binding; the value range comes from the type the checker resolved for it. Only the annotated declaration itself is exempt.
 
 ## Fix
 
-Where the report names an owner, delete the local finite set, import the owner binding from its registered public route, and derive the schema, the type and the membership check from it.
+Delete the local values and derive the schema, the type and the membership check from the owner's binding, imported through a registered route.
 
-Where no owner is named, register the runtime values in the production module that owns that concept and reference them from the consumer. Where a dependency package owns the vocabulary, derive from its published type or runtime API.
-
-For an unregistered route, either register the referenced declaration properly as an owner, or repoint the import to a public route that is already registered.
+Where no owner exists, register the runtime values in the module that owns the concept. Where a dependency already owns the vocabulary, derive from its published type.
 
 <!-- BEGIN GENERATED examples -->
 
@@ -150,10 +69,8 @@ export type Status = "draft" | "published";
 
 ### Forbidden bypasses (do not do this)
 
-- Adding a per-vocabulary opt-out, a per-workspace exclusion, or an exclusion tag on the owner side
-- Suppressing the canonical rules with `eslint-disable` or `oxlint-disable`
-- Placing an ambient binding of the owner's name to pose as a registered route
-- Moving the values into a Git-ignored untracked file to have it treated as a repository owner
+- Declaring a binding of the owner's name locally, or reaching it through an unregistered subpath. The route is checked, not the spelling
+- Moving the values into a file Git ignores so the scan cannot see it
 
 ## Messages
 

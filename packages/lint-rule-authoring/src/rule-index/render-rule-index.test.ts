@@ -20,7 +20,7 @@ describe("renderRuleIndex", () => {
     const it = test.extend("ruleIndex", () => renderRuleIndex([]));
 
     it("renders the head of the table and nothing else", ({ ruleIndex }) => {
-      expect(ruleIndex).toBe("| ルール | 説明 | ツール | 補足 |\n| --- | --- | --- | --- |");
+      expect(ruleIndex).toBe("| Rule | Description | Tool | Notices |\n| --- | --- | --- | --- |");
     });
   });
 
@@ -30,7 +30,7 @@ describe("renderRuleIndex", () => {
     it("gives the row a link to the rule document and the name of the tool", ({ ruleIndex }) => {
       expect(ruleIndex).toBe(
         [
-          "| ルール | 説明 | ツール | 補足 |",
+          "| Rule | Description | Tool | Notices |",
           "| --- | --- | --- | --- |",
           "| [no-plain--decorate-it](./no-plain--decorate-it.md) | Disallow plainness | oxlint |  |",
         ].join("\n"),
@@ -55,11 +55,11 @@ describe("renderRuleIndex", () => {
     }) => {
       expect(ruleIndex).toBe(
         [
-          "| ルール | 説明 | ツール | 補足 |",
+          "| Rule | Description | Tool | Notices |",
           "| --- | --- | --- | --- |",
           "| [no-plain--decorate-it](./no-plain--decorate-it.md) | Disallow `a \\| b` unions | oxlint | 🔧 💡 ⚙️ |",
           "",
-          "補足の記号 — 🔧: 自動修正あり / 💡: エディタの修正候補あり / ⚙️: オプションあり",
+          "Notices — 🔧: fixable / 💡: suggestions / ⚙️: options",
         ].join("\n"),
       );
     });
@@ -75,7 +75,7 @@ describe("renderRuleIndex", () => {
     it("puts a placeholder in the tool cell of both rows", ({ ruleIndex }) => {
       expect(ruleIndex).toBe(
         [
-          "| ルール | 説明 | ツール | 補足 |",
+          "| Rule | Description | Tool | Notices |",
           "| --- | --- | --- | --- |",
           "| [no-plain--decorate-it](./no-plain--decorate-it.md) | Disallow plainness | - |  |",
           "| [no-tail--move-it](./no-tail--move-it.md) | Disallow plainness | - |  |",
@@ -96,17 +96,17 @@ describe("renderRuleIndex", () => {
     }) => {
       expect(ruleIndex).toBe(
         [
-          "## 既定で配るルール",
+          "## Shipped in the preset",
           "",
-          "| ルール | 説明 | ツール | 補足 |",
+          "| Rule | Description | Tool | Notices |",
           "| --- | --- | --- | --- |",
           "| [no-shipped--fix-it](./no-shipped--fix-it.md) | Disallow plainness | oxlint |  |",
           "",
-          "## 名指しで有効にするルール",
+          "## Enabled by name",
           "",
-          "このワークスペースが実装して配布するが、出荷する preset には載せていないルール。使う側が `rules` に名前を書いて初めて効く。載せていない理由は各ルールの文書が持つ。",
+          "Rules this workspace ships without putting them in the preset. A consumer names one in `rules` to turn it on. Why a rule is left out is written in its own document.",
           "",
-          "| ルール | 説明 | ツール | 補足 |",
+          "| Rule | Description | Tool | Notices |",
           "| --- | --- | --- | --- |",
           "| [no-named--enable-it](./no-named--enable-it.md) | Disallow plainness | oxlint |  |",
         ].join("\n"),
@@ -124,7 +124,7 @@ describe("renderRuleIndex", () => {
     it("puts the rows in the order of the rule names", ({ ruleIndex }) => {
       expect(ruleIndex).toBe(
         [
-          "| ルール | 説明 | ツール | 補足 |",
+          "| Rule | Description | Tool | Notices |",
           "| --- | --- | --- | --- |",
           "| [no-alpha--promote-it](./no-alpha--promote-it.md) | Disallow plainness | oxlint |  |",
           "| [no-zebra--saddle-it](./no-zebra--saddle-it.md) | Disallow plainness | oxlint |  |",

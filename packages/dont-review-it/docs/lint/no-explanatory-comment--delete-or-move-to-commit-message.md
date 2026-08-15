@@ -19,32 +19,15 @@ Disallow comments that explain the code, so reasoning lives in the commit messag
 
 ## Violation
 
-Anything written in comment syntax that is not a declaration a machine reads. Line comments and block comments alike.
+Anything written in comment syntax that is not a declaration a machine reads. Four kinds pass: a lint directive of the `eslint-` or `oxlint-` families, a compiler directive opening with `@ts-`, the `mock-factory-exemption` registration one rule reads, and a JSDoc block. A shebang is not read.
 
-Four kinds pass as declarations a machine reads:
-
-- A lint suppression directive (a leading token in the `eslint-disable` or `oxlint-disable` family)
-- A compiler directive (a leading token starting with `@ts-`)
-- A mock factory exemption (a leading token of `mock-factory-exemption`, which [no-vi-mock-factory-behavior--use-spy-true-and-fixture](./no-vi-mock-factory-behavior--use-spy-true-and-fixture.md) reads)
-- A JSDoc block (a block opening with `/**`)
-
-A shebang is not written to explain code and is out of reach.
-
-Whether the contents of a JSDoc block are description prose is not judged here. [no-detached-rationale--comment-at-explained-line](./no-detached-rationale--comment-at-explained-line.md) carries that, so the two do not report the same thing twice.
-
-### The invariant
-
-A comment that explains code turns into a lie the moment the code changes, and nothing detects that it has. The tests still pass, the type checker still passes, and a review sees no more than that a comment is there. The reader is left deciding, every time, whether to believe the comment or the code.
-
-The place an explanation belongs is the body of the commit message. Written there, it is pinned in the history as the intent held at the moment the change was made, and it stays readable after the code moves on. Written beside the code, it moves with the code.
-
-No option is offered. Whether the rule is on or off is settled by the configuration, and nothing else about the judgment is.
+Whether a JSDoc block carries description prose belongs to [no-detached-rationale--comment-at-explained-line](./no-detached-rationale--comment-at-explained-line.md), so the two never report the same comment.
 
 ## Fix
 
-Delete the comment and write what it was going to say in the body of the commit message for that change.
+Delete the comment and write what it was going to say in the body of the commit that makes the change.
 
-If the comment is there because a name does not carry the intent, change the name. If it is there because a block of work needs explaining, lift that block into a named function. Both say more than a comment does, and both follow the code when the code changes.
+Where the comment stood in for a name, change the name. Where it explained a block of work, lift that block into a named function.
 
 <!-- BEGIN GENERATED examples -->
 
@@ -82,9 +65,9 @@ export const total = 1;
 
 ### Forbidden bypasses (do not do this)
 
-- Prefixing a comment with the spelling of a directive a machine reads to get it through. A spelling that does not stand as a directive only disguises the suppression channel, and the description prose is still there
-- Moving the prose into a JSDoc block to leave this rule's reach. `no-detached-rationale--comment-at-explained-line` carries JSDoc, so it is reported where it lands
-- Writing the explanation as a string literal or an expression nothing reaches. It has stopped being a comment and nothing else: it turns into a lie when the code changes exactly as before
+- Prefixing prose with the spelling of a directive. The first token is read, and a spelling that stands as no directive only disguises the comment
+- Moving the prose into a JSDoc block. `no-detached-rationale--comment-at-explained-line` reports it there
+- Writing the explanation as a string literal nothing reads
 
 ## Messages
 

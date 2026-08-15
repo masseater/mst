@@ -19,50 +19,13 @@ Disallow a module specifier that names a re-export module while the statement ta
 
 ## Violation
 
-A specifier naming a re-export-only module, in a statement that takes values from it. The report points at the specifier.
+A statement that takes a value through a relative specifier naming a re-export module: one ending in a separator, one whose last segment is `.` or `..`, and one whose file stem is `index`. Static imports, dynamic imports and re-exports are all read, and a statement carrying types alone is left alone because nothing is taken at run time.
 
-Four statements are read:
-
-- `import ... from "..."`
-- `export ... from "..."` and `export * from "..."`
-- `import("...")`
-
-A specifier is taken to name a re-export-only module when both hold:
-
-- It is relative: `.` or `..` themselves, or something starting with `./` or `../`
-- Its last segment, with the extension dropped, is spelled `index`; or the specifier ends at a directory (`.` or `..` themselves, or a trailing `/`)
-
-Whether values are taken is settled by the same rules as in [no-barrel-module--declare-in-the-owning-module](no-barrel-module--declare-in-the-owning-module.md). `import type { ... } from "..."`, and a form where every specifier carries `type`, take no values. An import for side effects alone, binding no name, counts as taking values, because it runs the module.
-
-### The invariant
-
-The reasons are the same as in [no-barrel-module--declare-in-the-owning-module](no-barrel-module--declare-in-the-owning-module.md): resolving values through a forward keeps everything the barrel forwards to in the bundle, makes development-time resolution read all of it, and leaves the correspondence between a name and its owner unreadable.
-
-The two are separate rules because the fixes differ. On the side that placed a forward-only file the fix is deleting the file; on the side that read it the fix is naming the declaring module. Enabling only one is a real choice: where your own repository keeps no surface while a package you depend on does, only the reading side can be stopped.
-
-### Where detection does not reach
-
-What a specifier points at is not read. A forward-only file under a name other than `index` is not reported when named, and a module carrying declarations under the name `index` is reported when named. The judgment rides the naming convention rather than the contents.
-
-A relative specifier with no extension is not reported. `./models` could resolve to `models.ts` or to `models/index.ts`, and the syntax does not settle which.
-
-External packages are not read. Whether such a package keeps a surface or not, the reader has no way to rearrange it.
-
-A specifier assembled while the program runs is not read. That shape is reported separately by [forbid-unresolvable-module-specifier--write-a-statically-resolvable-specifier](forbid-unresolvable-module-specifier--write-a-statically-resolvable-specifier.md).
-
-### Configuration
-
-None. The only material this rule judges on is the spelling of the specifier, and it carries no threshold and no vocabulary. Opening an exclusion would be the entry point for writing "this one forward may pass" into a setting. Holding a package's published entry out is a decision belonging to the side that places the surface, and [no-barrel-module--declare-in-the-owning-module](no-barrel-module--declare-in-the-owning-module.md) carries it as `exclude`.
-
-### Why it is not shipped by default
-
-The same reason as [no-barrel-module--declare-in-the-owning-module](no-barrel-module--declare-in-the-owning-module.md). This repository expresses its published surface as re-exports in `src/index.ts`, and forbidding reads through that surface contradicts keeping the surface at all. Naming it in `rules` is what turns it on.
+This rule is not in the shipped preset. A consumer names it in `rules` to turn it on.
 
 ## Fix
 
-Rewrite the specifier to the module declaring the name. What the forward points at can be read by opening the re-export-only module being named.
-
-Reading a published entry from outside the package spells the specifier as a package name, which is not relative and never enters this rule. A report therefore means something inside the same package is reading through its own surface. That shape has nothing to do with what a surface is for, so name the declaring module.
+Name the module that declares the binding the statement takes.
 
 <!-- BEGIN GENERATED examples -->
 
@@ -94,10 +57,8 @@ import type { Total } from './totals/index.ts';
 
 ### Forbidden bypasses (do not do this)
 
-- Silencing it with a suppression directive and keeping the specifier
-- Renaming the re-export-only module to something other than `index`. This rule reads the spelling of the specifier alone, so the report clears while values still resolve through a forward
-- Dropping the extension and writing `./models`. Whether that resolves to a forward-only file is not read here
-- Adding one more forward-only file and giving that one a name other than `index`
+- Renaming the re-export module to something other than `index`. What is left is a module that still forwards another module's declarations
+- Reaching the same binding through a package subpath that resolves to the re-export module
 
 ## Messages
 

@@ -19,70 +19,11 @@ Require a spec that derives tests from `standardIoTest` to pin both captured str
 
 ## Violation
 
-A file deriving its tests from `standardIoTest` that is missing a snapshot of either captured stream. The demand is one snapshot assertion, for stdout and for stderr each, whose subject is a value that reaches that stream, and either `toMatchInlineSnapshot` or `toMatchSnapshot` satisfies it.
-
-Whether a value reaches a stream is settled from the identifier at the root of the snapshot's subject. A root that is the stream binding itself (`stdout`, `stderr`) reaches that stream. A root that is a fixture declared in this file is followed through the names that fixture took as dependencies, to see whether a stream is arrived at. The chain of dependencies has no depth limit, and arriving is enough to count.
-
-The judgment is not made on the spelling. Accepting only a particular member read (a shape such as `expect(stdout.text)`) would collide with the neighbouring rule that forbids projecting the value a fixture hands over, leaving a spec that can satisfy neither demand.
-
-Derivation is settled from calls to the imported `standardIoTest`, renamed imports included, and a modified call such as `standardIoTest.skip` counts as derivation too. A form derived into a binding, as `const it = standardIoTest.extend(...)`, is tracked through calls on that binding as well, and so is a chain of derivations — a binding that `extend`s a binding that was itself derived. One report is raised per missing stream, at the position of the first derivation call.
-
-A file that does not use the fixture is asked for nothing.
-
-### The invariant
-
-A CLI's stdout and stderr are a contract with the user. Even with `standardIoTest` capturing them, with the captured text pinned nowhere the output can change into anything while every assertion keeps passing. What is left is the appearance of verification because something is being captured.
-
-A content assertion such as `toContain` guards only the fragment the writer had in mind. One snapshot of the whole stream makes the changes the writer did not have in mind — a progress display leaking in, warnings appearing or disappearing, a trailing newline moving — show up as a snapshot diff. Both streams are demanded because what tends to fall outside anyone's attention is usually the other stream.
-
-### What is not a violation
-
-- Content assertions standing beside the snapshots. The division where the snapshot guards the whole and the content assertion guards the intent is welcome
-- A file that neither imports nor uses `standardIoTest`
-- Tests using only one of the streams being mixed in. The demand is per file, not per test
-
-Where the machine reaches and where the discipline reaches are not the same. Detection is the floor under the invariant, not the ceiling.
-
-### Configuration
-
-None.
+A spec deriving tests from `standardIoTest` that leaves one of the two captured streams unpinned. Each of `stdout` and `stderr` is reported where no test takes it as a subject and pins it with an inline snapshot, directly or through a fixture that reads from it.
 
 ## Fix
 
-Add a test pinning each stream. Keep the run inside the fixture and let the `it` take the stream binding itself as the subject.
-
-```ts
-import { standardIoTest } from "@mst/dont-review-it/vitest";
-
-const it = standardIoTest.extend("theRunOfTheCommand", { auto: true }, () => {
-  runTheCommand(["--help"]);
-});
-
-it("pins what the run put on standard output", ({ stdout }) => {
-  expect(stdout).toMatchInlineSnapshot();
-});
-
-it("pins what the run put on standard error", ({ stderr }) => {
-  expect(stderr).toMatchInlineSnapshot();
-});
-```
-
-The stream binding can stand as the subject because it carries only the chunks that were written, as an enumerable surface. What appears in the snapshot is what was written; the folding into text and the intake for writes do not.
-
-To pin it in text form, fold it inside the fixture and make that binding the subject.
-
-```ts
-const it = standardIoTest.extend("theStandardOutputOfTheRun", ({ stdout }) => {
-  runTheCommand(["--help"]);
-  return stdout.text();
-});
-
-it("pins what the run put on standard output", ({ theStandardOutputOfTheRun }) => {
-  expect(theStandardOutputOfTheRun).toMatchInlineSnapshot();
-});
-```
-
-Where the output mixes in values that change per run, such as a temporary path, and cannot be snapshotted, snapshot an invariant route those values do not reach — a deterministic violation message, say — and cover the varying route with content assertions.
+Add a test taking that stream as its subject and pinning it with `toMatchInlineSnapshot()`, so every change to what the command prints surfaces as a diff.
 
 <!-- BEGIN GENERATED examples -->
 
@@ -142,9 +83,8 @@ it("pins stderr", ({ theStandardErrorOfARun }) => {
 
 ### Forbidden bypasses (do not do this)
 
-- Renaming the fixture binding (`({ stdout: out })`) to escape the static judgment of the subject. Nothing changes about it not being pinned
-- Snapshotting a value that reaches no stream to satisfy the count. The root of the subject is followed, so a value whose chain of dependencies never arrives at a stream does not satisfy it
-- Placing a snapshot in an empty test to meet the demand without going through the real run. What gets pinned is an empty record, and the contract is unguarded
+- Asserting the stream's text against a literal instead. What the command prints then moves without a diff to read
+- Pinning one stream and leaving the other. Each is reported on its own
 
 ## Messages
 

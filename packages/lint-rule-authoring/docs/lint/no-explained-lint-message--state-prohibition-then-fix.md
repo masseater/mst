@@ -19,57 +19,11 @@ Require every lint message to carry a prohibition and an imperative repair direc
 
 ## Violation
 
-Object literals carrying `docs` and `messages` directly are read; a rule definition's `meta` takes that shape. Among the values of that `messages`, string literals and template literals are checked.
-
-Before the check, code spans (the ranges enclosed in backticks) and interpolations (the `{{ }}` placeholders, and a template literal's expressions) are masked out of the text. The prose that remains is read on eight points.
-
-- No outright prohibition
-- No imperative repair direction
-- A connective introducing a reason is there
-- A conditional word is there
-- A turn of phrase recommending a way out is there
-- A pointer to the document is written by hand
-- A character outside printable ASCII is there
-- The text is identical to `meta.docs.description`
-
-The vocabulary is held by this rule.
-
-- Outright prohibition: `must not` / `is forbidden` / `are forbidden`
-- Reason connectives: `because` / `since` / `so that` / `therefore` / `which means` / `as a result`
-- Conditional words: `if` / `when` / `unless` / `whenever` / `once` / `otherwise`
-- Ways out: turns of phrase recommending suppression, disabling, adding an exemption, or deferring
-- Imperative verbs: the list of verbs that may open a repair direction
-
-The imperative judgment cuts the text into sentences and asks whether the first word of any sentence is in the list of imperative verbs. Wanting to write with a verb absent from the list, add that verb to the list. The list is owned by this rule, so the place to add it is one spot in this rule's source.
-
-### Deliberately not widened
-
-| Shape | Why it is left out |
-| --- | --- |
-| An object carrying only one of `docs` and `messages` | It is no rule `meta` |
-| A message whose value is no string | The text is settled at run time, so it cannot be read statically |
-
-The report stands on the message's definition itself. For a reason, a condition or a way out, the word that caught is carried into the report.
-
-### The invariant
-
-What is held is that the report alone settles the next move.
-
-The first layer is where a report is read. A report is the first repair direction the violator reads. Fold a reason into it and the repair direction moves to the back of the paragraph. The reader, having read the prohibiting sentence, is put off by the length and starts looking for another means before reaching the repair. What actually gets chosen is the shortest operation that clears the report — that is, suppression.
-
-The second layer is where the reason belongs. Write the reason both in the message and in the document and only one of them gets updated, and they go stale separately. This package holds "the authority for an explanation sits in one place" as an invariant, so the prose is held by the `docs/lint/` document alone. The pointer at the end of a message is appended by the factory, so the document is always reachable from a report.
-
-The third layer is what happens once a condition is written. Give the repair direction a case split and the judgment of which branch applies goes back to the reader. Unable to judge, they choose no branch and the report stays. Where the repair splits enough to need a case split, that is a quantity for the document to carry, not for one line of report.
-
-### Configuration
-
-None. Only whether the rule is on or off is settled by the configuration.
-
-The vocabulary is not made replaceable by configuration. Make it replaceable and what counts as a prohibition changes per workspace, and the very premise that report texts share one shape falls apart.
+A string in the `messages` of a property named `meta` that also carries `docs`. Code spans and `{{ }}` placeholders are masked out, and what is left is read on eight points: no outright prohibition (`must not` / `is forbidden`), no sentence opening with an imperative verb from the list this rule holds, a reason connective, a conditional word, a phrase offering a way around the rule, a hand-written `.md` pointer, a character outside printable ASCII, and a text identical to `meta.docs.description`. The last three are read on the raw message rather than the masked one.
 
 ## Fix
 
-State the prohibition outright, then state the repair in the imperative. Move the reason, the case split and the forbidden bypasses into the corresponding sections of this document.
+State the prohibition outright, then the repair in the imperative, and nothing else. The reason, the case split and the ways around belong to the sections of this document.
 
 ```ts
 messages: {
@@ -77,8 +31,6 @@ messages: {
     "A test file must not sit apart from the source it tests. Move this file into the directory of the source it tests and name it after that source.",
 },
 ```
-
-What the earlier text carried — that the path is the only thing tying the pair together, and what to do where nothing owns the behaviour any more — belongs to the "Violation" and "Fix" sections of the document, not to the report.
 
 <!-- BEGIN GENERATED examples -->
 
@@ -110,11 +62,9 @@ const rule = createRule({ name: "a-rule", meta: { docs: { description: "Disallow
 
 ### Forbidden bypasses (do not do this)
 
-- **Rewriting the reason as a conditional word.** Turning "why" into "in which case" leaves the report carrying something other than a repair direction. Both move to the document
-- **Putting the reason inside a code span to mask it.** The masking is there for the code a message quotes. It is no place to hide prose
-- **Shortening `meta.docs.description` to slip the identical-text detection.** What is detected is a text that is nothing but a copy of the description. Trim the description and the text still carries no repair direction
-- **Splitting the message in two, one carrying the prohibition and the other the repair.** Reports are read one at a time, so each one needs both the prohibition and the repair
-- **Dropping the repair direction to make the report shorter.** What may be dropped is the reason and the case split, not the repair direction
+- Rewriting the reason as a condition. Both belong in the document
+- Hiding prose inside a code span. The masking is there for the code a message quotes
+- Splitting the prohibition and the repair across two messages. Reports are read one at a time
 
 ## Messages
 

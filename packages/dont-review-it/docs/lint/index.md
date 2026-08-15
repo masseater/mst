@@ -1,12 +1,12 @@
-# lint ルール索引
+# Lint rule index
 
-このワークスペースの自前 lint ルールの一覧。ルール実装から生成される。手で書き換えない。更新は `vp run guard:fix` で行う。
+Every lint rule this workspace implements. Generated from the rule sources; refresh it with `vp run guard:fix` rather than editing it.
 
 <!-- BEGIN GENERATED lint-rules -->
 
-## 既定で配るルール
+## Shipped in the preset
 
-| ルール | 説明 | ツール | 補足 |
+| Rule | Description | Tool | Notices |
 | --- | --- | --- | --- |
 | [forbid-declared-command-invocation--use-designated-replacement](./forbid-declared-command-invocation--use-designated-replacement.md) | Disallow starting a command the shared declaration has retired as a child process, so the declaration that closes the import route and the manifest route closes the process route with the same entry | oxlint | ⚙️ |
 | [forbid-expectless-it--assert-or-delete-it](./forbid-expectless-it--assert-or-delete-it.md) | Disallow a test block whose body carries no assertion, so a passing run only ever means the claims written in the blocks held | oxlint | ⚙️ |
@@ -114,17 +114,17 @@
 | [require-test-block-spelling--use-configured-fn](./require-test-block-spelling--use-configured-fn.md) | Require every test block declaration to be rooted at one configured spelling, so a scan of the test surface settles what an identifier means without reading the block behind it | oxlint | 🔧 ⚙️ |
 | [require-vitest-extend-builder--infer-fixture-type](./require-vitest-extend-builder--infer-fixture-type.md) | Require every fixture to be declared as its own builder call whose type is inferred from what the factory returns, so the shape a test destructures is the shape the factory produces rather than a hand-written copy that drifts away from it | oxlint | 🔧 |
 
-## 名指しで有効にするルール
+## Enabled by name
 
-このワークスペースが実装して配布するが、出荷する preset には載せていないルール。使う側が `rules` に名前を書いて初めて効く。載せていない理由は各ルールの文書が持つ。
+Rules this workspace ships without putting them in the preset. A consumer names one in `rules` to turn it on. Why a rule is left out is written in its own document.
 
-| ルール | 説明 | ツール | 補足 |
+| Rule | Description | Tool | Notices |
 | --- | --- | --- | --- |
 | [no-barrel-import--import-from-the-owning-module](./no-barrel-import--import-from-the-owning-module.md) | Disallow a module specifier that names a re-export module while the statement takes a value through it, so the module a binding is taken from is the module that declares it | oxlint |  |
 | [no-barrel-module--declare-in-the-owning-module](./no-barrel-module--declare-in-the-owning-module.md) | Disallow a module whose every statement is a re-export and which forwards at least one value, so the module a binding is taken from is the module that declares it | oxlint | ⚙️ |
 | [no-mixed-package-surface--declare-one-surface](./no-mixed-package-surface--declare-one-surface.md) | Require a package to declare either the surface it is run through or the surface it is imported through, so which discipline owns the package is decided by its manifest instead of by whoever reaches into it next | oxlint | ⚙️ |
 | [require-spec-or-assets-only-in-spec-directory--move-out-or-inline](./require-spec-or-assets-only-in-spec-directory--move-out-or-inline.md) | Require every file under a directory named for specs to be a spec or the test data one of those specs owns, so setup carved out of a spec is reported where it sits instead of only where a spec imports it | oxlint | ⚙️ |
 
-補足の記号 — 🔧: 自動修正あり / 💡: エディタの修正候補あり / ⚙️: オプションあり
+Notices — 🔧: fixable / 💡: suggestions / ⚙️: options
 
 <!-- END GENERATED lint-rules -->
