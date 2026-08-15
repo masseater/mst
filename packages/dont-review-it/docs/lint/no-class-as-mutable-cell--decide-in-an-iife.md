@@ -12,8 +12,8 @@ Disallow a class whose only instance is built inside one function and never leav
 - Fixable: no
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`no-class-as-mutable-cell--decide-in-an-iife.ts`](../../src/lint/oxlint/rules/no-class-as-mutable-cell--decide-in-an-iife.ts)
+- Bundle: `state`
+- Source: [`no-class-as-mutable-cell--decide-in-an-iife.ts`](../../src/lint/oxlint/rules/state/no-class-as-mutable-cell--decide-in-an-iife.ts)
 
 <!-- END GENERATED rule-header -->
 

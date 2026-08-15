@@ -12,8 +12,8 @@ Require every path the required-file table registers to hold a file that is not 
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`require-registered-file--restore-it-at-the-registered-path.ts`](../../src/lint/oxlint/rules/require-registered-file--restore-it-at-the-registered-path.ts)
+- Bundle: `workspace`
+- Source: [`require-registered-file--restore-it-at-the-registered-path.ts`](../../src/lint/oxlint/rules/workspace/require-registered-file--restore-it-at-the-registered-path.ts)
 
 <!-- END GENERATED rule-header -->
 

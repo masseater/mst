@@ -12,8 +12,8 @@ Disallow calling a member named then, catch or finally, so the continuation and 
 - Fixable: no
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`no-promise-chain--use-async-await.ts`](../../src/lint/oxlint/rules/no-promise-chain--use-async-await.ts)
+- Bundle: `state`
+- Source: [`no-promise-chain--use-async-await.ts`](../../src/lint/oxlint/rules/state/no-promise-chain--use-async-await.ts)
 
 <!-- END GENERATED rule-header -->
 

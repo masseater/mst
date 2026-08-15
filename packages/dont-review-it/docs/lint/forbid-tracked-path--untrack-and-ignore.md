@@ -12,8 +12,8 @@ Require every path registered as untrackable to stay out of the tracked file lis
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`forbid-tracked-path--untrack-and-ignore.ts`](../../src/lint/oxlint/rules/forbid-tracked-path--untrack-and-ignore.ts)
+- Bundle: `workspace`
+- Source: [`forbid-tracked-path--untrack-and-ignore.ts`](../../src/lint/oxlint/rules/workspace/forbid-tracked-path--untrack-and-ignore.ts)
 
 <!-- END GENERATED rule-header -->
 

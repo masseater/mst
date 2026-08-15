@@ -12,8 +12,8 @@ Require a file named as a spec to declare at least one test block that runs, so 
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`require-test-block-for-spec-file--add-test-or-delete-file.ts`](../../src/lint/oxlint/rules/require-test-block-for-spec-file--add-test-or-delete-file.ts)
+- Bundle: `testing`
+- Source: [`require-test-block-for-spec-file--add-test-or-delete-file.ts`](../../src/lint/oxlint/rules/testing/require-test-block-for-spec-file--add-test-or-delete-file.ts)
 
 <!-- END GENERATED rule-header -->
 

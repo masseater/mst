@@ -12,8 +12,8 @@ Require the test config to demand full coverage on every metric, so the amount o
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`no-lenient-coverage-threshold--demand-full-coverage.ts`](../../src/lint/oxlint/rules/no-lenient-coverage-threshold--demand-full-coverage.ts)
+- Bundle: `testing`
+- Source: [`no-lenient-coverage-threshold--demand-full-coverage.ts`](../../src/lint/oxlint/rules/testing/no-lenient-coverage-threshold--demand-full-coverage.ts)
 
 <!-- END GENERATED rule-header -->
 

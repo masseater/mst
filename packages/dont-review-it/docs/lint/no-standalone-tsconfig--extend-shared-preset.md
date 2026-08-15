@@ -12,8 +12,8 @@ Require the tsconfig.json that governs a file to extend one of the shared preset
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`no-standalone-tsconfig--extend-shared-preset.ts`](../../src/lint/oxlint/rules/no-standalone-tsconfig--extend-shared-preset.ts)
+- Bundle: `workspace`
+- Source: [`no-standalone-tsconfig--extend-shared-preset.ts`](../../src/lint/oxlint/rules/workspace/no-standalone-tsconfig--extend-shared-preset.ts)
 
 <!-- END GENERATED rule-header -->
 

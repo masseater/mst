@@ -12,8 +12,8 @@ Disallow reading a test data file from anywhere but the spec of its own stem in 
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`no-cross-spec-assets-import--use-own-assets.ts`](../../src/lint/oxlint/rules/no-cross-spec-assets-import--use-own-assets.ts)
+- Bundle: `testing`
+- Source: [`no-cross-spec-assets-import--use-own-assets.ts`](../../src/lint/oxlint/rules/testing/no-cross-spec-assets-import--use-own-assets.ts)
 
 <!-- END GENERATED rule-header -->
 

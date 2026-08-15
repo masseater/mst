@@ -12,8 +12,8 @@ Require the lint and fmt blocks of a Vite+ configuration to be what the matching
 - Fixable: no
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`no-unwrapped-toolchain-config--call-the-preset-for-the-block.ts`](../../src/lint/oxlint/rules/no-unwrapped-toolchain-config--call-the-preset-for-the-block.ts)
+- Bundle: `governance`
+- Source: [`no-unwrapped-toolchain-config--call-the-preset-for-the-block.ts`](../../src/lint/oxlint/rules/governance/no-unwrapped-toolchain-config--call-the-preset-for-the-block.ts)
 
 <!-- END GENERATED rule-header -->
 

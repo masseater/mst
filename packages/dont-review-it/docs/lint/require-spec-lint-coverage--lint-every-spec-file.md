@@ -12,8 +12,8 @@ Require every file declaring a test block to sit inside the reach of the spec di
 - Fixable: no
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`require-spec-lint-coverage--lint-every-spec-file.ts`](../../src/lint/oxlint/rules/require-spec-lint-coverage--lint-every-spec-file.ts)
+- Bundle: `testing`
+- Source: [`require-spec-lint-coverage--lint-every-spec-file.ts`](../../src/lint/oxlint/rules/testing/require-spec-lint-coverage--lint-every-spec-file.ts)
 
 <!-- END GENERATED rule-header -->
 

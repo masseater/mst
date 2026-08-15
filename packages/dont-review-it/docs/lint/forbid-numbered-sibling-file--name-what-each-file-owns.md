@@ -12,8 +12,8 @@ Disallow splitting a file into siblings distinguished only by a number, so every
 - Fixable: no
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`forbid-numbered-sibling-file--name-what-each-file-owns.ts`](../../src/lint/oxlint/rules/forbid-numbered-sibling-file--name-what-each-file-owns.ts)
+- Bundle: `core`
+- Source: [`forbid-numbered-sibling-file--name-what-each-file-owns.ts`](../../src/lint/oxlint/rules/core/forbid-numbered-sibling-file--name-what-each-file-owns.ts)
 
 <!-- END GENERATED rule-header -->
 

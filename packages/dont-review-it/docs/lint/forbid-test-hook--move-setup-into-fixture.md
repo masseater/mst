@@ -12,8 +12,8 @@ Disallow a spec file naming a test hook, so every subject an assertion reads is 
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`forbid-test-hook--move-setup-into-fixture.ts`](../../src/lint/oxlint/rules/forbid-test-hook--move-setup-into-fixture.ts)
+- Bundle: `testing`
+- Source: [`forbid-test-hook--move-setup-into-fixture.ts`](../../src/lint/oxlint/rules/testing/forbid-test-hook--move-setup-into-fixture.ts)
 
 <!-- END GENERATED rule-header -->
 

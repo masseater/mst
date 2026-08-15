@@ -12,8 +12,8 @@ Disallow a file carrying more code lines than the budget set for it, so a file i
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`forbid-oversized-file--split-by-responsibility.ts`](../../src/lint/oxlint/rules/forbid-oversized-file--split-by-responsibility.ts)
+- Bundle: `core`
+- Source: [`forbid-oversized-file--split-by-responsibility.ts`](../../src/lint/oxlint/rules/core/forbid-oversized-file--split-by-responsibility.ts)
 
 <!-- END GENERATED rule-header -->
 

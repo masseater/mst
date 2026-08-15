@@ -12,8 +12,8 @@ Disallow taking the result of a call that returns a failure and a value as a pai
 - Fixable: no
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`no-discarded-failure--receive-and-surface-it.ts`](../../src/lint/oxlint/rules/no-discarded-failure--receive-and-surface-it.ts)
+- Bundle: `state`
+- Source: [`no-discarded-failure--receive-and-surface-it.ts`](../../src/lint/oxlint/rules/state/no-discarded-failure--receive-and-surface-it.ts)
 
 <!-- END GENERATED rule-header -->
 

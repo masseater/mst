@@ -12,8 +12,8 @@ Disallow a named function whose whole body forwards its own parameters unchanged
 - Fixable: no
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`no-identity-wrapper--call-the-target-directly.ts`](../../src/lint/oxlint/rules/no-identity-wrapper--call-the-target-directly.ts)
+- Bundle: `core`
+- Source: [`no-identity-wrapper--call-the-target-directly.ts`](../../src/lint/oxlint/rules/core/no-identity-wrapper--call-the-target-directly.ts)
 
 <!-- END GENERATED rule-header -->
 

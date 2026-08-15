@@ -12,8 +12,8 @@ Require the test config to declare that doubles are reset and restored before ea
 - Fixable: no
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`no-shared-double-state--reset-doubles-between-tests.ts`](../../src/lint/oxlint/rules/no-shared-double-state--reset-doubles-between-tests.ts)
+- Bundle: `testing`
+- Source: [`no-shared-double-state--reset-doubles-between-tests.ts`](../../src/lint/oxlint/rules/testing/no-shared-double-state--reset-doubles-between-tests.ts)
 
 <!-- END GENERATED rule-header -->
 

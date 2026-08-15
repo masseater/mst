@@ -12,8 +12,8 @@ Require a spec that derives tests from `standardIoTest` to pin both captured str
 - Fixable: no
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`require-standard-io-snapshot--pin-both-streams.ts`](../../src/lint/oxlint/rules/require-standard-io-snapshot--pin-both-streams.ts)
+- Bundle: `testing`
+- Source: [`require-standard-io-snapshot--pin-both-streams.ts`](../../src/lint/oxlint/rules/testing/require-standard-io-snapshot--pin-both-streams.ts)
 
 <!-- END GENERATED rule-header -->
 

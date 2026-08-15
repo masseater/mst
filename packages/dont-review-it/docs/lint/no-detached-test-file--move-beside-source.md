@@ -12,8 +12,8 @@ Require a test file to sit in the directory of the source it tests under that so
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`no-detached-test-file--move-beside-source.ts`](../../src/lint/oxlint/rules/no-detached-test-file--move-beside-source.ts)
+- Bundle: `testing`
+- Source: [`no-detached-test-file--move-beside-source.ts`](../../src/lint/oxlint/rules/testing/no-detached-test-file--move-beside-source.ts)
 
 <!-- END GENERATED rule-header -->
 

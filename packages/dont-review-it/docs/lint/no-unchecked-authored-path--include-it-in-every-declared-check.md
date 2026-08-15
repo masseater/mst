@@ -12,8 +12,8 @@ Require every authored path to sit inside a check this repository declares, and 
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`no-unchecked-authored-path--include-it-in-every-declared-check.ts`](../../src/lint/oxlint/rules/no-unchecked-authored-path--include-it-in-every-declared-check.ts)
+- Bundle: `workspace`
+- Source: [`no-unchecked-authored-path--include-it-in-every-declared-check.ts`](../../src/lint/oxlint/rules/workspace/no-unchecked-authored-path--include-it-in-every-declared-check.ts)
 
 <!-- END GENERATED rule-header -->
 

@@ -12,8 +12,8 @@ Require every test block declaration to be rooted at one configured spelling, so
 - Fixable: yes
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`require-test-block-spelling--use-configured-fn.ts`](../../src/lint/oxlint/rules/require-test-block-spelling--use-configured-fn.ts)
+- Bundle: `testing`
+- Source: [`require-test-block-spelling--use-configured-fn.ts`](../../src/lint/oxlint/rules/testing/require-test-block-spelling--use-configured-fn.ts)
 
 <!-- END GENERATED rule-header -->
 

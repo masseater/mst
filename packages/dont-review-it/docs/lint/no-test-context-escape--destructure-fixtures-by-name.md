@@ -12,8 +12,8 @@ Disallow a test callback or a fixture factory holding the test context as anythi
 - Fixable: no
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`no-test-context-escape--destructure-fixtures-by-name.ts`](../../src/lint/oxlint/rules/no-test-context-escape--destructure-fixtures-by-name.ts)
+- Bundle: `testing`
+- Source: [`no-test-context-escape--destructure-fixtures-by-name.ts`](../../src/lint/oxlint/rules/testing/no-test-context-escape--destructure-fixtures-by-name.ts)
 
 <!-- END GENERATED rule-header -->
 

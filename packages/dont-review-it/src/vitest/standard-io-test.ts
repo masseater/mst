@@ -1,6 +1,6 @@
 import { test, vi } from "vite-plus/test";
 
-import { PROCESS_IO_MEMBER } from "../lint/oxlint/rules/no-logged-and-continued-failure--stop-or-recover.ts";
+import { PROCESS_IO_MEMBER } from "../lint/oxlint/rules/state/no-logged-and-continued-failure--stop-or-recover.ts";
 
 /** @public */
 export type CapturedStream = {

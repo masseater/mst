@@ -12,8 +12,8 @@ Disallow writing a value that a declared vocabulary already owns as a literal, s
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`no-strict-canonical-literal-use--use-canonical-import.ts`](../../src/lint/oxlint/rules/no-strict-canonical-literal-use--use-canonical-import.ts)
+- Bundle: `single-ownership`
+- Source: [`no-strict-canonical-literal-use--use-canonical-import.ts`](../../src/lint/oxlint/rules/single-ownership/no-strict-canonical-literal-use--use-canonical-import.ts)
 
 <!-- END GENERATED rule-header -->
 

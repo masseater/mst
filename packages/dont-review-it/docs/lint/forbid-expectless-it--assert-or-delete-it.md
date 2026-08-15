@@ -12,8 +12,8 @@ Disallow a test block whose body carries no assertion, so a passing run only eve
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`forbid-expectless-it--assert-or-delete-it.ts`](../../src/lint/oxlint/rules/forbid-expectless-it--assert-or-delete-it.ts)
+- Bundle: `testing`
+- Source: [`forbid-expectless-it--assert-or-delete-it.ts`](../../src/lint/oxlint/rules/testing/forbid-expectless-it--assert-or-delete-it.ts)
 
 <!-- END GENERATED rule-header -->
 

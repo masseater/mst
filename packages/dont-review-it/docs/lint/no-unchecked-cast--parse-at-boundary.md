@@ -12,8 +12,8 @@ Disallow handing a concrete type to a value the source declares as `any` or `unk
 - Fixable: no
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`no-unchecked-cast--parse-at-boundary.ts`](../../src/lint/oxlint/rules/no-unchecked-cast--parse-at-boundary.ts)
+- Bundle: `core`
+- Source: [`no-unchecked-cast--parse-at-boundary.ts`](../../src/lint/oxlint/rules/core/no-unchecked-cast--parse-at-boundary.ts)
 
 <!-- END GENERATED rule-header -->
 

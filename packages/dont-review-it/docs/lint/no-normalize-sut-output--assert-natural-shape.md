@@ -12,8 +12,8 @@ Disallow reshaping the value a fixture hands back, so an assertion is written ag
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`no-normalize-sut-output--assert-natural-shape.ts`](../../src/lint/oxlint/rules/no-normalize-sut-output--assert-natural-shape.ts)
+- Bundle: `testing`
+- Source: [`no-normalize-sut-output--assert-natural-shape.ts`](../../src/lint/oxlint/rules/testing/no-normalize-sut-output--assert-natural-shape.ts)
 
 <!-- END GENERATED rule-header -->
 

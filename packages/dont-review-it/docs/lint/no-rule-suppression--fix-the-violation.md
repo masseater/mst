@@ -12,8 +12,8 @@ Disallow taking a rule of the parallel determinism gate out of a run through a s
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`no-rule-suppression--fix-the-violation.ts`](../../src/lint/oxlint/rules/no-rule-suppression--fix-the-violation.ts)
+- Bundle: `governance`
+- Source: [`no-rule-suppression--fix-the-violation.ts`](../../src/lint/oxlint/rules/governance/no-rule-suppression--fix-the-violation.ts)
 
 <!-- END GENERATED rule-header -->
 

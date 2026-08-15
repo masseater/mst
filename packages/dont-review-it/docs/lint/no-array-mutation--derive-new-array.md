@@ -12,8 +12,8 @@ Disallow calling an array method that changes the receiver in place, so a change
 - Fixable: no
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`no-array-mutation--derive-new-array.ts`](../../src/lint/oxlint/rules/no-array-mutation--derive-new-array.ts)
+- Bundle: `state`
+- Source: [`no-array-mutation--derive-new-array.ts`](../../src/lint/oxlint/rules/state/no-array-mutation--derive-new-array.ts)
 
 <!-- END GENERATED rule-header -->
 

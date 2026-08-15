@@ -1,0 +1,232 @@
+import { sortBy, take } from "es-toolkit";
+
+import { createDontReviewItRule } from "../../../../create-rule.ts";
+import { nodesOfType } from "../../lib/nodes-of-type.ts";
+import { resolveBinding, type ScopeLookup } from "../../lib/resolved-bindings.ts";
+import { fixtureDeclarationsOf } from "../../lib/spec-syntax/fixture-declarations.ts";
+import {
+  DEFAULT_MOCK_NAMESPACE_SPELLINGS,
+  spellsMockNamespace,
+  type NamespaceLookup,
+} from "../../lib/spec-syntax/mock-namespace.ts";
+import { moduleExportSpelling } from "../../lib/spec-syntax/module-declarations.ts";
+import { DESTRUCTIVE_OPERATIONS } from "../../lib/spec-syntax/normalizing-operations.ts";
+import { DEFAULT_SPEC_FILE_SUFFIXES, isSpecFile } from "../../lib/spec-syntax/spec-files.ts";
+import { staticMemberName } from "../../lib/spec-syntax/static-names.ts";
+import { memberRootOf, unwrapSubject } from "../../lib/spec-syntax/subject-expressions.ts";
+import {
+  declaresTestBlock,
+  testBlockRootNames,
+  testCallbacksOf,
+} from "../../lib/spec-syntax/test-block-declarations.ts";
+import { INJECTED_TEST_HOOK_SPELLINGS } from "../../lib/spec-syntax/test-hook-declarations.ts";
+
+import type { Definition, ESTree } from "@oxlint/plugins";
+
+const standsInsideTest = (node: ESTree.Node, regions: readonly ESTree.Node[]): boolean =>
+  regions.some((region) => region.start <= node.start && node.end <= region.end);
+
+const importedFrom = (definition: Definition): string | null => {
+  const declaration = definition.parent;
+  if (declaration?.type !== "ImportDeclaration") return null;
+  return `the module \`${declaration.source.value}\` this file takes it from`;
+};
+
+const originOf = (definition: Definition): string =>
+  importedFrom(definition) ?? `line ${String(definition.name.loc.start.line)} of this file`;
+
+const declaresRebindableName = (definition: Definition): boolean => {
+  const declaration = definition.parent;
+  if (declaration?.type !== "VariableDeclaration") return false;
+  return declaration.kind === "let" || declaration.kind === "var";
+};
+
+const hookLocalNamesIn = (declaration: ESTree.ImportDeclaration): readonly string[] =>
+  declaration.specifiers.flatMap((specifier) =>
+    specifier.type === "ImportSpecifier" &&
+    INJECTED_TEST_HOOK_SPELLINGS.includes(moduleExportSpelling(specifier.imported))
+      ? [specifier.local.name]
+      : [],
+  );
+
+const namesSetupHook = (node: ESTree.CallExpression, hookNames: ReadonlySet<string>): boolean => {
+  const callee = unwrapSubject(node.callee);
+  return (
+    callee.type === "Identifier" &&
+    (INJECTED_TEST_HOOK_SPELLINGS.includes(callee.name) || hookNames.has(callee.name))
+  );
+};
+
+const testRegionsIn = (
+  program: ESTree.Program,
+  rootNames: ReadonlySet<string>,
+): readonly ESTree.Node[] => {
+  const hookNames: ReadonlySet<string> = new Set(
+    nodesOfType(program, "ImportDeclaration").flatMap(hookLocalNamesIn),
+  );
+
+  return nodesOfType(program, "CallExpression").flatMap((call) => [
+    ...fixtureDeclarationsOf(call).flatMap(({ factory }) => factory ?? []),
+    ...(declaresTestBlock(call, rootNames) || namesSetupHook(call, hookNames)
+      ? testCallbacksOf(call)
+      : []),
+  ]);
+};
+
+const writtenLeavesOf = (
+  pattern:
+    | ESTree.AssignmentTargetMaybeDefault
+    | ESTree.AssignmentTargetProperty
+    | ESTree.AssignmentTargetRest,
+): readonly ESTree.Expression[] => {
+  if (pattern.type === "ArrayPattern") {
+    return pattern.elements.flatMap((held) => (held === null ? [] : writtenLeavesOf(held)));
+  }
+  if (pattern.type === "ObjectPattern") return pattern.properties.flatMap(writtenLeavesOf);
+  if (pattern.type === "Property") return writtenLeavesOf(pattern.value);
+  if (pattern.type === "RestElement") return writtenLeavesOf(pattern.argument);
+  if (pattern.type === "AssignmentPattern") return writtenLeavesOf(pattern.left);
+  return [unwrapSubject(pattern)];
+};
+
+const REBINDING_MESSAGE = "sharedBindingRebound";
+
+const WRITING_MESSAGE = "sharedValueWritten";
+
+type StateWrite = {
+  readonly node: ESTree.Node;
+  readonly root: { readonly name: string; readonly at: ESTree.Node };
+  readonly messageId: string;
+  readonly member: string;
+};
+
+const memberWriteOf = (node: ESTree.Node, leaf: ESTree.Expression): readonly StateWrite[] => {
+  if (leaf.type !== "MemberExpression") return [];
+
+  const root = memberRootOf(leaf);
+  if (root === null) return [];
+  return [{ node, root: { name: root.name, at: root }, messageId: WRITING_MESSAGE, member: "" }];
+};
+
+const writeOfLeaf = (node: ESTree.Node, leaf: ESTree.Expression): readonly StateWrite[] =>
+  leaf.type === "Identifier"
+    ? [{ node, root: { name: leaf.name, at: leaf }, messageId: REBINDING_MESSAGE, member: "" }]
+    : memberWriteOf(node, leaf);
+
+const standsOnMockNamespace = (node: ESTree.Expression, lookup: NamespaceLookup): boolean => {
+  const written = unwrapSubject(node);
+  if (spellsMockNamespace(written, lookup)) return true;
+  if (written.type === "CallExpression") return standsOnMockNamespace(written.callee, lookup);
+  if (written.type === "MemberExpression") return standsOnMockNamespace(written.object, lookup);
+  return false;
+};
+
+const assignmentWrites = (
+  node: ESTree.AssignmentExpression,
+  lookup: NamespaceLookup,
+): readonly StateWrite[] =>
+  standsOnMockNamespace(node.right, lookup)
+    ? []
+    : writtenLeavesOf(node.left).flatMap((leaf) => writeOfLeaf(node, leaf));
+
+const deletionWrites = (node: ESTree.UnaryExpression): readonly StateWrite[] =>
+  node.operator === "delete" ? memberWriteOf(node, unwrapSubject(node.argument)) : [];
+
+const updateWrites = (node: ESTree.UpdateExpression): readonly StateWrite[] =>
+  writeOfLeaf(node, unwrapSubject(node.argument));
+
+const OPERATION_MESSAGE = "sharedValueChangedByCall";
+
+const operationWrites = (node: ESTree.CallExpression): readonly StateWrite[] => {
+  const callee = unwrapSubject(node.callee);
+  if (callee.type !== "MemberExpression") return [];
+
+  const member = staticMemberName(callee);
+  if (member === null || !DESTRUCTIVE_OPERATIONS.has(member)) return [];
+
+  const root = memberRootOf(callee.object);
+  if (root === null) return [];
+  return [{ node, root: { name: root.name, at: root }, messageId: OPERATION_MESSAGE, member }];
+};
+
+const stateWritesIn = (
+  program: ESTree.Program,
+  namespaces: NamespaceLookup,
+): readonly StateWrite[] => {
+  const found = [
+    ...nodesOfType(program, "AssignmentExpression").flatMap((node) =>
+      assignmentWrites(node, namespaces),
+    ),
+    ...nodesOfType(program, "UpdateExpression").flatMap(updateWrites),
+    ...nodesOfType(program, "UnaryExpression").flatMap(deletionWrites),
+    ...nodesOfType(program, "CallExpression").flatMap(operationWrites),
+  ];
+
+  return sortBy(
+    found.map((write) => ({ write, at: write.node.start })),
+    ["at"],
+  ).map((placed) => placed.write);
+};
+
+export const noModuleScopeMutableState = createDontReviewItRule({
+  name: "no-module-scope-mutable-state--lift-into-fixture",
+  meta: {
+    type: "problem",
+    docs: {
+      description:
+        "Disallow a test writing to a binding declared outside every fixture, test block and setup hook, so the state a test changes belongs to that test alone rather than to the whole file",
+      relatedGuidelines: [],
+    },
+    messages: {
+      sharedBindingRebound:
+        "A binding declared outside every test must not be reassigned from inside one. `{{name}}` is declared at {{origin}}, and the whole file shares the single instance it names: what this test leaves behind is what the next test starts from, in an order that changes from run to run. Move the declaration into the body of the fixture the test takes its subject from and return it, leaving every test to receive its own through a parameter. Declaring it `const`, packing it into an object, hiding the write behind a setter, and moving the declaration into another module all keep the single instance and are reported the same way. A count meant to add up across tests belongs inside the one test that reads the number.",
+      sharedValueWritten:
+        "A value declared outside every test must not be written into from inside one. `{{name}}` is declared at {{origin}}, and every test in this file reads and writes the one value it names: a property this test adds, replaces or deletes is still there for the next test, in an order that changes from run to run. Move the declaration into the body of the fixture the test takes its subject from and return it, leaving every test to receive its own through a parameter. `const` on the declaration does not stop this write, freezing the value only turns it into a failure at run time, and moving the declaration into another module leaves the sharing exactly where it stood.",
+      sharedValueChangedByCall:
+        "`{{member}}` must not be called on a value declared outside every test. `{{name}}` is declared at {{origin}}, and the elements or entries this call adds, removes or reorders stay in the one value the whole file shares: the next test starts from whatever this test left behind, in an order that changes from run to run. Move the declaration into the body of the fixture the test takes its subject from and return it, leaving every test to receive its own through a parameter. Declaring it `const` and freezing it both keep the single instance; build the value this test needs inside the fixture instead.",
+    },
+    schema: [],
+  },
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, DEFAULT_SPEC_FILE_SUFFIXES)) return {};
+
+    const scopeAt: ScopeLookup = (node) => inspection.sourceCode.getScope(node);
+    const namespaces: NamespaceLookup = {
+      scopeAt,
+      spellings: new Set(DEFAULT_MOCK_NAMESPACE_SPELLINGS),
+      seenBindings: new Set(),
+    };
+
+    const declarationsOutsideTests = (
+      write: StateWrite,
+      regions: readonly ESTree.Node[],
+    ): readonly Definition[] => {
+      const binding = resolveBinding(scopeAt(write.root.at), write.root.name);
+      if (binding === null) return [];
+      return binding.defs.some((definition) => standsInsideTest(definition.name, regions))
+        ? []
+        : binding.defs;
+    };
+
+    return {
+      "Program:exit"(program: ESTree.Program) {
+        const regions = testRegionsIn(program, testBlockRootNames(program));
+
+        for (const write of stateWritesIn(program, namespaces)) {
+          if (!standsInsideTest(write.node, regions)) continue;
+
+          for (const definition of take(declarationsOutsideTests(write, regions), 1)) {
+            if (write.messageId === REBINDING_MESSAGE && !declaresRebindableName(definition)) {
+              continue;
+            }
+            inspection.report({
+              node: write.node,
+              messageId: write.messageId,
+              data: { name: write.root.name, origin: originOf(definition), member: write.member },
+            });
+          }
+        }
+      },
+    };
+  },
+});

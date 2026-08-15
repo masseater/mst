@@ -12,8 +12,8 @@ Disallow calling a method that writes to a receiver which is not an array - a co
 - Fixable: no
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`no-receiver-mutation--derive-new-value.ts`](../../src/lint/oxlint/rules/no-receiver-mutation--derive-new-value.ts)
+- Bundle: `state`
+- Source: [`no-receiver-mutation--derive-new-value.ts`](../../src/lint/oxlint/rules/state/no-receiver-mutation--derive-new-value.ts)
 
 <!-- END GENERATED rule-header -->
 

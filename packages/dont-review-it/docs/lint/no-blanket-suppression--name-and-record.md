@@ -12,8 +12,8 @@ Disallow any lint suppression that fails to name its rule, to stop at the one st
 - Fixable: no
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`no-blanket-suppression--name-and-record.ts`](../../src/lint/oxlint/rules/no-blanket-suppression--name-and-record.ts)
+- Bundle: `governance`
+- Source: [`no-blanket-suppression--name-and-record.ts`](../../src/lint/oxlint/rules/governance/no-blanket-suppression--name-and-record.ts)
 
 <!-- END GENERATED rule-header -->
 

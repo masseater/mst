@@ -12,8 +12,8 @@ Disallow a declaration that another declaration in the repository spells with th
 - Fixable: no
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`no-twin-declaration--merge-into-one-owner.ts`](../../src/lint/oxlint/rules/no-twin-declaration--merge-into-one-owner.ts)
+- Bundle: `single-ownership`
+- Source: [`no-twin-declaration--merge-into-one-owner.ts`](../../src/lint/oxlint/rules/single-ownership/no-twin-declaration--merge-into-one-owner.ts)
 
 <!-- END GENERATED rule-header -->
 
