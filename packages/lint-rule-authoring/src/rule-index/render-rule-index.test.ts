@@ -2,9 +2,10 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { renderRuleIndex } from "./render-rule-index.ts";
 
-import type { LintRuleFacts } from "./rule-facts.ts";
+import type { BundledLintRule } from "./rule-bundle.ts";
 
-const plainRule: LintRuleFacts = {
+const plainRule: BundledLintRule = {
+  bundle: null,
   name: "no-plain--decorate-it",
   description: "Disallow plainness",
   sourcePath: "src/lint/oxlint/rules/no-plain--decorate-it.ts",
@@ -109,6 +110,75 @@ describe("renderRuleIndex", () => {
           "| Rule | Description | Tool | Notices |",
           "| --- | --- | --- | --- |",
           "| [no-named--enable-it](./no-named--enable-it.md) | Disallow plainness | oxlint |  |",
+        ].join("\n"),
+      );
+    });
+  });
+
+  describe("a workspace whose shipped rules sit in bundles, with one left off the preset", () => {
+    const it = test.extend("ruleIndex", () =>
+      renderRuleIndex([
+        { ...plainRule, name: "no-spec--fix-it", bundle: "test" },
+        { ...plainRule, name: "no-core--fix-it", bundle: "core" },
+        { ...plainRule, name: "no-named--enable-it", shipped: false },
+      ]));
+
+    it("gives each bundle a heading of its own and keeps the named side last", ({ ruleIndex }) => {
+      expect(ruleIndex).toBe(
+        [
+          "## Bundles",
+          "",
+          "Each bundle is adopted on its own, and a rule sits in exactly one of them. Which bundles a repository takes on is written where it calls the preset.",
+          "",
+          "### core",
+          "",
+          "| Rule | Description | Tool | Notices |",
+          "| --- | --- | --- | --- |",
+          "| [no-core--fix-it](./no-core--fix-it.md) | Disallow plainness | oxlint |  |",
+          "",
+          "### test",
+          "",
+          "| Rule | Description | Tool | Notices |",
+          "| --- | --- | --- | --- |",
+          "| [no-spec--fix-it](./no-spec--fix-it.md) | Disallow plainness | oxlint |  |",
+          "",
+          "## Enabled by name",
+          "",
+          "Rules this workspace ships without putting them in the preset. A consumer names one in `rules` to turn it on. Why a rule is left out is written in its own document.",
+          "",
+          "| Rule | Description | Tool | Notices |",
+          "| --- | --- | --- | --- |",
+          "| [no-named--enable-it](./no-named--enable-it.md) | Disallow plainness | oxlint |  |",
+        ].join("\n"),
+      );
+    });
+  });
+
+  describe("a shipped rule standing outside the bundles the workspace has", () => {
+    const it = test.extend("ruleIndex", () =>
+      renderRuleIndex([
+        { ...plainRule, name: "no-core--fix-it", bundle: "core" },
+        { ...plainRule, name: "no-stray--fix-it" },
+      ]));
+
+    it("leaves the stray under a heading of its own instead of dropping it", ({ ruleIndex }) => {
+      expect(ruleIndex).toBe(
+        [
+          "## Bundles",
+          "",
+          "Each bundle is adopted on its own, and a rule sits in exactly one of them. Which bundles a repository takes on is written where it calls the preset.",
+          "",
+          "### core",
+          "",
+          "| Rule | Description | Tool | Notices |",
+          "| --- | --- | --- | --- |",
+          "| [no-core--fix-it](./no-core--fix-it.md) | Disallow plainness | oxlint |  |",
+          "",
+          "## Shipped in the preset",
+          "",
+          "| Rule | Description | Tool | Notices |",
+          "| --- | --- | --- | --- |",
+          "| [no-stray--fix-it](./no-stray--fix-it.md) | Disallow plainness | oxlint |  |",
         ].join("\n"),
       );
     });

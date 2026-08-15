@@ -1,6 +1,11 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import { renderExamples, renderMessages, renderRuntimeSelection } from "./render-rule-doc.ts";
+import {
+  renderExamples,
+  renderMessages,
+  renderRuleHeader,
+  renderRuntimeSelection,
+} from "./render-rule-doc.ts";
 
 const SILENT_RULE = {
   name: "no-thing--allow-it",
@@ -10,8 +15,54 @@ const SILENT_RULE = {
   hasSuggestions: false,
   configurable: false,
   shipped: true,
+  bundle: null,
   messages: [],
 };
+
+const HEADER_HEAD: readonly string[] = [
+  "Disallow the thing",
+  "",
+  "- Tool: `oxlint`",
+  "- Fixable: no",
+  "- Suggestions: no",
+  "- Options: no",
+];
+
+const HEADER_TAIL =
+  "- Source: [`no-thing--allow-it.ts`](../../src/lint/oxlint/rules/no-thing--allow-it.ts)";
+
+describe("renderRuleHeader", () => {
+  describe("a shipped rule that sits in a bundle", () => {
+    const it = test.extend("rendered", () => renderRuleHeader({ ...SILENT_RULE, bundle: "core" }));
+
+    it("names the bundle instead of saying the preset carries it", ({ rendered }) => {
+      expect(rendered).toBe([...HEADER_HEAD, "- Bundle: `core`", HEADER_TAIL].join("\n"));
+    });
+  });
+
+  describe("a shipped rule in a workspace that has no bundles", () => {
+    const it = test.extend("rendered", () => renderRuleHeader(SILENT_RULE));
+
+    it("says the preset carries it", ({ rendered }) => {
+      expect(rendered).toBe(
+        [...HEADER_HEAD, "- Shipped in the preset: yes", HEADER_TAIL].join("\n"),
+      );
+    });
+  });
+
+  describe("a rule the preset leaves off", () => {
+    const it = test.extend("rendered", () =>
+      renderRuleHeader({ ...SILENT_RULE, shipped: false, bundle: "core" }));
+
+    it("says the preset does not carry it even though a directory names a bundle", ({
+      rendered,
+    }) => {
+      expect(rendered).toBe(
+        [...HEADER_HEAD, "- Shipped in the preset: no", HEADER_TAIL].join("\n"),
+      );
+    });
+  });
+});
 
 describe("renderMessages", () => {
   describe("a rule that declares no message of its own", () => {

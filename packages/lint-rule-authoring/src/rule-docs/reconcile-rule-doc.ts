@@ -27,7 +27,7 @@ import { lintRuleExamplesIn, testFilePathFor, type LintRuleExamples } from "./ru
 import { PLACEHOLDER_TOKENS, scaffoldRuleDoc } from "./scaffold-rule-doc.ts";
 
 import type { LintRuleCheckReport, LintRuleProblem } from "../lint-rule-problem.ts";
-import type { LintRuleFacts } from "../rule-index/rule-facts.ts";
+import type { BundledLintRule } from "../rule-index/rule-bundle.ts";
 
 const MISSING_DESCRIPTION = `A rule must not go without \`meta.docs.description\`; the document is built from it. Declare it on the rule.`;
 
@@ -60,7 +60,7 @@ const renderedRegionsOf = ({
   rule,
   examples,
 }: {
-  readonly rule: LintRuleFacts;
+  readonly rule: BundledLintRule;
   readonly examples: LintRuleExamples;
 }): readonly RenderedRegion[] => [
   { region: GENERATED_REGIONS.header, content: renderRuleHeader(rule) },
@@ -98,7 +98,7 @@ const staleTargetsIn = ({
   rendered,
 }: {
   readonly source: string;
-  readonly rule: LintRuleFacts;
+  readonly rule: BundledLintRule;
   readonly rendered: readonly RenderedRegion[];
 }): readonly string[] => [
   ...(FRONTMATTER_DESCRIPTION_PATTERN.exec(source)?.[0] === renderFrontmatterDescription(rule)
@@ -118,7 +118,7 @@ const upToDateSource = ({
   rendered,
 }: {
   readonly source: string;
-  readonly rule: LintRuleFacts;
+  readonly rule: BundledLintRule;
   readonly rendered: readonly RenderedRegion[];
 }): string =>
   rendered.reduce(
@@ -146,7 +146,7 @@ const generatedProblems = ({
   absolutePath,
 }: {
   readonly source: string;
-  readonly rule: LintRuleFacts;
+  readonly rule: BundledLintRule;
   readonly rendered: readonly RenderedRegion[];
   readonly write: boolean;
   readonly absolutePath: string;
@@ -169,7 +169,7 @@ const seededSourceOf = ({
   write,
 }: {
   readonly absolutePath: string;
-  readonly rule: LintRuleFacts;
+  readonly rule: BundledLintRule;
   readonly examples: LintRuleExamples;
   readonly write: boolean;
 }): string | null => {
@@ -191,7 +191,7 @@ const ruleDocProblems = ({
 }: {
   readonly repositoryRoot: string;
   readonly workspace: LintRuleWorkspace;
-  readonly rule: LintRuleFacts;
+  readonly rule: BundledLintRule;
   readonly write: boolean;
 }): readonly LintRuleProblem[] => {
   const file = join(workspace.workspaceDir, RULE_DOCS_DIR, `${rule.name}.md`);

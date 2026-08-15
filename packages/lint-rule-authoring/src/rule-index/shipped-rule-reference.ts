@@ -6,7 +6,7 @@ import { REGENERATE_COMMAND } from "../regenerate-command.ts";
 import { renderShippedRuleReference } from "./render-shipped-rule-reference.ts";
 
 import type { LintRuleProblem } from "../lint-rule-problem.ts";
-import type { LintRuleFacts } from "./rule-facts.ts";
+import type { BundledLintRule } from "./rule-bundle.ts";
 
 const BEGIN_MARKER = "<!-- BEGIN GENERATED shipped-lint-rules -->";
 
@@ -33,7 +33,7 @@ export const shippedRuleReferenceProblems = ({
 }: {
   readonly repositoryRoot: string;
   readonly workspaceDir: string;
-  readonly rules: readonly LintRuleFacts[];
+  readonly rules: readonly BundledLintRule[];
   readonly write: boolean;
 }): readonly LintRuleProblem[] => {
   const skillPath = join(repositoryRoot, workspaceDir, SKILL_DIRECTORY, "SKILL.md");

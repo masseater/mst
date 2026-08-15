@@ -2,13 +2,14 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { renderShippedRuleReference } from "./render-shipped-rule-reference.ts";
 
-import type { LintRuleFacts } from "./rule-facts.ts";
+import type { BundledLintRule } from "./rule-bundle.ts";
 
 const WORKSPACE_DIR = "packages/dont-review-it";
 
 const DOCS_BASE = `https://github.com/masseater/mst/blob/main/${WORKSPACE_DIR}/docs/lint`;
 
-const plainRule: LintRuleFacts = {
+const plainRule: BundledLintRule = {
+  bundle: null,
   name: "no-plain--decorate-it",
   description: "Disallow plainness",
   sourcePath: "src/lint/oxlint/rules/no-plain--decorate-it.ts",
@@ -69,6 +70,83 @@ describe("renderShippedRuleReference", () => {
           `| [no-plain--decorate-it](${DOCS_BASE}/no-plain--decorate-it.md) | Disallow \`a \\| b\` unions | 🔧 💡 ⚙️ |`,
           "",
           "Notices — 🔧: fixes itself / 💡: offers an editor suggestion / ⚙️: reads options",
+        ].join("\n"),
+      );
+    });
+  });
+
+  describe("a workspace whose shipped rules sit in bundles", () => {
+    const it = test.extend("reference", () =>
+      renderShippedRuleReference({
+        rules: [
+          { ...plainRule, name: "no-spec--fix-it", bundle: "test" },
+          { ...plainRule, name: "no-core--fix-it", bundle: "core" },
+          { ...plainRule, name: "no-stray--fix-it" },
+        ],
+        workspaceDir: WORKSPACE_DIR,
+      }));
+
+    it("gives each bundle a heading and keeps the unbundled one under the shipped heading", ({
+      reference,
+    }) => {
+      expect(reference).toBe(
+        [
+          "## Bundles the preset can carry",
+          "",
+          "Each bundle is adopted on its own, and a rule sits in exactly one of them. Name the ones this repository takes on where it calls the preset.",
+          "",
+          "### core",
+          "",
+          "| Rule | What it rejects | Notices |",
+          "| --- | --- | --- |",
+          `| [no-core--fix-it](${DOCS_BASE}/no-core--fix-it.md) | Disallow plainness |  |`,
+          "",
+          "### test",
+          "",
+          "| Rule | What it rejects | Notices |",
+          "| --- | --- | --- |",
+          `| [no-spec--fix-it](${DOCS_BASE}/no-spec--fix-it.md) | Disallow plainness |  |`,
+          "",
+          "## Rules the shipped preset enables",
+          "",
+          "| Rule | What it rejects | Notices |",
+          "| --- | --- | --- |",
+          `| [no-stray--fix-it](${DOCS_BASE}/no-stray--fix-it.md) | Disallow plainness |  |`,
+        ].join("\n"),
+      );
+    });
+  });
+
+  describe("a workspace whose shipped rules all sit in bundles, with one left off the preset", () => {
+    const it = test.extend("reference", () =>
+      renderShippedRuleReference({
+        rules: [
+          { ...plainRule, name: "no-core--fix-it", bundle: "core" },
+          { ...plainRule, name: "no-named--enable-it", shipped: false },
+        ],
+        workspaceDir: WORKSPACE_DIR,
+      }));
+
+    it("goes straight from the bundles to the named side", ({ reference }) => {
+      expect(reference).toBe(
+        [
+          "## Bundles the preset can carry",
+          "",
+          "Each bundle is adopted on its own, and a rule sits in exactly one of them. Name the ones this repository takes on where it calls the preset.",
+          "",
+          "### core",
+          "",
+          "| Rule | What it rejects | Notices |",
+          "| --- | --- | --- |",
+          `| [no-core--fix-it](${DOCS_BASE}/no-core--fix-it.md) | Disallow plainness |  |`,
+          "",
+          "## Rules this package ships without enabling them",
+          "",
+          "Whether these hold depends on the adopting repository, so the preset leaves them off. Name one in `rules` to turn it on; its document says why it is not enabled by default.",
+          "",
+          "| Rule | What it rejects | Notices |",
+          "| --- | --- | --- |",
+          `| [no-named--enable-it](${DOCS_BASE}/no-named--enable-it.md) | Disallow plainness |  |`,
         ].join("\n"),
       );
     });
