@@ -28,6 +28,15 @@ domains:
   - name: "surfacing verified specifications"
     slug: "surfacing-verified-specifications"
     description: "Declaring behavior claims as specification tests and generating the human-readable list from them."
+  - name: "wrapping heavy commands"
+    slug: "wrapping-heavy-commands"
+    description: "Keeping parallel heavy commands inside the host's capacity and their output outside the caller's context window."
+  - name: "answering pull requests without a human"
+    slug: "answering-pull-requests"
+    description: "Running the relay and the two runtimes that review a pull request and respond to its feedback unattended."
+  - name: "stopping valueless additions"
+    slug: "stopping-valueless-additions"
+    description: "Reporting the code an AI adds to a change that only restates what the same change removed."
 
 skills:
   - name: "adopt the dont-review-it preset"
@@ -52,13 +61,13 @@ skills:
       - mistake: "ignorePatterns placed in an extended preset"
         mechanism: "oxlint's Oxlintrc::merge keeps only the extending side's ignore_patterns, so patterns shipped through extends silently vanish."
         wrong_pattern: |
-          export const preset = defineConfig({
+          export const myPreset = defineConfig({
+            extends: [somePreset],
             ignorePatterns: [".agents/"],
           });
         correct_pattern: |
-          import { withGitExcludes } from "@mst/dont-review-it";
           export default defineConfig({
-            lint: withGitExcludes({ extends: [oxlint] }),
+            lint: dontReviewItPreset.lint({ ignorePatterns: [".agents/"] }),
           });
         source: "masseater/mst:.claude/rules/ai-generated/gotchas.md"
         priority: "HIGH"
@@ -97,6 +106,26 @@ skills:
             "include": ["src"]
           }
         source: "masseater/mst:packages/dont-review-it/docs/lint/no-standalone-tsconfig--extend-shared-preset.md"
+        priority: "MEDIUM"
+        status: "active"
+      - mistake: "a GitHub alert written with its body on the next line"
+        mechanism: "fmt sets proseWrap: never, so a blockquote whose marker and body form one paragraph is joined into a single line and GitHub renders the marker as literal text."
+        wrong_pattern: |
+          > [!IMPORTANT] Install through the official installer.
+        correct_pattern: |
+          > [!IMPORTANT]
+          >
+          > Install through the official installer.
+        source: "masseater/mst:docs/engineering-decision-logs/0046-let-the-formatter-own-where-markdown-lines-break.md"
+        priority: "HIGH"
+        status: "active"
+      - mistake: "a second exported config added beside the preset"
+        mechanism: "one rule set applied at the root reaches the whole repository; a second entry point makes the reach depend on which one a repository wired, returning the adoption decision to the caller."
+        wrong_pattern: |
+          export const dontReviewItStrictPreset = { lint: () => ({}) };
+        correct_pattern: |
+          export const dontReviewItPreset = { fmt, lint };
+        source: "masseater/mst:packages/dont-review-it/AGENTS.md"
         priority: "MEDIUM"
         status: "active"
     compositions:
@@ -180,6 +209,19 @@ skills:
         source: "masseater/mst:packages/dont-review-it/src/intent-skills/shipped-skills.ts"
         priority: "HIGH"
         status: "active"
+      - mistake: "a published entry point left pointing at TypeScript source"
+        mechanism: "a workspace link resolves to the real path so Node strips types happily, while the published copy lands under node_modules where Node refuses with ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING."
+        wrong_pattern: |
+          { "bin": { "my-cli": "./src/cli.ts" }, "files": ["dist"] }
+        correct_pattern: |
+          {
+            "bin": { "my-cli": "./src/cli.ts" },
+            "files": ["dist"],
+            "publishConfig": { "bin": { "my-cli": "./dist/cli.mjs" } }
+          }
+        source: "masseater/mst:packages/dont-review-it/AGENTS.md"
+        priority: "HIGH"
+        status: "active"
       - mistake: "internal package left carrying skill wiring"
         mechanism: "a private package with a skills directory, a skills files entry, or the discovery keyword advertises a distribution surface that never ships."
         wrong_pattern: |
@@ -242,6 +284,16 @@ skills:
         priority: "HIGH"
         status: "active"
         skills: ["lint-rule-authoring-core", "dont-review-it-core"]
+      - mistake: "a schema handed over from another module"
+        mechanism: "the index extracts facts by parsing the rule's own file, so a schema referenced by identifier cannot be counted and the rule is published as one that takes no options while it goes on reading them."
+        wrong_pattern: |
+          import { CATALOG_ENTRY_SCHEMA } from "./catalog-entry-schema.ts";
+          schema: CATALOG_ENTRY_SCHEMA,
+        correct_pattern: |
+          schema: [{ type: "object", properties: { intentionalRanges: { type: "array" } } }],
+        source: "masseater/mst:.claude/rules/ai-generated/gotchas.md"
+        priority: "MEDIUM"
+        status: "active"
       - mistake: "rule added at warn severity"
         mechanism: "warn is the severity a human assigns after judgment; a rule introduced at warn is ignorable from day one and enforces nothing."
         wrong_pattern: |
@@ -290,6 +342,24 @@ skills:
           - IF: x is about to be written; THEN PROHIBIT: write x
         source: "masseater/mst:packages/agentic-documents/src/checks/no-table.ts"
         priority: "HIGH"
+        status: "active"
+      - mistake: "a reference that resolves to nothing"
+        mechanism: "links in a normative document are followed by agents, and a missing target or heading anchor produces no error at read time — the agent proceeds without the rule the pointer stood in for."
+        wrong_pattern: |
+          See [the enforcement guide](../../docs/guidelines/enforcment.md#detection).
+        correct_pattern: |
+          See [the enforcement guide](../../docs/guidelines/enforcement.md#detection).
+        source: "masseater/mst:packages/agentic-documents/src/checks/reference-targets.ts"
+        priority: "HIGH"
+        status: "active"
+      - mistake: "a version number written into the prose"
+        mechanism: "a version in prose has no mechanism keeping it current, so it stays right until the manifest moves and then instructs every reader to install the wrong one."
+        wrong_pattern: |
+          - IF: pinning the runtime; THEN MUST: use Node 26.7.0
+        correct_pattern: |
+          - IF: pinning the runtime; THEN MUST: use the version `devEngines.runtime` declares
+        source: "masseater/mst:packages/agentic-documents/src/checks/version-in-prose.ts"
+        priority: "MEDIUM"
         status: "active"
       - mistake: "two decision keywords on one line"
         mechanism: "a line holding MUST and PROHIBIT together leaves the binding keyword ambiguous, and the single-decision-keyword check reports it."
@@ -360,6 +430,28 @@ skills:
         source: "masseater/mst:packages/verified-specifications/src/run-cli.ts"
         priority: "MEDIUM"
         status: "active"
+      - mistake: "a runner narrowed through a member"
+        mechanism: "each, skip and only make the claim run in variants or not at all, and neither reads as one plain sentence about the subject; the check reports any describe or it reached through a member."
+        wrong_pattern: |
+          it.each(["表", "見出し"])("%s を報告する", () => {})
+        correct_pattern: |
+          it("規範が表の行として書かれていれば報告する", () => {})
+        source: "masseater/mst:packages/verified-specifications/src/extract/claims.ts"
+        priority: "MEDIUM"
+        status: "active"
+      - mistake: "a subject left with no claims under it"
+        mechanism: "a describe with no it under it renders as a heading with nothing beneath, which reads as a subject whose claims were lost rather than one that was never written."
+        wrong_pattern: |
+          describe("規範文書の検査", () => {
+            beforeEach(() => resetFixtures());
+          });
+        correct_pattern: |
+          describe("規範文書の検査", () => {
+            it("規範が表の行として書かれていれば報告する", () => {});
+          });
+        source: "masseater/mst:packages/verified-specifications/src/extract/claims.ts"
+        priority: "MEDIUM"
+        status: "active"
       - mistake: "coverage exercise placed in specs/"
         mechanism: "an execution that is not a claim dilutes the generated list a human reads."
         wrong_pattern: |
@@ -376,6 +468,231 @@ skills:
         correct_pattern: |
           { "extends": "@mst/dont-review-it/tsconfig/library.json" }
         source: "masseater/mst:packages/verified-specifications/AGENTS.md"
+        priority: "MEDIUM"
+        status: "active"
+
+  - name: "wrap a heavy command"
+    slug: "ai-native-core"
+    domain: "wrapping-heavy-commands"
+    description: "Wrap an entry point with throttle and spool in that order, read the record a summary points at, wire the unabridged PreToolUse hook, and start telemetry once per process."
+    type: "core"
+    packages:
+      - "@mst/ai-native"
+    covers:
+      - "throttle --timeout"
+      - "MST_THROTTLE_LIMIT"
+      - "spool"
+      - ".spool/ log files"
+      - "unabridged PreToolUse hook"
+      - "@mst/ai-native/telemetry"
+      - "@mst/ai-native/vitest-sdk"
+      - "MST_TELEMETRY"
+      - "OTEL_EXPORTER_OTLP_ENDPOINT"
+    tasks:
+      - "wrap a package.json entry point with both wrappers"
+      - "read the full output behind a spool summary"
+      - "wire the unabridged hook into an agent config"
+      - "start the telemetry provider from a process entry point"
+    failure_modes:
+      - mistake: "wrappers composed with spool on the outside"
+        mechanism: "throttle announces its queue position on stderr, so wrapping it inside spool diverts those announcements into the log file and a queued run looks identical to a hung one."
+        wrong_pattern: |
+          spool -- throttle -- vp run guard
+        correct_pattern: |
+          throttle -- spool -- vp run guard
+        source: "masseater/mst:packages/ai-native/AGENTS.md"
+        priority: "HIGH"
+        status: "active"
+      - mistake: "throttle nested inside the command it wraps"
+        mechanism: "the inner call is an independent competitor for the same host and namespace, so it consumes a second slot and the limit stops bounding what it names."
+        wrong_pattern: |
+          throttle -- pnpm run guard   # where guard itself runs `throttle -- vp test`
+        correct_pattern: |
+          pnpm run guard               # where guard runs `throttle -- spool -- vp run guard:all`
+        source: "masseater/mst:packages/ai-native/src/throttle/usage.ts"
+        priority: "HIGH"
+        status: "active"
+      - mistake: "an interactive command wrapped with spool"
+        mechanism: "the prompt is part of the child's output, so it is written to the log file while the terminal stays silent and the child waits for input that never arrives."
+        wrong_pattern: |
+          spool -- npm login
+        correct_pattern: |
+          npm login
+        source: "masseater/mst:packages/ai-native/AGENTS.md"
+        priority: "HIGH"
+        status: "active"
+      - mistake: "a wrapper failure read as the child's exit code"
+        mechanism: "recording failures and slot failures make the run report failure even when the child succeeded, and throttle uses exit code 1 for both a failing child and a slot it could not acquire or release, so the number alone cannot tell the two apart."
+        wrong_pattern: |
+          spool -- vp run -r build
+          echo "build failed with $?"
+        correct_pattern: |
+          spool -- vp run -r build
+          # read the summary: the channel and wording say whether spool or the child failed
+        source: "masseater/mst:packages/ai-native/src/spool/run-spool.ts"
+        priority: "MEDIUM"
+        status: "active"
+      - mistake: "telemetry provider requested more than once per process"
+        mechanism: "the first caller fixes service.name for the whole process, so a second entry point that asks for its own provider silently reports its spans under the first caller's service."
+        wrong_pattern: |
+          const provider = startTelemetry({ serviceName: "my-step" });
+          const another = startTelemetry({ serviceName: "my-other-step" });
+        correct_pattern: |
+          const provider = startTelemetry({ serviceName: "my-command" });
+        source: "masseater/mst:packages/ai-native/src/telemetry/telemetry.ts"
+        priority: "MEDIUM"
+        status: "active"
+      - mistake: "unabridged expected to catch a sliced command inside a nested shell"
+        mechanism: "the hook reads command positions of the command line it is handed, and `bash -c '... | tail'` collapses to one string token while `xargs head` puts head in an argument position, so both are allowed."
+        wrong_pattern: |
+          bash -c 'vp run -r test | tail -20'
+        correct_pattern: |
+          spool -- vp run -r test
+        source: "masseater/mst:packages/ai-native/src/unabridged/find-slicing-commands.ts"
+        priority: "MEDIUM"
+        status: "active"
+
+  - name: "keep a pull-request loop running"
+    slug: "auto-develop-core"
+    domain: "answering-pull-requests"
+    description: "Run the relay and the reviewer and author runtimes, and keep one response per pull request while every verdict describes the input it was computed from."
+    type: "core"
+    packages:
+      - "@mst/auto-develop"
+    covers:
+      - "relay server endpoints"
+      - "reviewer runtime"
+      - "author runtime"
+      - "--concurrency"
+      - "--dry-run"
+      - "per-PR job lanes"
+      - "startup drain"
+      - "engine run context"
+    tasks:
+      - "start the relay and point a webhook at it"
+      - "start a runtime against a repository"
+      - "decide how a GitHub event reaches a pull request job"
+    failure_modes:
+      - mistake: "the GitHub token presented to a subscriber endpoint"
+        mechanism: "the stream resolves its bearer against the session store, so a GitHub token there is an unknown credential and comes back 401 — after the token has already been sent to whatever origin the caller named, and the 401 reads as a wiring problem rather than a leak."
+        wrong_pattern: |
+          curl -H "authorization: Bearer $GH_TOKEN" "$RELAY_ORIGIN/events/stream?mode=reviewer"
+        correct_pattern: |
+          SESSION=$(curl -sX POST -H "authorization: Bearer $GH_TOKEN" "$RELAY_ORIGIN/auth/session" | jq -r .token)
+          curl -H "authorization: Bearer $SESSION" "$RELAY_ORIGIN/events/stream?mode=reviewer"
+        source: "masseater/mst:packages/auto-develop/specs/relay-credential.spec.ts"
+        priority: "CRITICAL"
+        status: "active"
+      - mistake: "the pull request diff put into the engine prompt"
+        mechanism: "the prompt is handed to the agent CLI as process arguments, so a diff large enough to exceed the argument length limit fails at spawn — the loop works on small pull requests and breaks on the ones worth reviewing."
+        wrong_pattern: |
+          Review this pull request. Here is the diff:
+          <the whole unified diff>
+        correct_pattern: |
+          Review PR #123. The run context is at .repo-workflow/review-context/<run-id>/review-carried.json.
+        source: "masseater/mst:packages/auto-develop/specs/engine-session.spec.ts"
+        priority: "HIGH"
+        status: "active"
+      - mistake: "a wiring change tried against a live repository without --dry-run"
+        mechanism: "every write to GitHub is real, so a run started to confirm the relay connection leaves commit statuses and review comments that nothing distinguishes from a verdict the loop meant to publish."
+        wrong_pattern: |
+          auto-develop reviewer --pr 123
+        correct_pattern: |
+          auto-develop reviewer --pr 123 --dry-run
+        source: "masseater/mst:packages/auto-develop/src/cli/runtime-command.ts"
+        priority: "HIGH"
+        status: "active"
+      - mistake: "the queue snapshot read back after a restart"
+        mechanism: "the snapshot is written for humans and audits only, so reading it back adds a second recovery path that disagrees with the startup drain whenever GitHub moved while the process was down."
+        wrong_pattern: |
+          recovering the in-flight work by loading the snapshot the previous process wrote to disk
+        correct_pattern: |
+          starting from an empty in-memory queue and letting GET /events/startup-drain re-derive the work
+        source: "masseater/mst:packages/auto-develop/specs/job-lane.spec.ts"
+        priority: "HIGH"
+        status: "active"
+      - mistake: "a pull-request filter that parses to nothing"
+        mechanism: "--pr keeps only the positive integers it can parse and drops the rest without a word, and an empty target list means every lane, so one unparseable entry turns a scoped run into a run over all pull requests."
+        wrong_pattern: |
+          auto-develop reviewer --pr "#123"
+        correct_pattern: |
+          auto-develop reviewer --pr 123
+        source: "masseater/mst:packages/auto-develop/src/cli/runtime-command.ts"
+        priority: "HIGH"
+        status: "active"
+      - mistake: "the same number given to both pull-request filters"
+        mechanism: "exclusion is applied after selection, so a number named on both lists never runs while the command reports nothing about the contradiction."
+        wrong_pattern: |
+          auto-develop author --pr 41,42 --exclude-pr 42
+        correct_pattern: |
+          auto-develop author --pr 41
+        source: "masseater/mst:packages/auto-develop/specs/job-lane.spec.ts"
+        priority: "MEDIUM"
+        status: "active"
+      - mistake: "an environment address written as a constant"
+        mechanism: "an endpoint, credential, or repository baked into the implementation cannot be changed by configuration, so the package runs against exactly one environment and fails silently in any other."
+        wrong_pattern: |
+          const repository = "masseater/mst";
+        correct_pattern: |
+          const repository = requireEnv("GITHUB_REPOSITORY");
+        source: "masseater/mst:packages/auto-develop/AGENTS.md"
+        priority: "MEDIUM"
+        status: "active"
+
+  - name: "stop the checks that only restate a removal"
+    slug: "stop-ai-slop-core"
+    domain: "stopping-valueless-additions"
+    description: "Run stop-ai-slop check over the change on its way into the integration branch and delete the absence assertions it reports instead of reshaping them."
+    type: "core"
+    packages:
+      - "@mst/stop-ai-slop"
+    covers:
+      - "stop-ai-slop check"
+      - "--base / --head"
+      - "--repository-root"
+      - "comparison range resolution"
+      - "src/check-registry.ts"
+    tasks:
+      - "run the check over a branch"
+      - "respond to a removal-verification report"
+      - "register a new check"
+    failure_modes:
+      - mistake: "an absence assertion added by the change that removed its subject"
+        mechanism: "the assertion can only fail if someone re-adds the export the same change deleted, so it pins a state the deletion already records and every later reader has to work out why it is there."
+        wrong_pattern: |
+          import * as legacy from "./legacy.ts";
+          expect(legacy).not.toHaveProperty("legacyMode");
+        correct_pattern: |
+          import { current } from "./legacy.ts";
+          expect(current).toBe(true);
+        source: "masseater/mst:packages/stop-ai-slop/AGENTS.md"
+        priority: "HIGH"
+        status: "active"
+      - mistake: "the assertion reshaped until the locator cannot be recovered"
+        mechanism: "the check reports a locator it can resolve statically, so hiding the name behind a computed expression removes the report while the assertion it names stays in the suite."
+        wrong_pattern: |
+          expect(legacy).not.toHaveProperty(String("legacyMode"));
+        correct_pattern: |
+          // the assertion is deleted
+        source: "masseater/mst:packages/stop-ai-slop/AGENTS.md"
+        priority: "MEDIUM"
+        status: "active"
+      - mistake: "revisions guessed instead of resolved"
+        mechanism: "HEAD~1 is the previous commit rather than the point the change left the integration branch, so a branch with more than one commit is compared over its last step only and every earlier addition goes unreported."
+        wrong_pattern: |
+          stop-ai-slop check --base HEAD~1 --head HEAD
+        correct_pattern: |
+          stop-ai-slop check
+        source: "masseater/mst:packages/stop-ai-slop/src/comparison-range.ts"
+        priority: "MEDIUM"
+        status: "active"
+      - mistake: "a new check published as its own subcommand"
+        mechanism: "check runs the registry in definition order, so a check reachable only through a second subcommand exists without running until every caller is updated to name it."
+        wrong_pattern: |
+          defineCommand({ subCommands: { check, "check-removals": checkRemovals } });
+        correct_pattern: |
+          export const CHECKS: readonly SlopCheck[] = [noRemovalVerification, checkRemovals];
+        source: "masseater/mst:packages/stop-ai-slop/AGENTS.md"
         priority: "MEDIUM"
         status: "active"
 
@@ -403,6 +720,15 @@ cross_references:
   - from: "agentic-documents-core"
     to: "dont-review-it-repository-checks"
     reason: "Both are guard-run check CLIs with the same single-entry, nonzero-exit discipline."
+  - from: "stop-ai-slop-core"
+    to: "dont-review-it-repository-checks"
+    reason: "Both are guard-run check CLIs with the same single-entry, nonzero-exit discipline."
+  - from: "ai-native-core"
+    to: "dont-review-it-repository-checks"
+    reason: "The gate the checks run inside is the command the wrappers wrap; the composition order is decided once, at that entry."
+  - from: "ai-native-core"
+    to: "lint-rule-authoring-core"
+    reason: "Rule duration is exported through the telemetry entry this package owns, so a rule that measures itself starts here."
 
 gaps:
   - skill: "dont-review-it-core"
