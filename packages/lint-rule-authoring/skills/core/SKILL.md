@@ -145,6 +145,8 @@ pnpm exec lint-rule-authoring check --write
 
 Without `--write` it reports what is missing, unmarked, stale, or still carrying the text a seeded document was written with, and exits non-zero. With `--write` it seeds the absent documents and regenerates every generated region.
 
+Two documents are regenerated per workspace. `docs/lint/index.md` is the in-repository index, and — when the workspace also has `skills/core/SKILL.md` — `skills/core/references/lint-rules.md` is the copy that ships inside the package. The shipped one exists because `docs/` stays in the repository: an installed copy has no other statement of what the rules reject, so its table links each rule to its document on GitHub rather than to a relative path.
+
 ## Common Mistakes
 
 ### [HIGH] a ParenthesizedExpression branch written in a rule
@@ -274,6 +276,9 @@ Source: masseater/mst:packages/lint-rule-authoring/AGENTS.md
                                  firstToken, matchesGlobSegment, oxlint
 @mst/lint-rule-authoring/plugin  the oxlint jsPlugins entry holding this package's own rules
 lint-rule-authoring check        [--write] [--repository-root <path>]
+docs/lint/index.md               generated index, in the repository
+skills/core/references/          generated rule reference, shipped in the package
+  lint-rules.md
 
 meta.docs.description            one line; the index heading
 meta.docs.relatedGuidelines      the normative documents the rule enforces
