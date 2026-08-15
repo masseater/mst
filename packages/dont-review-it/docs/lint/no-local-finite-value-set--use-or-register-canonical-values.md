@@ -19,7 +19,7 @@ Disallow defining a finite value set inside a file that does not own it, so one 
 
 ## Violation
 
-Syntax in a production source that defines a finite vocabulary of strings, numbers, booleans and `null`. Six shapes are read.
+Syntax in a production source that defines a finite vocabulary of strings, numbers, booleans and `null`. These shapes are read.
 
 - A static scalar array handed to a call whose member is `enum` or `picklist`
 - A type alias that is a union of scalar literals

@@ -19,7 +19,7 @@ Disallow a file carrying more code lines than the budget set for it, so a file i
 
 ## Violation
 
-A file carrying more code lines than its budget. A code line is a line at least one token stands on, so blank lines and lines holding nothing but a comment are not counted.
+A file carrying more code lines than its budget. A code line is a line any token spans, so a line holding nothing but a comment is not counted while every line a multi-line token runs through is.
 
 A spec file is measured against `maxSpecLines`, which defaults to 1500, and every other file against `maxLines`, which defaults to 500. Which files count as specs is settled by `specFileSuffixes`.
 
