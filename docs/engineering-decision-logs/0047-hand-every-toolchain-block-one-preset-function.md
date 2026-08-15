@@ -25,7 +25,7 @@
 
 利用者が書くのは 1 つの import と、ブロックごとの 1 回の呼び出しだけになる。preset に何が入っているかを知らなくても、配線として正しい状態が既定になる。
 
-`oxlint` と `withGitExcludes` は公開面から消える。preset の内部モジュールとして残るが、外から名指しはできない。3 つを個別に組み替えて使う道は塞がれ、[0042](0042-apply-one-preset-at-the-root-and-report-the-exception-the-toolchain-forces.md) が言う「採用の判断を残さない」がツールチェーン設定の側にも及ぶ。
+`oxlint` と `withGitExcludes` は公開面から消える。preset の内部モジュールとして残るが、外から名指しはできない。3 つを個別に組み替えて使う道は塞がれ、[0042](0042-let-the-caller-choose-the-bundles-and-apply-them-at-the-root.md) が言う「採用の判断を残さない」がツールチェーン設定の側にも及ぶ。
 
 `@mst/dont-review-it` の依存に `@mst/verified-specifications` が加わる。インストールした利用者には仕様担保テストの検査も一緒に届く。
 

@@ -12,6 +12,8 @@ const LINT_BUNDLES = [
 
 export type LintBundle = (typeof LINT_BUNDLES)[number];
 
+export const LINT_BUNDLE_NAMES: readonly LintBundle[] = LINT_BUNDLES;
+
 export const LINT_BUNDLE = {
   governance: LINT_BUNDLES[0],
   writing: LINT_BUNDLES[1],
@@ -23,7 +25,7 @@ export const LINT_BUNDLE = {
   ci: LINT_BUNDLES[7],
 } as const satisfies Record<string, LintBundle>;
 
-export const SELECTABLE_LINT_BUNDLES: readonly LintBundle[] = LINT_BUNDLES.filter(
+const SELECTABLE_LINT_BUNDLES: readonly LintBundle[] = LINT_BUNDLES.filter(
   (bundle) => bundle !== LINT_BUNDLE.governance,
 );
 

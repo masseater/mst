@@ -1,5 +1,8 @@
 import { dirname, join } from "node:path";
 
+import { adoptedBundlesIn } from "../configs/bundles/adopted-bundles.ts";
+import { LINT_BUNDLE_NAMES, type LintBundle } from "../configs/bundles/bundle-names.ts";
+import { BUNDLE_RULES } from "../configs/oxlint.ts";
 import {
   listRepositoryFiles,
   readTextFile,
@@ -24,6 +27,27 @@ const workspaceDirectoriesIn = (repositoryRoot: string): readonly string[] =>
     .manifests.map((manifest) => dirname(manifest.relativePath))
     .filter((directory) => directory !== ".")
     .toSorted();
+
+const bundleCarrying = (ruleId: string): LintBundle | null =>
+  LINT_BUNDLE_NAMES.find((bundle) =>
+    BUNDLE_RULES[bundle].some((rule) => ruleId.endsWith(rule.name)),
+  ) ?? null;
+
+const unreachedWarning = ({
+  declaration,
+  config,
+  bundle,
+}: {
+  readonly declaration: DisabledRuleDeclaration;
+  readonly config: PresetAdoptionConfig;
+  readonly bundle: LintBundle;
+}): readonly RepositoryProblem[] => [
+  {
+    file: config.toolchainConfigFileName,
+    line: declaration.line,
+    message: `The lint configuration must not switch ${declaration.ruleId} off while it does not carry the ${bundle} bundle, because the override stops nothing. Delete the override, or name that bundle where the preset is called.`,
+  },
+];
 
 const coveredWorkspaces = ({
   declaration,
@@ -66,10 +90,17 @@ export const runPresetAdoptionChecks = ({
   const workspaces = workspaceDirectoriesIn(repositoryRoot);
   if (source === null) return { warnings: [], scanned: workspaces.length, configMissing: true };
 
+  const adopted =
+    adoptedBundlesIn({ source, toolchainConfigFileName: config.toolchainConfigFileName }) ??
+    LINT_BUNDLE_NAMES;
+
   return {
-    warnings: disabledRuleDeclarationsIn({ source, config }).flatMap((declaration) =>
-      warningsFor({ declaration, workspaces, config }),
-    ),
+    warnings: disabledRuleDeclarationsIn({ source, config }).flatMap((declaration) => {
+      const bundle = bundleCarrying(declaration.ruleId);
+      return bundle !== null && !adopted.includes(bundle)
+        ? unreachedWarning({ declaration, config, bundle })
+        : warningsFor({ declaration, workspaces, config });
+    }),
     scanned: workspaces.length,
     configMissing: false,
   };

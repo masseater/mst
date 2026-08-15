@@ -4,7 +4,7 @@ bin を公開するパッケージが守る規範。機械で止められるも�
 
 ## 採用
 
-採用の判断は無い。`oxlint` を `extends` した時点で、CLI 固有のルールを含めて全部が効く。CLI であるかどうかはルールの側が見る。判断は [EDR 0042](../../../docs/engineering-decision-logs/0042-apply-one-preset-at-the-root-and-report-the-exception-the-toolchain-forces.md) にある。
+CLI 固有の束は無い。CLI に関わるルールは `writing` に入っていて、その束を採った時点で全部が効く。CLI であるかどうかはルールの側が見る。判断は [EDR 0042](../../../docs/engineering-decision-logs/0042-let-the-caller-choose-the-bundles-and-apply-them-at-the-root.md) にある。
 
 - IF: preset のルールを一部だけ止めたくなった; THEN
   - PROHIBIT: 黙って `overrides` で off にする
