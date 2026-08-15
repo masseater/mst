@@ -12,8 +12,8 @@ Disallow every dependency version that matches more than one release, in workspa
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Bundle: `workspace`
-- Source: [`no-version-range--pin-the-exact-version.ts`](../../src/lint/oxlint/rules/workspace/no-version-range--pin-the-exact-version.ts)
+- Bundle: `toolchain`
+- Source: [`no-version-range--pin-the-exact-version.ts`](../../src/lint/oxlint/rules/toolchain/no-version-range--pin-the-exact-version.ts)
 
 <!-- END GENERATED rule-header -->
 

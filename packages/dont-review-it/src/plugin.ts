@@ -10,25 +10,6 @@ import { loadRepositoryCellClassIndex } from "./lint/oxlint/lib/mutable-cell-cla
 import { loadRepositoryTypeAuthorityIndex } from "./lint/oxlint/lib/split-type-authority/builder.ts";
 import { loadStyleClassIndex } from "./lint/oxlint/lib/style-classes/builder.ts";
 import { loadRepositoryValueDeclarationIndex } from "./lint/oxlint/lib/value-declarations/builder.ts";
-import { forbidNumberedSiblingFile } from "./lint/oxlint/rules/core/forbid-numbered-sibling-file--name-what-each-file-owns.ts";
-import { forbidOversizedFile } from "./lint/oxlint/rules/core/forbid-oversized-file--split-by-responsibility.ts";
-import { forbidUnresolvableModuleSpecifier } from "./lint/oxlint/rules/core/forbid-unresolvable-module-specifier--write-a-statically-resolvable-specifier.ts";
-import { noAmbiguousVariableName } from "./lint/oxlint/rules/core/no-ambiguous-variable-name--rename-to-concrete-noun.ts";
-import { noCittyParentRun } from "./lint/oxlint/rules/core/no-citty-parent-run--move-run-into-a-subcommand.ts";
-import { noDefaultExport } from "./lint/oxlint/rules/core/no-default-export--use-named-export.ts";
-import { noDetachedDeclaration } from "./lint/oxlint/rules/core/no-detached-declaration--declare-it-next-to-its-use.ts";
-import { noDetachedRationale } from "./lint/oxlint/rules/core/no-detached-rationale--comment-at-explained-line.ts";
-import { noDoubleTypeAssertion } from "./lint/oxlint/rules/core/no-double-type-assertion--declare-the-real-type.ts";
-import { noExplanatoryComment } from "./lint/oxlint/rules/core/no-explanatory-comment--delete-or-move-to-commit-message.ts";
-import { noHardcodedEndpoint } from "./lint/oxlint/rules/core/no-hardcoded-endpoint--read-from-configuration.ts";
-import { noHardcodedProviderId } from "./lint/oxlint/rules/core/no-hardcoded-provider-id--read-from-configuration.ts";
-import { noIdentityWrapper } from "./lint/oxlint/rules/core/no-identity-wrapper--call-the-target-directly.ts";
-import { noMultiBindingDeclaration } from "./lint/oxlint/rules/core/no-multi-binding-declaration--declare-one-binding-per-statement.ts";
-import { noSingleUseLocalType } from "./lint/oxlint/rules/core/no-single-use-local-type--inline-at-the-use-site.ts";
-import { noUncheckedCast } from "./lint/oxlint/rules/core/no-unchecked-cast--parse-at-boundary.ts";
-import { noUnorderedImport } from "./lint/oxlint/rules/core/no-unordered-import--group-by-origin-then-sort-by-specifier.ts";
-import { createNoUnusedStyleClass } from "./lint/oxlint/rules/core/no-unused-style-class--delete-or-reference-it.ts";
-import { requireReExportOnlyFiles } from "./lint/oxlint/rules/core/require-re-export-only-files--move-declaration-to-owning-module.ts";
 import { forbidDeclaredCommandInvocation } from "./lint/oxlint/rules/governance/forbid-declared-command-invocation--use-designated-replacement.ts";
 import { forbidGenericRestrictionRule } from "./lint/oxlint/rules/governance/forbid-generic-restriction-rule--use-the-declared-rule.ts";
 import { forbidRestrictedTargetRelay } from "./lint/oxlint/rules/governance/forbid-restricted-target-relay--delete-the-relay.ts";
@@ -39,6 +20,16 @@ import { noRuleSuppression } from "./lint/oxlint/rules/governance/no-rule-suppre
 import { noSilentSuppression } from "./lint/oxlint/rules/governance/no-silent-suppression--fix-or-justify-inline.ts";
 import { noUnregisteredRulePlugin } from "./lint/oxlint/rules/governance/no-unregistered-rule-plugin--enable-the-plugin.ts";
 import { noUnwrappedToolchainConfig } from "./lint/oxlint/rules/governance/no-unwrapped-toolchain-config--call-the-preset-for-the-block.ts";
+import { noArrayMutation } from "./lint/oxlint/rules/mutation-and-failure/no-array-mutation--derive-new-array.ts";
+import { createNoClassAsMutableCell } from "./lint/oxlint/rules/mutation-and-failure/no-class-as-mutable-cell--decide-in-an-iife.ts";
+import { noDiscardedFailure } from "./lint/oxlint/rules/mutation-and-failure/no-discarded-failure--receive-and-surface-it.ts";
+import { noEmptyCatch } from "./lint/oxlint/rules/mutation-and-failure/no-empty-catch--throw-or-handle.ts";
+import { noFloatingPromise } from "./lint/oxlint/rules/mutation-and-failure/no-floating-promise--await-the-result.ts";
+import { noLoggedAndContinuedFailure } from "./lint/oxlint/rules/mutation-and-failure/no-logged-and-continued-failure--stop-or-recover.ts";
+import { noPromiseChain } from "./lint/oxlint/rules/mutation-and-failure/no-promise-chain--use-async-await.ts";
+import { noReassign } from "./lint/oxlint/rules/mutation-and-failure/no-reassign--use-spread-or-iife.ts";
+import { noReceiverMutation } from "./lint/oxlint/rules/mutation-and-failure/no-receiver-mutation--derive-new-value.ts";
+import { noSilentCatch } from "./lint/oxlint/rules/mutation-and-failure/no-silent-catch--rethrow-or-handle.ts";
 import { noBarrelImport } from "./lint/oxlint/rules/no-barrel-import--import-from-the-owning-module.ts";
 import { noBarrelModule } from "./lint/oxlint/rules/no-barrel-module--declare-in-the-owning-module.ts";
 import { noMixedPackageSurface } from "./lint/oxlint/rules/no-mixed-package-surface--declare-one-surface.ts";
@@ -49,16 +40,6 @@ import { createNoLocalFiniteValueSet } from "./lint/oxlint/rules/single-ownershi
 import { createNoSplitTypeAuthority } from "./lint/oxlint/rules/single-ownership/no-split-type-authority--rename-or-unify.ts";
 import { createNoStrictCanonicalLiteralUseRule } from "./lint/oxlint/rules/single-ownership/no-strict-canonical-literal-use--use-canonical-import.ts";
 import { createNoTwinDeclaration } from "./lint/oxlint/rules/single-ownership/no-twin-declaration--merge-into-one-owner.ts";
-import { noArrayMutation } from "./lint/oxlint/rules/state/no-array-mutation--derive-new-array.ts";
-import { createNoClassAsMutableCell } from "./lint/oxlint/rules/state/no-class-as-mutable-cell--decide-in-an-iife.ts";
-import { noDiscardedFailure } from "./lint/oxlint/rules/state/no-discarded-failure--receive-and-surface-it.ts";
-import { noEmptyCatch } from "./lint/oxlint/rules/state/no-empty-catch--throw-or-handle.ts";
-import { noFloatingPromise } from "./lint/oxlint/rules/state/no-floating-promise--await-the-result.ts";
-import { noLoggedAndContinuedFailure } from "./lint/oxlint/rules/state/no-logged-and-continued-failure--stop-or-recover.ts";
-import { noPromiseChain } from "./lint/oxlint/rules/state/no-promise-chain--use-async-await.ts";
-import { noReassign } from "./lint/oxlint/rules/state/no-reassign--use-spread-or-iife.ts";
-import { noReceiverMutation } from "./lint/oxlint/rules/state/no-receiver-mutation--derive-new-value.ts";
-import { noSilentCatch } from "./lint/oxlint/rules/state/no-silent-catch--rethrow-or-handle.ts";
 import { forbidExpectlessIt } from "./lint/oxlint/rules/testing/forbid-expectless-it--assert-or-delete-it.ts";
 import { forbidItExtend } from "./lint/oxlint/rules/testing/forbid-it-extend--use-test-extend.ts";
 import { forbidMultiExpectIt } from "./lint/oxlint/rules/testing/forbid-multi-expect-it--split-into-separate-it.ts";
@@ -113,12 +94,31 @@ import { requireTestAssetsConstants } from "./lint/oxlint/rules/testing/require-
 import { requireTestBlockForSpecFile } from "./lint/oxlint/rules/testing/require-test-block-for-spec-file--add-test-or-delete-file.ts";
 import { requireTestBlockSpelling } from "./lint/oxlint/rules/testing/require-test-block-spelling--use-configured-fn.ts";
 import { requireVitestExtendBuilder } from "./lint/oxlint/rules/testing/require-vitest-extend-builder--infer-fixture-type.ts";
-import { forbidTrackedPath } from "./lint/oxlint/rules/workspace/forbid-tracked-path--untrack-and-ignore.ts";
-import { noStandaloneTsconfig } from "./lint/oxlint/rules/workspace/no-standalone-tsconfig--extend-shared-preset.ts";
-import { noUncheckedAuthoredPath } from "./lint/oxlint/rules/workspace/no-unchecked-authored-path--include-it-in-every-declared-check.ts";
-import { createNoVersionRange } from "./lint/oxlint/rules/workspace/no-version-range--pin-the-exact-version.ts";
-import { createRequireCatalogEntry } from "./lint/oxlint/rules/workspace/require-catalog-entry--register-shared-dependency.ts";
-import { requireRegisteredFile } from "./lint/oxlint/rules/workspace/require-registered-file--restore-it-at-the-registered-path.ts";
+import { forbidTrackedPath } from "./lint/oxlint/rules/toolchain/forbid-tracked-path--untrack-and-ignore.ts";
+import { noStandaloneTsconfig } from "./lint/oxlint/rules/toolchain/no-standalone-tsconfig--extend-shared-preset.ts";
+import { noUncheckedAuthoredPath } from "./lint/oxlint/rules/toolchain/no-unchecked-authored-path--include-it-in-every-declared-check.ts";
+import { createNoVersionRange } from "./lint/oxlint/rules/toolchain/no-version-range--pin-the-exact-version.ts";
+import { createRequireCatalogEntry } from "./lint/oxlint/rules/toolchain/require-catalog-entry--register-shared-dependency.ts";
+import { requireRegisteredFile } from "./lint/oxlint/rules/toolchain/require-registered-file--restore-it-at-the-registered-path.ts";
+import { forbidNumberedSiblingFile } from "./lint/oxlint/rules/writing/forbid-numbered-sibling-file--name-what-each-file-owns.ts";
+import { forbidOversizedFile } from "./lint/oxlint/rules/writing/forbid-oversized-file--split-by-responsibility.ts";
+import { forbidUnresolvableModuleSpecifier } from "./lint/oxlint/rules/writing/forbid-unresolvable-module-specifier--write-a-statically-resolvable-specifier.ts";
+import { noAmbiguousVariableName } from "./lint/oxlint/rules/writing/no-ambiguous-variable-name--rename-to-concrete-noun.ts";
+import { noCittyParentRun } from "./lint/oxlint/rules/writing/no-citty-parent-run--move-run-into-a-subcommand.ts";
+import { noDefaultExport } from "./lint/oxlint/rules/writing/no-default-export--use-named-export.ts";
+import { noDetachedDeclaration } from "./lint/oxlint/rules/writing/no-detached-declaration--declare-it-next-to-its-use.ts";
+import { noDetachedRationale } from "./lint/oxlint/rules/writing/no-detached-rationale--comment-at-explained-line.ts";
+import { noDoubleTypeAssertion } from "./lint/oxlint/rules/writing/no-double-type-assertion--declare-the-real-type.ts";
+import { noExplanatoryComment } from "./lint/oxlint/rules/writing/no-explanatory-comment--delete-or-move-to-commit-message.ts";
+import { noHardcodedEndpoint } from "./lint/oxlint/rules/writing/no-hardcoded-endpoint--read-from-configuration.ts";
+import { noHardcodedProviderId } from "./lint/oxlint/rules/writing/no-hardcoded-provider-id--read-from-configuration.ts";
+import { noIdentityWrapper } from "./lint/oxlint/rules/writing/no-identity-wrapper--call-the-target-directly.ts";
+import { noMultiBindingDeclaration } from "./lint/oxlint/rules/writing/no-multi-binding-declaration--declare-one-binding-per-statement.ts";
+import { noSingleUseLocalType } from "./lint/oxlint/rules/writing/no-single-use-local-type--inline-at-the-use-site.ts";
+import { noUncheckedCast } from "./lint/oxlint/rules/writing/no-unchecked-cast--parse-at-boundary.ts";
+import { noUnorderedImport } from "./lint/oxlint/rules/writing/no-unordered-import--group-by-origin-then-sort-by-specifier.ts";
+import { createNoUnusedStyleClass } from "./lint/oxlint/rules/writing/no-unused-style-class--delete-or-reference-it.ts";
+import { requireReExportOnlyFiles } from "./lint/oxlint/rules/writing/require-re-export-only-files--move-declaration-to-owning-module.ts";
 
 import type { Plugin } from "@oxlint/plugins";
 
@@ -157,7 +157,7 @@ export const requireCatalogEntry = createRequireCatalogEntry({
   loadWorkspaces: loadWorkspaceDependencies,
 });
 
-const noVersionRange = createNoVersionRange({
+export const noVersionRange = createNoVersionRange({
   loadWorkspaces: loadWorkspaceDependencies,
   loadCatalog: loadCatalogEntries,
 });

@@ -12,8 +12,8 @@ Require the files the deployment lists as re-export only to carry re-exports and
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Bundle: `core`
-- Source: [`require-re-export-only-files--move-declaration-to-owning-module.ts`](../../src/lint/oxlint/rules/core/require-re-export-only-files--move-declaration-to-owning-module.ts)
+- Bundle: `writing`
+- Source: [`require-re-export-only-files--move-declaration-to-owning-module.ts`](../../src/lint/oxlint/rules/writing/require-re-export-only-files--move-declaration-to-owning-module.ts)
 
 <!-- END GENERATED rule-header -->
 

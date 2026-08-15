@@ -3,7 +3,7 @@ import { nodesOfType } from "../../lib/nodes-of-type.ts";
 import { propertyKeyOf } from "../../lib/object-literal.ts";
 import { standardIoFixtureLocalNameOf } from "../../lib/standard-io-fixture.ts";
 import { staticMemberOf } from "../../lib/static-member.ts";
-import { PROCESS_IO_MEMBER } from "../state/no-logged-and-continued-failure--stop-or-recover.ts";
+import { PROCESS_IO_MEMBER } from "../mutation-and-failure/no-logged-and-continued-failure--stop-or-recover.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 import type { NamedReport } from "../../lib/named-report.ts";

@@ -12,8 +12,8 @@ Disallow a declaration that stands apart from the statement that uses it, so a r
 - Fixable: yes
 - Suggestions: no
 - Options: no
-- Bundle: `core`
-- Source: [`no-detached-declaration--declare-it-next-to-its-use.ts`](../../src/lint/oxlint/rules/core/no-detached-declaration--declare-it-next-to-its-use.ts)
+- Bundle: `writing`
+- Source: [`no-detached-declaration--declare-it-next-to-its-use.ts`](../../src/lint/oxlint/rules/writing/no-detached-declaration--declare-it-next-to-its-use.ts)
 
 <!-- END GENERATED rule-header -->
 
