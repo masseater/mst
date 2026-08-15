@@ -40,26 +40,11 @@ const holdsEnabledRule = (held: ESTree.Expression): boolean => {
 const RESTRICTION_RULES_OPTION = "restrictionRules";
 
 const RESTRICTION_RULES: readonly { readonly rule: string; readonly substitute: string }[] = [
-  {
-    rule: "no-restricted-imports",
-    substitute: "forbid-declared-module-import--use-declared-replacement",
-  },
-  {
-    rule: "no-restricted-modules",
-    substitute: "forbid-declared-module-import--use-declared-replacement",
-  },
-  {
-    rule: "no-restricted-paths",
-    substitute: "forbid-module-import-outside-owner--import-through-owner",
-  },
-  {
-    rule: "no-restricted-globals",
-    substitute: "forbid-declared-export-reference--use-declared-replacement",
-  },
-  {
-    rule: "no-restricted-properties",
-    substitute: "forbid-declared-export-reference--use-declared-replacement",
-  },
+  { rule: "no-restricted-imports", substitute: "" },
+  { rule: "no-restricted-modules", substitute: "" },
+  { rule: "no-restricted-paths", substitute: "" },
+  { rule: "no-restricted-globals", substitute: "" },
+  { rule: "no-restricted-properties", substitute: "" },
   { rule: "no-restricted-exports", substitute: "" },
   { rule: "no-restricted-syntax", substitute: "" },
   { rule: "no-restricted-types", substitute: "" },

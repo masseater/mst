@@ -3,11 +3,9 @@ import { describe } from "vite-plus/test";
 
 import { forbidGenericRestrictionRule } from "./forbid-generic-restriction-rule--use-the-declared-rule.ts";
 
-const MODULE_IMPORT_RULE = "forbid-declared-module-import--use-declared-replacement";
+const OWN_RULE = "forbid-declared-command-invocation--use-designated-replacement";
 
-const EXPORT_REFERENCE_RULE = "forbid-declared-export-reference--use-declared-replacement";
-
-const OWNER_IMPORT_RULE = "forbid-module-import-outside-owner--import-through-owner";
+const ADDED_RULE = "forbid-declared-element--use-the-owned-component";
 
 const CONFIG_FILE = "vite.config.ts";
 
@@ -24,7 +22,7 @@ describe("dont-review-it/forbid-generic-restriction-rule--use-the-declared-rule"
       {
         name: "this package's own rules carry their bans in their own options",
         documented: true,
-        code: `export default { lint: { rules: { "dont-review-it/${MODULE_IMPORT_RULE}": ["error", { restricted: [{ module: "lodash" }] }] } } };`,
+        code: `export default { lint: { rules: { "dont-review-it/${OWN_RULE}": ["error", { declared: [{ name: "npx" }] }] } } };`,
         filename: CONFIG_FILE,
       },
       {
@@ -64,7 +62,7 @@ describe("dont-review-it/forbid-generic-restriction-rule--use-the-declared-rule"
         name: "an added entry naming no rule adds no ban",
         code: `export default { lint: { rules: { "no-restricted-html-elements": "error" } } };`,
         filename: CONFIG_FILE,
-        options: [{ restrictionRules: [{ rule: "", substitute: MODULE_IMPORT_RULE }] }],
+        options: [{ restrictionRules: [{ rule: "", substitute: ADDED_RULE }] }],
       },
       {
         name: "a registered exception carrying grounds is the path this rule leaves open",
@@ -85,14 +83,14 @@ describe("dont-review-it/forbid-generic-restriction-rule--use-the-declared-rule"
     ],
     invalid: [
       {
-        name: "a listed rule enabled in the lint configuration names where its bans belong",
+        name: "a listed rule enabled in the lint configuration asks for a rule of its own",
         documented: true,
         code: `export default { lint: { rules: { "no-restricted-imports": ["error", { paths: ["lodash"] }] } } };`,
         filename: CONFIG_FILE,
         errors: [
           {
-            messageId: "redirectedRestrictionRule",
-            data: { ruleName: "no-restricted-imports", substitute: MODULE_IMPORT_RULE },
+            messageId: "undelegatedRestrictionRule",
+            data: { ruleName: "no-restricted-imports", substitute: "" },
           },
         ],
       },
@@ -102,8 +100,8 @@ describe("dont-review-it/forbid-generic-restriction-rule--use-the-declared-rule"
         filename: CONFIG_FILE,
         errors: [
           {
-            messageId: "redirectedRestrictionRule",
-            data: { ruleName: "typescript/no-restricted-imports", substitute: MODULE_IMPORT_RULE },
+            messageId: "undelegatedRestrictionRule",
+            data: { ruleName: "typescript/no-restricted-imports", substitute: "" },
           },
         ],
       },
@@ -114,8 +112,8 @@ describe("dont-review-it/forbid-generic-restriction-rule--use-the-declared-rule"
         filename: CONFIG_FILE,
         errors: [
           {
-            messageId: "redirectedRestrictionRule",
-            data: { ruleName: "no-restricted-globals", substitute: EXPORT_REFERENCE_RULE },
+            messageId: "undelegatedRestrictionRule",
+            data: { ruleName: "no-restricted-globals", substitute: "" },
           },
         ],
       },
@@ -125,8 +123,8 @@ describe("dont-review-it/forbid-generic-restriction-rule--use-the-declared-rule"
         filename: CONFIG_FILE,
         errors: [
           {
-            messageId: "redirectedRestrictionRule",
-            data: { ruleName: "no-restricted-properties", substitute: EXPORT_REFERENCE_RULE },
+            messageId: "undelegatedRestrictionRule",
+            data: { ruleName: "no-restricted-properties", substitute: "" },
           },
         ],
       },
@@ -136,8 +134,8 @@ describe("dont-review-it/forbid-generic-restriction-rule--use-the-declared-rule"
         filename: CONFIG_FILE,
         errors: [
           {
-            messageId: "redirectedRestrictionRule",
-            data: { ruleName: "no-restricted-paths", substitute: OWNER_IMPORT_RULE },
+            messageId: "undelegatedRestrictionRule",
+            data: { ruleName: "no-restricted-paths", substitute: "" },
           },
         ],
       },
@@ -166,7 +164,7 @@ describe("dont-review-it/forbid-generic-restriction-rule--use-the-declared-rule"
         name: "a rule table split out of the lint configuration is read the same way",
         code: `export const UPSTREAM_RULES = { "no-restricted-imports": LINT_SEVERITY.ERROR };`,
         filename: PRESET_FILE,
-        errors: [{ messageId: "redirectedRestrictionRule" }],
+        errors: [{ messageId: "undelegatedRestrictionRule" }],
       },
       {
         name: "an exception without grounds leaves the entry standing",
@@ -193,25 +191,17 @@ describe("dont-review-it/forbid-generic-restriction-rule--use-the-declared-rule"
         filename: CONFIG_FILE,
         options: [
           {
-            restrictionRules: [
-              {
-                rule: "no-restricted-html-elements",
-                substitute: "forbid-declared-element--use-the-owned-component",
-              },
-            ],
+            restrictionRules: [{ rule: "no-restricted-html-elements", substitute: ADDED_RULE }],
           },
         ],
         errors: [
           {
             messageId: "redirectedRestrictionRule",
-            data: {
-              ruleName: "no-restricted-html-elements",
-              substitute: "forbid-declared-element--use-the-owned-component",
-            },
+            data: { ruleName: "no-restricted-html-elements", substitute: ADDED_RULE },
           },
           {
-            messageId: "redirectedRestrictionRule",
-            data: { ruleName: "no-restricted-imports", substitute: MODULE_IMPORT_RULE },
+            messageId: "undelegatedRestrictionRule",
+            data: { ruleName: "no-restricted-imports", substitute: "" },
           },
         ],
       },
