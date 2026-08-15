@@ -25,7 +25,9 @@ lint による強制が、書かれた時点でも、時間が経った後でも
 
 - `@mst/lint-rule-authoring` — factory・severity 語彙・テスト基盤・ルール索引の照合関数・このパッケージの oxlint config
 - `@mst/lint-rule-authoring/plugin` — oxlint が `jsPlugins` の指定子で読むエントリ
-- `lint-rule-authoring check [--write]` — マニフェストの `lintRules` が宣言する置き場からルールを発見し、各ワークスペースの `packages/<workspace>/docs/lint/index.md` の生成領域を照合・再生成する CLI
+- `lint-rule-authoring check [--write]` — マニフェストの `lintRules` が宣言する置き場からルールを発見し、各ワークスペースの `packages/<workspace>/docs/lint/index.md` と、skill を持つワークスペースの `skills/core/references/lint-rules.md` の生成領域を照合・再生成する CLI
+
+出荷側の一覧を別に生成するのは、`docs/` が tarball に入らないためである。install した側が読めるのは skill だけで、`vp lint --print-config` は js plugin のルールを 1 本も出さない。出荷側の表は各ルールの文書へリポジトリの URL で繋ぐ。
 
 ## 規約
 

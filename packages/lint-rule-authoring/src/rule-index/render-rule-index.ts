@@ -1,16 +1,10 @@
 import { lintToolOf } from "../lint-tool.ts";
+import { escapePipes, noticesOf } from "./rule-table.ts";
 
 import type { LintRuleFacts } from "./rule-facts.ts";
 
 const NOTICE_LEGEND =
   "補足の記号 — 🔧: 自動修正あり / 💡: エディタの修正候補あり / ⚙️: オプションあり";
-
-const noticesOf = (rule: LintRuleFacts): string =>
-  [rule.fixable ? "🔧" : "", rule.hasSuggestions ? "💡" : "", rule.configurable ? "⚙️" : ""]
-    .filter((symbol) => symbol !== "")
-    .join(" ");
-
-const escapePipes = (writtenText: string): string => writtenText.replaceAll("|", "\\|");
 
 const rowOf = (rule: LintRuleFacts): string =>
   `| [${rule.name}](./${rule.name}.md) | ${escapePipes(rule.description)} | ${lintToolOf(rule.sourcePath)} | ${noticesOf(rule)} |`;
