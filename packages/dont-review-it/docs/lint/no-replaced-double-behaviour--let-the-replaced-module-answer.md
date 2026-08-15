@@ -19,79 +19,13 @@ Disallow settling what a double taken from a replaced module hands back, so a re
 
 ## Violation
 
-A call inside a spec file settling the value or the implementation a double from a replaced module returns. The members counted as settings are the `mockReturnValue` family, the `mockResolvedValue` family, the `mockRejectedValue` family, the `mockImplementation` family, `mockReturnThis` and `withImplementation`.
+A behaviour setter called on a double that reaches a replaced module. The receiver is followed through member paths, through `const` bindings, and through `vi.mocked(...)`, so a view of the module and a name bound to one reach the same judgment.
 
-"From a replaced module" is identified by where the binding came from. The setting's receiver is followed, and landing on a name that arrived through an import makes it one of the replaced module's. Three routes are followed.
-
-- The imported name itself (`send.mockReturnValue(1)`)
-- A member of the imported name (`mailer.send.mockReturnValue(1)`)
-- One going through the call that retypes it at run time (`vi.mocked(send).mockReturnValue(1)`)
-
-Bindings placed in between are followed too. Going through `const double = vi.mocked(send);` reads as the same setting.
-
-A double made on the spot with `vi.fn()` is out of scope. A double the test hands over as an argument is the test's input rather than a replacement, and no real thing has stopped running.
-
-A member settled only at run time (`double[member](1)`) is not read. What was settled cannot be established from the call position, so it is not reported.
-
-### The invariant
-
-A replaced module records how it was called and does not answer.
-
-A module may be replaced because that is an external I/O boundary ([no-non-boundary-double--replace-at-the-external-boundary](./no-non-boundary-double--replace-at-the-external-boundary.md)). Replacing a boundary is for keeping the test from leaving the process, not for letting the test settle what comes back from beyond the boundary.
-
-The moment a return value is settled, what that test reads back is a value it wrote itself. The replaced side never runs, and all that is confirmed is that the settled value equals the expected value. That says nothing about the subject's behaviour. The test goes green, and the verification that vanished meets nobody's eye.
-
-The call record remains. How it was called can be claimed with the `toHaveBeenCalledWith` family, so the route of confirming "what was handed to the boundary" stays open. What closes is only the route where the spec settles "what shall be treated as having come back".
-
-### The boundary with the other rules
-
-| Shape | What reads it |
-| --- | --- |
-| Whether the target may be replaced | `no-non-boundary-double--replace-at-the-external-boundary` |
-| Whether the replacement declaration hands over a factory | [no-vi-mock-factory-behavior--use-spy-true-and-fixture](./no-vi-mock-factory-behavior--use-spy-true-and-fixture.md) |
-| Where a double is stood up and where it is settled | [no-module-scope-mock-config--lift-into-fixture](./no-module-scope-mock-config--lift-into-fixture.md) |
-| Whether a replaced double answers | This rule |
-
-`no-module-scope-mock-config` reads the **position** of a setting and asks for it to move into a fixture. For a double from a replaced module, this rule reports it where it moved to as well. When both fire, deleting the setting itself clears both.
-
-### Configuration
-
-- `specFileSuffixes` — the suffixes read as spec files
-
-### Not violations
-
-- A double made on the spot with `vi.fn()` and handed to the subject as an argument
-- Claims about the call record (the `toHaveBeenCalledWith` family)
-- Clearing the call record (`mockClear`). It settles nothing about what is returned
-- A file that is not a spec
-- A setting with a line-local directive carrying grounds written above it
+An exemption comment naming this rule, written directly above the call and carrying grounds after `--`, takes the call out of the report. One written without grounds is itself reported.
 
 ## Fix
 
-Delete the setting. The replaced module stays a pass-through, and the test claims how it was called and nothing else.
-
-```ts
-vi.mock(import("./transport.ts"), { spy: true });
-
-const it = test.extend("theDeliveryOfOneMessage", () => deliver(MESSAGE));
-
-it("hands the message to the transport", ({ theDeliveryOfOneMessage }) => {
-  expect(vi.mocked(send)).toHaveBeenCalledWith(MESSAGE);
-});
-```
-
-Where the test needs a particular value, hand that value in through the subject's arguments rather than from the replaced module. Where it is not in a shape that accepts one, building an injection boundary is a design change on the implementation side, and [how tests are written](../../../../docs/guidelines/tests.md) holds the conditions.
-
-### Where it cannot be written without settling
-
-Sometimes the answer exists only beyond the boundary and cannot be settled from outside. There, leave a directive with grounds on the line above.
-
-```ts
-// mock-factory-exemption no-replaced-double-behaviour--let-the-replaced-module-answer -- whether the pipeline started is settled inside the boundary this spec replaces
-vi.mocked(startLintTelemetry).mockReturnValue(false);
-```
-
-The directive is line-local, and with an empty reason it does not hold as an exception and the directive itself is reported. Write in the reason what cannot be settled from outside. The rule name is written so that one directive does not silence other rules as well.
+Delete the call and leave the replacement a pass-through that only records how it was called. Assert the calls with the `toHaveBeenCalled` family.
 
 <!-- BEGIN GENERATED examples -->
 
@@ -135,11 +69,8 @@ send.mockRejectedValue(1);
 
 ### Forbidden bypasses (do not do this)
 
-- Moving the setting into a fixture. Position is irrelevant; the replaced double is still answering
-- Rebinding the replaced double to another name before settling it. Bindings are followed
-- Assembling the member at run time so it cannot be read. The judgment disappears, and the replaced side still does not run
-- Placing a directive with no reason. The directive itself is reported
-- A suppression directive
+- Binding the double to a name first, or taking it through `vi.mocked(...)`. Both are followed
+- Writing the exemption comment without grounds. It is reported until they are written
 
 ## Messages
 

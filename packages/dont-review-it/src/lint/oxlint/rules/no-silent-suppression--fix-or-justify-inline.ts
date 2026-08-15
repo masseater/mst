@@ -84,7 +84,7 @@ export const noSilentSuppression = createDontReviewItRule({
       undeclaredIgnoredRegion:
         "An ignore pattern must not name `{{pattern}}`, a place outside the regions this repository excludes from the walk. Delete the pattern and rewrite the code it hides, or declare the region in the definition this configuration receives.",
       ignoredForbiddenPath:
-        "An ignore pattern must not cover `{{forbiddenPath}}`, a path registered as forbidden. Delete the pattern, and delete that file or move it to the place its owner spelledNames.",
+        "An ignore pattern must not cover `{{forbiddenPath}}`, a path registered as forbidden. Delete the pattern, and delete that file or move it to the place its owner names.",
     },
     schema: [
       {

@@ -19,69 +19,17 @@ Disallow reading a test data file from anywhere but the spec of its own stem in 
 
 ## Violation
 
-A file in the repository coupling to a test data file that is not its own.
+A file coupling to a test data file it does not own. A test data file is one named `<stem>.<marker>.<extension>`, where the marker defaults to `assets`; its owner is the spec of the same stem in the same directory, and nobody else may read it. A test data file is not itself read as a reader.
 
-Whether a file is test data is settled by its name: the shape `<stem>.<marker>.<extension>`, where the marker is `assets` by default. What the extension is makes no difference, so `order.assets.ts` and `order.assets.json` are treated alike. The stem may carry dots of its own (the stem of `vite.config.assets.ts` is `vite.config`).
+Static imports, re-exports, type-only forms and a dynamic `import` or `require` whose specifier settles before the run all count as coupling. The judgment runs on where the specifier resolves, so relative paths, workspace package specifiers and tsconfig `paths` reach the same answer, and a chain of re-exports is followed to what it forwards.
 
-There is exactly one owner: **the spec file of the same stem in the same directory**. The owner of `order.assets.ts` is the `order.test.ts` beside it. A spec of the same stem in another directory is not the owner. This definition is shared with `require-spec-file-for-assets--create-matching-spec`, which carries "there is always an owner" while this one carries "nobody but the owner reads it".
-
-Readers are not limited to specs. A production module, a script, a tool's configuration file — coupling from anywhere is reported. The invariant held is "nobody but the owner reads it", not "no other spec reads it", so the judgment does not turn on what kind of reader it is.
-
-### What counts as coupling
-
-- An `import` declaration, including a side-effect import binding nothing
-- A named re-export (`export ... from`) and a star re-export (`export * from`)
-- A type-only `import` or `export`. Carrying no value changes nothing about being tied to that file's shape
-- A dynamic `import` or `require` whose module specifier is settled before the run. Where the specifier is a literal, a string bound to a `const` in the same file, or a template literal assembled from static parts alone, it is treated like an `import` declaration
-
-The report stands on the statement or expression writing that coupling.
-
-### How specifiers are resolved
-
-The judgment is made on where a specifier resolves rather than on how it is spelled. Watching relative specifiers alone would let one layer of aliasing reach data outside the owner.
-
-- Relative specifiers. Forms with no extension, forms omitting `index`, and forms spelled with a built extension (`.js`, `.mjs`, `.cjs`) all resolve to the file that exists
-- Package specifiers. `node_modules` is walked upward from the reader's position to a package inside the workspace. Subpaths declared through `exports` and deep paths that bypass the declaration are both followed
-- tsconfig `paths`. The `tsconfig.json` nearest the reader is read, and where it declares nothing, what it `extends` through a relative specifier is followed. Where several wildcard declarations match, the one with the longest leading match is taken
-
-Where a specifier resolves to a forwarding file, what that file re-exports is followed, and reaching test data is reported. Any number of forwarding layers is followed.
-
-### The invariant
-
-With exactly one reader, that spec is free to rework its own test data. Adding a value or changing the shape reaches no further than that one file.
-
-The moment a second reader appears, that property is gone. Fixing the data for one side quietly changes the other's expected values, the change is invisible from the editing side, and the breakage is noticed when an unrelated test fails. What was the owning spec then cannot touch its own data without checking the other tests. The problems shared setup brings arrive intact, and "it is only data" exempts none of them.
-
-Test data was allowed outside the spec because large static data in the spec body makes the contract unreadable, not so it could be reused across tests. This rule separates putting it outside from sharing it.
-
-Readers being unrestricted follows for the same reason: where a production module reads test data, that data has stopped being a value tests may freely rewrite.
-
-### Where detection does not reach
-
-- Only re-exports are followed as forwarding. A file that imports test data and redeclares it under another name is itself reported as a reader that is not the owner, and it stops there. Readers are not traced further back
-- A specifier going through a subpath a package's `exports` declared with a wildcard (the `"./data/*"` shape) cannot be followed, because which file it lands on is not expanded. Subpaths carrying no wildcard, and deep paths that bypass the declaration, are followed
-- Installed packages are resolved by real path, following symbolic links. Where the repository itself sits under a symbolic link, coupling through a package specifier cannot be followed
-- Subpath imports opening with `#` are not resolved
-- A dynamic `import` whose specifier is settled only at run time, taking a variable or a string assembled while running, cannot be reported. Which file it couples to is settled only by a run-time value. Not being detected does not mean that spelling is allowed
-
-### Configuration
-
-- `assetsNameMarkers` (optional, a list of strings): the marker a test data file's name carries. Defaults to `assets`, and naming it **replaces** the default. `require-spec-file-for-assets--create-matching-spec` and `require-test-assets-constants--move-setup-to-spec` read the same vocabulary, so hand all three the same value
-- `specFileSuffixes` (optional, a list of strings): the spec file suffixes. Defaults to `.test.ts` and `.test.tsx`, and naming it replaces the default. Who the owner is, and which shape the report is phrased in, follow from this vocabulary
-
-```jsonc
-["error", { "assetsNameMarkers": ["assets"], "specFileSuffixes": [".spec.ts"] }]
-```
-
-There is no setting for permitting particular non-owner readers. Making exceptions writable as configuration would create a route where whoever received a report adds an exception instead of making their own data, and shared test data comes back through it.
+`assetsNameMarkers` and `specFileSuffixes` settle the vocabulary; hand them the same values as the other rules that read test data.
 
 ## Fix
 
-Create a test data file of your own stem and write the values you need there. Data being duplicated across tests is the correct state in this bundle, not something to reduce. Where the values are small, write them straight into the spec without a file.
+Create a test data file of your own stem and write the values this file needs into it. Data duplicated between specs is the state this bundle asks for.
 
-Where the reader is not a spec, the value is a production value. Take it out of the test data, settle an owner for it as a production module, and read it from there.
-
-Where the report came through a forwarding file, there are two places to fix. The forwarding file is itself reported as a reader that is not the owner, so delete the forwarding and let each reader hold its own data.
+Where the reader is not a spec, the value is a production value: give it an owner as a production module and read it from there.
 
 <!-- BEGIN GENERATED examples -->
 
@@ -108,13 +56,9 @@ import { rows } from "./order.assets";
 
 ### Forbidden bypasses (do not do this)
 
-- Making a shared test data file and reading it from several specs. What is watched is somebody other than the owner reading it, not how many readers there are
-- Rewriting it as a dynamic `import` or `require`. As long as the specifier is settled before the run, it is reported as the same coupling
-- Placing a forwarding file that re-exports another stem's test data. Any number of forwarding layers is followed
-- Reading it through a path alias or a package specifier. The judgment is made on where it resolves, not how it is spelled
-- Placing a test data file of the same stem in another directory and claiming it as your own. Ownership is settled by the directory and the stem together
-- Assuming it is out of reach because the reader is not a spec. What kind of reader it is does not matter
-- Silencing it with a suppression directive
+- Placing a forwarding module between the reader and the data. Any number of forwarding layers is followed
+- Reaching the file through a path alias or a package specifier. The judgment runs on where it resolves
+- Putting a file of the same stem in another directory and calling it your own. Ownership is the directory and the stem together
 
 ## Messages
 

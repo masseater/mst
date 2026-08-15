@@ -28,9 +28,9 @@ const STALE_INDEX = `\`${INDEX_PATH}\` must not fall behind the rule implementat
 
 const DUPLICATED_RULE_NAME = `Two rules in \`packages/example\` must not share the name \`no-thing--allow-it\`; they claim the same document. Rename one of them.`;
 
-const HANDWRITTEN_INDEX = "# 手書きの索引\n\n散文だけがある。\n";
+const HANDWRITTEN_INDEX = "# A hand written index\n\nProse and nothing else.\n";
 
-const STALE_REGION_INDEX = `# 索引\n\n前書き。\n\n<!-- BEGIN GENERATED lint-rules -->\n\n古い表\n\n<!-- END GENERATED lint-rules -->\n\n後書き。\n`;
+const STALE_REGION_INDEX = `# An index\n\nFront matter prose.\n\n<!-- BEGIN GENERATED lint-rules -->\n\nA stale table\n\n<!-- END GENERATED lint-rules -->\n\nTrailing prose.\n`;
 
 describe("lintRuleIndexProblems", () => {
   describe("a repository without declaring workspaces", () => {
@@ -114,13 +114,13 @@ describe("lintRuleIndexProblems", () => {
 
     it("carries the generated region and the rule", ({ indexText }) => {
       expect(indexText).toMatchInlineSnapshot(`
-        "# lint ルール索引
+        "# Lint rule index
 
-        このワークスペースの自前 lint ルールの一覧。ルール実装から生成される。手で書き換えない。更新は \`vp run guard:fix\` で行う。
+        Every lint rule this workspace implements. Generated from the rule sources; refresh it with \`vp run guard:fix\` rather than editing it.
 
         <!-- BEGIN GENERATED lint-rules -->
 
-        | ルール | 説明 | ツール | 補足 |
+        | Rule | Description | Tool | Notices |
         | --- | --- | --- | --- |
         | [no-thing--allow-it](./no-thing--allow-it.md) | Disallow the thing | - |  |
 
@@ -204,15 +204,15 @@ describe("lintRuleIndexProblems", () => {
       expect(indexText).toMatchInlineSnapshot(`
         "<!-- BEGIN GENERATED lint-rules -->
 
-        | ルール | 説明 | ツール | 補足 |
+        | Rule | Description | Tool | Notices |
         | --- | --- | --- | --- |
         | [no-thing--allow-it](./no-thing--allow-it.md) | Disallow the thing | - |  |
 
         <!-- END GENERATED lint-rules -->
 
-        # 手書きの索引
+        # A hand written index
 
-        散文だけがある。
+        Prose and nothing else.
         "
       `);
     });
@@ -235,7 +235,7 @@ describe("lintRuleIndexProblems", () => {
       mkdirSync(dirname(join(root, INDEX_PATH)), { recursive: true });
       writeFileSync(
         join(root, INDEX_PATH),
-        "---\ndescription: 索引\n---\n\n# 手書きの索引\n",
+        "---\ndescription: an index\n---\n\n# A hand written index\n",
         "utf8",
       );
       lintRuleIndexProblems({ repositoryRoot: root, write: true });
@@ -245,19 +245,19 @@ describe("lintRuleIndexProblems", () => {
     it("takes the inserted region after the frontmatter", ({ indexText }) => {
       expect(indexText).toMatchInlineSnapshot(`
         "---
-        description: 索引
+        description: an index
         ---
 
         <!-- BEGIN GENERATED lint-rules -->
 
-        | ルール | 説明 | ツール | 補足 |
+        | Rule | Description | Tool | Notices |
         | --- | --- | --- | --- |
         | [no-thing--allow-it](./no-thing--allow-it.md) | Disallow the thing | - |  |
 
         <!-- END GENERATED lint-rules -->
 
 
-        # 手書きの索引
+        # A hand written index
         "
       `);
     });
@@ -278,7 +278,7 @@ describe("lintRuleIndexProblems", () => {
         "utf8",
       );
       mkdirSync(dirname(join(root, INDEX_PATH)), { recursive: true });
-      writeFileSync(join(root, INDEX_PATH), "---\nこの行は仕切りではない。\n", "utf8");
+      writeFileSync(join(root, INDEX_PATH), "---\nThis line is not a fence.\n", "utf8");
       lintRuleIndexProblems({ repositoryRoot: root, write: true });
       return readFileSync(join(root, INDEX_PATH), "utf8");
     });
@@ -287,14 +287,14 @@ describe("lintRuleIndexProblems", () => {
       expect(indexText).toMatchInlineSnapshot(`
         "<!-- BEGIN GENERATED lint-rules -->
 
-        | ルール | 説明 | ツール | 補足 |
+        | Rule | Description | Tool | Notices |
         | --- | --- | --- | --- |
         | [no-thing--allow-it](./no-thing--allow-it.md) | Disallow the thing | - |  |
 
         <!-- END GENERATED lint-rules -->
 
         ---
-        この行は仕切りではない。
+        This line is not a fence.
         "
       `);
     });
@@ -349,19 +349,19 @@ describe("lintRuleIndexProblems", () => {
 
     it("is refreshed while the prose around it stays", ({ indexText }) => {
       expect(indexText).toMatchInlineSnapshot(`
-        "# 索引
+        "# An index
 
-        前書き。
+        Front matter prose.
 
         <!-- BEGIN GENERATED lint-rules -->
 
-        | ルール | 説明 | ツール | 補足 |
+        | Rule | Description | Tool | Notices |
         | --- | --- | --- | --- |
         | [no-thing--allow-it](./no-thing--allow-it.md) | Disallow the thing | - |  |
 
         <!-- END GENERATED lint-rules -->
 
-        後書き。
+        Trailing prose.
         "
       `);
     });
@@ -384,7 +384,7 @@ describe("lintRuleIndexProblems", () => {
       mkdirSync(dirname(join(root, INDEX_PATH)), { recursive: true });
       writeFileSync(
         join(root, INDEX_PATH),
-        `# 索引\n\n<!-- BEGIN GENERATED lint-rules -->\n\n| ルール                                      | 説明               | ツール | 補足 |\n| ------------------------------------------- | ------------------ | ------ | ---- |\n| [no-thing--allow-it](./no-thing--allow-it.md) | Disallow the thing | -      |      |\n\n<!-- END GENERATED lint-rules -->\n`,
+        `# An index\n\n<!-- BEGIN GENERATED lint-rules -->\n\n| Rule                                        | Description        | Tool   | Notices |\n| ------------------------------------------- | ------------------ | ------ | ---- |\n| [no-thing--allow-it](./no-thing--allow-it.md) | Disallow the thing | -      |      |\n\n<!-- END GENERATED lint-rules -->\n`,
         "utf8",
       );
       return lintRuleIndexProblems({ repositoryRoot: root, write: false });
@@ -482,13 +482,13 @@ describe("lintRuleIndexProblems", () => {
 
     it("carries an empty table", ({ indexText }) => {
       expect(indexText).toMatchInlineSnapshot(`
-        "# lint ルール索引
+        "# Lint rule index
 
-        このワークスペースの自前 lint ルールの一覧。ルール実装から生成される。手で書き換えない。更新は \`vp run guard:fix\` で行う。
+        Every lint rule this workspace implements. Generated from the rule sources; refresh it with \`vp run guard:fix\` rather than editing it.
 
         <!-- BEGIN GENERATED lint-rules -->
 
-        | ルール | 説明 | ツール | 補足 |
+        | Rule | Description | Tool | Notices |
         | --- | --- | --- | --- |
 
         <!-- END GENERATED lint-rules -->

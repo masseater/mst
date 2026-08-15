@@ -19,44 +19,27 @@ Disallow a spec that assembles its own stdout or stderr test double, so stream c
 
 ## Violation
 
-A test file (`*.test.ts`, `*.test.tsx`, `*.spec.ts`, `*.spec.tsx`) assembling a test double for stdout or stderr of its own. Three families are reported.
+A test file assembling its own stdout or stderr double, in three shapes.
 
-1. A fixture definition `*.extend({ ... })` declaring a name of `stdout` or `stderr`. The builder form handing the name over as a string in the first argument (`*.extend("stdout", ...)`) counts as the same redeclaration. A file importing the shared fixture is reported all the same once it declares one again
-2. A direct reach for `process.stdout` or `process.stderr`, whether to spy on it or to write to it. A file that has imported `standardIoTest` is exempt: with the capture settled in one shared fixture, letting the code under test write to the stream is exactly what should happen
-3. A property named `stdout` or `stderr` handed an object literal carrying a `write` method, or a stream instance such as `new PassThrough()`. That is the shape of injecting a hand-built fake stream into the code under test
+- An `extend` call declaring a fixture named `stdout` or `stderr`, whether the name comes as a string argument or as a property key. A file that imports the shared fixture is reported all the same once it declares one again
+- A direct reach for `process.stdout` or `process.stderr`. A file that imports `standardIoTest` is exempt: letting the code under test write to the stream is the point
+- A property named `stdout` or `stderr` holding an object with a `write` method, or a stream instance such as `new PassThrough()`
 
-Nothing is reported outside test files. The implementation of the shared fixture is where capturing a stream is assembled, and it is out of this rule's reach.
-
-### The invariant
-
-A test double for a standard stream always drags along the same incidental work: swapping the capture in, decoding the chunks, restoring the stream afterwards. Assembled per spec, that incidental work becomes as many implementations as there are specs, each with quirks of its own — a missed restore, a different encoding, interference under parallel runs. A fix found in one spec does not reach the others.
-
-That work is the kind of problem to be solved once, and the solution is the `standardIoTest` fixture in `@mst/dont-review-it/vitest`. What is left to the spec is running the test and checking the captured text.
-
-### What is not a violation
-
-- A spec that imported `standardIoTest` writing to `process.stdout` or `process.stderr` through the code under test
-- An `extend` fixture under a name unrelated to streams, such as `repository`
-- A property named `stdout` holding something that is not a write target, such as a string. Handing the captured result around is not the same shape
-- `process` members other than the two captured streams, such as `process.exitCode` and `process.env`
-
-Where the machine reaches and where the discipline reaches are not the same. Detection is the floor under the invariant, not the ceiling.
+Only `*.test.ts`, `*.test.tsx`, `*.spec.ts` and `*.spec.tsx` are read.
 
 ## Fix
 
-Import `standardIoTest` and derive the test from it. The captured text is read from the fixture's `text`.
+Import `standardIoTest` from `@mst/dont-review-it/vitest`, derive the test from it, and read the captured text off the fixture.
 
 ```ts
-import { standardIoTest } from "@mst/dont-review-it/vitest";
+standardIoTest("hands back what was written", ({ stdout }) => {
+  process.stdout.write("progress\n");
 
-standardIoTest("hands the subject everything written to stdout", ({ stdout }) => {
-  process.stdout.write("progress line\n");
-
-  expect(stdout.text).toBe("progress line\n");
+  expect(stdout.text).toBe("progress\n");
 });
 ```
 
-Where a stream was being injected into the code under test, stop injecting it: let the code write to `process.stdout` or `process.stderr` and let the fixture capture it.
+Where a stream was being injected into the code under test, stop injecting it.
 
 <!-- BEGIN GENERATED examples -->
 
@@ -96,9 +79,9 @@ const result = { stdout: "captured text", stderr: "" };
 
 ### Forbidden bypasses (do not do this)
 
-- Binding the fake stream to a variable first and handing that to the property, to escape the judgment made on the shape of the value. What is being assembled has not changed
-- Writing a module of your own named `standardIoTest` and importing it to satisfy the exemption alone. The exemption rests on trusting the shared fixture's implementation, not on the name
-- Assembling a test double for stdin. The fixture provides stdout and stderr today, so the machine does not detect it, and it is a violation of the same kind. When capturing stdin is needed, add it to the shared fixture rather than assembling it in a spec
+- Binding the fake stream to a variable and handing that to the property. What is assembled has not changed
+- Writing a module of your own named `standardIoTest` to satisfy the exemption. The exemption rests on the shared fixture, not on the name
+- Assembling a double for stdin. The machine does not reach it, and it is the same violation
 
 ## Messages
 

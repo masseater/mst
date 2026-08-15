@@ -19,87 +19,17 @@ Disallow creating a mock or settling what it does anywhere but a module replacem
 
 ## Violation
 
-A call that stands a mock up, or a call that settles what a mock does, written outside the two permitted areas inside a test declaration file.
+Standing up a mock, or settling what it does, anywhere but two places: the factory of a module replacement declaration, and the body of a fixture function.
 
-There are only two permitted areas.
+Three reports. Creating a mock through a creation member on the runner namespace, settling behaviour through a behaviour member on a value that reaches a mock, and calling a member reached through a subscript that only settles at run time. Where several such calls are chained, only the outermost is reported.
 
-1. Inside a factory handed to a module replacement declaration (by default `vi.mock` / `vi.doMock`)
-2. Inside the body of a fixture function
-
-The judgment runs on AST containment rather than on how scope looks. So the module's top level, a `describe` body, the inside of a hoisted container (`vi.hoisted`) and an `it` body are none of them permitted areas.
-
-### The three families in scope
-
-| Family | What is read |
-| --- | --- |
-| Calls that stand a mock up | `fn` / `mocked` / `spyOn` on the mock namespace. The namespace is identified by following bindings |
-| Calls that settle behaviour | Calls to behaviour-setting method names. The receiver is not read; the method name settles it |
-| Calls through a subscript | A call through a subscript whose name cannot be read statically, where the receiver reaches a mock or the namespace |
-
-The method names treated as behaviour-setting are taken from the public API of vitest 4's `MockInstance`: `mockImplementation`, `mockImplementationOnce`, `withImplementation`, `mockReturnThis`, `mockReturnValue`, `mockReturnValueOnce`, `mockResolvedValue`, `mockResolvedValueOnce`, `mockRejectedValue`, `mockRejectedValueOnce`, `mockThrow`, `mockThrowOnce` — twelve in all.
-
-### How the namespace and the receiver are read
-
-- **The namespace.** Beyond a plain identifier spelling match, bindings are followed to their declaration inside the same file, and a declaration landing on the namespace counts as a match. An import taken under another name (`import { vi as runner }`), a re-binding into a variable (`const runner = vi`), and access through a whole-module import (`runner.vi` from `import * as runner`) all give the same judgment. A globally injected setup and an explicit-import setup read the same
-- **Method names.** Besides property names, a string-literal subscript and a template-literal subscript with no substitution are read as names. `vi['fn']()` is treated as `vi.fn()`, and a template-literal subscript the same
-- **The receiver.** Wrapping in a type assertion, `satisfies`, a non-null assertion, an optional chain or `await` is peeled before the judgment
-- **Chains.** Settling right after standing up (`vi.fn().mockReturnValue(1)`) is reported once, at the outer call. The inner creation call is not reported twice. A form with a property in between (`vi.mocked(mailer).send.mockResolvedValue(1)`) is likewise one report
-
-### Identifying the fixture area
-
-The method name `extend` alone does not make a permitted area. The receiver's chain is followed to its root, and only where that root is a test block binding (`test` / `it`, their aliased imports, or bindings derived from them through `extend`) does it count as a fixture call. The inside of an argument to an unrelated API carrying a method of the same name is not a permitted area.
-
-What is permitted is only the body of the fixture function itself. The inside of an options object handed to `extend` does not land in the permitted area.
-
-The range is limited to test declaration files: by default, files ending in `.test.ts` or `.test.tsx`.
-
-### Deliberately not widened
-
-| Shape | Why it is left out |
-| --- | --- |
-| Teardown such as `sendMail.mockClear()` or `vi.clearAllMocks()` | [no-redundant-mock-reset--lift-mocks-into-fixture](./no-redundant-mock-reset--lift-mocks-into-fixture.md) takes it. That one enforces not writing it at all rather than where it is written |
-| A computed subscript whose receiver reaches neither a mock nor the namespace | Neither the name nor the target can be identified. This keeps subscript access on unrelated objects from being swept in |
-| A method call on a private identifier | The same name is a different thing |
-| The inside of a module replacement declaration's factory | Always permitted by this rule. Whether behaviour may be written in that factory is judged by [no-vi-mock-factory-behavior--use-spy-true-and-fixture](./no-vi-mock-factory-behavior--use-spy-true-and-fixture.md) |
-| Taking a reference without calling it (`const build = vi.fn;`) | Calls are what is read. Where the extracted reference is called is judged at that call |
-
-One consequence of settling behaviour-setting by name alone is that a non-mock object carrying a method of the same name is reported. That over-detection is intended: what matters more is that the judgment holds without type information as long as the name is readable. Something standing in for type information is used only in the subscript family, and there the opposite applies — only what reaches a mock or the namespace is reported, avoiding false positives.
-
-### The invariant
-
-The mock a test reads was stood up for that test and configured for that test.
-
-The first layer is sharing. A mock stood up at module scope is one instance every test in the file touches. A return value one test settled stays for the next, and the call record accumulates. Tests are written assuming they run in parallel both per file and per `it` inside one file, so what "the next test" is changes from run to run. The failure appears in a form that does not reproduce, and reading the failing test's own text does not give the cause.
-
-The second layer is how reproducibility is built. Placed inside a fixture, the test receives the mock with the configuration it asked for already applied. A fixture is re-evaluated for each test, so the configuration is re-applied per test. Together with the shared configuration clearing call records before each test, the state stops depending on execution order.
-
-The third layer is that a spec reads on its own. Where learning what a mock returns means going back to the head of the file, a spec cannot be read as a specification. Forbidding configuration in an `it` body is the same reason inverted: let preparation into an `it` and what that test verifies is buried among lines that are not assertions.
-
-### Configuration
-
-| Name | Default | Meaning |
-| --- | --- | --- |
-| `mockNamespaceSpellings` | `["vi"]` | The spellings identified as the mock namespace |
-| `mockCreationMembers` | `["fn", "mocked", "spyOn"]` | The namespace members that stand a mock up |
-| `mockBehaviorMembers` | The twelve taken from vitest 4's `MockInstance` (above) | The method names that settle behaviour |
-| `moduleReplacementMembers` | `["mock", "doMock"]` | The namespace members whose factory interior becomes a permitted area |
-| `specFileSuffixes` | `[".test.ts", ".test.tsx"]` | The suffixes taken as test declaration files |
-
-Each replaces its default wholesale. Handing over an empty array leaves the default in place. Teardown method names are not in the default of `mockBehaviorMembers`; including them would change what this rule is responsible for and produce duplicate reports with `no-redundant-mock-reset--lift-mocks-into-fixture`.
+The namespace is followed through imports, aliases and `const` bindings, and a string-literal subscript is read as the member it names. `mockNamespaceSpellings`, `mockCreationMembers`, `mockBehaviorMembers`, `moduleReplacementMembers` and `specFileSuffixes` settle the vocabulary.
 
 ## Fix
 
-Move the calls that stand a mock up and settle its behaviour into a fixture body, and have that fixture return the mock's binding. The test receives it as a parameter and writes assertions alone.
+Move the call into the body of the fixture the test takes its subject from, return the mock binding from there, and let the test block receive it as a parameter.
 
-```ts
-const test = baseTest.extend("report", () => {
-  const summarise = vi.fn();
-  summarise.mockReturnValue({ id: "a", total: 2 });
-  return summarise;
-});
-```
-
-Keep a module replacement declaration to declaring structure, and settle per-test results inside the fixture. What may be written in a replacement declaration's factory is judged separately by `no-vi-mock-factory-behavior--use-spy-true-and-fixture`.
+Do not clear or restore the mock afterwards; the shared runner configuration owns that.
 
 <!-- BEGIN GENERATED examples -->
 
@@ -142,14 +72,9 @@ const it = test.extend('sendMail', () => {
 
 ### Forbidden bypasses (do not do this)
 
-- **Putting the instance in a hoisted container and only touching it from the fixture.** That the instance is shared does not change. A hoisted container is not a permitted area, so a creation call written there is reported. Putting a non-mock instance at module scope and rewriting it from tests is reported by [no-module-scope-mutable-state--lift-into-fixture](./no-module-scope-mutable-state--lift-into-fixture.md)
-- **Avoiding detection with subscript access.** String-literal and substitution-free template-literal subscripts are read as names. A subscript whose name cannot be read is reported too where the receiver reaches a mock or the namespace
-- **Importing the namespace under another name, or re-binding it into a variable.** Bindings are followed to their declaration, so it falls
-- **Loosening the type before placing it as the receiver.** Type assertions, `satisfies` and non-null assertions are peeled before the judgment
-- **Moving the configuration down into an `it` body.** That only moves the placement problem into another forbidden area, and it is reported as the same violation
-- **Writing it in the argument of another API carrying a method named `extend`.** The receiver's chain is followed to its root, so what does not reach a test block binding is not a permitted area
-- **Writing it in the options object handed to `extend`.** What is permitted is the fixture function's body alone
-- **A suppression directive.** [no-rule-suppression--fix-the-violation](./no-rule-suppression--fix-the-violation.md) reports it
+- Parking the instance in a hoisted container, or importing the namespace under another name. Both are followed
+- Reaching the member through a subscript. A spelled-out subscript is read as the member, and one that settles at run time is reported on its own
+- Dropping the call into the body of the test block. Only a replacement factory and a fixture body may hold it
 
 ## Messages
 

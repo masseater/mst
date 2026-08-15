@@ -19,56 +19,11 @@ Disallow splitting a file into siblings distinguished only by a number, so every
 
 ## Violation
 
-A linted file whose name ends in a separator followed by digits, with its counterpart standing in the same directory. Both halves are reported, so splitting something in two raises two reports.
-
-The name is judged on what stands before the first dot. What is read of `parser-1.test.ts` is `parser-1`; the chain of suffixes is left out. The oversized-file rule names splitting a test file by number (`foo-1.test.ts`, `foo-2.test.ts`) as the first of its forbidden bypasses, and reading only up to the first dot keeps that shape from passing through.
-
-Two characters count as separators: the hyphen and the underscore. Digits following a word with no separator (`oauth2`, `base64`, `http2`) are not targets. Digits in that position are part of the word, not the order of a split.
-
-A counterpart is either of these, in the same directory:
-
-- The same prefix followed by different digits (`order-2.ts` against `order-1.ts`)
-- The prefix with the separator dropped (`handler.ts` against `handler-1.ts`)
-
-A file carrying the same name is not a counterpart. `widget-1.test.ts` beside `widget-1.ts` is that file's test, not the other half of a split. A different prefix is not a counterpart either, so `alpha-1.ts` and `beta-2.ts` living together are not reported.
-
-One report is raised per file, covering the whole file (the Program node), because there is no line to point at inside it.
-
-The directory listing is asked of the file system, and the answer is remembered for as long as the process lives. Creating or deleting a counterpart mid-run does not change that process's answer; the next run does.
-
-### What is not detected
-
-**A split by one character after the separator.** `grid-x.ts` and `grid-y.ts` are not reported. One character in that position can legitimately name an axis or a dimension, and the syntax alone cannot tell that from a number in disguise. Escaping by swapping digits for letters is treated as a bypass, below.
-
-**A numbered name with no counterpart.** `report-1.ts` standing alone is not reported. What this rule watches is the trace of a split, not whether a name is good.
-
-**Numbering on identifiers.** `handleA` / `handleB` and `step1` / `step2` are out of reach. This is a discipline about file boundaries, while those are about naming, and another rule carries names. One rule judging both would mean loosening one loosens the other with it.
-
-**The contents of the files.** Whether two files really carry one responsibility is not read. A machine has no way to count responsibilities, so this stops at the name as a proxy. Passing means "this rule has nothing to say", not "this is fine".
-
-### The invariant
-
-[forbid-oversized-file--split-by-responsibility](./forbid-oversized-file--split-by-responsibility.md) pushes a file over its budget to be split. The cheapest way for whoever was pushed to get back under it is cutting the contents in half and numbering them. The line count certainly falls, and the responsibilities do not move an inch.
-
-That state is invisible to the oversized-file rule: both halves are under the budget, so from that rule's angle it looks solved. This is why its document names the shape as the first of its forbidden bypasses — but naming it was all that happened, and no machine was watching.
-
-Once a rule carrying a budget exists, the shortest route out from under that budget has to be closed at the same time, or the budget stops being a device that makes responsibilities be recounted and becomes a device that makes numbers be added.
-
-A number being worthless as a name is why this rule watches numbers alone. Somebody reading `order-1` and `order-2` cannot decide from the names which one carries the behaviour they are after. They open both to find out, which is more reading than the single file before the split.
-
-### Configuration
-
-None. Whether the rule is on or off is settled by the configuration, and nothing else about the judgment is.
-
-Which files it targets is not left to the consumer, because this norm does not depend on how a deployment is arranged. In any directory, siblings that differ only by a number have names that are not doing any work. Requiring a target list would leave the rule silently inert in a repository that forgot to write one.
+A file whose base name ends in a separator and a number (`parse-1.ts`, `parse_2.ts`) while the same directory holds either another file under the same prefix and a different number, or the file the prefix names without one. The report carries the sibling it found.
 
 ## Fix
 
-State in the name what each of the two files owns. Where you can state it, rename them to that. Each file after a split has to have a name that describes what it owns, and other modules have to import it for that reason.
-
-Where trying to state it produces only one name, the split produced nothing. Put the two back into one file, then reduce what the file does. If putting them back runs into the line budget, recounting responsibilities from there is the right order, and splitting by number does not stand in for it.
-
-In test files, reducing the number of scenarios is also a correct fix. Drop verification that confirms the same thing twice through two entrances.
+List what each file owns and rename each after what it owns. Where the split had no responsibility behind it, fold the files back into one.
 
 <!-- BEGIN GENERATED examples -->
 
@@ -81,16 +36,10 @@ export const total = 1;
 
 <!-- END GENERATED examples -->
 
-The subject of this rule is the names a directory holds rather than the source in front of you, so the code above is the file the report stands on, and what settles the judgment is what that file is called and what stands beside it.
-
 ### Forbidden bypasses (do not do this)
 
-- Swapping the digits for a single letter (`order-a.ts`, `order-b.ts`). The syntax does not stop it, and nothing has changed about names that do not describe what they own. It is a violation under the guidelines and is rejected in review
-- Swapping the digits for ordinal words (`order-first.ts`, `order-second.ts`). A violation for the same reason
-- Moving one half into another directory so they no longer live together. Only the directory listing is read, so the report clears, while one responsibility scattered across two places has got worse
-- Attaching the digits to the word to remove the separator (`order1.ts`, `order2.ts`). This rule requires a separator, so the report clears. That is a signal that the judgment leans too hard on the separator: fix the judgment rather than the escape
-- Adding a re-export-only file for the appearance of a split without moving anything. Only the name was split; the responsibility stayed in the original file
-- Silencing that one file with a suppression directive. The split gets pinned in place with no grounds given for the responsibilities being two
+- Moving one of the siblings into another directory. The numbers still stand in for names nobody chose
+- Replacing the number with a word that carries no responsibility (`parse-extra.ts`). Detection stops, the split does not
 
 ## Messages
 

@@ -19,31 +19,11 @@ Disallow a file whose name carries a test marker other than the two the reposito
 
 ## Violation
 
-A file whose name carries a marker that puts it outside the production scope while being neither of the two the repository actually runs, `.test.` and `.spec.`.
-
-The markers are `.fixture.`, `.mock.`, `.test.`, `.spec.`, `.stories.` and `.story.`, and each may carry any number of further words separated by `.` or `-`. A file matching one of them is taken to be something other than a production source: the two rules that read finite value vocabularies hold it out of reach, and so does the rule that reads duplicated declaration bodies.
-
-Of those, only the ones ending in `.test.<extension>` or `.spec.<extension>` are tests. Everything else is reported. `order.test-fixture.ts` matches `.test.` and so leaves the production scope, while it is not spelled as a test, and it is reported here.
-
-Directory names are not read. `fixtures/order.ts` is out of this rule's reach.
-
-### The invariant
-
-What settles whether a file is in the production scope is its name. Spell a file like a test and it leaves the lint's reach and becomes hard for `knip` to see. With both happening at once, a place that cannot meet the guidelines can be created out of a spelling alone.
-
-`canonical-values.test-fixture.ts` was once placed exactly that way in this repository. `.test-fixture.` matches the out-of-production judgment and misses the is-a-test judgment: a name landing in the gap between two classifiers, where a shared helper for tests sat without being checked by anything.
-
-There are two places for tests and no others. What holds coverage up goes beside its source as `<source name>.test.ts`; what holds a specification up goes directly under the package as `specs/<feature>.spec.ts`. Any other spelling either adds a third place or dodges a check.
-
-No option is offered. Widening the accepted spellings through configuration would hand back the very channel — leaving the scope by spelling — that this rule closes.
+A file whose name carries a test marker the repository does not run. The markers that put a file outside the production scope are `.fixture.`, `.mock.`, `.test.`, `.spec.`, `.stories.` and `.story.`; of those only `.test.` and `.spec.` name files the runner picks up, so a name carrying any of the others is reported on its Program node.
 
 ## Fix
 
-Delete the reported file and declare what it held inside each test that uses it.
-
-Test setup is allowed to look alike across tests. Not sharing it keeps tests from coupling, so rewriting one never stops another from running. Only writing the same test in several places is forbidden, by [no-duplicated-test--delete-the-copy](./no-duplicated-test--delete-the-copy.md).
-
-Where the contents were needed as production code, drop the test marker from the name and place it as a production source. It comes under the lint from that point on.
+Delete the file and declare what it held inside each test that used it. Setup repeated between tests is the state this bundle asks for.
 
 <!-- BEGIN GENERATED examples -->
 
@@ -79,9 +59,8 @@ export const total = 1;
 
 ### Forbidden bypasses (do not do this)
 
-- Hunting for another gap between the classifiers by changing the spelling. `.test-helper.` and `.spec-support.` are reported the same way
-- Naming the directory `__fixtures__` or `fixtures` to keep the marker out of the file name. The out-of-scope judgment by directory still stands, and what is placed there is reported by [no-detached-test-file--move-beside-source](./no-detached-test-file--move-beside-source.md)
-- Adding an exclusion to the `knip` configuration to silence the unused report alone. A place that nothing checks is still there
+- Renaming it to `.test.ts` while nothing in it is a test. The file then joins the suite as a spec with no claims
+- Moving it under a directory the production scope already excludes. The content still sits outside every check
 
 ## Messages
 
