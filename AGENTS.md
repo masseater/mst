@@ -81,6 +81,14 @@ mst は、リポジトリ運用の仕組みを再利用可能な単位として�
 - IF: 仕様担保のテストを置く; THEN
   - MUST: パッケージ直下の `specs/` に `<機能名>.spec.ts` として置く
   - MUST: 書き方を `packages/verified-specifications/AGENTS.md` に従わせる
+  - PROHIBIT: カバレッジを埋めるために置く
+    - `specs/` はカバレッジの計測から外れている。埋まらない
+- IF: カバレッジが埋まらない; THEN
+  - MUST: 対象ソースの隣にテストを足す
+  - PROHIBIT: `specs/` にテストを足して埋める
+- IF: テストの設定にカバレッジの計測を書く; THEN MUST: `test.coverage.exclude` で `specs/**` を計測から外す
+  - 仕様担保テストが通りかかっただけのコードが覆われて見え、直接見ているものが無いことに気づけなくなる
+  - 外し忘れは `require-spec-directory-outside-coverage--exclude-it-from-the-measurement` が報告する
 - IF: テストの実行経路を決める; THEN MUST: main に入るすべての経路が通るまとまりに含める
 - IF: main への merge を判断する; THEN
   - MUST: 各パッケージの `SPECIFICATIONS.md` の diff を何よりも先に読み、主張の変化をすべて承認してから merge する

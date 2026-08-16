@@ -19,6 +19,87 @@ const THREE_WORKSPACES = {
 };
 
 describe("runPresetAdoptionChecks", () => {
+  describe("a configuration switching off a preset rule that no bundle carries", () => {
+    const it = test.extend("reportOverARuleNoBundleCarries", () => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "preset-adoption-"));
+      onTestFinished(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      for (const [relativePath, writtenSource] of Object.entries({
+        ...TWO_WORKSPACES,
+        "vite.config.ts": `export default defineConfig({
+  lint: { rules: { "dont-review-it/no-such-rule--do-something": "off" } },
+});`,
+      })) {
+        const writtenPath = join(repositoryRoot, relativePath);
+        mkdirSync(dirname(writtenPath), { recursive: true });
+        writeFileSync(writtenPath, writtenSource, "utf8");
+      }
+      return runPresetAdoptionChecks({ repositoryRoot, config: defaultPresetAdoptionConfig });
+    });
+
+    it("names the workspaces it stops reaching, as it does for any preset rule", ({
+      reportOverARuleNoBundleCarries,
+    }) => {
+      expect(reportOverARuleNoBundleCarries).toStrictEqual({
+        warnings: [
+          {
+            file: "vite.config.ts",
+            line: 2,
+            message:
+              "The lint configuration must not leave dont-review-it/no-such-rule--do-something switched off for packages/left. Delete the override and repair what it reports, or record in an engineering decision log why the rule cannot reach there.",
+          },
+          {
+            file: "vite.config.ts",
+            line: 2,
+            message:
+              "The lint configuration must not leave dont-review-it/no-such-rule--do-something switched off for packages/right. Delete the override and repair what it reports, or record in an engineering decision log why the rule cannot reach there.",
+          },
+        ],
+        scanned: 2,
+        configMissing: false,
+      });
+    });
+  });
+
+  describe("a configuration switching off a rule of a bundle it never names", () => {
+    const it = test.extend("reportOverAnUnadoptedBundle", () => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "preset-adoption-"));
+      onTestFinished(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      for (const [relativePath, writtenSource] of Object.entries({
+        ...TWO_WORKSPACES,
+        "vite.config.ts": `export default defineConfig({
+  lint: dontReviewItPreset.lint({
+    bundles: ["testing"],
+    rules: { "dont-review-it/no-reassign--use-spread-or-iife": "off" },
+  }),
+});`,
+      })) {
+        const writtenPath = join(repositoryRoot, relativePath);
+        mkdirSync(dirname(writtenPath), { recursive: true });
+        writeFileSync(writtenPath, writtenSource, "utf8");
+      }
+      return runPresetAdoptionChecks({ repositoryRoot, config: defaultPresetAdoptionConfig });
+    });
+
+    it("says the override stops nothing", ({ reportOverAnUnadoptedBundle }) => {
+      expect(reportOverAnUnadoptedBundle).toStrictEqual({
+        warnings: [
+          {
+            file: "vite.config.ts",
+            line: 4,
+            message:
+              "The lint configuration must not switch dont-review-it/no-reassign--use-spread-or-iife off while it does not carry the mutation-and-failure bundle, because the override stops nothing. Delete the override, or name that bundle where the preset is called.",
+          },
+        ],
+        scanned: 2,
+        configMissing: false,
+      });
+    });
+  });
+
   describe("a configuration that switches nothing off", () => {
     const it = test.extend("reportOverAConfigurationSwitchingNothingOff", () => {
       const repositoryRoot = mkdtempSync(join(tmpdir(), "preset-adoption-"));

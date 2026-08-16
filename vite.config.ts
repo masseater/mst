@@ -73,6 +73,7 @@ export default defineConfig({
     mockReset: true,
     restoreMocks: true,
     coverage: {
+      exclude: ["specs/**"],
       thresholds: { 100: true, perFile: true },
     },
     unstubEnvs: true,

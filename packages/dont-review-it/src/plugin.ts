@@ -1,11 +1,10 @@
-import { API } from "typescript/unstable/sync";
-
 import { loadCanonicalValuesCatalogSnapshot } from "./lint/oxlint/lib/canonical-values/builder.ts";
 import { loadCatalogEntries } from "./lint/oxlint/lib/dependency-catalog/catalog-entries.ts";
 import { loadWorkspaceDependencies } from "./lint/oxlint/lib/dependency-catalog/workspace-manifests.ts";
 import { loadRepositoryBodyIndex } from "./lint/oxlint/lib/duplicated-bodies/builder.ts";
 import { replacedModuleAt } from "./lint/oxlint/lib/external-io-boundary.ts";
 import { createLibraryVocabularyLoader } from "./lint/oxlint/lib/library-vocabulary/harvester.ts";
+import { openTypeScriptApi } from "./lint/oxlint/lib/library-vocabulary/open-api.ts";
 import { loadRepositoryCellClassIndex } from "./lint/oxlint/lib/mutable-cell-classes/builder.ts";
 import { loadRepositoryTypeAuthorityIndex } from "./lint/oxlint/lib/split-type-authority/builder.ts";
 import { loadStyleClassIndex } from "./lint/oxlint/lib/style-classes/builder.ts";
@@ -87,6 +86,7 @@ import { noViMockFactoryBehavior } from "./lint/oxlint/rules/testing/no-vi-mock-
 import { noVitestContextExpect } from "./lint/oxlint/rules/testing/no-vitest-context-expect--import-expect-from-vitest.ts";
 import { requireItOnlyExpect } from "./lint/oxlint/rules/testing/require-it-only-expect--move-setup-into-fixture.ts";
 import { requireMockTypeParameter } from "./lint/oxlint/rules/testing/require-mock-type-parameter--annotate-vi-fn.ts";
+import { requireSpecDirectoryOutsideCoverage } from "./lint/oxlint/rules/testing/require-spec-directory-outside-coverage--exclude-it-from-the-measurement.ts";
 import { requireSpecFileForAssets } from "./lint/oxlint/rules/testing/require-spec-file-for-assets--create-matching-spec.ts";
 import { requireSpecLintCoverage } from "./lint/oxlint/rules/testing/require-spec-lint-coverage--lint-every-spec-file.ts";
 import { requireStandardIoSnapshot } from "./lint/oxlint/rules/testing/require-standard-io-snapshot--pin-both-streams.ts";
@@ -124,9 +124,7 @@ import type { Plugin } from "@oxlint/plugins";
 
 export const noLocalFiniteValueSet = createNoLocalFiniteValueSet({
   loadCatalog: loadCanonicalValuesCatalogSnapshot,
-  loadLibraryVocabulary: createLibraryVocabularyLoader({
-    openApi: (packageDirectory) => new API({ cwd: packageDirectory }),
-  }),
+  loadLibraryVocabulary: createLibraryVocabularyLoader({ openApi: openTypeScriptApi }),
 });
 
 export const noStrictCanonicalLiteralUse = createNoStrictCanonicalLiteralUseRule({
@@ -266,6 +264,7 @@ const plugin: Plugin = {
     [requireMockTypeParameter.name]: requireMockTypeParameter,
     [requireReExportOnlyFiles.name]: requireReExportOnlyFiles,
     [requireRegisteredFile.name]: requireRegisteredFile,
+    [requireSpecDirectoryOutsideCoverage.name]: requireSpecDirectoryOutsideCoverage,
     [requireSpecFileForAssets.name]: requireSpecFileForAssets,
     [requireSpecLintCoverage.name]: requireSpecLintCoverage,
     [requireSpecOrAssetsOnlyInSpecDirectory.name]: requireSpecOrAssetsOnlyInSpecDirectory,

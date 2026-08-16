@@ -44,6 +44,7 @@ import { noViMockFactoryBehavior } from "../../lint/oxlint/rules/testing/no-vi-m
 import { noVitestContextExpect } from "../../lint/oxlint/rules/testing/no-vitest-context-expect--import-expect-from-vitest.ts";
 import { requireItOnlyExpect } from "../../lint/oxlint/rules/testing/require-it-only-expect--move-setup-into-fixture.ts";
 import { requireMockTypeParameter } from "../../lint/oxlint/rules/testing/require-mock-type-parameter--annotate-vi-fn.ts";
+import { requireSpecDirectoryOutsideCoverage } from "../../lint/oxlint/rules/testing/require-spec-directory-outside-coverage--exclude-it-from-the-measurement.ts";
 import { requireSpecFileForAssets } from "../../lint/oxlint/rules/testing/require-spec-file-for-assets--create-matching-spec.ts";
 import { requireSpecLintCoverage } from "../../lint/oxlint/rules/testing/require-spec-lint-coverage--lint-every-spec-file.ts";
 import { requireStandardIoSnapshot } from "../../lint/oxlint/rules/testing/require-standard-io-snapshot--pin-both-streams.ts";
@@ -103,6 +104,7 @@ export const testingBundle: readonly WorkspaceLintRule[] = [
   noVitestContextExpect,
   requireItOnlyExpect,
   requireMockTypeParameter,
+  requireSpecDirectoryOutsideCoverage,
   requireSpecFileForAssets,
   requireSpecLintCoverage,
   requireStandardIoSnapshot,

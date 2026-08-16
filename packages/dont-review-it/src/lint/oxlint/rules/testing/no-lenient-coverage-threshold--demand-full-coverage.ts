@@ -1,6 +1,7 @@
 import { createDontReviewItRule } from "../../../../create-rule.ts";
 import { defaultExportedObject } from "../../lib/default-exported-object.ts";
 import { declaresTrueAt, nestedObjectAt, objectPropertyOf } from "../../lib/object-literal.ts";
+import { isRecord } from "../../lib/record-value.ts";
 import { isTestRunnerConfig } from "../../lib/test-runner-config.ts";
 
 import type { ESTree, Options } from "@oxlint/plugins";
@@ -12,9 +13,6 @@ const PER_FILE_KEY = "perFile";
 const FULL_COVERAGE = 100;
 
 const THRESHOLD_SCHEMA = { type: "number", minimum: 0, maximum: FULL_COVERAGE } as const;
-
-const isRecord = (held: unknown): held is Readonly<Record<string, unknown>> =>
-  held instanceof Object;
 
 type CoverageRequirement = {
   readonly metric: string;
