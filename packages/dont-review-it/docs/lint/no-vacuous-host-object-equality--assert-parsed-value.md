@@ -12,8 +12,8 @@ Disallow comparing or recording a host object that keeps its state in internal s
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`no-vacuous-host-object-equality--assert-parsed-value.ts`](../../src/lint/oxlint/rules/no-vacuous-host-object-equality--assert-parsed-value.ts)
+- Bundle: `testing`
+- Source: [`no-vacuous-host-object-equality--assert-parsed-value.ts`](../../src/lint/oxlint/rules/testing/no-vacuous-host-object-equality--assert-parsed-value.ts)
 
 <!-- END GENERATED rule-header -->
 

@@ -32,7 +32,7 @@
 
 これは上流の欠陥である。vite-task は `dependencies` / `devDependencies` / `peerDependencies` のすべてを実行順序の辺として扱い、循環を hard-error にする（[vite-task#411](https://github.com/voidzero-dev/vite-task/issues/411)）。pnpm と turbo は同じワークスペースを問題なく扱う。修正は [vite-task#414](https://github.com/voidzero-dev/vite-task/pull/414) にあるが、2026-08-13 時点で未マージであり、リポジトリが使う vite-plus 0.2.8 には入っていない。
 
-[0042](0042-apply-one-preset-at-the-root-and-report-the-exception-the-toolchain-forces.md) は同じ欠陥に対して「上流に修正がある一時的な欠陥を避けるために、パッケージの構成を恒久的に組み替えない」と決めており、fixture 専用パッケージの新設も既存パッケージへの移設も検討して捨てている。**隔離設定のためにワークスペース依存を持たない葉のパッケージを立てる案は、その決定が既に捨てた形と同じものなので採らない。**
+[0042](0042-let-the-caller-choose-the-bundles-and-apply-them-at-the-root.md) は同じ欠陥に対して「上流に修正がある一時的な欠陥を避けるために、パッケージの構成を恒久的に組み替えない」と決めており、fixture 専用パッケージの新設も既存パッケージへの移設も検討して捨てている。**隔離設定のためにワークスペース依存を持たない葉のパッケージを立てる案は、その決定が既に捨てた形と同じものなので採らない。**
 
 **タスクの前後関係を設定で切る。** ルートの `run.tasks` に `test` を定義しても、各パッケージの package.json の同名スクリプトがあるため効かない（Vite+ は同名のタスクを両方に定義することを禁じている）。パッケージ側の `vite.config.ts` に置くとタスクグラフの読み込み自体が落ちる。循環は宣言した `dependsOn` ではなくパッケージグラフから導かれているので、設定で外せる場所が無い。
 

@@ -46,9 +46,36 @@ description: Machine-enforced answers to the writing questions that would otherw
 
 公開する config は `dontReviewItPreset` の 1 つだけである。`fmt` と `lint` の 2 つの関数を持ち、ルートの `vite.config.ts` はそれぞれのブロックで対応する関数を呼ぶ。呼び出し側が足したいものは引数に渡し、preset が返した値へ後ろから重なる。呼び忘れは [no-unwrapped-toolchain-config--call-the-preset-for-the-block](docs/lint/no-unwrapped-toolchain-config--call-the-preset-for-the-block.md) が報告する。
 
-`lint` が配るルール集合は 1 枚だけである。対象種別による出し分けはしない。ルートの `lint` が呼んだ時点でリポジトリ全体に効き、採用の判断は残らない。CLI に固有の規律もこの中にあり、対象を絞るのはルールの側である。判断は [EDR 0042](../../docs/engineering-decision-logs/0042-apply-one-preset-at-the-root-and-report-the-exception-the-toolchain-forces.md) にある。
+`lint` は束（bundle）を受け取り、名指しされた束のルールだけを配る。束は採用者が引き受ける不変条件の単位で、`all` を渡すと全部入る。呼び出した時点でリポジトリ全体に効き、対象種別による出し分けはしない。対象を絞るのはルールの側である。判断は [EDR 0042](../../docs/engineering-decision-logs/0042-let-the-caller-choose-the-bundles-and-apply-them-at-the-root.md) にある。
 
-仕様担保テストの置き場所だけは、この 1 枚の中で `overrides` として範囲を絞る。`specs/` の下はテスト規律の束の射程外で、名前の綴りを `.spec.ts` に切り替え、ソース隣接の要求と `describe` の入れ子の上限をそこに与える。射程の分担は [EDR 0060](../../docs/engineering-decision-logs/0060-let-the-specifications-bundle-guard-the-specs-directory-alone.md) が、設定の所在は [EDR 0057](../../docs/engineering-decision-logs/0057-read-the-spelling-the-repository-mandates-and-move-the-spec-lint-settings-into-the-preset.md) が決めている。
+束は 8 つある。`governance` は選択に関わらず必ず入り、残りが選べる。
+
+- `governance` は報告を消す経路を塞ぐ。選べない
+- `writing` は書き方の一般則を持つ
+- `testing` は vitest の上に立つテストの規律を持つ
+- `single-ownership` は値と宣言が 1 つの所有者を持つことを守る
+- `mutation-and-failure` は値の変わり方と失敗の行き先を守る
+- `toolchain` は道具の設定と依存の宣言を守る
+- `publishing` は npm へ公開する形を守る
+- `ci` は GitHub Actions の定義を守る
+
+- IF: ルールを足す; THEN
+  - MUST: `src/lint/oxlint/rules/<束>/` に置く
+  - MUST: 同じ束の構成ファイル `src/configs/bundles/<束>.ts` に載せる
+  - PROHIBIT: ルールディレクトリの直下に置いたまま preset に載せる
+    - 置き場が束の権威である。索引も文書もそこから束を読む
+- IF: 束を増やす; THEN
+  - MUST: `src/configs/bundles/bundle-names.ts` の語彙に足す
+  - PROHIBIT: 名前に `test` / `tests` / `spec` / `specs` / `fixtures` / `lib` / `dist` / `coverage` を選ぶ
+    - テスト専用ディレクトリの判定・走査の除外・索引の走査の除外に捕まり、そこに置いたルールが黙って検査から落ちる
+  - PROHIBIT: リポジトリ内の他の概念が持つ綴りを選ぶ
+    - 束の名前は `@canonical-values` に登録される。同じ綴りの literal がすべて違反になる
+- IF: 束を横断して読むルールを書く; THEN MUST: `governance` に置く
+  - 選べる束に置くと、採用しないことでその強制ごと外せてしまう
+- IF: 束のディレクトリと構成ファイルが食い違った; THEN MUST: 直す
+  - `src/configs/bundles/composition.ts` の検査が落とす
+
+仕様担保テストの置き場所だけは、`testing` 束の中で `overrides` として範囲を絞る。`specs/` の下はテスト規律の束の射程外で、名前の綴りを `.spec.ts` に切り替え、ソース隣接の要求と `describe` の入れ子の上限をそこに与える。射程の分担は [EDR 0060](../../docs/engineering-decision-logs/0060-let-the-specifications-bundle-guard-the-specs-directory-alone.md) が、設定の所在は [EDR 0057](../../docs/engineering-decision-logs/0057-read-the-spelling-the-repository-mandates-and-move-the-spec-lint-settings-into-the-preset.md) が決めている。
 
 `fmt` が決めているのは、整形結果が読み手に届く見た目を変えず、差分にだけ現れる書き方である。markdown の段落を 1 行に畳むこと、import の並び順がこれにあたる。判断は [EDR 0046](../../docs/engineering-decision-logs/0046-let-the-formatter-own-where-markdown-lines-break.md) と [EDR 0047](../../docs/engineering-decision-logs/0047-hand-every-toolchain-block-one-preset-function.md) にある。
 
@@ -69,10 +96,14 @@ lint ルールとして書けない検査は CLI として持つ。マニフェ�
 
 CLI が持つコマンドは `check` の 1 つで、そこが全部の検査を走らせる。1 件でも見つかれば非ゼロで終わる。
 
+検査も束に属する。採用者がツールチェーン設定で名指ししていない束の検査は走らない。走らなかったものは一覧から消えず、走らせていない理由を添えて 0 件として並ぶ。束を名指ししていない設定と、設定そのものが無いリポジトリでは、全部の検査が走る。
+
 - IF: 検査が 1 ファイルの構文で完結しない; THEN MUST: lint ルールではなく CLI の検査として持つ
 - IF: 検査対象の形式を lint のツールチェーンが解釈できない; THEN MUST: 同じく CLI の検査として持つ
 - IF: 検査を足す; THEN
   - MUST: `check` が走らせる一覧に載せる
+  - MUST: それが属する束を決め、`run-checks.ts` の対応表に載せる
+    - 載せ忘れた検査は、どの束を採っていても走り続ける
   - PROHIBIT: 2 つ目のサブコマンドを作る
     - 呼ぶ側が入口を選べると、載せ忘れた検査が「あるのに走らない」状態で残る
 - IF: 検査が違反を見つけた; THEN
@@ -185,6 +216,8 @@ AI 向けの指示が 1 か所にしかないことを見る。`AGENTS.md` が�
 `check` が、ルートのツールチェーン設定とワークスペースの一覧を突き合わせる。preset を `extends` した時点で全体に効くという前提が、実際に成り立っているかを見る。
 
 設定を読んで `off` にされている preset のルールを拾い、その `files` が届くワークスペースを名指しして警告する。パスを絞らずに止めたルールは、すべてのワークスペースに届かないものとして数える。preset の外のルールは見ない。ツールチェーン設定が無いリポジトリでは何も検査しない。
+
+止めたルールを載せている束を採用者が名指ししていない場合は、別の文で報告する。その override は何も止めていないので、直し方は override を消すか、その束を名指しするかの 2 つに分かれる。どちらを選ぶかは判断なので、こちらも警告に留める。
 
 報告を警告に留めるのは、止め方を解く手段が 1 つに決まらないためである。override を消して報告を直す道と、依存の向きなどで届かないことを記録して残す道があり、どちらを選ぶかは判断になる。
 

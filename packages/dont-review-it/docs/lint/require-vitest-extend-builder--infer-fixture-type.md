@@ -12,8 +12,8 @@ Require every fixture to be declared as its own builder call whose type is infer
 - Fixable: yes
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`require-vitest-extend-builder--infer-fixture-type.ts`](../../src/lint/oxlint/rules/require-vitest-extend-builder--infer-fixture-type.ts)
+- Bundle: `testing`
+- Source: [`require-vitest-extend-builder--infer-fixture-type.ts`](../../src/lint/oxlint/rules/testing/require-vitest-extend-builder--infer-fixture-type.ts)
 
 <!-- END GENERATED rule-header -->
 

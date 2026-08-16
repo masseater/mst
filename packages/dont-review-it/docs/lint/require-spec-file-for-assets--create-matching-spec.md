@@ -12,8 +12,8 @@ Require every test data file to sit beside a spec of the same stem, so the data 
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`require-spec-file-for-assets--create-matching-spec.ts`](../../src/lint/oxlint/rules/require-spec-file-for-assets--create-matching-spec.ts)
+- Bundle: `testing`
+- Source: [`require-spec-file-for-assets--create-matching-spec.ts`](../../src/lint/oxlint/rules/testing/require-spec-file-for-assets--create-matching-spec.ts)
 
 <!-- END GENERATED rule-header -->
 

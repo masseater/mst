@@ -12,8 +12,8 @@ Disallow a test that another test in the same file spells with the same title an
 - Fixable: no
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`no-duplicated-test--delete-the-copy.ts`](../../src/lint/oxlint/rules/no-duplicated-test--delete-the-copy.ts)
+- Bundle: `testing`
+- Source: [`no-duplicated-test--delete-the-copy.ts`](../../src/lint/oxlint/rules/testing/no-duplicated-test--delete-the-copy.ts)
 
 <!-- END GENERATED rule-header -->
 

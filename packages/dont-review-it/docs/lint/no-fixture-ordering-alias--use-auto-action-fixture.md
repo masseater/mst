@@ -12,8 +12,8 @@ Disallow a fixture taking apart a dependency whose value it never consumes, so t
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`no-fixture-ordering-alias--use-auto-action-fixture.ts`](../../src/lint/oxlint/rules/no-fixture-ordering-alias--use-auto-action-fixture.ts)
+- Bundle: `testing`
+- Source: [`no-fixture-ordering-alias--use-auto-action-fixture.ts`](../../src/lint/oxlint/rules/testing/no-fixture-ordering-alias--use-auto-action-fixture.ts)
 
 <!-- END GENERATED rule-header -->
 

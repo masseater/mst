@@ -28,6 +28,17 @@ const STALE_INDEX = `\`${INDEX_PATH}\` must not fall behind the rule implementat
 
 const DUPLICATED_RULE_NAME = `Two rules in \`packages/example\` must not share the name \`no-thing--allow-it\`; they claim the same document. Rename one of them.`;
 
+const STRAY_RULE_SOURCE = `export const rule = {
+  name: "no-stray--allow-it",
+  meta: { docs: { description: "Disallow straying" }, messages: { report: "No." } },
+  create: () => ({}),
+};
+`;
+
+const STRAY_RULE_PATH = "packages/example/src/rules/no-stray--allow-it.ts";
+
+const UNBUNDLED_SHIPPED_RULE = `A rule the preset carries must not sit outside a bundle directory once \`packages/example\` declares bundles. Move \`no-stray--allow-it\` under the directory of the bundle that carries it, or declare \`shipped: false\` on it.`;
+
 const HANDWRITTEN_INDEX = "# A hand written index\n\nProse and nothing else.\n";
 
 const STALE_REGION_INDEX = `# An index\n\nFront matter prose.\n\n<!-- BEGIN GENERATED lint-rules -->\n\nA stale table\n\n<!-- END GENERATED lint-rules -->\n\nTrailing prose.\n`;
@@ -445,6 +456,36 @@ describe("lintRuleIndexProblems", () => {
     it("are reported even though the index gets written", ({ report }) => {
       expect(report).toStrictEqual({
         problems: [{ file: INDEX_PATH, message: DUPLICATED_RULE_NAME }],
+        scanned: 1,
+      });
+    });
+  });
+
+  describe("a shipped rule left outside the bundle directories a workspace has", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "reconcile-rule-index-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages/example/src/rules/core"), { recursive: true });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      writeFileSync(join(root, "packages/example/package.json"), DECLARING_MANIFEST, "utf8");
+      writeFileSync(
+        join(root, "packages/example/src/rules/core/no-thing--allow-it.ts"),
+        RULE_SOURCE,
+        "utf8",
+      );
+      writeFileSync(
+        join(root, "packages/example/src/rules/no-stray--allow-it.ts"),
+        STRAY_RULE_SOURCE,
+        "utf8",
+      );
+      return lintRuleIndexProblems({ repositoryRoot: root, write: true });
+    });
+
+    it("is reported against the source that has to move", ({ report }) => {
+      expect(report).toStrictEqual({
+        problems: [{ file: STRAY_RULE_PATH, message: UNBUNDLED_SHIPPED_RULE }],
         scanned: 1,
       });
     });

@@ -12,8 +12,8 @@ Disallow settling what a double taken from a replaced module hands back, so a re
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`no-replaced-double-behaviour--let-the-replaced-module-answer.ts`](../../src/lint/oxlint/rules/no-replaced-double-behaviour--let-the-replaced-module-answer.ts)
+- Bundle: `testing`
+- Source: [`no-replaced-double-behaviour--let-the-replaced-module-answer.ts`](../../src/lint/oxlint/rules/testing/no-replaced-double-behaviour--let-the-replaced-module-answer.ts)
 
 <!-- END GENERATED rule-header -->
 

@@ -12,8 +12,8 @@ Disallow a catch clause whose body never carries the failure it bound out of the
 - Fixable: no
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`no-silent-catch--rethrow-or-handle.ts`](../../src/lint/oxlint/rules/no-silent-catch--rethrow-or-handle.ts)
+- Bundle: `mutation-and-failure`
+- Source: [`no-silent-catch--rethrow-or-handle.ts`](../../src/lint/oxlint/rules/mutation-and-failure/no-silent-catch--rethrow-or-handle.ts)
 
 <!-- END GENERATED rule-header -->
 

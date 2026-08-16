@@ -12,8 +12,8 @@ Require a JSDoc block to carry tag content only, so an explanation never drifts 
 - Fixable: no
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`no-detached-rationale--comment-at-explained-line.ts`](../../src/lint/oxlint/rules/no-detached-rationale--comment-at-explained-line.ts)
+- Bundle: `writing`
+- Source: [`no-detached-rationale--comment-at-explained-line.ts`](../../src/lint/oxlint/rules/writing/no-detached-rationale--comment-at-explained-line.ts)
 
 <!-- END GENERATED rule-header -->
 

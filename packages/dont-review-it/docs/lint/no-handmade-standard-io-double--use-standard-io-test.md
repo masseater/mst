@@ -12,8 +12,8 @@ Disallow a spec that assembles its own stdout or stderr test double, so stream c
 - Fixable: no
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`no-handmade-standard-io-double--use-standard-io-test.ts`](../../src/lint/oxlint/rules/no-handmade-standard-io-double--use-standard-io-test.ts)
+- Bundle: `testing`
+- Source: [`no-handmade-standard-io-double--use-standard-io-test.ts`](../../src/lint/oxlint/rules/testing/no-handmade-standard-io-double--use-standard-io-test.ts)
 
 <!-- END GENERATED rule-header -->
 

@@ -12,8 +12,8 @@ Disallow a lint suppression comment in the files these rules run on, so a report
 - Fixable: yes
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`no-lint-suppression-in-spec--fix-the-violation.ts`](../../src/lint/oxlint/rules/no-lint-suppression-in-spec--fix-the-violation.ts)
+- Bundle: `testing`
+- Source: [`no-lint-suppression-in-spec--fix-the-violation.ts`](../../src/lint/oxlint/rules/testing/no-lint-suppression-in-spec--fix-the-violation.ts)
 
 <!-- END GENERATED rule-header -->
 

@@ -12,8 +12,8 @@ Disallow enabling an off-the-shelf lint rule that reads what it rejects from its
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`forbid-generic-restriction-rule--use-the-declared-rule.ts`](../../src/lint/oxlint/rules/forbid-generic-restriction-rule--use-the-declared-rule.ts)
+- Bundle: `governance`
+- Source: [`forbid-generic-restriction-rule--use-the-declared-rule.ts`](../../src/lint/oxlint/rules/governance/forbid-generic-restriction-rule--use-the-declared-rule.ts)
 
 <!-- END GENERATED rule-header -->
 

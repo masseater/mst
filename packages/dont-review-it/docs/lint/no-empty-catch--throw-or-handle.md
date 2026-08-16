@@ -12,8 +12,8 @@ Disallow a catch clause whose body carries no statement, so catching a failure i
 - Fixable: no
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`no-empty-catch--throw-or-handle.ts`](../../src/lint/oxlint/rules/no-empty-catch--throw-or-handle.ts)
+- Bundle: `mutation-and-failure`
+- Source: [`no-empty-catch--throw-or-handle.ts`](../../src/lint/oxlint/rules/mutation-and-failure/no-empty-catch--throw-or-handle.ts)
 
 <!-- END GENERATED rule-header -->
 

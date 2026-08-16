@@ -2,6 +2,7 @@ import { posix } from "node:path";
 
 import { lintToolOf } from "../lint-tool.ts";
 
+import type { BundledLintRule } from "../rule-index/rule-bundle.ts";
 import type { LintRuleFacts } from "../rule-index/rule-facts.ts";
 import type { LintRuleExample, LintRuleExamples } from "./rule-examples.ts";
 
@@ -33,15 +34,20 @@ const escapedDescription = (description: string): string =>
 export const renderFrontmatterDescription = (rule: LintRuleFacts): string =>
   `description: "${escapedDescription(rule.description)}"`;
 
-const yesOrNo = (holds: boolean): string => (holds ? "yes" : "no");
-
 const sourceLinkOf = (sourcePath: string): string => {
   const shown = posix.basename(sourcePath);
   const reached = posix.relative(RULE_DOCS_DIR, sourcePath);
   return `[\`${shown}\`](${reached})`;
 };
 
-export const renderRuleHeader = (rule: LintRuleFacts): string =>
+const yesOrNo = (holds: boolean): string => (holds ? "yes" : "no");
+
+const adoptionLineOf = (rule: BundledLintRule): string =>
+  rule.shipped && rule.bundle !== null
+    ? `- Bundle: \`${rule.bundle}\``
+    : `- Shipped in the preset: ${yesOrNo(rule.shipped)}`;
+
+export const renderRuleHeader = (rule: BundledLintRule): string =>
   [
     rule.description,
     "",
@@ -49,7 +55,7 @@ export const renderRuleHeader = (rule: LintRuleFacts): string =>
     `- Fixable: ${yesOrNo(rule.fixable)}`,
     `- Suggestions: ${yesOrNo(rule.hasSuggestions)}`,
     `- Options: ${yesOrNo(rule.configurable)}`,
-    `- Shipped in the preset: ${yesOrNo(rule.shipped)}`,
+    adoptionLineOf(rule),
     `- Source: ${sourceLinkOf(rule.sourcePath)}`,
   ].join("\n");
 

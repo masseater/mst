@@ -12,8 +12,8 @@ Disallow producing the subject of an assertion inside `expect`, so an assertion 
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`no-expect-call-expression--yield-from-fixture.ts`](../../src/lint/oxlint/rules/no-expect-call-expression--yield-from-fixture.ts)
+- Bundle: `testing`
+- Source: [`no-expect-call-expression--yield-from-fixture.ts`](../../src/lint/oxlint/rules/testing/no-expect-call-expression--yield-from-fixture.ts)
 
 <!-- END GENERATED rule-header -->
 

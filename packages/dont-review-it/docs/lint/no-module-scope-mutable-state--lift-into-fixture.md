@@ -12,8 +12,8 @@ Disallow a test writing to a binding declared outside every fixture, test block 
 - Fixable: no
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`no-module-scope-mutable-state--lift-into-fixture.ts`](../../src/lint/oxlint/rules/no-module-scope-mutable-state--lift-into-fixture.ts)
+- Bundle: `testing`
+- Source: [`no-module-scope-mutable-state--lift-into-fixture.ts`](../../src/lint/oxlint/rules/testing/no-module-scope-mutable-state--lift-into-fixture.ts)
 
 <!-- END GENERATED rule-header -->
 

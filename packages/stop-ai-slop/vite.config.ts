@@ -14,6 +14,7 @@ export default defineConfig({
     restoreMocks: true,
     testTimeout: 60_000,
     coverage: {
+      exclude: ["specs/**"],
       thresholds: { 100: true, perFile: true },
     },
     unstubEnvs: true,

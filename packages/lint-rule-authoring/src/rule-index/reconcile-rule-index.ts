@@ -6,6 +6,7 @@ import { generatedFileProblems, staleGeneratedFile } from "../reconcile-generate
 import { REGENERATE_COMMAND } from "../regenerate-command.ts";
 import { lintRuleWorkspacesIn, type LintRuleWorkspace } from "./lint-rule-workspaces.ts";
 import { renderRuleIndex } from "./render-rule-index.ts";
+import { bundleNamesIn } from "./rule-bundle.ts";
 import { shippedRuleReferenceProblems } from "./shipped-rule-reference.ts";
 import { workspaceRulesOf } from "./workspace-rules.ts";
 
@@ -33,6 +34,15 @@ const duplicatedRuleName = ({
 }): string =>
   `Two rules in \`${workspaceDir}\` must not share the name \`${ruleName}\`; they claim the same document. Rename one of them.`;
 
+const unbundledShippedRule = ({
+  ruleName,
+  workspaceDir,
+}: {
+  readonly ruleName: string;
+  readonly workspaceDir: string;
+}): string =>
+  `A rule the preset carries must not sit outside a bundle directory once \`${workspaceDir}\` declares bundles. Move \`${ruleName}\` under the directory of the bundle that carries it, or declare \`shipped: false\` on it.`;
+
 const reconcileWorkspace = ({
   repositoryRoot,
   workspace,
@@ -52,8 +62,22 @@ const reconcileWorkspace = ({
       message: duplicatedRuleName({ ruleName, workspaceDir: workspace.workspaceDir }),
     }));
 
+  const strays =
+    bundleNamesIn(rules).length === 0
+      ? []
+      : rules
+          .filter((rule) => rule.shipped && rule.bundle === null)
+          .map((rule) => ({
+            file: join(workspace.workspaceDir, rule.sourcePath),
+            message: unbundledShippedRule({
+              ruleName: rule.name,
+              workspaceDir: workspace.workspaceDir,
+            }),
+          }));
+
   return [
     ...duplicates,
+    ...strays,
     ...generatedFileProblems({
       repositoryRoot,
       file,

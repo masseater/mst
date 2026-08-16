@@ -12,8 +12,8 @@ Disallow an exported type whose name carries a second shape inside its workspace
 - Fixable: no
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`no-split-type-authority--rename-or-unify.ts`](../../src/lint/oxlint/rules/no-split-type-authority--rename-or-unify.ts)
+- Bundle: `single-ownership`
+- Source: [`no-split-type-authority--rename-or-unify.ts`](../../src/lint/oxlint/rules/single-ownership/no-split-type-authority--rename-or-unify.ts)
 
 <!-- END GENERATED rule-header -->
 

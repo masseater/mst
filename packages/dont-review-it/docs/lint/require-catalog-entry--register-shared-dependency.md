@@ -12,8 +12,8 @@ Require every package that more than one workspace declares to be registered in 
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`require-catalog-entry--register-shared-dependency.ts`](../../src/lint/oxlint/rules/require-catalog-entry--register-shared-dependency.ts)
+- Bundle: `toolchain`
+- Source: [`require-catalog-entry--register-shared-dependency.ts`](../../src/lint/oxlint/rules/toolchain/require-catalog-entry--register-shared-dependency.ts)
 
 <!-- END GENERATED rule-header -->
 

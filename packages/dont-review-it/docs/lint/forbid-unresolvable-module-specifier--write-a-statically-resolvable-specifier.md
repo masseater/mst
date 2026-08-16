@@ -12,8 +12,8 @@ Disallow a module specifier whose value is decided while the program runs, so ev
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`forbid-unresolvable-module-specifier--write-a-statically-resolvable-specifier.ts`](../../src/lint/oxlint/rules/forbid-unresolvable-module-specifier--write-a-statically-resolvable-specifier.ts)
+- Bundle: `writing`
+- Source: [`forbid-unresolvable-module-specifier--write-a-statically-resolvable-specifier.ts`](../../src/lint/oxlint/rules/writing/forbid-unresolvable-module-specifier--write-a-statically-resolvable-specifier.ts)
 
 <!-- END GENERATED rule-header -->
 

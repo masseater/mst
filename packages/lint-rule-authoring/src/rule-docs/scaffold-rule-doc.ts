@@ -10,7 +10,7 @@ import {
   renderRuntimeSelection,
 } from "./render-rule-doc.ts";
 
-import type { LintRuleFacts } from "../rule-index/rule-facts.ts";
+import type { BundledLintRule } from "../rule-index/rule-bundle.ts";
 import type { LintRuleExamples } from "./rule-examples.ts";
 
 const VIOLATION_PLACEHOLDER =
@@ -38,7 +38,7 @@ export const scaffoldRuleDoc = ({
   rule,
   examples,
 }: {
-  readonly rule: LintRuleFacts;
+  readonly rule: BundledLintRule;
   readonly examples: LintRuleExamples;
 }): string =>
   [

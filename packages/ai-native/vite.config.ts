@@ -15,6 +15,7 @@ export default defineConfig({
     pool: "threads",
     testTimeout: 60_000,
     coverage: {
+      exclude: ["specs/**"],
       thresholds: { 100: true, perFile: true },
     },
     unstubEnvs: true,

@@ -12,8 +12,8 @@ Disallow a helper function standing at module scope or in the body of a grouping
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`no-spec-file-helper-function--inline-or-use-fixture.ts`](../../src/lint/oxlint/rules/no-spec-file-helper-function--inline-or-use-fixture.ts)
+- Bundle: `testing`
+- Source: [`no-spec-file-helper-function--inline-or-use-fixture.ts`](../../src/lint/oxlint/rules/testing/no-spec-file-helper-function--inline-or-use-fixture.ts)
 
 <!-- END GENERATED rule-header -->
 

@@ -12,8 +12,8 @@ Disallow an external snapshot whose recorded value fits within the shared inline
 - Fixable: yes
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`no-undersized-external-snapshot--use-inline-snapshot.ts`](../../src/lint/oxlint/rules/no-undersized-external-snapshot--use-inline-snapshot.ts)
+- Bundle: `testing`
+- Source: [`no-undersized-external-snapshot--use-inline-snapshot.ts`](../../src/lint/oxlint/rules/testing/no-undersized-external-snapshot--use-inline-snapshot.ts)
 
 <!-- END GENERATED rule-header -->
 

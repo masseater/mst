@@ -12,8 +12,8 @@ Disallow starting a command the shared declaration has retired as a child proces
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`forbid-declared-command-invocation--use-designated-replacement.ts`](../../src/lint/oxlint/rules/forbid-declared-command-invocation--use-designated-replacement.ts)
+- Bundle: `governance`
+- Source: [`forbid-declared-command-invocation--use-designated-replacement.ts`](../../src/lint/oxlint/rules/governance/forbid-declared-command-invocation--use-designated-replacement.ts)
 
 <!-- END GENERATED rule-header -->
 

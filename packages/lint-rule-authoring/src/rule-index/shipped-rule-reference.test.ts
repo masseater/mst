@@ -6,7 +6,7 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { shippedRuleReferenceProblems } from "./shipped-rule-reference.ts";
 
-import type { LintRuleFacts } from "./rule-facts.ts";
+import type { BundledLintRule } from "./rule-bundle.ts";
 
 const WORKSPACE_DIR = "packages/example";
 
@@ -16,7 +16,7 @@ const SKILL_PATH = "packages/example/skills/core/SKILL.md";
 
 const SKILL_SOURCE = "---\nname: core\n---\n";
 
-const rules: readonly LintRuleFacts[] = [
+const rules: readonly BundledLintRule[] = [
   {
     name: "no-thing--allow-it",
     description: "Disallow the thing",
@@ -25,6 +25,7 @@ const rules: readonly LintRuleFacts[] = [
     hasSuggestions: false,
     configurable: false,
     shipped: true,
+    bundle: null,
     messages: [],
   },
 ];

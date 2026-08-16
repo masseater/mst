@@ -83,6 +83,24 @@ describe("preset の適用範囲の検査", () => {
     expect(runPresetAdoptionChecks({ repositoryRoot, config }).warnings).toStrictEqual([]);
   });
 
+  it("採っていない束のルールを止めている override は、何も止めていないものとして報告する", async () => {
+    const repositoryRoot = await repositoryWith({
+      ...WORKSPACES,
+      "vite.config.ts": `export default defineConfig({
+  lint: dontReviewItPreset.lint({
+    bundles: ["testing"],
+    rules: { "dont-review-it/no-reassign--use-spread-or-iife": "off" },
+  }),
+});`,
+    });
+
+    const { warnings } = runPresetAdoptionChecks({ repositoryRoot, config });
+
+    expect(warnings.map((warning) => warning.message)).toStrictEqual([
+      "The lint configuration must not switch dont-review-it/no-reassign--use-spread-or-iife off while it does not carry the mutation-and-failure bundle, because the override stops nothing. Delete the override, or name that bundle where the preset is called.",
+    ]);
+  });
+
   it("ツールチェーンの設定が無いリポジトリでは適用範囲を検査しない", async () => {
     const repositoryRoot = await repositoryWith(WORKSPACES);
 

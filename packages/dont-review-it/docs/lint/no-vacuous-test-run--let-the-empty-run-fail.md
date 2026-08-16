@@ -12,8 +12,8 @@ Disallow a test config that lets a run finding no test file report success, so a
 - Fixable: no
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`no-vacuous-test-run--let-the-empty-run-fail.ts`](../../src/lint/oxlint/rules/no-vacuous-test-run--let-the-empty-run-fail.ts)
+- Bundle: `testing`
+- Source: [`no-vacuous-test-run--let-the-empty-run-fail.ts`](../../src/lint/oxlint/rules/testing/no-vacuous-test-run--let-the-empty-run-fail.ts)
 
 <!-- END GENERATED rule-header -->
 

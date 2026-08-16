@@ -12,8 +12,8 @@ Disallow silencing a protected rule from a comment in the source or from a sever
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`no-inline-suppression-of-protected-rule--register-the-exception-in-configuration.ts`](../../src/lint/oxlint/rules/no-inline-suppression-of-protected-rule--register-the-exception-in-configuration.ts)
+- Bundle: `governance`
+- Source: [`no-inline-suppression-of-protected-rule--register-the-exception-in-configuration.ts`](../../src/lint/oxlint/rules/governance/no-inline-suppression-of-protected-rule--register-the-exception-in-configuration.ts)
 
 <!-- END GENERATED rule-header -->
 

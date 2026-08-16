@@ -18,7 +18,29 @@ const PACKAGE_MANIFEST = '{ "description": "A probe repository." }\n';
 const WORKSPACE_LIST =
   "# ワークスペース\n\n<!-- BEGIN GENERATED workspaces -->\n<!-- END GENERATED workspaces -->\n";
 
+const USAGE = `Usage: agentic-documents <command> [options]
+
+Commands:
+  check   Report every place where a document disagrees with the repository or breaks the normative notation.
+
+Options:
+  --repository-root <path>  Root of the repository to scan. Defaults to the current working directory.
+  --write                   Rewrite generated regions instead of reporting them as stale.
+`;
+
 describe("runAgenticDocuments", () => {
+  describe("a run that names no command", () => {
+    const it = test.extend("theRunWithoutACommand", () => runAgenticDocuments([]));
+
+    it("exits as a misuse and prints what it can be asked to do", ({ theRunWithoutACommand }) => {
+      expect(theRunWithoutACommand).toStrictEqual({
+        exitCode: EXIT_MISUSE,
+        out: "",
+        error: USAGE,
+      });
+    });
+  });
+
   describe("an option it does not know", () => {
     const it = test.extend("theRunOfAnUnknownOption", () =>
       runAgenticDocuments(["check", "--unknown-option"]));

@@ -12,8 +12,8 @@ Disallow a style sheet class that no script and no markup in the repository spel
 - Fixable: no
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`no-unused-style-class--delete-or-reference-it.ts`](../../src/lint/oxlint/rules/no-unused-style-class--delete-or-reference-it.ts)
+- Bundle: `writing`
+- Source: [`no-unused-style-class--delete-or-reference-it.ts`](../../src/lint/oxlint/rules/writing/no-unused-style-class--delete-or-reference-it.ts)
 
 <!-- END GENERATED rule-header -->
 

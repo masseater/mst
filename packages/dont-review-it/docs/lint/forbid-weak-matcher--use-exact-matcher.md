@@ -12,8 +12,8 @@ Disallow a matcher that reads only part of the value or the shape of its subject
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`forbid-weak-matcher--use-exact-matcher.ts`](../../src/lint/oxlint/rules/forbid-weak-matcher--use-exact-matcher.ts)
+- Bundle: `testing`
+- Source: [`forbid-weak-matcher--use-exact-matcher.ts`](../../src/lint/oxlint/rules/testing/forbid-weak-matcher--use-exact-matcher.ts)
 
 <!-- END GENERATED rule-header -->
 

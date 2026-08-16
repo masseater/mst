@@ -12,8 +12,8 @@ Disallow writing a caught failure to an output stream inside a catch clause that
 - Fixable: no
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`no-logged-and-continued-failure--stop-or-recover.ts`](../../src/lint/oxlint/rules/no-logged-and-continued-failure--stop-or-recover.ts)
+- Bundle: `mutation-and-failure`
+- Source: [`no-logged-and-continued-failure--stop-or-recover.ts`](../../src/lint/oxlint/rules/mutation-and-failure/no-logged-and-continued-failure--stop-or-recover.ts)
 
 <!-- END GENERATED rule-header -->
 

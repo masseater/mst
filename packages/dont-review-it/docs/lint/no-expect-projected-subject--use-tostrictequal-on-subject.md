@@ -12,8 +12,8 @@ Disallow handing an assertion anything other than the bare binding a fixture pro
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`no-expect-projected-subject--use-tostrictequal-on-subject.ts`](../../src/lint/oxlint/rules/no-expect-projected-subject--use-tostrictequal-on-subject.ts)
+- Bundle: `testing`
+- Source: [`no-expect-projected-subject--use-tostrictequal-on-subject.ts`](../../src/lint/oxlint/rules/testing/no-expect-projected-subject--use-tostrictequal-on-subject.ts)
 
 <!-- END GENERATED rule-header -->
 

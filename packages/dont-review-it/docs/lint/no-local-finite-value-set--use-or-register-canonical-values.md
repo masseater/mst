@@ -12,8 +12,8 @@ Disallow defining a finite value set inside a file that does not own it, so one 
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`no-local-finite-value-set--use-or-register-canonical-values.ts`](../../src/lint/oxlint/rules/no-local-finite-value-set--use-or-register-canonical-values.ts)
+- Bundle: `single-ownership`
+- Source: [`no-local-finite-value-set--use-or-register-canonical-values.ts`](../../src/lint/oxlint/rules/single-ownership/no-local-finite-value-set--use-or-register-canonical-values.ts)
 
 <!-- END GENERATED rule-header -->
 

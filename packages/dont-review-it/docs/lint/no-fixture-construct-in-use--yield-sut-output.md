@@ -12,8 +12,8 @@ Disallow a fixture factory handing back a value the spec built instead of the va
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`no-fixture-construct-in-use--yield-sut-output.ts`](../../src/lint/oxlint/rules/no-fixture-construct-in-use--yield-sut-output.ts)
+- Bundle: `testing`
+- Source: [`no-fixture-construct-in-use--yield-sut-output.ts`](../../src/lint/oxlint/rules/testing/no-fixture-construct-in-use--yield-sut-output.ts)
 
 <!-- END GENERATED rule-header -->
 

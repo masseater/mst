@@ -12,8 +12,8 @@ Disallow a spec file coupling to a module that its own package's public entry ca
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`no-dry-test-setup--inline-owned-setup.ts`](../../src/lint/oxlint/rules/no-dry-test-setup--inline-owned-setup.ts)
+- Bundle: `testing`
+- Source: [`no-dry-test-setup--inline-owned-setup.ts`](../../src/lint/oxlint/rules/testing/no-dry-test-setup--inline-owned-setup.ts)
 
 <!-- END GENERATED rule-header -->
 

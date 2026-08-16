@@ -12,8 +12,8 @@ Require an assets file to carry nothing but const declarations of written-out da
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`require-test-assets-constants--move-setup-to-spec.ts`](../../src/lint/oxlint/rules/require-test-assets-constants--move-setup-to-spec.ts)
+- Bundle: `testing`
+- Source: [`require-test-assets-constants--move-setup-to-spec.ts`](../../src/lint/oxlint/rules/testing/require-test-assets-constants--move-setup-to-spec.ts)
 
 <!-- END GENERATED rule-header -->
 

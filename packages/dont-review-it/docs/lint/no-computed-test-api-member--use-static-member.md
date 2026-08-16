@@ -12,8 +12,8 @@ Disallow reaching a member of the test block API or the assertion entry through 
 - Fixable: yes
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`no-computed-test-api-member--use-static-member.ts`](../../src/lint/oxlint/rules/no-computed-test-api-member--use-static-member.ts)
+- Bundle: `testing`
+- Source: [`no-computed-test-api-member--use-static-member.ts`](../../src/lint/oxlint/rules/testing/no-computed-test-api-member--use-static-member.ts)
 
 <!-- END GENERATED rule-header -->
 

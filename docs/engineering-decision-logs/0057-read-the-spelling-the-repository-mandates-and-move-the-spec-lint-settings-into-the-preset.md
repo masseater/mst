@@ -9,7 +9,7 @@ lint 設定の棚卸しをした。preset が配る 106 本のうち有効化し
 
 抜けていたのは、`off` を見張る側だった。`vp exec dont-review-it check` の preset-adoption は `0 problems 0 warnings` を返し続けていた。ルートの設定に `off` が無いからではない。`disabled-rule-declarations.ts` が重大度を `Literal` ノードとしてしか読まず、ルートが書く `LINT_SEVERITY.OFF` は `MemberExpression` だったためである。しかもこの綴りは `no-strict-canonical-literal-use--use-canonical-import` が強制しているもので、検査が読める `"off"` のほうを lint が禁じている。読める綴りと書ける綴りが交わっていなかった。
 
-[EDR 0042](0042-apply-one-preset-at-the-root-and-report-the-exception-the-toolchain-forces.md) は、上流が直るまでの例外について「例外を設定に置いたまま黙らせるのではなく、適用範囲の検査が『preset のルールを off にしている override』として毎回報告する」と書いている。その報告は一度も出ていなかった。ルートの 1 行を `"off"` に書き換えると、同じコミットのまま 2 件の警告が現れる。
+[EDR 0042](0042-let-the-caller-choose-the-bundles-and-apply-them-at-the-root.md) は、上流が直るまでの例外について「例外を設定に置いたまま黙らせるのではなく、適用範囲の検査が『preset のルールを off にしている override』として毎回報告する」と書いている。その報告は一度も出ていなかった。ルートの 1 行を `"off"` に書き換えると、同じコミットのまま 2 件の警告が現れる。
 
 同じ棚卸しで、`@mst/verified-specifications` の import される面が `oxlint` 設定 1 本だけであることも分かった。その設定の中身は `dont-review-it/no-detached-test-file--move-beside-source` という、依存宣言に無いパッケージのルール名の名指しである。依存の向きは `@mst/dont-review-it` から `@mst/verified-specifications` への一方向で、参照はその逆に走っていた。この設定を読む箇所はリポジトリに 1 つしかなく、それが `@mst/dont-review-it` の preset である。
 

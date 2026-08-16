@@ -10,6 +10,7 @@ export default defineConfig({
   },
   fmt: dontReviewItPreset.fmt(),
   lint: dontReviewItPreset.lint({
+    bundles: "all",
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
     rules: {
       "vite-plus/prefer-vite-plus-imports": LINT_SEVERITY.ERROR,
@@ -42,7 +43,6 @@ export default defineConfig({
           ],
         },
       ],
-      "dont-review-it/no-version-range--pin-the-exact-version": LINT_SEVERITY.ERROR,
     },
     overrides: [
       {
@@ -73,6 +73,7 @@ export default defineConfig({
     mockReset: true,
     restoreMocks: true,
     coverage: {
+      exclude: ["specs/**"],
       thresholds: { 100: true, perFile: true },
     },
     unstubEnvs: true,

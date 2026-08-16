@@ -12,8 +12,8 @@ Disallow an import list whose order does not follow origin then specifier, so wh
 - Fixable: no
 - Suggestions: no
 - Options: no
-- Shipped in the preset: yes
-- Source: [`no-unordered-import--group-by-origin-then-sort-by-specifier.ts`](../../src/lint/oxlint/rules/no-unordered-import--group-by-origin-then-sort-by-specifier.ts)
+- Bundle: `writing`
+- Source: [`no-unordered-import--group-by-origin-then-sort-by-specifier.ts`](../../src/lint/oxlint/rules/writing/no-unordered-import--group-by-origin-then-sort-by-specifier.ts)
 
 <!-- END GENERATED rule-header -->
 

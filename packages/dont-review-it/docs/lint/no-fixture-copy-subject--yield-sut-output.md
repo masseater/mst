@@ -12,8 +12,8 @@ Disallow a fixture handing back a subject assembled by reading same-named proper
 - Fixable: no
 - Suggestions: no
 - Options: yes
-- Shipped in the preset: yes
-- Source: [`no-fixture-copy-subject--yield-sut-output.ts`](../../src/lint/oxlint/rules/no-fixture-copy-subject--yield-sut-output.ts)
+- Bundle: `testing`
+- Source: [`no-fixture-copy-subject--yield-sut-output.ts`](../../src/lint/oxlint/rules/testing/no-fixture-copy-subject--yield-sut-output.ts)
 
 <!-- END GENERATED rule-header -->
 
