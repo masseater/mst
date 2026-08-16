@@ -1,5 +1,6 @@
 import { createDontReviewItRule } from "../../../../create-rule.ts";
 import { IN_PLACE_ARRAY_METHODS } from "../../lib/array-mutation-methods.ts";
+import { isTransparentWrapper, isTypeAsserting } from "../../lib/node-kinds.ts";
 import {
   resolveBinding,
   type BindingResolution,
@@ -144,20 +145,14 @@ const isArrayLikeThroughWrapper = (
   node: ESTree.Expression,
   resolution: BindingResolution,
 ): boolean | null => {
-  switch (node.type) {
-    case "ChainExpression":
-    case "TSNonNullExpression":
-      return isArrayLikeExpression(node.expression, resolution);
-    case "TSAsExpression":
-    case "TSSatisfiesExpression":
-    case "TSTypeAssertion":
-      return (
-        isArrayLikeType(node.typeAnnotation, new Set()) ||
-        isArrayLikeExpression(node.expression, resolution)
-      );
-    default:
-      return null;
+  if (isTypeAsserting(node)) {
+    return (
+      isArrayLikeType(node.typeAnnotation, new Set()) ||
+      isArrayLikeExpression(node.expression, resolution)
+    );
   }
+  if (isTransparentWrapper(node)) return isArrayLikeExpression(node.expression, resolution);
+  return null;
 };
 
 const isArrayLikeExpression = (node: ESTree.Expression, resolution: BindingResolution): boolean => {

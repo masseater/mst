@@ -35,8 +35,9 @@ const inventoryFileFor = (match: RegExpMatchArray): InventoryFile => {
       return { kind: "changed", beforePath: path, afterPath: path };
     case "T":
       return { kind: "typeChanged", beforePath: path, afterPath: path };
+    default:
+      throw new Error("Unsupported Git diff status");
   }
-  throw new Error("Unsupported Git diff status");
 };
 
 const nulCharacter = String.fromCodePoint(0);

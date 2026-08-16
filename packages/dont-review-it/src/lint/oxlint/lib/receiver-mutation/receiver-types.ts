@@ -1,4 +1,5 @@
 import { ancestorsOf } from "../ast-node.ts";
+import { isTypeAsserting } from "../node-kinds.ts";
 import { resolveBinding, type BindingResolution } from "../resolved-bindings.ts";
 import { unwrapSubject } from "../spec-syntax/subject-expressions.ts";
 import { WIDENED_TYPE_NODES } from "../widened-type-nodes.ts";
@@ -47,16 +48,8 @@ const judgedTypeOf = (asked: {
   });
 };
 
-const assertedTypeOf = (node: ESTree.Expression): ESTree.TSType | null => {
-  switch (node.type) {
-    case "TSAsExpression":
-    case "TSSatisfiesExpression":
-    case "TSTypeAssertion":
-      return node.typeAnnotation;
-    default:
-      return null;
-  }
-};
+const assertedTypeOf = (node: ESTree.Expression): ESTree.TSType | null =>
+  isTypeAsserting(node) ? node.typeAnnotation : null;
 
 const judgedAssertionOf = (node: ESTree.Expression): JudgedReceiver | null => {
   const asserted = assertedTypeOf(node);

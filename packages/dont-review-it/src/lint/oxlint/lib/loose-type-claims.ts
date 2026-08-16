@@ -1,12 +1,12 @@
+import { isTransparentWrapper } from "./node-kinds.ts";
+import { isWidenedType, type WidenedTypeNode } from "./widened-type-nodes.ts";
+
 import type { ESTree } from "@oxlint/plugins";
 
-export type LooseTypeNode = ESTree.TSAnyKeyword | ESTree.TSUnknownKeyword;
+export const looseTypeNodeOf = (node: ESTree.TSType): WidenedTypeNode | null => {
+  if (isWidenedType(node)) return node;
 
-export const looseTypeNodeOf = (node: ESTree.TSType): LooseTypeNode | null => {
   switch (node.type) {
-    case "TSAnyKeyword":
-    case "TSUnknownKeyword":
-      return node;
     case "TSParenthesizedType":
       return looseTypeNodeOf(node.typeAnnotation);
     case "TSUnionType": {
@@ -33,16 +33,8 @@ export const isConcreteTypeClaim = (node: ESTree.TSType): boolean =>
 export const isTypeAssertion = (node: ESTree.Expression): boolean =>
   node.type === "TSAsExpression" || node.type === "TSTypeAssertion";
 
-export const unwrappedValueOf = (node: ESTree.Expression): ESTree.Expression => {
-  switch (node.type) {
-    case "ChainExpression":
-    case "ParenthesizedExpression":
-    case "TSNonNullExpression":
-      return unwrappedValueOf(node.expression);
-    default:
-      return node;
-  }
-};
+export const unwrappedValueOf = (node: ESTree.Expression): ESTree.Expression =>
+  isTransparentWrapper(node) ? unwrappedValueOf(node.expression) : node;
 
 export const declaredReturnTypeOf = (node: ESTree.Node): ESTree.TSTypeAnnotation | null => {
   if (!("returnType" in node)) return null;

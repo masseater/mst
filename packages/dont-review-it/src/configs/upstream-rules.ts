@@ -170,7 +170,11 @@ export const UPSTREAM_RULES: NonNullable<OxlintConfig["rules"]> = {
   "typescript/strict-boolean-expressions": LINT_SEVERITY.ERROR,
   "typescript/switch-exhaustiveness-check": [
     LINT_SEVERITY.ERROR,
-    { considerDefaultExhaustiveForUnions: true },
+    {
+      allowDefaultCaseForExhaustiveSwitch: false,
+      considerDefaultExhaustiveForUnions: false,
+      requireDefaultForNonUnion: true,
+    },
   ],
   "typescript/triple-slash-reference": LINT_SEVERITY.ERROR,
   "typescript/unbound-method": LINT_SEVERITY.ERROR,
