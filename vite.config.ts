@@ -52,6 +52,15 @@ export default defineConfig({
         },
       },
       {
+        files: ["packages/dont-review-it/src/lint/oxlint/**"],
+        rules: {
+          "typescript/switch-exhaustiveness-check": [
+            LINT_SEVERITY.ERROR,
+            { considerDefaultExhaustiveForUnions: true },
+          ],
+        },
+      },
+      {
         files: ["**/{test,tests,__tests__,spec,__specs__}/**"],
         rules: {
           "vitest/consistent-test-filename": [

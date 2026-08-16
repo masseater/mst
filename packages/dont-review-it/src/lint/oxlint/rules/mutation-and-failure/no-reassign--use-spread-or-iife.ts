@@ -1,4 +1,5 @@
 import { createDontReviewItRule } from "../../../../create-rule.ts";
+import { isSugared } from "../../lib/node-kinds.ts";
 
 import type { ESTree, Options } from "@oxlint/plugins";
 
@@ -27,18 +28,8 @@ const PER_ITERATION_HEAD_STATEMENTS: ReadonlySet<string> = new Set([
   "ForOfStatement",
 ]);
 
-const unwrapSugar = (node: ESTree.Node): ESTree.Node => {
-  switch (node.type) {
-    case "ChainExpression":
-    case "TSAsExpression":
-    case "TSNonNullExpression":
-    case "TSSatisfiesExpression":
-    case "TSTypeAssertion":
-      return unwrapSugar(node.expression);
-    default:
-      return node;
-  }
-};
+const unwrapSugar = (node: ESTree.Node): ESTree.Node =>
+  isSugared(node) ? unwrapSugar(node.expression) : node;
 
 const isClassMemberScope = (node: ESTree.Node): boolean => {
   switch (node.type) {

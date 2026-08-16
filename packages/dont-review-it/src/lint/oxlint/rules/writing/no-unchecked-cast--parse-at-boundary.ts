@@ -5,20 +5,20 @@ import {
   isTypeAssertion,
   looseTypeNodeOf,
   unwrappedValueOf,
-  type LooseTypeNode,
 } from "../../lib/loose-type-claims.ts";
 import {
   resolveBinding,
   type BindingResolution,
   type ScopeLookup,
 } from "../../lib/resolved-bindings.ts";
+import { type WidenedTypeNode } from "../../lib/widened-type-nodes.ts";
 
 import type { Definition, ESTree } from "@oxlint/plugins";
 
 const looseNodeOfDefinition = (
   definition: Definition,
   resolution: BindingResolution,
-): LooseTypeNode | null => {
+): WidenedTypeNode | null => {
   const annotation = definition.name.typeAnnotation;
   if (annotation !== null && annotation !== undefined) {
     return looseTypeNodeOf(annotation.typeAnnotation);
@@ -33,7 +33,7 @@ const looseNodeOfDefinition = (
 const looseNodeOfBinding = (
   node: ESTree.IdentifierReference,
   { scopeAt, seenBindings }: BindingResolution,
-): LooseTypeNode | null => {
+): WidenedTypeNode | null => {
   const binding = resolveBinding(scopeAt(node), node.name);
   if (binding === null || seenBindings.has(binding)) return null;
 
@@ -47,7 +47,7 @@ const looseNodeOfBinding = (
 const looseNodeOfExpression = (
   node: ESTree.Expression,
   resolution: BindingResolution,
-): LooseTypeNode | null => {
+): WidenedTypeNode | null => {
   const unwrapped = unwrappedValueOf(node);
   return unwrapped.type === "Identifier" ? looseNodeOfBinding(unwrapped, resolution) : null;
 };

@@ -111,6 +111,14 @@ mst は、リポジトリ運用の仕組みを再利用可能な単位として�
   - MUST: 同じ処理が [es-toolkit](https://github.com/toss/es-toolkit) で提供されていないか先に調べる
   - PROHIBIT: 提供されているものを自前実装する
   - PROHIBIT: `es-toolkit` の関数を包み直すだけのラッパーを作る
+- IF: 自分が所有する有限の語彙を `switch` で分岐する; THEN
+  - MUST: 全ての値を `case` として列挙する
+  - PROHIBIT: `default` を置く
+    - `default` は「まとめて同じ扱いでよい既知の値」と「一度も考えたことのない値」を同じ綴りで書く。型に値が増えたとき、後者が前者の顔をして通り、気付くのはその挙動を踏んだ利用者になる
+- IF: 他人が所有する語彙（`ESTree.Node["type"]` など）を `switch` で分岐する; THEN
+  - MAY: 扱う値だけを `case` に置き、残りを `default` で受ける
+  - MUST: `typescript/switch-exhaustiveness-check` を緩める `overrides` の `files` にその置き場を載せる
+    - 緩めた範囲が設定に現れていないと、網羅していない `switch` が全部同じ見た目になる
 - IF: 実装の根拠を書き残す; THEN
   - PROHIBIT: コードコメントに書く
   - MUST: コミットメッセージの本文に残す
