@@ -292,7 +292,7 @@ export const noExpectMirroredSubject = createDontReviewItRule({
     docs: {
       description:
         "Disallow writing the expression a fixture built the subject from as the expected value of an assertion, so a passing assertion states something about the code rather than that one expression evaluates to itself",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/tests.md"],
     },
     messages: {
       mirroredSubject:

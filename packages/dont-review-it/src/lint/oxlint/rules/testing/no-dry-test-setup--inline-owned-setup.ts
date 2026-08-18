@@ -43,7 +43,7 @@ export const noDryTestSetup = createDontReviewItRule({
     docs: {
       description:
         "Disallow a spec file coupling to a module that its own package's public entry cannot reach or that is named as shared setup, so the setup a spec runs on stays written in the spec that runs it",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/tests.md"],
     },
     messages: {
       setupModuleCoupling:

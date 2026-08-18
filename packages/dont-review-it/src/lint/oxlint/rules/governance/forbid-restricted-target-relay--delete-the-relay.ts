@@ -30,7 +30,7 @@ export const forbidRestrictedTargetRelay = createDontReviewItRule({
     docs: {
       description:
         "Disallow a local module passing a restricted target straight to its own public surface and disallow reading a restricted target through such a module, so a target held out of reach in one file stays out of reach behind a chain of local modules",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/placement-and-tools.md"],
     },
     messages: {
       restrictedTargetForward:

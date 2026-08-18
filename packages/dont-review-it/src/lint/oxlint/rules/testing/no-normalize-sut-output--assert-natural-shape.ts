@@ -299,7 +299,7 @@ export const noNormalizeSutOutput = createDontReviewItRule({
     docs: {
       description:
         "Disallow reshaping the value a fixture hands back, so an assertion is written against the shape the code under test produced rather than the shape the spec tidied it into",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/tests.md"],
     },
     messages: {
       normalizedSubject:

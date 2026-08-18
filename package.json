@@ -42,5 +42,11 @@
   },
   "engines": {
     "node": ">=26.0.0"
+  },
+  "normativeDocuments": {
+    "fileName": "AGENTS.md",
+    "directories": [
+      "docs/guidelines"
+    ]
   }
 }

@@ -43,7 +43,7 @@ export const createRequireCatalogEntry = ({
       docs: {
         description:
           "Require every package that more than one workspace declares to be registered in the catalog, so the version they resolve to is decided in one place instead of workspace by workspace",
-        relatedGuidelines: [],
+        relatedGuidelines: ["AGENTS.md"],
       },
       messages: {
         unregisteredSharedDependency:

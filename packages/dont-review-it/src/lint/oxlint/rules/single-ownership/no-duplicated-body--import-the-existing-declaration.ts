@@ -37,7 +37,7 @@ export const createNoDuplicatedBody = ({
       docs: {
         description:
           "Disallow a declaration whose body is spelled exactly as another declaration elsewhere in the repository, so one behaviour keeps one owner instead of drifting between copies",
-        relatedGuidelines: [],
+        relatedGuidelines: ["docs/guidelines/writing-code.md"],
       },
       messages: {
         duplicatedBody:

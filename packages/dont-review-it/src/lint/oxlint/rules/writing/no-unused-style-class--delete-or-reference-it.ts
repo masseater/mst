@@ -26,7 +26,7 @@ export const createNoUnusedStyleClass = ({
       docs: {
         description:
           "Disallow a style sheet class that no script and no markup in the repository spells, so the style sheet keeps only the classes that reach the rendered page",
-        relatedGuidelines: [],
+        relatedGuidelines: ["docs/guidelines/writing-code.md"],
       },
       messages: {
         unusedStyleClass:

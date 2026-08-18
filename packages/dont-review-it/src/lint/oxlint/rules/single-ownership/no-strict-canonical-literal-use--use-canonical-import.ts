@@ -31,7 +31,7 @@ export const createNoStrictCanonicalLiteralUseRule = (input: {
       docs: {
         description:
           "Disallow writing a value that a declared vocabulary already owns as a literal, so every use site derives its spelling from the one place that declares it",
-        relatedGuidelines: [],
+        relatedGuidelines: ["docs/guidelines/writing-code.md"],
       },
       messages: {
         canonicalValueLiteral:

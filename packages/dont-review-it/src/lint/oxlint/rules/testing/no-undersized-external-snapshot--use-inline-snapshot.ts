@@ -43,7 +43,7 @@ export const noUndersizedExternalSnapshot = createDontReviewItRule({
     docs: {
       description:
         "Disallow an external snapshot whose recorded value fits within the shared inline budget, so where a recorded value lives follows from its size rather than from the taste of whoever wrote the assertion",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/tests.md"],
     },
     messages: {
       undersizedExternalSnapshot:

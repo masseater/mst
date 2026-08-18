@@ -76,7 +76,7 @@ export const noInlineSuppressionOfProtectedRule = createDontReviewItRule({
     docs: {
       description:
         "Disallow silencing a protected rule from a comment in the source or from a severity the lint configuration lowers, so an exception to one of these rules stands as one registered entry carrying the grounds somebody wrote for it",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/enforcement.md"],
     },
     messages: {
       namedSuppression:

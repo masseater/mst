@@ -11,7 +11,7 @@
 
 意図は文書の散文に残っていたが、機械には読めなかった。preset の `rules` に名前が無いという事実だけが残っており、それは配線を忘れたルールと同じ形をしている。[EDR 0018](0018-narrow-the-export-surface-to-what-is-used.md) と [EDR 0056](0056-report-the-rule-whose-plugin-no-list-enables.md) が記録した「宣言されているだけで何も止めていない検査」と、区別が付かない。
 
-`docs/lint/index.md` の索引も同じところで詰まっていた。索引を組む `lintRuleFactsIn` はルールのファイルを 1 つずつ `oxc-parser` で読むだけで、preset を読まない。この 2 本は、実際には効いていないまま、他の 100 本と同じ行として並んでいた。
+`docs/lint/` の索引も同じところで詰まっていた。索引を組む `lintRuleFactsIn` はルールのファイルを 1 つずつ `oxc-parser` で読むだけで、preset を読まない。この 2 本は、実際には効いていないまま、他の 100 本と同じ行として並んでいた。
 
 ## 決定
 

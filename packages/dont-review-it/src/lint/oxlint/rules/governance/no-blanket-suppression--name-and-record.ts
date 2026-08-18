@@ -54,7 +54,7 @@ export const noBlanketSuppression = createDontReviewItRule({
     docs: {
       description:
         "Disallow any lint suppression that fails to name its rule, to stop at the one statement below it, to carry its grounds, or to stand against a row in the repository ledger, so what a run has stopped saying and whose name it was stopped under can be read off the source alone",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/enforcement.md"],
     },
     messages: {
       unnamedSuppression: `A \`{{spelling}}\` comment must not stand without naming the rule it stops. Delete it and rewrite the code the linter reports. ${ACCEPTED_FORM} ${BEFORE_SUPPRESSING}`,

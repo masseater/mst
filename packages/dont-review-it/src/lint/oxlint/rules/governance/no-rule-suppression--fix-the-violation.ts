@@ -87,7 +87,7 @@ export const noRuleSuppression = createDontReviewItRule({
     docs: {
       description:
         "Disallow taking a rule of the parallel determinism gate out of a run through a suppression comment, a lowered severity, or an ignore entry, leaving the code the rule stands on as the only place a report ends",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/enforcement.md"],
     },
     messages: {
       fileScopedSuppression:

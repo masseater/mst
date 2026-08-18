@@ -14,7 +14,8 @@ import { brokenReferences } from "./checks/reference-targets.ts";
 import { multipleDecisionKeywords } from "./checks/single-decision-keyword.ts";
 import { versionLiteralsInProse } from "./checks/version-in-prose.ts";
 import { workspaceListProblems } from "./checks/workspace-list.ts";
-import { loadNormativeDocuments } from "./scan/load-normative-documents.ts";
+import { loadNormativeDocuments, loadReferenceSources } from "./scan/load-normative-documents.ts";
+import { collectWorkspaces } from "./scan/workspaces.ts";
 
 import type { AgenticDocumentsConfig } from "./config.ts";
 import type { DocumentProblem } from "./problem.ts";
@@ -58,8 +59,20 @@ export const runChecks = async ({
       async (document): Promise<readonly DocumentProblem[]> => [
         ...syntacticProblems({ document, config }),
         ...(await frontmatterProblems({ repositoryRoot, document, config })),
-        ...(await brokenReferences({ repositoryRoot, document, config })),
       ],
+    ),
+  );
+
+  const referenceSources = await loadReferenceSources({ repositoryRoot, config });
+  const listedWorkspaces = await collectWorkspaces({
+    repositoryRoot,
+    definitionFile: config.workspaceDefinition.file,
+    definitionField: config.workspaceDefinition.field,
+  });
+  const workspaceDirectories = listedWorkspaces.entries.map((listed) => listed.directory);
+  const perReferenceSource = await Promise.all(
+    referenceSources.map((document) =>
+      brokenReferences({ repositoryRoot, document, config, workspaceDirectories }),
     ),
   );
 
@@ -70,5 +83,8 @@ export const runChecks = async ({
     ...(await workspaceListProblems({ repositoryRoot, config, write })),
   ];
 
-  return sortBy([...perDocument.flat(), ...acrossDocuments], [locationKeyOf]);
+  return sortBy(
+    [...perDocument.flat(), ...perReferenceSource.flat(), ...acrossDocuments],
+    [locationKeyOf],
+  );
 };

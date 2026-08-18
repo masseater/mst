@@ -129,7 +129,7 @@ export const noSpecSpecificSharedSetup = createDontReviewItRule({
     docs: {
       description:
         "Disallow a shared setup module or a runner configuration telling one spec from another, so the cleanup and the file system rules keep standing on a setup that hands every spec the same starting state",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/tests.md"],
     },
     messages: {
       specIdentifyingBranch:

@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 
 import { describe, expect, test } from "vite-plus/test";
 
-import { findFilesNamed } from "./repository-files.ts";
+import { findFilesNamed, findFilesSuffixed } from "./repository-files.ts";
 
 describe("findFilesNamed", () => {
   describe("a repository carrying that name at several depths", () => {
@@ -124,6 +124,36 @@ describe("findFilesNamed", () => {
 
     it("leaves out what is neither a file nor a directory", ({ paths }) => {
       expect(paths).toStrictEqual(["AGENTS.md"]);
+    });
+  });
+});
+
+describe("findFilesSuffixed", () => {
+  describe("拡張子が同じ文書を階層の別々の深さに持つリポジトリ", () => {
+    const it = test.extend("paths", async ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "repository-files-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      for (const [path, markdownBody] of Object.entries({
+        "docs/guidelines/tests.md": "# tests\n",
+        "AGENTS.md": "# root\n",
+        "node_modules/vendor/README.md": "# vendored\n",
+        "docs/notes.txt": "plain\n",
+      })) {
+        const documentPath = join(repositoryRoot, path);
+        mkdirSync(dirname(documentPath), { recursive: true });
+        writeFileSync(documentPath, markdownBody, "utf8");
+      }
+      return findFilesSuffixed({
+        repositoryRoot,
+        suffix: ".md",
+        ignoredDirectories: ["node_modules"],
+      });
+    });
+
+    it("無視する場所を除いた全ての一致をパス順に返す", ({ paths }) => {
+      expect(paths).toStrictEqual(["AGENTS.md", "docs/guidelines/tests.md"]);
     });
   });
 });

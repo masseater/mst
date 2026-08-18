@@ -75,7 +75,7 @@ export const noReplacedDoubleBehaviour = createDontReviewItRule({
     docs: {
       description:
         "Disallow settling what a double taken from a replaced module hands back, so a replacement records how the code under test called out and never answers in place of the module it stands for",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/tests.md"],
     },
     messages: {
       replacedDoubleBehaviour:

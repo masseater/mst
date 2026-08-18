@@ -1,5 +1,5 @@
 import { readlink } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 
 import { readTextOrNull, statOrNull } from "../scan/read-file.ts";
 
@@ -121,11 +121,13 @@ export const companionFileProblems = async ({
   readonly config: AgenticDocumentsConfig;
 }): Promise<readonly DocumentProblem[]> => {
   const nested = await Promise.all(
-    documents.flatMap((document) =>
-      config.companionFileNames.map((companionFileName) =>
-        companionProblem({ repositoryRoot, document, companionFileName, config }),
+    documents
+      .filter((document) => basename(document.file) === config.normativeDocumentFileName)
+      .flatMap((document) =>
+        config.companionFileNames.map((companionFileName) =>
+          companionProblem({ repositoryRoot, document, companionFileName, config }),
+        ),
       ),
-    ),
   );
 
   return nested.flat();

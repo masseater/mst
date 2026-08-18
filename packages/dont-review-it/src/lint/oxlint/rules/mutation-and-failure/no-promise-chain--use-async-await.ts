@@ -29,7 +29,7 @@ export const noPromiseChain = createDontReviewItRule({
     docs: {
       description:
         "Disallow calling a member named then, catch or finally, so the continuation and the failure handling of an asynchronous call stay on the enclosing function's own control flow",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/writing-code.md"],
     },
     messages: {
       promiseChainCall:

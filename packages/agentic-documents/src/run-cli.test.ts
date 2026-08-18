@@ -13,7 +13,15 @@ const NORMATIVE_DOCUMENT =
 const NORMATIVE_DOCUMENT_CARRYING_TWO_TABLES =
   "---\ndescription: A probe repository.\n---\n\n# probe\n\n| a |\n| --- |\n| MUST: x |\n\n| b |\n| --- |\n| MUST: y |\n";
 
-const PACKAGE_MANIFEST = '{ "description": "A probe repository." }\n';
+const PACKAGE_MANIFEST = `${JSON.stringify({
+  description: "A probe repository.",
+  normativeDocuments: { fileName: "AGENTS.md", directories: ["docs/guidelines"] },
+})}\n`;
+
+const GUIDELINE_DOCUMENT =
+  "---\ndescription: A probe guideline.\n---\n\n# probe guideline\n\nこの主題の基準は無い。\n";
+
+const WORKSPACE_DEFINITION = "packages:\n  - packages/*\n";
 
 const WORKSPACE_LIST =
   "# ワークスペース\n\n<!-- BEGIN GENERATED workspaces -->\n<!-- END GENERATED workspaces -->\n";
@@ -86,8 +94,13 @@ describe("runAgenticDocuments", () => {
       );
       await symlink("AGENTS.md", join(repositoryRoot, "CLAUDE.md"));
       await writeFile(join(repositoryRoot, "package.json"), PACKAGE_MANIFEST, "utf-8");
-      await mkdir(join(repositoryRoot, "docs"));
+      await mkdir(join(repositoryRoot, "docs/guidelines"), { recursive: true });
       await writeFile(join(repositoryRoot, "docs/workspaces.md"), WORKSPACE_LIST, "utf-8");
+      await writeFile(
+        join(repositoryRoot, "docs/guidelines/probe.md"),
+        GUIDELINE_DOCUMENT,
+        "utf-8",
+      );
       return runAgenticDocuments(["check", "--repository-root", repositoryRoot]);
     });
 
@@ -100,6 +113,53 @@ describe("runAgenticDocuments", () => {
     });
   });
 
+  describe("a document outside the normative places pointing at nothing", () => {
+    const it = test.extend("theRunOfARepositoryWithARottenPointer", async ({}, { onCleanup }) => {
+      const repositoryRoot = await mkdtemp(join(tmpdir(), "agentic-documents-"));
+      onCleanup(async () => rm(repositoryRoot, { recursive: true, force: true }));
+      await writeFile(join(repositoryRoot, "AGENTS.md"), NORMATIVE_DOCUMENT, "utf-8");
+      await symlink("AGENTS.md", join(repositoryRoot, "CLAUDE.md"));
+      await writeFile(join(repositoryRoot, "package.json"), PACKAGE_MANIFEST, "utf-8");
+      await mkdir(join(repositoryRoot, "docs/guidelines"), { recursive: true });
+      await writeFile(join(repositoryRoot, "docs/workspaces.md"), WORKSPACE_LIST, "utf-8");
+      await writeFile(
+        join(repositoryRoot, "docs/guidelines/probe.md"),
+        GUIDELINE_DOCUMENT,
+        "utf-8",
+      );
+      await writeFile(
+        join(repositoryRoot, "docs/a-record.md"),
+        "# a record\n\n[the rule](rules/gone.md) settled it.\n",
+        "utf-8",
+      );
+      await mkdir(join(repositoryRoot, "packages/probe"), { recursive: true });
+      await writeFile(join(repositoryRoot, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf-8");
+      await writeFile(
+        join(repositoryRoot, "packages/probe/package.json"),
+        PACKAGE_MANIFEST,
+        "utf-8",
+      );
+      await writeFile(
+        join(repositoryRoot, "packages/probe/AGENTS.md"),
+        NORMATIVE_DOCUMENT,
+        "utf-8",
+      );
+      await symlink("AGENTS.md", join(repositoryRoot, "packages/probe/CLAUDE.md"));
+      await runAgenticDocuments(["check", "--repository-root", repositoryRoot, "--write"]);
+      return runAgenticDocuments(["check", "--repository-root", repositoryRoot]);
+    });
+
+    it("is reported even though it is not a normative document", ({
+      theRunOfARepositoryWithARottenPointer,
+    }) => {
+      expect(theRunOfARepositoryWithARottenPointer).toStrictEqual({
+        exitCode: EXIT_PROBLEMS_FOUND,
+        out: "docs/a-record.md:3 参照 `rules/gone.md` の指し先 `docs/rules/gone.md` が実在しない。参照を更新するか、参照ごと消す。\n",
+        error: "",
+      });
+    });
+  });
+
   describe("a repository whose documents satisfy every check", () => {
     const it = test.extend("theRunOfASatisfyingRepository", async ({}, { onCleanup }) => {
       const repositoryRoot = await mkdtemp(join(tmpdir(), "agentic-documents-"));
@@ -107,8 +167,13 @@ describe("runAgenticDocuments", () => {
       await writeFile(join(repositoryRoot, "AGENTS.md"), NORMATIVE_DOCUMENT, "utf-8");
       await symlink("AGENTS.md", join(repositoryRoot, "CLAUDE.md"));
       await writeFile(join(repositoryRoot, "package.json"), PACKAGE_MANIFEST, "utf-8");
-      await mkdir(join(repositoryRoot, "docs"));
+      await mkdir(join(repositoryRoot, "docs/guidelines"), { recursive: true });
       await writeFile(join(repositoryRoot, "docs/workspaces.md"), WORKSPACE_LIST, "utf-8");
+      await writeFile(
+        join(repositoryRoot, "docs/guidelines/probe.md"),
+        GUIDELINE_DOCUMENT,
+        "utf-8",
+      );
       return runAgenticDocuments(["check", "--repository-root", repositoryRoot]);
     });
 
@@ -132,8 +197,13 @@ describe("runAgenticDocuments", () => {
       await writeFile(join(repositoryRoot, "AGENTS.md"), NORMATIVE_DOCUMENT, "utf-8");
       await symlink("AGENTS.md", join(repositoryRoot, "CLAUDE.md"));
       await writeFile(join(repositoryRoot, "package.json"), PACKAGE_MANIFEST, "utf-8");
-      await mkdir(join(repositoryRoot, "docs"));
+      await mkdir(join(repositoryRoot, "docs/guidelines"), { recursive: true });
       await writeFile(join(repositoryRoot, "docs/workspaces.md"), WORKSPACE_LIST, "utf-8");
+      await writeFile(
+        join(repositoryRoot, "docs/guidelines/probe.md"),
+        GUIDELINE_DOCUMENT,
+        "utf-8",
+      );
       process.chdir(repositoryRoot);
       return runAgenticDocuments(["check"]);
     });

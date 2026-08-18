@@ -79,7 +79,7 @@ export const noLenientCoverageThreshold = createDontReviewItRule({
     docs: {
       description:
         "Require the test config to demand full coverage on every metric, so the amount of untested code that is allowed to stay is a decision written down once rather than whatever the suite happens to reach",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/tests.md"],
     },
     messages: {
       missingCoverageThresholds:

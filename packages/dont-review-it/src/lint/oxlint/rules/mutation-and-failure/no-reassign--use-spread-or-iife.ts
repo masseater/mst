@@ -115,7 +115,7 @@ export const noReassign = createDontReviewItRule({
     docs: {
       description:
         "Disallow every assignment-shaped mutation - a re-bindable declaration, a write to an existing binding or property, an index or length write, a property-writing standard call, a property deletion, a pattern assignment - so the value a name holds is fixed where the name is declared",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/writing-code.md"],
     },
     messages: {
       identifierAssignment:

@@ -20,7 +20,7 @@ export const noFloatingPromise = createDontReviewItRule({
     docs: {
       description:
         "Disallow a promise-valued expression that reaches no await, no return, no binding that is later awaited and no composition, so the place a failed asynchronous call lands is fixed by the call site's own control flow",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/writing-code.md"],
     },
     messages: {
       floatingPromiseStatement:

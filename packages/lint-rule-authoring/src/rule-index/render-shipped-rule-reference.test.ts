@@ -11,6 +11,8 @@ const DOCS_BASE = `https://github.com/masseater/mst/blob/main/${WORKSPACE_DIR}/d
 const plainRule: BundledLintRule = {
   bundle: null,
   name: "no-plain--decorate-it",
+  relatedGuidelines: [],
+  unreadableGuidelines: 0,
   description: "Disallow plainness",
   sourcePath: "src/lint/oxlint/rules/no-plain--decorate-it.ts",
   fixable: false,

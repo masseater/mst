@@ -210,7 +210,7 @@ export const forbidDeclaredCommandInvocation = createDontReviewItRule({
     docs: {
       description:
         "Disallow starting a command the shared declaration has retired as a child process, so the declaration that closes the import route and the manifest route closes the process route with the same entry",
-      relatedGuidelines: [],
+      relatedGuidelines: ["AGENTS.md"],
     },
     messages: {
       declaredCommandInvocation:

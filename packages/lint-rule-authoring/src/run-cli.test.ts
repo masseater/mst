@@ -8,13 +8,15 @@ import { runLintRuleAuthoring } from "./run-cli.ts";
 
 const USAGE = `Usage: lint-rule-authoring check [--write] [--repository-root <path>]
 
-Reconciles every workspace lint rule index (docs/lint/index.md) and every rule
-document (docs/lint/<rule>.md) with the rule implementations found under the
-directories that the workspace manifests declare in their lintRules field.
-Without --write it only reports what is missing, unmarked, stale, or still
-carrying the text a seeded document was written with; with --write it seeds the
-absent documents and regenerates every generated region. Exits non-zero when a
-problem remains.
+Reconciles every workspace lint rule index (docs/lint/index.md), every rule
+document (docs/lint/<rule>.md), and the repository table of rules by normative
+document (docs/lint-rules-by-guideline.md) with the rule implementations found
+under the directories that the workspace manifests declare in their lintRules
+field. Also reports every rule that names no normative document as its grounds,
+or names one that is not there. Without --write it only reports what is missing,
+unmarked, stale, or still carrying the text a seeded document was written with;
+with --write it seeds the absent documents and regenerates every generated
+region. Exits non-zero when a problem remains.
 
 Options:
   --write                   Write the regenerated documents instead of only reporting them.
@@ -24,6 +26,8 @@ Options:
 const MISSING_INDEX = `packages/example/docs/lint/index.md A workspace that declares lint rules must not go without \`packages/example/docs/lint/index.md\`. Generate it with \`vp run guard:fix\`.\n`;
 
 const MISSING_DOC = `packages/example/docs/lint/no-thing--allow-it.md A rule must not go without its document. Seed it with \`vp run guard:fix\`, then write the sections it leaves for you.\n`;
+
+const MISSING_GUIDELINE_INDEX = `docs/lint-rules-by-guideline.md A repository whose rules name their grounds must not go without \`docs/lint-rules-by-guideline.md\`. Generate it with \`vp run guard:fix\`.\n`;
 
 const SEEDED_SECTIONS = [
   `packages/example/docs/lint/no-thing--allow-it.md A seeded section must not be left as it was written. Replace "State what this rule rejects, why the invariant behind it holds, and where the detection stops short.".`,
@@ -39,7 +43,10 @@ const SEEDED_SECTIONS_LEFT_AS_WRITTEN = [...SEEDED_SECTIONS, NO_EXAMPLE, ""].joi
 
 const DECLARED_RULE = `export const rule = {
   name: "no-thing--allow-it",
-  meta: { docs: { description: "Disallow the thing" }, messages: { report: "No." } },
+  meta: {
+    docs: { description: "Disallow the thing", relatedGuidelines: ["docs/guidelines/writing.md"] },
+    messages: { report: "No." },
+  },
   create: () => ({}),
 };
 `;
@@ -73,7 +80,17 @@ describe("runLintRuleAuthoring", () => {
       rmSync(root, { recursive: true, force: true });
     });
     writeFileSync(join(root, "pnpm-workspace.yaml"), "packages:\n  - packages/*\n", "utf8");
+    writeFileSync(
+      join(root, "package.json"),
+      JSON.stringify({
+        name: "probe",
+        normativeDocuments: { fileName: "AGENTS.md", directories: ["docs/guidelines"] },
+      }),
+      "utf8",
+    );
     mkdirSync(join(root, "packages/example/src/rules"), { recursive: true });
+    mkdirSync(join(root, "docs/guidelines"), { recursive: true });
+    writeFileSync(join(root, "docs/guidelines/writing.md"), "# writing\n", "utf8");
     writeFileSync(
       join(root, "packages/example/package.json"),
       JSON.stringify({ lintRules: ["src/rules"] }),
@@ -130,10 +147,10 @@ describe("runLintRuleAuthoring", () => {
         runLintRuleAuthoring(["check", "--repository-root", declaringRepository]),
       );
 
-      it("reports the missing index and the missing document, and exits one", ({ theRun }) => {
+      it("reports every document it would have generated, and exits one", ({ theRun }) => {
         expect(theRun).toStrictEqual({
           exitCode: 1,
-          out: `${MISSING_INDEX}${MISSING_DOC}`,
+          out: `${MISSING_INDEX}${MISSING_DOC}${MISSING_GUIDELINE_INDEX}`,
           error: "",
         });
       });

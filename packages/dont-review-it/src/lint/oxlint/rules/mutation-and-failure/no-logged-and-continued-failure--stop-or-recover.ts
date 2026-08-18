@@ -84,7 +84,7 @@ export const noLoggedAndContinuedFailure = createDontReviewItRule({
     docs: {
       description:
         "Disallow writing a caught failure to an output stream inside a catch clause that neither stops nor returns, so a failure that was caught either ends the work or produces a value the caller can use",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/writing-code.md"],
     },
     messages: {
       loggedAndContinuedFailure:

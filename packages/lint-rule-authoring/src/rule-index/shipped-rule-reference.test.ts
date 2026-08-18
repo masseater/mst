@@ -19,6 +19,8 @@ const SKILL_SOURCE = "---\nname: core\n---\n";
 const rules: readonly BundledLintRule[] = [
   {
     name: "no-thing--allow-it",
+    relatedGuidelines: [],
+    unreadableGuidelines: 0,
     description: "Disallow the thing",
     sourcePath: "src/rules/no-thing--allow-it.ts",
     fixable: false,

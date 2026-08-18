@@ -83,7 +83,7 @@ export const noDetachedTestFile = createDontReviewItRule({
     docs: {
       description:
         "Require a test file to sit in the directory of the source it tests under that source's name, so the pair is tied together by the path and a test cannot be left behind when its source moves",
-      relatedGuidelines: [],
+      relatedGuidelines: ["AGENTS.md"],
     },
     messages: {
       detachedTestFile:

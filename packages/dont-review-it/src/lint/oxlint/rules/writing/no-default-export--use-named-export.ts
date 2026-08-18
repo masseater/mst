@@ -27,7 +27,7 @@ export const noDefaultExport = createDontReviewItRule({
     docs: {
       description:
         "Disallow every export whose outward name is `default`, so a symbol keeps the name it was defined under all the way to the places that call it",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/writing-code.md"],
     },
     messages: {
       defaultExport:

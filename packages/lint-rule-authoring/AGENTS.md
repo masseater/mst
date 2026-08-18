@@ -25,7 +25,7 @@ lint による強制が、書かれた時点でも、時間が経った後でも
 
 - `@mst/lint-rule-authoring` — factory・severity 語彙・テスト基盤・ルール索引の照合関数・このパッケージの oxlint config
 - `@mst/lint-rule-authoring/plugin` — oxlint が `jsPlugins` の指定子で読むエントリ
-- `lint-rule-authoring check [--write]` — マニフェストの `lintRules` が宣言する置き場からルールを発見し、各ワークスペースの `packages/<workspace>/docs/lint/index.md` と、skill を持つワークスペースの `skills/core/references/lint-rules.md` の生成領域を照合・再生成する CLI
+- `lint-rule-authoring check [--write]` — マニフェストの `lintRules` が宣言する置き場からルールを発見し、各ワークスペースの `packages/<workspace>/docs/lint/index.md`、skill を持つワークスペースの `skills/core/references/lint-rules.md`、リポジトリ直下の `docs/lint-rules-by-guideline.md` の生成領域を照合・再生成し、各ルールが根拠として名指しする規範文書を検査する CLI
 
 出荷側の一覧を別に生成するのは、`docs/` が tarball に入らないためである。install した側が読めるのは skill だけで、`vp lint --print-config` は js plugin のルールを 1 本も出さない。出荷側の表は各ルールの文書へリポジトリの URL で繋ぐ。
 
@@ -48,6 +48,15 @@ lint による強制が、書かれた時点でも、時間が経った後でも
   - PROHIBIT: 宣言を書かずに preset の側だけで載せないでおく
     - 索引はルールの実装だけを読む。preset を読まないので、宣言が無いルールは配られているものとして並ぶ
   - 載せてよい条件と、文書に何を書くかは [AGENTS.md](../../AGENTS.md) が持つ
+- IF: ルールを書く; THEN
+  - MUST: そのルールが強制している規範文書を meta に名指しする
+    - 規範を読んだ人が、そこまでのどこが機械に任されているかを `docs/lint-rules-by-guideline.md` から引ける
+  - MUST: 名指しできる先を、リポジトリ直下か自分のワークスペースの `docs/guidelines/` の文書か `AGENTS.md` に限る
+  - PROHIBIT: 決定の記録を根拠として名指しする
+    - 決定の記録は誰も拘束しない。何を守るのかは規範文書の側にある
+  - IF: 強制したい不変条件を持つ規範文書が無い; THEN
+    - MUST: 規範文書の側を先に足す
+    - PROHIBIT: 近い話題の文書を当てて済ませる
 - IF: preset を束に分けて配る; THEN
   - MUST: ルールを束の名前のディレクトリに置く
     - 索引は、宣言されたルールディレクトリからの相対パスの先頭セグメントを束として読む。ルールの実装だけを読むという性質は変わらない

@@ -94,7 +94,7 @@ export const noHardcodedProviderId = createDontReviewItRule({
     docs: {
       description:
         "Disallow text written out in the source at an identity argument of a client built from a provider package, so which account a deployment acts as is decided by its configuration rather than by the file that builds the client",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/secrets-and-permissions.md"],
     },
     messages: {
       hardcodedProviderId:

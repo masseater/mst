@@ -17,7 +17,7 @@ export const noBroadLintDisable = createLintRuleAuthoringRule({
     docs: {
       description:
         "Require every lint suppression to apply to the next line alone, so code written later never inherits an exemption nobody chose for it",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/enforcement.md"],
     },
     messages: {
       broadLintDisable:

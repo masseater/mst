@@ -179,7 +179,7 @@ export const requireTestBlockForSpecFile = createDontReviewItRule({
     docs: {
       description:
         "Require a file named as a spec to declare at least one test block that runs, so naming a file a spec costs a check that actually executes rather than buying the standing of a spec for free",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/enforcement.md"],
     },
     messages: {
       noTestBlock:

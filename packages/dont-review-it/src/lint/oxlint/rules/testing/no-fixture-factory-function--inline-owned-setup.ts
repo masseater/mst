@@ -172,7 +172,7 @@ export const noFixtureFactoryFunction = createDontReviewItRule({
     docs: {
       description:
         "Disallow a fixture handing back a function that builds the subject, so the setup a scenario runs is spelled out in the fixture that owns it rather than chosen again by every test block",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/tests.md"],
     },
     messages: {
       parameterisedFactory:

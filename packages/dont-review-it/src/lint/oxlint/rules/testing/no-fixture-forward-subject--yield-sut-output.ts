@@ -201,7 +201,7 @@ export const noFixtureForwardSubject = createDontReviewItRule({
     docs: {
       description:
         "Disallow a fixture handing back a binding it was given, a member read off an existing value, or a value derived from a binding it was given, so the subject a fixture owns is the whole output of the code it exercises rather than a narrower view of something that already existed",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/tests.md"],
     },
     messages: {
       forwardedSubject:

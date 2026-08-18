@@ -10,6 +10,8 @@ export type WorkspaceListConfig = {
 
 export type AgenticDocumentsConfig = {
   readonly normativeDocumentFileName: string;
+  readonly normativeDocumentDirectories: readonly string[];
+  readonly documentFileSuffix: string;
   readonly companionFileNames: readonly string[];
   readonly requiredFrontmatterFields: readonly string[];
   readonly decisionKeywords: readonly string[];
@@ -46,6 +48,8 @@ const WORKSPACE_LIST_REGION: GeneratedRegionBoundary = {
 
 export const defaultConfig: AgenticDocumentsConfig = {
   normativeDocumentFileName: "AGENTS.md",
+  normativeDocumentDirectories: [],
+  documentFileSuffix: ".md",
   companionFileNames: ["CLAUDE.md"],
   requiredFrontmatterFields: ["description"],
   decisionKeywords: ["MUST", "PROHIBIT", "SHOULD NOT", "SHOULD", "MAY"],
@@ -57,7 +61,16 @@ export const defaultConfig: AgenticDocumentsConfig = {
   contrastivePositiveMarkers: ["OK", "Good", "After", "良い例", "正しい例", "推奨"],
   sectionBoundaryHeadingDepth: 2,
   generatedRegionBoundaries: [TOOLCHAIN_REGION],
-  ignoredDirectories: ["node_modules", ".git", "dist", "coverage", ".claude", ".local-agents"],
+  ignoredDirectories: [
+    "node_modules",
+    ".git",
+    "dist",
+    "coverage",
+    ".claude",
+    ".local-agents",
+    ".spool",
+    "_artifacts",
+  ],
   repositoryRelativePrefixes: ["apps/", "packages/", "docs/", "tools/"],
   pointerMark: "@",
   duplicateUnitMinimumLength: 40,

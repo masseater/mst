@@ -103,7 +103,7 @@ export const noFixtureCopySubject = createDontReviewItRule({
     docs: {
       description:
         "Disallow a fixture handing back a subject assembled by reading same-named properties off another value, so an assertion compares the shape the code under test produced instead of a hand-written copy that goes stale on its own",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/tests.md"],
     },
     messages: {
       copiedSubject:

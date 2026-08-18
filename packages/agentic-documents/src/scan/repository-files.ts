@@ -31,6 +31,15 @@ const collect = async ({
   return nested.flat();
 };
 
+const repositoryRelative = ({
+  repositoryRoot,
+  absolutePaths,
+}: {
+  readonly repositoryRoot: string;
+  readonly absolutePaths: readonly string[];
+}): readonly string[] =>
+  absolutePaths.map((absolutePath) => relative(repositoryRoot, absolutePath)).toSorted();
+
 export const findFilesNamed = async ({
   repositoryRoot,
   fileName,
@@ -46,5 +55,23 @@ export const findFilesNamed = async ({
     matches: (entryName) => entryName === fileName,
   });
 
-  return absolutePaths.map((absolutePath) => relative(repositoryRoot, absolutePath)).toSorted();
+  return repositoryRelative({ repositoryRoot, absolutePaths });
+};
+
+export const findFilesSuffixed = async ({
+  repositoryRoot,
+  suffix,
+  ignoredDirectories,
+}: {
+  readonly repositoryRoot: string;
+  readonly suffix: string;
+  readonly ignoredDirectories: readonly string[];
+}): Promise<readonly string[]> => {
+  const absolutePaths = await collect({
+    absoluteDirectory: repositoryRoot,
+    ignoredDirectories,
+    matches: (entryName) => entryName.endsWith(suffix),
+  });
+
+  return repositoryRelative({ repositoryRoot, absolutePaths });
 };

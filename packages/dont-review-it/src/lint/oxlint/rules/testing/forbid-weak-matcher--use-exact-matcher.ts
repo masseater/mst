@@ -65,7 +65,7 @@ export const forbidWeakMatcher = createDontReviewItRule({
     docs: {
       description:
         "Disallow a matcher that reads only part of the value or the shape of its subject inside a spec file, so an assertion passes only for a subject that equals what the spec says it must equal",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/tests.md"],
     },
     messages: {
       weakMatcher:

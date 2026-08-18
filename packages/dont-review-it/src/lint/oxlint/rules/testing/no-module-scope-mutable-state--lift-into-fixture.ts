@@ -175,7 +175,7 @@ export const noModuleScopeMutableState = createDontReviewItRule({
     docs: {
       description:
         "Disallow a test writing to a binding declared outside every fixture, test block and setup hook, so the state a test changes belongs to that test alone rather than to the whole file",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/tests.md"],
     },
     messages: {
       sharedBindingRebound:

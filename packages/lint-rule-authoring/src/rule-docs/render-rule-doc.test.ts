@@ -9,6 +9,8 @@ import {
 
 const SILENT_RULE = {
   name: "no-thing--allow-it",
+  relatedGuidelines: [],
+  unreadableGuidelines: 0,
   description: "Disallow the thing",
   sourcePath: "src/lint/oxlint/rules/no-thing--allow-it.ts",
   fixable: false,

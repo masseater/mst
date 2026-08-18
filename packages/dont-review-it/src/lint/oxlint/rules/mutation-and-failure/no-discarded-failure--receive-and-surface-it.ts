@@ -64,7 +64,7 @@ export const noDiscardedFailure = createDontReviewItRule({
     docs: {
       description:
         "Disallow taking the result of a call that returns a failure and a value as a pair without binding the failure, and disallow a catch clause that names nothing, so a failure reaches a place that can act on it instead of turning into the value that stands for its own absence",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/writing-code.md"],
     },
     messages: {
       discardedFailurePair:

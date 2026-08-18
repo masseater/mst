@@ -26,7 +26,7 @@ export const noAmbiguousVariableName = createDontReviewItRule({
     docs: {
       description:
         "Disallow a binding named by one of the ambiguous-name patterns, so the name says what the binding holds instead of sending a reader upstream to the assignment",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/writing-code.md"],
     },
     messages: {
       ambiguousVariableName:

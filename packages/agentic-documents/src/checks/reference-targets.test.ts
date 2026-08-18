@@ -34,6 +34,7 @@ describe("brokenReferences", () => {
           config: defaultConfig,
         }),
         config: defaultConfig,
+        workspaceDirectories: [],
       });
     });
 
@@ -56,6 +57,7 @@ describe("brokenReferences", () => {
           config: defaultConfig,
         }),
         config: defaultConfig,
+        workspaceDirectories: [],
       });
     });
 
@@ -80,6 +82,7 @@ describe("brokenReferences", () => {
           config: defaultConfig,
         }),
         config: defaultConfig,
+        workspaceDirectories: [],
       });
     });
 
@@ -106,6 +109,7 @@ describe("brokenReferences", () => {
           config: defaultConfig,
         }),
         config: defaultConfig,
+        workspaceDirectories: [],
       });
     });
 
@@ -132,6 +136,7 @@ describe("brokenReferences", () => {
           config: defaultConfig,
         }),
         config: defaultConfig,
+        workspaceDirectories: [],
       });
     });
 
@@ -154,6 +159,7 @@ describe("brokenReferences", () => {
           config: defaultConfig,
         }),
         config: defaultConfig,
+        workspaceDirectories: [],
       });
     });
 
@@ -180,6 +186,7 @@ describe("brokenReferences", () => {
           config: defaultConfig,
         }),
         config: defaultConfig,
+        workspaceDirectories: [],
       });
     });
 
@@ -204,6 +211,7 @@ describe("brokenReferences", () => {
           config: defaultConfig,
         }),
         config: defaultConfig,
+        workspaceDirectories: [],
       });
     });
 
@@ -230,6 +238,7 @@ describe("brokenReferences", () => {
           config: defaultConfig,
         }),
         config: defaultConfig,
+        workspaceDirectories: [],
       });
     });
 
@@ -252,10 +261,178 @@ describe("brokenReferences", () => {
           config: defaultConfig,
         }),
         config: defaultConfig,
+        workspaceDirectories: [],
       });
     });
 
     it("何も報告しない", ({ problems }) => {
+      expect(problems).toStrictEqual([]);
+    });
+  });
+
+  describe("自分のワークスペースが同じ位置に持つ文書を、ワークスペース名を省いて書いた散文", () => {
+    const it = test.extend("problems", async ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-references-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      mkdirSync(join(repositoryRoot, "packages/user/docs"), { recursive: true });
+      writeFileSync(join(repositoryRoot, "packages/user/docs/rules.md"), "# 規約\n", "utf8");
+      return brokenReferences({
+        repositoryRoot,
+        document: toNormativeDocument({
+          file: "packages/user/AGENTS.md",
+          source: "このワークスペースの `docs/rules.md` を読む\n",
+          config: defaultConfig,
+        }),
+        config: defaultConfig,
+        workspaceDirectories: ["packages/user"],
+      });
+    });
+
+    it("自分のワークスペースの下で解決できるので何も報告しない", ({ problems }) => {
+      expect(problems).toStrictEqual([]);
+    });
+  });
+
+  describe("自分のワークスペースの下にも無い文書を、ワークスペース名を省いて書いた散文", () => {
+    const it = test.extend("problems", async ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-references-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      mkdirSync(join(repositoryRoot, "packages/user"), { recursive: true });
+      return brokenReferences({
+        repositoryRoot,
+        document: toNormativeDocument({
+          file: "packages/user/AGENTS.md",
+          source: "このワークスペースの `docs/rules.md` を読む\n",
+          config: defaultConfig,
+        }),
+        config: defaultConfig,
+        workspaceDirectories: ["packages/user"],
+      });
+    });
+
+    it("指し先が実在しないと報告する", ({ problems }) => {
+      expect(problems).toStrictEqual([
+        { file: "packages/user/AGENTS.md", line: 1, message: MISSING_FILE_MESSAGE },
+      ]);
+    });
+  });
+
+  describe("ワークスペースの下で解決できるが、その見出しを持たない指し先", () => {
+    const it = test.extend("problems", async ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-references-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      mkdirSync(join(repositoryRoot, "packages/user/docs"), { recursive: true });
+      writeFileSync(join(repositoryRoot, "packages/user/docs/rules.md"), "# 規約\n", "utf8");
+      return brokenReferences({
+        repositoryRoot,
+        document: toNormativeDocument({
+          file: "packages/user/AGENTS.md",
+          source: "`docs/rules.md#存在しない見出し` を読む\n",
+          config: defaultConfig,
+        }),
+        config: defaultConfig,
+        workspaceDirectories: ["packages/user"],
+      });
+    });
+
+    it("解決できたワークスペースの文書を指して、位置が無いと報告する", ({ problems }) => {
+      expect(problems).toStrictEqual([
+        {
+          file: "packages/user/AGENTS.md",
+          line: 1,
+          message:
+            "参照 `docs/rules.md#存在しない見出し` が指す位置が `packages/user/docs/rules.md` に無い。現在の見出しを指すか、位置の指定を消す。指していた節の内容が今どこにあるかを確かめる。",
+        },
+      ]);
+    });
+  });
+
+  describe("ワークスペースの文書が、別のワークスペースにしか無い指し先を書いた散文", () => {
+    const it = test.extend("problems", async ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-references-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      mkdirSync(join(repositoryRoot, "packages/other/docs"), { recursive: true });
+      mkdirSync(join(repositoryRoot, "packages/user"), { recursive: true });
+      writeFileSync(join(repositoryRoot, "packages/other/docs/rules.md"), "# 規約\n", "utf8");
+      return brokenReferences({
+        repositoryRoot,
+        document: toNormativeDocument({
+          file: "packages/user/AGENTS.md",
+          source: "`docs/rules.md` を読む\n",
+          config: defaultConfig,
+        }),
+        config: defaultConfig,
+        workspaceDirectories: ["packages/other", "packages/user"],
+      });
+    });
+
+    it("自分のワークスペースの下に無いので報告する", ({ problems }) => {
+      expect(problems).toStrictEqual([
+        { file: "packages/user/AGENTS.md", line: 1, message: MISSING_FILE_MESSAGE },
+      ]);
+    });
+  });
+
+  describe("どのワークスペースにも属さない文書が、ワークスペース配下の指し先を書いた散文", () => {
+    const it = test.extend("problems", async ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-references-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      mkdirSync(join(repositoryRoot, "packages/user/docs"), { recursive: true });
+      writeFileSync(join(repositoryRoot, "packages/user/docs/rules.md"), "# 規約\n", "utf8");
+      return brokenReferences({
+        repositoryRoot,
+        document: toNormativeDocument({
+          file: "AGENTS.md",
+          source: "`docs/rules.md` を読む\n",
+          config: defaultConfig,
+        }),
+        config: defaultConfig,
+        workspaceDirectories: ["packages/user"],
+      });
+    });
+
+    it("持ち主がいないので根からだけ解決し、報告する", ({ problems }) => {
+      expect(problems).toStrictEqual([
+        { file: "AGENTS.md", line: 1, message: MISSING_FILE_MESSAGE },
+      ]);
+    });
+  });
+
+  describe("入れ子のワークスペースが持つ文書", () => {
+    const it = test.extend("problems", async ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-references-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      mkdirSync(join(repositoryRoot, "apps/web/packages/inner/docs"), { recursive: true });
+      writeFileSync(
+        join(repositoryRoot, "apps/web/packages/inner/docs/rules.md"),
+        "# 規約\n",
+        "utf8",
+      );
+      return brokenReferences({
+        repositoryRoot,
+        document: toNormativeDocument({
+          file: "apps/web/packages/inner/AGENTS.md",
+          source: "`docs/rules.md` を読む\n",
+          config: defaultConfig,
+        }),
+        config: defaultConfig,
+        workspaceDirectories: ["apps/web", "apps/web/packages/inner"],
+      });
+    });
+
+    it("最も深く一致するワークスペースを持ち主として解決する", ({ problems }) => {
       expect(problems).toStrictEqual([]);
     });
   });

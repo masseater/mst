@@ -7,6 +7,8 @@ import type { BundledLintRule } from "./rule-bundle.ts";
 const plainRule: BundledLintRule = {
   bundle: null,
   name: "no-plain--decorate-it",
+  relatedGuidelines: [],
+  unreadableGuidelines: 0,
   description: "Disallow plainness",
   sourcePath: "src/lint/oxlint/rules/no-plain--decorate-it.ts",
   fixable: false,

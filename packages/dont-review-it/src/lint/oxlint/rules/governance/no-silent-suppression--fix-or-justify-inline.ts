@@ -70,7 +70,7 @@ export const noSilentSuppression = createDontReviewItRule({
     docs: {
       description:
         "Require every report from the rules that keep one declaration in one place to end in a repair, a registered deviation, or a suppression that carries its grounds, so what the linter stops saying is a decision somebody wrote down",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/enforcement.md"],
     },
     messages: {
       groundlessSuppression:

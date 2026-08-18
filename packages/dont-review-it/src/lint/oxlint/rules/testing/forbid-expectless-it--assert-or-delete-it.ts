@@ -44,7 +44,7 @@ export const forbidExpectlessIt = createDontReviewItRule({
     docs: {
       description:
         "Disallow a test block whose body carries no assertion, so a passing run only ever means the claims written in the blocks held",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/tests.md"],
     },
     messages: {
       expectlessIt:

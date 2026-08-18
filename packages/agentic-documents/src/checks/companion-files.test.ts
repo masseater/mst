@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -203,6 +203,32 @@ describe("companionFileProblems", () => {
             "`CLAUDE.md` が規範文書を指す参照 1 つだけを中身として持っている。読み手によっては参照として解釈されず、その 1 行だけが指示として読まれる。規範文書への結び付きに置き換える。",
         },
       ]);
+    });
+  });
+
+  describe("規範文書の置き場に平置きされた主題ごとの文書", () => {
+    const it = test.extend("problems", async ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "agentic-documents-companion-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      mkdirSync(join(repositoryRoot, "docs", "guidelines"), { recursive: true });
+      writeFileSync(join(repositoryRoot, "docs", "guidelines", "tests.md"), "# テスト\n", "utf8");
+      return companionFileProblems({
+        repositoryRoot,
+        documents: [
+          toNormativeDocument({
+            file: "docs/guidelines/tests.md",
+            source: "# テスト\n",
+            config: defaultConfig,
+          }),
+        ],
+        config: defaultConfig,
+      });
+    });
+
+    it("対応ファイルを求めない", ({ problems }) => {
+      expect(problems).toStrictEqual([]);
     });
   });
 });

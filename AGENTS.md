@@ -30,6 +30,11 @@ mst は、リポジトリ運用の仕組みを再利用可能な単位として�
 - IF: AI 向けの指示を置く; THEN
   - MUST: `AGENTS.md` を実体とし、`CLAUDE.md` を同じディレクトリの `AGENTS.md` を指すシンボリックリンクにする
   - PROHIBIT: `CLAUDE.md` に中身を書く
+- IF: 規範文書の置き場を増やす、減らす、名前を変える; THEN
+  - MUST: ルートの `package.json` の `normativeDocuments` を書き換える
+    - `fileName` は場所ごとの規約を読む先の名前、`directories` はその直下の Markdown を規範文書として扱う置き場である。文書の検査とルールの根拠の検査と逆引き表が、いずれもこの宣言だけを読む
+  - PROHIBIT: 検査の側に置き場を書く
+    - 宣言が 2 箇所になると、片方を変えても他方は気付かない
 - IF: lint の重大度を読む; THEN MUST: warn を人間に確認せず無視してよいもの、error を基本的にすべて解消するものとして扱う
 - IF: lint ルールを追加する; THEN
   - MUST: error で追加する

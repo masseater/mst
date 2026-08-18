@@ -255,7 +255,7 @@ export const forbidMultiExpectIt = createDontReviewItRule({
     docs: {
       description:
         "Disallow a test block reaching more assertions than the budget set for it, counting the ones its callees carry as well, so a failing block names one behaviour and one cause",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/tests.md"],
     },
     messages: {
       multiExpectIt:

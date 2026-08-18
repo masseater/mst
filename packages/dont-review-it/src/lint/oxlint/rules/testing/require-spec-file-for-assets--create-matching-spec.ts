@@ -31,7 +31,7 @@ export const requireSpecFileForAssets = createDontReviewItRule({
     docs: {
       description:
         "Require every test data file to sit beside a spec of the same stem, so the data has one owner that reads it and leaves the repository with the test that gave it a reason to exist",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/tests.md"],
     },
     messages: {
       unownedAssets:

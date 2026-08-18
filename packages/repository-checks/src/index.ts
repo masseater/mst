@@ -8,5 +8,11 @@ export {
   type CliResult,
 } from "./cli-result.ts";
 export { gitExecutablePath } from "./git-executable.ts";
+export {
+  DOCUMENT_SUFFIX,
+  normativeDocumentPlacesIn,
+  normativeDocumentsIn,
+  type NormativeDocumentPlaces,
+} from "./normative-document-places.ts";
 export { failureCodeOf, readUnlessMissing } from "./path-failure.ts";
 export type { RepositoryProblem } from "./problem.ts";

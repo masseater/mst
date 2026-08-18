@@ -40,6 +40,8 @@ export const full = createRule({
       expect(facts).toStrictEqual([
         {
           name: "no-full--stop-doing-it",
+          relatedGuidelines: [],
+          unreadableGuidelines: 0,
           description: "Disallow the thing",
           sourcePath: "src/rules/full.ts",
           fixable: true,
@@ -82,6 +84,8 @@ export const full = createRule({
       expect(facts).toStrictEqual([
         {
           name: "no-bare--wrap-it",
+          relatedGuidelines: [],
+          unreadableGuidelines: 0,
           description: "Disallow bare spelling",
           sourcePath: "src/rules/bare.ts",
           fixable: false,
@@ -409,6 +413,8 @@ export const borrowedDocs = {
       expect(facts).toStrictEqual([
         {
           name: "no-borrowed-docs--inline-them",
+          relatedGuidelines: [],
+          unreadableGuidelines: 0,
           description: "",
           sourcePath: "src/rules/borrowed-docs.ts",
           fixable: false,
@@ -447,6 +453,8 @@ export const namedSchema = {
       expect(facts).toStrictEqual([
         {
           name: "no-named-schema--read-it",
+          relatedGuidelines: [],
+          unreadableGuidelines: 0,
           description: "",
           sourcePath: "src/rules/named-schema.ts",
           fixable: false,
@@ -571,6 +579,135 @@ export const second = {
       expect(readMessages).toStrictEqual([
         { messageId: "spelled", template: "It is forbidden. Write it out." },
       ]);
+    });
+  });
+
+  describe("grounds that are not written out as a list of paths", () => {
+    const it = test.extend("readGrounds", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "rule-facts-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      const sourcePath = "src/rules/named-grounds.ts";
+      mkdirSync(dirname(join(root, sourcePath)), { recursive: true });
+      writeFileSync(
+        join(root, sourcePath),
+        `export const named = {
+  name: "no-named-grounds--write-them-out",
+  meta: {
+    docs: { description: "Disallow naming grounds by a constant", relatedGuidelines: GROUNDS },
+    messages: { report: "No." },
+  },
+  create: () => ({}),
+};
+`,
+        "utf8",
+      );
+      return lintRuleFactsIn({ workspaceRoot: root, sourcePath }).flatMap(
+        (rule) => rule.relatedGuidelines,
+      );
+    });
+
+    it("reads none of them", ({ readGrounds }) => {
+      expect(readGrounds).toStrictEqual([]);
+    });
+  });
+
+  describe("grounds holding a path settled while the program runs", () => {
+    const it = test.extend("readGrounds", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "rule-facts-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      const sourcePath = "src/rules/settled-grounds.ts";
+      mkdirSync(dirname(join(root, sourcePath)), { recursive: true });
+      writeFileSync(
+        join(root, sourcePath),
+        `export const settled = {
+  name: "no-settled-grounds--write-them-out",
+  meta: {
+    docs: {
+      description: "Disallow settling grounds at run time",
+      relatedGuidelines: [pathOf(), "docs/guidelines/tests.md"],
+    },
+    messages: { report: "No." },
+  },
+  create: () => ({}),
+};
+`,
+        "utf8",
+      );
+      return lintRuleFactsIn({ workspaceRoot: root, sourcePath }).flatMap(
+        (rule) => rule.relatedGuidelines,
+      );
+    });
+
+    it("keeps the one written out and passes over the one it cannot read", ({ readGrounds }) => {
+      expect(readGrounds).toStrictEqual(["docs/guidelines/tests.md"]);
+    });
+  });
+
+  describe("a rule declaring no grounds at all", () => {
+    const it = test.extend("readGrounds", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "rule-facts-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      const sourcePath = "src/rules/no-grounds.ts";
+      mkdirSync(dirname(join(root, sourcePath)), { recursive: true });
+      writeFileSync(
+        join(root, sourcePath),
+        `export const bare = {
+  name: "no-grounds--declare-them",
+  meta: {
+    docs: { description: "Disallow going without grounds" },
+    messages: { report: "No." },
+  },
+  create: () => ({}),
+};
+`,
+        "utf8",
+      );
+      return lintRuleFactsIn({ workspaceRoot: root, sourcePath }).flatMap(
+        (rule) => rule.relatedGuidelines,
+      );
+    });
+
+    it("reads an empty list", ({ readGrounds }) => {
+      expect(readGrounds).toStrictEqual([]);
+    });
+  });
+
+  describe("grounds held by a constant of the same file", () => {
+    const it = test.extend("readGrounds", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "rule-facts-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      const sourcePath = "src/rules/held-grounds.ts";
+      mkdirSync(dirname(join(root, sourcePath)), { recursive: true });
+      writeFileSync(
+        join(root, sourcePath),
+        `const GROUNDS = ["docs/guidelines/tests.md", "AGENTS.md"];
+
+export const held = {
+  name: "no-held-grounds--read-them",
+  meta: {
+    docs: { description: "Disallow holding grounds unread", relatedGuidelines: GROUNDS },
+    messages: { report: "No." },
+  },
+  create: () => ({}),
+};
+`,
+        "utf8",
+      );
+      return lintRuleFactsIn({ workspaceRoot: root, sourcePath }).flatMap(
+        (rule) => rule.relatedGuidelines,
+      );
+    });
+
+    it("follows the constant and reads both paths", ({ readGrounds }) => {
+      expect(readGrounds).toStrictEqual(["docs/guidelines/tests.md", "AGENTS.md"]);
     });
   });
 });

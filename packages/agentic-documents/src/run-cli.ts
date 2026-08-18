@@ -6,6 +6,7 @@ import {
   EXIT_MISUSE,
   EXIT_PROBLEMS_FOUND,
   EXIT_SUCCESS,
+  normativeDocumentPlacesIn,
   type CliResult,
 } from "@mst/repository-checks";
 
@@ -40,9 +41,16 @@ const dispatch = async (argv: readonly string[]): Promise<CliResult> => {
     return { exitCode: EXIT_MISUSE, out: "", error: USAGE };
   }
 
+  const repositoryRoot = resolve(parsedNode.values["repository-root"] ?? process.cwd());
+  const places = normativeDocumentPlacesIn(repositoryRoot);
+
   const problems = await runChecks({
-    repositoryRoot: resolve(parsedNode.values["repository-root"] ?? process.cwd()),
-    config: defaultConfig,
+    repositoryRoot,
+    config: {
+      ...defaultConfig,
+      normativeDocumentFileName: places.fileName,
+      normativeDocumentDirectories: places.directories,
+    },
     write: parsedNode.values.write,
   });
 

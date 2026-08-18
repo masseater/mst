@@ -256,7 +256,7 @@ export const noExpectMockCallInspection = createDontReviewItRule({
     docs: {
       description:
         "Disallow reading the call record of a mock as a value, in the subject of an assertion or in what a fixture hands back, so a claim about how a function was called is stated by the matcher that names it",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/tests.md"],
     },
     messages: {
       inspectedCallRecord:

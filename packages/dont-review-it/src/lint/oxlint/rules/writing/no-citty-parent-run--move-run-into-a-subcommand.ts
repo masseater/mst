@@ -15,7 +15,7 @@ export const noCittyParentRun = createDontReviewItRule({
     docs: {
       description:
         "Disallow a `run` handler on a citty command that declares `subCommands`, so a matched subcommand's output is never followed by the parent's",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/placement-and-tools.md"],
     },
     messages: {
       parentRun:

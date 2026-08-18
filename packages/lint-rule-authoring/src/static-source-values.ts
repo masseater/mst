@@ -58,6 +58,20 @@ const referencedTextOf = ({
   return resolveText({ node: referenced, constants, visited: [...visited, referencedName] });
 };
 
+export const listedNodesOf = ({
+  node,
+  constants,
+  visited,
+}: ResolveInput): readonly UnknownFields[] | null => {
+  if (node.type === "Identifier") {
+    const referencedName = node.name as string;
+    const referenced = constants.get(referencedName);
+    if (referenced === undefined || visited.includes(referencedName)) return null;
+    return listedNodesOf({ node: referenced, constants, visited: [...visited, referencedName] });
+  }
+  return node.type === "ArrayExpression" ? nodesIn(node.elements) : null;
+};
+
 const listedTextsOf = ({ node, constants, visited }: ResolveInput): readonly string[] | null => {
   if (node.type === "Identifier") {
     const referencedName = node.name as string;

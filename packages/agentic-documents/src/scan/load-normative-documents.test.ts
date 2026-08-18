@@ -177,4 +177,36 @@ describe("loadNormativeDocuments", () => {
       ]);
     });
   });
+
+  describe("規範文書の置き場として宣言された場所を持つリポジトリ", () => {
+    const it = test.extend("files", async ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "normative-documents-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      for (const [relativePath, documentSource] of Object.entries({
+        "AGENTS.md": "root\n",
+        "docs/guidelines/tests.md": "tests\n",
+        "docs/guidelines/principles.md": "principles\n",
+        "docs/engineering-decision-logs/0001-something.md": "decision\n",
+      })) {
+        const documentPath = join(repositoryRoot, relativePath);
+        mkdirSync(dirname(documentPath), { recursive: true });
+        writeFileSync(documentPath, documentSource, "utf8");
+      }
+      const documents = await loadNormativeDocuments({
+        repositoryRoot,
+        config: { ...defaultConfig, normativeDocumentDirectories: ["docs/guidelines"] },
+      });
+      return documents.map((document) => document.file);
+    });
+
+    it("その直下の文書を規範文書として読み、宣言していない場所は読まない", ({ files }) => {
+      expect(files).toStrictEqual([
+        "AGENTS.md",
+        "docs/guidelines/principles.md",
+        "docs/guidelines/tests.md",
+      ]);
+    });
+  });
 });

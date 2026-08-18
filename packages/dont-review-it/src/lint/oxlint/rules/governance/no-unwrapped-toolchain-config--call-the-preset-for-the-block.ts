@@ -19,7 +19,7 @@ export const noUnwrappedToolchainConfig = createDontReviewItRule({
     docs: {
       description:
         "Require the lint and fmt blocks of a Vite+ configuration to be what the matching `dontReviewItPreset` function returns, so the rule set, the formatting decisions, and what git is told to ignore all arrive without the caller restating them",
-      relatedGuidelines: [],
+      relatedGuidelines: ["docs/guidelines/placement-and-tools.md"],
     },
     messages: {
       unwrappedLint: `The \`lint\` block handed to Vite+'s \`defineConfig\` must not skip \`${PRESET_NAME}.lint\`. Wrap the block, keeping the additions where they are: \`lint: ${PRESET_NAME}.lint({ rules: { ... } })\`.`,

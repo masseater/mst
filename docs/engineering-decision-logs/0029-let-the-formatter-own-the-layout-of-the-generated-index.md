@@ -5,7 +5,7 @@
 
 ## 文脈
 
-各ワークスペースの `docs/lint/index.md` は、マニフェストの `lintRules` が宣言する置き場からルールを発見して生成する表を、マーカーで区切った領域に持つ。生成は `lint-rule-authoring check --write` が行い、鮮度の検査は [0026](0026-give-the-checks-one-entry-that-fails.md) の入口である `dont-review-it check` が行う。
+各ワークスペースが `docs/lint/` に持つ索引は、マニフェストの `lintRules` が宣言する置き場からルールを発見して生成する表を、マーカーで区切った領域に持つ。生成は `lint-rule-authoring check --write` が行い、鮮度の検査は [0026](0026-give-the-checks-one-entry-that-fails.md) の入口である `dont-review-it check` が行う。
 
 oxfmt は markdown の表を列ごとにパディングして揃える。幅の計算は文字の表示幅に基づき、日本語や絵文字は 1 文字を幅 2 として数える。生成器が書いた素の表は `vp check --fix` で必ず書き換わる。
 

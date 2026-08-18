@@ -7,6 +7,7 @@ import {
   declaratorsIn,
   isAstNode,
   keyNameOf,
+  listedNodesOf,
   moduleConstantsIn,
   nodesIn,
   propertyOf,
@@ -66,6 +67,29 @@ const descriptionOf = ({
   return resolveText({ node: descriptionNode, constants, visited: [] }) ?? "";
 };
 
+const relatedGuidelinesOf = ({
+  docs,
+  constants,
+}: {
+  readonly docs: UnknownFields | null;
+  readonly constants: ConstantsByName;
+}): { readonly spelled: readonly string[]; readonly unreadable: number } => {
+  const declared = docs === null ? null : propertyOf(docs, "relatedGuidelines");
+  if (declared === null) return { spelled: [], unreadable: 0 };
+
+  const listed = listedNodesOf({ node: declared, constants, visited: [] });
+  if (listed === null) return { spelled: [], unreadable: 1 };
+
+  const read = listed.map((namedDocument) =>
+    resolveText({ node: namedDocument, constants, visited: [] }),
+  );
+
+  return {
+    spelled: read.filter((resolved): resolved is string => resolved !== null),
+    unreadable: read.filter((resolved) => resolved === null).length,
+  };
+};
+
 type LintRuleMessage = {
   readonly messageId: string;
   readonly template: string;
@@ -107,6 +131,8 @@ const declaresOptions = ({
 export type LintRuleFacts = {
   readonly name: string;
   readonly description: string;
+  readonly relatedGuidelines: readonly string[];
+  readonly unreadableGuidelines: number;
   readonly sourcePath: string;
   readonly fixable: boolean;
   readonly hasSuggestions: boolean;
@@ -134,11 +160,14 @@ const factsOf = ({
   const suggestionsFlag = propertyOf(meta, "hasSuggestions");
   const docs = propertyOf(meta, "docs");
   const shippedFlag = docs === null ? null : propertyOf(docs, "shipped");
+  const grounds = relatedGuidelinesOf({ docs, constants });
 
   return [
     {
       name: ruleNameOf({ definition, constants, sourcePath }),
       description: descriptionOf({ docs, constants }),
+      relatedGuidelines: grounds.spelled,
+      unreadableGuidelines: grounds.unreadable,
       sourcePath,
       fixable: propertyOf(meta, "fixable") !== null,
       hasSuggestions: suggestionsFlag?.value === true,

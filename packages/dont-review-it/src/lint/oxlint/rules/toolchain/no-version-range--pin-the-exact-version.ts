@@ -42,7 +42,7 @@ export const createNoVersionRange = ({
       docs: {
         description:
           "Disallow every dependency version that matches more than one release, in workspace manifests and in the catalog alike, so the release a workspace installs is decided by the declaration instead of by the moment the install ran",
-        relatedGuidelines: [],
+        relatedGuidelines: ["AGENTS.md"],
       },
       messages: {
         rangedManifestVersion:
