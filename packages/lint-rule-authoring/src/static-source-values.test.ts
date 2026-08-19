@@ -1,7 +1,7 @@
 import { parseSync } from "oxc-parser";
 import { describe, expect, test } from "vite-plus/test";
 
-import { moduleConstantsIn, nodesIn, resolveText } from "./static-source-values.ts";
+import { listedNodesOf, moduleConstantsIn, nodesIn, resolveText } from "./static-source-values.ts";
 
 describe("resolveText", () => {
   describe("a list written in place and joined", () => {
@@ -190,6 +190,33 @@ describe("resolveText", () => {
         ["counted", null],
         ["picked", null],
         ["joined", "ab"],
+      ]);
+    });
+  });
+});
+
+describe("listedNodesOf", () => {
+  describe("constants written as a list, as a name for one, and as neither", () => {
+    const it = test.extend("listed", () => {
+      const constants = moduleConstantsIn(
+        nodesIn(
+          parseSync(
+            "held.ts",
+            'const parts = ["a", "b"];\nconst named = parts;\nconst counted = 1;',
+          ).program.body,
+        ),
+      );
+      return [...constants].map(([spelled, node]) => {
+        const listed = listedNodesOf({ node, constants, visited: [] });
+        return [spelled, listed === null ? null : listed.map((part) => part.type)];
+      });
+    });
+
+    it("walks a list, follows a name to one, and settles on nothing otherwise", ({ listed }) => {
+      expect(listed).toStrictEqual([
+        ["parts", ["Literal", "Literal"]],
+        ["named", ["Literal", "Literal"]],
+        ["counted", null],
       ]);
     });
   });

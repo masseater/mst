@@ -135,6 +135,8 @@ const REPEATED = `A rule must not name the same normative document twice. Remove
 
 const ABSENT = `A rule must not name a normative document that does not exist. Point \`docs/guidelines/gone.md\` at a document that is there, or drop the grounds that moved away.`;
 
+const ABSENT_OPERATING_DOCUMENT = `A rule must not name a normative document that does not exist. Point \`packages/example/AGENTS.md\` at a document that is there, or drop the grounds that moved away.`;
+
 const OUTSIDE_A_RECORD = `A rule must not draw its grounds from outside the normative documents. Point \`docs/engineering-decision-logs/0001-a-decision.md\` at a document this repository declares as normative, which is an \`AGENTS.md\` or a document directly in one of ["docs/guidelines"], at the repository root or in the workspace that owns the rule.`;
 
 const OUTSIDE_ANOTHER_WORKSPACE = `A rule must not draw its grounds from outside the normative documents. Point \`packages/other/AGENTS.md\` at a document this repository declares as normative, which is an \`AGENTS.md\` or a document directly in one of ["docs/guidelines"], at the repository root or in the workspace that owns the rule.`;
@@ -351,6 +353,42 @@ describe("relatedGuidelineProblems", () => {
 
     it("is left alone", ({ report }) => {
       expect(report).toStrictEqual({ problems: [], scanned: 1 });
+    });
+  });
+
+  describe("a rule naming the operating document its own workspace does not carry", () => {
+    const it = test.extend("report", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "related-guidelines-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages/example/src/rules"), { recursive: true });
+      mkdirSync(join(root, "packages/example/docs/guidelines"), { recursive: true });
+      mkdirSync(join(root, "packages/other"), { recursive: true });
+      mkdirSync(join(root, "docs/guidelines"), { recursive: true });
+      mkdirSync(join(root, "docs/engineering-decision-logs"), { recursive: true });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_DEFINITION, "utf8");
+      writeFileSync(join(root, "package.json"), DECLARING_ROOT_MANIFEST, "utf8");
+      writeFileSync(join(root, "AGENTS.md"), "# root\n", "utf8");
+      writeFileSync(join(root, "packages/other/AGENTS.md"), "# other\n", "utf8");
+      writeFileSync(join(root, "docs/guidelines/tests.md"), "# tests\n", "utf8");
+      writeFileSync(join(root, "docs/guidelines/notes.txt"), "plain\n", "utf8");
+      writeFileSync(join(root, "packages/example/docs/guidelines/local.md"), "# local\n", "utf8");
+      writeFileSync(
+        join(root, "docs/engineering-decision-logs/0001-a-decision.md"),
+        "# a decision\n",
+        "utf8",
+      );
+      writeFileSync(join(root, "packages/example/package.json"), DECLARING_MANIFEST, "utf8");
+      writeFileSync(join(root, RULE_PATH), RULE_STANDING_ON_ITS_OWN_OPERATING_DOCUMENT, "utf8");
+      return relatedGuidelineProblems({ repositoryRoot: root });
+    });
+
+    it("is reported as standing on a document that moved away", ({ report }) => {
+      expect(report).toStrictEqual({
+        problems: [{ file: RULE_PATH, message: ABSENT_OPERATING_DOCUMENT }],
+        scanned: 1,
+      });
     });
   });
 
