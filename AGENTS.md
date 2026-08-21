@@ -106,6 +106,14 @@ mst は、リポジトリ運用の仕組みを再利用可能な単位として�
   - MUST: 同じ変更で `skills/CHANGELOG.md` にその版の見出しを書く
   - PROHIBIT: SKILL.md の `metadata.library_version` を手で書き換える
     - マニフェストから一意に決まる値で、`vp run guard:fix` が揃える
+- IF: パッケージを npm へ出す; THEN
+  - MUST: マニフェストの `version` を上げた変更を main へ入れ、公開は CI の `publish` job に任せる
+    - レジストリに無い版だけが出る。どのパッケージが出るかは、上げた `version` が決める
+  - PROHIBIT: 手元から publish する
+    - ゲートを通っていない作業ツリーから出た tarball が、通ったものと区別できないままレジストリに残る
+    - 例外は [docs/publishing.md](docs/publishing.md) が持つ最初の 1 回だけで、そこでしか登録できないものを登録するために行う
+- IF: publish job を置くワークフローのファイル名を変える; THEN MUST: npm の Trusted Publisher の登録を同じ変更で直す
+  - 登録はワークフローのファイル名に紐づいていて、リポジトリ側だけ動かすと publish が認証に落ちる
 - IF: `.github/workflows/ci.yml` の `voidzero-dev/setup-vp` を書く; THEN
   - MUST: commit SHA で固定する
   - MUST: コメントにタグを書く
