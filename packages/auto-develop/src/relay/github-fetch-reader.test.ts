@@ -1,255 +1,126 @@
-import { describe, expect, test } from "vite-plus/test";
+import { describe, expect, test, vi } from "vite-plus/test";
 
-import {
-  createGithubFetchReader,
-  octokitAccessFor,
-  type GithubApiAccess,
-} from "./github-fetch-reader.ts";
+import { createGithubFetchReader, octokitAccessFor } from "./github-fetch-reader.ts";
 import { GithubRejectionError } from "./github-rejection-error.ts";
 import { GithubUnavailableError } from "./github-unavailable-error.ts";
 
-class GithubStatusError extends Error {
-  readonly status: number;
-
-  readonly response: { readonly headers: Readonly<Record<string, string>> };
-
-  constructor(status: number, headers: Readonly<Record<string, string>>) {
-    super(`github responded ${status}`);
-    this.status = status;
-    this.response = { headers };
-  }
-}
-
-const accessReturning = (parts: {
-  readonly graphqlData?: unknown;
-  readonly authenticatedLogin?: string;
-  readonly repositoryPrivate?: boolean;
-  readonly failure?: Error;
-}): GithubApiAccess => {
-  const refuse = (): Promise<never> =>
-    Promise.reject(parts.failure ?? new Error("no failure configured"));
-  return {
-    graphql: () => (parts.failure === undefined ? Promise.resolve(parts.graphqlData) : refuse()),
-    authenticatedLogin: () =>
-      parts.failure === undefined ? Promise.resolve(parts.authenticatedLogin ?? "") : refuse(),
-    repositoryIsPrivate: () =>
-      parts.failure === undefined ? Promise.resolve(parts.repositoryPrivate ?? false) : refuse(),
-  };
-};
-
-const readerWith = (parts: Parameters<typeof accessReturning>[0]) =>
-  createGithubFetchReader({
-    repository: "owner/repo",
-    token: "gh-token",
-    accessFor: () => accessReturning(parts),
-  });
-
-const failureWith = (
-  status: number,
-  headers: Readonly<Record<string, string>> = {},
-): GithubStatusError => new GithubStatusError(status, headers);
-
-const jsonResponse = (body: unknown): Response =>
-  Response.json(body, {
-    status: 200,
-    headers: { "content-type": "application/json" },
-  });
-
-const readerOverFetch = (fetchImpl: typeof fetch) =>
-  createGithubFetchReader({
-    repository: "owner/repo",
-    token: "gh-token",
-    accessFor: octokitAccessFor({ baseUrl: "https://api.github.test", fetchImpl }),
-  });
-
-const rejectionOf = async (task: () => Promise<unknown>): Promise<unknown> => {
-  try {
-    await task();
-    return null;
-  } catch (readFailure) {
-    return readFailure;
-  }
-};
-
-const openPullData = {
-  repository: {
-    pullRequests: {
-      nodes: [
-        {
-          number: 7,
-          title: "topic",
-          isDraft: false,
-          author: { login: "human" },
-          baseRefOid: "base-sha",
-          headRefOid: "head-sha",
-          mergeable: "MERGEABLE",
-          mergeStateStatus: "CLEAN",
-          reviewDecision: null,
-          labels: { nodes: [{ name: "keep" }] },
-          reviewRequests: { nodes: [{ requestedReviewer: { login: "review-bot" } }] },
-        },
-      ],
-    },
-  },
-};
-
-const bucketDataFor = (nodes: readonly unknown[]): unknown => ({
-  repository: {
-    pullRequest: {
-      commits: { nodes: [{ commit: { statusCheckRollup: { contexts: { nodes } } } }] },
-    },
-  },
-});
-
-const checkRollupData = {
-  repository: {
-    pullRequest: {
-      commits: {
-        nodes: [
-          {
-            commit: {
-              statusCheckRollup: {
-                contexts: {
+describe("createGithubFetchReader の読み取り", () => {
+  const it = test
+    .extend("resolvedLogin", () =>
+      createGithubFetchReader({
+        repository: "owner/repo",
+        token: "gh-token",
+        accessFor: () => ({
+          graphql: () => Promise.resolve(undefined),
+          authenticatedLogin: () => Promise.resolve("review-bot"),
+          repositoryIsPrivate: () => Promise.resolve(false),
+        }),
+      }).resolveTokenLogin("t"))
+    .extend("privacyFlag", () =>
+      createGithubFetchReader({
+        repository: "owner/repo",
+        token: "gh-token",
+        accessFor: () => ({
+          graphql: () => Promise.resolve(undefined),
+          authenticatedLogin: () => Promise.resolve(""),
+          repositoryIsPrivate: () => Promise.resolve(true),
+        }),
+      }).readRepositoryPrivacy("t"),
+    )
+    .extend("openPulls", () =>
+      createGithubFetchReader({
+        repository: "owner/repo",
+        token: "gh-token",
+        accessFor: () => ({
+          graphql: () =>
+            Promise.resolve({
+              repository: {
+                pullRequests: {
                   nodes: [
-                    { status: "COMPLETED", conclusion: "SUCCESS" },
-                    { status: "IN_PROGRESS" },
-                    { state: "FAILURE" },
+                    {
+                      number: 7,
+                      title: "topic",
+                      isDraft: false,
+                      author: { login: "human" },
+                      baseRefOid: "base-sha",
+                      headRefOid: "head-sha",
+                      mergeable: "MERGEABLE",
+                      mergeStateStatus: "CLEAN",
+                      reviewDecision: null,
+                      labels: { nodes: [{ name: "keep" }] },
+                      reviewRequests: { nodes: [{ requestedReviewer: { login: "review-bot" } }] },
+                    },
                   ],
                 },
               },
-            },
-          },
-        ],
-      },
-    },
-  },
-};
-
-const it = test
-  .extend("resolvedLogin", () =>
-    readerWith({ authenticatedLogin: "review-bot" }).resolveTokenLogin("t"))
-  .extend("privacyFlag", () => readerWith({ repositoryPrivate: true }).readRepositoryPrivacy("t"))
-  .extend("openPulls", () => readerWith({ graphqlData: openPullData }).listOpenPullRequests())
-  .extend("pullAuthor", () =>
-    readerWith({
-      graphqlData: { repository: { pullRequest: { author: { login: "human" } } } },
-    }).resolvePullAuthor(7),
-  )
-  .extend("checkBuckets", () => readerWith({ graphqlData: checkRollupData }).listCheckBuckets(7))
-  .extend("serverFailure", () =>
-    rejectionOf(() => readerWith({ failure: failureWith(503) }).listOpenPullRequests()),
-  )
-  .extend("rateLimitFailure", () =>
-    rejectionOf(() =>
-      readerWith({
-        failure: failureWith(403, { "x-ratelimit-remaining": "0" }),
+            }),
+          authenticatedLogin: () => Promise.resolve(""),
+          repositoryIsPrivate: () => Promise.resolve(false),
+        }),
       }).listOpenPullRequests(),
-    ),
-  )
-  .extend("forbiddenFailure", () =>
-    rejectionOf(() =>
-      readerWith({
-        failure: failureWith(403, { "x-ratelimit-remaining": "42" }),
-      }).listOpenPullRequests(),
-    ),
-  )
-  .extend("missingRepositoryData", () => readerWith({ graphqlData: {} }).listOpenPullRequests())
-  .extend("missingAuthorData", () => readerWith({ graphqlData: {} }).resolvePullAuthor(7))
-  .extend("missingCheckData", () => readerWith({ graphqlData: {} }).listCheckBuckets(7))
-  .extend("loginOverOctokit", () =>
-    readerOverFetch(() => Promise.resolve(jsonResponse({ login: "octo-user" }))).resolveTokenLogin(
-      "t",
-    ),
-  )
-  .extend("privacyOverOctokit", () =>
-    readerOverFetch(() => Promise.resolve(jsonResponse({ private: true }))).readRepositoryPrivacy(
-      "t",
-    ),
-  )
-  .extend("pullsOverOctokit", () =>
-    readerOverFetch(() =>
-      Promise.resolve(jsonResponse({ data: openPullData })),
-    ).listOpenPullRequests(),
-  )
-  .extend("cancelledBucket", () =>
-    readerWith({
-      graphqlData: bucketDataFor([{ status: "COMPLETED", conclusion: "CANCELLED" }]),
-    }).listCheckBuckets(7),
-  )
-  .extend("skippedBucket", () =>
-    readerWith({
-      graphqlData: bucketDataFor([{ status: "COMPLETED", conclusion: "SKIPPED" }]),
-    }).listCheckBuckets(7),
-  )
-  .extend("neutralBucket", () =>
-    readerWith({
-      graphqlData: bucketDataFor([{ status: "COMPLETED", conclusion: "NEUTRAL" }]),
-    }).listCheckBuckets(7),
-  )
-  .extend("failedRunBucket", () =>
-    readerWith({
-      graphqlData: bucketDataFor([{ status: "COMPLETED", conclusion: "FAILURE" }]),
-    }).listCheckBuckets(7),
-  )
-  .extend("expectedContextBucket", () =>
-    readerWith({ graphqlData: bucketDataFor([{ state: "EXPECTED" }]) }).listCheckBuckets(7),
-  )
-  .extend("successContextBucket", () =>
-    readerWith({ graphqlData: bucketDataFor([{ state: "SUCCESS" }]) }).listCheckBuckets(7),
-  )
-  .extend("pullWithoutOptionalFields", () =>
-    readerWith({
-      graphqlData: { repository: { pullRequests: { nodes: [{}] } } },
-    }).listOpenPullRequests(),
-  )
-  .extend("nonRecordNodesSkipped", () =>
-    readerWith({
-      graphqlData: { repository: { pullRequests: { nodes: ["not a node"] } } },
-    }).listOpenPullRequests(),
-  )
-  .extend("nonRecordContextsSkipped", () =>
-    readerWith({ graphqlData: bucketDataFor(["not a node"]) }).listCheckBuckets(7),
-  )
-  .extend("nonStringLabelsDropped", () =>
-    readerWith({
-      graphqlData: {
-        repository: {
-          pullRequests: {
-            nodes: [
-              {
-                labels: { nodes: [{ name: 7 }] },
-                reviewRequests: { nodes: [{ requestedReviewer: { login: 7 } }] },
+    )
+    .extend("pullSummaryGraphql", async () => {
+      const graphql = vi.fn<
+        (query: string, variables: Readonly<Record<string, unknown>>) => Promise<unknown>
+      >(() => Promise.resolve({ repository: { pullRequests: { nodes: [] } } }));
+      await createGithubFetchReader({
+        repository: "owner/repo",
+        token: "gh-token",
+        accessFor: () => ({
+          graphql,
+          authenticatedLogin: () => Promise.resolve(""),
+          repositoryIsPrivate: () => Promise.resolve(false),
+        }),
+      }).listOpenPullRequests();
+      return graphql;
+    })
+    .extend("pullAuthor", () =>
+      createGithubFetchReader({
+        repository: "owner/repo",
+        token: "gh-token",
+        accessFor: () => ({
+          graphql: () =>
+            Promise.resolve({ repository: { pullRequest: { author: { login: "human" } } } }),
+          authenticatedLogin: () => Promise.resolve(""),
+          repositoryIsPrivate: () => Promise.resolve(false),
+        }),
+      }).resolvePullAuthor(7),
+    )
+    .extend("checkBuckets", () =>
+      createGithubFetchReader({
+        repository: "owner/repo",
+        token: "gh-token",
+        accessFor: () => ({
+          graphql: () =>
+            Promise.resolve({
+              repository: {
+                pullRequest: {
+                  commits: {
+                    nodes: [
+                      {
+                        commit: {
+                          statusCheckRollup: {
+                            contexts: {
+                              nodes: [
+                                { status: "COMPLETED", conclusion: "SUCCESS" },
+                                { status: "IN_PROGRESS" },
+                                { state: "FAILURE" },
+                              ],
+                            },
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
               },
-            ],
-          },
-        },
-      },
-    }).listOpenPullRequests(),
-  )
-  .extend("nonRecordGraphqlData", () =>
-    readerWith({ graphqlData: "not a record" }).listOpenPullRequests(),
-  )
-  .extend("failureWithoutStatus", () =>
-    rejectionOf(() =>
-      readerWith({ failure: new Error("no status on this failure") }).listOpenPullRequests(),
-    ),
-  )
-  .extend("loginFailureOverDefaultPath", () =>
-    rejectionOf(() =>
-      readerOverFetch(() =>
-        Promise.resolve(new Response("nope", { status: 404 })),
-      ).resolveTokenLogin("t"),
-    ),
-  )
-  .extend("privacyFailureOverDefaultPath", () =>
-    rejectionOf(() =>
-      readerOverFetch(() =>
-        Promise.resolve(new Response("nope", { status: 404 })),
-      ).readRepositoryPrivacy("t"),
-    ),
-  );
+            }),
+          authenticatedLogin: () => Promise.resolve(""),
+          repositoryIsPrivate: () => Promise.resolve(false),
+        }),
+      }).listCheckBuckets(7),
+    );
 
-describe("createGithubFetchReader の読み取り", () => {
   it("認証済みユーザーのログインを返す", ({ resolvedLogin }) => {
     expect(resolvedLogin).toStrictEqual("review-bot");
   });
@@ -276,6 +147,33 @@ describe("createGithubFetchReader の読み取り", () => {
     ]);
   });
 
+  it("ラベル名を GitHub GraphQL schema の field で取得する", ({ pullSummaryGraphql }) => {
+    expect(pullSummaryGraphql).toHaveBeenCalledWith(
+      `query($owner: String!, $name: String!) {
+  repository(owner: $owner, name: $name) {
+    pullRequests(states: OPEN, first: 100) {
+      nodes {
+        number
+        title
+        isDraft
+        author { login }
+        baseRefOid
+        headRefOid
+        mergeable
+        mergeStateStatus
+        reviewDecision
+        labels(first: 100) { nodes { name } }
+        reviewRequests(first: 100) {
+          nodes { requestedReviewer { ... on User { login } } }
+        }
+      }
+    }
+  }
+}`,
+      { name: "repo", owner: "owner" },
+    );
+  });
+
   it("PR の著者ログインを返す", ({ pullAuthor }) => {
     expect(pullAuthor).toStrictEqual("human");
   });
@@ -286,20 +184,266 @@ describe("createGithubFetchReader の読み取り", () => {
 });
 
 describe("createGithubFetchReader の失敗分類", () => {
+  const it = test
+    .extend("serverFailure", async () => {
+      const githubStatusFailure: Error & {
+        status: number;
+        response: { headers: Record<string, string> };
+      } = {
+        name: "GithubStatusError",
+        message: "github responded 503",
+        status: 503,
+        response: { headers: {} },
+      };
+      try {
+        await createGithubFetchReader({
+          repository: "owner/repo",
+          token: "gh-token",
+          accessFor: () => ({
+            graphql: () => Promise.reject(githubStatusFailure),
+            authenticatedLogin: () => Promise.resolve(""),
+            repositoryIsPrivate: () => Promise.resolve(false),
+          }),
+        }).listOpenPullRequests();
+        throw new Error("a 5xx response was accepted");
+      } catch (serverReadFailure) {
+        return serverReadFailure;
+      }
+    })
+    .extend("rateLimitFailure", async () => {
+      const githubStatusFailure: Error & {
+        status: number;
+        response: { headers: Record<string, string> };
+      } = {
+        name: "GithubStatusError",
+        message: "github responded 403",
+        status: 403,
+        response: { headers: { "x-ratelimit-remaining": "0" } },
+      };
+      try {
+        await createGithubFetchReader({
+          repository: "owner/repo",
+          token: "gh-token",
+          accessFor: () => ({
+            graphql: () => Promise.reject(githubStatusFailure),
+            authenticatedLogin: () => Promise.resolve(""),
+            repositoryIsPrivate: () => Promise.resolve(false),
+          }),
+        }).listOpenPullRequests();
+        throw new Error("an exhausted rate limit was accepted");
+      } catch (rateLimitReadFailure) {
+        return rateLimitReadFailure;
+      }
+    })
+    .extend("forbiddenFailure", async () => {
+      const githubStatusFailure: Error & {
+        status: number;
+        response: { headers: Record<string, string> };
+      } = {
+        name: "GithubStatusError",
+        message: "github responded 403",
+        status: 403,
+        response: { headers: { "x-ratelimit-remaining": "42" } },
+      };
+      try {
+        await createGithubFetchReader({
+          repository: "owner/repo",
+          token: "gh-token",
+          accessFor: () => ({
+            graphql: () => Promise.reject(githubStatusFailure),
+            authenticatedLogin: () => Promise.resolve(""),
+            repositoryIsPrivate: () => Promise.resolve(false),
+          }),
+        }).listOpenPullRequests();
+        throw new Error("a forbidden response was accepted");
+      } catch (forbiddenReadFailure) {
+        return forbiddenReadFailure;
+      }
+    });
+
   it("5xx は一時的な障害として扱う", ({ serverFailure }) => {
-    expect(serverFailure).toBeInstanceOf(GithubUnavailableError);
+    expect(serverFailure).toStrictEqual(new GithubUnavailableError("github responded with 503"));
   });
 
   it("残数ゼロの 403 は一時的な障害として扱う", ({ rateLimitFailure }) => {
-    expect(rateLimitFailure).toBeInstanceOf(GithubUnavailableError);
+    expect(rateLimitFailure).toStrictEqual(new GithubUnavailableError("github responded with 403"));
   });
 
   it("残数のある 403 は拒否として扱う", ({ forbiddenFailure }) => {
-    expect(forbiddenFailure).toBeInstanceOf(GithubRejectionError);
+    expect(forbiddenFailure).toStrictEqual(
+      new GithubRejectionError("github rejected the asked with 403"),
+    );
   });
 });
 
 describe("createGithubFetchReader の分類", () => {
+  const it = test
+    .extend("cancelledBucket", () =>
+      createGithubFetchReader({
+        repository: "owner/repo",
+        token: "gh-token",
+        accessFor: () => ({
+          graphql: () =>
+            Promise.resolve({
+              repository: {
+                pullRequest: {
+                  commits: {
+                    nodes: [
+                      {
+                        commit: {
+                          statusCheckRollup: {
+                            contexts: {
+                              nodes: [{ status: "COMPLETED", conclusion: "CANCELLED" }],
+                            },
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            }),
+          authenticatedLogin: () => Promise.resolve(""),
+          repositoryIsPrivate: () => Promise.resolve(false),
+        }),
+      }).listCheckBuckets(7))
+    .extend("skippedBucket", () =>
+      createGithubFetchReader({
+        repository: "owner/repo",
+        token: "gh-token",
+        accessFor: () => ({
+          graphql: () =>
+            Promise.resolve({
+              repository: {
+                pullRequest: {
+                  commits: {
+                    nodes: [
+                      {
+                        commit: {
+                          statusCheckRollup: {
+                            contexts: { nodes: [{ status: "COMPLETED", conclusion: "SKIPPED" }] },
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            }),
+          authenticatedLogin: () => Promise.resolve(""),
+          repositoryIsPrivate: () => Promise.resolve(false),
+        }),
+      }).listCheckBuckets(7),
+    )
+    .extend("neutralBucket", () =>
+      createGithubFetchReader({
+        repository: "owner/repo",
+        token: "gh-token",
+        accessFor: () => ({
+          graphql: () =>
+            Promise.resolve({
+              repository: {
+                pullRequest: {
+                  commits: {
+                    nodes: [
+                      {
+                        commit: {
+                          statusCheckRollup: {
+                            contexts: { nodes: [{ status: "COMPLETED", conclusion: "NEUTRAL" }] },
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            }),
+          authenticatedLogin: () => Promise.resolve(""),
+          repositoryIsPrivate: () => Promise.resolve(false),
+        }),
+      }).listCheckBuckets(7),
+    )
+    .extend("failedRunBucket", () =>
+      createGithubFetchReader({
+        repository: "owner/repo",
+        token: "gh-token",
+        accessFor: () => ({
+          graphql: () =>
+            Promise.resolve({
+              repository: {
+                pullRequest: {
+                  commits: {
+                    nodes: [
+                      {
+                        commit: {
+                          statusCheckRollup: {
+                            contexts: { nodes: [{ status: "COMPLETED", conclusion: "FAILURE" }] },
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            }),
+          authenticatedLogin: () => Promise.resolve(""),
+          repositoryIsPrivate: () => Promise.resolve(false),
+        }),
+      }).listCheckBuckets(7),
+    )
+    .extend("expectedContextBucket", () =>
+      createGithubFetchReader({
+        repository: "owner/repo",
+        token: "gh-token",
+        accessFor: () => ({
+          graphql: () =>
+            Promise.resolve({
+              repository: {
+                pullRequest: {
+                  commits: {
+                    nodes: [
+                      {
+                        commit: {
+                          statusCheckRollup: { contexts: { nodes: [{ state: "EXPECTED" }] } },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            }),
+          authenticatedLogin: () => Promise.resolve(""),
+          repositoryIsPrivate: () => Promise.resolve(false),
+        }),
+      }).listCheckBuckets(7),
+    )
+    .extend("successContextBucket", () =>
+      createGithubFetchReader({
+        repository: "owner/repo",
+        token: "gh-token",
+        accessFor: () => ({
+          graphql: () =>
+            Promise.resolve({
+              repository: {
+                pullRequest: {
+                  commits: {
+                    nodes: [
+                      {
+                        commit: {
+                          statusCheckRollup: { contexts: { nodes: [{ state: "SUCCESS" }] } },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            }),
+          authenticatedLogin: () => Promise.resolve(""),
+          repositoryIsPrivate: () => Promise.resolve(false),
+        }),
+      }).listCheckBuckets(7),
+    );
+
   it("取り消しは cancel になる", ({ cancelledBucket }) => {
     expect(cancelledBucket).toStrictEqual(["cancel"]);
   });
@@ -326,6 +470,85 @@ describe("createGithubFetchReader の分類", () => {
 });
 
 describe("createGithubFetchReader の既定クライアント", () => {
+  const it = test
+    .extend("loginOverOctokit", () =>
+      createGithubFetchReader({
+        repository: "owner/repo",
+        token: "gh-token",
+        accessFor: octokitAccessFor({
+          baseUrl: "https://api.github.test",
+          fetchImpl: () =>
+            Promise.resolve(
+              Response.json(
+                { login: "octo-user" },
+                {
+                  status: 200,
+                  headers: { "content-type": "application/json" },
+                },
+              ),
+            ),
+        }),
+      }).resolveTokenLogin("t"))
+    .extend("privacyOverOctokit", () =>
+      createGithubFetchReader({
+        repository: "owner/repo",
+        token: "gh-token",
+        accessFor: octokitAccessFor({
+          baseUrl: "https://api.github.test",
+          fetchImpl: () =>
+            Promise.resolve(
+              Response.json(
+                { private: true },
+                {
+                  status: 200,
+                  headers: { "content-type": "application/json" },
+                },
+              ),
+            ),
+        }),
+      }).readRepositoryPrivacy("t"),
+    )
+    .extend("pullsOverOctokit", () =>
+      createGithubFetchReader({
+        repository: "owner/repo",
+        token: "gh-token",
+        accessFor: octokitAccessFor({
+          baseUrl: "https://api.github.test",
+          fetchImpl: () =>
+            Promise.resolve(
+              Response.json(
+                {
+                  data: {
+                    repository: {
+                      pullRequests: {
+                        nodes: [
+                          {
+                            number: 7,
+                            title: "topic",
+                            isDraft: false,
+                            author: { login: "human" },
+                            baseRefOid: "base-sha",
+                            headRefOid: "head-sha",
+                            mergeable: "MERGEABLE",
+                            mergeStateStatus: "CLEAN",
+                            reviewDecision: null,
+                            labels: { nodes: [{ name: "keep" }] },
+                            reviewRequests: {
+                              nodes: [{ requestedReviewer: { login: "review-bot" } }],
+                            },
+                          },
+                        ],
+                      },
+                    },
+                  },
+                },
+                { status: 200, headers: { "content-type": "application/json" } },
+              ),
+            ),
+        }),
+      }).listOpenPullRequests(),
+    );
+
   it("注入なしでもログインを読む", ({ loginOverOctokit }) => {
     expect(loginOverOctokit).toStrictEqual("octo-user");
   });
@@ -354,6 +577,169 @@ describe("createGithubFetchReader の既定クライアント", () => {
 });
 
 describe("createGithubFetchReader の欠損応答", () => {
+  const it = test
+    .extend("nonRecordGraphqlData", () =>
+      createGithubFetchReader({
+        repository: "owner/repo",
+        token: "gh-token",
+        accessFor: () => ({
+          graphql: () => Promise.resolve("not a record"),
+          authenticatedLogin: () => Promise.resolve(""),
+          repositoryIsPrivate: () => Promise.resolve(false),
+        }),
+      }).listOpenPullRequests())
+    .extend("nonRecordNodesSkipped", () =>
+      createGithubFetchReader({
+        repository: "owner/repo",
+        token: "gh-token",
+        accessFor: () => ({
+          graphql: () =>
+            Promise.resolve({ repository: { pullRequests: { nodes: ["not a node"] } } }),
+          authenticatedLogin: () => Promise.resolve(""),
+          repositoryIsPrivate: () => Promise.resolve(false),
+        }),
+      }).listOpenPullRequests(),
+    )
+    .extend("nonRecordContextsSkipped", () =>
+      createGithubFetchReader({
+        repository: "owner/repo",
+        token: "gh-token",
+        accessFor: () => ({
+          graphql: () =>
+            Promise.resolve({
+              repository: {
+                pullRequest: {
+                  commits: {
+                    nodes: [
+                      {
+                        commit: {
+                          statusCheckRollup: { contexts: { nodes: ["not a node"] } },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            }),
+          authenticatedLogin: () => Promise.resolve(""),
+          repositoryIsPrivate: () => Promise.resolve(false),
+        }),
+      }).listCheckBuckets(7),
+    )
+    .extend("nonStringLabelsDropped", () =>
+      createGithubFetchReader({
+        repository: "owner/repo",
+        token: "gh-token",
+        accessFor: () => ({
+          graphql: () =>
+            Promise.resolve({
+              repository: {
+                pullRequests: {
+                  nodes: [
+                    {
+                      labels: { nodes: [{ name: 7 }] },
+                      reviewRequests: { nodes: [{ requestedReviewer: { login: 7 } }] },
+                    },
+                  ],
+                },
+              },
+            }),
+          authenticatedLogin: () => Promise.resolve(""),
+          repositoryIsPrivate: () => Promise.resolve(false),
+        }),
+      }).listOpenPullRequests(),
+    )
+    .extend("failureWithoutStatus", async () => {
+      try {
+        await createGithubFetchReader({
+          repository: "owner/repo",
+          token: "gh-token",
+          accessFor: () => ({
+            graphql: () => Promise.reject(new Error("no heldStatus on this failure")),
+            authenticatedLogin: () => Promise.resolve(""),
+            repositoryIsPrivate: () => Promise.resolve(false),
+          }),
+        }).listOpenPullRequests();
+        throw new Error("a statusless failure was accepted");
+      } catch (statuslessReadFailure) {
+        return statuslessReadFailure;
+      }
+    })
+    .extend("loginFailureOverDefaultPath", async () => {
+      try {
+        await createGithubFetchReader({
+          repository: "owner/repo",
+          token: "gh-token",
+          accessFor: octokitAccessFor({
+            baseUrl: "https://api.github.test",
+            fetchImpl: () => Promise.resolve(new Response("nope", { status: 404 })),
+          }),
+        }).resolveTokenLogin("t");
+        throw new Error("a 404 login response was accepted");
+      } catch (loginReadFailure) {
+        return loginReadFailure;
+      }
+    })
+    .extend("privacyFailureOverDefaultPath", async () => {
+      try {
+        await createGithubFetchReader({
+          repository: "owner/repo",
+          token: "gh-token",
+          accessFor: octokitAccessFor({
+            baseUrl: "https://api.github.test",
+            fetchImpl: () => Promise.resolve(new Response("nope", { status: 404 })),
+          }),
+        }).readRepositoryPrivacy("t");
+        throw new Error("a 404 privacy response was accepted");
+      } catch (privacyReadFailure) {
+        return privacyReadFailure;
+      }
+    })
+    .extend("pullWithoutOptionalFields", () =>
+      createGithubFetchReader({
+        repository: "owner/repo",
+        token: "gh-token",
+        accessFor: () => ({
+          graphql: () => Promise.resolve({ repository: { pullRequests: { nodes: [{}] } } }),
+          authenticatedLogin: () => Promise.resolve(""),
+          repositoryIsPrivate: () => Promise.resolve(false),
+        }),
+      }).listOpenPullRequests(),
+    )
+    .extend("missingRepositoryData", () =>
+      createGithubFetchReader({
+        repository: "owner/repo",
+        token: "gh-token",
+        accessFor: () => ({
+          graphql: () => Promise.resolve({}),
+          authenticatedLogin: () => Promise.resolve(""),
+          repositoryIsPrivate: () => Promise.resolve(false),
+        }),
+      }).listOpenPullRequests(),
+    )
+    .extend("missingAuthorData", () =>
+      createGithubFetchReader({
+        repository: "owner/repo",
+        token: "gh-token",
+        accessFor: () => ({
+          graphql: () => Promise.resolve({}),
+          authenticatedLogin: () => Promise.resolve(""),
+          repositoryIsPrivate: () => Promise.resolve(false),
+        }),
+      }).resolvePullAuthor(7),
+    )
+    .extend("missingCheckData", () =>
+      createGithubFetchReader({
+        repository: "owner/repo",
+        token: "gh-token",
+        accessFor: () => ({
+          graphql: () => Promise.resolve({}),
+          authenticatedLogin: () => Promise.resolve(""),
+          repositoryIsPrivate: () => Promise.resolve(false),
+        }),
+      }).listCheckBuckets(7),
+    );
+
   it("応答そのものがレコードでなければ空を返す", ({ nonRecordGraphqlData }) => {
     expect(nonRecordGraphqlData).toStrictEqual([]);
   });
@@ -367,19 +753,39 @@ describe("createGithubFetchReader の欠損応答", () => {
   });
 
   it("文字列でないラベルとレビュアーは落とす", ({ nonStringLabelsDropped }) => {
-    expect(nonStringLabelsDropped[0]?.labelNames).toStrictEqual([]);
+    expect(nonStringLabelsDropped).toStrictEqual([
+      {
+        number: 0,
+        title: "",
+        draft: false,
+        authorLogin: null,
+        baseSha: "",
+        headSha: "",
+        mergeable: null,
+        mergeStateStatus: null,
+        reviewDecision: null,
+        labelNames: [],
+        requestedReviewerLogins: [],
+      },
+    ]);
   });
 
   it("状態を持たない失敗は拒否として扱う", ({ failureWithoutStatus }) => {
-    expect(failureWithoutStatus).toBeInstanceOf(GithubRejectionError);
+    expect(failureWithoutStatus).toStrictEqual(
+      new GithubRejectionError("github rejected the asked with 0"),
+    );
   });
 
   it("既定クライアントのログイン取得の失敗も分類される", ({ loginFailureOverDefaultPath }) => {
-    expect(loginFailureOverDefaultPath).toBeInstanceOf(GithubRejectionError);
+    expect(loginFailureOverDefaultPath).toStrictEqual(
+      new GithubRejectionError("github rejected the asked with 404"),
+    );
   });
 
   it("既定クライアントの公開範囲取得の失敗も分類される", ({ privacyFailureOverDefaultPath }) => {
-    expect(privacyFailureOverDefaultPath).toBeInstanceOf(GithubRejectionError);
+    expect(privacyFailureOverDefaultPath).toStrictEqual(
+      new GithubRejectionError("github rejected the asked with 404"),
+    );
   });
 
   it("任意項目を欠く PR も既定値で写す", ({ pullWithoutOptionalFields }) => {

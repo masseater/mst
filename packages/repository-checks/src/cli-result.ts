@@ -26,5 +26,5 @@ export const createCliRunner =
   <Arguments extends readonly unknown[]>(
     operation: (...args: Arguments) => Promise<CliResult>,
   ): ((...args: Arguments) => Promise<CliResult>) =>
-  (...args) =>
-    safelyRunCli(() => operation(...args));
+  (...handed) =>
+    safelyRunCli(() => operation(...handed));

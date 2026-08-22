@@ -1,4 +1,5 @@
 import { CLAUDE_ENGINE, type EngineKind } from "../config/engine.ts";
+import { DECLARED_MODE } from "../contract/vocabulary.ts";
 
 import type { Mode } from "./run-context.ts";
 
@@ -10,7 +11,7 @@ const SKILL_NAMES: Readonly<Record<Mode, string>> = {
 const skillInvocation = (invoke: { readonly engine: EngineKind; readonly mode: Mode }): string => {
   const prefix = invoke.engine === CLAUDE_ENGINE ? "/" : "$";
   const skill = `${prefix}${SKILL_NAMES[invoke.mode]}`;
-  return invoke.mode === "reviewer" ? `${skill} review` : skill;
+  return invoke.mode === DECLARED_MODE.reviewer ? `${skill} review` : skill;
 };
 
 const NON_INTERACTIVE_INSTRUCTION =
@@ -41,7 +42,7 @@ export const buildPrompt = (build: {
     "",
     NON_INTERACTIVE_INSTRUCTION,
     "",
-    build.mode === "reviewer" ? REVIEWER_CLOSING : AUTHOR_CLOSING,
+    build.mode === DECLARED_MODE.reviewer ? REVIEWER_CLOSING : AUTHOR_CLOSING,
   ];
   return lines.join("\n");
 };

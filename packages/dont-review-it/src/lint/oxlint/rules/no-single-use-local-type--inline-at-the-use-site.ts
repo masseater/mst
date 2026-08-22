@@ -59,9 +59,9 @@ const messageIdFor = (
   if (reference === undefined) return "unusedLocalType";
   if (isWithin(reference.identifier, node)) return "selfOnlyLocalType";
 
-  const kind = referenceKindOf(reference);
-  if (kind === "implements") return "singleImplementationLocalType";
-  if (kind === "interfaceHeritage") return "singleInterfaceHeritageLocalType";
+  const referenceKind = referenceKindOf(reference);
+  if (referenceKind === "implements") return "singleImplementationLocalType";
+  if (referenceKind === "interfaceHeritage") return "singleInterfaceHeritageLocalType";
   return "singleUseLocalTypeAlias";
 };
 
@@ -88,40 +88,36 @@ export const noSingleUseLocalType = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
-    if (isOutOfScopeSource(context.filename) || DECLARATION_FILE.test(context.filename)) return {};
+  create(inspection) {
+    if (isOutOfScopeSource(inspection.filename) || DECLARATION_FILE.test(inspection.filename))
+      return {};
 
-    const localTypes = new Map<Variable, LocalTypeDeclaration>();
     const variablesFor = (node: ESTree.Node): readonly Variable[] =>
-      context.sourceCode.getDeclaredVariables(node);
+      inspection.sourceCode.getDeclaredVariables(node);
 
-    const declare = (node: LocalTypeDeclaration["node"]): void => {
+    const inspectDeclaration = (node: LocalTypeDeclaration["node"]): void => {
       if (node.parent.type !== "Program") return;
-      variablesFor(node)
+      const declaration = variablesFor(node)
         .filter((variable) => variable.identifiers.includes(node.id))
         .slice(0, 1)
-        .forEach((variable) => {
-          localTypes.set(variable, { node, variable });
-        });
+        .map((variable) => ({ node, variable }))
+        .at(0);
+      if (declaration === undefined) return;
+      const { variable } = declaration;
+      if (variable.references.some(isExportReference)) return;
+      const references = variable.references.filter(
+        (reference) => referenceKindOf(reference) !== null,
+      );
+      if (references.length >= REFERENCES_A_SHARED_TYPE) return;
+      inspection.report({
+        node,
+        messageId: messageIdFor(declaration, references[0]),
+        data: { name: node.id.name },
+      });
     };
 
     return {
-      TSTypeAliasDeclaration: declare,
-      "Program:exit"() {
-        for (const declaration of localTypes.values()) {
-          const { node, variable } = declaration;
-          if (variable.references.some(isExportReference)) continue;
-          const references = variable.references.filter(
-            (reference) => referenceKindOf(reference) !== null,
-          );
-          if (references.length >= REFERENCES_A_SHARED_TYPE) continue;
-          context.report({
-            node,
-            messageId: messageIdFor(declaration, references[0]),
-            data: { name: node.id.name },
-          });
-        }
-      },
+      TSTypeAliasDeclaration: inspectDeclaration,
     };
   },
 });

@@ -24,7 +24,7 @@ spec ファイルから他のモジュールへ伸びる結合の辺を 1 本ず
 8. **所属パッケージの公開エントリから到達できないファイル**。報告する
 9. 所属パッケージが公開エントリを決められない場合、そのファイルを中継とみなして、そのファイルが持つ結合の辺を同じ判定へかける。4 段まで辿る
 
-「公開エントリ」は `package.json` の `exports` / `main` / `bin` が指すファイルである。このリポジトリの `packages/dont-review-it` なら `./src/index.ts`（`.`）、`./src/plugin.ts`（`./plugin`）、`./src/cli.ts`（`bin`）の 3 つがそれに当たる。到達可能性はそこから結合の辺を辿って求め、パッケージのディレクトリの内側だけを歩く。`src/lint/oxlint/rules/*.ts` が SUT として扱われるのは、`plugin.ts` がそれらを import しているからであって、名前や置き場所によるものではない。
+「公開エントリ」は `package.json` の `exports` / `main` / `bin` が指すファイルである。このリポジトリの `packages/dont-review-it` なら `./src/index.ts`（`.`）、`./src/plugin.ts`（`./plugin`）、`./src/vitest/standard-io-test.ts`（`./vitest`）、`./src/cli.ts`（`bin`）の 4 つがそれに当たる。到達可能性はそこから結合の辺を辿って求め、パッケージのディレクトリの内側だけを歩く。`src/lint/oxlint/rules/*.ts` が SUT として扱われるのは、`plugin.ts` がそれらを import しているからであって、名前や置き場所によるものではない。
 
 到達可能性と、パッケージを実行コードが参照しているかどうかは、プロセスが生きている間だけ覚える。lint の実行中にファイルを足しても、そのプロセスの答えは変わらない。変わるのは次に lint を起動したときである。
 

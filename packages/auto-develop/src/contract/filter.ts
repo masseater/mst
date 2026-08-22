@@ -6,12 +6,12 @@ import type { FilteredEvent } from "./filtered-event.ts";
 import type { Mode } from "./vocabulary.ts";
 
 export const filterEvent = (
-  event: Readonly<Record<string, unknown>>,
-  mode: Mode,
+  delivered: Readonly<Record<string, unknown>>,
+  spelledMode: Mode,
 ): FilteredEvent | null => {
-  const eventType = event.event_type ?? event.type;
-  if (eventType === "pull_request") return filterPullRequestEvent(event, mode);
-  if (eventType === "pull_request_review") return filterReviewEvent(event, mode);
-  if (eventType === "check_suite") return filterCheckSuiteEvent(event, mode);
+  const eventType = delivered.event_type ?? delivered.type;
+  if (eventType === "pull_request") return filterPullRequestEvent(delivered, spelledMode);
+  if (eventType === "pull_request_review") return filterReviewEvent(delivered, spelledMode);
+  if (eventType === "check_suite") return filterCheckSuiteEvent(delivered, spelledMode);
   return null;
 };

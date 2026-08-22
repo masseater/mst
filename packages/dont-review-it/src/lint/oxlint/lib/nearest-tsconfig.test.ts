@@ -2,135 +2,214 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { extendsOneOf, nearestTsconfigExtends } from "./nearest-tsconfig.ts";
 
-const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-nearest-tsconfig-"));
+const LIBRARY_PRESET = "dont-review-it/tsconfig/library.json";
 
-const writeWorkspaceFixture = (name: string, tsconfig: string): string => {
-  const directory = join(fixtureDir, name);
-  mkdirSync(directory, { recursive: true });
-  writeFileSync(join(directory, "tsconfig.json"), tsconfig);
-  return join(directory, "index.ts");
-};
+const APP_PRESET = "dont-review-it/tsconfig/app.json";
 
 describe("nearestTsconfigExtends", () => {
-  it("reads a single extends entry as a list of one", () => {
-    const sourcePath = writeWorkspaceFixture("single", '{ "extends": "./preset.json" }\n');
+  const workspaceTest = test.extend("workspaceRoot", ({}, { onCleanup }) => {
+    const root = mkdtempSync(join(tmpdir(), "nearest-tsconfig-"));
+    onCleanup(() => {
+      rmSync(root, { recursive: true, force: true });
+    });
+    return root;
+  });
 
-    expect(nearestTsconfigExtends(sourcePath)).toStrictEqual({
-      tsconfigPath: join(fixtureDir, "single", "tsconfig.json"),
-      specifiers: ["./preset.json"],
+  describe("a tsconfig carrying a single extends entry", () => {
+    const it = workspaceTest.extend("extendsRead", ({ workspaceRoot }) => {
+      const directory = join(workspaceRoot, "single");
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(join(directory, "tsconfig.json"), '{ "extends": "./preset.json" }\n');
+      return nearestTsconfigExtends(join(directory, "index.ts"));
+    });
+
+    it("reads it as a list of one beside the path it was read from", ({
+      extendsRead,
+      workspaceRoot,
+    }) => {
+      expect(extendsRead).toStrictEqual({
+        tsconfigPath: join(workspaceRoot, "single", "tsconfig.json"),
+        specifiers: ["./preset.json"],
+      });
     });
   });
 
-  it("keeps every entry of an extends array in the order they were written", () => {
-    const sourcePath = writeWorkspaceFixture(
-      "several",
-      '{ "extends": ["./first.json", "./second.json"] }\n',
-    );
+  describe("a tsconfig carrying several extends entries", () => {
+    const it = workspaceTest.extend("specifiers", ({ workspaceRoot }) => {
+      const directory = join(workspaceRoot, "several");
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(
+        join(directory, "tsconfig.json"),
+        '{ "extends": ["./first.json", "./second.json"] }\n',
+      );
+      const read = nearestTsconfigExtends(join(directory, "index.ts"));
+      return read === null ? null : read.specifiers;
+    });
 
-    expect(nearestTsconfigExtends(sourcePath)?.specifiers).toStrictEqual([
-      "./first.json",
-      "./second.json",
-    ]);
-  });
-
-  it("drops entries of an extends array that are not strings", () => {
-    const sourcePath = writeWorkspaceFixture("mixed", '{ "extends": ["./first.json", 7, null] }\n');
-
-    expect(nearestTsconfigExtends(sourcePath)?.specifiers).toStrictEqual(["./first.json"]);
-  });
-
-  it("reads a tsconfig that carries comments and a trailing comma", () => {
-    const sourcePath = writeWorkspaceFixture(
-      "jsonc",
-      '{\n  // the preset\n  "extends": "./preset.json",\n}\n',
-    );
-
-    expect(nearestTsconfigExtends(sourcePath)?.specifiers).toStrictEqual(["./preset.json"]);
-  });
-
-  it("reports no specifier for a tsconfig without an extends field", () => {
-    const sourcePath = writeWorkspaceFixture("bare", '{ "compilerOptions": { "strict": true } }\n');
-
-    expect(nearestTsconfigExtends(sourcePath)?.specifiers).toStrictEqual([]);
-  });
-
-  it("reports no specifier for a tsconfig that cannot be read as JSON", () => {
-    const sourcePath = writeWorkspaceFixture("broken", "{ not json\n");
-
-    expect(nearestTsconfigExtends(sourcePath)?.specifiers).toStrictEqual([]);
-  });
-
-  it("walks up until it meets a tsconfig", () => {
-    writeWorkspaceFixture("nested", '{ "extends": "./preset.json" }\n');
-    mkdirSync(join(fixtureDir, "nested", "src", "deep"), { recursive: true });
-
-    expect(
-      nearestTsconfigExtends(join(fixtureDir, "nested", "src", "deep", "index.ts")),
-    ).toStrictEqual({
-      tsconfigPath: join(fixtureDir, "nested", "tsconfig.json"),
-      specifiers: ["./preset.json"],
+    it("keeps every entry in the order they were written", ({ specifiers }) => {
+      expect(specifiers).toStrictEqual(["./first.json", "./second.json"]);
     });
   });
 
-  it("stops at the nearest tsconfig instead of the outermost one", () => {
-    writeWorkspaceFixture("outer", '{ "extends": "./outer.json" }\n');
-    const innerSourcePath = writeWorkspaceFixture(
-      join("outer", "inner"),
-      '{ "extends": "./inner.json" }\n',
-    );
+  describe("a tsconfig whose extends array mixes texts with other values", () => {
+    const it = workspaceTest.extend("specifiers", ({ workspaceRoot }) => {
+      const directory = join(workspaceRoot, "mixed");
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(join(directory, "tsconfig.json"), '{ "extends": ["./first.json", 7, null] }\n');
+      const read = nearestTsconfigExtends(join(directory, "index.ts"));
+      return read === null ? null : read.specifiers;
+    });
 
-    expect(nearestTsconfigExtends(innerSourcePath)?.specifiers).toStrictEqual(["./inner.json"]);
+    it("drops the entries that are not strings", ({ specifiers }) => {
+      expect(specifiers).toStrictEqual(["./first.json"]);
+    });
   });
 
-  it("remembers its answer, so a tsconfig removed afterwards still answers", () => {
-    const sourcePath = writeWorkspaceFixture("remembered", '{ "extends": "./preset.json" }\n');
-    expect(nearestTsconfigExtends(sourcePath)?.specifiers).toStrictEqual(["./preset.json"]);
+  describe("a tsconfig carrying comments and a trailing comma", () => {
+    const it = workspaceTest.extend("specifiers", ({ workspaceRoot }) => {
+      const directory = join(workspaceRoot, "jsonc");
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(
+        join(directory, "tsconfig.json"),
+        '{\n  // the preset\n  "extends": "./preset.json",\n}\n',
+      );
+      const read = nearestTsconfigExtends(join(directory, "index.ts"));
+      return read === null ? null : read.specifiers;
+    });
 
-    rmSync(join(fixtureDir, "remembered", "tsconfig.json"));
+    it("reads it all the same", ({ specifiers }) => {
+      expect(specifiers).toStrictEqual(["./preset.json"]);
+    });
+  });
 
-    expect(nearestTsconfigExtends(sourcePath)?.specifiers).toStrictEqual(["./preset.json"]);
+  describe("a tsconfig without an extends field", () => {
+    const it = workspaceTest.extend("specifiers", ({ workspaceRoot }) => {
+      const directory = join(workspaceRoot, "bare");
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(
+        join(directory, "tsconfig.json"),
+        '{ "compilerOptions": { "strict": true } }\n',
+      );
+      const read = nearestTsconfigExtends(join(directory, "index.ts"));
+      return read === null ? null : read.specifiers;
+    });
+
+    it("reports no specifier", ({ specifiers }) => {
+      expect(specifiers).toStrictEqual([]);
+    });
+  });
+
+  describe("a tsconfig that cannot be read as JSON", () => {
+    const it = workspaceTest.extend("specifiers", ({ workspaceRoot }) => {
+      const directory = join(workspaceRoot, "broken");
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(join(directory, "tsconfig.json"), "{ not json\n");
+      const read = nearestTsconfigExtends(join(directory, "index.ts"));
+      return read === null ? null : read.specifiers;
+    });
+
+    it("reports no specifier", ({ specifiers }) => {
+      expect(specifiers).toStrictEqual([]);
+    });
+  });
+
+  describe("a source sitting deeper than the tsconfig above it", () => {
+    const it = workspaceTest.extend("extendsRead", ({ workspaceRoot }) => {
+      const directory = join(workspaceRoot, "nested");
+      mkdirSync(join(directory, "src", "deep"), { recursive: true });
+      writeFileSync(join(directory, "tsconfig.json"), '{ "extends": "./preset.json" }\n');
+      return nearestTsconfigExtends(join(directory, "src", "deep", "index.ts"));
+    });
+
+    it("walks up until it meets a tsconfig", ({ extendsRead, workspaceRoot }) => {
+      expect(extendsRead).toStrictEqual({
+        tsconfigPath: join(workspaceRoot, "nested", "tsconfig.json"),
+        specifiers: ["./preset.json"],
+      });
+    });
+  });
+
+  describe("a source with a tsconfig beside it and another one further up", () => {
+    const it = workspaceTest.extend("specifiers", ({ workspaceRoot }) => {
+      const outer = join(workspaceRoot, "outer");
+      mkdirSync(join(outer, "inner"), { recursive: true });
+      writeFileSync(join(outer, "tsconfig.json"), '{ "extends": "./outer.json" }\n');
+      writeFileSync(join(outer, "inner", "tsconfig.json"), '{ "extends": "./inner.json" }\n');
+      const read = nearestTsconfigExtends(join(outer, "inner", "index.ts"));
+      return read === null ? null : read.specifiers;
+    });
+
+    it("stops at the nearest tsconfig instead of the outermost one", ({ specifiers }) => {
+      expect(specifiers).toStrictEqual(["./inner.json"]);
+    });
+  });
+
+  describe("a tsconfig removed after it was read once", () => {
+    const it = workspaceTest.extend("specifiers", ({ workspaceRoot }) => {
+      const directory = join(workspaceRoot, "remembered");
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(join(directory, "tsconfig.json"), '{ "extends": "./preset.json" }\n');
+      nearestTsconfigExtends(join(directory, "index.ts"));
+      rmSync(join(directory, "tsconfig.json"));
+      const read = nearestTsconfigExtends(join(directory, "index.ts"));
+      return read === null ? null : read.specifiers;
+    });
+
+    it("still answers, because the reading is remembered", ({ specifiers }) => {
+      expect(specifiers).toStrictEqual(["./preset.json"]);
+    });
   });
 });
 
 describe("extendsOneOf", () => {
-  it("matches a package specifier by the tail that names the preset file", () => {
-    expect(
-      extendsOneOf(
-        ["@mst/dont-review-it/tsconfig/library.json"],
-        ["dont-review-it/tsconfig/library.json"],
-      ),
-    ).toBe(true);
+  describe("a package specifier naming an allowed preset", () => {
+    const it = test.extend("verdict", () =>
+      extendsOneOf(["@mst/dont-review-it/tsconfig/library.json"], [LIBRARY_PRESET]));
+
+    it("matches it by the tail that names the preset file", ({ verdict }) => {
+      expect(verdict).toBe(true);
+    });
   });
 
-  it("matches a relative specifier that reaches the same file", () => {
-    expect(
-      extendsOneOf(
-        ["../dont-review-it/tsconfig/library.json"],
-        ["dont-review-it/tsconfig/library.json"],
-      ),
-    ).toBe(true);
+  describe("a relative specifier reaching the same file", () => {
+    const it = test.extend("verdict", () =>
+      extendsOneOf(["../dont-review-it/tsconfig/library.json"], [LIBRARY_PRESET]));
+
+    it("matches it", ({ verdict }) => {
+      expect(verdict).toBe(true);
+    });
   });
 
-  it("accepts a list where only one entry names an allowed preset", () => {
-    expect(
+  describe("a list where only one entry names an allowed preset", () => {
+    const it = test.extend("verdict", () =>
       extendsOneOf(
         ["./local.json", "@mst/dont-review-it/tsconfig/app.json"],
-        ["dont-review-it/tsconfig/library.json", "dont-review-it/tsconfig/app.json"],
-      ),
-    ).toBe(true);
+        [LIBRARY_PRESET, APP_PRESET],
+      ));
+
+    it("accepts it", ({ verdict }) => {
+      expect(verdict).toBe(true);
+    });
   });
 
-  it("rejects a preset of the same name owned by somebody else", () => {
-    expect(
-      extendsOneOf(["@other/tsconfig/library.json"], ["dont-review-it/tsconfig/library.json"]),
-    ).toBe(false);
+  describe("a preset of the same name owned by somebody else", () => {
+    const it = test.extend("verdict", () =>
+      extendsOneOf(["@other/tsconfig/library.json"], [LIBRARY_PRESET]));
+
+    it("rejects it", ({ verdict }) => {
+      expect(verdict).toBe(false);
+    });
   });
 
-  it("rejects an empty list of specifiers", () => {
-    expect(extendsOneOf([], ["dont-review-it/tsconfig/library.json"])).toBe(false);
+  describe("an empty list of specifiers", () => {
+    const it = test.extend("verdict", () => extendsOneOf([], [LIBRARY_PRESET]));
+
+    it("rejects it", ({ verdict }) => {
+      expect(verdict).toBe(false);
+    });
   });
 });

@@ -26,7 +26,7 @@ describe("dont-review-it/no-expect-mock-call-inspection--use-to-have-been-called
       {
         name: "what a mock returned is outside what this reading covers",
         filename: SPEC_FILE,
-        code: 'const sendMail = vi.fn();\ntest("hands the id back", () => {\n  expect(sendMail.mock.results).toStrictEqual([{ type: "return", value: "id" }]);\n});',
+        code: 'const sendMail = vi.fn();\ntest("hands the id back", () => {\n  expect(sendMail.mock.results).toStrictEqual([{ type: "return", held: "id" }]);\n});',
       },
       {
         name: "what a mock settled with is outside what this reading covers",

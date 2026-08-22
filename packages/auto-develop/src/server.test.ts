@@ -1,359 +1,666 @@
 import { spawnSync } from "node:child_process";
-import { Writable } from "node:stream";
+import { EventEmitter } from "node:events";
 import { fileURLToPath } from "node:url";
 
-import { describe, expect, onTestFinished, test, vi } from "vite-plus/test";
+import { standardIoTest as test } from "@mst/dont-review-it/vitest";
+import { describe, expect, vi } from "vite-plus/test";
 
 import { runRelayServerModule } from "./relay-server.ts";
 import { IdTokenRejectionError } from "./relay/id-token-rejection-error.ts";
+import { SOCKET_LIFECYCLE_EVENT } from "./runtime/event-names.ts";
 
 import type { RelayServerRuntime } from "./relay-server-runtime.ts";
 import type { GithubReader } from "./relay/github-reader.ts";
 import type { RelayDependencies } from "./relay/routes.ts";
-import type { ShutdownSignal, SignalTarget } from "./runtime/shutdown.ts";
+import type { SignalTarget } from "./runtime/shutdown.ts";
 
-type RunningRelayServer = NonNullable<ReturnType<typeof runRelayServerModule>>;
-
-const serverPath = fileURLToPath(new URL("./server.ts", import.meta.url));
-
-const requiredEnvironment = {
+const REQUIRED_ENVIRONMENT = {
   GITHUB_REPOSITORY: "example/repository",
   GITHUB_WEBHOOK_SECRET: "webhook-secret",
   PORT: "43123",
   AUTO_DEVELOP_LOG_DIR: "/relay-logs",
 };
 
-const githubReader: GithubReader = {
-  resolveTokenLogin: () => Promise.resolve("operator"),
-  readRepositoryPrivacy: () => Promise.resolve(false),
-  listOpenPullRequests: () => Promise.resolve([]),
-  resolvePullAuthor: () => Promise.resolve(null),
-  listCheckBuckets: () => Promise.resolve([]),
-};
-
-const recordingStream = (): {
-  readonly stream: Writable;
-  readonly text: () => string;
-} => {
-  const writes = new Map<number, string>();
-  const stream = new Writable({
-    write: (...call: [unknown, BufferEncoding, (error?: Error | null) => void]) => {
-      const [chunk, , callback] = call;
-      writes.set(writes.size, String(chunk));
-      callback();
-    },
-  });
-  return { stream, text: () => [...writes.values()].join("") };
-};
-
-const recordingSignals = (): {
-  readonly target: SignalTarget;
-  readonly fire: (signal: ShutdownSignal) => void;
-  readonly listenerCount: () => number;
-} => {
-  const listeners = new Map<ShutdownSignal, Set<() => void>>();
-  return {
-    target: {
-      on: (signal, listener) => {
-        const signalListeners = listeners.get(signal) ?? new Set<() => void>();
-        signalListeners.add(listener);
-        listeners.set(signal, signalListeners);
-      },
-      off: (signal, listener) => {
-        listeners.get(signal)?.delete(listener);
-      },
-    },
-    fire: (signal) => {
-      for (const listener of listeners.get(signal) ?? []) listener();
-    },
-    listenerCount: () =>
-      [...listeners.values()].reduce((total, signalListeners) => total + signalListeners.size, 0),
-  };
-};
-
-const runtimeFixture = (
-  options: {
-    readonly environment?: Readonly<Record<string, unknown>>;
-    readonly createLogFileSink?: RelayServerRuntime["createLogFileSink"];
-    readonly listen?: (port: number, onListening: () => void) => unknown;
-    readonly shutdown?: () => Promise<void>;
-  } = {},
-) => {
-  const stdout = recordingStream();
-  const stderr = recordingStream();
-  const signals = recordingSignals();
-  const githubTokens = new Map<number, string>();
-  const relayDependencies = new Map<number, RelayDependencies>();
-  const listenedPorts = new Map<number, number>();
-  const serverErrorListeners = new Set<(failure: Error) => void>();
-  const shutdown = vi.fn<() => Promise<void>>(options.shutdown ?? (() => Promise.resolve()));
-  const exited = Promise.withResolvers<number>();
-  const exit = vi.fn<(code: number) => void>((code) => {
-    exited.resolve(code);
-  });
-  const createGithubReader = vi.fn<RelayServerRuntime["createGithubReader"]>((access) => {
-    githubTokens.set(githubTokens.size, access.token);
-    return githubReader;
-  });
-  const createRelay = vi.fn<RelayServerRuntime["createRelay"]>((dependencies) => {
-    relayDependencies.set(relayDependencies.size, dependencies);
-    return {
-      server: {
-        listen:
-          options.listen ??
-          ((port, onListening) => {
-            listenedPorts.set(listenedPorts.size, port);
-            onListening();
-          }),
-        once: (_event, listener) => {
-          serverErrorListeners.add(listener);
-        },
-        off: (_event, listener) => {
-          serverErrorListeners.delete(listener);
-        },
-      },
-      shutdown,
-    };
-  });
-  const createLogFileSink =
-    options.createLogFileSink ??
-    vi.fn<RelayServerRuntime["createLogFileSink"]>(() => ({ append: () => undefined }));
-  const runtime: RelayServerRuntime = {
-    environment: {
-      ...requiredEnvironment,
-      GH_TOKEN: "primary-token",
-      ...options.environment,
-    },
-    currentDirectory: () => "/repository",
-    nowIso: () => "2026-08-13T00:00:00.000Z",
-    fetchImpl: fetch,
-    signalTarget: signals.target,
-    stdout: stdout.stream,
-    stderr: stderr.stream,
-    exit,
-    createGithubReader,
-    createLogFileSink,
-    createRelay,
-  };
-  return {
-    runtime,
-    stdout,
-    stderr,
-    signals,
-    githubTokens,
-    relayDependencies,
-    listenedPorts,
-    shutdown,
-    exit,
-    exited: exited.promise,
-    failServer: (failure: Error) => {
-      for (const listener of serverErrorListeners) {
-        serverErrorListeners.delete(listener);
-        listener(failure);
-      }
-    },
-    serverErrorListenerCount: () => serverErrorListeners.size,
-    createGithubReader,
-    createRelay,
-  };
-};
-
-const start = (runtime: RelayServerRuntime): RunningRelayServer => {
-  const running = runRelayServerModule(true, runtime);
-  if (running === null) throw new Error("the relay server module did not start");
-  onTestFinished(() => {
-    running.shutdownRegistration.release();
-  });
-  return running;
-};
-
-const shutdownReport = async (signal: ShutdownSignal) => {
-  const setup = runtimeFixture();
-  start(setup.runtime);
-
-  setup.signals.fire(signal);
-  const exitCode = await setup.exited;
-  return {
-    exitCode,
-    shutdownCalls: setup.shutdown.mock.calls,
-    exitCalls: setup.exit.mock.calls,
-    loggedSignal: setup.stdout.text().includes(`"signal":"${signal}"`),
-    loggedShutdown: setup.stdout.text().includes("shutting down relay server"),
-  };
-};
-
 describe("relay server entrypoint", () => {
-  test("GH_TOKEN を GITHUB_TOKEN より優先して listen callback を公開する", async () => {
-    const setup = runtimeFixture({ environment: { GITHUB_TOKEN: "fallback-token" } });
-    start(setup.runtime);
-
-    expect(setup.githubTokens.get(0)).toBe("primary-token");
-    expect(setup.listenedPorts.get(0)).toBe(43_123);
-    expect(setup.stdout.text()).toContain('"port":43123');
-    expect(setup.stdout.text()).toContain("relay server listening");
-    const dependencies = setup.relayDependencies.get(0);
-    if (dependencies === undefined) throw new Error("relay dependencies were not captured");
-    await expect(
-      dependencies.verifyIdToken({ idToken: "id-token", audience: "https://relay.example" }),
-    ).rejects.toThrow(IdTokenRejectionError);
-  });
-
-  test("GH_TOKEN が無ければ GITHUB_TOKEN を使う", () => {
-    const setup = runtimeFixture({
-      environment: { GH_TOKEN: undefined, GITHUB_TOKEN: "fallback-token" },
-    });
-    start(setup.runtime);
-
-    expect(setup.githubTokens.get(0)).toBe("fallback-token");
-  });
-
-  test("GitHub token がどちらも無ければ listen 前に拒否する", () => {
-    const setup = runtimeFixture({
-      environment: { GH_TOKEN: undefined, GITHUB_TOKEN: undefined },
-    });
-
-    expect(() => runRelayServerModule(true, setup.runtime)).toThrow(
-      "GH_TOKEN or GITHUB_TOKEN must be set for GitHub API access",
-    );
-    expect(setup.createGithubReader).not.toHaveBeenCalled();
-    expect(setup.createRelay).not.toHaveBeenCalled();
-  });
-
-  test("main でない import はサーバーを起動しない", () => {
-    const setup = runtimeFixture();
-
-    expect(runRelayServerModule(false, setup.runtime)).toBeNull();
-    expect(setup.createRelay).not.toHaveBeenCalled();
-  });
-
-  test("SIGINT は relay を停止して 0 で終了する", async () => {
-    expect(await shutdownReport("SIGINT")).toStrictEqual({
-      exitCode: 0,
-      shutdownCalls: [[]],
-      exitCalls: [[0]],
-      loggedSignal: true,
-      loggedShutdown: true,
-    });
-  });
-
-  test("SIGTERM は relay を停止して 0 で終了する", async () => {
-    expect(await shutdownReport("SIGTERM")).toStrictEqual({
-      exitCode: 0,
-      shutdownCalls: [[]],
-      exitCalls: [[0]],
-      loggedSignal: true,
-      loggedShutdown: true,
-    });
-  });
-
-  test("停止中の追加 signal は同じ shutdown Promise に合流する", async () => {
-    const deferredShutdown = Promise.withResolvers<undefined>();
-    const setup = runtimeFixture({ shutdown: () => deferredShutdown.promise });
-    start(setup.runtime);
-
-    setup.signals.fire("SIGINT");
-    setup.signals.fire("SIGTERM");
-
-    expect(setup.shutdown.mock.calls).toStrictEqual([[]]);
-    expect(setup.signals.listenerCount()).toBe(0);
-    expect(setup.serverErrorListenerCount()).toBe(0);
-    deferredShutdown.resolve(undefined);
-    await expect(setup.exited).resolves.toBe(0);
-    expect(setup.exit.mock.calls).toStrictEqual([[0]]);
-  });
-
-  test("shutdown 失敗は診断して 1 で終了する", async () => {
-    const setup = runtimeFixture({
-      shutdown: () => Promise.reject(new Error("close failed")),
-    });
-    start(setup.runtime);
-
-    setup.signals.fire("SIGTERM");
-
-    await expect(setup.exited).resolves.toBe(1);
-    expect(setup.exit.mock.calls).toStrictEqual([[1]]);
-    expect(setup.stdout.text()).toContain("relay server shutdown failed");
-    expect(setup.stdout.text()).toContain("close failed");
-  });
-
-  test("非同期 server error は listener を解除して 1 で終了する", async () => {
-    const setup = runtimeFixture();
-    start(setup.runtime);
-
-    setup.failServer(new Error("address already in use"));
-
-    await expect(setup.exited).resolves.toBe(1);
-    expect(setup.shutdown.mock.calls).toStrictEqual([[]]);
-    expect(setup.signals.listenerCount()).toBe(0);
-    expect(setup.serverErrorListenerCount()).toBe(0);
-    expect(setup.stdout.text()).toContain("relay server failed");
-    expect(setup.stdout.text()).toContain("address already in use");
-  });
-
-  test("同期 listen failure は listener を解除して再送出する", () => {
-    const listenFailure = new Error("listen failed");
-    const setup = runtimeFixture({
-      listen: () => {
-        throw listenFailure;
-      },
-    });
-
-    expect(() => runRelayServerModule(true, setup.runtime)).toThrow(listenFailure);
-    expect(setup.signals.listenerCount()).toBe(0);
-    expect(setup.serverErrorListenerCount()).toBe(0);
-    expect(setup.stdout.text()).toContain("relay server failed to listen");
-  });
-
-  test("明示 release は signal と server error listener を両方解除する", () => {
-    const setup = runtimeFixture();
-    const running = start(setup.runtime);
-
-    expect(setup.signals.listenerCount()).toBe(2);
-    expect(setup.serverErrorListenerCount()).toBe(1);
-    running.shutdownRegistration.release();
-    expect(setup.signals.listenerCount()).toBe(0);
-    expect(setup.serverErrorListenerCount()).toBe(0);
-  });
-
-  test("ログファイル追記失敗は stderr の診断へ渡す", () => {
-    const setup = runtimeFixture({
-      createLogFileSink: (sink) => ({
-        append: () => {
-          sink.onFailure(new Error("disk unavailable"));
+  const it = test
+    .extend("githubReader", {
+      resolveTokenLogin: () => Promise.resolve("operator"),
+      readRepositoryPrivacy: () => Promise.resolve(false),
+      listOpenPullRequests: () => Promise.resolve([]),
+      resolvePullAuthor: () => Promise.resolve(null),
+      listCheckBuckets: () => Promise.resolve([]),
+    } satisfies GithubReader)
+    .extend("primaryGithubAccess", async ({ githubReader }, { onCleanup }) => {
+      const capturedAccess =
+        Promise.withResolvers<Parameters<RelayServerRuntime["createGithubReader"]>[0]>();
+      const signalEvents = new EventEmitter();
+      const serverEvents = new EventEmitter();
+      const runtime: RelayServerRuntime = {
+        environment: {
+          ...REQUIRED_ENVIRONMENT,
+          GH_TOKEN: "primary-token",
+          GITHUB_TOKEN: "fallback-token",
         },
-      }),
-    });
-    start(setup.runtime);
+        currentDirectory: () => "/repository",
+        nowIso: () => "2026-08-13T00:00:00.000Z",
+        fetchImpl: fetch,
+        signalTarget: signalEvents as SignalTarget,
+        stdout: process.stdout,
+        stderr: process.stderr,
+        exit: () => undefined,
+        createGithubReader: (access) => {
+          capturedAccess.resolve(access);
+          return githubReader;
+        },
+        createLogFileSink: () => ({ append: () => undefined }),
+        createRelay: () => ({
+          server: {
+            listen: (_port, onListening) => {
+              onListening();
+            },
+            once: serverEvents.once.bind(serverEvents),
+            off: serverEvents.off.bind(serverEvents),
+          },
+          shutdown: () => Promise.resolve(),
+        }),
+      };
+      const running = runRelayServerModule(true, runtime);
+      if (running === null) throw new Error("the relay server module did not start");
+      onCleanup(running.shutdownRegistration.release);
+      return Promise.resolve(capturedAccess.promise);
+    })
+    .extend("fallbackGithubAccess", async ({ githubReader }, { onCleanup }) => {
+      const capturedAccess =
+        Promise.withResolvers<Parameters<RelayServerRuntime["createGithubReader"]>[0]>();
+      const signalEvents = new EventEmitter();
+      const serverEvents = new EventEmitter();
+      const runtime: RelayServerRuntime = {
+        environment: {
+          ...REQUIRED_ENVIRONMENT,
+          GH_TOKEN: undefined,
+          GITHUB_TOKEN: "fallback-token",
+        },
+        currentDirectory: () => "/repository",
+        nowIso: () => "2026-08-13T00:00:00.000Z",
+        fetchImpl: fetch,
+        signalTarget: signalEvents as SignalTarget,
+        stdout: process.stdout,
+        stderr: process.stderr,
+        exit: () => undefined,
+        createGithubReader: (access) => {
+          capturedAccess.resolve(access);
+          return githubReader;
+        },
+        createLogFileSink: () => ({ append: () => undefined }),
+        createRelay: () => ({
+          server: {
+            listen: (_port, onListening) => {
+              onListening();
+            },
+            once: serverEvents.once.bind(serverEvents),
+            off: serverEvents.off.bind(serverEvents),
+          },
+          shutdown: () => Promise.resolve(),
+        }),
+      };
+      const running = runRelayServerModule(true, runtime);
+      if (running === null) throw new Error("the relay server module did not start");
+      onCleanup(running.shutdownRegistration.release);
+      return Promise.resolve(capturedAccess.promise);
+    })
+    .extend("idTokenRejection", async ({ githubReader }, { onCleanup }) => {
+      const capturedDependencies = Promise.withResolvers<RelayDependencies>();
+      const signalEvents = new EventEmitter();
+      const serverEvents = new EventEmitter();
+      const runtime: RelayServerRuntime = {
+        environment: { ...REQUIRED_ENVIRONMENT, GH_TOKEN: "primary-token" },
+        currentDirectory: () => "/repository",
+        nowIso: () => "2026-08-13T00:00:00.000Z",
+        fetchImpl: fetch,
+        signalTarget: signalEvents as SignalTarget,
+        stdout: process.stdout,
+        stderr: process.stderr,
+        exit: () => undefined,
+        createGithubReader: () => githubReader,
+        createLogFileSink: () => ({ append: () => undefined }),
+        createRelay: (dependencies) => {
+          capturedDependencies.resolve(dependencies);
+          return {
+            server: {
+              listen: (_port, onListening) => {
+                onListening();
+              },
+              once: serverEvents.once.bind(serverEvents),
+              off: serverEvents.off.bind(serverEvents),
+            },
+            shutdown: () => Promise.resolve(),
+          };
+        },
+      };
+      const running = runRelayServerModule(true, runtime);
+      if (running === null) throw new Error("the relay server module did not start");
+      onCleanup(running.shutdownRegistration.release);
+      const dependencies = await capturedDependencies.promise;
+      try {
+        await dependencies.verifyIdToken({
+          idToken: "id-token",
+          audience: "https://relay.example",
+        });
+      } catch (verificationFailure) {
+        return verificationFailure;
+      }
+      throw new Error("the injected id token verifier accepted a token");
+    })
+    .extend("missingTokenRejection", ({ githubReader }) => {
+      const signalEvents = new EventEmitter();
+      const serverEvents = new EventEmitter();
+      const runtime: RelayServerRuntime = {
+        environment: {
+          ...REQUIRED_ENVIRONMENT,
+          GH_TOKEN: undefined,
+          GITHUB_TOKEN: undefined,
+        },
+        currentDirectory: () => "/repository",
+        nowIso: () => "2026-08-13T00:00:00.000Z",
+        fetchImpl: fetch,
+        signalTarget: signalEvents as SignalTarget,
+        stdout: process.stdout,
+        stderr: process.stderr,
+        exit: () => undefined,
+        createGithubReader: () => githubReader,
+        createLogFileSink: () => ({ append: () => undefined }),
+        createRelay: () => ({
+          server: {
+            listen: (_port, onListening) => {
+              onListening();
+            },
+            once: serverEvents.once.bind(serverEvents),
+            off: serverEvents.off.bind(serverEvents),
+          },
+          shutdown: () => Promise.resolve(),
+        }),
+      };
+      try {
+        runRelayServerModule(true, runtime);
+      } catch (missingTokenFailure) {
+        return missingTokenFailure;
+      }
+      throw new Error("a missing GitHub token was accepted");
+    })
+    .extend("inactiveRelay", ({ githubReader }) => {
+      const runtime: RelayServerRuntime = {
+        environment: {},
+        currentDirectory: () => "/repository",
+        nowIso: () => "2026-08-13T00:00:00.000Z",
+        fetchImpl: fetch,
+        signalTarget: new EventEmitter() as SignalTarget,
+        stdout: process.stdout,
+        stderr: process.stderr,
+        exit: () => undefined,
+        createGithubReader: () => githubReader,
+        createLogFileSink: () => ({ append: () => undefined }),
+        createRelay: () => {
+          throw new Error("a non-main import tried to create the relay");
+        },
+      };
+      return runRelayServerModule(false, runtime);
+    })
+    .extend("signalExit", async ({ githubReader }) => {
+      const exited = Promise.withResolvers<number>();
+      const exit = vi.fn<(code: number) => void>((code) => {
+        exited.resolve(code);
+      });
+      const signalEvents = new EventEmitter();
+      const serverEvents = new EventEmitter();
+      const runtime: RelayServerRuntime = {
+        environment: { ...REQUIRED_ENVIRONMENT, GH_TOKEN: "primary-token" },
+        currentDirectory: () => "/repository",
+        nowIso: () => "2026-08-13T00:00:00.000Z",
+        fetchImpl: fetch,
+        signalTarget: signalEvents as SignalTarget,
+        stdout: process.stdout,
+        stderr: process.stderr,
+        exit,
+        createGithubReader: () => githubReader,
+        createLogFileSink: () => ({ append: () => undefined }),
+        createRelay: () => ({
+          server: {
+            listen: (_port, onListening) => {
+              onListening();
+            },
+            once: serverEvents.once.bind(serverEvents),
+            off: serverEvents.off.bind(serverEvents),
+          },
+          shutdown: () => Promise.resolve(),
+        }),
+      };
+      runRelayServerModule(true, runtime);
+      signalEvents.emit("SIGINT");
+      await exited.promise;
+      return exit;
+    })
+    .extend("terminationExit", async ({ githubReader }) => {
+      const exited = Promise.withResolvers<number>();
+      const exit = vi.fn<(code: number) => void>((code) => {
+        exited.resolve(code);
+      });
+      const signalEvents = new EventEmitter();
+      const serverEvents = new EventEmitter();
+      const runtime: RelayServerRuntime = {
+        environment: { ...REQUIRED_ENVIRONMENT, GH_TOKEN: "primary-token" },
+        currentDirectory: () => "/repository",
+        nowIso: () => "2026-08-13T00:00:00.000Z",
+        fetchImpl: fetch,
+        signalTarget: signalEvents as SignalTarget,
+        stdout: process.stdout,
+        stderr: process.stderr,
+        exit,
+        createGithubReader: () => githubReader,
+        createLogFileSink: () => ({ append: () => undefined }),
+        createRelay: () => ({
+          server: {
+            listen: (_port, onListening) => {
+              onListening();
+            },
+            once: serverEvents.once.bind(serverEvents),
+            off: serverEvents.off.bind(serverEvents),
+          },
+          shutdown: () => Promise.resolve(),
+        }),
+      };
+      runRelayServerModule(true, runtime);
+      signalEvents.emit("SIGTERM");
+      await exited.promise;
+      return exit;
+    })
+    .extend("joinedSignalsExit", async ({ githubReader }) => {
+      const exited = Promise.withResolvers<number>();
+      const exit = vi.fn<(code: number) => void>((code) => {
+        exited.resolve(code);
+      });
+      const shutdownEntered = Promise.withResolvers<undefined>();
+      const shutdownFinished = Promise.withResolvers<undefined>();
+      const signalEvents = new EventEmitter();
+      const serverEvents = new EventEmitter();
+      const runtime: RelayServerRuntime = {
+        environment: { ...REQUIRED_ENVIRONMENT, GH_TOKEN: "primary-token" },
+        currentDirectory: () => "/repository",
+        nowIso: () => "2026-08-13T00:00:00.000Z",
+        fetchImpl: fetch,
+        signalTarget: signalEvents as SignalTarget,
+        stdout: process.stdout,
+        stderr: process.stderr,
+        exit,
+        createGithubReader: () => githubReader,
+        createLogFileSink: () => ({ append: () => undefined }),
+        createRelay: () => ({
+          server: {
+            listen: (_port, onListening) => {
+              onListening();
+            },
+            once: serverEvents.once.bind(serverEvents),
+            off: serverEvents.off.bind(serverEvents),
+          },
+          shutdown: () => {
+            shutdownEntered.resolve(undefined);
+            return shutdownFinished.promise;
+          },
+        }),
+      };
+      runRelayServerModule(true, runtime);
+      signalEvents.emit("SIGINT");
+      await shutdownEntered.promise;
+      signalEvents.emit("SIGTERM");
+      shutdownFinished.resolve(undefined);
+      await exited.promise;
+      return exit;
+    })
+    .extend("failedShutdownExit", async ({ githubReader }) => {
+      const exited = Promise.withResolvers<number>();
+      const exit = vi.fn<(code: number) => void>((code) => {
+        exited.resolve(code);
+      });
+      const signalEvents = new EventEmitter();
+      const serverEvents = new EventEmitter();
+      const runtime: RelayServerRuntime = {
+        environment: { ...REQUIRED_ENVIRONMENT, GH_TOKEN: "primary-token" },
+        currentDirectory: () => "/repository",
+        nowIso: () => "2026-08-13T00:00:00.000Z",
+        fetchImpl: fetch,
+        signalTarget: signalEvents as SignalTarget,
+        stdout: process.stdout,
+        stderr: process.stderr,
+        exit,
+        createGithubReader: () => githubReader,
+        createLogFileSink: () => ({ append: () => undefined }),
+        createRelay: () => ({
+          server: {
+            listen: (_port, onListening) => {
+              onListening();
+            },
+            once: serverEvents.once.bind(serverEvents),
+            off: serverEvents.off.bind(serverEvents),
+          },
+          shutdown: () => Promise.reject(new Error("close failed")),
+        }),
+      };
+      runRelayServerModule(true, runtime);
+      signalEvents.emit("SIGTERM");
+      await exited.promise;
+      return exit;
+    })
+    .extend("serverFailureExit", async ({ githubReader }) => {
+      const exited = Promise.withResolvers<number>();
+      const exit = vi.fn<(code: number) => void>((code) => {
+        exited.resolve(code);
+      });
+      const signalEvents = new EventEmitter();
+      const serverEvents = new EventEmitter();
+      const runtime: RelayServerRuntime = {
+        environment: { ...REQUIRED_ENVIRONMENT, GH_TOKEN: "primary-token" },
+        currentDirectory: () => "/repository",
+        nowIso: () => "2026-08-13T00:00:00.000Z",
+        fetchImpl: fetch,
+        signalTarget: signalEvents as SignalTarget,
+        stdout: process.stdout,
+        stderr: process.stderr,
+        exit,
+        createGithubReader: () => githubReader,
+        createLogFileSink: () => ({ append: () => undefined }),
+        createRelay: () => ({
+          server: {
+            listen: (_port, onListening) => {
+              onListening();
+            },
+            once: serverEvents.once.bind(serverEvents),
+            off: serverEvents.off.bind(serverEvents),
+          },
+          shutdown: () => Promise.resolve(),
+        }),
+      };
+      runRelayServerModule(true, runtime);
+      serverEvents.emit(SOCKET_LIFECYCLE_EVENT.failure, new Error("address already in use"));
+      await exited.promise;
+      return exit;
+    })
+    .extend("listenRejection", ({ githubReader }) => {
+      const signalEvents = new EventEmitter();
+      const serverEvents = new EventEmitter();
+      const listenFailure = new Error("listen failed");
+      const runtime: RelayServerRuntime = {
+        environment: { ...REQUIRED_ENVIRONMENT, GH_TOKEN: "primary-token" },
+        currentDirectory: () => "/repository",
+        nowIso: () => "2026-08-13T00:00:00.000Z",
+        fetchImpl: fetch,
+        signalTarget: signalEvents as SignalTarget,
+        stdout: process.stdout,
+        stderr: process.stderr,
+        exit: () => undefined,
+        createGithubReader: () => githubReader,
+        createLogFileSink: () => ({ append: () => undefined }),
+        createRelay: () => ({
+          server: {
+            listen: () => {
+              throw listenFailure;
+            },
+            once: serverEvents.once.bind(serverEvents),
+            off: serverEvents.off.bind(serverEvents),
+          },
+          shutdown: () => Promise.resolve(),
+        }),
+      };
+      try {
+        runRelayServerModule(true, runtime);
+      } catch (listenRejection) {
+        return listenRejection;
+      }
+      throw new Error("a synchronous listen failure was swallowed");
+    })
+    .extend("serverFailureListenersAfterRelease", ({ githubReader }) => {
+      const signalEvents = new EventEmitter();
+      const serverEvents = new EventEmitter();
+      const runtime: RelayServerRuntime = {
+        environment: { ...REQUIRED_ENVIRONMENT, GH_TOKEN: "primary-token" },
+        currentDirectory: () => "/repository",
+        nowIso: () => "2026-08-13T00:00:00.000Z",
+        fetchImpl: fetch,
+        signalTarget: signalEvents as SignalTarget,
+        stdout: process.stdout,
+        stderr: process.stderr,
+        exit: () => undefined,
+        createGithubReader: () => githubReader,
+        createLogFileSink: () => ({ append: () => undefined }),
+        createRelay: () => ({
+          server: {
+            listen: (_port, onListening) => {
+              onListening();
+            },
+            once: serverEvents.once.bind(serverEvents),
+            off: serverEvents.off.bind(serverEvents),
+          },
+          shutdown: () => Promise.resolve(),
+        }),
+      };
+      const running = runRelayServerModule(true, runtime);
+      if (running === null) throw new Error("the relay server module did not start");
+      running.shutdownRegistration.release();
+      return serverEvents.listenerCount(SOCKET_LIFECYCLE_EVENT.failure);
+    })
+    .extend("logSinkFailureDiagnostic", ({ githubReader, stderr }, { onCleanup }) => {
+      const signalEvents = new EventEmitter();
+      const serverEvents = new EventEmitter();
+      const runtime: RelayServerRuntime = {
+        environment: { ...REQUIRED_ENVIRONMENT, GH_TOKEN: "primary-token" },
+        currentDirectory: () => "/repository",
+        nowIso: () => "2026-08-13T00:00:00.000Z",
+        fetchImpl: fetch,
+        signalTarget: signalEvents as SignalTarget,
+        stdout: process.stdout,
+        stderr: process.stderr,
+        exit: () => undefined,
+        createGithubReader: () => githubReader,
+        createLogFileSink: (sink) => ({
+          append: () => {
+            sink.onFailure(new Error("disk unavailable"));
+          },
+        }),
+        createRelay: () => ({
+          server: {
+            listen: (_port, onListening) => {
+              onListening();
+            },
+            once: serverEvents.once.bind(serverEvents),
+            off: serverEvents.off.bind(serverEvents),
+          },
+          shutdown: () => Promise.resolve(),
+        }),
+      };
+      const running = runRelayServerModule(true, runtime);
+      if (running === null) throw new Error("the relay server module did not start");
+      onCleanup(running.shutdownRegistration.release);
+      return stderr.text();
+    })
+    .extend("directEntryExitStatus", () => {
+      const directRun = spawnSync(
+        process.execPath,
+        [fileURLToPath(new URL("./server.ts", import.meta.url))],
+        {
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            GH_TOKEN: undefined,
+            GITHUB_TOKEN: undefined,
+            ...REQUIRED_ENVIRONMENT,
+          },
+          killSignal: "SIGKILL",
+          timeout: 10_000,
+        },
+      );
+      return Math.trunc(directRun.status ?? -1);
+    })
+    .extend("directEntrySignal", () => {
+      const directRun = spawnSync(
+        process.execPath,
+        [fileURLToPath(new URL("./server.ts", import.meta.url))],
+        {
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            GH_TOKEN: undefined,
+            GITHUB_TOKEN: undefined,
+            ...REQUIRED_ENVIRONMENT,
+          },
+          killSignal: "SIGKILL",
+          timeout: 10_000,
+        },
+      );
+      return String(directRun.signal);
+    })
+    .extend("directEntryStarted", () => {
+      const directRun = spawnSync(
+        process.execPath,
+        [fileURLToPath(new URL("./server.ts", import.meta.url))],
+        {
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            GH_TOKEN: undefined,
+            GITHUB_TOKEN: undefined,
+            ...REQUIRED_ENVIRONMENT,
+          },
+          killSignal: "SIGKILL",
+          timeout: 10_000,
+        },
+      );
+      return Object.is(directRun.error, undefined);
+    })
+    .extend("directEntryDiagnostic", () => {
+      const directRun = spawnSync(
+        process.execPath,
+        [fileURLToPath(new URL("./server.ts", import.meta.url))],
+        {
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            GH_TOKEN: undefined,
+            GITHUB_TOKEN: undefined,
+            ...REQUIRED_ENVIRONMENT,
+          },
+          killSignal: "SIGKILL",
+          timeout: 10_000,
+        },
+      );
+      return directRun.stderr.includes(
+        "GH_TOKEN or GITHUB_TOKEN must be set for GitHub API access",
+      );
+    })
+    .extend("serverModuleKeys", async () => Object.keys(await import("./server.ts")));
 
-    expect(setup.stderr.text()).toContain(
-      "could not append to the log file: Error: disk unavailable",
+  it("GH_TOKEN を GITHUB_TOKEN より優先する", ({ primaryGithubAccess }) => {
+    expect(primaryGithubAccess).toMatchInlineSnapshot(`
+      {
+        "accessFor": [Function],
+        "repository": "example/repository",
+        "token": "primary-token",
+      }
+    `);
+  });
+
+  it("GH_TOKEN が無ければ GITHUB_TOKEN を使う", ({ fallbackGithubAccess }) => {
+    expect(fallbackGithubAccess).toMatchInlineSnapshot(`
+      {
+        "accessFor": [Function],
+        "repository": "example/repository",
+        "token": "fallback-token",
+      }
+    `);
+  });
+
+  it("注入する ID token verifier は未配線として拒否する", ({ idTokenRejection }) => {
+    expect(idTokenRejection).toStrictEqual(
+      new IdTokenRejectionError("no id token verifier is wired into this build"),
     );
   });
 
-  test("公開serverは起動せずにimportできる", async () => {
-    const serverModule = await import("./server.ts");
-    expect(Object.keys(serverModule)).toStrictEqual([]);
+  it("GitHub token がどちらも無ければ listen 前に拒否する", ({ missingTokenRejection }) => {
+    expect(missingTokenRejection).toStrictEqual(
+      new Error("GH_TOKEN or GITHUB_TOKEN must be set for GitHub API access"),
+    );
   });
 
-  test("公開serverを直接実行すると起動検証が走る", { timeout: 15_000 }, () => {
-    const environment = Object.fromEntries(
-      Object.entries(process.env).filter(
-        (entry): entry is [string, string] =>
-          entry[1] !== undefined && entry[0] !== "GH_TOKEN" && entry[0] !== "GITHUB_TOKEN",
-      ),
-    );
-    const execution = spawnSync(process.execPath, [serverPath], {
-      encoding: "utf8",
-      env: { ...environment, ...requiredEnvironment },
-      killSignal: "SIGKILL",
-      timeout: 10_000,
-    });
+  it("main でない import はサーバーを起動しない", ({ inactiveRelay }) => {
+    expect(inactiveRelay).toBe(null);
+  });
 
-    expect(execution.error).toBeUndefined();
-    expect(execution.signal).toBeNull();
-    expect(execution.status).not.toBe(0);
-    expect(execution.stderr).toContain(
-      "GH_TOKEN or GITHUB_TOKEN must be set for GitHub API access",
+  it("SIGINT は relay を停止して 0 で終了する", ({ signalExit }) => {
+    expect(signalExit).toHaveBeenCalledExactlyOnceWith(0);
+  });
+
+  it("SIGTERM は relay を停止して 0 で終了する", ({ terminationExit }) => {
+    expect(terminationExit).toHaveBeenCalledExactlyOnceWith(0);
+  });
+
+  it("停止中の追加 signal は同じ shutdown Promise に合流する", ({ joinedSignalsExit }) => {
+    expect(joinedSignalsExit).toHaveBeenCalledExactlyOnceWith(0);
+  });
+
+  it("shutdown 失敗は 1 で終了する", ({ failedShutdownExit }) => {
+    expect(failedShutdownExit).toHaveBeenCalledExactlyOnceWith(1);
+  });
+
+  it("非同期 server error は 1 で終了する", ({ serverFailureExit }) => {
+    expect(serverFailureExit).toHaveBeenCalledExactlyOnceWith(1);
+  });
+
+  it("同期 listen failure は再送出する", ({ listenRejection }) => {
+    expect(listenRejection).toStrictEqual(new Error("listen failed"));
+  });
+
+  it("明示 release は server error listener を解除する", ({
+    serverFailureListenersAfterRelease,
+  }) => {
+    expect(serverFailureListenersAfterRelease).toBe(0);
+  });
+
+  it("ログファイル追記失敗は stderr の診断へ渡す", ({ logSinkFailureDiagnostic }) => {
+    expect(logSinkFailureDiagnostic).toBe(
+      "could not append to the log file: Error: disk unavailable\n",
     );
+  });
+
+  it("公開 server は起動せずに import できる", ({ serverModuleKeys }) => {
+    expect(serverModuleKeys).toStrictEqual([]);
+  });
+
+  it("公開 server の直接実行は 0 以外で終了する", ({ directEntryExitStatus }) => {
+    expect(directEntryExitStatus).toBe(1);
+  });
+
+  it("公開 server の直接実行は signal で終了しない", ({ directEntrySignal }) => {
+    expect(directEntrySignal).toBe("null");
+  });
+
+  it("公開 server の直接実行は子processを起動できる", ({ directEntryStarted }) => {
+    expect(directEntryStarted).toBe(true);
+  });
+
+  it("公開 server の直接実行は起動検証の診断を返す", ({ directEntryDiagnostic }) => {
+    expect(directEntryDiagnostic).toBe(true);
+  });
+
+  it("シナリオを起動しないテストの stdout は空のままになる", ({ stdout }) => {
+    expect(stdout).toMatchInlineSnapshot(`
+      {
+        "chunks": [],
+      }
+    `);
+  });
+
+  it("シナリオを起動しないテストの stderr は空のままになる", ({ stderr }) => {
+    expect(stderr).toMatchInlineSnapshot(`
+      {
+        "chunks": [],
+      }
+    `);
   });
 });

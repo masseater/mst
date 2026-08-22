@@ -38,9 +38,9 @@ export const composedPrefixOf = ({
 }: {
   readonly layer: EntryCompositionLayer;
   readonly config: EntryCompositionConfig;
-}): string => layer.wrappers.map((wrapper) => `${wrapper}${config.wrapperSeparator}`).join("");
+}): string => layer.wrappers.map((wrapping) => `${wrapping}${config.wrapperSeparator}`).join("");
 
-export const wrapperNameOf = (wrapper: string): string => wrapper.replace(/ .*$/u, "");
+export const wrapperNameOf = (wrapping: string): string => wrapping.replace(/ .*$/u, "");
 
 export const entryBodyOf = ({
   value,
@@ -60,7 +60,7 @@ export const entryBodyOf = ({
       : null;
     const wrapperOnly =
       wrapperHead !== null &&
-      layer.wrappers.some((wrapper) => wrapperNameOf(wrapper) === wrapperNameOf(wrapperHead));
+      layer.wrappers.some((wrapping) => wrapperNameOf(wrapping) === wrapperNameOf(wrapperHead));
     return wrapperOnly ? "" : value;
   }
   const headName = wrapperNameOf(value.slice(0, separatorIndex));

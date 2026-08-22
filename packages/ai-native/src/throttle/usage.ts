@@ -9,18 +9,17 @@ Runs the command while keeping the number of simultaneous executions that
 share this host and namespace at or below the limit. When every slot is held
 the wrapper joins a wait queue, reports its position on stderr, and retries
 every slot on each poll. The default wait budget is ${DEFAULT_WAIT_BUDGET_MS / 1000}
-seconds. A slot whose holder
-exits is released by the operating system. A live holder keeps its slot until
-its command ends or its timeout stops the command. Do not nest throttle inside
-a command it wraps: the inner call counts as one more competitor and consumes
-a second slot. The operating system's temporary directory that stores the
-slots must be on a local filesystem, not NFS, SMB, or another network filesystem.
-Do not delete, rename, replace, or clean up slot lock files while throttle
-processes are active.
+seconds. The operating system releases a slot when its holder exits, including
+an abrupt termination. Do not nest throttle inside a command it wraps: the inner
+call counts as one more competitor and consumes a second slot. The operating
+system's temporary directory that stores the slots must be on a local filesystem,
+not NFS, SMB, or another network filesystem. Do not delete, rename, replace, or
+clean up slot lock files while throttle processes are active.
 
 Options:
-  --timeout <seconds>  Send SIGTERM to the command's process group after this
-                       many seconds, then SIGKILL after a short grace period.
+  --timeout <seconds>  Stop the command's whole process tree after this many
+                       seconds. POSIX sends SIGTERM, then SIGKILL after a short
+                       grace period; Windows uses taskkill /T /F immediately.
                        Accepts 0 through ${MAXIMUM_TIMEOUT_SECONDS}. 0 never
                        interrupts the command. Defaults to 0.
 
@@ -32,7 +31,7 @@ Environment:
 Exit codes:
   0  the wrapped command succeeded
   1  the wrapped command failed, was killed, could not be started, ran past
-     the timeout, or the wrapper could not get a slot
+     the timeout, or the wrapper could not get or release a slot
   2  throttle itself was called incorrectly`;
 
 export type Invocation = {
@@ -69,12 +68,12 @@ export const parseInvocation = (argv: readonly string[]): Invocation | string =>
   if (split === -1) return USAGE;
   const timeout = parsedTimeoutSeconds(argv.slice(0, split));
   if (typeof timeout === "string") return timeout;
-  const [executable, ...args] = argv.slice(split + 1);
+  const [executable, ...handedArgs] = argv.slice(split + 1);
   if (executable === undefined) return USAGE;
   return {
     timeoutSec: timeout.seconds,
     executable,
-    args,
-    commandLine: [executable, ...args].join(" "),
+    args: handedArgs,
+    commandLine: [executable, ...handedArgs].join(" "),
   };
 };

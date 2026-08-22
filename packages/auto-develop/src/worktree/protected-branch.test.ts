@@ -2,29 +2,32 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { isProtectedBranch, UNKNOWN_BRANCH_MARKER } from "./protected-branch.ts";
 
-const it = test
-  .extend("protectionWithoutDefaultBranch", () =>
-    isProtectedBranch({ branch: "topic/x", defaultBranch: null }))
-  .extend("protectionForBranchlessWorktree", () =>
-    isProtectedBranch({ branch: null, defaultBranch: "main" }),
-  )
-  .extend("protectionForUnknownMarker", () =>
-    isProtectedBranch({ branch: UNKNOWN_BRANCH_MARKER, defaultBranch: "main" }),
-  )
-  .extend("protectionForDefaultBranch", () =>
-    isProtectedBranch({ branch: "develop", defaultBranch: "develop" }),
-  )
-  .extend("protectionForMain", () =>
-    isProtectedBranch({ branch: "main", defaultBranch: "develop" }),
-  )
-  .extend("protectionForMaster", () =>
-    isProtectedBranch({ branch: "master", defaultBranch: "develop" }),
-  )
-  .extend("protectionForTopicBranch", () =>
-    isProtectedBranch({ branch: "topic/x", defaultBranch: "main" }),
-  );
-
 describe("isProtectedBranch", () => {
+  const it = test
+    .extend("protectionWithoutDefaultBranch", () =>
+      isProtectedBranch({ branch: "topic/x", defaultBranch: null }))
+    .extend("protectionForBranchlessWorktree", () =>
+      isProtectedBranch({ branch: null, defaultBranch: "main" }),
+    )
+    .extend("protectionForUnknownMarker", () =>
+      isProtectedBranch({
+        branch: UNKNOWN_BRANCH_MARKER,
+        defaultBranch: "main",
+      }),
+    )
+    .extend("protectionForDefaultBranch", () =>
+      isProtectedBranch({ branch: "develop", defaultBranch: "develop" }),
+    )
+    .extend("protectionForMain", () =>
+      isProtectedBranch({ branch: "main", defaultBranch: "develop" }),
+    )
+    .extend("protectionForMaster", () =>
+      isProtectedBranch({ branch: "master", defaultBranch: "develop" }),
+    )
+    .extend("protectionForTopicBranch", () =>
+      isProtectedBranch({ branch: "topic/x", defaultBranch: "main" }),
+    );
+
   it("デフォルトブランチの解決に失敗したら全ブランチを保護する", ({
     protectionWithoutDefaultBranch,
   }) => {

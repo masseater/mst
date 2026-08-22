@@ -1,245 +1,618 @@
 import { describe, expect, test, vi } from "vite-plus/test";
 
-import { silentLogger } from "../logging/logger.ts";
+import { silentLogger, type Logger } from "../logging/logger.ts";
 import { EngineAuthExpiredError } from "./auth-expiry.ts";
 import { createEngine, type EngineConfig } from "./engine.ts";
 import { ProcessFailedError } from "./process-failed-error.ts";
 
-import type { TmuxRunRequest } from "./tmux-runner.ts";
-
-type EngineRunner = EngineConfig["runner"];
-
-const collect = async (stream: AsyncGenerator<string, void, undefined>): Promise<string> => {
-  const chunks = new Map<number, string>();
-  for await (const chunk of stream) chunks.set(chunks.size, chunk);
-  return [...chunks.values()].join("");
-};
-
-const emittingRunner = (
-  chunks: readonly string[],
-): { readonly runner: EngineRunner; readonly requests: () => readonly TmuxRunRequest[] } => {
-  const seen = new Map<number, TmuxRunRequest>();
-  const runner: EngineRunner = async function* run(request) {
-    seen.set(seen.size, request);
-    for (const chunk of chunks) yield chunk;
-  };
-  return { runner, requests: () => [...seen.values()] };
-};
-
-const failingRunner = (failure: Error): EngineRunner => {
-  const runner: EngineRunner = async function* run() {
-    await Promise.resolve();
-    yield "";
-    throw failure;
-  };
-  return runner;
-};
-
-const rejectionOf = async (stream: AsyncGenerator<string, void, undefined>): Promise<unknown> => {
-  try {
-    await collect(stream);
-    return undefined;
-  } catch (streamFailure) {
-    return streamFailure;
-  }
-};
-
-const configWith = (overrides: Partial<EngineConfig>): EngineConfig => ({
-  kind: "claude",
-  resolveGitPaths: () => Promise.resolve({ repoRoot: "/repo", sharedGitDir: "/repo/.git" }),
-  timeoutMs: 3 * 24 * 60 * 60 * 1000,
-  bypassPermissions: false,
-  runner: emittingRunner([]).runner,
-  killSession: () => Promise.resolve(),
-  log: silentLogger,
-  ...overrides,
-});
-
-const claudeRunWithBypass = async (): Promise<TmuxRunRequest | undefined> => {
-  const { runner, requests } = emittingRunner([]);
-  const engine = createEngine(configWith({ runner, bypassPermissions: true }));
-  await collect(engine.execute({ prompt: "review", cwd: "/work", prNumber: 7 }));
-  return requests()[0];
-};
-
-const codexRun = async (): Promise<{
-  readonly gitPathCalls: readonly (readonly [string])[];
-  readonly request: TmuxRunRequest | undefined;
-}> => {
-  const { runner, requests } = emittingRunner([]);
-  const resolveGitPaths = vi.fn<EngineConfig["resolveGitPaths"]>(() =>
-    Promise.resolve({ repoRoot: "/repo", sharedGitDir: "/repo/.git" }),
-  );
-  const engine = createEngine(configWith({ kind: "codex", runner, resolveGitPaths }));
-  await collect(engine.execute({ prompt: "fix", cwd: "/work/pr-1", prNumber: 7 }));
-  return { gitPathCalls: resolveGitPaths.mock.calls, request: requests()[0] };
-};
-
-const overriddenRun = async (): Promise<TmuxRunRequest | undefined> => {
-  const { runner, requests } = emittingRunner([]);
-  const engine = createEngine(configWith({ runner, launchOverride: "wrapper sub" }));
-  await collect(engine.execute({ prompt: "review", cwd: "/work", prNumber: 7 }));
-  return requests()[0];
-};
-
-const expiredAuthFailure = new ProcessFailedError({
+const EXPIRED_CODEX_AUTH_FAILURE = new ProcessFailedError({
   command: "codex",
   exitCode: 1,
   output: "refresh_token_invalidated",
 });
 
-const abortedRun = async (): Promise<{
-  readonly forwardedSignal: AbortSignal | undefined;
-  readonly passedSignal: AbortSignal;
-}> => {
-  const { runner, requests } = emittingRunner([]);
-  const engine = createEngine(configWith({ runner }));
-  const abort = new AbortController();
-  await collect(
-    engine.execute({ prompt: "review", cwd: "/work", prNumber: 7, signal: abort.signal }),
-  );
-  return { forwardedSignal: requests()[0]?.signal, passedSignal: abort.signal };
-};
+const QUALITY_CHECK_FAILURE = new ProcessFailedError({
+  command: "claude",
+  exitCode: 1,
+  output: "quality check failed",
+});
 
-const warningsForTwoBypassedRuns = async (): Promise<number> => {
-  const warn = vi.fn<(fields: Readonly<Record<string, unknown>>, message: string) => void>();
-  const engine = createEngine(
-    configWith({ bypassPermissions: true, log: { ...silentLogger, warn } }),
-  );
-  await collect(engine.execute({ prompt: "review", cwd: "/work", prNumber: 7 }));
-  await collect(engine.execute({ prompt: "review", cwd: "/work", prNumber: 8 }));
-  return warn.mock.calls.length;
-};
+const UNRESPONSIVE_RUN_FAILURE = new Error("engine run exceeded the 1000ms timeout");
 
-const killedSessions = async (): Promise<readonly (readonly [string])[]> => {
-  const killSession = vi.fn<(sessionName: string) => Promise<void>>(() => Promise.resolve());
-  const engine = createEngine(configWith({ killSession }));
-  await engine.kill(7);
-  return killSession.mock.calls;
-};
+const MISSING_SESSION_FAILURE = new Error("no session");
 
-const warningsForFailingKill = async (): Promise<number> => {
-  const warn = vi.fn<(fields: Readonly<Record<string, unknown>>, message: string) => void>();
-  const engine = createEngine(
-    configWith({
-      killSession: () => Promise.reject(new Error("no session")),
-      log: { ...silentLogger, warn },
-    }),
-  );
-  await engine.kill(7);
-  return warn.mock.calls.length;
-};
-
-const it = test
-  .extend("forwardedOutput", () => {
-    const { runner } = emittingRunner(["hello ", "world"]);
-    const engine = createEngine(configWith({ runner }));
-    return collect(engine.execute({ prompt: "review", cwd: "/work", prNumber: 7 }));
-  })
-  .extend("claudeRequest", () => claudeRunWithBypass())
-  .extend("codexExecution", () => codexRun())
-  .extend("overriddenRequest", () => overriddenRun())
-  .extend("expiredAuthRejection", () => {
-    const engine = createEngine(
-      configWith({ kind: "codex", runner: failingRunner(expiredAuthFailure) }),
-    );
-    return rejectionOf(engine.execute({ prompt: "fix", cwd: "/work", prNumber: 7 }));
-  })
-  .extend("signalForwarding", () => abortedRun())
-  .extend("bypassWarningCount", () => warningsForTwoBypassedRuns())
-  .extend("killSessionCalls", () => killedSessions())
-  .extend("failingKillWarningCount", () => warningsForFailingKill());
+const FORWARDED_ABORT_SIGNAL = new AbortController().signal;
 
 describe("createEngine execute", () => {
-  it("runner の出力断片を無加工で転送する", ({ forwardedOutput }) => {
-    expect(forwardedOutput).toStrictEqual("hello world");
-  });
-
-  it("claude はセッション名を runner へ渡す", ({ claudeRequest }) => {
-    expect(claudeRequest?.sessionName).toStrictEqual("auto-develop-pr-7");
-  });
-
-  it("claude はバイナリ名を runner へ渡す", ({ claudeRequest }) => {
-    expect(claudeRequest?.binary).toStrictEqual("claude");
-  });
-
-  it("claude は引数を runner へ渡す", ({ claudeRequest }) => {
-    expect(claudeRequest?.args).toStrictEqual([
-      "-p",
-      "--dangerously-skip-permissions",
-      "--name",
-      "auto-develop-pr-7",
-      "review",
-    ]);
-  });
-
-  it("claude は無反応タイムアウトを runner へ渡す", ({ claudeRequest }) => {
-    expect(claudeRequest?.idleTimeoutMs).toStrictEqual(1_800_000);
-  });
-
-  it("codex は git パス解決を作業ディレクトリで呼ぶ", ({ codexExecution }) => {
-    expect(codexExecution.gitPathCalls).toStrictEqual([["/work/pr-1"]]);
-  });
-
-  it("codex は解決したパスを引数へ組み込む", ({ codexExecution }) => {
-    expect(codexExecution.request?.args).toContain("--add-dir");
-  });
-
-  it("上書きはバイナリを差し替える", ({ overriddenRequest }) => {
-    expect(overriddenRequest?.binary).toStrictEqual("wrapper");
-  });
-
-  it("上書きは接頭引数を前置する", ({ overriddenRequest }) => {
-    expect(overriddenRequest?.args[0]).toStrictEqual("sub");
-  });
-
-  it("上書きの接頭引数の後に本来の引数が続く", ({ overriddenRequest }) => {
-    expect(overriddenRequest?.args[1]).toStrictEqual("-p");
-  });
-
-  it("認証失効パターンに一致する失敗は型付きエラーへ昇格する", ({ expiredAuthRejection }) => {
-    expect(expiredAuthRejection).toBeInstanceOf(EngineAuthExpiredError);
-  });
-
-  it("昇格したエラーは元のプロセス失敗を cause に持つ", ({ expiredAuthRejection }) => {
-    expect((expiredAuthRejection as EngineAuthExpiredError).cause).toStrictEqual(
-      expiredAuthFailure,
-    );
-  });
-
-  it("認証失効パターンに一致しない失敗は元の例外のまま再送出する", async () => {
-    const processFailure = new ProcessFailedError({
-      command: "claude",
-      exitCode: 1,
-      output: "quality check failed",
+  describe("a run whose runner writes two chunks", () => {
+    const it = test.extend("theChunksForwardedFromTheRunner", () => {
+      const engine = createEngine({
+        kind: "claude",
+        resolveGitPaths: () => Promise.resolve({ repoRoot: "/repo", sharedGitDir: "/repo/.git" }),
+        timeoutMs: 259_200_000,
+        bypassPermissions: false,
+        runner: async function* run(): AsyncGenerator<string, void, undefined> {
+          yield await Promise.resolve("hello ");
+          yield "world";
+        },
+        killSession: () => Promise.resolve(),
+        log: silentLogger,
+      });
+      return Array.fromAsync(engine.execute({ prompt: "review", cwd: "/work", prNumber: 7 }));
     });
-    const engine = createEngine(configWith({ runner: failingRunner(processFailure) }));
-    const streaming = collect(engine.execute({ prompt: "review", cwd: "/work", prNumber: 7 }));
-    await expect(streaming).rejects.toThrow(processFailure);
+
+    it("hands every chunk on unaltered", ({ theChunksForwardedFromTheRunner }) => {
+      expect(theChunksForwardedFromTheRunner).toStrictEqual(["hello ", "world"]);
+    });
   });
 
-  it("プロセス失敗でない例外はそのまま再送出する", async () => {
-    const timeoutFailure = new Error("engine run exceeded the 1000ms timeout");
-    const engine = createEngine(configWith({ runner: failingRunner(timeoutFailure) }));
-    const streaming = collect(engine.execute({ prompt: "review", cwd: "/work", prNumber: 7 }));
-    await expect(streaming).rejects.toThrow(timeoutFailure);
+  describe("a claude run that bypasses the permission prompt", () => {
+    const it = test.extend("theRunRequestOfABypassingClaudeRun", async () => {
+      const runner = vi.fn<EngineConfig["runner"]>(async function* run(): AsyncGenerator<
+        string,
+        void,
+        undefined
+      > {
+        yield* await Promise.resolve([]);
+      });
+      const engine = createEngine({
+        kind: "claude",
+        resolveGitPaths: () => Promise.resolve({ repoRoot: "/repo", sharedGitDir: "/repo/.git" }),
+        timeoutMs: 259_200_000,
+        bypassPermissions: true,
+        runner,
+        killSession: () => Promise.resolve(),
+        log: silentLogger,
+      });
+      await Array.fromAsync(engine.execute({ prompt: "review", cwd: "/work", prNumber: 7 }));
+      return runner;
+    });
+
+    it("asks the runner for a session named after the pull request", ({
+      theRunRequestOfABypassingClaudeRun,
+    }) => {
+      expect(theRunRequestOfABypassingClaudeRun).toHaveBeenCalledWith({
+        binary: "claude",
+        args: ["-p", "--dangerously-skip-permissions", "--name", "auto-develop-pr-7", "review"],
+        cwd: "/work",
+        sessionName: "auto-develop-pr-7",
+        timeoutMs: 259_200_000,
+        idleTimeoutMs: 1_800_000,
+      });
+    });
   });
 
-  it("中断シグナルは runner へ転送される", ({ signalForwarding }) => {
-    expect(signalForwarding.forwardedSignal).toStrictEqual(signalForwarding.passedSignal);
+  describe("a claude run that keeps the permission prompt", () => {
+    const it = test.extend("theRunRequestOfAPermissionKeepingClaudeRun", async () => {
+      const runner = vi.fn<EngineConfig["runner"]>(async function* run(): AsyncGenerator<
+        string,
+        void,
+        undefined
+      > {
+        yield* await Promise.resolve([]);
+      });
+      const engine = createEngine({
+        kind: "claude",
+        resolveGitPaths: () => Promise.resolve({ repoRoot: "/repo", sharedGitDir: "/repo/.git" }),
+        timeoutMs: 259_200_000,
+        bypassPermissions: false,
+        runner,
+        killSession: () => Promise.resolve(),
+        log: silentLogger,
+      });
+      await Array.fromAsync(engine.execute({ prompt: "review", cwd: "/work", prNumber: 7 }));
+      return runner;
+    });
+
+    it("asks the runner to run claude under the automatic permission mode", ({
+      theRunRequestOfAPermissionKeepingClaudeRun,
+    }) => {
+      expect(theRunRequestOfAPermissionKeepingClaudeRun).toHaveBeenCalledWith({
+        binary: "claude",
+        args: ["-p", "--permission-mode", "auto", "--name", "auto-develop-pr-7", "review"],
+        cwd: "/work",
+        sessionName: "auto-develop-pr-7",
+        timeoutMs: 259_200_000,
+        idleTimeoutMs: 1_800_000,
+      });
+    });
   });
 
-  it("バイパス有効時の警告はエンジン生成時に 1 回だけ出る", ({ bypassWarningCount }) => {
-    expect(bypassWarningCount).toStrictEqual(1);
+  describe("a codex run inside a worktree of a shared repository", () => {
+    const it = test
+      .extend("theGitPathLookupOfACodexRun", async () => {
+        const resolveGitPaths = vi.fn<EngineConfig["resolveGitPaths"]>(() =>
+          Promise.resolve({ repoRoot: "/repo", sharedGitDir: "/repo/.git" }),
+        );
+        const engine = createEngine({
+          kind: "codex",
+          resolveGitPaths,
+          timeoutMs: 259_200_000,
+          bypassPermissions: false,
+          runner: async function* run(): AsyncGenerator<string, void, undefined> {
+            yield* await Promise.resolve([]);
+          },
+          killSession: () => Promise.resolve(),
+          log: silentLogger,
+        });
+        await Array.fromAsync(engine.execute({ prompt: "fix", cwd: "/work/pr-1", prNumber: 7 }));
+        return resolveGitPaths;
+      })
+      .extend("theRunRequestOfACodexRun", async () => {
+        const runner = vi.fn<EngineConfig["runner"]>(async function* run(): AsyncGenerator<
+          string,
+          void,
+          undefined
+        > {
+          yield* await Promise.resolve([]);
+        });
+        const engine = createEngine({
+          kind: "codex",
+          resolveGitPaths: () => Promise.resolve({ repoRoot: "/repo", sharedGitDir: "/repo/.git" }),
+          timeoutMs: 259_200_000,
+          bypassPermissions: false,
+          runner,
+          killSession: () => Promise.resolve(),
+          log: silentLogger,
+        });
+        await Array.fromAsync(engine.execute({ prompt: "fix", cwd: "/work/pr-1", prNumber: 7 }));
+        return runner;
+      })
+      .extend("theRunRequestOfABypassingCodexRun", async () => {
+        const runner = vi.fn<EngineConfig["runner"]>(async function* run(): AsyncGenerator<
+          string,
+          void,
+          undefined
+        > {
+          yield* await Promise.resolve([]);
+        });
+        const engine = createEngine({
+          kind: "codex",
+          resolveGitPaths: () => Promise.resolve({ repoRoot: "/repo", sharedGitDir: "/repo/.git" }),
+          timeoutMs: 259_200_000,
+          bypassPermissions: true,
+          runner,
+          killSession: () => Promise.resolve(),
+          log: silentLogger,
+        });
+        await Array.fromAsync(engine.execute({ prompt: "fix", cwd: "/work/pr-1", prNumber: 7 }));
+        return runner;
+      });
+
+    it("looks the git paths up from the working directory of the run", ({
+      theGitPathLookupOfACodexRun,
+    }) => {
+      expect(theGitPathLookupOfACodexRun).toHaveBeenCalledWith("/work/pr-1");
+    });
+
+    it("asks the runner to reach the repository root and the shared git directory", ({
+      theRunRequestOfACodexRun,
+    }) => {
+      expect(theRunRequestOfACodexRun).toHaveBeenCalledWith({
+        binary: "codex",
+        args: [
+          "-a",
+          "on-request",
+          "-c",
+          'approvals_reviewer="auto_review"',
+          "exec",
+          "-C",
+          "/work/pr-1",
+          "--add-dir",
+          "/repo",
+          "--add-dir",
+          "/repo/.git",
+          "fix",
+        ],
+        cwd: "/work/pr-1",
+        sessionName: "auto-develop-pr-7",
+        timeoutMs: 259_200_000,
+        idleTimeoutMs: 1_800_000,
+      });
+    });
+
+    it("asks the runner to skip the approval prompt when the bypass is on", ({
+      theRunRequestOfABypassingCodexRun,
+    }) => {
+      expect(theRunRequestOfABypassingCodexRun).toHaveBeenCalledWith({
+        binary: "codex",
+        args: [
+          "-a",
+          "never",
+          "exec",
+          "--dangerously-bypass-approvals-and-sandbox",
+          "-C",
+          "/work/pr-1",
+          "--add-dir",
+          "/repo",
+          "--add-dir",
+          "/repo/.git",
+          "fix",
+        ],
+        cwd: "/work/pr-1",
+        sessionName: "auto-develop-pr-7",
+        timeoutMs: 259_200_000,
+        idleTimeoutMs: 1_800_000,
+      });
+    });
+  });
+
+  describe("a codex run whose working directory sits outside a git repository", () => {
+    const it = test.extend("theRunRequestOfACodexRunWithoutGitPaths", async () => {
+      const runner = vi.fn<EngineConfig["runner"]>(async function* run(): AsyncGenerator<
+        string,
+        void,
+        undefined
+      > {
+        yield* await Promise.resolve([]);
+      });
+      const engine = createEngine({
+        kind: "codex",
+        resolveGitPaths: () => Promise.resolve({ repoRoot: null, sharedGitDir: null }),
+        timeoutMs: 259_200_000,
+        bypassPermissions: false,
+        runner,
+        killSession: () => Promise.resolve(),
+        log: silentLogger,
+      });
+      await Array.fromAsync(engine.execute({ prompt: "fix", cwd: "/work", prNumber: 7 }));
+      return runner;
+    });
+
+    it("asks the runner for no reachable directory beyond the working directory", ({
+      theRunRequestOfACodexRunWithoutGitPaths,
+    }) => {
+      expect(theRunRequestOfACodexRunWithoutGitPaths).toHaveBeenCalledWith({
+        binary: "codex",
+        args: [
+          "-a",
+          "on-request",
+          "-c",
+          'approvals_reviewer="auto_review"',
+          "exec",
+          "-C",
+          "/work",
+          "fix",
+        ],
+        cwd: "/work",
+        sessionName: "auto-develop-pr-7",
+        timeoutMs: 259_200_000,
+        idleTimeoutMs: 1_800_000,
+      });
+    });
+  });
+
+  describe("a run whose launch is overridden by a wrapper and a subcommand", () => {
+    const it = test.extend("theRunRequestOfAWrappedRun", async () => {
+      const runner = vi.fn<EngineConfig["runner"]>(async function* run(): AsyncGenerator<
+        string,
+        void,
+        undefined
+      > {
+        yield* await Promise.resolve([]);
+      });
+      const engine = createEngine({
+        kind: "claude",
+        resolveGitPaths: () => Promise.resolve({ repoRoot: "/repo", sharedGitDir: "/repo/.git" }),
+        launchOverride: "wrapper sub",
+        timeoutMs: 259_200_000,
+        bypassPermissions: false,
+        runner,
+        killSession: () => Promise.resolve(),
+        log: silentLogger,
+      });
+      await Array.fromAsync(engine.execute({ prompt: "review", cwd: "/work", prNumber: 7 }));
+      return runner;
+    });
+
+    it("asks the runner for the wrapper with the subcommand ahead of the engine arguments", ({
+      theRunRequestOfAWrappedRun,
+    }) => {
+      expect(theRunRequestOfAWrappedRun).toHaveBeenCalledWith({
+        binary: "wrapper",
+        args: ["sub", "-p", "--permission-mode", "auto", "--name", "auto-develop-pr-7", "review"],
+        cwd: "/work",
+        sessionName: "auto-develop-pr-7",
+        timeoutMs: 259_200_000,
+        idleTimeoutMs: 1_800_000,
+      });
+    });
+  });
+
+  describe("a run whose launch is overridden by a binary alone", () => {
+    const it = test.extend("theRunRequestOfARenamedBinaryRun", async () => {
+      const runner = vi.fn<EngineConfig["runner"]>(async function* run(): AsyncGenerator<
+        string,
+        void,
+        undefined
+      > {
+        yield* await Promise.resolve([]);
+      });
+      const engine = createEngine({
+        kind: "claude",
+        resolveGitPaths: () => Promise.resolve({ repoRoot: "/repo", sharedGitDir: "/repo/.git" }),
+        launchOverride: "wrapper",
+        timeoutMs: 259_200_000,
+        bypassPermissions: false,
+        runner,
+        killSession: () => Promise.resolve(),
+        log: silentLogger,
+      });
+      await Array.fromAsync(engine.execute({ prompt: "review", cwd: "/work", prNumber: 7 }));
+      return runner;
+    });
+
+    it("asks the runner for the wrapper with the engine arguments untouched", ({
+      theRunRequestOfARenamedBinaryRun,
+    }) => {
+      expect(theRunRequestOfARenamedBinaryRun).toHaveBeenCalledWith({
+        binary: "wrapper",
+        args: ["-p", "--permission-mode", "auto", "--name", "auto-develop-pr-7", "review"],
+        cwd: "/work",
+        sessionName: "auto-develop-pr-7",
+        timeoutMs: 259_200_000,
+        idleTimeoutMs: 1_800_000,
+      });
+    });
+  });
+
+  describe("a run carrying an abort signal", () => {
+    const it = test.extend("theRunRequestOfAnAbortableRun", async () => {
+      const runner = vi.fn<EngineConfig["runner"]>(async function* run(): AsyncGenerator<
+        string,
+        void,
+        undefined
+      > {
+        yield* await Promise.resolve([]);
+      });
+      const engine = createEngine({
+        kind: "claude",
+        resolveGitPaths: () => Promise.resolve({ repoRoot: "/repo", sharedGitDir: "/repo/.git" }),
+        timeoutMs: 259_200_000,
+        bypassPermissions: false,
+        runner,
+        killSession: () => Promise.resolve(),
+        log: silentLogger,
+      });
+      await Array.fromAsync(
+        engine.execute({
+          prompt: "review",
+          cwd: "/work",
+          prNumber: 7,
+          signal: FORWARDED_ABORT_SIGNAL,
+        }),
+      );
+      return runner;
+    });
+
+    it("hands the signal on to the runner", ({ theRunRequestOfAnAbortableRun }) => {
+      expect(theRunRequestOfAnAbortableRun).toHaveBeenCalledWith({
+        binary: "claude",
+        args: ["-p", "--permission-mode", "auto", "--name", "auto-develop-pr-7", "review"],
+        cwd: "/work",
+        sessionName: "auto-develop-pr-7",
+        timeoutMs: 259_200_000,
+        idleTimeoutMs: 1_800_000,
+        signal: FORWARDED_ABORT_SIGNAL,
+      });
+    });
+  });
+
+  describe("a codex run whose failure names an invalidated refresh token", () => {
+    const it = test.extend("theRejectionOfAnExpiredCodexAuthRun", async () => {
+      const engine = createEngine({
+        kind: "codex",
+        resolveGitPaths: () => Promise.resolve({ repoRoot: "/repo", sharedGitDir: "/repo/.git" }),
+        timeoutMs: 259_200_000,
+        bypassPermissions: false,
+        runner: async function* run(): AsyncGenerator<string, void, undefined> {
+          yield* await Promise.resolve([]);
+          throw EXPIRED_CODEX_AUTH_FAILURE;
+        },
+        killSession: () => Promise.resolve(),
+        log: silentLogger,
+      });
+      try {
+        return await Array.fromAsync(engine.execute({ prompt: "fix", cwd: "/work", prNumber: 7 }));
+      } catch (halted) {
+        return halted;
+      }
+    });
+
+    it("raises the failure to the halting authentication error", ({
+      theRejectionOfAnExpiredCodexAuthRun,
+    }) => {
+      expect(theRejectionOfAnExpiredCodexAuthRun).toStrictEqual(
+        new EngineAuthExpiredError({
+          engine: "codex",
+          matchedPattern: "refresh_token_invalidated",
+          cause: EXPIRED_CODEX_AUTH_FAILURE,
+        }),
+      );
+    });
+  });
+
+  describe("a claude run whose failure names no authentication pattern", () => {
+    const it = test.extend("theRejectionOfAFailedQualityCheck", async () => {
+      const engine = createEngine({
+        kind: "claude",
+        resolveGitPaths: () => Promise.resolve({ repoRoot: "/repo", sharedGitDir: "/repo/.git" }),
+        timeoutMs: 259_200_000,
+        bypassPermissions: false,
+        runner: async function* run(): AsyncGenerator<string, void, undefined> {
+          yield* await Promise.resolve([]);
+          throw QUALITY_CHECK_FAILURE;
+        },
+        killSession: () => Promise.resolve(),
+        log: silentLogger,
+      });
+      try {
+        return await Array.fromAsync(
+          engine.execute({ prompt: "review", cwd: "/work", prNumber: 7 }),
+        );
+      } catch (rethrown) {
+        return rethrown;
+      }
+    });
+
+    it("hands the process failure back untouched", ({ theRejectionOfAFailedQualityCheck }) => {
+      expect(theRejectionOfAFailedQualityCheck).toBe(QUALITY_CHECK_FAILURE);
+    });
+  });
+
+  describe("a run whose failure is not a process failure", () => {
+    const it = test.extend("theRejectionOfAnUnresponsiveRun", async () => {
+      const engine = createEngine({
+        kind: "claude",
+        resolveGitPaths: () => Promise.resolve({ repoRoot: "/repo", sharedGitDir: "/repo/.git" }),
+        timeoutMs: 259_200_000,
+        bypassPermissions: false,
+        runner: async function* run(): AsyncGenerator<string, void, undefined> {
+          yield* await Promise.resolve([]);
+          throw UNRESPONSIVE_RUN_FAILURE;
+        },
+        killSession: () => Promise.resolve(),
+        log: silentLogger,
+      });
+      try {
+        return await Array.fromAsync(
+          engine.execute({ prompt: "review", cwd: "/work", prNumber: 7 }),
+        );
+      } catch (rethrown) {
+        return rethrown;
+      }
+    });
+
+    it("hands the original exception back untouched", ({ theRejectionOfAnUnresponsiveRun }) => {
+      expect(theRejectionOfAnUnresponsiveRun).toBe(UNRESPONSIVE_RUN_FAILURE);
+    });
+  });
+
+  describe("two runs from one engine whose permission bypass is enabled", () => {
+    const it = test.extend("theBypassWarningOfTwoRuns", async () => {
+      const warn = vi.fn<Logger["warn"]>();
+      const engine = createEngine({
+        kind: "claude",
+        resolveGitPaths: () => Promise.resolve({ repoRoot: "/repo", sharedGitDir: "/repo/.git" }),
+        timeoutMs: 259_200_000,
+        bypassPermissions: true,
+        runner: async function* run(): AsyncGenerator<string, void, undefined> {
+          yield* await Promise.resolve([]);
+        },
+        killSession: () => Promise.resolve(),
+        log: { ...silentLogger, warn },
+      });
+      await Array.fromAsync(engine.execute({ prompt: "review", cwd: "/work", prNumber: 7 }));
+      await Array.fromAsync(engine.execute({ prompt: "review", cwd: "/work", prNumber: 8 }));
+      return warn;
+    });
+
+    it("warns once, when the engine is built rather than when it runs", ({
+      theBypassWarningOfTwoRuns,
+    }) => {
+      expect(theBypassWarningOfTwoRuns).toHaveBeenCalledExactlyOnceWith(
+        { engine: "claude" },
+        "engine permission bypass is enabled",
+      );
+    });
+  });
+
+  describe("a run that reaches its end", () => {
+    const it = test.extend("theInfoLogOfACompletedRun", async () => {
+      const infoLogger = vi.fn<Logger["info"]>();
+      const engine = createEngine({
+        kind: "claude",
+        resolveGitPaths: () => Promise.resolve({ repoRoot: "/repo", sharedGitDir: "/repo/.git" }),
+        timeoutMs: 259_200_000,
+        bypassPermissions: false,
+        runner: async function* run(): AsyncGenerator<string, void, undefined> {
+          yield* await Promise.resolve([]);
+        },
+        killSession: () => Promise.resolve(),
+        log: { ...silentLogger, info: infoLogger },
+      });
+      await Array.fromAsync(engine.execute({ prompt: "review", cwd: "/work", prNumber: 7 }));
+      return infoLogger;
+    });
+
+    it("records the completion beside the start", ({ theInfoLogOfACompletedRun }) => {
+      expect(theInfoLogOfACompletedRun).toHaveBeenCalledTimes(2);
+    });
   });
 });
 
 describe("createEngine kill", () => {
-  it("PR 番号のセッションを 1 回強制終了する", ({ killSessionCalls }) => {
-    expect(killSessionCalls).toStrictEqual([["auto-develop-pr-7"]]);
+  describe("a kill aimed at a pull request number", () => {
+    const it = test.extend("theSessionKillOfAPullRequestNumber", async () => {
+      const killSession = vi.fn<EngineConfig["killSession"]>(() => Promise.resolve());
+      const engine = createEngine({
+        kind: "claude",
+        resolveGitPaths: () => Promise.resolve({ repoRoot: "/repo", sharedGitDir: "/repo/.git" }),
+        timeoutMs: 259_200_000,
+        bypassPermissions: false,
+        runner: async function* run(): AsyncGenerator<string, void, undefined> {
+          yield* await Promise.resolve([]);
+        },
+        killSession,
+        log: silentLogger,
+      });
+      await engine.kill(7);
+      return killSession;
+    });
+
+    it("ends the one session named after that pull request", ({
+      theSessionKillOfAPullRequestNumber,
+    }) => {
+      expect(theSessionKillOfAPullRequestNumber).toHaveBeenCalledExactlyOnceWith(
+        "auto-develop-pr-7",
+      );
+    });
   });
 
-  it("kill の失敗は例外にせず警告のみ", ({ failingKillWarningCount }) => {
-    expect(failingKillWarningCount).toStrictEqual(1);
+  describe("a kill whose session is already gone", () => {
+    const it = test
+      .extend("theWarningOfAKillWithNoSession", async () => {
+        const warn = vi.fn<Logger["warn"]>();
+        const engine = createEngine({
+          kind: "claude",
+          resolveGitPaths: () => Promise.resolve({ repoRoot: "/repo", sharedGitDir: "/repo/.git" }),
+          timeoutMs: 259_200_000,
+          bypassPermissions: false,
+          runner: async function* run(): AsyncGenerator<string, void, undefined> {
+            yield* await Promise.resolve([]);
+          },
+          killSession: () => Promise.reject(MISSING_SESSION_FAILURE),
+          log: { ...silentLogger, warn },
+        });
+        await engine.kill(7);
+        return warn;
+      })
+      .extend("theSettlementOfAKillWithNoSession", () => {
+        const engine = createEngine({
+          kind: "claude",
+          resolveGitPaths: () => Promise.resolve({ repoRoot: "/repo", sharedGitDir: "/repo/.git" }),
+          timeoutMs: 259_200_000,
+          bypassPermissions: false,
+          runner: async function* run(): AsyncGenerator<string, void, undefined> {
+            yield* await Promise.resolve([]);
+          },
+          killSession: () => Promise.reject(MISSING_SESSION_FAILURE),
+          log: silentLogger,
+        });
+        return Promise.allSettled([engine.kill(7)]);
+      });
+
+    it("writes the miss down as a warning", ({ theWarningOfAKillWithNoSession }) => {
+      expect(theWarningOfAKillWithNoSession).toHaveBeenCalledExactlyOnceWith(
+        { prNumber: 7, err: MISSING_SESSION_FAILURE },
+        "killing the engine session failed",
+      );
+    });
+
+    it("settles without an exception", ({ theSettlementOfAKillWithNoSession }) => {
+      expect(theSettlementOfAKillWithNoSession).toStrictEqual([
+        { status: "fulfilled", value: undefined },
+      ]);
+    });
   });
 });

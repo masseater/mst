@@ -84,13 +84,14 @@ const findingsIn = ({
   });
   const singleUseEntries = singleUse.map((finding) => finding.entry);
   const bypassed = bypassedCatalogFindings({
-    catalogEntries: definition.catalogEntries.filter((entry) => !singleUseEntries.includes(entry)),
+    catalogEntries: definition.catalogEntries,
+    excludedCatalogEntries: singleUseEntries,
     usages,
     config,
   });
   const shared = sharedDependencyFindings({
     usages,
-    catalogedNames: definition.catalogEntries.map((entry) => entry.dependencyName),
+    catalogedNames: definition.catalogEntries.map((catalogEntry) => catalogEntry.dependencyName),
     definitionPath,
     config,
   });

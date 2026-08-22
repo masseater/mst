@@ -5,6 +5,10 @@ export type WorkflowChecksConfig = {
   readonly jobsKey: string;
   readonly stepsKey: string;
   readonly runKey: string;
+  readonly usesKey: string;
+  readonly withKey: string;
+  readonly fetchDepthKey: string;
+  readonly checkoutActionSpecifier: string;
   readonly permissionsKey: string;
   readonly continueOnErrorKey: string;
   readonly gatingTriggers: readonly string[];
@@ -14,6 +18,11 @@ export type WorkflowChecksConfig = {
   readonly statementSeparators: readonly string[];
   readonly controlFlowKeywords: readonly string[];
   readonly failureMaskingSnippets: readonly string[];
+  readonly renovateConfigPaths: readonly string[];
+  readonly dependabotConfigPaths: readonly string[];
+  readonly updatesKey: string;
+  readonly packageEcosystemKey: string;
+  readonly actionsEcosystem: string;
 };
 
 export const defaultWorkflowChecksConfig: WorkflowChecksConfig = {
@@ -23,6 +32,10 @@ export const defaultWorkflowChecksConfig: WorkflowChecksConfig = {
   jobsKey: "jobs",
   stepsKey: "steps",
   runKey: "run",
+  usesKey: "uses",
+  withKey: "with",
+  fetchDepthKey: "fetch-depth",
+  checkoutActionSpecifier: "actions/checkout",
   permissionsKey: "permissions",
   continueOnErrorKey: "continue-on-error",
   gatingTriggers: ["pull_request", "pull_request_target"],
@@ -32,4 +45,17 @@ export const defaultWorkflowChecksConfig: WorkflowChecksConfig = {
   statementSeparators: ["&&", "||", ";", "|"],
   controlFlowKeywords: ["if", "for", "while", "until", "case", "select"],
   failureMaskingSnippets: ["|| true", "|| :", "|| exit 0"],
+  renovateConfigPaths: [
+    "renovate.json",
+    "renovate.json5",
+    ".renovaterc",
+    ".renovaterc.json",
+    ".renovaterc.json5",
+    ".github/renovate.json",
+    ".github/renovate.json5",
+  ],
+  dependabotConfigPaths: [".github/dependabot.yml", ".github/dependabot.yaml"],
+  updatesKey: "updates",
+  packageEcosystemKey: "package-ecosystem",
+  actionsEcosystem: "github-actions",
 };

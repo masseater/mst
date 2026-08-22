@@ -57,3 +57,5 @@ jobs:
             - args: ['--frozen-lockfile']
 
       - run: vp run guard
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

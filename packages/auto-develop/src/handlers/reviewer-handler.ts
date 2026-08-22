@@ -1,6 +1,10 @@
 import { changedEndpoint, type DiffEndpoint } from "../lifecycle/input-change.ts";
 import { isReviewInputChanged } from "../lifecycle/review-input-changed-error.ts";
-import { effectiveReviewOf, reviewVerdictState } from "../lifecycle/review-verdict.ts";
+import {
+  COMMIT_STATUS_STATE,
+  effectiveReviewOf,
+  reviewVerdictState,
+} from "../lifecycle/review-verdict.ts";
 import {
   REVIEWER_STATUS_CONTEXT,
   type HandlerGithubClient,
@@ -38,18 +42,21 @@ const writeVerdict = async (verdict: {
   if (config.proxyLogin === undefined) {
     await verdict.statusWriter.write({
       sha: verdict.sha,
-      state: "failure",
+      state: COMMIT_STATUS_STATE.failure,
       description: "review failed; the reviewer login is unknown",
     });
     return;
   }
   const reviews = await config.github.listReviews(verdict.prNumber);
   const effectiveReview = effectiveReviewOf({ reviews, login: config.proxyLogin });
-  const state = reviewVerdictState(effectiveReview);
+  const heldState = reviewVerdictState(effectiveReview);
   await verdict.statusWriter.write({
     sha: verdict.sha,
-    state,
-    description: state === "error" ? "review completed with changes requested" : "review completed",
+    state: heldState,
+    description:
+      heldState === COMMIT_STATUS_STATE.error
+        ? "review completed with changes requested"
+        : "review completed",
   });
 };
 
@@ -93,7 +100,7 @@ const handleSessionFailure = async (failing: {
   if (after === null) return;
   const wrote = await failing.statusWriter.write({
     sha: after.headRefOid,
-    state: "failure",
+    state: COMMIT_STATUS_STATE.failure,
     description: "review failed",
   });
   if (wrote) throw failing.failure;
@@ -136,7 +143,7 @@ export const createReviewerHandler = (config: ReviewerHandlerConfig) => {
     const before = await config.github.prSnapshot(prNumber);
     const started = await statusWriter.write({
       sha: before.headRefOid,
-      state: "pending",
+      state: COMMIT_STATUS_STATE.pending,
       description: "reviewing",
     });
     if (!started) return;

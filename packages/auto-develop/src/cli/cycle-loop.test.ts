@@ -1,254 +1,528 @@
-import { describe, expect, onTestFinished, test, vi } from "vite-plus/test";
+import { describe, expect, test, vi } from "vite-plus/test";
 
-import {
-  STREAM_ENDED,
-  type ConnectionCycleConfig,
-  type CycleOutcome,
-  type runConnectionCycle,
-} from "../runtime/connection-cycle.ts";
+import { silentLogger } from "../logging/logger.ts";
 import { CredentialTerminalError } from "../transport/credential-provider.ts";
-import { cycleUntilStopped, type CycleLoop } from "./cycle-loop.ts";
-
-import type { Logger } from "../logging/logger.ts";
-import type { JobQueue } from "../queue/job-queue.ts";
-import type { EventDispatcher } from "../runtime/event-dispatch.ts";
-import type { registerShutdown, SignalTarget } from "../runtime/shutdown.ts";
-
-const mocked = vi.hoisted(() => ({
-  runConnectionCycle: vi.fn<typeof runConnectionCycle>(),
-  registerShutdown: vi.fn<typeof registerShutdown>(),
-}));
-
-vi.mock(import("../runtime/connection-cycle.ts"), async (importOriginal) => ({
-  ...(await importOriginal()),
-  runConnectionCycle: mocked.runConnectionCycle,
-}));
-
-vi.mock(import("../runtime/shutdown.ts"), async (importOriginal) => ({
-  ...(await importOriginal()),
-  registerShutdown: mocked.registerShutdown,
-}));
-
-const idleQueue = (): JobQueue => ({
-  enqueue: () => true,
-  enqueueFollowUp: () => true,
-  setHandlers: () => undefined,
-  runningLanes: () => [],
-  waitingLanes: () => [],
-  size: () => ({ waiting: 0, running: 0 }),
-  isIdle: () => true,
-  admitsLane: () => true,
-  cancelLane: () => 0,
-  drain: () => Promise.resolve(),
-  reserveLane: () => Promise.resolve(null),
-});
-
-const fixture = (
-  remoteHeadCommit: () => Promise<string | null>,
-  onError: Logger["error"] = () => undefined,
-) => {
-  const log: Logger = {
-    info: vi.fn<Logger["info"]>(),
-    warn: vi.fn<Logger["warn"]>(),
-    error: vi.fn<Logger["error"]>(onError),
-  };
-  const dispatcher: EventDispatcher = {
-    dispatch: vi.fn<EventDispatcher["dispatch"]>(() => true),
-  };
-  const runtime: CycleLoop["runtime"] = {
-    log,
-    syncToMain: vi.fn<CycleLoop["runtime"]["syncToMain"]>(() => Promise.resolve()),
-    drainStartup: vi.fn<CycleLoop["runtime"]["drainStartup"]>(() => Promise.resolve([])),
-    connect: vi.fn<CycleLoop["runtime"]["connect"]>(() => Promise.resolve()),
-    subscribe: async function* subscribe() {
-      yield* [];
-    },
-    dispatcher,
-    queue: idleQueue(),
-    disconnect: vi.fn<CycleLoop["runtime"]["disconnect"]>(),
-    remoteHeadCommit,
-  };
-  const release = vi.fn<() => void>();
-  const registered = Promise.withResolvers<{
-    readonly target: SignalTarget;
-    readonly onSignal: (signal: "SIGINT" | "SIGTERM") => void;
-    readonly log: Logger;
-  }>();
-  mocked.registerShutdown.mockImplementation((registration) => {
-    registered.resolve(registration);
-    return { release };
-  });
-  return {
-    cycling: {
-      mode: "reviewer" as const,
-      runtime,
-      restart: {
-        request: vi.fn<CycleLoop["restart"]["request"]>(),
-        requested: vi.fn<CycleLoop["restart"]["requested"]>(() => null),
-      },
-      idleMonitor: {
-        recordActivity: vi.fn<CycleLoop["idleMonitor"]["recordActivity"]>(),
-        idleTooLong: vi.fn<CycleLoop["idleMonitor"]["idleTooLong"]>(() => false),
-      },
-      baseline: new Map<string, string>(),
-    },
-    log,
-    release,
-    registered: registered.promise,
-  };
-};
-
-const resetMocks = (): void => {
-  mocked.runConnectionCycle.mockReset();
-  mocked.registerShutdown.mockReset();
-};
+import { cycleUntilStopped } from "./cycle-loop.ts";
 
 describe("cycleUntilStopped", () => {
-  test("接続サイクルへ全境界を渡し、再起動要求なら待たずに終了する", async () => {
-    resetMocks();
-    const setup = fixture(() => Promise.resolve("commit-a"));
-    mocked.runConnectionCycle.mockImplementation(async (config) => {
-      await config.syncMain();
-      await config.startupDrain();
-      const connection = config.connect();
-      await config.subscribe().next();
-      await connection;
-      config.onActivity();
-      expect(config.signalled()).toBe(false);
-      return "restart-requested";
-    });
-
-    await cycleUntilStopped(setup.cycling);
-
-    expect(setup.cycling.baseline.get("commit")).toBe("commit-a");
-    expect(setup.cycling.runtime.syncToMain).toHaveBeenCalledExactlyOnceWith();
-    expect(setup.cycling.runtime.drainStartup).toHaveBeenCalledExactlyOnceWith();
-    expect(setup.cycling.runtime.connect).toHaveBeenCalledExactlyOnceWith();
-    expect(setup.cycling.idleMonitor.recordActivity).toHaveBeenCalledExactlyOnceWith();
-    expect(setup.release).toHaveBeenCalledExactlyOnceWith();
-  });
-
-  test("stream 終了後は 3 秒待って次の接続サイクルへ進む", async () => {
-    resetMocks();
-    vi.useFakeTimers();
-    onTestFinished(() => {
-      vi.useRealTimers();
-    });
-    const setup = fixture(() => Promise.resolve("commit-b"));
-    const firstCycle = Promise.withResolvers<undefined>();
-    mocked.runConnectionCycle
-      .mockImplementationOnce(() => {
-        firstCycle.resolve(undefined);
-        return Promise.resolve(STREAM_ENDED);
+  describe("再起動要求で終わる接続サイクル", () => {
+    const it = test
+      .extend("immediateCycleObservation", async () => {
+        const observation = vi.fn<(event: string) => void>();
+        const baseline = new Map<string, string>();
+        await cycleUntilStopped({
+          mode: "reviewer",
+          runtime: {
+            log: silentLogger,
+            syncToMain: () => {
+              observation("sync-main");
+              return Promise.resolve();
+            },
+            drainStartup: () => {
+              observation("startup-drain");
+              return Promise.resolve([]);
+            },
+            connect: () => {
+              observation("connect");
+              return Promise.resolve();
+            },
+            subscribe: async function* subscribe() {
+              observation("subscribe");
+              yield {};
+            },
+            dispatcher: { dispatch: () => true },
+            queue: {
+              enqueue: () => true,
+              enqueueFollowUp: () => true,
+              setHandlers: () => undefined,
+              runningLanes: () => [],
+              waitingLanes: () => [],
+              size: () => ({ waiting: 0, running: 0 }),
+              isIdle: () => true,
+              admitsLane: () => true,
+              cancelLane: () => 0,
+              drain: () => Promise.resolve(),
+              reserveLane: () => Promise.resolve(null),
+            },
+            disconnect: () => undefined,
+            remoteHeadCommit: () => {
+              observation("remote-head");
+              return Promise.resolve("commit-a");
+            },
+          },
+          restart: {
+            request: () => undefined,
+            requested: () => {
+              observation(`baseline:${String(baseline.get("commit"))}`);
+              return "idle";
+            },
+          },
+          idleMonitor: {
+            recordActivity: () => {
+              observation("activity");
+            },
+            idleTooLong: () => false,
+          },
+          baseline,
+        });
+        return observation;
       })
-      .mockResolvedValueOnce("signalled");
+      .extend("releasedSignalListeners", async () => {
+        const processOff = vi.spyOn(process, "off");
+        await cycleUntilStopped({
+          mode: "reviewer",
+          runtime: {
+            log: silentLogger,
+            syncToMain: () => Promise.resolve(),
+            drainStartup: () => Promise.resolve([]),
+            connect: () => Promise.resolve(),
+            subscribe: async function* subscribe() {
+              await Promise.resolve();
+              yield* [];
+            },
+            dispatcher: { dispatch: () => true },
+            queue: {
+              enqueue: () => true,
+              enqueueFollowUp: () => true,
+              setHandlers: () => undefined,
+              runningLanes: () => [],
+              waitingLanes: () => [],
+              size: () => ({ waiting: 0, running: 0 }),
+              isIdle: () => true,
+              admitsLane: () => true,
+              cancelLane: () => 0,
+              drain: () => Promise.resolve(),
+              reserveLane: () => Promise.resolve(null),
+            },
+            disconnect: () => undefined,
+            remoteHeadCommit: () => Promise.resolve("commit-a"),
+          },
+          restart: { request: () => undefined, requested: () => "idle" },
+          idleMonitor: { recordActivity: () => undefined, idleTooLong: () => false },
+          baseline: new Map(),
+        });
+        return processOff;
+      });
 
-    const completion = cycleUntilStopped(setup.cycling);
-    await firstCycle.promise;
-    await Promise.resolve();
-    await vi.advanceTimersByTimeAsync(3_000);
-    await completion;
+    it("remote head を最初に読む", ({ immediateCycleObservation }) => {
+      expect(immediateCycleObservation).toHaveBeenNthCalledWith(1, "remote-head");
+    });
 
-    expect(mocked.runConnectionCycle).toHaveBeenCalledTimes(2);
-    expect(setup.log.warn).toHaveBeenCalledExactlyOnceWith(
-      { ending: STREAM_ENDED },
-      "the connection cycle ended; reconnecting shortly",
-    );
-    expect(setup.release).toHaveBeenCalledExactlyOnceWith();
+    it("main へ同期する", ({ immediateCycleObservation }) => {
+      expect(immediateCycleObservation).toHaveBeenNthCalledWith(2, "sync-main");
+    });
+
+    it("起動時イベントを巻き取る", ({ immediateCycleObservation }) => {
+      expect(immediateCycleObservation).toHaveBeenNthCalledWith(3, "startup-drain");
+    });
+
+    it("relay へ接続する", ({ immediateCycleObservation }) => {
+      expect(immediateCycleObservation).toHaveBeenNthCalledWith(4, "connect");
+    });
+
+    it("relay を購読する", ({ immediateCycleObservation }) => {
+      expect(immediateCycleObservation).toHaveBeenNthCalledWith(5, "subscribe");
+    });
+
+    it("購読イベントを活動として記録する", ({ immediateCycleObservation }) => {
+      expect(immediateCycleObservation).toHaveBeenNthCalledWith(6, "activity");
+    });
+
+    it("再起動判定より前に remote head を基準へ保存する", ({ immediateCycleObservation }) => {
+      expect(immediateCycleObservation).toHaveBeenNthCalledWith(7, "baseline:commit-a");
+    });
+
+    it("再起動要求を検出したサイクルは追加処理をしない", ({ immediateCycleObservation }) => {
+      expect(immediateCycleObservation).toHaveBeenCalledTimes(7);
+    });
+
+    it("終了時に両シグナルの登録を解放する", ({ releasedSignalListeners }) => {
+      expect(releasedSignalListeners).toHaveBeenCalledTimes(2);
+    });
   });
 
-  test("remote head が空なら失敗回数に応じたバックオフ後に再試行する", async () => {
-    resetMocks();
-    vi.useFakeTimers();
-    vi.spyOn(Math, "random").mockReturnValue(0);
-    onTestFinished(() => {
-      vi.restoreAllMocks();
-      vi.useRealTimers();
+  describe("stream 終了後の再接続", () => {
+    const it = test.extend("reconnectObservation", async ({}, { onCleanup }) => {
+      vi.useFakeTimers();
+      onCleanup(() => {
+        vi.useRealTimers();
+      });
+      const observation = vi.fn<(event: string) => void>();
+      const warningObserved = Promise.withResolvers<undefined>();
+      const requested = vi
+        .fn<() => "idle" | null>()
+        .mockReturnValueOnce(null)
+        .mockReturnValue("idle");
+      const completion = cycleUntilStopped({
+        mode: "reviewer",
+        runtime: {
+          log: {
+            ...silentLogger,
+            warn: (fields, logText) => {
+              observation(`${String(fields.ending)}|${logText}`);
+              warningObserved.resolve(undefined);
+            },
+          },
+          syncToMain: () => Promise.resolve(),
+          drainStartup: () => Promise.resolve([]),
+          connect: () => Promise.resolve(),
+          subscribe: async function* subscribe() {
+            await Promise.resolve();
+            yield* [];
+          },
+          dispatcher: { dispatch: () => true },
+          queue: {
+            enqueue: () => true,
+            enqueueFollowUp: () => true,
+            setHandlers: () => undefined,
+            runningLanes: () => [],
+            waitingLanes: () => [],
+            size: () => ({ waiting: 0, running: 0 }),
+            isIdle: () => true,
+            admitsLane: () => true,
+            cancelLane: () => 0,
+            drain: () => Promise.resolve(),
+            reserveLane: () => Promise.resolve(null),
+          },
+          disconnect: () => undefined,
+          remoteHeadCommit: () => {
+            observation("remote-head");
+            return Promise.resolve("commit-b");
+          },
+        },
+        restart: { request: () => undefined, requested },
+        idleMonitor: { recordActivity: () => undefined, idleTooLong: () => false },
+        baseline: new Map(),
+      });
+      await warningObserved.promise;
+      await vi.advanceTimersByTimeAsync(3_000);
+      await completion;
+      return observation;
     });
-    const firstFailureLogged = Promise.withResolvers<undefined>();
-    const secondFailureLogged = Promise.withResolvers<undefined>();
-    const failureCount = new Map([["value", 0]]);
-    const remoteHeadCommit = vi
-      .fn<() => Promise<string | null>>()
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce("commit-c");
-    const setup = fixture(remoteHeadCommit, () => {
-      const count = (failureCount.get("value") ?? 0) + 1;
-      failureCount.set("value", count);
-      if (count === 1) firstFailureLogged.resolve(undefined);
-      else secondFailureLogged.resolve(undefined);
-    });
-    mocked.runConnectionCycle.mockResolvedValue("signalled");
 
-    const completion = cycleUntilStopped(setup.cycling);
-    await firstFailureLogged.promise;
-    await vi.advanceTimersByTimeAsync(1_500);
-    await secondFailureLogged.promise;
-    await vi.advanceTimersByTimeAsync(3_000);
-    await completion;
+    it("最初の接続を開始する", ({ reconnectObservation }) => {
+      expect(reconnectObservation).toHaveBeenNthCalledWith(1, "remote-head");
+    });
 
-    expect(remoteHeadCommit).toHaveBeenCalledTimes(3);
-    expect(setup.log.error).toHaveBeenCalledTimes(2);
-    const [firstFields, firstMessage] = vi.mocked(setup.log.error).mock.calls[0] ?? [];
-    expect(firstMessage).toBe("the connection cycle failed; retrying after a backoff");
-    expect(firstFields).toStrictEqual({
-      mode: "reviewer",
-      backoffMs: 1_500,
-      consecutiveFailures: 1,
-      err: firstFields?.err,
+    it("stream 終了を正確に記録する", ({ reconnectObservation }) => {
+      expect(reconnectObservation).toHaveBeenNthCalledWith(
+        2,
+        "stream-ended|the connection cycle ended; reconnecting shortly",
+      );
     });
-    const [secondFields, secondMessage] = vi.mocked(setup.log.error).mock.calls[1] ?? [];
-    expect(secondMessage).toBe("the connection cycle failed; retrying after a backoff");
-    expect(secondFields).toStrictEqual({
-      mode: "reviewer",
-      backoffMs: 3_000,
-      consecutiveFailures: 2,
-      err: secondFields?.err,
+
+    it("3 秒後に次の接続を開始する", ({ reconnectObservation }) => {
+      expect(reconnectObservation).toHaveBeenNthCalledWith(3, "remote-head");
     });
-    for (const fields of [firstFields, secondFields]) {
-      const loggedError = fields?.err;
-      expect(loggedError).toBeInstanceOf(Error);
-      if (!(loggedError instanceof Error))
-        throw new Error("the failure log did not retain the error");
-      expect(loggedError.message).toBe("the tracked remote branch resolved to no commit");
-    }
-    expect(setup.release).toHaveBeenCalledExactlyOnceWith();
+
+    it("再接続要求を検出したら繰り返しを終える", ({ reconnectObservation }) => {
+      expect(reconnectObservation).toHaveBeenCalledTimes(3);
+    });
   });
 
-  test("恒久的な資格情報拒否は再試行せず伝播する", async () => {
-    resetMocks();
-    const failure = new CredentialTerminalError("refused");
-    const setup = fixture(() => Promise.reject(failure));
-
-    await expect(cycleUntilStopped(setup.cycling)).rejects.toBe(failure);
-
-    expect(mocked.runConnectionCycle).not.toHaveBeenCalled();
-    expect(setup.log.error).not.toHaveBeenCalled();
-    expect(setup.release).toHaveBeenCalledExactlyOnceWith();
-  });
-
-  test("shutdown signal は切断してサイクルへ通知し、終了後に登録を解放する", async () => {
-    resetMocks();
-    const setup = fixture(() => Promise.resolve("commit-d"));
-    const cycleStarted = Promise.withResolvers<ConnectionCycleConfig>();
-    const cycleEnding = Promise.withResolvers<CycleOutcome>();
-    mocked.runConnectionCycle.mockImplementation((config) => {
-      cycleStarted.resolve(config);
-      return cycleEnding.promise;
+  describe("remote head が空のときの再試行", () => {
+    const it = test.extend("backoffObservation", async ({}, { onCleanup }) => {
+      vi.useFakeTimers();
+      vi.spyOn(Math, "random").mockReturnValue(0);
+      onCleanup(() => {
+        vi.useRealTimers();
+      });
+      const observation = vi.fn<(event: string) => void>();
+      const firstFailureObserved = Promise.withResolvers<undefined>();
+      const secondFailureObserved = Promise.withResolvers<undefined>();
+      const remoteHeadCommit = vi
+        .fn<() => Promise<string | null>>()
+        .mockImplementationOnce(() => {
+          observation("remote-1");
+          return Promise.resolve(null);
+        })
+        .mockImplementationOnce(() => {
+          observation("remote-2");
+          return Promise.resolve(null);
+        })
+        .mockImplementation(() => {
+          observation("remote-3");
+          return Promise.resolve("commit-c");
+        });
+      const completion = cycleUntilStopped({
+        mode: "reviewer",
+        runtime: {
+          log: {
+            ...silentLogger,
+            error: (fields, logText) => {
+              const cycleFailure = fields.err;
+              observation(
+                [
+                  logText,
+                  String(fields.backoffMs),
+                  String(fields.consecutiveFailures),
+                  cycleFailure instanceof Error ? cycleFailure.message : String(cycleFailure),
+                ].join("|"),
+              );
+              if (fields.consecutiveFailures === 1) firstFailureObserved.resolve(undefined);
+              if (fields.consecutiveFailures === 2) secondFailureObserved.resolve(undefined);
+            },
+          },
+          syncToMain: () => Promise.resolve(),
+          drainStartup: () => Promise.resolve([]),
+          connect: () => Promise.resolve(),
+          subscribe: async function* subscribe() {
+            await Promise.resolve();
+            yield* [];
+          },
+          dispatcher: { dispatch: () => true },
+          queue: {
+            enqueue: () => true,
+            enqueueFollowUp: () => true,
+            setHandlers: () => undefined,
+            runningLanes: () => [],
+            waitingLanes: () => [],
+            size: () => ({ waiting: 0, running: 0 }),
+            isIdle: () => true,
+            admitsLane: () => true,
+            cancelLane: () => 0,
+            drain: () => Promise.resolve(),
+            reserveLane: () => Promise.resolve(null),
+          },
+          disconnect: () => undefined,
+          remoteHeadCommit,
+        },
+        restart: { request: () => undefined, requested: () => "idle" },
+        idleMonitor: { recordActivity: () => undefined, idleTooLong: () => false },
+        baseline: new Map(),
+      });
+      await firstFailureObserved.promise;
+      await vi.advanceTimersByTimeAsync(1_500);
+      await secondFailureObserved.promise;
+      await vi.advanceTimersByTimeAsync(3_000);
+      await completion;
+      return observation;
     });
 
-    const completion = cycleUntilStopped(setup.cycling);
-    const [registration, config] = await Promise.all([setup.registered, cycleStarted.promise]);
-    expect(registration.target).toBe(process);
-    expect(config.signalled()).toBe(false);
+    it("最初の remote head を読む", ({ backoffObservation }) => {
+      expect(backoffObservation).toHaveBeenNthCalledWith(1, "remote-1");
+    });
 
-    registration.onSignal("SIGTERM");
-    expect(setup.cycling.runtime.disconnect).toHaveBeenCalledExactlyOnceWith();
-    expect(config.signalled()).toBe(true);
-    cycleEnding.resolve("signalled");
-    await completion;
+    it("最初の失敗を 1.5 秒の backoff として記録する", ({ backoffObservation }) => {
+      expect(backoffObservation).toHaveBeenNthCalledWith(
+        2,
+        "the connection cycle failed; retrying after a backoff|1500|1|the tracked remote branch resolved to no commit",
+      );
+    });
 
-    expect(setup.release).toHaveBeenCalledExactlyOnceWith();
+    it("1.5 秒後に remote head を読み直す", ({ backoffObservation }) => {
+      expect(backoffObservation).toHaveBeenNthCalledWith(3, "remote-2");
+    });
+
+    it("2 回目の失敗を 3 秒の backoff として記録する", ({ backoffObservation }) => {
+      expect(backoffObservation).toHaveBeenNthCalledWith(
+        4,
+        "the connection cycle failed; retrying after a backoff|3000|2|the tracked remote branch resolved to no commit",
+      );
+    });
+
+    it("3 秒後に remote head を読み直す", ({ backoffObservation }) => {
+      expect(backoffObservation).toHaveBeenNthCalledWith(5, "remote-3");
+    });
+
+    it("remote head を得たら追加の再試行をしない", ({ backoffObservation }) => {
+      expect(backoffObservation).toHaveBeenCalledTimes(5);
+    });
+  });
+
+  describe("恒久的な資格情報拒否", () => {
+    const it = test
+      .extend("credentialFailure", async () => {
+        const failure = new CredentialTerminalError("refused");
+        try {
+          await cycleUntilStopped({
+            mode: "reviewer",
+            runtime: {
+              log: silentLogger,
+              syncToMain: () => Promise.resolve(),
+              drainStartup: () => Promise.resolve([]),
+              connect: () => Promise.resolve(),
+              subscribe: async function* subscribe() {
+                await Promise.resolve();
+                yield* [];
+              },
+              dispatcher: { dispatch: () => true },
+              queue: {
+                enqueue: () => true,
+                enqueueFollowUp: () => true,
+                setHandlers: () => undefined,
+                runningLanes: () => [],
+                waitingLanes: () => [],
+                size: () => ({ waiting: 0, running: 0 }),
+                isIdle: () => true,
+                admitsLane: () => true,
+                cancelLane: () => 0,
+                drain: () => Promise.resolve(),
+                reserveLane: () => Promise.resolve(null),
+              },
+              disconnect: () => undefined,
+              remoteHeadCommit: () => Promise.reject(failure),
+            },
+            restart: { request: () => undefined, requested: () => null },
+            idleMonitor: { recordActivity: () => undefined, idleTooLong: () => false },
+            baseline: new Map(),
+          });
+        } catch (caught) {
+          return caught;
+        }
+        throw new Error("the credential rejection was not propagated");
+      })
+      .extend("credentialRemoteHead", async () => {
+        const failure = new CredentialTerminalError("refused");
+        const remoteHeadCommit = vi.fn<() => Promise<string | null>>(() => Promise.reject(failure));
+        try {
+          await cycleUntilStopped({
+            mode: "reviewer",
+            runtime: {
+              log: silentLogger,
+              syncToMain: () => Promise.resolve(),
+              drainStartup: () => Promise.resolve([]),
+              connect: () => Promise.resolve(),
+              subscribe: async function* subscribe() {
+                await Promise.resolve();
+                yield* [];
+              },
+              dispatcher: { dispatch: () => true },
+              queue: {
+                enqueue: () => true,
+                enqueueFollowUp: () => true,
+                setHandlers: () => undefined,
+                runningLanes: () => [],
+                waitingLanes: () => [],
+                size: () => ({ waiting: 0, running: 0 }),
+                isIdle: () => true,
+                admitsLane: () => true,
+                cancelLane: () => 0,
+                drain: () => Promise.resolve(),
+                reserveLane: () => Promise.resolve(null),
+              },
+              disconnect: () => undefined,
+              remoteHeadCommit,
+            },
+            restart: { request: () => undefined, requested: () => null },
+            idleMonitor: { recordActivity: () => undefined, idleTooLong: () => false },
+            baseline: new Map(),
+          });
+        } catch (caughtFailure) {
+          if (caughtFailure !== failure) throw caughtFailure;
+        }
+        return remoteHeadCommit;
+      })
+      .extend("credentialErrorLog", async () => {
+        const failure = new CredentialTerminalError("refused");
+        const errorLog =
+          vi.fn<(fields: Readonly<Record<string, unknown>>, logText: string) => void>();
+        try {
+          await cycleUntilStopped({
+            mode: "reviewer",
+            runtime: {
+              log: { ...silentLogger, error: errorLog },
+              syncToMain: () => Promise.resolve(),
+              drainStartup: () => Promise.resolve([]),
+              connect: () => Promise.resolve(),
+              subscribe: async function* subscribe() {
+                await Promise.resolve();
+                yield* [];
+              },
+              dispatcher: { dispatch: () => true },
+              queue: {
+                enqueue: () => true,
+                enqueueFollowUp: () => true,
+                setHandlers: () => undefined,
+                runningLanes: () => [],
+                waitingLanes: () => [],
+                size: () => ({ waiting: 0, running: 0 }),
+                isIdle: () => true,
+                admitsLane: () => true,
+                cancelLane: () => 0,
+                drain: () => Promise.resolve(),
+                reserveLane: () => Promise.resolve(null),
+              },
+              disconnect: () => undefined,
+              remoteHeadCommit: () => Promise.reject(failure),
+            },
+            restart: { request: () => undefined, requested: () => null },
+            idleMonitor: { recordActivity: () => undefined, idleTooLong: () => false },
+            baseline: new Map(),
+          });
+        } catch (caughtFailure) {
+          if (caughtFailure !== failure) throw caughtFailure;
+        }
+        return errorLog;
+      });
+
+    it("資格情報エラーをそのまま伝播する", ({ credentialFailure }) => {
+      expect(credentialFailure).toStrictEqual(new CredentialTerminalError("refused"));
+    });
+
+    it("資格情報エラーでは remote head を再試行しない", ({ credentialRemoteHead }) => {
+      expect(credentialRemoteHead).toHaveBeenCalledTimes(1);
+    });
+
+    it("資格情報エラーを再試行ログへ記録しない", ({ credentialErrorLog }) => {
+      expect(credentialErrorLog).toHaveBeenCalledTimes(0);
+    });
+  });
+
+  describe("shutdown signal", () => {
+    const it = test.extend("signalDisconnect", async ({}, { onCleanup }) => {
+      const priorListeners = new Set(process.listeners("SIGTERM"));
+      onCleanup(() => {
+        for (const listener of process.listeners("SIGTERM")) {
+          if (!priorListeners.has(listener)) process.off("SIGTERM", listener);
+        }
+      });
+      const streamMayFinish = Promise.withResolvers<undefined>();
+      const disconnect = vi.fn<() => void>();
+      const completion = cycleUntilStopped({
+        mode: "reviewer",
+        runtime: {
+          log: silentLogger,
+          syncToMain: () => Promise.resolve(),
+          drainStartup: () => Promise.resolve([]),
+          connect: () => Promise.resolve(),
+          subscribe: async function* subscribe() {
+            await streamMayFinish.promise;
+            yield {};
+          },
+          dispatcher: { dispatch: () => true },
+          queue: {
+            enqueue: () => true,
+            enqueueFollowUp: () => true,
+            setHandlers: () => undefined,
+            runningLanes: () => [],
+            waitingLanes: () => [],
+            size: () => ({ waiting: 0, running: 0 }),
+            isIdle: () => true,
+            admitsLane: () => true,
+            cancelLane: () => 0,
+            drain: () => Promise.resolve(),
+            reserveLane: () => Promise.resolve(null),
+          },
+          disconnect,
+          remoteHeadCommit: () => Promise.resolve("commit-d"),
+        },
+        restart: { request: () => undefined, requested: () => null },
+        idleMonitor: { recordActivity: () => undefined, idleTooLong: () => false },
+        baseline: new Map(),
+      });
+      const signalListener = process
+        .listeners("SIGTERM")
+        .find((listener) => !priorListeners.has(listener));
+      if (signalListener === undefined) throw new Error("SIGTERM listener was not registered");
+      signalListener("SIGTERM");
+      streamMayFinish.resolve(undefined);
+      await completion;
+      return disconnect;
+    });
+
+    it("signal を受けたら relay を切断する", ({ signalDisconnect }) => {
+      expect(signalDisconnect).toHaveBeenCalledExactlyOnceWith();
+    });
   });
 });

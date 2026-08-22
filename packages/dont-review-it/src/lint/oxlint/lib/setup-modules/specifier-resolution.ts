@@ -2,12 +2,13 @@ import { realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
 import { readUnlessMissing } from "@mst/repository-checks";
+import { memoize } from "es-toolkit";
 
-import { buildExportSpecifierIndex } from "../canonical-values/export-specifier-index.ts";
 import { isDirectory, isFile } from "../canonical-values/source-files.ts";
 import { segmentsOf } from "../path-segments.ts";
 import { toPosixPath } from "../posix-path.ts";
 import { aliasedPathsFor } from "../tsconfig-path-aliases.ts";
+import { buildSetupExportSpecifierIndex } from "./export-specifier-index.ts";
 import { declaresPublicSubpath, isInsideDirectory } from "./package-entries.ts";
 
 const SCOPE_PREFIX = "@";
@@ -119,42 +120,33 @@ export type CouplingRequest = {
   readonly workspaceRoot: string;
 };
 
-const indexByPackageDirectory = new Map<string, ReadonlyMap<string, string>>();
-
-const rememberedIndexOf = (packageDirectory: string): ReadonlyMap<string, string> => {
-  const remembered = indexByPackageDirectory.get(packageDirectory);
-  if (remembered !== undefined) return remembered;
-
-  const built = buildExportSpecifierIndex(packageDirectory);
-  indexByPackageDirectory.set(packageDirectory, built);
-  return built;
-};
+const rememberedIndexOf = memoize(buildSetupExportSpecifierIndex);
 
 const entryFilesUnder = (packageDirectory: string, specifier: string): readonly string[] =>
   [...rememberedIndexOf(packageDirectory)]
     .filter(([, spelled]) => spelled === specifier)
     .map(([file]) => file);
 
-export const relativeSpecifierTo = (fromFile: string, target: string): string => {
-  const spelled = toPosixPath(relative(dirname(fromFile), target));
+export const relativeSpecifierTo = (fromFile: string, checked: string): string => {
+  const spelled = toPosixPath(relative(dirname(fromFile), checked));
   return spelled.startsWith(".") ? spelled : `./${spelled}`;
 };
 
-const aliasedFilesFor = (request: CouplingRequest): readonly string[] =>
-  aliasedPathsFor({ specifier: request.specifier, fromFile: request.fromFile }).flatMap((path) => {
+const aliasedFilesFor = (asked: CouplingRequest): readonly string[] =>
+  aliasedPathsFor({ specifier: asked.specifier, fromFile: asked.fromFile }).flatMap((path) => {
     const resolved = resolveCoupling({
-      specifier: relativeSpecifierTo(request.fromFile, path),
-      fromFile: request.fromFile,
-      workspaceRoot: request.workspaceRoot,
+      specifier: relativeSpecifierTo(asked.fromFile, path),
+      fromFile: asked.fromFile,
+      workspaceRoot: asked.workspaceRoot,
     });
     return resolved?.kind === "repositoryFile" ? [resolved.path] : [];
   });
 
-export const repositoryFilesFor = (request: CouplingRequest): readonly string[] => {
-  const { specifier, fromFile, workspaceRoot } = request;
+export const repositoryFilesFor = (asked: CouplingRequest): readonly string[] => {
+  const { specifier, fromFile, workspaceRoot } = asked;
   const resolved = resolveCoupling({ specifier, fromFile, workspaceRoot });
   if (resolved?.kind === "repositoryFile") return [resolved.path];
 
   const found = packageDirectoryInWorkspace({ specifier, fromFile, workspaceRoot });
-  return found === null ? aliasedFilesFor(request) : entryFilesUnder(found.directory, specifier);
+  return found === null ? aliasedFilesFor(asked) : entryFilesUnder(found.directory, specifier);
 };

@@ -22,18 +22,18 @@ export type WebhookRequest = {
   readonly config: { readonly webhookSecret: string; readonly githubRepository: string };
   readonly events: EventStore;
   readonly log: Logger;
-  readonly now?: () => number;
+  readonly stampedNow?: () => number;
 };
 
-const hasExclusionLabel = (payload: Readonly<Record<string, unknown>>): boolean => {
-  const labels = asRecord(payload.pull_request)?.labels;
-  if (!Array.isArray(labels)) return false;
-  return labels.some((label) => asRecord(label)?.name === EXCLUSION_LABEL);
+const hasExclusionLabel = (carried: Readonly<Record<string, unknown>>): boolean => {
+  const spelledLabels = asRecord(carried.pull_request)?.labels;
+  if (!Array.isArray(spelledLabels)) return false;
+  return spelledLabels.some((spelledLabel) => asRecord(spelledLabel)?.name === EXCLUSION_LABEL);
 };
 
-const isExclusionLabelEdge = (payload: Readonly<Record<string, unknown>>): boolean => {
-  const isEdgeAction = payload.action === "labeled" || payload.action === "unlabeled";
-  return isEdgeAction && asRecord(payload.label)?.name === EXCLUSION_LABEL;
+const isExclusionLabelEdge = (carried: Readonly<Record<string, unknown>>): boolean => {
+  const isEdgeAction = carried.action === "labeled" || carried.action === "unlabeled";
+  return isEdgeAction && asRecord(carried.label)?.name === EXCLUSION_LABEL;
 };
 
 const skippedByExclusion = (webhook: {
@@ -48,16 +48,16 @@ const skippedByExclusion = (webhook: {
   return !isExclusionLabelEdge(webhook.payload);
 };
 
-const parseJsonBody = (rawBody: string): Readonly<Record<string, unknown>> | undefined => {
-  const [parseFailure, parsed] = attempt((): unknown => JSON.parse(rawBody));
-  return parseFailure === null ? asRecord(parsed) : undefined;
+const parseJsonBody = (requestBody: string): Readonly<Record<string, unknown>> | undefined => {
+  const [parseFailure, parsedNode] = attempt((): unknown => JSON.parse(requestBody));
+  return parseFailure === null ? asRecord(parsedNode) : undefined;
 };
 
 const requiredHeaders = (
-  request: WebhookRequest,
+  asked: WebhookRequest,
 ): { readonly eventType: string; readonly deliveryId: string } | null =>
-  request.eventType !== undefined && request.deliveryId !== undefined
-    ? { eventType: request.eventType, deliveryId: request.deliveryId }
+  asked.eventType !== undefined && asked.deliveryId !== undefined
+    ? { eventType: asked.eventType, deliveryId: asked.deliveryId }
     : null;
 
 const skippedResponse = (webhook: {
@@ -99,8 +99,8 @@ const storeCondensedEvent = async (storing: {
   readonly deliveryId: string;
   readonly payload: Readonly<Record<string, unknown>>;
 }): Promise<WebhookOutcome> => {
-  const now = storing.request.now ?? Date.now;
-  const receivedAtMs = now();
+  const stampedNow = storing.request.stampedNow ?? Date.now;
+  const receivedAtMs = stampedNow();
   const condensed = condenseWebhookPayload({
     eventType: storing.eventType,
     payload: storing.payload,
@@ -134,23 +134,23 @@ const storeCondensedEvent = async (storing: {
   return { status: 200, body: { accepted: true } };
 };
 
-export const handleWebhook = async (request: WebhookRequest): Promise<WebhookOutcome> => {
-  const headers = requiredHeaders(request);
+export const handleWebhook = async (asked: WebhookRequest): Promise<WebhookOutcome> => {
+  const headers = requiredHeaders(asked);
   if (headers === null) return { status: 400, body: { error: "Missing required headers" } };
   const signatureAccepted = verifyWebhookSignature({
-    body: request.rawBody,
-    signatureHeader: request.signatureHeader,
-    secret: request.config.webhookSecret,
+    body: asked.rawBody,
+    signatureHeader: asked.signatureHeader,
+    secret: asked.config.webhookSecret,
   });
   if (!signatureAccepted) return { status: 401, body: { error: "Invalid signature" } };
   if (headers.eventType === "ping") return { status: 200, body: { pong: true } };
-  const payload = parseJsonBody(request.rawBody);
-  if (payload === undefined) return { status: 400, body: { error: "Invalid JSON body" } };
+  const carried = parseJsonBody(asked.rawBody);
+  if (carried === undefined) return { status: 400, body: { error: "Invalid JSON body" } };
   const skip = skippedResponse({
     eventType: headers.eventType,
-    payload,
-    githubRepository: request.config.githubRepository,
+    payload: carried,
+    githubRepository: asked.config.githubRepository,
   });
   if (skip !== null) return skip;
-  return storeCondensedEvent({ request, ...headers, payload });
+  return storeCondensedEvent({ request: asked, ...headers, payload: carried });
 };

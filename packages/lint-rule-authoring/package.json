@@ -5,6 +5,7 @@
   "keywords": [
     "tanstack-intent"
   ],
+  "homepage": "https://github.com/masseater/mst",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -42,7 +43,8 @@
     "dev": "vp pack --watch",
     "test": "spool -- vp test",
     "check": "spool -- vp check",
-    "check:skills": "intent validate"
+    "check:skills": "intent validate",
+    "typecheck": "spool -- tsc -p ."
   },
   "dependencies": {
     "@opentelemetry/api": "1.9.1",

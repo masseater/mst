@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import { isPlainObject } from "es-toolkit";
+import { isPlainObject, memoize } from "es-toolkit";
 
 import { readJsonFile } from "../canonical-values/read-json-file.ts";
 import { bareRuleNameOf, namesRule, suppressionDirectiveOf } from "./suppression-directives.ts";
@@ -35,16 +35,9 @@ const approvalOf = (declared: unknown): readonly SuppressionApproval[] => {
 const approvalsIn = (held: unknown): readonly SuppressionApproval[] =>
   Array.isArray(held) ? held.flatMap(approvalOf) : [];
 
-const approvalsByRepository = new Map<string, readonly SuppressionApproval[]>();
-
-export const approvalLedgerIn = (repositoryRoot: string): readonly SuppressionApproval[] => {
-  const memoized = approvalsByRepository.get(repositoryRoot);
-  if (memoized !== undefined) return memoized;
-
-  const read = approvalsIn(readJsonFile(join(repositoryRoot, APPROVAL_LEDGER_FILE_NAME)));
-  approvalsByRepository.set(repositoryRoot, read);
-  return read;
-};
+export const approvalLedgerIn = memoize((repositoryRoot: string): readonly SuppressionApproval[] =>
+  approvalsIn(readJsonFile(join(repositoryRoot, APPROVAL_LEDGER_FILE_NAME))),
+);
 
 export const approvalFor = ({
   ledger,

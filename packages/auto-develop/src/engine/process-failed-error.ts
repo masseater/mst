@@ -5,7 +5,7 @@ export class ProcessFailedError extends Error {
 
   readonly exitCode: number;
 
-  readonly output: string;
+  readonly produced: string;
 
   constructor(details: {
     readonly command: string;
@@ -15,6 +15,6 @@ export class ProcessFailedError extends Error {
     super(`${details.command} exited with code ${details.exitCode}`);
     this.command = details.command;
     this.exitCode = details.exitCode;
-    this.output = details.output;
+    this.produced = details.output;
   }
 }

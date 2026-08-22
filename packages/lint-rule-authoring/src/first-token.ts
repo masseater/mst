@@ -1,1 +1,2 @@
-export const firstToken = (text: string): string => text.trim().split(/\s+/u, 1).join("");
+export const firstToken = (writtenText: string): string =>
+  writtenText.trim().split(/\s+/u, 1).join("");

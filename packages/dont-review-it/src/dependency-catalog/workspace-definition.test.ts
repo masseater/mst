@@ -1,100 +1,226 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { defaultDependencyCatalogChecksConfig } from "./config.ts";
-import {
-  parsedWorkspaceDefinitionOrNull,
-  type WorkspaceDefinition,
-} from "./workspace-definition.ts";
-
-const config = defaultDependencyCatalogChecksConfig;
-
-const definitionFor = (source: string): WorkspaceDefinition => {
-  const definition = parsedWorkspaceDefinitionOrNull({ source, config });
-  if (definition === null) throw new Error(`the fixture does not parse: ${source}`);
-  return definition;
-};
+import { parsedWorkspaceDefinitionOrNull } from "./workspace-definition.ts";
 
 describe("parsedWorkspaceDefinitionOrNull", () => {
-  it("reads the package patterns, the default catalog, and the named catalogs", () => {
-    const definition = definitionFor(
-      "packages:\n  - packages/*\ncatalog:\n  react: ^19.0.0\ncatalogs:\n  legacy:\n    react: ^18.0.0\n",
-    );
+  describe("a definition carrying package patterns, a default catalog, and a named catalog", () => {
+    const it = test.extend("parsedWorkspaceDefinition", () =>
+      parsedWorkspaceDefinitionOrNull({
+        source:
+          "packages:\n  - packages/*\ncatalog:\n  react: ^19.0.0\ncatalogs:\n  legacy:\n    react: ^18.0.0\n",
+        config: defaultDependencyCatalogChecksConfig,
+      }));
 
-    expect(definition.packagePatterns).toStrictEqual(["packages/*"]);
-    expect(definition.catalogEntries).toStrictEqual([
-      { catalogName: "", dependencyName: "react", version: "^19.0.0" },
-      { catalogName: "legacy", dependencyName: "react", version: "^18.0.0" },
-    ]);
-  });
-
-  it("reads a definition that is not a mapping as empty", () => {
-    expect(definitionFor("42\n")).toStrictEqual({
-      packagePatterns: [],
-      catalogEntries: [],
-      catalogReferencingOverrides: [],
+    it("reads the package patterns, the default catalog, and the named catalogs", ({
+      parsedWorkspaceDefinition,
+    }) => {
+      expect(parsedWorkspaceDefinition).toStrictEqual({
+        packagePatterns: ["packages/*"],
+        catalogEntries: [
+          { catalogName: "", dependencyName: "react", version: "^19.0.0" },
+          { catalogName: "legacy", dependencyName: "react", version: "^18.0.0" },
+        ],
+        catalogReferencingOverrides: [],
+      });
     });
   });
 
-  it("drops the package patterns that are not strings", () => {
-    expect(definitionFor("packages:\n  - packages/*\n  - 42\n").packagePatterns).toStrictEqual([
-      "packages/*",
-    ]);
+  describe("a definition that is not a mapping", () => {
+    const it = test.extend("parsedWorkspaceDefinition", () =>
+      parsedWorkspaceDefinitionOrNull({
+        source: "42\n",
+        config: defaultDependencyCatalogChecksConfig,
+      }));
+
+    it("reads as empty", ({ parsedWorkspaceDefinition }) => {
+      expect(parsedWorkspaceDefinition).toStrictEqual({
+        packagePatterns: [],
+        catalogEntries: [],
+        catalogReferencingOverrides: [],
+      });
+    });
   });
 
-  it("reads a packages field that is not a sequence as no patterns", () => {
-    expect(definitionFor("packages: everything\n").packagePatterns).toStrictEqual([]);
+  describe("a packages field holding an entry that is not a string", () => {
+    const it = test.extend("parsedWorkspaceDefinition", () =>
+      parsedWorkspaceDefinitionOrNull({
+        source: "packages:\n  - packages/*\n  - 42\n",
+        config: defaultDependencyCatalogChecksConfig,
+      }));
+
+    it("drops the package patterns that are not strings", ({ parsedWorkspaceDefinition }) => {
+      expect(parsedWorkspaceDefinition).toStrictEqual({
+        packagePatterns: ["packages/*"],
+        catalogEntries: [],
+        catalogReferencingOverrides: [],
+      });
+    });
   });
 
-  it("drops the catalog entries whose version is not a string", () => {
-    expect(definitionFor("catalog:\n  react:\n    pinned: true\n").catalogEntries).toStrictEqual(
-      [],
-    );
+  describe("a packages field that is not a sequence", () => {
+    const it = test.extend("parsedWorkspaceDefinition", () =>
+      parsedWorkspaceDefinitionOrNull({
+        source: "packages: everything\n",
+        config: defaultDependencyCatalogChecksConfig,
+      }));
+
+    it("reads as no patterns", ({ parsedWorkspaceDefinition }) => {
+      expect(parsedWorkspaceDefinition).toStrictEqual({
+        packagePatterns: [],
+        catalogEntries: [],
+        catalogReferencingOverrides: [],
+      });
+    });
   });
 
-  it("collects the override targets that point back into the catalog", () => {
-    const definition = definitionFor('overrides:\n  vite: "catalog:"\n  esbuild: ^0.25.0\n');
+  describe("a catalog entry whose version is not a string", () => {
+    const it = test.extend("parsedWorkspaceDefinition", () =>
+      parsedWorkspaceDefinitionOrNull({
+        source: "catalog:\n  react:\n    pinned: true\n",
+        config: defaultDependencyCatalogChecksConfig,
+      }));
 
-    expect(definition.catalogReferencingOverrides).toStrictEqual([
-      { catalogName: "", dependencyName: "vite" },
-    ]);
+    it("drops the catalog entry", ({ parsedWorkspaceDefinition }) => {
+      expect(parsedWorkspaceDefinition).toStrictEqual({
+        packagePatterns: [],
+        catalogEntries: [],
+        catalogReferencingOverrides: [],
+      });
+    });
   });
 
-  it("keeps the name of the catalog an override references", () => {
-    const definition = definitionFor('overrides:\n  vite: "catalog:legacy"\n');
+  describe("overrides pointing at the catalog beside one that does not", () => {
+    const it = test.extend("parsedWorkspaceDefinition", () =>
+      parsedWorkspaceDefinitionOrNull({
+        source: 'overrides:\n  vite: "catalog:"\n  esbuild: ^0.25.0\n',
+        config: defaultDependencyCatalogChecksConfig,
+      }));
 
-    expect(definition.catalogReferencingOverrides).toStrictEqual([
-      { catalogName: "legacy", dependencyName: "vite" },
-    ]);
-  });
-});
-
-describe("parsedWorkspaceDefinitionOrNull override targets", () => {
-  const overrideNamesFor = (overrideKey: string) =>
-    definitionFor(`overrides:\n  "${overrideKey}": "catalog:"\n`).catalogReferencingOverrides.map(
-      (reference) => reference.dependencyName,
-    );
-
-  it("keeps a scoped name whole", () => {
-    expect(overrideNamesFor("@scope/vite")).toStrictEqual(["@scope/vite"]);
-  });
-
-  it("cuts the version qualifier off a name", () => {
-    expect(overrideNamesFor("vite@^6.0.0")).toStrictEqual(["vite"]);
+    it("collects the override targets that point back into the catalog", ({
+      parsedWorkspaceDefinition,
+    }) => {
+      expect(parsedWorkspaceDefinition).toStrictEqual({
+        packagePatterns: [],
+        catalogEntries: [],
+        catalogReferencingOverrides: [{ catalogName: "", dependencyName: "vite" }],
+      });
+    });
   });
 
-  it("cuts the version qualifier off a scoped name", () => {
-    expect(overrideNamesFor("@scope/vite@^6.0.0")).toStrictEqual(["@scope/vite"]);
+  describe("an override pointing at a named catalog", () => {
+    const it = test.extend("parsedWorkspaceDefinition", () =>
+      parsedWorkspaceDefinitionOrNull({
+        source: 'overrides:\n  vite: "catalog:legacy"\n',
+        config: defaultDependencyCatalogChecksConfig,
+      }));
+
+    it("keeps the name of the catalog the override references", ({ parsedWorkspaceDefinition }) => {
+      expect(parsedWorkspaceDefinition).toStrictEqual({
+        packagePatterns: [],
+        catalogEntries: [],
+        catalogReferencingOverrides: [{ catalogName: "legacy", dependencyName: "vite" }],
+      });
+    });
   });
 
-  it("reads the child of a parent-child selector as the target", () => {
-    expect(overrideNamesFor("plugin@1>vite@^6.0.0")).toStrictEqual(["vite"]);
-  });
+  describe("the key of an override that points at the catalog", () => {
+    describe("a scoped name", () => {
+      const it = test.extend("parsedWorkspaceDefinition", () =>
+        parsedWorkspaceDefinitionOrNull({
+          source: 'overrides:\n  "@scope/vite": "catalog:"\n',
+          config: defaultDependencyCatalogChecksConfig,
+        }));
 
-  it("keeps a range whose operator spells > inside the version qualifier", () => {
-    expect(overrideNamesFor("vite@>=6.0.0")).toStrictEqual(["vite"]);
-  });
+      it("stays whole", ({ parsedWorkspaceDefinition }) => {
+        expect(parsedWorkspaceDefinition).toStrictEqual({
+          packagePatterns: [],
+          catalogEntries: [],
+          catalogReferencingOverrides: [{ catalogName: "", dependencyName: "@scope/vite" }],
+        });
+      });
+    });
 
-  it("reads a spaced > as part of the version range the way pnpm does", () => {
-    expect(overrideNamesFor("plugin@1 > vite@^6.0.0")).toStrictEqual(["plugin"]);
+    describe("a name carrying a version qualifier", () => {
+      const it = test.extend("parsedWorkspaceDefinition", () =>
+        parsedWorkspaceDefinitionOrNull({
+          source: 'overrides:\n  "vite@^6.0.0": "catalog:"\n',
+          config: defaultDependencyCatalogChecksConfig,
+        }));
+
+      it("loses the version qualifier", ({ parsedWorkspaceDefinition }) => {
+        expect(parsedWorkspaceDefinition).toStrictEqual({
+          packagePatterns: [],
+          catalogEntries: [],
+          catalogReferencingOverrides: [{ catalogName: "", dependencyName: "vite" }],
+        });
+      });
+    });
+
+    describe("a scoped name carrying a version qualifier", () => {
+      const it = test.extend("parsedWorkspaceDefinition", () =>
+        parsedWorkspaceDefinitionOrNull({
+          source: 'overrides:\n  "@scope/vite@^6.0.0": "catalog:"\n',
+          config: defaultDependencyCatalogChecksConfig,
+        }));
+
+      it("loses the version qualifier and keeps the scope", ({ parsedWorkspaceDefinition }) => {
+        expect(parsedWorkspaceDefinition).toStrictEqual({
+          packagePatterns: [],
+          catalogEntries: [],
+          catalogReferencingOverrides: [{ catalogName: "", dependencyName: "@scope/vite" }],
+        });
+      });
+    });
+
+    describe("a parent-child selector", () => {
+      const it = test.extend("parsedWorkspaceDefinition", () =>
+        parsedWorkspaceDefinitionOrNull({
+          source: 'overrides:\n  "plugin@1>vite@^6.0.0": "catalog:"\n',
+          config: defaultDependencyCatalogChecksConfig,
+        }));
+
+      it("reads the child as the target", ({ parsedWorkspaceDefinition }) => {
+        expect(parsedWorkspaceDefinition).toStrictEqual({
+          packagePatterns: [],
+          catalogEntries: [],
+          catalogReferencingOverrides: [{ catalogName: "", dependencyName: "vite" }],
+        });
+      });
+    });
+
+    describe("a range whose operator spells > inside the version qualifier", () => {
+      const it = test.extend("parsedWorkspaceDefinition", () =>
+        parsedWorkspaceDefinitionOrNull({
+          source: 'overrides:\n  "vite@>=6.0.0": "catalog:"\n',
+          config: defaultDependencyCatalogChecksConfig,
+        }));
+
+      it("keeps the name before the qualifier as the target", ({ parsedWorkspaceDefinition }) => {
+        expect(parsedWorkspaceDefinition).toStrictEqual({
+          packagePatterns: [],
+          catalogEntries: [],
+          catalogReferencingOverrides: [{ catalogName: "", dependencyName: "vite" }],
+        });
+      });
+    });
+
+    describe("a spaced > between a parent and a child", () => {
+      const it = test.extend("parsedWorkspaceDefinition", () =>
+        parsedWorkspaceDefinitionOrNull({
+          source: 'overrides:\n  "plugin@1 > vite@^6.0.0": "catalog:"\n',
+          config: defaultDependencyCatalogChecksConfig,
+        }));
+
+      it("reads the > as part of the version range the way pnpm does", ({
+        parsedWorkspaceDefinition,
+      }) => {
+        expect(parsedWorkspaceDefinition).toStrictEqual({
+          packagePatterns: [],
+          catalogEntries: [],
+          catalogReferencingOverrides: [{ catalogName: "", dependencyName: "plugin" }],
+        });
+      });
+    });
   });
 });

@@ -1,7 +1,9 @@
 import { testLintRule } from "@mst/lint-rule-authoring";
-import { describe, expect, test } from "vite-plus/test";
+import { describe, expect, it } from "vite-plus/test";
 
 import { forbidSymbolPrefixedName } from "./forbid-symbol-prefixed-name--rename-to-alphanumeric-start.ts";
+
+const declaredOptionsSchema = forbidSymbolPrefixedName.meta.schema;
 
 describe("lint-rule-authoring/forbid-symbol-prefixed-name--rename-to-alphanumeric-start", () => {
   testLintRule(forbidSymbolPrefixedName, {
@@ -208,8 +210,8 @@ describe("lint-rule-authoring/forbid-symbol-prefixed-name--rename-to-alphanumeri
     ],
   });
 
-  test("the options schema declares the allowed names and refuses any other key", () => {
-    expect(forbidSymbolPrefixedName.meta.schema).toStrictEqual([
+  it("the options schema declares the allowed names and refuses any other key", () => {
+    expect(declaredOptionsSchema).toStrictEqual([
       {
         type: "object",
         properties: {

@@ -62,17 +62,21 @@ const isDefineConfigTarget = (
   expression: ESTree.Expression,
   bindings: DefineConfigBindings,
 ): boolean => {
-  const target = unwrapTransparentExpression(expression);
-  if (target.type === "Identifier") return bindings.named.has(target.name);
-  if (target.type !== "MemberExpression" || target.computed || target.object.type === "Super") {
+  const configTarget = unwrapTransparentExpression(expression);
+  if (configTarget.type === "Identifier") return bindings.named.has(configTarget.name);
+  if (
+    configTarget.type !== "MemberExpression" ||
+    configTarget.computed ||
+    configTarget.object.type === "Super"
+  ) {
     return false;
   }
-  const receiver = unwrapTransparentExpression(target.object);
+  const receiver = unwrapTransparentExpression(configTarget.object);
   return (
     receiver.type === "Identifier" &&
     bindings.namespaces.has(receiver.name) &&
-    target.property.type === "Identifier" &&
-    target.property.name === "defineConfig"
+    configTarget.property.type === "Identifier" &&
+    configTarget.property.name === "defineConfig"
   );
 };
 
@@ -130,11 +134,11 @@ const memberNameOf = (member: ESTree.MemberExpression): string | null => {
     : null;
 };
 
-const isModuleExports = (target: ESTree.AssignmentTarget): boolean =>
-  target.type === "MemberExpression" &&
-  target.object.type === "Identifier" &&
-  target.object.name === "module" &&
-  memberNameOf(target) === "exports";
+const isModuleExports = (assignmentTarget: ESTree.AssignmentTarget): boolean =>
+  assignmentTarget.type === "MemberExpression" &&
+  assignmentTarget.object.type === "Identifier" &&
+  assignmentTarget.object.name === "module" &&
+  memberNameOf(assignmentTarget) === "exports";
 
 const assignsModuleExports = (program: ESTree.Program): boolean =>
   program.body.some(
@@ -144,13 +148,17 @@ const assignsModuleExports = (program: ESTree.Program): boolean =>
       isModuleExports(node.expression.left),
   );
 
-const hasDynamicProperty = (object: ESTree.ObjectExpression): boolean =>
-  object.properties.some(
+const hasDynamicProperty = (candidateObject: ESTree.ObjectExpression): boolean =>
+  candidateObject.properties.some(
     (property) => property.type === "SpreadElement" || propertyKeyOf(property) === null,
   );
 
-export const staticallyClosedObject = (object: StaticObjectResolution): StaticObjectResolution =>
-  object.kind === "static" && hasDynamicProperty(object.object) ? { kind: "dynamic" } : object;
+export const staticallyClosedObject = (
+  resolution: StaticObjectResolution,
+): StaticObjectResolution =>
+  resolution.kind === "static" && hasDynamicProperty(resolution.object)
+    ? { kind: "dynamic" }
+    : resolution;
 
 export const resolveTestConfig = ({
   filename,
@@ -192,10 +200,13 @@ export const staticObjectPathAt = ({
   readonly object: ESTree.ObjectExpression;
   readonly path: readonly string[];
 }): StaticObjectResolution =>
-  path.reduce<StaticObjectResolution>((current, key) => staticObjectAt({ object: current, key }), {
-    kind: "static",
-    object,
-  });
+  path.reduce<StaticObjectResolution>(
+    (resolvedObject, pathSegment) => staticObjectAt({ object: resolvedObject, key: pathSegment }),
+    {
+      kind: "static",
+      object,
+    },
+  );
 
 export const staticTestTaskAt = (config: ESTree.ObjectExpression): StaticTestTaskResolution => {
   const tasks = staticallyClosedObject(

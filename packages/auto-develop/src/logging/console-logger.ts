@@ -2,10 +2,10 @@ import type { LogFileSink } from "./daily-log-file.ts";
 import type { Logger } from "./logger.ts";
 
 export type TextOutput = {
-  readonly write: (text: string) => unknown;
+  readonly write: (writtenText: string) => unknown;
 };
 
-const readableFailure = (_key: string, field: unknown): unknown =>
+const readableFailure = (_fieldName: string, field: unknown): unknown =>
   field instanceof Error
     ? {
         name: field.name,
@@ -15,38 +15,47 @@ const readableFailure = (_key: string, field: unknown): unknown =>
       }
     : field;
 
+/** @canonical-values auto-develop.log-level */
+const LOG_LEVELS = ["info", "warn", "error"] as const;
+
+const LOG_LEVEL = {
+  info: LOG_LEVELS[0],
+  warn: LOG_LEVELS[1],
+  error: LOG_LEVELS[2],
+} as const;
+
 export const createConsoleLogger = (
-  name: string,
-  options: { readonly fileSink?: LogFileSink; readonly out?: TextOutput } = {},
+  spelled: string,
+  ruleOptions: { readonly fileSink?: LogFileSink; readonly out?: TextOutput } = {},
 ): Logger => {
-  const out = options.out ?? process.stdout;
-  const writeLine = (entry: {
+  const out = ruleOptions.out ?? process.stdout;
+  const writeLine = (listed: {
     readonly level: string;
     readonly fields: Readonly<Record<string, unknown>>;
     readonly message: string;
   }): void => {
     const line = `${JSON.stringify(
       {
-        level: entry.level,
-        name,
+        level: listed.level,
+        name: spelled,
         time: new Date().toISOString(),
-        ...entry.fields,
-        msg: entry.message,
+        ...listed.fields,
+        msg: listed.message,
       },
       readableFailure,
     )}\n`;
     out.write(line);
-    options.fileSink?.append(line);
+    ruleOptions.fileSink?.append(line);
   };
   return {
-    info: (fields, message) => {
-      writeLine({ level: "info", fields, message });
+    info: (fields, complaint) => {
+      writeLine({ level: LOG_LEVEL.info, fields, message: complaint });
     },
-    warn: (fields, message) => {
-      writeLine({ level: "warn", fields, message });
+    warn: (fields, complaint) => {
+      writeLine({ level: LOG_LEVEL.warn, fields, message: complaint });
     },
-    error: (fields, message) => {
-      writeLine({ level: "error", fields, message });
+    error: (fields, complaint) => {
+      writeLine({ level: LOG_LEVEL.error, fields, message: complaint });
     },
   };
 };

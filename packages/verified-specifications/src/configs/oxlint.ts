@@ -1,4 +1,4 @@
-import { LINT_SEVERITY } from "@mst/lint-rule-authoring";
+import { freezeDeep, LINT_SEVERITY } from "@mst/lint-rule-authoring";
 import { defineConfig, type OxlintConfig } from "oxlint";
 
 const SPEC_FILES = ["**/*.spec.ts", "**/*.spec.tsx"];
@@ -30,3 +30,5 @@ export const oxlint: OxlintConfig = defineConfig({
     },
   ],
 });
+
+freezeDeep(oxlint);

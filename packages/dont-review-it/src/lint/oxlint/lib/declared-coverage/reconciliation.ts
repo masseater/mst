@@ -1,6 +1,6 @@
 import { dirname, join } from "node:path";
 
-import { groupBy } from "es-toolkit";
+import { groupBy, memoize } from "es-toolkit";
 
 import { nearestPackageDirectory } from "../canonical-values/source-files.ts";
 import {
@@ -55,7 +55,9 @@ const findingsIn = (reconciled: CoverageReconciliation): readonly CoverageFindin
     ...broadDeclarationFindings(uncheckedDeclarations),
     ...deadRowFindings({
       registry: UNCHECKED_DECLARATION_REGISTRY,
-      rows: uncheckedDeclarations.filter((row) => !coversWholeDirectory(row.pattern)),
+      rows: uncheckedDeclarations.filter(
+        (uncheckedDeclaration) => !coversWholeDirectory(uncheckedDeclaration.pattern),
+      ),
       paths,
     }),
     ...registrationFindings({ tables: declarations.tables, checks, paths }),
@@ -83,16 +85,4 @@ const keyOf = (reconciled: CoverageReconciliation): string =>
     ...[...reconciled.unscannedDirectoryNames].toSorted(),
   ].join("\n");
 
-const findingsByReconciliation = new Map<string, ReadonlyMap<string, readonly CoverageFinding[]>>();
-
-export const coverageFindingsIn = (
-  reconciled: CoverageReconciliation,
-): ReadonlyMap<string, readonly CoverageFinding[]> => {
-  const key = keyOf(reconciled);
-  const memoized = findingsByReconciliation.get(key);
-  if (memoized !== undefined) return memoized;
-
-  const read = readReconciliation(reconciled);
-  findingsByReconciliation.set(key, read);
-  return read;
-};
+export const coverageFindingsIn = memoize(readReconciliation, { getCacheKey: keyOf });

@@ -1,6 +1,9 @@
 import { describe, expect, test } from "vite-plus/test";
 
 import { type WorkspaceLintRule } from "./create-workspace-lint-rule.ts";
+import { forbidSymbolPrefixedName } from "./lint/oxlint/rules/forbid-symbol-prefixed-name--rename-to-alphanumeric-start.ts";
+import { noBroadLintDisable } from "./lint/oxlint/rules/no-broad-lint-disable--use-next-line-with-reason.ts";
+import { noExplainedLintMessage } from "./lint/oxlint/rules/no-explained-lint-message--state-prohibition-then-fix.ts";
 import plugin from "./plugin.ts";
 import { testLintRule } from "./rule-tester.ts";
 
@@ -26,23 +29,16 @@ testLintRule(registeredBroadDisable, {
 });
 
 describe("lint-rule-authoring plugin", () => {
-  test("it publishes the expected registry under its package name", () => {
-    expect(plugin.meta).toStrictEqual({ name: "lint-rule-authoring" });
-    expect(Object.keys(plugin.rules).toSorted()).toStrictEqual([
-      "forbid-symbol-prefixed-name--rename-to-alphanumeric-start",
-      "no-broad-lint-disable--use-next-line-with-reason",
-      "no-explained-lint-message--state-prohibition-then-fix",
-    ]);
-  });
+  const it = test.extend("lintRuleAuthoringPlugin", () => plugin);
 
-  test("every registry key is the registered rule's public name", () => {
-    const registrations = Object.entries(plugin.rules).map(([registeredName, rule]) => [
-      registeredName,
-      (rule as WorkspaceLintRule).name,
-    ]);
-
-    expect(registrations.every(([registeredName, ruleName]) => registeredName === ruleName)).toBe(
-      true,
-    );
+  it("publishes its complete package registry", ({ lintRuleAuthoringPlugin }) => {
+    expect(lintRuleAuthoringPlugin).toStrictEqual({
+      meta: { name: "lint-rule-authoring" },
+      rules: {
+        "forbid-symbol-prefixed-name--rename-to-alphanumeric-start": forbidSymbolPrefixedName,
+        "no-broad-lint-disable--use-next-line-with-reason": noBroadLintDisable,
+        "no-explained-lint-message--state-prohibition-then-fix": noExplainedLintMessage,
+      },
+    });
   });
 });

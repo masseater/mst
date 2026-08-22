@@ -28,8 +28,8 @@ export type ImportedDeclaration = {
   readonly declared: ESTree.Expression;
 };
 
-export const moduleExportSpelling = (name: ESTree.ModuleExportName): string =>
-  name.type === "Identifier" ? name.name : name.value;
+export const moduleExportSpelling = (spelled: ESTree.ModuleExportName): string =>
+  spelled.type === "Identifier" ? spelled.name : spelled.value;
 
 const declaredStatement = (statement: SpecStatement): SpecStatement =>
   statement.type === "ExportNamedDeclaration" && statement.declaration !== null
@@ -102,22 +102,24 @@ const forwardedSpecifiersIn = (statement: SpecStatement): readonly string[] =>
 
 export const moduleDeclarationsOf = (
   filename: string,
-  body: readonly SpecStatement[],
+  writtenBody: readonly SpecStatement[],
 ): ModuleDeclarations => ({
   filename,
-  initializerByName: new Map(body.flatMap(boundNamesIn)),
-  importedByName: new Map(body.flatMap(importedNamesIn)),
-  localNameByExported: new Map(body.flatMap(exportedAliasesIn)),
-  forwardedByExported: new Map(body.flatMap(forwardedNamesIn)),
-  forwardedSpecifiers: body.flatMap(forwardedSpecifiersIn),
+  initializerByName: new Map(writtenBody.flatMap(boundNamesIn)),
+  importedByName: new Map(writtenBody.flatMap(importedNamesIn)),
+  localNameByExported: new Map(writtenBody.flatMap(exportedAliasesIn)),
+  forwardedByExported: new Map(writtenBody.flatMap(forwardedNamesIn)),
+  forwardedSpecifiers: writtenBody.flatMap(forwardedSpecifiersIn),
 });
 
 const parsedModuleAt = (path: string): ModuleDeclarations | null => {
   const source = readUnlessMissing(() => readFileSync(path, "utf8"));
   if (source === null) return null;
 
-  const body = parseSync(path, source).program.body.map((statement) => statement as SpecStatement);
-  return moduleDeclarationsOf(path, body);
+  const writtenBody = parseSync(path, source).program.body.map(
+    (statement) => statement as SpecStatement,
+  );
+  return moduleDeclarationsOf(path, writtenBody);
 };
 
 const declaredUnderName = (reading: {
@@ -148,12 +150,12 @@ const declaredUnderName = (reading: {
   );
 };
 
-export const importedDeclarationOf = (request: {
+export const importedDeclarationOf = (asked: {
   readonly from: ModuleDeclarations;
   readonly imported: ImportedName;
   readonly visited: ReadonlySet<string>;
 }): ImportedDeclaration | null => {
-  const { from, imported, visited } = request;
+  const { from, imported, visited } = asked;
   if (!REPOSITORY_SPECIFIER.test(imported.specifier)) return null;
 
   const path = resolve(dirname(from.filename), imported.specifier);

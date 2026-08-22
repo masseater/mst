@@ -1,6 +1,7 @@
 import { createDailyLogFileSink, type LogFileSink } from "./logging/daily-log-file.ts";
 import { createRelayServer } from "./relay/app.ts";
 import { createGithubFetchReader } from "./relay/github-fetch-reader.ts";
+import { type SOCKET_LIFECYCLE_EVENT } from "./runtime/event-names.ts";
 
 import type { TextOutput } from "./logging/console-logger.ts";
 import type { GithubReader } from "./relay/github-reader.ts";
@@ -10,8 +11,14 @@ import type { SignalTarget } from "./runtime/shutdown.ts";
 export type RelayProcess = {
   readonly server: {
     readonly listen: (port: number, onListening: () => void) => unknown;
-    readonly once: (event: "error", listener: (failure: Error) => void) => unknown;
-    readonly off: (event: "error", listener: (failure: Error) => void) => unknown;
+    readonly once: (
+      event: typeof SOCKET_LIFECYCLE_EVENT.failure,
+      listener: (failure: Error) => void,
+    ) => unknown;
+    readonly off: (
+      event: typeof SOCKET_LIFECYCLE_EVENT.failure,
+      listener: (failure: Error) => void,
+    ) => unknown;
   };
   readonly shutdown: () => Promise<void>;
 };

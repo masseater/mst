@@ -10,8 +10,8 @@ export const DEFAULT_SPEC_FILE_SUFFIXES: readonly string[] = [".test.ts", ".test
 
 const SPEC_FILE_SUFFIXES_OPTION = "specFileSuffixes";
 
-export const specFileSuffixesFrom = (options: Readonly<Options>): readonly string[] =>
-  configuredSuffixesFrom(options, {
+export const specFileSuffixesFrom = (ruleOptions: Readonly<Options>): readonly string[] =>
+  configuredSuffixesFrom(ruleOptions, {
     optionName: SPEC_FILE_SUFFIXES_OPTION,
     carried: DEFAULT_SPEC_FILE_SUFFIXES,
   });

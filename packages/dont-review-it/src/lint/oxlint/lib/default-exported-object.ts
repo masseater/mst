@@ -1,11 +1,11 @@
 import type { ESTree } from "@oxlint/plugins";
 
 export const objectExpressionOf = (
-  value: ESTree.ExportDefaultDeclaration["declaration"],
+  held: ESTree.ExportDefaultDeclaration["declaration"],
 ): ESTree.ObjectExpression | null => {
-  if (value.type === "ObjectExpression") return value;
-  if (value.type !== "CallExpression") return null;
-  const [firstArgument] = value.arguments;
+  if (held.type === "ObjectExpression") return held;
+  if (held.type !== "CallExpression") return null;
+  const [firstArgument] = held.arguments;
   if (firstArgument === undefined || firstArgument.type === "SpreadElement") return null;
   return objectExpressionOf(firstArgument);
 };

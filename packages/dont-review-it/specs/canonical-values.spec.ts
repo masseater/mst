@@ -11,10 +11,10 @@ const repositoryWith = async (files: Readonly<Record<string, string>>): Promise<
   onTestFinished(async () => rm(repositoryRoot, { recursive: true, force: true }));
 
   await Promise.all(
-    Object.entries(files).map(async ([name, source]) => {
-      const target = join(repositoryRoot, name);
-      await mkdir(dirname(target), { recursive: true });
-      await writeFile(target, source, "utf-8");
+    Object.entries(files).map(async ([fileName, source]) => {
+      const absolutePath = join(repositoryRoot, fileName);
+      await mkdir(dirname(absolutePath), { recursive: true });
+      await writeFile(absolutePath, source, "utf-8");
     }),
   );
   return repositoryRoot;
@@ -35,7 +35,7 @@ export const STATUSES = ["draft", "published"] as const;
     expect(reported).toContain("src/order.ts");
   });
 
-  it("同じ値の集合を別々の概念が宣言していたら、両方の概念を挙げて報告する", async () => {
+  it("canonical owner に problem が無い場合、同じ値の集合を別々の概念が宣言していたら、両方の概念を挙げて警告し、落とさない", async () => {
     const repositoryRoot = await repositoryWith({
       "src/article.ts": `/** @canonical-values article.status */
 export const ARTICLE_STATUSES = ["published", "draft"] as const;
@@ -44,9 +44,27 @@ export const ARTICLE_STATUSES = ["published", "draft"] as const;
 export const ORDER_STATUSES = ["draft", "published"] as const;
 `,
     });
-    const reported = runChecks(repositoryRoot).problems.join("\n");
+    const report = runChecks(repositoryRoot);
+    const reported = report.warnings.join("\n");
     expect(reported).toContain("article.status");
     expect(reported).toContain("order.status");
+    expect(report.problems).toStrictEqual([]);
+  });
+
+  it("canonical owner に problem がある場合、不完全な catalog から同値の概念を警告しない", async () => {
+    const repositoryRoot = await repositoryWith({
+      "src/article.ts": `/** @canonical-values article.status */
+export const ARTICLE_STATUSES = ["published", "draft"] as const;
+`,
+      "src/broken.ts": `/** @canonical-values */
+export const BROKEN_STATUSES = ["draft"] as const;
+`,
+      "src/order.ts": `/** @canonical-values order.status */
+export const ORDER_STATUSES = ["draft", "published"] as const;
+`,
+    });
+
+    expect(runChecks(repositoryRoot).warnings).toStrictEqual([]);
   });
 
   it("概念を名指ししない注釈を報告する", async () => {
@@ -74,8 +92,7 @@ export const ORDER_STATUSES = ["draft"] as const;
       "src/order.ts": `/** @canonical-values order.status */
 export const ORDER_STATUSES = ["draft"] as const;
 `,
-      "src/order.test.ts": `/** @canonical-values order.status */
-const FIXTURE_STATUSES = ["draft"] as const;
+      "src/order.test.ts": `const FIXTURE_STATUSES = ["draft"] as const;
 `,
     });
     const { problems, warnings, failures } = runChecks(repositoryRoot);

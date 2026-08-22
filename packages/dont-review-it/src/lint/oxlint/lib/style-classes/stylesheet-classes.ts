@@ -17,7 +17,7 @@ const BLOCK_OPENING = "{";
 
 const CLASS_SELECTOR = /\.-?[A-Za-z_][\w-]*/gu;
 
-const blanked = (text: string): string => text.replace(PRINTED_CHARACTER, " ");
+const blanked = (writtenText: string): string => writtenText.replace(PRINTED_CHARACTER, " ");
 
 const withoutNoise = (source: string): string => source.replace(NOISE_PATTERN, blanked);
 
@@ -26,13 +26,13 @@ type Prelude = {
   readonly text: string;
 };
 
-const preludesIn = (text: string): readonly Prelude[] => {
-  const delimiters = [...text.matchAll(BLOCK_DELIMITER)];
+const preludesIn = (writtenText: string): readonly Prelude[] => {
+  const delimiters = [...writtenText.matchAll(BLOCK_DELIMITER)];
   return delimiters.flatMap((delimiter, position) => {
     if (delimiter[0] !== BLOCK_OPENING) return [];
-    const previous = delimiters[position - 1];
-    const start = previous === undefined ? 0 : previous.index + 1;
-    return [{ start, text: text.slice(start, delimiter.index) }];
+    const earlier = delimiters[position - 1];
+    const start = earlier === undefined ? 0 : earlier.index + 1;
+    return [{ start, text: writtenText.slice(start, delimiter.index) }];
   });
 };
 

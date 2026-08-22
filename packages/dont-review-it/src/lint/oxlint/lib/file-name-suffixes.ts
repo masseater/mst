@@ -1,3 +1,5 @@
+import { maxBy } from "es-toolkit";
+
 import type { Options } from "@oxlint/plugins";
 
 export const baseNameOf = (filename: string): string =>
@@ -7,12 +9,10 @@ export const longestMatchingSuffix = (
   filename: string,
   suffixes: readonly string[],
 ): string | null =>
-  suffixes
-    .filter((suffix) => baseNameOf(filename).endsWith(suffix))
-    .reduce<string | null>(
-      (longest, suffix) => (longest === null || suffix.length > longest.length ? suffix : longest),
-      null,
-    );
+  maxBy(
+    suffixes.filter((suffix) => baseNameOf(filename).endsWith(suffix)),
+    (suffix) => suffix.length,
+  ) ?? null;
 
 export const stemBefore = (filename: string, suffix: string): string => {
   const base = baseNameOf(filename);
@@ -20,15 +20,17 @@ export const stemBefore = (filename: string, suffix: string): string => {
 };
 
 export const configuredSuffixesFrom = (
-  options: Readonly<Options>,
+  ruleOptions: Readonly<Options>,
   { optionName, carried }: { readonly optionName: string; readonly carried: readonly string[] },
 ): readonly string[] => {
-  const [first] = options;
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) return carried;
 
   const configured = first[optionName];
   if (!Array.isArray(configured)) return carried;
 
-  const spelled = configured.filter((entry): entry is string => typeof entry === "string");
+  const spelled = configured.filter(
+    (candidate): candidate is string => typeof candidate === "string",
+  );
   return spelled.length === 0 ? carried : spelled;
 };

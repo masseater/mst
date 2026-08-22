@@ -10,8 +10,8 @@ export type ChangedFile = {
 
 const isRename = (statusCode: string): boolean => /^R\d+$/.test(statusCode);
 
-const parseRow = (row: string): ChangedFile | null => {
-  const [statusCode, ...rest] = row.split("\t");
+const parseRow = (lined: string): ChangedFile | null => {
+  const [statusCode, ...rest] = lined.split("\t");
   if (statusCode === undefined || statusCode === "") return null;
   if (isRename(statusCode)) {
     return {
@@ -31,12 +31,12 @@ const parseRow = (row: string): ChangedFile | null => {
   };
 };
 
-export const parseNameStatus = (output: string): readonly ChangedFile[] =>
-  output
+export const parseNameStatus = (produced: string): readonly ChangedFile[] =>
+  produced
     .split("\n")
     .filter((line) => line.trim() !== "")
-    .flatMap((row) => {
-      const file = parseRow(row);
+    .flatMap((lined) => {
+      const file = parseRow(lined);
       return file === null ? [] : [file];
     });
 

@@ -1,6 +1,7 @@
-import { take } from "es-toolkit";
+import { sortBy, take } from "es-toolkit";
 
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { resolveBinding, type ScopeLookup } from "../lib/resolved-bindings.ts";
 import { fixtureDeclarationsOf } from "../lib/spec-syntax/fixture-declarations.ts";
 import {
@@ -15,14 +16,12 @@ import { staticMemberName } from "../lib/spec-syntax/static-names.ts";
 import { memberRootOf, unwrapSubject } from "../lib/spec-syntax/subject-expressions.ts";
 import {
   declaresTestBlock,
-  testBlockBindings,
+  testBlockRootNames,
   testCallbacksOf,
 } from "../lib/spec-syntax/test-block-declarations.ts";
 import { INJECTED_TEST_HOOK_SPELLINGS } from "../lib/spec-syntax/test-hook-declarations.ts";
 
 import type { Definition, ESTree } from "@oxlint/plugins";
-
-const TEST_HOOK_SPELLINGS: ReadonlySet<string> = new Set(INJECTED_TEST_HOOK_SPELLINGS);
 
 const REBINDING_MESSAGE = "sharedBindingRebound";
 
@@ -41,19 +40,19 @@ const standsInsideTest = (node: ESTree.Node, regions: readonly ESTree.Node[]): b
   regions.some((region) => region.start <= node.start && node.end <= region.end);
 
 const writtenLeavesOf = (
-  target:
+  pattern:
     | ESTree.AssignmentTargetMaybeDefault
     | ESTree.AssignmentTargetProperty
     | ESTree.AssignmentTargetRest,
 ): readonly ESTree.Expression[] => {
-  if (target.type === "ArrayPattern") {
-    return target.elements.flatMap((element) => (element === null ? [] : writtenLeavesOf(element)));
+  if (pattern.type === "ArrayPattern") {
+    return pattern.elements.flatMap((held) => (held === null ? [] : writtenLeavesOf(held)));
   }
-  if (target.type === "ObjectPattern") return target.properties.flatMap(writtenLeavesOf);
-  if (target.type === "Property") return writtenLeavesOf(target.value);
-  if (target.type === "RestElement") return writtenLeavesOf(target.argument);
-  if (target.type === "AssignmentPattern") return writtenLeavesOf(target.left);
-  return [unwrapSubject(target)];
+  if (pattern.type === "ObjectPattern") return pattern.properties.flatMap(writtenLeavesOf);
+  if (pattern.type === "Property") return writtenLeavesOf(pattern.value);
+  if (pattern.type === "RestElement") return writtenLeavesOf(pattern.argument);
+  if (pattern.type === "AssignmentPattern") return writtenLeavesOf(pattern.left);
+  return [unwrapSubject(pattern)];
 };
 
 const memberWriteOf = (node: ESTree.Node, leaf: ESTree.Expression): readonly StateWrite[] => {
@@ -121,14 +120,52 @@ const declaresRebindableName = (definition: Definition): boolean => {
 const hookLocalNamesIn = (declaration: ESTree.ImportDeclaration): readonly string[] =>
   declaration.specifiers.flatMap((specifier) =>
     specifier.type === "ImportSpecifier" &&
-    TEST_HOOK_SPELLINGS.has(moduleExportSpelling(specifier.imported))
+    INJECTED_TEST_HOOK_SPELLINGS.includes(moduleExportSpelling(specifier.imported))
       ? [specifier.local.name]
       : [],
   );
 
 const namesSetupHook = (node: ESTree.CallExpression, hookNames: ReadonlySet<string>): boolean => {
   const callee = unwrapSubject(node.callee);
-  return callee.type === "Identifier" && hookNames.has(callee.name);
+  return (
+    callee.type === "Identifier" &&
+    (INJECTED_TEST_HOOK_SPELLINGS.includes(callee.name) || hookNames.has(callee.name))
+  );
+};
+
+const testRegionsIn = (
+  program: ESTree.Program,
+  rootNames: ReadonlySet<string>,
+): readonly ESTree.Node[] => {
+  const hookNames: ReadonlySet<string> = new Set(
+    nodesOfType(program, "ImportDeclaration").flatMap(hookLocalNamesIn),
+  );
+
+  return nodesOfType(program, "CallExpression").flatMap((call) => [
+    ...fixtureDeclarationsOf(call).flatMap(({ factory }) => factory ?? []),
+    ...(declaresTestBlock(call, rootNames) || namesSetupHook(call, hookNames)
+      ? testCallbacksOf(call)
+      : []),
+  ]);
+};
+
+const stateWritesIn = (
+  program: ESTree.Program,
+  namespaces: NamespaceLookup,
+): readonly StateWrite[] => {
+  const found = [
+    ...nodesOfType(program, "AssignmentExpression").flatMap((node) =>
+      assignmentWrites(node, namespaces),
+    ),
+    ...nodesOfType(program, "UpdateExpression").flatMap(updateWrites),
+    ...nodesOfType(program, "UnaryExpression").flatMap(deletionWrites),
+    ...nodesOfType(program, "CallExpression").flatMap(operationWrites),
+  ];
+
+  return sortBy(
+    found.map((write) => ({ write, at: write.node.start })),
+    ["at"],
+  ).map((placed) => placed.write);
 };
 
 export const noModuleScopeMutableState = createDontReviewItRule({
@@ -150,29 +187,14 @@ export const noModuleScopeMutableState = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, DEFAULT_SPEC_FILE_SUFFIXES)) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, DEFAULT_SPEC_FILE_SUFFIXES)) return {};
 
-    const scopeAt: ScopeLookup = (node) => context.sourceCode.getScope(node);
+    const scopeAt: ScopeLookup = (node) => inspection.sourceCode.getScope(node);
     const namespaces: NamespaceLookup = {
       scopeAt,
       spellings: new Set(DEFAULT_MOCK_NAMESPACE_SPELLINGS),
       seenBindings: new Set(),
-    };
-
-    const blocks = testBlockBindings();
-    const hookNames = new Set<string>(TEST_HOOK_SPELLINGS);
-    const calls = new Set<ESTree.CallExpression>();
-    const writes = new Set<StateWrite>();
-
-    const testRegions = (): readonly ESTree.Node[] => {
-      const rootNames = blocks.rootNames();
-      return [...calls].flatMap((call) => [
-        ...fixtureDeclarationsOf(call).flatMap(({ factory }) => factory ?? []),
-        ...(declaresTestBlock(call, rootNames) || namesSetupHook(call, hookNames)
-          ? testCallbacksOf(call)
-          : []),
-      ]);
     };
 
     const declarationsOutsideTests = (
@@ -187,37 +209,17 @@ export const noModuleScopeMutableState = createDontReviewItRule({
     };
 
     return {
-      ImportDeclaration(node: ESTree.ImportDeclaration) {
-        blocks.takeImport(node);
-        for (const name of hookLocalNamesIn(node)) hookNames.add(name);
-      },
-      VariableDeclarator(node: ESTree.VariableDeclarator) {
-        blocks.takeLocalBinding(node);
-      },
-      AssignmentExpression(node: ESTree.AssignmentExpression) {
-        for (const write of assignmentWrites(node, namespaces)) writes.add(write);
-      },
-      UpdateExpression(node: ESTree.UpdateExpression) {
-        for (const write of updateWrites(node)) writes.add(write);
-      },
-      UnaryExpression(node: ESTree.UnaryExpression) {
-        for (const write of deletionWrites(node)) writes.add(write);
-      },
-      CallExpression(node: ESTree.CallExpression) {
-        calls.add(node);
-        for (const write of operationWrites(node)) writes.add(write);
-      },
-      "Program:exit"() {
-        const regions = testRegions();
+      "Program:exit"(program: ESTree.Program) {
+        const regions = testRegionsIn(program, testBlockRootNames(program));
 
-        for (const write of writes) {
+        for (const write of stateWritesIn(program, namespaces)) {
           if (!standsInsideTest(write.node, regions)) continue;
 
           for (const definition of take(declarationsOutsideTests(write, regions), 1)) {
             if (write.messageId === REBINDING_MESSAGE && !declaresRebindableName(definition)) {
               continue;
             }
-            context.report({
+            inspection.report({
               node: write.node,
               messageId: write.messageId,
               data: { name: write.root.name, origin: originOf(definition), member: write.member },

@@ -25,16 +25,16 @@ type DeclaredPattern = {
   readonly value: string;
 };
 
-const requiredPatternsFrom = (options: Readonly<Options>): readonly string[] => {
-  const [first] = options as readonly { readonly include?: readonly string[] }[];
+const requiredPatternsFrom = (ruleOptions: Readonly<Options>): readonly string[] => {
+  const [first] = ruleOptions as readonly { readonly include?: readonly string[] }[];
   return first?.include ?? [DEFAULT_PRODUCTION_SOURCE_PATTERN];
 };
 
 const declaredPatternOf = (
-  element: ESTree.Expression | ESTree.SpreadElement | null,
+  patternEntry: ESTree.Expression | ESTree.SpreadElement | null,
 ): DeclaredPattern | null => {
-  if (element === null || element.type === "SpreadElement") return null;
-  const unwrapped = unwrapTransparentExpression(element);
+  if (patternEntry === null || patternEntry.type === "SpreadElement") return null;
+  const unwrapped = unwrapTransparentExpression(patternEntry);
   if (unwrapped.type !== "Literal" || typeof unwrapped.value !== "string") return null;
   return { node: unwrapped, value: unwrapped.value };
 };
@@ -80,21 +80,22 @@ const changedValueKindOf = (expression: ESTree.Expression): "disabled" | "dynami
     : "dynamic";
 };
 
-const changedSettingOf = (object: ESTree.ObjectExpression): ChangedSetting => {
-  const properties = object.properties.filter(
+const changedSettingOf = (changedContainer: ESTree.ObjectExpression): ChangedSetting => {
+  const properties = changedContainer.properties.filter(
     (property): property is ESTree.ObjectProperty =>
       property.type === "Property" && propertyKeyOf(property) === "changed",
   );
   const property = properties.at(-1);
   if (property === undefined) return { kind: "absent-or-disabled" };
-  const kind = changedValueKindOf(property.value);
-  if (kind === "disabled") return { kind: "absent-or-disabled" };
-  if (kind === "dynamic") return { kind, property };
-  const previous = properties.at(-2);
+  const changedValueKind = changedValueKindOf(property.value);
+  if (changedValueKind === "disabled") return { kind: "absent-or-disabled" };
+  if (changedValueKind === "dynamic") return { kind: changedValueKind, property };
+  const precedingProperty = properties.at(-2);
   return {
-    kind,
+    kind: changedValueKind,
     property,
-    fixable: previous === undefined || changedValueKindOf(previous.value) === "disabled",
+    fixable:
+      precedingProperty === undefined || changedValueKindOf(precedingProperty.value) === "disabled",
   };
 };
 
@@ -123,10 +124,10 @@ const changedProblemFor = ({
 };
 
 const changedProblemOf = (
-  object: ESTree.ObjectExpression,
+  changedContainer: ESTree.ObjectExpression,
   sourceCode: SourceCode,
 ): ReturnType<typeof changedProblemFor> =>
-  changedProblemFor({ setting: changedSettingOf(object), sourceCode });
+  changedProblemFor({ setting: changedSettingOf(changedContainer), sourceCode });
 
 const coverageBoundaryProblemsOf = (
   coverage: ESTree.ObjectExpression,
@@ -158,7 +159,7 @@ const appendPatternsFix = ({
   readonly patterns: string;
   readonly sourceCode: SourceCode;
 }): FixFn => {
-  const lastElement = include.elements.findLast((element) => element !== null);
+  const lastElement = include.elements.findLast((patternEntry) => patternEntry !== null);
   if (lastElement !== undefined) {
     return (fixer) => fixer.insertTextAfter(lastElement, `, ${patterns}`);
   }
@@ -248,8 +249,8 @@ export const noPartialCoverageSourceUniverse = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    const requiredPatterns = requiredPatternsFrom(context.options);
+  create(inspection) {
+    const requiredPatterns = requiredPatternsFrom(inspection.options);
     const reportMissingPatterns = ({
       coverage,
       include,
@@ -267,10 +268,10 @@ export const noPartialCoverageSourceUniverse = createDontReviewItRule({
         coverage,
         include,
         missingPatterns,
-        sourceCode: context.sourceCode,
+        sourceCode: inspection.sourceCode,
       });
       missingPatterns.forEach((pattern, index) => {
-        context.report({
+        inspection.report({
           node: coverage,
           messageId: "missingProductionSourcePattern",
           data: { pattern },
@@ -280,7 +281,7 @@ export const noPartialCoverageSourceUniverse = createDontReviewItRule({
     };
     const reportMissingCoverage = (node: ESTree.Program): void => {
       for (const pattern of requiredPatterns) {
-        context.report({
+        inspection.report({
           node,
           messageId: "missingProductionSourcePattern",
           data: { pattern },
@@ -290,7 +291,7 @@ export const noPartialCoverageSourceUniverse = createDontReviewItRule({
     const reportNegatedPatterns = (declaredPatterns: readonly DeclaredPattern[]): void => {
       for (const pattern of declaredPatterns) {
         if (!pattern.value.startsWith("!")) continue;
-        context.report({
+        inspection.report({
           node: pattern.node,
           messageId: "negatedCoveragePattern",
           data: { pattern: pattern.value },
@@ -300,7 +301,7 @@ export const noPartialCoverageSourceUniverse = createDontReviewItRule({
     const inspectCoverage = (coverage: ESTree.ObjectExpression): void => {
       const declared = declaredCoverageOf(coverage);
       if (declared === null) {
-        context.report({ node: coverage, messageId: "dynamicCoverageConfiguration" });
+        inspection.report({ node: coverage, messageId: "dynamicCoverageConfiguration" });
         return;
       }
       reportNegatedPatterns(declared.patterns);
@@ -309,10 +310,10 @@ export const noPartialCoverageSourceUniverse = createDontReviewItRule({
         include: declared.include,
         declaredPatterns: declared.patterns,
       });
-      const changedProblem = changedProblemOf(coverage, context.sourceCode);
-      if (changedProblem !== null) context.report(changedProblem);
+      const changedProblem = changedProblemOf(coverage, inspection.sourceCode);
+      if (changedProblem !== null) inspection.report(changedProblem);
       for (const problem of coverageBoundaryProblemsOf(coverage)) {
-        context.report(problem);
+        inspection.report(problem);
       }
     };
     const inspectResolvedCoverage = (
@@ -320,7 +321,7 @@ export const noPartialCoverageSourceUniverse = createDontReviewItRule({
       node: ESTree.Program,
     ): void => {
       if (coverage.kind === "dynamic") {
-        context.report({ node, messageId: "dynamicCoverageConfiguration" });
+        inspection.report({ node, messageId: "dynamicCoverageConfiguration" });
         return;
       }
       if (coverage.kind === "missing") {
@@ -332,10 +333,10 @@ export const noPartialCoverageSourceUniverse = createDontReviewItRule({
     const inspectTestTask = (config: ESTree.ObjectExpression, node: ESTree.Program): void => {
       const task = staticTestTaskAt(config);
       if (task.kind === "dynamic") {
-        context.report({ node, messageId: "dynamicTestTaskConfiguration" });
+        inspection.report({ node, messageId: "dynamicTestTaskConfiguration" });
       }
       if (task.kind === "present") {
-        context.report({ node: task.property, messageId: "testTaskBypassesCoverageGuard" });
+        inspection.report({ node: task.property, messageId: "testTaskBypassesCoverageGuard" });
       }
     };
     const inspectStaticConfig = (config: ESTree.ObjectExpression, node: ESTree.Program): void => {
@@ -346,10 +347,10 @@ export const noPartialCoverageSourceUniverse = createDontReviewItRule({
       }
       inspectTestTask(closed.object, node);
       for (const problem of [
-        configRootProblemOf(closed.object, context.sourceCode),
-        testChangedProblemOf(closed.object, context.sourceCode),
+        configRootProblemOf(closed.object, inspection.sourceCode),
+        testChangedProblemOf(closed.object, inspection.sourceCode),
       ]) {
-        if (problem !== null) context.report(problem);
+        if (problem !== null) inspection.report(problem);
       }
       inspectResolvedCoverage(
         staticallyClosedObject(
@@ -361,11 +362,11 @@ export const noPartialCoverageSourceUniverse = createDontReviewItRule({
     const inspectResolvedConfig = (resolved: TestConfigResolution, node: ESTree.Program): void => {
       if (resolved.kind === "not-test-config") return;
       if (resolved.kind === "commonjs") {
-        context.report({ node, messageId: "commonJsTestConfig" });
+        inspection.report({ node, messageId: "commonJsTestConfig" });
         return;
       }
       if (resolved.kind === "dynamic") {
-        context.report({ node, messageId: "dynamicCoverageConfiguration" });
+        inspection.report({ node, messageId: "dynamicCoverageConfiguration" });
         return;
       }
       inspectStaticConfig(resolved.config, node);
@@ -373,7 +374,7 @@ export const noPartialCoverageSourceUniverse = createDontReviewItRule({
     return {
       Program(node: ESTree.Program) {
         inspectResolvedConfig(
-          resolveTestConfig({ filename: context.filename, program: node }),
+          resolveTestConfig({ filename: inspection.filename, program: node }),
           node,
         );
       },

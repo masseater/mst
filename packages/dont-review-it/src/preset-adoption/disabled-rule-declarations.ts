@@ -1,4 +1,9 @@
+import { LINT_SEVERITY } from "@mst/lint-rule-authoring";
+
+import { isReferenceTo, type ImportedTarget } from "../lint/oxlint/lib/imported-binding.ts";
 import { propertyKeyOf } from "../lint/oxlint/lib/object-literal.ts";
+import { severityLevelOf, SILENT_LEVEL } from "../lint/oxlint/lib/rule-sets/severity-levels.ts";
+import { staticMemberOf } from "../lint/oxlint/lib/static-member.ts";
 import { unwrapTransparentExpression } from "../lint/oxlint/lib/transparent-expression.ts";
 import { lineAt, problemAt } from "./inspection-problem.ts";
 
@@ -6,12 +11,8 @@ import type { ESTree } from "@oxlint/plugins";
 import type { PresetAdoptionConfig } from "./config.ts";
 import type { RuleBlockInspection } from "./inspection-types.ts";
 
-const DISABLED_SEVERITIES: ReadonlySet<unknown> = new Set(["off", "allow", 0]);
-
-const ENABLED_SEVERITIES: ReadonlySet<unknown> = new Set(["warn", "error", "deny", 1, 2]);
-
-const severityExpressionOf = (value: ESTree.Expression): ESTree.Expression | null => {
-  const unwrapped = unwrapTransparentExpression(value);
+const severityExpressionOf = (writtenSeverity: ESTree.Expression): ESTree.Expression | null => {
+  const unwrapped = unwrapTransparentExpression(writtenSeverity);
   if (unwrapped.type !== "ArrayExpression") return unwrapped;
   const first = unwrapped.elements[0] ?? null;
   return first === null || first.type === "SpreadElement"
@@ -19,29 +20,57 @@ const severityExpressionOf = (value: ESTree.Expression): ESTree.Expression | nul
     : unwrapTransparentExpression(first);
 };
 
-const severityOf = (value: ESTree.Expression) => {
-  const severity = severityExpressionOf(value);
-  if (severity?.type !== "Literal") {
-    return { kind: "uninspectable" as const, node: severity ?? value };
+const provenSeverityLevel = ({
+  severity,
+  severityConstant,
+}: {
+  readonly severity: ESTree.Expression;
+  readonly severityConstant: ImportedTarget;
+}): string | null => {
+  if (
+    severity.type === "Literal" &&
+    (typeof severity.value === "string" || typeof severity.value === "number")
+  ) {
+    return severityLevelOf(severity);
   }
-  if (DISABLED_SEVERITIES.has(severity.value)) {
-    return { kind: "disabled" as const, node: severity };
+  const member = staticMemberOf(severity);
+  return member !== null && isReferenceTo(member.object, severityConstant)
+    ? severityLevelOf(severity)
+    : null;
+};
+
+const severityOf = ({
+  writtenSeverity,
+  severityConstant,
+}: {
+  readonly writtenSeverity: ESTree.Expression;
+  readonly severityConstant: ImportedTarget;
+}) => {
+  const severity = severityExpressionOf(writtenSeverity);
+  if (severity === null) {
+    return { kind: "uninspectable" as const, node: writtenSeverity };
   }
-  return ENABLED_SEVERITIES.has(severity.value)
-    ? { kind: "enabled" as const, node: severity }
-    : { kind: "uninspectable" as const, node: severity };
+  const level = provenSeverityLevel({ severity, severityConstant });
+  if (level === null) {
+    return { kind: "uninspectable" as const, node: severity };
+  }
+  return level === SILENT_LEVEL
+    ? { kind: "disabled" as const, node: severity }
+    : level === LINT_SEVERITY.WARN
+      ? { kind: "warning" as const, node: severity }
+      : { kind: "enabled" as const, node: severity };
 };
 
 const presetRuleProperties = ({
   object,
-  prefix,
+  ruleIds,
 }: {
   readonly object: ESTree.ObjectExpression;
-  readonly prefix: string;
+  readonly ruleIds: readonly string[];
 }): readonly ESTree.ObjectProperty[] =>
   object.properties.filter(
     (property): property is ESTree.ObjectProperty =>
-      property.type === "Property" && propertyKeyOf(property)?.startsWith(prefix) === true,
+      property.type === "Property" && ruleIds.includes(String(propertyKeyOf(property))),
   );
 
 const duplicatedRuleProperty = (
@@ -66,20 +95,27 @@ const invalidRuleObjectProblem = ({
     source,
     start: written.start,
     config,
-    message: `A ${config.rulesFieldName} block that can affect ${config.presetRulePrefix} rules must be an object literal.`,
+    message: `A ${config.rulesFieldName} block that can affect preset-owned rules must be an object literal.`,
   });
 
 const inspectStaticRuleObject = ({
   object,
   source,
   config,
+  severityConstant,
 }: {
   readonly object: ESTree.ObjectExpression;
   readonly source: string;
   readonly config: PresetAdoptionConfig;
+  readonly severityConstant: ImportedTarget;
 }): RuleBlockInspection => {
   const dynamic = object.properties.find(
-    (property) => property.type === "SpreadElement" || property.computed,
+    (property) =>
+      property.type === "SpreadElement" ||
+      property.computed ||
+      property.kind !== "init" ||
+      property.method ||
+      propertyKeyOf(property) === "__proto__",
   );
   if (dynamic !== undefined) {
     return {
@@ -89,12 +125,12 @@ const inspectStaticRuleObject = ({
           source,
           start: dynamic.start,
           config,
-          message: `A ${config.rulesFieldName} block must not contain a spread or computed rule name because disabled preset rules must be statically inspectable.`,
+          message: `A ${config.rulesFieldName} block must contain only static data properties, with no spread, computed rule name, accessor, method, or __proto__ setter, because preset-owned rules must be statically inspectable.`,
         }),
       ],
     };
   }
-  const properties = presetRuleProperties({ object, prefix: config.presetRulePrefix });
+  const properties = presetRuleProperties({ object, ruleIds: config.presetOwnedRuleIds });
   const duplicated = duplicatedRuleProperty(properties);
   if (duplicated !== undefined) {
     return {
@@ -104,7 +140,7 @@ const inspectStaticRuleObject = ({
           source,
           start: duplicated.start,
           config,
-          message: `A ${config.presetRulePrefix} rule must not be declared more than once in the same ${config.rulesFieldName} block.`,
+          message: `A preset-owned rule must not be declared more than once in the same ${config.rulesFieldName} block.`,
         }),
       ],
     };
@@ -112,7 +148,7 @@ const inspectStaticRuleObject = ({
   const inspected = properties.map((property) => ({
     property,
     ruleId: String(propertyKeyOf(property)),
-    severity: severityOf(property.value),
+    severity: severityOf({ writtenSeverity: property.value, severityConstant }),
   }));
   return {
     disabledDeclarations: inspected.flatMap(({ property, ruleId, severity }) =>
@@ -120,18 +156,38 @@ const inspectStaticRuleObject = ({
         ? [{ ruleId, line: lineAt({ source, start: property.start }) }]
         : [],
     ),
-    problems: inspected.flatMap(({ ruleId, severity }) =>
-      severity.kind === "uninspectable"
+    problems: inspected.flatMap(({ ruleId, severity }) => {
+      if (severity.kind === "warning") {
+        return [
+          problemAt({
+            source,
+            start: severity.node.start,
+            config,
+            message: `The severity of ${ruleId} must fail the lint run. Raise warn or 1 to error, deny, 2, or a statically imported ${config.severityExportName}.ERROR, optionally as the first array element.`,
+          }),
+        ];
+      }
+      if (severity.kind === "enabled") {
+        return [
+          problemAt({
+            source,
+            start: severity.node.start,
+            config,
+            message: `${ruleId} is owned by dontReviewItPreset and must not be redeclared with caller severity or options. Delete the declaration and use the preset setting.`,
+          }),
+        ];
+      }
+      return severity.kind === "uninspectable"
         ? [
             problemAt({
               source,
               start: severity.node.start,
               config,
-              message: `The severity of ${ruleId} must be written directly as off, allow, warn, error, deny, 0, 1, or 2, optionally as the first array element.`,
+              message: `The severity of ${ruleId} must be statically provable as error, deny, 2, or a statically imported ${config.severityExportName}.ERROR, optionally as the first array element.`,
             }),
           ]
-        : [],
-    ),
+        : [];
+    }),
   };
 };
 
@@ -139,10 +195,12 @@ export const inspectRuleBlock = ({
   written,
   source,
   config,
+  severityConstant,
 }: {
   readonly written: ESTree.Expression;
   readonly source: string;
   readonly config: PresetAdoptionConfig;
+  readonly severityConstant: ImportedTarget;
 }): RuleBlockInspection => {
   const unwrapped = unwrapTransparentExpression(written);
   if (unwrapped.type !== "ObjectExpression") {
@@ -151,5 +209,5 @@ export const inspectRuleBlock = ({
       problems: [invalidRuleObjectProblem({ written, source, config })],
     };
   }
-  return inspectStaticRuleObject({ object: unwrapped, source, config });
+  return inspectStaticRuleObject({ object: unwrapped, source, config, severityConstant });
 };

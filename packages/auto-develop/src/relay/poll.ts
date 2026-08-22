@@ -24,7 +24,7 @@ const ownedEventsOf = async (selection: {
   for (const stored of selection.scanned) selection.ownerFilter.remember(stored);
   const ownershipFlags = await Promise.all(
     selection.scanned.map((stored) =>
-      selection.ownerFilter.owns({ event: stored, subscriberLogin: selection.subscriberLogin }),
+      selection.ownerFilter.owns({ stored: stored, subscriberLogin: selection.subscriberLogin }),
     ),
   );
   return selection.scanned.filter((_stored, index) => ownershipFlags[index] === true);
@@ -45,12 +45,12 @@ export const runPoll = async (poll: {
   readonly ownerFilter: OwnerFilter;
   readonly now?: () => number;
 }): Promise<readonly EventEnvelope[]> => {
-  const now = poll.now ?? Date.now;
+  const stampedNow = poll.now ?? Date.now;
   const savedCursor = await poll.cursors.read(poll.clientId);
   const scanned = await readResumableEvents({
     events: poll.events,
     resumeAfterId: savedCursor,
-    nowMs: now(),
+    nowMs: stampedNow(),
   });
   const owned = await ownedEventsOf({
     scanned,

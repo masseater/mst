@@ -9,13 +9,12 @@ import { defaultEntryCompositionConfig } from "./entry-composition/config.ts";
 import { entryCompositionProblems } from "./entry-composition/entry-composition-problems.ts";
 import { defaultIntentSkillsConfig } from "./intent-skills/config.ts";
 import { shippedSkillsProblems } from "./intent-skills/shipped-skills.ts";
-import { buildCanonicalValuesCatalog } from "./lint/oxlint/lib/canonical-values/builder.ts";
 import { listRepositoryFiles } from "./lint/oxlint/lib/canonical-values/source-files.ts";
 import {
   findEquivalentConcepts,
   formatCanonicalValuesProblem,
   formatEquivalentConceptGroup,
-  verifyCanonicalValues,
+  inspectCanonicalValues,
 } from "./lint/oxlint/lib/canonical-values/verify.ts";
 import { duplicatedClustersIn } from "./lint/oxlint/lib/duplicated-bodies/body-index.ts";
 import { buildRepositoryBodyIndex } from "./lint/oxlint/lib/duplicated-bodies/builder.ts";
@@ -23,12 +22,14 @@ import { formatDuplicatedCluster } from "./lint/oxlint/lib/duplicated-bodies/sit
 import { defaultPresetAdoptionConfig } from "./preset-adoption/config.ts";
 import { runPresetAdoptionChecks } from "./preset-adoption/run-preset-adoption-checks.ts";
 import { formatRepositoryProblem } from "./problem.ts";
+import { defaultRequiredFileFormConfig } from "./required-file-form/config.ts";
+import { runRequiredFileFormChecks } from "./required-file-form/run-required-file-form-checks.ts";
 import {
   formatTestCommandOverrideProblem,
   testCommandOverrideProblems,
 } from "./test-execution/test-command-overrides.ts";
 import { defaultWorkflowChecksConfig } from "./workflows/config.ts";
-import { runWorkflowChecks } from "./workflows/run-workflow-checks.ts";
+import { workflowOutcomesOf } from "./workflows/workflow-outcomes.ts";
 
 import type { CheckOutcome } from "@mst/repository-checks";
 
@@ -40,6 +41,8 @@ export type CheckReport = {
 };
 
 const NO_WORKSPACE_DEFINITION = "no workspace definition";
+
+const NO_WORKFLOW_DEFINITION = "no workflow definition";
 
 const NO_TOOLCHAIN_CONFIG = "no toolchain configuration";
 
@@ -53,10 +56,49 @@ const checkReportFrom = ({
   readonly failures: readonly string[];
 }): CheckReport => ({
   outcomes,
-  problems: outcomes.flatMap((outcome) => outcome.problems).toSorted(),
-  warnings: outcomes.flatMap((outcome) => outcome.warnings).toSorted(),
+  problems: outcomes.flatMap((checkRecord) => checkRecord.problems).toSorted(),
+  warnings: outcomes.flatMap((checkRecord) => checkRecord.warnings).toSorted(),
   failures: failures.toSorted(),
 });
+
+const sourceScanOutcomes = (repositoryRoot: string): readonly CheckOutcome[] => {
+  const repositoryFiles = listRepositoryFiles(resolve(repositoryRoot));
+  const canonicalValues = inspectCanonicalValues({ repositoryRoot });
+
+  return [
+    {
+      check: "canonical-values",
+      unit: "source file",
+      count: repositoryFiles.commentSources.length,
+      skippedReason: null,
+      problems: canonicalValues.problems.map(formatCanonicalValuesProblem).toSorted(),
+      warnings: [],
+    },
+    {
+      check: "equivalent-concepts",
+      unit: "concept",
+      count: canonicalValues.catalog.entries.length,
+      skippedReason: null,
+      problems: [],
+      warnings:
+        canonicalValues.problems.length === 0
+          ? findEquivalentConcepts(canonicalValues.catalog.entries)
+              .map(formatEquivalentConceptGroup)
+              .toSorted()
+          : [],
+    },
+    {
+      check: "duplicated-bodies",
+      unit: "declaration source",
+      count: repositoryFiles.declarationSources.length,
+      skippedReason: null,
+      problems: duplicatedClustersIn(buildRepositoryBodyIndex({ repositoryRoot }))
+        .map(formatDuplicatedCluster)
+        .toSorted(),
+      warnings: [],
+    },
+  ];
+};
 
 export const runChecks = (repositoryRoot: string): CheckReport => {
   const dependencyCatalog = runDependencyCatalogChecks({
@@ -67,14 +109,19 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
     repositoryRoot,
     config: defaultEntryCompositionConfig,
   });
-  const repositoryFiles = listRepositoryFiles(resolve(repositoryRoot));
-  const catalog = buildCanonicalValuesCatalog({ repositoryRoot });
-  const workflows = runWorkflowChecks({ repositoryRoot, config: defaultWorkflowChecksConfig });
+  const workflows = workflowOutcomesOf({
+    repositoryRoot,
+    config: defaultWorkflowChecksConfig,
+  });
   const skills = shippedSkillsProblems({ repositoryRoot, config: defaultIntentSkillsConfig });
   const testExecution = testCommandOverrideProblems(repositoryRoot);
   const presetAdoption = runPresetAdoptionChecks({
     repositoryRoot,
     config: defaultPresetAdoptionConfig,
+  });
+  const requiredFileForm = runRequiredFileFormChecks({
+    repositoryRoot,
+    config: defaultRequiredFileFormConfig,
   });
   const ruleIndex = dependencyCatalog.definitionUnreadable
     ? { problems: [], scanned: 0 }
@@ -90,42 +137,21 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
         problems: entryComposition.problems.map(formatRepositoryProblem).toSorted(),
         warnings: [],
       },
-      {
-        check: "canonical-values",
-        unit: "source file",
-        count: repositoryFiles.commentSources.length,
-        skippedReason: null,
-        problems: verifyCanonicalValues({ repositoryRoot })
-          .map(formatCanonicalValuesProblem)
-          .toSorted(),
-        warnings: [],
-      },
-      {
-        check: "equivalent-concepts",
-        unit: "concept",
-        count: catalog.entries.length,
-        skippedReason: null,
-        problems: findEquivalentConcepts(catalog.entries)
-          .map(formatEquivalentConceptGroup)
-          .toSorted(),
-        warnings: [],
-      },
-      {
-        check: "duplicated-bodies",
-        unit: "declaration source",
-        count: repositoryFiles.declarationSources.length,
-        skippedReason: null,
-        problems: duplicatedClustersIn(buildRepositoryBodyIndex({ repositoryRoot }))
-          .map(formatDuplicatedCluster)
-          .toSorted(),
-        warnings: [],
-      },
+      ...sourceScanOutcomes(repositoryRoot),
       {
         check: "workflow-definitions",
         unit: "definition",
-        count: workflows.scanned,
+        count: workflows.definitions.scanned,
         skippedReason: null,
-        problems: workflows.problems.map(formatRepositoryProblem).toSorted(),
+        problems: workflows.definitions.problems.map(formatRepositoryProblem).toSorted(),
+        warnings: [],
+      },
+      {
+        check: "action-updates",
+        unit: "update configuration",
+        count: workflows.updates.scanned,
+        skippedReason: workflows.definitions.scanned === 0 ? NO_WORKFLOW_DEFINITION : null,
+        problems: workflows.updates.problems.map(formatRepositoryProblem).toSorted(),
         warnings: [],
       },
       {
@@ -152,6 +178,14 @@ export const runChecks = (repositoryRoot: string): CheckReport => {
         count: testExecution.scanned,
         skippedReason: null,
         problems: testExecution.problems.map(formatTestCommandOverrideProblem).toSorted(),
+        warnings: [],
+      },
+      {
+        check: "required-file-form",
+        unit: "package root",
+        count: requiredFileForm.scanned,
+        skippedReason: null,
+        problems: requiredFileForm.problems.map(formatRepositoryProblem).toSorted(),
         warnings: [],
       },
       {

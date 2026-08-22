@@ -1,25 +1,39 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import { gitExcludePatterns } from "./git-excludes/git-exclude-patterns.ts";
+import {
+  gitIgnoredRepositoryPaths,
+  gitIgnorePatternForLiteralPath,
+} from "../lint/oxlint/lib/git-ignored-source.ts";
 import { withGitExcludes } from "./with-git-excludes.ts";
 
-import type { OxlintConfig } from "oxlint";
+const REPOSITORY_EXCLUDES = [...gitIgnoredRepositoryPaths(process.cwd())].flatMap(
+  (repositoryPath) => {
+    const pattern = gitIgnorePatternForLiteralPath(repositoryPath);
+    return pattern === null ? [] : [pattern];
+  },
+);
 
 describe("withGitExcludes", () => {
-  test("it prepends repository exclusions and preserves explicit lint settings", () => {
-    const configured: OxlintConfig = {
-      ignorePatterns: ["generated/**"],
-      rules: { eqeqeq: "error" },
-    };
+  describe("an explicit lint configuration", () => {
+    const it = test.extend("combinedConfig", () =>
+      withGitExcludes({
+        ignorePatterns: ["generated/**"],
+        rules: { eqeqeq: "error" },
+      }));
 
-    const combined = withGitExcludes(configured);
+    it("prepends repository exclusions and preserves every setting", ({ combinedConfig }) => {
+      expect(combinedConfig).toStrictEqual({
+        ignorePatterns: [...REPOSITORY_EXCLUDES, "generated/**"],
+        rules: { eqeqeq: "error" },
+      });
+    });
+  });
 
-    expect(combined).not.toBe(configured);
-    expect(combined.ignorePatterns).toStrictEqual([...gitExcludePatterns(), "generated/**"]);
-    expect(combined.rules).toBe(configured.rules);
-  }, 30_000);
+  describe("a configuration without explicit exclusions", () => {
+    const it = test.extend("combinedConfig", () => withGitExcludes({}));
 
-  test("it supplies repository exclusions when the caller declared none", () => {
-    expect(withGitExcludes({}).ignorePatterns).toStrictEqual([...gitExcludePatterns()]);
-  }, 30_000);
+    it("supplies the repository exclusions", ({ combinedConfig }) => {
+      expect(combinedConfig).toStrictEqual({ ignorePatterns: REPOSITORY_EXCLUDES });
+    });
+  });
 });

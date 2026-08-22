@@ -11,37 +11,37 @@ type FileLockRequest = {
   recordGeneration: () => void;
 };
 
-const releaseDescriptor = (request: FileLockRequest, descriptor: number): void => {
-  releaseFileLock({ descriptor, unlock: request.unlock, close: request.close });
+const releaseDescriptor = (fileLock: FileLockRequest, descriptor: number): void => {
+  releaseFileLock({ descriptor, unlock: fileLock.unlock, close: fileLock.close });
 };
 
-const lockedDescriptor = (request: FileLockRequest): number | null => {
-  const descriptor = request.open(request.path);
+const lockedDescriptor = (fileLock: FileLockRequest): number | null => {
+  const descriptor = fileLock.open(fileLock.path);
   const acquired = (() => {
     try {
-      return request.tryLock(descriptor);
+      return fileLock.tryLock(descriptor);
     } catch (lockFailure) {
       return closeFileDescriptorAfterFailure({
         descriptor,
         precedingFailure: lockFailure,
-        close: request.close,
+        close: fileLock.close,
       });
     }
   })();
   if (!acquired) {
-    request.close(descriptor);
+    fileLock.close(descriptor);
     return null;
   }
   return descriptor;
 };
 
 const releaseAfterGenerationFailure = (input: {
-  request: FileLockRequest;
+  fileLock: FileLockRequest;
   descriptor: number;
   generationWriteFailure: unknown;
 }): never => {
   try {
-    releaseDescriptor(input.request, input.descriptor);
+    releaseDescriptor(input.fileLock, input.descriptor);
   } catch (releaseFailure) {
     throw new AggregateError(
       [input.generationWriteFailure, releaseFailure],
@@ -51,25 +51,27 @@ const releaseAfterGenerationFailure = (input: {
   throw input.generationWriteFailure;
 };
 
-const recordGeneration = (request: FileLockRequest, descriptor: number): void => {
+const recordGeneration = (fileLock: FileLockRequest, descriptor: number): void => {
   try {
-    request.recordGeneration();
+    fileLock.recordGeneration();
   } catch (generationWriteFailure) {
-    releaseAfterGenerationFailure({ request, descriptor, generationWriteFailure });
+    releaseAfterGenerationFailure({ fileLock, descriptor, generationWriteFailure });
   }
 };
 
 export const tryAcquireFileLock = (
-  request: FileLockRequest,
+  fileLock: FileLockRequest,
 ): { release: () => Promise<void> } | null => {
-  const descriptor = lockedDescriptor(request);
+  const descriptor = lockedDescriptor(fileLock);
   if (descriptor === null) return null;
-  recordGeneration(request, descriptor);
+  recordGeneration(fileLock, descriptor);
   return {
-    release: once(() =>
-      Promise.try(() => {
-        releaseDescriptor(request, descriptor);
-      }),
+    release: once(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseDescriptor(fileLock, descriptor);
+          resolve();
+        }),
     ),
   };
 };

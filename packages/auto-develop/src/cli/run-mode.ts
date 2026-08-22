@@ -6,13 +6,14 @@ import { prepareRunContext } from "../context/prepare-run-context.ts";
 import { buildPrompt } from "../context/prompt.ts";
 import { LAUNCH_AUTO } from "../context/run-context.ts";
 import { asRecord } from "../contract/unknown-record.ts";
-import { createAuthorHandler } from "../handlers/author-handler.ts";
+import { DECLARED_MODE, type Mode } from "../contract/vocabulary.ts";
+import { AUTHOR_REASON, createAuthorHandler } from "../handlers/author-handler.ts";
 import { createGithubApiClient } from "../handlers/github-api-client.ts";
 import { createReviewInputCoordinator } from "../handlers/review-input-coordinator.ts";
 import { createReviewerHandler } from "../handlers/reviewer-handler.ts";
 import { withJobBanner } from "../queue/job-banner.ts";
 import { prLaneNumber, type PrFilter } from "../queue/pr-lane.ts";
-import { createPeriodicScheduler } from "../queue/scheduler.ts";
+import { createPeriodicScheduler, type PeriodicSchedule } from "../queue/scheduler.ts";
 import { composeRuntime, type ComposedRuntime } from "../runtime/compose-runtime.ts";
 import { createIdleMonitor, type IdleMonitor } from "../runtime/idle-monitor.ts";
 import {
@@ -26,7 +27,6 @@ import { worktreePathFor } from "../worktree/paths.ts";
 import { cycleUntilStopped } from "./cycle-loop.ts";
 import { runContextFsOnDisk } from "./run-context-fs.ts";
 
-import type { Mode } from "../contract/vocabulary.ts";
 import type { HandlerGithubClient } from "../handlers/github-client.ts";
 
 const UPDATE_CHECK_INTERVAL_MS = 15 * 60_000;
@@ -46,11 +46,18 @@ export type ModeRunRequest = {
   readonly engineTimeoutMs: number;
 };
 
+type ModeScheduler = {
+  readonly start: () => ModeScheduler | undefined;
+  readonly stop: () => Promise<void> | undefined;
+};
+
+const startScheduler = (scheduler: ModeScheduler): ModeScheduler => scheduler.start() ?? scheduler;
+
 type ModeRunDependencies = {
   readonly composeRuntime: typeof composeRuntime;
   readonly createAuthorHandler: typeof createAuthorHandler;
   readonly createGithubApiClient: typeof createGithubApiClient;
-  readonly createPeriodicScheduler: typeof createPeriodicScheduler;
+  readonly createPeriodicScheduler: (schedule: PeriodicSchedule) => ModeScheduler;
   readonly createReviewInputCoordinator: typeof createReviewInputCoordinator;
   readonly createReviewerHandler: typeof createReviewerHandler;
   readonly cycleUntilStopped: typeof cycleUntilStopped;
@@ -113,30 +120,27 @@ const promptFor = (
   });
 };
 
-const runtimeFor = (
-  request: ModeRunRequest,
-  dependencies: ModeRunDependencies,
-): ComposedRuntime => {
+const runtimeFor = (asked: ModeRunRequest, dependencies: ModeRunDependencies): ComposedRuntime => {
   const repoDir = resolveRepositoryRoot(process.cwd());
   const engineCommand = readEnvVar("AUTO_DEVELOP_ENGINE_COMMAND", dependencies.environment);
   return dependencies.composeRuntime({
-    mode: request.mode,
-    relayOrigin: request.relayOrigin,
+    mode: asked.mode,
+    relayOrigin: asked.relayOrigin,
     repoDir,
     logDirectory: resolveLogDirectory(repoDir, dependencies.environment),
     engineKind: DEFAULT_ENGINE,
     ...(engineCommand === undefined ? {} : { engineOverride: engineCommand }),
-    engineTimeoutMs: request.engineTimeoutMs,
-    bypassPermissions: request.bypassPermissions,
-    concurrency: request.concurrency,
-    prFilter: request.prFilter,
-    githubToken: request.githubToken,
+    engineTimeoutMs: asked.engineTimeoutMs,
+    bypassPermissions: asked.bypassPermissions,
+    concurrency: asked.concurrency,
+    prFilter: asked.prFilter,
+    githubToken: asked.githubToken,
     setupWorktree: () => Promise.resolve(),
   });
 };
 
-const pullNumberOf = (payload: unknown): number => {
-  const pullNumber = asRecord(payload)?.pullNumber;
+const pullNumberOf = (carried: unknown): number => {
+  const pullNumber = asRecord(carried)?.pullNumber;
   return typeof pullNumber === "number" ? pullNumber : 0;
 };
 
@@ -146,7 +150,7 @@ const attachHandlers = (attaching: {
   readonly github: HandlerGithubClient;
   readonly dependencies: ModeRunDependencies;
 }): void => {
-  const { request, runtime, github, dependencies } = attaching;
+  const { request: asked, runtime, github, dependencies } = attaching;
   const coordinate = dependencies.createReviewInputCoordinator({
     gate: runtime.gate,
     queue: runtime.queue,
@@ -166,7 +170,7 @@ const attachHandlers = (attaching: {
           Promise.resolve(
             promptFor(
               {
-                mode: request.mode,
+                mode: asked.mode,
                 prNumber: session.prNumber,
                 baseRef: `origin/${session.baseBranch}`,
                 headRef: session.headBranch,
@@ -179,8 +183,8 @@ const attachHandlers = (attaching: {
     requestFollowUpReview: (followUp) => {
       void coordinate({ prNumber: followUp.prNumber, endpoint: followUp.endpoint });
     },
-    dryRun: request.dryRun,
-    proxyLogin: request.reviewerLogin,
+    dryRun: asked.dryRun,
+    proxyLogin: asked.reviewerLogin,
     log: runtime.log,
   });
   const author = dependencies.createAuthorHandler({
@@ -193,7 +197,7 @@ const attachHandlers = (attaching: {
           Promise.resolve(
             promptFor(
               {
-                mode: request.mode,
+                mode: asked.mode,
                 prNumber: session.prNumber,
                 baseRef: session.headBranch,
                 headRef: session.headBranch,
@@ -204,23 +208,23 @@ const attachHandlers = (attaching: {
             ),
           ),
       }),
-    reviewerLogin: request.reviewerLogin,
-    dryRun: request.dryRun,
+    reviewerLogin: asked.reviewerLogin,
+    dryRun: asked.dryRun,
     log: runtime.log,
   });
   runtime.queue.setHandlers({
     handlers: {
-      "pr-event": (payload) => {
-        const prNumber = pullNumberOf(payload);
+      "pr-event": (carried) => {
+        const prNumber = pullNumberOf(carried);
         return dependencies.runJob({
-          mode: request.mode,
+          mode: asked.mode,
           prNumber,
           run: async () => {
-            if (request.mode === "reviewer") {
+            if (asked.mode === DECLARED_MODE.reviewer) {
               await reviewer(prNumber);
               return;
             }
-            await author({ prNumber, reason: "request_changes" });
+            await author({ prNumber, reason: AUTHOR_REASON.requestChanges });
           },
         });
       },
@@ -252,20 +256,20 @@ const announceStart = (announcing: {
   readonly request: ModeRunRequest;
   readonly runtime: ComposedRuntime;
 }): void => {
-  const { request } = announcing;
+  const { request: asked } = announcing;
   announcing.runtime.log.info(
     runMetadataLogFields(
       buildRunMetadata({
-        mode: request.mode,
+        mode: asked.mode,
         engine: DEFAULT_ENGINE,
-        ghUser: request.reviewerLogin,
+        ghUser: asked.reviewerLogin,
         ghUserSource: "override",
         ghTokenSource: "environment-variable",
-        concurrency: request.concurrency,
-        dryRun: request.dryRun,
-        dangerouslySkipPermissions: request.bypassPermissions,
-        targetPrs: request.prFilter.targetPrs,
-        excludedPrs: request.prFilter.excludedPrs,
+        concurrency: asked.concurrency,
+        dryRun: asked.dryRun,
+        dangerouslySkipPermissions: asked.bypassPermissions,
+        targetPrs: asked.prFilter.targetPrs,
+        excludedPrs: asked.prFilter.excludedPrs,
       }),
     ),
     "runtime starting",
@@ -308,32 +312,33 @@ const startedSchedulers = (starting: {
   readonly idleMonitor: IdleMonitor;
   readonly baseline: Map<string, string>;
   readonly dependencies: ModeRunDependencies;
-}): { readonly stop: () => void } => {
+}): { readonly stop: () => Promise<void> } => {
   const startedAtMs = starting.dependencies.now();
-  const statusBar = starting.dependencies.createPeriodicScheduler({
-    checkRestart: () => {
-      paintStatusBar({
-        request: starting.request,
-        runtime: starting.runtime,
-        startedAtMs,
-        dependencies: starting.dependencies,
-      });
-      if (starting.idleMonitor.idleTooLong()) starting.restart.request("idle");
-    },
-    cleanup: { run: () => reclaimIdleWorktrees({ runtime: starting.runtime }) },
-    log: starting.runtime.log,
-  });
-  const updateChecker = starting.dependencies.createPeriodicScheduler({
-    checkRestart: () => void requestRestartWhenCodeMovedOn(starting),
-    restartCheckIntervalMs: UPDATE_CHECK_INTERVAL_MS,
-    log: starting.runtime.log,
-  });
-  statusBar.start();
-  updateChecker.start();
+  const statusBar = startScheduler(
+    starting.dependencies.createPeriodicScheduler({
+      checkRestart: () => {
+        paintStatusBar({
+          request: starting.request,
+          runtime: starting.runtime,
+          startedAtMs,
+          dependencies: starting.dependencies,
+        });
+        if (starting.idleMonitor.idleTooLong()) starting.restart.request("idle");
+      },
+      cleanup: { run: () => reclaimIdleWorktrees({ runtime: starting.runtime }) },
+      log: starting.runtime.log,
+    }),
+  );
+  const updateChecker = startScheduler(
+    starting.dependencies.createPeriodicScheduler({
+      checkRestart: () => void requestRestartWhenCodeMovedOn(starting),
+      restartCheckIntervalMs: UPDATE_CHECK_INTERVAL_MS,
+      log: starting.runtime.log,
+    }),
+  );
   return {
-    stop: () => {
-      statusBar.stop();
-      updateChecker.stop();
+    stop: async () => {
+      await Promise.all([statusBar.stop(), updateChecker.stop()]);
     },
   };
 };
@@ -348,11 +353,11 @@ const restartRequestFor = (runtime: ComposedRuntime): RestartRequest =>
 
 export const createModeRunner = (
   overrides: Partial<ModeRunDependencies> = {},
-): ((request: ModeRunRequest) => Promise<void>) => {
+): ((asked: ModeRunRequest) => Promise<void>) => {
   const dependencies: ModeRunDependencies = { ...MODE_RUN_DEPENDENCIES, ...overrides };
-  return async (request) => {
-    const runtime = runtimeFor(request, dependencies);
-    announceStart({ request, runtime });
+  return async (asked) => {
+    const runtime = runtimeFor(asked, dependencies);
+    announceStart({ request: asked, runtime });
     const restart = restartRequestFor(runtime);
     const idleMonitor = createIdleMonitor({
       startedAtMs: dependencies.now(),
@@ -361,7 +366,7 @@ export const createModeRunner = (
     });
     const baseline = new Map<string, string>();
     const schedulers = startedSchedulers({
-      request,
+      request: asked,
       runtime,
       restart,
       idleMonitor,
@@ -369,24 +374,24 @@ export const createModeRunner = (
       dependencies,
     });
     attachHandlers({
-      request,
+      request: asked,
       runtime,
       github: dependencies.createGithubApiClient({
-        repository: request.repository,
-        token: request.githubToken,
+        repository: asked.repository,
+        token: asked.githubToken,
       }),
       dependencies,
     });
     try {
       await dependencies.cycleUntilStopped({
-        mode: request.mode,
+        mode: asked.mode,
         runtime,
         restart,
         idleMonitor,
         baseline,
       });
     } finally {
-      schedulers.stop();
+      await schedulers.stop();
     }
   };
 };

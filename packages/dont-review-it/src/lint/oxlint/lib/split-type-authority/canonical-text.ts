@@ -37,7 +37,7 @@ const namesIn = (
   node: unknown,
   pickedNamesOf: (node: AstFields) => readonly string[],
 ): string[] => {
-  if (Array.isArray(node)) return node.flatMap((item) => namesIn(item, pickedNamesOf));
+  if (Array.isArray(node)) return node.flatMap((member) => namesIn(member, pickedNamesOf));
   if (!isAstFields(node)) return [];
   return [
     ...pickedNamesOf(node),
@@ -56,8 +56,8 @@ const referencedNamesOf = (node: AstFields): readonly string[] => {
 
 export const placeholdersIn = (node: unknown): TypeParameterPlaceholders =>
   new Map(
-    uniq(namesIn(node, declaredParameterNamesOf)).map((name, position) => [
-      name,
+    uniq(namesIn(node, declaredParameterNamesOf)).map((spelled, position) => [
+      spelled,
       `${PLACEHOLDER_PREFIX}${position}`,
     ]),
   );
@@ -65,25 +65,25 @@ export const placeholdersIn = (node: unknown): TypeParameterPlaceholders =>
 export const referencedTypeNamesIn = (node: unknown): readonly string[] =>
   namesIn(node, referencedNamesOf);
 
-const boundNameOf = (placeholders: TypeParameterPlaceholders, name: string): string =>
-  placeholders.get(name) ?? name;
+const boundNameOf = (placeholders: TypeParameterPlaceholders, spelled: string): string =>
+  placeholders.get(spelled) ?? spelled;
 
 export const canonicalTextOf = (node: unknown, placeholders: TypeParameterPlaceholders): string => {
   if (Array.isArray(node)) {
-    return `[${node.map((item) => canonicalTextOf(item, placeholders)).join(",")}]`;
+    return `[${node.map((member) => canonicalTextOf(member, placeholders)).join(",")}]`;
   }
   if (!isAstFields(node)) return JSON.stringify(node);
 
-  const kind = String(node[NODE_TYPE_FIELD]);
-  const unordered = UNORDERED_LISTS.get(kind);
+  const nodeKind = String(node[NODE_TYPE_FIELD]);
+  const unordered = UNORDERED_LISTS.get(nodeKind);
   if (unordered !== undefined) {
     return `${unordered.tag}{${(node[unordered.field] as readonly unknown[])
-      .map((item) => canonicalTextOf(item, placeholders))
+      .map((member) => canonicalTextOf(member, placeholders))
       .toSorted()
       .join(",")}}`;
   }
-  if (kind === TYPE_REFERENCE_KIND) return typeReferenceTextOf(node, placeholders);
-  if (kind === TYPE_PARAMETER_KIND) return typeParameterTextOf(node, placeholders);
+  if (nodeKind === TYPE_REFERENCE_KIND) return typeReferenceTextOf(node, placeholders);
+  if (nodeKind === TYPE_PARAMETER_KIND) return typeParameterTextOf(node, placeholders);
 
   return `{${comparedFieldsOf(node)
     .map(([field, held]) => `${field}:${canonicalTextOf(held, placeholders)}`)

@@ -9,7 +9,7 @@ const PREFIXED_VERSION_PATTERN = /(?<![\w./-])v\d+(?:\.\d+){0,3}(?!\w)/gu;
 
 const RANGE_VERSION_PATTERN = /(?<!\w)(?:>=|<=|\^|~|>|<)\d+(?:\.\d+){0,3}(?!\w)/gu;
 
-const message = (found: string): string =>
+const complaint = (found: string): string =>
   `散文に版番号 \`${found}\` を直書きすることは禁止されている。値を消し、その版を決めているファイルを名指しする。`;
 
 const isExcluded = ({
@@ -42,6 +42,6 @@ export const versionLiteralsInProse = ({
         .map(({ offset, found }) => ({
           file: document.file,
           line: document.source.slice(0, offset).split("\n").length,
-          message: message(found),
+          message: complaint(found),
         }));
     });

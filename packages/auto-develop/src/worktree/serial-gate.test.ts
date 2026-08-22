@@ -2,68 +2,72 @@ import { describe, expect, test, vi } from "vite-plus/test";
 
 import { createSerialGate } from "./serial-gate.ts";
 
-const it = test
-  .extend("fifoCompletions", async () => {
-    const gate = createSerialGate();
-    const first = gate.run(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 20));
-      return "first";
-    });
-    const second = gate.run(() => Promise.resolve("second"));
-    return Promise.all([first, second]);
-  })
-  .extend(
-    "runAfterFailure",
-    async (): Promise<{
-      readonly caught: Error | null;
-      readonly following: string;
-      readonly nextTaskCalls: readonly (readonly [])[];
-    }> => {
+describe("createSerialGate", () => {
+  const it = test
+    .extend("fifoCompletions", () => {
+      const gate = createSerialGate();
+      const slowRun = gate.run(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        return "first";
+      });
+      const quickRun = gate.run(() => Promise.resolve("second"));
+      return Promise.all([slowRun, quickRun]);
+    })
+    .extend("failedSettlements", () => {
+      const gate = createSerialGate();
+      return Promise.allSettled([gate.run(() => Promise.reject(new Error("first broke")))]);
+    })
+    .extend("settlementsAfterFailure", () => {
+      const gate = createSerialGate();
+      const failingRun = gate.run(() => Promise.reject(new Error("first broke")));
+      const followingRun = gate.run(() => Promise.resolve("done"));
+      return Promise.allSettled([failingRun, followingRun]);
+    })
+    .extend("nextTask", async () => {
       const gate = createSerialGate();
       const nextTask = vi.fn<() => Promise<string>>(() => Promise.resolve("done"));
-      const failing = gate.run(() => Promise.reject(new Error("first broke")));
-      const following = gate.run(nextTask);
-      try {
-        await failing;
-        return { caught: null, following: await following, nextTaskCalls: nextTask.mock.calls };
-      } catch (gateFailure) {
-        return {
-          caught: gateFailure instanceof Error ? gateFailure : null,
-          following: await following,
-          nextTaskCalls: nextTask.mock.calls,
-        };
-      }
-    },
-  )
-  .extend("sequentialCompletions", async () => {
-    const gate = createSerialGate();
-    const first = await gate.run(() => Promise.resolve("first"));
-    const second = await gate.run(() => Promise.resolve("second"));
-    return { first, second };
-  });
+      await Promise.allSettled([
+        gate.run(() => Promise.reject(new Error("first broke"))),
+        gate.run(nextTask),
+      ]);
+      return nextTask;
+    })
+    .extend("firstCompletion", () => {
+      const gate = createSerialGate();
+      return gate.run(() => Promise.resolve("first"));
+    })
+    .extend("secondCompletion", async () => {
+      const gate = createSerialGate();
+      await gate.run(() => Promise.resolve("first"));
+      return gate.run(() => Promise.resolve("second"));
+    });
 
-describe("createSerialGate", () => {
   it("処理を FIFO で 1 件ずつ流す", ({ fifoCompletions }) => {
     expect(fifoCompletions).toStrictEqual(["first", "second"]);
   });
 
-  it("処理の例外は呼び出し元へ伝わる", ({ runAfterFailure }) => {
-    expect(runAfterFailure.caught?.message).toStrictEqual("first broke");
+  it("処理の例外は呼び出し元へ伝わる", ({ failedSettlements }) => {
+    expect(failedSettlements).toStrictEqual([
+      { reason: new Error("first broke"), status: "rejected" },
+    ]);
   });
 
-  it("処理が例外で失敗しても次の待機者へ順番を渡す", ({ runAfterFailure }) => {
-    expect(runAfterFailure.following).toStrictEqual("done");
+  it("処理が例外で失敗しても次の待機者へ順番を渡す", ({ settlementsAfterFailure }) => {
+    expect(settlementsAfterFailure).toStrictEqual([
+      { reason: new Error("first broke"), status: "rejected" },
+      { status: "fulfilled", value: "done" },
+    ]);
   });
 
-  it("次の待機者はちょうど 1 回だけ呼ばれる", ({ runAfterFailure }) => {
-    expect(runAfterFailure.nextTaskCalls.length).toStrictEqual(1);
+  it("次の待機者はちょうど 1 回だけ呼ばれる", ({ nextTask }) => {
+    expect(nextTask).toHaveBeenCalledOnce();
   });
 
-  it("成功した処理の戻り値が返る", ({ sequentialCompletions }) => {
-    expect(sequentialCompletions.first).toStrictEqual("first");
+  it("成功した処理の戻り値が返る", ({ firstCompletion }) => {
+    expect(firstCompletion).toBe("first");
   });
 
-  it("成功した処理の後続も順番に流れる", ({ sequentialCompletions }) => {
-    expect(sequentialCompletions.second).toStrictEqual("second");
+  it("成功した処理の後続も順番に流れる", ({ secondCompletion }) => {
+    expect(secondCompletion).toBe("second");
   });
 });

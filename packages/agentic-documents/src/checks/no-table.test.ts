@@ -4,36 +4,59 @@ import { defaultConfig } from "../config.ts";
 import { toNormativeDocument } from "../scan/normative-documents.ts";
 import { tablesInNormativeDocument } from "./no-table.ts";
 
-const documentOf = (source: string) =>
-  toNormativeDocument({ file: "AGENTS.md", source, config: defaultConfig });
+const TABLE_MESSAGE =
+  "規範を表の行として書くことは禁止されている。各行を `IF: <条件>; THEN <キーワード>: <行動>` の項目に書き直す。規範ではない一覧であれば、規範文書の外へ移す。";
 
 describe("tablesInNormativeDocument", () => {
-  test("規範文書に置かれた表を報告する", () => {
-    const problems = tablesInNormativeDocument(
-      documentOf("| 条件 | 行動 |\n| --- | --- |\n| 開始する | 記録する |\n"),
-    );
+  describe("表を置いた規範文書", () => {
+    const it = test.extend("problems", () =>
+      tablesInNormativeDocument(
+        toNormativeDocument({
+          file: "AGENTS.md",
+          source: "| 条件 | 行動 |\n| --- | --- |\n| 開始する | 記録する |\n",
+          config: defaultConfig,
+        }),
+      ));
 
-    expect(problems.length).toStrictEqual(1);
+    it("表の始まる行を報告する", ({ problems }) => {
+      expect(problems).toStrictEqual([{ file: "AGENTS.md", line: 1, message: TABLE_MESSAGE }]);
+    });
   });
 
-  test("表を持たない文書では報告しない", () => {
-    const problems = tablesInNormativeDocument(
-      documentOf("# 規約\n\n- MUST: 開始する前に記録する\n"),
-    );
+  describe("表を持たない規範文書", () => {
+    const it = test.extend("problems", () =>
+      tablesInNormativeDocument(
+        toNormativeDocument({
+          file: "AGENTS.md",
+          source: "# 規約\n\n- MUST: 開始する前に記録する\n",
+          config: defaultConfig,
+        }),
+      ));
 
-    expect(problems).toStrictEqual([]);
+    it("何も報告しない", ({ problems }) => {
+      expect(problems).toStrictEqual([]);
+    });
   });
 
-  test("機械が書き込む領域の中の表は報告しない", () => {
-    const source = `${defaultConfig.generatedRegionBoundaries[0]?.begin ?? ""}
+  describe("機械が書き込む領域の中に置かれた表", () => {
+    const it = test.extend("problems", () =>
+      tablesInNormativeDocument(
+        toNormativeDocument({
+          file: "AGENTS.md",
+          source: `${defaultConfig.generatedRegionBoundaries[0]?.begin ?? ""}
 
 | 条件 | 行動 |
 | --- | --- |
 | 開始する | 記録する |
 
 ${defaultConfig.generatedRegionBoundaries[0]?.end ?? ""}
-`;
+`,
+          config: defaultConfig,
+        }),
+      ));
 
-    expect(tablesInNormativeDocument(documentOf(source))).toStrictEqual([]);
+    it("何も報告しない", ({ problems }) => {
+      expect(problems).toStrictEqual([]);
+    });
   });
 });

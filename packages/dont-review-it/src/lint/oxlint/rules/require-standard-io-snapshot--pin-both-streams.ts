@@ -1,4 +1,12 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
+import { isAssertionEntryReference } from "../lib/spec-syntax/assertion-entries.ts";
+import {
+  fixtureDeclarationsOf,
+  fixtureDependenciesOf,
+  type FixtureDeclaration,
+} from "../lib/spec-syntax/fixture-declarations.ts";
+import { unwrapSubject } from "../lib/spec-syntax/subject-expressions.ts";
 import { standardIoFixtureLocalNameOf } from "../lib/standard-io-fixture.ts";
 
 import type { ESTree } from "@oxlint/plugins";
@@ -6,6 +14,14 @@ import type { ESTree } from "@oxlint/plugins";
 const CAPTURED_STREAM_NAMES = ["stdout", "stderr"] as const;
 
 const SNAPSHOT_MATCHER_NAMES = new Set(["toMatchInlineSnapshot", "toMatchSnapshot"]);
+
+const rootIdentifierName = (expression: ESTree.Expression): string | null => {
+  const written = unwrapSubject(expression);
+  if (written.type === "Identifier") return written.name;
+  if (written.type === "MemberExpression") return rootIdentifierName(written.object);
+  if (written.type === "CallExpression") return rootIdentifierName(written.callee);
+  return null;
+};
 
 const calleeRootNameOf = (callee: ESTree.Expression): string | null => {
   if (callee.type === "Identifier") return callee.name;
@@ -29,19 +45,75 @@ const snapshotSubjectOf = (node: ESTree.CallExpression): ESTree.Expression | nul
   if (callee.type !== "MemberExpression" || callee.property.type !== "Identifier") return null;
   if (!SNAPSHOT_MATCHER_NAMES.has(callee.property.name)) return null;
   if (callee.object.type !== "CallExpression") return null;
-  if (callee.object.callee.type !== "Identifier" || callee.object.callee.name !== "expect") {
-    return null;
-  }
+  if (!isAssertionEntryReference(callee.object.callee)) return null;
   const [subject] = callee.object.arguments;
   if (subject === undefined || subject.type === "SpreadElement") return null;
   return subject;
 };
 
-const capturedTextStreamOf = (subject: ESTree.Expression): string | null => {
-  if (subject.type !== "MemberExpression" || subject.object.type !== "Identifier") return null;
-  if (subject.property.type !== "Identifier" || subject.property.name !== "text") return null;
-  const streamName = subject.object.name;
-  return (CAPTURED_STREAM_NAMES as readonly string[]).includes(streamName) ? streamName : null;
+const declaredDependencyNames = (declaration: FixtureDeclaration): readonly string[] => {
+  if (declaration.factory === null) return [];
+  return (fixtureDependenciesOf(declaration.factory) ?? []).map((dependency) => dependency.name);
+};
+
+const streamsReachedBy = (
+  reached: ReadonlyMap<string, ReadonlySet<string>>,
+  dependencies: ReadonlyMap<string, readonly string[]>,
+): ReadonlyMap<string, ReadonlySet<string>> => {
+  const grown = new Map(
+    [...dependencies].map(([fixtureName, declared]): readonly [string, ReadonlySet<string>] => [
+      fixtureName,
+      new Set(
+        declared.flatMap((dependency) => [
+          ...((CAPTURED_STREAM_NAMES as readonly string[]).includes(dependency)
+            ? [dependency]
+            : []),
+          ...(reached.get(dependency) ?? []),
+        ]),
+      ),
+    ]),
+  );
+
+  const settled = [...grown].every(
+    ([fixtureName, streams]) => streams.size === (reached.get(fixtureName)?.size ?? -1),
+  );
+  return settled ? grown : streamsReachedBy(grown, dependencies);
+};
+
+const streamsBehindNames = (program: ESTree.Program): ReadonlyMap<string, ReadonlySet<string>> => {
+  const declarations = nodesOfType(program, "CallExpression").flatMap((call) =>
+    fixtureDeclarationsOf(call),
+  );
+  const dependencies = new Map(
+    declarations.map((declaration): readonly [string, readonly string[]] => [
+      declaration.name,
+      declaredDependencyNames(declaration),
+    ]),
+  );
+  return streamsReachedBy(new Map(), dependencies);
+};
+
+const fixtureLocalNamesIn = (program: ESTree.Program): ReadonlySet<string> => {
+  const known = new Set(
+    nodesOfType(program, "ImportDeclaration").flatMap(
+      (node) => standardIoFixtureLocalNameOf(node) ?? [],
+    ),
+  );
+  const declarators = nodesOfType(program, "VariableDeclarator");
+  const grown = (reached: ReadonlySet<string>): ReadonlySet<string> => {
+    const gained = new Set([
+      ...reached,
+      ...declarators.flatMap((declarator) =>
+        declarator.id.type === "Identifier" &&
+        declarator.init !== null &&
+        isDerivedFromFixture(declarator.init, reached)
+          ? [declarator.id.name]
+          : [],
+      ),
+    ]);
+    return gained.size === reached.size ? reached : grown(gained);
+  };
+  return grown(known);
 };
 
 export const requireStandardIoSnapshot = createDontReviewItRule({
@@ -55,40 +127,41 @@ export const requireStandardIoSnapshot = createDontReviewItRule({
     },
     messages: {
       missingSnapshot:
-        "A spec that derives tests from `standardIoTest` must not leave `{{name}}` unpinned. Add a test asserting `expect({{name}}.text).toMatchInlineSnapshot()`.",
+        "A spec that derives tests from `standardIoTest` must not leave `{{name}}` unpinned. Add a test taking `{{name}}` as its subject and pinning it with `toMatchInlineSnapshot()`, or pin a fixture that reads from it.",
     },
     schema: [],
   },
-  create(context) {
-    const fixtureLocalNames = new Set<string>();
-    const fixtureCalls = new Set<ESTree.CallExpression>();
-    const snapshottedStreams = new Set<string>();
-
+  create(inspection) {
     return {
-      ImportDeclaration(node: ESTree.ImportDeclaration) {
-        const localName = standardIoFixtureLocalNameOf(node);
-        if (localName !== null) fixtureLocalNames.add(localName);
-      },
-      VariableDeclarator(node: ESTree.VariableDeclarator) {
-        if (node.id.type !== "Identifier" || node.init === null) return;
-        if (isDerivedFromFixture(node.init, fixtureLocalNames)) {
-          fixtureLocalNames.add(node.id.name);
-        }
-      },
-      CallExpression(node: ESTree.CallExpression) {
-        const rootName = calleeRootNameOf(node.callee);
-        if (rootName !== null && fixtureLocalNames.has(rootName)) fixtureCalls.add(node);
-        const subject = snapshotSubjectOf(node);
-        if (subject === null) return;
-        const streamName = capturedTextStreamOf(subject);
-        if (streamName !== null) snapshottedStreams.add(streamName);
-      },
-      "Program:exit"() {
-        const [firstFixtureCall] = fixtureCalls;
+      "Program:exit"(program: ESTree.Program) {
+        const fixtureLocalNames = fixtureLocalNamesIn(program);
+        const [firstFixtureCall] = nodesOfType(program, "CallExpression").filter((call) => {
+          const rootName = calleeRootNameOf(call.callee);
+          return rootName !== null && fixtureLocalNames.has(rootName);
+        });
         if (firstFixtureCall === undefined) return;
-        for (const name of CAPTURED_STREAM_NAMES) {
-          if (snapshottedStreams.has(name)) continue;
-          context.report({ node: firstFixtureCall, messageId: "missingSnapshot", data: { name } });
+
+        const behind = streamsBehindNames(program);
+        const pinnedNames = nodesOfType(program, "CallExpression").flatMap((call) => {
+          const subject = snapshotSubjectOf(call);
+          return subject === null ? [] : (rootIdentifierName(subject) ?? []);
+        });
+        const pinnedStreams = new Set(
+          pinnedNames.flatMap((pinnedName) => [
+            ...((CAPTURED_STREAM_NAMES as readonly string[]).includes(pinnedName)
+              ? [pinnedName]
+              : []),
+            ...(behind.get(pinnedName) ?? []),
+          ]),
+        );
+
+        for (const streamName of CAPTURED_STREAM_NAMES) {
+          if (pinnedStreams.has(streamName)) continue;
+          inspection.report({
+            node: firstFixtureCall,
+            messageId: "missingSnapshot",
+            data: { name: streamName },
+          });
         }
       },
     };

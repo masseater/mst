@@ -2,103 +2,26 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { sealEnvelope, unwrapEnvelope, unwrapPollResponse } from "./envelope.ts";
 
-const unwrapRejectionOf = (envelope: unknown): string => {
-  try {
-    unwrapEnvelope(envelope);
-    return "no rejection";
-  } catch (rejection) {
-    return rejection instanceof Error ? rejection.name : typeof rejection;
-  }
-};
-
-const pollRejectionOf = (response: unknown): string => {
-  try {
-    unwrapPollResponse(response);
-    return "no rejection";
-  } catch (rejection) {
-    return rejection instanceof Error ? rejection.name : typeof rejection;
-  }
-};
-
-const it = test
-  .extend("flattenedPayload", () =>
-    unwrapEnvelope(
-      sealEnvelope({
-        eventType: "pull_request",
-        deliveryId: "delivery-1",
-        payload: { action: "closed", pull_request: { number: 7 } },
-      }),
-    ))
-  .extend("metadataOverriddenPayload", () =>
-    unwrapEnvelope(
-      sealEnvelope({
-        eventType: "pull_request",
-        deliveryId: "delivery-1",
-        payload: { event_type: "spoofed", delivery_id: "spoofed" },
-      }),
-    ),
-  )
-  .extend("foreignSchemaVersionRejection", () =>
-    unwrapRejectionOf({
-      schema_version: 2,
-      event_type: "pull_request",
-      delivery_id: "d",
-      payload: {},
-    }),
-  )
-  .extend("schemaVersionLessRejection", () =>
-    unwrapRejectionOf({ event_type: "pull_request", delivery_id: "d", payload: {} }),
-  )
-  .extend("eventTypeLessRejection", () =>
-    unwrapRejectionOf({ schema_version: 1, delivery_id: "d", payload: {} }),
-  )
-  .extend("deliveryIdLessRejection", () =>
-    unwrapRejectionOf({ schema_version: 1, event_type: "pull_request", payload: {} }),
-  )
-  .extend("payloadLessRejection", () =>
-    unwrapRejectionOf({ schema_version: 1, event_type: "pull_request", delivery_id: "d" }),
-  )
-  .extend("arrayPayloadRejection", () =>
-    unwrapRejectionOf({
-      schema_version: 1,
-      event_type: "pull_request",
-      delivery_id: "d",
-      payload: [],
-    }),
-  )
-  .extend("nullEnvelopeRejection", () => unwrapRejectionOf(null))
-  .extend("unwrappedPollEvents", () =>
-    unwrapPollResponse({
-      events: [
-        sealEnvelope({
-          eventType: "pull_request",
-          deliveryId: "delivery-1",
-          payload: { action: "closed" },
-        }),
-        sealEnvelope({
-          eventType: "check_suite",
-          deliveryId: "delivery-2",
-          payload: { action: "completed" },
-        }),
-      ],
-    }),
-  )
-  .extend("emptyPollEvents", () => unwrapPollResponse({ events: [] }))
-  .extend("nonArrayEventsRejection", () => pollRejectionOf({ events: "none" }))
-  .extend("taintedPollRejection", () =>
-    pollRejectionOf({
-      events: [
-        sealEnvelope({
-          eventType: "pull_request",
-          deliveryId: "delivery-1",
-          payload: { action: "closed" },
-        }),
-        { schema_version: 2, event_type: "pull_request", delivery_id: "d", payload: {} },
-      ],
-    }),
-  );
-
 describe("sealEnvelope と unwrapEnvelope", () => {
+  const it = test
+    .extend("flattenedPayload", () =>
+      unwrapEnvelope(
+        sealEnvelope({
+          eventType: "pull_request",
+          deliveryId: "delivery-1",
+          payload: { action: "closed", pull_request: { number: 7 } },
+        }),
+      ))
+    .extend("metadataOverriddenPayload", () =>
+      unwrapEnvelope(
+        sealEnvelope({
+          eventType: "pull_request",
+          deliveryId: "delivery-1",
+          payload: { event_type: "spoofed", delivery_id: "spoofed" },
+        }),
+      ),
+    );
+
   it("封筒に包んで展開すると payload が平坦化され封筒メタデータが合成される", ({
     flattenedPayload,
   }) => {
@@ -119,6 +42,74 @@ describe("sealEnvelope と unwrapEnvelope", () => {
 });
 
 describe("unwrapEnvelope の拒否", () => {
+  const it = test
+    .extend("foreignSchemaVersionRejection", () => {
+      try {
+        unwrapEnvelope({
+          schema_version: 2,
+          event_type: "pull_request",
+          delivery_id: "d",
+          payload: {},
+        });
+      } catch (rejection) {
+        return rejection instanceof Error ? rejection.name : typeof rejection;
+      }
+      throw new Error("展開が拒否されなかった");
+    })
+    .extend("schemaVersionLessRejection", () => {
+      try {
+        unwrapEnvelope({ event_type: "pull_request", delivery_id: "d", payload: {} });
+      } catch (rejection) {
+        return rejection instanceof Error ? rejection.name : typeof rejection;
+      }
+      throw new Error("展開が拒否されなかった");
+    })
+    .extend("eventTypeLessRejection", () => {
+      try {
+        unwrapEnvelope({ schema_version: 1, delivery_id: "d", payload: {} });
+      } catch (rejection) {
+        return rejection instanceof Error ? rejection.name : typeof rejection;
+      }
+      throw new Error("展開が拒否されなかった");
+    })
+    .extend("deliveryIdLessRejection", () => {
+      try {
+        unwrapEnvelope({ schema_version: 1, event_type: "pull_request", payload: {} });
+      } catch (rejection) {
+        return rejection instanceof Error ? rejection.name : typeof rejection;
+      }
+      throw new Error("展開が拒否されなかった");
+    })
+    .extend("payloadLessRejection", () => {
+      try {
+        unwrapEnvelope({ schema_version: 1, event_type: "pull_request", delivery_id: "d" });
+      } catch (rejection) {
+        return rejection instanceof Error ? rejection.name : typeof rejection;
+      }
+      throw new Error("展開が拒否されなかった");
+    })
+    .extend("arrayPayloadRejection", () => {
+      try {
+        unwrapEnvelope({
+          schema_version: 1,
+          event_type: "pull_request",
+          delivery_id: "d",
+          payload: [],
+        });
+      } catch (rejection) {
+        return rejection instanceof Error ? rejection.name : typeof rejection;
+      }
+      throw new Error("展開が拒否されなかった");
+    })
+    .extend("nullEnvelopeRejection", () => {
+      try {
+        unwrapEnvelope(null);
+      } catch (rejection) {
+        return rejection instanceof Error ? rejection.name : typeof rejection;
+      }
+      throw new Error("展開が拒否されなかった");
+    });
+
   it("schema_version が別の値なら拒否する", ({ foreignSchemaVersionRejection }) => {
     expect(foreignSchemaVersionRejection).toStrictEqual("InvalidEnvelopeError");
   });
@@ -149,6 +140,49 @@ describe("unwrapEnvelope の拒否", () => {
 });
 
 describe("unwrapPollResponse", () => {
+  const it = test
+    .extend("unwrappedPollEvents", () =>
+      unwrapPollResponse({
+        events: [
+          sealEnvelope({
+            eventType: "pull_request",
+            deliveryId: "delivery-1",
+            payload: { action: "closed" },
+          }),
+          sealEnvelope({
+            eventType: "check_suite",
+            deliveryId: "delivery-2",
+            payload: { action: "completed" },
+          }),
+        ],
+      }))
+    .extend("emptyPollEvents", () => unwrapPollResponse({ events: [] }))
+    .extend("nonArrayEventsRejection", () => {
+      try {
+        unwrapPollResponse({ events: "none" });
+      } catch (rejection) {
+        return rejection instanceof Error ? rejection.name : typeof rejection;
+      }
+      throw new Error("展開が拒否されなかった");
+    })
+    .extend("taintedPollRejection", () => {
+      try {
+        unwrapPollResponse({
+          events: [
+            sealEnvelope({
+              eventType: "pull_request",
+              deliveryId: "delivery-1",
+              payload: { action: "closed" },
+            }),
+            { schema_version: 2, event_type: "pull_request", delivery_id: "d", payload: {} },
+          ],
+        });
+      } catch (rejection) {
+        return rejection instanceof Error ? rejection.name : typeof rejection;
+      }
+      throw new Error("展開が拒否されなかった");
+    });
+
   it("複数の封筒を全て展開して返す", ({ unwrappedPollEvents }) => {
     expect(unwrappedPollEvents).toStrictEqual([
       { action: "closed", event_type: "pull_request", delivery_id: "delivery-1" },

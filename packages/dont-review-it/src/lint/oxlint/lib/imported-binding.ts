@@ -18,31 +18,28 @@ export const newBinding = (): ImportedBinding => ({
 export const importedNameOf = (specifier: ESTree.ImportSpecifier): string =>
   specifier.imported.type === "Literal" ? specifier.imported.value : specifier.imported.name;
 
-export const collectBinding = (node: ESTree.ImportDeclaration, target: ImportedTarget): void => {
+export const collectBinding = (node: ESTree.ImportDeclaration, checked: ImportedTarget): void => {
   if (node.importKind === "type") return;
   for (const specifier of node.specifiers) {
     if (specifier.type === "ImportNamespaceSpecifier") {
-      target.binding.namespaceNames.add(specifier.local.name);
+      checked.binding.namespaceNames.add(specifier.local.name);
       continue;
     }
     if (specifier.type !== "ImportSpecifier") continue;
     if (specifier.importKind === "type") continue;
-    if (importedNameOf(specifier) !== target.exportedName) continue;
-    target.binding.directNames.add(specifier.local.name);
+    if (importedNameOf(specifier) !== checked.exportedName) continue;
+    checked.binding.directNames.add(specifier.local.name);
   }
 };
 
-export const isReferenceOf = (reference: ESTree.Expression, target: ImportedTarget): boolean => {
-  if (reference.type === "Identifier") return target.binding.directNames.has(reference.name);
-  if (reference.type !== "MemberExpression" || reference.computed) return false;
-  if (reference.object.type !== "Identifier" || reference.property.type !== "Identifier") {
+export const isReferenceTo = (expression: ESTree.Expression, checked: ImportedTarget): boolean => {
+  if (expression.type === "Identifier") return checked.binding.directNames.has(expression.name);
+  if (expression.type !== "MemberExpression" || expression.computed) return false;
+  if (expression.object.type !== "Identifier" || expression.property.type !== "Identifier") {
     return false;
   }
   return (
-    target.binding.namespaceNames.has(reference.object.name) &&
-    reference.property.name === target.exportedName
+    checked.binding.namespaceNames.has(expression.object.name) &&
+    expression.property.name === checked.exportedName
   );
 };
-
-export const isCallOf = (callee: ESTree.Expression, target: ImportedTarget): boolean =>
-  isReferenceOf(callee, target);

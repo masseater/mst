@@ -17,13 +17,13 @@ const noticesOf = (rule: LintRuleFacts): string =>
     .filter((symbol) => symbol !== "")
     .join(" ");
 
-const escapePipes = (text: string): string => text.replaceAll("|", String.raw`\|`);
+const escapePipes = (writtenText: string): string => writtenText.replaceAll("|", String.raw`\|`);
 
 const rowOf = (rule: LintRuleFacts): string =>
   `| [${rule.name}](./${rule.name}.md) | ${escapePipes(rule.description)} | ${toolOf(rule.sourcePath)} | ${noticesOf(rule)} |`;
 
 export const renderRuleIndex = (rules: readonly LintRuleFacts[]): string => {
-  const sorted = rules.toSorted((left, right) => left.name.localeCompare(right.name));
-  const table = [TABLE_HEAD, ...sorted.map(rowOf)].join("\n");
-  return sorted.some((rule) => noticesOf(rule) !== "") ? `${table}\n\n${NOTICE_LEGEND}` : table;
+  const sortedOnes = rules.toSorted((left, right) => left.name.localeCompare(right.name));
+  const table = [TABLE_HEAD, ...sortedOnes.map(rowOf)].join("\n");
+  return sortedOnes.some((rule) => noticesOf(rule) !== "") ? `${table}\n\n${NOTICE_LEGEND}` : table;
 };

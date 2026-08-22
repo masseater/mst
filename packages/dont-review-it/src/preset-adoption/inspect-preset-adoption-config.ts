@@ -7,13 +7,11 @@ import {
 } from "../lint/oxlint/lib/imported-binding.ts";
 import { unwrapTransparentExpression } from "../lint/oxlint/lib/transparent-expression.ts";
 import { inspectRuleBlock } from "./disabled-rule-declarations.ts";
-import { problemAt } from "./inspection-problem.ts";
+import { lineAt, problemAt } from "./inspection-problem.ts";
 import { inspectionProgramOf } from "./inspection-program.ts";
 import { inspectOverrides } from "./override-declarations.ts";
-import { presetAdoptionProblems } from "./preset-reference.ts";
 import {
-  allValueImportBindingsIn,
-  objectPassedDirectlyTo,
+  objectPassedDirectlyToMember,
   staticDefaultExportedConfig,
 } from "./static-import-reference.ts";
 import { staticPropertyAt, uninspectableObjectProblem } from "./static-object-property.ts";
@@ -32,43 +30,48 @@ const parsedProgram = ({
   readonly program: ESTree.Program | null;
   readonly problems: PresetAdoptionInspection["problems"];
 } => {
-  const parsed = parseSync(config.toolchainConfigFileName, source, { preserveParens: false });
-  const [parseError] = parsed.errors;
+  const parsedConfig = parseSync(config.toolchainConfigFileName, source, { preserveParens: false });
+  const [parseError] = parsedConfig.errors;
   if (parseError !== undefined) {
     return {
       program: null,
       problems: [
         problemAt({
           source,
-          start: Math.min(source.length, ...parseError.labels.map((label) => label.start)),
+          start: Math.min(
+            source.length,
+            ...parseError.labels.map((parseLabel) => parseLabel.start),
+          ),
           config,
           message: `The toolchain configuration must parse before preset adoption can be inspected: ${parseError.message}`,
         }),
       ],
     };
   }
-  return inspectionProgramOf({ held: parsed.program, source, config });
+  return inspectionProgramOf({ held: parsedConfig.program, source, config });
 };
 
 const collectImportedTargets = ({
   statement,
   preset,
-  wrapper,
   factory,
+  severityConstant,
   config,
 }: {
   readonly statement: ESTree.ImportDeclaration;
   readonly preset: ImportedTarget;
-  readonly wrapper: ImportedTarget;
   readonly factory: ImportedTarget;
+  readonly severityConstant: ImportedTarget;
   readonly config: PresetAdoptionConfig;
 }): void => {
   if (statement.source.value === config.presetModuleSpecifier) {
     collectBinding(statement, preset);
-    collectBinding(statement, wrapper);
   }
   if (statement.source.value === config.toolchainModuleSpecifier) {
     collectBinding(statement, factory);
+  }
+  if (statement.source.value === config.severityModuleSpecifier) {
+    collectBinding(statement, severityConstant);
   }
 };
 
@@ -80,27 +83,29 @@ const importedTargetsIn = ({
   readonly config: PresetAdoptionConfig;
 }): {
   readonly preset: ImportedTarget;
-  readonly wrapper: ImportedTarget;
   readonly factory: ImportedTarget;
+  readonly severityConstant: ImportedTarget;
 } => {
   const preset = { exportedName: config.presetExportName, binding: newBinding() };
-  const wrapper = { exportedName: config.lintWrapperExportName, binding: newBinding() };
   const factory = { exportedName: config.configFactoryExportName, binding: newBinding() };
+  const severityConstant = { exportedName: config.severityExportName, binding: newBinding() };
   for (const statement of program.body) {
     if (statement.type !== "ImportDeclaration") continue;
-    collectImportedTargets({ statement, preset, wrapper, factory, config });
+    collectImportedTargets({ statement, preset, factory, severityConstant, config });
   }
-  return { preset, wrapper, factory };
+  return { preset, factory, severityConstant };
 };
 
 const inspectOptionalRules = ({
   lint,
   source,
   config,
+  severityConstant,
 }: {
   readonly lint: ESTree.ObjectExpression;
   readonly source: string;
   readonly config: PresetAdoptionConfig;
+  readonly severityConstant: ImportedTarget;
 }): RuleBlockInspection => {
   const rules = staticPropertyAt({
     object: lint,
@@ -110,7 +115,12 @@ const inspectOptionalRules = ({
     subject: "The root lint configuration",
   });
   if (rules.kind === "present") {
-    return inspectRuleBlock({ written: rules.property.value, source, config });
+    return inspectRuleBlock({
+      written: rules.property.value,
+      source,
+      config,
+      severityConstant,
+    });
   }
   return {
     disabledDeclarations: [],
@@ -122,10 +132,12 @@ const inspectOptionalOverrides = ({
   lint,
   source,
   config,
+  severityConstant,
 }: {
   readonly lint: ESTree.ObjectExpression;
   readonly source: string;
   readonly config: PresetAdoptionConfig;
+  readonly severityConstant: ImportedTarget;
 }): PresetAdoptionInspection => {
   const overrides = staticPropertyAt({
     object: lint,
@@ -135,7 +147,12 @@ const inspectOptionalOverrides = ({
     subject: "The root lint configuration",
   });
   if (overrides.kind === "present") {
-    return inspectOverrides({ written: overrides.property.value, source, config });
+    return inspectOverrides({
+      written: overrides.property.value,
+      source,
+      config,
+      severityConstant,
+    });
   }
   return {
     disabledDeclarations: [],
@@ -143,18 +160,146 @@ const inspectOptionalOverrides = ({
   };
 };
 
-const inspectLint = ({
+const inspectCallerExtends = ({
   lint,
   source,
   config,
-  preset,
-  program,
 }: {
   readonly lint: ESTree.ObjectExpression;
   readonly source: string;
   readonly config: PresetAdoptionConfig;
-  readonly preset: ImportedTarget;
-  readonly program: ESTree.Program;
+}): PresetAdoptionInspection["problems"] => {
+  const extended = staticPropertyAt({
+    object: lint,
+    key: config.extendsFieldName,
+    source,
+    config,
+    subject: "The root lint configuration",
+  });
+  if (extended.kind === "missing") return [];
+  if (extended.kind === "problem") return [extended.problem];
+  return [
+    problemAt({
+      source,
+      start: extended.property.start,
+      config,
+      message: `The root lint configuration must not declare ${config.extendsFieldName}; pass additions directly so preset rules cannot be weakened by an opaque extended override.`,
+    }),
+  ];
+};
+
+const isStringPatternLiteral = (
+  candidate: ESTree.ArrayExpression["elements"][number],
+): candidate is Extract<ESTree.Expression, { readonly type: "Literal" }> & {
+  readonly value: string;
+} => candidate?.type === "Literal" && typeof candidate.value === "string";
+
+const inspectWrittenIgnorePatterns = ({
+  written,
+  propertyStart,
+  source,
+  config,
+}: {
+  readonly written: ESTree.Expression;
+  readonly propertyStart: number;
+  readonly source: string;
+  readonly config: PresetAdoptionConfig;
+}): Pick<PresetAdoptionInspection, "ignorePatterns" | "problems"> => {
+  const unwrapped = unwrapTransparentExpression(written);
+  if (unwrapped.type !== "ArrayExpression") {
+    return {
+      problems: [
+        problemAt({
+          source,
+          start: unwrapped.start,
+          config,
+          message: `The root lint.${config.ignorePatternsFieldName} value must be a literal array so lint reach can be proven.`,
+        }),
+      ],
+    };
+  }
+  const unreadableEntry = unwrapped.elements.find(
+    (candidate) => !isStringPatternLiteral(candidate),
+  );
+  if (unreadableEntry !== undefined) {
+    return {
+      problems: [
+        problemAt({
+          source,
+          start: unreadableEntry?.start ?? unwrapped.start,
+          config,
+          message: `Every root lint.${config.ignorePatternsFieldName} entry must be a string literal so lint reach can be proven.`,
+        }),
+      ],
+    };
+  }
+  const controlCharacterEntry = unwrapped.elements
+    .filter(isStringPatternLiteral)
+    .find(
+      (candidate) =>
+        candidate.value.includes("\0") ||
+        candidate.value.includes("\n") ||
+        candidate.value.includes("\r"),
+    );
+  if (controlCharacterEntry !== undefined) {
+    return {
+      problems: [
+        problemAt({
+          source,
+          start: controlCharacterEntry.start,
+          config,
+          message: `Every root lint.${config.ignorePatternsFieldName} entry must be one Git ignore pattern without NUL, carriage return, or line feed characters.`,
+        }),
+      ],
+    };
+  }
+  return {
+    ignorePatterns: {
+      line: lineAt({ source, start: propertyStart }),
+      patterns: unwrapped.elements
+        .filter(isStringPatternLiteral)
+        .map((patternLiteral) => patternLiteral.value),
+    },
+    problems: [],
+  };
+};
+
+const inspectOptionalIgnorePatterns = ({
+  lint,
+  source,
+  config,
+}: {
+  readonly lint: ESTree.ObjectExpression;
+  readonly source: string;
+  readonly config: PresetAdoptionConfig;
+}): Pick<PresetAdoptionInspection, "ignorePatterns" | "problems"> => {
+  const ignored = staticPropertyAt({
+    object: lint,
+    key: config.ignorePatternsFieldName,
+    source,
+    config,
+    subject: "The root lint configuration",
+  });
+  if (ignored.kind === "missing") return { problems: [] };
+  if (ignored.kind === "problem") return { problems: [ignored.problem] };
+  return inspectWrittenIgnorePatterns({
+    written: ignored.property.value,
+    propertyStart: ignored.property.start,
+    source,
+    config,
+  });
+};
+
+const inspectLint = ({
+  lint,
+  source,
+  config,
+  severityConstant,
+}: {
+  readonly lint: ESTree.ObjectExpression;
+  readonly source: string;
+  readonly config: PresetAdoptionConfig;
+  readonly severityConstant: ImportedTarget;
 }): PresetAdoptionInspection => {
   const uninspectable = uninspectableObjectProblem({
     object: lint,
@@ -165,15 +310,10 @@ const inspectLint = ({
   if (uninspectable !== null) {
     return { disabledDeclarations: [], problems: [uninspectable] };
   }
-  const adoptionProblems = presetAdoptionProblems({
-    lint,
-    source,
-    config,
-    preset,
-    valueImports: allValueImportBindingsIn(program),
-  });
-  const rules = inspectOptionalRules({ lint, source, config });
-  const overrides = inspectOptionalOverrides({ lint, source, config });
+  const rules = inspectOptionalRules({ lint, source, config, severityConstant });
+  const overrides = inspectOptionalOverrides({ lint, source, config, severityConstant });
+  const callerExtendsProblems = inspectCallerExtends({ lint, source, config });
+  const ignored = inspectOptionalIgnorePatterns({ lint, source, config });
   return {
     disabledDeclarations: [
       ...rules.disabledDeclarations.map((declaration) => ({
@@ -184,24 +324,28 @@ const inspectLint = ({
       })),
       ...overrides.disabledDeclarations,
     ],
-    problems: [...adoptionProblems, ...rules.problems, ...overrides.problems],
+    ...(ignored.ignorePatterns === undefined ? {} : { ignorePatterns: ignored.ignorePatterns }),
+    problems: [
+      ...rules.problems,
+      ...overrides.problems,
+      ...callerExtendsProblems,
+      ...ignored.problems,
+    ],
   };
 };
 
 const inspectConfiguredObject = ({
   configured,
-  program,
   source,
   config,
   preset,
-  wrapper,
+  severityConstant,
 }: {
   readonly configured: ESTree.ObjectExpression;
-  readonly program: ESTree.Program;
   readonly source: string;
   readonly config: PresetAdoptionConfig;
   readonly preset: ImportedTarget;
-  readonly wrapper: ImportedTarget;
+  readonly severityConstant: ImportedTarget;
 }): PresetAdoptionInspection => {
   const lintProperty = staticPropertyAt({
     object: configured,
@@ -221,17 +365,18 @@ const inspectConfiguredObject = ({
           source,
           start: configured.start,
           config,
-          message: `The root toolchain configuration must declare a ${config.lintFieldName} block that directly adopts ${config.presetModuleSpecifier}'s ${config.presetExportName} preset.`,
+          message: `The root toolchain configuration must declare a ${config.lintFieldName} block that directly calls ${config.presetModuleSpecifier}'s statically imported ${config.presetExportName}.${config.presetLintFunctionName} function.`,
         }),
       ],
     };
   }
   const written = unwrapTransparentExpression(lintProperty.property.value);
-  const lint =
-    written.type === "ObjectExpression"
-      ? written
-      : objectPassedDirectlyTo({ expression: written, target: wrapper });
-  if (lint !== null) return inspectLint({ lint, source, config, preset, program });
+  const lint = objectPassedDirectlyToMember({
+    expression: written,
+    target: preset,
+    memberName: config.presetLintFunctionName,
+  });
+  if (lint !== null) return inspectLint({ lint, source, config, severityConstant });
   return {
     disabledDeclarations: [],
     problems: [
@@ -239,7 +384,7 @@ const inspectConfiguredObject = ({
         source,
         start: written.start,
         config,
-        message: `The root lint block must be an object literal or one object literal passed directly to ${config.lintWrapperExportName} statically imported from ${config.presetModuleSpecifier}.`,
+        message: `The root lint block must be exactly one direct call to ${config.presetExportName}.${config.presetLintFunctionName} through a value import from ${config.presetModuleSpecifier}, with one object literal argument.`,
       }),
     ],
   };
@@ -252,21 +397,22 @@ export const inspectPresetAdoptionConfig = ({
   readonly source: string;
   readonly config: PresetAdoptionConfig;
 }): PresetAdoptionInspection => {
-  const parsed = parsedProgram({ source, config });
-  if (parsed.program === null) return { disabledDeclarations: [], problems: parsed.problems };
-  const targets = importedTargetsIn({ program: parsed.program, config });
+  const inspectedProgram = parsedProgram({ source, config });
+  if (inspectedProgram.program === null) {
+    return { disabledDeclarations: [], problems: inspectedProgram.problems };
+  }
+  const importedTargets = importedTargetsIn({ program: inspectedProgram.program, config });
   const configured = staticDefaultExportedConfig({
-    program: parsed.program,
-    factory: targets.factory,
+    program: inspectedProgram.program,
+    factory: importedTargets.factory,
   });
   if (configured !== null) {
     return inspectConfiguredObject({
       configured,
-      program: parsed.program,
       source,
       config,
-      preset: targets.preset,
-      wrapper: targets.wrapper,
+      preset: importedTargets.preset,
+      severityConstant: importedTargets.severityConstant,
     });
   }
   return {

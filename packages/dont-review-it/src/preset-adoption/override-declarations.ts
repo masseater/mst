@@ -5,6 +5,7 @@ import { staticPropertyAt } from "./static-object-property.ts";
 
 import type { RepositoryProblem } from "@mst/repository-checks";
 import type { ESTree } from "@oxlint/plugins";
+import type { ImportedTarget } from "../lint/oxlint/lib/imported-binding.ts";
 import type { PresetAdoptionConfig } from "./config.ts";
 import type { PresetAdoptionInspection } from "./inspection-types.ts";
 
@@ -64,17 +65,17 @@ const literalPatternsIn = ({
     readonly patterns: readonly string[];
     readonly problems: readonly RepositoryProblem[];
   }>(
-    (inspection, element) => {
+    (inspection, patternEntry) => {
       if (inspection.problems.length > 0) return inspection;
-      if (element?.type === "Literal" && typeof element.value === "string") {
-        return { patterns: [...inspection.patterns, element.value], problems: [] };
+      if (patternEntry?.type === "Literal" && typeof patternEntry.value === "string") {
+        return { patterns: [...inspection.patterns, patternEntry.value], problems: [] };
       }
       return {
         patterns: [],
         problems: [
           problemAt({
             source,
-            start: element?.start ?? unwrapped.start,
+            start: patternEntry?.start ?? unwrapped.start,
             config,
             message: `Every ${key} entry on an override containing a disabled preset rule must be a string literal.`,
           }),
@@ -116,10 +117,12 @@ const inspectOverrideObject = ({
   override,
   source,
   config,
+  severityConstant,
 }: {
   readonly override: ESTree.ObjectExpression;
   readonly source: string;
   readonly config: PresetAdoptionConfig;
+  readonly severityConstant: ImportedTarget;
 }): PresetAdoptionInspection => {
   const rules = staticPropertyAt({
     object: override,
@@ -130,7 +133,12 @@ const inspectOverrideObject = ({
   });
   if (rules.kind === "missing") return { disabledDeclarations: [], problems: [] };
   if (rules.kind === "problem") return { disabledDeclarations: [], problems: [rules.problem] };
-  const inspectedRules = inspectRuleBlock({ written: rules.property.value, source, config });
+  const inspectedRules = inspectRuleBlock({
+    written: rules.property.value,
+    source,
+    config,
+    severityConstant,
+  });
   if (inspectedRules.disabledDeclarations.length === 0) {
     return { disabledDeclarations: [], problems: inspectedRules.problems };
   }
@@ -180,11 +188,13 @@ const inspectOverrideElement = ({
   array,
   source,
   config,
+  severityConstant,
 }: {
   readonly element: ESTree.ArrayExpression["elements"][number];
   readonly array: ESTree.ArrayExpression;
   readonly source: string;
   readonly config: PresetAdoptionConfig;
+  readonly severityConstant: ImportedTarget;
 }): PresetAdoptionInspection => {
   if (element === null || element.type === "SpreadElement") {
     return invalidOverride({
@@ -196,7 +206,7 @@ const inspectOverrideElement = ({
   }
   const override = unwrapTransparentExpression(element);
   return override.type === "ObjectExpression"
-    ? inspectOverrideObject({ override, source, config })
+    ? inspectOverrideObject({ override, source, config, severityConstant })
     : invalidOverride({
         start: override.start,
         source,
@@ -216,10 +226,12 @@ export const inspectOverrides = ({
   written,
   source,
   config,
+  severityConstant,
 }: {
   readonly written: ESTree.Expression;
   readonly source: string;
   readonly config: PresetAdoptionConfig;
+  readonly severityConstant: ImportedTarget;
 }): PresetAdoptionInspection => {
   const unwrapped = unwrapTransparentExpression(written);
   if (unwrapped.type !== "ArrayExpression") {
@@ -231,8 +243,14 @@ export const inspectOverrides = ({
     });
   }
   return mergeInspections(
-    unwrapped.elements.map((element) =>
-      inspectOverrideElement({ element, array: unwrapped, source, config }),
+    unwrapped.elements.map((overrideEntry) =>
+      inspectOverrideElement({
+        element: overrideEntry,
+        array: unwrapped,
+        source,
+        config,
+        severityConstant,
+      }),
     ),
   );
 };

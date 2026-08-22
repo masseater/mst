@@ -48,19 +48,20 @@ const violationMessagesIn = (command: string, scriptName: string): readonly stri
     ): resolution is Extract<CommandResolution, { readonly kind: "test" | "unresolved-test" }> =>
       resolution.kind === "test" || resolution.kind === "unresolved-test",
   );
-  const messages = testCommands.flatMap((resolution) => {
+  const argumentViolationMessages = testCommands.flatMap((resolution) => {
     const arguments_ = resolution.arguments ?? [];
     const config = arguments_.some(
-      (option) => CONFIG_OPTIONS.has(option) || /^(?:--config|-c)=/u.test(option),
+      (runnerArgument) =>
+        CONFIG_OPTIONS.has(runnerArgument) || /^(?:--config|-c)=/u.test(runnerArgument),
     );
     const coverage = arguments_.some(
-      (option, index) =>
-        option === "--no-coverage" ||
-        option === "--changed" ||
-        option.startsWith("--changed=") ||
-        option.startsWith("--coverage.") ||
-        option.startsWith("--coverage=") ||
-        (option === "--coverage" && BOOLEAN_OPTION_VALUES.has(arguments_[index + 1] ?? "")),
+      (runnerArgument, index) =>
+        runnerArgument === "--no-coverage" ||
+        runnerArgument === "--changed" ||
+        runnerArgument.startsWith("--changed=") ||
+        runnerArgument.startsWith("--coverage.") ||
+        runnerArgument.startsWith("--coverage=") ||
+        (runnerArgument === "--coverage" && BOOLEAN_OPTION_VALUES.has(arguments_[index + 1] ?? "")),
     );
     const runnerArguments =
       arguments_.length > 1 || (arguments_.length === 1 && arguments_[0] !== "--coverage");
@@ -68,11 +69,13 @@ const violationMessagesIn = (command: string, scriptName: string): readonly stri
       config ? configMessageFor(scriptName) : null,
       coverage ? coverageMessageFor(scriptName) : null,
       !config && !coverage && runnerArguments ? runnerArgumentMessageFor(scriptName) : null,
-    ].filter((message): message is string => message !== null);
+    ].filter((violationMessage): violationMessage is string => violationMessage !== null);
   });
   const [onlyResolution] = resolutions;
   const uninspectable = resolutions.length !== 1 || onlyResolution?.kind !== "test";
-  return uninspectable ? [...messages, uninspectableMessageFor(scriptName)] : messages;
+  return uninspectable
+    ? [...argumentViolationMessages, uninspectableMessageFor(scriptName)]
+    : argumentViolationMessages;
 };
 
 const packagePatternsIn = (source: string): readonly string[] | null => {
@@ -83,10 +86,10 @@ const packagePatternsIn = (source: string): readonly string[] | null => {
   return definition?.packagePatterns ?? null;
 };
 
-const problemFor = (relativePath: string, message: string): RepositoryProblem => ({
+const problemFor = (relativePath: string, problemMessage: string): RepositoryProblem => ({
   file: relativePath,
   line: null,
-  message,
+  message: problemMessage,
 });
 
 const ownsTestConfig = ({
@@ -121,7 +124,9 @@ const problemsForManifest = ({
   const rootGuardProblems =
     relativePath === rootManifestFileName &&
     (Object.hasOwn(scripts, "guard") || Object.hasOwn(scripts, "guard:all"))
-      ? rootTestInvocationMessagesIn(scripts).map((message) => problemFor(relativePath, message))
+      ? rootTestInvocationMessagesIn(scripts).map((guardMessage) =>
+          problemFor(relativePath, guardMessage),
+        )
       : [];
   const coverageTarget = ownsTestConfig({
     repositoryRoot,
@@ -140,7 +145,9 @@ const problemsForManifest = ({
     return [
       ...rootGuardProblems,
       ...lifecycleProblems,
-      ...violationMessagesIn(testEntry, "test").map((message) => problemFor(relativePath, message)),
+      ...violationMessagesIn(testEntry, "test").map((violationMessage) =>
+        problemFor(relativePath, violationMessage),
+      ),
     ];
   }
   if (!coverageTarget) return [...rootGuardProblems, ...lifecycleProblems];

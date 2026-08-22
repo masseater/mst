@@ -1,43 +1,120 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { defaultWorkflowChecksConfig } from "../config.ts";
 import { parseWorkflowDocument } from "../workflow-document.ts";
 import { reusableWorkflowTriggers } from "./reusable-workflow-trigger.ts";
 
-const config = defaultWorkflowChecksConfig;
-
-const problemsFor = (source: string) =>
-  reusableWorkflowTriggers({
-    document: parseWorkflowDocument({ relativePath: ".github/workflows/ci.yml", source }),
-    config,
-  });
+const OWNED_PUSH = `A part that other workflows call must not own a trigger of its own, because the permissions and the concurrency it declares then apply to runs no caller asked for. Drop push from this file, and leave the start to the workflow that calls it.`;
 
 describe("reusableWorkflowTriggers", () => {
-  it("reports a callable part that also starts itself", () => {
-    expect(problemsFor("on:\n  workflow_call:\n  push:\n")[0]?.message).toContain("push");
+  describe("a callable part that also starts itself", () => {
+    const it = test.extend("problems", () =>
+      reusableWorkflowTriggers({
+        document: parseWorkflowDocument({
+          relativePath: ".github/workflows/ci.yml",
+          source: "on:\n  workflow_call:\n  push:\n",
+        }),
+        config: defaultWorkflowChecksConfig,
+      }));
+
+    it("is reported with the trigger it owns named in the message", ({ problems }) => {
+      expect(problems).toStrictEqual([
+        { file: ".github/workflows/ci.yml", line: 2, message: OWNED_PUSH },
+      ]);
+    });
   });
 
-  it("leaves a part that only ever starts from its caller alone", () => {
-    expect(problemsFor("on:\n  workflow_call:\n")).toStrictEqual([]);
+  describe("a part that only ever starts from its caller", () => {
+    const it = test.extend("problems", () =>
+      reusableWorkflowTriggers({
+        document: parseWorkflowDocument({
+          relativePath: ".github/workflows/ci.yml",
+          source: "on:\n  workflow_call:\n",
+        }),
+        config: defaultWorkflowChecksConfig,
+      }));
+
+    it("is left alone", ({ problems }) => {
+      expect(problems).toStrictEqual([]);
+    });
   });
 
-  it("leaves a workflow that is not callable alone", () => {
-    expect(problemsFor("on:\n  push:\n")).toStrictEqual([]);
+  describe("a workflow that is not callable", () => {
+    const it = test.extend("problems", () =>
+      reusableWorkflowTriggers({
+        document: parseWorkflowDocument({
+          relativePath: ".github/workflows/ci.yml",
+          source: "on:\n  push:\n",
+        }),
+        config: defaultWorkflowChecksConfig,
+      }));
+
+    it("is left alone", ({ problems }) => {
+      expect(problems).toStrictEqual([]);
+    });
   });
 
-  it("reads the triggers written as a list", () => {
-    expect(problemsFor("on: [workflow_call, push]\n")[0]?.message).toContain("push");
+  describe("the triggers written as a list", () => {
+    const it = test.extend("problems", () =>
+      reusableWorkflowTriggers({
+        document: parseWorkflowDocument({
+          relativePath: ".github/workflows/ci.yml",
+          source: "on: [workflow_call, push]\n",
+        }),
+        config: defaultWorkflowChecksConfig,
+      }));
+
+    it("are read, and the trigger the part owns is named in the message", ({ problems }) => {
+      expect(problems).toStrictEqual([
+        { file: ".github/workflows/ci.yml", line: 1, message: OWNED_PUSH },
+      ]);
+    });
   });
 
-  it("names the line the triggers were written on when they are a list", () => {
-    expect(problemsFor("name: Part\non: [workflow_call, push]\n")[0]?.line).toBe(2);
+  describe("the triggers written as a list below the name of the workflow", () => {
+    const it = test.extend("problems", () =>
+      reusableWorkflowTriggers({
+        document: parseWorkflowDocument({
+          relativePath: ".github/workflows/ci.yml",
+          source: "name: Part\non: [workflow_call, push]\n",
+        }),
+        config: defaultWorkflowChecksConfig,
+      }));
+
+    it("are reported beside the line they were written on", ({ problems }) => {
+      expect(problems).toStrictEqual([
+        { file: ".github/workflows/ci.yml", line: 2, message: OWNED_PUSH },
+      ]);
+    });
   });
 
-  it("leaves a list that only makes the workflow callable alone", () => {
-    expect(problemsFor("on: [workflow_call]\n")).toStrictEqual([]);
+  describe("a list that only makes the workflow callable", () => {
+    const it = test.extend("problems", () =>
+      reusableWorkflowTriggers({
+        document: parseWorkflowDocument({
+          relativePath: ".github/workflows/ci.yml",
+          source: "on: [workflow_call]\n",
+        }),
+        config: defaultWorkflowChecksConfig,
+      }));
+
+    it("is left alone", ({ problems }) => {
+      expect(problems).toStrictEqual([]);
+    });
   });
 
-  it("leaves a single trigger written on its own alone", () => {
-    expect(problemsFor("on: push\n")).toStrictEqual([]);
+  describe("a single trigger written on its own", () => {
+    const it = test.extend("problems", () =>
+      reusableWorkflowTriggers({
+        document: parseWorkflowDocument({
+          relativePath: ".github/workflows/ci.yml",
+          source: "on: push\n",
+        }),
+        config: defaultWorkflowChecksConfig,
+      }));
+
+    it("is left alone", ({ problems }) => {
+      expect(problems).toStrictEqual([]);
+    });
   });
 });

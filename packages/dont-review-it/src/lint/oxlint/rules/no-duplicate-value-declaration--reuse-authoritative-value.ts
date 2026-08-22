@@ -50,21 +50,21 @@ export const createNoDuplicateValueDeclaration = ({
       },
       schema: [],
     },
-    create(context) {
-      if (isOutOfScopeSource(context.filename)) return {};
+    create(inspection) {
+      if (isOutOfScopeSource(inspection.filename)) return {};
 
-      const repositoryRootOf = memoize((): string => findWorkspaceRoot(context.cwd));
+      const repositoryRootOf = memoize((): string => findWorkspaceRoot(inspection.cwd));
 
       return {
         Program(node: ESTree.Program) {
           const repositoryRoot = repositoryRootOf();
           const reports = duplicateValueReportsIn({
             index: loadIndex({ repositoryRoot }),
-            relativePath: toPosixPath(relative(repositoryRoot, resolve(context.filename))),
+            relativePath: toPosixPath(relative(repositoryRoot, resolve(inspection.filename))),
           });
 
           for (const report of reports) {
-            context.report({
+            inspection.report({
               node: statementCovering(node.body, report.site.line) ?? node,
               messageId: report.site.exported ? "duplicateValueDeclaration" : "hiddenExportedValue",
               data: { name: report.site.name, sites: spellRivals(report.matches) },

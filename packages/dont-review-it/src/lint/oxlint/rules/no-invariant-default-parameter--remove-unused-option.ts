@@ -1,6 +1,8 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { hasFunctionOverload } from "../lib/function-overload.ts";
 import { isExportDeclaration } from "../lib/is-export-declaration.ts";
 import { isWithin } from "../lib/is-within.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { isOutOfScopeSource } from "../lib/out-of-scope-source.ts";
 import { runtimeParametersOf } from "../lib/runtime-parameters.ts";
 import { unwrapTransparentExpression } from "../lib/transparent-expression.ts";
@@ -18,13 +20,6 @@ type NamedFunction = {
 type StaticValue = {
   readonly key: string;
   readonly text: string;
-};
-
-const overloadContainerOf = (node: ESTree.Function): ESTree.Node => {
-  const parent = node.parent;
-  if (parent.type === "ExportNamedDeclaration") return parent.parent;
-  if (parent.type === "ExportDefaultDeclaration") return parent.parent;
-  return parent;
 };
 
 const declaredFunctionOf = (node: ESTree.Function): NamedFunction | null => {
@@ -158,7 +153,12 @@ const invariantValueFor = ({
   );
   const [first, ...remaining] = effectiveArguments;
   if (first === undefined || first === null) return null;
-  if (remaining.some((value) => value === null || value.key !== first.key)) return null;
+  if (
+    remaining.some(
+      (effectiveArgument) => effectiveArgument === null || effectiveArgument.key !== first.key,
+    )
+  )
+    return null;
   return first;
 };
 
@@ -215,39 +215,37 @@ export const noInvariantDefaultParameter = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
-    if (isOutOfScopeSource(context.filename)) return {};
+  create(inspection) {
+    if (isOutOfScopeSource(inspection.filename)) return {};
     const variablesFor = (node: ESTree.Node): readonly Variable[] =>
-      context.sourceCode.getDeclaredVariables(node);
-    const sourceTextOf = (node: ESTree.Node): string => context.sourceCode.getText(node);
-    const directEvalCalls = new Set<ESTree.CallExpression>();
-    const overloadNamesByContainer = new WeakMap<ESTree.Node, Set<string>>();
-    const recordOverload = (
-      node: ESTree.Function & { readonly id: ESTree.BindingIdentifier },
-    ): void => {
-      const container = overloadContainerOf(node);
-      const names = overloadNamesByContainer.get(container) ?? new Set<string>();
-      names.add(node.id.name);
-      overloadNamesByContainer.set(container, names);
-    };
-    const hasOverload = (node: ESTree.Function): boolean =>
-      node.id !== null &&
-      (overloadNamesByContainer.get(overloadContainerOf(node))?.has(node.id.name) ?? false);
+      inspection.sourceCode.getDeclaredVariables(node);
+    const sourceTextOf = (node: ESTree.Node): string => inspection.sourceCode.getText(node);
     const isUnshadowedUndefined = (node: ESTree.IdentifierReference): boolean =>
-      referencesFor(context.sourceCode.getScope(node), node).some(
+      referencesFor(inspection.sourceCode.getScope(node), node).some(
         (reference) => reference.resolved === null || reference.resolved.defs.length === 0,
       );
+    const containsDirectEval = (
+      declared: ESTree.Function | ESTree.ArrowFunctionExpression,
+    ): boolean =>
+      nodesOfType(declared, "CallExpression").some((call) => {
+        if (call.optional) return false;
+        const evalTarget = unwrapTransparentExpression(call.callee);
+        if (evalTarget.type !== "Identifier" || evalTarget.name !== "eval") return false;
+        return referencesFor(inspection.sourceCode.getScope(evalTarget), evalTarget).some(
+          (reference) => reference.resolved === null || reference.resolved.defs.length === 0,
+        );
+      });
 
     const inspect = (named: NamedFunction | null): void => {
       if (named === null) return;
       if (
         usesOwnArguments(named.declared, (node) =>
-          context.sourceCode.getScope(node.params[0] ?? node),
+          inspection.sourceCode.getScope(node.params[0] ?? node),
         )
       ) {
         return;
       }
-      if ([...directEvalCalls].some((call) => isWithin(call, named.declared))) return;
+      if (containsDirectEval(named.declared)) return;
       const calls = closedCallsOfVariables(variablesDeclaredBy(named, variablesFor));
       if (calls === null) return;
 
@@ -274,7 +272,7 @@ export const noInvariantDefaultParameter = createDontReviewItRule({
           isUnshadowedUndefined,
         });
         if (invariant === null) return;
-        context.report({
+        inspection.report({
           node: parameter,
           messageId: "invariantDefaultParameter",
           data: { name: parameter.left.name, value: invariant.text },
@@ -283,23 +281,8 @@ export const noInvariantDefaultParameter = createDontReviewItRule({
     };
 
     return {
-      CallExpression(node: ESTree.CallExpression) {
-        if (node.optional) return;
-        const target = unwrapTransparentExpression(node.callee);
-        if (target.type !== "Identifier" || target.name !== "eval") return;
-        if (
-          referencesFor(context.sourceCode.getScope(target), target).some(
-            (reference) => reference.resolved === null || reference.resolved.defs.length === 0,
-          )
-        ) {
-          directEvalCalls.add(node);
-        }
-      },
-      TSDeclareFunction(node: ESTree.Function & { readonly id: ESTree.BindingIdentifier }) {
-        recordOverload(node);
-      },
       "FunctionDeclaration:exit"(node: ESTree.Function) {
-        if (hasOverload(node)) return;
+        if (hasFunctionOverload(node)) return;
         inspect(declaredFunctionOf(node));
       },
       "VariableDeclarator:exit"(node: ESTree.VariableDeclarator) {

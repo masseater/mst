@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 import { testLintRule } from "@mst/lint-rule-authoring";
 import { describe } from "vite-plus/test";
@@ -11,50 +11,77 @@ const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-require-registered
 
 const MODULE_SOURCE = "export const shipped = true;\n";
 
+const WORKSPACE_MANIFEST = "packages:\n  - packages/*\n";
+
+const ROOT_PACKAGE_MANIFEST = '{ "name": "fixture" }\n';
+
 const RELEASE_REASON = "the release notes are read from it";
 
 const UNCHECKED_CONTENT =
   "What this file holds is read by no check, so this row asks only that it exists and holds something.";
 
-const writeFixture = (name: string, source: string): string => {
-  const path = join(fixtureDir, name);
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, source, "utf8");
-  return path;
-};
+const heldRepository = join(fixtureDir, "held");
+mkdirSync(heldRepository, { recursive: true });
+writeFileSync(join(heldRepository, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf8");
+writeFileSync(join(heldRepository, "package.json"), ROOT_PACKAGE_MANIFEST, "utf8");
+writeFileSync(
+  join(heldRepository, "CHANGELOG.md"),
+  "nothing a check reads, and enough to hold the row\n",
+  "utf8",
+);
+const heldEntry = join(heldRepository, "entry.ts");
+writeFileSync(heldEntry, MODULE_SOURCE, "utf8");
 
-const writeRepository = (name: string): void => {
-  writeFixture(`${name}/pnpm-workspace.yaml`, "packages:\n  - packages/*\n");
-  writeFixture(`${name}/package.json`, '{ "name": "fixture" }\n');
-};
+const absentRepository = join(fixtureDir, "absent");
+mkdirSync(absentRepository, { recursive: true });
+writeFileSync(join(absentRepository, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf8");
+writeFileSync(join(absentRepository, "package.json"), ROOT_PACKAGE_MANIFEST, "utf8");
+const absentEntry = join(absentRepository, "entry.ts");
+writeFileSync(absentEntry, MODULE_SOURCE, "utf8");
 
-writeRepository("held");
-writeFixture("held/CHANGELOG.md", "nothing a check reads, and enough to hold the row\n");
-const heldEntry = writeFixture("held/entry.ts", MODULE_SOURCE);
+const emptiedRepository = join(fixtureDir, "emptied");
+mkdirSync(emptiedRepository, { recursive: true });
+writeFileSync(join(emptiedRepository, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf8");
+writeFileSync(join(emptiedRepository, "package.json"), ROOT_PACKAGE_MANIFEST, "utf8");
+writeFileSync(join(emptiedRepository, "CHANGELOG.md"), "", "utf8");
+const emptiedEntry = join(emptiedRepository, "entry.ts");
+writeFileSync(emptiedEntry, MODULE_SOURCE, "utf8");
 
-writeRepository("absent");
-const absentEntry = writeFixture("absent/entry.ts", MODULE_SOURCE);
+const ownedRepository = join(fixtureDir, "owned");
+const alphaWorkspace = join(ownedRepository, "packages/alpha");
+const betaWorkspace = join(ownedRepository, "packages/beta");
+mkdirSync(alphaWorkspace, { recursive: true });
+mkdirSync(betaWorkspace, { recursive: true });
+writeFileSync(join(ownedRepository, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf8");
+writeFileSync(join(ownedRepository, "package.json"), ROOT_PACKAGE_MANIFEST, "utf8");
+writeFileSync(join(alphaWorkspace, "package.json"), '{ "name": "alpha" }\n', "utf8");
+writeFileSync(join(alphaWorkspace, "README.md"), "what alpha publishes\n", "utf8");
+writeFileSync(join(betaWorkspace, "package.json"), '{ "name": "beta" }\n', "utf8");
+const alphaEntry = join(alphaWorkspace, "entry.ts");
+writeFileSync(alphaEntry, MODULE_SOURCE, "utf8");
+const betaEntry = join(betaWorkspace, "entry.ts");
+writeFileSync(betaEntry, MODULE_SOURCE, "utf8");
 
-writeRepository("emptied");
-writeFixture("emptied/CHANGELOG.md", "");
-const emptiedEntry = writeFixture("emptied/entry.ts", MODULE_SOURCE);
+const retiredRepository = join(fixtureDir, "retired");
+mkdirSync(retiredRepository, { recursive: true });
+writeFileSync(join(retiredRepository, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf8");
+writeFileSync(join(retiredRepository, "package.json"), ROOT_PACKAGE_MANIFEST, "utf8");
+const retiredEntry = join(retiredRepository, "entry.ts");
+writeFileSync(retiredEntry, MODULE_SOURCE, "utf8");
 
-writeRepository("owned");
-writeFixture("owned/packages/alpha/package.json", '{ "name": "alpha" }\n');
-writeFixture("owned/packages/alpha/README.md", "what alpha publishes\n");
-writeFixture("owned/packages/beta/package.json", '{ "name": "beta" }\n');
-const alphaEntry = writeFixture("owned/packages/alpha/entry.ts", MODULE_SOURCE);
-const betaEntry = writeFixture("owned/packages/beta/entry.ts", MODULE_SOURCE);
+const unregisteredRepository = join(fixtureDir, "unregistered");
+mkdirSync(unregisteredRepository, { recursive: true });
+writeFileSync(join(unregisteredRepository, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf8");
+writeFileSync(join(unregisteredRepository, "package.json"), ROOT_PACKAGE_MANIFEST, "utf8");
+writeFileSync(join(unregisteredRepository, "CHANGELOG.md"), "what shipped\n", "utf8");
+const unregisteredEntry = join(unregisteredRepository, "entry.ts");
+writeFileSync(unregisteredEntry, MODULE_SOURCE, "utf8");
 
-writeRepository("retired");
-const retiredEntry = writeFixture("retired/entry.ts", MODULE_SOURCE);
-
-writeRepository("unregistered");
-writeFixture("unregistered/CHANGELOG.md", "what shipped\n");
-const unregisteredEntry = writeFixture("unregistered/entry.ts", MODULE_SOURCE);
-
-writeFixture("unmanaged/pnpm-workspace.yaml", "packages: []\n");
-const looseEntry = writeFixture("unmanaged/loose.ts", MODULE_SOURCE);
+const unmanagedDirectory = join(fixtureDir, "unmanaged");
+mkdirSync(unmanagedDirectory, { recursive: true });
+writeFileSync(join(unmanagedDirectory, "pnpm-workspace.yaml"), "packages: []\n", "utf8");
+const looseEntry = join(unmanagedDirectory, "loose.ts");
+writeFileSync(looseEntry, MODULE_SOURCE, "utf8");
 
 const CHANGELOG_ROW = [{ requiredFiles: [{ pattern: "CHANGELOG.md", reason: RELEASE_REASON }] }];
 

@@ -1,5 +1,6 @@
 import { uniq } from "es-toolkit";
 
+import { matchesAnchoredGlobPath } from "../glob-path-match.ts";
 import { bareRuleNameOf } from "./suppression-directives.ts";
 
 import type { Options } from "@oxlint/plugins";
@@ -36,7 +37,13 @@ export const GENERATED_PATHS: readonly string[] = [
   "**/generated/**",
   "**/__snapshots__/**",
   "**/*.d.ts",
+  "**/*.min.*",
+  "**/*-min.*",
+  "**/*_min.*",
 ];
+
+export const isGeneratedLintPath = (relativePath: string): boolean =>
+  GENERATED_PATHS.some((pattern) => matchesAnchoredGlobPath({ relativePath, pattern }));
 
 export type ProtectionDeviation = {
   readonly rule: string;
@@ -69,8 +76,8 @@ export const PROTECTION_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-const declaredFieldsIn = (options: Readonly<Options>): DeclaredFields => {
-  const [declared] = options;
+const declaredFieldsIn = (ruleOptions: Readonly<Options>): DeclaredFields => {
+  const [declared] = ruleOptions;
   const spelled = typeof declared === "object" && declared !== null && !Array.isArray(declared);
   return spelled ? declared : {};
 };
@@ -84,12 +91,12 @@ const spelledTextsAt = ({
 }): readonly string[] => {
   const listed = fields[key];
   if (!Array.isArray(listed)) return [];
-  return listed.filter((entry): entry is string => typeof entry === "string");
+  return listed.filter((candidate): candidate is string => typeof candidate === "string");
 };
 
-const deviationOf = (entry: Options[number]): readonly ProtectionDeviation[] => {
-  if (typeof entry !== "object" || entry === null || Array.isArray(entry)) return [];
-  const { rule, reason } = entry;
+const deviationOf = (listed: Options[number]): readonly ProtectionDeviation[] => {
+  if (typeof listed !== "object" || listed === null || Array.isArray(listed)) return [];
+  const { rule, reason } = listed;
   if (typeof rule !== "string" || rule === "") return [];
   return [{ rule, grounds: typeof reason === "string" ? reason.trim() : "" }];
 };
@@ -99,8 +106,8 @@ const deviationsAt = (fields: DeclaredFields): readonly ProtectionDeviation[] =>
   return Array.isArray(listed) ? listed.flatMap(deviationOf) : [];
 };
 
-export const protectionSettingsIn = (options: Readonly<Options>): ProtectionSettings => {
-  const fields = declaredFieldsIn(options);
+export const protectionSettingsIn = (ruleOptions: Readonly<Options>): ProtectionSettings => {
+  const fields = declaredFieldsIn(ruleOptions);
   return {
     addedRules: spelledTextsAt({ fields, key: "protectedRules" }),
     deviations: deviationsAt(fields),

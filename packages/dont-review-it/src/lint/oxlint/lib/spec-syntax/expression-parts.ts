@@ -5,9 +5,9 @@ import type { ESTree } from "@oxlint/plugins";
 export const handedValues = (
   handed: readonly (ESTree.Expression | ESTree.SpreadElement | null)[],
 ): readonly ESTree.Expression[] =>
-  handed.flatMap((value) => {
-    if (value === null) return [];
-    return value.type === "SpreadElement" ? [value.argument] : [value];
+  handed.flatMap((held) => {
+    if (held === null) return [];
+    return held.type === "SpreadElement" ? [held.argument] : [held];
   });
 
 const receiverOf = (call: ESTree.CallExpression): readonly ESTree.Expression[] => {

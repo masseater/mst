@@ -25,15 +25,15 @@ const DEFAULT_SETUP_MODULE_NAME_PATTERNS: readonly string[] = [
 ];
 
 const configuredStrings = (
-  options: Readonly<Options>,
-  key: "allowedFixturePackages" | "setupModuleNamePatterns",
+  ruleOptions: Readonly<Options>,
+  named: "allowedFixturePackages" | "setupModuleNamePatterns",
 ): readonly string[] | null => {
-  const [first] = options;
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) return null;
 
-  const configured = first[key];
+  const configured = first[named];
   if (!Array.isArray(configured)) return null;
-  return configured.filter((entry): entry is string => typeof entry === "string");
+  return configured.filter((candidate): candidate is string => typeof candidate === "string");
 };
 
 export const noDryTestSetup = createDontReviewItRule({
@@ -66,25 +66,25 @@ export const noDryTestSetup = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
-    const fromFile = resolve(context.cwd, context.filename);
+    const fromFile = resolve(inspection.cwd, inspection.filename);
 
     const policyOf = memoize(
       (): SetupModulePolicy => ({
         workspaceRoot: findWorkspaceRoot(dirname(fromFile)),
         namePatterns:
-          configuredStrings(context.options, "setupModuleNamePatterns") ??
+          configuredStrings(inspection.options, "setupModuleNamePatterns") ??
           DEFAULT_SETUP_MODULE_NAME_PATTERNS,
         allowedPackageSpecifiers:
-          configuredStrings(context.options, "allowedFixturePackages") ?? [],
-        assetsNameMarkers: assetsNameMarkersFrom(context.options),
+          configuredStrings(inspection.options, "allowedFixturePackages") ?? [],
+        assetsNameMarkers: assetsNameMarkersFrom(inspection.options),
       }),
     );
 
     const constantsOf = memoize(
-      (): ReadonlyMap<string, string> => constantSpecifiersIn(context.sourceCode.ast.body),
+      (): ReadonlyMap<string, string> => constantSpecifiersIn(inspection.sourceCode.ast.body),
     );
 
     const reportCoupling = (node: ESTree.Node): void => {
@@ -98,10 +98,10 @@ export const noDryTestSetup = createDontReviewItRule({
       });
       if (reached === null) return;
       if (reached.relays.length === 0) {
-        context.report({ node, messageId: "setupModuleCoupling", data: { path: reached.path } });
+        inspection.report({ node, messageId: "setupModuleCoupling", data: { path: reached.path } });
         return;
       }
-      context.report({
+      inspection.report({
         node,
         messageId: "relayedSetupModuleCoupling",
         data: { path: reached.path, relays: reached.relays.join(", ") },
@@ -116,8 +116,12 @@ export const noDryTestSetup = createDontReviewItRule({
           fromFile,
           workspaceRoot: policy.workspaceRoot,
         });
-        for (const entry of misplaced) {
-          context.report({ node, messageId: "misplacedFixturePackage", data: { entry } });
+        for (const listed of misplaced) {
+          inspection.report({
+            node,
+            messageId: "misplacedFixturePackage",
+            data: { entry: listed },
+          });
         }
       },
       ImportDeclaration: reportCoupling,

@@ -20,18 +20,18 @@ export const buildLibraryVocabularyIndex = (
   harvested: readonly LibraryVocabularyEntry[],
 ): LibraryVocabularyIndex =>
   sortBy(
-    uniqBy(sortBy(harvested, [...NAME_ORDER]), (entry) => entry.declarationId),
+    uniqBy(sortBy(harvested, [...NAME_ORDER]), (listed) => listed.declarationId),
     [...NAME_ORDER],
   );
 
 export const libraryOwnersOf = (
   index: LibraryVocabularyIndex,
-  values: readonly CanonicalValue[],
+  heldValues: readonly CanonicalValue[],
 ): readonly LibraryVocabularyEntry[] => {
-  const written = new Set(values.map(canonicalValueKey));
+  const written = new Set(heldValues.map(canonicalValueKey));
   if (written.size === 0) return [];
-  return index.filter((entry) => {
-    const admitted = new Set(entry.values.map(canonicalValueKey));
-    return [...written].every((value) => admitted.has(value));
+  return index.filter((listed) => {
+    const admitted = new Set(listed.values.map(canonicalValueKey));
+    return [...written].every((held) => admitted.has(held));
   });
 };

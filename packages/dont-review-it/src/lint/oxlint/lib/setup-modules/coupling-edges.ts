@@ -26,7 +26,7 @@ export const nodeTypeOf = (node: AstFields): string => {
 };
 
 export const listedFieldsOf = (held: unknown): readonly AstFields[] =>
-  (Array.isArray(held) ? held : [held]).map(astFieldsOf).filter((entry) => entry !== null);
+  (Array.isArray(held) ? held : [held]).map(astFieldsOf).filter((candidate) => candidate !== null);
 
 export const statementsOf = (program: AstFields): readonly AstFields[] =>
   listedFieldsOf(program.body);
@@ -46,12 +46,14 @@ const assembledFromParts = (
   node: AstFields,
   constants: ReadonlyMap<string, string>,
 ): string | null => {
-  const texts = listedFieldsOf(node.quasis).map(cookedTextOf);
+  const writtenTexts = listedFieldsOf(node.quasis).map(cookedTextOf);
   const filled = listedFieldsOf(node.expressions).map((expression) =>
     staticSpecifierOf(expression, constants),
   );
-  if (texts.includes(null) || filled.includes(null)) return null;
-  return texts.map((text, index) => [text, filled.at(index)].join("")).join("");
+  if (writtenTexts.includes(null) || filled.includes(null)) return null;
+  return writtenTexts
+    .map((writtenText, index) => [writtenText, filled.at(index)].join(""))
+    .join("");
 };
 
 const joinedFromSides = (
@@ -60,9 +62,10 @@ const joinedFromSides = (
 ): string | null => {
   if (node.operator !== CONCATENATION_OPERATOR) return null;
 
-  const spelled = listedFieldsOf([node.left, node.right]).map((side) =>
-    staticSpecifierOf(side, constants),
-  );
+  const spelled = [node.left, node.right].map((side) => {
+    const written = astFieldsOf(side);
+    return written === null ? null : staticSpecifierOf(written, constants);
+  });
   return spelled.includes(null) ? null : spelled.join("");
 };
 
@@ -70,11 +73,11 @@ export const staticSpecifierOf = (
   node: AstFields,
   constants: ReadonlyMap<string, string>,
 ): string | null => {
-  const type = nodeTypeOf(node);
-  if (type === "Literal") return typeof node.value === "string" ? node.value : null;
-  if (type === "Identifier") return constants.get(String(node.name)) ?? null;
-  if (type === "TemplateLiteral") return assembledFromParts(node, constants);
-  if (type === "BinaryExpression") return joinedFromSides(node, constants);
+  const nodeType = nodeTypeOf(node);
+  if (nodeType === "Literal") return typeof node.value === "string" ? node.value : null;
+  if (nodeType === "Identifier") return constants.get(String(node.name)) ?? null;
+  if (nodeType === "TemplateLiteral") return assembledFromParts(node, constants);
+  if (nodeType === "BinaryExpression") return joinedFromSides(node, constants);
   return null;
 };
 
@@ -93,11 +96,11 @@ const declaredEdgeOf = (
   node: AstFields,
   constants: ReadonlyMap<string, string>,
 ): CouplingEdge | null => {
-  const type = nodeTypeOf(node);
-  if (type === IMPORT_DECLARATION) {
+  const nodeType = nodeTypeOf(node);
+  if (nodeType === IMPORT_DECLARATION) {
     return edgeThrough(node.source, { kind: node.importKind, constants });
   }
-  if (type === EXPORT_NAMED_DECLARATION || type === EXPORT_ALL_DECLARATION) {
+  if (nodeType === EXPORT_NAMED_DECLARATION || nodeType === EXPORT_ALL_DECLARATION) {
     return edgeThrough(node.source, { kind: node.exportKind, constants });
   }
   return null;
@@ -107,9 +110,9 @@ export const requestedSpecifierOf = (node: unknown): AstFields | null => {
   const spelled = astFieldsOf(node);
   if (spelled === null) return null;
 
-  const type = nodeTypeOf(spelled);
-  if (type === "ImportExpression") return astFieldsOf(spelled.source);
-  if (type !== "CallExpression") return null;
+  const nodeType = nodeTypeOf(spelled);
+  if (nodeType === "ImportExpression") return astFieldsOf(spelled.source);
+  if (nodeType !== "CallExpression") return null;
 
   const callee = astFieldsOf(spelled.callee);
   if (callee === null || nodeTypeOf(callee) !== "Identifier") return null;
@@ -159,8 +162,8 @@ const boundConstantsIn = (
   });
 };
 
-export const constantSpecifiersIn = (body: unknown): ReadonlyMap<string, string> =>
-  listedFieldsOf(body).reduce<ReadonlyMap<string, string>>(
+export const constantSpecifiersIn = (writtenBody: unknown): ReadonlyMap<string, string> =>
+  listedFieldsOf(writtenBody).reduce<ReadonlyMap<string, string>>(
     (known, statement) => new Map([...known, ...boundConstantsIn(statement, known)]),
     new Map(),
   );

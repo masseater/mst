@@ -1,6 +1,6 @@
 import { dirname, join } from "node:path";
 
-import { groupBy } from "es-toolkit";
+import { groupBy, memoize } from "es-toolkit";
 
 import { nearestPackageDirectory } from "../canonical-values/source-files.ts";
 import { spelledNames } from "../declared-coverage/coverage-declarations.ts";
@@ -106,16 +106,8 @@ const keyOf = (scan: SpecDirectoryScan): string =>
     [...scan.unscannedDirectoryNames].toSorted(),
   ]);
 
-const foreignFilesByScan = new Map<string, ReadonlyMap<string, readonly ForeignFile[]>>();
+const scannedForeignFiles = memoize(readScan, { getCacheKey: keyOf });
 
 export const foreignFilesIn = (
   scan: SpecDirectoryScan,
-): ReadonlyMap<string, readonly ForeignFile[]> => {
-  const key = keyOf(scan);
-  const memoized = foreignFilesByScan.get(key);
-  if (memoized !== undefined) return memoized;
-
-  const read = readScan(scan);
-  foreignFilesByScan.set(key, read);
-  return read;
-};
+): ReadonlyMap<string, readonly ForeignFile[]> => scannedForeignFiles(scan);

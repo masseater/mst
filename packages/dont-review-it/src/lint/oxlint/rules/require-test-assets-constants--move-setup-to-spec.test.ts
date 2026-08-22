@@ -1,11 +1,13 @@
 import { testLintRule } from "@mst/lint-rule-authoring";
-import { describe, expect, test } from "vite-plus/test";
+import { describe, expect, it } from "vite-plus/test";
 
 import { requireTestAssetsConstants } from "./require-test-assets-constants--move-setup-to-spec.ts";
 
 const ASSETS_FILE = "report.assets.ts";
 
 const SPEC_FILE = "report.test.ts";
+
+const optionsSchema = requireTestAssetsConstants.meta.schema;
 
 describe("dont-review-it/require-test-assets-constants--move-setup-to-spec", () => {
   testLintRule(requireTestAssetsConstants, {
@@ -367,8 +369,8 @@ describe("dont-review-it/require-test-assets-constants--move-setup-to-spec", () 
     ],
   });
 
-  test("the options schema declares the assets vocabulary and refuses any other key", () => {
-    expect(requireTestAssetsConstants.meta.schema).toStrictEqual([
+  it("the options schema declares the assets vocabulary and refuses any other key", () => {
+    expect(optionsSchema).toStrictEqual([
       {
         type: "object",
         properties: {

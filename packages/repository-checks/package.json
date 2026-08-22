@@ -23,7 +23,8 @@
     "build": "spool -- vp pack",
     "dev": "vp pack --watch",
     "test": "spool -- vp test",
-    "check": "spool -- vp check"
+    "check": "spool -- vp check",
+    "typecheck": "spool -- tsc -p ."
   },
   "dependencies": {
     "es-toolkit": "catalog:"

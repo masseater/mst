@@ -39,11 +39,13 @@ const commandAfterSimpleWrapper = (command: readonly string[]): WrapperResolutio
 };
 
 const transparentWrapperResolutionOf = (command: readonly string[]): WrapperResolution => {
-  const name = executableName(command[0] ?? "");
-  if (name === null) return { kind: "unresolved" };
-  if (name === "env") return commandAfterEnvAt(command, 1);
-  if (name === "command" || name === "exec") return commandAfterSimpleWrapper(command);
-  if (name !== "spool") return { kind: "resolved", command };
+  const wrapperExecutableName = executableName(command[0] ?? "");
+  if (wrapperExecutableName === null) return { kind: "unresolved" };
+  if (wrapperExecutableName === "env") return commandAfterEnvAt(command, 1);
+  if (wrapperExecutableName === "command" || wrapperExecutableName === "exec") {
+    return commandAfterSimpleWrapper(command);
+  }
+  if (wrapperExecutableName !== "spool") return { kind: "resolved", command };
   return command[1] === "--"
     ? { kind: "resolved", command: command.slice(2) }
     : { kind: "unresolved" };
@@ -68,8 +70,8 @@ const transparentCommandIn = (segment: readonly string[]): WrapperResolution => 
 
 const runnerArgumentsResolution = (arguments_: readonly string[]): CommandResolution => {
   const [first, ...rest] = arguments_;
-  const normalized = first === "run" ? rest : arguments_;
-  return { kind: "test", arguments: normalized };
+  const runnerArguments = first === "run" ? rest : arguments_;
+  return { kind: "test", arguments: runnerArguments };
 };
 
 const vitestRunArgumentsResolution = (arguments_: readonly string[]): CommandResolution => {
@@ -80,15 +82,17 @@ const vitestRunArgumentsResolution = (arguments_: readonly string[]): CommandRes
 const testResolutionForCommand = (command: readonly string[]): CommandResolution => {
   const executable = command[0];
   if (executable === undefined) return { kind: "unresolved" };
-  const name = executable === "./node_modules/.bin/vitest" ? "vitest" : executable;
-  if (name === "vitest") {
+  const testExecutableName = executable === "./node_modules/.bin/vitest" ? "vitest" : executable;
+  if (testExecutableName === "vitest") {
     return vitestRunArgumentsResolution(command.slice(1));
   }
-  if (name === "vp" && command[1] === "test") {
+  if (testExecutableName === "vp" && command[1] === "test") {
     return runnerArgumentsResolution(command.slice(2));
   }
-  if (name === "vp" && command[1] === "run") return { kind: "unresolved-test" };
-  return BENIGN_COMMANDS.has(name) || name === "vp" ? { kind: "not-test" } : { kind: "unresolved" };
+  if (testExecutableName === "vp" && command[1] === "run") return { kind: "unresolved-test" };
+  return BENIGN_COMMANDS.has(testExecutableName) || testExecutableName === "vp"
+    ? { kind: "not-test" }
+    : { kind: "unresolved" };
 };
 
 const testCommandResolution = (segment: readonly string[]): CommandResolution => {

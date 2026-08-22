@@ -49,8 +49,8 @@ const claimsOf = async (input: {
     }),
   );
   return {
-    subjects: read.flatMap((entry) => entry.subjects),
-    problems: read.flatMap((entry) => entry.problems),
+    subjects: read.flatMap((listed) => listed.subjects),
+    problems: read.flatMap((listed) => listed.problems),
   };
 };
 

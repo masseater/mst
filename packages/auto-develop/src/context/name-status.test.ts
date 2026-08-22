@@ -2,19 +2,17 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { isDeletion, parseNameStatus } from "./name-status.ts";
 
-const it = test
-  .extend("modifiedAddedDeletedRows", () =>
-    parseNameStatus("M\tsrc/a.ts\nA\tsrc/b.ts\nD\tsrc/c.ts"))
-  .extend("renamedRows", () => parseNameStatus("R100\tsrc/old.ts\tsrc/new.ts"))
-  .extend("blankOnlyRows", () => parseNameStatus("\n\n"))
-  .extend("rowsWithoutTab", () => parseNameStatus("M"))
-  .extend("renameRowsWithoutNewPath", () => parseNameStatus("R100\tsrc/old.ts"))
-  .extend("renameRowsWithoutPaths", () => parseNameStatus("R100"))
-  .extend("rowsWithoutStatusCode", () => parseNameStatus("\tsrc/a.ts"))
-  .extend("deletionFlagForD", () => isDeletion("D"))
-  .extend("deletionFlagForM", () => isDeletion("M"));
-
 describe("parseNameStatus", () => {
+  const it = test
+    .extend("modifiedAddedDeletedRows", () =>
+      parseNameStatus("M\tsrc/a.ts\nA\tsrc/b.ts\nD\tsrc/c.ts"))
+    .extend("renamedRows", () => parseNameStatus("R100\tsrc/old.ts\tsrc/new.ts"))
+    .extend("blankOnlyRows", () => parseNameStatus("\n\n"))
+    .extend("rowsWithoutTab", () => parseNameStatus("M"))
+    .extend("renameRowsWithoutNewPath", () => parseNameStatus("R100\tsrc/old.ts"))
+    .extend("renameRowsWithoutPaths", () => parseNameStatus("R100"))
+    .extend("rowsWithoutStatusCode", () => parseNameStatus("\tsrc/a.ts"));
+
   it("変更・追加・削除は 2 フィールドでパスを取る", ({ modifiedAddedDeletedRows }) => {
     expect(modifiedAddedDeletedRows).toStrictEqual([
       {
@@ -87,6 +85,10 @@ describe("parseNameStatus", () => {
 });
 
 describe("isDeletion", () => {
+  const it = test
+    .extend("deletionFlagForD", () => isDeletion("D"))
+    .extend("deletionFlagForM", () => isDeletion("M"));
+
   it("D を削除とみなす", ({ deletionFlagForD }) => {
     expect(deletionFlagForD).toStrictEqual(true);
   });

@@ -1,345 +1,416 @@
-import { describe, expect, onTestFinished, test, vi } from "vite-plus/test";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-type TypeEntry = {
-  readonly packageName: string;
-  readonly declarationsPath: string;
-};
-
-type HarvesterScenario = {
-  readonly entries: readonly TypeEntry[];
-  readonly snapshot: unknown;
-  readonly snapshotFailure?: Error;
-};
-
-const fakes = vi.hoisted(() => {
-  const scenarios = new Map<string, HarvesterScenario>();
-  const openedFiles = new Map<string, readonly string[]>();
-  const constructionCounts = new Map<string, number>();
-  const closeCounts = new Map<string, number>();
-  const environmentFailure = new Error("typescript is unavailable");
-
-  class FakeApi {
-    readonly packageDirectory: string;
-
-    constructor({ cwd }: { readonly cwd: string }) {
-      this.packageDirectory = cwd;
-      constructionCounts.set(cwd, (constructionCounts.get(cwd) ?? 0) + 1);
-    }
-
-    updateSnapshot({ openFiles: askedFiles }: { readonly openFiles: readonly string[] }): unknown {
-      openedFiles.set(this.packageDirectory, askedFiles);
-      const scenario = scenarios.get(this.packageDirectory);
-      if (scenario === undefined) throw new Error("a harvester scenario must be registered");
-      if (scenario.snapshotFailure !== undefined) throw scenario.snapshotFailure;
-      return scenario.snapshot;
-    }
-
-    close(): void {
-      closeCounts.set(this.packageDirectory, (closeCounts.get(this.packageDirectory) ?? 0) + 1);
-    }
-  }
-
-  return {
-    aliasFlag: 1,
-    closeCounts,
-    constructionCounts,
-    environmentFailure,
-    FakeApi,
-    openedFiles,
-    scenarios,
-  };
-});
-
-vi.mock(import("typescript/unstable/sync"), async (importOriginal) => {
-  const original = await importOriginal();
-  const assumeType = <Expected>(candidate: unknown, _witness?: Expected): Expected =>
-    candidate as Expected;
-  return {
-    ...original,
-    API: assumeType<typeof original.API>(fakes.FakeApi),
-    SymbolFlags: {
-      ...original.SymbolFlags,
-      Alias: fakes.aliasFlag,
-    },
-  };
-});
-
-vi.mock(import("./dependency-types.ts"), async (importOriginal) => {
-  const original = await importOriginal();
-  return {
-    ...original,
-    dependencyTypeEntries: (packageDirectory: string): readonly TypeEntry[] =>
-      fakes.scenarios.get(packageDirectory)?.entries ?? [],
-  };
-});
-
-vi.mock(import("../canonical-values/source-files.ts"), async (importOriginal) => {
-  const original = await importOriginal();
-  return {
-    ...original,
-    nearestPackageDirectory: (_fileDirectory: string, repositoryRoot: string): string | null =>
-      fakes.scenarios.has(repositoryRoot) ? repositoryRoot : null,
-  };
-});
-
-vi.mock(import("../path-failure.ts"), async (importOriginal) => {
-  const original = await importOriginal();
-  return {
-    ...original,
-    isEnvironmentFailure: (failure: unknown): boolean => failure === fakes.environmentFailure,
-  };
-});
+import { attempt } from "es-toolkit";
+import { API } from "typescript/unstable/sync";
+import { describe, expect, test, vi } from "vite-plus/test";
 
 import { loadLibraryVocabulary } from "./harvester.ts";
 
-type FakeMemberType = {
-  readonly value?: string | number;
-  readonly isStringLiteralType: () => boolean;
-  readonly isNumberLiteralType: () => boolean;
-};
+vi.mock(import("typescript/unstable/sync"), { spy: true });
 
-type FakeDeclaredType = {
-  readonly isErrorType: () => boolean;
-  readonly isUnionType: () => boolean;
-  readonly getTypes: () => readonly FakeMemberType[];
-};
+class FileSystemFailure extends Error {
+  readonly code = "EACCES";
+}
 
-type FakeSymbol = {
-  readonly flags: number;
-  readonly name: string;
-  readonly declarations?: readonly { readonly path: string; readonly index: number }[];
-  readonly declaredType: FakeDeclaredType;
-  readonly aliased?: FakeSymbol;
-};
-
-const memberType = (
-  kind: "string" | "number" | "other",
-  admitted?: string | number,
-): FakeMemberType => ({
-  value: admitted,
-  isStringLiteralType: () => kind === "string",
-  isNumberLiteralType: () => kind === "number",
-});
-
-const declaredType = ({
-  error = false,
-  union = true,
-  members = [],
-}: {
-  readonly error?: boolean;
-  readonly union?: boolean;
-  readonly members?: readonly FakeMemberType[];
-}): FakeDeclaredType => ({
-  isErrorType: () => error,
-  isUnionType: () => union,
-  getTypes: () => members,
-});
-
-const exportedType = ({
-  name,
-  declaration = true,
-  definition = declaredType({}),
-}: {
-  readonly name: string;
-  readonly declaration?: boolean;
-  readonly definition?: FakeDeclaredType;
-}): FakeSymbol => ({
-  flags: 0,
-  name,
-  declarations: declaration ? [{ path: "/types/index.d.ts", index: name.length }] : [],
-  declaredType: definition,
-});
-
-const aliasOf = (name: string, aliased: FakeSymbol): FakeSymbol => ({
-  flags: fakes.aliasFlag,
-  name,
-  declarations: [{ path: "/types/index.d.ts", index: name.length }],
-  declaredType: declaredType({}),
-  aliased,
-});
-
-const checkerFor = (exported: readonly FakeSymbol[], moduleAvailable = true) => ({
-  getSymbolAtLocation: () => (moduleAvailable ? { name: "dependency" } : undefined),
-  getExportsOfModule: () => exported,
-  getAliasedSymbol: (symbol: FakeSymbol) => {
-    if (symbol.aliased === undefined) throw new Error("an alias target must be present");
-    return symbol.aliased;
-  },
-  getDeclaredTypeOfSymbol: (symbol: FakeSymbol) => symbol.declaredType,
-});
-
-const snapshotFor = (
-  entries: readonly TypeEntry[],
-  exported: readonly FakeSymbol[],
-): {
-  readonly getDefaultProjectForFile: (declarationsPath: string) => unknown;
-} => {
-  const [, sourceMissing, moduleMissing, successful] = entries;
-  return {
-    getDefaultProjectForFile: (declarationsPath: string) => {
-      if (declarationsPath === entries[0]?.declarationsPath) return undefined;
-      if (declarationsPath === sourceMissing?.declarationsPath) {
-        return {
-          program: { getSourceFile: () => undefined },
-          checker: checkerFor([]),
-        };
-      }
-      if (declarationsPath === moduleMissing?.declarationsPath) {
-        return {
-          program: { getSourceFile: () => ({ path: declarationsPath }) },
-          checker: checkerFor([], false),
-        };
-      }
-      if (declarationsPath !== successful?.declarationsPath) return undefined;
-      return {
-        program: { getSourceFile: () => ({ path: declarationsPath }) },
-        checker: checkerFor(exported),
-      };
-    },
-  };
-};
-
-const registerScenario = (
-  name: string,
-  scenario: HarvesterScenario,
-): { readonly filename: string; readonly repositoryRoot: string } => {
-  const repositoryRoot = `/virtual/${name}`;
-  fakes.scenarios.set(repositoryRoot, scenario);
-  onTestFinished(() => {
-    fakes.scenarios.delete(repositoryRoot);
-    fakes.openedFiles.delete(repositoryRoot);
-    fakes.constructionCounts.delete(repositoryRoot);
-    fakes.closeCounts.delete(repositoryRoot);
-  });
-  return { filename: `${repositoryRoot}/src/subject.ts`, repositoryRoot };
-};
-
-const entriesFor = (name: string): readonly TypeEntry[] =>
-  ["no-project", "no-source", "no-module", "exports"].map((suffix) => ({
-    packageName: name,
-    declarationsPath: `/virtual/${name}/node_modules/dependency/${suffix}.d.ts`,
-  }));
+const FIXTURE_ROOT = join(tmpdir(), "dont-review-it-library-vocabulary-harvester");
 
 describe("loadLibraryVocabulary", () => {
-  test("it harvests literal unions from usable dependency declarations", () => {
-    const entries = entriesFor("complete");
-    const direct = exportedType({
-      name: "Mixed",
-      definition: declaredType({
-        members: [memberType("string", "on"), memberType("number", 2)],
-      }),
-    });
-    const alias = aliasOf(
-      "SeverityAlias",
-      exportedType({
-        name: "Severity",
-        definition: declaredType({
-          members: [memberType("string", "error"), memberType("other")],
-        }),
-      }),
-    );
-    const exported = [
-      direct,
-      alias,
-      exportedType({ name: "Scalar", definition: declaredType({ union: false }) }),
-      exportedType({ name: "Broken", definition: declaredType({ error: true }) }),
-      exportedType({
-        name: "ObjectOnly",
-        definition: declaredType({ members: [memberType("other")] }),
-      }),
-      exportedType({
-        name: "Undeclared",
-        declaration: false,
-        definition: declaredType({ members: [memberType("string", "hidden")] }),
-      }),
-    ];
-    const request = registerScenario("complete", {
-      entries,
-      snapshot: snapshotFor(entries, exported),
+  describe("typed dependency declarations that export literal unions", () => {
+    const it = test.extend("vocabulary", ({}, { onCleanup }) => {
+      const packageDirectory = join(FIXTURE_ROOT, "literal-unions");
+      rmSync(packageDirectory, { recursive: true, force: true });
+      onCleanup(() => {
+        rmSync(packageDirectory, { recursive: true, force: true });
+      });
+      mkdirSync(join(packageDirectory, "src"), { recursive: true });
+      mkdirSync(join(packageDirectory, "node_modules", "fixture-types"), { recursive: true });
+      writeFileSync(
+        join(packageDirectory, "package.json"),
+        JSON.stringify({ dependencies: { "fixture-types": "1.0.0" } }),
+        "utf8",
+      );
+      writeFileSync(
+        join(packageDirectory, "node_modules", "fixture-types", "package.json"),
+        JSON.stringify({ name: "fixture-types", version: "1.0.0", types: "./index.d.ts" }),
+        "utf8",
+      );
+      writeFileSync(
+        join(packageDirectory, "node_modules", "fixture-types", "index.d.ts"),
+        [
+          'export type Mixed = "on" | 2;',
+          'type Severity = "error" | object;',
+          "export { Severity as SeverityAlias };",
+          "export type Scalar = string;",
+          "export type Broken = Missing;",
+          'export type ObjectOnly = { state: "ready" } | { state: "done" };',
+          "",
+        ].join("\n"),
+        "utf8",
+      );
+      return loadLibraryVocabulary({
+        filename: join(packageDirectory, "src", "subject.ts"),
+        repositoryRoot: packageDirectory,
+      });
     });
 
-    const harvested = loadLibraryVocabulary(request);
-
-    expect(harvested).toStrictEqual([
-      {
-        packageName: "complete",
-        typeName: "Mixed",
-        declarationId: "/types/index.d.ts#5",
-        values: ["on", 2],
-        admitsUnnamedValues: false,
-      },
-      {
-        packageName: "complete",
-        typeName: "SeverityAlias",
-        declarationId: "/types/index.d.ts#8",
-        values: ["error"],
-        admitsUnnamedValues: true,
-      },
-    ]);
-    expect(fakes.openedFiles.get(request.repositoryRoot)).toStrictEqual(
-      entries.map((entry) => entry.declarationsPath),
-    );
-    expect(fakes.constructionCounts.get(request.repositoryRoot)).toBe(1);
-    expect(fakes.closeCounts.get(request.repositoryRoot)).toBe(1);
+    it("are harvested as the vocabulary their declarations admit", ({ vocabulary }) => {
+      expect(vocabulary).toStrictEqual([
+        {
+          packageName: "fixture-types",
+          typeName: "Mixed",
+          declarationId: `${join(
+            FIXTURE_ROOT.toLowerCase(),
+            "literal-unions",
+            "node_modules",
+            "fixture-types",
+            "index.d.ts",
+          )}#3`,
+          values: ["on", 2],
+          admitsUnnamedValues: false,
+        },
+        {
+          packageName: "fixture-types",
+          typeName: "SeverityAlias",
+          declarationId: `${join(
+            FIXTURE_ROOT.toLowerCase(),
+            "literal-unions",
+            "node_modules",
+            "fixture-types",
+            "index.d.ts",
+          )}#13`,
+          values: ["error"],
+          admitsUnnamedValues: true,
+        },
+      ]);
+    });
   });
 
-  test("it reuses the harvested index for the same package directory", () => {
-    const entries = entriesFor("memoized");
-    const request = registerScenario("memoized", {
-      entries,
-      snapshot: snapshotFor(entries, []),
-    });
-
-    const firstHarvest = loadLibraryVocabulary(request);
-    const secondHarvest = loadLibraryVocabulary(request);
-
-    expect(secondHarvest).toBe(firstHarvest);
-    expect(fakes.constructionCounts.get(request.repositoryRoot)).toBe(1);
-    expect(fakes.closeCounts.get(request.repositoryRoot)).toBe(1);
-  });
-
-  test("it returns an empty index when the source belongs to no package", () => {
-    expect(
+  describe("the TypeScript session used for a successful harvest", () => {
+    const it = test.extend("closeTypeScript", ({}, { onCleanup }) => {
+      const packageDirectory = join(FIXTURE_ROOT, "closed-after-success");
+      rmSync(packageDirectory, { recursive: true, force: true });
+      onCleanup(() => {
+        rmSync(packageDirectory, { recursive: true, force: true });
+      });
+      mkdirSync(join(packageDirectory, "src"), { recursive: true });
+      mkdirSync(join(packageDirectory, "node_modules", "fixture-types"), { recursive: true });
+      writeFileSync(
+        join(packageDirectory, "package.json"),
+        JSON.stringify({ dependencies: { "fixture-types": "1.0.0" } }),
+        "utf8",
+      );
+      writeFileSync(
+        join(packageDirectory, "node_modules", "fixture-types", "package.json"),
+        JSON.stringify({ name: "fixture-types", version: "1.0.0", types: "./index.d.ts" }),
+        "utf8",
+      );
+      writeFileSync(
+        join(packageDirectory, "node_modules", "fixture-types", "index.d.ts"),
+        'export type Mode = "fast" | "safe";\n',
+        "utf8",
+      );
+      const closeSpy = vi.spyOn(API.prototype, "close");
       loadLibraryVocabulary({
-        filename: "/outside/repository/subject.ts",
-        repositoryRoot: "/outside/repository",
-      }),
-    ).toStrictEqual([]);
-  });
-
-  test("it returns an empty index without opening TypeScript when the package has no typed dependencies", () => {
-    const request = registerScenario("without-dependencies", {
-      entries: [],
-      snapshot: snapshotFor([], []),
+        filename: join(packageDirectory, "src", "subject.ts"),
+        repositoryRoot: packageDirectory,
+      });
+      return closeSpy;
     });
 
-    expect(loadLibraryVocabulary(request)).toStrictEqual([]);
-    expect(fakes.constructionCounts.has(request.repositoryRoot)).toBe(false);
-    expect(fakes.closeCounts.has(request.repositoryRoot)).toBe(false);
+    it("is closed once", ({ closeTypeScript }) => {
+      expect(closeTypeScript).toHaveBeenCalledTimes(1);
+    });
   });
 
-  test("it treats an unavailable TypeScript environment as an empty vocabulary", () => {
-    const entries = entriesFor("unavailable");
-    const request = registerScenario("unavailable", {
-      entries,
-      snapshot: snapshotFor(entries, []),
-      snapshotFailure: fakes.environmentFailure,
-    });
+  describe("a package directory asked for its vocabulary twice", () => {
+    const packageDirectory = join(FIXTURE_ROOT, "memoized");
+    const it = test
+      .extend("firstVocabulary", ({}, { onCleanup }) => {
+        rmSync(packageDirectory, { recursive: true, force: true });
+        onCleanup(() => {
+          rmSync(packageDirectory, { recursive: true, force: true });
+        });
+        mkdirSync(join(packageDirectory, "src"), { recursive: true });
+        mkdirSync(join(packageDirectory, "node_modules", "fixture-types"), { recursive: true });
+        writeFileSync(
+          join(packageDirectory, "package.json"),
+          JSON.stringify({ dependencies: { "fixture-types": "1.0.0" } }),
+          "utf8",
+        );
+        writeFileSync(
+          join(packageDirectory, "node_modules", "fixture-types", "package.json"),
+          JSON.stringify({ name: "fixture-types", version: "1.0.0", types: "./index.d.ts" }),
+          "utf8",
+        );
+        writeFileSync(
+          join(packageDirectory, "node_modules", "fixture-types", "index.d.ts"),
+          'export type Mode = "fast" | "safe";\n',
+          "utf8",
+        );
+        return loadLibraryVocabulary({
+          filename: join(packageDirectory, "src", "first.ts"),
+          repositoryRoot: packageDirectory,
+        });
+      })
+      .extend("secondVocabulary", ({ firstVocabulary }) => {
+        const [libraryType] = firstVocabulary;
+        if (libraryType === undefined) throw new Error("the first vocabulary must be present");
+        return loadLibraryVocabulary({
+          filename: join(packageDirectory, "src", `${libraryType.typeName}.ts`),
+          repositoryRoot: packageDirectory,
+        });
+      });
 
-    expect(loadLibraryVocabulary(request)).toStrictEqual([]);
-    expect(fakes.closeCounts.get(request.repositoryRoot)).toBe(1);
+    it("receives the first harvested index without rebuilding it", ({
+      firstVocabulary,
+      secondVocabulary,
+    }) => {
+      expect(secondVocabulary).toBe(firstVocabulary);
+    });
   });
 
-  test("it closes TypeScript and surfaces a non-environment failure", () => {
-    const entries = entriesFor("broken");
-    const checkerFailure = new Error("checker failed");
-    const request = registerScenario("broken", {
-      entries,
-      snapshot: snapshotFor(entries, []),
-      snapshotFailure: checkerFailure,
+  describe("a source outside every package in the repository", () => {
+    const it = test.extend("vocabulary", () =>
+      loadLibraryVocabulary({
+        filename: join(FIXTURE_ROOT, "outside", "subject.ts"),
+        repositoryRoot: join(FIXTURE_ROOT, "outside"),
+      }));
+
+    it("has no library vocabulary", ({ vocabulary }) => {
+      expect(vocabulary).toStrictEqual([]);
+    });
+  });
+
+  describe("a package that declares no typed dependency", () => {
+    const it = test.extend("vocabulary", ({}, { onCleanup }) => {
+      const packageDirectory = join(FIXTURE_ROOT, "without-dependencies");
+      rmSync(packageDirectory, { recursive: true, force: true });
+      onCleanup(() => {
+        rmSync(packageDirectory, { recursive: true, force: true });
+      });
+      mkdirSync(join(packageDirectory, "src"), { recursive: true });
+      writeFileSync(join(packageDirectory, "package.json"), "{}\n", "utf8");
+      return loadLibraryVocabulary({
+        filename: join(packageDirectory, "src", "subject.ts"),
+        repositoryRoot: packageDirectory,
+      });
     });
 
-    expect(() => loadLibraryVocabulary(request)).toThrow(checkerFailure);
-    expect(fakes.closeCounts.get(request.repositoryRoot)).toBe(1);
+    it("has an empty vocabulary", ({ vocabulary }) => {
+      expect(vocabulary).toStrictEqual([]);
+    });
+  });
+
+  describe("a package with no typed dependency entering TypeScript", () => {
+    const it = test.extend("updateSnapshot", ({}, { onCleanup }) => {
+      const packageDirectory = join(FIXTURE_ROOT, "without-dependencies-session");
+      rmSync(packageDirectory, { recursive: true, force: true });
+      onCleanup(() => {
+        rmSync(packageDirectory, { recursive: true, force: true });
+      });
+      mkdirSync(join(packageDirectory, "src"), { recursive: true });
+      writeFileSync(join(packageDirectory, "package.json"), "{}\n", "utf8");
+      const updateSnapshotSpy = vi.spyOn(API.prototype, "updateSnapshot");
+      loadLibraryVocabulary({
+        filename: join(packageDirectory, "src", "subject.ts"),
+        repositoryRoot: packageDirectory,
+      });
+      return updateSnapshotSpy;
+    });
+
+    it("is never attempted", ({ updateSnapshot }) => {
+      expect(updateSnapshot).toHaveBeenCalledTimes(0);
+    });
+  });
+
+  describe("dependency declarations whose TypeScript structures cannot be inspected", () => {
+    const it = test.extend("vocabulary", ({}, { onCleanup }) => {
+      const packageDirectory = join(FIXTURE_ROOT, "uninspectable-declarations");
+      rmSync(packageDirectory, { recursive: true, force: true });
+      mkdirSync(join(packageDirectory, "src"), { recursive: true });
+      writeFileSync(
+        join(packageDirectory, "package.json"),
+        JSON.stringify({
+          dependencies: {
+            "no-declaration": "1.0.0",
+            "no-module": "1.0.0",
+            "no-project": "1.0.0",
+            "no-source": "1.0.0",
+          },
+        }),
+        "utf8",
+      );
+      const declarationSources = {
+        "no-declaration": 'export type MissingDeclaration = "fast" | "safe";\n',
+        "no-module": 'declare type GlobalMode = "fast" | "safe";\n',
+        "no-project": 'export type ProjectMode = "fast" | "safe";\n',
+        "no-source": 'export type SourceMode = "fast" | "safe";\n',
+      };
+      for (const [dependencyName, declarationSource] of Object.entries(declarationSources)) {
+        const dependencyDirectory = join(packageDirectory, "node_modules", dependencyName);
+        mkdirSync(dependencyDirectory, { recursive: true });
+        writeFileSync(
+          join(dependencyDirectory, "package.json"),
+          JSON.stringify({ name: dependencyName, version: "1.0.0", types: "./index.d.ts" }),
+          "utf8",
+        );
+        writeFileSync(join(dependencyDirectory, "index.d.ts"), declarationSource, "utf8");
+      }
+      const noDeclarationPath = join(
+        packageDirectory,
+        "node_modules",
+        "no-declaration",
+        "index.d.ts",
+      );
+      const noModulePath = join(packageDirectory, "node_modules", "no-module", "index.d.ts");
+      const noProjectPath = join(packageDirectory, "node_modules", "no-project", "index.d.ts");
+      const noSourcePath = join(packageDirectory, "node_modules", "no-source", "index.d.ts");
+      const preparatoryApi = new API({ cwd: packageDirectory });
+      onCleanup(() => {
+        preparatoryApi.close();
+        rmSync(packageDirectory, { recursive: true, force: true });
+      });
+      const snapshot = preparatoryApi.updateSnapshot({
+        openFiles: [noDeclarationPath, noModulePath, noProjectPath, noSourcePath],
+      });
+      const getDefaultProjectForFile = snapshot.getDefaultProjectForFile.bind(snapshot);
+      const noSourceProject = getDefaultProjectForFile(noSourcePath);
+      if (noSourceProject === undefined) throw new Error("the no-source project must be present");
+      const noDeclarationProject = getDefaultProjectForFile(noDeclarationPath);
+      if (noDeclarationProject === undefined) {
+        throw new Error("the no-declaration project must be present");
+      }
+      const noDeclarationSource = noDeclarationProject.program.getSourceFile(noDeclarationPath);
+      if (noDeclarationSource === undefined) {
+        throw new Error("the no-declaration source must be present");
+      }
+      const noDeclarationModule =
+        noDeclarationProject.checker.getSymbolAtLocation(noDeclarationSource);
+      if (noDeclarationModule === undefined) {
+        throw new Error("the no-declaration module must be present");
+      }
+      const [exportedType] = noDeclarationProject.checker.getExportsOfModule(noDeclarationModule);
+      if (exportedType === undefined) throw new Error("the exported type must be present");
+      const declaredType = noDeclarationProject.checker.getDeclaredTypeOfSymbol(exportedType);
+      const exportedTypeWithoutDeclarations = new Proxy(exportedType, {
+        get(sourceSymbol, propertyName) {
+          if (propertyName === "declarations") return [];
+          if (propertyName === "flags") return sourceSymbol.flags;
+          if (propertyName === "name") return sourceSymbol.name;
+          return undefined;
+        },
+      });
+      vi.spyOn(noDeclarationProject.checker, "getExportsOfModule").mockReturnValueOnce([
+        exportedTypeWithoutDeclarations,
+      ]);
+      vi.spyOn(noDeclarationProject.checker, "getDeclaredTypeOfSymbol").mockReturnValueOnce(
+        declaredType,
+      );
+      const noModuleProject = getDefaultProjectForFile(noModulePath);
+      if (noModuleProject === undefined) throw new Error("the no-module project must be present");
+      const noModuleSource = noModuleProject.program.getSourceFile(noModulePath);
+      if (noModuleSource === undefined) throw new Error("the no-module source must be present");
+      vi.spyOn(noSourceProject.program, "getSourceFile").mockImplementation((sourcePath) => {
+        if (sourcePath === noDeclarationPath) return noDeclarationSource;
+        if (sourcePath === noModulePath) return noModuleSource;
+        return undefined;
+      });
+      vi.spyOn(snapshot, "getDefaultProjectForFile").mockImplementation((declarationsPath) => {
+        if (declarationsPath === noDeclarationPath) return noDeclarationProject;
+        if (declarationsPath === noModulePath) return noModuleProject;
+        if (declarationsPath === noSourcePath) return noSourceProject;
+        return undefined;
+      });
+      vi.spyOn(API.prototype, "updateSnapshot").mockReturnValueOnce(snapshot);
+      return loadLibraryVocabulary({
+        filename: join(packageDirectory, "src", "subject.ts"),
+        repositoryRoot: packageDirectory,
+      });
+    });
+
+    it("contribute no library vocabulary", ({ vocabulary }) => {
+      expect(vocabulary).toStrictEqual([]);
+    });
+  });
+
+  describe("TypeScript refusing to read the dependency declarations", () => {
+    const it = test.extend("vocabulary", ({}, { onCleanup }) => {
+      const packageDirectory = join(FIXTURE_ROOT, "environment-failure");
+      rmSync(packageDirectory, { recursive: true, force: true });
+      onCleanup(() => {
+        rmSync(packageDirectory, { recursive: true, force: true });
+      });
+      mkdirSync(join(packageDirectory, "src"), { recursive: true });
+      mkdirSync(join(packageDirectory, "node_modules", "fixture-types"), { recursive: true });
+      writeFileSync(
+        join(packageDirectory, "package.json"),
+        JSON.stringify({ dependencies: { "fixture-types": "1.0.0" } }),
+        "utf8",
+      );
+      writeFileSync(
+        join(packageDirectory, "node_modules", "fixture-types", "package.json"),
+        JSON.stringify({ name: "fixture-types", version: "1.0.0", types: "./index.d.ts" }),
+        "utf8",
+      );
+      writeFileSync(
+        join(packageDirectory, "node_modules", "fixture-types", "index.d.ts"),
+        'export type Mode = "fast" | "safe";\n',
+        "utf8",
+      );
+      vi.spyOn(API.prototype, "updateSnapshot").mockImplementationOnce(() => {
+        throw new FileSystemFailure("the declarations cannot be read");
+      });
+      return loadLibraryVocabulary({
+        filename: join(packageDirectory, "src", "subject.ts"),
+        repositoryRoot: packageDirectory,
+      });
+    });
+
+    it("is treated as an unavailable library vocabulary", ({ vocabulary }) => {
+      expect(vocabulary).toStrictEqual([]);
+    });
+  });
+
+  describe("TypeScript finding a defect in the dependency declarations", () => {
+    const checkerFailure = new TypeError("checker failed");
+    const it = test.extend("settlement", ({}, { onCleanup }) => {
+      const packageDirectory = join(FIXTURE_ROOT, "checker-failure");
+      rmSync(packageDirectory, { recursive: true, force: true });
+      onCleanup(() => {
+        rmSync(packageDirectory, { recursive: true, force: true });
+      });
+      mkdirSync(join(packageDirectory, "src"), { recursive: true });
+      mkdirSync(join(packageDirectory, "node_modules", "fixture-types"), { recursive: true });
+      writeFileSync(
+        join(packageDirectory, "package.json"),
+        JSON.stringify({ dependencies: { "fixture-types": "1.0.0" } }),
+        "utf8",
+      );
+      writeFileSync(
+        join(packageDirectory, "node_modules", "fixture-types", "package.json"),
+        JSON.stringify({ name: "fixture-types", version: "1.0.0", types: "./index.d.ts" }),
+        "utf8",
+      );
+      writeFileSync(
+        join(packageDirectory, "node_modules", "fixture-types", "index.d.ts"),
+        'export type Mode = "fast" | "safe";\n',
+        "utf8",
+      );
+      vi.spyOn(API.prototype, "updateSnapshot").mockImplementationOnce(() => {
+        throw checkerFailure;
+      });
+      return attempt(() =>
+        loadLibraryVocabulary({
+          filename: join(packageDirectory, "src", "subject.ts"),
+          repositoryRoot: packageDirectory,
+        }),
+      );
+    });
+
+    it("is surfaced whole", ({ settlement }) => {
+      expect(settlement).toStrictEqual([checkerFailure, null]);
+    });
   });
 });

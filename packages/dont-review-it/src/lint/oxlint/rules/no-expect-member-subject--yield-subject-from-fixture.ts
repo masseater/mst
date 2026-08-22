@@ -1,4 +1,5 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { resolveBinding, type ScopeLookup } from "../lib/resolved-bindings.ts";
 import { isAssertionEntryCall } from "../lib/spec-syntax/assertion-entries.ts";
 import { destructuredBindingsOf } from "../lib/spec-syntax/destructured-bindings.ts";
@@ -7,7 +8,7 @@ import { unwrapSubject, type SpecFunction } from "../lib/spec-syntax/subject-exp
 import { TABLE_DRIVEN_MEMBERS } from "../lib/spec-syntax/table-driven-titles.ts";
 import {
   declaresTestBlock,
-  testBlockBindings,
+  testBlockRootNames,
   testCallbacksOf,
 } from "../lib/spec-syntax/test-block-declarations.ts";
 import { testBlockModifiersOf } from "../lib/spec-syntax/test-block-modifiers.ts";
@@ -48,8 +49,8 @@ type Reading = {
 const handsRowsToCallback = (call: ESTree.CallExpression): boolean =>
   testBlockModifiersOf(call.callee).some((modifier) => TABLE_DRIVEN_MEMBERS.has(modifier.name));
 
-const contextSitesOf = (callback: SpecFunction): readonly HandedSite[] => {
-  const [parameter] = callback.params;
+const contextSitesOf = (specFunction: SpecFunction): readonly HandedSite[] => {
+  const [parameter] = specFunction.params;
   if (parameter === undefined) return [];
   return destructuredBindingsOf(parameter).map((binding) => ({
     name: binding.name,
@@ -112,10 +113,10 @@ const readingOfSubject = (subject: ESTree.Expression, lookup: Lookup): SubjectRe
 };
 
 const reportedSubjectIn = (
-  entry: ESTree.CallExpression,
+  assertionCall: ESTree.CallExpression,
   lookup: Lookup,
 ): { readonly node: ESTree.Expression; readonly messageId: string } | null => {
-  const [handed] = entry.arguments;
+  const [handed] = assertionCall.arguments;
   if (handed === undefined || handed.type === "SpreadElement") return null;
 
   const subject = unwrapSubject(handed);
@@ -151,45 +152,34 @@ export const noExpectMemberSubject = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
-
-    const blockBindings = testBlockBindings();
-    const calls = new Set<ESTree.CallExpression>();
-    const entries = new Set<ESTree.CallExpression>();
-    const declarators = new Set<ESTree.VariableDeclarator>();
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
     return {
-      ImportDeclaration: blockBindings.takeImport,
-      VariableDeclarator(node: ESTree.VariableDeclarator) {
-        blockBindings.takeLocalBinding(node);
-        declarators.add(node);
-      },
-      CallExpression(node: ESTree.CallExpression) {
-        calls.add(node);
-        if (isAssertionEntryCall(node)) entries.add(node);
-      },
-      "Program:exit"() {
-        const rootNames = blockBindings.rootNames();
-        const callbacks = [...calls]
+      "Program:exit"(program: ESTree.Program) {
+        const rootNames = testBlockRootNames(program);
+        const calls = nodesOfType(program, "CallExpression");
+        const specFunctions = calls
           .filter((call) => declaresTestBlock(call, rootNames) && !handsRowsToCallback(call))
           .flatMap((call) => testCallbacksOf(call));
 
         const lookup: Lookup = {
           sites: [
-            ...callbacks.flatMap((callback) => contextSitesOf(callback)),
-            ...[...declarators].flatMap((declarator) => declaredSitesOf(declarator)),
+            ...specFunctions.flatMap((specFunction) => contextSitesOf(specFunction)),
+            ...nodesOfType(program, "VariableDeclarator").flatMap((declarator) =>
+              declaredSitesOf(declarator),
+            ),
           ],
-          scopeAt: (node: ESTree.Node) => context.sourceCode.getScope(node),
+          scopeAt: (node: ESTree.Node) => inspection.sourceCode.getScope(node),
         };
 
-        for (const entry of entries) {
-          const reported = reportedSubjectIn(entry, lookup);
+        for (const assertionCall of calls.filter((call) => isAssertionEntryCall(call))) {
+          const reported = reportedSubjectIn(assertionCall, lookup);
           if (reported === null) continue;
-          context.report({
+          inspection.report({
             node: reported.node,
             messageId: reported.messageId,
-            data: { subject: context.sourceCode.getText(reported.node) },
+            data: { subject: inspection.sourceCode.getText(reported.node) },
           });
         }
       },

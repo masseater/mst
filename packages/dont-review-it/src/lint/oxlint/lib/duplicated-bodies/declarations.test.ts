@@ -2,142 +2,316 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { declarationsIn } from "./declarations.ts";
 
-type Declaration = ReturnType<typeof declarationsIn>[number];
+const ARROW_DOUBLING_STRUCTURE =
+  '{typeAnnotation:null,init:{type:"ArrowFunctionExpression",expression:true,async:false,typeParameters:null,params:[{type:"Identifier",decorators:[],name:"value",optional:false,typeAnnotation:{type:"TSTypeAnnotation",typeAnnotation:{type:"TSNumberKeyword"}}}],returnType:null,body:{type:"BinaryExpression",left:{type:"Identifier",decorators:[],name:"value",optional:false,typeAnnotation:null},operator:"*",right:{type:"Literal",value:2,raw:"2"}},id:null,generator:false}}';
 
-const soleDeclarationOf = (source: string): Declaration => {
-  const [declaration] = declarationsIn(source);
-  if (declaration === undefined) throw new Error(`nothing was declared in: ${source}`);
-  return declaration;
-};
+const ANNOTATED_ARROW_DOUBLING_STRUCTURE =
+  '{typeAnnotation:null,init:{type:"ArrowFunctionExpression",expression:true,async:false,typeParameters:null,params:[{type:"Identifier",decorators:[],name:"value",optional:false,typeAnnotation:{type:"TSTypeAnnotation",typeAnnotation:{type:"TSNumberKeyword"}}}],returnType:{type:"TSTypeAnnotation",typeAnnotation:{type:"TSNumberKeyword"}},body:{type:"BinaryExpression",left:{type:"Identifier",decorators:[],name:"value",optional:false,typeAnnotation:null},operator:"*",right:{type:"Literal",value:2,raw:"2"}},id:null,generator:false}}';
 
-const structureOfFirst = (source: string): string => soleDeclarationOf(source).structure;
+const FUNCTION_DOUBLING_STRUCTURE =
+  '{typeParameters:null,params:[{type:"Identifier",decorators:[],name:"value",optional:false,typeAnnotation:{type:"TSTypeAnnotation",typeAnnotation:{type:"TSNumberKeyword"}}}],returnType:null,body:{type:"BlockStatement",body:[{type:"ReturnStatement",argument:{type:"BinaryExpression",left:{type:"Identifier",decorators:[],name:"value",optional:false,typeAnnotation:null},operator:"*",right:{type:"Literal",value:2,raw:"2"}}}]},async:false,generator:false}';
 
-const namesOf = (declarations: readonly { readonly name: string }[]): readonly string[] =>
-  declarations.map((declaration) => declaration.name);
+const OUTER_ARROW_STRUCTURE =
+  '{typeAnnotation:null,init:{type:"ArrowFunctionExpression",expression:false,async:false,typeParameters:null,params:[],returnType:null,body:{type:"BlockStatement",body:[{type:"VariableDeclaration",kind:"const",declarations:[{type:"VariableDeclarator",id:{type:"Identifier",decorators:[],name:"inner",optional:false,typeAnnotation:null},init:{type:"Literal",value:1,raw:"1"},definite:false}],declare:false},{type:"ReturnStatement",argument:{type:"Identifier",decorators:[],name:"inner",optional:false,typeAnnotation:null}}]},id:null,generator:false}}';
+
+const LITERAL_ONE_STRUCTURE = '{typeAnnotation:null,init:{type:"Literal",value:1,raw:"1"}}';
+
+const LITERAL_TWO_STRUCTURE = '{typeAnnotation:null,init:{type:"Literal",value:2,raw:"2"}}';
+
+const TITLE_ALIAS_STRUCTURE =
+  '{typeParameters:null,typeAnnotation:{type:"TSTypeLiteral",members:[{type:"TSPropertySignature",computed:false,optional:false,readonly:true,key:{type:"Identifier",decorators:[],name:"title",optional:false,typeAnnotation:null},typeAnnotation:{type:"TSTypeAnnotation",typeAnnotation:{type:"TSStringKeyword"}},accessibility:null,static:false}]}}';
+
+const TITLE_INTERFACE_STRUCTURE =
+  '{typeParameters:null,extends:[],body:{type:"TSInterfaceBody",body:[{type:"TSPropertySignature",computed:false,optional:false,readonly:true,key:{type:"Identifier",decorators:[],name:"title",optional:false,typeAnnotation:null},typeAnnotation:{type:"TSTypeAnnotation",typeAnnotation:{type:"TSStringKeyword"}},accessibility:null,static:false}]}}';
+
+const TWICE_ARROW_SOURCE = "const twice = (value: number) => value * 2;";
+
+const DRAFT_ALIAS_SOURCE = "type Draft = { readonly title: string };";
+
+const DRAFT_INTERFACE_SOURCE = "interface Draft {\n  readonly title: string;\n}";
 
 describe("declarationsIn", () => {
-  test("reads an arrow binding under the name it was declared with", () => {
-    expect(soleDeclarationOf("const twice = (value: number): number => value * 2;").name).toBe(
-      "twice",
-    );
+  describe("an arrow binding", () => {
+    const it = test.extend("declarations", () => declarationsIn(TWICE_ARROW_SOURCE));
+
+    it("is read under the name it was declared with", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        { name: "twice", line: 1, structure: ARROW_DOUBLING_STRUCTURE, nodeCount: 7 },
+      ]);
+    });
   });
 
-  test("gives two bindings that differ only in name the same structure", () => {
-    expect(structureOfFirst("const twice = (value: number) => value * 2;")).toBe(
-      structureOfFirst("const doubled = (value: number) => value * 2;"),
-    );
+  describe("an arrow binding differing from another only in its name", () => {
+    const it = test.extend("declarations", () =>
+      declarationsIn("const doubled = (value: number) => value * 2;"));
+
+    it("is read with the structure the other one is read with", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        { name: "doubled", line: 1, structure: ARROW_DOUBLING_STRUCTURE, nodeCount: 7 },
+      ]);
+    });
   });
 
-  test("gives two bindings that differ only in comments the same structure", () => {
-    expect(structureOfFirst("const twice = (value: number) => value * 2;")).toBe(
-      structureOfFirst("// doubles it\nconst twice = (value: number) => /* here */ value * 2;"),
-    );
+  describe("an arrow binding carrying comments", () => {
+    const it = test
+      .extend("declarationsOfTheCommentedArrow", () =>
+        declarationsIn("/* doubles it */ const twice = (value: number) => /* here */ value * 2;"))
+      .extend("declarationsOfThePlainArrow", () => declarationsIn(TWICE_ARROW_SOURCE));
+
+    it("is read as the same declaration as the one without them", ({
+      declarationsOfTheCommentedArrow,
+      declarationsOfThePlainArrow,
+    }) => {
+      expect(declarationsOfTheCommentedArrow).toStrictEqual(declarationsOfThePlainArrow);
+    });
   });
 
-  test("gives two bindings that differ only in formatting the same structure", () => {
-    expect(structureOfFirst("const twice = (value: number) => value * 2;")).toBe(
-      structureOfFirst("const twice = (\n  value: number,\n) =>\n  value * 2;"),
-    );
+  describe("an arrow binding wrapped over several lines", () => {
+    const it = test
+      .extend("declarationsOfTheWrappedArrow", () =>
+        declarationsIn("const twice = (\n  value: number,\n) =>\n  value * 2;"))
+      .extend("declarationsOfTheArrowOnOneLine", () => declarationsIn(TWICE_ARROW_SOURCE));
+
+    it("is read as the same declaration as the one written on one line", ({
+      declarationsOfTheWrappedArrow,
+      declarationsOfTheArrowOnOneLine,
+    }) => {
+      expect(declarationsOfTheWrappedArrow).toStrictEqual(declarationsOfTheArrowOnOneLine);
+    });
   });
 
-  test("keeps two bindings apart when the body calls a different name", () => {
-    expect(structureOfFirst("const read = (path: string) => statSync(path);")).not.toBe(
-      structureOfFirst("const read = (path: string) => readFileSync(path);"),
-    );
+  describe("two arrow bindings whose bodies call a different name", () => {
+    const it = test
+      .extend("declarationsCallingStatSync", () =>
+        declarationsIn("const read = (path: string) => statSync(path);"))
+      .extend("declarationsCallingReadFileSync", () =>
+        declarationsIn("const read = (path: string) => readFileSync(path);"),
+      );
+
+    it("are kept apart", ({ declarationsCallingStatSync, declarationsCallingReadFileSync }) => {
+      expect(declarationsCallingStatSync).not.toStrictEqual(declarationsCallingReadFileSync);
+    });
   });
 
-  test("keeps two bindings apart when a parameter is named differently", () => {
-    expect(structureOfFirst("const twice = (value: number) => value * 2;")).not.toBe(
-      structureOfFirst("const twice = (amount: number) => amount * 2;"),
-    );
+  describe("two arrow bindings whose parameter is named differently", () => {
+    const it = test
+      .extend("declarationsTakingAmount", () =>
+        declarationsIn("const twice = (amount: number) => amount * 2;"))
+      .extend("declarationsTakingValue", () => declarationsIn(TWICE_ARROW_SOURCE));
+
+    it("are kept apart", ({ declarationsTakingAmount, declarationsTakingValue }) => {
+      expect(declarationsTakingAmount).not.toStrictEqual(declarationsTakingValue);
+    });
   });
 
-  test("keeps two bindings apart when only a string literal differs", () => {
-    expect(structureOfFirst(`const label = () => report("draft");`)).not.toBe(
-      structureOfFirst(`const label = () => report("published");`),
-    );
+  describe("two arrow bindings differing only in a string literal", () => {
+    const it = test
+      .extend("declarationsReportingDraft", () =>
+        declarationsIn('const label = () => report("draft");'))
+      .extend("declarationsReportingPublished", () =>
+        declarationsIn('const label = () => report("published");'),
+      );
+
+    it("are kept apart", ({ declarationsReportingDraft, declarationsReportingPublished }) => {
+      expect(declarationsReportingDraft).not.toStrictEqual(declarationsReportingPublished);
+    });
   });
 
-  test("keeps the type annotation of a binding inside the structure", () => {
-    expect(structureOfFirst("const parse: (text: string) => unknown = JSON.parse;")).not.toBe(
-      structureOfFirst("const parse: (text: string) => string = JSON.parse;"),
-    );
+  describe("two bindings differing only in a bigint literal", () => {
+    const it = test
+      .extend("declarationsHoldingOneBigint", () => declarationsIn("const amount = 1n;"))
+      .extend("declarationsHoldingTwoBigint", () => declarationsIn("const amount = 2n;"));
+
+    it("are kept apart because the bigint is written into the structure", ({
+      declarationsHoldingOneBigint,
+      declarationsHoldingTwoBigint,
+    }) => {
+      expect(declarationsHoldingOneBigint).not.toStrictEqual(declarationsHoldingTwoBigint);
+    });
   });
 
-  test("reads a function declaration under the name it was declared with", () => {
-    expect(soleDeclarationOf("function twice(value: number) {\n  return value * 2;\n}").name).toBe(
-      "twice",
-    );
+  describe("two bindings annotated with a different type", () => {
+    const it = test
+      .extend("declarationsAnnotatedAsUnknown", () =>
+        declarationsIn("const parse: (text: string) => unknown = JSON.parse;"))
+      .extend("declarationsAnnotatedAsString", () =>
+        declarationsIn("const parse: (text: string) => string = JSON.parse;"),
+      );
+
+    it("are kept apart because the annotation stands inside the structure", ({
+      declarationsAnnotatedAsUnknown,
+      declarationsAnnotatedAsString,
+    }) => {
+      expect(declarationsAnnotatedAsUnknown).not.toStrictEqual(declarationsAnnotatedAsString);
+    });
   });
 
-  test("reads an exported binding", () => {
-    expect(soleDeclarationOf("export const twice = (value: number) => value * 2;").name).toBe(
-      "twice",
-    );
+  describe("a function declaration", () => {
+    const it = test.extend("declarations", () =>
+      declarationsIn("function twice(value: number) {\n  return value * 2;\n}"));
+
+    it("is read under the name it was declared with", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        { name: "twice", line: 1, structure: FUNCTION_DOUBLING_STRUCTURE, nodeCount: 8 },
+      ]);
+    });
   });
 
-  test("leaves a declaration nested inside another declaration out", () => {
-    const declarations = declarationsIn(
-      "const outer = () => {\n  const inner = 1;\n  return inner;\n};",
-    );
-    expect(namesOf(declarations)).toStrictEqual(["outer"]);
+  describe("an exported arrow binding", () => {
+    const it = test
+      .extend("declarationsOfTheExportedArrow", () =>
+        declarationsIn("export const twice = (value: number) => value * 2;"))
+      .extend("declarationsOfTheKeptArrow", () => declarationsIn(TWICE_ARROW_SOURCE));
+
+    it("is read as the same declaration as the one kept to its module", ({
+      declarationsOfTheExportedArrow,
+      declarationsOfTheKeptArrow,
+    }) => {
+      expect(declarationsOfTheExportedArrow).toStrictEqual(declarationsOfTheKeptArrow);
+    });
   });
 
-  test("leaves an anonymous function written at a call site out", () => {
-    expect(declarationsIn("register(function () { return 1; });")).toStrictEqual([]);
+  describe("an arrow binding holding a binding of its own", () => {
+    const it = test.extend("declarations", () =>
+      declarationsIn("const outer = () => {\n  const inner = 1;\n  return inner;\n};"));
+
+    it("is read alone, leaving the nested binding out", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        { name: "outer", line: 1, structure: OUTER_ARROW_STRUCTURE, nodeCount: 8 },
+      ]);
+    });
   });
 
-  test("leaves a destructured binding out because it declares no single name", () => {
-    expect(declarationsIn("const { first, second } = readPair();")).toStrictEqual([]);
+  describe("an anonymous function written at a call site", () => {
+    const it = test.extend("declarations", () =>
+      declarationsIn("register(function () { return 1; });"));
+
+    it("is left out because it declares no name", ({ declarations }) => {
+      expect(declarations).toStrictEqual([]);
+    });
   });
 
-  test("records the line the declaration starts on", () => {
-    expect(
-      declarationsIn("const first = 1;\n\nconst second = 2;").map(
-        (declaration) => declaration.line,
-      ),
-    ).toStrictEqual([1, 3]);
+  describe("a destructured binding", () => {
+    const it = test.extend("declarations", () =>
+      declarationsIn("const { first, second } = readPair();"));
+
+    it("is left out because it declares no single name", ({ declarations }) => {
+      expect(declarations).toStrictEqual([]);
+    });
   });
 
-  test("reads a type alias under the name it was declared with", () => {
-    expect(soleDeclarationOf("type Draft = { readonly title: string };").name).toBe("Draft");
+  describe("two bindings separated by a blank line", () => {
+    const it = test.extend("declarations", () =>
+      declarationsIn("const first = 1;\n\nconst second = 2;"));
+
+    it("are each recorded at the line they start on", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        { name: "first", line: 1, structure: LITERAL_ONE_STRUCTURE, nodeCount: 1 },
+        { name: "second", line: 3, structure: LITERAL_TWO_STRUCTURE, nodeCount: 1 },
+      ]);
+    });
   });
 
-  test("reads an interface under the name it was declared with", () => {
-    expect(soleDeclarationOf("interface Draft {\n  readonly title: string;\n}").name).toBe("Draft");
+  describe("a type alias", () => {
+    const it = test.extend("declarations", () => declarationsIn(DRAFT_ALIAS_SOURCE));
+
+    it("is read under the name it was declared with", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        { name: "Draft", line: 1, structure: TITLE_ALIAS_STRUCTURE, nodeCount: 5 },
+      ]);
+    });
   });
 
-  test("reads an exported type alias", () => {
-    expect(soleDeclarationOf("export type Draft = { readonly title: string };").name).toBe("Draft");
+  describe("an interface", () => {
+    const it = test.extend("declarations", () => declarationsIn(DRAFT_INTERFACE_SOURCE));
+
+    it("is read under the name it was declared with", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        { name: "Draft", line: 1, structure: TITLE_INTERFACE_STRUCTURE, nodeCount: 5 },
+      ]);
+    });
   });
 
-  test("gives two type aliases that differ only in name the same structure", () => {
-    expect(structureOfFirst("type Draft = { readonly title: string };")).toBe(
-      structureOfFirst("type Published = { readonly title: string };"),
-    );
+  describe("an exported type alias", () => {
+    const it = test
+      .extend("declarationsOfTheExportedAlias", () =>
+        declarationsIn("export type Draft = { readonly title: string };"))
+      .extend("declarationsOfTheKeptAlias", () => declarationsIn(DRAFT_ALIAS_SOURCE));
+
+    it("is read as the same declaration as the one kept to its module", ({
+      declarationsOfTheExportedAlias,
+      declarationsOfTheKeptAlias,
+    }) => {
+      expect(declarationsOfTheExportedAlias).toStrictEqual(declarationsOfTheKeptAlias);
+    });
   });
 
-  test("keeps two type aliases apart when a member differs", () => {
-    expect(structureOfFirst("type Draft = { readonly title: string };")).not.toBe(
-      structureOfFirst("type Draft = { readonly title: number };"),
-    );
+  describe("a type alias differing from another only in its name", () => {
+    const it = test.extend("declarations", () =>
+      declarationsIn("type Published = { readonly title: string };"));
+
+    it("is read with the structure the other one is read with", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        { name: "Published", line: 1, structure: TITLE_ALIAS_STRUCTURE, nodeCount: 5 },
+      ]);
+    });
   });
 
-  test("keeps the type parameters of a type alias inside the structure", () => {
-    expect(structureOfFirst("type Boxed<Held> = { readonly held: Held };")).not.toBe(
-      structureOfFirst("type Boxed = { readonly held: Held };"),
-    );
+  describe("two type aliases whose member differs", () => {
+    const it = test
+      .extend("declarationsTitledWithANumber", () =>
+        declarationsIn("type Draft = { readonly title: number };"))
+      .extend("declarationsTitledWithAString", () => declarationsIn(DRAFT_ALIAS_SOURCE));
+
+    it("are kept apart", ({ declarationsTitledWithANumber, declarationsTitledWithAString }) => {
+      expect(declarationsTitledWithANumber).not.toStrictEqual(declarationsTitledWithAString);
+    });
   });
 
-  test("keeps an interface apart from a type alias that spells the same members", () => {
-    expect(structureOfFirst("interface Draft {\n  readonly title: string;\n}")).not.toBe(
-      structureOfFirst("type Draft = { readonly title: string };"),
-    );
+  describe("a parameterised type alias and the plain alias of the same name", () => {
+    const it = test
+      .extend("declarationsOfTheParameterisedAlias", () =>
+        declarationsIn("type Boxed<Held> = { readonly held: Held };"))
+      .extend("declarationsOfThePlainAlias", () =>
+        declarationsIn("type Boxed = { readonly held: Held };"),
+      );
+
+    it("are kept apart because the type parameters stand inside the structure", ({
+      declarationsOfTheParameterisedAlias,
+      declarationsOfThePlainAlias,
+    }) => {
+      expect(declarationsOfTheParameterisedAlias).not.toStrictEqual(declarationsOfThePlainAlias);
+    });
   });
 
-  test("counts more nodes for a longer body", () => {
-    const small = soleDeclarationOf("const one = 1;");
-    const large = soleDeclarationOf("const twice = (value: number): number => value * 2;");
-    expect(large.nodeCount).toBeGreaterThan(small.nodeCount);
+  describe("an interface and a type alias spelling the same members", () => {
+    const it = test
+      .extend("declarationsOfTheInterface", () => declarationsIn(DRAFT_INTERFACE_SOURCE))
+      .extend("declarationsOfTheAlias", () => declarationsIn(DRAFT_ALIAS_SOURCE));
+
+    it("are kept apart", ({ declarationsOfTheInterface, declarationsOfTheAlias }) => {
+      expect(declarationsOfTheInterface).not.toStrictEqual(declarationsOfTheAlias);
+    });
+  });
+
+  describe("a body written as a single literal", () => {
+    const it = test.extend("declarations", () => declarationsIn("const one = 1;"));
+
+    it("is counted as one node", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        { name: "one", line: 1, structure: LITERAL_ONE_STRUCTURE, nodeCount: 1 },
+      ]);
+    });
+  });
+
+  describe("a longer body", () => {
+    const it = test.extend("declarations", () =>
+      declarationsIn("const twice = (value: number): number => value * 2;"));
+
+    it("is counted as more nodes", ({ declarations }) => {
+      expect(declarations).toStrictEqual([
+        { name: "twice", line: 1, structure: ANNOTATED_ARROW_DOUBLING_STRUCTURE, nodeCount: 9 },
+      ]);
+    });
   });
 });

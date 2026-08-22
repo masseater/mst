@@ -47,24 +47,30 @@
     "dev": "vp pack --watch",
     "test": "spool -- vp test",
     "check": "spool -- vp check",
-    "check:skills": "intent validate"
+    "check:skills": "intent validate",
+    "typecheck": "spool -- tsc -p ."
   },
   "dependencies": {
     "@mst/lint-rule-authoring": "workspace:*",
+    "@mst/repository-checks": "workspace:*",
+    "@mst/verified-specifications": "workspace:*",
     "@oxlint/plugins": "catalog:",
     "citty": "catalog:",
     "es-toolkit": "catalog:",
     "jsonc-parser": "catalog:",
+    "mdast-util-from-markdown": "2.0.3",
+    "mdast-util-frontmatter": "2.0.1",
+    "micromark-extension-frontmatter": "2.0.0",
     "oxc-parser": "catalog:",
     "oxfmt": "0.61.0",
     "oxlint": "catalog:",
     "std-env": "4.2.0",
     "typescript": "catalog:",
+    "typescript-6": "npm:@typescript/typescript6@6.0.2",
     "yaml": "catalog:"
   },
   "devDependencies": {
     "@mst/ai-native": "workspace:*",
-    "@mst/repository-checks": "workspace:*",
     "@tanstack/intent": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",

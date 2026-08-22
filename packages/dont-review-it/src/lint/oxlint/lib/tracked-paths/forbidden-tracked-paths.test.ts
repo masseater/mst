@@ -7,135 +7,236 @@ import {
   trackedPathsInForce,
 } from "./forbidden-tracked-paths.ts";
 
-const DEFAULT_PATTERNS = ["**/node_modules/**", "**/dist/**", "**/coverage/**", "**/.env"];
+describe("registeredTrackedPathsFrom", () => {
+  describe("an empty configuration", () => {
+    const it = test.extend("registeredPatterns", () =>
+      registeredTrackedPathsFrom([]).map((registration) => registration.pattern));
 
-const patternsOf = (registrations: readonly { readonly pattern: string }[]): readonly string[] =>
-  registrations.map((registration) => registration.pattern);
-
-const SELF_RELEASING_OPTIONS = [
-  {
-    forbidden: [{ pattern: "vendor/**", reason: "the upstream ships no source" }],
-    released: [{ pattern: "vendor/**", reason: "the bundle is the shipped artifact" }],
-  },
-];
-
-describe("forbidden-tracked-paths", () => {
-  test("an empty configuration carries the registered defaults", () => {
-    expect(patternsOf(registeredTrackedPathsFrom([]))).toStrictEqual(DEFAULT_PATTERNS);
+    it("carries the registered defaults", ({ registeredPatterns }) => {
+      expect(registeredPatterns).toStrictEqual([
+        "**/node_modules/**",
+        "**/dist/**",
+        "**/coverage/**",
+        "**/.env",
+      ]);
+    });
   });
 
-  test("a first option that is not an object carries the registered defaults", () => {
-    expect(patternsOf(registeredTrackedPathsFrom([[]]))).toStrictEqual(DEFAULT_PATTERNS);
+  describe("a first option that is not an object", () => {
+    const it = test.extend("registeredPatterns", () =>
+      registeredTrackedPathsFrom([[]]).map((registration) => registration.pattern));
+
+    it("carries the registered defaults", ({ registeredPatterns }) => {
+      expect(registeredPatterns).toStrictEqual([
+        "**/node_modules/**",
+        "**/dist/**",
+        "**/coverage/**",
+        "**/.env",
+      ]);
+    });
   });
 
-  test("a forbidden field that is not a list carries the registered defaults", () => {
-    expect(patternsOf(registeredTrackedPathsFrom([{ forbidden: "vendor" }]))).toStrictEqual(
-      DEFAULT_PATTERNS,
-    );
+  describe("a forbidden field that is not a list", () => {
+    const it = test.extend("registeredPatterns", () =>
+      registeredTrackedPathsFrom([{ forbidden: "vendor" }]).map(
+        (registration) => registration.pattern,
+      ));
+
+    it("carries the registered defaults", ({ registeredPatterns }) => {
+      expect(registeredPatterns).toStrictEqual([
+        "**/node_modules/**",
+        "**/dist/**",
+        "**/coverage/**",
+        "**/.env",
+      ]);
+    });
   });
 
-  test("a configured row is added after the defaults", () => {
-    expect(
-      patternsOf(
-        registeredTrackedPathsFrom([
-          { forbidden: [{ pattern: "vendor/**", reason: "the upstream ships no source" }] },
-        ]),
-      ),
-    ).toStrictEqual([...DEFAULT_PATTERNS, "vendor/**"]);
+  describe("a configuration holding one spelled row", () => {
+    const it = test.extend("registeredPatterns", () =>
+      registeredTrackedPathsFrom([
+        { forbidden: [{ pattern: "vendor/**", reason: "the upstream ships no source" }] },
+      ]).map((registration) => registration.pattern));
+
+    it("adds that row after the defaults", ({ registeredPatterns }) => {
+      expect(registeredPatterns).toStrictEqual([
+        "**/node_modules/**",
+        "**/dist/**",
+        "**/coverage/**",
+        "**/.env",
+        "vendor/**",
+      ]);
+    });
   });
 
-  test("rows without a spelled pattern are dropped", () => {
-    expect(
-      patternsOf(
-        registeredTrackedPathsFrom([{ forbidden: [null, 42, { pattern: "   " }, ["vendor"]] }]),
-      ),
-    ).toStrictEqual(DEFAULT_PATTERNS);
+  describe("rows carrying no spelled pattern", () => {
+    const it = test.extend("registeredPatterns", () =>
+      registeredTrackedPathsFrom([{ forbidden: [null, 42, { pattern: "   " }, ["vendor"]] }]).map(
+        (registration) => registration.pattern,
+      ));
+
+    it("are dropped", ({ registeredPatterns }) => {
+      expect(registeredPatterns).toStrictEqual([
+        "**/node_modules/**",
+        "**/dist/**",
+        "**/coverage/**",
+        "**/.env",
+      ]);
+    });
   });
 
-  test("a row keeps its reason, its ignore demand and its exceptions", () => {
-    const [registration] = registeredTrackedPathsFrom([
-      {
-        forbidden: [
+  describe("a row carrying a reason, an ignore demand and exceptions", () => {
+    const it = test.extend("registrationsAfterTheDefaults", () =>
+      registeredTrackedPathsFrom([
+        {
+          forbidden: [
+            {
+              pattern: "vendor/**",
+              reason: "  the upstream ships no source  ",
+              ignoreListing: false,
+              exceptions: [
+                null,
+                { pattern: "" },
+                { pattern: "vendor/keep.js", reason: " shipped " },
+              ],
+            },
+          ],
+        },
+      ]).slice(-1));
+
+    it("keeps its reason, its ignore demand and its spelled exceptions", ({
+      registrationsAfterTheDefaults,
+    }) => {
+      expect(registrationsAfterTheDefaults).toStrictEqual([
+        {
+          pattern: "vendor/**",
+          reason: "the upstream ships no source",
+          ignoreListing: false,
+          exceptions: [{ pattern: "vendor/keep.js", reason: "shipped" }],
+        },
+      ]);
+    });
+  });
+
+  describe("a row naming no readable reason and no exception list", () => {
+    const it = test.extend("registrationsAfterTheDefaults", () =>
+      registeredTrackedPathsFrom([
+        { forbidden: [{ pattern: "vendor/**", reason: 42, exceptions: "vendor/keep.js" }] },
+      ]).slice(-1));
+
+    it("reads as an empty pair that demands the listing", ({ registrationsAfterTheDefaults }) => {
+      expect(registrationsAfterTheDefaults).toStrictEqual([
+        { pattern: "vendor/**", reason: "", ignoreListing: true, exceptions: [] },
+      ]);
+    });
+  });
+});
+
+describe("releasesFrom", () => {
+  describe("releases carrying no spelled pattern", () => {
+    const it = test.extend("releases", () =>
+      releasesFrom([{ released: [null, { pattern: "  " }, { pattern: "**/dist/**" }] }]));
+
+    it("are dropped", ({ releases }) => {
+      expect(releases).toStrictEqual([{ pattern: "**/dist/**", reason: "" }]);
+    });
+  });
+});
+
+describe("trackedPathsInForce", () => {
+  describe("a release that carries grounds", () => {
+    const it = test.extend("patternsInForce", () =>
+      trackedPathsInForce({
+        registered: registeredTrackedPathsFrom([]),
+        releases: releasesFrom([
           {
-            pattern: "vendor/**",
-            reason: "  the upstream ships no source  ",
-            ignoreListing: false,
-            exceptions: [null, { pattern: "" }, { pattern: "vendor/keep.js", reason: " shipped " }],
+            released: [
+              { pattern: "**/dist/**", reason: "the build output is the shipped artifact" },
+            ],
           },
-        ],
-      },
-    ]).slice(-1);
+        ]),
+      }).map((registration) => registration.pattern));
 
-    expect(registration).toStrictEqual({
-      pattern: "vendor/**",
-      reason: "the upstream ships no source",
-      ignoreListing: false,
-      exceptions: [{ pattern: "vendor/keep.js", reason: "shipped" }],
+    it("lifts the row it names", ({ patternsInForce }) => {
+      expect(patternsInForce).toStrictEqual(["**/node_modules/**", "**/coverage/**", "**/.env"]);
     });
   });
 
-  test("a row naming no exception list and no reason reads as an empty pair", () => {
-    const [registration] = registeredTrackedPathsFrom([
-      { forbidden: [{ pattern: "vendor/**", reason: 42, exceptions: "vendor/keep.js" }] },
-    ]).slice(-1);
+  describe("a release that carries no grounds", () => {
+    const it = test.extend("patternsInForce", () =>
+      trackedPathsInForce({
+        registered: registeredTrackedPathsFrom([]),
+        releases: releasesFrom([{ released: [{ pattern: "**/dist/**" }] }]),
+      }).map((registration) => registration.pattern));
 
-    expect(registration).toStrictEqual({
-      pattern: "vendor/**",
-      reason: "",
-      ignoreListing: true,
-      exceptions: [],
+    it("lifts nothing", ({ patternsInForce }) => {
+      expect(patternsInForce).toStrictEqual([
+        "**/node_modules/**",
+        "**/dist/**",
+        "**/coverage/**",
+        "**/.env",
+      ]);
     });
   });
 
-  test("releases without a spelled pattern are dropped", () => {
-    expect(
-      releasesFrom([{ released: [null, { pattern: "  " }, { pattern: "**/dist/**" }] }]),
-    ).toStrictEqual([{ pattern: "**/dist/**", reason: "" }]);
+  describe("a release naming a row this configuration added", () => {
+    const it = test.extend("patternsInForce", () =>
+      trackedPathsInForce({
+        registered: registeredTrackedPathsFrom([
+          {
+            forbidden: [{ pattern: "vendor/**", reason: "the upstream ships no source" }],
+            released: [{ pattern: "vendor/**", reason: "the bundle is the shipped artifact" }],
+          },
+        ]),
+        releases: releasesFrom([
+          {
+            forbidden: [{ pattern: "vendor/**", reason: "the upstream ships no source" }],
+            released: [{ pattern: "vendor/**", reason: "the bundle is the shipped artifact" }],
+          },
+        ]),
+      }).map((registration) => registration.pattern));
+
+    it("lifts nothing", ({ patternsInForce }) => {
+      expect(patternsInForce).toStrictEqual([
+        "**/node_modules/**",
+        "**/dist/**",
+        "**/coverage/**",
+        "**/.env",
+        "vendor/**",
+      ]);
+    });
+  });
+});
+
+describe("deadReleasesIn", () => {
+  describe("a release naming a pattern outside the defaults", () => {
+    const it = test.extend("deadReleases", () =>
+      deadReleasesIn(
+        releasesFrom([
+          { released: [{ pattern: "**/nowhere/**", reason: "moved" }, { pattern: "**/dist/**" }] },
+        ]),
+      ));
+
+    it("is dead", ({ deadReleases }) => {
+      expect(deadReleases).toStrictEqual([{ pattern: "**/nowhere/**", reason: "moved" }]);
+    });
   });
 
-  test("a release that carries grounds lifts the row it names", () => {
-    const registered = registeredTrackedPathsFrom([]);
-    const releases = releasesFrom([
-      { released: [{ pattern: "**/dist/**", reason: "the build output is the shipped artifact" }] },
-    ]);
+  describe("a release naming a row this configuration added", () => {
+    const it = test.extend("deadReleases", () =>
+      deadReleasesIn(
+        releasesFrom([
+          {
+            forbidden: [{ pattern: "vendor/**", reason: "the upstream ships no source" }],
+            released: [{ pattern: "vendor/**", reason: "the bundle is the shipped artifact" }],
+          },
+        ]),
+      ));
 
-    expect(patternsOf(trackedPathsInForce({ registered, releases }))).toStrictEqual([
-      "**/node_modules/**",
-      "**/coverage/**",
-      "**/.env",
-    ]);
-  });
-
-  test("a release that carries no grounds lifts nothing", () => {
-    const registered = registeredTrackedPathsFrom([]);
-    const releases = releasesFrom([{ released: [{ pattern: "**/dist/**" }] }]);
-
-    expect(patternsOf(trackedPathsInForce({ registered, releases }))).toStrictEqual(
-      DEFAULT_PATTERNS,
-    );
-  });
-
-  test("a release naming a pattern outside the defaults is dead", () => {
-    const releases = releasesFrom([
-      { released: [{ pattern: "**/nowhere/**", reason: "moved" }, { pattern: "**/dist/**" }] },
-    ]);
-
-    expect(deadReleasesIn(releases)).toStrictEqual([{ pattern: "**/nowhere/**", reason: "moved" }]);
-  });
-
-  test("a release naming a row this configuration added is dead", () => {
-    expect(deadReleasesIn(releasesFrom(SELF_RELEASING_OPTIONS))).toStrictEqual([
-      { pattern: "vendor/**", reason: "the bundle is the shipped artifact" },
-    ]);
-  });
-
-  test("a release naming a row this configuration added lifts nothing", () => {
-    const registered = registeredTrackedPathsFrom(SELF_RELEASING_OPTIONS);
-    const releases = releasesFrom(SELF_RELEASING_OPTIONS);
-
-    expect(patternsOf(trackedPathsInForce({ registered, releases }))).toStrictEqual([
-      ...DEFAULT_PATTERNS,
-      "vendor/**",
-    ]);
+    it("is dead", ({ deadReleases }) => {
+      expect(deadReleases).toStrictEqual([
+        { pattern: "vendor/**", reason: "the bundle is the shipped artifact" },
+      ]);
+    });
   });
 });

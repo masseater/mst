@@ -11,7 +11,7 @@ type RepositoryParameters = {
 type PullRequestParameters = RepositoryParameters & { readonly pull_number: number };
 
 type GithubApi = {
-  readonly getPull: (request: PullRequestParameters) => Promise<{
+  readonly getPull: (asked: PullRequestParameters) => Promise<{
     readonly data: {
       readonly title: string;
       readonly body: string | null;
@@ -23,14 +23,14 @@ type GithubApi = {
     };
   }>;
   readonly createCommitStatus: (
-    request: RepositoryParameters & {
+    asked: RepositoryParameters & {
       readonly sha: string;
       readonly state: CommitStatusState;
       readonly context: string;
       readonly description: string;
     },
   ) => Promise<unknown>;
-  readonly listReviews: (request: PullRequestParameters & { readonly per_page: number }) => Promise<
+  readonly listReviews: (asked: PullRequestParameters & { readonly per_page: number }) => Promise<
     readonly {
       readonly state: string;
       readonly body: string;
@@ -40,7 +40,7 @@ type GithubApi = {
     }[]
   >;
   readonly requestReviewers: (
-    request: PullRequestParameters & { readonly reviewers: string[] },
+    asked: PullRequestParameters & { readonly reviewers: string[] },
   ) => Promise<unknown>;
 };
 
@@ -49,7 +49,7 @@ type ReviewParameters = Parameters<GithubApi["listReviews"]>[0];
 type ReviewResponses = Awaited<ReturnType<GithubApi["listReviews"]>>;
 
 type PaginatedReviewEndpoint = (
-  request: ReviewParameters,
+  asked: ReviewParameters,
 ) => Promise<{ readonly data: ReviewResponses }>;
 
 export type GithubOctokit = {
@@ -63,7 +63,7 @@ export type GithubOctokit = {
   };
   readonly paginate: (
     endpoint: PaginatedReviewEndpoint,
-    request: ReviewParameters,
+    asked: ReviewParameters,
   ) => Promise<ReviewResponses>;
 };
 
@@ -81,7 +81,7 @@ const createOctokitApi = (client: {
   return {
     getPull: octokit.rest.pulls.get.bind(octokit.rest.pulls),
     createCommitStatus: octokit.rest.repos.createCommitStatus.bind(octokit.rest.repos),
-    listReviews: (request) => octokit.paginate(octokit.rest.pulls.listReviews, request),
+    listReviews: (asked) => octokit.paginate(octokit.rest.pulls.listReviews, asked),
     requestReviewers: octokit.rest.pulls.requestReviewers.bind(octokit.rest.pulls),
   };
 };
@@ -112,14 +112,14 @@ export const createGithubApiClient = (client: {
         requestedReviewerLogins: (data.requested_reviewers ?? []).map((reviewer) => reviewer.login),
       };
     },
-    createCommitStatus: async (request) => {
+    createCommitStatus: async (asked) => {
       await api.createCommitStatus({
         owner,
         repo,
-        sha: request.sha,
-        state: request.state,
-        context: request.context,
-        description: request.description,
+        sha: asked.sha,
+        state: asked.state,
+        context: asked.context,
+        description: asked.description,
       });
     },
     listReviews: async (prNumber): Promise<readonly Review[]> => {
@@ -137,12 +137,12 @@ export const createGithubApiClient = (client: {
         authorLogin: review.user?.login ?? "",
       }));
     },
-    requestReviewers: async (request) => {
+    requestReviewers: async (asked) => {
       await api.requestReviewers({
         owner,
         repo,
-        pull_number: request.prNumber,
-        reviewers: [...request.logins],
+        pull_number: asked.prNumber,
+        reviewers: [...asked.logins],
       });
     },
   };

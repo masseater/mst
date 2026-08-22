@@ -5,7 +5,7 @@ export class VerifierUnavailableError extends Error {
 
   readonly category = "verifier-unavailable";
 
-  constructor(reason: string) {
-    super(reason);
+  constructor(reason: string, ruleOptions?: { readonly cause?: unknown }) {
+    super(reason, ruleOptions);
   }
 }

@@ -1,7 +1,7 @@
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { describe, expect, onTestFinished, test, vi } from "vite-plus/test";
+import { describe, expect, test, vi } from "vite-plus/test";
 
 import { createCommandExecutor, createGitRunner, createTailFs } from "./node-adapters.ts";
 
@@ -41,31 +41,79 @@ const repositoryLocalGitVariables = [
 ] as const;
 
 type GitFileRunner = NonNullable<NonNullable<Parameters<typeof createGitRunner>[0]>["fileRunner"]>;
+type CommandFileRunner = NonNullable<
+  NonNullable<Parameters<typeof createCommandExecutor>[0]>["fileRunner"]
+>;
 
 describe("createGitRunner", () => {
-  test("constructs the process-backed default without starting a child", () => {
-    expect(createGitRunner().run).toBeTypeOf("function");
-  });
-
-  test("removes repository-local Git variables while preserving transport settings", async () => {
-    const fileRunner = vi.fn<GitFileRunner>(() =>
-      Promise.resolve({ stdout: "revision\n", stderr: "" }),
-    );
-
-    const completedGitCommand = await createGitRunner({
-      fileRunner,
-      environment: {
-        ...Object.fromEntries(repositoryLocalGitVariables.map((name) => [name, `parent-${name}`])),
-        GIT_SSH_COMMAND: "ssh -i /credentials/deploy-key",
-      },
-    }).run({
-      args: ["rev-parse", "HEAD"],
-      cwd: "/repository",
-      configOverrides: { "user.name": "test user" },
+  const it = test
+    .extend("defaultGitRunType", () => typeof createGitRunner().run)
+    .extend("completedGitCommand", async () => {
+      const gitFileRun = vi.fn<GitFileRunner>(() =>
+        Promise.resolve({ stdout: "revision\n", stderr: "" }),
+      );
+      return createGitRunner({
+        fileRunner: gitFileRun,
+        environment: {
+          ...Object.fromEntries(
+            repositoryLocalGitVariables.map((gitVariable) => [
+              gitVariable,
+              `parent-${gitVariable}`,
+            ]),
+          ),
+          GIT_SSH_COMMAND: "ssh -i /credentials/deploy-key",
+        },
+      }).run({
+        args: ["rev-parse", "HEAD"],
+        cwd: "/repository",
+        configOverrides: { "user.name": "test user" },
+      });
+    })
+    .extend("configuredGitFileRun", async () => {
+      const configuredGitFileRun = vi.fn<GitFileRunner>(() =>
+        Promise.resolve({ stdout: "revision\n", stderr: "" }),
+      );
+      await createGitRunner({
+        fileRunner: configuredGitFileRun,
+        environment: {
+          ...Object.fromEntries(
+            repositoryLocalGitVariables.map((gitVariable) => [
+              gitVariable,
+              `parent-${gitVariable}`,
+            ]),
+          ),
+          GIT_SSH_COMMAND: "ssh -i /credentials/deploy-key",
+        },
+      }).run({
+        args: ["rev-parse", "HEAD"],
+        cwd: "/repository",
+        configOverrides: { "user.name": "test user" },
+      });
+      return configuredGitFileRun;
+    })
+    .extend("unconfiguredGitFileRun", async () => {
+      const unconfiguredGitFileRun = vi.fn<GitFileRunner>(() =>
+        Promise.resolve({ stdout: "", stderr: "" }),
+      );
+      await createGitRunner({ fileRunner: unconfiguredGitFileRun, environment: {} }).run({
+        args: ["status", "--short"],
+        cwd: "/repository",
+      });
+      return unconfiguredGitFileRun;
     });
 
+  it("constructs the process-backed default without starting a child", ({ defaultGitRunType }) => {
+    expect(defaultGitRunType).toBe("function");
+  });
+
+  it("returns the completed Git command", ({ completedGitCommand }) => {
     expect(completedGitCommand).toStrictEqual({ stdout: "revision\n", stderr: "" });
-    expect(fileRunner).toHaveBeenCalledExactlyOnceWith({
+  });
+
+  it("removes repository-local Git variables while preserving transport settings", ({
+    configuredGitFileRun,
+  }) => {
+    expect(configuredGitFileRun).toHaveBeenCalledExactlyOnceWith({
       binary: "git",
       args: ["-c", "user.name=test user", "rev-parse", "HEAD"],
       options: {
@@ -76,15 +124,8 @@ describe("createGitRunner", () => {
     });
   });
 
-  test("omits Git config flags when overrides are absent", async () => {
-    const fileRunner = vi.fn<GitFileRunner>(() => Promise.resolve({ stdout: "", stderr: "" }));
-
-    await createGitRunner({ fileRunner, environment: {} }).run({
-      args: ["status", "--short"],
-      cwd: "/repository",
-    });
-
-    expect(fileRunner).toHaveBeenCalledExactlyOnceWith({
+  it("omits Git config flags when overrides are absent", ({ unconfiguredGitFileRun }) => {
+    expect(unconfiguredGitFileRun).toHaveBeenCalledExactlyOnceWith({
       binary: "git",
       args: ["status", "--short"],
       options: {
@@ -97,84 +138,186 @@ describe("createGitRunner", () => {
 });
 
 describe("createCommandExecutor", () => {
-  test(
+  const it = test
+    .extend("nodeVersionCommand", () =>
+      createCommandExecutor({ timeout: 30_000 }).run({
+        binary: process.execPath,
+        args: ["--version"],
+      }))
+    .extend("completedCommand", () => {
+      const commandFileRun = vi.fn<CommandFileRunner>(() =>
+        Promise.resolve({ stdout: "out", stderr: "err" }),
+      );
+      return createCommandExecutor({ fileRunner: commandFileRun, timeout: 30_000 }).run({
+        binary: "command",
+        args: ["argument"],
+      });
+    })
+    .extend("successfulCommandFileRun", async () => {
+      const successfulCommandFileRun = vi.fn<CommandFileRunner>(() =>
+        Promise.resolve({ stdout: "out", stderr: "err" }),
+      );
+      await createCommandExecutor({
+        fileRunner: successfulCommandFileRun,
+        timeout: 30_000,
+      }).run({
+        binary: "command",
+        args: ["argument"],
+      });
+      return successfulCommandFileRun;
+    })
+    .extend("nonzeroCommand", () => {
+      const processFailure = new CommandFailure({ code: 7, stderr: "err", stdout: "out" });
+      return createCommandExecutor({
+        fileRunner: () => Promise.reject(processFailure),
+      }).run({
+        binary: "command",
+        args: [],
+      });
+    })
+    .extend("missingCommand", () =>
+      createCommandExecutor({
+        fileRunner: () => Promise.reject(new CommandFailure({ code: "ENOENT" })),
+      }).run({ binary: "missing", args: [] }),
+    );
+
+  it(
     "runs the process-backed default with the requested binary and arguments",
     { timeout: 40_000 },
-    async () => {
-      const gitVersion = await createCommandExecutor({ timeout: 30_000 }).run({
-        binary: "git",
-        args: ["--version"],
+    ({ nodeVersionCommand }) => {
+      expect(nodeVersionCommand).toStrictEqual({
+        exitCode: 0,
+        stdout: `${process.version}\n`,
+        stderr: "",
       });
-
-      expect(gitVersion.exitCode).toBe(0);
-      expect(gitVersion.stdout).toMatch(/^git version \d+\.\d+\.\d+/u);
-      expect(gitVersion.stderr).toBe("");
     },
   );
 
-  test("returns standard streams and the successful exit code", async () => {
-    const fileRunner = vi.fn<
-      NonNullable<NonNullable<Parameters<typeof createCommandExecutor>[0]>["fileRunner"]>
-    >(() => Promise.resolve({ stdout: "out", stderr: "err" }));
-    const completedCommand = await createCommandExecutor({ fileRunner, timeout: 30_000 }).run({
-      binary: "command",
-      args: ["argument"],
-    });
-
+  it("returns standard streams and the successful exit code", ({ completedCommand }) => {
     expect(completedCommand).toStrictEqual({ exitCode: 0, stdout: "out", stderr: "err" });
-    expect(fileRunner).toHaveBeenCalledExactlyOnceWith({
+  });
+
+  it("passes the requested command to the file runner", ({ successfulCommandFileRun }) => {
+    expect(successfulCommandFileRun).toHaveBeenCalledExactlyOnceWith({
       binary: "command",
       args: ["argument"],
       options: { maxBuffer: 64 * 1024 * 1024, timeout: 30_000 },
     });
   });
 
-  test("returns output from a nonzero child", async () => {
-    const processFailure = new CommandFailure({ code: 7, stderr: "err", stdout: "out" });
-    const failed = await createCommandExecutor({
-      fileRunner: () => Promise.reject(processFailure),
-    }).run({
-      binary: "command",
-      args: [],
-    });
-
-    expect(failed).toStrictEqual({ exitCode: 7, stdout: "out", stderr: "err" });
+  it("returns output from a nonzero child", ({ nonzeroCommand }) => {
+    expect(nonzeroCommand).toStrictEqual({ exitCode: 7, stdout: "out", stderr: "err" });
   });
 
-  test("fills absent output from a rejected file runner", async () => {
-    const failedStart = await createCommandExecutor({
-      fileRunner: () => Promise.reject(new CommandFailure({ code: "ENOENT" })),
-    }).run({ binary: "missing", args: [] });
-
-    expect(failedStart).toStrictEqual({ exitCode: 1, stdout: "", stderr: "" });
+  it("fills absent output from a rejected file runner", ({ missingCommand }) => {
+    expect(missingCommand).toStrictEqual({ exitCode: 1, stdout: "", stderr: "" });
   });
 });
 
 describe("createTailFs", () => {
-  test("creates, reads and removes command transcript files", () => {
-    const fs = createTailFs();
-    const directory = fs.makeTempDir("auto-develop-tail-fs-");
-    onTestFinished(() => {
-      rmSync(directory, { recursive: true, force: true });
+  const it = test
+    .extend("completeTranscript", ({}, { onCleanup }) => {
+      const tailFs = createTailFs();
+      const directory = tailFs.makeTempDir("auto-develop-tail-fs-");
+      onCleanup(() => {
+        tailFs.removeRecursive(directory);
+      });
+      const transcriptPath = join(directory, "output.txt");
+      tailFs.appendTarget(transcriptPath);
+      writeFileSync(transcriptPath, "first-second");
+      return tailFs.readAll(transcriptPath);
+    })
+    .extend("transcriptSuffix", ({}, { onCleanup }) => {
+      const tailFs = createTailFs();
+      const directory = tailFs.makeTempDir("auto-develop-tail-fs-");
+      onCleanup(() => {
+        tailFs.removeRecursive(directory);
+      });
+      const transcriptPath = join(directory, "output.txt");
+      tailFs.appendTarget(transcriptPath);
+      writeFileSync(transcriptPath, "first-second");
+      return tailFs.readFrom({ path: transcriptPath, offset: 6 });
+    })
+    .extend("missingTranscriptSuffix", ({}, { onCleanup }) => {
+      const tailFs = createTailFs();
+      const directory = tailFs.makeTempDir("auto-develop-tail-fs-");
+      onCleanup(() => {
+        tailFs.removeRecursive(directory);
+      });
+      return tailFs.readFrom({ path: join(directory, "missing"), offset: 0 });
+    })
+    .extend("completedExitCode", ({}, { onCleanup }) => {
+      const tailFs = createTailFs();
+      const directory = tailFs.makeTempDir("auto-develop-tail-fs-");
+      onCleanup(() => {
+        tailFs.removeRecursive(directory);
+      });
+      const exitCodePath = join(directory, "exit-code.txt");
+      writeFileSync(exitCodePath, "7\n");
+      return tailFs.readExitCode(exitCodePath);
+    })
+    .extend("invalidExitCode", ({}, { onCleanup }) => {
+      const tailFs = createTailFs();
+      const directory = tailFs.makeTempDir("auto-develop-tail-fs-");
+      onCleanup(() => {
+        tailFs.removeRecursive(directory);
+      });
+      const exitCodePath = join(directory, "invalid-exit-code.txt");
+      writeFileSync(exitCodePath, "not-a-number\n");
+      return tailFs.readExitCode(exitCodePath);
+    })
+    .extend("missingExitCode", ({}, { onCleanup }) => {
+      const tailFs = createTailFs();
+      const directory = tailFs.makeTempDir("auto-develop-tail-fs-");
+      onCleanup(() => {
+        tailFs.removeRecursive(directory);
+      });
+      return tailFs.readExitCode(join(directory, "missing"));
+    })
+    .extend("missingTranscript", ({}, { onCleanup }) => {
+      const tailFs = createTailFs();
+      const directory = tailFs.makeTempDir("auto-develop-tail-fs-");
+      onCleanup(() => {
+        tailFs.removeRecursive(directory);
+      });
+      return tailFs.readAll(join(directory, "missing"));
+    })
+    .extend("removedDirectoryPresence", () => {
+      const tailFs = createTailFs();
+      const directory = tailFs.makeTempDir("auto-develop-tail-fs-");
+      tailFs.removeRecursive(directory);
+      return existsSync(directory);
     });
-    const output = join(directory, "output.txt");
-    const exitCode = join(directory, "exit-code.txt");
-    const invalidExitCode = join(directory, "invalid-exit-code.txt");
-    fs.appendTarget(output);
-    writeFileSync(output, "first-second");
-    writeFileSync(exitCode, "7\n");
-    writeFileSync(invalidExitCode, "not-a-number\n");
 
-    expect(readFileSync(output, "utf8")).toBe("first-second");
-    expect(fs.readFrom({ path: output, offset: 6 })).toBe("second");
-    expect(fs.readFrom({ path: join(directory, "missing"), offset: 0 })).toBe("");
-    expect(fs.readExitCode(exitCode)).toBe(7);
-    expect(fs.readExitCode(invalidExitCode)).toBeNull();
-    expect(fs.readExitCode(join(directory, "missing"))).toBeNull();
-    expect(fs.readAll(output)).toBe("first-second");
-    expect(fs.readAll(join(directory, "missing"))).toBe("");
+  it("reads the complete transcript", ({ completeTranscript }) => {
+    expect(completeTranscript).toBe("first-second");
+  });
 
-    fs.removeRecursive(directory);
-    expect(existsSync(directory)).toBe(false);
+  it("reads a transcript from an offset", ({ transcriptSuffix }) => {
+    expect(transcriptSuffix).toBe("second");
+  });
+
+  it("returns an empty suffix for a missing transcript", ({ missingTranscriptSuffix }) => {
+    expect(missingTranscriptSuffix).toBe("");
+  });
+
+  it("reads a completed exit code", ({ completedExitCode }) => {
+    expect(completedExitCode).toBe(7);
+  });
+
+  it("returns null for an invalid exit code", ({ invalidExitCode }) => {
+    expect(invalidExitCode).toBe(null);
+  });
+
+  it("returns null for a missing exit code", ({ missingExitCode }) => {
+    expect(missingExitCode).toBe(null);
+  });
+
+  it("returns an empty transcript for a missing file", ({ missingTranscript }) => {
+    expect(missingTranscript).toBe("");
+  });
+
+  it("removes a transcript directory recursively", ({ removedDirectoryPresence }) => {
+    expect(removedDirectoryPresence).toBe(false);
   });
 });

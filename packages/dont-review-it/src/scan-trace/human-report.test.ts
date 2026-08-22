@@ -2,76 +2,181 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { humanScanTrace } from "./human-report.ts";
 
-import type { CheckOutcome } from "@mst/repository-checks";
-
-const outcomeWith = (overrides: Partial<CheckOutcome>): CheckOutcome => ({
-  check: "workflow-definitions",
-  unit: "definition",
-  count: 2,
-  skippedReason: null,
-  problems: [],
-  warnings: [],
-  ...overrides,
-});
-
-const plainTrace = (outcomes: readonly CheckOutcome[]): string =>
-  humanScanTrace({ outcomes, colored: false });
-
 describe("humanScanTrace", () => {
-  test("a run of no checks writes nothing", () => {
-    expect(plainTrace([])).toBe("");
+  describe("a run of no checks", () => {
+    const it = test.extend("trace", () => humanScanTrace({ outcomes: [], colored: false }));
+
+    it("writes nothing", ({ trace }) => {
+      expect(trace).toBe("");
+    });
   });
 
-  test("a check that opened its subjects and found nothing is marked as passed", () => {
-    expect(plainTrace([outcomeWith({})])).toBe(
-      "  ✓ workflow-definitions  2 definitions\n\n  1 check ran, nothing to report\n",
-    );
+  describe("a check that opened its subjects and found nothing", () => {
+    const it = test.extend("trace", () =>
+      humanScanTrace({
+        outcomes: [
+          {
+            check: "workflow-definitions",
+            unit: "definition",
+            count: 2,
+            skippedReason: null,
+            problems: [],
+            warnings: [],
+          },
+        ],
+        colored: false,
+      }));
+
+    it("is marked as passed above a tally that reports nothing", ({ trace }) => {
+      expect(trace).toBe(
+        "  ✓ workflow-definitions  2 definitions\n\n  1 check ran, nothing to report\n",
+      );
+    });
   });
 
-  test("a check that found violations is marked as failed and carries their number", () => {
-    expect(plainTrace([outcomeWith({ problems: ["a", "b"] })])).toBe(
-      "  ✗ workflow-definitions  2 definitions  2 problems\n\n  1 check ran, 2 problems\n",
-    );
+  describe("a check that found violations", () => {
+    const it = test.extend("trace", () =>
+      humanScanTrace({
+        outcomes: [
+          {
+            check: "workflow-definitions",
+            unit: "definition",
+            count: 2,
+            skippedReason: null,
+            problems: ["a", "b"],
+            warnings: [],
+          },
+        ],
+        colored: false,
+      }));
+
+    it("is marked as failed and carries their number", ({ trace }) => {
+      expect(trace).toBe(
+        "  ✗ workflow-definitions  2 definitions  2 problems\n\n  1 check ran, 2 problems\n",
+      );
+    });
   });
 
-  test("a check that never opened a subject is marked as skipped and states its reason", () => {
-    expect(
-      plainTrace([
-        outcomeWith({
-          check: "dependency-declarations",
-          count: 0,
-          skippedReason: "no workspace definition",
-        }),
-      ]),
-    ).toBe(
-      "  ⊘ dependency-declarations  skipped — no workspace definition\n\n  1 check ran, nothing to report\n",
-    );
+  describe("a check that never opened a subject", () => {
+    const it = test.extend("trace", () =>
+      humanScanTrace({
+        outcomes: [
+          {
+            check: "dependency-declarations",
+            unit: "definition",
+            count: 0,
+            skippedReason: "no workspace definition",
+            problems: [],
+            warnings: [],
+          },
+        ],
+        colored: false,
+      }));
+
+    it("is marked as skipped and states its reason", ({ trace }) => {
+      expect(trace).toBe(
+        "  ⊘ dependency-declarations  skipped — no workspace definition\n\n  1 check ran, nothing to report\n",
+      );
+    });
   });
 
-  test("the names and the numbers of several checks are aligned into columns", () => {
-    expect(
-      plainTrace([
-        outcomeWith({ check: "intent-skills", unit: "manifest", count: 128 }),
-        outcomeWith({}),
-      ]),
-    ).toBe(
-      "  ✓ intent-skills         128 manifests\n  ✓ workflow-definitions    2 definitions\n\n  2 checks ran, nothing to report\n",
-    );
+  describe("several checks of differing name and count", () => {
+    const it = test.extend("trace", () =>
+      humanScanTrace({
+        outcomes: [
+          {
+            check: "intent-skills",
+            unit: "manifest",
+            count: 128,
+            skippedReason: null,
+            problems: [],
+            warnings: [],
+          },
+          {
+            check: "workflow-definitions",
+            unit: "definition",
+            count: 2,
+            skippedReason: null,
+            problems: [],
+            warnings: [],
+          },
+        ],
+        colored: false,
+      }));
+
+    it("have their names and their numbers aligned into columns", ({ trace }) => {
+      expect(trace).toBe(
+        "  ✓ intent-skills         128 manifests\n  ✓ workflow-definitions    2 definitions\n\n  2 checks ran, nothing to report\n",
+      );
+    });
   });
 
-  test("a warning leaves the check standing as passed and is named as a warning", () => {
-    expect(plainTrace([outcomeWith({ warnings: ["a"] })])).toBe(
-      "  ✓ workflow-definitions  2 definitions  1 warning\n\n  1 check ran, 1 warning\n",
-    );
+  describe("a check that raised a warning and no problem", () => {
+    const it = test.extend("trace", () =>
+      humanScanTrace({
+        outcomes: [
+          {
+            check: "workflow-definitions",
+            unit: "definition",
+            count: 2,
+            skippedReason: null,
+            problems: [],
+            warnings: ["a"],
+          },
+        ],
+        colored: false,
+      }));
+
+    it("stands as passed with the warning named", ({ trace }) => {
+      expect(trace).toBe(
+        "  ✓ workflow-definitions  2 definitions  1 warning\n\n  1 check ran, 1 warning\n",
+      );
+    });
   });
 
-  test("problems and warnings are named side by side when both are present", () => {
-    expect(plainTrace([outcomeWith({ problems: ["a"], warnings: ["b"] })])).toBe(
-      "  ✗ workflow-definitions  2 definitions  1 problem, 1 warning\n\n  1 check ran, 1 problem, 1 warning\n",
-    );
+  describe("a check that raised both a problem and a warning", () => {
+    const it = test.extend("trace", () =>
+      humanScanTrace({
+        outcomes: [
+          {
+            check: "workflow-definitions",
+            unit: "definition",
+            count: 2,
+            skippedReason: null,
+            problems: ["a"],
+            warnings: ["b"],
+          },
+        ],
+        colored: false,
+      }));
+
+    it("names them side by side", ({ trace }) => {
+      expect(trace).toBe(
+        "  ✗ workflow-definitions  2 definitions  1 problem, 1 warning\n\n  1 check ran, 1 problem, 1 warning\n",
+      );
+    });
   });
 
-  test("a reader that can take colour is handed the marks wrapped in it", () => {
-    expect(humanScanTrace({ outcomes: [outcomeWith({})], colored: true })).toContain("[32m✓");
+  describe("a reader that can take colour", () => {
+    const it = test.extend("trace", () =>
+      humanScanTrace({
+        outcomes: [
+          {
+            check: "workflow-definitions",
+            unit: "definition",
+            count: 2,
+            skippedReason: null,
+            problems: [],
+            warnings: [],
+          },
+        ],
+        colored: true,
+      }));
+
+    it("is handed the mark and the tally wrapped in it", ({ trace }) => {
+      expect(trace).toBe(
+        "  \x1B[32m✓\x1B[39m workflow-definitions  2 definitions\n\n  \x1B[2m1 check ran, nothing to report\x1B[22m\n",
+      );
+    });
   });
 });

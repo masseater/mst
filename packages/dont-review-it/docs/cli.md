@@ -59,7 +59,7 @@ bin を公開するパッケージが守る規範。機械で止められるも�
 - IF: 検査を走らせるコマンドが、どの観点をどれだけ開いたかを残す; THEN
   - MUST: 走査証跡を stderr に書く
   - PROHIBIT: stdout に混ぜる
-    - 走査の事実は結果ではない。判断は [EDR 0050](../../../docs/engineering-decision-logs/0050-write-the-scan-trace-to-stderr-and-read-the-reader-from-the-runtime.md) にある
+    - 走査の事実は結果ではない。判断は [EDR 0062](../../../docs/engineering-decision-logs/0062-write-the-scan-trace-to-stderr-and-read-the-reader-from-the-runtime.md) にある
   - MUST: 対象を開かなかった観点を、開いて何も見つからなかった観点と別の形で書く
   - PROHIBIT: 対象がゼロだったことを理由に終了コードを変える
 - IF: 読み手が人間か AI かで出力の形を変える; THEN

@@ -18,18 +18,18 @@
 
 次は検出しない。
 
-| 形                                                           | 検出しない理由                                                    |
-| ------------------------------------------------------------ | ----------------------------------------------------------------- |
-| `Promise.all([...])` / `Promise.race` / `Promise.allSettled` | メンバー呼び出しではあるが、名前が 3 語のいずれでもない           |
-| `new Promise((resolve, reject) => ...)`                      | メンバー呼び出しではない                                          |
-| `queue.thenable(handle)` / `queue.catchAll(handle)`          | 3 語を含むだけで完全一致しない                                    |
-| `queue[key](handle)` / `handlers[0](handle)`                 | プロパティ名が静的に文字列へ確定しない                            |
-| ``queue[`th${suffix}`](handle)``                             | 式を含むテンプレートは静的に確定しない                            |
-| `queue["done"](handle)`                                      | 静的に確定するが 3 語のいずれでもない                             |
-| `const continueWith = promise.then;`                         | 呼び出しを伴わないメンバー参照。発火位置を呼び出しに限っている    |
-| `const box = { then(handle) { return handle; } };`           | 定義側は見ない。見るのは呼び出し位置だけ                          |
-| `this.#then()`                                               | プライベート識別子 `#then` は `then` とは別の名前で、衝突しえない |
-| `try { ... } catch (failure) { ... } finally { ... }`        | 構文であってメンバー参照ではない。`catch` は予約語                |
+| 形 | 検出しない理由 |
+| --- | --- |
+| `Promise.all([...])` / `Promise.race` / `Promise.allSettled` | メンバー呼び出しではあるが、名前が 3 語のいずれでもない |
+| `new Promise((resolve, reject) => ...)` | メンバー呼び出しではない |
+| `queue.thenable(handle)` / `queue.catchAll(handle)` | 3 語を含むだけで完全一致しない |
+| `queue[key](handle)` / `handlers[0](handle)` | プロパティ名が静的に文字列へ確定しない |
+| ``queue[`th${suffix}`](handle)`` | 式を含むテンプレートは静的に確定しない |
+| `queue["done"](handle)` | 静的に確定するが 3 語のいずれでもない |
+| `const continueWith = promise.then;` | 呼び出しを伴わないメンバー参照。発火位置を呼び出しに限っている |
+| `const box = { then(handle) { return handle; } };` | 定義側は見ない。見るのは呼び出し位置だけ |
+| `this.#then()` | プライベート識別子 `#then` は `then` とは別の名前で、衝突しえない |
+| `try { ... } catch (failure) { ... } finally { ... }` | 構文であってメンバー参照ではない。`catch` は予約語 |
 
 このうち根拠が 2 種類ある。「静的に確定しない添字アクセス」はプロパティ名が確定しないという事実に基づく除外で、「呼び出しを伴わないメンバー参照」は検出自体は可能だが発火位置を呼び出しに限るという設計判断に基づく除外である。どちらも書いてよいという意味ではない。後者は「禁じる回避策」で塞ぐ。
 

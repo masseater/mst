@@ -1,3 +1,5 @@
+import { SERVER_SENT_EVENT_FIELD } from "../runtime/event-names.ts";
+
 export type SseFrame = {
   readonly id?: string;
   readonly event?: string;
@@ -15,13 +17,13 @@ const fieldValue = (line: string, field: string): string | undefined =>
 
 const parseFrame = (block: string): PartialFrame =>
   block.split("\n").reduce<PartialFrame>((frame, line) => {
-    const id = fieldValue(line, "id");
-    const event = fieldValue(line, "event");
-    const dataEntry = fieldValue(line, "data");
+    const identity = fieldValue(line, SERVER_SENT_EVENT_FIELD.id);
+    const frameEvent = fieldValue(line, SERVER_SENT_EVENT_FIELD.event);
+    const dataEntry = fieldValue(line, SERVER_SENT_EVENT_FIELD.data);
     return {
       ...frame,
-      ...(id === undefined ? {} : { id }),
-      ...(event === undefined ? {} : { event }),
+      ...(identity === undefined ? {} : { id: identity }),
+      ...(frameEvent === undefined ? {} : { event: frameEvent }),
       ...(dataEntry === undefined ? {} : { data: dataEntry }),
     };
   }, {});

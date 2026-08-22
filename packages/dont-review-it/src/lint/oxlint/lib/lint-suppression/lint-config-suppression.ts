@@ -1,3 +1,5 @@
+import { LINT_SEVERITY } from "@mst/lint-rule-authoring";
+
 import {
   defaultExportedObject,
   objectExpressionOf,
@@ -11,9 +13,13 @@ import type { ESTree } from "@oxlint/plugins";
 
 export const LINT_CONFIGURATION_FILE = /(?:^|\/)vite\.config\.[cm]?[jt]s$/u;
 
-const FAILING_SPELLINGS: ReadonlySet<string> = new Set(["error", "deny"]);
+const FAILING_SPELLINGS: ReadonlySet<string> = new Set([LINT_SEVERITY.ERROR, "deny"]);
 
-const PASSING_SPELLINGS: ReadonlySet<string> = new Set(["off", "allow", "warn"]);
+const PASSING_SPELLINGS: ReadonlySet<string> = new Set([
+  LINT_SEVERITY.OFF,
+  "allow",
+  LINT_SEVERITY.WARN,
+]);
 
 const LOWEST_FAILING_NUMBER = 2;
 
@@ -35,8 +41,8 @@ export const lintBlockOf = (program: ProgramStatements): ESTree.ObjectExpression
   return lint === null ? null : objectExpressionOf(lint);
 };
 
-const weakenedSeverityOf = (value: ESTree.Expression): string | null => {
-  const spelled = spelledSeverityOf(value);
+const weakenedSeverityOf = (held: ESTree.Expression): string | null => {
+  const spelled = spelledSeverityOf(held);
   if (spelled === null) return null;
   if (FAILING_SPELLINGS.has(spelled)) return null;
   if (PASSING_SPELLINGS.has(spelled)) return spelled;
@@ -52,13 +58,14 @@ const weakenedRulesIn = ({
   readonly rules: ESTree.ObjectExpression;
   readonly targetRules: readonly string[];
 }): readonly WeakenedRule[] => {
-  const named = new Set(targetRules.map(bareRuleNameOf));
+  const targeted = new Set(targetRules.map(bareRuleNameOf));
   return rules.properties.flatMap<WeakenedRule>((property) => {
     if (property.type !== "Property") return [];
-    const key = propertyKeyOf(property);
-    if (key === null || !named.has(bareRuleNameOf(key))) return [];
+    const named = propertyKeyOf(property);
+    if (named === null) return [];
+    if (!targeted.has(bareRuleNameOf(named))) return [];
     const severity = weakenedSeverityOf(property.value);
-    return severity === null ? [] : [{ property, ruleName: key, severity }];
+    return severity === null ? [] : [{ property, ruleName: named, severity }];
   });
 };
 
@@ -67,10 +74,8 @@ export const ruleBlocksIn = (lint: ESTree.ObjectExpression): readonly ESTree.Obj
   const overrides = objectValueOf({ object: lint, key: "overrides" });
   const overridden =
     overrides?.type === "ArrayExpression"
-      ? overrides.elements.flatMap((element) =>
-          element?.type === "ObjectExpression"
-            ? [objectValueOf({ object: element, key: "rules" })]
-            : [],
+      ? overrides.elements.flatMap((held) =>
+          held?.type === "ObjectExpression" ? [objectValueOf({ object: held, key: "rules" })] : [],
         )
       : [];
   return [own, ...overridden].filter(
@@ -90,9 +95,9 @@ export const weakenedTargetRulesIn = ({
 export const ignoreEntriesIn = (lint: ESTree.ObjectExpression): readonly IgnoreEntry[] => {
   const patterns = objectValueOf({ object: lint, key: "ignorePatterns" });
   if (patterns?.type !== "ArrayExpression") return [];
-  return patterns.elements.flatMap<IgnoreEntry>((element) =>
-    element?.type === "Literal" && typeof element.value === "string"
-      ? [{ element, pattern: element.value }]
+  return patterns.elements.flatMap<IgnoreEntry>((held) =>
+    held?.type === "Literal" && typeof held.value === "string"
+      ? [{ element: held, pattern: held.value }]
       : [],
   );
 };

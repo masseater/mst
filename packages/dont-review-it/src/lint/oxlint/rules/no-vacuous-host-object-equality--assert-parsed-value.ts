@@ -1,5 +1,6 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
 import { ancestorsOf } from "../lib/ast-node.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { resolveBinding, type ScopeLookup } from "../lib/resolved-bindings.ts";
 import {
   isAssertionEntryCall,
@@ -81,8 +82,8 @@ type SnapshotRecording = {
   readonly subject: ComparedSide;
 };
 
-const parsedValueMatcherFrom = (options: Readonly<Options>): string => {
-  const [first] = options;
+const parsedValueMatcherFrom = (ruleOptions: Readonly<Options>): string => {
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) {
     return DEFAULT_PARSED_VALUE_MATCHER;
   }
@@ -172,12 +173,15 @@ const inlineRecordOf = (call: ESTree.CallExpression): string | null => {
   return staticSpelling(last);
 };
 
-const runtimeImportsOf = (request: {
+const runtimeImportsOf = ({
+  program,
+  modules,
+}: {
   readonly program: ESTree.Program;
   readonly modules: ReadonlySet<string>;
 }): RuntimeImports => {
-  const specifiers = request.program.body.flatMap((statement) =>
-    statement.type === "ImportDeclaration" && request.modules.has(statement.source.value)
+  const specifiers = program.body.flatMap((statement) =>
+    statement.type === "ImportDeclaration" && modules.has(statement.source.value)
       ? statement.specifiers
       : [],
   );
@@ -204,27 +208,32 @@ const runtimeImportsOf = (request: {
   };
 };
 
-const lookupOf = (request: {
+const lookupOf = ({
+  imports,
+  hostTypes,
+  scopeAt,
+}: {
   readonly imports: RuntimeImports;
   readonly hostTypes: ReadonlySet<string>;
   readonly scopeAt: ScopeLookup;
 }): HostTypeLookup => ({
-  named: (name, at) => {
-    const imported = request.imports.names.get(name);
-    if (imported !== undefined) return request.hostTypes.has(imported) ? imported : null;
-    if (!request.hostTypes.has(name)) return null;
-    return resolveBinding(request.scopeAt(at), name) === null ? name : null;
+  named: (spelling, at) => {
+    const imported = imports.names.get(spelling);
+    if (imported !== undefined) return hostTypes.has(imported) ? imported : null;
+    if (!hostTypes.has(spelling)) return null;
+    return resolveBinding(scopeAt(at), spelling) === null ? spelling : null;
   },
   qualified: (namespace, member) =>
-    request.imports.namespaces.has(namespace) && request.hostTypes.has(member) ? member : null,
+    imports.namespaces.has(namespace) && hostTypes.has(member) ? member : null,
 });
 
-const specReaderOf = (request: {
+const specReaderOf = ({
+  lookup,
+  scopeAt,
+}: {
   readonly lookup: HostTypeLookup;
   readonly scopeAt: ScopeLookup;
 }): SpecReader => {
-  const { lookup, scopeAt } = request;
-
   const settledInitializerOf = (
     identifier: ESTree.IdentifierReference,
   ): ESTree.Expression | null => {
@@ -308,25 +317,28 @@ const vacuousIn = (input: {
 const namedFileRecordOf = (call: ESTree.CallExpression, filename: string): readonly string[] => {
   const written = argumentAt(call, 0);
   const named = written === null ? null : staticSpelling(written);
-  const record = named === null ? null : fileRecordOf(filename, named);
-  return record === null ? [] : [record];
+  const fileRecord = named === null ? null : fileRecordOf(filename, named);
+  return fileRecord === null ? [] : [fileRecord];
 };
 
-const recordsAt = (request: {
+const recordsAt = ({
+  site,
+  keys,
+  filename,
+}: {
   readonly site: SnapshotMatcherSite;
   readonly keys: SnapshotEntryKeys | undefined;
   readonly filename: string;
 }): readonly string[] => {
-  const { site, keys, filename } = request;
   if (site.matcher === FILE_RECORD_MATCHER) return namedFileRecordOf(site.node, filename);
   if (!INLINE_SPELLING_BY_EXTERNAL.has(site.matcher)) {
-    const record = inlineRecordOf(site.node);
-    return record === null ? [] : [record];
+    const inlineRecord = inlineRecordOf(site.node);
+    return inlineRecord === null ? [] : [inlineRecord];
   }
   if (keys?.kind !== "spelled") return [];
-  return keys.keys.flatMap((key) => {
-    const record = externalRecordOf(filename, key);
-    return record === null ? [] : [record];
+  return keys.keys.flatMap((snapshotKey) => {
+    const externalRecord = externalRecordOf(filename, snapshotKey);
+    return externalRecord === null ? [] : [externalRecord];
   });
 };
 
@@ -360,18 +372,17 @@ export const noVacuousHostObjectEquality = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
-    const hostTypes = hostObjectTypesFrom(context.options);
-    const scopeAt: ScopeLookup = (node) => context.sourceCode.getScope(node);
+    const hostTypes = hostObjectTypesFrom(inspection.options);
+    const scopeAt: ScopeLookup = (node) => inspection.sourceCode.getScope(node);
     const imports = runtimeImportsOf({
-      program: context.sourceCode.ast,
-      modules: runtimeModulesFrom(context.options),
+      program: inspection.sourceCode.ast,
+      modules: runtimeModulesFrom(inspection.options),
     });
     const reader = specReaderOf({ lookup: lookupOf({ imports, hostTypes, scopeAt }), scopeAt });
-    const recordings = new Set<SnapshotRecording>();
-    const matcher = parsedValueMatcherFrom(context.options);
+    const matcher = parsedValueMatcherFrom(inspection.options);
 
     const reportComparison = (site: ComparisonSite): void => {
       const positions = comparedPositionsOf({
@@ -380,20 +391,25 @@ export const noVacuousHostObjectEquality = createDontReviewItRule({
         resolve: reader.resolve,
       });
       for (const [node, hostType] of positions.flatMap((pair) => vacuousIn({ pair, reader }))) {
-        context.report({ node, messageId: site.messageId, data: { hostType, matcher } });
+        inspection.report({ node, messageId: site.messageId, data: { hostType, matcher } });
       }
     };
 
-    const reportSnapshot = (recording: SnapshotRecording, records: readonly string[]): void => {
-      const [found] = records.flatMap((record) => {
-        const hostType = emptyBodyConstructorOf(record);
-        return hostType === null || !hostTypes.has(hostType) ? [] : [[record, hostType] as const];
+    const reportSnapshot = (
+      recording: SnapshotRecording,
+      snapshotRecords: readonly string[],
+    ): void => {
+      const [found] = snapshotRecords.flatMap((snapshotRecord) => {
+        const hostType = emptyBodyConstructorOf(snapshotRecord);
+        return hostType === null || !hostTypes.has(hostType)
+          ? []
+          : [[snapshotRecord, hostType] as const];
       });
       if (found === undefined) return;
 
       const subject = reader.settle(recording.subject);
       if (subject === null || !reader.mayHold(subject, found[1])) return;
-      context.report({
+      inspection.report({
         node: recording.site.matcherNode,
         messageId: "vacuousSnapshotRecord",
         data: { hostType: found[1], matcher, record: found[0].trim() },
@@ -402,24 +418,23 @@ export const noVacuousHostObjectEquality = createDontReviewItRule({
 
     return {
       CallExpression(node: ESTree.CallExpression) {
-        const recorded = snapshotRecordingOf(node);
-        if (recorded !== null) {
-          recordings.add(recorded);
-          return;
-        }
+        if (snapshotRecordingOf(node) !== null) return;
+
         const site = comparisonSiteOf(node);
         if (site !== null) reportComparison(site);
       },
-      "Program:exit"() {
-        const taken = [...recordings];
+      "Program:exit"(program: ESTree.Program) {
+        const taken = nodesOfType(program, "CallExpression").flatMap(
+          (node) => snapshotRecordingOf(node) ?? [],
+        );
         const resolved = entryKeysOf(taken.map((recording) => recording.site));
         for (const [index, recording] of taken.entries()) {
-          const records = recordsAt({
+          const snapshotRecords = recordsAt({
             site: recording.site,
             keys: resolved[index],
-            filename: context.filename,
+            filename: inspection.filename,
           });
-          reportSnapshot(recording, records);
+          reportSnapshot(recording, snapshotRecords);
         }
       },
     };

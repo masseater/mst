@@ -202,7 +202,7 @@ export const UPSTREAM_RULES: NonNullable<OxlintConfig["rules"]> = {
   "unicorn/prefer-structured-clone": LINT_SEVERITY.ERROR,
 };
 
-const MAX_NESTED_DESCRIBE = 2;
+const MAX_NESTED_DESCRIBE = 4;
 
 export const UPSTREAM_TEST_RULES: NonNullable<OxlintConfig["rules"]> = {
   "no-empty-pattern": LINT_SEVERITY.OFF,
@@ -246,5 +246,5 @@ export const UPSTREAM_TEST_RULES: NonNullable<OxlintConfig["rules"]> = {
   "vitest/valid-describe-callback": LINT_SEVERITY.ERROR,
   "vitest/valid-expect": LINT_SEVERITY.ERROR,
   "vitest/valid-title": LINT_SEVERITY.ERROR,
-  "vitest/warn-todo": LINT_SEVERITY.WARN,
+  "vitest/warn-todo": LINT_SEVERITY.ERROR,
 };

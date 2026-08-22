@@ -3,10 +3,20 @@ import { randomBytes } from "node:crypto";
 import { once } from "node:events";
 import { createWriteStream, type WriteStream } from "node:fs";
 import { mkdir, unlink } from "node:fs/promises";
-import { constants } from "node:os";
 import { join } from "node:path";
 
+import { STREAM_EVENT } from "../node-event-names.ts";
+import {
+  exitCodeOf,
+  startFailureSummary,
+  waitClose,
+  waitSpawn,
+  type ChildEnd,
+} from "./child-outcome.ts";
+import { formatElapsed } from "./format-elapsed.ts";
 import { commandIdOf, defaultSpoolRoot, timestampOf } from "./log-destination.ts";
+import { parseCommand, type Command } from "./parse-command.ts";
+import { isPassthroughSignalled, runPassthrough } from "./run-passthrough.ts";
 import { createEscapeStripper } from "./strip-escapes.ts";
 
 import type { Duplex, Readable, Writable } from "node:stream";
@@ -30,25 +40,7 @@ type ResolvedDeps = {
   spoolRoot: () => string;
 };
 
-type Command = [string, ...string[]];
-
-type ChildEnd = { code: number | null; signal: NodeJS.Signals | null };
-
-const parseCommand = (argv: string[]): Command | undefined => {
-  if (argv[0] !== "--") {
-    return undefined;
-  }
-  const [head, ...rest] = argv.slice(1);
-  if (head === undefined) {
-    return undefined;
-  }
-  return [head, ...rest];
-};
-
-const defaultIsPassthrough = (): boolean => {
-  const ciSignal = process.env.CI;
-  return ciSignal !== undefined && ciSignal !== "" && ciSignal !== "false";
-};
+const defaultIsPassthrough = (): boolean => isPassthroughSignalled(process.env.CI);
 
 const resolveDeps = (deps: SpoolDeps): ResolvedDeps => ({
   stdout: deps.stdout,
@@ -59,48 +51,11 @@ const resolveDeps = (deps: SpoolDeps): ResolvedDeps => ({
   spoolRoot: deps.spoolRoot ?? defaultSpoolRoot,
 });
 
-const formatElapsed = (milliseconds: number): string => {
-  const totalSeconds = milliseconds / 1000;
-  if (totalSeconds < 60) {
-    return `${(Math.floor(totalSeconds * 10) / 10).toFixed(1)}s`;
-  }
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = String(Math.floor(totalSeconds % 60)).padStart(2, "0");
-  return `${minutes}m${seconds}s`;
-};
-
-const exitCodeOf = (end: ChildEnd): number => {
-  if (end.code !== null) {
-    return end.code;
-  }
-  return 128 + constants.signals[end.signal as NodeJS.Signals];
-};
-
-const waitSpawn = (child: ChildProcess): Promise<Error | undefined> =>
-  new Promise((resolvePromise) => {
-    child.once("spawn", () => {
-      resolvePromise(undefined);
-    });
-    child.once("error", (spawnError) => {
-      resolvePromise(spawnError);
-    });
-  });
-
-const waitClose = (child: ChildProcess): Promise<ChildEnd> =>
-  new Promise((resolvePromise) => {
-    child.once("close", (code, signal) => {
-      resolvePromise({ code, signal });
-    });
-  });
-
-const startFailureSummary = (commandLine: string, spawnError: Error): string =>
-  `spool: command: ${commandLine}\nspool: error: cannot start command: ${String(spawnError)}\n`;
-
 const recordFailureSummary = (
   commandLine: string,
-  record: { filePath: string; reason: unknown },
+  written: { filePath: string; reason: unknown },
 ): string =>
-  `spool: command: ${commandLine}\nspool: error: cannot record to ${record.filePath}: ${String(record.reason)}\n`;
+  `spool: command: ${commandLine}\nspool: error: cannot record to ${written.filePath}: ${String(written.reason)}\n`;
 
 const openRecordFile = async (rootDir: string, filePath: string): Promise<WriteStream | Error> => {
   try {
@@ -126,7 +81,7 @@ const tailLimit = 32768;
 
 class SpoolRecording {
   private readonly fileStream: WriteStream;
-  private strippers: readonly Duplex[] = [];
+  private readonly strippers: readonly [Duplex, Duplex];
   private failure: Error | undefined = undefined;
   private bytes = 0;
   private newlines = 0;
@@ -136,9 +91,15 @@ class SpoolRecording {
 
   constructor(fileStream: WriteStream) {
     this.fileStream = fileStream;
-    fileStream.on("error", (streamError: Error) => {
+    this.strippers = [createEscapeStripper(), createEscapeStripper()];
+    fileStream.on(STREAM_EVENT.failure, (streamError: Error) => {
       this.abort(streamError);
     });
+    for (const stripper of this.strippers) {
+      stripper.on(STREAM_EVENT.data, (part: Buffer) => {
+        this.observe(part);
+      });
+    }
   }
 
   private abort(streamError: Error): void {
@@ -151,7 +112,7 @@ class SpoolRecording {
 
   private observe(part: Buffer): void {
     this.bytes += part.length;
-    this.newlines += part.reduce((count, byte) => (byte === 0x0a ? count + 1 : count), 0);
+    this.newlines += part.reduce((counted, byte) => (byte === 0x0a ? counted + 1 : counted), 0);
     this.endsWithNewline = part.at(-1) === 0x0a;
     this.tailParts = [...this.tailParts, part];
     this.tailLength += part.length;
@@ -169,19 +130,12 @@ class SpoolRecording {
   }
 
   async capture(input: { child: ChildProcess; closed: Promise<ChildEnd> }): Promise<ChildEnd> {
-    const strippers = [createEscapeStripper(), createEscapeStripper()] as const;
-    this.strippers = strippers;
-    (input.child.stdout as Readable).pipe(strippers[0]).pipe(this.fileStream, { end: false });
-    (input.child.stderr as Readable).pipe(strippers[1]).pipe(this.fileStream, { end: false });
-    for (const stripper of strippers) {
-      stripper.on("data", (part: Buffer) => {
-        this.observe(part);
-      });
-    }
+    (input.child.stdout as Readable).pipe(this.strippers[0]).pipe(this.fileStream, { end: false });
+    (input.child.stderr as Readable).pipe(this.strippers[1]).pipe(this.fileStream, { end: false });
     const [end] = await Promise.all([
       input.closed,
-      once(strippers[0], "end"),
-      once(strippers[1], "end"),
+      once(this.strippers[0], "end"),
+      once(this.strippers[1], "end"),
     ]);
     await this.finish();
     return end;
@@ -305,33 +259,6 @@ const runEscaped = async (command: Command, deps: ResolvedDeps): Promise<number>
     return 1;
   }
   return recordRun({ command, deps, filePath, fileStream: opened });
-};
-
-const reportStartFailure = async (input: {
-  deps: ResolvedDeps;
-  commandLine: string;
-  closed: Promise<ChildEnd>;
-  spawnError: Error;
-}): Promise<number> => {
-  await input.closed;
-  input.deps.stderr.write(startFailureSummary(input.commandLine, input.spawnError));
-  return 127;
-};
-
-const runPassthrough = async (command: Command, deps: ResolvedDeps): Promise<number> => {
-  const commandLine = command.join(" ");
-  const startedAt = deps.monotonicNow();
-  const child = spawn(command[0], command.slice(1), { stdio: "inherit" });
-  const closed = waitClose(child);
-  const spawnError = await waitSpawn(child);
-  if (spawnError !== undefined) {
-    return reportStartFailure({ deps, commandLine, closed, spawnError });
-  }
-  const exitCode = exitCodeOf(await closed);
-  deps.stdout.write(
-    `spool: command: ${commandLine}\nspool: exit: ${exitCode} (${formatElapsed(deps.monotonicNow() - startedAt)})\n`,
-  );
-  return exitCode;
 };
 
 const usageText = [

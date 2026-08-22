@@ -3,11 +3,11 @@ library:
   name: "mst"
   version: "0.0.0"
   repository: "https://github.com/masseater/mst"
-  description: "Reusable units of repository operation: a lint preset, repository checks, lint-rule authoring materials, document checks, and shared CLI plumbing."
+  description: "Reusable units of repository operation: repository gates, agent command controls, pull-request automation, lint-rule authoring, and verified agent-facing documents."
 generated_from:
   domain_map: "_artifacts/domain_map.yaml"
   skill_spec: "_artifacts/skill_spec.md"
-generated_at: "2026-08-11"
+generated_at: "2026-08-14"
 
 skills:
   - name: "adopt the dont-review-it preset"
@@ -16,10 +16,10 @@ skills:
     domain: "enforcing-writing-standards"
     path: "packages/dont-review-it/skills/core/SKILL.md"
     package: "packages/dont-review-it"
-    description: "Wire the oxlint preset, the js plugin, and the shared tsconfig presets into a Vite+ repository, and verify the wiring with a violating file."
+    description: "Call the formatting and linting preset functions, extend the shared tsconfig presets, and verify custom-rule wiring with a violating file."
     sources:
-      - "masseater/mst:packages/dont-review-it/src/configs/oxlint.ts"
-      - "masseater/mst:packages/dont-review-it/src/configs/with-git-excludes.ts"
+      - "masseater/mst:packages/dont-review-it/src/configs/preset.ts"
+      - "masseater/mst:packages/dont-review-it/docs/lint/no-unwrapped-toolchain-config--call-the-preset-for-the-block.md"
       - "masseater/mst:packages/dont-review-it/docs/lint/no-standalone-tsconfig--extend-shared-preset.md"
 
   - name: "run the repository checks"
@@ -28,11 +28,11 @@ skills:
     domain: "gating-the-repository"
     path: "packages/dont-review-it/skills/repository-checks/SKILL.md"
     package: "packages/dont-review-it"
-    description: "Run dont-review-it check as the single entry for canonical values, duplicated bodies, workflow definitions, and shipped agent skills."
+    description: "Run dont-review-it check as the single entry for repository-wide checks that lint cannot express, including generated entry composition, dependency declarations, workflow definitions, preset adoption, and shipped agent skills."
     requires:
       - "dont-review-it-core"
     sources:
-      - "masseater/mst:packages/dont-review-it/src/run-cli.ts"
+      - "masseater/mst:packages/dont-review-it/src/check-command.ts"
       - "masseater/mst:packages/dont-review-it/src/run-checks.ts"
       - "masseater/mst:packages/dont-review-it/src/workflows/run-workflow-checks.ts"
       - "masseater/mst:packages/dont-review-it/src/intent-skills/shipped-skills.ts"
@@ -45,6 +45,7 @@ skills:
     package: "packages/lint-rule-authoring"
     description: "Write a custom oxlint rule through the factory, with its test beside it and its prose in a docs file."
     sources:
+      - "masseater/mst:packages/lint-rule-authoring/src/run-cli.ts"
       - "masseater/mst:packages/lint-rule-authoring/src/create-workspace-lint-rule.ts"
       - "masseater/mst:packages/lint-rule-authoring/src/rule-tester.ts"
       - "masseater/mst:packages/lint-rule-authoring/AGENTS.md"
@@ -71,3 +72,39 @@ skills:
       - "masseater/mst:packages/agentic-documents/src/run-cli.ts"
       - "masseater/mst:packages/agentic-documents/src/config.ts"
       - "masseater/mst:packages/agentic-documents/AGENTS.md"
+
+  - name: "throttle, spool, and keep output unabridged"
+    slug: "ai-native-core"
+    type: "core"
+    domain: "controlling-agent-command-resources"
+    path: "packages/ai-native/skills/core/SKILL.md"
+    package: "packages/ai-native"
+    description: "Wrap heavy commands with throttle and spool, compose the wrappers in the safe order, and wire unabridged as a Bash PreToolUse hook."
+    sources:
+      - "masseater/mst:packages/ai-native/src/throttle/usage.ts"
+      - "masseater/mst:packages/ai-native/src/spool/run-spool.ts"
+      - "masseater/mst:packages/ai-native/src/unabridged/find-slicing-commands.ts"
+      - "masseater/mst:packages/ai-native/AGENTS.md"
+
+  - name: "keep a pull-request review loop running"
+    slug: "auto-develop-core"
+    type: "core"
+    domain: "operating-pull-request-review-loops"
+    path: "packages/auto-develop/skills/core/SKILL.md"
+    package: "packages/auto-develop"
+    description: "Run the GitHub webhook relay and the reviewer and author runtimes while preserving per-PR lane exclusivity and current-input commit statuses."
+    sources:
+      - "masseater/mst:packages/auto-develop/src/server.ts"
+      - "masseater/mst:packages/auto-develop/src/cli.ts"
+      - "masseater/mst:packages/auto-develop/AGENTS.md"
+
+  - name: "stop checks that only restate a removal"
+    slug: "stop-ai-slop-core"
+    type: "core"
+    domain: "rejecting-removal-only-verification"
+    path: "packages/stop-ai-slop/skills/core/SKILL.md"
+    package: "packages/stop-ai-slop"
+    description: "Compare the change on its way into the integration branch and report absence assertions added by the same change that removed their subject."
+    sources:
+      - "masseater/mst:packages/stop-ai-slop/src/comparison-range.ts"
+      - "masseater/mst:packages/stop-ai-slop/AGENTS.md"

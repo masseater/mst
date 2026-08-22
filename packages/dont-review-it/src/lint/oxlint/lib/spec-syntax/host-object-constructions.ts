@@ -7,8 +7,11 @@ const DEFAULT_HOST_OBJECT_TYPES: readonly string[] = ["Request", "Response"];
 
 const DEFAULT_RUNTIME_MODULES: readonly string[] = ["undici"];
 
+/** @canonical-values dont-review-it.response-factory-member */
+const RESPONSE_FACTORY_MEMBERS = ["error", "json", "redirect"] as const;
+
 const HOST_OBJECT_FACTORY_MEMBERS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
-  ["Response", new Set(["error", "json", "redirect"])],
+  ["Response", new Set(RESPONSE_FACTORY_MEMBERS)],
 ]);
 
 const HOST_OBJECT_TYPES_OPTION = "hostObjectTypes";
@@ -20,33 +23,39 @@ export type HostTypeLookup = {
   readonly qualified: (namespace: string, member: string) => string | null;
 };
 
-const spelledListFrom = (request: {
+const spelledListFrom = (asked: {
   readonly options: Readonly<Options>;
   readonly key: string;
   readonly fallback: readonly string[];
 }): readonly string[] => {
-  const [first] = request.options;
-  if (typeof first !== "object" || first === null || Array.isArray(first)) return request.fallback;
+  const [first] = asked.options;
+  if (typeof first !== "object" || first === null || Array.isArray(first)) return asked.fallback;
 
-  const configured = first[request.key];
-  if (!Array.isArray(configured)) return request.fallback;
+  const configured = first[asked.key];
+  if (!Array.isArray(configured)) return asked.fallback;
 
-  const spelled = configured.filter((entry): entry is string => typeof entry === "string");
-  return spelled.length === 0 ? request.fallback : spelled;
+  const spelled = configured.filter(
+    (candidate): candidate is string => typeof candidate === "string",
+  );
+  return spelled.length === 0 ? asked.fallback : spelled;
 };
 
-export const hostObjectTypesFrom = (options: Readonly<Options>): ReadonlySet<string> =>
+export const hostObjectTypesFrom = (ruleOptions: Readonly<Options>): ReadonlySet<string> =>
   new Set(
     spelledListFrom({
-      options,
+      options: ruleOptions,
       key: HOST_OBJECT_TYPES_OPTION,
       fallback: DEFAULT_HOST_OBJECT_TYPES,
     }),
   );
 
-export const runtimeModulesFrom = (options: Readonly<Options>): ReadonlySet<string> =>
+export const runtimeModulesFrom = (ruleOptions: Readonly<Options>): ReadonlySet<string> =>
   new Set(
-    spelledListFrom({ options, key: RUNTIME_MODULES_OPTION, fallback: DEFAULT_RUNTIME_MODULES }),
+    spelledListFrom({
+      options: ruleOptions,
+      key: RUNTIME_MODULES_OPTION,
+      fallback: DEFAULT_RUNTIME_MODULES,
+    }),
   );
 
 const referencedHostTypeOf = (node: ESTree.Expression, lookup: HostTypeLookup): string | null => {

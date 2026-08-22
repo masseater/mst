@@ -32,16 +32,16 @@ export const unwrapEnvelope = (candidate: unknown): Readonly<Record<string, unkn
   const envelope = asRecord(candidate);
   const eventType = envelope?.event_type;
   const deliveryId = envelope?.delivery_id;
-  const payload = asRecord(envelope?.payload);
+  const carried = asRecord(envelope?.payload);
   if (
     envelope?.schema_version !== ENVELOPE_SCHEMA_VERSION ||
     typeof eventType !== "string" ||
     typeof deliveryId !== "string" ||
-    payload === undefined
+    carried === undefined
   ) {
     throw new InvalidEnvelopeError();
   }
-  return { ...payload, event_type: eventType, delivery_id: deliveryId };
+  return { ...carried, event_type: eventType, delivery_id: deliveryId };
 };
 
 export const unwrapPollResponse = (

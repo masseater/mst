@@ -3,21 +3,67 @@ import { describe, expect, test } from "vite-plus/test";
 import { defaultPresetAdoptionConfig } from "./config.ts";
 import { inspectionProgramOf } from "./inspection-program.ts";
 
-const inspect = (held: unknown) =>
-  inspectionProgramOf({ held, source: "export default {};", config: defaultPresetAdoptionConfig });
-
 describe("inspectionProgramOf", () => {
-  test("accepts the generic fields of a parsed program", () => {
-    expect(inspect({ type: "Program", body: [] }).problems).toStrictEqual([]);
+  describe("a value exposing the generic fields of a parsed program", () => {
+    const it = test.extend("inspection", () =>
+      inspectionProgramOf({
+        held: { type: "Program", body: [] },
+        source: "export default {};",
+        config: defaultPresetAdoptionConfig,
+      }));
+
+    it("accepts the value as an inspectable program", ({ inspection }) => {
+      expect(inspection).toStrictEqual({
+        program: { type: "Program", body: [] },
+        problems: [],
+      });
+    });
   });
 
-  test.each([null, { type: "ExpressionStatement", body: [] }, { type: "Program", body: null }])(
-    "rejects a value that does not expose program fields",
-    (held) => {
-      const inspection = inspect(held);
+  describe("values that do not expose the generic fields of a parsed program", () => {
+    const it = test.extend("inspections", () =>
+      [null, { type: "ExpressionStatement", body: [] }, { type: "Program", body: null }].map(
+        (held) =>
+          inspectionProgramOf({
+            held,
+            source: "export default {};",
+            config: defaultPresetAdoptionConfig,
+          }),
+      ));
 
-      expect(inspection.program).toBeNull();
-      expect(inspection.problems[0]?.message).toContain("syntax tree could not be inspected");
-    },
-  );
+    it("rejects every value with the same inspection problem", ({ inspections }) => {
+      expect(inspections).toStrictEqual([
+        {
+          program: null,
+          problems: [
+            {
+              file: "vite.config.ts",
+              line: 1,
+              message: "The toolchain configuration syntax tree could not be inspected.",
+            },
+          ],
+        },
+        {
+          program: null,
+          problems: [
+            {
+              file: "vite.config.ts",
+              line: 1,
+              message: "The toolchain configuration syntax tree could not be inspected.",
+            },
+          ],
+        },
+        {
+          program: null,
+          problems: [
+            {
+              file: "vite.config.ts",
+              line: 1,
+              message: "The toolchain configuration syntax tree could not be inspected.",
+            },
+          ],
+        },
+      ]);
+    });
+  });
 });

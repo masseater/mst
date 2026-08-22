@@ -6,7 +6,7 @@ export const runContextFsOnDisk: RunContextFs = {
   mkdirRecursive: (dir) => {
     mkdirSync(dir, { recursive: true });
   },
-  writeJson: (path, value) => {
-    writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
+  writeJson: (path, held) => {
+    writeFileSync(path, `${JSON.stringify(held, null, 2)}\n`);
   },
 };

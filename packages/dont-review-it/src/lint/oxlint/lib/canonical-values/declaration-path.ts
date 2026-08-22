@@ -2,15 +2,25 @@ import { toPosixPath } from "../posix-path.ts";
 
 import type { CanonicalValuesCatalog, CanonicalValuesEntry } from "./catalog.ts";
 
-const matchesDeclarationPath = (path: string, entry: CanonicalValuesEntry): boolean => {
-  const normalized = toPosixPath(path);
-  return normalized === entry.declarationPath || normalized.endsWith(`/${entry.declarationPath}`);
+const matchesDeclarationPath = ({
+  path,
+  repositoryRoot,
+  declaration,
+}: {
+  readonly declaration: CanonicalValuesEntry;
+  readonly path: string;
+  readonly repositoryRoot: string;
+}): boolean => {
+  const normalizedPath = toPosixPath(path);
+  if (normalizedPath === declaration.declarationPath) return true;
+  const normalizedRoot = toPosixPath(repositoryRoot).replace(/\/+$/u, "");
+  return normalizedPath === `${normalizedRoot}/${declaration.declarationPath}`;
 };
 
-export const declaresConceptAt = (
+export const declarationEntriesAt = (
   catalog: CanonicalValuesCatalog,
-  { conceptId, path }: { readonly conceptId: string; readonly path: string },
-): boolean =>
-  catalog.entries.some(
-    (entry) => entry.conceptId === conceptId && matchesDeclarationPath(path, entry),
+  { path, repositoryRoot }: { readonly path: string; readonly repositoryRoot: string },
+): readonly CanonicalValuesEntry[] =>
+  catalog.entries.filter((declaration) =>
+    matchesDeclarationPath({ declaration, path, repositoryRoot }),
   );

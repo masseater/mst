@@ -17,8 +17,8 @@ export type ReadStyleSheet = {
 
 const NAME_SEPARATOR = "-";
 
-const interpolatedPrefixesOf = (name: string): readonly string[] => {
-  const segments = name.split(NAME_SEPARATOR);
+const interpolatedPrefixesOf = (spelled: string): readonly string[] => {
+  const segments = spelled.split(NAME_SEPARATOR);
   return range(1, segments.length).map(
     (kept) => `${segments.slice(0, kept).join(NAME_SEPARATOR)}${NAME_SEPARATOR}`,
   );

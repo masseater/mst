@@ -3,10 +3,27 @@ import { describe, expect, test } from "vite-plus/test";
 import { isExportDeclaration } from "./is-export-declaration.ts";
 
 describe("isExportDeclaration", () => {
-  test("it accepts both export declaration forms and rejects every other parent", () => {
-    expect(isExportDeclaration({ type: "ExportNamedDeclaration" })).toBe(true);
-    expect(isExportDeclaration({ type: "ExportDefaultDeclaration" })).toBe(true);
-    expect(isExportDeclaration({ type: "Program" })).toBe(false);
-    expect(isExportDeclaration(null)).toBe(false);
+  const it = test
+    .extend("namedExportDeclaration", () => isExportDeclaration({ type: "ExportNamedDeclaration" }))
+    .extend("defaultExportDeclaration", () =>
+      isExportDeclaration({ type: "ExportDefaultDeclaration" }),
+    )
+    .extend("programDeclaration", () => isExportDeclaration({ type: "Program" }))
+    .extend("absentDeclaration", () => isExportDeclaration(null));
+
+  it("accepts a named export declaration", ({ namedExportDeclaration }) => {
+    expect(namedExportDeclaration).toBe(true);
+  });
+
+  it("accepts a default export declaration", ({ defaultExportDeclaration }) => {
+    expect(defaultExportDeclaration).toBe(true);
+  });
+
+  it("rejects a program declaration", ({ programDeclaration }) => {
+    expect(programDeclaration).toBe(false);
+  });
+
+  it("rejects an absent declaration", ({ absentDeclaration }) => {
+    expect(absentDeclaration).toBe(false);
   });
 });

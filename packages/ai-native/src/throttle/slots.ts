@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { tryLock, unlock } from "fs-native-extensions";
 
 import { tryAcquireFileLock } from "./acquire-file-lock.ts";
+import { failedWithCode, failureSpelling } from "./failure-codes.ts";
 
 export type SlotHold = { release: () => Promise<void> };
 
@@ -51,20 +52,24 @@ const lockUnlessHeld = (marker: string): SlotHold | null => {
   });
 };
 
+const firstFreeSlot = (configuration: AcquireConfiguration): SlotHold | null => {
+  for (const index of slotIndexes(configuration.limit)) {
+    const acquired = lockUnlessHeld(markerPath(configuration.slotDir, index));
+    if (acquired !== null) return acquired;
+  }
+  return null;
+};
+
 export const tryAcquireAny = (configuration: AcquireConfiguration): Promise<SlotHold | null> =>
-  Promise.try(() => {
-    for (const index of slotIndexes(configuration.limit)) {
-      const acquired = lockUnlessHeld(markerPath(configuration.slotDir, index));
-      if (acquired !== null) return acquired;
-    }
-    return null;
+  new Promise((resolve) => {
+    resolve(firstFreeSlot(configuration));
   });
 
 const generationIdentity = (marker: string): string => {
   try {
     return readFileSync(marker, "utf8") || "unused";
   } catch (unreadableGeneration) {
-    return `unreadable:${(unreadableGeneration as { code: string }).code}`;
+    return `unreadable:${failureSpelling(unreadableGeneration)}`;
   }
 };
 
@@ -74,12 +79,12 @@ export const slotStateFingerprint = (slotDir: string, limit: number): string =>
     .join(",");
 
 export const enqueueWaiter = (slotDir: string): string => {
-  const name = [
+  const spelled = [
     String(Date.now()).padStart(13, "0"),
     String(process.pid),
     randomBytes(4).toString("hex"),
   ].join("-");
-  const entryPath = join(waitersDir(slotDir), name);
+  const entryPath = join(waitersDir(slotDir), spelled);
   writeFileSync(entryPath, `${process.pid}\n`);
   return entryPath;
 };
@@ -88,21 +93,26 @@ export const removeWaiter = (entryPath: string): void => {
   rmSync(entryPath, { force: true, recursive: true });
 };
 
+const OWNED_BY_ANOTHER_USER_CODES: ReadonlySet<string> = new Set(["EPERM"]);
+
 const isAlive = (pid: number): boolean => {
   try {
     process.kill(pid, 0);
     return true;
   } catch (failure) {
-    return (failure as { code?: string }).code === "EPERM";
+    return failedWithCode(failure, OWNED_BY_ANOTHER_USER_CODES);
   }
 };
 
+const UNREADABLE_ENTRY_CODES: ReadonlySet<string> = new Set(["ENOENT", "ENOTDIR", "EISDIR"]);
+
 const recordedPid = (entryPath: string): number | null => {
   try {
-    const record = readFileSync(entryPath, "utf8").trim();
-    return /^[0-9]+$/.test(record) ? Number(record) : null;
+    const written = readFileSync(entryPath, "utf8").trim();
+    return /^[0-9]+$/.test(written) ? Number(written) : null;
   } catch (unreadableEntry) {
-    return null;
+    if (failedWithCode(unreadableEntry, UNREADABLE_ENTRY_CODES)) return null;
+    throw unreadableEntry;
   }
 };
 
@@ -116,4 +126,4 @@ const survives = (entryPath: string): boolean => {
 export const sweepWaiters = (slotDir: string): string[] =>
   readdirSync(waitersDir(slotDir))
     .toSorted()
-    .filter((name) => survives(join(waitersDir(slotDir), name)));
+    .filter((spelled) => survives(join(waitersDir(slotDir), spelled)));

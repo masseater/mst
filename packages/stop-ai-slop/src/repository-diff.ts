@@ -71,26 +71,28 @@ const inventoryRecordPattern = new RegExp(
   "guy",
 );
 
-const parseDiffInventory = (output: string): readonly InventoryFile[] => {
-  const matches = Array.from(output.matchAll(inventoryRecordPattern));
-  const parsedLength = matches.reduce((length, match) => length + match[0].length, 0);
-  if (parsedLength !== output.length) {
+const parseDiffInventory = (produced: string): readonly InventoryFile[] => {
+  const matches = Array.from(produced.matchAll(inventoryRecordPattern));
+  const parsedLength = matches.reduce((counted, matched) => counted + matched[0].length, 0);
+  if (parsedLength !== produced.length) {
     throw new Error("Invalid NUL-delimited Git diff metadata");
   }
   return matches.map(inventoryFileFor);
 };
 
 const addedLinesIn = (file: AnyFileChange): readonly number[] =>
-  file.chunks.flatMap((chunk) =>
-    "changes" in chunk
-      ? chunk.changes.flatMap((change) => (change.type === "AddedLine" ? [change.lineAfter] : []))
+  file.chunks.flatMap((writtenChunk) =>
+    "changes" in writtenChunk
+      ? writtenChunk.changes.flatMap((change) =>
+          change.type === "AddedLine" ? [change.lineAfter] : [],
+        )
       : [],
   );
 
 const parsedTypeFor = (
-  kind: Exclude<InventoryFile, { kind: "typeChanged" }>["kind"],
+  nodeKind: Exclude<InventoryFile, { kind: "typeChanged" }>["kind"],
 ): AnyFileChange["type"] => {
-  switch (kind) {
+  switch (nodeKind) {
     case "added":
       return "AddedFile";
     case "deleted":
@@ -157,19 +159,19 @@ export const parseRepositoryChanges = ({
   diff: string;
 }>): readonly RepositoryChange[] => {
   const inventory = parseDiffInventory(inventoryOutput);
-  const parsed = parseGitDiff(diff);
-  if (diff.trim().length > 0 && parsed.files.length === 0) {
+  const parsedNode = parseGitDiff(diff);
+  if (diff.trim().length > 0 && parsedNode.files.length === 0) {
     throw new Error("Unable to parse non-empty Git diff");
   }
 
   const patchExpectations = inventory.flatMap(patchExpectationsFor);
-  if (patchExpectations.length !== parsed.files.length) {
+  if (patchExpectations.length !== parsedNode.files.length) {
     throw new Error(
-      `Git diff metadata and patch file counts disagree: ${patchExpectations.length} != ${parsed.files.length}`,
+      `Git diff metadata and patch file counts disagree: ${patchExpectations.length} != ${parsedNode.files.length}`,
     );
   }
 
-  return zip(patchExpectations, parsed.files).flatMap(([expectation, parsedFile]) => {
+  return zip(patchExpectations, parsedNode.files).flatMap(([expectation, parsedFile]) => {
     if (parsedFile.type !== expectation.expectedType) {
       throw new Error(
         `Git diff metadata and patch disagree: ${expectation.expectedType} != ${parsedFile.type}`,

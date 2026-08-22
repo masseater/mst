@@ -1,6 +1,7 @@
 import { carriedDeliveryId } from "./delivery-id.ts";
 import { asRecord } from "./unknown-record.ts";
 import {
+  DECLARED_MODE,
   isAuthorWorkConclusion,
   isCheckSuiteConclusion,
   type CheckSuiteConclusion,
@@ -10,13 +11,13 @@ import {
 import type { FilteredEvent } from "./filtered-event.ts";
 
 const completedSuiteShape = (
-  event: Readonly<Record<string, unknown>>,
+  delivered: Readonly<Record<string, unknown>>,
 ): {
   readonly conclusion: CheckSuiteConclusion;
   readonly headSha: string;
   readonly pullNumber: number;
 } | null => {
-  const checkSuite = asRecord(event.check_suite);
+  const checkSuite = asRecord(delivered.check_suite);
   const conclusion = checkSuite?.conclusion;
   const headSha = checkSuite?.head_sha;
   const pullRequests = checkSuite?.pull_requests;
@@ -28,18 +29,18 @@ const completedSuiteShape = (
 };
 
 export const filterCheckSuiteEvent = (
-  event: Readonly<Record<string, unknown>>,
-  mode: Mode,
+  delivered: Readonly<Record<string, unknown>>,
+  spelledMode: Mode,
 ): FilteredEvent | null => {
-  if (mode === "reviewer") return null;
-  const suite = completedSuiteShape(event);
-  if (suite === null || event.action !== "completed") return null;
+  if (spelledMode === DECLARED_MODE.reviewer) return null;
+  const suite = completedSuiteShape(delivered);
+  if (suite === null || delivered.action !== "completed") return null;
   if (!isAuthorWorkConclusion(suite.conclusion)) return null;
   return {
     kind: "ci-completed",
     pullNumber: suite.pullNumber,
     conclusion: suite.conclusion,
     headSha: suite.headSha,
-    ...carriedDeliveryId(event),
+    ...carriedDeliveryId(delivered),
   };
 };

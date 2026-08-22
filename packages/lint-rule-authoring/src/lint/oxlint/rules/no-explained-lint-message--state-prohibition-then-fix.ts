@@ -101,11 +101,11 @@ const opensWithFixVerb = (inspectable: string): boolean =>
 
 const namedPropertyOf = (
   properties: ESTree.ObjectExpression["properties"],
-  name: string,
+  spelled: string,
 ): ESTree.ObjectProperty | null => {
   for (const property of properties) {
     if (property.type !== "Property") continue;
-    if (staticKeyOf(property) === name) return property;
+    if (staticKeyOf(property) === spelled) return property;
   }
   return null;
 };
@@ -167,14 +167,14 @@ export const noExplainedLintMessage = createLintRuleAuthoringRule({
     },
     schema: [],
   },
-  create(context) {
-    const reportEveryViolation = (message: ESTree.ObjectProperty, description: string): void => {
-      const prose = proseOf(message.value);
+  create(inspection) {
+    const reportEveryViolation = (complaint: ESTree.ObjectProperty, description: string): void => {
+      const prose = proseOf(complaint.value);
       if (prose === null) return;
-      const messageId = staticKeyOf(message) ?? "";
+      const messageId = staticKeyOf(complaint) ?? "";
       for (const violation of violationsOf(prose, description)) {
-        context.report({
-          node: message,
+        inspection.report({
+          node: complaint,
           messageId: violation.messageId,
           data: { messageId, phrase: violation.phrase },
         });
@@ -185,14 +185,14 @@ export const noExplainedLintMessage = createLintRuleAuthoringRule({
       Property(node: ESTree.ObjectProperty) {
         if (staticKeyOf(node) !== "meta") return;
         if (node.value.type !== "ObjectExpression") return;
-        const messages = namedPropertyOf(node.value.properties, "messages");
+        const complaints = namedPropertyOf(node.value.properties, "messages");
         const docs = namedPropertyOf(node.value.properties, "docs");
-        if (messages === null || docs === null) return;
-        if (messages.value.type !== "ObjectExpression") return;
+        if (complaints === null || docs === null) return;
+        if (complaints.value.type !== "ObjectExpression") return;
         const description = descriptionOf(docs);
-        for (const message of messages.value.properties) {
-          if (message.type !== "Property") continue;
-          reportEveryViolation(message, description);
+        for (const complaint of complaints.value.properties) {
+          if (complaint.type !== "Property") continue;
+          reportEveryViolation(complaint, description);
         }
       },
     };

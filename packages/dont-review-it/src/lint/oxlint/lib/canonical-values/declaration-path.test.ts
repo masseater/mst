@@ -1,73 +1,138 @@
 import { describe, expect, test } from "vite-plus/test";
 
 import { buildCatalog } from "./catalog.ts";
-import { declaresConceptAt } from "./declaration-path.ts";
-import { fingerprintValues, type CanonicalValue } from "./fingerprint.ts";
+import { declarationEntriesAt } from "./declaration-path.ts";
 
-describe("declaration-path", () => {
-  const ORDER_STATUS: CanonicalValue[] = ["draft", "published"];
+import type { CanonicalValue } from "./fingerprint.ts";
 
-  const CATALOG = buildCatalog([
-    {
-      conceptId: "order.status",
-      declarationPath: "packages/order/src/status.ts",
-      exportPath: "@mst/order",
-      values: ORDER_STATUS,
-      fingerprint: fingerprintValues(ORDER_STATUS),
-    },
-  ]);
+const ORDER_STATUS: readonly CanonicalValue[] = ["draft", "published"];
 
-  test("the declaring file declares the concept the annotation names", () => {
-    expect(
-      declaresConceptAt(CATALOG, {
-        conceptId: "order.status",
+const CATALOG = buildCatalog([
+  {
+    annotationStart: 0,
+    binding: "ORDER_STATUSES",
+    bindingStart: 40,
+    conceptId: "order.status",
+    declarationEnd: 80,
+    declarationPath: "packages/order/src/status.ts",
+    declarationStart: 20,
+    importRoutes: [
+      {
+        exportName: "ORDER_STATUSES",
+        resolvedSourcePaths: ["packages/order/src/order-status.ts"],
+        specifier: "@mst/order",
+      },
+    ],
+    packageName: "@mst/order",
+    values: ORDER_STATUS,
+    fingerprint: "fingerprint-of-draft-and-published",
+  },
+]);
+
+describe("declarationEntriesAt", () => {
+  describe("the declaring file named by an absolute path", () => {
+    const it = test.extend("conceptIdsDeclaredAtTheAbsolutePath", () =>
+      declarationEntriesAt(CATALOG, {
         path: "/repo/packages/order/src/status.ts",
-      }),
-    ).toBe(true);
+        repositoryRoot: "/repo",
+      }).map((declaration) => declaration.conceptId));
+
+    it("declares the concept the annotation names", ({ conceptIdsDeclaredAtTheAbsolutePath }) => {
+      expect(conceptIdsDeclaredAtTheAbsolutePath).toStrictEqual(["order.status"]);
+    });
   });
 
-  test("the declaring file is recognized through a repository relative path", () => {
-    expect(
-      declaresConceptAt(CATALOG, {
-        conceptId: "order.status",
+  describe("the declaring file named by a repository relative path", () => {
+    const it = test.extend("conceptIdsDeclaredAtTheRepositoryRelativePath", () =>
+      declarationEntriesAt(CATALOG, {
         path: "packages/order/src/status.ts",
-      }),
-    ).toBe(true);
+        repositoryRoot: "/repo",
+      }).map((declaration) => declaration.conceptId));
+
+    it("is recognized as the declaring file", ({
+      conceptIdsDeclaredAtTheRepositoryRelativePath,
+    }) => {
+      expect(conceptIdsDeclaredAtTheRepositoryRelativePath).toStrictEqual(["order.status"]);
+    });
   });
 
-  test("the declaring file is recognized through a windows path", () => {
-    expect(
-      declaresConceptAt(CATALOG, {
-        conceptId: "order.status",
+  describe("the declaring file named by a windows path", () => {
+    const it = test.extend("conceptIdsDeclaredAtTheWindowsPath", () =>
+      declarationEntriesAt(CATALOG, {
         path: String.raw`C:\repo\packages\order\src\status.ts`,
-      }),
-    ).toBe(true);
+        repositoryRoot: String.raw`C:\repo`,
+      }).map((declaration) => declaration.conceptId));
+
+    it("is recognized as the declaring file", ({ conceptIdsDeclaredAtTheWindowsPath }) => {
+      expect(conceptIdsDeclaredAtTheWindowsPath).toStrictEqual(["order.status"]);
+    });
   });
 
-  test("a path whose suffix starts inside a segment declares nothing", () => {
-    expect(
-      declaresConceptAt(CATALOG, {
-        conceptId: "order.status",
+  describe("a path whose suffix starts inside a segment", () => {
+    const it = test.extend("conceptIdsDeclaredWhereTheSuffixStartsInsideASegment", () =>
+      declarationEntriesAt(CATALOG, {
         path: "/repo/vendored-packages/order/src/status.ts",
-      }),
-    ).toBe(false);
+        repositoryRoot: "/repo",
+      }).map((declaration) => declaration.conceptId));
+
+    it("declares nothing", ({ conceptIdsDeclaredWhereTheSuffixStartsInsideASegment }) => {
+      expect(conceptIdsDeclaredWhereTheSuffixStartsInsideASegment).toStrictEqual([]);
+    });
   });
 
-  test("another file in the same package does not declare the concept", () => {
-    expect(
-      declaresConceptAt(CATALOG, {
-        conceptId: "order.status",
+  describe("the same relative suffix under another repository", () => {
+    const it = test.extend("conceptIdsDeclaredUnderAnotherRepository", () =>
+      declarationEntriesAt(CATALOG, {
+        path: "/vendor/repo/packages/order/src/status.ts",
+        repositoryRoot: "/repo",
+      }).map((declaration) => declaration.conceptId));
+
+    it("declares nothing", ({ conceptIdsDeclaredUnderAnotherRepository }) => {
+      expect(conceptIdsDeclaredUnderAnotherRepository).toStrictEqual([]);
+    });
+  });
+
+  describe("another file in the same package", () => {
+    const it = test.extend("conceptIdsDeclaredAtAnotherFileInTheSamePackage", () =>
+      declarationEntriesAt(CATALOG, {
         path: "/repo/packages/order/src/order.ts",
-      }),
-    ).toBe(false);
+        repositoryRoot: "/repo",
+      }).map((declaration) => declaration.conceptId));
+
+    it("does not declare the concept", ({ conceptIdsDeclaredAtAnotherFileInTheSamePackage }) => {
+      expect(conceptIdsDeclaredAtAnotherFileInTheSamePackage).toStrictEqual([]);
+    });
   });
 
-  test("a concept the catalog does not know is declared nowhere", () => {
-    expect(
-      declaresConceptAt(CATALOG, {
-        conceptId: "totally.unrelated",
+  describe("a concept the catalog does not know", () => {
+    const it = test.extend("declarationsAtTheDeclaringFile", () =>
+      declarationEntriesAt(CATALOG, {
         path: "/repo/packages/order/src/status.ts",
-      }),
-    ).toBe(false);
+        repositoryRoot: "/repo",
+      }));
+
+    it("is declared nowhere", ({ declarationsAtTheDeclaringFile }) => {
+      expect(declarationsAtTheDeclaringFile).toStrictEqual([
+        {
+          annotationStart: 0,
+          binding: "ORDER_STATUSES",
+          bindingStart: 40,
+          conceptId: "order.status",
+          declarationEnd: 80,
+          declarationPath: "packages/order/src/status.ts",
+          declarationStart: 20,
+          importRoutes: [
+            {
+              exportName: "ORDER_STATUSES",
+              resolvedSourcePaths: ["packages/order/src/order-status.ts"],
+              specifier: "@mst/order",
+            },
+          ],
+          packageName: "@mst/order",
+          values: ["draft", "published"],
+          fingerprint: "fingerprint-of-draft-and-published",
+        },
+      ]);
+    });
   });
 });

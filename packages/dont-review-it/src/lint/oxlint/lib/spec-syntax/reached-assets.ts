@@ -1,3 +1,4 @@
+import { memoize } from "es-toolkit";
 import { parseSync } from "oxc-parser";
 
 import { readTextFile } from "../canonical-values/source-files.ts";
@@ -21,8 +22,8 @@ const isInsideRepository = (path: string, workspaceRoot: string): boolean =>
   isInsideDirectory({ path, directory: workspaceRoot }) &&
   !segmentsOf({ path: toPosixPath(path), separator: "/" }).includes("node_modules");
 
-const forwardingSpecifiersIn = (body: readonly SpecStatement[]): readonly string[] =>
-  body.flatMap((statement) => {
+const forwardingSpecifiersIn = (writtenBody: readonly SpecStatement[]): readonly string[] =>
+  writtenBody.flatMap((statement) => {
     if (statement.type === "ExportAllDeclaration") return [statement.source.value];
     if (statement.type === "ExportNamedDeclaration" && statement.source !== null) {
       return [statement.source.value];
@@ -30,22 +31,14 @@ const forwardingSpecifiersIn = (body: readonly SpecStatement[]): readonly string
     return [];
   });
 
-const forwardedByFile = new Map<string, readonly string[]>();
-
-const forwardedSpecifiersOf = (file: string): readonly string[] => {
-  const remembered = forwardedByFile.get(file);
-  if (remembered !== undefined) return remembered;
-
+const forwardedSpecifiersOf = memoize((file: string): readonly string[] => {
   const source = readTextFile(file);
-  const found =
-    source === null
-      ? []
-      : forwardingSpecifiersIn(
-          parseSync(file, source).program.body.map((statement) => statement as SpecStatement),
-        );
-  forwardedByFile.set(file, found);
-  return found;
-};
+  return source === null
+    ? []
+    : forwardingSpecifiersIn(
+        parseSync(file, source).program.body.map((statement) => statement as SpecStatement),
+      );
+});
 
 const assetsFrom = (file: string, reading: Reading): string | null => {
   if (reading.visited.has(file)) return null;

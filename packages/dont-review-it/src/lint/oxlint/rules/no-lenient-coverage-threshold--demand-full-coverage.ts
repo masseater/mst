@@ -32,11 +32,11 @@ type CoverageViolation = {
   readonly data: Record<string, number | string>;
 };
 
-const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
-  value instanceof Object;
+const isRecord = (held: unknown): held is Readonly<Record<string, unknown>> =>
+  held instanceof Object;
 
-const requirementsFrom = (options: Readonly<Options>): readonly CoverageRequirement[] => {
-  const [first] = options;
+const requirementsFrom = (ruleOptions: Readonly<Options>): readonly CoverageRequirement[] => {
+  const [first] = ruleOptions;
   const overrides = isRecord(first) ? first : {};
   return COVERAGE_METRICS.map((metric) => {
     const override = overrides[metric];
@@ -131,11 +131,11 @@ export const noLenientCoverageThreshold = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    const requirements = requirementsFrom(context.options);
+  create(inspection) {
+    const requirements = requirementsFrom(inspection.options);
 
     const reportMissingThresholds = (node: ESTree.Program): void => {
-      context.report({
+      inspection.report({
         node,
         messageId: "missingCoverageThresholds",
         data: {
@@ -147,7 +147,7 @@ export const noLenientCoverageThreshold = createDontReviewItRule({
 
     const inspectThresholds = (thresholds: StaticObjectResolution, node: ESTree.Program): void => {
       if (thresholds.kind === "dynamic") {
-        context.report({ node, messageId: "dynamicCoverageConfiguration" });
+        inspection.report({ node, messageId: "dynamicCoverageConfiguration" });
         return;
       }
       if (thresholds.kind === "missing") {
@@ -155,24 +155,24 @@ export const noLenientCoverageThreshold = createDontReviewItRule({
         return;
       }
       if (!declaresTrueAt({ thresholds: thresholds.object, key: PER_FILE_KEY })) {
-        context.report({ node: thresholds.object, messageId: "aggregateCoverageThreshold" });
+        inspection.report({ node: thresholds.object, messageId: "aggregateCoverageThreshold" });
       }
       for (const violation of violationsIn({
         thresholds: thresholds.object,
         requirements,
       })) {
-        context.report(violation);
+        inspection.report(violation);
       }
     };
 
     const inspectResolvedConfig = (resolved: TestConfigResolution, node: ESTree.Program): void => {
       if (resolved.kind === "not-test-config") return;
       if (resolved.kind === "commonjs") {
-        context.report({ node, messageId: "commonJsTestConfig" });
+        inspection.report({ node, messageId: "commonJsTestConfig" });
         return;
       }
       if (resolved.kind === "dynamic") {
-        context.report({ node, messageId: "dynamicCoverageConfiguration" });
+        inspection.report({ node, messageId: "dynamicCoverageConfiguration" });
         return;
       }
       inspectThresholds(
@@ -186,7 +186,7 @@ export const noLenientCoverageThreshold = createDontReviewItRule({
     return {
       Program(node: ESTree.Program) {
         inspectResolvedConfig(
-          resolveTestConfig({ filename: context.filename, program: node }),
+          resolveTestConfig({ filename: inspection.filename, program: node }),
           node,
         );
       },

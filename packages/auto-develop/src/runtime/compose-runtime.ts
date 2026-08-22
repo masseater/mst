@@ -72,13 +72,16 @@ type ComposeRuntimeDependencies = {
     readonly nowIso: () => string;
     readonly onFailure: (failure: unknown) => void;
   }) => LogFileSink;
-  readonly createLogger: (name: string, options: { readonly fileSink: LogFileSink }) => Logger;
+  readonly createLogger: (
+    spelled: string,
+    ruleOptions: { readonly fileSink: LogFileSink },
+  ) => Logger;
   readonly createGit: () => GitRunner;
   readonly createCommandExecutor: typeof createCommandExecutor;
   readonly createTailFs: typeof createTailFs;
   readonly runInTmux: typeof runInTmux;
-  readonly createQueue: (config: JobQueueConfig) => JobQueue;
-  readonly createTransport: (config: SseTransportConfig) => SseTransport;
+  readonly createQueue: (queueConfig: JobQueueConfig) => JobQueue;
+  readonly createTransport: (transportConfig: SseTransportConfig) => SseTransport;
   readonly acquireWorktree: typeof acquireWorktree;
   readonly createWorktreeFs: () => WorktreeFs;
   readonly syncMain: typeof syncMain;
@@ -87,7 +90,7 @@ type ComposeRuntimeDependencies = {
   readonly runStartupDrain: typeof runStartupDrainClient;
   readonly now: () => number;
   readonly nowDate: () => Date;
-  readonly sleep: (ms: number) => Promise<void>;
+  readonly sleep: (milliseconds: number) => Promise<void>;
 };
 
 const defaultDependencies: ComposeRuntimeDependencies = {
@@ -108,7 +111,7 @@ const defaultDependencies: ComposeRuntimeDependencies = {
   runStartupDrain: runStartupDrainClient,
   now: Date.now,
   nowDate: () => new Date(),
-  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  sleep: (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
 };
 
 const issueRelaySession = async (issue: {
@@ -116,12 +119,12 @@ const issueRelaySession = async (issue: {
   readonly githubToken: string;
   readonly fetch: ComposeRuntimeDependencies["fetch"];
 }): Promise<{ readonly token: string; readonly expiresAt: string }> => {
-  const response = await issue.fetch(`${issue.relayOrigin}${AUTH_SESSION_PATH}`, {
+  const produced = await issue.fetch(`${issue.relayOrigin}${AUTH_SESSION_PATH}`, {
     method: "POST",
     headers: { authorization: `Bearer ${issue.githubToken}` },
   });
-  if (!response.ok) throw new Error(`the relay refused the session with status ${response.status}`);
-  return parseAuthSession(await response.json());
+  if (!produced.ok) throw new Error(`the relay refused the session with status ${produced.status}`);
+  return parseAuthSession(await produced.json());
 };
 
 const probeRemoteHead = async (probe: {

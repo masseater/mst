@@ -8,25 +8,25 @@
 
 **single-assignment**（8 本）。「宣言箇所が最終値を決める」を分担する。
 
-| ルール                                      | 欠けたときに開く穴                                                             | 型情報 |
-| ------------------------------------------- | ------------------------------------------------------------------------------ | ------ |
-| no-reassign--use-spread-or-iife             | 再束縛可能な宣言と代入の形をとる書き込みが素通りする                           | 不要   |
-| no-array-mutation--derive-new-array         | 配列へのメソッド呼び出し形の変異が丸ごと素通りする                             | 要     |
-| no-receiver-mutation--derive-new-value      | 連想配列・集合・日時・自前クラスへのメソッド呼び出し形の変異が丸ごと素通りする | 要     |
-| no-class-as-mutable-cell--decide-in-an-iife | 局所の可変状態をクラスに包み直した形が素通りする                               | 要     |
-| no-promise-chain--use-async-await           | 失敗処理がチェーンに散り、どの `catch` 節にも入らなくなる                      | 要     |
-| no-floating-promise--await-the-result       | 誰も待たない Promise が失敗を落としたまま進む                                  | 要     |
-| no-blanket-suppression--name-and-record     | ルール名を書かない抑制が束の全員を一度に黙らせる                               | 不要   |
-| no-partial-rule-set--enable-the-whole-set   | 束の一部だけを持つ設定が素通りする                                             | 不要   |
+| ルール | 欠けたときに開く穴 | 型情報 |
+| --- | --- | --- |
+| no-reassign--use-spread-or-iife | 再束縛可能な宣言と代入の形をとる書き込みが素通りする | 不要 |
+| no-array-mutation--derive-new-array | 配列へのメソッド呼び出し形の変異が丸ごと素通りする | 要 |
+| no-receiver-mutation--derive-new-value | 連想配列・集合・日時・自前クラスへのメソッド呼び出し形の変異が丸ごと素通りする | 要 |
+| no-class-as-mutable-cell--decide-in-an-iife | 局所の可変状態をクラスに包み直した形が素通りする | 要 |
+| no-promise-chain--use-async-await | 失敗処理がチェーンに散り、どの `catch` 節にも入らなくなる | 要 |
+| no-floating-promise--await-the-result | 誰も待たない Promise が失敗を落としたまま進む | 要 |
+| no-blanket-suppression--name-and-record | ルール名を書かない抑制が束の全員を一度に黙らせる | 不要 |
+| no-partial-rule-set--enable-the-whole-set | 束の一部だけを持つ設定が素通りする | 不要 |
 
 **failure-routing**（4 本）。「失敗が必ずどこかで観測される」を分担する。
 
-| ルール                                | 欠けたときに開く穴                                        | 型情報 |
-| ------------------------------------- | --------------------------------------------------------- | ------ |
-| no-promise-chain--use-async-await     | 失敗処理がチェーンに散り、どの `catch` 節にも入らなくなる | 要     |
-| no-empty-catch--throw-or-handle       | 文を 1 つも持たない `catch` 節が素通りする                | 不要   |
-| no-silent-catch--rethrow-or-handle    | 失敗をどこにも記録しない `catch` 節が素通りする           | 不要   |
-| no-floating-promise--await-the-result | 誰も待たない Promise が失敗を落としたまま進む             | 要     |
+| ルール | 欠けたときに開く穴 | 型情報 |
+| --- | --- | --- |
+| no-promise-chain--use-async-await | 失敗処理がチェーンに散り、どの `catch` 節にも入らなくなる | 要 |
+| no-empty-catch--throw-or-handle | 文を 1 つも持たない `catch` 節が素通りする | 不要 |
+| no-silent-catch--rethrow-or-handle | 失敗をどこにも記録しない `catch` 節が素通りする | 不要 |
+| no-floating-promise--await-the-result | 誰も待たない Promise が失敗を落としたまま進む | 要 |
 
 2 本は両方の束に属する。片方の束を揃えても、もう片方に欠けがあれば束ごとに 1 件ずつ報告される。
 

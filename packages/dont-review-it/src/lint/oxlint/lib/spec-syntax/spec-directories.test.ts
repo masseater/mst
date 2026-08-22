@@ -2,52 +2,97 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { specDirectoryNamesFrom, specDirectoryOf } from "./spec-directories.ts";
 
-const DEFAULT_NAMES = specDirectoryNamesFrom([]);
+const DEFAULT_NAMES: ReadonlySet<string> = new Set([
+  "__specs__",
+  "__tests__",
+  "spec",
+  "specs",
+  "test",
+  "tests",
+]);
 
-describe("spec-directories", () => {
-  test("a file directly under a directory carrying one of those names sits in a spec directory", () => {
-    expect(
-      specDirectoryOf({ relativePath: "packages/alpha/test/order.ts", names: DEFAULT_NAMES }),
-    ).toBe("packages/alpha/test");
+describe("specDirectoryOf", () => {
+  describe("a file directly under a directory carrying one of those names", () => {
+    const it = test.extend("specDirectory", () =>
+      specDirectoryOf({ relativePath: "packages/alpha/test/order.ts", names: DEFAULT_NAMES }));
+
+    it("sits in that spec directory", ({ specDirectory }) => {
+      expect(specDirectory).toBe("packages/alpha/test");
+    });
   });
 
-  test("a file nested deeper under a spec directory sits in the same spec directory", () => {
-    expect(
-      specDirectoryOf({ relativePath: "packages/alpha/test/orders/held.ts", names: DEFAULT_NAMES }),
-    ).toBe("packages/alpha/test");
+  describe("a file nested deeper under a spec directory", () => {
+    const it = test.extend("specDirectory", () =>
+      specDirectoryOf({
+        relativePath: "packages/alpha/test/orders/held.ts",
+        names: DEFAULT_NAMES,
+      }));
+
+    it("sits in the same spec directory", ({ specDirectory }) => {
+      expect(specDirectory).toBe("packages/alpha/test");
+    });
   });
 
-  test("the outermost directory carrying the name is the one the file sits in", () => {
-    expect(specDirectoryOf({ relativePath: "test/alpha/spec/held.ts", names: DEFAULT_NAMES })).toBe(
-      "test",
-    );
+  describe("a file under two directories carrying those names", () => {
+    const it = test.extend("specDirectory", () =>
+      specDirectoryOf({ relativePath: "test/alpha/spec/held.ts", names: DEFAULT_NAMES }));
+
+    it("sits in the outermost directory carrying the name", ({ specDirectory }) => {
+      expect(specDirectory).toBe("test");
+    });
   });
 
-  test("a file outside every directory carrying one of those names sits in no spec directory", () => {
-    expect(
-      specDirectoryOf({ relativePath: "packages/alpha/src/order.ts", names: DEFAULT_NAMES }),
-    ).toBe(null);
+  describe("a file outside every directory carrying one of those names", () => {
+    const it = test.extend("specDirectory", () =>
+      specDirectoryOf({ relativePath: "packages/alpha/src/order.ts", names: DEFAULT_NAMES }));
+
+    it("sits in no spec directory", ({ specDirectory }) => {
+      expect(specDirectory).toBe(null);
+    });
   });
 
-  test("a file whose own name carries a spec directory name sits in no spec directory", () => {
-    expect(specDirectoryOf({ relativePath: "packages/alpha/test", names: DEFAULT_NAMES })).toBe(
-      null,
-    );
+  describe("a path whose own last segment carries a spec directory name", () => {
+    const it = test.extend("specDirectory", () =>
+      specDirectoryOf({ relativePath: "packages/alpha/test", names: DEFAULT_NAMES }));
+
+    it("sits in no spec directory", ({ specDirectory }) => {
+      expect(specDirectory).toBe(null);
+    });
+  });
+});
+
+describe("specDirectoryNamesFrom", () => {
+  describe("a rule run without settings", () => {
+    const it = test.extend("specDirectoryNames", () => specDirectoryNamesFrom([]));
+
+    it("reads the directory names the rule itself carries", ({ specDirectoryNames }) => {
+      expect(specDirectoryNames).toStrictEqual(DEFAULT_NAMES);
+    });
   });
 
-  test("a rule run without settings reads the directory names the rule itself carries", () => {
-    const carried = new Set(["__specs__", "__tests__", "spec", "specs", "test", "tests"]);
-    expect(specDirectoryNamesFrom([])).toStrictEqual(carried);
-    expect(specDirectoryNamesFrom([{}])).toStrictEqual(carried);
+  describe("settings that name no spec directory", () => {
+    const it = test.extend("specDirectoryNames", () => specDirectoryNamesFrom([{}]));
+
+    it("leave the rule's own names in place", ({ specDirectoryNames }) => {
+      expect(specDirectoryNames).toStrictEqual(DEFAULT_NAMES);
+    });
   });
 
-  test("a repository that names its spec directories differently replaces the names entirely", () => {
-    expect(specDirectoryNamesFrom([{ specDirectoryNames: ["cases"] }])).toStrictEqual(
-      new Set(["cases"]),
-    );
+  describe("a repository that names its spec directories differently", () => {
+    const it = test.extend("specDirectoryNames", () =>
+      specDirectoryNamesFrom([{ specDirectoryNames: ["cases"] }]));
+
+    it("replaces the names entirely", ({ specDirectoryNames }) => {
+      expect(specDirectoryNames).toStrictEqual(new Set(["cases"]));
+    });
   });
 
-  test("an empty name list leaves the rule's own names in place", () => {
-    expect(specDirectoryNamesFrom([{ specDirectoryNames: [] }])).toStrictEqual(DEFAULT_NAMES);
+  describe("settings carrying an empty name list", () => {
+    const it = test.extend("specDirectoryNames", () =>
+      specDirectoryNamesFrom([{ specDirectoryNames: [] }]));
+
+    it("leave the rule's own names in place", ({ specDirectoryNames }) => {
+      expect(specDirectoryNames).toStrictEqual(DEFAULT_NAMES);
+    });
   });
 });

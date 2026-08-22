@@ -1,9 +1,10 @@
 export const readEnvVar = (
-  name: string,
+  spelled: string,
   env: Readonly<Record<string, unknown>> = process.env,
 ): string | undefined => {
-  const rawEntry = env[name];
-  if (rawEntry === undefined || rawEntry === "") return undefined;
-  if (typeof rawEntry !== "string") throw new TypeError(`${name} must be a string when set`);
-  return rawEntry;
+  const declaredValue = env[spelled];
+  if (declaredValue === undefined || declaredValue === "") return undefined;
+  if (typeof declaredValue !== "string")
+    throw new TypeError(`${spelled} must be a string when set`);
+  return declaredValue;
 };

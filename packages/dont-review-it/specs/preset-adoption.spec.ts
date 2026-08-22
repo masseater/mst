@@ -15,6 +15,7 @@ const WORKSPACES = {
   "packages/left/package.json": `{"name": "left"}`,
   "packages/lint-rule-authoring/package.json": `{"name": "lint-rule-authoring"}`,
   "packages/right/package.json": `{"name": "right"}`,
+  "packages/verified-specifications/package.json": `{"name": "verified-specifications"}`,
 };
 
 const repositoryWith = async (files: Readonly<Record<string, string>>): Promise<string> => {
@@ -22,30 +23,30 @@ const repositoryWith = async (files: Readonly<Record<string, string>>): Promise<
   onTestFinished(async () => rm(repositoryRoot, { recursive: true, force: true }));
 
   await Promise.all(
-    Object.entries(files).map(async ([name, source]) => {
-      const target = join(repositoryRoot, name);
-      await mkdir(dirname(target), { recursive: true });
-      await writeFile(target, source, "utf-8");
+    Object.entries(files).map(async ([relativePath, writtenSource]) => {
+      const writtenPath = join(repositoryRoot, relativePath);
+      await mkdir(dirname(writtenPath), { recursive: true });
+      await writeFile(writtenPath, writtenSource, "utf-8");
     }),
   );
   return repositoryRoot;
 };
 
 const adoptingConfig = (lint: string): string => `import {
-  oxlint as preset,
-  withGitExcludes,
+  dontReviewItPreset as preset,
 } from "@mst/dont-review-it";
+import { LINT_SEVERITY } from "@mst/lint-rule-authoring";
 import { defineConfig } from "vite-plus";
 export default defineConfig({
-  lint: withGitExcludes({ extends: [preset], ${lint} }),
+  lint: preset.lint({ ${lint} }),
 });`;
 
 describe("preset の適用範囲の検査", () => {
-  it("vite.config.ts があるリポジトリでは値として静的 import した preset を root lint.extends から直接ちょうど 1 回参照させる", async () => {
+  it("vite.config.ts があるリポジトリでは値として静的 import した dontReviewItPreset の lint 関数へ object literal を直接渡す", async () => {
     const repositoryRoot = await repositoryWith({
       ...WORKSPACES,
-      "vite.config.ts": `import { oxlint } from "@mst/dont-review-it";
-export default { lint: { extends: [oxlint] } };`,
+      "vite.config.ts": `import { dontReviewItPreset } from "@mst/dont-review-it";
+export default { lint: dontReviewItPreset.lint({}) };`,
     });
 
     expect(runPresetAdoptionChecks({ repositoryRoot, config }).problems).toStrictEqual([]);
@@ -56,14 +57,13 @@ export default { lint: { extends: [oxlint] } };`,
       `import * as preset from "@mst/dont-review-it";
 import * as vite from "vite-plus";
 export default vite.defineConfig({
-  lint: preset.withGitExcludes({ extends: [preset.oxlint] }),
+  lint: preset.dontReviewItPreset.lint({}),
 });`,
       `import {
-  oxlint as preset,
-  withGitExcludes as wrap,
+  dontReviewItPreset as preset,
 } from "@mst/dont-review-it";
 import { defineConfig as configure } from "vite-plus";
-export default configure({ lint: wrap({ extends: [preset] }) });`,
+export default configure({ lint: preset.lint({}) });`,
     ];
     const reports = await Promise.all(
       sources.map(async (source) => {
@@ -78,24 +78,60 @@ export default configure({ lint: wrap({ extends: [preset] }) });`,
     expect(reports.every((report) => report.problems.length === 0)).toBe(true);
   });
 
-  it("type-only import と別 module と動的 import と local relay と computed member と spread と重複を preset の直接採用として通さない", async () => {
+  it("severity の named alias と namespace を配列先頭から正規 module へ直接たどる", async () => {
     const sources = [
-      `import type { oxlint } from "@mst/dont-review-it";
-export default { lint: { extends: [oxlint] } };`,
-      `import { oxlint } from "another-preset";
-export default { lint: { extends: [oxlint] } };`,
-      `const { oxlint } = await import("@mst/dont-review-it");
-export default { lint: { extends: [oxlint] } };`,
-      `import { oxlint } from "@mst/dont-review-it";
-const relayed = oxlint;
-export default { lint: { extends: [relayed] } };`,
+      `import { dontReviewItPreset } from "@mst/dont-review-it";
+import { LINT_SEVERITY as LEVEL } from "@mst/lint-rule-authoring";
+export default { lint: dontReviewItPreset.lint({ rules: {
+  "dont-review-it/rule": [LEVEL.ERROR, {}],
+} }) };`,
+      `import { dontReviewItPreset } from "@mst/dont-review-it";
+import * as lintRuleAuthoring from "@mst/lint-rule-authoring";
+export default { lint: dontReviewItPreset.lint({ rules: {
+  "dont-review-it/rule": [lintRuleAuthoring.LINT_SEVERITY.ERROR, {}],
+} }) };`,
+    ];
+    const reports = await Promise.all(
+      sources.map(async (source) => {
+        const repositoryRoot = await repositoryWith({
+          ...WORKSPACES,
+          "vite.config.ts": source,
+        });
+        return runPresetAdoptionChecks({ repositoryRoot, config });
+      }),
+    );
+
+    expect(
+      reports.map((report) => ({
+        problems: report.problems,
+        warnings: report.warnings,
+      })),
+    ).toStrictEqual([
+      { problems: [], warnings: [] },
+      { problems: [], warnings: [] },
+    ]);
+  });
+
+  it("type-only import と別 module と動的 import と local relay と computed member と spread と重複を preset の直接呼出しとして通さない", async () => {
+    const sources = [
+      `import type { dontReviewItPreset } from "@mst/dont-review-it";
+export default { lint: dontReviewItPreset.lint({}) };`,
+      `import { dontReviewItPreset } from "another-preset";
+export default { lint: dontReviewItPreset.lint({}) };`,
+      `const { dontReviewItPreset } = await import("@mst/dont-review-it");
+export default { lint: dontReviewItPreset.lint({}) };`,
+      `import { dontReviewItPreset } from "@mst/dont-review-it";
+const relayed = dontReviewItPreset;
+export default { lint: relayed.lint({}) };`,
       `import * as preset from "@mst/dont-review-it";
-export default { lint: { extends: [preset["oxlint"]] } };`,
-      `import { oxlint } from "@mst/dont-review-it";
-import { companions } from "another-preset";
-export default { lint: { extends: [oxlint, ...companions] } };`,
-      `import { oxlint } from "@mst/dont-review-it";
-export default { lint: { extends: [oxlint, oxlint] } };`,
+export default { lint: preset["dontReviewItPreset"].lint({}) };`,
+      `import { dontReviewItPreset } from "@mst/dont-review-it";
+export default { lint: dontReviewItPreset.lint(...sharedLint) };`,
+      `import { dontReviewItPreset } from "@mst/dont-review-it";
+export default {
+  lint: dontReviewItPreset.lint({}),
+  lint: dontReviewItPreset.lint({}),
+};`,
     ];
     const reports = await Promise.all(
       sources.map(async (source) => {
@@ -110,7 +146,7 @@ export default { lint: { extends: [oxlint, oxlint] } };`,
     expect(reports.every((report) => report.problems.length > 0)).toBe(true);
   });
 
-  it("preset rule を off と allow と 0 またはそれらを先頭に置く配列で止めた宣言をすべて検出する", async () => {
+  it("preset rule を off と allow と 0 と名前付き定数またはそれらを先頭に置く配列で止めた宣言をすべて検出する", async () => {
     const repositoryRoot = await repositoryWith({
       ...WORKSPACES,
       "vite.config.ts": adoptingConfig(`rules: {
@@ -120,19 +156,110 @@ export default { lint: { extends: [oxlint, oxlint] } };`,
         "dont-review-it/fourth": ["off"],
         "dont-review-it/fifth": "allow",
         "dont-review-it/sixth": [0, {}],
+        "dont-review-it/seventh": LINT_SEVERITY.OFF,
+        "dont-review-it/eighth": [LINT_SEVERITY.OFF, {}],
       }`),
     });
 
-    expect(runPresetAdoptionChecks({ repositoryRoot, config }).problems).toHaveLength(24);
+    expect(runPresetAdoptionChecks({ repositoryRoot, config }).problems).toHaveLength(40);
   });
 
-  it("EDR に記録された 2 workspace と 1 rule の完全一致だけを warning に留める", async () => {
+  it("preset rule を warn と 1 と名前付き定数またはそれらを先頭に置く配列へ下げた宣言をすべて problem にする", async () => {
+    const repositoryRoot = await repositoryWith({
+      ...WORKSPACES,
+      "vite.config.ts": adoptingConfig(`rules: {
+        "dont-review-it/first": "warn",
+        "dont-review-it/second": ["warn", {}],
+        "dont-review-it/third": 1,
+        "dont-review-it/fourth": [1, {}],
+        "dont-review-it/fifth": LINT_SEVERITY.WARN,
+        "dont-review-it/sixth": [LINT_SEVERITY.WARN, {}],
+      }`),
+    });
+
+    const report = runPresetAdoptionChecks({ repositoryRoot, config });
+
+    expect({ problems: report.problems.length, warnings: report.warnings }).toStrictEqual({
+      problems: 6,
+      warnings: [],
+    });
+  });
+
+  it("正規 module から値 import した LINT_SEVERITY 以外の member を severity とみなさない", async () => {
+    const sources = [
+      `const fake = { ERROR: "off" };
+import { dontReviewItPreset } from "@mst/dont-review-it";
+export default { lint: dontReviewItPreset.lint({ rules: {
+  "dont-review-it/rule": fake.ERROR,
+} }) };`,
+      `const fake = { OFF: "error" };
+import { dontReviewItPreset } from "@mst/dont-review-it";
+export default { lint: dontReviewItPreset.lint({ rules: {
+  "dont-review-it/rule": fake.OFF,
+} }) };`,
+      `import { dontReviewItPreset } from "@mst/dont-review-it";
+import { LINT_SEVERITY } from "another-module";
+export default { lint: dontReviewItPreset.lint({ rules: {
+  "dont-review-it/rule": LINT_SEVERITY.OFF,
+} }) };`,
+      `import { dontReviewItPreset } from "@mst/dont-review-it";
+import type { LINT_SEVERITY } from "@mst/lint-rule-authoring";
+export default { lint: dontReviewItPreset.lint({ rules: {
+  "dont-review-it/rule": LINT_SEVERITY.OFF,
+} }) };`,
+      `import { dontReviewItPreset } from "@mst/dont-review-it";
+const { LINT_SEVERITY } = await import("@mst/lint-rule-authoring");
+export default { lint: dontReviewItPreset.lint({ rules: {
+  "dont-review-it/rule": LINT_SEVERITY.OFF,
+} }) };`,
+      `import { dontReviewItPreset } from "@mst/dont-review-it";
+import { LINT_SEVERITY } from "@mst/lint-rule-authoring";
+const relayed = LINT_SEVERITY;
+export default { lint: dontReviewItPreset.lint({ rules: {
+  "dont-review-it/rule": relayed.OFF,
+} }) };`,
+      `import { dontReviewItPreset } from "@mst/dont-review-it";
+import { LINT_SEVERITY } from "@mst/lint-rule-authoring";
+export default { lint: dontReviewItPreset.lint({ rules: {
+  "dont-review-it/rule": LINT_SEVERITY["OFF"],
+} }) };`,
+      `import { dontReviewItPreset } from "@mst/dont-review-it";
+export default { lint: dontReviewItPreset.lint({ rules: {
+  "dont-review-it/rule": [...severities],
+} }) };`,
+    ];
+    const reports = await Promise.all(
+      sources.map(async (source) => {
+        const repositoryRoot = await repositoryWith({
+          ...WORKSPACES,
+          "vite.config.ts": source,
+        });
+        return runPresetAdoptionChecks({ repositoryRoot, config });
+      }),
+    );
+
+    expect({
+      reportCount: reports.length,
+      allRejectedAtSeverity: reports.every((report) =>
+        report.problems.some((problem) =>
+          problem.message.includes("statically imported LINT_SEVERITY.ERROR"),
+        ),
+      ),
+      allWarningsEmpty: reports.every((report) => report.warnings.length === 0),
+    }).toStrictEqual({ reportCount: 8, allRejectedAtSeverity: true, allWarningsEmpty: true });
+  });
+
+  it("EDR に記録された 3 workspace と 1 rule の完全一致だけを warning に留める", async () => {
     const repositoryRoot = await repositoryWith({
       ...WORKSPACES,
       "vite.config.ts": adoptingConfig(`overrides: [{
-        files: ["packages/ai-native/**", "packages/lint-rule-authoring/**"],
+        files: [
+          "packages/ai-native/**",
+          "packages/lint-rule-authoring/**",
+          "packages/verified-specifications/**",
+        ],
         rules: {
-          "dont-review-it/no-handmade-standard-io-double--use-standard-io-test": "off",
+          "dont-review-it/no-handmade-standard-io-double--use-standard-io-test": LINT_SEVERITY.OFF,
         },
       }]`),
     });
@@ -140,7 +267,31 @@ export default { lint: { extends: [oxlint, oxlint] } };`,
     const report = runPresetAdoptionChecks({ repositoryRoot, config });
 
     expect(report.problems).toStrictEqual([]);
-    expect(report.warnings).toHaveLength(2);
+    expect(report.warnings).toHaveLength(3);
+  });
+
+  it("EDR に記録された完全一致の例外を複数宣言したら全宣言を problem にする", async () => {
+    const exception = `{
+      files: [
+        "packages/ai-native/**",
+        "packages/lint-rule-authoring/**",
+        "packages/verified-specifications/**",
+      ],
+      rules: {
+        "dont-review-it/no-handmade-standard-io-double--use-standard-io-test": LINT_SEVERITY.OFF,
+      },
+    }`;
+    const repositoryRoot = await repositoryWith({
+      ...WORKSPACES,
+      "vite.config.ts": adoptingConfig(`overrides: [${exception}, ${exception}]`),
+    });
+
+    const report = runPresetAdoptionChecks({ repositoryRoot, config });
+
+    expect({ problems: report.problems.length, warnings: report.warnings.length }).toStrictEqual({
+      problems: 6,
+      warnings: 0,
+    });
   });
 
   it("EDR の完全一致以外で止めた preset rule を warning ではなく problem にする", async () => {
@@ -160,7 +311,7 @@ export default { lint: { extends: [oxlint, oxlint] } };`,
     expect(report.warnings).toStrictEqual([]);
   });
 
-  it("rules と overrides と severity と files と excludeFiles の有効値を静的に追えない設定を problem にする", async () => {
+  it("preset rule を止め得る rules と overrides、および disabled preset rule の severity と files と excludeFiles を静的に追えない設定を problem にする", async () => {
     const lintBlocks = [
       `rules: sharedRules`,
       `overrides: sharedOverrides`,

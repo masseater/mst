@@ -1,89 +1,60 @@
-import { parseSync } from "oxc-parser";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, test } from "vite-plus/test";
 
-import {
-  annotatedDeclarationRanges,
-  isInsideAnnotatedDeclaration,
-} from "./annotated-declaration.ts";
+import { registeredDeclarationRanges } from "./annotated-declaration.ts";
+import { analyzeCanonicalValuesRepository } from "./builder.ts";
 
-const rangesIn = (sourceText: string) => {
-  const parsed = parseSync("source.ts", sourceText);
-  return annotatedDeclarationRanges(
-    { body: parsed.program.body, comments: parsed.comments },
-    sourceText,
-  );
-};
+describe("registeredDeclarationRanges", () => {
+  describe("a source holding the declaration exactly where the catalog recorded it", () => {
+    const it = test.extend("conceptIdsExemptedInTheRecordedSource", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "canonical-values-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      const sourceText = `/** @canonical-values order.status */
+export const ORDER_STATUSES = ["draft", "published"] as const;
+`;
+      mkdirSync(join(repositoryRoot, "src"), { recursive: true });
+      writeFileSync(join(repositoryRoot, "src/status.ts"), sourceText, "utf8");
+      const catalog = analyzeCanonicalValuesRepository({ repositoryRoot }).catalog;
+      return registeredDeclarationRanges({
+        catalog,
+        filename: join(repositoryRoot, "src/status.ts"),
+        repositoryRoot,
+        sourceText,
+      }).map((exemptedRange) => exemptedRange.conceptId);
+    });
 
-const conceptIdsIn = (sourceText: string): readonly string[] =>
-  rangesIn(sourceText).map((range) => range.conceptId);
-
-describe("annotatedDeclarationRanges", () => {
-  test("an annotation sitting on a declaration marks that declaration", () => {
-    expect(
-      conceptIdsIn(`/** @canonical-values user.status */
-export const USER_STATUSES = ["draft"] as const;
-`),
-    ).toStrictEqual(["user.status"]);
+    it("exempts that one declaration", ({ conceptIdsExemptedInTheRecordedSource }) => {
+      expect(conceptIdsExemptedInTheRecordedSource).toStrictEqual(["order.status"]);
+    });
   });
 
-  test("a doc comment that declares no concept marks nothing", () => {
-    expect(
-      conceptIdsIn(`/** what the value stands for */
-export const USER_STATUSES = ["draft"] as const;
-`),
-    ).toStrictEqual([]);
-  });
+  describe("a source whose declaration has moved since the catalog recorded it", () => {
+    const it = test.extend("rangesExemptedInTheMovedSource", ({}, { onCleanup }) => {
+      const repositoryRoot = mkdtempSync(join(tmpdir(), "canonical-values-"));
+      onCleanup(() => {
+        rmSync(repositoryRoot, { recursive: true, force: true });
+      });
+      const sourceText = `/** @canonical-values order.status */
+export const ORDER_STATUSES = ["draft", "published"] as const;
+`;
+      mkdirSync(join(repositoryRoot, "src"), { recursive: true });
+      writeFileSync(join(repositoryRoot, "src/status.ts"), sourceText, "utf8");
+      const catalog = analyzeCanonicalValuesRepository({ repositoryRoot }).catalog;
+      return registeredDeclarationRanges({
+        catalog,
+        filename: join(repositoryRoot, "src/status.ts"),
+        repositoryRoot,
+        sourceText: `\n${sourceText}`,
+      });
+    });
 
-  test("a line comment carrying the tag marks nothing, because only a doc comment does", () => {
-    expect(
-      conceptIdsIn(`// @canonical-values user.status
-export const USER_STATUSES = ["draft"] as const;
-`),
-    ).toStrictEqual([]);
-  });
-
-  test("an annotation with no declaration after it marks nothing", () => {
-    expect(
-      conceptIdsIn(`export const USER_STATUSES = ["draft"] as const;
-/** @canonical-values user.status */
-`),
-    ).toStrictEqual([]);
-  });
-
-  test("an annotation with something other than the declaration after it marks nothing", () => {
-    expect(
-      conceptIdsIn(`/** @canonical-values user.status */
-// what the value stands for
-export const USER_STATUSES = ["draft"] as const;
-`),
-    ).toStrictEqual([]);
-  });
-
-  test("an annotation nested inside a declaration marks nothing", () => {
-    expect(
-      conceptIdsIn(`export const ORDER = {
-  /** @canonical-values user.status */
-  statuses: ["draft"],
-};
-`),
-    ).toStrictEqual([]);
-  });
-});
-
-describe("isInsideAnnotatedDeclaration", () => {
-  test("a node inside a marked declaration is inside it", () => {
-    const ranges = rangesIn(`/** @canonical-values user.status */
-export const USER_STATUSES = ["draft"] as const;
-`);
-
-    expect(isInsideAnnotatedDeclaration(ranges, { start: 40, end: 45 })).toBe(true);
-  });
-
-  test("a node outside every marked declaration is outside them", () => {
-    const ranges = rangesIn(`/** @canonical-values user.status */
-export const USER_STATUSES = ["draft"] as const;
-`);
-
-    expect(isInsideAnnotatedDeclaration(ranges, { start: 0, end: 5 })).toBe(false);
+    it("exempts nothing", ({ rangesExemptedInTheMovedSource }) => {
+      expect(rangesExemptedInTheMovedSource).toStrictEqual([]);
+    });
   });
 });

@@ -1,56 +1,66 @@
-import { dirname, relative, resolve } from "node:path";
+import { isBuiltin } from "node:module";
+import { isAbsolute } from "node:path";
 
-import { toPosixPath } from "../posix-path.ts";
+import { pathIsInside } from "../path-is-inside.ts";
+import {
+  isIgnoredRepositoryModule,
+  matchesConfiguredPathAlias,
+  repositoryModulePath,
+  resolvedDirectImportEntries,
+  resolvedPublicImportEntries,
+  type ImportRouteQuery,
+} from "./import-route-resolution.ts";
+import { isRelativeImportSpecifier } from "./import-specifier.ts";
 
 import type { CanonicalValuesCatalog, CanonicalValuesEntry } from "./catalog.ts";
 
-const MODULE_FILE_SUFFIX = /\.[cm]?[jt]sx?$/u;
-
-const INDEX_MODULE_SUFFIX = /\/index$/u;
-
 const SUBPATH_IMPORT_PREFIX = "#";
 
-const isRelativeSpecifier = (specifier: string): boolean =>
-  specifier.startsWith("./") || specifier.startsWith("../");
-
-const matchesExportPath = (specifier: string, entry: CanonicalValuesEntry): boolean =>
-  entry.exportPath !== null &&
-  (specifier === entry.exportPath || specifier.startsWith(`${entry.exportPath}/`));
-
-const withoutModuleSuffix = (path: string): string =>
-  toPosixPath(path).replace(MODULE_FILE_SUFFIX, "").replace(INDEX_MODULE_SUFFIX, "");
-
-const matchesDeclarationPath = (
-  {
-    resolvedPath,
-    repositoryRoot,
-  }: { readonly resolvedPath: string; readonly repositoryRoot: string },
-  entry: CanonicalValuesEntry,
-): boolean => {
-  const declaration = withoutModuleSuffix(entry.declarationPath);
-  return (
-    withoutModuleSuffix(relative(repositoryRoot, resolvedPath)) === declaration ||
-    withoutModuleSuffix(resolvedPath).endsWith(`/${declaration}`)
-  );
+const packageNameOf = (specifier: string): string => {
+  if (!specifier.startsWith("@")) return specifier.split("/")[0] as string;
+  return specifier.split("/").slice(0, 2).join("/");
 };
 
+const belongsToRegisteredPackage = (specifier: string, catalog: CanonicalValuesCatalog): boolean =>
+  catalog.packageNames.has(packageNameOf(specifier));
+
+const registeredEntriesForImportRoute = (
+  query: ImportRouteQuery,
+  catalog: CanonicalValuesCatalog,
+): readonly CanonicalValuesEntry[] => {
+  const publicEntries = catalog.entries.filter((declaration) =>
+    declaration.importRoutes.some(
+      (route) => route.specifier === query.specifier && route.exportName === query.importedName,
+    ),
+  );
+  return publicEntries.length === 0
+    ? resolvedDirectImportEntries(query, catalog.entries)
+    : resolvedPublicImportEntries(query, publicEntries);
+};
+
+const isKnownRepositorySpecifier = (
+  query: ImportRouteQuery,
+  catalog: CanonicalValuesCatalog,
+): boolean =>
+  repositoryModulePath(query) !== null ||
+  query.specifier.startsWith(SUBPATH_IMPORT_PREFIX) ||
+  belongsToRegisteredPackage(query.specifier, catalog);
+
+const isExternalProtocolSpecifier = (specifier: string): boolean =>
+  isBuiltin(specifier) || /^[a-z][a-z+.-]*:/iu.test(specifier);
+
 export const importRouteStatus = (
-  {
-    specifier,
-    filename,
-    repositoryRoot,
-  }: { readonly specifier: string; readonly filename: string; readonly repositoryRoot: string },
+  query: ImportRouteQuery,
   catalog: CanonicalValuesCatalog,
 ): "registered" | "unregistered" | "external" => {
-  if (catalog.entries.some((entry) => matchesExportPath(specifier, entry))) return "registered";
-  if (isRelativeSpecifier(specifier)) {
-    const resolvedPath = resolve(dirname(filename), specifier);
-    return catalog.entries.some((entry) =>
-      matchesDeclarationPath({ resolvedPath, repositoryRoot }, entry),
-    )
-      ? "registered"
-      : "unregistered";
+  if (isIgnoredRepositoryModule(query, catalog)) return "external";
+  if (registeredEntriesForImportRoute(query, catalog).length !== 0) return "registered";
+  if (isRelativeImportSpecifier(query.specifier)) return "unregistered";
+  if (isAbsolute(query.specifier)) {
+    return pathIsInside(query.repositoryRoot, query.specifier) ? "unregistered" : "external";
   }
-  if (specifier.startsWith(SUBPATH_IMPORT_PREFIX)) return "unregistered";
+  if (isKnownRepositorySpecifier(query, catalog)) return "unregistered";
+  if (isExternalProtocolSpecifier(query.specifier)) return "external";
+  if (matchesConfiguredPathAlias(query)) return "unregistered";
   return "external";
 };

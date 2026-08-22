@@ -5,39 +5,35 @@ import { describe, expect, test, vi } from "vite-plus/test";
 
 import { sseSinkFor } from "./sse-sink.ts";
 
-const detachedResponse = (): ServerResponse =>
-  new ServerResponse(new IncomingMessage(new Socket()));
-
-const it = test
-  .extend("eventFrameWriteSpy", () => {
-    const streamResponse = detachedResponse();
-    const writeSpy = vi.spyOn(streamResponse, "write");
-    sseSinkFor(streamResponse).writeEvent({
-      eventType: "pull_request",
-      eventId: "delivery-1",
-      envelopeJson: "{}",
-    });
-    return writeSpy;
-  })
-  .extend("keepaliveFrameWriteSpy", () => {
-    const streamResponse = detachedResponse();
-    const writeSpy = vi.spyOn(streamResponse, "write");
-    sseSinkFor(streamResponse).writeKeepalive();
-    return writeSpy;
-  })
-  .extend("rejectionForDestroyedResponse", (): Error | undefined => {
-    const streamResponse = detachedResponse();
-    streamResponse.destroy();
-    const sink = sseSinkFor(streamResponse);
-    try {
-      sink.writeKeepalive();
-      return undefined;
-    } catch (thrown) {
-      return thrown instanceof Error ? thrown : undefined;
-    }
-  });
-
 describe("sseSinkFor", () => {
+  const it = test
+    .extend("eventFrameWriteSpy", () => {
+      const streamResponse = new ServerResponse(new IncomingMessage(new Socket()));
+      const writeSpy = vi.spyOn(streamResponse, "write");
+      sseSinkFor(streamResponse).writeEvent({
+        eventType: "pull_request",
+        eventId: "delivery-1",
+        envelopeJson: "{}",
+      });
+      return writeSpy;
+    })
+    .extend("keepaliveFrameWriteSpy", () => {
+      const streamResponse = new ServerResponse(new IncomingMessage(new Socket()));
+      const writeSpy = vi.spyOn(streamResponse, "write");
+      sseSinkFor(streamResponse).writeKeepalive();
+      return writeSpy;
+    })
+    .extend("keepaliveRejectionAfterDestroy", () => {
+      const streamResponse = new ServerResponse(new IncomingMessage(new Socket()));
+      streamResponse.destroy();
+      try {
+        sseSinkFor(streamResponse).writeKeepalive();
+      } catch (thrown) {
+        return thrown;
+      }
+      throw new Error("writeKeepalive resolved on a destroyed response");
+    });
+
   it("イベントフレームは event と data と id の並びで書かれる", ({ eventFrameWriteSpy }) => {
     expect(eventFrameWriteSpy).toHaveBeenCalledWith(
       "event: pull_request\ndata: {}\nid: delivery-1\n\n",
@@ -48,7 +44,7 @@ describe("sseSinkFor", () => {
     expect(keepaliveFrameWriteSpy).toHaveBeenCalledWith("event: ping\ndata:\n\n");
   });
 
-  it("応答が破棄済みなら書き込みは失敗として表面化する", ({ rejectionForDestroyedResponse }) => {
-    expect(rejectionForDestroyedResponse?.message).toContain("sse connection is closed");
+  it("応答が破棄済みなら書き込みは失敗として表面化する", ({ keepaliveRejectionAfterDestroy }) => {
+    expect(keepaliveRejectionAfterDestroy).toStrictEqual(new Error("sse connection is closed"));
   });
 });

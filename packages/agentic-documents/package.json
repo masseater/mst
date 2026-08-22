@@ -38,7 +38,8 @@
     "dev": "vp pack --watch",
     "test": "spool -- vp test",
     "check": "spool -- vp check",
-    "check:skills": "intent validate"
+    "check:skills": "intent validate",
+    "typecheck": "spool -- tsc -p ."
   },
   "dependencies": {
     "es-toolkit": "catalog:",
@@ -50,6 +51,7 @@
   },
   "devDependencies": {
     "@mst/ai-native": "workspace:*",
+    "@mst/dont-review-it": "workspace:*",
     "@mst/repository-checks": "workspace:*",
     "@tanstack/intent": "catalog:",
     "@types/mdast": "4.0.4",

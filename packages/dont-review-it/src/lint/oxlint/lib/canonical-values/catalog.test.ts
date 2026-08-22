@@ -1,52 +1,342 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import { buildCatalog, canonicalValueKey, EMPTY_CANONICAL_VALUES_CATALOG } from "./catalog.ts";
-import { fingerprintValues } from "./fingerprint.ts";
+import { buildCatalog, canonicalValueKey } from "./catalog.ts";
 
-describe("catalog", () => {
-  const entry = (conceptId: string, values: readonly string[]) => ({
-    conceptId,
-    declarationPath: `packages/example/src/${conceptId}.ts`,
-    exportPath: "@mst/example",
-    values,
-    fingerprint: fingerprintValues(values),
+describe("buildCatalog", () => {
+  describe("a concept that spells the same value twice", () => {
+    const it = test.extend("entriesResolvedForARepeatedValue", () => {
+      const repeated = {
+        annotationStart: 0,
+        binding: "ORDER_STATUSES",
+        bindingStart: 20,
+        conceptId: "order-status",
+        declarationEnd: 40,
+        declarationPath: "packages/example/src/order-status.ts",
+        declarationStart: 10,
+        importRoutes: [
+          {
+            exportName: "ORDER_STATUSES",
+            resolvedSourcePaths: ["packages/example/src/index.ts"],
+            specifier: "@mst/example",
+          },
+        ],
+        packageName: "@mst/example",
+        values: ["draft", "draft"],
+        fingerprint: "fingerprint-of-draft",
+      };
+      return buildCatalog([repeated]).entriesByValue.get(canonicalValueKey("draft"));
+    });
+
+    it("is listed against that value once", ({ entriesResolvedForARepeatedValue }) => {
+      expect(entriesResolvedForARepeatedValue).toStrictEqual([
+        {
+          annotationStart: 0,
+          binding: "ORDER_STATUSES",
+          bindingStart: 20,
+          conceptId: "order-status",
+          declarationEnd: 40,
+          declarationPath: "packages/example/src/order-status.ts",
+          declarationStart: 10,
+          importRoutes: [
+            {
+              exportName: "ORDER_STATUSES",
+              resolvedSourcePaths: ["packages/example/src/index.ts"],
+              specifier: "@mst/example",
+            },
+          ],
+          packageName: "@mst/example",
+          values: ["draft", "draft"],
+          fingerprint: "fingerprint-of-draft",
+        },
+      ]);
+    });
   });
 
-  test("a concept that spells the same value twice is listed against it once", () => {
-    const repeated = entry("order-status", ["draft", "draft"]);
+  describe("package names handed to a catalog built from no declaration", () => {
+    const it = test.extend("exampleIsKnownToACatalogBuiltFromNoDeclaration", () =>
+      buildCatalog([], { packageNames: ["@mst/example"] }).packageNames.has("@mst/example"));
 
-    expect(buildCatalog([repeated]).entriesByValue.get(canonicalValueKey("draft"))).toStrictEqual([
-      repeated,
-    ]);
+    it("are held without any owning declaration", ({
+      exampleIsKnownToACatalogBuiltFromNoDeclaration,
+    }) => {
+      expect(exampleIsKnownToACatalogBuiltFromNoDeclaration).toBe(true);
+    });
   });
 
-  test("an empty catalog resolves nothing", () => {
-    expect(EMPTY_CANONICAL_VALUES_CATALOG.entries).toStrictEqual([]);
-    expect(EMPTY_CANONICAL_VALUES_CATALOG.entriesByValue.size).toBe(0);
+  describe("concepts that share a value set", () => {
+    const it = test.extend("entriesResolvedForASharedFingerprint", () => {
+      const orderStatus = {
+        annotationStart: 0,
+        binding: "ORDER_STATUSES",
+        bindingStart: 20,
+        conceptId: "order-status",
+        declarationEnd: 40,
+        declarationPath: "packages/example/src/order-status.ts",
+        declarationStart: 10,
+        importRoutes: [
+          {
+            exportName: "ORDER_STATUSES",
+            resolvedSourcePaths: ["packages/example/src/index.ts"],
+            specifier: "@mst/example",
+          },
+        ],
+        packageName: "@mst/example",
+        values: ["draft", "published"],
+        fingerprint: "fingerprint-of-draft-and-published",
+      };
+      const articleStatus = {
+        annotationStart: 0,
+        binding: "ARTICLE_STATUSES",
+        bindingStart: 20,
+        conceptId: "article-status",
+        declarationEnd: 40,
+        declarationPath: "packages/example/src/article-status.ts",
+        declarationStart: 10,
+        importRoutes: [
+          {
+            exportName: "ARTICLE_STATUSES",
+            resolvedSourcePaths: ["packages/example/src/index.ts"],
+            specifier: "@mst/example",
+          },
+        ],
+        packageName: "@mst/example",
+        values: ["published", "draft"],
+        fingerprint: "fingerprint-of-draft-and-published",
+      };
+      return buildCatalog([orderStatus, articleStatus]).entriesByFingerprint.get(
+        "fingerprint-of-draft-and-published",
+      );
+    });
+
+    it("are reachable through one fingerprint", ({ entriesResolvedForASharedFingerprint }) => {
+      expect(entriesResolvedForASharedFingerprint).toStrictEqual([
+        {
+          annotationStart: 0,
+          binding: "ORDER_STATUSES",
+          bindingStart: 20,
+          conceptId: "order-status",
+          declarationEnd: 40,
+          declarationPath: "packages/example/src/order-status.ts",
+          declarationStart: 10,
+          importRoutes: [
+            {
+              exportName: "ORDER_STATUSES",
+              resolvedSourcePaths: ["packages/example/src/index.ts"],
+              specifier: "@mst/example",
+            },
+          ],
+          packageName: "@mst/example",
+          values: ["draft", "published"],
+          fingerprint: "fingerprint-of-draft-and-published",
+        },
+        {
+          annotationStart: 0,
+          binding: "ARTICLE_STATUSES",
+          bindingStart: 20,
+          conceptId: "article-status",
+          declarationEnd: 40,
+          declarationPath: "packages/example/src/article-status.ts",
+          declarationStart: 10,
+          importRoutes: [
+            {
+              exportName: "ARTICLE_STATUSES",
+              resolvedSourcePaths: ["packages/example/src/index.ts"],
+              specifier: "@mst/example",
+            },
+          ],
+          packageName: "@mst/example",
+          values: ["published", "draft"],
+          fingerprint: "fingerprint-of-draft-and-published",
+        },
+      ]);
+    });
   });
 
-  test("concepts that share a value set are reachable through one fingerprint", () => {
-    const first = entry("order-status", ["draft", "published"]);
-    const second = entry("article-status", ["published", "draft"]);
+  describe("a value two concepts own", () => {
+    const it = test.extend("entriesResolvedForAValueTwoConceptsOwn", () => {
+      const orderStatus = {
+        annotationStart: 0,
+        binding: "ORDER_STATUSES",
+        bindingStart: 20,
+        conceptId: "order-status",
+        declarationEnd: 40,
+        declarationPath: "packages/example/src/order-status.ts",
+        declarationStart: 10,
+        importRoutes: [
+          {
+            exportName: "ORDER_STATUSES",
+            resolvedSourcePaths: ["packages/example/src/index.ts"],
+            specifier: "@mst/example",
+          },
+        ],
+        packageName: "@mst/example",
+        values: ["draft"],
+        fingerprint: "fingerprint-of-draft",
+      };
+      const articleStatus = {
+        annotationStart: 0,
+        binding: "ARTICLE_STATUSES",
+        bindingStart: 20,
+        conceptId: "article-status",
+        declarationEnd: 40,
+        declarationPath: "packages/example/src/article-status.ts",
+        declarationStart: 10,
+        importRoutes: [
+          {
+            exportName: "ARTICLE_STATUSES",
+            resolvedSourcePaths: ["packages/example/src/index.ts"],
+            specifier: "@mst/example",
+          },
+        ],
+        packageName: "@mst/example",
+        values: ["draft", "archived"],
+        fingerprint: "fingerprint-of-draft-and-archived",
+      };
+      return buildCatalog([orderStatus, articleStatus]).entriesByValue.get(
+        canonicalValueKey("draft"),
+      );
+    });
 
-    const catalog = buildCatalog([first, second]);
-
-    expect(catalog.entriesByFingerprint.get(first.fingerprint)).toStrictEqual([first, second]);
+    it("resolves to every concept that owns it", ({ entriesResolvedForAValueTwoConceptsOwn }) => {
+      expect(entriesResolvedForAValueTwoConceptsOwn).toStrictEqual([
+        {
+          annotationStart: 0,
+          binding: "ORDER_STATUSES",
+          bindingStart: 20,
+          conceptId: "order-status",
+          declarationEnd: 40,
+          declarationPath: "packages/example/src/order-status.ts",
+          declarationStart: 10,
+          importRoutes: [
+            {
+              exportName: "ORDER_STATUSES",
+              resolvedSourcePaths: ["packages/example/src/index.ts"],
+              specifier: "@mst/example",
+            },
+          ],
+          packageName: "@mst/example",
+          values: ["draft"],
+          fingerprint: "fingerprint-of-draft",
+        },
+        {
+          annotationStart: 0,
+          binding: "ARTICLE_STATUSES",
+          bindingStart: 20,
+          conceptId: "article-status",
+          declarationEnd: 40,
+          declarationPath: "packages/example/src/article-status.ts",
+          declarationStart: 10,
+          importRoutes: [
+            {
+              exportName: "ARTICLE_STATUSES",
+              resolvedSourcePaths: ["packages/example/src/index.ts"],
+              specifier: "@mst/example",
+            },
+          ],
+          packageName: "@mst/example",
+          values: ["draft", "archived"],
+          fingerprint: "fingerprint-of-draft-and-archived",
+        },
+      ]);
+    });
   });
 
-  test("a value resolves to every concept that owns it", () => {
-    const first = entry("order-status", ["draft"]);
-    const second = entry("article-status", ["draft", "archived"]);
+  describe("a value only one concept owns", () => {
+    const it = test.extend("entriesResolvedForAValueOneConceptOwns", () => {
+      const orderStatus = {
+        annotationStart: 0,
+        binding: "ORDER_STATUSES",
+        bindingStart: 20,
+        conceptId: "order-status",
+        declarationEnd: 40,
+        declarationPath: "packages/example/src/order-status.ts",
+        declarationStart: 10,
+        importRoutes: [
+          {
+            exportName: "ORDER_STATUSES",
+            resolvedSourcePaths: ["packages/example/src/index.ts"],
+            specifier: "@mst/example",
+          },
+        ],
+        packageName: "@mst/example",
+        values: ["draft"],
+        fingerprint: "fingerprint-of-draft",
+      };
+      const articleStatus = {
+        annotationStart: 0,
+        binding: "ARTICLE_STATUSES",
+        bindingStart: 20,
+        conceptId: "article-status",
+        declarationEnd: 40,
+        declarationPath: "packages/example/src/article-status.ts",
+        declarationStart: 10,
+        importRoutes: [
+          {
+            exportName: "ARTICLE_STATUSES",
+            resolvedSourcePaths: ["packages/example/src/index.ts"],
+            specifier: "@mst/example",
+          },
+        ],
+        packageName: "@mst/example",
+        values: ["draft", "archived"],
+        fingerprint: "fingerprint-of-draft-and-archived",
+      };
+      return buildCatalog([orderStatus, articleStatus]).entriesByValue.get(
+        canonicalValueKey("archived"),
+      );
+    });
 
-    const catalog = buildCatalog([first, second]);
-
-    expect(catalog.entriesByValue.get(canonicalValueKey("draft"))).toStrictEqual([first, second]);
-    expect(catalog.entriesByValue.get(canonicalValueKey("archived"))).toStrictEqual([second]);
+    it("resolves to that concept alone", ({ entriesResolvedForAValueOneConceptOwns }) => {
+      expect(entriesResolvedForAValueOneConceptOwns).toStrictEqual([
+        {
+          annotationStart: 0,
+          binding: "ARTICLE_STATUSES",
+          bindingStart: 20,
+          conceptId: "article-status",
+          declarationEnd: 40,
+          declarationPath: "packages/example/src/article-status.ts",
+          declarationStart: 10,
+          importRoutes: [
+            {
+              exportName: "ARTICLE_STATUSES",
+              resolvedSourcePaths: ["packages/example/src/index.ts"],
+              specifier: "@mst/example",
+            },
+          ],
+          packageName: "@mst/example",
+          values: ["draft", "archived"],
+          fingerprint: "fingerprint-of-draft-and-archived",
+        },
+      ]);
+    });
   });
 
-  test("a value nobody declares resolves to nothing", () => {
-    const catalog = buildCatalog([entry("order-status", ["draft"])]);
+  describe("a value nobody declares", () => {
+    const it = test.extend("entriesResolvedForAValueNobodyDeclares", () => {
+      const orderStatus = {
+        annotationStart: 0,
+        binding: "ORDER_STATUSES",
+        bindingStart: 20,
+        conceptId: "order-status",
+        declarationEnd: 40,
+        declarationPath: "packages/example/src/order-status.ts",
+        declarationStart: 10,
+        importRoutes: [
+          {
+            exportName: "ORDER_STATUSES",
+            resolvedSourcePaths: ["packages/example/src/index.ts"],
+            specifier: "@mst/example",
+          },
+        ],
+        packageName: "@mst/example",
+        values: ["draft"],
+        fingerprint: "fingerprint-of-draft",
+      };
+      return buildCatalog([orderStatus]).entriesByValue.get(canonicalValueKey("published"));
+    });
 
-    expect(catalog.entriesByValue.get(canonicalValueKey("published"))).toBeUndefined();
+    it("resolves to nothing", ({ entriesResolvedForAValueNobodyDeclares }) => {
+      expect(entriesResolvedForAValueNobodyDeclares).toBe(undefined);
+    });
   });
 });

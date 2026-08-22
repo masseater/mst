@@ -1,5 +1,6 @@
 import { join } from "node:path";
 
+import { CHILD_PROCESS_EVENT } from "../runtime/event-names.ts";
 import { shellQuote, type CommandExecutor, type TailFs } from "./command-executor.ts";
 import { ProcessFailedError } from "./process-failed-error.ts";
 import { UnresponsiveError } from "./unresponsive-error.ts";
@@ -51,14 +52,14 @@ const readExit = (finalize: {
 }): number => {
   const exitCode = finalize.fs.readExitCode(finalize.exitPath) ?? -1;
   if (exitCode === 0) return 0;
-  const output = finalize.fs.readAll(finalize.outPath);
-  if (output !== "") {
+  const produced = finalize.fs.readAll(finalize.outPath);
+  if (produced !== "") {
     finalize.log.error(
-      { command: finalize.binary, exitCode, output },
+      { command: finalize.binary, exitCode, output: produced },
       "engine process exited non-zero",
     );
   }
-  throw new ProcessFailedError({ command: finalize.binary, exitCode, output });
+  throw new ProcessFailedError({ command: finalize.binary, exitCode, output: produced });
 };
 
 const finalizeRun = (settle: {
@@ -68,12 +69,12 @@ const finalizeRun = (settle: {
   readonly exitPath: string;
   readonly outPath: string;
 }): number => {
-  const { state, request } = settle;
+  const { state: heldState, request } = settle;
   if (request.signal?.aborted === true) throw request.signal.reason;
-  if (state.flags.get("timedOut") === true) {
+  if (heldState.flags.get("timedOut") === true) {
     throw new Error(`engine run exceeded the ${request.timeoutMs}ms timeout`);
   }
-  const idleMs = state.times.get("idleMs");
+  const idleMs = heldState.times.get("idleMs");
   if (idleMs !== undefined) {
     throw new UnresponsiveError({ command: request.binary, idleMs });
   }
@@ -92,15 +93,15 @@ const shouldStop = (check: {
   readonly deps: TmuxRunnerDeps;
   readonly startedAtMs: number;
 }): boolean => {
-  const { state, request, deps } = check;
+  const { state: heldState, request, deps } = check;
   if (request.signal?.aborted === true) return true;
   if (deps.now() - check.startedAtMs > request.timeoutMs) {
-    state.flags.set("timedOut", true);
+    heldState.flags.set("timedOut", true);
     return true;
   }
-  const lastOutputMs = state.times.get("lastOutput") ?? check.startedAtMs;
+  const lastOutputMs = heldState.times.get("lastOutput") ?? check.startedAtMs;
   if (request.idleTimeoutMs !== undefined && deps.now() - lastOutputMs > request.idleTimeoutMs) {
-    state.times.set("idleMs", request.idleTimeoutMs);
+    heldState.times.set("idleMs", request.idleTimeoutMs);
     return true;
   }
   return false;
@@ -112,12 +113,18 @@ const drainNewOutput = function* (draining: {
   readonly outPath: string;
   readonly stampLastOutput: boolean;
 }): Generator<string, void, undefined> {
-  const { state, deps } = draining;
-  const chunk = deps.fs.readFrom({ path: draining.outPath, offset: state.offsets.get("out") ?? 0 });
-  if (chunk === "") return;
-  state.offsets.set("out", (state.offsets.get("out") ?? 0) + Buffer.byteLength(chunk));
-  if (draining.stampLastOutput) state.times.set("lastOutput", deps.now());
-  yield chunk;
+  const { state: heldState, deps } = draining;
+  const writtenChunk = deps.fs.readFrom({
+    path: draining.outPath,
+    offset: heldState.offsets.get("out") ?? 0,
+  });
+  if (writtenChunk === "") return;
+  heldState.offsets.set(
+    "out",
+    (heldState.offsets.get("out") ?? 0) + Buffer.byteLength(writtenChunk),
+  );
+  if (draining.stampLastOutput) heldState.times.set("lastOutput", deps.now());
+  yield writtenChunk;
 };
 
 const sessionEnded = async (checking: {
@@ -145,11 +152,11 @@ const tailLoop = async function* (loop: {
   readonly outPath: string;
   readonly startedAtMs: number;
 }): AsyncGenerator<string, void, undefined> {
-  const { state, request, deps, outPath } = loop;
+  const { state: heldState, request, deps, outPath } = loop;
   for (;;) {
-    yield* drainNewOutput({ state, deps, outPath, stampLastOutput: true });
+    yield* drainNewOutput({ state: heldState, deps, outPath, stampLastOutput: true });
     if (await sessionEnded(loop)) {
-      yield* drainNewOutput({ state, deps, outPath, stampLastOutput: false });
+      yield* drainNewOutput({ state: heldState, deps, outPath, stampLastOutput: false });
       return;
     }
     await deps.sleep(request.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS);
@@ -215,16 +222,16 @@ const startSession = async (starting: {
 };
 
 export const runInTmux = (deps: TmuxRunnerDeps) =>
-  async function* run(request: TmuxRunRequest): AsyncGenerator<string, void, undefined> {
-    await killStaleSession({ deps, sessionName: request.sessionName });
-    const tempDir = deps.fs.makeTempDir(`auto-develop-tmux-${request.sessionName}-`);
+  async function* run(asked: TmuxRunRequest): AsyncGenerator<string, void, undefined> {
+    await killStaleSession({ deps, sessionName: asked.sessionName });
+    const tempDir = deps.fs.makeTempDir(`auto-develop-tmux-${asked.sessionName}-`);
     try {
       const outPath = join(tempDir, "out.log");
-      const exitPath = join(tempDir, "exit");
-      await startSession({ deps, request, outPath, exitPath });
-      const state: TailState = { offsets: new Map(), flags: new Map(), times: new Map() };
-      yield* tailLoop({ state, request, deps, outPath, startedAtMs: deps.now() });
-      finalizeRun({ state, request, deps, exitPath, outPath });
+      const exitPath = join(tempDir, CHILD_PROCESS_EVENT.exit);
+      await startSession({ deps, request: asked, outPath, exitPath });
+      const heldState: TailState = { offsets: new Map(), flags: new Map(), times: new Map() };
+      yield* tailLoop({ state: heldState, request: asked, deps, outPath, startedAtMs: deps.now() });
+      finalizeRun({ state: heldState, request: asked, deps, exitPath, outPath });
     } finally {
       deps.fs.removeRecursive(tempDir);
     }

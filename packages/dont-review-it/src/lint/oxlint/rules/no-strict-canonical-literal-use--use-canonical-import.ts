@@ -1,65 +1,27 @@
-import { memoize } from "es-toolkit";
-
 import { createDontReviewItRule } from "../../../create-rule.ts";
-import {
-  annotatedDeclarationRanges,
-  isInsideAnnotatedDeclaration,
-  type AnnotatedDeclarationRange,
-} from "../lib/canonical-values/annotated-declaration.ts";
-import {
-  canonicalValueKey,
-  type CanonicalValuesCatalog,
-  type CanonicalValuesEntry,
-} from "../lib/canonical-values/catalog.ts";
-import { declaresConceptAt } from "../lib/canonical-values/declaration-path.ts";
-import {
-  ancestorsOf,
-  isKeySelectorArgument,
-  isModuleSyntaxPosition,
-  isStructuralKeyPosition,
-  literalValue,
-  negatedNumericValue,
-  templateLiteralValue,
-  type LiteralNode,
-} from "../lib/canonical-values/literal-position.ts";
+import { analyzeCanonicalLiterals } from "../lib/canonical-values/canonical-literal-analysis.ts";
 import {
   OWNERSHIP_POLICY_SCHEMA,
   ownershipPolicyOf,
 } from "../lib/canonical-values/ownership-policy.ts";
 import { findWorkspaceRoot } from "../lib/canonical-values/workspace-root.ts";
-import { isOutOfScopeSource } from "../lib/out-of-scope-source.ts";
+import { isOutOfScopeLintSource } from "../lib/out-of-scope-source.ts";
 
-import type { ESTree, Visitor } from "@oxlint/plugins";
 import type { CanonicalValuesCatalogLoader } from "../lib/canonical-values/catalog-loader.ts";
-import type { CanonicalValue } from "../lib/canonical-values/fingerprint.ts";
+import type { CanonicalValuesEntry } from "../lib/canonical-values/catalog.ts";
 
-type LintedSource = {
-  readonly program: ESTree.Program;
-  readonly sourceText: string;
-  readonly filename: string;
-};
-
-const registeredDeclarationRanges = (
-  { program, sourceText, filename }: LintedSource,
-  catalog: CanonicalValuesCatalog,
-): readonly AnnotatedDeclarationRange[] =>
-  annotatedDeclarationRanges(program, sourceText).filter((range) =>
-    declaresConceptAt(catalog, { conceptId: range.conceptId, path: filename }),
-  );
-
-const conceptSummary = (entries: readonly CanonicalValuesEntry[]): string =>
-  entries
-    .map((entry) =>
-      entry.exportPath === null
-        ? `${entry.conceptId} declared in ${entry.declarationPath}`
-        : `${entry.conceptId} exported from ${entry.exportPath}`,
-    )
+const conceptSummary = (canonicalOwners: readonly CanonicalValuesEntry[]): string =>
+  canonicalOwners
+    .map((canonicalOwner) => {
+      const routes = canonicalOwner.importRoutes.map((route) => route.specifier).join(", ");
+      return routes === ""
+        ? `${canonicalOwner.conceptId} declared in ${canonicalOwner.declarationPath}`
+        : `${canonicalOwner.conceptId} exported from ${routes}`;
+    })
     .toSorted()
     .join("; ");
 
-export const createNoStrictCanonicalLiteralUseRule = ({
-  loadCatalog,
-}: {
+export const createNoStrictCanonicalLiteralUseRule = (input: {
   readonly loadCatalog: CanonicalValuesCatalogLoader;
 }) =>
   createDontReviewItRule({
@@ -73,82 +35,33 @@ export const createNoStrictCanonicalLiteralUseRule = ({
       },
       messages: {
         canonicalValueLiteral:
-          "A value that a declared vocabulary already owns must not be written again as a literal. Replace {{value}} with the binding its owner publishes: {{concepts}}. Ownership policy: {{ownershipPolicy}}.",
+          "Writing a value that a declared vocabulary already owns as a literal is forbidden. Replace {{value}} with the binding its owner publishes: {{concepts}}. Ownership policy: {{ownershipPolicy}}.",
       },
       schema: OWNERSHIP_POLICY_SCHEMA,
     },
-    create(context): Visitor {
-      if (isOutOfScopeSource(context.filename)) return {};
-
-      const ownershipPolicy = ownershipPolicyOf(context.options);
-      const loadedCatalog = memoize(
-        (): CanonicalValuesCatalog =>
-          loadCatalog({ repositoryRoot: findWorkspaceRoot(context.cwd) }),
-      );
-      const lintedSource: LintedSource = {
-        program: context.sourceCode.ast,
-        sourceText: context.sourceCode.text,
-        filename: context.filename,
-      };
-      const exemptRangesOf = memoize(
-        (loaded: CanonicalValuesCatalog): readonly AnnotatedDeclarationRange[] =>
-          registeredDeclarationRanges(lintedSource, loaded),
-      );
-
-      const inspect = ({
-        node,
-        spelling,
-        ancestors,
-      }: {
-        readonly node: ESTree.Node;
-        readonly spelling: CanonicalValue;
-        readonly ancestors: readonly ESTree.Node[];
-      }): void => {
-        const parent = ancestors.at(-1);
-        if (parent !== undefined && isStructuralKeyPosition(parent, node)) return;
-        if (parent !== undefined && isModuleSyntaxPosition(parent, node)) return;
-        if (isKeySelectorArgument(ancestors)) return;
-
-        const loaded = loadedCatalog();
-        const entries = loaded.entriesByValue.get(canonicalValueKey(spelling));
-        if (entries === undefined || entries.length === 0) return;
-
-        if (isInsideAnnotatedDeclaration(exemptRangesOf(loaded), node)) return;
-
-        context.report({
-          node,
-          messageId: "canonicalValueLiteral",
-          data: {
-            value: context.sourceCode.getText(node),
-            concepts: conceptSummary(entries),
-            ownershipPolicy,
-          },
-        });
-      };
-
+    create(ruleContext) {
+      const repositoryRoot = findWorkspaceRoot(ruleContext.cwd);
+      if (isOutOfScopeLintSource(ruleContext.filename, repositoryRoot)) return {};
+      const diagnostics = analyzeCanonicalLiterals({
+        catalog: input.loadCatalog({ repositoryRoot }),
+        filename: ruleContext.filename,
+        repositoryRoot,
+        sourceCode: ruleContext.sourceCode,
+      });
+      const ownershipPolicy = ownershipPolicyOf(ruleContext.options);
       return {
-        Literal(node: LiteralNode) {
-          const spelling = literalValue(node);
-          if (spelling === null) return;
-          const { parent } = node;
-          if (
-            typeof spelling === "number" &&
-            parent.type === "UnaryExpression" &&
-            parent.operator === "-"
-          ) {
-            return;
+        Program() {
+          for (const diagnostic of diagnostics) {
+            ruleContext.report({
+              node: diagnostic.node,
+              messageId: "canonicalValueLiteral",
+              data: {
+                value: ruleContext.sourceCode.getText(diagnostic.node),
+                concepts: conceptSummary(diagnostic.entries),
+                ownershipPolicy,
+              },
+            });
           }
-          inspect({ node, spelling, ancestors: ancestorsOf(node) });
-        },
-        TemplateLiteral(node: ESTree.TemplateLiteral) {
-          const spelling = templateLiteralValue(node);
-          if (spelling === null) return;
-          inspect({ node, spelling, ancestors: ancestorsOf(node) });
-        },
-        UnaryExpression(node: ESTree.UnaryExpression) {
-          const spelling = negatedNumericValue(node);
-          if (spelling === null) return;
-          inspect({ node, spelling, ancestors: ancestorsOf(node) });
         },
       };
     },

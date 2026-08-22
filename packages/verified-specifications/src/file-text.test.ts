@@ -2,36 +2,64 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, onTestFinished, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { fileTextOrNull } from "./file-text.ts";
 
-const temporaryDirectory = async (): Promise<string> => {
-  const directory = await mkdtemp(join(tmpdir(), "verified-specifications-"));
-  onTestFinished(async () => rm(directory, { recursive: true, force: true }));
-  return directory;
-};
-
 describe("fileTextOrNull", () => {
-  test("returns the text of a file that exists", async () => {
-    const directory = await temporaryDirectory();
-    await writeFile(join(directory, "present.txt"), "content", "utf-8");
-    await expect(fileTextOrNull(join(directory, "present.txt"))).resolves.toBe("content");
+  describe("a file that is there", () => {
+    const it = test.extend("theTextOfAFileThatIsThere", async ({}, { onCleanup }) => {
+      const directory = await mkdtemp(join(tmpdir(), "verified-specifications-"));
+      onCleanup(async () => rm(directory, { recursive: true, force: true }));
+      await writeFile(join(directory, "present.txt"), "content", "utf-8");
+      return fileTextOrNull(join(directory, "present.txt"));
+    });
+
+    it("hands back the text written in it", ({ theTextOfAFileThatIsThere }) => {
+      expect(theTextOfAFileThatIsThere).toBe("content");
+    });
   });
 
-  test("returns null for a file that does not exist", async () => {
-    const directory = await temporaryDirectory();
-    await expect(fileTextOrNull(join(directory, "absent.txt"))).resolves.toBeNull();
+  describe("a file that is not there", () => {
+    const it = test.extend("theTextOfAFileThatIsNotThere", async ({}, { onCleanup }) => {
+      const directory = await mkdtemp(join(tmpdir(), "verified-specifications-"));
+      onCleanup(async () => rm(directory, { recursive: true, force: true }));
+      return fileTextOrNull(join(directory, "absent.txt"));
+    });
+
+    it("reads the absence as nothing to read", ({ theTextOfAFileThatIsNotThere }) => {
+      expect(theTextOfAFileThatIsNotThere).toBe(null);
+    });
   });
 
-  test("returns null for a path that descends through a file", async () => {
-    const directory = await temporaryDirectory();
-    await writeFile(join(directory, "present.txt"), "content", "utf-8");
-    await expect(fileTextOrNull(join(directory, "present.txt", "nested"))).resolves.toBeNull();
+  describe("a path that descends through a file", () => {
+    const it = test.extend("theTextOfAPathBelowAFile", async ({}, { onCleanup }) => {
+      const directory = await mkdtemp(join(tmpdir(), "verified-specifications-"));
+      onCleanup(async () => rm(directory, { recursive: true, force: true }));
+      await writeFile(join(directory, "present.txt"), "content", "utf-8");
+      return fileTextOrNull(join(directory, "present.txt", "nested"));
+    });
+
+    it("reads the missing descent as nothing to read", ({ theTextOfAPathBelowAFile }) => {
+      expect(theTextOfAPathBelowAFile).toBe(null);
+    });
   });
 
-  test("surfaces a failure that is not absence", async () => {
-    const directory = await temporaryDirectory();
-    await expect(fileTextOrNull(directory)).rejects.toThrow("EISDIR");
+  describe("a path that names a directory", () => {
+    const it = test.extend("theFailureOfReadingADirectory", async ({}, { onCleanup }) => {
+      const directory = await mkdtemp(join(tmpdir(), "verified-specifications-"));
+      onCleanup(async () => rm(directory, { recursive: true, force: true }));
+      try {
+        return await fileTextOrNull(directory);
+      } catch (failure) {
+        return failure instanceof Error && "code" in failure ? failure.code : failure;
+      }
+    });
+
+    it("surfaces the failure instead of reading it as absence", ({
+      theFailureOfReadingADirectory,
+    }) => {
+      expect(theFailureOfReadingADirectory).toBe("EISDIR");
+    });
   });
 });

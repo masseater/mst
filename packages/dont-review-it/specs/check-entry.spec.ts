@@ -15,9 +15,9 @@ const repositoryWith = (files: Readonly<Record<string, string>>): string => {
     rmSync(root, { recursive: true, force: true });
   });
   for (const [path, source] of Object.entries(files)) {
-    const target = join(root, path);
-    mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, source, "utf8");
+    const fixturePath = join(root, path);
+    mkdirSync(dirname(fixturePath), { recursive: true });
+    writeFileSync(fixturePath, source, "utf8");
   }
   return root;
 };
@@ -60,13 +60,13 @@ describe("リポジトリ検査の入口", () => {
     process.exitCode = 0;
   });
 
-  it("vite.config.ts が preset を root lint.extends から直接採用していなければ報告して失敗する", async () => {
+  it("vite.config.ts が dontReviewItPreset.lint を直接呼ばなければ報告して失敗する", async () => {
     const repositoryRoot = repositoryWith({
-      "vite.config.ts": `export default { lint: { extends: [] } };`,
+      "vite.config.ts": `export default { lint: {} };`,
     });
 
     expect(runChecks(repositoryRoot).problems.join("\n")).toContain(
-      "statically imported oxlint value exactly once",
+      "exactly one direct call to dontReviewItPreset.lint",
     );
 
     process.exitCode = 0;
@@ -78,10 +78,10 @@ describe("リポジトリ検査の入口", () => {
     process.exitCode = 0;
   });
 
-  it("vite.config.ts が preset を root lint.extends から直接採用していれば check を成功させる", async () => {
+  it("vite.config.ts が値 import した dontReviewItPreset.lint を直接呼べば check を成功させる", async () => {
     const repositoryRoot = repositoryWith({
-      "vite.config.ts": `import { oxlint } from "@mst/dont-review-it";
-export default { lint: { extends: [oxlint] } };`,
+      "vite.config.ts": `import { dontReviewItPreset } from "@mst/dont-review-it";
+export default { lint: dontReviewItPreset.lint({}) };`,
     });
 
     process.exitCode = 0;

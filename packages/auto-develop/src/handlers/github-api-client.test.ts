@@ -2,63 +2,320 @@ import { describe, expect, test, vi } from "vite-plus/test";
 
 import { createGithubApiClient, type GithubOctokit } from "./github-api-client.ts";
 
-const octokitWith = (responses: {
-  readonly pull?: Awaited<ReturnType<GithubOctokit["rest"]["pulls"]["get"]>>["data"];
-  readonly reviews?: Awaited<ReturnType<GithubOctokit["rest"]["pulls"]["listReviews"]>>["data"];
-}) => {
-  const getPull = vi.fn<GithubOctokit["rest"]["pulls"]["get"]>(() =>
-    Promise.resolve({
-      data: responses.pull ?? {
-        title: "Pull title",
-        body: "Pull body",
-        state: "open",
-        head: { ref: "topic", sha: "head-sha" },
-        base: { ref: "main" },
-        draft: true,
-        requested_reviewers: [{ login: "reviewer-one" }, { login: "reviewer-two" }],
-      },
-    }),
-  );
-  const listReviews = vi.fn<GithubOctokit["rest"]["pulls"]["listReviews"]>(() =>
-    Promise.resolve({ data: responses.reviews ?? [] }),
-  );
-  const paginate = vi.fn<GithubOctokit["paginate"]>(
-    async (endpoint, request) => (await endpoint(request)).data,
-  );
-  const createCommitStatus = vi.fn<GithubOctokit["rest"]["repos"]["createCommitStatus"]>(() =>
-    Promise.resolve(),
-  );
-  const requestReviewers = vi.fn<GithubOctokit["rest"]["pulls"]["requestReviewers"]>(() =>
-    Promise.resolve(),
-  );
-  return {
-    octokit: {
-      rest: {
-        pulls: { get: getPull, listReviews, requestReviewers },
-        repos: { createCommitStatus },
-      },
-      paginate,
-    } satisfies GithubOctokit,
-    getPull,
-    listReviews,
-    paginate,
-    createCommitStatus,
-    requestReviewers,
-  };
-};
-
 describe("createGithubApiClient", () => {
-  test("maps a complete pull response into a snapshot", async () => {
-    const github = octokitWith({});
-    const client = createGithubApiClient({
-      repository: "owner/repository/ignored",
-      token: "token",
-      octokit: github.octokit,
-    });
+  const it = test
+    .extend("completePullSnapshot", async () => {
+      const octokit = {
+        rest: {
+          pulls: {
+            get: vi.fn<GithubOctokit["rest"]["pulls"]["get"]>(() =>
+              Promise.resolve({
+                data: {
+                  title: "Pull title",
+                  body: "Pull body",
+                  state: "open",
+                  head: { ref: "topic", sha: "head-sha" },
+                  base: { ref: "main" },
+                  draft: true,
+                  requested_reviewers: [{ login: "reviewer-one" }, { login: "reviewer-two" }],
+                },
+              }),
+            ),
+            listReviews: vi.fn<GithubOctokit["rest"]["pulls"]["listReviews"]>(() =>
+              Promise.resolve({ data: [] }),
+            ),
+            requestReviewers: vi.fn<GithubOctokit["rest"]["pulls"]["requestReviewers"]>(() =>
+              Promise.resolve(),
+            ),
+          },
+          repos: {
+            createCommitStatus: vi.fn<GithubOctokit["rest"]["repos"]["createCommitStatus"]>(() =>
+              Promise.resolve(),
+            ),
+          },
+        },
+        paginate: vi.fn<GithubOctokit["paginate"]>(
+          async (endpoint, pullRequest) => (await endpoint(pullRequest)).data,
+        ),
+      } satisfies GithubOctokit;
+      return createGithubApiClient({
+        repository: "owner/repository/ignored",
+        token: "token",
+        octokit,
+      }).prSnapshot(17);
+    })
+    .extend("completePullRequest", async () => {
+      const getPull = vi.fn<GithubOctokit["rest"]["pulls"]["get"]>(() =>
+        Promise.resolve({
+          data: {
+            title: "Pull title",
+            body: "Pull body",
+            state: "open",
+            head: { ref: "topic", sha: "head-sha" },
+            base: { ref: "main" },
+            draft: true,
+            requested_reviewers: [{ login: "reviewer-one" }, { login: "reviewer-two" }],
+          },
+        }),
+      );
+      const octokit = {
+        rest: {
+          pulls: {
+            get: getPull,
+            listReviews: vi.fn<GithubOctokit["rest"]["pulls"]["listReviews"]>(() =>
+              Promise.resolve({ data: [] }),
+            ),
+            requestReviewers: vi.fn<GithubOctokit["rest"]["pulls"]["requestReviewers"]>(() =>
+              Promise.resolve(),
+            ),
+          },
+          repos: {
+            createCommitStatus: vi.fn<GithubOctokit["rest"]["repos"]["createCommitStatus"]>(() =>
+              Promise.resolve(),
+            ),
+          },
+        },
+        paginate: vi.fn<GithubOctokit["paginate"]>(
+          async (endpoint, pullRequest) => (await endpoint(pullRequest)).data,
+        ),
+      } satisfies GithubOctokit;
+      await createGithubApiClient({
+        repository: "owner/repository/ignored",
+        token: "token",
+        octokit,
+      }).prSnapshot(17);
+      return getPull;
+    })
+    .extend("defaultedPullSnapshot", async () => {
+      const octokit = {
+        rest: {
+          pulls: {
+            get: vi.fn<GithubOctokit["rest"]["pulls"]["get"]>(() =>
+              Promise.resolve({
+                data: {
+                  title: "Pull title",
+                  body: null,
+                  state: "closed",
+                  head: { ref: "topic", sha: "head-sha" },
+                  base: { ref: "main" },
+                  requested_reviewers: null,
+                },
+              }),
+            ),
+            listReviews: vi.fn<GithubOctokit["rest"]["pulls"]["listReviews"]>(() =>
+              Promise.resolve({ data: [] }),
+            ),
+            requestReviewers: vi.fn<GithubOctokit["rest"]["pulls"]["requestReviewers"]>(() =>
+              Promise.resolve(),
+            ),
+          },
+          repos: {
+            createCommitStatus: vi.fn<GithubOctokit["rest"]["repos"]["createCommitStatus"]>(() =>
+              Promise.resolve(),
+            ),
+          },
+        },
+        paginate: vi.fn<GithubOctokit["paginate"]>(
+          async (endpoint, pullRequest) => (await endpoint(pullRequest)).data,
+        ),
+      } satisfies GithubOctokit;
+      return createGithubApiClient({ repository: "", token: "token", octokit }).prSnapshot(3);
+    })
+    .extend("defaultedPullRequest", async () => {
+      const getPull = vi.fn<GithubOctokit["rest"]["pulls"]["get"]>(() =>
+        Promise.resolve({
+          data: {
+            title: "Pull title",
+            body: null,
+            state: "closed",
+            head: { ref: "topic", sha: "head-sha" },
+            base: { ref: "main" },
+            requested_reviewers: null,
+          },
+        }),
+      );
+      const octokit = {
+        rest: {
+          pulls: {
+            get: getPull,
+            listReviews: vi.fn<GithubOctokit["rest"]["pulls"]["listReviews"]>(() =>
+              Promise.resolve({ data: [] }),
+            ),
+            requestReviewers: vi.fn<GithubOctokit["rest"]["pulls"]["requestReviewers"]>(() =>
+              Promise.resolve(),
+            ),
+          },
+          repos: {
+            createCommitStatus: vi.fn<GithubOctokit["rest"]["repos"]["createCommitStatus"]>(() =>
+              Promise.resolve(),
+            ),
+          },
+        },
+        paginate: vi.fn<GithubOctokit["paginate"]>(
+          async (endpoint, pullRequest) => (await endpoint(pullRequest)).data,
+        ),
+      } satisfies GithubOctokit;
+      await createGithubApiClient({ repository: "", token: "token", octokit }).prSnapshot(3);
+      return getPull;
+    })
+    .extend("commitStatusRequest", async () => {
+      const createCommitStatus = vi.fn<GithubOctokit["rest"]["repos"]["createCommitStatus"]>(() =>
+        Promise.resolve(),
+      );
+      const octokit = {
+        rest: {
+          pulls: {
+            get: vi.fn<GithubOctokit["rest"]["pulls"]["get"]>(),
+            listReviews: vi.fn<GithubOctokit["rest"]["pulls"]["listReviews"]>(),
+            requestReviewers: vi.fn<GithubOctokit["rest"]["pulls"]["requestReviewers"]>(),
+          },
+          repos: { createCommitStatus },
+        },
+        paginate: vi.fn<GithubOctokit["paginate"]>(),
+      } satisfies GithubOctokit;
+      await createGithubApiClient({
+        repository: "owner/repository",
+        token: "token",
+        octokit,
+      }).createCommitStatus({
+        sha: "head-sha",
+        state: "pending",
+        context: "auto-develop/reviewer",
+        description: "reviewing",
+      });
+      return createCommitStatus;
+    })
+    .extend("mappedReviews", async () => {
+      const listReviews = vi.fn<GithubOctokit["rest"]["pulls"]["listReviews"]>(() =>
+        Promise.resolve({
+          data: [
+            {
+              state: "APPROVED",
+              body: "looks good",
+              submitted_at: "2026-08-11T00:00:00.000Z",
+              commit_id: "reviewed-sha",
+              user: { login: "reviewer" },
+            },
+            {
+              state: "PENDING",
+              body: "draft review",
+              commit_id: null,
+              user: null,
+            },
+          ],
+        }),
+      );
+      const octokit = {
+        rest: {
+          pulls: {
+            get: vi.fn<GithubOctokit["rest"]["pulls"]["get"]>(),
+            listReviews,
+            requestReviewers: vi.fn<GithubOctokit["rest"]["pulls"]["requestReviewers"]>(),
+          },
+          repos: {
+            createCommitStatus: vi.fn<GithubOctokit["rest"]["repos"]["createCommitStatus"]>(),
+          },
+        },
+        paginate: vi.fn<GithubOctokit["paginate"]>(
+          async (endpoint, pullRequest) => (await endpoint(pullRequest)).data,
+        ),
+      } satisfies GithubOctokit;
+      return createGithubApiClient({
+        repository: "owner/repository",
+        token: "token",
+        octokit,
+      }).listReviews(17);
+    })
+    .extend("paginateReviewsRequest", async () => {
+      const listReviews = vi.fn<GithubOctokit["rest"]["pulls"]["listReviews"]>(() =>
+        Promise.resolve({ data: [] }),
+      );
+      const paginate = vi.fn<GithubOctokit["paginate"]>(
+        async (endpoint, pullRequest) => (await endpoint(pullRequest)).data,
+      );
+      const octokit = {
+        rest: {
+          pulls: {
+            get: vi.fn<GithubOctokit["rest"]["pulls"]["get"]>(),
+            listReviews,
+            requestReviewers: vi.fn<GithubOctokit["rest"]["pulls"]["requestReviewers"]>(),
+          },
+          repos: {
+            createCommitStatus: vi.fn<GithubOctokit["rest"]["repos"]["createCommitStatus"]>(),
+          },
+        },
+        paginate,
+      } satisfies GithubOctokit;
+      await createGithubApiClient({
+        repository: "owner/repository",
+        token: "token",
+        octokit,
+      }).listReviews(17);
+      return paginate;
+    })
+    .extend("listReviewsRequest", async () => {
+      const listReviews = vi.fn<GithubOctokit["rest"]["pulls"]["listReviews"]>(() =>
+        Promise.resolve({ data: [] }),
+      );
+      const octokit = {
+        rest: {
+          pulls: {
+            get: vi.fn<GithubOctokit["rest"]["pulls"]["get"]>(),
+            listReviews,
+            requestReviewers: vi.fn<GithubOctokit["rest"]["pulls"]["requestReviewers"]>(),
+          },
+          repos: {
+            createCommitStatus: vi.fn<GithubOctokit["rest"]["repos"]["createCommitStatus"]>(),
+          },
+        },
+        paginate: vi.fn<GithubOctokit["paginate"]>(
+          async (endpoint, pullRequest) => (await endpoint(pullRequest)).data,
+        ),
+      } satisfies GithubOctokit;
+      await createGithubApiClient({
+        repository: "owner/repository",
+        token: "token",
+        octokit,
+      }).listReviews(17);
+      return listReviews;
+    })
+    .extend("reviewerRequest", async () => {
+      const requestReviewers = vi.fn<GithubOctokit["rest"]["pulls"]["requestReviewers"]>(() =>
+        Promise.resolve(),
+      );
+      const octokit = {
+        rest: {
+          pulls: {
+            get: vi.fn<GithubOctokit["rest"]["pulls"]["get"]>(),
+            listReviews: vi.fn<GithubOctokit["rest"]["pulls"]["listReviews"]>(),
+            requestReviewers,
+          },
+          repos: {
+            createCommitStatus: vi.fn<GithubOctokit["rest"]["repos"]["createCommitStatus"]>(),
+          },
+        },
+        paginate: vi.fn<GithubOctokit["paginate"]>(),
+      } satisfies GithubOctokit;
+      await createGithubApiClient({
+        repository: "owner/repository",
+        token: "token",
+        octokit,
+      }).requestReviewers({ prNumber: 17, logins: ["reviewer-one", "reviewer-two"] });
+      return requestReviewers;
+    })
+    .extend("defaultAdapter", () =>
+      createGithubApiClient({ repository: "owner/repository", token: "token" }),
+    )
+    .extend("enterpriseAdapter", () =>
+      createGithubApiClient({
+        repository: "owner/repository",
+        token: "token",
+        baseUrl: "https://github.example.test/api/v3",
+      }),
+    );
 
-    const snapshot = await client.prSnapshot(17);
-
-    expect(snapshot).toStrictEqual({
+  it("maps a complete pull response into a snapshot", ({ completePullSnapshot }) => {
+    expect(completePullSnapshot).toStrictEqual({
       prNumber: 17,
       title: "Pull title",
       body: "Pull body",
@@ -69,56 +326,40 @@ describe("createGithubApiClient", () => {
       draft: true,
       requestedReviewerLogins: ["reviewer-one", "reviewer-two"],
     });
-    expect(github.getPull).toHaveBeenCalledExactlyOnceWith({
+  });
+
+  it("passes pull coordinates to GitHub", ({ completePullRequest }) => {
+    expect(completePullRequest).toHaveBeenCalledExactlyOnceWith({
       owner: "owner",
       repo: "repository",
       pull_number: 17,
     });
   });
 
-  test("defaults nullable and omitted pull fields", async () => {
-    const github = octokitWith({
-      pull: {
-        title: "Pull title",
-        body: null,
-        state: "closed",
-        head: { ref: "topic", sha: "head-sha" },
-        base: { ref: "main" },
-        requested_reviewers: null,
-      },
+  it("defaults nullable and omitted pull fields", ({ defaultedPullSnapshot }) => {
+    expect(defaultedPullSnapshot).toStrictEqual({
+      prNumber: 3,
+      title: "Pull title",
+      body: "",
+      state: "closed",
+      headRefName: "topic",
+      headRefOid: "head-sha",
+      baseRefName: "main",
+      draft: false,
+      requestedReviewerLogins: [],
     });
-    const client = createGithubApiClient({
-      repository: "",
-      token: "token",
-      octokit: github.octokit,
-    });
+  });
 
-    const snapshot = await client.prSnapshot(3);
-
-    expect(snapshot).toMatchObject({ body: "", draft: false, requestedReviewerLogins: [] });
-    expect(github.getPull).toHaveBeenCalledExactlyOnceWith({
+  it("passes empty repository coordinates through", ({ defaultedPullRequest }) => {
+    expect(defaultedPullRequest).toHaveBeenCalledExactlyOnceWith({
       owner: "",
       repo: "",
       pull_number: 3,
     });
   });
 
-  test("passes a commit status through with repository coordinates", async () => {
-    const github = octokitWith({});
-    const client = createGithubApiClient({
-      repository: "owner/repository",
-      token: "token",
-      octokit: github.octokit,
-    });
-
-    await client.createCommitStatus({
-      sha: "head-sha",
-      state: "pending",
-      context: "auto-develop/reviewer",
-      description: "reviewing",
-    });
-
-    expect(github.createCommitStatus).toHaveBeenCalledExactlyOnceWith({
+  it("passes a commit status through with repository coordinates", ({ commitStatusRequest }) => {
+    expect(commitStatusRequest).toHaveBeenCalledExactlyOnceWith({
       owner: "owner",
       repo: "repository",
       sha: "head-sha",
@@ -128,33 +369,8 @@ describe("createGithubApiClient", () => {
     });
   });
 
-  test("paginates reviews and maps complete and absent fields", async () => {
-    const github = octokitWith({
-      reviews: [
-        {
-          state: "APPROVED",
-          body: "looks good",
-          submitted_at: "2026-08-11T00:00:00.000Z",
-          commit_id: "reviewed-sha",
-          user: { login: "reviewer" },
-        },
-        {
-          state: "PENDING",
-          body: "draft review",
-          commit_id: null,
-          user: null,
-        },
-      ],
-    });
-    const client = createGithubApiClient({
-      repository: "owner/repository",
-      token: "token",
-      octokit: github.octokit,
-    });
-
-    const reviews = await client.listReviews(17);
-
-    expect(reviews).toStrictEqual([
+  it("paginates reviews and maps complete and absent fields", ({ mappedReviews }) => {
+    expect(mappedReviews).toStrictEqual([
       {
         state: "APPROVED",
         body: "looks good",
@@ -170,27 +386,23 @@ describe("createGithubApiClient", () => {
         authorLogin: "",
       },
     ]);
-    const request = {
+  });
+
+  it("paginates the review endpoint exactly once", ({ paginateReviewsRequest }) => {
+    expect(paginateReviewsRequest).toHaveBeenCalledOnce();
+  });
+
+  it("passes review coordinates to the review endpoint", ({ listReviewsRequest }) => {
+    expect(listReviewsRequest).toHaveBeenCalledExactlyOnceWith({
       owner: "owner",
       repo: "repository",
       pull_number: 17,
       per_page: 100,
-    };
-    expect(github.paginate).toHaveBeenCalledExactlyOnceWith(github.listReviews, request);
-    expect(github.listReviews).toHaveBeenCalledExactlyOnceWith(request);
+    });
   });
 
-  test("requests each named reviewer", async () => {
-    const github = octokitWith({});
-    const client = createGithubApiClient({
-      repository: "owner/repository",
-      token: "token",
-      octokit: github.octokit,
-    });
-
-    await client.requestReviewers({ prNumber: 17, logins: ["reviewer-one", "reviewer-two"] });
-
-    expect(github.requestReviewers).toHaveBeenCalledExactlyOnceWith({
+  it("requests each named reviewer", ({ reviewerRequest }) => {
+    expect(reviewerRequest).toHaveBeenCalledExactlyOnceWith({
       owner: "owner",
       repo: "repository",
       pull_number: 17,
@@ -198,21 +410,23 @@ describe("createGithubApiClient", () => {
     });
   });
 
-  test.each([{}, { baseUrl: "https://github.example.test/api/v3" }])(
-    "constructs its production Octokit adapter for $baseUrl",
-    (configuration) => {
-      const client = createGithubApiClient({
-        repository: "owner/repository",
-        token: "token",
-        ...configuration,
-      });
+  it("constructs its production Octokit adapter with the default origin", ({ defaultAdapter }) => {
+    expect(defaultAdapter).toStrictEqual({
+      prSnapshot: defaultAdapter.prSnapshot,
+      createCommitStatus: defaultAdapter.createCommitStatus,
+      listReviews: defaultAdapter.listReviews,
+      requestReviewers: defaultAdapter.requestReviewers,
+    });
+  });
 
-      expect(Object.keys(client).toSorted()).toStrictEqual([
-        "createCommitStatus",
-        "listReviews",
-        "prSnapshot",
-        "requestReviewers",
-      ]);
-    },
-  );
+  it("constructs its production Octokit adapter with an enterprise origin", ({
+    enterpriseAdapter,
+  }) => {
+    expect(enterpriseAdapter).toStrictEqual({
+      prSnapshot: enterpriseAdapter.prSnapshot,
+      createCommitStatus: enterpriseAdapter.createCommitStatus,
+      listReviews: enterpriseAdapter.listReviews,
+      requestReviewers: enterpriseAdapter.requestReviewers,
+    });
+  });
 });

@@ -53,8 +53,8 @@ const memberOf = (
 ): readonly [string, ESTree.Expression] | null => {
   if (property.type !== "Property") return null;
 
-  const key = convertedKeyOf(property);
-  return key === null ? null : [key, property.value];
+  const memberKey = convertedKeyOf(property);
+  return memberKey === null ? null : [memberKey, property.value];
 };
 
 const membersOf = (
@@ -66,10 +66,8 @@ const membersOf = (
 };
 
 const elementsOf = (node: ESTree.ArrayExpression): readonly ComparedSide[] | null => {
-  const written = node.elements.map((element) =>
-    element?.type === "SpreadElement" ? undefined : element,
-  );
-  const settled = written.flatMap((element) => (element === undefined ? [] : [element]));
+  const written = node.elements.map((held) => (held?.type === "SpreadElement" ? undefined : held));
+  const settled = written.flatMap((held) => (held === undefined ? [] : [held]));
   return settled.length === written.length ? settled : null;
 };
 
@@ -95,9 +93,9 @@ const objectAgainstObject = (input: {
   const counterparts = membersOf(other);
   if (counterparts === null || counterparts.size !== members.size) return [];
 
-  const lined = [...members].map(([key, value]) => ({
-    left: value,
-    right: counterparts.get(key) ?? null,
+  const lined = [...members].map(([memberKey, held]) => ({
+    left: held,
+    right: counterparts.get(memberKey) ?? null,
   }));
   if (lined.some((pair) => pair.right === null)) return [];
   return lined.flatMap((pair) => pairedSides({ ...pair, resolve }));
@@ -111,9 +109,7 @@ const objectPositions = (
   if (members === null) return [];
   if (other?.type === "ObjectExpression") return objectAgainstObject({ members, other, resolve });
   if (other !== null && isSettledShape(other)) return [];
-  return [...members.values()].flatMap((value) =>
-    pairedSides({ left: value, right: null, resolve }),
-  );
+  return [...members.values()].flatMap((held) => pairedSides({ left: held, right: null, resolve }));
 };
 
 const arrayAgainstArray = (input: {
@@ -126,11 +122,11 @@ const arrayAgainstArray = (input: {
   if (counterparts === null || counterparts.length !== elements.length) return [];
 
   const lined = zip(elements, counterparts);
-  if (lined.some(([element, counterpart]) => (element === null) !== (counterpart === null))) {
+  if (lined.some(([held, counterpart]) => (held === null) !== (counterpart === null))) {
     return [];
   }
-  return lined.flatMap(([element, counterpart]) =>
-    element === null ? [] : pairedSides({ left: element, right: counterpart, resolve }),
+  return lined.flatMap(([held, counterpart]) =>
+    held === null ? [] : pairedSides({ left: held, right: counterpart, resolve }),
   );
 };
 
@@ -138,12 +134,13 @@ const arrayPositions = (
   input: ContainerPositions<ESTree.ArrayExpression>,
 ): readonly ComparedPair[] => {
   const { node, other, resolve } = input;
-  const elements = elementsOf(node);
-  if (elements === null) return [];
-  if (other?.type === "ArrayExpression") return arrayAgainstArray({ elements, other, resolve });
+  const listed = elementsOf(node);
+  if (listed === null) return [];
+  if (other?.type === "ArrayExpression")
+    return arrayAgainstArray({ elements: listed, other, resolve });
   if (other !== null && isSettledShape(other)) return [];
-  return elements.flatMap((element) =>
-    element === null ? [] : pairedSides({ left: element, right: null, resolve }),
+  return listed.flatMap((held) =>
+    held === null ? [] : pairedSides({ left: held, right: null, resolve }),
   );
 };
 

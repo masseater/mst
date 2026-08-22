@@ -58,9 +58,9 @@ const typescriptValueBindingsOf = (fields: UnknownFields): readonly string[] => 
     : [];
 };
 
-const declarationBindingsIn = (value: unknown): readonly string[] => {
-  if (!isPlainObject(value)) return [];
-  const fields: UnknownFields = value;
+const declarationBindingsIn = (held: unknown): readonly string[] => {
+  if (!isPlainObject(held)) return [];
+  const fields: UnknownFields = held;
   if (fields.type === "ExportNamedDeclaration" || fields.type === "ExportDefaultDeclaration") {
     return declarationBindingsIn(fields.declaration);
   }
@@ -78,10 +78,10 @@ const declarationBindingsIn = (value: unknown): readonly string[] => {
 const statementBindingsIn = (statements: readonly unknown[]): readonly string[] =>
   statements.flatMap(declarationBindingsIn);
 
-const varBindingsIn = (value: unknown): readonly string[] => {
-  if (Array.isArray(value)) return value.flatMap(varBindingsIn);
-  if (!isPlainObject(value)) return [];
-  const fields: UnknownFields = value;
+const varBindingsIn = (held: unknown): readonly string[] => {
+  if (Array.isArray(held)) return held.flatMap(varBindingsIn);
+  if (!isPlainObject(held)) return [];
+  const fields: UnknownFields = held;
   if (isFunctionNode(fields) || isClassNode(fields) || isIsolatedVarScope(fields)) return [];
   if (fields.type === "VariableDeclaration" && fields.kind === "var") {
     return declarationBindingsIn(fields);
@@ -134,16 +134,16 @@ const scopeBindingsOf = (fields: UnknownFields): readonly string[] =>
     : (SCOPE_BINDINGS_BY_TYPE[fields.type as string]?.(fields) ?? []);
 
 export const scopedCallExpressionsIn = (
-  value: unknown,
+  held: unknown,
   inheritedBindings: ReadonlySet<string> = new Set(),
 ): readonly Readonly<{
   call: CallExpression;
   localBindings: ReadonlySet<string>;
 }>[] => {
-  if (Array.isArray(value))
-    return value.flatMap((nested) => scopedCallExpressionsIn(nested, inheritedBindings));
-  if (!isPlainObject(value)) return [];
-  const fields: UnknownFields = value;
+  if (Array.isArray(held))
+    return held.flatMap((nested) => scopedCallExpressionsIn(nested, inheritedBindings));
+  if (!isPlainObject(held)) return [];
+  const fields: UnknownFields = held;
   const localBindings = new Set([...inheritedBindings, ...scopeBindingsOf(fields)]);
   const nested = Object.entries(fields).flatMap(([, child]) =>
     scopedCallExpressionsIn(child, localBindings),

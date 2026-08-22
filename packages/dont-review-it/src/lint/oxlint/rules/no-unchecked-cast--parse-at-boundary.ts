@@ -71,8 +71,8 @@ export const noUncheckedCast = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
-    const scopeAt: ScopeLookup = (node) => context.sourceCode.getScope(node);
+  create(inspection) {
+    const scopeAt: ScopeLookup = (node) => inspection.sourceCode.getScope(node);
     const resolution: BindingResolution = { scopeAt, seenBindings: new Set() };
 
     const reportUncheckedCast = (node: ESTree.TSAsExpression | ESTree.TSTypeAssertion): void => {
@@ -82,12 +82,12 @@ export const noUncheckedCast = createDontReviewItRule({
 
       const loose = looseNodeOfExpression(asserted, resolution);
       if (loose === null) return;
-      context.report({
+      inspection.report({
         node,
         messageId: "uncheckedCast",
         data: {
-          looseType: context.sourceCode.getText(loose),
-          claimed: context.sourceCode.getText(asserted),
+          looseType: inspection.sourceCode.getText(loose),
+          claimed: inspection.sourceCode.getText(asserted),
         },
       });
     };
@@ -101,10 +101,10 @@ export const noUncheckedCast = createDontReviewItRule({
       if (declared === null || carried === null) return;
       if (!isConcreteTypeClaim(declared.typeAnnotation)) return;
       if (looseNodeOfExpression(carried, resolution)?.type !== "TSAnyKeyword") return;
-      context.report({
+      inspection.report({
         node: carried,
         messageId: "uncheckedTypeClaim",
-        data: { claimed: context.sourceCode.getText(carried) },
+        data: { claimed: inspection.sourceCode.getText(carried) },
       });
     };
 
@@ -143,7 +143,7 @@ export const noUncheckedCast = createDontReviewItRule({
             reference.identifier.start >= body.start && reference.identifier.end <= body.end,
         );
         if (read === true) return;
-        context.report({
+        inspection.report({
           node,
           messageId: "unexaminedTypePredicate",
           data: { parameter: parameterName.name },

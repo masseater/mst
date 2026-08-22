@@ -1,3 +1,5 @@
+import { groupBy } from "es-toolkit";
+
 import { isInsideGeneratedRegion } from "../markdown/generated-region.ts";
 import { flattenTextKeepingCode, lineOf, offsetOf } from "../markdown/nodes.ts";
 
@@ -6,7 +8,7 @@ import type { AgenticDocumentsConfig } from "../config.ts";
 import type { DocumentProblem } from "../problem.ts";
 import type { NormativeDocument } from "../scan/normative-documents.ts";
 
-const message = ({
+const complaint = ({
   files,
   unit,
 }: {
@@ -15,16 +17,10 @@ const message = ({
 }): string =>
   `同じ規範が ${files.length} つの文書に逐語で写されている（${files.join(", ")}）: "${unit}"。持ち主を 1 つ決めてそこに残し、他の文書は本文を消して持ち主を指す案内に置き換える。言い回しを変えて一致を外すことは解決ではない。`;
 
-const truncate = (text: string, limit: number): string =>
-  text.length > limit ? `${text.slice(0, limit)}…` : text;
+const truncate = (unitText: string, limit: number): string =>
+  unitText.length > limit ? `${unitText.slice(0, limit)}…` : unitText;
 
-const normalize = (text: string): string => text.trim().replaceAll(/\s+/gu, " ");
-
-type Unit = {
-  readonly file: string;
-  readonly line: number | null;
-  readonly text: string;
-};
+const normalize = (unitText: string): string => unitText.trim().replaceAll(/\s+/gu, " ");
 
 const unitNodesOf = (node: Nodes): readonly Nodes[] => {
   if (node.type === "heading") return [];
@@ -40,7 +36,11 @@ const unitsOf = ({
 }: {
   readonly document: NormativeDocument;
   readonly config: AgenticDocumentsConfig;
-}): readonly Unit[] =>
+}): readonly {
+  readonly file: string;
+  readonly line: number | null;
+  readonly text: string;
+}[] =>
   unitNodesOf(document.tree)
     .filter((node) => !isInsideGeneratedRegion(offsetOf(node), document.generated))
     .map((node) => ({
@@ -60,20 +60,16 @@ export const duplicatedNormativeUnits = ({
 }): readonly DocumentProblem[] => {
   const units = documents.flatMap((document) => unitsOf({ document, config }));
 
-  const byText = units.reduce<ReadonlyMap<string, readonly Unit[]>>(
-    (grouped, unit) =>
-      new Map([...grouped, [unit.text, [...(grouped.get(unit.text) ?? []), unit]]]),
-    new Map(),
-  );
+  const byText = groupBy(units, (unit) => unit.text);
 
-  return [...byText].flatMap(([text, sites]): readonly DocumentProblem[] => {
+  return Object.entries(byText).flatMap(([unitText, sites]): readonly DocumentProblem[] => {
     const files = [...new Set(sites.map((site) => site.file))].toSorted();
     if (files.length < 2) return [];
 
     return sites.slice(0, 1).map((first) => ({
       file: first.file,
       line: first.line,
-      message: message({ files, unit: truncate(text, 120) }),
+      message: complaint({ files, unit: truncate(unitText, 120) }),
     }));
   });
 };

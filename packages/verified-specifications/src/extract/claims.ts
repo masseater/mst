@@ -87,8 +87,8 @@ const rootRunnerNameOf = (callee: AstFields): string | null => {
   const node = withoutParentheses(callee);
   if (isMemberNode(node)) return rootRunnerNameOf(node.object);
   if (isCallNode(node)) return rootRunnerNameOf(node.callee);
-  const name = isIdentifierNode(node) ? node.name : null;
-  return name !== null && RUNNER_NAMES.has(name) ? name : null;
+  const spelled = isIdentifierNode(node) ? node.name : null;
+  return spelled !== null && RUNNER_NAMES.has(spelled) ? spelled : null;
 };
 
 const literalTextOf = (argument: AstFields | null): string | null => {
@@ -96,17 +96,17 @@ const literalTextOf = (argument: AstFields | null): string | null => {
   return typeof argument.value === "string" ? argument.value : null;
 };
 
-const at = (call: CallFields, message: string): ProblemAt => ({
+const at = (call: CallFields, complaint: string): ProblemAt => ({
   offset: call.start,
-  message,
+  message: complaint,
 });
 
 const bodyStatementsOf = (call: CallFields): readonly AstFields[] => {
-  const callback = nodeOrNull(call.arguments[1]);
-  const body = callback === null ? null : nodeOrNull(callback.body);
-  if (body === null) return [];
-  if (isBlockNode(body)) return body.body;
-  return [{ type: "ExpressionStatement", expression: body }];
+  const handedCallback = nodeOrNull(call.arguments[1]);
+  const callbackBody = handedCallback === null ? null : nodeOrNull(handedCallback.body);
+  if (callbackBody === null) return [];
+  if (isBlockNode(callbackBody)) return callbackBody.body;
+  return [{ type: "ExpressionStatement", expression: callbackBody }];
 };
 
 const claimIssueOf = (input: {
@@ -138,8 +138,8 @@ const claimsReadOf = (
 ): { readonly claims: readonly string[]; readonly problems: readonly ProblemAt[] } => {
   const read = bodyStatementsOf(call).map(claimReadOf);
   return {
-    claims: read.flatMap((entry) => (entry.claim === null ? [] : [entry.claim])),
-    problems: read.flatMap((entry) => entry.problems),
+    claims: read.flatMap((readEntry) => (readEntry.claim === null ? [] : [readEntry.claim])),
+    problems: read.flatMap((readEntry) => readEntry.problems),
   };
 };
 
@@ -188,9 +188,11 @@ const readStatements = (input: {
   readonly problems: readonly RepositoryProblem[];
 } => {
   const read = input.statements.filter(isAstNode).map(subjectReadOf);
-  const subjects = read.flatMap((entry) => (entry.subject === null ? [] : [entry.subject]));
+  const subjects = read.flatMap((readEntry) =>
+    readEntry.subject === null ? [] : [readEntry.subject],
+  );
   const problems = read
-    .flatMap((entry) => entry.problems)
+    .flatMap((readEntry) => readEntry.problems)
     .map(({ offset, message }) => ({
       file: input.file,
       line: input.source.slice(0, offset).split("\n").length,
@@ -213,9 +215,9 @@ export const extractClaims = (input: {
   readonly problems: readonly RepositoryProblem[];
 } => {
   const { file, source } = input;
-  const parsed = parseSync(file, source);
-  if (parsed.errors.length > 0) {
+  const parsedProgram = parseSync(file, source);
+  if (parsedProgram.errors.length > 0) {
     return { subjects: [], problems: [{ file, line: null, message: UNPARSABLE_SOURCE }] };
   }
-  return readStatements({ file, source, statements: parsed.program.body });
+  return readStatements({ file, source, statements: parsedProgram.program.body });
 };

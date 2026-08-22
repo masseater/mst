@@ -1,30 +1,41 @@
-import { describe, expect, expectTypeOf, onTestFinished, test, vi } from "vite-plus/test";
+import { describe, expect, test, vi } from "vite-plus/test";
 
-import { productionRelayServerRuntime, type RelayServerRuntime } from "./relay-server-runtime.ts";
+import { productionRelayServerRuntime } from "./relay-server-runtime.ts";
 
 describe("productionRelayServerRuntime", () => {
-  test("本番relay runtimeは現在のNode境界と時刻を公開する", () => {
-    vi.useFakeTimers();
-    onTestFinished(() => {
-      vi.useRealTimers();
+  const it = test
+    .extend("productionRuntime", () => productionRelayServerRuntime())
+    .extend("productionCurrentDirectory", () => productionRelayServerRuntime().currentDirectory())
+    .extend("productionCurrentIso", ({}, { onCleanup }) => {
+      vi.useFakeTimers();
+      onCleanup(() => {
+        vi.useRealTimers();
+      });
+      vi.setSystemTime(new Date("2026-08-13T00:00:00.000Z"));
+      return productionRelayServerRuntime().nowIso();
     });
-    vi.setSystemTime(new Date("2026-08-13T00:00:00.000Z"));
 
-    const runtime = productionRelayServerRuntime();
+  it("本番 relay runtime は現在の Node 境界を全て公開する", ({ productionRuntime }) => {
+    expect(productionRuntime).toStrictEqual({
+      environment: process.env,
+      currentDirectory: productionRuntime.currentDirectory,
+      nowIso: productionRuntime.nowIso,
+      fetchImpl: fetch,
+      signalTarget: process,
+      stdout: productionRuntime.stdout,
+      stderr: productionRuntime.stderr,
+      exit: productionRuntime.exit,
+      createGithubReader: productionRuntime.createGithubReader,
+      createLogFileSink: productionRuntime.createLogFileSink,
+      createRelay: productionRuntime.createRelay,
+    });
+  });
 
-    expectTypeOf<RelayServerRuntime["stdout"]>().toEqualTypeOf<{
-      readonly write: (text: string) => unknown;
-    }>();
-    expect(runtime.environment).toBe(process.env);
-    expect(runtime.currentDirectory()).toBe(process.cwd());
-    expect(runtime.nowIso()).toBe("2026-08-13T00:00:00.000Z");
-    expect(runtime.fetchImpl).toBe(fetch);
-    expect(runtime.signalTarget).toBe(process);
-    expect(runtime.stdout.write).toBeTypeOf("function");
-    expect(runtime.stderr.write).toBeTypeOf("function");
-    expect(runtime.exit).toBeTypeOf("function");
-    expect(runtime.createGithubReader).toBeTypeOf("function");
-    expect(runtime.createLogFileSink).toBeTypeOf("function");
-    expect(runtime.createRelay).toBeTypeOf("function");
+  it("本番 relay runtime は現在の作業directoryを返す", ({ productionCurrentDirectory }) => {
+    expect(productionCurrentDirectory).toBe(process.cwd());
+  });
+
+  it("本番 relay runtime は現在時刻をISO形式で返す", ({ productionCurrentIso }) => {
+    expect(productionCurrentIso).toBe("2026-08-13T00:00:00.000Z");
   });
 });

@@ -87,7 +87,7 @@ const declarationFrom = (
 ): ScannedTypeDeclaration => {
   const shape = shapeOf(statement);
   const placeholders = placeholdersIn(statement);
-  const isUnbound = (name: string): boolean => !placeholders.has(name);
+  const isUnbound = (spelled: string): boolean => !placeholders.has(spelled);
 
   return {
     name: String((statement.id as AstFields).name),
@@ -100,10 +100,9 @@ const declarationFrom = (
 };
 
 const exportedTypeDeclarationOf = (statement: unknown): ExportedTypeDeclaration | null => {
-  const exported = statement as AstFields;
-  if (exported[NODE_TYPE_FIELD] !== EXPORT_KIND) return null;
+  if (!isAstFields(statement) || statement[NODE_TYPE_FIELD] !== EXPORT_KIND) return null;
 
-  const { declaration } = exported;
+  const { declaration } = statement;
   if (!isAstFields(declaration)) return null;
 
   const shapeOf = SHAPE_BY_KIND.get(String(declaration[NODE_TYPE_FIELD]));
@@ -111,8 +110,8 @@ const exportedTypeDeclarationOf = (statement: unknown): ExportedTypeDeclaration 
 };
 
 export const typeDeclarationsIn = (source: string): readonly ScannedTypeDeclaration[] => {
-  const parsed = parseSync(SOURCE_NAME, source);
-  return parsed.program.body.flatMap((statement) => {
+  const parsedNode = parseSync(SOURCE_NAME, source);
+  return parsedNode.program.body.flatMap((statement) => {
     const exported = exportedTypeDeclarationOf(statement);
     return exported === null ? [] : [declarationFrom(source, exported)];
   });

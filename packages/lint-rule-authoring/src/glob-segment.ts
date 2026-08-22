@@ -1,22 +1,26 @@
 const literalsFollowInOrder = ({
   segment,
   literals,
+  cursor,
+  lastMatchableEnd,
 }: {
   readonly segment: string;
   readonly literals: readonly string[];
+  readonly cursor: number;
+  readonly lastMatchableEnd: number;
 }): boolean => {
-  const head = literals.slice(0, 1).join("");
-  const tail = literals.slice(-1).join("");
-  const lastMatchableEnd = segment.length - tail.length;
+  const [literal, ...remaining] = literals;
+  if (literal === undefined) return true;
 
-  return (
-    literals.slice(1, -1).reduce<number | null>((cursor, literal) => {
-      if (cursor === null) return null;
-      const found = segment.indexOf(literal, cursor);
-      if (found === -1 || found + literal.length > lastMatchableEnd) return null;
-      return found + literal.length;
-    }, head.length) !== null
-  );
+  const found = segment.indexOf(literal, cursor);
+  if (found === -1 || found + literal.length > lastMatchableEnd) return false;
+
+  return literalsFollowInOrder({
+    segment,
+    literals: remaining,
+    cursor: found + literal.length,
+    lastMatchableEnd,
+  });
 };
 
 export const matchesGlobSegment = ({
@@ -35,5 +39,10 @@ export const matchesGlobSegment = ({
   if (!segment.endsWith(tail)) return false;
   if (segment.length < head.length + tail.length) return false;
 
-  return literalsFollowInOrder({ segment, literals });
+  return literalsFollowInOrder({
+    segment,
+    literals: literals.slice(1, -1),
+    cursor: head.length,
+    lastMatchableEnd: segment.length - tail.length,
+  });
 };

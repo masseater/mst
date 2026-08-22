@@ -12,7 +12,8 @@
     "directory": "packages/auto-develop"
   },
   "bin": {
-    "auto-develop": "./src/cli.ts"
+    "auto-develop": "./src/cli.ts",
+    "auto-develop-relay": "./src/server.ts"
   },
   "files": [
     "dist",
@@ -27,7 +28,8 @@
   },
   "publishConfig": {
     "bin": {
-      "auto-develop": "./dist/cli.mjs"
+      "auto-develop": "./dist/cli.mjs",
+      "auto-develop-relay": "./dist/server.mjs"
     },
     "exports": {
       "./package.json": "./package.json",
@@ -40,7 +42,8 @@
     "dev": "vp pack --watch",
     "test": "spool -- vp test",
     "check": "spool -- vp check",
-    "check:skills": "intent validate"
+    "check:skills": "intent validate",
+    "typecheck": "spool -- tsc -p ."
   },
   "dependencies": {
     "citty": "catalog:",

@@ -9,9 +9,17 @@ const PROCESS_OBJECT_NAME = "process";
 
 const PROCESS_STREAM_NAMES: ReadonlySet<string> = new Set(["stdout", "stderr"]);
 
-const STREAM_WRITE_NAME = "write";
+/** @canonical-values dont-review-it.process-io-member */
+const PROCESS_IO_MEMBERS = ["write", "exit"] as const;
 
-const PROCESS_EXIT_NAME = "exit";
+export const PROCESS_IO_MEMBER = {
+  write: PROCESS_IO_MEMBERS[0],
+  exit: PROCESS_IO_MEMBERS[1],
+} as const;
+
+const STREAM_WRITE_NAME = PROCESS_IO_MEMBER.write;
+
+const PROCESS_EXIT_NAME = PROCESS_IO_MEMBER.exit;
 
 const STOPPING_STATEMENT_TYPES: ReadonlySet<string> = new Set([
   "ReturnStatement",
@@ -84,7 +92,7 @@ export const noLoggedAndContinuedFailure = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
+  create(inspection) {
     return {
       CallExpression(node: ESTree.CallExpression) {
         if (!isOutputSinkCall(node)) return;
@@ -93,7 +101,7 @@ export const noLoggedAndContinuedFailure = createDontReviewItRule({
         if (clause === null) return;
         if (stopsUnconditionally(clause)) return;
 
-        context.report({ node, messageId: "loggedAndContinuedFailure" });
+        inspection.report({ node, messageId: "loggedAndContinuedFailure" });
       },
     };
   },

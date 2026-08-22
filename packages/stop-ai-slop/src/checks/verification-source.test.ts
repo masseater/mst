@@ -1,13 +1,14 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { absenceVerificationsIn, valueExportsIn } from "./verification-source.ts";
 
-const imports = 'import { existsSync } from "node:fs";\nimport { expect } from "vite-plus/test";\n';
-
 describe("absenceVerificationsIn", () => {
-  it("rejects file assertions that do not use the exact imported call and repository path shape", () => {
-    const windowsPath = JSON.stringify(String.raw`C:\src\legacy.ts`);
-    const source = `${imports}
+  describe("file assertions missing the exact imported call and repository path shape", () => {
+    const it = test.extend("fileShapeVerifications", () => {
+      const windowsPath = JSON.stringify(String.raw`C:\src\legacy.ts`);
+      const source = `import { existsSync } from "node:fs";
+import { expect } from "vite-plus/test";
+
       const value = false;
       const path = "src/legacy.ts";
       expect(value).toBe(false);
@@ -23,12 +24,17 @@ describe("absenceVerificationsIn", () => {
       expect(existsSync("src/legacy.ts")).toBe();
       expect(existsSync("src/legacy.ts")).toBe(false, true);
     `;
+      return absenceVerificationsIn({ file: "src/probe.test.ts", source });
+    });
 
-    expect(absenceVerificationsIn({ file: "src/probe.test.ts", source })).toStrictEqual([]);
+    it("rejects every one of them", ({ fileShapeVerifications }) => {
+      expect(fileShapeVerifications).toStrictEqual([]);
+    });
   });
 
-  it("accepts a parent-relative namespace import but rejects unresolved module locators", () => {
-    const source = `
+  describe("namespace imports resolving to a parent-relative module and to nothing else", () => {
+    const it = test.extend("namespaceImportVerifications", () => {
+      const source = `
       import * as legacy from "../legacy.ts";
       import * as outside from "../../../outside.ts";
       import * as packageApi from "package-api";
@@ -43,22 +49,27 @@ describe("absenceVerificationsIn", () => {
       expect(jsonApi).not.toHaveProperty("legacyMode");
       expect(unimported).not.toHaveProperty("legacyMode");
     `;
+      return absenceVerificationsIn({ file: "src/nested/probe.test.ts", source });
+    });
 
-    expect(absenceVerificationsIn({ file: "src/nested/probe.test.ts", source })).toStrictEqual([
-      {
-        kind: "export",
-        locator: '["declaration","src/legacy.ts","legacyMode"]',
-        modulePath: "src/legacy.ts",
-        exportName: "legacyMode",
-        file: "src/nested/probe.test.ts",
-        line: 9,
-        endLine: 9,
-      },
-    ]);
+    it("keeps the parent-relative one alone", ({ namespaceImportVerifications }) => {
+      expect(namespaceImportVerifications).toStrictEqual([
+        {
+          kind: "export",
+          locator: '["declaration","src/legacy.ts","legacyMode"]',
+          modulePath: "src/legacy.ts",
+          exportName: "legacyMode",
+          file: "src/nested/probe.test.ts",
+          line: 9,
+          endLine: 9,
+        },
+      ]);
+    });
   });
 
-  it("rejects positive, malformed, and non-identifier export assertions", () => {
-    const source = `
+  describe("positive, malformed, and non-identifier export assertions", () => {
+    const it = test.extend("exportAssertionVerifications", () => {
+      const source = `
       import * as legacy from "./legacy.ts";
       import { expect } from "vite-plus/test";
 
@@ -68,41 +79,61 @@ describe("absenceVerificationsIn", () => {
       expect(legacy.legacyMode).toBeUndefined(false);
       expect(legacy["legacyMode"]).toBeUndefined();
     `;
+      return absenceVerificationsIn({ file: "src/probe.test.ts", source });
+    });
 
-    expect(absenceVerificationsIn({ file: "src/probe.test.ts", source })).toStrictEqual([]);
+    it("rejects every one of them", ({ exportAssertionVerifications }) => {
+      expect(exportAssertionVerifications).toStrictEqual([]);
+    });
   });
 
-  it("accepts an exact undefined-property assertion", () => {
-    const source = `
+  describe("an exact undefined-property assertion", () => {
+    const it = test.extend("undefinedPropertyVerifications", () => {
+      const source = `
       import * as legacy from "./legacy.ts";
       import { expect } from "vite-plus/test";
 
       expect(legacy.legacyMode).toBeUndefined();
     `;
+      return absenceVerificationsIn({ file: "src/probe.test.ts", source });
+    });
 
-    expect(absenceVerificationsIn({ file: "src/probe.test.ts", source })).toStrictEqual([
-      {
-        kind: "export",
-        locator: '["declaration","src/legacy.ts","legacyMode"]',
-        modulePath: "src/legacy.ts",
-        exportName: "legacyMode",
-        file: "src/probe.test.ts",
-        line: 5,
-        endLine: 5,
-      },
-    ]);
+    it("accepts it", ({ undefinedPropertyVerifications }) => {
+      expect(undefinedPropertyVerifications).toStrictEqual([
+        {
+          kind: "export",
+          locator: '["declaration","src/legacy.ts","legacyMode"]',
+          modulePath: "src/legacy.ts",
+          exportName: "legacyMode",
+          file: "src/probe.test.ts",
+          line: 5,
+          endLine: 5,
+        },
+      ]);
+    });
   });
 
-  it("throws a file-qualified error for invalid source", () => {
-    expect(() =>
-      absenceVerificationsIn({ file: "src/broken.test.ts", source: "export {" }),
-    ).toThrow(/^src\/broken\.test\.ts:/u);
+  describe("a source the parser cannot read", () => {
+    const it = test.extend("unparsableSourceFailure", () => {
+      try {
+        absenceVerificationsIn({ file: "src/broken.test.ts", source: "export {" });
+      } catch (parseFailure) {
+        return parseFailure;
+      }
+      throw new Error("absenceVerificationsIn accepted a source the parser cannot read");
+    });
+
+    it("throws an error qualified by the file it came from", ({ unparsableSourceFailure }) => {
+      expect(unparsableSourceFailure).toStrictEqual(
+        new Error("src/broken.test.ts: Expected `}` but found `EOF`"),
+      );
+    });
   });
 });
 
 describe("valueExportsIn", () => {
-  it("returns only named runtime exports", () => {
-    expect(
+  describe("a module exporting a named binding, a default, a type, and a namespace", () => {
+    const it = test.extend("runtimeExportNames", () =>
       valueExportsIn({
         file: "src/module.ts",
         source: `
@@ -111,7 +142,10 @@ describe("valueExportsIn", () => {
           export type { External } from "./types.ts";
           export * as namespace from "./other.ts";
         `,
-      }),
-    ).toStrictEqual(["named", "namespace"]);
+      }));
+
+    it("returns only the named runtime ones", ({ runtimeExportNames }) => {
+      expect(runtimeExportNames).toStrictEqual(["named", "namespace"]);
+    });
   });
 });

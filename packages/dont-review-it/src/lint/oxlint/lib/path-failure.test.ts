@@ -9,15 +9,29 @@ class RuntimeRefusal extends Error {
 }
 
 describe("isEnvironmentFailure", () => {
-  test("a failure carrying a code came from the environment", () => {
-    expect(isEnvironmentFailure(new RuntimeRefusal("EROFS"))).toBe(true);
+  describe("a failure carrying a code", () => {
+    const it = test.extend("cameFromTheEnvironment", () =>
+      isEnvironmentFailure(new RuntimeRefusal("EROFS")));
+
+    it("came from the environment", ({ cameFromTheEnvironment }) => {
+      expect(cameFromTheEnvironment).toBe(true);
+    });
   });
 
-  test("a failure carrying no code came from our own declarations", () => {
-    expect(isEnvironmentFailure(new TypeError("cannot serialise a function"))).toBe(false);
+  describe("a failure carrying no code", () => {
+    const it = test.extend("cameFromTheEnvironment", () =>
+      isEnvironmentFailure(new TypeError("cannot serialise a function")));
+
+    it("came from our own declarations", ({ cameFromTheEnvironment }) => {
+      expect(cameFromTheEnvironment).toBe(false);
+    });
   });
 
-  test("a thrown value that is not an object carries nothing to classify", () => {
-    expect(isEnvironmentFailure("EROFS")).toBe(false);
+  describe("a thrown value that is not an object", () => {
+    const it = test.extend("cameFromTheEnvironment", () => isEnvironmentFailure("EROFS"));
+
+    it("carries nothing to classify", ({ cameFromTheEnvironment }) => {
+      expect(cameFromTheEnvironment).toBe(false);
+    });
   });
 });

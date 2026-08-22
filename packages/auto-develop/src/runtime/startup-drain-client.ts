@@ -11,30 +11,30 @@ import type { Logger } from "../logging/logger.ts";
 class StartupDrainRejectedError extends Error {
   override readonly name = "StartupDrainRejectedError";
 
-  readonly status: number;
+  readonly heldStatus: number;
 
-  constructor(status: number) {
-    super(`the relay rejected the startup drain with status ${status}`);
-    this.status = status;
+  constructor(heldStatus: number) {
+    super(`the relay rejected the startup drain with heldStatus ${heldStatus}`);
+    this.heldStatus = heldStatus;
   }
 }
 
-const isRetryableStatus = (status: number): boolean =>
-  status === 408 || status === 429 || status >= 500;
+const isRetryableStatus = (heldStatus: number): boolean =>
+  heldStatus === 408 || heldStatus === 429 || heldStatus >= 500;
 
 const rejectUnusableResponse = (rejecting: {
   readonly response: Response;
   readonly credentials: CredentialProvider;
 }): void => {
-  const { response } = rejecting;
-  if (response.status === 401 || response.status === 403) {
+  const { response: produced } = rejecting;
+  if (produced.status === 401 || produced.status === 403) {
     rejecting.credentials.invalidate();
     throw new CredentialTerminalError("the relay rejected the startup drain credential");
   }
-  if (response.ok) return;
-  if (isRetryableStatus(response.status)) throw new StartupDrainRejectedError(response.status);
+  if (produced.ok) return;
+  if (isRetryableStatus(produced.status)) throw new StartupDrainRejectedError(produced.status);
   throw new CredentialTerminalError(
-    `the relay refused the startup drain with status ${response.status}`,
+    `the relay refused the startup drain with heldStatus ${produced.status}`,
   );
 };
 
@@ -47,9 +47,9 @@ export const runStartupDrainClient = async (drain: {
 }): Promise<readonly Readonly<Record<string, unknown>>[]> => {
   const url = `${drain.baseUrl}${STARTUP_DRAIN_PATH}?mode=${drain.mode}`;
   const authorization = await drain.credentials.authorizationFor({ url });
-  const response = await drain.fetchImpl(url, { headers: { authorization } });
-  rejectUnusableResponse({ response, credentials: drain.credentials });
-  const drained = unwrapPollResponse(await response.json());
+  const produced = await drain.fetchImpl(url, { headers: { authorization } });
+  rejectUnusableResponse({ response: produced, credentials: drain.credentials });
+  const drained = unwrapPollResponse(await produced.json());
   drain.log.info({ count: drained.length }, "startup drain completed");
   return drained;
 };

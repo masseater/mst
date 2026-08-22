@@ -167,6 +167,7 @@ describe("dont-review-it/no-invariant-default-parameter--remove-unused-option", 
         name: "test helpers are outside the production abstraction rule",
         code: "function format(value, compact = false) { return compact ? String(value) : value; }\nformat(1);",
         filename: "packages/example/src/format.test.ts",
+        cwd: "/repo",
       },
     ],
     invalid: [

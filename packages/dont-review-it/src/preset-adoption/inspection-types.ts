@@ -11,6 +11,10 @@ export type DisabledRuleDeclaration = {
 
 export type PresetAdoptionInspection = {
   readonly disabledDeclarations: readonly DisabledRuleDeclaration[];
+  readonly ignorePatterns?: {
+    readonly line: number;
+    readonly patterns: readonly string[];
+  };
   readonly problems: readonly RepositoryProblem[];
 };
 

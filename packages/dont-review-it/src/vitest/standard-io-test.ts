@@ -1,36 +1,31 @@
 import { test, vi } from "vite-plus/test";
 
+import { PROCESS_IO_MEMBER } from "../lint/oxlint/rules/no-logged-and-continued-failure--stop-or-recover.ts";
+import { runAsyncProcess } from "../process-execution/async-process.ts";
+
 type CapturedStream = {
-  readonly text: string;
-};
-
-const decoded = (chunk: string | Uint8Array): string =>
-  typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk);
-
-const captureWrites = (stream: NodeJS.WriteStream) => {
-  const spy = vi.spyOn(stream, "write").mockImplementation(() => true);
-  return {
-    subject: {
-      get text(): string {
-        return spy.mock.calls.map(([chunk]) => decoded(chunk)).join("");
-      },
-    },
-    restore: (): void => {
-      spy.mockRestore();
-    },
-  };
+  readonly chunks: readonly string[];
+  readonly text: () => string;
 };
 
 /** @public */
-export const standardIoTest = test.extend<{ stdout: CapturedStream; stderr: CapturedStream }>({
-  stdout: async ({}, use) => {
-    const capture = captureWrites(process.stdout);
-    await use(capture.subject);
-    capture.restore();
-  },
-  stderr: async ({}, use) => {
-    const capture = captureWrites(process.stderr);
-    await use(capture.subject);
-    capture.restore();
-  },
-});
+export { runAsyncProcess, type CapturedStream };
+
+const decoded = (writtenFragment: string | Uint8Array): string =>
+  typeof writtenFragment === "string" ? writtenFragment : new TextDecoder().decode(writtenFragment);
+
+const capturedWrites = (stream: NodeJS.WriteStream): CapturedStream => {
+  const spy = vi.spyOn(stream, PROCESS_IO_MEMBER.write).mockImplementation(() => true);
+  const written = (): readonly string[] =>
+    spy.mock.calls.map(([writtenFragment]) => decoded(writtenFragment));
+
+  return Object.create(Object.prototype, {
+    chunks: { enumerable: true, get: written },
+    text: { enumerable: false, value: () => written().join("") },
+  }) as CapturedStream;
+};
+
+/** @public */
+export const standardIoTest = test
+  .extend("stdout", { auto: true }, () => capturedWrites(process.stdout))
+  .extend("stderr", { auto: true }, () => capturedWrites(process.stderr));

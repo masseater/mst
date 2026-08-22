@@ -100,18 +100,17 @@ const addedVerificationsIn = (
 ): readonly VerificationOccurrence[] => {
   const beforeCounts = countBy(beforeVerifications, (verification) => verification.locator);
   const afterCounts = countBy(afterVerifications, (verification) => verification.locator);
-  const selectedCounts = new Map<string, number>();
   const prioritizedVerifications = [
     ...afterVerifications.filter((verification) => verification.isAdded),
     ...afterVerifications.filter((verification) => !verification.isAdded),
   ];
-  return prioritizedVerifications.filter((verification) => {
-    const selectedCount = selectedCounts.get(verification.locator) ?? 0;
+  return prioritizedVerifications.filter((verification, position) => {
+    const precedingCount = prioritizedVerifications
+      .slice(0, position)
+      .filter((preceding) => preceding.locator === verification.locator).length;
     const afterCount = afterCounts[verification.locator] as number;
     const addedCount = afterCount - (beforeCounts[verification.locator] ?? 0);
-    if (selectedCount >= addedCount) return false;
-    selectedCounts.set(verification.locator, selectedCount + 1);
-    return true;
+    return precedingCount < addedCount;
   });
 };
 

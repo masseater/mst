@@ -54,14 +54,16 @@ export const createGitRunner = (
   return {
     run: async (invocation) => {
       const configArgs = Object.entries(invocation.configOverrides ?? {}).flatMap(
-        ([key, value]) => ["-c", `${key}=${value}`],
+        ([named, held]) => ["-c", `${named}=${held}`],
       );
       const finished = await fileRunner({
         binary: "git",
         args: [...configArgs, ...invocation.args],
         options: {
           cwd: invocation.cwd,
-          env: omitBy(environment, (_, name) => repositoryLocalGitVariables.has(String(name))),
+          env: omitBy(environment, (_, variableName) =>
+            repositoryLocalGitVariables.has(String(variableName)),
+          ),
           maxBuffer: 64 * 1024 * 1024,
         },
       });
@@ -113,8 +115,8 @@ export const createTailFs = (): TailFs => ({
   },
   readExitCode: (path) => {
     try {
-      const parsed = Number(readFileSync(path, "utf8").trim());
-      return Number.isFinite(parsed) ? parsed : null;
+      const parsedNode = Number(readFileSync(path, "utf8").trim());
+      return Number.isFinite(parsedNode) ? parsedNode : null;
     } catch (readFailure) {
       void readFailure;
       return null;

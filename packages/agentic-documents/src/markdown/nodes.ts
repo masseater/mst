@@ -32,7 +32,7 @@ export const flattenTextKeepingCode = (node: Nodes): string => {
   return isParent(node) ? node.children.map(flattenTextKeepingCode).join("") : "";
 };
 
-export const leadingParagraphOf = (item: Nodes & Parent): Paragraph | null => {
-  const [first] = item.children;
+export const leadingParagraphOf = (member: Nodes & Parent): Paragraph | null => {
+  const [first] = member.children;
   return first?.type === "paragraph" ? first : null;
 };

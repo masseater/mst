@@ -11,12 +11,11 @@ import {
 } from "./relay-server-runtime.ts";
 import { octokitAccessFor } from "./relay/github-fetch-reader.ts";
 import { IdTokenRejectionError } from "./relay/id-token-rejection-error.ts";
-import {
-  createMemoryCursorStore,
-  createMemoryEventStore,
-  createMemorySessionStore,
-} from "./relay/memory-store.ts";
+import { createMemoryCursorStore } from "./relay/memory-cursor-store.ts";
+import { createMemoryEventStore } from "./relay/memory-event-store.ts";
+import { createMemorySessionStore } from "./relay/memory-session-store.ts";
 import { relayConfigFromEnv, type RelayConfig } from "./relay/relay-config.ts";
+import { ABORT_SIGNAL_EVENT, SOCKET_LIFECYCLE_EVENT } from "./runtime/event-names.ts";
 import { registerShutdown, type ShutdownRegistration } from "./runtime/shutdown.ts";
 
 import type { Logger } from "./logging/logger.ts";
@@ -79,14 +78,13 @@ const createConfiguredRelay = (
 };
 
 const createReleaseLifecycle = (): ReleaseLifecycle => {
-  const releaseCallbacks = new Set<() => void>();
+  const releaseController = new AbortController();
   return {
     add: (release) => {
-      releaseCallbacks.add(release);
+      releaseController.signal.addEventListener(ABORT_SIGNAL_EVENT.abort, release, { once: true });
     },
     release: once(() => {
-      for (const release of releaseCallbacks) release();
-      releaseCallbacks.clear();
+      releaseController.abort();
     }),
   };
 };
@@ -119,9 +117,9 @@ const registerServerFailure = (registration: {
     registration.log.error({ err: failure }, "relay server failed");
     void registration.shutdownAndExit(1);
   };
-  registration.relay.server.once("error", onServerError);
+  registration.relay.server.once(SOCKET_LIFECYCLE_EVENT.failure, onServerError);
   registration.lifecycle.add(() => {
-    registration.relay.server.off("error", onServerError);
+    registration.relay.server.off(SOCKET_LIFECYCLE_EVENT.failure, onServerError);
   });
 };
 

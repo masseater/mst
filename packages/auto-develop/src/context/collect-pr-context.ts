@@ -33,13 +33,13 @@ const resolveContent = async (resolve: {
 }): Promise<ChangedFile> => {
   const { git, head, file } = resolve;
   if (isDeletion(file.statusCode)) return { ...file, omissionReason: "deleted" };
-  const mode = await git.treeEntryMode({ ref: head, path: file.path });
-  if (mode === GITLINK_MODE) return { ...file, omissionReason: "submodule" };
-  const content = await git.showFile({ ref: head, path: file.path });
-  if (Buffer.byteLength(content, "utf8") > MAX_CONTENT_BYTES) {
+  const spelledMode = await git.treeEntryMode({ ref: head, path: file.path });
+  if (spelledMode === GITLINK_MODE) return { ...file, omissionReason: "submodule" };
+  const writtenContent = await git.showFile({ ref: head, path: file.path });
+  if (Buffer.byteLength(writtenContent, "utf8") > MAX_CONTENT_BYTES) {
     return { ...file, omissionReason: "too-large" };
   }
-  return { ...file, content };
+  return { ...file, content: writtenContent };
 };
 
 export const collectPrContext = async (collect: {

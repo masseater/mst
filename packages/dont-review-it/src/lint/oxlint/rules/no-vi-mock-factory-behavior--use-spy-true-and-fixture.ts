@@ -1,10 +1,6 @@
-import { firstToken } from "@mst/lint-rule-authoring";
-
 import { createDontReviewItRule } from "../../../create-rule.ts";
-import {
-  DIRECTIVE_GROUNDS_SEPARATOR,
-  MOCK_FACTORY_EXEMPTION_DIRECTIVE,
-} from "../lib/directive-comments.ts";
+import { exemptionsWrittenAbove } from "../lib/directive-comments.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import {
   DEFAULT_MOCK_CREATION_MEMBERS,
   DEFAULT_MOCK_NAMESPACE_SPELLINGS,
@@ -22,7 +18,7 @@ import {
   type SpecFunction,
 } from "../lib/spec-syntax/subject-expressions.ts";
 
-import type { Comment, ESTree, Options, Scope } from "@oxlint/plugins";
+import type { ESTree, Options, Scope } from "@oxlint/plugins";
 
 const RULE_NAME = "no-vi-mock-factory-behavior--use-spy-true-and-fixture";
 
@@ -30,12 +26,8 @@ const BUILTIN_MODULE_PREFIXES_OPTION = "builtinModulePrefixes";
 
 const DEFAULT_BUILTIN_MODULE_PREFIXES: readonly string[] = ["node:"];
 
-const CREATION_MEMBERS: ReadonlySet<string> = new Set(DEFAULT_MOCK_CREATION_MEMBERS);
-
-const WHITESPACE = /\s+/u;
-
-const builtinModulePrefixesFrom = (options: Readonly<Options>): readonly string[] => {
-  const [first] = options;
+const builtinModulePrefixesFrom = (ruleOptions: Readonly<Options>): readonly string[] => {
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) {
     return DEFAULT_BUILTIN_MODULE_PREFIXES;
   }
@@ -43,7 +35,9 @@ const builtinModulePrefixesFrom = (options: Readonly<Options>): readonly string[
   const configured = first[BUILTIN_MODULE_PREFIXES_OPTION];
   if (!Array.isArray(configured)) return DEFAULT_BUILTIN_MODULE_PREFIXES;
 
-  const spelled = configured.filter((entry): entry is string => typeof entry === "string");
+  const spelled = configured.filter(
+    (candidate): candidate is string => typeof candidate === "string",
+  );
   return spelled.length === 0 ? DEFAULT_BUILTIN_MODULE_PREFIXES : spelled;
 };
 
@@ -102,7 +96,7 @@ const createsMockWithImplementation = (
   if (callee.type !== "MemberExpression") return false;
 
   const member = staticMemberName(callee);
-  if (member === null || !CREATION_MEMBERS.has(member)) return false;
+  if (member === null || !DEFAULT_MOCK_CREATION_MEMBERS.includes(member)) return false;
   if (call.arguments.length === 0) return false;
   return spellsMockNamespace(callee.object, lookup);
 };
@@ -123,26 +117,28 @@ const yieldsImportedBinding = (
     .map((expression) => unwrapSubject(expression))
     .some((written) => written.type === "Identifier" && spellsImportedBinding(written, scopeAt));
 
-const commentBlockAbove = (comments: readonly Comment[], line: number): readonly Comment[] => {
-  const adjacent = comments.find((comment) => comment.loc.end.line === line - 1);
-  if (adjacent === undefined) return [];
-  return [...commentBlockAbove(comments, adjacent.loc.start.line), adjacent];
-};
+const enclosingFactoryOf = (
+  call: ESTree.CallExpression,
+  factories: readonly SpecFunction[],
+): SpecFunction | null =>
+  factories.find((factory) => call.start >= factory.start && call.end <= factory.end) ?? null;
 
-const exemptionIn = (
-  comment: Comment,
-): { readonly comment: Comment; readonly grounds: string } | null => {
-  const spelled = comment.value.trim();
-  if (firstToken(spelled) !== MOCK_FACTORY_EXEMPTION_DIRECTIVE) return null;
+const settlesBehaviour = (call: ESTree.CallExpression, lookup: NamespaceLookup): boolean =>
+  setsMockBehaviour(call) ||
+  createsMockWithImplementation(call, lookup) ||
+  callsImportedBinding(call, lookup.scopeAt);
 
-  const written = spelled.slice(MOCK_FACTORY_EXEMPTION_DIRECTIVE.length);
-  const separated = DIRECTIVE_GROUNDS_SEPARATOR.exec(written);
-  const named = separated === null ? written : written.slice(0, separated.index);
-  if (!named.split(WHITESPACE).includes(RULE_NAME)) return null;
-
-  const grounds = separated === null ? "" : written.slice(separated.index + separated[0].length);
-  return { comment, grounds: grounds.trim() };
-};
+const behavesInside = (read: {
+  readonly factory: SpecFunction;
+  readonly factories: readonly SpecFunction[];
+  readonly calls: readonly ESTree.CallExpression[];
+  readonly lookup: NamespaceLookup;
+}): boolean =>
+  read.calls.some(
+    (call) =>
+      enclosingFactoryOf(call, read.factories) === read.factory &&
+      settlesBehaviour(call, read.lookup),
+  );
 
 export const noViMockFactoryBehavior = createDontReviewItRule({
   name: RULE_NAME,
@@ -155,9 +151,9 @@ export const noViMockFactoryBehavior = createDontReviewItRule({
     },
     messages: {
       factoryShape:
-        "A module replacement declaration must not hand over a factory. Pass `{ spy: true }` as the second argument, and declare the values a test needs inside the fixture that test receives.",
+        "A module replacement declaration must not hand over a factory. Pass `{ spy: true }` as the second argument and let the replaced module answer, so the replacement records how it was called and settles nothing.",
       factoryBehaviour:
-        "The body of a module replacement factory must not settle what a mock hands back. Move every return value, resolved value, rejected value and implementation into the fixture that hands the mock to the test, and leave the factory holding bare mock containers.",
+        "The body of a module replacement factory must not settle what a mock hands back. Delete every return value, resolved value, rejected value and implementation written here, and leave the replacement a pass-through that only records how it was called.",
       unreasonedExemption:
         "An exemption comment must not stand without grounds. Write the grounds for this exemption after `--`, and name there the boundary this spec replaces by hand.",
     },
@@ -171,66 +167,60 @@ export const noViMockFactoryBehavior = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
+  create(inspection) {
     const lookup: NamespaceLookup = {
-      scopeAt: (node: ESTree.Node): Scope => context.sourceCode.getScope(node),
+      scopeAt: (node: ESTree.Node): Scope => inspection.sourceCode.getScope(node),
       spellings: new Set(DEFAULT_MOCK_NAMESPACE_SPELLINGS),
       seenBindings: new Set(),
     };
-    const builtinPrefixes = builtinModulePrefixesFrom(context.options);
-    const factories = new Set<SpecFunction>();
-    const settled = new Set<SpecFunction>();
-
-    const reportBehaviour = (factory: SpecFunction): void => {
-      if (settled.has(factory)) return;
-      settled.add(factory);
-      context.report({ node: factory, messageId: "factoryBehaviour" });
-    };
-
-    const enclosingFactory = (node: ESTree.Node): SpecFunction | null =>
-      [...factories].find((factory) => node.start >= factory.start && node.end <= factory.end) ??
-      null;
+    const builtinPrefixes = builtinModulePrefixesFrom(inspection.options);
 
     const grantsExemption = (call: ESTree.CallExpression): boolean => {
-      const written = commentBlockAbove(context.sourceCode.ast.comments, call.loc.start.line)
-        .map((comment) => exemptionIn(comment))
-        .filter((exemption) => exemption !== null);
+      const written = exemptionsWrittenAbove({
+        comments: inspection.sourceCode.ast.comments,
+        line: call.loc.start.line,
+        ruleName: RULE_NAME,
+      });
 
       for (const exemption of written.filter((carried) => carried.grounds === "")) {
-        context.report({ loc: exemption.comment.loc, messageId: "unreasonedExemption" });
+        inspection.report({ loc: exemption.comment.loc, messageId: "unreasonedExemption" });
       }
       return written.some((exemption) => exemption.grounds !== "");
     };
 
-    const takeDeclaration = (call: ESTree.CallExpression, replacement: ModuleReplacement): void => {
-      factories.add(replacement.factory);
-      if (yieldsImportedBinding(replacement.factory, lookup.scopeAt)) {
-        reportBehaviour(replacement.factory);
+    const reportDeclaration = (declared: {
+      readonly call: ESTree.CallExpression;
+      readonly replacement: ModuleReplacement;
+    }): void => {
+      const { factory, specifier } = declared.replacement;
+      if (yieldsImportedBinding(factory, lookup.scopeAt)) {
+        inspection.report({ node: factory, messageId: "factoryBehaviour" });
       }
 
-      const exempted = grantsExemption(call);
-      if (namesBuiltinModule(replacement.specifier, builtinPrefixes)) return;
-      if (yieldsEmptyObjectOnly(replacement.factory)) return;
+      const exempted = grantsExemption(declared.call);
+      if (namesBuiltinModule(specifier, builtinPrefixes)) return;
+      if (yieldsEmptyObjectOnly(factory)) return;
       if (exempted) return;
-      context.report({ node: replacement.factory, messageId: "factoryShape" });
+      inspection.report({ node: factory, messageId: "factoryShape" });
     };
 
     return {
-      CallExpression(node: ESTree.CallExpression) {
-        const replacement = moduleReplacementOf(node, lookup);
-        if (replacement !== null) {
-          takeDeclaration(node, replacement);
-          return;
-        }
+      "Program:exit"(program: ESTree.Program) {
+        const calls = nodesOfType(program, "CallExpression");
+        const declarations = calls.flatMap((call) => {
+          const replacement = moduleReplacementOf(call, lookup);
+          return replacement === null ? [] : [{ call, replacement }];
+        });
+        const factories = declarations.map((declared) => declared.replacement.factory);
+        const inner = calls.filter(
+          (call) => !declarations.some((declared) => declared.call === call),
+        );
 
-        const factory = enclosingFactory(node);
-        if (factory === null) return;
-        if (
-          setsMockBehaviour(node) ||
-          createsMockWithImplementation(node, lookup) ||
-          callsImportedBinding(node, lookup.scopeAt)
-        ) {
-          reportBehaviour(factory);
+        for (const declared of declarations) reportDeclaration(declared);
+        for (const factory of factories) {
+          if (yieldsImportedBinding(factory, lookup.scopeAt)) continue;
+          if (!behavesInside({ factory, factories, calls: inner, lookup })) continue;
+          inspection.report({ node: factory, messageId: "factoryBehaviour" });
         }
       },
     };

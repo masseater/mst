@@ -1,6 +1,8 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import {
   ASSERTION_CHAIN_MODIFIERS,
+  ASSERTION_COUNT_DECLARATIONS,
   DERIVED_ASSERTION_RECEIVERS,
 } from "../lib/spec-syntax/matcher-vocabulary.ts";
 import { isSpecFile, specFileSuffixesFrom } from "../lib/spec-syntax/spec-files.ts";
@@ -22,16 +24,14 @@ const ASSERTION_NAMESPACE = "expect";
 
 const ALLOWED_UTILITIES_OPTION = "allowedExpectUtilities";
 
-const DEFAULT_ALLOWED_UTILITIES: ReadonlySet<string> = new Set(["assertions", "hasAssertions"]);
-
-const allowedUtilitiesFrom = (options: Readonly<Options>): ReadonlySet<string> => {
-  const [first] = options;
+const allowedUtilitiesFrom = (ruleOptions: Readonly<Options>): ReadonlySet<string> => {
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) {
-    return DEFAULT_ALLOWED_UTILITIES;
+    return ASSERTION_COUNT_DECLARATIONS;
   }
 
   const listed = first[ALLOWED_UTILITIES_OPTION];
-  return Array.isArray(listed) ? new Set(listed.map(String)) : DEFAULT_ALLOWED_UTILITIES;
+  return Array.isArray(listed) ? new Set(listed.map(String)) : ASSERTION_COUNT_DECLARATIONS;
 };
 
 const namespaceReceiverOf = (call: ESTree.CallExpression): string | null => {
@@ -101,25 +101,69 @@ const testCallbackOf = (call: ESTree.CallExpression): SpecFunction | null => {
   return handed.flatMap((argument) => asSpecFunction(argument) ?? []).at(-1) ?? null;
 };
 
-const statementsOf = (callback: SpecFunction): readonly SpecStatement[] => {
-  const body = blockBodyOf(callback);
-  return body === null ? [] : body.body;
+const statementsOf = (takenFunction: SpecFunction): readonly SpecStatement[] => {
+  const writtenBody = blockBodyOf(takenFunction);
+  return writtenBody === null ? [] : writtenBody.body;
 };
 
-const conciseBodyOf = (callback: SpecFunction): ESTree.Expression | null => {
-  const { body } = callback;
+const conciseBodyOf = (takenFunction: SpecFunction): ESTree.Expression | null => {
+  const { body } = takenFunction;
   return body === null || body.type === "BlockStatement" ? null : body;
 };
 
 const spansExecutedArgument = (
   call: ESTree.CallExpression,
-  executions: ReadonlySet<ESTree.Node>,
+  executions: readonly ESTree.Node[],
 ): boolean =>
-  [...executions].some((execution) =>
+  executions.some((execution) =>
     call.arguments.some(
       (argument) => execution.start >= argument.start && execution.end <= argument.end,
     ),
   );
+
+type Reading = {
+  readonly expression: ESTree.Expression | null;
+  readonly reported: ESTree.Node;
+  readonly messageId: string;
+};
+
+const readingOf = (statement: SpecStatement): Reading => {
+  const messageId = "setupStatement";
+  if (statement.type === "ExpressionStatement") {
+    return { expression: statement.expression, reported: statement, messageId };
+  }
+  if (statement.type === "ReturnStatement" && statement.argument !== null) {
+    return { expression: statement.argument, reported: statement, messageId };
+  }
+  return { expression: null, reported: statement, messageId };
+};
+
+const readingsIn = (takenFunction: SpecFunction): readonly Reading[] => {
+  const concise = conciseBodyOf(takenFunction);
+  return [
+    ...statementsOf(takenFunction).map((statement) => readingOf(statement)),
+    ...(concise === null
+      ? []
+      : [{ expression: concise, reported: concise, messageId: "nonAssertionBody" }]),
+  ];
+};
+
+const carriesSetup = (reading: Reading, allowed: ReadonlySet<string>): boolean => {
+  if (reading.expression === null) return true;
+  if (namespaceUtilityIn(reading.expression, allowed) !== null) return false;
+  return !isAssertion(reading.expression);
+};
+
+const executedUtilitiesIn = (read: {
+  readonly reading: Reading;
+  readonly allowed: ReadonlySet<string>;
+  readonly executions: readonly ESTree.Node[];
+}): readonly ESTree.CallExpression[] => {
+  const { expression } = read.reading;
+  const utility = expression === null ? null : namespaceUtilityIn(expression, read.allowed);
+  if (utility === null || !spansExecutedArgument(utility, read.executions)) return [];
+  return [utility];
+};
 
 export const requireItOnlyExpect = createDontReviewItRule({
   name: "require-it-only-expect--move-setup-into-fixture",
@@ -149,67 +193,32 @@ export const requireItOnlyExpect = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
-    const allowed = allowedUtilitiesFrom(context.options);
-    const pending = new Set<{ readonly node: ESTree.Node; readonly messageId: string }>();
-    const utilityCalls = new Set<ESTree.CallExpression>();
-    const executions = new Set<ESTree.Node>();
-
-    const readExpression = (read: {
-      readonly expression: ESTree.Expression;
-      readonly reported: ESTree.Node;
-      readonly messageId: string;
-    }): void => {
-      const utility = namespaceUtilityIn(read.expression, allowed);
-      if (utility !== null) {
-        utilityCalls.add(utility);
-        return;
-      }
-      if (isAssertion(read.expression)) return;
-      pending.add({ node: read.reported, messageId: read.messageId });
-    };
-
-    const readStatement = (statement: SpecStatement): void => {
-      const messageId = "setupStatement";
-      if (statement.type === "ExpressionStatement") {
-        readExpression({ expression: statement.expression, reported: statement, messageId });
-        return;
-      }
-      if (statement.type === "ReturnStatement" && statement.argument !== null) {
-        readExpression({ expression: statement.argument, reported: statement, messageId });
-        return;
-      }
-      pending.add({ node: statement, messageId });
-    };
-
-    const readCallback = (callback: SpecFunction): void => {
-      for (const statement of statementsOf(callback)) readStatement(statement);
-
-      const concise = conciseBodyOf(callback);
-      if (concise === null) return;
-      readExpression({ expression: concise, reported: concise, messageId: "nonAssertionBody" });
-    };
+    const allowed = allowedUtilitiesFrom(inspection.options);
 
     return {
-      CallExpression(node: ESTree.CallExpression) {
-        executions.add(node);
-        const callback = testCallbackOf(node);
-        if (callback !== null) readCallback(callback);
-      },
-      NewExpression(node: ESTree.NewExpression) {
-        executions.add(node);
-      },
-      AssignmentExpression(node: ESTree.AssignmentExpression) {
-        executions.add(node);
-      },
-      "Program:exit"() {
-        for (const report of pending) context.report(report);
-        for (const call of utilityCalls) {
-          if (!spansExecutedArgument(call, executions)) continue;
-          context.report({ node: call, messageId: "utilityArgument" });
-        }
+      "Program:exit"(program: ESTree.Program) {
+        const calls = nodesOfType(program, "CallExpression");
+        const readings = calls
+          .flatMap((call) => testCallbackOf(call) ?? [])
+          .flatMap((takenFunction) => readingsIn(takenFunction));
+        const executions = [
+          ...calls,
+          ...nodesOfType(program, "NewExpression"),
+          ...nodesOfType(program, "AssignmentExpression"),
+        ];
+        const findings = [
+          ...readings
+            .filter((reading) => carriesSetup(reading, allowed))
+            .map((reading) => ({ node: reading.reported, messageId: reading.messageId })),
+          ...readings
+            .flatMap((reading) => executedUtilitiesIn({ reading, allowed, executions }))
+            .map((utility) => ({ node: utility, messageId: "utilityArgument" })),
+        ];
+
+        for (const finding of findings) inspection.report(finding);
       },
     };
   },

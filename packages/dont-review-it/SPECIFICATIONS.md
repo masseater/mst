@@ -7,7 +7,7 @@
 [`specs/canonical-values.spec.ts`](specs/canonical-values.spec.ts)
 
 - 同じ概念を 2 か所で宣言していたら、先に宣言した場所を挙げて報告する
-- 同じ値の集合を別々の概念が宣言していたら、両方の概念を挙げて報告する
+- 同じ値の集合を別々の概念が宣言していたら、両方の概念を挙げて警告し、落とさない
 - 概念を名指ししない注釈を報告する
 - 退役した注釈タグが残っていたら報告する
 - テストファイルが繰り返す値の集合を二重宣言と数えない
@@ -19,8 +19,8 @@
 - check 以外の命令を名指しで拒否する
 - 存在しない場所を検査対象に取らない
 - 依存バージョンの食い違いを報告して失敗する
-- vite.config.ts が preset を root lint.extends から直接採用していなければ報告して失敗する
-- vite.config.ts が preset を root lint.extends から直接採用していれば check を成功させる
+- vite.config.ts が dontReviewItPreset.lint を直接呼ばなければ報告して失敗する
+- vite.config.ts が値 import した dontReviewItPreset.lint を直接呼べば check を成功させる
 - test command が config を差し替える経路を報告して失敗する
 - test command が coverage 設定を上書きするか対象を変更ファイルだけに絞る経路を報告して失敗する
 - root guard が再帰 test へ安全な coverage と worker 上限以外を転送する経路を報告して失敗する
@@ -62,25 +62,36 @@
 - 同じ本体を綴る宣言を、繰り返しているすべての場所を挙げて報告する
 - テストファイルが繰り返す本体を重複と数えない
 
-## 設定への git 除外の注入
-
-[`specs/git-excludes.spec.ts`](specs/git-excludes.spec.ts)
-
-- 呼び手が書いた除外パターンを、git 由来の除外の後ろに残す
-- 除外を書いていない呼び手の設定にも、除外パターンの配列を与える
-
 ## preset の適用範囲の検査
 
 [`specs/preset-adoption.spec.ts`](specs/preset-adoption.spec.ts)
 
-- vite.config.ts があるリポジトリでは値として静的 import した preset を root lint.extends から直接ちょうど 1 回参照させる
+- vite.config.ts があるリポジトリでは値として静的 import した dontReviewItPreset の lint 関数へ object literal を直接渡す
 - named alias と namespace のどちらでも正規 module から直接参照する preset を採用済みとみなす
-- type-only import と別 module と動的 import と local relay と computed member と spread と重複を preset の直接採用として通さない
-- preset rule を off と allow と 0 またはそれらを先頭に置く配列で止めた宣言をすべて検出する
-- EDR に記録された 2 workspace と 1 rule の完全一致だけを warning に留める
+- type-only import と別 module と動的 import と local relay と computed member と spread と重複を preset の直接呼出しとして通さない
+- preset rule を off と allow と 0 と名前付き定数またはそれらを先頭に置く配列で止めた宣言をすべて検出する
+- EDR に記録された 3 workspace と 1 rule の完全一致だけを warning に留める
 - EDR の完全一致以外で止めた preset rule を warning ではなく problem にする
 - rules と overrides と severity と files と excludeFiles の有効値を静的に追えない設定を problem にする
 - vite.config.ts が無いリポジトリには preset の導入を要求しない
+
+## 必須ファイルの形の検査
+
+[`specs/required-file-form.spec.ts`](specs/required-file-form.spec.ts)
+
+- JSON で置かれた knip の設定を、TypeScript の綴りを名指しして報告する
+- JSON で置かれた oxlint の設定を、ツールチェーン設定へ移す指示とともに報告する
+- 旧来の rc 形式で置かれた eslint の設定を報告する
+- JavaScript で置かれた vite の設定を報告する
+- リポジトリの根だけでなく、マニフェストを持つディレクトリに置かれた設定も報告する
+- TypeScript で書かれた設定を報告しない
+- AGENTS.md を持つディレクトリに CLAUDE.md が無いことを報告する
+- CLAUDE.md が中身を持つ実体ファイルであることを報告する
+- CLAUDE.md が AGENTS.md 以外を指すシンボリックリンクであることを報告する
+- CLAUDE.md だけがあって AGENTS.md が無いことを報告する
+- AGENTS.md を指すシンボリックリンクの CLAUDE.md を報告しない
+- どちらの指示ファイルも無いディレクトリを報告しない
+- マニフェストを 1 つも持たないリポジトリでも、根を開いた対象として数える
 
 ## 検査の走査証跡
 
@@ -88,9 +99,29 @@
 
 - 観点ごとに、開いた対象の数を残す
 - 対象を持てなかった観点に、開かなかった理由を持たせる
+- 設定を持つリポジトリでは preset adoption を走査済みとして残す
 - 人間が読む形では、状態の記号と対象の規模を観点ごとに桁で揃えて並べる
 - AI が読む形では、記号も桁揃えも持たせずに 1 行 1 観点で並べる
 - 違反を見つけた観点を、その件数とともに残す
+
+## 出荷する skill と宣言した版の突き合わせ
+
+[`specs/shipped-skill-versions.spec.ts`](specs/shipped-skill-versions.spec.ts)
+
+- npm へ公開できるパッケージが skill の隣に changelog を持たなければ報告する
+- changelog が宣言された版を書いていなければ、その changelog を指して報告する
+- 同梱する skill が別の版を名乗っていれば、その skill を指して報告する
+- changelog が版を書き、skill が同じ版を名乗っていれば何も報告しない
+- 公開しないパッケージが skill の隣に changelog を持てば報告する
+- 自動修正は skill の版を宣言へ揃え、changelog には触れない
+
+## ツールチェーン設定の preset
+
+[`specs/toolchain-preset.spec.ts`](specs/toolchain-preset.spec.ts)
+
+- 呼び手が書いた除外パターンを、git 由来の除外の後ろに残す
+- 除外を書いていない呼び手の設定にも、除外パターンの配列を与える
+- markdown の段落を折り返さない整形を、呼び手が書かなくても与える
 
 ## ワークフロー定義の検査
 
@@ -103,5 +134,9 @@
 - 権限を宣言しないまま既定の権限で走るジョブを報告する
 - 1 つの実行ブロックに複数のコマンド呼び出しを詰めたステップを報告する
 - 失敗を握りつぶす記述を実行ブロックに置けない
+- タグで参照したアクションを報告する
+- 固定はしたが版を書き添えていないアクション参照を報告する
+- 履歴を全部取りにいくチェックアウトを報告する
+- 固定した参照を引き上げる仕組みを持たないリポジトリを報告する
 - 失敗を成功として報告させる continue-on-error を置けない
 - すべての規律を守った定義を黙って通す

@@ -1,31 +1,41 @@
 import { testLintRule } from "@mst/lint-rule-authoring";
-import { describe, expect, test } from "vite-plus/test";
+import { describe, expect, it } from "vite-plus/test";
 
 import { forbidOversizedFile } from "./forbid-oversized-file--split-by-responsibility.ts";
 
-const sourceOfLines = (count: number): string =>
-  Array.from({ length: count }, (_, index) => `const line${index} = ${index};`).join("\n");
+const numberedLines = Array.from({ length: 1600 }, (_, index) => `const line${index} = ${index};`);
+
+const sourceOfThreeLines = numberedLines.slice(0, 3).join("\n");
+const sourceOfFourLines = numberedLines.slice(0, 4).join("\n");
+const sourceOfFiveLines = numberedLines.slice(0, 5).join("\n");
+const sourceOf399Lines = numberedLines.slice(0, 399).join("\n");
+const sourceOf450Lines = numberedLines.slice(0, 450).join("\n");
+const sourceOf501Lines = numberedLines.slice(0, 501).join("\n");
+const sourceOf1499Lines = numberedLines.slice(0, 1499).join("\n");
+const sourceOf1501Lines = numberedLines.slice(0, 1501).join("\n");
+
+const optionsSchema = forbidOversizedFile.meta.schema;
 
 describe("dont-review-it/forbid-oversized-file--split-by-responsibility", () => {
   testLintRule(forbidOversizedFile, {
     valid: [
       {
         name: "a file shorter than the default budget passes",
-        code: sourceOfLines(399),
+        code: sourceOf399Lines,
       },
       {
         name: "a file exactly at the budget is not over it",
-        code: sourceOfLines(3),
+        code: sourceOfThreeLines,
         options: [{ maxLines: 3 }],
       },
       {
         name: "options that name no budget leave the default budget in place",
-        code: sourceOfLines(399),
+        code: sourceOf399Lines,
         options: [{}],
       },
       {
         name: "a raised budget lets through a file the default would report",
-        code: sourceOfLines(450),
+        code: sourceOf450Lines,
         options: [{ maxLines: 500 }],
       },
       {
@@ -45,7 +55,7 @@ describe("dont-review-it/forbid-oversized-file--split-by-responsibility", () => 
       },
       {
         name: "a trailing newline adds no code line",
-        code: `${sourceOfLines(3)}\n`,
+        code: `${sourceOfThreeLines}\n`,
         options: [{ maxLines: 3 }],
       },
       {
@@ -53,22 +63,45 @@ describe("dont-review-it/forbid-oversized-file--split-by-responsibility", () => 
         code: "// one\n// two\n// three\n// four",
         options: [{ maxLines: 1 }],
       },
+      {
+        name: "a spec file carries a budget of its own that the source budget would refuse",
+        filename: "owner.test.ts",
+        code: sourceOf1499Lines,
+      },
+      {
+        name: "a raised spec budget lets through a spec the spec default would report",
+        filename: "owner.test.ts",
+        code: sourceOf1501Lines,
+        options: [{ maxSpecLines: 1600 }],
+      },
+      {
+        name: "a spelling given for spec files decides which budget a file draws on",
+        filename: "owner.spec.ts",
+        code: sourceOf1499Lines,
+        options: [{ specFileSuffixes: [".spec.ts"] }],
+      },
     ],
     invalid: [
       {
         name: "a file one line past the default budget is reported",
-        code: sourceOfLines(401),
-        errors: [{ messageId: "oversizedFile", data: { codeLines: 401, maxLines: 400 } }],
+        code: sourceOf501Lines,
+        errors: [{ messageId: "oversizedFile", data: { codeLines: 501, maxLines: 500 } }],
       },
       {
         name: "an options object without the key falls back to the default budget",
-        code: sourceOfLines(401),
+        code: sourceOf501Lines,
         options: [{}],
-        errors: [{ messageId: "oversizedFile", data: { codeLines: 401, maxLines: 400 } }],
+        errors: [{ messageId: "oversizedFile", data: { codeLines: 501, maxLines: 500 } }],
+      },
+      {
+        name: "a spec file one line past the spec budget is reported",
+        filename: "owner.test.ts",
+        code: sourceOf1501Lines,
+        errors: [{ messageId: "oversizedFile", data: { codeLines: 1501, maxLines: 1500 } }],
       },
       {
         name: "a lowered budget reports the whole program rather than a line inside it",
-        code: sourceOfLines(4),
+        code: sourceOfFourLines,
         options: [{ maxLines: 3 }],
         errors: [
           {
@@ -83,7 +116,7 @@ describe("dont-review-it/forbid-oversized-file--split-by-responsibility", () => 
       },
       {
         name: "the file is reported once rather than once per line past the budget",
-        code: sourceOfLines(5),
+        code: sourceOfFiveLines,
         options: [{ maxLines: 1 }],
         errors: [{ messageId: "oversizedFile", data: { codeLines: 5, maxLines: 1 } }],
       },
@@ -102,11 +135,15 @@ describe("dont-review-it/forbid-oversized-file--split-by-responsibility", () => 
     ],
   });
 
-  test("the options schema declares the budget and refuses any other key", () => {
-    expect(forbidOversizedFile.meta.schema).toStrictEqual([
+  it("the options schema declares both budgets and the spec spelling, and refuses any other key", () => {
+    expect(optionsSchema).toStrictEqual([
       {
         type: "object",
-        properties: { maxLines: { type: "integer", minimum: 1 } },
+        properties: {
+          maxLines: { type: "integer", minimum: 1 },
+          maxSpecLines: { type: "integer", minimum: 1 },
+          specFileSuffixes: { type: "array", items: { type: "string" } },
+        },
         additionalProperties: false,
       },
     ]);

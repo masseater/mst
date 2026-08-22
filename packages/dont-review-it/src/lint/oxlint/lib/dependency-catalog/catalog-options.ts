@@ -29,17 +29,19 @@ type CatalogEntryOptions = {
   }[];
 };
 
-const optionsOf = (options: Context["options"]): CatalogEntryOptions =>
-  (options[0] ?? {}) as CatalogEntryOptions;
+const optionsOf = (ruleOptions: Context["options"]): CatalogEntryOptions =>
+  (ruleOptions[0] ?? {}) as CatalogEntryOptions;
 
-export const catalogFrom = (options: Context["options"]): ReadonlySet<string> =>
-  new Set(optionsOf(options).catalog);
+export const catalogFrom = (ruleOptions: Context["options"]): ReadonlySet<string> => {
+  const configuredCatalog = optionsOf(ruleOptions).catalog;
+  return configuredCatalog === undefined ? new Set() : new Set(configuredCatalog);
+};
 
 export const deviationsFrom = (
-  options: Context["options"],
+  ruleOptions: Context["options"],
 ): ReadonlyMap<string, ReadonlySet<string>> =>
   new Map(
-    (optionsOf(options).deviations ?? []).map((deviation) => [
+    (optionsOf(ruleOptions).deviations ?? []).map((deviation) => [
       deviation.workspace,
       new Set(deviation.packages),
     ]),

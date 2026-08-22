@@ -5,6 +5,6 @@ import { unified } from "unified";
 
 import type { Root } from "mdast";
 
-const processor = unified().use(remarkParse).use(remarkGfm).use(remarkFrontmatter, ["yaml"]);
+const processing = unified().use(remarkParse).use(remarkGfm).use(remarkFrontmatter, ["yaml"]);
 
-export const parseMarkdown = (source: string): Root => processor.parse(source);
+export const parseMarkdown = (source: string): Root => processing.parse(source);

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import {
   isImplementationSourceFile,
@@ -6,15 +6,37 @@ import {
 } from "./no-removal-verification-paths.ts";
 
 describe("no-removal-verification paths", () => {
-  it("does not classify deleted or changed specification tests as production sources", () => {
-    const specificationPaths = [
-      "packages/feature/specs/changed.spec.ts",
-      "packages/feature/specs/deleted.spec.ts",
-      "packages/feature/specs/verification.spec.ts",
-    ];
+  const it = test
+    .extend("verificationClassifications", () =>
+      [
+        "packages/feature/specs/changed.spec.ts",
+        "packages/feature/specs/deleted.spec.ts",
+        "packages/feature/specs/verification.spec.ts",
+      ].map(isVerificationTestFile))
+    .extend("implementationClassifications", () =>
+      [
+        "packages/feature/specs/changed.spec.ts",
+        "packages/feature/specs/deleted.spec.ts",
+        "packages/feature/specs/verification.spec.ts",
+      ].map(isImplementationSourceFile),
+    )
+    .extend("compoundSuffixClassification", () =>
+      isVerificationTestFile("packages/feature/specs/deleted.spec.test.ts"),
+    );
 
-    expect(specificationPaths.map(isVerificationTestFile)).toStrictEqual([true, true, true]);
-    expect(specificationPaths.map(isImplementationSourceFile)).toStrictEqual([false, false, false]);
-    expect(isVerificationTestFile("packages/feature/specs/deleted.spec.test.ts")).toBe(true);
+  it("classifies specification files as verification tests", ({ verificationClassifications }) => {
+    expect(verificationClassifications).toStrictEqual([true, true, true]);
+  });
+
+  it("excludes specification files from implementation sources", ({
+    implementationClassifications,
+  }) => {
+    expect(implementationClassifications).toStrictEqual([false, false, false]);
+  });
+
+  it("recognizes the test suffix after the specification suffix", ({
+    compoundSuffixClassification,
+  }) => {
+    expect(compoundSuffixClassification).toBe(true);
   });
 });

@@ -1,45 +1,40 @@
 import { standardIoTest } from "@mst/dont-review-it/vitest";
-import { describe, expect, onTestFinished, vi } from "vite-plus/test";
-
-import type { CliResult } from "@mst/repository-checks";
-
-const runAgenticDocumentsMock = vi.hoisted(() =>
-  vi.fn<(argv: readonly string[]) => Promise<CliResult>>(),
-);
-
-vi.mock(import("./run-cli.ts"), () => ({ runAgenticDocuments: runAgenticDocumentsMock }));
+import { describe, expect, vi } from "vite-plus/test";
 
 describe("cli entrypoint", () => {
-  const runEntry = async (answer: CliResult): Promise<void> => {
-    const previousExitCode = process.exitCode;
-    const expectedArguments = process.argv.slice(2);
-    vi.resetModules();
-    runAgenticDocumentsMock.mockResolvedValue(answer);
-    onTestFinished(() => {
-      runAgenticDocumentsMock.mockReset();
-      process.exitCode = previousExitCode;
+  const it = standardIoTest.extend("theUnknownCommandRun", { auto: true }, async () => {
+    vi.stubGlobal("process", {
+      ...process,
+      argv: [process.execPath, "cli.ts", "unknown"],
+      exitCode: undefined,
     });
-
+    vi.resetModules();
     await import("./cli.ts");
+  });
 
-    expect(runAgenticDocumentsMock).toHaveBeenCalledExactlyOnceWith(expectedArguments);
-    expect(process.exitCode).toBe(answer.exitCode);
-  };
+  it("writes no report for an unknown command", ({ stdout }) => {
+    expect(stdout).toMatchInlineSnapshot(`
+      {
+        "chunks": [],
+      }
+    `);
+  });
 
-  standardIoTest(
-    "it passes arguments through and publishes both output channels",
-    async ({ stdout, stderr }) => {
-      await runEntry({ exitCode: 7, out: "problems\n", error: "diagnostic\n" });
+  it("writes usage for an unknown command", ({ stderr }) => {
+    expect(stderr).toMatchInlineSnapshot(`
+      {
+        "chunks": [
+          "Usage: agentic-documents <command> [options]
 
-      expect(stdout.text).toMatchInlineSnapshot(`"problems\n"`);
-      expect(stderr.text).toMatchInlineSnapshot(`"diagnostic\n"`);
-    },
-  );
+      Commands:
+        check   Report every place where a document disagrees with the repository or breaks the normative notation.
 
-  standardIoTest("it writes neither channel for empty output", async ({ stdout, stderr }) => {
-    await runEntry({ exitCode: 0, out: "", error: "" });
-
-    expect(stdout.text).toMatchInlineSnapshot(`""`);
-    expect(stderr.text).toMatchInlineSnapshot(`""`);
+      Options:
+        --repository-root <path>  Root of the repository to scan. Defaults to the current working directory.
+        --write                   Rewrite generated regions instead of reporting them as stale.
+      ",
+        ],
+      }
+    `);
   });
 });

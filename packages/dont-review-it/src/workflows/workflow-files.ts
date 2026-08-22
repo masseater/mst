@@ -18,12 +18,14 @@ export const readWorkflowDocuments = ({
   const entryNames = readUnlessMissing(() => readdirSync(directory)) ?? [];
 
   return entryNames
-    .filter((name) => config.workflowFileExtensions.some((extension) => name.endsWith(extension)))
+    .filter((spelled) =>
+      config.workflowFileExtensions.some((extension) => spelled.endsWith(extension)),
+    )
     .toSorted()
-    .map((name) =>
+    .map((spelled) =>
       parseWorkflowDocument({
-        relativePath: `${config.workflowDirectory}/${name}`,
-        source: readFileSync(join(directory, name), "utf8"),
+        relativePath: `${config.workflowDirectory}/${spelled}`,
+        source: readFileSync(join(directory, spelled), "utf8"),
       }),
     );
 };

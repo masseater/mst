@@ -2,22 +2,32 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, onTestFinished, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { textOrNull } from "./read-text.ts";
 
 describe("textOrNull", () => {
-  test("a file that exists hands back its text", () => {
-    const root = mkdtempSync(join(tmpdir(), "read-text-"));
-    onTestFinished(() => {
-      rmSync(root, { recursive: true, force: true });
+  describe("a file that exists", () => {
+    const it = test.extend("presentFileText", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "read-text-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "present.txt"), "written", "utf8");
+      return textOrNull(join(root, "present.txt"));
     });
-    writeFileSync(join(root, "present.txt"), "written", "utf8");
 
-    expect(textOrNull(join(root, "present.txt"))).toBe("written");
+    it("hands back its text", ({ presentFileText }) => {
+      expect(presentFileText).toBe("written");
+    });
   });
 
-  test("a file that does not exist is an absence", () => {
-    expect(textOrNull(join(tmpdir(), "read-text-absent", "missing.txt"))).toBe(null);
+  describe("a file that does not exist", () => {
+    const it = test.extend("missingFileText", () =>
+      textOrNull(join(tmpdir(), "read-text-absent", "missing.txt")));
+
+    it("is an absence", ({ missingFileText }) => {
+      expect(missingFileText).toBe(null);
+    });
   });
 });

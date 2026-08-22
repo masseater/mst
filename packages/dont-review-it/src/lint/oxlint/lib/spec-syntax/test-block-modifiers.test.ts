@@ -9,166 +9,498 @@ import {
 
 import type { ESTree } from "@oxlint/plugins";
 
-const declaredBlockIn = (declarationSource: string): ESTree.Expression => {
-  const statement = parseSync("spec.ts", declarationSource).program.body[0] as ESTree.Statement;
-  const written = (statement as ESTree.ExpressionStatement).expression;
-  if (written.type === "TaggedTemplateExpression") return written.tag;
-  return (written as ESTree.CallExpression).callee;
-};
+describe("testBlockModifiersOf", () => {
+  describe("the names it reads off a declaration", () => {
+    describe("every modifier the runner chains onto a block", () => {
+      const it = test.extend("modifierNames", () =>
+        [
+          "concurrent",
+          "each",
+          "fails",
+          "for",
+          "only",
+          "runIf",
+          "sequential",
+          "shuffle",
+          "skip",
+          "skipIf",
+          "todo",
+        ].flatMap((chained) => {
+          const statement = parseSync("spec.ts", `it.${chained}("names a behaviour", () => {});`)
+            .program.body[0] as ESTree.ExpressionStatement;
+          const written = statement.expression as ESTree.CallExpression;
+          return testBlockModifiersOf(written.callee).map((modifier) => modifier.name);
+        }));
 
-const rootOf = (declarationSource: string): string | null =>
-  testBlockRootName(declaredBlockIn(declarationSource));
+      it("is named as a modifier", ({ modifierNames }) => {
+        expect(modifierNames).toStrictEqual([
+          "concurrent",
+          "each",
+          "fails",
+          "for",
+          "only",
+          "runIf",
+          "sequential",
+          "shuffle",
+          "skip",
+          "skipIf",
+          "todo",
+        ]);
+      });
+    });
 
-const modifierNamesIn = (declarationSource: string): readonly string[] =>
-  testBlockModifiersOf(declaredBlockIn(declarationSource)).map((modifier) => modifier.name);
+    describe("a bare block declaration", () => {
+      const it = test.extend("modifierNames", () => {
+        const statement = parseSync("spec.ts", 'it("names a behaviour", () => {});').program
+          .body[0] as ESTree.ExpressionStatement;
+        const written = statement.expression as ESTree.CallExpression;
+        return testBlockModifiersOf(written.callee).map((modifier) => modifier.name);
+      });
 
-const handedShapesIn = (declarationSource: string): readonly (readonly string[] | null)[] =>
-  testBlockModifiersOf(declaredBlockIn(declarationSource)).map(
-    (modifier) => modifier.handed?.map((held) => held.type) ?? null,
-  );
+      it("carries no modifier", ({ modifierNames }) => {
+        expect(modifierNames).toStrictEqual([]);
+      });
+    });
 
-describe("dont-review-it/spec-syntax/test-block-modifiers", () => {
-  test("every modifier the runner chains onto a block is named as a modifier", () => {
-    expect(
-      modifierNamesIn(
-        'it.concurrent.each.fails.for.only.runIf.sequential.shuffle.skip.skipIf.todo("names a behaviour", () => {});',
-      ),
-    ).toStrictEqual([
-      "todo",
-      "skipIf",
-      "skip",
-      "shuffle",
-      "sequential",
-      "runIf",
-      "only",
-      "for",
-      "fails",
-      "each",
-      "concurrent",
-    ]);
+    describe("a modifier in front of the block", () => {
+      const it = test.extend("modifierNames", () => {
+        const statement = parseSync("spec.ts", 'it.skip("names a behaviour", () => {});').program
+          .body[0] as ESTree.ExpressionStatement;
+        const written = statement.expression as ESTree.CallExpression;
+        return testBlockModifiersOf(written.callee).map((modifier) => modifier.name);
+      });
+
+      it("is read under the name it is spelled with", ({ modifierNames }) => {
+        expect(modifierNames).toStrictEqual(["skip"]);
+      });
+    });
+
+    describe("modifiers stacked on top of each other", () => {
+      const it = test.extend("modifierNames", () => {
+        const statement = parseSync(
+          "spec.ts",
+          'it.skip.each(rows)("names a behaviour", (row) => {});',
+        ).program.body[0] as ESTree.ExpressionStatement;
+        const written = statement.expression as ESTree.CallExpression;
+        return testBlockModifiersOf(written.callee).map((modifier) => modifier.name);
+      });
+
+      it("are read from the outermost inwards", ({ modifierNames }) => {
+        expect(modifierNames).toStrictEqual(["each", "skip"]);
+      });
+    });
+
+    describe("a modifier written as a string subscript", () => {
+      const it = test.extend("modifierNames", () => {
+        const statement = parseSync("spec.ts", 'it["skip"]("names a behaviour", () => {});').program
+          .body[0] as ESTree.ExpressionStatement;
+        const written = statement.expression as ESTree.CallExpression;
+        return testBlockModifiersOf(written.callee).map((modifier) => modifier.name);
+      });
+
+      it("is read the same way", ({ modifierNames }) => {
+        expect(modifierNames).toStrictEqual(["skip"]);
+      });
+    });
+
+    describe("a modifier chosen at run time", () => {
+      const it = test.extend("modifierNames", () => {
+        const statement = parseSync("spec.ts", 'it[chosen]("names a behaviour", () => {});').program
+          .body[0] as ESTree.ExpressionStatement;
+        const written = statement.expression as ESTree.CallExpression;
+        return testBlockModifiersOf(written.callee).map((modifier) => modifier.name);
+      });
+
+      it("is read as no modifier at all", ({ modifierNames }) => {
+        expect(modifierNames).toStrictEqual([]);
+      });
+    });
+
+    describe("the fixture builder spelling", () => {
+      const it = test.extend("modifierNames", () => {
+        const statement = parseSync("spec.ts", 'it.extend("names a behaviour", () => {});').program
+          .body[0] as ESTree.ExpressionStatement;
+        const written = statement.expression as ESTree.CallExpression;
+        return testBlockModifiersOf(written.callee).map((modifier) => modifier.name);
+      });
+
+      it("is not a modifier", ({ modifierNames }) => {
+        expect(modifierNames).toStrictEqual([]);
+      });
+    });
+
+    describe("the fixture override spelling", () => {
+      const it = test.extend("modifierNames", () => {
+        const statement = parseSync("spec.ts", 'it.override("names a behaviour", () => {});')
+          .program.body[0] as ESTree.ExpressionStatement;
+        const written = statement.expression as ESTree.CallExpression;
+        return testBlockModifiersOf(written.callee).map((modifier) => modifier.name);
+      });
+
+      it("is not a modifier", ({ modifierNames }) => {
+        expect(modifierNames).toStrictEqual([]);
+      });
+    });
+
+    describe("the fixture scoping spelling", () => {
+      const it = test.extend("modifierNames", () => {
+        const statement = parseSync("spec.ts", 'it.scoped("names a behaviour", () => {});').program
+          .body[0] as ESTree.ExpressionStatement;
+        const written = statement.expression as ESTree.CallExpression;
+        return testBlockModifiersOf(written.callee).map((modifier) => modifier.name);
+      });
+
+      it("is not a modifier", ({ modifierNames }) => {
+        expect(modifierNames).toStrictEqual([]);
+      });
+    });
+
+    describe("a name the runner does not chain onto a block", () => {
+      const it = test.extend("modifierNames", () => {
+        const statement = parseSync(
+          "spec.ts",
+          'test.extend({ subject: 1 })("names a behaviour", () => {});',
+        ).program.body[0] as ESTree.ExpressionStatement;
+        const written = statement.expression as ESTree.CallExpression;
+        return testBlockModifiersOf(written.callee).map((modifier) => modifier.name);
+      });
+
+      it("stops the reading", ({ modifierNames }) => {
+        expect(modifierNames).toStrictEqual([]);
+      });
+    });
   });
 
-  test("a name the runner does not chain onto a block is not a modifier", () => {
-    expect(rootOf('it.extend("names a behaviour", () => {});')).toBe(null);
-    expect(rootOf('it.override("names a behaviour", () => {});')).toBe(null);
-    expect(rootOf('it.scoped("names a behaviour", () => {});')).toBe(null);
+  describe("what each modifier is handed", () => {
+    describe("a modifier handed a named table", () => {
+      const it = test.extend("handedShapes", () => {
+        const statement = parseSync("spec.ts", 'it.each(rows)("names a behaviour", (row) => {});')
+          .program.body[0] as ESTree.ExpressionStatement;
+        const written = statement.expression as ESTree.CallExpression;
+        return testBlockModifiersOf(written.callee).map(
+          (modifier) => modifier.handed?.map((held) => held.type) ?? null,
+        );
+      });
+
+      it("hands the table over with it", ({ handedShapes }) => {
+        expect(handedShapes).toStrictEqual([["Identifier"]]);
+      });
+    });
+
+    describe("a modifier handed a written table", () => {
+      const it = test.extend("handedShapes", () => {
+        const statement = parseSync("spec.ts", 'it.each([1, 2])("names a behaviour", (row) => {});')
+          .program.body[0] as ESTree.ExpressionStatement;
+        const written = statement.expression as ESTree.CallExpression;
+        return testBlockModifiersOf(written.callee).map(
+          (modifier) => modifier.handed?.map((held) => held.type) ?? null,
+        );
+      });
+
+      it("hands that table over with it", ({ handedShapes }) => {
+        expect(handedShapes).toStrictEqual([["ArrayExpression"]]);
+      });
+    });
+
+    describe("a modifier written without an argument list", () => {
+      const it = test.extend("handedShapes", () => {
+        const statement = parseSync("spec.ts", 'it.skip("names a behaviour", () => {});').program
+          .body[0] as ESTree.ExpressionStatement;
+        const written = statement.expression as ESTree.CallExpression;
+        return testBlockModifiersOf(written.callee).map(
+          (modifier) => modifier.handed?.map((held) => held.type) ?? null,
+        );
+      });
+
+      it("hands nothing over", ({ handedShapes }) => {
+        expect(handedShapes).toStrictEqual([null]);
+      });
+    });
+
+    describe("a table spread into the modifier", () => {
+      const it = test.extend("handedShapes", () => {
+        const statement = parseSync(
+          "spec.ts",
+          'it.each(...tables)("names a behaviour", (row) => {});',
+        ).program.body[0] as ESTree.ExpressionStatement;
+        const written = statement.expression as ESTree.CallExpression;
+        return testBlockModifiersOf(written.callee).map(
+          (modifier) => modifier.handed?.map((held) => held.type) ?? null,
+        );
+      });
+
+      it("leaves nothing to read", ({ handedShapes }) => {
+        expect(handedShapes).toStrictEqual([null]);
+      });
+    });
+
+    describe("a table written as a tagged template", () => {
+      const it = test.extend("handedShapes", () => {
+        const statement = parseSync("spec.ts", 'it.each`a | b`("names a behaviour", () => {});')
+          .program.body[0] as ESTree.ExpressionStatement;
+        const written = statement.expression as ESTree.CallExpression;
+        return testBlockModifiersOf(written.callee).map(
+          (modifier) => modifier.handed?.map((held) => held.type) ?? null,
+        );
+      });
+
+      it("leaves nothing to read", ({ handedShapes }) => {
+        expect(handedShapes).toStrictEqual([null]);
+      });
+    });
+
+    describe("the arguments of the block itself", () => {
+      const it = test.extend("handedShapes", () => {
+        const statement = parseSync("spec.ts", 'it.concurrent("names a behaviour", () => {});')
+          .program.body[0] as ESTree.ExpressionStatement;
+        const written = statement.expression as ESTree.CallExpression;
+        return testBlockModifiersOf(written.callee).map(
+          (modifier) => modifier.handed?.map((held) => held.type) ?? null,
+        );
+      });
+
+      it("belong to no modifier", ({ handedShapes }) => {
+        expect(handedShapes).toStrictEqual([null]);
+      });
+    });
+  });
+});
+
+describe("testBlockRootName", () => {
+  describe("a bare block declaration", () => {
+    const it = test.extend("rootName", () => {
+      const statement = parseSync("spec.ts", 'it("names a behaviour", () => {});').program
+        .body[0] as ESTree.ExpressionStatement;
+      const written = statement.expression as ESTree.CallExpression;
+      return testBlockRootName(written.callee);
+    });
+
+    it("is rooted at the identifier it is written with", ({ rootName }) => {
+      expect(rootName).toBe("it");
+    });
   });
 
-  test("a bare block declaration is rooted at the identifier it is written with", () => {
-    expect(rootOf('it("names a behaviour", () => {});')).toBe("it");
-    expect(rootOf('test("names a behaviour", () => {});')).toBe("test");
+  describe("a bare block declaration written with the other spelling", () => {
+    const it = test.extend("rootName", () => {
+      const statement = parseSync("spec.ts", 'test("names a behaviour", () => {});').program
+        .body[0] as ESTree.ExpressionStatement;
+      const written = statement.expression as ESTree.CallExpression;
+      return testBlockRootName(written.callee);
+    });
+
+    it("is rooted at that spelling", ({ rootName }) => {
+      expect(rootName).toBe("test");
+    });
   });
 
-  test("a modifier in front of the block leaves the root where it was", () => {
-    expect(rootOf('it.skip("names a behaviour", () => {});')).toBe("it");
-    expect(rootOf('describe.concurrent("names a group", () => {});')).toBe("describe");
+  describe("a modifier in front of the block", () => {
+    const it = test.extend("rootName", () => {
+      const statement = parseSync("spec.ts", 'it.skip("names a behaviour", () => {});').program
+        .body[0] as ESTree.ExpressionStatement;
+      const written = statement.expression as ESTree.CallExpression;
+      return testBlockRootName(written.callee);
+    });
+
+    it("leaves the root where it was", ({ rootName }) => {
+      expect(rootName).toBe("it");
+    });
   });
 
-  test("modifiers stacked on top of each other still reach the same root", () => {
-    expect(rootOf('it.skipIf(slow).concurrent("names a behaviour", () => {});')).toBe("it");
+  describe("a modifier in front of a grouping block", () => {
+    const it = test.extend("rootName", () => {
+      const statement = parseSync("spec.ts", 'describe.concurrent("names a group", () => {});')
+        .program.body[0] as ESTree.ExpressionStatement;
+      const written = statement.expression as ESTree.CallExpression;
+      return testBlockRootName(written.callee);
+    });
+
+    it("leaves that root where it was", ({ rootName }) => {
+      expect(rootName).toBe("describe");
+    });
   });
 
-  test("a modifier written as a string subscript reaches the same root", () => {
-    expect(rootOf('it["skip"]("names a behaviour", () => {});')).toBe("it");
+  describe("modifiers stacked on top of each other", () => {
+    const it = test.extend("rootName", () => {
+      const statement = parseSync(
+        "spec.ts",
+        'it.skipIf(slow).concurrent("names a behaviour", () => {});',
+      ).program.body[0] as ESTree.ExpressionStatement;
+      const written = statement.expression as ESTree.CallExpression;
+      return testBlockRootName(written.callee);
+    });
+
+    it("still reach the same root", ({ rootName }) => {
+      expect(rootName).toBe("it");
+    });
   });
 
-  test("a modifier chosen at run time hides the root from this reading", () => {
-    expect(rootOf('it[chosen]("names a behaviour", () => {});')).toBe(null);
+  describe("a modifier written as a string subscript", () => {
+    const it = test.extend("rootName", () => {
+      const statement = parseSync("spec.ts", 'it["skip"]("names a behaviour", () => {});').program
+        .body[0] as ESTree.ExpressionStatement;
+      const written = statement.expression as ESTree.CallExpression;
+      return testBlockRootName(written.callee);
+    });
+
+    it("reaches the same root", ({ rootName }) => {
+      expect(rootName).toBe("it");
+    });
   });
 
-  test("a table-driven block reaches its root through the call the table returns", () => {
-    expect(rootOf('it.each(rows)("names a behaviour", (row) => {});')).toBe("it");
+  describe("a modifier chosen at run time", () => {
+    const it = test.extend("rootName", () => {
+      const statement = parseSync("spec.ts", 'it[chosen]("names a behaviour", () => {});').program
+        .body[0] as ESTree.ExpressionStatement;
+      const written = statement.expression as ESTree.CallExpression;
+      return testBlockRootName(written.callee);
+    });
+
+    it("hides the root from this reading", ({ rootName }) => {
+      expect(rootName).toBe(null);
+    });
   });
 
-  test("a table written as a tagged template reaches the same root", () => {
-    expect(rootOf("it.each`a | b`;")).toBe("it");
+  describe("a table-driven block", () => {
+    const it = test.extend("rootName", () => {
+      const statement = parseSync("spec.ts", 'it.each(rows)("names a behaviour", (row) => {});')
+        .program.body[0] as ESTree.ExpressionStatement;
+      const written = statement.expression as ESTree.CallExpression;
+      return testBlockRootName(written.callee);
+    });
+
+    it("reaches its root through the call the table returns", ({ rootName }) => {
+      expect(rootName).toBe("it");
+    });
   });
 
-  test("a block called through the function a tagged table returns reaches the same root", () => {
-    expect(rootOf('it.each`a | b`("names a behaviour", () => {});')).toBe("it");
+  describe("a table written as a tagged template", () => {
+    const it = test.extend("rootName", () => {
+      const statement = parseSync("spec.ts", "it.each`a | b`;").program
+        .body[0] as ESTree.ExpressionStatement;
+      const written = statement.expression as ESTree.TaggedTemplateExpression;
+      return testBlockRootName(written.tag);
+    });
+
+    it("reaches the same root", ({ rootName }) => {
+      expect(rootName).toBe("it");
+    });
   });
 
-  test("a callee that is neither a name, a call nor a member reaches no root", () => {
-    expect(rootOf('this("names a behaviour");')).toBe(null);
+  describe("a block called through the function a tagged table returns", () => {
+    const it = test.extend("rootName", () => {
+      const statement = parseSync("spec.ts", 'it.each`a | b`("names a behaviour", () => {});')
+        .program.body[0] as ESTree.ExpressionStatement;
+      const written = statement.expression as ESTree.CallExpression;
+      return testBlockRootName(written.callee);
+    });
+
+    it("reaches the same root", ({ rootName }) => {
+      expect(rootName).toBe("it");
+    });
   });
 
-  test("a fixture factory is not a modified block, so its root is out of reach", () => {
-    expect(rootOf("test.extend({ subject: 1 });")).toBe(null);
-    expect(rootOf("it.extend({ subject: 1 });")).toBe(null);
+  describe("a callee that is neither a name, a call nor a member", () => {
+    const it = test.extend("rootName", () => {
+      const statement = parseSync("spec.ts", 'this("names a behaviour");').program
+        .body[0] as ESTree.ExpressionStatement;
+      const written = statement.expression as ESTree.CallExpression;
+      return testBlockRootName(written.callee);
+    });
+
+    it("reaches no root", ({ rootName }) => {
+      expect(rootName).toBe(null);
+    });
   });
 
-  test("a block derived from a fixture factory is rooted at nothing this reading can name", () => {
-    expect(rootOf('test.extend({ subject: 1 })("names a behaviour", () => {});')).toBe(null);
+  describe("a fixture factory built on the other spelling", () => {
+    const it = test.extend("rootName", () => {
+      const statement = parseSync("spec.ts", "test.extend({ subject: 1 });").program
+        .body[0] as ESTree.ExpressionStatement;
+      const written = statement.expression as ESTree.CallExpression;
+      return testBlockRootName(written.callee);
+    });
+
+    it("is not a modified block", ({ rootName }) => {
+      expect(rootName).toBe(null);
+    });
   });
 
-  test("a member call on a receiver is not a modified block", () => {
-    expect(rootOf('suite.it("names a behaviour", () => {});')).toBe(null);
+  describe("a fixture factory built on the block spelling", () => {
+    const it = test.extend("rootName", () => {
+      const statement = parseSync("spec.ts", "it.extend({ subject: 1 });").program
+        .body[0] as ESTree.ExpressionStatement;
+      const written = statement.expression as ESTree.CallExpression;
+      return testBlockRootName(written.callee);
+    });
+
+    it("is not a modified block either", ({ rootName }) => {
+      expect(rootName).toBe(null);
+    });
   });
 
-  test("the root is handed back as the identifier the declaration is written with", () => {
-    const root = testBlockRootIdentifier(
-      declaredBlockIn('it.skip("names a behaviour", () => {});'),
-    );
-    expect(root?.type).toBe("Identifier");
+  describe("a block derived from a fixture factory", () => {
+    const it = test.extend("rootName", () => {
+      const statement = parseSync(
+        "spec.ts",
+        'test.extend({ subject: 1 })("names a behaviour", () => {});',
+      ).program.body[0] as ESTree.ExpressionStatement;
+      const written = statement.expression as ESTree.CallExpression;
+      return testBlockRootName(written.callee);
+    });
+
+    it("is rooted at nothing this reading can name", ({ rootName }) => {
+      expect(rootName).toBe(null);
+    });
   });
 
-  test("a declaration with no reachable root hands back nothing to rename", () => {
-    expect(testBlockRootIdentifier(declaredBlockIn("test.extend({ subject: 1 });"))).toBe(null);
+  describe("a member call on a receiver", () => {
+    const it = test.extend("rootName", () => {
+      const statement = parseSync("spec.ts", 'suite.it("names a behaviour", () => {});').program
+        .body[0] as ESTree.ExpressionStatement;
+      const written = statement.expression as ESTree.CallExpression;
+      return testBlockRootName(written.callee);
+    });
+
+    it("is not a modified block", ({ rootName }) => {
+      expect(rootName).toBe(null);
+    });
+  });
+});
+
+describe("testBlockRootIdentifier", () => {
+  describe("a modifier in front of the block", () => {
+    const it = test.extend("rootIdentifier", () => {
+      const statement = parseSync("spec.ts", 'it.skip("names a behaviour", () => {});').program
+        .body[0] as ESTree.ExpressionStatement;
+      const written = statement.expression as ESTree.CallExpression;
+      return testBlockRootIdentifier(written.callee);
+    });
+
+    it("hands the root back as the identifier the declaration is written with", ({
+      rootIdentifier,
+    }) => {
+      expect(rootIdentifier).toStrictEqual({
+        type: "Identifier",
+        start: 0,
+        end: 2,
+        decorators: [],
+        name: "it",
+        optional: false,
+        typeAnnotation: null,
+      });
+    });
   });
 
-  test("a bare block declaration carries no modifier", () => {
-    expect(modifierNamesIn('it("names a behaviour", () => {});')).toStrictEqual([]);
-  });
+  describe("a declaration with no reachable root", () => {
+    const it = test.extend("rootIdentifier", () => {
+      const statement = parseSync("spec.ts", "test.extend({ subject: 1 });").program
+        .body[0] as ESTree.ExpressionStatement;
+      const written = statement.expression as ESTree.CallExpression;
+      return testBlockRootIdentifier(written.callee);
+    });
 
-  test("a modifier in front of the block is read under the name it is spelled with", () => {
-    expect(modifierNamesIn('it.skip("names a behaviour", () => {});')).toStrictEqual(["skip"]);
-  });
-
-  test("modifiers stacked on top of each other are read from the outermost inwards", () => {
-    expect(modifierNamesIn('it.skip.each(rows)("names a behaviour", (row) => {});')).toStrictEqual([
-      "each",
-      "skip",
-    ]);
-  });
-
-  test("a modifier written as a string subscript is read the same way", () => {
-    expect(modifierNamesIn('it["skip"]("names a behaviour", () => {});')).toStrictEqual(["skip"]);
-  });
-
-  test("a modifier chosen at run time is read as no modifier at all", () => {
-    expect(modifierNamesIn('it[chosen]("names a behaviour", () => {});')).toStrictEqual([]);
-  });
-
-  test("a name the runner does not chain onto a block stops the reading", () => {
-    expect(
-      modifierNamesIn('test.extend({ subject: 1 })("names a behaviour", () => {});'),
-    ).toStrictEqual([]);
-  });
-
-  test("a modifier handed a table hands the table over with it", () => {
-    expect(handedShapesIn('it.each(rows)("names a behaviour", (row) => {});')).toStrictEqual([
-      ["Identifier"],
-    ]);
-    expect(handedShapesIn('it.each([1, 2])("names a behaviour", (row) => {});')).toStrictEqual([
-      ["ArrayExpression"],
-    ]);
-  });
-
-  test("a modifier written without an argument list hands nothing over", () => {
-    expect(handedShapesIn('it.skip("names a behaviour", () => {});')).toStrictEqual([null]);
-  });
-
-  test("a table spread into the modifier leaves nothing to read", () => {
-    expect(handedShapesIn('it.each(...tables)("names a behaviour", (row) => {});')).toStrictEqual([
-      null,
-    ]);
-  });
-
-  test("a table written as a tagged template leaves nothing to read", () => {
-    expect(handedShapesIn('it.each`a | b`("names a behaviour", () => {});')).toStrictEqual([null]);
-  });
-
-  test("the arguments of the block itself belong to no modifier", () => {
-    expect(handedShapesIn('it.concurrent("names a behaviour", () => {});')).toStrictEqual([null]);
+    it("hands back nothing to rename", ({ rootIdentifier }) => {
+      expect(rootIdentifier).toBe(null);
+    });
   });
 });

@@ -1,30 +1,16 @@
+/** @canonical-values ai-native.interrupt-signal */
 const INTERRUPT_SIGNALS = ["SIGINT", "SIGTERM"] as const;
 
 export const raiseSignal = (signal: NodeJS.Signals): void => {
   process.kill(process.pid, signal);
 };
 
-export const safeKill = (pid: number, signal: NodeJS.Signals): boolean => {
-  try {
-    process.kill(pid, signal);
-    return true;
-  } catch (signalDeliveryFailure) {
-    return false;
-  }
+export const installInterruptHandler = (takenHandler: (signal: NodeJS.Signals) => void): void => {
+  for (const signal of INTERRUPT_SIGNALS) process.once(signal, takenHandler);
 };
 
-export const installInterruptHandler = (handler: (signal: NodeJS.Signals) => void): void => {
-  for (const signal of INTERRUPT_SIGNALS) process.once(signal, handler);
-};
-
-export const installPersistentInterruptHandler = (
-  handler: (signal: NodeJS.Signals) => void,
-): void => {
-  for (const signal of INTERRUPT_SIGNALS) process.on(signal, handler);
-};
-
-export const dropInterruptHandler = (handler: (signal: NodeJS.Signals) => void): void => {
-  for (const signal of INTERRUPT_SIGNALS) process.removeListener(signal, handler);
+export const dropInterruptHandler = (takenHandler: (signal: NodeJS.Signals) => void): void => {
+  for (const signal of INTERRUPT_SIGNALS) process.removeListener(signal, takenHandler);
 };
 
 export const makeWaitingInterruptHandler = (dependencies: {
@@ -41,34 +27,49 @@ export const makeWaitingInterruptHandler = (dependencies: {
 type HeldDependencies = {
   release: () => Promise<void>;
   raise: (signal: NodeJS.Signals) => void;
+  onUnreleased: (failure: Error) => void;
 };
 
-const releaseThenRaise = async (
+const raiseAfterRelease = async (
   dependencies: HeldDependencies,
-  signal: NodeJS.Signals,
+  arrival: Promise<NodeJS.Signals | null>,
 ): Promise<void> => {
+  const signal = await arrival;
+  if (signal === null) return;
   try {
     await dependencies.release();
-  } catch (releaseFailure) {
-    dependencies.raise(signal);
-    return;
+  } catch (staleLease) {
+    dependencies.onUnreleased(
+      new Error(`releasing the slot before re-raising ${signal} failed`, { cause: staleLease }),
+    );
   }
   dependencies.raise(signal);
 };
 
-export const makeHeldInterruptHandler = (
+export const makeHeldInterrupt = (
   dependencies: HeldDependencies,
-): ((signal: NodeJS.Signals) => void) => {
-  return (signal) => {
-    void releaseThenRaise(dependencies, signal);
+): {
+  readonly handler: (signal: NodeJS.Signals) => void;
+  readonly standDown: () => void;
+  readonly settled: Promise<void>;
+} => {
+  const arrival = Promise.withResolvers<NodeJS.Signals | null>();
+  return {
+    handler: arrival.resolve,
+    standDown: (): void => {
+      arrival.resolve(null);
+    },
+    settled: raiseAfterRelease(dependencies, arrival.promise),
   };
 };
 
 export const makeRunningInterruptHandler = (dependencies: {
   childPid: number;
-  kill: (pid: number, signal: NodeJS.Signals) => boolean;
+  signalTree: (input: { pid: number; signal: NodeJS.Signals }) => Error | null;
+  reportFailure: (failure: Error) => void;
 }): ((signal: NodeJS.Signals) => void) => {
   return (signal) => {
-    dependencies.kill(-dependencies.childPid, signal);
+    const failure = dependencies.signalTree({ pid: dependencies.childPid, signal });
+    if (failure !== null) dependencies.reportFailure(failure);
   };
 };

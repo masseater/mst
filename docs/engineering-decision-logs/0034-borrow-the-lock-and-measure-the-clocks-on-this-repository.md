@@ -7,7 +7,7 @@
 
 `@mst/ai-native` の `throttle` は、同一ホスト × 同一名前空間でラッパーの同時実行数を上限以下に保つ。この保証は、保持者が正常終了した場合だけでなく、強制終了した場合にも次の競合者が安全に取得できて初めて成立する。
 
-ディレクトリの存在と mtime で lease を表す `proper-lockfile` 4.1.2 は、失効を判定した競合者が古いディレクトリを削除するまでの間に別の競合者が新しいロックを取得すると、その新しいディレクトリを削除して同時保持を許す競合を持つ。上流 [moxystudio/node-proper-lockfile#121](https://github.com/moxystudio/node-proper-lockfile/issues/121) は 2026-08-12 時点で未解決であり、失効回収を通常経路に含めたまま採用できない。
+ディレクトリの存在と mtime で lease を表す `proper-lockfile` 4.1.2 は、失効を判定した競合者が古いディレクトリを削除するまでの間に別の競合者が新しいロックを取得すると、その新しいディレクトリを削除して同時保持を許す競合を持つ。上流 [moxystudio/node-proper-lockfile#121](https://github.com/moxystudio/node-proper-lockfile/issues/121) は 2026-08-14 時点で未解決であり、失効回収を通常経路に含めたまま採用できない。
 
 一方で、待機予算・打ち切り時間・同時保持数といった時間量と定員は、このマシンでこの作業がどれだけかかるかに張り付いており、ライブラリからも一般論からも導けない。
 
@@ -28,6 +28,8 @@
 - 打ち切りの既定は 0（打ち切らない）。値を課すのは結線側で、`guard` には全検査を有界にする 1800 秒を指定する。
 - 強制終了までの猶予 5 秒。後始末を持つツールチェーンの退出には足り、利用者が設定した打ち切りを実質的に延ばさない。
 
+`--timeout` と実行中の割り込みは process tree 全体を対象にする。POSIX は `detached` child を process group leader として起動し、負の PID へ SIGTERM、5秒後に SIGKILL を送る。Windows は負の PID による process group signal を提供せず、Node core の cross-platform `killTree` も [nodejs/node#64406](https://github.com/nodejs/node/issues/64406) で未実装なので、OS 標準の `taskkill /PID <pid> /T /F` を使う。Windows の signal は元から穏当な終了要求にならないため、猶予を置かず tree 全体を即時強制終了する。tree 終了に失敗した場合は root process の終了も試し、tree 全体を終了できなかった事実を stderr に残す。
+
 環境からの上書きは同時保持数のみ `MST_THROTTLE_LIMIT` で受ける。リポジトリの環境変数の語彙は有効化を表す 1 語だけという方針（[EDR 0021](0021-measure-our-own-lint-rules-and-let-the-user-choose-the-sink.md)）に、ホスト側の事情で変わる値の口を 1 つ加えた形である。無効値は既定へフォールバックし、書き間違いを「重いコマンドが一切動かない」に変換しない。
 
 ## 影響
@@ -38,3 +40,4 @@
 - native addon の配布対象である Node 26 の macOS・Linux・Windowsと、それぞれの x64・arm64を支持範囲とする。musl、Alpine、ネットワークファイルシステムは支持範囲に含めない。
 - `proper-lockfile` 4.1.2 の継続、同 Issue を rename で回避する fork、Node 26 の prebuild を持たない `fs-ext-extra-prebuilt` は採用しない。
 - `release` は同じ Promise を返す冪等操作とし、`unlock` と `close` をそれぞれ一度だけ試す。どちらかが失敗すれば wrapper も失敗し、両方が失敗した場合は双方を一つの `AggregateError` に保持する。`close` に失敗した descriptor は process 終了までロックを保持し得る。
+- 明示的な`release`に失敗した実行は、子commandが成功していてもstderrへwrapper自身の失敗を出し、終了code 1を返す。子commandも失敗した場合は双方の理由をstderrへ出す。

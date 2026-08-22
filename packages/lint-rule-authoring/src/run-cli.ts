@@ -33,17 +33,17 @@ const scannableDirectory = (candidatePath: string): boolean =>
   readUnlessMissing(() => statSync(candidatePath))?.isDirectory() === true;
 
 const dispatch = (argv: readonly string[]): CliResult => {
-  const parsed = parseArgs({
+  const parsedNode = parseArgs({
     args: [...argv],
     allowPositionals: true,
     options: { "repository-root": { type: "string" }, write: { type: "boolean" } },
   });
-  const [command] = parsed.positionals;
+  const [command] = parsedNode.positionals;
   if (command !== "check") {
     return { exitCode: EXIT_MISUSE, out: "", error: USAGE };
   }
 
-  const repositoryRoot = resolve(parsed.values["repository-root"] ?? process.cwd());
+  const repositoryRoot = resolve(parsedNode.values["repository-root"] ?? process.cwd());
   if (!scannableDirectory(repositoryRoot)) {
     return {
       exitCode: EXIT_MISUSE,
@@ -54,7 +54,7 @@ const dispatch = (argv: readonly string[]): CliResult => {
 
   const { problems } = lintRuleIndexProblems({
     repositoryRoot,
-    write: parsed.values.write ?? false,
+    write: parsedNode.values.write ?? false,
   });
   return {
     exitCode: problems.length === 0 ? EXIT_SUCCESS : EXIT_PROBLEMS_FOUND,
@@ -64,8 +64,8 @@ const dispatch = (argv: readonly string[]): CliResult => {
 };
 
 export const runLintRuleAuthoring = (argv: readonly string[]): CliResult => {
-  const [failure, outcome] = attempt<CliResult, Error>(() => dispatch(argv));
+  const [failure, ranCheck] = attempt<CliResult, Error>(() => dispatch(argv));
   return failure === null
-    ? outcome
+    ? ranCheck
     : { exitCode: EXIT_MISUSE, out: "", error: `${failure.message}\n` };
 };

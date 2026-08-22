@@ -1,93 +1,115 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { defaultDependencyCatalogChecksConfig } from "../config.ts";
 import { sharedDependencyFindings } from "./uncataloged-shared-dependency.ts";
 
-import type { DependencyUsage } from "../dependency-usage.ts";
-
-const config = defaultDependencyCatalogChecksConfig;
-
-const DEFINITION_PATH = "pnpm-workspace.yaml";
-
-const findingsFor = ({
-  usages,
-  catalogedNames = [],
-}: {
-  readonly usages: readonly DependencyUsage[];
-  readonly catalogedNames?: readonly string[];
-}) => sharedDependencyFindings({ usages, catalogedNames, definitionPath: DEFINITION_PATH, config });
-
 describe("sharedDependencyFindings", () => {
-  it("reports a version that two manifests pin outside the catalog", () => {
-    const { problems } = findingsFor({
-      usages: [
-        {
-          dependencyName: "typescript",
-          catalogReferences: [],
-          directReferences: [
-            { manifestPath: "apps/web/package.json", specifier: "^5.0.0" },
-            { manifestPath: "packages/repository-checks/package.json", specifier: "^5.0.0" },
-          ],
-        },
-      ],
-    });
+  describe("a dependency two manifests pin to the same version outside the catalog", () => {
+    const it = test.extend("findings", () =>
+      sharedDependencyFindings({
+        usages: [
+          {
+            dependencyName: "typescript",
+            catalogReferences: [],
+            directReferences: [
+              { manifestPath: "apps/web/package.json", specifier: "^5.0.0" },
+              { manifestPath: "packages/repository-checks/package.json", specifier: "^5.0.0" },
+            ],
+          },
+        ],
+        catalogedNames: [],
+        definitionPath: "pnpm-workspace.yaml",
+        config: defaultDependencyCatalogChecksConfig,
+      }));
 
-    expect(problems.length).toBe(1);
-    expect(problems[0]?.file).toBe(DEFINITION_PATH);
-    expect(problems[0]?.message).toContain("apps/web/package.json");
-    expect(problems[0]?.message).toContain("packages/repository-checks/package.json");
-    expect(problems[0]?.message).toContain("^5.0.0");
+    it("reports the repeated pin against the workspace definition and names both manifests", ({
+      findings,
+    }) => {
+      expect(findings).toStrictEqual({
+        problems: [
+          {
+            file: "pnpm-workspace.yaml",
+            line: null,
+            message:
+              "typescript must not be pinned to ^5.0.0 separately by apps/web/package.json and packages/repository-checks/package.json, because pins that repeat drift apart silently. Add typescript to the catalog and reference it with catalog: from each manifest.",
+          },
+        ],
+      });
+    });
   });
 
-  it("reports when the pinned versions disagree", () => {
-    const { problems } = findingsFor({
-      usages: [
-        {
-          dependencyName: "typescript",
-          catalogReferences: [],
-          directReferences: [
-            { manifestPath: "apps/web/package.json", specifier: "^5.0.0" },
-            { manifestPath: "packages/repository-checks/package.json", specifier: "^5.5.0" },
-          ],
-        },
-      ],
-    });
+  describe("a dependency two manifests pin to different versions", () => {
+    const it = test.extend("findings", () =>
+      sharedDependencyFindings({
+        usages: [
+          {
+            dependencyName: "typescript",
+            catalogReferences: [],
+            directReferences: [
+              { manifestPath: "apps/web/package.json", specifier: "^5.0.0" },
+              { manifestPath: "packages/repository-checks/package.json", specifier: "^5.5.0" },
+            ],
+          },
+        ],
+        catalogedNames: [],
+        definitionPath: "pnpm-workspace.yaml",
+        config: defaultDependencyCatalogChecksConfig,
+      }));
 
-    expect(problems.length).toBe(1);
-    expect(problems[0]?.message).toContain("apps/web/package.json pins ^5.0.0");
-    expect(problems[0]?.message).toContain("packages/repository-checks/package.json pins ^5.5.0");
-    expect(problems[0]?.message).toContain("Choose the intended version");
+    it("reports the pin each manifest carries without choosing a version", ({ findings }) => {
+      expect(findings).toStrictEqual({
+        problems: [
+          {
+            file: "pnpm-workspace.yaml",
+            line: null,
+            message:
+              "typescript is pinned to different specifiers: apps/web/package.json pins ^5.0.0, packages/repository-checks/package.json pins ^5.5.0. Choose the intended version, add it to the catalog, and reference it with catalog: from every listed manifest.",
+          },
+        ],
+      });
+    });
   });
 
-  it("leaves a version that only one manifest pins alone", () => {
-    const { problems } = findingsFor({
-      usages: [
-        {
-          dependencyName: "typescript",
-          catalogReferences: [],
-          directReferences: [{ manifestPath: "apps/web/package.json", specifier: "^5.0.0" }],
-        },
-      ],
-    });
+  describe("a dependency only one manifest pins", () => {
+    const it = test.extend("findings", () =>
+      sharedDependencyFindings({
+        usages: [
+          {
+            dependencyName: "typescript",
+            catalogReferences: [],
+            directReferences: [{ manifestPath: "apps/web/package.json", specifier: "^5.0.0" }],
+          },
+        ],
+        catalogedNames: [],
+        definitionPath: "pnpm-workspace.yaml",
+        config: defaultDependencyCatalogChecksConfig,
+      }));
 
-    expect(problems).toStrictEqual([]);
+    it("leaves it alone", ({ findings }) => {
+      expect(findings).toStrictEqual({ problems: [] });
+    });
   });
 
-  it("leaves a dependency that the catalog holds to the catalog checks", () => {
-    const { problems } = findingsFor({
-      usages: [
-        {
-          dependencyName: "typescript",
-          catalogReferences: [],
-          directReferences: [
-            { manifestPath: "apps/web/package.json", specifier: "^5.0.0" },
-            { manifestPath: "packages/repository-checks/package.json", specifier: "^5.0.0" },
-          ],
-        },
-      ],
-      catalogedNames: ["typescript"],
-    });
+  describe("a dependency the catalog already holds", () => {
+    const it = test.extend("findings", () =>
+      sharedDependencyFindings({
+        usages: [
+          {
+            dependencyName: "typescript",
+            catalogReferences: [],
+            directReferences: [
+              { manifestPath: "apps/web/package.json", specifier: "^5.0.0" },
+              { manifestPath: "packages/repository-checks/package.json", specifier: "^5.0.0" },
+            ],
+          },
+        ],
+        catalogedNames: ["typescript"],
+        definitionPath: "pnpm-workspace.yaml",
+        config: defaultDependencyCatalogChecksConfig,
+      }));
 
-    expect(problems).toStrictEqual([]);
+    it("leaves it to the catalog checks", ({ findings }) => {
+      expect(findings).toStrictEqual({ problems: [] });
+    });
   });
 });

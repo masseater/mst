@@ -21,11 +21,11 @@ const twinReports = (input: {
   readonly relativePath: string;
 }): readonly { readonly line: number; readonly sites: string }[] => {
   const { index, relativePath } = input;
-  return (index.bodiesByPath.get(relativePath) ?? []).flatMap((body) => {
-    const elsewhere = (index.sitesByNamedFingerprint.get(namedFingerprintOf(body)) ?? []).filter(
-      (site) => site.relativePath !== relativePath || site.line !== body.line,
-    );
-    return elsewhere.length === 0 ? [] : [{ line: body.line, sites: spellSites(elsewhere) }];
+  return (index.bodiesByPath.get(relativePath) ?? []).flatMap((writtenBody) => {
+    const elsewhere = (
+      index.sitesByNamedFingerprint.get(namedFingerprintOf(writtenBody)) ?? []
+    ).filter((site) => site.relativePath !== relativePath || site.line !== writtenBody.line);
+    return elsewhere.length === 0 ? [] : [{ line: writtenBody.line, sites: spellSites(elsewhere) }];
   });
 };
 
@@ -49,22 +49,22 @@ export const createNoTwinDeclaration = ({
       },
       schema: [],
     },
-    create(context) {
-      if (isOutOfScopeSource(context.filename)) return {};
+    create(inspection) {
+      if (isOutOfScopeSource(inspection.filename)) return {};
 
-      const repositoryRootOf = memoize((): string => findWorkspaceRoot(context.cwd));
+      const repositoryRootOf = memoize((): string => findWorkspaceRoot(inspection.cwd));
 
       return {
         Program(node: ESTree.Program) {
           const repositoryRoot = repositoryRootOf();
-          const relativePath = toPosixPath(relative(repositoryRoot, resolve(context.filename)));
+          const relativePath = toPosixPath(relative(repositoryRoot, resolve(inspection.filename)));
           const reports = twinReports({
             index: loadIndex({ repositoryRoot }),
             relativePath,
           });
 
           for (const report of reports) {
-            context.report({
+            inspection.report({
               node: statementCovering(node.body, report.line) ?? node,
               messageId: "twinDeclaration",
               data: { sites: report.sites },

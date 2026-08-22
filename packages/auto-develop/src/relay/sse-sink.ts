@@ -1,10 +1,10 @@
 import type { ServerResponse } from "node:http";
 import type { SseSink } from "./sse.ts";
 
-export const sseSinkFor = (res: ServerResponse): SseSink => {
+export const sseSinkFor = (produced: ServerResponse): SseSink => {
   const writeOrThrow = (frame: string): void => {
-    if (res.destroyed || res.writableEnded) throw new Error("sse connection is closed");
-    res.write(frame);
+    if (produced.destroyed || produced.writableEnded) throw new Error("sse connection is closed");
+    produced.write(frame);
   };
   return {
     writeEvent: (frame) => {

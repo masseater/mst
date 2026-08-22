@@ -1,3 +1,5 @@
+import { namedFieldsOf } from "../named-fields.ts";
+
 import type { Options, RuleMeta } from "@oxlint/plugins";
 
 export type GroundedPattern = {
@@ -73,14 +75,9 @@ const DEFAULT_FORBIDDEN_TRACKED_PATHS: readonly ForbiddenTrackedPath[] = [
   },
 ];
 
-const namedFieldsOf = (held: unknown): Readonly<Record<string, unknown>> | null =>
-  typeof held !== "object" || held === null || Array.isArray(held)
-    ? null
-    : (held as Readonly<Record<string, unknown>>);
-
-const listedUnder = (options: Readonly<Options>, key: string): readonly unknown[] => {
-  const fields = namedFieldsOf(options[0]);
-  const held = fields === null ? null : fields[key];
+const listedUnder = (ruleOptions: Readonly<Options>, fieldName: string): readonly unknown[] => {
+  const fields = namedFieldsOf(ruleOptions[0]);
+  const held = fields === null ? null : fields[fieldName];
   return Array.isArray(held) ? held : [];
 };
 
@@ -111,16 +108,16 @@ const registrationOf = (held: unknown): ForbiddenTrackedPath | null => {
 };
 
 export const registeredTrackedPathsFrom = (
-  options: Readonly<Options>,
+  ruleOptions: Readonly<Options>,
 ): readonly ForbiddenTrackedPath[] => [
   ...DEFAULT_FORBIDDEN_TRACKED_PATHS,
-  ...listedUnder(options, "forbidden")
+  ...listedUnder(ruleOptions, "forbidden")
     .map(registrationOf)
     .filter((registration) => registration !== null),
 ];
 
-export const releasesFrom = (options: Readonly<Options>): readonly GroundedPattern[] =>
-  groundedPatternsIn(listedUnder(options, "released"));
+export const releasesFrom = (ruleOptions: Readonly<Options>): readonly GroundedPattern[] =>
+  groundedPatternsIn(listedUnder(ruleOptions, "released"));
 
 const RELEASABLE_PATTERNS: ReadonlySet<string> = new Set(
   DEFAULT_FORBIDDEN_TRACKED_PATHS.map((registration) => registration.pattern),

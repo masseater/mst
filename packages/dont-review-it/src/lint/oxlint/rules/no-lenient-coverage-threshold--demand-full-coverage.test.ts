@@ -3,9 +3,6 @@ import { describe } from "vite-plus/test";
 
 import { noLenientCoverageThreshold } from "./no-lenient-coverage-threshold--demand-full-coverage.ts";
 
-const configFor = (thresholds: string): string =>
-  `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { coverage: { thresholds: ${thresholds} } } });\n`;
-
 const FULL_THRESHOLDS =
   "{ branches: 100, functions: 100, lines: 100, statements: 100, perFile: true }";
 
@@ -14,17 +11,17 @@ describe("dont-review-it/no-lenient-coverage-threshold--demand-full-coverage", (
     valid: [
       {
         name: "every metric spelled out at full coverage, checked file by file, passes",
-        code: configFor(FULL_THRESHOLDS),
+        code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { coverage: { thresholds: ${FULL_THRESHOLDS} } } });\n`,
         filename: "vite.config.ts",
       },
       {
         name: "the shorthand that demands full coverage on every metric at once passes",
-        code: configFor("{ 100: true, perFile: true }"),
+        code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { coverage: { thresholds: { 100: true, perFile: true } } } });\n`,
         filename: "vite.config.ts",
       },
       {
         name: "the shorthand written as a string key passes",
-        code: configFor(`{ "100": true, perFile: true }`),
+        code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { coverage: { thresholds: { "100": true, perFile: true } } } });\n`,
         filename: "vite.config.ts",
       },
       {
@@ -54,21 +51,19 @@ describe("dont-review-it/no-lenient-coverage-threshold--demand-full-coverage", (
       },
       {
         name: "a threshold above the demanded number passes",
-        code: configFor(FULL_THRESHOLDS),
+        code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { coverage: { thresholds: ${FULL_THRESHOLDS} } } });\n`,
         filename: "vite.config.ts",
         options: [{ branches: 90 }],
       },
       {
         name: "a lowered demand is met by the number the options name",
-        code: configFor(
-          "{ branches: 90, functions: 100, lines: 100, statements: 100, perFile: true }",
-        ),
+        code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { coverage: { thresholds: { branches: 90, functions: 100, lines: 100, statements: 100, perFile: true } } } });\n`,
         filename: "vite.config.ts",
         options: [{ branches: 90 }],
       },
       {
         name: "the shorthand still satisfies a lowered demand",
-        code: configFor("{ 100: true, perFile: true }"),
+        code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { coverage: { thresholds: { 100: true, perFile: true } } } });\n`,
         filename: "vite.config.ts",
         options: [{ branches: 90 }],
       },
@@ -79,9 +74,7 @@ describe("dont-review-it/no-lenient-coverage-threshold--demand-full-coverage", (
       },
       {
         name: "a threshold wrapped in parentheses is read as the number it is",
-        code: configFor(
-          "{ branches: (100), functions: 100, lines: 100, statements: 100, perFile: true }",
-        ),
+        code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { coverage: { thresholds: { branches: (100), functions: 100, lines: 100, statements: 100, perFile: true } } } });\n`,
         filename: "vite.config.ts",
       },
       {
@@ -153,13 +146,13 @@ describe("dont-review-it/no-lenient-coverage-threshold--demand-full-coverage", (
       },
       {
         name: "a full threshold checked against the package total is reported",
-        code: configFor("{ branches: 100, functions: 100, lines: 100, statements: 100 }"),
+        code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { coverage: { thresholds: { branches: 100, functions: 100, lines: 100, statements: 100 } } } });\n`,
         filename: "vite.config.ts",
         errors: [{ messageId: "aggregateCoverageThreshold" }],
       },
       {
         name: "the per-file check turned off is reported the same as leaving it out",
-        code: configFor("{ 100: true, perFile: false }"),
+        code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { coverage: { thresholds: { 100: true, perFile: false } } } });\n`,
         filename: "vite.config.ts",
         errors: [{ messageId: "aggregateCoverageThreshold" }],
       },
@@ -171,7 +164,7 @@ describe("dont-review-it/no-lenient-coverage-threshold--demand-full-coverage", (
       },
       {
         name: "a metric left out is reported on its own",
-        code: configFor("{ functions: 100, lines: 100, statements: 100, perFile: true }"),
+        code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { coverage: { thresholds: { functions: 100, lines: 100, statements: 100, perFile: true } } } });\n`,
         filename: "vite.config.ts",
         errors: [{ messageId: "unsetCoverageThreshold" }],
       },
@@ -207,9 +200,7 @@ describe("dont-review-it/no-lenient-coverage-threshold--demand-full-coverage", (
       },
       {
         name: "every metric below full coverage is reported one by one",
-        code: configFor(
-          "{ branches: 90, functions: 90, lines: 90, statements: 90, perFile: true }",
-        ),
+        code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { coverage: { thresholds: { branches: 90, functions: 90, lines: 90, statements: 90, perFile: true } } } });\n`,
         filename: "vite.config.ts",
         errors: [
           { messageId: "lenientCoverageThreshold" },
@@ -220,7 +211,7 @@ describe("dont-review-it/no-lenient-coverage-threshold--demand-full-coverage", (
       },
       {
         name: "the shorthand turned off leaves every metric unset",
-        code: configFor("{ 100: false, perFile: true }"),
+        code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { coverage: { thresholds: { 100: false, perFile: true } } } });\n`,
         filename: "vite.config.ts",
         errors: [
           { messageId: "unsetCoverageThreshold" },
@@ -231,9 +222,7 @@ describe("dont-review-it/no-lenient-coverage-threshold--demand-full-coverage", (
       },
       {
         name: "a metric below a demand the options lowered is still reported",
-        code: configFor(
-          "{ branches: 80, functions: 100, lines: 100, statements: 100, perFile: true }",
-        ),
+        code: `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { coverage: { thresholds: { branches: 80, functions: 100, lines: 100, statements: 100, perFile: true } } } });\n`,
         filename: "vite.config.ts",
         options: [{ branches: 90 }],
         errors: [{ messageId: "lenientCoverageThreshold" }],

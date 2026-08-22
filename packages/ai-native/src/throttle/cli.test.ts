@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { once } from "node:events";
 import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -6,160 +7,221 @@ import { text } from "node:stream/consumers";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
-import { describe, expect, onTestFinished, test, vi } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { ensureSlots, tryAcquireAny } from "./slots.ts";
 
 const CLI_PATH = fileURLToPath(new URL("./cli.ts", import.meta.url));
 
-const isolatedTmp = (): string => {
-  const dir = mkdtempSync(join(tmpdir(), "throttle-cli-tmp-"));
-  onTestFinished(() => {
-    rmSync(dir, { recursive: true, force: true });
-  });
-  return dir;
-};
-
-const slotDirUnder = (tmpRoot: string): string => join(tmpRoot, "mst-throttle", "mst");
-
-type ProcessReport = {
-  code: number | null;
-  signal: NodeJS.Signals | null;
-  stdout: string;
-  stderr: string;
-};
-
-const collect = async (invocation: {
-  executable: string;
-  args: readonly string[];
-  tmpRoot: string;
-}): Promise<ProcessReport> => {
-  const child = spawn(invocation.executable, [...invocation.args], {
-    stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, TMPDIR: invocation.tmpRoot },
-  });
-  const childEnd = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(
-    (resolve) => {
-      child.once("exit", (code, signal) => {
-        resolve({ code, signal });
-      });
-    },
-  );
-  const [stdout, stderr, end] = await Promise.all([
-    text(child.stdout),
-    text(child.stderr),
-    childEnd,
-  ]);
-  return { code: end.code, signal: end.signal, stdout, stderr };
-};
-
-const waitUntil = async (isDone: () => boolean): Promise<void> => {
-  if (isDone()) return;
-  await delay(100);
-  return waitUntil(isDone);
-};
-
-const acquireSlotIn = async (slotDir: string): Promise<() => Promise<void>> => {
-  ensureSlots(slotDir, 1);
-  const hold = await tryAcquireAny({ slotDir, limit: 1 });
-  if (hold !== null) return hold.release;
-  await delay(200);
-  return acquireSlotIn(slotDir);
-};
+const TWO_STREAM_SCRIPT = String.raw`process.stdout.write('alpha\nbeta\n'); process.stderr.write('gamma\ndelta\n');`;
 
 describe("cli", () => {
-  test("the entry forwards its arguments and exposes the throttle exit code", async () => {
-    const originalExitCode = process.exitCode;
-    onTestFinished(() => {
-      process.exitCode = originalExitCode;
-      vi.doUnmock("./run-throttle.ts");
+  describe("a call that names no command", () => {
+    const it = test.extend("theWayThrottleAnswersACallWithoutACommand", async ({}, {
+      onCleanup,
+    }) => {
+      const tmpRoot = mkdtempSync(join(tmpdir(), "throttle-cli-tmp-"));
+      onCleanup(() => {
+        rmSync(tmpRoot, { recursive: true, force: true });
+      });
+      const child = spawn(process.execPath, [CLI_PATH], {
+        stdio: ["ignore", "pipe", "pipe"],
+        env: { ...process.env, TMPDIR: tmpRoot },
+      });
+      return Promise.all([once(child, "exit"), text(child.stdout), text(child.stderr)]);
     });
-    const runThrottle = vi.fn<() => Promise<number>>().mockResolvedValue(17);
-    vi.doMock(import("./run-throttle.ts"), () => ({ runThrottle }));
-    await import("./cli.ts");
 
-    expect(runThrottle).toHaveBeenCalledExactlyOnceWith(process.argv.slice(2));
-    expect(process.exitCode).toBe(17);
+    it(
+      "exits 2 with nothing on stdout and the usage on stderr",
+      { timeout: 20_000 },
+      ({ theWayThrottleAnswersACallWithoutACommand }) => {
+        expect(theWayThrottleAnswersACallWithoutACommand).toMatchInlineSnapshot(`
+          [
+            [
+              2,
+              null,
+            ],
+            "",
+            "Usage: throttle [--timeout <seconds>] -- <command> [args...]
+
+          Runs the command while keeping the number of simultaneous executions that
+          share this host and namespace at or below the limit. When every slot is held
+          the wrapper joins a wait queue, reports its position on stderr, and retries
+          every slot on each poll, for at most the wait budget. The operating system
+          releases a slot when its holder exits, including an abrupt termination. Do
+          not nest throttle inside a command it wraps: the inner call counts
+          as one more competitor and consumes a second slot.
+
+          Options:
+            --timeout <seconds>  Stop the command's whole process tree after this many
+                                 seconds. POSIX sends SIGTERM, then SIGKILL after a short
+                                 grace period; Windows uses taskkill /T /F immediately.
+                                 0 never interrupts the command. Defaults to 0.
+
+          Environment:
+            MST_THROTTLE_LIMIT   Number of slots shared by every throttle on this host
+                                 and namespace. Invalid values (non-integer, zero or
+                                 less) fall back to the default of 1.
+
+          Exit codes:
+            0  the wrapped command succeeded
+            1  the wrapped command failed, was killed, could not be started, ran past
+               the timeout, or the wrapper could not get or release a slot
+            2  throttle itself was called incorrectly
+          ",
+          ]
+        `);
+      },
+    );
   });
 
-  test(
-    "a call without a command prints the usage on stderr and exits 2",
-    { timeout: 20_000 },
-    async () => {
-      const report = await collect({
-        executable: process.execPath,
-        args: [CLI_PATH],
-        tmpRoot: isolatedTmp(),
+  describe("a command that writes to both of its streams", () => {
+    describe("started without the wrapper", () => {
+      const it = test.extend("theWayNodeRunsItOnItsOwn", async () => {
+        const child = spawn(process.execPath, ["-e", TWO_STREAM_SCRIPT], {
+          stdio: ["ignore", "pipe", "pipe"],
+        });
+        return Promise.all([once(child, "exit"), text(child.stdout), text(child.stderr)]);
       });
 
-      expect(report.code).toBe(2);
-      expect(report.stdout).toBe("");
-      expect(report.stderr).toContain("Usage: throttle");
-    },
-  );
-
-  test(
-    "the child's streams pass through byte for byte, plus only throttle's own stderr lines",
-    { timeout: 30_000 },
-    async () => {
-      const tmpRoot = isolatedTmp();
-      const script = String.raw`process.stdout.write('alpha\nbeta\n'); process.stderr.write('gamma\ndelta\n');`;
-
-      const direct = await collect({ executable: process.execPath, args: ["-e", script], tmpRoot });
-      const wrapped = await collect({
-        executable: process.execPath,
-        args: [CLI_PATH, "--", process.execPath, "-e", script],
-        tmpRoot,
-      });
-
-      expect(direct.code).toBe(0);
-      expect(wrapped.code).toBe(0);
-      expect(wrapped.stdout).toBe(direct.stdout);
-      const passthrough = wrapped.stderr
-        .split("\n")
-        .filter((line) => !line.startsWith("throttle: "))
-        .join("\n");
-      expect(passthrough).toBe(direct.stderr);
-    },
-  );
-
-  test(
-    "a waiting wrapper removes its queue entry and dies of the forwarded signal",
-    { timeout: 30_000 },
-    async () => {
-      vi.stubEnv("MST_THROTTLE_LIMIT", "");
-      onTestFinished(() => {
-        vi.unstubAllEnvs();
-      });
-      const tmpRoot = isolatedTmp();
-      const slotDir = slotDirUnder(tmpRoot);
-      const release = await acquireSlotIn(slotDir);
-      onTestFinished(async () => {
-        await release();
-      });
-      const waitersDir = join(slotDir, "waiters");
-      const child = spawn(process.execPath, [CLI_PATH, "--", process.execPath, "-e", ""], {
-        stdio: ["ignore", "pipe", "pipe"],
-        env: { ...process.env, TMPDIR: tmpRoot, MST_THROTTLE_LIMIT: "" },
-      });
-      const childDeath = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(
-        (resolve) => {
-          child.once("exit", (code, signal) => {
-            resolve({ code, signal });
-          });
+      it(
+        "exits zero after writing two lines to each stream",
+        { timeout: 30_000 },
+        ({ theWayNodeRunsItOnItsOwn }) => {
+          expect(theWayNodeRunsItOnItsOwn).toStrictEqual([
+            [0, null],
+            "alpha\nbeta\n",
+            "gamma\ndelta\n",
+          ]);
         },
       );
-      const ownEntries = (): string[] =>
-        readdirSync(waitersDir).filter((name) => name.includes(`-${child.pid}-`));
+    });
 
-      await waitUntil(() => ownEntries().length === 1);
+    describe("started through the wrapper", () => {
+      const it = test.extend("theWayThrottleRunsIt", async ({}, { onCleanup }) => {
+        const tmpRoot = mkdtempSync(join(tmpdir(), "throttle-cli-tmp-"));
+        onCleanup(() => {
+          rmSync(tmpRoot, { recursive: true, force: true });
+        });
+        const child = spawn(
+          process.execPath,
+          [CLI_PATH, "--", process.execPath, "-e", TWO_STREAM_SCRIPT],
+          {
+            stdio: ["ignore", "pipe", "pipe"],
+            env: { ...process.env, TMPDIR: tmpRoot, MST_THROTTLE_LIMIT: "1" },
+          },
+        );
+        return Promise.all([once(child, "exit"), text(child.stdout), text(child.stderr)]);
+      });
 
-      child.kill("SIGTERM");
-      const death = await childDeath;
+      it(
+        "hands both streams through byte for byte and adds only its own lines to stderr",
+        { timeout: 30_000 },
+        ({ theWayThrottleRunsIt }) => {
+          expect(theWayThrottleRunsIt).toStrictEqual([
+            [0, null],
+            "alpha\nbeta\n",
+            `throttle: acquiring a slot (limit 1)\nthrottle: run ${process.execPath} -e ${TWO_STREAM_SCRIPT}\ngamma\ndelta\n`,
+          ]);
+        },
+      );
+    });
+  });
 
-      expect(death.signal).toBe("SIGTERM");
-      await waitUntil(() => ownEntries().length === 0);
-      expect(ownEntries()).toHaveLength(0);
-    },
-  );
+  describe("a wrapper left waiting because the only slot is held", () => {
+    describe("when a SIGTERM reaches it", () => {
+      const it = test.extend("theWayAWaitingWrapperEnds", async ({}, { onCleanup }) => {
+        const tmpRoot = mkdtempSync(join(tmpdir(), "throttle-cli-tmp-"));
+        const slotDir = join(tmpRoot, "mst-throttle", "mst");
+        ensureSlots(slotDir, 1);
+        const holdTheOnlySlot = async (): Promise<() => Promise<void>> => {
+          const held = await tryAcquireAny({ slotDir, limit: 1 });
+          if (held !== null) return held.release;
+          await delay(200);
+          return holdTheOnlySlot();
+        };
+        const release = await holdTheOnlySlot();
+        onCleanup(async () => {
+          await release();
+          rmSync(tmpRoot, { recursive: true, force: true });
+        });
+        const child = spawn(process.execPath, [CLI_PATH, "--", process.execPath, "-e", ""], {
+          stdio: ["ignore", "pipe", "pipe"],
+          env: { ...process.env, TMPDIR: tmpRoot, MST_THROTTLE_LIMIT: "1" },
+        });
+        const waitersDir = join(slotDir, "waiters");
+        const ownEntries = (): string[] =>
+          readdirSync(waitersDir).filter((waiterFileName) =>
+            waiterFileName.includes(`-${String(child.pid)}-`),
+          );
+        const untilEnqueued = async (): Promise<void> => {
+          if (ownEntries().length === 1) return;
+          await delay(100);
+          return untilEnqueued();
+        };
+        await untilEnqueued();
+        child.kill("SIGTERM");
+        return Promise.all([once(child, "exit"), text(child.stdout)]);
+      });
+
+      it(
+        "dies of the signal it was sent, having written nothing to stdout",
+        { timeout: 30_000 },
+        ({ theWayAWaitingWrapperEnds }) => {
+          expect(theWayAWaitingWrapperEnds).toStrictEqual([[null, "SIGTERM"], ""]);
+        },
+      );
+    });
+
+    describe("once a SIGTERM has ended it", () => {
+      const it = test.extend("theQueueEntriesOfAKilledWrapper", async ({}, { onCleanup }) => {
+        const tmpRoot = mkdtempSync(join(tmpdir(), "throttle-cli-tmp-"));
+        const slotDir = join(tmpRoot, "mst-throttle", "mst");
+        ensureSlots(slotDir, 1);
+        const holdTheOnlySlot = async (): Promise<() => Promise<void>> => {
+          const held = await tryAcquireAny({ slotDir, limit: 1 });
+          if (held !== null) return held.release;
+          await delay(200);
+          return holdTheOnlySlot();
+        };
+        const release = await holdTheOnlySlot();
+        onCleanup(async () => {
+          await release();
+          rmSync(tmpRoot, { recursive: true, force: true });
+        });
+        const child = spawn(process.execPath, [CLI_PATH, "--", process.execPath, "-e", ""], {
+          stdio: ["ignore", "pipe", "pipe"],
+          env: { ...process.env, TMPDIR: tmpRoot, MST_THROTTLE_LIMIT: "1" },
+        });
+        const waitersDir = join(slotDir, "waiters");
+        const ownEntries = (): string[] =>
+          readdirSync(waitersDir).filter((waiterFileName) =>
+            waiterFileName.includes(`-${String(child.pid)}-`),
+          );
+        const untilEnqueued = async (): Promise<void> => {
+          if (ownEntries().length === 1) return;
+          await delay(100);
+          return untilEnqueued();
+        };
+        await untilEnqueued();
+        child.kill("SIGTERM");
+        await once(child, "exit");
+        const untilDrained = async (pollsLeft: number): Promise<void> => {
+          if (pollsLeft === 0 || ownEntries().length === 0) return;
+          await delay(100);
+          return untilDrained(pollsLeft - 1);
+        };
+        await untilDrained(100);
+        return ownEntries();
+      });
+
+      it(
+        "has taken its own entry out of the wait queue",
+        { timeout: 30_000 },
+        ({ theQueueEntriesOfAKilledWrapper }) => {
+          expect(theQueueEntriesOfAKilledWrapper).toStrictEqual([]);
+        },
+      );
+    });
+  });
 });

@@ -1,51 +1,84 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import { effectiveReviewOf, reviewVerdictState, type Review } from "./review-verdict.ts";
-
-const review = (shape: Partial<Review>): Review => ({
-  state: "APPROVED",
-  body: "",
-  submittedAt: "2026-08-11T00:00:00.000Z",
-  commitSha: "abc",
-  authorLogin: "bot",
-  ...shape,
-});
-
-const it = test
-  .extend("latestEffectiveReview", () =>
-    effectiveReviewOf({
-      reviews: [
-        review({ state: "APPROVED", submittedAt: "1" }),
-        review({ state: "CHANGES_REQUESTED", submittedAt: "2" }),
-      ],
-      login: "bot",
-    }))
-  .extend("reviewIgnoringComments", () =>
-    effectiveReviewOf({
-      reviews: [review({ state: "APPROVED" }), review({ state: "COMMENTED" })],
-      login: "bot",
-    }),
-  )
-  .extend("reviewFromOtherLogin", () =>
-    effectiveReviewOf({
-      reviews: [review({ state: "CHANGES_REQUESTED", authorLogin: "human" })],
-      login: "bot",
-    }),
-  )
-  .extend("reviewFromEmptyList", () => effectiveReviewOf({ reviews: [], login: "bot" }))
-  .extend("stateForChangesRequested", () =>
-    reviewVerdictState(review({ state: "CHANGES_REQUESTED" })),
-  )
-  .extend("stateForApproved", () => reviewVerdictState(review({ state: "APPROVED" })))
-  .extend("stateForNoReview", () => reviewVerdictState(null));
+import { effectiveReviewOf, reviewVerdictState } from "./review-verdict.ts";
 
 describe("effectiveReviewOf", () => {
+  const it = test
+    .extend("latestEffectiveReview", () =>
+      effectiveReviewOf({
+        reviews: [
+          {
+            state: "APPROVED",
+            body: "",
+            submittedAt: "1",
+            commitSha: "abc",
+            authorLogin: "bot",
+          },
+          {
+            state: "CHANGES_REQUESTED",
+            body: "",
+            submittedAt: "2",
+            commitSha: "abc",
+            authorLogin: "bot",
+          },
+        ],
+        login: "bot",
+      }))
+    .extend("reviewIgnoringComments", () =>
+      effectiveReviewOf({
+        reviews: [
+          {
+            state: "APPROVED",
+            body: "",
+            submittedAt: "2026-08-11T00:00:00.000Z",
+            commitSha: "abc",
+            authorLogin: "bot",
+          },
+          {
+            state: "COMMENTED",
+            body: "",
+            submittedAt: "2026-08-11T00:00:00.000Z",
+            commitSha: "abc",
+            authorLogin: "bot",
+          },
+        ],
+        login: "bot",
+      }),
+    )
+    .extend("reviewFromOtherLogin", () =>
+      effectiveReviewOf({
+        reviews: [
+          {
+            state: "CHANGES_REQUESTED",
+            body: "",
+            submittedAt: "2026-08-11T00:00:00.000Z",
+            commitSha: "abc",
+            authorLogin: "human",
+          },
+        ],
+        login: "bot",
+      }),
+    )
+    .extend("reviewFromEmptyList", () => effectiveReviewOf({ reviews: [], login: "bot" }));
+
   it("指定ログインの承認/変更要求のうち最新 1 件を返す", ({ latestEffectiveReview }) => {
-    expect(latestEffectiveReview?.state).toStrictEqual("CHANGES_REQUESTED");
+    expect(latestEffectiveReview).toStrictEqual({
+      state: "CHANGES_REQUESTED",
+      body: "",
+      submittedAt: "2",
+      commitSha: "abc",
+      authorLogin: "bot",
+    });
   });
 
   it("コメントのみのレビューは判定に数えない", ({ reviewIgnoringComments }) => {
-    expect(reviewIgnoringComments?.state).toStrictEqual("APPROVED");
+    expect(reviewIgnoringComments).toStrictEqual({
+      state: "APPROVED",
+      body: "",
+      submittedAt: "2026-08-11T00:00:00.000Z",
+      commitSha: "abc",
+      authorLogin: "bot",
+    });
   });
 
   it("別ログインのレビューは無視する", ({ reviewFromOtherLogin }) => {
@@ -58,6 +91,26 @@ describe("effectiveReviewOf", () => {
 });
 
 describe("reviewVerdictState", () => {
+  const it = test
+    .extend("stateForChangesRequested", () =>
+      reviewVerdictState({
+        state: "CHANGES_REQUESTED",
+        body: "",
+        submittedAt: "2026-08-11T00:00:00.000Z",
+        commitSha: "abc",
+        authorLogin: "bot",
+      }))
+    .extend("stateForApproved", () =>
+      reviewVerdictState({
+        state: "APPROVED",
+        body: "",
+        submittedAt: "2026-08-11T00:00:00.000Z",
+        commitSha: "abc",
+        authorLogin: "bot",
+      }),
+    )
+    .extend("stateForNoReview", () => reviewVerdictState(null));
+
   it("変更要求は error", ({ stateForChangesRequested }) => {
     expect(stateForChangesRequested).toStrictEqual("error");
   });

@@ -1,17 +1,41 @@
-import { EXCLUSION_LABEL, type Mode } from "../contract/vocabulary.ts";
+import {
+  CHECK_SUITE_CONCLUSION,
+  DECLARED_MODE,
+  EXCLUSION_LABEL,
+  REVIEW_STATE,
+  type Mode,
+} from "../contract/vocabulary.ts";
+import { GITHUB_REVIEW_STATE } from "../lifecycle/review-verdict.ts";
+import {
+  CHECK_BUCKET,
+  type CheckBucket,
+  type GithubPullSummary,
+  type GithubReader,
+} from "./github-reader.ts";
 import { startupDrainDeliveryId, synthesizeEnvelope } from "./synth.ts";
 
 import type { EventEnvelope } from "../contract/envelope.ts";
-import type { CheckBucket, GithubPullSummary, GithubReader } from "./github-reader.ts";
+
+/** @canonical-values auto-develop.check-fold-verdict */
+const CHECK_FOLD_VERDICTS = ["success", "pending", "failure", "none"] as const;
+
+const CHECK_FOLD_VERDICT = {
+  success: CHECK_FOLD_VERDICTS[0],
+  pending: CHECK_FOLD_VERDICTS[1],
+  failure: CHECK_FOLD_VERDICTS[2],
+  none: CHECK_FOLD_VERDICTS[3],
+} as const;
 
 const foldCheckBuckets = (
   buckets: readonly CheckBucket[],
-): "success" | "pending" | "failure" | "none" => {
-  if (buckets.length === 0) return "success";
-  if (buckets.includes("pending")) return "pending";
-  if (buckets.includes("fail")) return "failure";
-  if (buckets.includes("cancel") || buckets.includes("skipping")) return "none";
-  return "success";
+): (typeof CHECK_FOLD_VERDICTS)[number] => {
+  if (buckets.length === 0) return CHECK_FOLD_VERDICT.success;
+  if (buckets.includes(CHECK_BUCKET.pending)) return CHECK_FOLD_VERDICT.pending;
+  if (buckets.includes(CHECK_BUCKET.fail)) return CHECK_FOLD_VERDICT.failure;
+  if (buckets.includes(CHECK_BUCKET.cancel) || buckets.includes(CHECK_BUCKET.skipping)) {
+    return CHECK_FOLD_VERDICT.none;
+  }
+  return CHECK_FOLD_VERDICT.success;
 };
 
 const reviewRequestedEnvelope = (pull: GithubPullSummary): EventEnvelope =>
@@ -34,7 +58,7 @@ const changesRequestedEnvelope = (pull: GithubPullSummary): EventEnvelope =>
     filtered: {
       kind: "source-review-submitted",
       pullNumber: pull.number,
-      state: "changes_requested",
+      state: REVIEW_STATE.changesRequested,
       body: "",
     },
     deliveryId: startupDrainDeliveryId({
@@ -69,7 +93,7 @@ const ciFailureEnvelope = (pull: GithubPullSummary): EventEnvelope =>
     filtered: {
       kind: "ci-completed",
       pullNumber: pull.number,
-      conclusion: "failure",
+      conclusion: CHECK_SUITE_CONCLUSION.failure,
       headSha: pull.headSha,
     },
     deliveryId: startupDrainDeliveryId({
@@ -92,10 +116,14 @@ const authorWorkEnvelopes = async (work: {
   const ciSuppressed =
     work.ciSuppressionLabel !== undefined && pull.labelNames.includes(work.ciSuppressionLabel);
   return [
-    ...(pull.reviewDecision === "CHANGES_REQUESTED" ? [changesRequestedEnvelope(pull)] : []),
+    ...(pull.reviewDecision === GITHUB_REVIEW_STATE.changesRequested
+      ? [changesRequestedEnvelope(pull)]
+      : []),
     ...(indicatesSummaryConflict(pull) ? [mergeConflictEnvelope(pull)] : []),
     ...(pull.mergeStateStatus === "BEHIND" ? [baseUpdateEnvelope(pull)] : []),
-    ...(foldCheckBuckets(buckets) === "failure" && !ciSuppressed ? [ciFailureEnvelope(pull)] : []),
+    ...(foldCheckBuckets(buckets) === CHECK_FOLD_VERDICT.failure && !ciSuppressed
+      ? [ciFailureEnvelope(pull)]
+      : []),
   ];
 };
 
@@ -108,7 +136,7 @@ export const runStartupDrain = async (drain: {
   const openPulls = (await drain.github.listOpenPullRequests()).filter(
     (pull) => !pull.labelNames.includes(EXCLUSION_LABEL),
   );
-  if (drain.mode === "reviewer") {
+  if (drain.mode === DECLARED_MODE.reviewer) {
     return openPulls
       .filter((pull) => pull.requestedReviewerLogins.includes(drain.login))
       .map(reviewRequestedEnvelope);

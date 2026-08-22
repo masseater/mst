@@ -2,33 +2,28 @@ import { describe, expect, test, vi } from "vite-plus/test";
 
 import { codeMovedOn, createRestartRequest } from "./restart-request.ts";
 
-const silentLatch = { onRequest: () => undefined };
-
-const it = test
-  .extend("freshRequest", () => createRestartRequest(silentLatch).requested())
-  .extend("firstReason", () => {
-    const restart = createRestartRequest(silentLatch);
-    restart.request("code-updated");
-    return restart.requested();
-  })
-  .extend("reasonAfterSecondRequest", () => {
-    const restart = createRestartRequest(silentLatch);
-    restart.request("code-updated");
-    restart.request("idle");
-    return restart.requested();
-  })
-  .extend("announcedReasons", () => {
-    const onRequest = vi.fn<(reason: "code-updated" | "idle") => void>();
-    const restart = createRestartRequest({ onRequest });
-    restart.request("idle");
-    restart.request("code-updated");
-    return onRequest.mock.calls.flat();
-  })
-  .extend("movedOn", () => codeMovedOn({ startupCommit: "abc", currentCommit: "def" }))
-  .extend("sameCommit", () => codeMovedOn({ startupCommit: "abc", currentCommit: "abc" }))
-  .extend("unknownCommit", () => codeMovedOn({ startupCommit: "abc", currentCommit: null }));
-
 describe("createRestartRequest", () => {
+  const it = test
+    .extend("freshRequest", () => createRestartRequest({ onRequest: () => undefined }).requested())
+    .extend("firstReason", () => {
+      const restart = createRestartRequest({ onRequest: () => undefined });
+      restart.request("code-updated");
+      return restart.requested();
+    })
+    .extend("reasonAfterSecondRequest", () => {
+      const restart = createRestartRequest({ onRequest: () => undefined });
+      restart.request("code-updated");
+      restart.request("idle");
+      return restart.requested();
+    })
+    .extend("restartAnnouncer", () => {
+      const announceRestart = vi.fn<(reason: "code-updated" | "idle") => void>();
+      const restart = createRestartRequest({ onRequest: announceRestart });
+      restart.request("idle");
+      restart.request("code-updated");
+      return announceRestart;
+    });
+
   it("要求前は理由を持たない", ({ freshRequest }) => {
     expect(freshRequest).toStrictEqual(null);
   });
@@ -41,12 +36,17 @@ describe("createRestartRequest", () => {
     expect(reasonAfterSecondRequest).toStrictEqual("code-updated");
   });
 
-  it("最初の要求だけを理由つきで一度だけ通知する", ({ announcedReasons }) => {
-    expect(announcedReasons).toStrictEqual(["idle"]);
+  it("最初の要求だけを理由つきで一度だけ通知する", ({ restartAnnouncer }) => {
+    expect(restartAnnouncer).toHaveBeenCalledExactlyOnceWith("idle");
   });
 });
 
 describe("codeMovedOn", () => {
+  const it = test
+    .extend("movedOn", () => codeMovedOn({ startupCommit: "abc", currentCommit: "def" }))
+    .extend("sameCommit", () => codeMovedOn({ startupCommit: "abc", currentCommit: "abc" }))
+    .extend("unknownCommit", () => codeMovedOn({ startupCommit: "abc", currentCommit: null }));
+
   it("起動時と違うコミットなら再起動が要る", ({ movedOn }) => {
     expect(movedOn).toStrictEqual(true);
   });

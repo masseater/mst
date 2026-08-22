@@ -81,7 +81,7 @@ describe("dont-review-it/no-single-use-local-type--inline-at-the-use-site", () =
       {
         name: "a type a test file declares is left alone",
         code: "type Draft = { readonly title: string };\nconst read = (draft: Draft) => draft.title;",
-        filename: "packages/dont-review-it/src/subject.test.ts",
+        filename: "/repo/packages/dont-review-it/src/subject.test.ts",
       },
       {
         name: "a global declaration interface remains available for ambient merging",

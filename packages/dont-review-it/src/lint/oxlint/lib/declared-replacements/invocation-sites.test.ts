@@ -1,93 +1,280 @@
 import { parseSync } from "oxc-parser";
 import { describe, expect, test } from "vite-plus/test";
 
-import { handedTextsOf, spawnRoutesIn, spawnSiteAt, type SpawnSite } from "./invocation-sites.ts";
+import { handedTextsOf, spawnRoutesIn, spawnSiteAt } from "./invocation-sites.ts";
 import { DEFAULT_SPAWN_FORMS, SPAWN_TARGET_LINE, SPAWN_TARGET_NAME } from "./spawn-forms.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
 const SPEC_FILE = "spec.ts";
 
-const statementsIn = (sourceText: string): readonly ESTree.Statement[] =>
-  parseSync(SPEC_FILE, sourceText).program.body.map((statement) => statement as ESTree.Statement);
+describe("spawnSiteAt", () => {
+  describe("something other than a node", () => {
+    const it = test.extend("site", () =>
+      spawnSiteAt({ node: "exec('lerna')", routes: new Map(), forms: DEFAULT_SPAWN_FORMS }));
 
-const lastExpressionIn = (statements: readonly ESTree.Statement[]): unknown => {
-  const last = statements.at(-1);
-  return last?.type === "ExpressionStatement" ? last.expression : null;
-};
-
-const siteIn = (sourceText: string): SpawnSite | null => {
-  const statements = statementsIn(sourceText);
-  return spawnSiteAt({
-    node: lastExpressionIn(statements),
-    routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
-    forms: DEFAULT_SPAWN_FORMS,
-  });
-};
-
-const spelledTarget = (site: SpawnSite | null): unknown => site?.target?.value;
-
-describe("declared-replacements/invocation-sites", () => {
-  test("something other than a node reaches no starting form", () => {
-    expect(
-      spawnSiteAt({ node: "exec('lerna')", routes: new Map(), forms: DEFAULT_SPAWN_FORMS }),
-    ).toBeNull();
+    it("reaches no starting form", ({ site }) => {
+      expect(site).toBe(null);
+    });
   });
 
-  test("an expression that calls nothing reaches no starting form", () => {
-    expect(siteIn("started;")).toBeNull();
+  describe("an expression that calls nothing", () => {
+    const it = test.extend("site", () => {
+      const statements = parseSync(SPEC_FILE, "started;").program.body.map(
+        (statement) => statement as ESTree.Statement,
+      );
+      const last = statements.at(-1);
+      return spawnSiteAt({
+        node: last?.type === "ExpressionStatement" ? last.expression : null,
+        routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+        forms: DEFAULT_SPAWN_FORMS,
+      });
+    });
+
+    it("reaches no starting form", ({ site }) => {
+      expect(site).toBe(null);
+    });
   });
 
-  test("a call to a binding nothing imports reaches no starting form", () => {
-    expect(siteIn('exec("lerna");')).toBeNull();
+  describe("a call to a binding nothing imports", () => {
+    const it = test.extend("site", () => {
+      const statements = parseSync(SPEC_FILE, 'exec("lerna");').program.body.map(
+        (statement) => statement as ESTree.Statement,
+      );
+      const last = statements.at(-1);
+      return spawnSiteAt({
+        node: last?.type === "ExpressionStatement" ? last.expression : null,
+        routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+        forms: DEFAULT_SPAWN_FORMS,
+      });
+    });
+
+    it("reaches no starting form", ({ site }) => {
+      expect(site).toBe(null);
+    });
   });
 
-  test("a call to a module the table says nothing about reaches no starting form", () => {
-    expect(siteIn('import { readFile } from "node:fs";\nreadFile("list");')).toBeNull();
+  describe("a call to a module the table says nothing about", () => {
+    const it = test.extend("site", () => {
+      const statements = parseSync(
+        SPEC_FILE,
+        'import { readFile } from "node:fs";\nreadFile("list");',
+      ).program.body.map((statement) => statement as ESTree.Statement);
+      const last = statements.at(-1);
+      return spawnSiteAt({
+        node: last?.type === "ExpressionStatement" ? last.expression : null,
+        routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+        forms: DEFAULT_SPAWN_FORMS,
+      });
+    });
+
+    it("reaches no starting form", ({ site }) => {
+      expect(site).toBe(null);
+    });
   });
 
-  test("a call to an imported starting form carries the argument that names the command", () => {
-    const site = siteIn('import { exec } from "node:child_process";\nexec("lerna run build");');
-    expect(site?.form.carries).toBe(SPAWN_TARGET_LINE);
-    expect(spelledTarget(site)).toBe("lerna run build");
+  describe("a call to an imported starting form", () => {
+    const it = test
+      .extend("form", () => {
+        const statements = parseSync(
+          SPEC_FILE,
+          'import { exec } from "node:child_process";\nexec("lerna run build");',
+        ).program.body.map((statement) => statement as ESTree.Statement);
+        const last = statements.at(-1);
+        const site = spawnSiteAt({
+          node: last?.type === "ExpressionStatement" ? last.expression : null,
+          routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+          forms: DEFAULT_SPAWN_FORMS,
+        });
+        if (site === null) throw new Error("no starting form was reached");
+        const { form } = site;
+        return form;
+      })
+      .extend("spelledTarget", () => {
+        const statements = parseSync(
+          SPEC_FILE,
+          'import { exec } from "node:child_process";\nexec("lerna run build");',
+        ).program.body.map((statement) => statement as ESTree.Statement);
+        const last = statements.at(-1);
+        const site = spawnSiteAt({
+          node: last?.type === "ExpressionStatement" ? last.expression : null,
+          routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+          forms: DEFAULT_SPAWN_FORMS,
+        });
+        if (site === null) throw new Error("no starting form was reached");
+        const { target } = site;
+        if (target === null) throw new Error("no target was carried");
+        const { value: spelledTarget } = target;
+        return spelledTarget;
+      });
+
+    it("is read through the entry that carries a command line", ({ form }) => {
+      expect(form).toStrictEqual({
+        specifier: "node:child_process",
+        exported: "exec",
+        position: 0,
+        carries: SPAWN_TARGET_LINE,
+      });
+    });
+
+    it("carries the argument that names the command", ({ spelledTarget }) => {
+      expect(spelledTarget).toBe("lerna run build");
+    });
   });
 
-  test("a call taking no argument carries no target", () => {
-    const site = siteIn('import { execSync } from "node:child_process";\nexecSync();');
-    expect(site?.target).toBeNull();
+  describe("a call taking no argument", () => {
+    const it = test.extend("carriedTarget", () => {
+      const statements = parseSync(
+        SPEC_FILE,
+        'import { execSync } from "node:child_process";\nexecSync();',
+      ).program.body.map((statement) => statement as ESTree.Statement);
+      const last = statements.at(-1);
+      const site = spawnSiteAt({
+        node: last?.type === "ExpressionStatement" ? last.expression : null,
+        routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+        forms: DEFAULT_SPAWN_FORMS,
+      });
+      if (site === null) throw new Error("no starting form was reached");
+      const { target: carriedTarget } = site;
+      return carriedTarget;
+    });
+
+    it("carries no target", ({ carriedTarget }) => {
+      expect(carriedTarget).toBe(null);
+    });
   });
 
-  test("a member of a whole module import carries the argument that names the command", () => {
-    const site = siteIn(
-      'import * as childProcess from "node:child_process";\nchildProcess.spawn("lerna", ["run"]);',
-    );
-    expect(site?.form.carries).toBe(SPAWN_TARGET_NAME);
-    expect(spelledTarget(site)).toBe("lerna");
+  describe("a member of a whole module import", () => {
+    const it = test
+      .extend("form", () => {
+        const statements = parseSync(
+          SPEC_FILE,
+          'import * as childProcess from "node:child_process";\nchildProcess.spawn("lerna", ["run"]);',
+        ).program.body.map((statement) => statement as ESTree.Statement);
+        const last = statements.at(-1);
+        const site = spawnSiteAt({
+          node: last?.type === "ExpressionStatement" ? last.expression : null,
+          routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+          forms: DEFAULT_SPAWN_FORMS,
+        });
+        if (site === null) throw new Error("no starting form was reached");
+        const { form } = site;
+        return form;
+      })
+      .extend("spelledTarget", () => {
+        const statements = parseSync(
+          SPEC_FILE,
+          'import * as childProcess from "node:child_process";\nchildProcess.spawn("lerna", ["run"]);',
+        ).program.body.map((statement) => statement as ESTree.Statement);
+        const last = statements.at(-1);
+        const site = spawnSiteAt({
+          node: last?.type === "ExpressionStatement" ? last.expression : null,
+          routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+          forms: DEFAULT_SPAWN_FORMS,
+        });
+        if (site === null) throw new Error("no starting form was reached");
+        const { target } = site;
+        if (target === null) throw new Error("no target was carried");
+        const { value: spelledTarget } = target;
+        return spelledTarget;
+      });
+
+    it("is read through the entry that carries a name", ({ form }) => {
+      expect(form).toStrictEqual({
+        specifier: "node:child_process",
+        exported: "spawn",
+        position: 0,
+        carries: SPAWN_TARGET_NAME,
+      });
+    });
+
+    it("carries the argument that names the command", ({ spelledTarget }) => {
+      expect(spelledTarget).toBe("lerna");
+    });
   });
 
-  test("a member of a default import carries the argument that names the command", () => {
-    const site = siteIn(
-      'import childProcess from "node:child_process";\nchildProcess.execSync("lerna");',
-    );
-    expect(spelledTarget(site)).toBe("lerna");
+  describe("a member of a default import", () => {
+    const it = test.extend("spelledTarget", () => {
+      const statements = parseSync(
+        SPEC_FILE,
+        'import childProcess from "node:child_process";\nchildProcess.execSync("lerna");',
+      ).program.body.map((statement) => statement as ESTree.Statement);
+      const last = statements.at(-1);
+      const site = spawnSiteAt({
+        node: last?.type === "ExpressionStatement" ? last.expression : null,
+        routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+        forms: DEFAULT_SPAWN_FORMS,
+      });
+      if (site === null) throw new Error("no starting form was reached");
+      const { target } = site;
+      if (target === null) throw new Error("no target was carried");
+      const { value: spelledTarget } = target;
+      return spelledTarget;
+    });
+
+    it("carries the argument that names the command", ({ spelledTarget }) => {
+      expect(spelledTarget).toBe("lerna");
+    });
   });
 
-  test("a member written as a subscript reaches no starting form", () => {
-    expect(
-      siteIn('import * as childProcess from "node:child_process";\nchildProcess["exec"]("lerna");'),
-    ).toBeNull();
+  describe("a member written as a subscript", () => {
+    const it = test.extend("site", () => {
+      const statements = parseSync(
+        SPEC_FILE,
+        'import * as childProcess from "node:child_process";\nchildProcess["exec"]("lerna");',
+      ).program.body.map((statement) => statement as ESTree.Statement);
+      const last = statements.at(-1);
+      return spawnSiteAt({
+        node: last?.type === "ExpressionStatement" ? last.expression : null,
+        routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+        forms: DEFAULT_SPAWN_FORMS,
+      });
+    });
+
+    it("reaches no starting form", ({ site }) => {
+      expect(site).toBe(null);
+    });
   });
 
-  test("a member of a named import reaches no starting form", () => {
-    expect(siteIn('import { promises } from "node:fs";\npromises.exec("lerna");')).toBeNull();
+  describe("a member of a named import", () => {
+    const it = test.extend("site", () => {
+      const statements = parseSync(
+        SPEC_FILE,
+        'import { promises } from "node:fs";\npromises.exec("lerna");',
+      ).program.body.map((statement) => statement as ESTree.Statement);
+      const last = statements.at(-1);
+      return spawnSiteAt({
+        node: last?.type === "ExpressionStatement" ? last.expression : null,
+        routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+        forms: DEFAULT_SPAWN_FORMS,
+      });
+    });
+
+    it("reaches no starting form", ({ site }) => {
+      expect(site).toBe(null);
+    });
   });
 
-  test("a member of a binding nothing imports reaches no starting form", () => {
-    expect(siteIn('runner.exec("lerna");')).toBeNull();
+  describe("a member of a binding nothing imports", () => {
+    const it = test.extend("site", () => {
+      const statements = parseSync(SPEC_FILE, 'runner.exec("lerna");').program.body.map(
+        (statement) => statement as ESTree.Statement,
+      );
+      const last = statements.at(-1);
+      return spawnSiteAt({
+        node: last?.type === "ExpressionStatement" ? last.expression : null,
+        routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+        forms: DEFAULT_SPAWN_FORMS,
+      });
+    });
+
+    it("reaches no starting form", ({ site }) => {
+      expect(site).toBe(null);
+    });
   });
 
-  test("a member written on something other than a name reaches no starting form", () => {
-    expect(
+  describe("a member written on something other than a name", () => {
+    const it = test.extend("site", () =>
       spawnSiteAt({
         node: {
           type: "CallExpression",
@@ -96,66 +283,350 @@ describe("declared-replacements/invocation-sites", () => {
         },
         routes: new Map(),
         forms: DEFAULT_SPAWN_FORMS,
-      }),
-    ).toBeNull();
+      }));
+
+    it("reaches no starting form", ({ site }) => {
+      expect(site).toBe(null);
+    });
   });
 
-  test("a template tag written on something other than a name reaches no starting form", () => {
-    expect(
+  describe("a template tag written on something other than a name", () => {
+    const it = test.extend("site", () =>
       spawnSiteAt({
         node: { type: "TaggedTemplateExpression", tag: null },
         routes: new Map(),
         forms: DEFAULT_SPAWN_FORMS,
-      }),
-    ).toBeNull();
+      }));
+
+    it("reaches no starting form", ({ site }) => {
+      expect(site).toBe(null);
+    });
   });
 
-  test("a tagged template carries the line it spells out", () => {
-    const site = siteIn('import { $ } from "execa";\n$`lerna run build`;');
-    expect(site?.form.carries).toBe(SPAWN_TARGET_LINE);
-    expect(site?.target?.type).toBe("TemplateLiteral");
+  describe("a tagged template", () => {
+    const it = test
+      .extend("form", () => {
+        const statements = parseSync(
+          SPEC_FILE,
+          'import { $ } from "execa";\n$`lerna run build`;',
+        ).program.body.map((statement) => statement as ESTree.Statement);
+        const last = statements.at(-1);
+        const site = spawnSiteAt({
+          node: last?.type === "ExpressionStatement" ? last.expression : null,
+          routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+          forms: DEFAULT_SPAWN_FORMS,
+        });
+        if (site === null) throw new Error("no starting form was reached");
+        const { form } = site;
+        return form;
+      })
+      .extend("targetSpelling", () => {
+        const statements = parseSync(
+          SPEC_FILE,
+          'import { $ } from "execa";\n$`lerna run build`;',
+        ).program.body.map((statement) => statement as ESTree.Statement);
+        const last = statements.at(-1);
+        const site = spawnSiteAt({
+          node: last?.type === "ExpressionStatement" ? last.expression : null,
+          routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+          forms: DEFAULT_SPAWN_FORMS,
+        });
+        if (site === null) throw new Error("no starting form was reached");
+        const { target } = site;
+        if (target === null) throw new Error("no target was carried");
+        const { type: targetSpelling } = target;
+        return targetSpelling;
+      });
+
+    it("is read through an entry that carries the line it spells out", ({ form }) => {
+      expect(form).toStrictEqual({
+        specifier: "execa",
+        exported: "$",
+        position: 0,
+        carries: SPAWN_TARGET_LINE,
+      });
+    });
+
+    it("carries the line it spells out", ({ targetSpelling }) => {
+      expect(targetSpelling).toBe("TemplateLiteral");
+    });
   });
 
-  test("a binding taken apart from a synchronous request keeps the route it came through", () => {
-    const site = siteIn('const { exec } = require("node:child_process");\nexec("lerna");');
-    expect(spelledTarget(site)).toBe("lerna");
+  describe("a binding taken apart from a synchronous request", () => {
+    const it = test.extend("spelledTarget", () => {
+      const statements = parseSync(
+        SPEC_FILE,
+        'const { exec } = require("node:child_process");\nexec("lerna");',
+      ).program.body.map((statement) => statement as ESTree.Statement);
+      const last = statements.at(-1);
+      const site = spawnSiteAt({
+        node: last?.type === "ExpressionStatement" ? last.expression : null,
+        routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+        forms: DEFAULT_SPAWN_FORMS,
+      });
+      if (site === null) throw new Error("no starting form was reached");
+      const { target } = site;
+      if (target === null) throw new Error("no target was carried");
+      const { value: spelledTarget } = target;
+      return spelledTarget;
+    });
+
+    it("keeps the route it came through", ({ spelledTarget }) => {
+      expect(spelledTarget).toBe("lerna");
+    });
   });
 
-  test("a whole module bound from a synchronous request keeps the route it came through", () => {
-    const site = siteIn('const cp = require("node:child_process");\ncp.execSync("lerna");');
-    expect(spelledTarget(site)).toBe("lerna");
+  describe("a whole module bound from a synchronous request", () => {
+    const it = test.extend("spelledTarget", () => {
+      const statements = parseSync(
+        SPEC_FILE,
+        'const cp = require("node:child_process");\ncp.execSync("lerna");',
+      ).program.body.map((statement) => statement as ESTree.Statement);
+      const last = statements.at(-1);
+      const site = spawnSiteAt({
+        node: last?.type === "ExpressionStatement" ? last.expression : null,
+        routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+        forms: DEFAULT_SPAWN_FORMS,
+      });
+      if (site === null) throw new Error("no starting form was reached");
+      const { target } = site;
+      if (target === null) throw new Error("no target was carried");
+      const { value: spelledTarget } = target;
+      return spelledTarget;
+    });
+
+    it("keeps the route it came through", ({ spelledTarget }) => {
+      expect(spelledTarget).toBe("lerna");
+    });
   });
 
-  test("a binding taken apart under a subscript reaches no starting form", () => {
-    expect(
-      siteIn('const { [named]: exec } = require("node:child_process");\nexec("lerna");'),
-    ).toBeNull();
+  describe("a binding taken apart under a subscript", () => {
+    const it = test.extend("site", () => {
+      const statements = parseSync(
+        SPEC_FILE,
+        'const { [named]: exec } = require("node:child_process");\nexec("lerna");',
+      ).program.body.map((statement) => statement as ESTree.Statement);
+      const last = statements.at(-1);
+      return spawnSiteAt({
+        node: last?.type === "ExpressionStatement" ? last.expression : null,
+        routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+        forms: DEFAULT_SPAWN_FORMS,
+      });
+    });
+
+    it("reaches no starting form", ({ site }) => {
+      expect(site).toBe(null);
+    });
   });
 
-  test("a binding taken apart under a written-out key reaches no starting form", () => {
-    expect(
-      siteIn('const { "exec": run } = require("node:child_process");\nrun("lerna");'),
-    ).toBeNull();
+  describe("a binding taken apart under a written-out key", () => {
+    const it = test.extend("site", () => {
+      const statements = parseSync(
+        SPEC_FILE,
+        'const { "exec": run } = require("node:child_process");\nrun("lerna");',
+      ).program.body.map((statement) => statement as ESTree.Statement);
+      const last = statements.at(-1);
+      return spawnSiteAt({
+        node: last?.type === "ExpressionStatement" ? last.expression : null,
+        routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+        forms: DEFAULT_SPAWN_FORMS,
+      });
+    });
+
+    it("reaches no starting form", ({ site }) => {
+      expect(site).toBe(null);
+    });
   });
 
-  test("a binding taken apart into a further pattern reaches no starting form", () => {
-    expect(
-      siteIn('const { exec: { inner } } = require("node:child_process");\ninner("lerna");'),
-    ).toBeNull();
+  describe("a binding taken apart into a further pattern", () => {
+    const it = test.extend("site", () => {
+      const statements = parseSync(
+        SPEC_FILE,
+        'const { exec: { inner } } = require("node:child_process");\ninner("lerna");',
+      ).program.body.map((statement) => statement as ESTree.Statement);
+      const last = statements.at(-1);
+      return spawnSiteAt({
+        node: last?.type === "ExpressionStatement" ? last.expression : null,
+        routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+        forms: DEFAULT_SPAWN_FORMS,
+      });
+    });
+
+    it("reaches no starting form", ({ site }) => {
+      expect(site).toBe(null);
+    });
   });
 
-  test("a binding taken apart into a list keeps no route", () => {
-    expect(siteIn('const [exec] = require("node:child_process");\nexec("lerna");')).toBeNull();
+  describe("a binding taken apart into a list", () => {
+    const it = test.extend("site", () => {
+      const statements = parseSync(
+        SPEC_FILE,
+        'const [exec] = require("node:child_process");\nexec("lerna");',
+      ).program.body.map((statement) => statement as ESTree.Statement);
+      const last = statements.at(-1);
+      return spawnSiteAt({
+        node: last?.type === "ExpressionStatement" ? last.expression : null,
+        routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+        forms: DEFAULT_SPAWN_FORMS,
+      });
+    });
+
+    it("keeps no route", ({ site }) => {
+      expect(site).toBe(null);
+    });
   });
 
-  test("a member written on another member reaches no starting form", () => {
-    expect(
-      siteIn('import * as childProcess from "node:child_process";\nchildProcess.inner.exec("x");'),
-    ).toBeNull();
+  describe("a member written on another member", () => {
+    const it = test.extend("site", () => {
+      const statements = parseSync(
+        SPEC_FILE,
+        'import * as childProcess from "node:child_process";\nchildProcess.inner.exec("x");',
+      ).program.body.map((statement) => statement as ESTree.Statement);
+      const last = statements.at(-1);
+      return spawnSiteAt({
+        node: last?.type === "ExpressionStatement" ? last.expression : null,
+        routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+        forms: DEFAULT_SPAWN_FORMS,
+      });
+    });
+
+    it("reaches no starting form", ({ site }) => {
+      expect(site).toBe(null);
+    });
   });
 
-  test("a declarator carrying neither a name nor an initializer keeps no route", () => {
-    expect(
+  describe("a declaration that is not a constant", () => {
+    const it = test.extend("site", () => {
+      const statements = parseSync(
+        SPEC_FILE,
+        'let exec = require("node:child_process").exec;\nexec("lerna");',
+      ).program.body.map((statement) => statement as ESTree.Statement);
+      const last = statements.at(-1);
+      return spawnSiteAt({
+        node: last?.type === "ExpressionStatement" ? last.expression : null,
+        routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+        forms: DEFAULT_SPAWN_FORMS,
+      });
+    });
+
+    it("keeps no route", ({ site }) => {
+      expect(site).toBe(null);
+    });
+  });
+
+  describe("a wrapper built around a starting form", () => {
+    const it = test.extend("spelledTarget", () => {
+      const statements = parseSync(
+        SPEC_FILE,
+        'import { promisify } from "node:util";\nimport { exec } from "node:child_process";\nconst run = promisify(exec);\nrun("lerna run build");',
+      ).program.body.map((statement) => statement as ESTree.Statement);
+      const last = statements.at(-1);
+      const site = spawnSiteAt({
+        node: last?.type === "ExpressionStatement" ? last.expression : null,
+        routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+        forms: DEFAULT_SPAWN_FORMS,
+      });
+      if (site === null) throw new Error("no starting form was reached");
+      const { target } = site;
+      if (target === null) throw new Error("no target was carried");
+      const { value: spelledTarget } = target;
+      return spelledTarget;
+    });
+
+    it("keeps the route it wraps", ({ spelledTarget }) => {
+      expect(spelledTarget).toBe("lerna run build");
+    });
+  });
+
+  describe("a wrapper exported where it is built", () => {
+    const it = test.extend("spelledTarget", () => {
+      const statements = parseSync(
+        SPEC_FILE,
+        'import { promisify } from "node:util";\nimport { exec } from "node:child_process";\nexport const run = promisify(exec);\nrun("lerna");',
+      ).program.body.map((statement) => statement as ESTree.Statement);
+      const last = statements.at(-1);
+      const site = spawnSiteAt({
+        node: last?.type === "ExpressionStatement" ? last.expression : null,
+        routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+        forms: DEFAULT_SPAWN_FORMS,
+      });
+      if (site === null) throw new Error("no starting form was reached");
+      const { target } = site;
+      if (target === null) throw new Error("no target was carried");
+      const { value: spelledTarget } = target;
+      return spelledTarget;
+    });
+
+    it("keeps the route it wraps", ({ spelledTarget }) => {
+      expect(spelledTarget).toBe("lerna");
+    });
+  });
+
+  describe("an export of names already bound", () => {
+    const it = test.extend("spelledTarget", () => {
+      const statements = parseSync(
+        SPEC_FILE,
+        'import { exec } from "node:child_process";\nexport { exec };\nexec("lerna");',
+      ).program.body.map((statement) => statement as ESTree.Statement);
+      const last = statements.at(-1);
+      const site = spawnSiteAt({
+        node: last?.type === "ExpressionStatement" ? last.expression : null,
+        routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+        forms: DEFAULT_SPAWN_FORMS,
+      });
+      if (site === null) throw new Error("no starting form was reached");
+      const { target } = site;
+      if (target === null) throw new Error("no target was carried");
+      const { value: spelledTarget } = target;
+      return spelledTarget;
+    });
+
+    it("keeps no further route", ({ spelledTarget }) => {
+      expect(spelledTarget).toBe("lerna");
+    });
+  });
+
+  describe("a wrapper handed no route of its own", () => {
+    const it = test.extend("site", () => {
+      const statements = parseSync(
+        SPEC_FILE,
+        'const run = promisify("exec");\nrun("lerna");',
+      ).program.body.map((statement) => statement as ESTree.Statement);
+      const last = statements.at(-1);
+      return spawnSiteAt({
+        node: last?.type === "ExpressionStatement" ? last.expression : null,
+        routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+        forms: DEFAULT_SPAWN_FORMS,
+      });
+    });
+
+    it("keeps none", ({ site }) => {
+      expect(site).toBe(null);
+    });
+  });
+
+  describe("a binding holding something other than a call", () => {
+    const it = test.extend("site", () => {
+      const statements = parseSync(SPEC_FILE, 'const run = 1;\nrun("lerna");').program.body.map(
+        (statement) => statement as ESTree.Statement,
+      );
+      const last = statements.at(-1);
+      return spawnSiteAt({
+        node: last?.type === "ExpressionStatement" ? last.expression : null,
+        routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+        forms: DEFAULT_SPAWN_FORMS,
+      });
+    });
+
+    it("keeps no route", ({ site }) => {
+      expect(site).toBe(null);
+    });
+  });
+});
+
+describe("spawnRoutesIn", () => {
+  describe("a declarator carrying neither a name nor an initializer", () => {
+    const it = test.extend("routes", () =>
       spawnRoutesIn({
         body: [
           {
@@ -165,65 +636,100 @@ describe("declared-replacements/invocation-sites", () => {
           },
         ],
         filename: SPEC_FILE,
-      }),
-    ).toStrictEqual(new Map());
+      }));
+
+    it("keeps no route", ({ routes }) => {
+      expect(routes).toStrictEqual(new Map());
+    });
+  });
+});
+
+describe("handedTextsOf", () => {
+  describe("a call spelling its arguments out one by one", () => {
+    const it = test.extend("handedTexts", () => {
+      const statements = parseSync(
+        SPEC_FILE,
+        'import { spawn } from "node:child_process";\nspawn("npx", ["lerna", "run"]);',
+      ).program.body.map((statement) => statement as ESTree.Statement);
+      const last = statements.at(-1);
+      const site = spawnSiteAt({
+        node: last?.type === "ExpressionStatement" ? last.expression : null,
+        routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+        forms: DEFAULT_SPAWN_FORMS,
+      });
+      if (site === null) throw new Error("no starting form was reached");
+      const { handed } = site;
+      return handedTextsOf({ handed, constants: new Map() });
+    });
+
+    it("comes back as text", ({ handedTexts }) => {
+      expect(handedTexts).toStrictEqual(["lerna", "run"]);
+    });
   });
 
-  test("a declaration that is not a constant keeps no route", () => {
-    expect(siteIn('let exec = require("node:child_process").exec;\nexec("lerna");')).toBeNull();
+  describe("a call handing anything but a list", () => {
+    const it = test.extend("handedTexts", () => {
+      const statements = parseSync(
+        SPEC_FILE,
+        'import { spawn } from "node:child_process";\nspawn("npx", handed);',
+      ).program.body.map((statement) => statement as ESTree.Statement);
+      const last = statements.at(-1);
+      const site = spawnSiteAt({
+        node: last?.type === "ExpressionStatement" ? last.expression : null,
+        routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+        forms: DEFAULT_SPAWN_FORMS,
+      });
+      if (site === null) throw new Error("no starting form was reached");
+      const { handed } = site;
+      return handedTextsOf({ handed, constants: new Map() });
+    });
+
+    it("comes back as nothing", ({ handedTexts }) => {
+      expect(handedTexts).toBe(null);
+    });
   });
 
-  test("a wrapper built around a starting form keeps the route it wraps", () => {
-    const site = siteIn(
-      'import { promisify } from "node:util";\nimport { exec } from "node:child_process";\nconst run = promisify(exec);\nrun("lerna run build");',
-    );
-    expect(spelledTarget(site)).toBe("lerna run build");
+  describe("a call nobody wrote arguments for", () => {
+    const it = test.extend("handedTexts", () => {
+      const statements = parseSync(
+        SPEC_FILE,
+        'import { spawn } from "node:child_process";\nspawn("npx");',
+      ).program.body.map((statement) => statement as ESTree.Statement);
+      const last = statements.at(-1);
+      const site = spawnSiteAt({
+        node: last?.type === "ExpressionStatement" ? last.expression : null,
+        routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+        forms: DEFAULT_SPAWN_FORMS,
+      });
+      if (site === null) throw new Error("no starting form was reached");
+      const { handed } = site;
+      return handedTextsOf({ handed, constants: new Map() });
+    });
+
+    it("comes back as nothing", ({ handedTexts }) => {
+      expect(handedTexts).toBe(null);
+    });
   });
 
-  test("a wrapper exported where it is built keeps the route it wraps", () => {
-    const site = siteIn(
-      'import { promisify } from "node:util";\nimport { exec } from "node:child_process";\nexport const run = promisify(exec);\nrun("lerna");',
-    );
-    expect(spelledTarget(site)).toBe("lerna");
-  });
+  describe("a list holding an argument nobody can fold", () => {
+    const it = test.extend("handedTexts", () => {
+      const statements = parseSync(
+        SPEC_FILE,
+        'import { spawn } from "node:child_process";\nspawn("npx", [chosen]);',
+      ).program.body.map((statement) => statement as ESTree.Statement);
+      const last = statements.at(-1);
+      const site = spawnSiteAt({
+        node: last?.type === "ExpressionStatement" ? last.expression : null,
+        routes: spawnRoutesIn({ body: statements, filename: SPEC_FILE }),
+        forms: DEFAULT_SPAWN_FORMS,
+      });
+      if (site === null) throw new Error("no starting form was reached");
+      const { handed } = site;
+      return handedTextsOf({ handed, constants: new Map() });
+    });
 
-  test("an export of names already bound keeps no further route", () => {
-    const site = siteIn(
-      'import { exec } from "node:child_process";\nexport { exec };\nexec("lerna");',
-    );
-    expect(spelledTarget(site)).toBe("lerna");
-  });
-
-  test("a wrapper handed no route of its own keeps none", () => {
-    expect(siteIn('const run = promisify("exec");\nrun("lerna");')).toBeNull();
-  });
-
-  test("a binding holding something other than a call keeps no route", () => {
-    expect(siteIn('const run = 1;\nrun("lerna");')).toBeNull();
-  });
-
-  test("arguments spelled out one by one come back as text", () => {
-    const site = siteIn(
-      'import { spawn } from "node:child_process";\nspawn("npx", ["lerna", "run"]);',
-    );
-    expect(handedTextsOf({ handed: site?.handed ?? [], constants: new Map() })).toStrictEqual([
-      "lerna",
-      "run",
-    ]);
-  });
-
-  test("arguments handed as anything but a list come back as nothing", () => {
-    const site = siteIn('import { spawn } from "node:child_process";\nspawn("npx", handed);');
-    expect(handedTextsOf({ handed: site?.handed ?? [], constants: new Map() })).toBeNull();
-  });
-
-  test("arguments nobody wrote come back as nothing", () => {
-    const site = siteIn('import { spawn } from "node:child_process";\nspawn("npx");');
-    expect(handedTextsOf({ handed: site?.handed ?? [], constants: new Map() })).toBeNull();
-  });
-
-  test("a list holding an argument nobody can fold comes back as nothing", () => {
-    const site = siteIn('import { spawn } from "node:child_process";\nspawn("npx", [chosen]);');
-    expect(handedTextsOf({ handed: site?.handed ?? [], constants: new Map() })).toBeNull();
+    it("comes back as nothing", ({ handedTexts }) => {
+      expect(handedTexts).toBe(null);
+    });
   });
 });

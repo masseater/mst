@@ -1,189 +1,510 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 import { range } from "es-toolkit";
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { governingSurfacesOf } from "./declared-surfaces.ts";
 
-const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-declared-surfaces-"));
-
 const MODULE_SOURCE = "export const shipped = true;\n";
 
-const writeFixture = (name: string, source: string): string => {
-  const path = join(fixtureDir, name);
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, source);
-  return path;
-};
-
-const writeManifest = (name: string, manifest: unknown): void => {
-  writeFixture(`${name}/package.json`, `${JSON.stringify(manifest, null, 2)}\n`);
-};
-
-const writePackage = (name: string, manifest: unknown): string => {
-  writeManifest(`repo/${name}`, manifest);
-  return writeFixture(`repo/${name}/entry.ts`, MODULE_SOURCE);
-};
-
-const surfacesFor = (filename: string): ReturnType<typeof governingSurfacesOf> =>
-  governingSurfacesOf({ cwd: fixtureDir, filename });
-
-writeFixture("repo/pnpm-workspace.yaml", "packages:\n  - packages/*\n");
-writeManifest("repo", { bin: "./cli.ts", main: "./index.js" });
-const rootEntry = writeFixture("repo/entry.ts", MODULE_SOURCE);
-
-const bothEntry = writePackage("packages/both", {
-  name: "@fixture/both",
-  bin: { "fixture-both": "./cli.ts" },
-  exports: { ".": "./src/index.ts" },
-});
-const runnableEntry = writePackage("packages/runnable", {
-  name: "@fixture/runnable",
-  bin: { "fixture-runnable": "./cli.ts" },
-  exports: { "./package.json": "./package.json" },
-  scripts: { build: "vp pack" },
-});
-const blankEntry = writePackage("packages/blank", {
-  name: "@fixture/blank",
-  bin: "",
-  exports: {},
-  main: "   ",
-  types: null,
-});
-const legacyEntry = writePackage("packages/legacy", {
-  name: "@fixture/legacy",
-  module: "./dist/index.js",
-  typings: "./dist/index.d.ts",
-});
-const typedEntry = writePackage("packages/typed", {
-  name: "@fixture/typed",
-  bin: "./cli.ts",
-  types: "./dist/index.d.ts",
-});
-const arrayedEntry = writePackage("packages/arrayed", {
-  name: "@fixture/arrayed",
-  exports: { ".": [null, "./dist/index.js"] },
-});
-const deepEntry = writePackage("packages/deep", {
-  name: "@fixture/deep",
-  exports: range(0, 12).reduce<unknown>((nested) => ({ default: nested }), "./dist/index.js"),
-});
-const namelessEntry = writePackage("packages/nameless", {
-  bin: "./cli.ts",
-  main: "./index.js",
-});
-const blankNameEntry = writePackage("packages/blank-name", {
-  name: "   ",
-  bin: "./cli.ts",
-  exports: "./index.js",
-});
-const brokenEntry = writeFixture("repo/packages/broken/entry.ts", MODULE_SOURCE);
-writeFixture("repo/packages/broken/package.json", "[]\n");
-
-writeFixture("no-manifest/pnpm-workspace.yaml", "packages: []\n");
-const looseEntry = writeFixture("no-manifest/loose.ts", MODULE_SOURCE);
-
-const rememberedEntry = writePackage("packages/remembered", {
-  name: "@fixture/remembered",
-  bin: "./cli.ts",
-});
+const WORKSPACE_MANIFEST = "packages:\n  - packages/*\n";
 
 describe("governingSurfacesOf", () => {
-  it("names both surfaces a package declares in one manifest", () => {
-    expect(surfacesFor(bothEntry)).toStrictEqual({
-      packageName: "@fixture/both",
-      manifestPath: "packages/both/package.json",
-      runnableFields: ["bin"],
-      importableFields: ["exports"],
+  describe("a package declaring a runnable and an importable surface in one manifest", () => {
+    const it = test.extend("surfacesOfAPackageDeclaringBoth", ({}, { onCleanup }) => {
+      const root = realpathSync(mkdtempSync(join(tmpdir(), "declared-surfaces-")));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf8");
+      mkdirSync(join(root, "packages", "both"), { recursive: true });
+      writeFileSync(
+        join(root, "packages", "both", "package.json"),
+        JSON.stringify({
+          name: "@fixture/both",
+          bin: { "fixture-both": "./cli.ts" },
+          exports: { ".": "./src/index.ts" },
+        }),
+        "utf8",
+      );
+      writeFileSync(join(root, "packages", "both", "entry.ts"), MODULE_SOURCE, "utf8");
+      return governingSurfacesOf({
+        cwd: root,
+        filename: join(root, "packages", "both", "entry.ts"),
+      });
+    });
+
+    it("names both surfaces the manifest declares", ({ surfacesOfAPackageDeclaringBoth }) => {
+      expect(surfacesOfAPackageDeclaringBoth).toStrictEqual({
+        packageName: "@fixture/both",
+        manifestPath: "packages/both/package.json",
+        runnableFields: ["bin"],
+        importableFields: ["exports"],
+      });
     });
   });
 
-  it("reads the manifest of the package a nested file belongs to", () => {
-    const nested = writeFixture("repo/packages/both/src/deep/inner.ts", MODULE_SOURCE);
+  describe("a file nested several directories inside a package", () => {
+    const it = test.extend("surfacesOfAFileNestedInsideAPackage", ({}, { onCleanup }) => {
+      const root = realpathSync(mkdtempSync(join(tmpdir(), "declared-surfaces-")));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf8");
+      mkdirSync(join(root, "packages", "both", "src", "deep"), { recursive: true });
+      writeFileSync(
+        join(root, "packages", "both", "package.json"),
+        JSON.stringify({
+          name: "@fixture/both",
+          bin: { "fixture-both": "./cli.ts" },
+          exports: { ".": "./src/index.ts" },
+        }),
+        "utf8",
+      );
+      writeFileSync(
+        join(root, "packages", "both", "src", "deep", "inner.ts"),
+        MODULE_SOURCE,
+        "utf8",
+      );
+      return governingSurfacesOf({
+        cwd: root,
+        filename: join(root, "packages", "both", "src", "deep", "inner.ts"),
+      });
+    });
 
-    expect(surfacesFor(nested)?.packageName).toBe("@fixture/both");
-  });
-
-  it("counts an exports map that only reaches the manifest itself as no import surface", () => {
-    expect(surfacesFor(runnableEntry)).toStrictEqual({
-      packageName: "@fixture/runnable",
-      manifestPath: "packages/runnable/package.json",
-      runnableFields: ["bin"],
-      importableFields: [],
+    it("is read from the manifest of the package that file belongs to", ({
+      surfacesOfAFileNestedInsideAPackage,
+    }) => {
+      expect(surfacesOfAFileNestedInsideAPackage).toStrictEqual({
+        packageName: "@fixture/both",
+        manifestPath: "packages/both/package.json",
+        runnableFields: ["bin"],
+        importableFields: ["exports"],
+      });
     });
   });
 
-  it("counts blank and empty declarations as no surface at all", () => {
-    expect(surfacesFor(blankEntry)).toStrictEqual({
-      packageName: "@fixture/blank",
-      manifestPath: "packages/blank/package.json",
-      runnableFields: [],
-      importableFields: [],
+  describe("a package whose exports map only reaches the manifest itself", () => {
+    const it = test.extend("surfacesOfAPackageExportingOnlyItsManifest", ({}, { onCleanup }) => {
+      const root = realpathSync(mkdtempSync(join(tmpdir(), "declared-surfaces-")));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf8");
+      mkdirSync(join(root, "packages", "runnable"), { recursive: true });
+      writeFileSync(
+        join(root, "packages", "runnable", "package.json"),
+        JSON.stringify({
+          name: "@fixture/runnable",
+          bin: { "fixture-runnable": "./cli.ts" },
+          exports: { "./package.json": "./package.json" },
+          scripts: { build: "vp pack" },
+        }),
+        "utf8",
+      );
+      writeFileSync(join(root, "packages", "runnable", "entry.ts"), MODULE_SOURCE, "utf8");
+      return governingSurfacesOf({
+        cwd: root,
+        filename: join(root, "packages", "runnable", "entry.ts"),
+      });
+    });
+
+    it("counts that map as no import surface", ({ surfacesOfAPackageExportingOnlyItsManifest }) => {
+      expect(surfacesOfAPackageExportingOnlyItsManifest).toStrictEqual({
+        packageName: "@fixture/runnable",
+        manifestPath: "packages/runnable/package.json",
+        runnableFields: ["bin"],
+        importableFields: [],
+      });
     });
   });
 
-  it("counts the bundler and type entries as an import surface", () => {
-    expect(surfacesFor(legacyEntry)?.importableFields).toStrictEqual(["module", "typings"]);
-  });
+  describe("a package declaring blank and empty targets", () => {
+    const it = test.extend("surfacesOfAPackageDeclaringBlankTargets", ({}, { onCleanup }) => {
+      const root = realpathSync(mkdtempSync(join(tmpdir(), "declared-surfaces-")));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf8");
+      mkdirSync(join(root, "packages", "blank"), { recursive: true });
+      writeFileSync(
+        join(root, "packages", "blank", "package.json"),
+        JSON.stringify({
+          name: "@fixture/blank",
+          bin: "",
+          exports: {},
+          main: "   ",
+          types: null,
+        }),
+        "utf8",
+      );
+      writeFileSync(join(root, "packages", "blank", "entry.ts"), MODULE_SOURCE, "utf8");
+      return governingSurfacesOf({
+        cwd: root,
+        filename: join(root, "packages", "blank", "entry.ts"),
+      });
+    });
 
-  it("counts a type entry declared beside a runnable entry as the second surface", () => {
-    expect(surfacesFor(typedEntry)).toStrictEqual({
-      packageName: "@fixture/typed",
-      manifestPath: "packages/typed/package.json",
-      runnableFields: ["bin"],
-      importableFields: ["types"],
+    it("counts them as no surface at all", ({ surfacesOfAPackageDeclaringBlankTargets }) => {
+      expect(surfacesOfAPackageDeclaringBlankTargets).toStrictEqual({
+        packageName: "@fixture/blank",
+        manifestPath: "packages/blank/package.json",
+        runnableFields: [],
+        importableFields: [],
+      });
     });
   });
 
-  it("reads a target written inside an array of alternatives", () => {
-    expect(surfacesFor(arrayedEntry)?.importableFields).toStrictEqual(["exports"]);
-  });
+  describe("a package declaring a bundler entry beside a type entry", () => {
+    const it = test.extend("surfacesOfAPackageDeclaringBundlerAndTypeEntries", ({}, {
+      onCleanup,
+    }) => {
+      const root = realpathSync(mkdtempSync(join(tmpdir(), "declared-surfaces-")));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf8");
+      mkdirSync(join(root, "packages", "legacy"), { recursive: true });
+      writeFileSync(
+        join(root, "packages", "legacy", "package.json"),
+        JSON.stringify({
+          name: "@fixture/legacy",
+          module: "./dist/index.js",
+          typings: "./dist/index.d.ts",
+        }),
+        "utf8",
+      );
+      writeFileSync(join(root, "packages", "legacy", "entry.ts"), MODULE_SOURCE, "utf8");
+      return governingSurfacesOf({
+        cwd: root,
+        filename: join(root, "packages", "legacy", "entry.ts"),
+      });
+    });
 
-  it("stops descending conditions once they nest past the limit", () => {
-    expect(surfacesFor(deepEntry)?.importableFields).toStrictEqual([]);
-  });
-
-  it("falls back to the directory when the manifest declares no name", () => {
-    expect(surfacesFor(namelessEntry)).toStrictEqual({
-      packageName: "packages/nameless",
-      manifestPath: "packages/nameless/package.json",
-      runnableFields: ["bin"],
-      importableFields: ["main"],
+    it("counts both as the import surface", ({
+      surfacesOfAPackageDeclaringBundlerAndTypeEntries,
+    }) => {
+      expect(surfacesOfAPackageDeclaringBundlerAndTypeEntries).toStrictEqual({
+        packageName: "@fixture/legacy",
+        manifestPath: "packages/legacy/package.json",
+        runnableFields: [],
+        importableFields: ["module", "typings"],
+      });
     });
   });
 
-  it("falls back to the directory when the declared name is blank", () => {
-    expect(surfacesFor(blankNameEntry)?.packageName).toBe("packages/blank-name");
-  });
+  describe("a package declaring a type entry beside a runnable entry", () => {
+    const it = test.extend("surfacesOfAPackageDeclaringATypeEntryBesideARunnableOne", ({}, {
+      onCleanup,
+    }) => {
+      const root = realpathSync(mkdtempSync(join(tmpdir(), "declared-surfaces-")));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf8");
+      mkdirSync(join(root, "packages", "typed"), { recursive: true });
+      writeFileSync(
+        join(root, "packages", "typed", "package.json"),
+        JSON.stringify({
+          name: "@fixture/typed",
+          bin: "./cli.ts",
+          types: "./dist/index.d.ts",
+        }),
+        "utf8",
+      );
+      writeFileSync(join(root, "packages", "typed", "entry.ts"), MODULE_SOURCE, "utf8");
+      return governingSurfacesOf({
+        cwd: root,
+        filename: join(root, "packages", "typed", "entry.ts"),
+      });
+    });
 
-  it("names the repository root package by the root itself", () => {
-    expect(surfacesFor(rootEntry)).toStrictEqual({
-      packageName: ".",
-      manifestPath: "package.json",
-      runnableFields: ["bin"],
-      importableFields: ["main"],
+    it("counts the type entry as the second surface", ({
+      surfacesOfAPackageDeclaringATypeEntryBesideARunnableOne,
+    }) => {
+      expect(surfacesOfAPackageDeclaringATypeEntryBesideARunnableOne).toStrictEqual({
+        packageName: "@fixture/typed",
+        manifestPath: "packages/typed/package.json",
+        runnableFields: ["bin"],
+        importableFields: ["types"],
+      });
     });
   });
 
-  it("reads no surface from a manifest that is not an object", () => {
-    expect(surfacesFor(brokenEntry)).toBeNull();
-  });
-
-  it("reads no surface for a file no manifest governs", () => {
-    expect(surfacesFor(looseEntry)).toBeNull();
-  });
-
-  it("remembers what a manifest declared, so a later rewrite does not change the answer", () => {
-    expect(surfacesFor(rememberedEntry)?.importableFields).toStrictEqual([]);
-
-    writeManifest("repo/packages/remembered", {
-      name: "@fixture/remembered",
-      bin: "./cli.ts",
-      exports: { ".": "./src/index.ts" },
+  describe("a package writing its target inside an array of alternatives", () => {
+    const it = test.extend("surfacesOfAPackageDeclaringAnArrayOfAlternatives", ({}, {
+      onCleanup,
+    }) => {
+      const root = realpathSync(mkdtempSync(join(tmpdir(), "declared-surfaces-")));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf8");
+      mkdirSync(join(root, "packages", "arrayed"), { recursive: true });
+      writeFileSync(
+        join(root, "packages", "arrayed", "package.json"),
+        JSON.stringify({
+          name: "@fixture/arrayed",
+          exports: { ".": [null, "./dist/index.js"] },
+        }),
+        "utf8",
+      );
+      writeFileSync(join(root, "packages", "arrayed", "entry.ts"), MODULE_SOURCE, "utf8");
+      return governingSurfacesOf({
+        cwd: root,
+        filename: join(root, "packages", "arrayed", "entry.ts"),
+      });
     });
 
-    expect(surfacesFor(rememberedEntry)?.importableFields).toStrictEqual([]);
+    it("reads the target out of that array", ({
+      surfacesOfAPackageDeclaringAnArrayOfAlternatives,
+    }) => {
+      expect(surfacesOfAPackageDeclaringAnArrayOfAlternatives).toStrictEqual({
+        packageName: "@fixture/arrayed",
+        manifestPath: "packages/arrayed/package.json",
+        runnableFields: [],
+        importableFields: ["exports"],
+      });
+    });
+  });
+
+  describe("a package nesting conditions past the limit", () => {
+    const it = test.extend("surfacesOfAPackageNestingConditionsPastTheLimit", ({}, {
+      onCleanup,
+    }) => {
+      const root = realpathSync(mkdtempSync(join(tmpdir(), "declared-surfaces-")));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf8");
+      mkdirSync(join(root, "packages", "deep"), { recursive: true });
+      const nested = range(0, 12).reduce<unknown>(
+        (condition) => ({ default: condition }),
+        "./dist/index.js",
+      );
+      writeFileSync(
+        join(root, "packages", "deep", "package.json"),
+        JSON.stringify({ name: "@fixture/deep", exports: nested }),
+        "utf8",
+      );
+      writeFileSync(join(root, "packages", "deep", "entry.ts"), MODULE_SOURCE, "utf8");
+      return governingSurfacesOf({
+        cwd: root,
+        filename: join(root, "packages", "deep", "entry.ts"),
+      });
+    });
+
+    it("stops descending and reads no surface", ({
+      surfacesOfAPackageNestingConditionsPastTheLimit,
+    }) => {
+      expect(surfacesOfAPackageNestingConditionsPastTheLimit).toStrictEqual({
+        packageName: "@fixture/deep",
+        manifestPath: "packages/deep/package.json",
+        runnableFields: [],
+        importableFields: [],
+      });
+    });
+  });
+
+  describe("a package whose manifest declares no name", () => {
+    const it = test.extend("surfacesOfAPackageDeclaringNoName", ({}, { onCleanup }) => {
+      const root = realpathSync(mkdtempSync(join(tmpdir(), "declared-surfaces-")));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf8");
+      mkdirSync(join(root, "packages", "nameless"), { recursive: true });
+      writeFileSync(
+        join(root, "packages", "nameless", "package.json"),
+        JSON.stringify({ bin: "./cli.ts", main: "./index.js" }),
+        "utf8",
+      );
+      writeFileSync(join(root, "packages", "nameless", "entry.ts"), MODULE_SOURCE, "utf8");
+      return governingSurfacesOf({
+        cwd: root,
+        filename: join(root, "packages", "nameless", "entry.ts"),
+      });
+    });
+
+    it("falls back to the directory it stands in", ({ surfacesOfAPackageDeclaringNoName }) => {
+      expect(surfacesOfAPackageDeclaringNoName).toStrictEqual({
+        packageName: "packages/nameless",
+        manifestPath: "packages/nameless/package.json",
+        runnableFields: ["bin"],
+        importableFields: ["main"],
+      });
+    });
+  });
+
+  describe("a package whose declared name is blank", () => {
+    const it = test.extend("surfacesOfAPackageDeclaringABlankName", ({}, { onCleanup }) => {
+      const root = realpathSync(mkdtempSync(join(tmpdir(), "declared-surfaces-")));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf8");
+      mkdirSync(join(root, "packages", "blank-name"), { recursive: true });
+      writeFileSync(
+        join(root, "packages", "blank-name", "package.json"),
+        JSON.stringify({ name: "   ", bin: "./cli.ts", exports: "./index.js" }),
+        "utf8",
+      );
+      writeFileSync(join(root, "packages", "blank-name", "entry.ts"), MODULE_SOURCE, "utf8");
+      return governingSurfacesOf({
+        cwd: root,
+        filename: join(root, "packages", "blank-name", "entry.ts"),
+      });
+    });
+
+    it("falls back to the directory it stands in", ({ surfacesOfAPackageDeclaringABlankName }) => {
+      expect(surfacesOfAPackageDeclaringABlankName).toStrictEqual({
+        packageName: "packages/blank-name",
+        manifestPath: "packages/blank-name/package.json",
+        runnableFields: ["bin"],
+        importableFields: ["exports"],
+      });
+    });
+  });
+
+  describe("the manifest standing at the repository root", () => {
+    const it = test.extend("surfacesOfTheRepositoryRootPackage", ({}, { onCleanup }) => {
+      const root = realpathSync(mkdtempSync(join(tmpdir(), "declared-surfaces-")));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf8");
+      writeFileSync(
+        join(root, "package.json"),
+        JSON.stringify({ bin: "./cli.ts", main: "./index.js" }),
+        "utf8",
+      );
+      writeFileSync(join(root, "entry.ts"), MODULE_SOURCE, "utf8");
+      return governingSurfacesOf({ cwd: root, filename: join(root, "entry.ts") });
+    });
+
+    it("is named by the root itself", ({ surfacesOfTheRepositoryRootPackage }) => {
+      expect(surfacesOfTheRepositoryRootPackage).toStrictEqual({
+        packageName: ".",
+        manifestPath: "package.json",
+        runnableFields: ["bin"],
+        importableFields: ["main"],
+      });
+    });
+  });
+
+  describe("a manifest that is not an object", () => {
+    const it = test.extend("surfacesOfAManifestThatIsNotAnObject", ({}, { onCleanup }) => {
+      const root = realpathSync(mkdtempSync(join(tmpdir(), "declared-surfaces-")));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf8");
+      mkdirSync(join(root, "packages", "broken"), { recursive: true });
+      writeFileSync(join(root, "packages", "broken", "package.json"), "[]\n", "utf8");
+      writeFileSync(join(root, "packages", "broken", "entry.ts"), MODULE_SOURCE, "utf8");
+      return governingSurfacesOf({
+        cwd: root,
+        filename: join(root, "packages", "broken", "entry.ts"),
+      });
+    });
+
+    it("governs no surface", ({ surfacesOfAManifestThatIsNotAnObject }) => {
+      expect(surfacesOfAManifestThatIsNotAnObject).toBe(null);
+    });
+  });
+
+  describe("a file no manifest governs", () => {
+    const it = test.extend("surfacesOfAFileNoManifestGoverns", ({}, { onCleanup }) => {
+      const root = realpathSync(mkdtempSync(join(tmpdir(), "declared-surfaces-")));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), "packages: []\n", "utf8");
+      writeFileSync(join(root, "loose.ts"), MODULE_SOURCE, "utf8");
+      return governingSurfacesOf({ cwd: root, filename: join(root, "loose.ts") });
+    });
+
+    it("reads no surface for it", ({ surfacesOfAFileNoManifestGoverns }) => {
+      expect(surfacesOfAFileNoManifestGoverns).toBe(null);
+    });
+  });
+
+  describe("a manifest read before any rewrite", () => {
+    const it = test.extend("surfacesReadBeforeTheManifestWasRewritten", ({}, { onCleanup }) => {
+      const root = realpathSync(mkdtempSync(join(tmpdir(), "declared-surfaces-")));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf8");
+      mkdirSync(join(root, "packages", "remembered"), { recursive: true });
+      writeFileSync(
+        join(root, "packages", "remembered", "package.json"),
+        JSON.stringify({ name: "@fixture/remembered", bin: "./cli.ts" }),
+        "utf8",
+      );
+      writeFileSync(join(root, "packages", "remembered", "entry.ts"), MODULE_SOURCE, "utf8");
+      return governingSurfacesOf({
+        cwd: root,
+        filename: join(root, "packages", "remembered", "entry.ts"),
+      });
+    });
+
+    it("carries the import surface that manifest declared", ({
+      surfacesReadBeforeTheManifestWasRewritten,
+    }) => {
+      expect(surfacesReadBeforeTheManifestWasRewritten).toStrictEqual({
+        packageName: "@fixture/remembered",
+        manifestPath: "packages/remembered/package.json",
+        runnableFields: ["bin"],
+        importableFields: [],
+      });
+    });
+  });
+
+  describe("a manifest read again after it was rewritten", () => {
+    const it = test.extend("surfacesReadAfterTheManifestWasRewritten", ({}, { onCleanup }) => {
+      const root = realpathSync(mkdtempSync(join(tmpdir(), "declared-surfaces-")));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "pnpm-workspace.yaml"), WORKSPACE_MANIFEST, "utf8");
+      mkdirSync(join(root, "packages", "remembered"), { recursive: true });
+      writeFileSync(
+        join(root, "packages", "remembered", "package.json"),
+        JSON.stringify({ name: "@fixture/remembered", bin: "./cli.ts" }),
+        "utf8",
+      );
+      writeFileSync(join(root, "packages", "remembered", "entry.ts"), MODULE_SOURCE, "utf8");
+      governingSurfacesOf({
+        cwd: root,
+        filename: join(root, "packages", "remembered", "entry.ts"),
+      });
+      writeFileSync(
+        join(root, "packages", "remembered", "package.json"),
+        JSON.stringify({
+          name: "@fixture/remembered",
+          bin: "./cli.ts",
+          exports: { ".": "./src/index.ts" },
+        }),
+        "utf8",
+      );
+      return governingSurfacesOf({
+        cwd: root,
+        filename: join(root, "packages", "remembered", "entry.ts"),
+      });
+    });
+
+    it("still carries what the first read remembered", ({
+      surfacesReadAfterTheManifestWasRewritten,
+    }) => {
+      expect(surfacesReadAfterTheManifestWasRewritten).toStrictEqual({
+        packageName: "@fixture/remembered",
+        manifestPath: "packages/remembered/package.json",
+        runnableFields: ["bin"],
+        importableFields: [],
+      });
+    });
   });
 });

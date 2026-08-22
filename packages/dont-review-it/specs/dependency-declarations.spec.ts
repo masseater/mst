@@ -11,10 +11,10 @@ const repositoryWith = async (files: Readonly<Record<string, string>>): Promise<
   onTestFinished(async () => rm(repositoryRoot, { recursive: true, force: true }));
 
   await Promise.all(
-    Object.entries(files).map(async ([name, source]) => {
-      const target = join(repositoryRoot, name);
-      await mkdir(dirname(target), { recursive: true });
-      await writeFile(target, source, "utf-8");
+    Object.entries(files).map(async ([fileName, source]) => {
+      const absolutePath = join(repositoryRoot, fileName);
+      await mkdir(dirname(absolutePath), { recursive: true });
+      await writeFile(absolutePath, source, "utf-8");
     }),
   );
   return repositoryRoot;
@@ -47,7 +47,7 @@ describe("依存宣言の検査", () => {
       "packages/web/package.json": `{"dependencies": {"react": "catalog:"}}`,
     });
     const { problems } = runChecks(repositoryRoot);
-    expect(problems.join("\n")).toContain("The catalog must not hold react");
+    expect(problems.join("\n")).toContain("The default catalog must not hold react");
   });
 
   it("overrides が catalog: で参照するエントリは、使うマニフェストが 1 つでも通す", async () => {
@@ -76,6 +76,91 @@ overrides:
     });
     const { problems } = runChecks(repositoryRoot);
     expect(problems.join("\n")).toContain("must not carry ^5.5.0 directly");
+  });
+
+  it("catalog 参照と異なるバージョンの直書きが並ぶ場合は、catalog の単一使用ではなくバージョンの食い違いとして報告する", async () => {
+    const repositoryRoot = await repositoryWith({
+      "pnpm-workspace.yaml": "packages:\n  - packages/*\ncatalog:\n  react: ^19.0.0\n",
+      "packages/web/package.json": `{"dependencies": {"react": "catalog:"}}`,
+      "packages/legacy/package.json": `{"dependencies": {"react": "^18.0.0"}}`,
+    });
+    const { problems } = runChecks(repositoryRoot);
+
+    expect(problems).toStrictEqual([
+      "packages/legacy/package.json react is pinned to ^18.0.0 here while the catalog pins ^19.0.0. Choose the intended version, keep it in one catalog entry, and replace this manifest's specifier with a reference to that entry.",
+    ]);
+  });
+
+  it("catalog と異なるバージョンを直接使うマニフェストが 1 つだけでも、catalog の削除よりバージョンの食い違いを先に報告する", async () => {
+    const repositoryRoot = await repositoryWith({
+      "pnpm-workspace.yaml": "packages:\n  - packages/*\ncatalog:\n  react: ^19.0.0\n",
+      "packages/legacy/package.json": `{"dependencies": {"react": "^18.0.0"}}`,
+    });
+    const { problems } = runChecks(repositoryRoot);
+
+    expect(problems).toStrictEqual([
+      "packages/legacy/package.json react is pinned to ^18.0.0 here while the catalog pins ^19.0.0. Choose the intended version, keep it in one catalog entry, and replace this manifest's specifier with a reference to that entry.",
+    ]);
+  });
+
+  it("named catalog の単一使用版と同じ直書きは、その entry の削除と別版 catalog との食い違いを同時に報告しない", async () => {
+    const repositoryRoot = await repositoryWith({
+      "pnpm-workspace.yaml": `packages:
+  - packages/*
+catalog:
+  react: ^19.0.0
+catalogs:
+  legacy:
+    react: ^18.0.0
+`,
+      "packages/web/package.json": `{"dependencies": {"react": "catalog:"}}`,
+      "packages/site/package.json": `{"dependencies": {"react": "catalog:"}}`,
+      "packages/legacy/package.json": `{"dependencies": {"react": "^18.0.0"}}`,
+    });
+    const { problems } = runChecks(repositoryRoot);
+
+    expect(problems).toStrictEqual([
+      'pnpm-workspace.yaml The named "legacy" catalog must not hold react while packages/legacy/package.json is the only manifest that uses it, because a catalog entry exists to share one version between manifests. Write ^18.0.0 into that manifest and delete the entry.',
+    ]);
+  });
+
+  it("単一使用の named catalog と共有中の default catalog が同じ版を持つ場合も、最初の run は named entry の削除だけを報告する", async () => {
+    const repositoryRoot = await repositoryWith({
+      "pnpm-workspace.yaml": `packages:
+  - packages/*
+catalog:
+  react: ^19.0.0
+catalogs:
+  legacy:
+    react: ^19.0.0
+`,
+      "packages/web/package.json": `{"dependencies": {"react": "catalog:"}}`,
+      "packages/site/package.json": `{"dependencies": {"react": "catalog:"}}`,
+      "packages/legacy/package.json": `{"dependencies": {"react": "^19.0.0"}}`,
+    });
+    const { problems } = runChecks(repositoryRoot);
+
+    expect(problems).toStrictEqual([
+      'pnpm-workspace.yaml The named "legacy" catalog must not hold react while packages/legacy/package.json is the only manifest that uses it, because a catalog entry exists to share one version between manifests. Write ^19.0.0 into that manifest and delete the entry.',
+    ]);
+  });
+
+  it("単一使用の named entry を削除した後の run は、残った default catalog への参照化を報告する", async () => {
+    const repositoryRoot = await repositoryWith({
+      "pnpm-workspace.yaml": `packages:
+  - packages/*
+catalog:
+  react: ^19.0.0
+`,
+      "packages/web/package.json": `{"dependencies": {"react": "catalog:"}}`,
+      "packages/site/package.json": `{"dependencies": {"react": "catalog:"}}`,
+      "packages/legacy/package.json": `{"dependencies": {"react": "^19.0.0"}}`,
+    });
+    const { problems } = runChecks(repositoryRoot);
+
+    expect(problems).toStrictEqual([
+      "packages/legacy/package.json react must not carry ^19.0.0 directly while the catalog already pins that version. Replace the specifier with catalog: so one declaration keeps the version.",
+    ]);
   });
 
   it("複数のマニフェストが catalog の外で同じバージョンを繰り返していたら報告する", async () => {

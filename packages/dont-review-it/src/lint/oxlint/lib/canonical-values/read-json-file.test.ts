@@ -1,50 +1,83 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, onTestFinished, test } from "vite-plus/test";
+import { attempt } from "es-toolkit";
+import { describe, expect, test } from "vite-plus/test";
 
 import { readJsonFile } from "./read-json-file.ts";
 
-const createFixtureDirectory = (): string => {
-  const root = mkdtempSync(join(tmpdir(), "read-json-file-"));
-  onTestFinished(() => {
-    rmSync(root, { recursive: true, force: true });
-  });
-  return root;
-};
+const TRUNCATED_JSON_DIRECTORY = join(tmpdir(), "read-json-file-truncated");
 
-const writeManifest = (root: string, text: string): string => {
-  const path = join(root, "package.json");
-  writeFileSync(path, text, "utf8");
-  return path;
-};
+const FOREIGN_TEXT_DIRECTORY = join(tmpdir(), "read-json-file-foreign-text");
 
 describe("readJsonFile", () => {
-  test("a manifest that parses hands back what it declares", () => {
-    const root = createFixtureDirectory();
-    const path = writeManifest(root, '{ "name": "order" }');
+  describe("a manifest that parses", () => {
+    const it = test.extend("manifest", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "read-json-file-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "package.json"), '{ "name": "order" }', "utf8");
+      return readJsonFile(join(root, "package.json"));
+    });
 
-    expect(readJsonFile(path)).toStrictEqual({ name: "order" });
+    it("hands back what it declares", ({ manifest }) => {
+      expect(manifest).toStrictEqual({ name: "order" });
+    });
   });
 
-  test("a manifest that is not there is an absence", () => {
-    const root = createFixtureDirectory();
+  describe("a manifest that is not there", () => {
+    const it = test.extend("manifest", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "read-json-file-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      return readJsonFile(join(root, "package.json"));
+    });
 
-    expect(readJsonFile(join(root, "package.json"))).toBe(null);
+    it("is an absence", ({ manifest }) => {
+      expect(manifest).toBe(null);
+    });
   });
 
-  test("a manifest that is there but does not parse is raised rather than reported as absent", () => {
-    const root = createFixtureDirectory();
-    const path = writeManifest(root, '{ "name": ');
+  describe("a manifest cut short", () => {
+    const it = test.extend("failureMessage", ({}, { onCleanup }) => {
+      mkdirSync(TRUNCATED_JSON_DIRECTORY, { recursive: true });
+      onCleanup(() => {
+        rmSync(TRUNCATED_JSON_DIRECTORY, { recursive: true, force: true });
+      });
+      writeFileSync(join(TRUNCATED_JSON_DIRECTORY, "package.json"), '{ "name": ', "utf8");
+      const [failure] = attempt<unknown, Error>(() =>
+        readJsonFile(join(TRUNCATED_JSON_DIRECTORY, "package.json")),
+      );
+      return failure === null ? null : failure.message;
+    });
 
-    expect(() => readJsonFile(path)).toThrow("does not parse as JSON");
+    it("is raised rather than reported as absent", ({ failureMessage }) => {
+      expect(failureMessage).toBe(
+        `${join(TRUNCATED_JSON_DIRECTORY, "package.json")} exists but does not parse as JSON`,
+      );
+    });
   });
 
-  test("the raised failure names the file that could not be parsed", () => {
-    const root = createFixtureDirectory();
-    const path = writeManifest(root, "not json at all");
+  describe("a manifest holding text that is no JSON at all", () => {
+    const it = test.extend("failureMessage", ({}, { onCleanup }) => {
+      mkdirSync(FOREIGN_TEXT_DIRECTORY, { recursive: true });
+      onCleanup(() => {
+        rmSync(FOREIGN_TEXT_DIRECTORY, { recursive: true, force: true });
+      });
+      writeFileSync(join(FOREIGN_TEXT_DIRECTORY, "package.json"), "not json at all", "utf8");
+      const [failure] = attempt<unknown, Error>(() =>
+        readJsonFile(join(FOREIGN_TEXT_DIRECTORY, "package.json")),
+      );
+      return failure === null ? null : failure.message;
+    });
 
-    expect(() => readJsonFile(path)).toThrow(path);
+    it("is raised the same way", ({ failureMessage }) => {
+      expect(failureMessage).toBe(
+        `${join(FOREIGN_TEXT_DIRECTORY, "package.json")} exists but does not parse as JSON`,
+      );
+    });
   });
 });

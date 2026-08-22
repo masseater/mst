@@ -12,22 +12,23 @@ export type GitOperations = {
   readonly sharedGitDirPath: () => Promise<string | null>;
 };
 
-const absoluteFrom = (cwd: string, output: string): string | null => {
-  const trimmed = output.trim();
+const absoluteFrom = (cwd: string, produced: string): string | null => {
+  const trimmed = produced.trim();
   if (trimmed === "") return null;
   return isAbsolute(trimmed) ? trimmed : resolve(cwd, trimmed);
 };
 
-export const createGitOperations = (context: {
+export const createGitOperations = (carried: {
   readonly git: GitRunner;
   readonly cwd: string;
 }): GitOperations => {
-  const run = (args: readonly string[]) => context.git.run({ args, cwd: context.cwd });
+  const run = (handedArgs: readonly string[]) =>
+    carried.git.run({ args: handedArgs, cwd: carried.cwd });
 
-  const resolvedPathOf = async (args: readonly string[]): Promise<string | null> => {
+  const resolvedPathOf = async (handedArgs: readonly string[]): Promise<string | null> => {
     try {
-      const { stdout } = await run(args);
-      return absoluteFrom(context.cwd, stdout);
+      const { stdout } = await run(handedArgs);
+      return absoluteFrom(carried.cwd, stdout);
     } catch (pathFailure) {
       void pathFailure;
       return null;
@@ -40,9 +41,9 @@ export const createGitOperations = (context: {
       return stdout.trim() !== "";
     },
     porcelainStatus: async () => (await run(["status", "--porcelain"])).stdout,
-    commitAll: async (message) => {
+    commitAll: async (complaint) => {
       await run(["add", "-A"]);
-      await run(["commit", "-m", message]);
+      await run(["commit", "-m", complaint]);
     },
     push: async () => {
       await run(["push", "origin", "HEAD"]);

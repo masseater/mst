@@ -1,6 +1,7 @@
 import { uniq } from "es-toolkit";
 
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { fixtureDeclarationsOf } from "../lib/spec-syntax/fixture-declarations.ts";
 import {
   moduleDeclarationsOf,
@@ -22,10 +23,10 @@ type Reading = {
   readonly factory: SpecFunction | null;
 };
 
-const boundInitializer = (reading: Reading, name: string): ESTree.Expression | null => {
-  const body = reading.factory === null ? null : blockBodyOf(reading.factory);
-  const held = body === null ? null : localConstInitializer(body, name);
-  return held ?? reading.module.initializerByName.get(name) ?? null;
+const boundInitializer = (reading: Reading, spelled: string): ESTree.Expression | null => {
+  const writtenBody = reading.factory === null ? null : blockBodyOf(reading.factory);
+  const held = writtenBody === null ? null : localConstInitializer(writtenBody, spelled);
+  return held ?? reading.module.initializerByName.get(spelled) ?? null;
 };
 
 const resolvedObject = (
@@ -43,8 +44,8 @@ const resolvedObject = (
   return bound.type === "ObjectExpression" ? bound : null;
 };
 
-const readNameOf = (reading: Reading, value: ESTree.Expression): string | null => {
-  const written = unwrapSubject(value);
+const readNameOf = (reading: Reading, propertyValue: ESTree.Expression): string | null => {
+  const written = unwrapSubject(propertyValue);
   if (written.type === "MemberExpression") return staticMemberName(written);
   if (written.type !== "Identifier") return null;
 
@@ -55,14 +56,17 @@ const readNameOf = (reading: Reading, value: ESTree.Expression): string | null =
   return bound.type === "MemberExpression" ? staticMemberName(bound) : null;
 };
 
-const copiedNamesIn = (reading: Reading, object: ESTree.ObjectExpression): readonly string[] =>
-  object.properties.flatMap((property) => {
+const copiedNamesIn = (
+  reading: Reading,
+  subjectLiteral: ESTree.ObjectExpression,
+): readonly string[] =>
+  subjectLiteral.properties.flatMap((property) => {
     if (property.type !== "Property") return [];
     if (property.method || property.kind !== "init") return [];
 
-    const name = staticPropertyName(property);
-    if (name === null) return [];
-    return readNameOf(reading, property.value) === name ? [name] : [];
+    const propertyName = staticPropertyName(property);
+    if (propertyName === null) return [];
+    return readNameOf(reading, property.value) === propertyName ? [propertyName] : [];
   });
 
 const reportsFor = (input: {
@@ -77,14 +81,14 @@ const reportsFor = (input: {
     const reading = { module: input.module, factory: declaration.factory };
 
     return declaration.subjects.flatMap((subject) => {
-      const object = resolvedObject(reading, subject);
-      if (object === null) return [];
+      const subjectLiteral = resolvedObject(reading, subject);
+      if (subjectLiteral === null) return [];
 
-      const copied = uniq(copiedNamesIn(reading, object));
+      const copied = uniq(copiedNamesIn(reading, subjectLiteral));
       if (copied.length === 0) return [];
       return [
         {
-          node: object,
+          node: subjectLiteral,
           messageId: "copiedSubject",
           data: { fixture: declaration.name, properties: copied.join(", ") },
         },
@@ -115,19 +119,18 @@ export const noFixtureCopySubject = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
-
-    const fixtures = new Set<ESTree.CallExpression>();
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
     return {
-      CallExpression(node: ESTree.CallExpression) {
-        if (fixtureDeclarationsOf(node).length > 0) fixtures.add(node);
-      },
-      "Program:exit"(node: ESTree.Program) {
-        const module = moduleDeclarationsOf(context.filename, node.body);
+      "Program:exit"(program: ESTree.Program) {
+        const module = moduleDeclarationsOf(inspection.filename, program.body);
+        const fixtures = nodesOfType(program, "CallExpression").filter(
+          (call) => fixtureDeclarationsOf(call).length > 0,
+        );
+
         for (const call of fixtures) {
-          for (const report of reportsFor({ module, call })) context.report(report);
+          for (const report of reportsFor({ module, call })) inspection.report(report);
         }
       },
     };

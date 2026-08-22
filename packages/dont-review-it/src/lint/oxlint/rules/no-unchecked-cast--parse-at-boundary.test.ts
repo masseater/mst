@@ -42,7 +42,7 @@ describe("dont-review-it/no-unchecked-cast--parse-at-boundary", () => {
       },
       {
         name: "a value a parse hands back is bound to the type that parse returns",
-        code: "const row: Row = parseRow(input);",
+        code: "const row: Row = parseRow(given);",
       },
       {
         name: "an assertion on a name this file does not declare is left alone",

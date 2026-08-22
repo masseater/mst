@@ -1,4 +1,5 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { IN_PLACE_ARRAY_METHODS } from "../lib/array-mutation-methods.ts";
 import {
   resolveBinding,
   type BindingResolution,
@@ -6,18 +7,6 @@ import {
 } from "../lib/resolved-bindings.ts";
 
 import type { Definition, ESTree } from "@oxlint/plugins";
-
-const IN_PLACE_ARRAY_METHODS: ReadonlySet<string> = new Set([
-  "copyWithin",
-  "fill",
-  "pop",
-  "push",
-  "reverse",
-  "shift",
-  "sort",
-  "splice",
-  "unshift",
-]);
 
 const ARRAY_RETURNING_ARRAY_METHODS: ReadonlySet<string> = new Set([
   "concat",
@@ -44,11 +33,11 @@ const ARRAY_TYPE_NAMES: ReadonlySet<string> = new Set(["Array", "ReadonlyArray"]
 const staticPropertyName = (node: ESTree.MemberExpression): string | null => {
   if (!node.computed) return node.property.type === "Identifier" ? node.property.name : null;
 
-  const key = node.property;
-  if (key.type === "Literal") return typeof key.value === "string" ? key.value : null;
-  if (key.type !== "TemplateLiteral") return null;
-  if (key.expressions.length !== 0) return null;
-  return key.quasis
+  const named = node.property;
+  if (named.type === "Literal") return typeof named.value === "string" ? named.value : null;
+  if (named.type !== "TemplateLiteral") return null;
+  if (named.expressions.length !== 0) return null;
+  return named.quasis
     .slice(0, 1)
     .map((quasi) => quasi.value.cooked)
     .join("");
@@ -57,14 +46,17 @@ const staticPropertyName = (node: ESTree.MemberExpression): string | null => {
 const isArrayGlobalReference = (node: ESTree.Expression): boolean =>
   node.type === "Identifier" && node.name === "Array";
 
-const declaredTypeParameterConstraint = (node: ESTree.Node, name: string): ESTree.TSType | null => {
+const declaredTypeParameterConstraint = (
+  node: ESTree.Node,
+  spelled: string,
+): ESTree.TSType | null => {
   if (node.parent === null) return null;
 
   const declared = "typeParameters" in node.parent ? node.parent.typeParameters : null;
-  const matched = declared?.params.find((parameter) => parameter.name.name === name);
+  const matched = declared?.params.find((parameter) => parameter.name.name === spelled);
   if (matched !== undefined) return matched.constraint;
 
-  return declaredTypeParameterConstraint(node.parent, name);
+  return declaredTypeParameterConstraint(node.parent, spelled);
 };
 
 const isArrayLikeTypeReference = (
@@ -154,8 +146,10 @@ const isSlicedTemporaryElementAccess = (
 ): boolean => {
   if (methodName !== "pop" && methodName !== "shift") return false;
   if (receiver.type !== "CallExpression") return false;
-  const target = receiver.callee;
-  return target.type === "MemberExpression" && staticPropertyName(target) === "slice";
+  const sliceCallTarget = receiver.callee;
+  return (
+    sliceCallTarget.type === "MemberExpression" && staticPropertyName(sliceCallTarget) === "slice"
+  );
 };
 
 const isArrayLikeThroughWrapper = (
@@ -213,8 +207,8 @@ export const noArrayMutation = createDontReviewItRule({
     },
     schema: [],
   },
-  create(context) {
-    const scopeAt: ScopeLookup = (node) => context.sourceCode.getScope(node);
+  create(inspection) {
+    const scopeAt: ScopeLookup = (node) => inspection.sourceCode.getScope(node);
 
     return {
       CallExpression(node: ESTree.CallExpression) {
@@ -226,7 +220,7 @@ export const noArrayMutation = createDontReviewItRule({
         if (!IN_PLACE_ARRAY_METHODS.has(methodName)) return;
         if (!isArrayLikeExpression(callee.object, { scopeAt, seenBindings: new Set() })) return;
 
-        context.report({
+        inspection.report({
           node: callee.property,
           messageId: isSlicedTemporaryElementAccess(callee.object, methodName)
             ? "slicedTemporaryElementAccess"

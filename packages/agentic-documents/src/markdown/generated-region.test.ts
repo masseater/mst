@@ -4,37 +4,58 @@ import { generatedRanges, isInsideGeneratedRegion } from "./generated-region.ts"
 
 const BOUNDARIES = [{ begin: "<!--BEGIN-->", end: "<!--END-->" }];
 
-const rangesIn = (source: string) => generatedRanges(source, BOUNDARIES);
+const DOCUMENT_OPENING_AND_CLOSING_A_REGION = "prose\n<!--BEGIN-->\ngenerated\n<!--END-->\nmore\n";
 
 describe("generatedRanges", () => {
-  test("a region that opens and closes is one range", () => {
-    const source = "prose\n<!--BEGIN-->\ngenerated\n<!--END-->\nmore\n";
+  describe("a document that opens a region and closes it", () => {
+    const it = test.extend("ranges", () =>
+      generatedRanges(DOCUMENT_OPENING_AND_CLOSING_A_REGION, BOUNDARIES));
 
-    expect(rangesIn(source)).toStrictEqual([
-      {
-        startOffset: source.indexOf("<!--BEGIN-->"),
-        endOffset: source.indexOf("<!--END-->") + "<!--END-->".length,
-      },
-    ]);
+    it("hands back one range spanning both boundaries and the text between them", ({ ranges }) => {
+      expect(ranges).toStrictEqual([{ startOffset: 6, endOffset: 39 }]);
+    });
   });
 
-  test("a document that never opens a region has none", () => {
-    expect(rangesIn("prose only\n")).toStrictEqual([]);
+  describe("a document that never opens a region", () => {
+    const it = test.extend("ranges", () => generatedRanges("prose only\n", BOUNDARIES));
+
+    it("hands back no range at all", ({ ranges }) => {
+      expect(ranges).toStrictEqual([]);
+    });
   });
 
-  test("a region that opens and never closes is not a range", () => {
-    expect(rangesIn("prose\n<!--BEGIN-->\ngenerated\n")).toStrictEqual([]);
+  describe("a document that opens a region and never closes it", () => {
+    const it = test.extend("ranges", () =>
+      generatedRanges("prose\n<!--BEGIN-->\ngenerated\n", BOUNDARIES));
+
+    it("hands back no range at all", ({ ranges }) => {
+      expect(ranges).toStrictEqual([]);
+    });
   });
 });
 
 describe("isInsideGeneratedRegion", () => {
-  const source = "prose\n<!--BEGIN-->\ngenerated\n<!--END-->\nmore\n";
+  describe("an offset standing between the boundaries of a region", () => {
+    const it = test.extend("verdict", () =>
+      isInsideGeneratedRegion(
+        19,
+        generatedRanges(DOCUMENT_OPENING_AND_CLOSING_A_REGION, BOUNDARIES),
+      ));
 
-  test("an offset inside the region is inside it", () => {
-    expect(isInsideGeneratedRegion(source.indexOf("generated"), rangesIn(source))).toBe(true);
+    it("reads as inside the generated region", ({ verdict }) => {
+      expect(verdict).toBe(true);
+    });
   });
 
-  test("an offset outside every region is outside them", () => {
-    expect(isInsideGeneratedRegion(0, rangesIn(source))).toBe(false);
+  describe("an offset standing ahead of every region", () => {
+    const it = test.extend("verdict", () =>
+      isInsideGeneratedRegion(
+        0,
+        generatedRanges(DOCUMENT_OPENING_AND_CLOSING_A_REGION, BOUNDARIES),
+      ));
+
+    it("reads as outside the generated region", ({ verdict }) => {
+      expect(verdict).toBe(false);
+    });
   });
 });

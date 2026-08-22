@@ -1,126 +1,288 @@
-import { LINT_SEVERITY } from "@mst/lint-rule-authoring";
 import { describe, expect, test } from "vite-plus/test";
 
 import { UPSTREAM_PLUGINS, UPSTREAM_RULES, UPSTREAM_TEST_RULES } from "./upstream-rules.ts";
 
-const PONYTAIL_UPSTREAM_RULE_NAMES = [
-  "no-useless-call",
-  "no-useless-return",
-  "prefer-object-has-own",
-  "typescript/prefer-readonly",
-  "unicorn/no-useless-collection-argument",
-  "unicorn/prefer-array-flat-map",
-  "unicorn/prefer-blob-reading-methods",
-  "unicorn/prefer-classlist-toggle",
-  "unicorn/prefer-code-point",
-  "unicorn/prefer-date-now",
-  "unicorn/prefer-dom-node-append",
-  "unicorn/prefer-dom-node-remove",
-  "unicorn/prefer-import-meta-properties",
-  "unicorn/prefer-math-min-max",
-  "unicorn/prefer-math-trunc",
-  "unicorn/prefer-modern-dom-apis",
-  "unicorn/prefer-modern-math-apis",
-  "unicorn/prefer-negative-index",
-  "unicorn/prefer-number-coercion",
-  "unicorn/prefer-query-selector",
-  "unicorn/prefer-regexp-test",
-  "unicorn/prefer-response-static-json",
-  "unicorn/prefer-string-raw",
-  "unicorn/prefer-string-replace-all",
-  "unicorn/prefer-structured-clone",
-] as const;
-
 describe("upstream rule policy", () => {
-  test("it enables every upstream plugin the configured rule prefixes require", () => {
-    expect(UPSTREAM_PLUGINS).toStrictEqual([
-      "import",
-      "jsx-a11y",
-      "oxc",
-      "promise",
-      "typescript",
-      "unicorn",
-      "vitest",
-    ]);
+  const it = test
+    .extend("upstreamPlugins", () => UPSTREAM_PLUGINS)
+    .extend("upstreamRules", () => UPSTREAM_RULES)
+    .extend("upstreamTestRules", () => UPSTREAM_TEST_RULES);
+
+  it("pins the complete plugin set", ({ upstreamPlugins }) => {
+    expect(upstreamPlugins).toMatchInlineSnapshot(`
+      [
+        "import",
+        "jsx-a11y",
+        "oxc",
+        "promise",
+        "typescript",
+        "unicorn",
+        "vitest",
+      ]
+    `);
   });
 
-  test("all 25 upstream Ponytail rules are fixed at error severity", () => {
-    const configuredRules = Object.fromEntries(
-      PONYTAIL_UPSTREAM_RULE_NAMES.map((ruleName) => [ruleName, UPSTREAM_RULES[ruleName]]),
-    );
-
-    expect(PONYTAIL_UPSTREAM_RULE_NAMES).toHaveLength(25);
-    expect(new Set(PONYTAIL_UPSTREAM_RULE_NAMES)).toHaveLength(25);
-    expect(configuredRules).toStrictEqual(
-      Object.fromEntries(
-        PONYTAIL_UPSTREAM_RULE_NAMES.map((ruleName) => [ruleName, LINT_SEVERITY.ERROR]),
-      ),
-    );
+  it("pins the complete production rule policy", ({ upstreamRules }) => {
+    expect(upstreamRules).toStrictEqual({
+      eqeqeq: "error",
+      "func-style": [
+        "error",
+        "expression",
+        {
+          allowArrowFunctions: true,
+        },
+      ],
+      "import/default": "error",
+      "import/export": "error",
+      "import/namespace": "error",
+      "import/no-named-as-default": "error",
+      "import/no-named-as-default-member": "error",
+      "jsx-a11y/alt-text": "error",
+      "jsx-a11y/anchor-has-content": "error",
+      "jsx-a11y/anchor-is-valid": "error",
+      "jsx-a11y/aria-activedescendant-has-tabindex": "error",
+      "jsx-a11y/aria-props": "error",
+      "jsx-a11y/aria-proptypes": "error",
+      "jsx-a11y/aria-role": "error",
+      "jsx-a11y/aria-unsupported-elements": "error",
+      "jsx-a11y/autocomplete-valid": "error",
+      "jsx-a11y/click-events-have-key-events": "error",
+      "jsx-a11y/heading-has-content": "error",
+      "jsx-a11y/html-has-lang": "error",
+      "jsx-a11y/iframe-has-title": "error",
+      "jsx-a11y/img-redundant-alt": "error",
+      "jsx-a11y/label-has-associated-control": "error",
+      "jsx-a11y/media-has-caption": "error",
+      "jsx-a11y/mouse-events-have-key-events": "error",
+      "jsx-a11y/no-access-key": "error",
+      "jsx-a11y/no-autofocus": "error",
+      "jsx-a11y/no-distracting-elements": "error",
+      "jsx-a11y/no-noninteractive-tabindex": "error",
+      "jsx-a11y/no-redundant-roles": "error",
+      "jsx-a11y/no-static-element-interactions": "error",
+      "jsx-a11y/role-has-required-aria-props": "error",
+      "jsx-a11y/role-supports-aria-props": "error",
+      "jsx-a11y/scope": "error",
+      "jsx-a11y/tabindex-no-positive": "error",
+      "no-async-promise-executor": "error",
+      "no-case-declarations": "error",
+      "no-compare-neg-zero": "error",
+      "no-cond-assign": "error",
+      "no-constant-binary-expression": "error",
+      "no-constant-condition": "error",
+      "no-control-regex": "error",
+      "no-debugger": "error",
+      "no-delete-var": "error",
+      "no-dupe-else-if": "error",
+      "no-duplicate-case": "error",
+      "no-empty-character-class": "error",
+      "no-empty-pattern": [
+        "error",
+        {
+          allowObjectPatternsAsParameters: true,
+        },
+      ],
+      "no-ex-assign": "error",
+      "no-extra-boolean-cast": "error",
+      "no-fallthrough": "error",
+      "no-global-assign": "error",
+      "no-invalid-regexp": "error",
+      "no-irregular-whitespace": "error",
+      "no-loss-of-precision": "error",
+      "no-misleading-character-class": "error",
+      "no-nonoctal-decimal-escape": "error",
+      "no-prototype-builtins": "error",
+      "no-regex-spaces": "error",
+      "no-self-assign": "error",
+      "no-shadow-restricted-names": "error",
+      "no-sparse-arrays": "error",
+      "no-unsafe-finally": "error",
+      "no-unsafe-optional-chaining": "error",
+      "no-unused-labels": "error",
+      "no-unused-private-class-members": "error",
+      "no-unused-vars": "off",
+      "no-useless-backreference": "error",
+      "no-useless-call": "error",
+      "no-useless-catch": "error",
+      "no-useless-escape": "error",
+      "no-useless-return": "error",
+      "no-var": "error",
+      "prefer-arrow-callback": "error",
+      "prefer-const": "error",
+      "prefer-object-has-own": "error",
+      "prefer-rest-params": "error",
+      "prefer-spread": "error",
+      "promise/no-callback-in-promise": "error",
+      "promise/no-new-statics": "error",
+      "promise/valid-params": "error",
+      "typescript/adjacent-overload-signatures": "error",
+      "typescript/array-type": "error",
+      "typescript/await-thenable": "error",
+      "typescript/ban-tslint-comment": "error",
+      "typescript/class-literal-property-style": "error",
+      "typescript/consistent-generic-constructors": "error",
+      "typescript/consistent-indexed-object-style": "error",
+      "typescript/consistent-type-assertions": "error",
+      "typescript/consistent-type-definitions": ["error", "type"],
+      "typescript/consistent-type-imports": [
+        "error",
+        {
+          fixStyle: "inline-type-imports",
+        },
+      ],
+      "typescript/dot-notation": "error",
+      "typescript/no-array-delete": "error",
+      "typescript/no-base-to-string": "error",
+      "typescript/no-confusing-non-null-assertion": "error",
+      "typescript/no-confusing-void-expression": "error",
+      "typescript/no-deprecated": "error",
+      "typescript/no-duplicate-enum-values": "error",
+      "typescript/no-duplicate-type-constituents": "error",
+      "typescript/no-dynamic-delete": "error",
+      "typescript/no-empty-object-type": "error",
+      "typescript/no-extra-non-null-assertion": "error",
+      "typescript/no-extraneous-class": "error",
+      "typescript/no-floating-promises": "error",
+      "typescript/no-for-in-array": "error",
+      "typescript/no-implied-eval": "error",
+      "typescript/no-inferrable-types": "error",
+      "typescript/no-invalid-void-type": "error",
+      "typescript/no-meaningless-void-operator": "error",
+      "typescript/no-misused-new": "error",
+      "typescript/no-misused-promises": "error",
+      "typescript/no-misused-spread": "error",
+      "typescript/no-mixed-enums": "error",
+      "typescript/no-namespace": "error",
+      "typescript/no-non-null-asserted-nullish-coalescing": "error",
+      "typescript/no-non-null-asserted-optional-chain": "error",
+      "typescript/no-non-null-assertion": "error",
+      "typescript/no-redundant-type-constituents": "error",
+      "typescript/no-require-imports": "error",
+      "typescript/no-this-alias": "error",
+      "typescript/no-unnecessary-boolean-literal-compare": "error",
+      "typescript/no-unnecessary-condition": "error",
+      "typescript/no-unnecessary-template-expression": "error",
+      "typescript/no-unnecessary-type-arguments": "error",
+      "typescript/no-unnecessary-type-assertion": "error",
+      "typescript/no-unnecessary-type-constraint": "error",
+      "typescript/no-unnecessary-type-parameters": "error",
+      "typescript/no-unsafe-argument": "error",
+      "typescript/no-unsafe-assignment": "error",
+      "typescript/no-unsafe-call": "error",
+      "typescript/no-unsafe-declaration-merging": "error",
+      "typescript/no-unsafe-enum-comparison": "error",
+      "typescript/no-unsafe-function-type": "error",
+      "typescript/no-unsafe-member-access": "error",
+      "typescript/no-unsafe-return": "error",
+      "typescript/no-unsafe-unary-minus": "error",
+      "typescript/no-useless-default-assignment": "error",
+      "typescript/no-wrapper-object-types": "error",
+      "typescript/only-throw-error": "error",
+      "typescript/prefer-as-const": "error",
+      "typescript/prefer-find": "error",
+      "typescript/prefer-for-of": "error",
+      "typescript/prefer-function-type": "error",
+      "typescript/prefer-includes": "error",
+      "typescript/prefer-literal-enum-member": "error",
+      "typescript/prefer-namespace-keyword": "error",
+      "typescript/prefer-nullish-coalescing": "error",
+      "typescript/prefer-optional-chain": "error",
+      "typescript/prefer-promise-reject-errors": "error",
+      "typescript/prefer-readonly": "error",
+      "typescript/prefer-reduce-type-parameter": "error",
+      "typescript/prefer-return-this-type": "error",
+      "typescript/prefer-string-starts-ends-with": "error",
+      "typescript/related-getter-setter-pairs": "error",
+      "typescript/require-await": "error",
+      "typescript/restrict-plus-operands": "error",
+      "typescript/restrict-template-expressions": "error",
+      "typescript/return-await": "error",
+      "typescript/strict-boolean-expressions": "error",
+      "typescript/switch-exhaustiveness-check": [
+        "error",
+        {
+          considerDefaultExhaustiveForUnions: true,
+        },
+      ],
+      "typescript/triple-slash-reference": "error",
+      "typescript/unbound-method": "error",
+      "typescript/unified-signatures": "error",
+      "typescript/use-unknown-in-catch-callback-variable": "error",
+      "unicorn/no-useless-collection-argument": "error",
+      "unicorn/prefer-array-flat-map": "error",
+      "unicorn/prefer-blob-reading-methods": "error",
+      "unicorn/prefer-classlist-toggle": "error",
+      "unicorn/prefer-code-point": "error",
+      "unicorn/prefer-date-now": "error",
+      "unicorn/prefer-dom-node-append": "error",
+      "unicorn/prefer-dom-node-remove": "error",
+      "unicorn/prefer-import-meta-properties": "error",
+      "unicorn/prefer-math-min-max": "error",
+      "unicorn/prefer-math-trunc": "error",
+      "unicorn/prefer-modern-dom-apis": "error",
+      "unicorn/prefer-modern-math-apis": "error",
+      "unicorn/prefer-negative-index": "error",
+      "unicorn/prefer-number-coercion": "error",
+      "unicorn/prefer-query-selector": "error",
+      "unicorn/prefer-regexp-test": "error",
+      "unicorn/prefer-response-static-json": "error",
+      "unicorn/prefer-string-raw": "error",
+      "unicorn/prefer-string-replace-all": "error",
+      "unicorn/prefer-structured-clone": "error",
+    });
   });
 
-  test("production rules keep deliberate exceptions and option contracts explicit", () => {
-    expect(UPSTREAM_RULES["no-unused-vars"]).toBe(LINT_SEVERITY.OFF);
-    expect(UPSTREAM_RULES["class-methods-use-this"]).toBeUndefined();
-    expect(UPSTREAM_RULES["func-style"]).toStrictEqual([
-      LINT_SEVERITY.ERROR,
-      "expression",
-      { allowArrowFunctions: true },
-    ]);
-    expect(UPSTREAM_RULES["typescript/consistent-type-definitions"]).toStrictEqual([
-      LINT_SEVERITY.ERROR,
-      "type",
-    ]);
-    expect(UPSTREAM_RULES["typescript/switch-exhaustiveness-check"]).toStrictEqual([
-      LINT_SEVERITY.ERROR,
-      { considerDefaultExhaustiveForUnions: true },
-    ]);
-    expect(UPSTREAM_RULES["unicorn/prefer-string-replace-all"]).toBe(LINT_SEVERITY.ERROR);
-    expect(UPSTREAM_RULES["prefer-object-has-own"]).toBe(LINT_SEVERITY.ERROR);
-    expect(UPSTREAM_RULES["unicorn/prefer-prototype-methods"]).toBeUndefined();
-    expect(UPSTREAM_RULES["unicorn/prefer-array-some"]).toBeUndefined();
-    expect(UPSTREAM_RULES["unicorn/prefer-array-index-of"]).toBeUndefined();
-    expect(UPSTREAM_RULES["unicorn/prefer-regexp-test"]).toBe(LINT_SEVERITY.ERROR);
-    expect(UPSTREAM_RULES["typescript/prefer-regexp-exec"]).toBeUndefined();
-    expect(UPSTREAM_RULES["no-useless-assignment"]).toBeUndefined();
-    expect(UPSTREAM_RULES["no-useless-constructor"]).toBeUndefined();
-    expect(UPSTREAM_RULES["unicorn/no-unnecessary-array-flat-depth"]).toBeUndefined();
-    expect(UPSTREAM_RULES["unicorn/prefer-array-flat"]).toBeUndefined();
-    expect(UPSTREAM_RULES["unicorn/no-unnecessary-array-splice-count"]).toBeUndefined();
-    expect(UPSTREAM_RULES["unicorn/no-unnecessary-slice-end"]).toBeUndefined();
-    expect(UPSTREAM_RULES["unicorn/prefer-add-event-listener"]).toBeUndefined();
-    expect(UPSTREAM_RULES["unicorn/prefer-default-parameters"]).toBeUndefined();
-    expect(UPSTREAM_RULES["unicorn/prefer-dom-node-dataset"]).toBeUndefined();
-    expect(UPSTREAM_RULES["unicorn/prefer-dom-node-text-content"]).toBeUndefined();
-    expect(UPSTREAM_RULES["unicorn/prefer-object-from-entries"]).toBeUndefined();
-    expect(UPSTREAM_RULES["unicorn/no-new-buffer"]).toBeUndefined();
-    expect(UPSTREAM_RULES["unicorn/no-useless-iterator-to-array"]).toBeUndefined();
-    expect(UPSTREAM_RULES["unicorn/prefer-at"]).toBeUndefined();
-    expect(UPSTREAM_RULES["unicorn/prefer-bigint-literals"]).toBeUndefined();
-    expect(UPSTREAM_RULES["unicorn/prefer-class-fields"]).toBeUndefined();
-    expect(UPSTREAM_RULES["unicorn/prefer-keyboard-event-key"]).toBeUndefined();
-    expect(UPSTREAM_RULES["unicorn/prefer-node-protocol"]).toBeUndefined();
-    expect(UPSTREAM_RULES["unicorn/prefer-native-coercion-functions"]).toBeUndefined();
-    expect(UPSTREAM_RULES["unicorn/prefer-optional-catch-binding"]).toBeUndefined();
-    expect(UPSTREAM_RULES["unicorn/prefer-string-slice"]).toBeUndefined();
-    expect(UPSTREAM_RULES["unicorn/prefer-string-trim-start-end"]).toBeUndefined();
-  });
-
-  test("rules relax incompatible base checks while enforcing Vitest structure", () => {
-    const disabledRuleNames = Object.entries(UPSTREAM_TEST_RULES)
-      .filter(([, severity]) => severity === LINT_SEVERITY.OFF)
-      .map(([ruleName]) => ruleName)
-      .toSorted();
-
-    expect(disabledRuleNames).toStrictEqual([
-      "no-empty-pattern",
-      "typescript/require-await",
-      "typescript/unbound-method",
-    ]);
-    expect(UPSTREAM_TEST_RULES["vitest/max-nested-describe"]).toStrictEqual([
-      LINT_SEVERITY.ERROR,
-      { max: 2 },
-    ]);
-    expect(UPSTREAM_TEST_RULES["vitest/no-hooks"]).toBe(LINT_SEVERITY.ERROR);
-    expect(UPSTREAM_TEST_RULES["vitest/warn-todo"]).toBe(LINT_SEVERITY.WARN);
+  it("pins the complete test rule policy", ({ upstreamTestRules }) => {
+    expect(upstreamTestRules).toStrictEqual({
+      "no-empty-pattern": "off",
+      "typescript/require-await": "off",
+      "typescript/unbound-method": "off",
+      "vitest/consistent-each-for": "error",
+      "vitest/expect-expect": "error",
+      "vitest/hoisted-apis-on-top": "error",
+      "vitest/max-nested-describe": [
+        "error",
+        {
+          max: 4,
+        },
+      ],
+      "vitest/no-commented-out-tests": "error",
+      "vitest/no-conditional-tests": "error",
+      "vitest/no-disabled-tests": "error",
+      "vitest/no-focused-tests": "error",
+      "vitest/no-hooks": "error",
+      "vitest/no-identical-title": "error",
+      "vitest/no-import-node-test": "error",
+      "vitest/no-interpolation-in-snapshots": "error",
+      "vitest/no-large-snapshots": "error",
+      "vitest/no-mocks-import": "error",
+      "vitest/no-standalone-expect": [
+        "error",
+        {
+          additionalTestBlockFunctions: ["it", "standardIoTest"],
+        },
+      ],
+      "vitest/no-test-return-statement": "error",
+      "vitest/no-unneeded-async-expect-function": "error",
+      "vitest/prefer-called-exactly-once-with": "error",
+      "vitest/prefer-comparison-matcher": "error",
+      "vitest/prefer-each": "error",
+      "vitest/prefer-expect-type-of": "error",
+      "vitest/prefer-import-in-mock": "error",
+      "vitest/prefer-importing-vitest-globals": "error",
+      "vitest/prefer-mock-promise-shorthand": "error",
+      "vitest/prefer-mock-return-shorthand": "error",
+      "vitest/prefer-spy-on": "error",
+      "vitest/prefer-strict-equal": "error",
+      "vitest/prefer-to-contain": "error",
+      "vitest/require-awaited-expect-poll": "error",
+      "vitest/require-local-test-context-for-concurrent-snapshots": "error",
+      "vitest/require-mock-type-parameters": "error",
+      "vitest/require-top-level-describe": "error",
+      "vitest/valid-describe-callback": "error",
+      "vitest/valid-expect": "error",
+      "vitest/valid-title": "error",
+      "vitest/warn-todo": "error",
+    });
   });
 });

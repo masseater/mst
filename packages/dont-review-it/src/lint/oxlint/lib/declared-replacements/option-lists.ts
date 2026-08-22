@@ -1,13 +1,13 @@
 import type { Options } from "@oxlint/plugins";
 
 export const listedUnder = (
-  options: Readonly<Options>,
-  key: string,
+  ruleOptions: Readonly<Options>,
+  named: string,
 ): readonly Readonly<Record<string, unknown>>[] => {
-  const [first] = options;
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) return [];
 
-  const listed = first[key];
+  const listed = first[named];
   if (!Array.isArray(listed)) return [];
   return listed.flatMap((held) =>
     typeof held === "object" && held !== null && !Array.isArray(held) ? [held] : [],

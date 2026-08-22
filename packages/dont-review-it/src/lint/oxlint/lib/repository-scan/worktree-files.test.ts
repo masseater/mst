@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { describe, expect, onTestFinished, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import {
   UNSCANNED_DIRECTORY_NAMES,
@@ -10,79 +10,121 @@ import {
   worktreeFilePathsUnder,
 } from "./worktree-files.ts";
 
-const createWorktree = (): string => {
-  const root = mkdtempSync(join(tmpdir(), "worktree-files-"));
-  onTestFinished(() => {
-    rmSync(root, { recursive: true, force: true });
-  });
-  return root;
-};
+describe("worktreeFilePathsUnder", () => {
+  describe("a worktree holding files at the root and under nested directories", () => {
+    const it = test.extend("paths", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "worktree-files-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages", "alpha"), { recursive: true });
+      writeFileSync(join(root, "packages", "alpha", "package.json"), "held\n", "utf8");
+      writeFileSync(join(root, "README.md"), "held\n", "utf8");
+      return worktreeFilePathsUnder({ root, unscannedDirectoryNames: UNSCANNED_DIRECTORY_NAMES });
+    });
 
-const writeAt = ({
-  root,
-  relativePath,
-}: {
-  readonly root: string;
-  readonly relativePath: string;
-}): string => {
-  const path = join(root, relativePath);
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, "held\n", "utf8");
-  return path;
-};
-
-const scan = (root: string): readonly string[] =>
-  worktreeFilePathsUnder({ root, unscannedDirectoryNames: UNSCANNED_DIRECTORY_NAMES });
-
-describe("worktree-files", () => {
-  test("every file under the root is listed as a repository relative path", () => {
-    const root = createWorktree();
-    writeAt({ root, relativePath: "packages/alpha/package.json" });
-    writeAt({ root, relativePath: "README.md" });
-
-    expect(scan(root)).toStrictEqual(["README.md", "packages/alpha/package.json"]);
+    it("lists every file as a repository relative path", ({ paths }) => {
+      expect(paths).toStrictEqual(["README.md", "packages/alpha/package.json"]);
+    });
   });
 
-  test("a directory named as unscanned is walked past", () => {
-    const root = createWorktree();
-    writeAt({ root, relativePath: "node_modules/left-pad/index.js" });
-    writeAt({ root, relativePath: "dist/bundle.js" });
-    writeAt({ root, relativePath: "src/entry.ts" });
+  describe("a worktree holding directories named as unscanned", () => {
+    const it = test.extend("paths", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "worktree-files-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "node_modules", "left-pad"), { recursive: true });
+      writeFileSync(join(root, "node_modules", "left-pad", "index.js"), "held\n", "utf8");
+      mkdirSync(join(root, "dist"), { recursive: true });
+      writeFileSync(join(root, "dist", "bundle.js"), "held\n", "utf8");
+      mkdirSync(join(root, "src"), { recursive: true });
+      writeFileSync(join(root, "src", "entry.ts"), "held\n", "utf8");
+      return worktreeFilePathsUnder({ root, unscannedDirectoryNames: UNSCANNED_DIRECTORY_NAMES });
+    });
 
-    expect(scan(root)).toStrictEqual(["src/entry.ts"]);
+    it("walks past each of them and keeps what stands beside them", ({ paths }) => {
+      expect(paths).toStrictEqual(["src/entry.ts"]);
+    });
   });
 
-  test("an entry that is neither a file nor a directory is left out", () => {
-    const root = createWorktree();
-    const target = writeAt({ root, relativePath: "src/entry.ts" });
-    symlinkSync(target, join(root, "link.ts"));
+  describe("a worktree holding a symbolic link beside a file", () => {
+    const it = test.extend("paths", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "worktree-files-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      const linkedFilePath = join(root, "src", "entry.ts");
+      mkdirSync(dirname(linkedFilePath), { recursive: true });
+      writeFileSync(linkedFilePath, "held\n", "utf8");
+      symlinkSync(linkedFilePath, join(root, "link.ts"));
+      return worktreeFilePathsUnder({ root, unscannedDirectoryNames: UNSCANNED_DIRECTORY_NAMES });
+    });
 
-    expect(scan(root)).toStrictEqual(["src/entry.ts"]);
+    it("leaves out the entry that is neither a file nor a directory", ({ paths }) => {
+      expect(paths).toStrictEqual(["src/entry.ts"]);
+    });
   });
 
-  test("a root that does not exist holds no files", () => {
-    const root = createWorktree();
+  describe("a root that does not exist", () => {
+    const it = test.extend("paths", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "worktree-files-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      return worktreeFilePathsUnder({
+        root: join(root, "absent"),
+        unscannedDirectoryNames: UNSCANNED_DIRECTORY_NAMES,
+      });
+    });
 
-    expect(scan(join(root, "absent"))).toStrictEqual([]);
+    it("holds no files", ({ paths }) => {
+      expect(paths).toStrictEqual([]);
+    });
   });
 
-  test("the same worktree is walked once and answered from what was walked", () => {
-    const root = createWorktree();
-    writeAt({ root, relativePath: "src/entry.ts" });
-    const walked = scan(root);
-    writeAt({ root, relativePath: "src/later.ts" });
+  describe("a worktree asked again after a later file appeared", () => {
+    const it = test.extend("paths", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "worktree-files-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "src"), { recursive: true });
+      writeFileSync(join(root, "src", "entry.ts"), "held\n", "utf8");
+      worktreeFilePathsUnder({ root, unscannedDirectoryNames: UNSCANNED_DIRECTORY_NAMES });
+      writeFileSync(join(root, "src", "later.ts"), "held\n", "utf8");
+      return worktreeFilePathsUnder({ root, unscannedDirectoryNames: UNSCANNED_DIRECTORY_NAMES });
+    });
 
-    expect(scan(root)).toStrictEqual(walked);
+    it("is walked once and answered from what was walked", ({ paths }) => {
+      expect(paths).toStrictEqual(["src/entry.ts"]);
+    });
+  });
+});
+
+describe("unscannedDirectoryNamesFrom", () => {
+  describe("options nobody wrote", () => {
+    const it = test.extend("unscannedDirectoryNames", () => unscannedDirectoryNamesFrom([]));
+
+    it("leaves the declared list standing", ({ unscannedDirectoryNames }) => {
+      expect(unscannedDirectoryNames).toBe(UNSCANNED_DIRECTORY_NAMES);
+    });
   });
 
-  test("options that name no unscanned directories leave the declared list standing", () => {
-    expect(unscannedDirectoryNamesFrom([])).toBe(UNSCANNED_DIRECTORY_NAMES);
-    expect(unscannedDirectoryNamesFrom([{}])).toBe(UNSCANNED_DIRECTORY_NAMES);
+  describe("options that name no unscanned directories", () => {
+    const it = test.extend("unscannedDirectoryNames", () => unscannedDirectoryNamesFrom([{}]));
+
+    it("leaves the declared list standing", ({ unscannedDirectoryNames }) => {
+      expect(unscannedDirectoryNames).toBe(UNSCANNED_DIRECTORY_NAMES);
+    });
   });
 
-  test("options that name unscanned directories replace the declared list", () => {
-    expect(unscannedDirectoryNamesFrom([{ unscannedDirectories: ["vendor"] }])).toStrictEqual(
-      new Set(["vendor"]),
-    );
+  describe("options that name unscanned directories", () => {
+    const it = test.extend("unscannedDirectoryNames", () =>
+      unscannedDirectoryNamesFrom([{ unscannedDirectories: ["vendor"] }]));
+
+    it("replaces the declared list", ({ unscannedDirectoryNames }) => {
+      expect(unscannedDirectoryNames).toStrictEqual(new Set(["vendor"]));
+    });
   });
 });

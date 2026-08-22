@@ -1,93 +1,228 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
-import { describe, expect, onTestFinished, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { tsconfigScopeProblemsOf } from "./tsconfig-scope.ts";
 
-const repositoryWith = async (files: Readonly<Record<string, string>>): Promise<string> => {
-  const repositoryRoot = await mkdtemp(join(tmpdir(), "verified-specifications-"));
-  onTestFinished(async () => rm(repositoryRoot, { recursive: true, force: true }));
+const WORKSPACE_DIRECTORY = "packages/repository-checks";
 
-  await Promise.all(
-    Object.entries(files).map(async ([name, source]) => {
-      const target = join(repositoryRoot, name);
-      await mkdir(dirname(target), { recursive: true });
-      await writeFile(target, source, "utf-8");
-    }),
-  );
-  return repositoryRoot;
-};
+const NARROWED_WITH_INCLUDE =
+  "A tsconfig that governs specification tests must not narrow the files it checks with include, because a specs/ directory dropped from the program loses type checking silently while every check stays green. Delete include and let the tsconfig cover the whole workspace.";
 
-const problemsIn = async (files: Readonly<Record<string, string>>): Promise<readonly string[]> => {
-  const repositoryRoot = await repositoryWith(files);
-  const problems = await tsconfigScopeProblemsOf({
-    repositoryRoot,
-    workspaceDirectory: join(repositoryRoot, "packages/repository-checks"),
-  });
-  return problems.map((problem) => problem.message);
-};
+const NARROWED_WITH_FILES =
+  "A tsconfig that governs specification tests must not narrow the files it checks with files, because a specs/ directory dropped from the program loses type checking silently while every check stays green. Delete files and let the tsconfig cover the whole workspace.";
+
+const NARROWED_WITH_EXCLUDE =
+  "A tsconfig that governs specification tests must not narrow the files it checks with exclude, because a specs/ directory dropped from the program loses type checking silently while every check stays green. Delete exclude and let the tsconfig cover the whole workspace.";
 
 describe("tsconfigScopeProblemsOf", () => {
-  test("accepts a tsconfig that only extends a preset", async () => {
-    await expect(
-      problemsIn({ "packages/repository-checks/tsconfig.json": '{ "extends": "preset" }' }),
-    ).resolves.toStrictEqual([]);
+  const repositoryTest = test.extend("repositoryRoot", async ({}, { onCleanup }) => {
+    const temporaryRepositoryRoot = await mkdtemp(join(tmpdir(), "verified-specifications-"));
+    onCleanup(async () => rm(temporaryRepositoryRoot, { recursive: true, force: true }));
+    return temporaryRepositoryRoot;
   });
 
-  test("reports a tsconfig that narrows with include", async () => {
-    await expect(
-      problemsIn({ "packages/repository-checks/tsconfig.json": '{ "include": ["src"] }' }),
-    ).resolves.toStrictEqual([expect.stringContaining("with include")]);
-  });
+  describe("a workspace tsconfig that only extends a preset", () => {
+    const it = repositoryTest.extend(
+      "theMessagesOfATsconfigThatOnlyExtendsAPreset",
+      async ({ repositoryRoot }) => {
+        await mkdir(join(repositoryRoot, WORKSPACE_DIRECTORY), { recursive: true });
+        await writeFile(
+          join(repositoryRoot, WORKSPACE_DIRECTORY, "tsconfig.json"),
+          '{ "extends": "preset" }',
+          "utf-8",
+        );
+        const problems = await tsconfigScopeProblemsOf({
+          repositoryRoot,
+          workspaceDirectory: join(repositoryRoot, WORKSPACE_DIRECTORY),
+        });
+        return problems.map((problem) => problem.message);
+      },
+    );
 
-  test("reports a tsconfig that narrows with files", async () => {
-    await expect(
-      problemsIn({ "packages/repository-checks/tsconfig.json": '{ "files": ["src/index.ts"] }' }),
-    ).resolves.toStrictEqual([expect.stringContaining("with files")]);
-  });
-
-  test("reports a tsconfig that narrows with exclude", async () => {
-    await expect(
-      problemsIn({ "packages/repository-checks/tsconfig.json": '{ "exclude": ["specs"] }' }),
-    ).resolves.toStrictEqual([expect.stringContaining("with exclude")]);
-  });
-
-  test("reads comments in a tsconfig without failing", async () => {
-    await expect(
-      problemsIn({
-        "packages/repository-checks/tsconfig.json": '{\n  // note\n  "include": ["src"]\n}',
-      }),
-    ).resolves.toStrictEqual([expect.stringContaining("with include")]);
-  });
-
-  test("falls back to the repository tsconfig when the workspace has none", async () => {
-    await expect(problemsIn({ "tsconfig.json": '{ "include": ["src"] }' })).resolves.toStrictEqual([
-      expect.stringContaining("with include"),
-    ]);
-  });
-
-  test("stays silent when no tsconfig governs the workspace", async () => {
-    await expect(problemsIn({})).resolves.toStrictEqual([]);
-  });
-
-  test("stays silent for a tsconfig that does not parse into a mapping", async () => {
-    await expect(
-      problemsIn({ "packages/repository-checks/tsconfig.json": '["not a mapping"]' }),
-    ).resolves.toStrictEqual([]);
-  });
-
-  test("names the tsconfig file relative to the repository root", async () => {
-    const repositoryRoot = await repositoryWith({
-      "packages/repository-checks/tsconfig.json": '{ "include": ["src"] }',
+    it("is accepted without a problem", ({ theMessagesOfATsconfigThatOnlyExtendsAPreset }) => {
+      expect(theMessagesOfATsconfigThatOnlyExtendsAPreset).toStrictEqual([]);
     });
-    const problems = await tsconfigScopeProblemsOf({
-      repositoryRoot,
-      workspaceDirectory: join(repositoryRoot, "packages/repository-checks"),
+  });
+
+  describe("a workspace tsconfig that narrows with include", () => {
+    const it = repositoryTest
+      .extend("theMessagesOfATsconfigNarrowingWithInclude", async ({ repositoryRoot }) => {
+        await mkdir(join(repositoryRoot, WORKSPACE_DIRECTORY), { recursive: true });
+        await writeFile(
+          join(repositoryRoot, WORKSPACE_DIRECTORY, "tsconfig.json"),
+          '{ "include": ["src"] }',
+          "utf-8",
+        );
+        const problems = await tsconfigScopeProblemsOf({
+          repositoryRoot,
+          workspaceDirectory: join(repositoryRoot, WORKSPACE_DIRECTORY),
+        });
+        return problems.map((problem) => problem.message);
+      })
+      .extend("theFilesOfATsconfigNarrowingWithInclude", async ({ repositoryRoot }) => {
+        await mkdir(join(repositoryRoot, WORKSPACE_DIRECTORY), { recursive: true });
+        await writeFile(
+          join(repositoryRoot, WORKSPACE_DIRECTORY, "tsconfig.json"),
+          '{ "include": ["src"] }',
+          "utf-8",
+        );
+        const problems = await tsconfigScopeProblemsOf({
+          repositoryRoot,
+          workspaceDirectory: join(repositoryRoot, WORKSPACE_DIRECTORY),
+        });
+        return problems.map((problem) => problem.file);
+      });
+
+    it("is reported as narrowing with include", ({
+      theMessagesOfATsconfigNarrowingWithInclude,
+    }) => {
+      expect(theMessagesOfATsconfigNarrowingWithInclude).toStrictEqual([NARROWED_WITH_INCLUDE]);
     });
-    expect(problems.map((problem) => problem.file)).toStrictEqual([
-      "packages/repository-checks/tsconfig.json",
-    ]);
+
+    it("is named by its path relative to the repository root", ({
+      theFilesOfATsconfigNarrowingWithInclude,
+    }) => {
+      expect(theFilesOfATsconfigNarrowingWithInclude).toStrictEqual([
+        "packages/repository-checks/tsconfig.json",
+      ]);
+    });
+  });
+
+  describe("a workspace tsconfig that narrows with files", () => {
+    const it = repositoryTest.extend(
+      "theMessagesOfATsconfigNarrowingWithFiles",
+      async ({ repositoryRoot }) => {
+        await mkdir(join(repositoryRoot, WORKSPACE_DIRECTORY), { recursive: true });
+        await writeFile(
+          join(repositoryRoot, WORKSPACE_DIRECTORY, "tsconfig.json"),
+          '{ "files": ["src/index.ts"] }',
+          "utf-8",
+        );
+        const problems = await tsconfigScopeProblemsOf({
+          repositoryRoot,
+          workspaceDirectory: join(repositoryRoot, WORKSPACE_DIRECTORY),
+        });
+        return problems.map((problem) => problem.message);
+      },
+    );
+
+    it("is reported as narrowing with files", ({ theMessagesOfATsconfigNarrowingWithFiles }) => {
+      expect(theMessagesOfATsconfigNarrowingWithFiles).toStrictEqual([NARROWED_WITH_FILES]);
+    });
+  });
+
+  describe("a workspace tsconfig that narrows with exclude", () => {
+    const it = repositoryTest.extend(
+      "theMessagesOfATsconfigNarrowingWithExclude",
+      async ({ repositoryRoot }) => {
+        await mkdir(join(repositoryRoot, WORKSPACE_DIRECTORY), { recursive: true });
+        await writeFile(
+          join(repositoryRoot, WORKSPACE_DIRECTORY, "tsconfig.json"),
+          '{ "exclude": ["specs"] }',
+          "utf-8",
+        );
+        const problems = await tsconfigScopeProblemsOf({
+          repositoryRoot,
+          workspaceDirectory: join(repositoryRoot, WORKSPACE_DIRECTORY),
+        });
+        return problems.map((problem) => problem.message);
+      },
+    );
+
+    it("is reported as narrowing with exclude", ({
+      theMessagesOfATsconfigNarrowingWithExclude,
+    }) => {
+      expect(theMessagesOfATsconfigNarrowingWithExclude).toStrictEqual([NARROWED_WITH_EXCLUDE]);
+    });
+  });
+
+  describe("a workspace tsconfig that carries a comment beside its include", () => {
+    const it = repositoryTest.extend(
+      "theMessagesOfATsconfigCarryingAComment",
+      async ({ repositoryRoot }) => {
+        await mkdir(join(repositoryRoot, WORKSPACE_DIRECTORY), { recursive: true });
+        await writeFile(
+          join(repositoryRoot, WORKSPACE_DIRECTORY, "tsconfig.json"),
+          '{\n  // note\n  "include": ["src"]\n}',
+          "utf-8",
+        );
+        const problems = await tsconfigScopeProblemsOf({
+          repositoryRoot,
+          workspaceDirectory: join(repositoryRoot, WORKSPACE_DIRECTORY),
+        });
+        return problems.map((problem) => problem.message);
+      },
+    );
+
+    it("is read past the comment and reported as narrowing with include", ({
+      theMessagesOfATsconfigCarryingAComment,
+    }) => {
+      expect(theMessagesOfATsconfigCarryingAComment).toStrictEqual([NARROWED_WITH_INCLUDE]);
+    });
+  });
+
+  describe("a repository tsconfig standing in for a workspace that has none", () => {
+    const it = repositoryTest.extend(
+      "theMessagesOfARepositoryTsconfigGoverningTheWorkspace",
+      async ({ repositoryRoot }) => {
+        await writeFile(join(repositoryRoot, "tsconfig.json"), '{ "include": ["src"] }', "utf-8");
+        const problems = await tsconfigScopeProblemsOf({
+          repositoryRoot,
+          workspaceDirectory: join(repositoryRoot, WORKSPACE_DIRECTORY),
+        });
+        return problems.map((problem) => problem.message);
+      },
+    );
+
+    it("governs the workspace and is reported for narrowing with include", ({
+      theMessagesOfARepositoryTsconfigGoverningTheWorkspace,
+    }) => {
+      expect(theMessagesOfARepositoryTsconfigGoverningTheWorkspace).toStrictEqual([
+        NARROWED_WITH_INCLUDE,
+      ]);
+    });
+  });
+
+  describe("a workspace governed by no tsconfig at all", () => {
+    const it = repositoryTest.extend(
+      "theMessagesWhenNoTsconfigGovernsTheWorkspace",
+      async ({ repositoryRoot }) => {
+        const problems = await tsconfigScopeProblemsOf({
+          repositoryRoot,
+          workspaceDirectory: join(repositoryRoot, WORKSPACE_DIRECTORY),
+        });
+        return problems.map((problem) => problem.message);
+      },
+    );
+
+    it("leaves the scan silent", ({ theMessagesWhenNoTsconfigGovernsTheWorkspace }) => {
+      expect(theMessagesWhenNoTsconfigGovernsTheWorkspace).toStrictEqual([]);
+    });
+  });
+
+  describe("a workspace tsconfig that parses into something other than a mapping", () => {
+    const it = repositoryTest.extend(
+      "theMessagesOfATsconfigThatIsNotAMapping",
+      async ({ repositoryRoot }) => {
+        await mkdir(join(repositoryRoot, WORKSPACE_DIRECTORY), { recursive: true });
+        await writeFile(
+          join(repositoryRoot, WORKSPACE_DIRECTORY, "tsconfig.json"),
+          '["not a mapping"]',
+          "utf-8",
+        );
+        const problems = await tsconfigScopeProblemsOf({
+          repositoryRoot,
+          workspaceDirectory: join(repositoryRoot, WORKSPACE_DIRECTORY),
+        });
+        return problems.map((problem) => problem.message);
+      },
+    );
+
+    it("leaves the scan silent", ({ theMessagesOfATsconfigThatIsNotAMapping }) => {
+      expect(theMessagesOfATsconfigThatIsNotAMapping).toStrictEqual([]);
+    });
   });
 });

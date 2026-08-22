@@ -1,5 +1,7 @@
 import { dirname, relative, resolve } from "node:path";
 
+import { memoize } from "es-toolkit";
+
 import {
   listRepositoryFiles,
   nearestPackageDirectory,
@@ -56,16 +58,13 @@ const buildRepositoryTypeAuthorityIndex = ({
   );
 };
 
-const indexByRepositoryRoot = new Map<string, TypeAuthorityIndex>();
+const typeAuthorityIndexAt = memoize(
+  (repositoryRoot: string): TypeAuthorityIndex =>
+    buildRepositoryTypeAuthorityIndex({ repositoryRoot }),
+);
 
-export const loadRepositoryTypeAuthorityIndex = (options: {
+export const loadRepositoryTypeAuthorityIndex = ({
+  repositoryRoot,
+}: {
   readonly repositoryRoot: string;
-}): TypeAuthorityIndex => {
-  const root = resolve(options.repositoryRoot);
-  const memoized = indexByRepositoryRoot.get(root);
-  if (memoized !== undefined) return memoized;
-
-  const built = buildRepositoryTypeAuthorityIndex({ repositoryRoot: root });
-  indexByRepositoryRoot.set(root, built);
-  return built;
-};
+}): TypeAuthorityIndex => typeAuthorityIndexAt(resolve(repositoryRoot));

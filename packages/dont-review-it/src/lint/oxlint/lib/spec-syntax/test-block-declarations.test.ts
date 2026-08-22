@@ -2,289 +2,1125 @@ import { parseSync } from "oxc-parser";
 import { describe, expect, test } from "vite-plus/test";
 
 import {
-  assertionEntryBindings,
+  assertionEntryRootNames,
   carriesSpelledTitle,
   declaresTestBlock,
-  groupingBlockBindings,
-  testBlockBindings,
+  groupingBlockRootNames,
+  runnerRootedTestBlockRootNames,
   testBlockBodyOf,
+  testBlockRootNames,
   testCallbacksOf,
-  type TestBlockBindings,
 } from "./test-block-declarations.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
-const statementsIn = (source: string): readonly ESTree.Statement[] =>
-  parseSync("spec.ts", source).program.body.map((statement) => statement as ESTree.Statement);
+describe("declaresTestBlock", () => {
+  describe("read against the names test blocks are rooted in", () => {
+    describe("a block written with an injected spelling", () => {
+      const it = test.extend("declaration", () => {
+        const program = {
+          type: "Program",
+          body: parseSync("spec.ts", 'it("names a behaviour", () => {});').program.body,
+        } as ESTree.Program;
+        const last = program.body.at(-1) as ESTree.ExpressionStatement;
+        return declaresTestBlock(
+          last.expression as ESTree.CallExpression,
+          testBlockRootNames(program),
+        );
+      });
 
-const lastCallIn = (statements: readonly ESTree.Statement[]): ESTree.CallExpression => {
-  const last = statements.at(-1) as ESTree.ExpressionStatement;
-  return last.expression as ESTree.CallExpression;
-};
+      it("is a test block declaration", ({ declaration }) => {
+        expect(declaration).toBe(true);
+      });
+    });
 
-const boundIn = (
-  bindings: TestBlockBindings,
-  statements: readonly ESTree.Statement[],
-): ReadonlySet<string> => {
-  for (const statement of statements) {
-    if (statement.type === "ImportDeclaration") bindings.takeImport(statement);
-    if (statement.type === "VariableDeclaration") {
-      for (const declarator of statement.declarations) bindings.takeLocalBinding(declarator);
-    }
-  }
-  return bindings.rootNames();
-};
+    describe("a block written with the other injected spelling", () => {
+      const it = test.extend("declaration", () => {
+        const program = {
+          type: "Program",
+          body: parseSync("spec.ts", 'test("names a behaviour", () => {});').program.body,
+        } as ESTree.Program;
+        const last = program.body.at(-1) as ESTree.ExpressionStatement;
+        return declaresTestBlock(
+          last.expression as ESTree.CallExpression,
+          testBlockRootNames(program),
+        );
+      });
 
-const declaresWith = (bindings: TestBlockBindings, source: string): boolean => {
-  const statements = statementsIn(source);
-  return declaresTestBlock(lastCallIn(statements), boundIn(bindings, statements));
-};
+      it("declares the same way", ({ declaration }) => {
+        expect(declaration).toBe(true);
+      });
+    });
 
-const titleSpelledIn = (source: string): boolean =>
-  carriesSpelledTitle(lastCallIn(statementsIn(source)));
+    describe("a block written with a modifier in front of an injected spelling", () => {
+      const it = test.extend("declaration", () => {
+        const program = {
+          type: "Program",
+          body: parseSync("spec.ts", 'it.skip("names a behaviour", () => {});').program.body,
+        } as ESTree.Program;
+        const last = program.body.at(-1) as ESTree.ExpressionStatement;
+        return declaresTestBlock(
+          last.expression as ESTree.CallExpression,
+          testBlockRootNames(program),
+        );
+      });
 
-const bodyShapeIn = (source: string): string | null => {
-  const statements = statementsIn(source);
-  const body = testBlockBodyOf(lastCallIn(statements), boundIn(testBlockBindings(), statements));
-  return body === null ? null : body.type;
-};
+      it("declares the same way", ({ declaration }) => {
+        expect(declaration).toBe(true);
+      });
+    });
 
-const declaresIn = (source: string): boolean => declaresWith(testBlockBindings(), source);
+    describe("a table-driven block written on an injected spelling", () => {
+      const it = test.extend("declaration", () => {
+        const program = {
+          type: "Program",
+          body: parseSync("spec.ts", 'it.each(rows)("names a behaviour", (row) => {});').program
+            .body,
+        } as ESTree.Program;
+        const last = program.body.at(-1) as ESTree.ExpressionStatement;
+        return declaresTestBlock(
+          last.expression as ESTree.CallExpression,
+          testBlockRootNames(program),
+        );
+      });
 
-const declaresGroupingIn = (source: string): boolean =>
-  declaresWith(groupingBlockBindings(), source);
+      it("declares the same way", ({ declaration }) => {
+        expect(declaration).toBe(true);
+      });
+    });
 
-const callbackShapesIn = (source: string): readonly string[] =>
-  testCallbacksOf(lastCallIn(statementsIn(source))).map((callback) => callback.type);
+    describe("a grouping block", () => {
+      const it = test.extend("declaration", () => {
+        const program = {
+          type: "Program",
+          body: parseSync("spec.ts", 'describe("names a group", () => {});').program.body,
+        } as ESTree.Program;
+        const last = program.body.at(-1) as ESTree.ExpressionStatement;
+        return declaresTestBlock(
+          last.expression as ESTree.CallExpression,
+          testBlockRootNames(program),
+        );
+      });
 
-const assertionEntryNamesIn = (source: string): readonly string[] =>
-  [...boundIn(assertionEntryBindings(), statementsIn(source))].toSorted();
+      it("is not a test block declaration", ({ declaration }) => {
+        expect(declaration).toBe(false);
+      });
+    });
 
-describe("dont-review-it/spec-syntax/test-block-declarations", () => {
-  test("a block written with an injected spelling is a test block declaration", () => {
-    expect(declaresIn('it("names a behaviour", () => {});')).toBe(true);
-    expect(declaresIn('test("names a behaviour", () => {});')).toBe(true);
+    describe("a call reached through a receiver", () => {
+      const it = test.extend("declaration", () => {
+        const program = {
+          type: "Program",
+          body: parseSync("spec.ts", 'suite.it("names a behaviour", () => {});').program.body,
+        } as ESTree.Program;
+        const last = program.body.at(-1) as ESTree.ExpressionStatement;
+        return declaresTestBlock(
+          last.expression as ESTree.CallExpression,
+          testBlockRootNames(program),
+        );
+      });
+
+      it("is not a test block declaration", ({ declaration }) => {
+        expect(declaration).toBe(false);
+      });
+    });
+
+    describe("a fixture factory", () => {
+      const it = test.extend("declaration", () => {
+        const program = {
+          type: "Program",
+          body: parseSync("spec.ts", "test.extend({ subject: 1 });").program.body,
+        } as ESTree.Program;
+        const last = program.body.at(-1) as ESTree.ExpressionStatement;
+        return declaresTestBlock(
+          last.expression as ESTree.CallExpression,
+          testBlockRootNames(program),
+        );
+      });
+
+      it("is not a test block declaration", ({ declaration }) => {
+        expect(declaration).toBe(false);
+      });
+    });
+
+    describe("a renamed import of a block spelling", () => {
+      const it = test.extend("declaration", () => {
+        const program = {
+          type: "Program",
+          body: parseSync(
+            "spec.ts",
+            'import { it as check } from "vitest";\ncheck("names a behaviour", () => {});',
+          ).program.body,
+        } as ESTree.Program;
+        const last = program.body.at(-1) as ESTree.ExpressionStatement;
+        return declaresTestBlock(
+          last.expression as ESTree.CallExpression,
+          testBlockRootNames(program),
+        );
+      });
+
+      it("declares under the name it was bound to", ({ declaration }) => {
+        expect(declaration).toBe(true);
+      });
+    });
+
+    describe("an import written with a quoted export name", () => {
+      const it = test.extend("declaration", () => {
+        const program = {
+          type: "Program",
+          body: parseSync(
+            "spec.ts",
+            'import { "test" as check } from "vitest";\ncheck("names a behaviour", () => {});',
+          ).program.body,
+        } as ESTree.Program;
+        const last = program.body.at(-1) as ESTree.ExpressionStatement;
+        return declaresTestBlock(
+          last.expression as ESTree.CallExpression,
+          testBlockRootNames(program),
+        );
+      });
+
+      it("is read the same way", ({ declaration }) => {
+        expect(declaration).toBe(true);
+      });
+    });
+
+    describe("an import of something other than a block spelling", () => {
+      const it = test.extend("declaration", () => {
+        const program = {
+          type: "Program",
+          body: parseSync(
+            "spec.ts",
+            'import { expect } from "vitest";\nexpect("names a behaviour", () => {});',
+          ).program.body,
+        } as ESTree.Program;
+        const last = program.body.at(-1) as ESTree.ExpressionStatement;
+        return declaresTestBlock(
+          last.expression as ESTree.CallExpression,
+          testBlockRootNames(program),
+        );
+      });
+
+      it("binds no block", ({ declaration }) => {
+        expect(declaration).toBe(false);
+      });
+    });
+
+    describe("a default import", () => {
+      const it = test.extend("declaration", () => {
+        const program = {
+          type: "Program",
+          body: parseSync(
+            "spec.ts",
+            'import runner from "vitest";\nrunner("names a behaviour", () => {});',
+          ).program.body,
+        } as ESTree.Program;
+        const last = program.body.at(-1) as ESTree.ExpressionStatement;
+        return declaresTestBlock(
+          last.expression as ESTree.CallExpression,
+          testBlockRootNames(program),
+        );
+      });
+
+      it("binds no block", ({ declaration }) => {
+        expect(declaration).toBe(false);
+      });
+    });
+
+    describe("a namespace import", () => {
+      const it = test.extend("declaration", () => {
+        const program = {
+          type: "Program",
+          body: parseSync(
+            "spec.ts",
+            'import * as runner from "vitest";\nrunner("names a behaviour", () => {});',
+          ).program.body,
+        } as ESTree.Program;
+        const last = program.body.at(-1) as ESTree.ExpressionStatement;
+        return declaresTestBlock(
+          last.expression as ESTree.CallExpression,
+          testBlockRootNames(program),
+        );
+      });
+
+      it("binds no block", ({ declaration }) => {
+        expect(declaration).toBe(false);
+      });
+    });
+
+    describe("a local binding of a block spelling", () => {
+      const it = test.extend("declaration", () => {
+        const program = {
+          type: "Program",
+          body: parseSync("spec.ts", 'const check = it;\ncheck("names a behaviour", () => {});')
+            .program.body,
+        } as ESTree.Program;
+        const last = program.body.at(-1) as ESTree.ExpressionStatement;
+        return declaresTestBlock(
+          last.expression as ESTree.CallExpression,
+          testBlockRootNames(program),
+        );
+      });
+
+      it("declares under its own name", ({ declaration }) => {
+        expect(declaration).toBe(true);
+      });
+    });
+
+    describe("a builder derived from the base", () => {
+      const it = test.extend("declaration", () => {
+        const program = {
+          type: "Program",
+          body: parseSync(
+            "spec.ts",
+            'const check = test.extend({ subject: 1 });\ncheck("names a behaviour", () => {});',
+          ).program.body,
+        } as ESTree.Program;
+        const last = program.body.at(-1) as ESTree.ExpressionStatement;
+        return declaresTestBlock(
+          last.expression as ESTree.CallExpression,
+          testBlockRootNames(program),
+        );
+      });
+
+      it("declares under the name it was bound to", ({ declaration }) => {
+        expect(declaration).toBe(true);
+      });
+    });
+
+    describe("a builder derived from another builder", () => {
+      const it = test.extend("declaration", () => {
+        const program = {
+          type: "Program",
+          body: parseSync(
+            "spec.ts",
+            'const check = test.extend({ port: 1 }).extend({ subject: 2 });\ncheck("names a behaviour", () => {});',
+          ).program.body,
+        } as ESTree.Program;
+        const last = program.body.at(-1) as ESTree.ExpressionStatement;
+        return declaresTestBlock(
+          last.expression as ESTree.CallExpression,
+          testBlockRootNames(program),
+        );
+      });
+
+      it("reaches the same base", ({ declaration }) => {
+        expect(declaration).toBe(true);
+      });
+    });
+
+    describe("a binding taken from a binding that was derived earlier", () => {
+      const it = test.extend("declaration", () => {
+        const program = {
+          type: "Program",
+          body: parseSync(
+            "spec.ts",
+            'const base = test.extend({ subject: 1 });\nconst check = base;\ncheck("names a behaviour", () => {});',
+          ).program.body,
+        } as ESTree.Program;
+        const last = program.body.at(-1) as ESTree.ExpressionStatement;
+        return declaresTestBlock(
+          last.expression as ESTree.CallExpression,
+          testBlockRootNames(program),
+        );
+      });
+
+      it("declares the same way", ({ declaration }) => {
+        expect(declaration).toBe(true);
+      });
+    });
+
+    describe("a member that is not the builder", () => {
+      const it = test.extend("declaration", () => {
+        const program = {
+          type: "Program",
+          body: parseSync(
+            "spec.ts",
+            'const check = test.override({ subject: 1 });\ncheck("names a behaviour", () => {});',
+          ).program.body,
+        } as ESTree.Program;
+        const last = program.body.at(-1) as ESTree.ExpressionStatement;
+        return declaresTestBlock(
+          last.expression as ESTree.CallExpression,
+          testBlockRootNames(program),
+        );
+      });
+
+      it("binds no block", ({ declaration }) => {
+        expect(declaration).toBe(false);
+      });
+    });
+
+    describe("a binding initialised by a plain call", () => {
+      const it = test.extend("declaration", () => {
+        const program = {
+          type: "Program",
+          body: parseSync(
+            "spec.ts",
+            'const check = build();\ncheck("names a behaviour", () => {});',
+          ).program.body,
+        } as ESTree.Program;
+        const last = program.body.at(-1) as ESTree.ExpressionStatement;
+        return declaresTestBlock(
+          last.expression as ESTree.CallExpression,
+          testBlockRootNames(program),
+        );
+      });
+
+      it("binds no block", ({ declaration }) => {
+        expect(declaration).toBe(false);
+      });
+    });
+
+    describe("a binding initialised by a value that is no call", () => {
+      const it = test.extend("declaration", () => {
+        const program = {
+          type: "Program",
+          body: parseSync("spec.ts", 'const port = 3000;\nport("names a behaviour", () => {});')
+            .program.body,
+        } as ESTree.Program;
+        const last = program.body.at(-1) as ESTree.ExpressionStatement;
+        return declaresTestBlock(
+          last.expression as ESTree.CallExpression,
+          testBlockRootNames(program),
+        );
+      });
+
+      it("binds no block", ({ declaration }) => {
+        expect(declaration).toBe(false);
+      });
+    });
+
+    describe("a binding taken apart from an object", () => {
+      const it = test.extend("declaration", () => {
+        const program = {
+          type: "Program",
+          body: parseSync(
+            "spec.ts",
+            'const { it: check } = runner;\ncheck("names a behaviour", () => {});',
+          ).program.body,
+        } as ESTree.Program;
+        const last = program.body.at(-1) as ESTree.ExpressionStatement;
+        return declaresTestBlock(
+          last.expression as ESTree.CallExpression,
+          testBlockRootNames(program),
+        );
+      });
+
+      it("binds no block", ({ declaration }) => {
+        expect(declaration).toBe(false);
+      });
+    });
+
+    describe("a binding declared without an initialiser", () => {
+      const it = test.extend("declaration", () => {
+        const program = {
+          type: "Program",
+          body: parseSync("spec.ts", 'let check;\ncheck("names a behaviour", () => {});').program
+            .body,
+        } as ESTree.Program;
+        const last = program.body.at(-1) as ESTree.ExpressionStatement;
+        return declaresTestBlock(
+          last.expression as ESTree.CallExpression,
+          testBlockRootNames(program),
+        );
+      });
+
+      it("binds no block", ({ declaration }) => {
+        expect(declaration).toBe(false);
+      });
+    });
   });
 
-  test("a block written with a modifier in front of an injected spelling declares the same way", () => {
-    expect(declaresIn('it.skip("names a behaviour", () => {});')).toBe(true);
-    expect(declaresIn('it.each(rows)("names a behaviour", (row) => {});')).toBe(true);
+  describe("read against the names grouping blocks are rooted in", () => {
+    describe("a group written with the injected spelling", () => {
+      const it = test.extend("declaration", () => {
+        const program = {
+          type: "Program",
+          body: parseSync("spec.ts", 'describe("names a group", () => {});').program.body,
+        } as ESTree.Program;
+        const last = program.body.at(-1) as ESTree.ExpressionStatement;
+        return declaresTestBlock(
+          last.expression as ESTree.CallExpression,
+          groupingBlockRootNames(program),
+        );
+      });
+
+      it("is a grouping block declaration", ({ declaration }) => {
+        expect(declaration).toBe(true);
+      });
+    });
+
+    describe("a table-driven group written with the injected spelling", () => {
+      const it = test.extend("declaration", () => {
+        const program = {
+          type: "Program",
+          body: parseSync("spec.ts", 'describe.each(rows)("names a group", (row) => {});').program
+            .body,
+        } as ESTree.Program;
+        const last = program.body.at(-1) as ESTree.ExpressionStatement;
+        return declaresTestBlock(
+          last.expression as ESTree.CallExpression,
+          groupingBlockRootNames(program),
+        );
+      });
+
+      it("declares the same way", ({ declaration }) => {
+        expect(declaration).toBe(true);
+      });
+    });
+
+    describe("a test block", () => {
+      const it = test.extend("declaration", () => {
+        const program = {
+          type: "Program",
+          body: parseSync("spec.ts", 'it("names a behaviour", () => {});').program.body,
+        } as ESTree.Program;
+        const last = program.body.at(-1) as ESTree.ExpressionStatement;
+        return declaresTestBlock(
+          last.expression as ESTree.CallExpression,
+          groupingBlockRootNames(program),
+        );
+      });
+
+      it("is not a grouping block declaration", ({ declaration }) => {
+        expect(declaration).toBe(false);
+      });
+    });
+
+    describe("the other test block spelling", () => {
+      const it = test.extend("declaration", () => {
+        const program = {
+          type: "Program",
+          body: parseSync("spec.ts", 'test("names a behaviour", () => {});').program.body,
+        } as ESTree.Program;
+        const last = program.body.at(-1) as ESTree.ExpressionStatement;
+        return declaresTestBlock(
+          last.expression as ESTree.CallExpression,
+          groupingBlockRootNames(program),
+        );
+      });
+
+      it("is not a grouping block declaration either", ({ declaration }) => {
+        expect(declaration).toBe(false);
+      });
+    });
+
+    describe("a renamed import of the grouping spelling", () => {
+      const it = test.extend("declaration", () => {
+        const program = {
+          type: "Program",
+          body: parseSync(
+            "spec.ts",
+            'import { describe as group } from "vitest";\ngroup("a group", () => {});',
+          ).program.body,
+        } as ESTree.Program;
+        const last = program.body.at(-1) as ESTree.ExpressionStatement;
+        return declaresTestBlock(
+          last.expression as ESTree.CallExpression,
+          groupingBlockRootNames(program),
+        );
+      });
+
+      it("declares under the name it was bound to", ({ declaration }) => {
+        expect(declaration).toBe(true);
+      });
+    });
+
+    describe("a local binding of the grouping spelling", () => {
+      const it = test.extend("declaration", () => {
+        const program = {
+          type: "Program",
+          body: parseSync("spec.ts", 'const group = describe;\ngroup("a group", () => {});').program
+            .body,
+        } as ESTree.Program;
+        const last = program.body.at(-1) as ESTree.ExpressionStatement;
+        return declaresTestBlock(
+          last.expression as ESTree.CallExpression,
+          groupingBlockRootNames(program),
+        );
+      });
+
+      it("declares under its own name", ({ declaration }) => {
+        expect(declaration).toBe(true);
+      });
+    });
+  });
+});
+
+describe("assertionEntryRootNames", () => {
+  describe("the injected assertion entry", () => {
+    const it = test.extend("assertionEntryRoots", () => {
+      const program = {
+        type: "Program",
+        body: parseSync("spec.ts", "const port = 3000;").program.body,
+      } as ESTree.Program;
+      return assertionEntryRootNames(program);
+    });
+
+    it("stands under its own spelling", ({ assertionEntryRoots }) => {
+      expect(assertionEntryRoots).toStrictEqual(new Set(["expect"]));
+    });
   });
 
-  test("a grouping block is not a test block declaration", () => {
-    expect(declaresIn('describe("names a group", () => {});')).toBe(false);
+  describe("a renamed import of the assertion entry", () => {
+    const it = test.extend("assertionEntryRoots", () => {
+      const program = {
+        type: "Program",
+        body: parseSync("spec.ts", 'import { expect as assertThat } from "vitest";').program.body,
+      } as ESTree.Program;
+      return assertionEntryRootNames(program);
+    });
+
+    it("stands under the name it was bound to", ({ assertionEntryRoots }) => {
+      expect(assertionEntryRoots).toStrictEqual(new Set(["assertThat", "expect"]));
+    });
   });
 
-  test("a call reached through a receiver is not a test block declaration", () => {
-    expect(declaresIn('suite.it("names a behaviour", () => {});')).toBe(false);
+  describe("a local binding of the assertion entry", () => {
+    const it = test.extend("assertionEntryRoots", () => {
+      const program = {
+        type: "Program",
+        body: parseSync("spec.ts", "const assertThat = expect;").program.body,
+      } as ESTree.Program;
+      return assertionEntryRootNames(program);
+    });
+
+    it("stands under its own name", ({ assertionEntryRoots }) => {
+      expect(assertionEntryRoots).toStrictEqual(new Set(["assertThat", "expect"]));
+    });
   });
 
-  test("a fixture factory is not a test block declaration", () => {
-    expect(declaresIn("test.extend({ subject: 1 });")).toBe(false);
+  describe("a test block spelling", () => {
+    const it = test.extend("assertionEntryRoots", () => {
+      const program = {
+        type: "Program",
+        body: parseSync("spec.ts", "const check = it;").program.body,
+      } as ESTree.Program;
+      return assertionEntryRootNames(program);
+    });
+
+    it("binds no assertion entry", ({ assertionEntryRoots }) => {
+      expect(assertionEntryRoots).toStrictEqual(new Set(["expect"]));
+    });
+  });
+});
+
+describe("runnerRootedTestBlockRootNames", () => {
+  describe("a spelling the runner injects", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
+      const program = {
+        type: "Program",
+        body: parseSync("spec.ts", "const port = 3000;").program.body,
+      } as ESTree.Program;
+      return runnerRootedTestBlockRootNames(program);
+    });
+
+    it("stands as a root while nothing in the file takes its name", ({
+      runnerRootedTestBlockRoots,
+    }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["it", "test"]));
+    });
   });
 
-  test("a renamed import of a block spelling declares under the name it was bound to", () => {
-    expect(
-      declaresIn('import { it as check } from "vitest";\ncheck("names a behaviour", () => {});'),
-    ).toBe(true);
+  describe("a renamed import from the test runner", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
+      const program = {
+        type: "Program",
+        body: parseSync("spec.ts", 'import { it as check } from "vitest";').program.body,
+      } as ESTree.Program;
+      return runnerRootedTestBlockRootNames(program);
+    });
+
+    it("stands as a root under the name it was bound to", ({ runnerRootedTestBlockRoots }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["check", "it", "test"]));
+    });
   });
 
-  test("an import written with a quoted export name is read the same way", () => {
-    expect(
-      declaresIn(
-        'import { "test" as check } from "vitest";\ncheck("names a behaviour", () => {});',
-      ),
-    ).toBe(true);
+  describe("an import of a spelling from a module that is no test runner", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
+      const program = {
+        type: "Program",
+        body: parseSync("spec.ts", 'import { it } from "./runner.ts";').program.body,
+      } as ESTree.Program;
+      return runnerRootedTestBlockRootNames(program);
+    });
+
+    it("takes that name away", ({ runnerRootedTestBlockRoots }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["test"]));
+    });
   });
 
-  test("an import of something other than a block spelling binds no block", () => {
-    expect(
-      declaresIn('import { expect } from "vitest";\nexpect("names a behaviour", () => {});'),
-    ).toBe(false);
+  describe("a binding derived from the runner", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
+      const program = {
+        type: "Program",
+        body: parseSync("spec.ts", "const it = test.extend({ subject: 1 });").program.body,
+      } as ESTree.Program;
+      return runnerRootedTestBlockRootNames(program);
+    });
+
+    it("stands as a root under its own name", ({ runnerRootedTestBlockRoots }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["it", "test"]));
+    });
   });
 
-  test("a default or namespace import binds no block", () => {
-    expect(declaresIn('import runner from "vitest";\nrunner("names a behaviour", () => {});')).toBe(
-      false,
-    );
-    expect(
-      declaresIn('import * as runner from "vitest";\nrunner("names a behaviour", () => {});'),
-    ).toBe(false);
+  describe("a binding of a spelling that reaches no runner", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
+      const program = {
+        type: "Program",
+        body: parseSync("spec.ts", "const it = buildRunner();").program.body,
+      } as ESTree.Program;
+      return runnerRootedTestBlockRootNames(program);
+    });
+
+    it("takes that name away", ({ runnerRootedTestBlockRoots }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["test"]));
+    });
   });
 
-  test("a local binding of a block spelling declares under its own name", () => {
-    expect(declaresIn('const check = it;\ncheck("names a behaviour", () => {});')).toBe(true);
+  describe("a function declaration taking a spelling", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
+      const program = {
+        type: "Program",
+        body: parseSync("spec.ts", "function it(title, body) {}").program.body,
+      } as ESTree.Program;
+      return runnerRootedTestBlockRootNames(program);
+    });
+
+    it("takes that name away", ({ runnerRootedTestBlockRoots }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["test"]));
+    });
   });
 
-  test("a builder derived from the base declares under the name it was bound to", () => {
-    expect(
-      declaresIn(
-        'const check = test.extend({ subject: 1 });\ncheck("names a behaviour", () => {});',
-      ),
-    ).toBe(true);
+  describe("a function declared without a name", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
+      const program = {
+        type: "Program",
+        body: parseSync("spec.ts", "export default function () {}").program.body,
+      } as ESTree.Program;
+      return runnerRootedTestBlockRootNames(program);
+    });
+
+    it("leaves every spelling standing", ({ runnerRootedTestBlockRoots }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["it", "test"]));
+    });
   });
 
-  test("a builder derived from another builder reaches the same base", () => {
-    expect(
-      declaresIn(
-        'const check = test.extend({ port: 1 }).extend({ subject: 2 });\ncheck("names a behaviour", () => {});',
-      ),
-    ).toBe(true);
+  describe("a binding taken apart from an object", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
+      const program = {
+        type: "Program",
+        body: parseSync("spec.ts", "const { it } = runner;").program.body,
+      } as ESTree.Program;
+      return runnerRootedTestBlockRootNames(program);
+    });
+
+    it("leaves every spelling standing", ({ runnerRootedTestBlockRoots }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["it", "test"]));
+    });
   });
 
-  test("a binding taken from a binding that was derived earlier declares the same way", () => {
-    expect(
-      declaresIn(
-        'const base = test.extend({ subject: 1 });\nconst check = base;\ncheck("names a behaviour", () => {});',
-      ),
-    ).toBe(true);
+  describe("a binding declared without an initialiser", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
+      const program = {
+        type: "Program",
+        body: parseSync("spec.ts", "let it;").program.body,
+      } as ESTree.Program;
+      return runnerRootedTestBlockRootNames(program);
+    });
+
+    it("takes that name away", ({ runnerRootedTestBlockRoots }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["test"]));
+    });
   });
 
-  test("a member that is not the builder binds no block", () => {
-    expect(
-      declaresIn(
-        'const check = test.override({ subject: 1 });\ncheck("names a behaviour", () => {});',
-      ),
-    ).toBe(false);
+  describe("an imported binding standing on its own", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
+      const program = {
+        type: "Program",
+        body: parseSync("spec.ts", 'import { standardIoTest } from "./standard-io-test.ts";')
+          .program.body,
+      } as ESTree.Program;
+      return runnerRootedTestBlockRootNames(program);
+    });
+
+    it("stays out of the roots", ({ runnerRootedTestBlockRoots }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["it", "test"]));
+    });
   });
 
-  test("a binding initialised by a plain call binds no block", () => {
-    expect(declaresIn('const check = build();\ncheck("names a behaviour", () => {});')).toBe(false);
+  describe("a binding derived from an imported factory", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
+      const program = {
+        type: "Program",
+        body: parseSync(
+          "spec.ts",
+          'import { standardIoTest } from "./standard-io-test.ts";\nconst spec = standardIoTest.extend("subject", () => 1);',
+        ).program.body,
+      } as ESTree.Program;
+      return runnerRootedTestBlockRootNames(program);
+    });
+
+    it("stands as a root under its own name", ({ runnerRootedTestBlockRoots }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["it", "spec", "test"]));
+    });
   });
 
-  test("a binding initialised by a value that is no call binds no block", () => {
-    expect(declaresIn('const port = 3000;\nport("names a behaviour", () => {});')).toBe(false);
+  describe("a binding derived through a chain of extends from an imported factory", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
+      const program = {
+        type: "Program",
+        body: parseSync(
+          "spec.ts",
+          'import { standardIoTest } from "./standard-io-test.ts";\nconst spec = standardIoTest.extend("a", () => 1).extend("b", () => 2);',
+        ).program.body,
+      } as ESTree.Program;
+      return runnerRootedTestBlockRootNames(program);
+    });
+
+    it("stands as a root the same way", ({ runnerRootedTestBlockRoots }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["it", "spec", "test"]));
+    });
   });
 
-  test("a binding taken apart from an object binds no block", () => {
-    expect(declaresIn('const { it: check } = runner;\ncheck("names a behaviour", () => {});')).toBe(
-      false,
-    );
+  describe("a binding derived from a default import", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
+      const program = {
+        type: "Program",
+        body: parseSync(
+          "spec.ts",
+          'import runner from "./standard-io-test.ts";\nconst spec = runner.extend("subject", () => 1);',
+        ).program.body,
+      } as ESTree.Program;
+      return runnerRootedTestBlockRootNames(program);
+    });
+
+    it("stays out of the roots, since only named imports are followed", ({
+      runnerRootedTestBlockRoots,
+    }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["it", "test"]));
+    });
   });
 
-  test("a binding declared without an initialiser binds no block", () => {
-    expect(declaresIn('let check;\ncheck("names a behaviour", () => {});')).toBe(false);
+  describe("a binding filled by a call on an imported name that builds no fixture", () => {
+    const it = test.extend("runnerRootedTestBlockRoots", () => {
+      const program = {
+        type: "Program",
+        body: parseSync(
+          "spec.ts",
+          'import { buildRunner } from "./runner.ts";\nconst it = buildRunner();',
+        ).program.body,
+      } as ESTree.Program;
+      return runnerRootedTestBlockRootNames(program);
+    });
+
+    it("takes that name away", ({ runnerRootedTestBlockRoots }) => {
+      expect(runnerRootedTestBlockRoots).toStrictEqual(new Set(["test"]));
+    });
+  });
+});
+
+describe("testCallbacksOf", () => {
+  describe("an arrow handed to a block", () => {
+    const it = test.extend("callbackShapes", () => {
+      const statement = parseSync("spec.ts", 'it("names a behaviour", () => {});').program
+        .body[0] as ESTree.ExpressionStatement;
+      const written = statement.expression as ESTree.CallExpression;
+      return testCallbacksOf(written).map((testCallback) => testCallback.type);
+    });
+
+    it("is read as its callback", ({ callbackShapes }) => {
+      expect(callbackShapes).toStrictEqual(["ArrowFunctionExpression"]);
+    });
   });
 
-  test("both function shapes handed to a block are read as its callbacks", () => {
-    expect(callbackShapesIn('it("names a behaviour", () => {});')).toStrictEqual([
-      "ArrowFunctionExpression",
-    ]);
-    expect(callbackShapesIn('it("names a behaviour", function () {});')).toStrictEqual([
-      "FunctionExpression",
-    ]);
+  describe("a function expression handed to a block", () => {
+    const it = test.extend("callbackShapes", () => {
+      const statement = parseSync("spec.ts", 'it("names a behaviour", function () {});').program
+        .body[0] as ESTree.ExpressionStatement;
+      const written = statement.expression as ESTree.CallExpression;
+      return testCallbacksOf(written).map((testCallback) => testCallback.type);
+    });
+
+    it("is read as its callback as well", ({ callbackShapes }) => {
+      expect(callbackShapes).toStrictEqual(["FunctionExpression"]);
+    });
   });
 
-  test("a value handed to a block that is no function is no callback", () => {
-    expect(callbackShapesIn('it("names a behaviour", 3000);')).toStrictEqual([]);
+  describe("a value handed to a block that is no function", () => {
+    const it = test.extend("callbackShapes", () => {
+      const statement = parseSync("spec.ts", 'it("names a behaviour", 3000);').program
+        .body[0] as ESTree.ExpressionStatement;
+      const written = statement.expression as ESTree.CallExpression;
+      return testCallbacksOf(written).map((testCallback) => testCallback.type);
+    });
+
+    it("is no callback", ({ callbackShapes }) => {
+      expect(callbackShapes).toStrictEqual([]);
+    });
   });
 
-  test("a function handed through a wrapping call is still the callback", () => {
-    expect(callbackShapesIn('it("names a behaviour", withSetup(() => {}));')).toStrictEqual([
-      "ArrowFunctionExpression",
-    ]);
+  describe("a function handed through a wrapping call", () => {
+    const it = test.extend("callbackShapes", () => {
+      const statement = parseSync("spec.ts", 'it("names a behaviour", withSetup(() => {}));')
+        .program.body[0] as ESTree.ExpressionStatement;
+      const written = statement.expression as ESTree.CallExpression;
+      return testCallbacksOf(written).map((testCallback) => testCallback.type);
+    });
+
+    it("is still the callback", ({ callbackShapes }) => {
+      expect(callbackShapes).toStrictEqual(["ArrowFunctionExpression"]);
+    });
   });
 
-  test("a callback spread into the block hides itself from this reading", () => {
-    expect(callbackShapesIn('it("names a behaviour", ...handlers);')).toStrictEqual([]);
-    expect(callbackShapesIn('it("names a behaviour", withSetup(...handlers));')).toStrictEqual([]);
+  describe("a callback spread into the block", () => {
+    const it = test.extend("callbackShapes", () => {
+      const statement = parseSync("spec.ts", 'it("names a behaviour", ...handlers);').program
+        .body[0] as ESTree.ExpressionStatement;
+      const written = statement.expression as ESTree.CallExpression;
+      return testCallbacksOf(written).map((testCallback) => testCallback.type);
+    });
+
+    it("hides itself from this reading", ({ callbackShapes }) => {
+      expect(callbackShapes).toStrictEqual([]);
+    });
   });
 
-  test("a group written with the injected spelling is a grouping block declaration", () => {
-    expect(declaresGroupingIn('describe("names a group", () => {});')).toBe(true);
-    expect(declaresGroupingIn('describe.each(rows)("names a group", (row) => {});')).toBe(true);
+  describe("a callback spread into a wrapping call", () => {
+    const it = test.extend("callbackShapes", () => {
+      const statement = parseSync("spec.ts", 'it("names a behaviour", withSetup(...handlers));')
+        .program.body[0] as ESTree.ExpressionStatement;
+      const written = statement.expression as ESTree.CallExpression;
+      return testCallbacksOf(written).map((testCallback) => testCallback.type);
+    });
+
+    it("hides itself the same way", ({ callbackShapes }) => {
+      expect(callbackShapes).toStrictEqual([]);
+    });
+  });
+});
+
+describe("carriesSpelledTitle", () => {
+  describe("a name written out as a string", () => {
+    const it = test.extend("spelledTitle", () => {
+      const statement = parseSync("spec.ts", 'it("names a behaviour", () => {});').program
+        .body[0] as ESTree.ExpressionStatement;
+      return carriesSpelledTitle(statement.expression as ESTree.CallExpression);
+    });
+
+    it("is a spelled title", ({ spelledTitle }) => {
+      expect(spelledTitle).toBe(true);
+    });
   });
 
-  test("a test block is not a grouping block declaration", () => {
-    expect(declaresGroupingIn('it("names a behaviour", () => {});')).toBe(false);
-    expect(declaresGroupingIn('test("names a behaviour", () => {});')).toBe(false);
+  describe("a name assembled by a template", () => {
+    const it = test.extend("spelledTitle", () => {
+      const statement = parseSync("spec.ts", "it(`names ${behaviour}`, () => {});").program
+        .body[0] as ESTree.ExpressionStatement;
+      return carriesSpelledTitle(statement.expression as ESTree.CallExpression);
+    });
+
+    it("is a spelled title", ({ spelledTitle }) => {
+      expect(spelledTitle).toBe(true);
+    });
   });
 
-  test("a renamed import of the grouping spelling declares under the name it was bound to", () => {
-    expect(
-      declaresGroupingIn(
-        'import { describe as group } from "vitest";\ngroup("a group", () => {});',
-      ),
-    ).toBe(true);
+  describe("a name that is no string", () => {
+    const it = test.extend("spelledTitle", () => {
+      const statement = parseSync("spec.ts", "it(3000, () => {});").program
+        .body[0] as ESTree.ExpressionStatement;
+      return carriesSpelledTitle(statement.expression as ESTree.CallExpression);
+    });
+
+    it("leaves the block without a spelled title", ({ spelledTitle }) => {
+      expect(spelledTitle).toBe(false);
+    });
   });
 
-  test("a local binding of the grouping spelling declares under its own name", () => {
-    expect(declaresGroupingIn('const group = describe;\ngroup("a group", () => {});')).toBe(true);
+  describe("a name held by a binding", () => {
+    const it = test.extend("spelledTitle", () => {
+      const statement = parseSync("spec.ts", "it(behaviour, () => {});").program
+        .body[0] as ESTree.ExpressionStatement;
+      return carriesSpelledTitle(statement.expression as ESTree.CallExpression);
+    });
+
+    it("leaves the block without a spelled title as well", ({ spelledTitle }) => {
+      expect(spelledTitle).toBe(false);
+    });
   });
 
-  test("the injected assertion entry stands under its own spelling", () => {
-    expect(assertionEntryNamesIn("const port = 3000;")).toStrictEqual(["expect"]);
+  describe("a block opening with its callback", () => {
+    const it = test.extend("spelledTitle", () => {
+      const statement = parseSync("spec.ts", "it(() => {});").program
+        .body[0] as ESTree.ExpressionStatement;
+      return carriesSpelledTitle(statement.expression as ESTree.CallExpression);
+    });
+
+    it("carries no spelled title", ({ spelledTitle }) => {
+      expect(spelledTitle).toBe(false);
+    });
   });
 
-  test("a renamed import of the assertion entry stands under the name it was bound to", () => {
-    expect(assertionEntryNamesIn('import { expect as assertThat } from "vitest";')).toStrictEqual([
-      "assertThat",
-      "expect",
-    ]);
+  describe("a block whose first argument is spread", () => {
+    const it = test.extend("spelledTitle", () => {
+      const statement = parseSync("spec.ts", "it(...declaration);").program
+        .body[0] as ESTree.ExpressionStatement;
+      return carriesSpelledTitle(statement.expression as ESTree.CallExpression);
+    });
+
+    it("carries no spelled title", ({ spelledTitle }) => {
+      expect(spelledTitle).toBe(false);
+    });
   });
 
-  test("a local binding of the assertion entry stands under its own name", () => {
-    expect(assertionEntryNamesIn("const assertThat = expect;")).toStrictEqual([
-      "assertThat",
-      "expect",
-    ]);
+  describe("a block handed nothing", () => {
+    const it = test.extend("spelledTitle", () => {
+      const statement = parseSync("spec.ts", "it();").program.body[0] as ESTree.ExpressionStatement;
+      return carriesSpelledTitle(statement.expression as ESTree.CallExpression);
+    });
+
+    it("carries no spelled title", ({ spelledTitle }) => {
+      expect(spelledTitle).toBe(false);
+    });
+  });
+});
+
+describe("testBlockBodyOf", () => {
+  describe("a named block", () => {
+    const it = test.extend("bodyShape", () => {
+      const program = {
+        type: "Program",
+        body: parseSync("spec.ts", 'it("names a behaviour", () => {});').program.body,
+      } as ESTree.Program;
+      const last = program.body.at(-1) as ESTree.ExpressionStatement;
+      const testBlockBody = testBlockBodyOf(
+        last.expression as ESTree.CallExpression,
+        testBlockRootNames(program),
+      );
+      return testBlockBody === null ? null : testBlockBody.type;
+    });
+
+    it("hands over the function that carries its body", ({ bodyShape }) => {
+      expect(bodyShape).toBe("ArrowFunctionExpression");
+    });
   });
 
-  test("a test block spelling binds no assertion entry", () => {
-    expect(assertionEntryNamesIn("const check = it;")).toStrictEqual(["expect"]);
+  describe("a named block handed a function expression", () => {
+    const it = test.extend("bodyShape", () => {
+      const program = {
+        type: "Program",
+        body: parseSync("spec.ts", 'it("names a behaviour", function () {});').program.body,
+      } as ESTree.Program;
+      const last = program.body.at(-1) as ESTree.ExpressionStatement;
+      const testBlockBody = testBlockBodyOf(
+        last.expression as ESTree.CallExpression,
+        testBlockRootNames(program),
+      );
+      return testBlockBody === null ? null : testBlockBody.type;
+    });
+
+    it("hands that function over", ({ bodyShape }) => {
+      expect(bodyShape).toBe("FunctionExpression");
+    });
   });
 
-  test("a name written out as a string is a spelled title", () => {
-    expect(titleSpelledIn('it("names a behaviour", () => {});')).toBe(true);
+  describe("a body written behind an options object", () => {
+    const it = test.extend("bodyShape", () => {
+      const program = {
+        type: "Program",
+        body: parseSync("spec.ts", 'it("names a behaviour", { retry: 2 }, () => {}, 1000);').program
+          .body,
+      } as ESTree.Program;
+      const last = program.body.at(-1) as ESTree.ExpressionStatement;
+      const testBlockBody = testBlockBodyOf(
+        last.expression as ESTree.CallExpression,
+        testBlockRootNames(program),
+      );
+      return testBlockBody === null ? null : testBlockBody.type;
+    });
+
+    it("is still the body", ({ bodyShape }) => {
+      expect(bodyShape).toBe("ArrowFunctionExpression");
+    });
   });
 
-  test("a name assembled by a template is a spelled title", () => {
-    expect(titleSpelledIn("it(`names ${behaviour}`, () => {});")).toBe(true);
+  describe("a body reached through a derived builder", () => {
+    const it = test.extend("bodyShape", () => {
+      const program = {
+        type: "Program",
+        body: parseSync(
+          "spec.ts",
+          'const check = test.extend({ subject: 1 });\ncheck("a behaviour", () => {});',
+        ).program.body,
+      } as ESTree.Program;
+      const last = program.body.at(-1) as ESTree.ExpressionStatement;
+      const testBlockBody = testBlockBodyOf(
+        last.expression as ESTree.CallExpression,
+        testBlockRootNames(program),
+      );
+      return testBlockBody === null ? null : testBlockBody.type;
+    });
+
+    it("is read the same way", ({ bodyShape }) => {
+      expect(bodyShape).toBe("ArrowFunctionExpression");
+    });
   });
 
-  test("a name that is no string leaves the block without a spelled title", () => {
-    expect(titleSpelledIn("it(3000, () => {});")).toBe(false);
-    expect(titleSpelledIn("it(behaviour, () => {});")).toBe(false);
+  describe("a block handed no callback", () => {
+    const it = test.extend("bodyShape", () => {
+      const program = {
+        type: "Program",
+        body: parseSync("spec.ts", 'it("names a behaviour");').program.body,
+      } as ESTree.Program;
+      const last = program.body.at(-1) as ESTree.ExpressionStatement;
+      const testBlockBody = testBlockBodyOf(
+        last.expression as ESTree.CallExpression,
+        testBlockRootNames(program),
+      );
+      return testBlockBody === null ? null : testBlockBody.type;
+    });
+
+    it("hands over no body", ({ bodyShape }) => {
+      expect(bodyShape).toBe(null);
+    });
   });
 
-  test("a block opening with its callback carries no spelled title", () => {
-    expect(titleSpelledIn("it(() => {});")).toBe(false);
+  describe("a block without a spelled title", () => {
+    const it = test.extend("bodyShape", () => {
+      const program = {
+        type: "Program",
+        body: parseSync("spec.ts", "it(() => {});").program.body,
+      } as ESTree.Program;
+      const last = program.body.at(-1) as ESTree.ExpressionStatement;
+      const testBlockBody = testBlockBodyOf(
+        last.expression as ESTree.CallExpression,
+        testBlockRootNames(program),
+      );
+      return testBlockBody === null ? null : testBlockBody.type;
+    });
+
+    it("hands over no body", ({ bodyShape }) => {
+      expect(bodyShape).toBe(null);
+    });
   });
 
-  test("a block whose first argument is spread carries no spelled title", () => {
-    expect(titleSpelledIn("it(...declaration);")).toBe(false);
-  });
+  describe("a call that declares no test block", () => {
+    const it = test.extend("bodyShape", () => {
+      const program = {
+        type: "Program",
+        body: parseSync("spec.ts", 'describe("names a group", () => {});').program.body,
+      } as ESTree.Program;
+      const last = program.body.at(-1) as ESTree.ExpressionStatement;
+      const testBlockBody = testBlockBodyOf(
+        last.expression as ESTree.CallExpression,
+        testBlockRootNames(program),
+      );
+      return testBlockBody === null ? null : testBlockBody.type;
+    });
 
-  test("a block handed nothing carries no spelled title", () => {
-    expect(titleSpelledIn("it();")).toBe(false);
-  });
-
-  test("a named block hands over the function that carries its body", () => {
-    expect(bodyShapeIn('it("names a behaviour", () => {});')).toBe("ArrowFunctionExpression");
-    expect(bodyShapeIn('it("names a behaviour", function () {});')).toBe("FunctionExpression");
-  });
-
-  test("a body written behind an options object is still the body", () => {
-    expect(bodyShapeIn('it("names a behaviour", { retry: 2 }, () => {}, 1000);')).toBe(
-      "ArrowFunctionExpression",
-    );
-  });
-
-  test("a body reached through a derived builder is read the same way", () => {
-    expect(
-      bodyShapeIn('const check = test.extend({ subject: 1 });\ncheck("a behaviour", () => {});'),
-    ).toBe("ArrowFunctionExpression");
-  });
-
-  test("a block handed no callback hands over no body", () => {
-    expect(bodyShapeIn('it("names a behaviour");')).toBe(null);
-  });
-
-  test("a block without a spelled title hands over no body", () => {
-    expect(bodyShapeIn("it(() => {});")).toBe(null);
-  });
-
-  test("a call that declares no test block hands over no body", () => {
-    expect(bodyShapeIn('describe("names a group", () => {});')).toBe(null);
+    it("hands over no body", ({ bodyShape }) => {
+      expect(bodyShape).toBe(null);
+    });
   });
 });

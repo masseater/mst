@@ -1,4 +1,5 @@
-import { Duplex } from "node:stream";
+import { once } from "node:events";
+import { Duplex, PassThrough } from "node:stream";
 
 const ESC = 0x1b;
 const BEL = 0x07;
@@ -63,35 +64,52 @@ const stringEscape: StripState = {
     byte === 0x5c || byte === BEL ? { state: ground, emitted: "" } : escapeLead.consume(byte),
 };
 
-const consumeBytes = (state: StripState, bytes: Buffer): StripStep =>
+const consumeBytes = (startingState: StripState, bytes: Buffer): StripStep =>
   bytes.reduce<StripStep>(
     (accumulated, byte) => {
       const step = accumulated.state.consume(byte);
       return { state: step.state, emitted: accumulated.emitted + step.emitted };
     },
-    { state, emitted: "" },
+    { state: startingState, emitted: "" },
   );
 
-class StripCursor {
-  private state: StripState = ground;
+const writeChunk = async (destination: PassThrough, part: Buffer): Promise<void> => {
+  if (destination.write(part)) return;
+  await once(destination, "drain");
+};
 
-  advance(chunk: Buffer): Buffer | undefined {
-    if (this.state === ground && !chunk.includes(ESC)) {
-      return chunk;
-    }
-    const consumed = consumeBytes(this.state, chunk);
-    this.state = consumed.state;
-    return consumed.emitted === "" ? undefined : Buffer.from(consumed.emitted, "latin1");
+const stripInto = async (
+  arrivals: AsyncIterator<Buffer>,
+  stripping: { readonly state: StripState; readonly destination: PassThrough },
+): Promise<void> => {
+  const arrived = await arrivals.next();
+  if (arrived.done === true) return;
+  if (stripping.state === ground && !arrived.value.includes(ESC)) {
+    await writeChunk(stripping.destination, arrived.value);
+    return stripInto(arrivals, stripping);
   }
-}
+  const consumed = consumeBytes(stripping.state, arrived.value);
+  if (consumed.emitted !== "") {
+    await writeChunk(stripping.destination, Buffer.from(consumed.emitted, "latin1"));
+  }
+  return stripInto(arrivals, { state: consumed.state, destination: stripping.destination });
+};
+
+const stripUntilExhausted = async (
+  source: AsyncIterable<Buffer>,
+  destination: PassThrough,
+): Promise<void> => {
+  try {
+    await stripInto(source[Symbol.asyncIterator](), { state: ground, destination });
+  } finally {
+    destination.end();
+  }
+};
 
 export const createEscapeStripper = (): Duplex =>
   Duplex.from(async function* (source: AsyncIterable<Buffer>) {
-    const cursor = new StripCursor();
-    for await (const chunk of source) {
-      const emitted = cursor.advance(chunk);
-      if (emitted !== undefined) {
-        yield emitted;
-      }
-    }
+    const stripped = new PassThrough();
+    const stripping = stripUntilExhausted(source, stripped);
+    yield* stripped;
+    await stripping;
   });

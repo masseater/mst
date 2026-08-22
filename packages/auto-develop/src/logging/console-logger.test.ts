@@ -1,110 +1,146 @@
 import { standardIoTest } from "@mst/dont-review-it/vitest";
-import { describe, expect, test, vi } from "vite-plus/test";
+import { describe, expect, vi } from "vite-plus/test";
 
-import { asRecord } from "../contract/unknown-record.ts";
 import { createConsoleLogger } from "./console-logger.ts";
 
-const recordingOut = (): {
-  readonly out: NodeJS.WritableStream;
-  readonly lines: () => readonly string[];
-} => {
-  const chunks = new Map<number, string>();
-  const write = (chunk: string): boolean => {
-    chunks.set(chunks.size, chunk);
-    return true;
-  };
-  return { out: { write } as NodeJS.WritableStream, lines: () => [...chunks.values()] };
-};
-
-const parsedLine = (line: string): Readonly<Record<string, unknown>> =>
-  JSON.parse(line) as Readonly<Record<string, unknown>>;
-
-const it = test
-  .extend("infoLine", () => {
-    const recording = recordingOut();
-    createConsoleLogger("relay", { out: recording.out }).info({ port: 8080 }, "listening");
-    return parsedLine(recording.lines()[0] ?? "{}");
-  })
-  .extend("warnLevel", () => {
-    const recording = recordingOut();
-    createConsoleLogger("relay", { out: recording.out }).warn({}, "careful");
-    return parsedLine(recording.lines()[0] ?? "{}").level;
-  })
-  .extend("errorLevel", () => {
-    const recording = recordingOut();
-    createConsoleLogger("relay", { out: recording.out }).error({}, "broken");
-    return parsedLine(recording.lines()[0] ?? "{}").level;
-  })
-  .extend("failureField", () => {
-    const recording = recordingOut();
-    const failure = new Error("the relay is unreachable", { cause: new Error("ECONNREFUSED") });
-    createConsoleLogger("relay", { out: recording.out }).error({ err: failure }, "cycle failed");
-    const logged = asRecord(parsedLine(recording.lines()[0] ?? "{}").err);
-    return {
-      name: logged?.name,
-      message: logged?.message,
-      carriesStack: typeof logged?.stack === "string",
-      causeMessage: asRecord(logged?.cause)?.message,
-    };
-  })
-  .extend("mirroredLines", () => {
-    const recording = recordingOut();
-    const append = vi.fn<(line: string) => void>();
-    createConsoleLogger("relay", { out: recording.out, fileSink: { append } }).info(
-      {},
-      "listening",
-    );
-    return { stdout: recording.lines(), file: append.mock.calls.map(([line]) => line) };
-  });
-
-standardIoTest("出力先を渡さなければ標準出力へ書く", ({ stdout }) => {
-  vi.setSystemTime(new Date("2026-08-11T00:00:00.000Z"));
-  createConsoleLogger("relay").info({}, "listening");
-  vi.useRealTimers();
-
-  expect(stdout.text).toMatchInlineSnapshot(`
-    "{"level":"info","name":"relay","time":"2026-08-11T00:00:00.000Z","msg":"listening"}
-    "
-  `);
-});
-
-standardIoTest("標準エラーへは書かない", ({ stderr }) => {
-  createConsoleLogger("relay").info({}, "listening");
-
-  expect(stderr.text).toMatchInlineSnapshot(`""`);
-});
-
 describe("createConsoleLogger", () => {
-  it("1 行 JSON にロガー名を載せる", ({ infoLine }) => {
-    expect(infoLine.name).toStrictEqual("relay");
-  });
+  describe("出力先を渡された名前付きのロガーが info を書いた行", () => {
+    const it = standardIoTest.extend("theLineFromTheNamedLogger", ({ stdout }) => {
+      vi.setSystemTime(new Date("2026-08-11T00:00:00.000Z"));
+      createConsoleLogger("watchdog", { out: process.stdout }).info({}, "listening");
+      return stdout.text();
+    });
 
-  it("付帯フィールドをそのまま並べる", ({ infoLine }) => {
-    expect(infoLine.port).toStrictEqual(8080);
-  });
-
-  it("メッセージを msg キーに置く", ({ infoLine }) => {
-    expect(infoLine.msg).toStrictEqual("listening");
-  });
-
-  it("警告は warn の水準になる", ({ warnLevel }) => {
-    expect(warnLevel).toStrictEqual("warn");
-  });
-
-  it("エラーは error の水準になる", ({ errorLevel }) => {
-    expect(errorLevel).toStrictEqual("error");
-  });
-
-  it("Error は名前とメッセージと原因が読める形に開いて載せる", ({ failureField }) => {
-    expect(failureField).toStrictEqual({
-      name: "Error",
-      message: "the relay is unreachable",
-      carriesStack: true,
-      causeMessage: "ECONNREFUSED",
+    it("与えられた名前を載せた 1 行の JSON になる", ({ theLineFromTheNamedLogger }) => {
+      expect(theLineFromTheNamedLogger).toBe(
+        '{"level":"info","name":"watchdog","time":"2026-08-11T00:00:00.000Z","msg":"listening"}\n',
+      );
     });
   });
 
-  it("ファイル出力先があれば同じ行を書き分ける", ({ mirroredLines }) => {
-    expect(mirroredLines.file).toStrictEqual(mirroredLines.stdout);
+  describe("付帯フィールドを添えて info を書いた行", () => {
+    const it = standardIoTest.extend("theLineCarryingFields", ({ stdout }) => {
+      vi.setSystemTime(new Date("2026-08-11T00:00:00.000Z"));
+      createConsoleLogger("relay").info({ port: 8080, attempt: 3 }, "listening");
+      return stdout.text();
+    });
+
+    it("付帯フィールドを水準と msg の間にそのまま並べる", ({ theLineCarryingFields }) => {
+      expect(theLineCarryingFields).toBe(
+        '{"level":"info","name":"relay","time":"2026-08-11T00:00:00.000Z","port":8080,"attempt":3,"msg":"listening"}\n',
+      );
+    });
+  });
+
+  describe("メッセージだけを添えて info を書いた行", () => {
+    const it = standardIoTest.extend("theLineCarryingTheMessage", ({ stdout }) => {
+      vi.setSystemTime(new Date("2026-08-11T00:00:00.000Z"));
+      createConsoleLogger("relay").info({}, "ready to accept connections");
+      return stdout.text();
+    });
+
+    it("メッセージを msg キーに置く", ({ theLineCarryingTheMessage }) => {
+      expect(theLineCarryingTheMessage).toBe(
+        '{"level":"info","name":"relay","time":"2026-08-11T00:00:00.000Z","msg":"ready to accept connections"}\n',
+      );
+    });
+  });
+
+  describe("warn で書いた行", () => {
+    const it = standardIoTest.extend("theWarnLine", ({ stdout }) => {
+      vi.setSystemTime(new Date("2026-08-11T00:00:00.000Z"));
+      createConsoleLogger("relay").warn({}, "careful");
+      return stdout.text();
+    });
+
+    it("水準に warn を載せる", ({ theWarnLine }) => {
+      expect(theWarnLine).toBe(
+        '{"level":"warn","name":"relay","time":"2026-08-11T00:00:00.000Z","msg":"careful"}\n',
+      );
+    });
+  });
+
+  describe("error で書いた行", () => {
+    const it = standardIoTest.extend("theErrorLine", ({ stdout }) => {
+      vi.setSystemTime(new Date("2026-08-11T00:00:00.000Z"));
+      createConsoleLogger("relay").error({}, "broken");
+      return stdout.text();
+    });
+
+    it("水準に error を載せる", ({ theErrorLine }) => {
+      expect(theErrorLine).toBe(
+        '{"level":"error","name":"relay","time":"2026-08-11T00:00:00.000Z","msg":"broken"}\n',
+      );
+    });
+  });
+
+  describe("原因を持つ Error を添えて error を書いた行", () => {
+    const it = standardIoTest.extend("theLineCarryingAFailure", ({ stdout }) => {
+      class FailureWithAPinnedStack extends Error {
+        override stack = `${this.name}: ${this.message} at the relay`;
+      }
+      vi.setSystemTime(new Date("2026-08-11T00:00:00.000Z"));
+      createConsoleLogger("relay").error(
+        {
+          err: new FailureWithAPinnedStack("the relay is unreachable", {
+            cause: new FailureWithAPinnedStack("ECONNREFUSED"),
+          }),
+        },
+        "cycle failed",
+      );
+      return stdout.text();
+    });
+
+    it("Error を名前とメッセージとスタックと原因に開いて載せる", ({ theLineCarryingAFailure }) => {
+      expect(theLineCarryingAFailure).toBe(
+        '{"level":"error","name":"relay","time":"2026-08-11T00:00:00.000Z","err":{"name":"Error","message":"the relay is unreachable","stack":"Error: the relay is unreachable at the relay","cause":{"name":"Error","message":"ECONNREFUSED","stack":"Error: ECONNREFUSED at the relay"}},"msg":"cycle failed"}\n',
+      );
+    });
+  });
+
+  describe("ファイル出力先を渡されたロガー", () => {
+    const it = standardIoTest.extend("theLineHandedToTheFileSink", ({ stderr }) => {
+      vi.setSystemTime(new Date("2026-08-11T00:00:00.000Z"));
+      createConsoleLogger("relay", {
+        fileSink: {
+          append: (handedLine) => {
+            process.stderr.write(handedLine);
+          },
+        },
+      }).info({}, "listening");
+      return stderr.text();
+    });
+
+    it("標準出力へ書いたものと同じ行をファイル出力先へ渡す", ({ theLineHandedToTheFileSink }) => {
+      expect(theLineHandedToTheFileSink).toBe(
+        '{"level":"info","name":"relay","time":"2026-08-11T00:00:00.000Z","msg":"listening"}\n',
+      );
+    });
+  });
+
+  describe("出力先を渡されずに info を書いたロガー", () => {
+    const it = standardIoTest.extend("theRunWithoutAnOutputStream", { auto: true }, () => {
+      vi.setSystemTime(new Date("2026-08-11T00:00:00.000Z"));
+      createConsoleLogger("relay").info({}, "listening");
+    });
+
+    it("標準出力へ 1 行だけ書く", ({ stdout }) => {
+      expect(stdout).toMatchInlineSnapshot(`
+        {
+          "chunks": [
+            "{"level":"info","name":"relay","time":"2026-08-11T00:00:00.000Z","msg":"listening"}
+        ",
+          ],
+        }
+      `);
+    });
+
+    it("標準エラーへは何も書かない", ({ stderr }) => {
+      expect(stderr).toMatchInlineSnapshot(`
+        {
+          "chunks": [],
+        }
+      `);
+    });
   });
 });

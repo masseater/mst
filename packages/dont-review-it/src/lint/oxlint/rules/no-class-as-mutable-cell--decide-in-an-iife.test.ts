@@ -6,10 +6,7 @@ import { describe } from "vite-plus/test";
 import { findWorkspaceRoot } from "../lib/canonical-values/workspace-root.ts";
 import { createNoClassAsMutableCell } from "./no-class-as-mutable-cell--decide-in-an-iife.ts";
 
-import type {
-  CellClassFinding,
-  CellClassIndex,
-} from "../lib/mutable-cell-classes/cell-class-index.ts";
+import type { CellClassIndex } from "../lib/mutable-cell-classes/cell-class-index.ts";
 
 const repositoryRoot = findWorkspaceRoot(process.cwd());
 
@@ -25,20 +22,33 @@ const TALLY = `class Tally {
 }
 `;
 
-const ruleReading = (findings: readonly CellClassFinding[]) => {
-  const index: CellClassIndex = { findingsByPath: new Map([[SUBJECT_PATH, findings]]) };
-  return createNoClassAsMutableCell({ loadIndex: () => index });
-};
+const namedScopeRule = createNoClassAsMutableCell({
+  loadIndex: (): CellClassIndex => ({
+    findingsByPath: new Map([
+      [SUBJECT_PATH, [{ className: "Tally", fields: ["total"], scopeName: "sum" }]],
+    ]),
+  }),
+});
 
-const namedScopeRule = ruleReading([{ className: "Tally", fields: ["total"], scopeName: "sum" }]);
+const namelessScopeRule = createNoClassAsMutableCell({
+  loadIndex: (): CellClassIndex => ({
+    findingsByPath: new Map([
+      [SUBJECT_PATH, [{ className: "Tally", fields: ["total", "seen"], scopeName: null }]],
+    ]),
+  }),
+});
 
-const namelessScopeRule = ruleReading([
-  { className: "Tally", fields: ["total", "seen"], scopeName: null },
-]);
+const otherClassRule = createNoClassAsMutableCell({
+  loadIndex: (): CellClassIndex => ({
+    findingsByPath: new Map([
+      [SUBJECT_PATH, [{ className: "Ledger", fields: ["total"], scopeName: "sum" }]],
+    ]),
+  }),
+});
 
-const otherClassRule = ruleReading([{ className: "Ledger", fields: ["total"], scopeName: "sum" }]);
-
-const emptyRule = ruleReading([]);
+const emptyRule = createNoClassAsMutableCell({
+  loadIndex: (): CellClassIndex => ({ findingsByPath: new Map([[SUBJECT_PATH, []]]) }),
+});
 
 describe("dont-review-it/no-class-as-mutable-cell--decide-in-an-iife", () => {
   testLintRule(namedScopeRule, {

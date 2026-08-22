@@ -1,9 +1,12 @@
 #!/usr/bin/env node
+import { emitCliReport } from "@mst/repository-checks";
+
 import { runLintRuleAuthoring } from "./run-cli.ts";
 
-const { exitCode, out, error } = runLintRuleAuthoring(process.argv.slice(2));
-
-if (out !== "") process.stdout.write(out);
-if (error !== "") process.stderr.write(error);
-
-process.exitCode = exitCode;
+emitCliReport(runLintRuleAuthoring(process.argv.slice(2)), {
+  writeOutput: process.stdout.write.bind(process.stdout),
+  writeError: process.stderr.write.bind(process.stderr),
+  setExitCode: (exitCode) => {
+    process.exitCode = exitCode;
+  },
+});

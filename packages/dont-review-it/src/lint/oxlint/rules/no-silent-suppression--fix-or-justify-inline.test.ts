@@ -9,8 +9,6 @@ const SELF_RULE = "no-silent-suppression--fix-or-justify-inline";
 
 const DECLARATION = "export type Cart = { readonly total: number };";
 
-const configFor = (lint: string): string => `export default { lint: ${lint} };`;
-
 const CONFIG_FILE = "vite.config.ts";
 
 describe("dont-review-it/no-silent-suppression--fix-or-justify-inline", () => {
@@ -55,17 +53,17 @@ describe("dont-review-it/no-silent-suppression--fix-or-justify-inline", () => {
       },
       {
         name: "a guarded rule held at the level that fails a run passes",
-        code: configFor(`{ rules: { "dont-review-it/${GUARDED_RULE}": "error" } }`),
+        code: `export default { lint: { rules: { "dont-review-it/${GUARDED_RULE}": "error" } } };`,
         filename: CONFIG_FILE,
       },
       {
         name: "a rule outside the guarded set may sit at any level",
-        code: configFor(`{ rules: { "no-console": "off" } }`),
+        code: `export default { lint: { rules: { "no-console": "off" } } };`,
         filename: CONFIG_FILE,
       },
       {
         name: "ignore patterns naming the declared regions are the walk's own definition",
-        code: configFor(`{ ignorePatterns: ["**/dist/**", "node_modules", "coverage/**"] }`),
+        code: `export default { lint: { ignorePatterns: ["**/dist/**", "node_modules", "coverage/**"] } };`,
         filename: CONFIG_FILE,
       },
       {
@@ -75,7 +73,7 @@ describe("dont-review-it/no-silent-suppression--fix-or-justify-inline", () => {
       },
       {
         name: "a file that is not the lint configuration is read for its comments alone",
-        code: configFor(`{ rules: { "dont-review-it/${GUARDED_RULE}": "off" } }`),
+        code: `export default { lint: { rules: { "dont-review-it/${GUARDED_RULE}": "off" } } };`,
         filename: "rules-snapshot.ts",
       },
       {
@@ -85,13 +83,13 @@ describe("dont-review-it/no-silent-suppression--fix-or-justify-inline", () => {
       },
       {
         name: "a region declared by the options is part of the walk's definition",
-        code: configFor(`{ ignorePatterns: ["**/generated/**"] }`),
+        code: `export default { lint: { ignorePatterns: ["**/generated/**"] } };`,
         filename: CONFIG_FILE,
         options: [{ excludedRegions: ["generated"] }],
       },
       {
         name: "an ignore pattern that reaches no registered forbidden path passes",
-        code: configFor(`{ ignorePatterns: ["**/dist/**"] }`),
+        code: `export default { lint: { ignorePatterns: ["**/dist/**"] } };`,
         filename: CONFIG_FILE,
         options: [{ forbiddenPaths: ["legacy/settings.json"] }],
       },
@@ -180,7 +178,7 @@ describe("dont-review-it/no-silent-suppression--fix-or-justify-inline", () => {
       },
       {
         name: "a guarded rule turned off in the configuration is reported",
-        code: configFor(`{ rules: { "dont-review-it/${GUARDED_RULE}": "off" } }`),
+        code: `export default { lint: { rules: { "dont-review-it/${GUARDED_RULE}": "off" } } };`,
         filename: CONFIG_FILE,
         errors: [
           {
@@ -191,27 +189,25 @@ describe("dont-review-it/no-silent-suppression--fix-or-justify-inline", () => {
       },
       {
         name: "a guarded rule lowered to a warning inside an override is reported",
-        code: configFor(
-          `{ overrides: [{ files: ["apps/**"], rules: { "${GUARDED_RULE}": "warn" } }] }`,
-        ),
+        code: `export default { lint: { overrides: [{ files: ["apps/**"], rules: { "${GUARDED_RULE}": "warn" } }] } };`,
         filename: CONFIG_FILE,
         errors: [{ messageId: "weakenedRule", data: { ruleName: GUARDED_RULE, severity: "warn" } }],
       },
       {
         name: "a guarded rule lowered inside the call that wraps the lint block is reported",
-        code: configFor(`withGitExcludes({ rules: { "${GUARDED_RULE}": ["off", {}] } })`),
+        code: `export default { lint: withGitExcludes({ rules: { "${GUARDED_RULE}": ["off", {}] } }) };`,
         filename: CONFIG_FILE,
         errors: [{ messageId: "weakenedRule" }],
       },
       {
         name: "an ignore pattern naming a place outside the declared regions is reported",
-        code: configFor(`{ ignorePatterns: ["**/dist/**", "packages/legacy/**"] }`),
+        code: `export default { lint: { ignorePatterns: ["**/dist/**", "packages/legacy/**"] } };`,
         filename: CONFIG_FILE,
         errors: [{ messageId: "undeclaredIgnoredRegion", data: { pattern: "packages/legacy/**" } }],
       },
       {
         name: "an ignore pattern covering a registered forbidden path names that path",
-        code: configFor(`{ ignorePatterns: ["**/dist/**"] }`),
+        code: `export default { lint: { ignorePatterns: ["**/dist/**"] } };`,
         filename: CONFIG_FILE,
         options: [{ forbiddenPaths: ["packages/cart/dist/settings.json"] }],
         errors: [

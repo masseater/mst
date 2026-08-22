@@ -1,103 +1,164 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
-import { describe, expect, onTestFinished, test, vi } from "vite-plus/test";
+import { describe, expect, test, vi } from "vite-plus/test";
 
+import { readTextFile } from "../canonical-values/source-files.ts";
 import { loadRepositoryTypeAuthorityIndex } from "./builder.ts";
 
-const UNREADABLE_FILE_NAME = "unreadable.ts";
-
-class MissingPathError extends Error {
-  readonly code = "ENOENT";
-
-  constructor() {
-    super("the path is gone");
-  }
-}
-
-vi.mock(import("node:fs"), async (importOriginal) => {
-  const real = await importOriginal();
-  const readFileSync = ((...call: Parameters<typeof real.readFileSync>) => {
-    const [path] = call;
-    if (String(path).endsWith(UNREADABLE_FILE_NAME)) throw new MissingPathError();
-    return real.readFileSync(...call);
-  }) as typeof real.readFileSync;
-  return { ...real, readFileSync };
-});
+vi.mock(import("../canonical-values/source-files.ts"), { spy: true });
 
 const SHAPE =
   "export type Shape = { readonly a: string; readonly b: number; readonly c: Named };\n";
 
 describe("loadRepositoryTypeAuthorityIndex", () => {
-  const repositoryWith = (files: Readonly<Record<string, string>>): string => {
-    const root = mkdtempSync(join(tmpdir(), "split-type-authority-builder-"));
-    onTestFinished(() => {
-      rmSync(root, { recursive: true, force: true });
-    });
-    for (const [path, text] of Object.entries(files)) {
-      const target = join(root, path);
-      mkdirSync(dirname(target), { recursive: true });
-      writeFileSync(target, text, "utf8");
-    }
-    return root;
-  };
-
-  const pathsIn = (repositoryRoot: string): readonly string[] => [
-    ...loadRepositoryTypeAuthorityIndex({ repositoryRoot }).typesByPath.keys(),
-  ];
-
-  test("a source declaring an exported type is placed in the index", () => {
-    expect(pathsIn(repositoryWith({ "src/a.ts": SHAPE }))).toStrictEqual(["src/a.ts"]);
-  });
-
-  test("a source declaring no exported type is left out of the index", () => {
-    expect(
-      pathsIn(repositoryWith({ "src/a.ts": SHAPE, "src/b.ts": "export {};\n" })),
-    ).toStrictEqual(["src/a.ts"]);
-  });
-
-  test("a test file is left out of the index", () => {
-    expect(pathsIn(repositoryWith({ "src/a.test.ts": SHAPE }))).toStrictEqual([]);
-  });
-
-  test("a repository holding no source at all is indexed as empty", () => {
-    expect(pathsIn(repositoryWith({ "README.md": "# held\n" }))).toStrictEqual([]);
-  });
-
-  test("a source that cannot be read is left out of the index", () => {
-    expect(
-      pathsIn(repositoryWith({ "src/a.ts": SHAPE, [`src/${UNREADABLE_FILE_NAME}`]: SHAPE })),
-    ).toStrictEqual(["src/a.ts"]);
-  });
-
-  test("a type is placed in the workspace whose manifest stands nearest to it", () => {
-    const root = repositoryWith({
-      "packages/order/package.json": "{}",
-      "packages/order/src/a.ts": SHAPE,
+  describe("a repository holding one source that declares an exported type", () => {
+    const it = test.extend("indexedPaths", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "split-type-authority-builder-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "src"), { recursive: true });
+      writeFileSync(join(root, "src", "a.ts"), SHAPE, "utf8");
+      return Array.from(
+        loadRepositoryTypeAuthorityIndex({ repositoryRoot: root }).typesByPath.keys(),
+      );
     });
 
-    expect(
-      loadRepositoryTypeAuthorityIndex({ repositoryRoot: root }).typesByPath.get(
-        "packages/order/src/a.ts",
-      )?.[0]?.workspacePath,
-    ).toBe("packages/order");
+    it("places that source in the index", ({ indexedPaths }) => {
+      expect(indexedPaths).toStrictEqual(["src/a.ts"]);
+    });
   });
 
-  test("a type under no manifest at all belongs to the workspace at the repository root", () => {
-    const repositoryRoot = repositoryWith({ "src/a.ts": SHAPE });
+  describe("a repository holding a source that declares no exported type", () => {
+    const it = test.extend("indexedPaths", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "split-type-authority-builder-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "src"), { recursive: true });
+      writeFileSync(join(root, "src", "a.ts"), SHAPE, "utf8");
+      writeFileSync(join(root, "src", "b.ts"), "export {};\n", "utf8");
+      return Array.from(
+        loadRepositoryTypeAuthorityIndex({ repositoryRoot: root }).typesByPath.keys(),
+      );
+    });
 
-    expect(
-      loadRepositoryTypeAuthorityIndex({ repositoryRoot }).typesByPath.get("src/a.ts")?.[0]
-        ?.workspacePath,
-    ).toBe("");
+    it("leaves that source out of the index", ({ indexedPaths }) => {
+      expect(indexedPaths).toStrictEqual(["src/a.ts"]);
+    });
   });
 
-  test("the index of a repository is built once and handed back on every later ask", () => {
-    const repositoryRoot = repositoryWith({ "src/a.ts": SHAPE });
+  describe("a repository holding only a test file", () => {
+    const it = test.extend("indexedPaths", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "split-type-authority-builder-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "src"), { recursive: true });
+      writeFileSync(join(root, "src", "a.test.ts"), SHAPE, "utf8");
+      return Array.from(
+        loadRepositoryTypeAuthorityIndex({ repositoryRoot: root }).typesByPath.keys(),
+      );
+    });
 
-    expect(loadRepositoryTypeAuthorityIndex({ repositoryRoot })).toBe(
-      loadRepositoryTypeAuthorityIndex({ repositoryRoot }),
-    );
+    it("leaves the test file out of the index", ({ indexedPaths }) => {
+      expect(indexedPaths).toStrictEqual([]);
+    });
+  });
+
+  describe("a repository holding no source at all", () => {
+    const it = test.extend("indexedPaths", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "split-type-authority-builder-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "README.md"), "# held\n", "utf8");
+      return Array.from(
+        loadRepositoryTypeAuthorityIndex({ repositoryRoot: root }).typesByPath.keys(),
+      );
+    });
+
+    it("is indexed as empty", ({ indexedPaths }) => {
+      expect(indexedPaths).toStrictEqual([]);
+    });
+  });
+
+  describe("a repository holding a source that cannot be read", () => {
+    const it = test.extend("indexedPaths", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "split-type-authority-builder-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "src"), { recursive: true });
+      writeFileSync(join(root, "src", "a-unreadable.ts"), SHAPE, "utf8");
+      writeFileSync(join(root, "src", "b-present.ts"), SHAPE, "utf8");
+      // mock-factory-exemption no-replaced-double-behaviour--let-the-replaced-module-answer -- whether a source that the scan already found can still be opened is settled by the file system inside the boundary this spec replaces, and every source this spec can write is readable
+      vi.mocked(readTextFile).mockReturnValueOnce(null);
+      return Array.from(
+        loadRepositoryTypeAuthorityIndex({ repositoryRoot: root }).typesByPath.keys(),
+      );
+    });
+
+    it("leaves that source out of the index", ({ indexedPaths }) => {
+      expect(indexedPaths).toStrictEqual(["src/b-present.ts"]);
+    });
+  });
+
+  describe("a type standing beside a manifest", () => {
+    const it = test.extend("workspacePaths", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "split-type-authority-builder-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "packages", "order", "src"), { recursive: true });
+      writeFileSync(join(root, "packages", "order", "package.json"), "{}", "utf8");
+      writeFileSync(join(root, "packages", "order", "src", "a.ts"), SHAPE, "utf8");
+      return loadRepositoryTypeAuthorityIndex({ repositoryRoot: root })
+        .typesByPath.get("packages/order/src/a.ts")
+        ?.map((indexed) => indexed.workspacePath);
+    });
+
+    it("is placed in the workspace whose manifest stands nearest to it", ({ workspacePaths }) => {
+      expect(workspacePaths).toStrictEqual(["packages/order"]);
+    });
+  });
+
+  describe("a type standing under no manifest at all", () => {
+    const it = test.extend("workspacePaths", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "split-type-authority-builder-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "src"), { recursive: true });
+      writeFileSync(join(root, "src", "a.ts"), SHAPE, "utf8");
+      return loadRepositoryTypeAuthorityIndex({ repositoryRoot: root })
+        .typesByPath.get("src/a.ts")
+        ?.map((indexed) => indexed.workspacePath);
+    });
+
+    it("belongs to the repository root", ({ workspacePaths }) => {
+      expect(workspacePaths).toStrictEqual([""]);
+    });
+  });
+
+  describe("a repository asked for its index a second time", () => {
+    const it = test.extend("sameIndexHandedBack", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "split-type-authority-builder-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "src"), { recursive: true });
+      writeFileSync(join(root, "src", "a.ts"), SHAPE, "utf8");
+      return (
+        loadRepositoryTypeAuthorityIndex({ repositoryRoot: root }) ===
+        loadRepositoryTypeAuthorityIndex({ repositoryRoot: root })
+      );
+    });
+
+    it("is handed the index built on the first ask", ({ sameIndexHandedBack }) => {
+      expect(sameIndexHandedBack).toBe(true);
+    });
   });
 });

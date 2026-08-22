@@ -3,121 +3,138 @@ import { describe, expect, test, vi } from "vite-plus/test";
 import { silentLogger } from "../logging/logger.ts";
 import { createPeriodicScheduler } from "./scheduler.ts";
 
-const elapse = async (ms: number): Promise<void> => {
-  await vi.advanceTimersByTimeAsync(ms);
-};
-
-const it = test
-  .extend("runningStates", () => {
-    const scheduler = createPeriodicScheduler({
-      checkRestart: vi.fn<() => void>(),
-      cleanup: { run: () => Promise.resolve() },
-      log: silentLogger,
-    });
-    const beforeStart = scheduler.isRunning();
-    scheduler.start();
-    const whileRunning = scheduler.isRunning();
-    scheduler.stop();
-    return { beforeStart, whileRunning, afterStop: scheduler.isRunning() };
-  })
-  .extend("restartCheckCounts", async () => {
-    vi.useFakeTimers();
-    const checkRestart = vi.fn<() => void>();
-    const scheduler = createPeriodicScheduler({
-      checkRestart,
-      restartCheckIntervalMs: 10,
-      log: silentLogger,
-    });
-    scheduler.start();
-    scheduler.start();
-    await elapse(35);
-    scheduler.stop();
-    const whileRunning = checkRestart.mock.calls.length;
-    await elapse(25);
-    const afterStop = checkRestart.mock.calls.length;
-    vi.useRealTimers();
-    return { whileRunning, afterStop };
-  })
-  .extend("cleanupStartCalls", async () => {
-    const cleanupStarts = vi.fn<() => void>();
-    const gate = new Map<string, () => void>();
-    const scheduler = createPeriodicScheduler({
-      checkRestart: vi.fn<() => void>(),
-      restartCheckIntervalMs: 1000,
-      cleanup: {
-        run: () => {
-          cleanupStarts();
-          return new Promise<void>((resolve) => {
-            gate.set("finish", resolve);
-          });
-        },
-        intervalMs: 5,
-      },
-      log: silentLogger,
-    });
-    vi.useFakeTimers();
-    scheduler.start();
-    await elapse(30);
-    scheduler.stop();
-    gate.get("finish")?.();
-    await elapse(5);
-    vi.useRealTimers();
-    return cleanupStarts.mock.calls;
-  })
-  .extend("cleanupFailureWarnCalls", async () => {
-    const warnLog = vi.fn<(fields: Readonly<Record<string, unknown>>, message: string) => void>();
-    const scheduler = createPeriodicScheduler({
-      checkRestart: vi.fn<() => void>(),
-      restartCheckIntervalMs: 1000,
-      cleanup: { run: () => Promise.reject(new Error("cleanup broke")), intervalMs: 10 },
-      log: { info: () => undefined, warn: warnLog, error: () => undefined },
-    });
-    vi.useFakeTimers();
-    scheduler.start();
-    await elapse(25);
-    scheduler.stop();
-    vi.useRealTimers();
-    return warnLog.mock.calls;
-  })
-  .extend("stopBeforeStartRunning", () => {
-    const scheduler = createPeriodicScheduler({
-      checkRestart: vi.fn<() => void>(),
-      log: silentLogger,
-    });
-    scheduler.stop();
-    return scheduler.isRunning();
-  });
-
 describe("createPeriodicScheduler", () => {
-  it("開始前は非稼働である", ({ runningStates }) => {
-    expect(runningStates.beforeStart).toStrictEqual(false);
+  const it = test
+    .extend("runningBeforeStart", () => {
+      const scheduler = createPeriodicScheduler({
+        checkRestart: vi.fn<() => void>(),
+        cleanup: { run: () => Promise.resolve() },
+        log: silentLogger,
+      });
+      return scheduler.isRunning();
+    })
+    .extend("runningAfterStart", async () => {
+      const scheduler = createPeriodicScheduler({
+        checkRestart: vi.fn<() => void>(),
+        cleanup: { run: () => Promise.resolve() },
+        log: silentLogger,
+      });
+      const started = scheduler.start();
+      const runningAfterStart = started.isRunning();
+      await started.stop();
+      return runningAfterStart;
+    })
+    .extend("runningAfterStop", async () => {
+      const scheduler = createPeriodicScheduler({
+        checkRestart: vi.fn<() => void>(),
+        cleanup: { run: () => Promise.resolve() },
+        log: silentLogger,
+      });
+      const started = scheduler.start();
+      await started.stop();
+      return started.isRunning();
+    })
+    .extend("runningAfterStopWithoutStart", async () => {
+      const scheduler = createPeriodicScheduler({
+        checkRestart: vi.fn<() => void>(),
+        log: silentLogger,
+      });
+      await scheduler.stop();
+      return scheduler.isRunning();
+    })
+    .extend("restartCheck", async () => {
+      vi.useFakeTimers();
+      const restartCheck = vi.fn<() => void>();
+      const scheduler = createPeriodicScheduler({
+        checkRestart: restartCheck,
+        restartCheckIntervalMs: 10,
+        log: silentLogger,
+      });
+      const started = scheduler.start();
+      await vi.advanceTimersByTimeAsync(35);
+      await started.stop();
+      vi.useRealTimers();
+      return restartCheck;
+    })
+    .extend("restartCheckAfterDoubleStartAndStop", async () => {
+      vi.useFakeTimers();
+      const restartCheckAfterDoubleStartAndStop = vi.fn<() => void>();
+      const scheduler = createPeriodicScheduler({
+        checkRestart: restartCheckAfterDoubleStartAndStop,
+        restartCheckIntervalMs: 10,
+        log: silentLogger,
+      });
+      const started = scheduler.start();
+      const restarted = started.start();
+      await vi.advanceTimersByTimeAsync(35);
+      await restarted.stop();
+      await vi.advanceTimersByTimeAsync(25);
+      vi.useRealTimers();
+      return restartCheckAfterDoubleStartAndStop;
+    })
+    .extend("cleanupRun", async () => {
+      vi.useFakeTimers();
+      const cleanupInFlight = Promise.withResolvers<undefined>();
+      const cleanupRun = vi.fn<() => Promise<void>>(() => cleanupInFlight.promise);
+      const scheduler = createPeriodicScheduler({
+        checkRestart: vi.fn<() => void>(),
+        restartCheckIntervalMs: 1000,
+        cleanup: { run: cleanupRun, intervalMs: 5 },
+        log: silentLogger,
+      });
+      const started = scheduler.start();
+      await vi.advanceTimersByTimeAsync(30);
+      cleanupInFlight.resolve(undefined);
+      await started.stop();
+      vi.useRealTimers();
+      return cleanupRun;
+    })
+    .extend("cleanupFailureWarn", async () => {
+      vi.useFakeTimers();
+      const cleanupFailureWarn =
+        vi.fn<(fields: Readonly<Record<string, unknown>>, sentence: string) => void>();
+      const scheduler = createPeriodicScheduler({
+        checkRestart: vi.fn<() => void>(),
+        restartCheckIntervalMs: 1000,
+        cleanup: { run: () => Promise.reject(new Error("cleanup broke")), intervalMs: 10 },
+        log: { info: () => undefined, warn: cleanupFailureWarn, error: () => undefined },
+      });
+      const started = scheduler.start();
+      await vi.advanceTimersByTimeAsync(25);
+      await started.stop();
+      vi.useRealTimers();
+      return cleanupFailureWarn;
+    });
+
+  it("開始前は非稼働である", ({ runningBeforeStart }) => {
+    expect(runningBeforeStart).toBe(false);
   });
 
-  it("開始後は稼働している", ({ runningStates }) => {
-    expect(runningStates.whileRunning).toStrictEqual(true);
+  it("開始後は稼働している", ({ runningAfterStart }) => {
+    expect(runningAfterStart).toBe(true);
   });
 
-  it("停止後は非稼働に戻る", ({ runningStates }) => {
-    expect(runningStates.afterStop).toStrictEqual(false);
+  it("停止後は非稼働に戻る", ({ runningAfterStop }) => {
+    expect(runningAfterStop).toBe(false);
   });
 
-  it("再起動チェックは間隔ごとに呼ばれる", ({ restartCheckCounts }) => {
-    expect(restartCheckCounts.whileRunning).toBeGreaterThanOrEqual(2);
+  it("再起動チェックは間隔ごとに呼ばれる", ({ restartCheck }) => {
+    expect(restartCheck).toHaveBeenCalledTimes(3);
   });
 
-  it("二重開始しても停止後に回数は増えない", ({ restartCheckCounts }) => {
-    expect(restartCheckCounts.afterStop).toStrictEqual(restartCheckCounts.whileRunning);
+  it("二重開始しても停止後に回数は増えない", ({ restartCheckAfterDoubleStartAndStop }) => {
+    expect(restartCheckAfterDoubleStartAndStop).toHaveBeenCalledTimes(3);
   });
 
-  it("掃除は前回分の実行中なら周期が来てもスキップされる", ({ cleanupStartCalls }) => {
-    expect(cleanupStartCalls.length).toStrictEqual(1);
+  it("掃除は前回分の実行中なら周期が来てもスキップされる", ({ cleanupRun }) => {
+    expect(cleanupRun).toHaveBeenCalledTimes(1);
   });
 
-  it("掃除の失敗は警告ログになりタイマーからは例外が漏れない", ({ cleanupFailureWarnCalls }) => {
-    expect(cleanupFailureWarnCalls.length).toBeGreaterThanOrEqual(1);
+  it("掃除の失敗は警告ログになりタイマーからは例外が漏れない", ({ cleanupFailureWarn }) => {
+    expect(cleanupFailureWarn).toHaveBeenCalledTimes(2);
   });
 
-  it("開始前の停止は例外を投げない", ({ stopBeforeStartRunning }) => {
-    expect(stopBeforeStartRunning).toStrictEqual(false);
+  it("開始前の停止は例外を投げない", ({ runningAfterStopWithoutStart }) => {
+    expect(runningAfterStopWithoutStart).toBe(false);
   });
 });

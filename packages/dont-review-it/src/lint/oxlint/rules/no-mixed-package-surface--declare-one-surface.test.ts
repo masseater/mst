@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 import { testLintRule } from "@mst/lint-rule-authoring";
 import { describe } from "vite-plus/test";
@@ -11,53 +11,104 @@ const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-no-mixed-package-s
 
 const MODULE_SOURCE = "export const shipped = true;\n";
 
-const writeFixture = (name: string, source: string): string => {
-  const path = join(fixtureDir, name);
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, source);
-  return path;
-};
+const packagesDir = join(fixtureDir, "repo/packages");
 
-const writePackage = (name: string, manifest: unknown): string => {
-  writeFixture(`repo/${name}/package.json`, `${JSON.stringify(manifest, null, 2)}\n`);
-  return writeFixture(`repo/${name}/entry.ts`, MODULE_SOURCE);
-};
+mkdirSync(join(packagesDir, "both"), { recursive: true });
+mkdirSync(join(packagesDir, "runnable"), { recursive: true });
+mkdirSync(join(packagesDir, "library"), { recursive: true });
+mkdirSync(join(packagesDir, "many-bins"), { recursive: true });
+mkdirSync(join(packagesDir, "legacy"), { recursive: true });
+mkdirSync(join(packagesDir, "nameless"), { recursive: true });
+mkdirSync(join(fixtureDir, "no-manifest"), { recursive: true });
 
-writeFixture("repo/pnpm-workspace.yaml", "packages:\n  - packages/*\n");
-writeFixture("repo/package.json", '{ "name": "@fixture/root" }\n');
+writeFileSync(join(fixtureDir, "repo/pnpm-workspace.yaml"), "packages:\n  - packages/*\n");
+writeFileSync(join(fixtureDir, "repo/package.json"), '{ "name": "@fixture/root" }\n');
 
-const bothEntry = writePackage("packages/both", {
-  name: "@fixture/both",
-  bin: { "fixture-both": "./cli.ts" },
-  exports: { ".": "./src/index.ts" },
-});
-const runnableEntry = writePackage("packages/runnable", {
-  name: "@fixture/runnable",
-  bin: { "fixture-runnable": "./cli.ts" },
-  exports: { "./package.json": "./package.json" },
-  scripts: { build: "vp pack", test: "vp test" },
-});
-const libraryEntry = writePackage("packages/library", {
-  name: "@fixture/library",
-  exports: { ".": "./src/index.ts", "./plugin": "./src/plugin.ts" },
-});
-const manyBinsEntry = writePackage("packages/many-bins", {
-  name: "@fixture/many-bins",
-  bin: { "fixture-check": "./check.ts", "fixture-report": "./report.ts" },
-});
-const legacyEntry = writePackage("packages/legacy", {
-  name: "@fixture/legacy",
-  bin: "./cli.ts",
-  main: "./dist/index.js",
-  types: "./dist/index.d.ts",
-});
-const namelessEntry = writePackage("packages/nameless", {
-  bin: "./cli.ts",
-  module: "./dist/index.js",
-});
+writeFileSync(
+  join(packagesDir, "both/package.json"),
+  `${JSON.stringify(
+    {
+      name: "@fixture/both",
+      bin: { "fixture-both": "./cli.ts" },
+      exports: { ".": "./src/index.ts" },
+    },
+    null,
+    2,
+  )}\n`,
+);
+const bothEntry = join(packagesDir, "both/entry.ts");
+writeFileSync(bothEntry, MODULE_SOURCE);
 
-writeFixture("no-manifest/pnpm-workspace.yaml", "packages: []\n");
-const looseEntry = writeFixture("no-manifest/loose.ts", MODULE_SOURCE);
+writeFileSync(
+  join(packagesDir, "runnable/package.json"),
+  `${JSON.stringify(
+    {
+      name: "@fixture/runnable",
+      bin: { "fixture-runnable": "./cli.ts" },
+      exports: { "./package.json": "./package.json" },
+      scripts: { build: "vp pack", test: "vp test" },
+    },
+    null,
+    2,
+  )}\n`,
+);
+const runnableEntry = join(packagesDir, "runnable/entry.ts");
+writeFileSync(runnableEntry, MODULE_SOURCE);
+
+writeFileSync(
+  join(packagesDir, "library/package.json"),
+  `${JSON.stringify(
+    {
+      name: "@fixture/library",
+      exports: { ".": "./src/index.ts", "./plugin": "./src/plugin.ts" },
+    },
+    null,
+    2,
+  )}\n`,
+);
+const libraryEntry = join(packagesDir, "library/entry.ts");
+writeFileSync(libraryEntry, MODULE_SOURCE);
+
+writeFileSync(
+  join(packagesDir, "many-bins/package.json"),
+  `${JSON.stringify(
+    {
+      name: "@fixture/many-bins",
+      bin: { "fixture-check": "./check.ts", "fixture-report": "./report.ts" },
+    },
+    null,
+    2,
+  )}\n`,
+);
+const manyBinsEntry = join(packagesDir, "many-bins/entry.ts");
+writeFileSync(manyBinsEntry, MODULE_SOURCE);
+
+writeFileSync(
+  join(packagesDir, "legacy/package.json"),
+  `${JSON.stringify(
+    {
+      name: "@fixture/legacy",
+      bin: "./cli.ts",
+      main: "./dist/index.js",
+      types: "./dist/index.d.ts",
+    },
+    null,
+    2,
+  )}\n`,
+);
+const legacyEntry = join(packagesDir, "legacy/entry.ts");
+writeFileSync(legacyEntry, MODULE_SOURCE);
+
+writeFileSync(
+  join(packagesDir, "nameless/package.json"),
+  `${JSON.stringify({ bin: "./cli.ts", module: "./dist/index.js" }, null, 2)}\n`,
+);
+const namelessEntry = join(packagesDir, "nameless/entry.ts");
+writeFileSync(namelessEntry, MODULE_SOURCE);
+
+writeFileSync(join(fixtureDir, "no-manifest/pnpm-workspace.yaml"), "packages: []\n");
+const looseEntry = join(fixtureDir, "no-manifest/loose.ts");
+writeFileSync(looseEntry, MODULE_SOURCE);
 
 const EXCUSED_BOTH = [
   { exceptions: [{ packageName: "@fixture/both", reason: "the split lands in the next release" }] },

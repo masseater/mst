@@ -38,12 +38,12 @@ export const createNoClassAsMutableCell = ({
       },
       schema: [],
     },
-    create(context) {
-      if (isOutOfScopeSource(context.filename)) return {};
+    create(inspection) {
+      if (isOutOfScopeSource(inspection.filename)) return {};
 
       const findingsOf = memoize((): readonly CellClassFinding[] => {
-        const repositoryRoot = findWorkspaceRoot(context.cwd);
-        const relativePath = toPosixPath(relative(repositoryRoot, resolve(context.filename)));
+        const repositoryRoot = findWorkspaceRoot(inspection.cwd);
+        const relativePath = toPosixPath(relative(repositoryRoot, resolve(inspection.filename)));
         return loadIndex({ repositoryRoot }).findingsByPath.get(relativePath) ?? [];
       });
 
@@ -57,7 +57,7 @@ export const createNoClassAsMutableCell = ({
 
           const fields = finding.fields.map((field) => `\`${field}\``).join(FIELD_SEPARATOR);
           if (finding.scopeName === null) {
-            context.report({
+            inspection.report({
               node: declared,
               messageId: "containedMutableCellInPlace",
               data: { className: declared.name, fields },
@@ -65,7 +65,7 @@ export const createNoClassAsMutableCell = ({
             return;
           }
 
-          context.report({
+          inspection.report({
             node: declared,
             messageId: "containedMutableCell",
             data: { className: declared.name, fields, scope: finding.scopeName },

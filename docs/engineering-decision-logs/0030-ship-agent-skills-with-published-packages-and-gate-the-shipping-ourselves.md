@@ -28,7 +28,7 @@
 
 **免除リストは持たない。** 上流は `_artifacts` の `coverage.ignored_packages` を読むが、この検査には付けない。公開するのに同梱しない選択肢を残すと、答えが一意に決まる問いでなくなる。免除が要る形が実際に現れたら、その時に上流と同じ形式を読む判断をする。
 
-**成果物の置き場所は Intent の monorepo 規約に従う。** discovery の成果物（domain_map.yaml / skill_spec.md / skill_tree.yaml）はリポジトリルートの `_artifacts/`、SKILL.md は各パッケージの `skills/` に置く。`files` に `skills` を足すので、tarball に同梱されるのは SKILL.md だけで成果物は含まれない。
+**成果物の置き場所は Intent の monorepo 規約に従う。** discovery の成果物（domain_map.yaml / skill_spec.md / skill_tree.yaml）はリポジトリルートの `_artifacts/`、SKILL.md と CHANGELOG.md は各パッケージの `skills/` に置く。`files` に `skills` を足すので、tarball には `skills/` 以下を同梱し、ルートの discovery 成果物は含めない。
 
 ## 影響
 
@@ -38,4 +38,4 @@
 
 **このリポジトリの外でも効く。** `dont-review-it check` を採用したリポジトリは、公開パッケージに skill を同梱しない状態を残せなくなる。
 
-**上流の検査と報告が重ならない。** 同梱と配布の配線（この検査）と、SKILL.md の構造（`intent validate`）で不変条件を分けたので、同じ違反が 2 つの経路から報告されることはない。
+**構造と配布の error gate は重ならない。** SKILL.md の構造は `intent validate`、同梱と配布の配線はこの検査が持つ。`intent validate` が packaging の不足を warning として併記する場合はあるが、この検査だけがその不足を error として止める。

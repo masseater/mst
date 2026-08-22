@@ -25,8 +25,8 @@ const incompleteWorkspace = ({
 }): string =>
   `ワークスペース \`${directory}\` の一覧を生成できない: ${reason}。空欄や欠落した行を出すと、存在するものが見えなくなったまま固定される。`;
 
-const renderList = (entries: readonly WorkspaceEntry[]): string =>
-  entries.map((entry) => `- \`${entry.directory}\` — ${entry.description}`).join("\n");
+const renderList = (listedEntries: readonly WorkspaceEntry[]): string =>
+  listedEntries.map((listed) => `- \`${listed.directory}\` — ${listed.description}`).join("\n");
 
 type Region = {
   readonly before: string;
@@ -49,7 +49,7 @@ const regionOf = ({
 
   return {
     before: source.slice(0, beginIndex + begin.length),
-    content: source.slice(beginIndex + begin.length, endIndex).trim(),
+    content: source.slice(beginIndex + begin.length, endIndex),
     after: source.slice(endIndex),
   };
 };
@@ -96,7 +96,7 @@ const reconcileRegion = async ({
   if ("problem" in loaded) return [loaded.problem];
 
   const { region } = loaded;
-  if (region.content === expected) return [];
+  if (region.content.trim() === expected) return [];
   if (!write) {
     return [{ file: listConfig.path, line: null, message: staleRegion(listConfig.path) }];
   }
@@ -120,24 +120,24 @@ export const workspaceListProblems = async ({
   const listConfig = config.workspaceList;
   if (listConfig === null) return [];
 
-  const collection = await collectWorkspaces({
+  const listedCollection = await collectWorkspaces({
     repositoryRoot,
     definitionFile: config.workspaceDefinition.file,
     definitionField: config.workspaceDefinition.field,
   });
 
-  if (collection.incomplete.length > 0) {
-    return collection.incomplete.map((item) => ({
-      file: join(item.directory, "package.json"),
+  if (listedCollection.incomplete.length > 0) {
+    return listedCollection.incomplete.map((member) => ({
+      file: join(member.directory, "package.json"),
       line: null,
-      message: incompleteWorkspace(item),
+      message: incompleteWorkspace(member),
     }));
   }
 
   return reconcileRegion({
     repositoryRoot,
     listConfig,
-    expected: renderList(collection.entries),
+    expected: renderList(listedCollection.entries),
     write,
   });
 };

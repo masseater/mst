@@ -2,25 +2,25 @@ export type SerialGate = {
   readonly run: <TaskResult>(task: () => Promise<TaskResult>) => Promise<TaskResult>;
 };
 
-const settleQuietly = async (previous: Promise<unknown>): Promise<void> => {
+const settleQuietly = async (earlier: Promise<unknown>): Promise<void> => {
   try {
-    await previous;
+    await earlier;
   } catch (previousFailure) {
     void previousFailure;
   }
 };
 
-export const createSerialGate = (): SerialGate => {
-  const chain = new Map<string, Promise<unknown>>([["tail", Promise.resolve()]]);
-  const run = async <TaskResult>(task: () => Promise<TaskResult>): Promise<TaskResult> => {
-    await settleQuietly(chain.get("tail") as Promise<unknown>);
-    return task();
+class ChainedSerialGate implements SerialGate {
+  #tail: Promise<unknown> = Promise.resolve();
+
+  readonly run = <TaskResult>(task: () => Promise<TaskResult>): Promise<TaskResult> => {
+    const started = (async (): Promise<TaskResult> => {
+      await settleQuietly(this.#tail);
+      return task();
+    })();
+    this.#tail = started;
+    return started;
   };
-  return {
-    run: (task) => {
-      const started = run(task);
-      chain.set("tail", started);
-      return started;
-    },
-  };
-};
+}
+
+export const createSerialGate = (): SerialGate => new ChainedSerialGate();

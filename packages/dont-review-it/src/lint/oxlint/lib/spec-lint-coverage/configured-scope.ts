@@ -6,7 +6,7 @@ import {
   ruleBlocksIn,
   type IgnoreEntry,
 } from "../lint-suppression/lint-config-suppression.ts";
-import { GENERATED_PATHS } from "../lint-suppression/protected-rules.ts";
+import { isGeneratedLintPath } from "../lint-suppression/protected-rules.ts";
 import { objectValueOf, propertyKeyOf } from "../object-literal.ts";
 import {
   UNSCANNED_DIRECTORY_NAMES,
@@ -39,16 +39,16 @@ const sharedSettingsIn = (asked: {
     return [{ property, ruleName: asked.ruleName, settingKey }];
   });
 
-const handedOptionsOf = (value: ESTree.Expression): readonly ESTree.ObjectExpression[] =>
-  value.type === "ArrayExpression"
-    ? value.elements.filter((element) => element?.type === "ObjectExpression")
+const handedOptionsOf = (held: ESTree.Expression): readonly ESTree.ObjectExpression[] =>
+  held.type === "ArrayExpression"
+    ? held.elements.filter((held) => held?.type === "ObjectExpression")
     : [];
 
 const settingsOfEntry = (property: ESTree.ObjectProperty): readonly PerRuleSetting[] => {
   const ruleName = propertyKeyOf(property);
   if (ruleName === null) return [];
-  return handedOptionsOf(property.value).flatMap((options) =>
-    sharedSettingsIn({ options, ruleName }),
+  return handedOptionsOf(property.value).flatMap((ruleOptions) =>
+    sharedSettingsIn({ options: ruleOptions, ruleName }),
   );
 };
 
@@ -62,8 +62,8 @@ export const perRuleSettingsIn = (lint: ESTree.ObjectExpression): readonly PerRu
 
 const spelledPatternsOf = (files: ESTree.Expression): readonly string[] =>
   files.type === "ArrayExpression"
-    ? files.elements.flatMap((element) =>
-        element?.type === "Literal" && typeof element.value === "string" ? [element.value] : [],
+    ? files.elements.flatMap((held) =>
+        held?.type === "Literal" && typeof held.value === "string" ? [held.value] : [],
       )
     : [];
 
@@ -80,29 +80,26 @@ export const scopeSpellingOf = (property: ESTree.ObjectProperty): string | null 
   return patterns === undefined || patterns.length === 0 ? null : spelledNames(patterns);
 };
 
-const isGeneratedPath = (relativePath: string): boolean =>
-  GENERATED_PATHS.some((pattern) => matchesAnchoredGlobPath({ relativePath, pattern }));
-
 export const authoredSpecPathsUnder = (repositoryRoot: string): readonly string[] =>
   worktreeFilePathsUnder({
     root: repositoryRoot,
     unscannedDirectoryNames: UNSCANNED_DIRECTORY_NAMES,
   })
     .filter((relativePath) => isSpecFile(relativePath, DEFAULT_SPEC_FILE_SUFFIXES))
-    .filter((relativePath) => !isGeneratedPath(relativePath));
+    .filter((relativePath) => !isGeneratedLintPath(relativePath));
 
 export const ignoredSpecFilesIn = (asked: {
   readonly lint: ESTree.ObjectExpression;
   readonly repositoryRoot: string;
 }): readonly IgnoredSpecFile[] => {
-  const entries = ignoreEntriesIn(asked.lint);
-  if (entries.length === 0) return [];
+  const listedEntries = ignoreEntriesIn(asked.lint);
+  if (listedEntries.length === 0) return [];
 
   const specPaths = authoredSpecPathsUnder(asked.repositoryRoot);
-  return entries.flatMap<IgnoredSpecFile>((entry) => {
+  return listedEntries.flatMap<IgnoredSpecFile>((listed) => {
     const matchedPath = specPaths.find((relativePath) =>
-      matchesAnchoredGlobPath({ relativePath, pattern: entry.pattern }),
+      matchesAnchoredGlobPath({ relativePath, pattern: listed.pattern }),
     );
-    return matchedPath === undefined ? [] : [{ entry, matchedPath }];
+    return matchedPath === undefined ? [] : [{ entry: listed, matchedPath }];
   });
 };

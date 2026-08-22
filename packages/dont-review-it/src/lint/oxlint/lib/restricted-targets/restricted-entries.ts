@@ -2,6 +2,7 @@ import { resolve, sep } from "node:path";
 
 import { matchesGlobPath } from "../glob-path-match.ts";
 import { listedTexts } from "../listed-texts.ts";
+import { isNamedFields } from "../named-fields.ts";
 import { segmentsOf } from "../path-segments.ts";
 
 import type { Context, RuleMeta } from "@oxlint/plugins";
@@ -58,18 +59,18 @@ export const RESTRICTED_TARGET_SCHEMA: RuleMeta["schema"] = [
   },
 ];
 
-const isJsonObject = (held: unknown): held is Readonly<Record<string, unknown>> =>
-  typeof held === "object" && held !== null && !Array.isArray(held);
-
-const declaredListOf = (options: Context["options"], key: string): readonly unknown[] => {
-  const [first] = options;
-  if (!isJsonObject(first)) return [];
-  const declared = first[key];
+const declaredListOf = (
+  ruleSettings: Context["options"],
+  settingField: string,
+): readonly unknown[] => {
+  const [first] = ruleSettings;
+  if (!isNamedFields(first)) return [];
+  const declared = first[settingField];
   return Array.isArray(declared) ? declared : [];
 };
 
 const entryOf = (held: unknown): RestrictedTargetEntry | null => {
-  if (!isJsonObject(held)) return null;
+  if (!isNamedFields(held)) return null;
   const { module, substitute } = held;
   if (typeof module !== "string" || module === "") return null;
   if (typeof substitute !== "string") return null;
@@ -83,29 +84,34 @@ const entryOf = (held: unknown): RestrictedTargetEntry | null => {
 };
 
 const aliasOf = (held: unknown): InternalAlias | null => {
-  if (!isJsonObject(held)) return null;
+  if (!isNamedFields(held)) return null;
   const { prefix, directory } = held;
   if (typeof prefix !== "string" || prefix === "") return null;
   return typeof directory === "string" ? { prefix, directory } : null;
 };
 
 export const restrictedTargetsFrom = (
-  options: Context["options"],
+  ruleSettings: Context["options"],
 ): readonly RestrictedTargetEntry[] =>
-  declaredListOf(options, "restricted")
+  declaredListOf(ruleSettings, "restricted")
     .map(entryOf)
-    .filter((entry) => entry !== null);
+    .filter((restrictedTarget) => restrictedTarget !== null);
 
-export const internalAliasesFrom = (options: Context["options"]): readonly InternalAlias[] =>
-  declaredListOf(options, "internalAliases")
+export const internalAliasesFrom = (ruleSettings: Context["options"]): readonly InternalAlias[] =>
+  declaredListOf(ruleSettings, "internalAliases")
     .map(aliasOf)
     .filter((alias) => alias !== null);
 
-const namesModule = (entry: RestrictedTargetEntry, specifier: string): boolean =>
-  specifier === entry.module || specifier.startsWith(`${entry.module}/`);
+const namesModule = (restrictedTarget: RestrictedTargetEntry, specifier: string): boolean =>
+  specifier === restrictedTarget.module || specifier.startsWith(`${restrictedTarget.module}/`);
 
-const coversExported = (entry: RestrictedTargetEntry, exported: string | null): boolean =>
-  entry.exports.length === 0 || exported === null || entry.exports.includes(exported);
+const coversExported = (
+  restrictedTarget: RestrictedTargetEntry,
+  exported: string | null,
+): boolean =>
+  restrictedTarget.exports.length === 0 ||
+  exported === null ||
+  restrictedTarget.exports.includes(exported);
 
 export const matchingRestrictedTarget = ({
   entries,
@@ -115,7 +121,9 @@ export const matchingRestrictedTarget = ({
   readonly forwarded: ForwardedTarget;
 }): RestrictedTargetEntry | null =>
   entries.find(
-    (entry) => namesModule(entry, forwarded.specifier) && coversExported(entry, forwarded.exported),
+    (restrictedTarget) =>
+      namesModule(restrictedTarget, forwarded.specifier) &&
+      coversExported(restrictedTarget, forwarded.exported),
   ) ?? null;
 
 export const entriesInForceAt = ({
@@ -129,8 +137,10 @@ export const entriesInForceAt = ({
 }): readonly RestrictedTargetEntry[] => {
   const pathSegments = segmentsOf({ path: file, separator: sep });
   return entries.filter(
-    (entry) =>
-      !entry.allowedPositions.some((pattern) => matchesGlobPath({ pathSegments, pattern, cwd })),
+    (restrictedTarget) =>
+      !restrictedTarget.allowedPositions.some((pattern) =>
+        matchesGlobPath({ pathSegments, pattern, cwd }),
+      ),
   );
 };
 

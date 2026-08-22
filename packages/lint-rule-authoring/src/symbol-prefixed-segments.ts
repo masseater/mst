@@ -1,13 +1,6 @@
 import { relative, sep } from "node:path";
 
-import { uniq } from "es-toolkit";
-
 import { matchesGlobSegment } from "./glob-segment.ts";
-
-export type SymbolPrefixedSegment = {
-  readonly segment: string;
-  readonly path: string;
-};
 
 const startsWithAlphanumeric = (segment: string): boolean => /^[a-zA-Z0-9]/u.test(segment);
 
@@ -29,15 +22,16 @@ export const symbolPrefixedSegmentsOf = ({
 }: {
   readonly location: { readonly cwd: string; readonly filename: string };
   readonly allowedNames: readonly string[];
-}): readonly SymbolPrefixedSegment[] => {
+}): ReadonlyMap<string, string> => {
   const path = repositoryRelativePathOf(location);
-  if (path === null) return [];
-  return uniq(
+  if (path === null) return new Map();
+  return new Map(
     path
       .split(sep)
       .filter((segment) => segment !== "" && !startsWithAlphanumeric(segment))
       .filter(
         (segment) => !allowedNames.some((pattern) => matchesGlobSegment({ segment, pattern })),
-      ),
-  ).map((segment) => ({ segment, path }));
+      )
+      .map((segment): readonly [string, string] => [segment, path]),
+  );
 };

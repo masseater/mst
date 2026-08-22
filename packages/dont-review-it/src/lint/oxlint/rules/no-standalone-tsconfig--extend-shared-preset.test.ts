@@ -11,64 +11,79 @@ const sharedPresets = ["dont-review-it/tsconfig/library.json", "dont-review-it/t
 
 const fixtureDir = mkdtempSync(join(tmpdir(), "dont-review-it-no-standalone-tsconfig-"));
 
-const writeWorkspaceFixture = (name: string, tsconfig: string): string => {
-  const directory = join(fixtureDir, name);
-  mkdirSync(directory, { recursive: true });
-  writeFileSync(join(directory, "tsconfig.json"), tsconfig);
-  return join(directory, "index.ts");
-};
-
-const extendsLibrary = writeWorkspaceFixture(
-  "extends-library",
+mkdirSync(join(fixtureDir, "extends-library"), { recursive: true });
+writeFileSync(
+  join(fixtureDir, "extends-library", "tsconfig.json"),
   '{ "extends": "@mst/dont-review-it/tsconfig/library.json" }\n',
 );
+const extendsLibrary = join(fixtureDir, "extends-library", "index.ts");
 
-const extendsApp = writeWorkspaceFixture(
-  "extends-app",
+mkdirSync(join(fixtureDir, "extends-app"), { recursive: true });
+writeFileSync(
+  join(fixtureDir, "extends-app", "tsconfig.json"),
   '{ "extends": "@mst/dont-review-it/tsconfig/app.json" }\n',
 );
+const extendsApp = join(fixtureDir, "extends-app", "index.ts");
 
-const extendsRelative = writeWorkspaceFixture(
-  "extends-relative",
+mkdirSync(join(fixtureDir, "extends-relative"), { recursive: true });
+writeFileSync(
+  join(fixtureDir, "extends-relative", "tsconfig.json"),
   '{ "extends": "../dont-review-it/tsconfig/library.json" }\n',
 );
+const extendsRelative = join(fixtureDir, "extends-relative", "index.ts");
 
-const extendsOwnPreset = writeWorkspaceFixture(
-  "extends-own-preset",
+mkdirSync(join(fixtureDir, "extends-own-preset"), { recursive: true });
+writeFileSync(
+  join(fixtureDir, "extends-own-preset", "tsconfig.json"),
   '{ "extends": "./tsconfig/library.json" }\n',
 );
+const extendsOwnPreset = join(fixtureDir, "extends-own-preset", "index.ts");
 
-const extendsArray = writeWorkspaceFixture(
-  "extends-array",
+mkdirSync(join(fixtureDir, "extends-array"), { recursive: true });
+writeFileSync(
+  join(fixtureDir, "extends-array", "tsconfig.json"),
   '{ "extends": ["./local.json", "@mst/dont-review-it/tsconfig/library.json"] }\n',
 );
+const extendsArray = join(fixtureDir, "extends-array", "index.ts");
 
-const withComments = writeWorkspaceFixture(
-  "with-comments",
+mkdirSync(join(fixtureDir, "with-comments"), { recursive: true });
+writeFileSync(
+  join(fixtureDir, "with-comments", "tsconfig.json"),
   '{\n  /* Bundler mode */\n  "extends": "@mst/dont-review-it/tsconfig/app.json", // preset\n}\n',
 );
+const withComments = join(fixtureDir, "with-comments", "index.ts");
 
-const forgotten = writeWorkspaceFixture(
-  "forgotten",
+mkdirSync(join(fixtureDir, "forgotten"), { recursive: true });
+writeFileSync(
+  join(fixtureDir, "forgotten", "tsconfig.json"),
   '{ "extends": "@mst/dont-review-it/tsconfig/library.json" }\n',
 );
+const forgotten = join(fixtureDir, "forgotten", "index.ts");
 
-const standalone = writeWorkspaceFixture(
-  "standalone",
+mkdirSync(join(fixtureDir, "standalone"), { recursive: true });
+writeFileSync(
+  join(fixtureDir, "standalone", "tsconfig.json"),
   '{ "compilerOptions": { "strict": true, "noEmit": true } }\n',
 );
+const standalone = join(fixtureDir, "standalone", "index.ts");
 
-const extendsBase = writeWorkspaceFixture(
-  "extends-base",
+mkdirSync(join(fixtureDir, "extends-base"), { recursive: true });
+writeFileSync(
+  join(fixtureDir, "extends-base", "tsconfig.json"),
   '{ "extends": "@mst/dont-review-it/tsconfig/base.json" }\n',
 );
+const extendsBase = join(fixtureDir, "extends-base", "index.ts");
 
-const extendsForeignPreset = writeWorkspaceFixture(
-  "extends-foreign-preset",
+mkdirSync(join(fixtureDir, "extends-foreign-preset"), { recursive: true });
+writeFileSync(
+  join(fixtureDir, "extends-foreign-preset", "tsconfig.json"),
   '{ "extends": "@tsconfig/node22/tsconfig.json" }\n',
 );
+const extendsForeignPreset = join(fixtureDir, "extends-foreign-preset", "index.ts");
 
-const malformed = writeWorkspaceFixture("malformed", "this is not a tsconfig at all\n");
+mkdirSync(join(fixtureDir, "malformed"), { recursive: true });
+writeFileSync(join(fixtureDir, "malformed", "tsconfig.json"), "this is not a tsconfig at all\n");
+const malformed = join(fixtureDir, "malformed", "index.ts");
 
 mkdirSync(join(fixtureDir, "standalone", "src", "deep"), { recursive: true });
 const buriedUnderStandalone = join(fixtureDir, "standalone", "src", "deep", "index.ts");

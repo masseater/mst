@@ -2,15 +2,10 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
+import { runAsyncProcess } from "@mst/dont-review-it/vitest";
 import { describe, expect, it, onTestFinished } from "vite-plus/test";
 
-import { repositoryAgnosticGitEnvironment } from "../src/lint/oxlint/lib/repository-agnostic-git-environment.ts";
 import { runChecks } from "../src/run-checks.ts";
-import {
-  runAsyncProcess,
-  type AsyncProcessInvocation,
-  type AsyncProcessResult,
-} from "../src/vitest/async-process.ts";
 
 const SUBPROCESS_TIMEOUT_MS = 180_000;
 const TEST_TIMEOUT_MS = 240_000;
@@ -28,9 +23,9 @@ const runBeforeDeadline = async ({
   arguments_: readonly string[];
   deadline: number;
   options: Readonly<{ cwd: string; env?: NodeJS.ProcessEnv }>;
-}>): Promise<AsyncProcessResult> => {
+}>) => {
   const remaining = deadline - performance.now();
-  const invocation: AsyncProcessInvocation = {
+  const invocation: Parameters<typeof runAsyncProcess>[0] = {
     label,
     command,
     arguments_,
@@ -47,9 +42,9 @@ const coverageFixtureWith = (files: Readonly<Record<string, string>>, prefix: st
   });
   symlinkSync(join(process.cwd(), "node_modules"), join(root, "node_modules"), "dir");
   for (const [relativePath, source] of Object.entries(files)) {
-    const target = join(root, relativePath);
-    mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, source, "utf8");
+    const fixturePath = join(root, relativePath);
+    mkdirSync(dirname(fixturePath), { recursive: true });
+    writeFileSync(fixturePath, source, "utf8");
   }
   return root;
 };
@@ -206,8 +201,26 @@ describe("カバレッジのソース集合", () => {
       );
       const globalConfig = join(root, ".fixture-gitconfig");
       writeFileSync(globalConfig, "", "utf8");
+      const {
+        GIT_ALTERNATE_OBJECT_DIRECTORIES,
+        GIT_COMMON_DIR,
+        GIT_CONFIG,
+        GIT_CONFIG_COUNT,
+        GIT_CONFIG_PARAMETERS,
+        GIT_DIR,
+        GIT_GRAFT_FILE,
+        GIT_IMPLICIT_WORK_TREE,
+        GIT_INDEX_FILE,
+        GIT_NO_REPLACE_OBJECTS,
+        GIT_OBJECT_DIRECTORY,
+        GIT_PREFIX,
+        GIT_REPLACE_REF_BASE,
+        GIT_SHALLOW_FILE,
+        GIT_WORK_TREE,
+        ...repositoryAgnosticEnvironment
+      } = process.env;
       const gitEnvironment = {
-        ...repositoryAgnosticGitEnvironment(process.env),
+        ...repositoryAgnosticEnvironment,
         GIT_CONFIG_GLOBAL: globalConfig,
         GIT_CONFIG_NOSYSTEM: "1",
       };

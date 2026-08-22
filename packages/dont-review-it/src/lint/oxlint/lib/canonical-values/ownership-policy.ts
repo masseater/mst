@@ -11,12 +11,13 @@ export const OWNERSHIP_POLICY_SCHEMA: RuleMeta["schema"] = [
   },
 ];
 
-export const ownershipPolicyOf = (options: Context["options"]): string => {
-  const configured = options[0];
+export const ownershipPolicyOf = (ruleOptions: Context["options"]): string => {
+  const configured = ruleOptions[0];
   if (typeof configured !== "object" || configured === null || Array.isArray(configured)) {
     return UNCONFIGURED_OWNERSHIP_POLICY;
   }
   const policy = configured.ownershipPolicy;
   if (typeof policy !== "string") return UNCONFIGURED_OWNERSHIP_POLICY;
-  return policy.trim() === "" ? UNCONFIGURED_OWNERSHIP_POLICY : policy;
+  if (policy.trim() === "") return UNCONFIGURED_OWNERSHIP_POLICY;
+  return policy;
 };

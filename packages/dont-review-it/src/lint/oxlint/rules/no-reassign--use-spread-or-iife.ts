@@ -6,8 +6,8 @@ const AMBIENT_ONLY_FILE_NAME = /\.d\.[cm]?ts$/u;
 
 const PLATFORM_ASSIGN_ONLY_TARGETS = ["process.exitCode"];
 
-const assignOnlyTargetsFrom = (options: Readonly<Options>): readonly string[] => {
-  const [first] = options;
+const assignOnlyTargetsFrom = (ruleOptions: Readonly<Options>): readonly string[] => {
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) {
     return PLATFORM_ASSIGN_ONLY_TARGETS;
   }
@@ -16,7 +16,7 @@ const assignOnlyTargetsFrom = (options: Readonly<Options>): readonly string[] =>
   if (!Array.isArray(assignOnlyTargets)) return PLATFORM_ASSIGN_ONLY_TARGETS;
   return [
     ...PLATFORM_ASSIGN_ONLY_TARGETS,
-    ...assignOnlyTargets.filter((entry): entry is string => typeof entry === "string"),
+    ...assignOnlyTargets.filter((candidate): candidate is string => typeof candidate === "string"),
   ];
 };
 
@@ -154,14 +154,14 @@ export const noReassign = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (AMBIENT_ONLY_FILE_NAME.test(context.filename)) return {};
+  create(inspection) {
+    if (AMBIENT_ONLY_FILE_NAME.test(inspection.filename)) return {};
 
-    const assignOnlyTargets = assignOnlyTargetsFrom(context.options);
+    const assignOnlyTargets = assignOnlyTargetsFrom(inspection.options);
 
     const reportWrite = (node: ESTree.Node, messageId: string | null): void => {
       if (messageId === null) return;
-      context.report({ node, messageId });
+      inspection.report({ node, messageId });
     };
 
     const reportLoopHead = (node: ESTree.Node): void => {
@@ -176,7 +176,7 @@ export const noReassign = createDontReviewItRule({
       CallExpression(node: ESTree.CallExpression) {
         const callee = mutatingCalleeName(node);
         if (callee === null) return;
-        context.report({ node, messageId: "mutatingCall", data: { callee } });
+        inspection.report({ node, messageId: "mutatingCall", data: { callee } });
       },
       ForInStatement(node: ESTree.ForInStatement) {
         reportLoopHead(node.left);
@@ -187,7 +187,7 @@ export const noReassign = createDontReviewItRule({
       UnaryExpression(node: ESTree.UnaryExpression) {
         if (node.operator !== "delete") return;
         if (unwrapSugar(node.argument).type !== "MemberExpression") return;
-        context.report({ node, messageId: "propertyDeletion" });
+        inspection.report({ node, messageId: "propertyDeletion" });
       },
       UpdateExpression(node: ESTree.UpdateExpression) {
         reportWrite(node.argument, updateMessageId(node.argument));
@@ -196,7 +196,11 @@ export const noReassign = createDontReviewItRule({
         if (!REASSIGNABLE_DECLARATION_KINDS.has(node.kind)) return;
         if (isAmbientDeclaration(node)) return;
         if (node.kind === "let" && PER_ITERATION_HEAD_STATEMENTS.has(node.parent.type)) return;
-        context.report({ node, messageId: "reassignableDeclaration", data: { kind: node.kind } });
+        inspection.report({
+          node,
+          messageId: "reassignableDeclaration",
+          data: { kind: node.kind },
+        });
       },
     };
   },

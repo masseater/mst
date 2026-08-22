@@ -42,13 +42,13 @@ const HELD_AT_FIELD: ReadonlyMap<string, string> = new Map([
 ]);
 
 const isHandedBy = (parent: AstFields, child: AstFields): boolean => {
-  const kind = nodeTypeOf(parent);
-  if (HANDING_KINDS.has(kind)) return true;
+  const nodeKind = nodeTypeOf(parent);
+  if (HANDING_KINDS.has(nodeKind)) return true;
 
-  const handedAt = HANDED_AT_FIELD.get(kind);
+  const handedAt = HANDED_AT_FIELD.get(nodeKind);
   if (handedAt !== undefined) return parent[handedAt] === child;
 
-  const heldAt = HELD_AT_FIELD.get(kind);
+  const heldAt = HELD_AT_FIELD.get(nodeKind);
   return heldAt !== undefined && parent[heldAt] !== child;
 };
 

@@ -11,32 +11,42 @@ export type BodyDeclaration = {
   readonly nodeCount: number;
 };
 
-const DEFAULT_SOURCE_NAME = "source.tsx";
+export const DEFAULT_SOURCE_NAME = "source.tsx";
 
 const POSITION_FIELDS: ReadonlySet<string> = new Set(["start", "end", "range", "loc"]);
 
-const isNode = (value: unknown): value is UnknownFields =>
-  value !== null && typeof value === "object" && !Array.isArray(value);
+const isNode = (syntaxField: unknown): syntaxField is UnknownFields =>
+  syntaxField !== null && typeof syntaxField === "object" && !Array.isArray(syntaxField);
 
 const namedFieldsOf = (node: UnknownFields): readonly (readonly [string, unknown])[] =>
-  Object.entries(node).filter(([field]) => !POSITION_FIELDS.has(field));
+  Object.entries(node).filter(
+    ([field, nestedField]) => !POSITION_FIELDS.has(field) && nestedField !== undefined,
+  );
 
-const jsonTextOf: (value: unknown) => string = JSON.stringify;
-
-const structureOf = (value: unknown): string => {
-  if (Array.isArray(value)) return `[${value.map(structureOf).join(",")}]`;
-  if (!isNode(value)) return jsonTextOf(value);
-  return `{${namedFieldsOf(value)
+export const structureOf = (syntaxField: unknown): string => {
+  if (Array.isArray(syntaxField)) return `[${syntaxField.map(structureOf).join(",")}]`;
+  if (!isNode(syntaxField)) {
+    return typeof syntaxField === "bigint"
+      ? `bigint:${String(syntaxField)}`
+      : JSON.stringify(syntaxField);
+  }
+  return `{${namedFieldsOf(syntaxField)
     .map(([field, nested]) => `${field}:${structureOf(nested)}`)
     .join(",")}}`;
 };
 
-const nodeCountOf = (value: unknown): number => {
-  if (Array.isArray(value))
-    return value.reduce<number>((total, item) => total + nodeCountOf(item), 0);
-  if (!isNode(value)) return 0;
-  const own = typeof value[NODE_TYPE_FIELD] === "string" ? 1 : 0;
-  return namedFieldsOf(value).reduce((total, [, nested]) => total + nodeCountOf(nested), own);
+export const nodeCountOf = (syntaxField: unknown): number => {
+  if (Array.isArray(syntaxField))
+    return syntaxField.reduce<number>(
+      (accumulatedCount, nestedItem) => accumulatedCount + nodeCountOf(nestedItem),
+      0,
+    );
+  if (!isNode(syntaxField)) return 0;
+  const own = typeof syntaxField[NODE_TYPE_FIELD] === "string" ? 1 : 0;
+  return namedFieldsOf(syntaxField).reduce(
+    (accumulatedCount, [, nested]) => accumulatedCount + nodeCountOf(nested),
+    own,
+  );
 };
 
 const declarationFrom = ({
@@ -56,8 +66,10 @@ const bindingsOf = (statement: UnknownFields): readonly UnknownFields[] =>
   (statement.declarations as readonly unknown[]).filter(isNode);
 
 const namedBindingIn = (binding: UnknownFields): string | null => {
-  const id = binding.id as UnknownFields;
-  return id[NODE_TYPE_FIELD] === "Identifier" ? String(id.name) : null;
+  const bindingIdentifier = binding.id as UnknownFields;
+  return bindingIdentifier[NODE_TYPE_FIELD] === "Identifier"
+    ? String(bindingIdentifier.name)
+    : null;
 };
 
 const bindingBodyOf = (binding: UnknownFields): unknown => ({
@@ -101,12 +113,16 @@ const bindingDeclarationsIn = (
   statement: UnknownFields,
 ): readonly BodyDeclaration[] =>
   bindingsOf(statement).flatMap((binding) => {
-    const name = namedBindingIn(binding);
-    if (name === null) return [];
+    const declarationName = namedBindingIn(binding);
+    if (declarationName === null) return [];
     return [
       declarationFrom({
         source,
-        described: { name, start: startOf(statement), body: bindingBodyOf(binding) },
+        described: {
+          name: declarationName,
+          start: startOf(statement),
+          body: bindingBodyOf(binding),
+        },
       }),
     ];
   });
@@ -118,11 +134,11 @@ const namedDeclarationsIn = (
   const bodyOf = BODY_BY_STATEMENT_KIND[String(statement[NODE_TYPE_FIELD])];
   if (bodyOf === undefined) return [];
 
-  const name = declaredNameOf(statement);
+  const declarationName = declaredNameOf(statement);
   return [
     declarationFrom({
       source,
-      described: { name, start: startOf(statement), body: bodyOf(statement) },
+      described: { name: declarationName, start: startOf(statement), body: bodyOf(statement) },
     }),
   ];
 };
@@ -133,15 +149,17 @@ const declarationsFromStatement = (
 ): readonly BodyDeclaration[] => {
   if (!isNode(statement)) return [];
 
-  const kind = statement[NODE_TYPE_FIELD];
-  if (kind === "ExportNamedDeclaration") {
+  const statementKind = statement[NODE_TYPE_FIELD];
+  if (statementKind === "ExportNamedDeclaration") {
     return declarationsFromStatement(source, statement.declaration);
   }
-  if (kind === "VariableDeclaration") return bindingDeclarationsIn(source, statement);
+  if (statementKind === "VariableDeclaration") return bindingDeclarationsIn(source, statement);
   return namedDeclarationsIn(source, statement);
 };
 
 export const declarationsIn = (source: string): readonly BodyDeclaration[] => {
-  const parsed = parseSync(DEFAULT_SOURCE_NAME, source);
-  return parsed.program.body.flatMap((statement) => declarationsFromStatement(source, statement));
+  const parsedSource = parseSync(DEFAULT_SOURCE_NAME, source);
+  return parsedSource.program.body.flatMap((statement) =>
+    declarationsFromStatement(source, statement),
+  );
 };

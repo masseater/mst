@@ -1,25 +1,17 @@
-const attemptOperation = (
-  operation: () => void,
-): { kind: "completed" } | { kind: "failed"; failure: unknown } => {
-  try {
-    operation();
-    return { kind: "completed" };
-  } catch (operationFailure) {
-    return { kind: "failed", failure: operationFailure };
-  }
-};
+import { attempt } from "es-toolkit";
 
 export const closeFileDescriptorAfterFailure = (input: {
   descriptor: number;
   precedingFailure: unknown;
   close: (descriptor: number) => void;
 }): never => {
-  const closeAttempt = attemptOperation(() => {
+  const [closeFailure] = attempt<true, Error>(() => {
     input.close(input.descriptor);
+    return true;
   });
-  if (closeAttempt.kind === "failed") {
+  if (closeFailure !== null) {
     throw new AggregateError(
-      [input.precedingFailure, closeAttempt.failure],
+      [input.precedingFailure, closeFailure],
       `Operation and close both failed for file descriptor ${input.descriptor}`,
     );
   }
@@ -31,18 +23,20 @@ export const releaseFileLock = (input: {
   unlock: (descriptor: number) => void;
   close: (descriptor: number) => void;
 }): void => {
-  const unlockAttempt = attemptOperation(() => {
+  const [unlockFailure] = attempt<true, Error>(() => {
     input.unlock(input.descriptor);
+    return true;
   });
-  const closeAttempt = attemptOperation(() => {
+  const [closeFailure] = attempt<true, Error>(() => {
     input.close(input.descriptor);
+    return true;
   });
-  if (unlockAttempt.kind === "failed" && closeAttempt.kind === "failed") {
+  if (unlockFailure !== null && closeFailure !== null) {
     throw new AggregateError(
-      [unlockAttempt.failure, closeAttempt.failure],
+      [unlockFailure, closeFailure],
       `Could not unlock and close file descriptor ${input.descriptor}`,
     );
   }
-  if (unlockAttempt.kind === "failed") throw unlockAttempt.failure;
-  if (closeAttempt.kind === "failed") throw closeAttempt.failure;
+  if (unlockFailure !== null) throw unlockFailure;
+  if (closeFailure !== null) throw closeFailure;
 };

@@ -10,32 +10,11 @@ import {
   isReviewState,
 } from "./vocabulary.ts";
 
-const it = test
-  .extend("authorIsMode", () => isMode("author"))
-  .extend("observerIsMode", () => isMode("observer"))
-  .extend("changesRequestedIsReviewState", () => isReviewState("changes_requested"))
-  .extend("dismissedIsReviewState", () => isReviewState("dismissed"))
-  .extend("changesRequestedStartsAuthorWork", () => isAuthorWorkReviewState("changes_requested"))
-  .extend("approvedStartsAuthorWork", () => isAuthorWorkReviewState("approved"))
-  .extend("startupFailureIsCheckSuiteConclusion", () => isCheckSuiteConclusion("startup_failure"))
-  .extend("nullIsCheckSuiteConclusion", () => isCheckSuiteConclusion(null))
-  .extend("timedOutStartsAuthorWork", () => isAuthorWorkConclusion("timed_out"))
-  .extend("successStartsAuthorWork", () => isAuthorWorkConclusion("success"))
-  .extend("conflictingMergeableIsConflict", () =>
-    indicatesMergeConflict({ mergeable: "CONFLICTING" }),
-  )
-  .extend("dirtyMergeStateIsConflict", () =>
-    indicatesMergeConflict({ merge_state_status: "DIRTY" }),
-  )
-  .extend("bareNumberIsConflict", () => indicatesMergeConflict({ number: 7 }))
-  .extend("behindMergeStateIsBehindBase", () =>
-    indicatesBehindBase({ merge_state_status: "BEHIND" }),
-  )
-  .extend("cleanMergeStateIsBehindBase", () =>
-    indicatesBehindBase({ merge_state_status: "CLEAN" }),
-  );
-
 describe("isMode", () => {
+  const it = test
+    .extend("authorIsMode", () => isMode("author"))
+    .extend("observerIsMode", () => isMode("observer"));
+
   it("author はモードとして認められる", ({ authorIsMode }) => {
     expect(authorIsMode).toStrictEqual(true);
   });
@@ -46,6 +25,10 @@ describe("isMode", () => {
 });
 
 describe("isReviewState", () => {
+  const it = test
+    .extend("changesRequestedIsReviewState", () => isReviewState("changes_requested"))
+    .extend("dismissedIsReviewState", () => isReviewState("dismissed"));
+
   it("changes_requested はレビュー判定語彙に含まれる", ({ changesRequestedIsReviewState }) => {
     expect(changesRequestedIsReviewState).toStrictEqual(true);
   });
@@ -56,6 +39,10 @@ describe("isReviewState", () => {
 });
 
 describe("isAuthorWorkReviewState", () => {
+  const it = test
+    .extend("changesRequestedStartsAuthorWork", () => isAuthorWorkReviewState("changes_requested"))
+    .extend("approvedStartsAuthorWork", () => isAuthorWorkReviewState("approved"));
+
   it("changes_requested だけが著者作業を起動する", ({ changesRequestedStartsAuthorWork }) => {
     expect(changesRequestedStartsAuthorWork).toStrictEqual(true);
   });
@@ -66,6 +53,10 @@ describe("isAuthorWorkReviewState", () => {
 });
 
 describe("isCheckSuiteConclusion", () => {
+  const it = test
+    .extend("startupFailureIsCheckSuiteConclusion", () => isCheckSuiteConclusion("startup_failure"))
+    .extend("nullIsCheckSuiteConclusion", () => isCheckSuiteConclusion(null));
+
   it("startup_failure は check suite 特有の結論として認められる", ({
     startupFailureIsCheckSuiteConclusion,
   }) => {
@@ -78,6 +69,10 @@ describe("isCheckSuiteConclusion", () => {
 });
 
 describe("isAuthorWorkConclusion", () => {
+  const it = test
+    .extend("timedOutStartsAuthorWork", () => isAuthorWorkConclusion("timed_out"))
+    .extend("successStartsAuthorWork", () => isAuthorWorkConclusion("success"));
+
   it("timed_out は著者作業を起動する", ({ timedOutStartsAuthorWork }) => {
     expect(timedOutStartsAuthorWork).toStrictEqual(true);
   });
@@ -88,6 +83,14 @@ describe("isAuthorWorkConclusion", () => {
 });
 
 describe("indicatesMergeConflict", () => {
+  const it = test
+    .extend("conflictingMergeableIsConflict", () =>
+      indicatesMergeConflict({ mergeable: "CONFLICTING" }))
+    .extend("dirtyMergeStateIsConflict", () =>
+      indicatesMergeConflict({ merge_state_status: "DIRTY" }),
+    )
+    .extend("bareNumberIsConflict", () => indicatesMergeConflict({ number: 7 }));
+
   it("mergeable が CONFLICTING ならコンフリクト", ({ conflictingMergeableIsConflict }) => {
     expect(conflictingMergeableIsConflict).toStrictEqual(true);
   });
@@ -102,6 +105,13 @@ describe("indicatesMergeConflict", () => {
 });
 
 describe("indicatesBehindBase", () => {
+  const it = test
+    .extend("behindMergeStateIsBehindBase", () =>
+      indicatesBehindBase({ merge_state_status: "BEHIND" }))
+    .extend("cleanMergeStateIsBehindBase", () =>
+      indicatesBehindBase({ merge_state_status: "CLEAN" }),
+    );
+
   it("merge_state_status が BEHIND なら base 遅れ", ({ behindMergeStateIsBehindBase }) => {
     expect(behindMergeStateIsBehindBase).toStrictEqual(true);
   });

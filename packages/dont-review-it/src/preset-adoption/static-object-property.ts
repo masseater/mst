@@ -6,8 +6,15 @@ import type { ESTree } from "@oxlint/plugins";
 import type { PresetAdoptionConfig } from "./config.ts";
 import type { StaticPropertyResolution } from "./inspection-types.ts";
 
-const dynamicPropertyIn = (object: ESTree.ObjectExpression): ESTree.Node | undefined =>
-  object.properties.find((property) => property.type === "SpreadElement" || property.computed);
+const dynamicPropertyIn = (objectExpression: ESTree.ObjectExpression): ESTree.Node | undefined =>
+  objectExpression.properties.find(
+    (property) =>
+      property.type === "SpreadElement" ||
+      property.computed ||
+      property.kind !== "init" ||
+      property.method ||
+      propertyKeyOf(property) === "__proto__",
+  );
 
 const matchingProperties = ({
   object,
@@ -39,7 +46,7 @@ export const uninspectableObjectProblem = ({
         source,
         start: dynamic.start,
         config,
-        message: `${subject} must not contain a spread or computed property because its effective properties must be statically inspectable.`,
+        message: `${subject} must contain only static data properties, with no spread, computed property, accessor, method, or __proto__ setter, because its effective own properties must be statically inspectable.`,
       });
 };
 

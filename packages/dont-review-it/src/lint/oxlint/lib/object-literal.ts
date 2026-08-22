@@ -22,6 +22,24 @@ export const objectValueOf = (lookup: ObjectLookup): ESTree.Expression | null =>
   return property === null ? null : property.value;
 };
 
+export const declaresTrueAt = (lookup: ObjectLookup): boolean => {
+  const declared = objectValueOf(lookup);
+  return declared?.type === "Literal" && declared.value === true;
+};
+
+export const nestedObjectAt = ({
+  object,
+  path,
+}: {
+  readonly object: ESTree.ObjectExpression;
+  readonly path: readonly string[];
+}): ESTree.ObjectExpression | null =>
+  path.reduce<ESTree.ObjectExpression | null>((reached, named) => {
+    if (reached === null) return null;
+    const nested = objectValueOf({ object: reached, key: named });
+    return nested?.type === "ObjectExpression" ? nested : null;
+  }, object);
+
 const endAfterHorizontalWhitespace = (source: string, start: number): number => {
   const suffix = source.slice(start);
   return source.length - suffix.replace(/^[\t ]*/u, "").length;
@@ -37,9 +55,9 @@ const trailingCommaRemovalRange = ({
   readonly sourceCode: SourceCode;
 }): [number, number] => {
   const afterComma = sourceCode.getTokenAfter(comma);
-  const previous = sourceCode.getTokenBefore(property);
-  if (afterComma?.value === "}" && previous?.value === ",") {
-    return [previous.start, comma.end];
+  const precedingToken = sourceCode.getTokenBefore(property);
+  if (afterComma?.value === "}" && precedingToken?.value === ",") {
+    return [precedingToken.start, comma.end];
   }
   return [property.start, endAfterHorizontalWhitespace(sourceCode.getText(), comma.end)];
 };
@@ -51,13 +69,13 @@ const objectPropertyRemovalRange = ({
   readonly property: ESTree.ObjectProperty;
   readonly sourceCode: SourceCode;
 }): [number, number] => {
-  const next = sourceCode.getTokenAfter(property);
-  if (next?.value === ",") {
-    return trailingCommaRemovalRange({ property, comma: next, sourceCode });
+  const followingToken = sourceCode.getTokenAfter(property);
+  if (followingToken?.value === ",") {
+    return trailingCommaRemovalRange({ property, comma: followingToken, sourceCode });
   }
-  const previous = sourceCode.getTokenBefore(property);
-  return previous?.value === ","
-    ? [previous.start, property.end]
+  const precedingToken = sourceCode.getTokenBefore(property);
+  return precedingToken?.value === ","
+    ? [precedingToken.start, property.end]
     : [property.start, endAfterHorizontalWhitespace(sourceCode.getText(), property.end)];
 };
 

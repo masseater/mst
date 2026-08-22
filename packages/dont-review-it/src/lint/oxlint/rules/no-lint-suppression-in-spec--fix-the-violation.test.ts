@@ -13,8 +13,6 @@ const SELF_RULE = "no-lint-suppression-in-spec--fix-the-violation";
 
 const EVERY_RULE_REACHING_HERE = "every rule this file is checked by";
 
-const spelled = (name: string): string => `\`${name}\``;
-
 describe("dont-review-it/no-lint-suppression-in-spec--fix-the-violation", () => {
   testLintRule(noLintSuppressionInSpec, {
     valid: [
@@ -55,7 +53,7 @@ describe("dont-review-it/no-lint-suppression-in-spec--fix-the-violation", () => 
         errors: [
           {
             messageId: "namedSuppression",
-            data: { spelling: "oxlint-disable-next-line", silenced: spelled(BUNDLE_RULE) },
+            data: { spelling: "oxlint-disable-next-line", silenced: `\`${BUNDLE_RULE}\`` },
           },
         ],
         output: `\n${ASSERTION}`,
@@ -66,7 +64,7 @@ describe("dont-review-it/no-lint-suppression-in-spec--fix-the-violation", () => 
         errors: [
           {
             messageId: "namedSuppression",
-            data: { spelling: "oxlint-disable-next-line", silenced: spelled(BUNDLE_RULE) },
+            data: { spelling: "oxlint-disable-next-line", silenced: `\`${BUNDLE_RULE}\`` },
           },
         ],
         output: `\n${ASSERTION}`,
@@ -77,7 +75,7 @@ describe("dont-review-it/no-lint-suppression-in-spec--fix-the-violation", () => 
         errors: [
           {
             messageId: "namedSuppression",
-            data: { spelling: "oxlint-disable-line", silenced: spelled(BUNDLE_RULE) },
+            data: { spelling: "oxlint-disable-line", silenced: `\`${BUNDLE_RULE}\`` },
           },
         ],
         output: "expect(runSut()).toBe(3); ",
@@ -99,7 +97,7 @@ describe("dont-review-it/no-lint-suppression-in-spec--fix-the-violation", () => 
         errors: [
           {
             messageId: "namedSuppression",
-            data: { spelling: "oxlint-disable", silenced: spelled(BUNDLE_RULE) },
+            data: { spelling: "oxlint-disable", silenced: `\`${BUNDLE_RULE}\`` },
           },
         ],
         output: `\n${ASSERTION}`,
@@ -123,7 +121,7 @@ describe("dont-review-it/no-lint-suppression-in-spec--fix-the-violation", () => 
             messageId: "namedSuppression",
             data: {
               spelling: "eslint-disable-next-line",
-              silenced: spelled(`dont-review-it/${BUNDLE_RULE}`),
+              silenced: `\`dont-review-it/${BUNDLE_RULE}\``,
             },
           },
         ],
@@ -137,7 +135,7 @@ describe("dont-review-it/no-lint-suppression-in-spec--fix-the-violation", () => 
             messageId: "namedSuppression",
             data: {
               spelling: "oxlint-disable-next-line",
-              silenced: `${spelled(BUNDLE_RULE)}, ${spelled(SECOND_BUNDLE_RULE)}`,
+              silenced: `\`${BUNDLE_RULE}\`, \`${SECOND_BUNDLE_RULE}\``,
             },
           },
         ],
@@ -149,7 +147,7 @@ describe("dont-review-it/no-lint-suppression-in-spec--fix-the-violation", () => 
         errors: [
           {
             messageId: "namedSuppression",
-            data: { spelling: "oxlint-disable-next-line", silenced: spelled(SELF_RULE) },
+            data: { spelling: "oxlint-disable-next-line", silenced: `\`${SELF_RULE}\`` },
           },
         ],
         output: `\n${ASSERTION}`,
@@ -160,7 +158,7 @@ describe("dont-review-it/no-lint-suppression-in-spec--fix-the-violation", () => 
         errors: [
           {
             messageId: "namedSuppression",
-            data: { spelling: "oxlint-disable-next-line", silenced: spelled(BUNDLE_RULE) },
+            data: { spelling: "oxlint-disable-next-line", silenced: `\`${BUNDLE_RULE}\`` },
           },
         ],
         output: "\nconst total = 1;",
@@ -177,7 +175,7 @@ describe("dont-review-it/no-lint-suppression-in-spec--fix-the-violation", () => 
         errors: [
           {
             messageId: "namedSuppression",
-            data: { spelling: "oxlint-disable", silenced: spelled(BUNDLE_RULE) },
+            data: { spelling: "oxlint-disable", silenced: `\`${BUNDLE_RULE}\`` },
           },
           { messageId: "suppressionRangeEnd", data: { spelling: "eslint-enable" } },
         ],

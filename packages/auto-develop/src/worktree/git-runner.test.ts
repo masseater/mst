@@ -5,38 +5,32 @@ import { indicatesDetachedHead, indicatesNotAWorkingTree } from "./git-runner.ts
 class GitStderrError extends Error {
   readonly stderr: unknown;
 
-  constructor(message: string, stderr: unknown) {
-    super(message);
+  constructor(complaint: string, stderr: unknown) {
+    super(complaint);
     this.stderr = stderr;
   }
 }
 
-const it = test
-  .extend("detachedFromStderrText", () =>
-    indicatesDetachedHead(
-      new GitStderrError("git failed", "fatal: ref HEAD is not a symbolic ref"),
-    ))
-  .extend("detachedFromMessageText", () =>
-    indicatesDetachedHead(new Error("HEAD is not a symbolic ref")),
-  )
-  .extend("detachedFromUnrelatedError", () =>
-    indicatesDetachedHead(new Error("some unrelated failure")),
-  )
-  .extend("detachedFromNonError", () => indicatesDetachedHead("broken"))
-  .extend("detachedFromNonStringStderr", () =>
-    indicatesDetachedHead(new GitStderrError("some failure", 42)),
-  )
-  .extend("detachedFromMessageWithNonStringStderr", () =>
-    indicatesDetachedHead(new GitStderrError("ref HEAD is not a symbolic ref", 42)),
-  )
-  .extend("notAWorkingTreeFromUnrelatedError", () =>
-    indicatesNotAWorkingTree(new Error("some other failure")),
-  )
-  .extend("notAWorkingTreeFromStderrText", () =>
-    indicatesNotAWorkingTree(new GitStderrError("git failed", "fatal: 'x' is not a working tree")),
-  );
-
 describe("indicatesDetachedHead", () => {
+  const it = test
+    .extend("detachedFromStderrText", () =>
+      indicatesDetachedHead(
+        new GitStderrError("git failed", "fatal: ref HEAD is not a symbolic ref"),
+      ))
+    .extend("detachedFromMessageText", () =>
+      indicatesDetachedHead(new Error("HEAD is not a symbolic ref")),
+    )
+    .extend("detachedFromUnrelatedError", () =>
+      indicatesDetachedHead(new Error("some unrelated failure")),
+    )
+    .extend("detachedFromNonError", () => indicatesDetachedHead("broken"))
+    .extend("detachedFromNonStringStderr", () =>
+      indicatesDetachedHead(new GitStderrError("some failure", 42)),
+    )
+    .extend("detachedFromMessageWithNonStringStderr", () =>
+      indicatesDetachedHead(new GitStderrError("ref HEAD is not a symbolic ref", 42)),
+    );
+
   it("stderr プロパティに fatal テキストが載っていても検出する", ({ detachedFromStderrText }) => {
     expect(detachedFromStderrText).toStrictEqual(true);
   });
@@ -69,6 +63,15 @@ describe("indicatesDetachedHead", () => {
 });
 
 describe("indicatesNotAWorkingTree", () => {
+  const it = test
+    .extend("notAWorkingTreeFromUnrelatedError", () =>
+      indicatesNotAWorkingTree(new Error("some other failure")))
+    .extend("notAWorkingTreeFromStderrText", () =>
+      indicatesNotAWorkingTree(
+        new GitStderrError("git failed", "fatal: 'x' is not a working tree"),
+      ),
+    );
+
   it("stderr にもメッセージ本文にも無ければ検出しない", ({ notAWorkingTreeFromUnrelatedError }) => {
     expect(notAWorkingTreeFromUnrelatedError).toStrictEqual(false);
   });

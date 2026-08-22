@@ -2,104 +2,109 @@
 
 ## 何を検出するか
 
-production の TypeScript ソースで、有限個の値からなる語彙を定義している構文。
+production の TypeScript source で、string・number・boolean・`null` からなる有限語彙を新しく定義する次の構文を検出する。
 
-無条件に報告する形は次の 4 つ。カタログに一致する項目が無くても報告する。
+- member 名が `enum` または `picklist` の call に渡す静的 scalar array
+- scalar literal union の type alias
+- member 名が `union` の call に渡す scalar `literal` call の静的 array
+- JSON Schema の非 computed `enum` property に渡す静的 scalar array
+- catalog fingerprint と一致する静的 `Set` initializer
+- catalog fingerprint と一致する `typeof ARRAY[number]`
+- named import または `import()` type を参照する `keyof`
+- schema call に渡す、静的 object または named import に対する `Object.keys`
 
-- スキーマの列挙に、スカラーリテラルの静的な配列を渡す呼び出し。メンバ名が `enum` / `picklist` の呼び出しを対象にする。配列を直接書く形と、同一ファイル内の束縛を 1 段だけ経由する形の両方
-- スカラーのリテラル型を並べた型エイリアス（`type OrderStatus = "draft" | "published"`）
-- リテラルのスキーマを並べた `union` 呼び出し（`z.union([z.literal("draft"), z.literal("published")])`）
-- JSON Schema の `enum` キーに静的な配列を書いた形。自前 lint ルールのオプションスキーマがこれに当たる
+schema array は直接記述した配列と、同じ file の module-scope Identifier binding に置いた配列を扱う。`Object.keys` は同じ file の module-scope object binding と named import を扱う。型 assertion、`satisfies`、non-null assertion、括弧は外して値を見る。値が 2 個未満の集合と、`true` / `false` だけの集合は語彙とみなさない。
 
-既存のカタログ項目と値の指紋が一致したときだけ報告する形は次の 2 つ。一致しなければ報告しない。
+`Set` と indexed access は一般の局所集合にも現れるため、catalog fingerprint と一致した場合だけ報告する。schema、literal union、JSON Schema は構文自体が有限語彙の定義なので、catalog owner がまだ無くても報告する。
 
-- 添字アクセスの要素型を定義するための静的な配列（`const STATUSES = [...] as const;` と `type OrderStatus = (typeof STATUSES)[number];` の組）
-- 静的な `Set` の初期化子（`new Set([...])`）
+自動修正は持たない。同じ綴りが別概念に属する場合があり、どの owner から導出するかを値だけでは決められないためである。
 
-この 2 つは語彙と無関係なコードにも同じ形で現れる。だから構文だけでは判断せず、値そのものが既に宣言済みの語彙と一致したときに限って候補として扱う。import から受け取った値でも同じで、指紋が一致する所有者が見つからない限り報告しない。
+## 解析の順序
 
-### import ルートの確認
+rule は visitor を返す前に source 全体を一度解析する。
 
-無条件に報告する 4 つの形が、値を repository 内の名前付き import から受け取っている場合、その import はカタログの公開経路か、注釈が付いた宣言のファイルへ解決される必要がある。解決されない経路を通っていたら報告する。所有者を経由しているように見えて、実は登録されていない別ルートだった、という状態を塞ぐため。
+1. Oxc AST から module-scope の静的 array・object binding と named import を索引化する
+2. source 全体から対象構文を列挙する
+3. 局所値域、catalog fingerprint、import route を照合して診断を確定する
+4. `Program` visitor は完成済み診断を報告するだけにする
 
-指紋の一致を条件とする 2 つの形（添字アクセスの元配列・静的な `Set` の初期化子）は、この確認の対象にしない。所有者が確定したときだけ候補として扱うという判断を、import 経由の値にもそのまま適用する。
+visitor が到着した順に binding state を書き換えない。callback の実行、標準 API の返値、collection mutation、一般の alias chain は評価しない。対象を増やす場合は明示的な syntax contract と耐久テストを追加し、JavaScript 実行系を lint 内に作らない。
 
-repository 内と見なすのは、相対指定子（`./` / `../`）と `#` から始まる指定子。裸の指定子はカタログの公開経路と一致するときだけ repository 内と見なし、それ以外は外部パッケージとして扱う。
+## import route の確認
 
-相対指定子の解決では拡張子と `index` の綴りを見ない。`./order-status` / `./order-status.ts` / `./order-status.js` / `./order-status/index.ts` は、宣言の登録経路 `.../order-status.ts` と同じものとして扱う。
+対象構文が named import の binding を受け取る場合、その import は catalog が登録した public route または owner declaration 自身へ解決される必要がある。
 
-現状の限界として、まだどこにも登録されていないワークスペースのパッケージ名（`@scope/name` 形式）で import している場合は、裸の指定子として外部パッケージ扱いになり、この確認では捕まらない。塞ぐにはカタログがリポジトリ内のワークスペース名を持つ必要がある。
+public route は次の identity をすべて保持する。
 
-### 依存パッケージが所有する語彙の提示
+- package specifier
+- exported name
+- package `exports` が解決した runtime source path
 
-カタログに所有者が見つからなかったとき、報告の直前に限り、lint 対象ファイルが属するパッケージの直接依存の公開型を調べる。ローカルに書かれた値をすべて admit するリテラルのユニオン型があれば、そのパッケージ名と型名を所有者として報告に載せる。
+consumer 側も TypeScript module resolution で実体 source を解決する。同じ specifier でも別 export name、別 source、未登録 subpath、`paths` が shadow sourceへ向けた alias は unregistered になる。relative import は実体 pathと imported name を owner declaration path・binding に完全一致させる。
 
-- 調べるのは、そのファイルが属するパッケージの `dependencies` / `devDependencies` / `peerDependencies` に直接書かれたものだけ。推移的な依存は見ない。名指しできるのは、そのファイルが実際に import できる公開 API に限られるため
-- `workspace:` で指定されたリポジトリ内のパッケージは対象外。リポジトリ内の所有者はカタログが受け持つ
-- ライブラリ側の型がローカルの値より広いときは、余分に admit する値を報告に並べて絞り込みを促す。リテラルでないメンバ（`number` など）を含む場合はその事実を書く
-- 同じ型宣言に別名で届く候補は 1 つに畳む。畳んだうえで残った複数の候補は、順序で優劣を示さず全て並べる
-- この照会は報告を出そうとする経路に入ったときだけ走り、プロセス内で 1 度だけ型チェッカを起動する
+catalog owner と同じ名前の ambient または local binding は、綴りだけで owner と同一視しない。runtime source identity を持たない同名 binding を対象 sink へ渡した場合は unregistered route として報告する。
 
-型情報は「何を報告するか」ではなく「報告に何を書くか」にしか使わない。カタログに所有者がいる場合の報告は変わらず、指紋の一致を条件とする 2 つの形は依存パッケージが所有していても報告しない。報告される箇所の集合は、この仕組みが無かったときと同じ。
+外部 package は repository route ではないため、この route check の対象外である。
 
-型チェッカを起動できない環境（プラットフォームのバイナリが無い、依存が刈り込まれている）では語彙索引を空として扱い、所有者を名指ししない報告に退避する。lint はここで落ちない。
+## owner の登録
 
-判断の記録は [EDR 0008](../../../../docs/engineering-decision-logs/0008-read-library-types-for-messages-only.md) にある。
+`@canonical-values` owner は次をすべて満たす必要がある。
 
-### 判定の細部
+- production の TypeScript sourceにある module-scope の JSDocである
+- canonical tag は JSDoc 内に1つだけである
+- JSDoc の直後に空白だけを挟んで単一 variable statement が続く
+- variable statement は単一 Identifier binding と runtime initializerを持つ
+- concept id は小文字英数字の語を `-` または `.` でつないだ形である
 
-- 値が 2 個未満なら語彙とみなさない
-- `null` と `undefined` は値の不在であって語彙の要素ではないので、数に入れない
-- 真偽値の両方を並べただけの形（`true | false`）は語彙とみなさない
-- 置換を持たないテンプレートリテラル（`` `draft` ``）は、引用符で書いた綴りと同じ値として扱う
-- 束縛を辿るのは 1 段まで。`const A = [...]; const B = A;` の `B` は追わない
-- `@canonical-values` 注釈が付いた宣言の中は対象外。そこが概念を定義する場所だから。注釈と認めるのは `/** */` 形式のブロックコメントで、その直後に空白だけを挟んでトップレベルの文が続く場合に限る。行コメント、`/* */` 形式、関数の中に埋めたもの、宣言との間に別のコメントを挟んだものは、どの宣言も免除しない。カタログを作る側が宣言として拾う条件と揃えてある
-- ファイル名が `.test.` / `.spec.` / `.stories.` / `.story.` で終わるもの、`__fixtures__` / `__mocks__` / `__stories__` / `__tests__` / `fixtures` / `test` / `tests` ディレクトリの配下は production のソースではないので対象外。この判定は [no-strict-canonical-literal-use--use-canonical-import](./no-strict-canonical-literal-use--use-canonical-import.md) と同じものを使う
-- 同じ構文要素が複数の形で拾われても、報告は 1 箇所につき 1 回
-- カタログの走査根は、lint の実行ディレクトリから上に辿って決める。`pnpm-workspace.yaml` か `workspaces` を持つ `package.json` が最初に見つかった場所が根になり、見つからなければ実行ディレクトリ自身を根にする。パッケージのディレクトリから lint を走らせても、リポジトリ全体から走らせたときと同じ語彙を見る
+line comment、通常の block comment、nested annotation、intervening token、ambient declaration、multi-binding、destructuring、type alias、enum、function、class、import、re-export、制御文は owner にならない。
 
-### 対象にならないもの
+owner 候補は最寄りの TypeScript configuration ごとにまとめ、configuration ごとに1つの `typescript-6` Programを作る。checker が同じ binding に解決した型から値域を導出する。
 
-有限の型を定義しない一般の配列、表示順を表す配列、実行時に組み立てられる集合、外部パッケージからの import、広い合併型、構造を持つ判別可能合併、既にカタログの配列から導出されている型。
+- array は numeric index type の literal union を値域にする
+- object は index signature を持たない閉じた property nameを値域にする
+- string、number、boolean、`null`、負数を扱う
+- checker が解決できる import と spreadを扱う
+- empty、widened domain、scalar、非 literal domain、直接記述された重複値は problem にする
 
-プロパティ・引数・戻り値の位置に直接書かれた合併も対象外。このルールが見るのは型エイリアスの宣言だけで、合併型そのものを見ないため、これらは文法上そもそも入ってこない。ただし宣言側の文法から外れた使用箇所は [no-strict-canonical-literal-use--use-canonical-import](./no-strict-canonical-literal-use--use-canonical-import.md) が捕まえる。片方だけでは穴が残るので、2 本で 1 組になっている。
+duplicate concept は衝突した全 declaration を catalog から除外する。strict verification は cache を使わず、invalid・duplicate・out-of-scope・値域導出失敗が1件でもあれば失敗する。
+
+## lint 免除
+
+免除は注釈の存在ではなく、catalog entry と現在の source の declaration identity が一致する場合だけ作る。
+
+- repository root からの declaration path
+- concept id と binding
+- annotation start、binding start、declaration start、declaration end
+
+一致した owner declaration 内の canonical domain だけを免除する。同じ file の declaration 外、別 path、別 binding、古い cache range、不正・duplicate・out-of-scope・値域導出失敗の declaration は免除を持たない。
+
+## Git ignore と production scope
+
+ファイル名に `.fixture.` / `.mock.` / `.test.` / `.spec.` / `.stories.` / `.story.` を含むものと、`__fixtures__` / `__mocks__` / `__stories__` / `__tests__` / `.cache` / `.local-agents` / `coverage` / `dist` / `dist-ssr` / `fixtures` / `test` / `tests` directory 配下は production source ではない。
+
+repository scan と import route 判定は、lint 開始前に `git ls-files --others --ignored --exclude-standard --directory` から作る同じ source scope に従う。Git が除外する未追跡 file、directory、symlink ancestor は catalog input と repository route に取り込まない。すでに tracked の file は後から ignore pattern に一致しても repository source のまま扱う。source scope と catalog は lint process の間は不変であり、visitor や import route lookup から Git と repository scan を再実行しない。
 
 ## なぜそれが要るか
 
-同じ値集合が 2 箇所で独立に書かれると、片方だけ変わっても何も落ちない。テストは通り、型検査も通る。壊れたことが分かるのは、実行時に片方の綴りが相手に届かなくなったときで、そこには元の 2 箇所を結ぶ手掛かりが残っていない。
+同じ有限集合が複数箇所に独立して書かれると、owner だけを変更しても型検査やテストが落ちない。schema、型、membership checkを同じ runtime bindingから導出すれば、語彙変更の供給元を1箇所に固定できる。
 
-だから語彙はリポジトリのどこか 1 箇所で宣言され、他の全箇所はそこから導出する。スキーマも、型も、所属判定も、同じ実行時の値から出す。そうすれば値を 1 つ足す変更が 1 箇所で済み、足し忘れた箇所は型が落とす。
-
-このルールが報告だけで自動修正を持たないのは、値が一致することが同じ概念であることの証明にならないから。同じ綴りが別々の概念に属することがあり、部分集合に変わっても同じ所有者に属し続けることがある。安全に置換するには、所有者の公開経路が 1 つに定まっていること、局所の束縛名が衝突しないこと、周囲の構文を保てることが要る。どれも機械が決定的には導けない。だから機械は候補を出すところまでで止め、どの所有者に属するかは人が決める。
+owner 候補の値域は TypeScript checker に一任する。Oxc AST から import・spread・public alias の値を独自に評価すると、TypeScript と異なる意味になり、catalog と consumer の間に別の抜け道が生まれる。
 
 ## どう直すか
 
-所有者を選ぶ前に、設計記録とソースを調べる。行き先は 3 つある。
+報告に owner が示された場合は、局所の有限集合を削除し、registered public routeから owner bindingを importしてschema・型・membership checkを導出する。
 
-報告に挙がったリポジトリ内の候補が、同じ概念・同じ変更理由・同じ境界を持つなら、局所の値を消してその公開 API を使う。スキーマも型も所属判定も、import した配列から導出する。候補が複数並んだときは、周囲の振る舞いと所有の境界で選ぶ。報告に並んだ順序で選ばない。綴りが同じことを理由に選ばない。
+owner が示されない場合は、その概念を所有する production module に runtime valuesを登録し、consumerから参照する。依存 package が語彙を所有する場合は、その公開型またはruntime APIから導出する。
 
-依存パッケージの公開型が名指しされたなら、その型から導出する。リポジトリ側は所有者を名乗らない。ライブラリ側が余分な値を admit しているなら、`Extract` や `Exclude` で必要な値まで絞り込む。こうしておくと、上流がその語彙を変えたときに宣言がコンパイルエラーになり、気づく契機が残る。
-
-```ts
-import type { AllowWarnDeny } from "oxlint";
-
-export type LintRuleSeverity = Extract<AllowWarnDeny, "error" | "warn" | "off">;
-```
-
-どちらの候補も無いなら、その概念を所有するべき場所に実行時の値を登録して、そこから全部を導出する。どこにも属さない概念が現れたら、任意の消費者に所有権を押し付けるのではなく、その概念を所有する新しい場所を作る。
-
-import ルートが未登録だと報告された場合は、参照先のファイルに注釈を付けて所有者として登録するか、既に登録されている所有者の公開経路に import を張り替える。
+unregistered route の場合は、参照先をownerとして正しく登録するか、すでに登録された public routeへimportを張り替える。
 
 ## 禁じる回避策
 
-- 語彙を別の構文へ書き換えて、このルールが見ている文法から逃れる。値集合が 2 箇所にある状態は変わらず、消費側のルールが同じ値を使用箇所で捕まえる
-- 所有者を経由しない import ルートを新しく作る。1 段挟んで見かけ上は外部から受け取っている形にしても、import ルートの確認で報告される
-- 語彙ごとの opt-out、ワークスペースごとの除外、所有者側の除外タグ。どれも用意しない。過去に存在した除外用のタグは検証エントリポイントが明示的に拒否する。抑制の口を 1 つでも残すと「面倒だから除外」が積み上がって、語彙の一元化そのものが崩れる
+- 語彙ごとの opt-out、workspaceごとの除外、owner側の除外tagを追加する
+- canonical ruleを`eslint-disable` / `oxlint-disable`で抑制する
+- ownerと同名のambient bindingを置いてregistered routeに見せる
+- 値をGit ignoredの未追跡fileへ移し、repository ownerとして扱わせる
 
 ## オプション
 
-`ownershipPolicy`（文字列、省略可）を取る。
-
-このパッケージは「どの語彙をどこが所有すべきか」の内容を持たない。所有権の割り当て方針は利用側が決めるものなので、方針を表す文字列を設定として受け取り、報告メッセージの末尾にそのまま載せる。方針の例としては、サービス全体の運用語彙・API の通信プロトコル・アプリ固有の状態、といった区分が置かれる。
-
-未設定のときは、方針が設定されていないことを報告に書く。報告を受けた人が、方針を決めるところから始める必要があると分かるようにするため。
+`ownershipPolicy` を文字列で受け取る。所有権の割り当て方針を報告メッセージに載せるだけで、検出範囲は変えない。

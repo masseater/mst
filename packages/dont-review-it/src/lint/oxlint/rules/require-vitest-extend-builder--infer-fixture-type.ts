@@ -25,10 +25,10 @@ const handedObjectOf = (call: ESTree.CallExpression): ESTree.ObjectExpression | 
 
 const sourceFor = (sourceCode: SourceCode): FixtureSource => ({
   textOf: (node) => sourceCode.getText(node),
-  readCountOf: (declared, name) =>
+  readCountOf: (declared, spelled) =>
     sourceCode
       .getScope(declared)
-      .variables.filter((bound) => bound.name === name)
+      .variables.filter((bound) => bound.name === spelled)
       .flatMap((bound) => bound.references).length,
 });
 
@@ -80,8 +80,8 @@ export const requireVitestExtendBuilder = createDontReviewItRule({
     schema: [],
     fixable: "code",
   },
-  create(context) {
-    const { sourceCode } = context;
+  create(inspection) {
+    const { sourceCode } = inspection;
     return {
       CallExpression(node: ESTree.CallExpression) {
         const builder = builderCallOf(node);
@@ -91,7 +91,7 @@ export const requireVitestExtendBuilder = createDontReviewItRule({
         if (handed === null) {
           const [declared] = node.typeArguments?.params ?? [];
           if (declared !== undefined) {
-            context.report({
+            inspection.report({
               node: declared,
               messageId: "handWrittenFixtureType",
               data: { written: sourceCode.getText(declared) },
@@ -101,7 +101,7 @@ export const requireVitestExtendBuilder = createDontReviewItRule({
         }
 
         const rewritten = rewriteFor(builder, sourceCode);
-        context.report({
+        inspection.report({
           node: handed,
           messageId: "objectFixtureDeclaration",
           fix: rewritten === null ? undefined : (fixer) => fixer.replaceText(node, rewritten),

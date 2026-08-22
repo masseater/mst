@@ -29,6 +29,13 @@ const runDuration = once(() =>
   }),
 );
 
+const stageDuration = once(() =>
+  meter().createHistogram("lint.stage.duration", {
+    description: "Time one named stage of the work a lint process does took",
+    unit: "ms",
+  }),
+);
+
 const isEnabled = (): boolean =>
   process.env[ENABLE_VARIABLE] !== undefined && process.env[DISABLE_VARIABLE] !== "true";
 
@@ -47,12 +54,19 @@ const failWhateverCannotBeExported = (): void => {
 const stopOnExit = (provider: MeterProvider): void => {
   const shutdownOnce = once(async (): Promise<void> => {
     runDuration().record(process.uptime() * MILLISECONDS_PER_SECOND);
-    await provider.forceFlush();
     await provider.shutdown();
   });
   process.on("beforeExit", () => {
     void shutdownOnce();
   });
+};
+
+export const measureStage = <Produced>(stage: string, run: () => Produced): Produced => {
+  if (!startLintTelemetry()) return run();
+  const startedAt = performance.now();
+  const produced = run();
+  stageDuration().record(performance.now() - startedAt, { stage });
+  return produced;
 };
 
 export const startLintTelemetry = once((): boolean => {

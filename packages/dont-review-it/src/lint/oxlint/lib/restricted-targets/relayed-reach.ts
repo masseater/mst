@@ -1,3 +1,4 @@
+import { memoize } from "es-toolkit";
 import { parseSync } from "oxc-parser";
 
 import { readTextFile } from "../canonical-values/source-files.ts";
@@ -34,23 +35,16 @@ type Walk = {
   readonly relays: readonly string[];
 };
 
-const passThroughsByFile = new Map<string, readonly PassThroughExport<AstFields>[]>();
-
-const passThroughExportsAt = (file: string): readonly PassThroughExport<AstFields>[] => {
-  const remembered = passThroughsByFile.get(file);
-  if (remembered !== undefined) return remembered;
-
+const passThroughExportsAt = memoize((file: string): readonly PassThroughExport<AstFields>[] => {
   const source = readTextFile(file);
   const program = source === null ? null : astFieldsOf(parseSync(file, source).program);
-  const found = program === null ? [] : passThroughExportsIn(statementsOf(program));
-  passThroughsByFile.set(file, found);
-  return found;
-};
+  return program === null ? [] : passThroughExportsIn(statementsOf(program));
+});
 
 const reachedFilesFor = (walk: Walk): readonly string[] => {
   const { specifier, fromFile, policy } = walk;
-  const request = { specifier, fromFile, workspaceRoot: policy.workspaceRoot };
-  const found = repositoryFilesFor(request);
+  const asked = { specifier, fromFile, workspaceRoot: policy.workspaceRoot };
+  const found = repositoryFilesFor(asked);
   if (found.length > 0) return found;
 
   const aliased = aliasedSpecifierIn({
@@ -60,17 +54,17 @@ const reachedFilesFor = (walk: Walk): readonly string[] => {
   });
   return aliased === null
     ? []
-    : repositoryFilesFor({ ...request, specifier: relativeSpecifierTo(fromFile, aliased) });
+    : repositoryFilesFor({ ...asked, specifier: relativeSpecifierTo(fromFile, aliased) });
 };
 
 const matchedForward = (
   forwards: readonly PassThroughExport<AstFields>[],
-  entries: readonly RestrictedTargetEntry[],
+  listedEntries: readonly RestrictedTargetEntry[],
 ): { readonly entry: RestrictedTargetEntry; readonly target: string } | null =>
   forwards
     .map((forwarded) => {
-      const entry = matchingRestrictedTarget({ entries, forwarded });
-      return entry === null ? null : { entry, target: forwarded.specifier };
+      const listed = matchingRestrictedTarget({ entries: listedEntries, forwarded });
+      return listed === null ? null : { entry: listed, target: forwarded.specifier };
     })
     .find((found) => found !== null) ?? null;
 

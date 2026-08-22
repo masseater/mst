@@ -1,8 +1,8 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, parse } from "node:path";
+import { join, parse } from "node:path";
 
-import { describe, expect, onTestFinished, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import {
   declaresPublicSubpath,
@@ -11,114 +11,235 @@ import {
   publicEntryFilesOf,
 } from "./package-entries.ts";
 
-const packageDirectoryHolding = (files: Readonly<Record<string, string>>): string => {
-  const root = mkdtempSync(join(tmpdir(), "setup-modules-package-entries-"));
-  onTestFinished(() => {
-    rmSync(root, { recursive: true, force: true });
-  });
-
-  for (const [relativePath, content] of Object.entries(files)) {
-    const path = join(root, relativePath);
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, content);
-  }
-  return root;
-};
-
-const packageDirectoryDeclaring = (manifest: unknown): string =>
-  packageDirectoryHolding({
-    "package.json": JSON.stringify(manifest),
-    "src/index.ts": "export const entered = 1;\n",
-    "src/plugin.ts": "export const plugged = 2;\n",
-  });
-
-describe("setup-modules/package-entries", () => {
-  test("a manifest that is not an object declares no public entry", () => {
-    const directory = packageDirectoryHolding({ "package.json": "[]" });
-
-    expect(publicEntryFilesOf(directory)).toBe(null);
-  });
-
-  test("a directory holding no manifest declares no public entry", () => {
-    expect(publicEntryFilesOf(packageDirectoryHolding({}))).toBe(null);
-  });
-
-  test("an entry named under a condition is taken as the entry of its subpath", () => {
-    const directory = packageDirectoryDeclaring({
-      name: "@fixture/conditioned",
-      exports: { ".": { import: "./src/index.ts" } },
+describe("publicEntryFilesOf", () => {
+  describe("a manifest that is not an object", () => {
+    const it = test.extend("entryFilesOfAManifestThatIsNotAnObject", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "setup-modules-package-entries-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "package.json"), "[]");
+      return publicEntryFilesOf(root);
     });
 
-    expect(publicEntryFilesOf(directory)).toStrictEqual([join(directory, "src/index.ts")]);
+    it("declares no public entry", ({ entryFilesOfAManifestThatIsNotAnObject }) => {
+      expect(entryFilesOfAManifestThatIsNotAnObject).toBe(null);
+    });
   });
 
-  test("a subpath offering several entries takes each of them", () => {
-    const directory = packageDirectoryDeclaring({
-      name: "@fixture/several",
-      exports: { ".": ["./src/index.ts", "./src/plugin.ts"] },
+  describe("a directory holding no manifest", () => {
+    const it = test.extend("entryFilesOfADirectoryHoldingNoManifest", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "setup-modules-package-entries-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      return publicEntryFilesOf(root);
     });
 
-    expect(publicEntryFilesOf(directory)).toStrictEqual([
-      join(directory, "src/index.ts"),
-      join(directory, "src/plugin.ts"),
-    ]);
+    it("declares no public entry", ({ entryFilesOfADirectoryHoldingNoManifest }) => {
+      expect(entryFilesOfADirectoryHoldingNoManifest).toBe(null);
+    });
   });
 
-  test("an entry written as a bare specifier is not a file of this package", () => {
-    const directory = packageDirectoryDeclaring({
-      name: "@fixture/redirected",
-      exports: { ".": "other-package/entry.js" },
+  describe("an entry named under a condition", () => {
+    const it = test.extend("entryFilesOfAnEntryNamedUnderACondition", ({}, { onCleanup }) => {
+      const root = join(tmpdir(), "setup-modules-package-entries-conditioned");
+      rmSync(root, { recursive: true, force: true });
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "src"), { recursive: true });
+      writeFileSync(join(root, "src/index.ts"), "export const entered = 1;\n");
+      writeFileSync(join(root, "src/plugin.ts"), "export const plugged = 2;\n");
+      writeFileSync(
+        join(root, "package.json"),
+        JSON.stringify({
+          name: "@fixture/conditioned",
+          exports: { ".": { import: "./src/index.ts" } },
+        }),
+      );
+      return publicEntryFilesOf(root);
     });
 
-    expect(publicEntryFilesOf(directory)).toBe(null);
+    it("is taken as the entry of its subpath", ({ entryFilesOfAnEntryNamedUnderACondition }) => {
+      expect(entryFilesOfAnEntryNamedUnderACondition).toStrictEqual([
+        join(tmpdir(), "setup-modules-package-entries-conditioned", "src/index.ts"),
+      ]);
+    });
   });
 
-  test("an entry naming a file that was never built declares nothing this reading can follow", () => {
-    const directory = packageDirectoryDeclaring({
-      name: "@fixture/unbuilt",
-      exports: { ".": "./dist/index.js" },
+  describe("a subpath offering several entries", () => {
+    const it = test.extend("entryFilesOfASubpathOfferingSeveralEntries", ({}, { onCleanup }) => {
+      const root = join(tmpdir(), "setup-modules-package-entries-several");
+      rmSync(root, { recursive: true, force: true });
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "src"), { recursive: true });
+      writeFileSync(join(root, "src/index.ts"), "export const entered = 1;\n");
+      writeFileSync(join(root, "src/plugin.ts"), "export const plugged = 2;\n");
+      writeFileSync(
+        join(root, "package.json"),
+        JSON.stringify({
+          name: "@fixture/several",
+          exports: { ".": ["./src/index.ts", "./src/plugin.ts"] },
+        }),
+      );
+      return publicEntryFilesOf(root);
     });
 
-    expect(publicEntryFilesOf(directory)).toBe(null);
+    it("takes each of them", ({ entryFilesOfASubpathOfferingSeveralEntries }) => {
+      expect(entryFilesOfASubpathOfferingSeveralEntries).toStrictEqual([
+        join(tmpdir(), "setup-modules-package-entries-several", "src/index.ts"),
+        join(tmpdir(), "setup-modules-package-entries-several", "src/plugin.ts"),
+      ]);
+    });
   });
 
-  test("a manifest that is not an object declares no subpath", () => {
-    const directory = packageDirectoryHolding({ "package.json": "[]" });
-
-    expect(declaresPublicSubpath({ packageDirectory: directory, subpath: "." })).toBe(false);
-  });
-
-  test("a subpath written with a wildcard covers the paths it spans", () => {
-    const directory = packageDirectoryDeclaring({
-      name: "@fixture/spanned",
-      exports: { ".": "./src/index.ts", "./tsconfig/*": "./tsconfig/*" },
+  describe("an entry written as a bare specifier", () => {
+    const it = test.extend("entryFilesOfAnEntryWrittenAsABareSpecifier", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "setup-modules-package-entries-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "src"), { recursive: true });
+      writeFileSync(join(root, "src/index.ts"), "export const entered = 1;\n");
+      writeFileSync(join(root, "src/plugin.ts"), "export const plugged = 2;\n");
+      writeFileSync(
+        join(root, "package.json"),
+        JSON.stringify({
+          name: "@fixture/redirected",
+          exports: { ".": "other-package/entry.js" },
+        }),
+      );
+      return publicEntryFilesOf(root);
     });
 
-    expect(
-      declaresPublicSubpath({ packageDirectory: directory, subpath: "./tsconfig/library.json" }),
-    ).toBe(true);
+    it("is not a file of this package", ({ entryFilesOfAnEntryWrittenAsABareSpecifier }) => {
+      expect(entryFilesOfAnEntryWrittenAsABareSpecifier).toBe(null);
+    });
   });
 
-  test("a subpath of a different depth is not covered by a wildcard", () => {
-    const directory = packageDirectoryDeclaring({
-      name: "@fixture/spanned",
-      exports: { ".": "./src/index.ts", "./tsconfig/*": "./tsconfig/*" },
+  describe("an entry naming a file that was never built", () => {
+    const it = test.extend("entryFilesOfAnEntryNamingAFileThatWasNeverBuilt", ({}, {
+      onCleanup,
+    }) => {
+      const root = mkdtempSync(join(tmpdir(), "setup-modules-package-entries-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "src"), { recursive: true });
+      writeFileSync(join(root, "src/index.ts"), "export const entered = 1;\n");
+      writeFileSync(join(root, "src/plugin.ts"), "export const plugged = 2;\n");
+      writeFileSync(
+        join(root, "package.json"),
+        JSON.stringify({ name: "@fixture/unbuilt", exports: { ".": "./dist/index.js" } }),
+      );
+      return publicEntryFilesOf(root);
     });
 
-    expect(
-      declaresPublicSubpath({ packageDirectory: directory, subpath: "./tsconfig/base/app.json" }),
-    ).toBe(false);
+    it("declares nothing this reading can follow", ({
+      entryFilesOfAnEntryNamingAFileThatWasNeverBuilt,
+    }) => {
+      expect(entryFilesOfAnEntryNamingAFileThatWasNeverBuilt).toBe(null);
+    });
+  });
+});
+
+describe("declaresPublicSubpath", () => {
+  describe("a manifest that is not an object", () => {
+    const it = test.extend("subpathDeclaredByAManifestThatIsNotAnObject", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "setup-modules-package-entries-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      writeFileSync(join(root, "package.json"), "[]");
+      return declaresPublicSubpath({ packageDirectory: root, subpath: "." });
+    });
+
+    it("declares no subpath", ({ subpathDeclaredByAManifestThatIsNotAnObject }) => {
+      expect(subpathDeclaredByAManifestThatIsNotAnObject).toBe(false);
+    });
   });
 
-  test("a file under no manifest at all belongs to no package", () => {
-    const { root } = parse(process.cwd());
+  describe("a subpath written with a wildcard", () => {
+    const it = test.extend("subpathSpannedByAWildcard", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "setup-modules-package-entries-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "src"), { recursive: true });
+      writeFileSync(join(root, "src/index.ts"), "export const entered = 1;\n");
+      writeFileSync(join(root, "src/plugin.ts"), "export const plugged = 2;\n");
+      writeFileSync(
+        join(root, "package.json"),
+        JSON.stringify({
+          name: "@fixture/spanned",
+          exports: { ".": "./src/index.ts", "./tsconfig/*": "./tsconfig/*" },
+        }),
+      );
+      return declaresPublicSubpath({
+        packageDirectory: root,
+        subpath: "./tsconfig/library.json",
+      });
+    });
 
-    expect(owningPackageDirectoryOf(join(root, "never-written-here.ts"))).toBe(null);
+    it("covers the paths it spans", ({ subpathSpannedByAWildcard }) => {
+      expect(subpathSpannedByAWildcard).toBe(true);
+    });
   });
 
-  test("a directory is not inside itself", () => {
-    const directory = packageDirectoryHolding({});
+  describe("a subpath of a different depth than the wildcard", () => {
+    const it = test.extend("subpathOfADifferentDepthThanTheWildcard", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "setup-modules-package-entries-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      mkdirSync(join(root, "src"), { recursive: true });
+      writeFileSync(join(root, "src/index.ts"), "export const entered = 1;\n");
+      writeFileSync(join(root, "src/plugin.ts"), "export const plugged = 2;\n");
+      writeFileSync(
+        join(root, "package.json"),
+        JSON.stringify({
+          name: "@fixture/spanned",
+          exports: { ".": "./src/index.ts", "./tsconfig/*": "./tsconfig/*" },
+        }),
+      );
+      return declaresPublicSubpath({
+        packageDirectory: root,
+        subpath: "./tsconfig/base/app.json",
+      });
+    });
 
-    expect(isInsideDirectory({ path: directory, directory })).toBe(false);
+    it("is not covered by a wildcard", ({ subpathOfADifferentDepthThanTheWildcard }) => {
+      expect(subpathOfADifferentDepthThanTheWildcard).toBe(false);
+    });
+  });
+});
+
+describe("owningPackageDirectoryOf", () => {
+  describe("a file under no manifest at all", () => {
+    const it = test.extend("owningPackageDirectoryOfAFileUnderNoManifest", () =>
+      owningPackageDirectoryOf(join(parse(process.cwd()).root, "never-written-here.ts")));
+
+    it("belongs to no package", ({ owningPackageDirectoryOfAFileUnderNoManifest }) => {
+      expect(owningPackageDirectoryOfAFileUnderNoManifest).toBe(null);
+    });
+  });
+});
+
+describe("isInsideDirectory", () => {
+  describe("a directory held against itself", () => {
+    const it = test.extend("verdictOnADirectoryHeldAgainstItself", ({}, { onCleanup }) => {
+      const root = mkdtempSync(join(tmpdir(), "setup-modules-package-entries-"));
+      onCleanup(() => {
+        rmSync(root, { recursive: true, force: true });
+      });
+      return isInsideDirectory({ path: root, directory: root });
+    });
+
+    it("is not inside itself", ({ verdictOnADirectoryHeldAgainstItself }) => {
+      expect(verdictOnADirectoryHeldAgainstItself).toBe(false);
+    });
   });
 });

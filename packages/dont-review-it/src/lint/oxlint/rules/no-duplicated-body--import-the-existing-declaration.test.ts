@@ -17,77 +17,90 @@ const subjectFilename = join(repositoryRoot, SUBJECT_PATH);
 
 const NODES_IN_A_REPORTED_BODY = 8;
 
-const indexWith = (fingerprintOfSubject: string, fingerprintOfOther: string) =>
-  buildBodyIndex([
-    {
-      relativePath: SUBJECT_PATH,
-      bodies: [
-        {
-          name: "twice",
-          line: 1,
-          fingerprint: fingerprintOfSubject,
-          nodeCount: NODES_IN_A_REPORTED_BODY,
-        },
-      ],
-    },
-    {
-      relativePath: OTHER_PATH,
-      bodies: [
-        {
-          name: "doubled",
-          line: 7,
-          fingerprint: fingerprintOfOther,
-          nodeCount: NODES_IN_A_REPORTED_BODY,
-        },
-      ],
-    },
-  ]);
-
-const ruleWith = (fingerprintOfSubject: string, fingerprintOfOther: string) =>
-  createNoDuplicatedBody({
-    loadIndex: () => indexWith(fingerprintOfSubject, fingerprintOfOther),
-  });
-
-const bodyAt = (line: number, fingerprint: string) => ({
-  name: "twice",
-  line,
-  fingerprint,
-  nodeCount: NODES_IN_A_REPORTED_BODY,
-});
-
-const ruleReading = (index: BodyIndex) => createNoDuplicatedBody({ loadIndex: () => index });
-
-const offPageBodyRule = ruleReading({
-  bodiesByPath: new Map([[SUBJECT_PATH, [bodyAt(99, "shared")]]]),
-  sitesByFingerprint: new Map([
-    [
-      "shared",
+const offPageBodyRule = createNoDuplicatedBody({
+  loadIndex: (): BodyIndex => ({
+    bodiesByPath: new Map([
       [
-        { relativePath: SUBJECT_PATH, name: "twice", line: 99 },
-        { relativePath: OTHER_PATH, name: "doubled", line: 7 },
+        SUBJECT_PATH,
+        [{ name: "twice", line: 99, fingerprint: "shared", nodeCount: NODES_IN_A_REPORTED_BODY }],
       ],
-    ],
-  ]),
-  sitesByNamedFingerprint: new Map(),
+    ]),
+    sitesByFingerprint: new Map([
+      [
+        "shared",
+        [
+          { relativePath: SUBJECT_PATH, name: "twice", line: 99 },
+          { relativePath: OTHER_PATH, name: "doubled", line: 7 },
+        ],
+      ],
+    ]),
+    sitesByNamedFingerprint: new Map(),
+  }),
 });
 
-const unlistedFingerprintRule = ruleReading({
-  bodiesByPath: new Map([[SUBJECT_PATH, [bodyAt(1, "unlisted")]]]),
-  sitesByFingerprint: new Map(),
-  sitesByNamedFingerprint: new Map(),
+const unlistedFingerprintRule = createNoDuplicatedBody({
+  loadIndex: (): BodyIndex => ({
+    bodiesByPath: new Map([
+      [
+        SUBJECT_PATH,
+        [{ name: "twice", line: 1, fingerprint: "unlisted", nodeCount: NODES_IN_A_REPORTED_BODY }],
+      ],
+    ]),
+    sitesByFingerprint: new Map(),
+    sitesByNamedFingerprint: new Map(),
+  }),
 });
 
-const soleSiteRule = ruleReading({
-  bodiesByPath: new Map([[SUBJECT_PATH, [bodyAt(1, "shared")]]]),
-  sitesByFingerprint: new Map([
-    ["shared", [{ relativePath: SUBJECT_PATH, name: "twice", line: 1 }]],
-  ]),
-  sitesByNamedFingerprint: new Map(),
+const soleSiteRule = createNoDuplicatedBody({
+  loadIndex: (): BodyIndex => ({
+    bodiesByPath: new Map([
+      [
+        SUBJECT_PATH,
+        [{ name: "twice", line: 1, fingerprint: "shared", nodeCount: NODES_IN_A_REPORTED_BODY }],
+      ],
+    ]),
+    sitesByFingerprint: new Map([
+      ["shared", [{ relativePath: SUBJECT_PATH, name: "twice", line: 1 }]],
+    ]),
+    sitesByNamedFingerprint: new Map(),
+  }),
 });
 
-const sharedBodyRule = ruleWith("shared", "shared");
+const sharedBodyRule = createNoDuplicatedBody({
+  loadIndex: () =>
+    buildBodyIndex([
+      {
+        relativePath: SUBJECT_PATH,
+        bodies: [
+          { name: "twice", line: 1, fingerprint: "shared", nodeCount: NODES_IN_A_REPORTED_BODY },
+        ],
+      },
+      {
+        relativePath: OTHER_PATH,
+        bodies: [
+          { name: "doubled", line: 7, fingerprint: "shared", nodeCount: NODES_IN_A_REPORTED_BODY },
+        ],
+      },
+    ]),
+});
 
-const distinctBodyRule = ruleWith("subject", "other");
+const distinctBodyRule = createNoDuplicatedBody({
+  loadIndex: () =>
+    buildBodyIndex([
+      {
+        relativePath: SUBJECT_PATH,
+        bodies: [
+          { name: "twice", line: 1, fingerprint: "subject", nodeCount: NODES_IN_A_REPORTED_BODY },
+        ],
+      },
+      {
+        relativePath: OTHER_PATH,
+        bodies: [
+          { name: "doubled", line: 7, fingerprint: "other", nodeCount: NODES_IN_A_REPORTED_BODY },
+        ],
+      },
+    ]),
+});
 
 describe("dont-review-it/no-duplicated-body--import-the-existing-declaration", () => {
   testLintRule(distinctBodyRule, {

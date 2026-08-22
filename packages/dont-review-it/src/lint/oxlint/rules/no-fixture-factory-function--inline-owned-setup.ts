@@ -1,5 +1,5 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
-import { resolveBinding, type ScopeLookup } from "../lib/resolved-bindings.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { isAssertionEntryCall } from "../lib/spec-syntax/assertion-entries.ts";
 import {
   fixtureDeclarationsOf,
@@ -22,11 +22,12 @@ import {
 } from "../lib/spec-syntax/subject-expressions.ts";
 import {
   declaresTestBlock,
-  testBlockBindings,
+  testBlockRootNames,
   testCallbacksOf,
 } from "../lib/spec-syntax/test-block-declarations.ts";
 
-import type { ESTree, Options } from "@oxlint/plugins";
+import type { ESTree, Options, Reference, Scope } from "@oxlint/plugins";
+import type { ScopeLookup } from "../lib/resolved-bindings.ts";
 
 const THROW_EXPECTING_MATCHERS_OPTION = "throwExpectingMatchers";
 
@@ -49,8 +50,8 @@ type ThunkReading = {
   readonly scopeAt: ScopeLookup;
 };
 
-const throwExpectingMatchersFrom = (options: Readonly<Options>): ReadonlySet<string> => {
-  const [first] = options;
+const throwExpectingMatchersFrom = (ruleOptions: Readonly<Options>): ReadonlySet<string> => {
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) {
     return THROW_EXPECTING_MATCHERS;
   }
@@ -111,21 +112,22 @@ const handedBackFunctionOf = (input: {
     : handedBackFunctionOf({ subject: initializer, body, reached });
 };
 
+const referencesTo = (scope: Scope, spelled: string): readonly Reference[] =>
+  scope.variables.filter((bound) => bound.name === spelled).flatMap((bound) => bound.references);
+
 const readsOnlyDemandFailure = (dependency: FixtureDependency, reading: ThunkReading): boolean => {
   const { boundAs, property } = dependency;
   if (boundAs === null) return false;
 
-  return (
-    resolveBinding(reading.scopeAt(property.value), boundAs)?.references.every(
-      (reference) => !reference.isWrite() && reading.throwSubjects.has(reference.identifier),
-    ) === true
+  return referencesTo(reading.scopeAt(property.value), boundAs).every(
+    (reference) => !reference.isWrite() && reading.throwSubjects.has(reference.identifier),
   );
 };
 
-const isDemandedFailureThunk = (name: string, reading: ThunkReading): boolean =>
-  !reading.handedOn.has(name) &&
+const isDemandedFailureThunk = (fixtureName: string, reading: ThunkReading): boolean =>
+  !reading.handedOn.has(fixtureName) &&
   reading.takenApart
-    .filter((dependency) => dependency.name === name)
+    .filter((dependency) => dependency.name === fixtureName)
     .every((dependency) => readsOnlyDemandFailure(dependency, reading));
 
 const reportForSubject = (input: {
@@ -189,28 +191,18 @@ export const noFixtureFactoryFunction = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    if (!isSpecFile(context.filename, specFileSuffixesFrom(context.options))) return {};
+  create(inspection) {
+    if (!isSpecFile(inspection.filename, specFileSuffixesFrom(inspection.options))) return {};
 
-    const matchers = throwExpectingMatchersFrom(context.options);
-    const bindings = testBlockBindings();
-    const calls = new Set<ESTree.CallExpression>();
+    const matchers = throwExpectingMatchersFrom(inspection.options);
 
     return {
-      ImportDeclaration(node: ESTree.ImportDeclaration) {
-        bindings.takeImport(node);
-      },
-      VariableDeclarator(node: ESTree.VariableDeclarator) {
-        bindings.takeLocalBinding(node);
-      },
-      CallExpression(node: ESTree.CallExpression) {
-        calls.add(node);
-      },
-      "Program:exit"() {
-        const rootNames = bindings.rootNames();
-        const declarations = [...calls].flatMap((call) => fixtureDeclarationsOf(call));
+      "Program:exit"(program: ESTree.Program) {
+        const rootNames = testBlockRootNames(program);
+        const calls = nodesOfType(program, "CallExpression");
+        const declarations = calls.flatMap((call) => fixtureDeclarationsOf(call));
         const factories = declarations.flatMap(({ factory }) => factory ?? []);
-        const callbacks = [...calls]
+        const testCallbacks = calls
           .filter((call) => declaresTestBlock(call, rootNames))
           .flatMap((call) => testCallbacksOf(call));
 
@@ -220,17 +212,19 @@ export const noFixtureFactoryFunction = createDontReviewItRule({
               (fixtureDependenciesOf(factory) ?? []).map(({ name }) => name),
             ),
           ),
-          takenApart: callbacks.flatMap((callback) => fixtureDependenciesOf(callback) ?? []),
+          takenApart: testCallbacks.flatMap(
+            (testCallback) => fixtureDependenciesOf(testCallback) ?? [],
+          ),
           throwSubjects: new Set(
-            [...calls]
+            calls
               .flatMap((call) => assertedChainOf(call) ?? [])
               .filter((chain) => demandsFailure(chain, matchers))
               .flatMap((chain) => (chain.subject.type === "Identifier" ? [chain.subject] : [])),
           ),
-          scopeAt: (node) => context.sourceCode.getScope(node),
+          scopeAt: (node) => inspection.sourceCode.getScope(node),
         };
 
-        for (const report of reportsFor(declarations, reading)) context.report(report);
+        for (const report of reportsFor(declarations, reading)) inspection.report(report);
       },
     };
   },

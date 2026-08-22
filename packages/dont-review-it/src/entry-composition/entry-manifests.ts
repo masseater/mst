@@ -58,9 +58,9 @@ const manifestListingAt = ({
     return { manifests: [], failures: [unreadableFailureOf(relativePath)] };
   }
 
-  const errors: ParseError[] = [];
-  const tree = parseTree(manifestRead.source, errors);
-  return tree !== undefined && errors.length === 0 && tree.type === "object"
+  const failures: ParseError[] = [];
+  const tree = parseTree(manifestRead.source, failures);
+  return tree !== undefined && failures.length === 0 && tree.type === "object"
     ? {
         manifests: [{ relativePath, absolutePath, source: manifestRead.source, root: tree, layer }],
         failures: [],

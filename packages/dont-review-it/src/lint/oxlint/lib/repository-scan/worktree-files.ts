@@ -2,6 +2,7 @@ import { readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 import { readUnlessMissing } from "@mst/repository-checks";
+import { memoize } from "es-toolkit";
 
 import { toPosixPath } from "../posix-path.ts";
 
@@ -21,40 +22,41 @@ export type Worktree = {
   readonly unscannedDirectoryNames: ReadonlySet<string>;
 };
 
-export const unscannedDirectoryNamesFrom = (options: Context["options"]): ReadonlySet<string> => {
-  const declared = ((options[0] ?? {}) as { readonly unscannedDirectories?: readonly string[] })
+export const unscannedDirectoryNamesFrom = (
+  ruleOptions: Context["options"],
+): ReadonlySet<string> => {
+  const declared = ((ruleOptions[0] ?? {}) as { readonly unscannedDirectories?: readonly string[] })
     .unscannedDirectories;
   return declared === undefined ? UNSCANNED_DIRECTORY_NAMES : new Set(declared);
 };
 
 const filePathsUnder = (worktree: Worktree, directory: string): readonly string[] => {
-  const entries = readUnlessMissing(() => readdirSync(directory, { withFileTypes: true }));
-  if (entries === null) return [];
+  const directoryChildren = readUnlessMissing(() =>
+    readdirSync(directory, { withFileTypes: true }),
+  );
+  if (directoryChildren === null) return [];
 
-  return entries.flatMap((entry) => {
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) {
-      return worktree.unscannedDirectoryNames.has(entry.name) ? [] : filePathsUnder(worktree, path);
+  return directoryChildren.flatMap((directoryChild) => {
+    const path = join(directory, directoryChild.name);
+    if (directoryChild.isDirectory()) {
+      return worktree.unscannedDirectoryNames.has(directoryChild.name)
+        ? []
+        : filePathsUnder(worktree, path);
     }
-    return entry.isFile() ? [toPosixPath(relative(worktree.root, path))] : [];
+    return directoryChild.isFile() ? [toPosixPath(relative(worktree.root, path))] : [];
   });
 };
-
-const filePathsByWorktree = new Map<string, readonly string[]>();
 
 const worktreeKeyOf = (worktree: Worktree): string =>
   [worktree.root, ...[...worktree.unscannedDirectoryNames].toSorted()].join("\n");
 
-export const worktreeFilePathsUnder = (asked: Worktree): readonly string[] => {
-  const worktree: Worktree = {
+const scannedFilePathsUnder = memoize(
+  (worktree: Worktree): readonly string[] => filePathsUnder(worktree, worktree.root).toSorted(),
+  { getCacheKey: worktreeKeyOf },
+);
+
+export const worktreeFilePathsUnder = (asked: Worktree): readonly string[] =>
+  scannedFilePathsUnder({
     root: resolve(asked.root),
     unscannedDirectoryNames: asked.unscannedDirectoryNames,
-  };
-  const key = worktreeKeyOf(worktree);
-  const memoized = filePathsByWorktree.get(key);
-  if (memoized !== undefined) return memoized;
-
-  const scanned = filePathsUnder(worktree, worktree.root).toSorted();
-  filePathsByWorktree.set(key, scanned);
-  return scanned;
-};
+  });

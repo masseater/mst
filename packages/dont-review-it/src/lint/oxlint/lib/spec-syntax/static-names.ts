@@ -13,10 +13,10 @@ export const staticSpelling = (node: ESTree.Expression): string | null => {
   return onlyQuasi === undefined || substituted ? null : onlyQuasi.value.cooked;
 };
 
-const spelledOutKey = (key: ESTree.PropertyKey, computed: boolean): string | null => {
-  if (key.type === "PrivateIdentifier") return null;
-  if (key.type === "Identifier") return computed ? null : key.name;
-  return staticSpelling(key);
+const spelledOutKey = (named: ESTree.PropertyKey, computed: boolean): string | null => {
+  if (named.type === "PrivateIdentifier") return null;
+  if (named.type === "Identifier") return computed ? null : named.name;
+  return staticSpelling(named);
 };
 
 export const staticMemberName = (node: ESTree.MemberExpression): string | null =>

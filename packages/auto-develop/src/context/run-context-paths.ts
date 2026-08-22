@@ -1,12 +1,14 @@
 import { join } from "node:path";
 
+import { DECLARED_MODE } from "../contract/vocabulary.ts";
+
 import type { Mode } from "./run-context.ts";
 
 const WORKFLOW_ROOT = ".repo-workflow";
 
 const RUN_ROOT_DIRECTORY: Readonly<Record<Mode, string>> = {
   reviewer: "review",
-  author: "author",
+  author: DECLARED_MODE.author,
 };
 
 const timestampSlug = (isoTime: string): string =>

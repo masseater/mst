@@ -1,30 +1,32 @@
 import { testLintRule } from "@mst/lint-rule-authoring";
-import { describe, expect, test } from "vite-plus/test";
+import { describe, expect, it } from "vite-plus/test";
 
 import { noPartialCoverageSourceUniverse } from "./no-partial-coverage-source-universe--include-production-files.ts";
 
-const configFor = (coverage: string): string =>
-  `import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { coverage: ${coverage} } });\n`;
+const CONFIG_PREFIX =
+  'import { defineConfig } from "vite-plus";\nexport default defineConfig({ test: { coverage: ';
+
+const CONFIG_SUFFIX = " } });\n";
+
+const optionsSchema = noPartialCoverageSourceUniverse.meta.schema;
 
 describe("dont-review-it/no-partial-coverage-source-universe--include-production-files", () => {
   testLintRule(noPartialCoverageSourceUniverse, {
     valid: [
       {
         name: "the production source root is included explicitly",
-        code: configFor(`{ include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"] }`),
+        code: `${CONFIG_PREFIX}{ include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"] }${CONFIG_SUFFIX}`,
         filename: "vite.config.ts",
       },
       {
         name: "a repository can declare its own production roots through the rule option",
-        code: configFor(`{ include: ["lib/**/*.ts", "app/**/*.tsx"] }`),
+        code: `${CONFIG_PREFIX}{ include: ["lib/**/*.ts", "app/**/*.tsx"] }${CONFIG_SUFFIX}`,
         filename: "vitest.config.ts",
         options: [{ include: ["lib/**/*.ts", "app/**/*.tsx"] }],
       },
       {
         name: "extra roots do not remove the required production root",
-        code: configFor(
-          `{ include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}", "scripts/**/*.ts"] }`,
-        ),
+        code: `${CONFIG_PREFIX}{ include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}", "scripts/**/*.ts"] }${CONFIG_SUFFIX}`,
         filename: "vite.config.mts",
       },
       {
@@ -64,7 +66,7 @@ describe("dont-review-it/no-partial-coverage-source-universe--include-production
       },
       {
         name: "an empty rule option keeps the default production root",
-        code: configFor(`{ include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"] }`),
+        code: `${CONFIG_PREFIX}{ include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"] }${CONFIG_SUFFIX}`,
         filename: "vite.config.ts",
         options: [{}],
       },
@@ -107,30 +109,28 @@ describe("dont-review-it/no-partial-coverage-source-universe--include-production
     invalid: [
       {
         name: "coverage without an include pattern omits unimported source",
-        code: configFor("{ thresholds: { 100: true, perFile: true } }"),
+        code: `${CONFIG_PREFIX}{ thresholds: { 100: true, perFile: true } }${CONFIG_SUFFIX}`,
         filename: "vite.config.ts",
         errors: [{ messageId: "missingProductionSourcePattern" }],
-        output: configFor(
-          `{ thresholds: { 100: true, perFile: true }, include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"] }`,
-        ),
+        output: `${CONFIG_PREFIX}{ thresholds: { 100: true, perFile: true }, include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"] }${CONFIG_SUFFIX}`,
       },
       {
         name: "an empty include array receives the required production root",
-        code: configFor("{ include: [] }"),
+        code: `${CONFIG_PREFIX}{ include: [] }${CONFIG_SUFFIX}`,
         filename: "vite.config.ts",
         errors: [{ messageId: "missingProductionSourcePattern" }],
-        output: configFor(`{ include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"] }`),
+        output: `${CONFIG_PREFIX}{ include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"] }${CONFIG_SUFFIX}`,
       },
       {
         name: "an empty coverage object receives every configured production root",
-        code: configFor("{}"),
+        code: `${CONFIG_PREFIX}{}${CONFIG_SUFFIX}`,
         filename: "vite.config.ts",
         options: [{ include: ["lib/**/*.ts", "app/**/*.tsx"] }],
         errors: [
           { messageId: "missingProductionSourcePattern" },
           { messageId: "missingProductionSourcePattern" },
         ],
-        output: configFor(`{include: ["lib/**/*.ts", "app/**/*.tsx"]}`),
+        output: `${CONFIG_PREFIX}{include: ["lib/**/*.ts", "app/**/*.tsx"]}${CONFIG_SUFFIX}`,
       },
       {
         name: "a static config without coverage reports every required source root",
@@ -145,65 +145,57 @@ describe("dont-review-it/no-partial-coverage-source-universe--include-production
       },
       {
         name: "a dynamic include cannot prove which source files are measured",
-        code: `const sourceFiles = ["src/**/*.ts"];\n${configFor("{ include: sourceFiles }")}`,
+        code: `const sourceFiles = ["src/**/*.ts"];\n${CONFIG_PREFIX}{ include: sourceFiles }${CONFIG_SUFFIX}`,
         filename: "vitest.config.ts",
         errors: [{ messageId: "dynamicCoverageConfiguration" }],
         output: null,
       },
       {
         name: "non-string array entries leave the effective source universe dynamic",
-        code: `const sourcePattern = "src/**/*.ts";\n${configFor("{ include: [sourcePattern, 42] }")}`,
+        code: `const sourcePattern = "src/**/*.ts";\n${CONFIG_PREFIX}{ include: [sourcePattern, 42] }${CONFIG_SUFFIX}`,
         filename: "vitest.config.ts",
         errors: [{ messageId: "dynamicCoverageConfiguration" }],
         output: null,
       },
       {
         name: "spread and empty include entries leave the effective source universe dynamic",
-        code: `const patterns = ["src/**/*.ts"];\n${configFor("{ include: [...patterns, ,] }")}`,
+        code: `const patterns = ["src/**/*.ts"];\n${CONFIG_PREFIX}{ include: [...patterns, ,] }${CONFIG_SUFFIX}`,
         filename: "vitest.config.ts",
         errors: [{ messageId: "dynamicCoverageConfiguration" }],
         output: null,
       },
       {
         name: "each missing configured root is reported",
-        code: configFor(`{ include: ["lib/**/*.ts"] }`),
+        code: `${CONFIG_PREFIX}{ include: ["lib/**/*.ts"] }${CONFIG_SUFFIX}`,
         filename: "vite.config.mts",
         options: [{ include: ["lib/**/*.ts", "app/**/*.tsx"] }],
         errors: [{ messageId: "missingProductionSourcePattern" }],
-        output: configFor(`{ include: ["lib/**/*.ts", "app/**/*.tsx"] }`),
+        output: `${CONFIG_PREFIX}{ include: ["lib/**/*.ts", "app/**/*.tsx"] }${CONFIG_SUFFIX}`,
       },
       {
         name: "an explicit exclusion can remove a production file from the denominator",
-        code: configFor(
-          `{ include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"], exclude: ["src/generated.ts"] }`,
-        ),
+        code: `${CONFIG_PREFIX}{ include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"], exclude: ["src/generated.ts"] }${CONFIG_SUFFIX}`,
         filename: "vite.config.ts",
         errors: [{ messageId: "excludedCoverageSource" }],
         output: null,
       },
       {
         name: "a negated include can subtract a file from an otherwise complete root",
-        code: configFor(
-          `{ include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}", "!src/uncovered.ts"] }`,
-        ),
+        code: `${CONFIG_PREFIX}{ include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}", "!src/uncovered.ts"] }${CONFIG_SUFFIX}`,
         filename: "vite.config.ts",
         errors: [{ messageId: "negatedCoveragePattern" }],
         output: null,
       },
       {
         name: "a coverage spread can override include or introduce an exclusion",
-        code: `const shared = {};\n${configFor(
-          `{ include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"], ...shared }`,
-        )}`,
+        code: `const shared = {};\n${CONFIG_PREFIX}{ include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"], ...shared }${CONFIG_SUFFIX}`,
         filename: "vite.config.ts",
         errors: [{ messageId: "dynamicCoverageConfiguration" }],
         output: null,
       },
       {
         name: "a computed coverage property can override the declared source universe",
-        code: `const key = "exclude";\n${configFor(
-          `{ include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"], [key]: ["src/uncovered.ts"] }`,
-        )}`,
+        code: `const key = "exclude";\n${CONFIG_PREFIX}{ include: ["src/**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"], [key]: ["src/uncovered.ts"] }${CONFIG_SUFFIX}`,
         filename: "vite.config.ts",
         errors: [{ messageId: "dynamicCoverageConfiguration" }],
         output: null,
@@ -365,8 +357,8 @@ describe("dont-review-it/no-partial-coverage-source-universe--include-production
     ],
   });
 
-  test("the option schema refuses empty and negated required patterns", () => {
-    expect(noPartialCoverageSourceUniverse.meta.schema).toStrictEqual([
+  it("the option schema refuses empty and negated required patterns", () => {
+    expect(optionsSchema).toStrictEqual([
       {
         type: "object",
         properties: {

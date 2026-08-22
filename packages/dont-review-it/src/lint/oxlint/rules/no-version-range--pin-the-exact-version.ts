@@ -22,10 +22,12 @@ const dataOf = ({ packageName, declaredVersion }: DeclaredDependency): Record<st
   declaredVersion,
 });
 
-const intentionalRangesFrom = (options: Context["options"]): ReadonlySet<string> =>
-  new Set(
-    ((options[0] ?? {}) as { readonly intentionalRanges?: readonly string[] }).intentionalRanges,
-  );
+const intentionalRangesFrom = (ruleOptions: Context["options"]): ReadonlySet<string> => {
+  const intentionalRanges = (
+    (ruleOptions[0] ?? {}) as { readonly intentionalRanges?: readonly string[] }
+  ).intentionalRanges;
+  return intentionalRanges === undefined ? new Set() : new Set(intentionalRanges);
+};
 
 export const createNoVersionRange = ({
   loadWorkspaces,
@@ -47,7 +49,7 @@ export const createNoVersionRange = ({
         rangedManifestVersion:
           "A dependency version that matches more than one release must not stand in a manifest. `{{packageName}}` is declared as `{{declaredVersion}}` in `{{workspace}}`. Write the single release this repository installs in place of the range.",
         rangedCatalogVersion:
-          "A catalog entry that matches more than one release is forbidden. `{{packageName}}` is registered as `{{declaredVersion}}`. Write the single release this repository installs in place of the range.",
+          "A catalog listed that matches more than one release is forbidden. `{{packageName}}` is registered as `{{declaredVersion}}`. Write the single release this repository installs in place of the range.",
       },
       schema: [
         {
@@ -59,8 +61,8 @@ export const createNoVersionRange = ({
         },
       ],
     },
-    create(context: Context) {
-      const intentionalRanges = intentionalRangesFrom(context.options);
+    create(carried: Context) {
+      const intentionalRanges = intentionalRangesFrom(carried.options);
 
       const reportManifest = ({
         node,
@@ -74,7 +76,7 @@ export const createNoVersionRange = ({
           intentionalRanges,
         });
         for (const declaration of index.get(declaring.relativeDir) ?? []) {
-          context.report({
+          carried.report({
             node,
             messageId: "rangedManifestVersion",
             data: { ...dataOf(declaration), workspace: declaring.relativeDir },
@@ -89,18 +91,18 @@ export const createNoVersionRange = ({
         readonly node: ESTree.Program;
         readonly repositoryRoot: string;
       }): void => {
-        const entries = rangedCatalogEntries({
+        const listedEntries = rangedCatalogEntries({
           catalogEntries: loadCatalog({ repositoryRoot }),
           intentionalRanges,
         });
-        for (const entry of entries) {
-          context.report({ node, messageId: "rangedCatalogVersion", data: dataOf(entry) });
+        for (const listed of listedEntries) {
+          carried.report({ node, messageId: "rangedCatalogVersion", data: dataOf(listed) });
         }
       };
 
       return {
         Program(node: ESTree.Program) {
-          const declaring = declaringWorkspaceOf(context);
+          const declaring = declaringWorkspaceOf(carried);
           if (declaring === null) return;
 
           reportManifest({ node, declaring });

@@ -1,16 +1,13 @@
 ---
 name: core
 description: >
-  Author a custom oxlint rule with @mst/lint-rule-authoring:
-  createWorkspaceLintRule factory, testLintRule tester, LINT_SEVERITY
-  vocabulary, report-message discipline, and the docs-file pathing the
-  factory appends. Load when writing or changing a lint rule, writing its
-  report messages, testing it, or registering it in a preset.
+  Author a custom oxlint rule with @mst/lint-rule-authoring: createWorkspaceLintRule factory, testLintRule tester, LINT_SEVERITY vocabulary, report-message discipline, and the docs-file pathing the factory appends. Load when writing or changing a lint rule, writing its report messages, testing it, or registering it in a preset.
 metadata:
   type: core
   library: "@mst/lint-rule-authoring"
   library_version: "0.0.0"
 sources:
+  - "masseater/mst:packages/lint-rule-authoring/src/run-cli.ts"
   - "masseater/mst:packages/lint-rule-authoring/src/create-workspace-lint-rule.ts"
   - "masseater/mst:packages/lint-rule-authoring/src/rule-tester.ts"
   - "masseater/mst:packages/lint-rule-authoring/AGENTS.md"
@@ -18,11 +15,13 @@ sources:
 
 # @mst/lint-rule-authoring — author a lint rule
 
-A rule is one unit made of three files that stay together: the
-implementation, its test beside it, and its prose document under
-`docs/lint/`. The factory wires the three: it fills `meta.docs.url` from
-the workspace path and rule name, and appends the repository-relative
-docs path to every report message. The author never writes that path.
+A rule is one unit made of three files that stay together: the implementation, its test beside it, and its prose document under `docs/lint/`. The factory wires the three: it fills `meta.docs.url` from the workspace path and rule name, and appends the repository-relative docs path to every report message. The author never writes that path.
+
+Regenerate every declared rule index after adding, deleting, or renaming a rule:
+
+```sh
+vp exec lint-rule-authoring check --write --repository-root .
+```
 
 ## Setup
 
@@ -65,16 +64,11 @@ export const noDefaultExport = createDontReviewItRule({
 });
 ```
 
-The rule name doubles as its file name and its docs file name:
-`src/lint/oxlint/rules/<name>.ts` and `docs/lint/<name>.md`.
+The rule name doubles as its file name and its docs file name: `src/lint/oxlint/rules/<name>.ts` and `docs/lint/<name>.md`.
 
 ### Write the report message
 
-A message is the prohibition and the imperative fix, in English, nothing
-else. State the prohibition with `must not` or `is forbidden`, then start
-the fix with an imperative verb. The reasoning, the case analysis, and the
-examples live in the docs file; the factory appends its path to the
-message.
+A message is the prohibition and the imperative fix, in English, nothing else. State the prohibition with `must not` or `is forbidden`, then start the fix with an imperative verb. The reasoning, the case analysis, and the examples live in the docs file; the factory appends its path to the message.
 
 ### Test the rule beside it
 
@@ -95,9 +89,7 @@ testLintRule(noDefaultExport, {
 });
 ```
 
-The file sits in the same directory as the rule, named
-`<rule-file>.test.ts`. The valid side must include the boundaries the rule
-is likely to misfire on; every invalid case names its expected messageId.
+The file sits in the same directory as the rule, named `<rule-file>.test.ts`. The valid side must include the boundaries the rule is likely to misfire on; every invalid case names its expected messageId.
 
 ### Register the rule at error severity
 
@@ -109,8 +101,7 @@ rules: {
 },
 ```
 
-Fix every violation the new rule reports before merging it. Demoting to
-warn is a decision a human makes, never a default.
+Fix every violation the new rule reports before merging it. Demoting to warn is a decision a human makes, never a default.
 
 ## Common Mistakes
 
@@ -128,9 +119,7 @@ Correct:
 const objectLiteralOf = (node) => (node.type === "ObjectExpression" ? node : null);
 ```
 
-oxlint strips parentheses before handing the AST to js plugins, so the
-branch is unreachable; the type only mentions the node because the AST
-definition is shared with `oxc-parser`, where it does appear.
+oxlint strips parentheses before handing the AST to js plugins, so the branch is unreachable; the type only mentions the node because the AST definition is shared with `oxc-parser`, where it does appear.
 
 Source: masseater/mst:.claude/rules/ai-generated/gotchas.md
 
@@ -154,9 +143,7 @@ messages: {
 },
 ```
 
-A reason pushes the fix instruction out of the first line, and a
-conditional fix returns the decision to the reader; both belong in the
-docs file the factory already points at.
+A reason pushes the fix instruction out of the first line, and a conditional fix returns the decision to the reader; both belong in the docs file the factory already points at.
 
 Source: masseater/mst:packages/lint-rule-authoring/AGENTS.md
 
@@ -176,8 +163,7 @@ vp lint src/wiring-probe.ts
 rm src/wiring-probe.ts
 ```
 
-`--print-config` never lists js plugin rules, so the diff around adding one
-is always empty; only a violating probe file proves the rule fires.
+`--print-config` never lists js plugin rules, so the diff around adding one is always empty; only a violating probe file proves the rule fires.
 
 Source: masseater/mst:.claude/rules/ai-generated/gotchas.md
 
@@ -195,8 +181,7 @@ Correct:
 rules: { "dont-review-it/my-new-rule": LINT_SEVERITY.ERROR },
 ```
 
-warn is defined as ignorable without asking a human, so a rule introduced
-at warn enforces nothing from its first day.
+warn is defined as ignorable without asking a human, so a rule introduced at warn enforces nothing from its first day.
 
 Source: masseater/mst:CLAUDE.md
 
@@ -215,12 +200,10 @@ src/lint/oxlint/rules/no-default-export--use-named-export.ts
 src/lint/oxlint/rules/no-default-export--use-named-export.test.ts
 ```
 
-A test detached from its rule stops moving with it, and the placement
-rules report both the directory and the `.spec.ts` suffix.
+A test detached from its rule stops moving with it, and the placement rules report both the directory and the `.spec.ts` suffix.
 
 Source: masseater/mst:packages/lint-rule-authoring/AGENTS.md
 
 ## See also
 
-- `packages/dont-review-it/skills/core` — the preset that registers rules
-  built with this factory, and how to verify the wiring.
+- `packages/dont-review-it/skills/core` — the preset that registers rules built with this factory, and how to verify the wiring.

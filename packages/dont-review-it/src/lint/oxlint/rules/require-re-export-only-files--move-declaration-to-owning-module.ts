@@ -11,14 +11,14 @@ const isDirectReExport = (node: ESTree.Program["body"][number]): boolean =>
   (node.type === "ExportNamedDeclaration" && node.source !== null);
 
 const patternsFrom = (
-  options: Readonly<Options>,
-  key: "targets" | "exclude",
+  ruleOptions: Readonly<Options>,
+  named: "targets" | "exclude",
 ): readonly string[] => {
-  const [first] = options;
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) return [];
-  const patterns = first[key];
+  const patterns = first[named];
   if (!Array.isArray(patterns)) return [];
-  return patterns.filter((entry): entry is string => typeof entry === "string");
+  return patterns.filter((candidate): candidate is string => typeof candidate === "string");
 };
 
 export const requireReExportOnlyFiles = createDontReviewItRule({
@@ -48,29 +48,30 @@ export const requireReExportOnlyFiles = createDontReviewItRule({
       },
     ],
   },
-  create(context) {
-    const targets = patternsFrom(context.options, "targets");
-    if (targets.length === 0) return {};
+  create(inspection) {
+    const checkedTargets = patternsFrom(inspection.options, "targets");
+    if (checkedTargets.length === 0) return {};
 
-    const exclude = patternsFrom(context.options, "exclude");
+    const exclude = patternsFrom(inspection.options, "exclude");
 
     return {
       Program(node: ESTree.Program) {
         const pathSegments = segmentsOf({
-          path: resolve(context.cwd, context.filename),
+          path: resolve(inspection.cwd, inspection.filename),
           separator: sep,
         });
-        const { cwd } = context;
-        if (!targets.some((pattern) => matchesGlobPath({ pathSegments, pattern, cwd }))) return;
+        const { cwd } = inspection;
+        if (!checkedTargets.some((pattern) => matchesGlobPath({ pathSegments, pattern, cwd })))
+          return;
         if (exclude.some((pattern) => matchesGlobPath({ pathSegments, pattern, cwd }))) return;
 
         if (!node.body.some(isDirectReExport)) {
-          context.report({ node, messageId: "missingReExport" });
+          inspection.report({ node, messageId: "missingReExport" });
         }
 
         for (const statement of node.body) {
           if (isDirectReExport(statement)) continue;
-          context.report({ node: statement, messageId: "extraStatement" });
+          inspection.report({ node: statement, messageId: "extraStatement" });
         }
       },
     };

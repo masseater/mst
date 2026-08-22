@@ -1,7 +1,7 @@
 import { readTextFile } from "../canonical-values/source-files.ts";
 import { repositoryFilesFor } from "../setup-modules/specifier-resolution.ts";
 
-import type { ImportedName } from "./receiver-types.ts";
+import type { ImportedName } from "../spec-syntax/module-declarations.ts";
 
 export type ClassModule = {
   readonly path: string;
@@ -14,13 +14,13 @@ const classModulesAt = (paths: readonly string[]): readonly ClassModule[] =>
     return found === null ? [] : [{ path, source: found }];
   });
 
-export const classModulesFor = (request: {
+export const classModulesFor = (asked: {
   readonly file: string;
   readonly source: string;
   readonly workspaceRoot: string;
   readonly imported: ImportedName | null;
 }): readonly ClassModule[] => {
-  const { file, source, workspaceRoot, imported } = request;
+  const { file, source, workspaceRoot, imported } = asked;
   if (imported === null) return [{ path: file, source }];
 
   return classModulesAt(

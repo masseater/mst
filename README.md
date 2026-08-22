@@ -6,7 +6,7 @@
 
 mst は、リポジトリ運用の仕組み（開発フロー、チェック体系、エージェント向けの文脈整備など）を、他のプロジェクトでも使える単位に切り出して整備していく先です。
 
-現時点では Vite+ による monorepo の土台が立ったところで、仕組みの整備そのものはこれからです。どのワークスペースがあるかは [docs/workspaces.md](./docs/workspaces.md) を参照してください（`pnpm-workspace.yaml` から生成されます）。
+Vite+ による monorepo を土台として、lint preset、リポジトリ検査、検証済み仕様、エージェント向け文書、AI 支援ワークフローを各ワークスペースで提供しています。構成と役割は [docs/workspaces.md](./docs/workspaces.md) を参照してください（`pnpm-workspace.yaml` から生成されます）。
 
 詳細な構成・アーキテクチャ・開発上の注意事項は `AGENTS.md` を参照してください。
 
@@ -31,6 +31,7 @@ vp install
 ```
 
 > [!IMPORTANT]
+>
 > `vp` を npm 経由（`npm i -g vite-plus`、mise の `npm:vite-plus` など）でグローバル導入すると、`vp test` が二重インスタンスになって失敗します。必ず上記の公式インストーラを使ってください。上流でも [voidzero-dev/vite-plus#2097](https://github.com/voidzero-dev/vite-plus/issues/2097) で、npm でのグローバルインストールはサポート対象外だと明言されています。
 
 ## Project Dependencies

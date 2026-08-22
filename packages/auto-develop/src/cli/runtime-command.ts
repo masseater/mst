@@ -2,10 +2,10 @@ import { EXIT_MISUSE } from "@mst/repository-checks";
 import { defineCommand } from "citty";
 
 import { runConfigSchema } from "../config/run-config.ts";
+import { DECLARED_MODE, type Mode } from "../contract/vocabulary.ts";
 import { createGitRunner } from "../runtime/node-adapters.ts";
 import { createBuildContextCommand, createBuildContextWriter } from "./build-context-command.ts";
 
-import type { Mode } from "../contract/vocabulary.ts";
 import type { ModeRunRequest } from "./run-mode.ts";
 
 const DEFAULT_CONCURRENCY = "3";
@@ -55,17 +55,17 @@ const prNumbersFrom = (raw: string | undefined): readonly number[] =>
     ? []
     : raw
         .split(",")
-        .map((entry) => Number(entry.trim()))
-        .filter((parsed) => Number.isInteger(parsed) && parsed > 0);
+        .map((listed) => Number(listed.trim()))
+        .filter((parsedNode) => Number.isInteger(parsedNode) && parsedNode > 0);
 
 const positiveIntegerFrom = (raw: string, fallback: number): number => {
-  const parsed = Number(raw);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+  const parsedNode = Number(raw);
+  return Number.isInteger(parsedNode) && parsedNode > 0 ? parsedNode : fallback;
 };
 
 type RuntimeCommandDependencies = {
-  readonly readEnvironment: (name: string) => string | undefined;
-  readonly runMode: (request: ModeRunRequest) => Promise<void>;
+  readonly readEnvironment: (variableName: string) => string | undefined;
+  readonly runMode: (asked: ModeRunRequest) => Promise<void>;
 };
 
 const startRuntime = async (start: {
@@ -116,15 +116,21 @@ const startRuntime = async (start: {
 
 export const createAutoDevelopCommand = (dependencies: RuntimeCommandDependencies) => {
   const reviewerCommand = defineCommand({
-    meta: { name: "reviewer", description: "Review pull requests as they are requested." },
+    meta: {
+      name: DECLARED_MODE.reviewer,
+      description: "Review pull requests as they are requested.",
+    },
     args: runtimeArgs,
-    run: ({ args }) => startRuntime({ mode: "reviewer", args, dependencies }),
+    run: ({ args }) => startRuntime({ mode: DECLARED_MODE.reviewer, args, dependencies }),
   });
 
   const authorCommand = defineCommand({
-    meta: { name: "author", description: "Answer review feedback, CI failures and base updates." },
+    meta: {
+      name: DECLARED_MODE.author,
+      description: "Answer review feedback, CI failures and base updates.",
+    },
     args: runtimeArgs,
-    run: ({ args }) => startRuntime({ mode: "author", args, dependencies }),
+    run: ({ args }) => startRuntime({ mode: DECLARED_MODE.author, args, dependencies }),
   });
 
   return defineCommand({

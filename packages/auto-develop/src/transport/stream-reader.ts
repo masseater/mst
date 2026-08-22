@@ -1,3 +1,4 @@
+import { ABORT_SIGNAL_EVENT } from "../runtime/event-names.ts";
 import { splitFrames } from "./sse-frames.ts";
 
 import type { FrameSink } from "./frame-sink.ts";
@@ -20,7 +21,7 @@ export const createStreamReader = (reading: {
         reject(new Error("SSE read timeout"));
       }, reading.readTimeoutMs);
       timeoutHalt.signal.addEventListener(
-        "abort",
+        ABORT_SIGNAL_EVENT.abort,
         () => {
           clearTimeout(timer);
         },
@@ -45,16 +46,19 @@ export const createStreamReader = (reading: {
   };
 
   return {
-    readStream: async (body) => {
-      const reader = body.getReader();
+    readStream: async (writtenBody) => {
+      const reader = writtenBody.getReader();
       const decoder = new TextDecoder();
-      const buffers = new Map<string, string>([["text", ""]]);
+      const bufferByStream = new Map<string, string>([["text", ""]]);
       try {
         for (;;) {
           if (!reading.isConnected()) return "client";
-          const chunk = await readChunk(reader);
-          if (chunk.done) return "server";
-          drainChunk({ buffers, decodedText: decoder.decode(chunk.value, { stream: true }) });
+          const writtenChunk = await readChunk(reader);
+          if (writtenChunk.done) return "server";
+          drainChunk({
+            buffers: bufferByStream,
+            decodedText: decoder.decode(writtenChunk.value, { stream: true }),
+          });
         }
       } finally {
         reader.releaseLock();

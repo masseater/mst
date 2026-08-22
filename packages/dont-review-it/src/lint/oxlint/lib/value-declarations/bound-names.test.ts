@@ -3,54 +3,95 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { boundNamesIn } from "./bound-names.ts";
 
-const namesBoundIn = (source: string): readonly string[] =>
-  [...boundNamesIn(parseSync("bound.ts", source).program.body)].toSorted();
-
 describe("boundNamesIn", () => {
-  test("takes the parameters of an arrow", () => {
-    expect(namesBoundIn(`const run = (step, count) => step + count;`)).toStrictEqual([
-      "count",
-      "run",
-      "step",
-    ]);
+  describe("an arrow taking two parameters", () => {
+    const it = test.extend("namesBoundByArrow", () =>
+      boundNamesIn(
+        parseSync("bound.ts", `const run = (step, count) => step + count;`).program.body,
+      ));
+
+    it("takes the parameters of an arrow", ({ namesBoundByArrow }) => {
+      expect(namesBoundByArrow).toStrictEqual(new Set(["run", "step", "count"]));
+    });
   });
 
-  test("takes the name and the parameters of a function declaration", () => {
-    expect(namesBoundIn(`function run(step) { return step; }`)).toStrictEqual(["run", "step"]);
+  describe("a function declaration", () => {
+    const it = test.extend("namesBoundByFunctionDeclaration", () =>
+      boundNamesIn(parseSync("bound.ts", `function run(step) { return step; }`).program.body));
+
+    it("takes the name and the parameters of a function declaration", ({
+      namesBoundByFunctionDeclaration,
+    }) => {
+      expect(namesBoundByFunctionDeclaration).toStrictEqual(new Set(["run", "step"]));
+    });
   });
 
-  test("takes the name of a class and of the bindings inside it", () => {
-    expect(namesBoundIn(`class Owner { run(step) { return step; } }`)).toStrictEqual([
-      "Owner",
-      "step",
-    ]);
+  describe("a class holding a method", () => {
+    const it = test.extend("namesBoundByClass", () =>
+      boundNamesIn(
+        parseSync("bound.ts", `class Owner { run(step) { return step; } }`).program.body,
+      ));
+
+    it("takes the name of a class and of the bindings inside it", ({ namesBoundByClass }) => {
+      expect(namesBoundByClass).toStrictEqual(new Set(["Owner", "step"]));
+    });
   });
 
-  test("takes the pieces a parameter is destructured into", () => {
-    expect(namesBoundIn(`const run = ({ id, seeds: [first, ...rest] = [] }) => id;`)).toStrictEqual(
-      ["first", "id", "rest", "run"],
-    );
+  describe("a parameter destructured into several names", () => {
+    const it = test.extend("namesBoundByDestructuredParameter", () =>
+      boundNamesIn(
+        parseSync("bound.ts", `const run = ({ id, seeds: [first, ...rest] = [] }) => id;`).program
+          .body,
+      ));
+
+    it("takes the pieces a parameter is destructured into", ({
+      namesBoundByDestructuredParameter,
+    }) => {
+      expect(namesBoundByDestructuredParameter).toStrictEqual(
+        new Set(["run", "id", "first", "rest"]),
+      );
+    });
   });
 
-  test("takes the binding a failure is caught into", () => {
-    expect(namesBoundIn(`try { run(); } catch (failure) { report(failure); }`)).toStrictEqual([
-      "failure",
-    ]);
+  describe("a catch clause", () => {
+    const it = test.extend("namesBoundByCatchClause", () =>
+      boundNamesIn(
+        parseSync("bound.ts", `try { run(); } catch (failure) { report(failure); }`).program.body,
+      ));
+
+    it("takes the binding a failure is caught into", ({ namesBoundByCatchClause }) => {
+      expect(namesBoundByCatchClause).toStrictEqual(new Set(["failure"]));
+    });
   });
 
-  test("takes the type parameter a declaration is written over", () => {
-    expect(namesBoundIn(`const run = <Held,>(held: Held) => held;`)).toStrictEqual([
-      "Held",
-      "held",
-      "run",
-    ]);
+  describe("a declaration written over a type parameter", () => {
+    const it = test.extend("namesBoundByTypeParameter", () =>
+      boundNamesIn(parseSync("bound.ts", `const run = <Held,>(held: Held) => held;`).program.body));
+
+    it("takes the type parameter a declaration is written over", ({
+      namesBoundByTypeParameter,
+    }) => {
+      expect(namesBoundByTypeParameter).toStrictEqual(new Set(["run", "Held", "held"]));
+    });
   });
 
-  test("leaves the type a parameter is annotated with out of the bindings", () => {
-    expect(namesBoundIn(`const run = ({ id }: Held) => id;`)).toStrictEqual(["id", "run"]);
+  describe("a parameter carrying a type annotation", () => {
+    const it = test.extend("namesBoundBesideTypeAnnotation", () =>
+      boundNamesIn(parseSync("bound.ts", `const run = ({ id }: Held) => id;`).program.body));
+
+    it("leaves the type a parameter is annotated with out of the bindings", ({
+      namesBoundBesideTypeAnnotation,
+    }) => {
+      expect(namesBoundBesideTypeAnnotation).toStrictEqual(new Set(["run", "id"]));
+    });
   });
 
-  test("leaves a name that is only read out of the bindings", () => {
-    expect(namesBoundIn(`report(readFileSync("x"));`)).toStrictEqual([]);
+  describe("a statement that only reads a name", () => {
+    const it = test.extend("namesBoundByPlainRead", () =>
+      boundNamesIn(parseSync("bound.ts", `report(readFileSync("x"));`).program.body));
+
+    it("leaves a name that is only read out of the bindings", ({ namesBoundByPlainRead }) => {
+      expect(namesBoundByPlainRead).toStrictEqual(new Set());
+    });
   });
 });

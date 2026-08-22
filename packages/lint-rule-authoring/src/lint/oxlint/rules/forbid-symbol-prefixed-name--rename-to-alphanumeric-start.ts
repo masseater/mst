@@ -3,12 +3,14 @@ import { symbolPrefixedSegmentsOf } from "../../../symbol-prefixed-segments.ts";
 
 import type { ESTree, Options } from "@oxlint/plugins";
 
-const allowedNamesFrom = (options: Readonly<Options>): readonly string[] => {
-  const [first] = options;
+const allowedNamesFrom = (ruleOptions: Readonly<Options>): readonly string[] => {
+  const [first] = ruleOptions;
   if (typeof first !== "object" || first === null || Array.isArray(first)) return [];
   const { allowedNames } = first;
   if (!Array.isArray(allowedNames)) return [];
-  return allowedNames.filter((entry): entry is string => typeof entry === "string");
+  return allowedNames.filter(
+    (allowedName): allowedName is string => typeof allowedName === "string",
+  );
 };
 
 export const forbidSymbolPrefixedName = createLintRuleAuthoringRule({
@@ -37,18 +39,18 @@ export const forbidSymbolPrefixedName = createLintRuleAuthoringRule({
       },
     ],
   },
-  create(context) {
-    const allowedNames = allowedNamesFrom(context.options);
+  create(inspection) {
+    const allowedNames = allowedNamesFrom(inspection.options);
 
     return {
       Program(node: ESTree.Program) {
         const offending = symbolPrefixedSegmentsOf({
-          location: { cwd: context.cwd, filename: context.filename },
+          location: { cwd: inspection.cwd, filename: inspection.filename },
           allowedNames,
         });
 
-        for (const { segment, path } of offending) {
-          context.report({
+        for (const [segment, path] of offending) {
+          inspection.report({
             node,
             messageId: "symbolPrefixedSegment",
             data: { segment, path },

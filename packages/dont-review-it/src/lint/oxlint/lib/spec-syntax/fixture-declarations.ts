@@ -31,25 +31,27 @@ export type FixtureDependency = {
 
 const HANDOFF_PARAMETER_INDEX = 1;
 
-const parameterNameAt = (fn: SpecFunction, index: number): string | null => {
-  const parameter = fn.params[index];
+const parameterNameAt = (takenFunction: SpecFunction, index: number): string | null => {
+  const parameter = takenFunction.params[index];
   if (parameter === undefined) return null;
   return parameter.type === "Identifier" ? parameter.name : null;
 };
 
-export const fixtureContextParameterName = (fn: SpecFunction): string | null =>
-  parameterNameAt(fn, 0);
+export const fixtureContextParameterName = (takenFunction: SpecFunction): string | null =>
+  parameterNameAt(takenFunction, 0);
 
-export const fixtureDependenciesOf = (fn: SpecFunction): readonly FixtureDependency[] | null => {
-  const [parameter] = fn.params;
+export const fixtureDependenciesOf = (
+  takenFunction: SpecFunction,
+): readonly FixtureDependency[] | null => {
+  const [parameter] = takenFunction.params;
   if (parameter?.type !== "ObjectPattern") return null;
 
   return parameter.properties.flatMap((property) => {
     if (property.type !== "Property") return [];
-    const name = staticPropertyName(property);
-    if (name === null) return [];
+    const spelled = staticPropertyName(property);
+    if (spelled === null) return [];
     const boundAs = property.value.type === "Identifier" ? property.value.name : null;
-    return [{ name, boundAs, property }];
+    return [{ name: spelled, boundAs, property }];
   });
 };
 
@@ -123,13 +125,13 @@ const objectDeclaration = ({
   };
 };
 
-const objectDeclarations = (object: ESTree.ObjectExpression): readonly FixtureDeclaration[] =>
-  object.properties.flatMap((property) => {
+const objectDeclarations = (holder: ESTree.ObjectExpression): readonly FixtureDeclaration[] =>
+  holder.properties.flatMap((property) => {
     if (property.type !== "Property") return [];
-    const name = staticPropertyName(property);
-    return name === null
+    const spelled = staticPropertyName(property);
+    return spelled === null
       ? []
-      : [objectDeclaration({ name, nameNode: property.key, written: property.value })];
+      : [objectDeclaration({ name: spelled, nameNode: property.key, written: property.value })];
   });
 
 export const fixtureDeclarationsOf = (
@@ -150,6 +152,6 @@ export const fixtureDeclarationsOf = (
     return [builderDeclaration({ name: declaredName, nameNode: head, rest })];
   }
 
-  const object = unwrapSubject(head);
-  return object.type === "ObjectExpression" ? objectDeclarations(object) : [];
+  const holder = unwrapSubject(head);
+  return holder.type === "ObjectExpression" ? objectDeclarations(holder) : [];
 };

@@ -2,93 +2,74 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { filterCheckSuiteEvent } from "./filter-check-suite.ts";
 
-const completedSuite = (conclusion: string) => ({
-  action: "completed",
-  check_suite: {
-    conclusion,
-    head_sha: "0a1b2c3",
-    pull_requests: [{ number: 7 }],
-  },
-});
-
-const it = test
-  .extend("failureVerdict", () => filterCheckSuiteEvent(completedSuite("failure"), "author"))
-  .extend("timedOutVerdict", () => filterCheckSuiteEvent(completedSuite("timed_out"), "author"))
-  .extend("startupFailureVerdict", () =>
-    filterCheckSuiteEvent(completedSuite("startup_failure"), "author"),
-  )
-  .extend("deliveryCarryingVerdict", () =>
-    filterCheckSuiteEvent({ ...completedSuite("failure"), delivery_id: "delivery-1" }, "author"),
-  )
-  .extend("multiPullVerdict", () =>
-    filterCheckSuiteEvent(
-      {
-        action: "completed",
-        check_suite: {
-          conclusion: "failure",
-          head_sha: "0a1b2c3",
-          pull_requests: [{ number: 7 }, { number: 8 }],
-        },
-      },
-      "author",
-    ),
-  )
-  .extend("successVerdict", () => filterCheckSuiteEvent(completedSuite("success"), "author"))
-  .extend("cancelledVerdict", () => filterCheckSuiteEvent(completedSuite("cancelled"), "author"))
-  .extend("reviewerModeVerdict", () => filterCheckSuiteEvent(completedSuite("failure"), "reviewer"))
-  .extend("requestedActionVerdict", () =>
-    filterCheckSuiteEvent({ ...completedSuite("failure"), action: "requested" }, "author"),
-  )
-  .extend("emptyPullsVerdict", () =>
-    filterCheckSuiteEvent(
-      {
-        action: "completed",
-        check_suite: { conclusion: "failure", head_sha: "0a1b2c3", pull_requests: [] },
-      },
-      "author",
-    ),
-  )
-  .extend("nonArrayPullsVerdict", () =>
-    filterCheckSuiteEvent(
-      {
-        action: "completed",
-        check_suite: { conclusion: "failure", head_sha: "0a1b2c3", pull_requests: "all" },
-      },
-      "author",
-    ),
-  )
-  .extend("nullSuiteVerdict", () =>
-    filterCheckSuiteEvent({ action: "completed", check_suite: null }, "author"),
-  )
-  .extend("unnumberedPullVerdict", () =>
-    filterCheckSuiteEvent(
-      {
-        action: "completed",
-        check_suite: { conclusion: "failure", head_sha: "0a1b2c3", pull_requests: [{ id: 1 }] },
-      },
-      "author",
-    ),
-  )
-  .extend("nullConclusionVerdict", () =>
-    filterCheckSuiteEvent(
-      {
-        action: "completed",
-        check_suite: { conclusion: null, head_sha: "0a1b2c3", pull_requests: [{ number: 7 }] },
-      },
-      "author",
-    ),
-  )
-  .extend("headShaLessVerdict", () =>
-    filterCheckSuiteEvent(
-      {
-        action: "completed",
-        check_suite: { conclusion: "failure", pull_requests: [{ number: 7 }] },
-      },
-      "author",
-    ),
-  );
-
 describe("採用される結論", () => {
+  const it = test
+    .extend("failureVerdict", () =>
+      filterCheckSuiteEvent(
+        {
+          action: "completed",
+          check_suite: {
+            conclusion: "failure",
+            head_sha: "0a1b2c3",
+            pull_requests: [{ number: 7 }],
+          },
+        },
+        "author",
+      ))
+    .extend("timedOutVerdict", () =>
+      filterCheckSuiteEvent(
+        {
+          action: "completed",
+          check_suite: {
+            conclusion: "timed_out",
+            head_sha: "0a1b2c3",
+            pull_requests: [{ number: 7 }],
+          },
+        },
+        "author",
+      ),
+    )
+    .extend("startupFailureVerdict", () =>
+      filterCheckSuiteEvent(
+        {
+          action: "completed",
+          check_suite: {
+            conclusion: "startup_failure",
+            head_sha: "0a1b2c3",
+            pull_requests: [{ number: 7 }],
+          },
+        },
+        "author",
+      ),
+    )
+    .extend("deliveryCarryingVerdict", () =>
+      filterCheckSuiteEvent(
+        {
+          action: "completed",
+          check_suite: {
+            conclusion: "failure",
+            head_sha: "0a1b2c3",
+            pull_requests: [{ number: 7 }],
+          },
+          delivery_id: "delivery-1",
+        },
+        "author",
+      ),
+    )
+    .extend("multiPullVerdict", () =>
+      filterCheckSuiteEvent(
+        {
+          action: "completed",
+          check_suite: {
+            conclusion: "failure",
+            head_sha: "0a1b2c3",
+            pull_requests: [{ number: 7 }, { number: 8 }],
+          },
+        },
+        "author",
+      ),
+    );
+
   it("failure は ci-completed になり結論と head SHA を保持する", ({ failureVerdict }) => {
     expect(failureVerdict).toStrictEqual({
       kind: "ci-completed",
@@ -137,6 +118,107 @@ describe("採用される結論", () => {
 });
 
 describe("不採用になる形", () => {
+  const it = test
+    .extend("successVerdict", () =>
+      filterCheckSuiteEvent(
+        {
+          action: "completed",
+          check_suite: {
+            conclusion: "success",
+            head_sha: "0a1b2c3",
+            pull_requests: [{ number: 7 }],
+          },
+        },
+        "author",
+      ))
+    .extend("cancelledVerdict", () =>
+      filterCheckSuiteEvent(
+        {
+          action: "completed",
+          check_suite: {
+            conclusion: "cancelled",
+            head_sha: "0a1b2c3",
+            pull_requests: [{ number: 7 }],
+          },
+        },
+        "author",
+      ),
+    )
+    .extend("reviewerModeVerdict", () =>
+      filterCheckSuiteEvent(
+        {
+          action: "completed",
+          check_suite: {
+            conclusion: "failure",
+            head_sha: "0a1b2c3",
+            pull_requests: [{ number: 7 }],
+          },
+        },
+        "reviewer",
+      ),
+    )
+    .extend("requestedActionVerdict", () =>
+      filterCheckSuiteEvent(
+        {
+          action: "requested",
+          check_suite: {
+            conclusion: "failure",
+            head_sha: "0a1b2c3",
+            pull_requests: [{ number: 7 }],
+          },
+        },
+        "author",
+      ),
+    )
+    .extend("emptyPullsVerdict", () =>
+      filterCheckSuiteEvent(
+        {
+          action: "completed",
+          check_suite: { conclusion: "failure", head_sha: "0a1b2c3", pull_requests: [] },
+        },
+        "author",
+      ),
+    )
+    .extend("nonArrayPullsVerdict", () =>
+      filterCheckSuiteEvent(
+        {
+          action: "completed",
+          check_suite: { conclusion: "failure", head_sha: "0a1b2c3", pull_requests: "all" },
+        },
+        "author",
+      ),
+    )
+    .extend("nullSuiteVerdict", () =>
+      filterCheckSuiteEvent({ action: "completed", check_suite: null }, "author"),
+    )
+    .extend("unnumberedPullVerdict", () =>
+      filterCheckSuiteEvent(
+        {
+          action: "completed",
+          check_suite: { conclusion: "failure", head_sha: "0a1b2c3", pull_requests: [{ id: 1 }] },
+        },
+        "author",
+      ),
+    )
+    .extend("nullConclusionVerdict", () =>
+      filterCheckSuiteEvent(
+        {
+          action: "completed",
+          check_suite: { conclusion: null, head_sha: "0a1b2c3", pull_requests: [{ number: 7 }] },
+        },
+        "author",
+      ),
+    )
+    .extend("headShaLessVerdict", () =>
+      filterCheckSuiteEvent(
+        {
+          action: "completed",
+          check_suite: { conclusion: "failure", pull_requests: [{ number: 7 }] },
+        },
+        "author",
+      ),
+    );
+
   it("success は自動応答を起こさない", ({ successVerdict }) => {
     expect(successVerdict).toStrictEqual(null);
   });

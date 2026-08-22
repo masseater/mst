@@ -1,9 +1,10 @@
 import { createDontReviewItRule } from "../../../create-rule.ts";
+import { nodesOfType } from "../lib/nodes-of-type.ts";
 import { staticSpelling } from "../lib/spec-syntax/static-names.ts";
 import { unwrapSubject } from "../lib/spec-syntax/subject-expressions.ts";
 import {
-  assertionEntryBindings,
-  testBlockBindings,
+  assertionEntryRootNames,
+  testBlockRootNames,
 } from "../lib/spec-syntax/test-block-declarations.ts";
 
 import type { ESTree } from "@oxlint/plugins";
@@ -37,20 +38,16 @@ export const noComputedTestApiMember = createDontReviewItRule({
     schema: [],
     fixable: "code",
   },
-  create(context) {
-    const blocks = testBlockBindings();
-    const entries = assertionEntryBindings();
-    const subscripts = new Set<ESTree.ComputedMemberExpression>();
-
+  create(inspection) {
     const reportSubscript = (node: ESTree.ComputedMemberExpression): void => {
       const member = staticSpelling(node.property);
       if (member === null) {
-        context.report({ node: node.property, messageId: "unreadableSubscript" });
+        inspection.report({ node: node.property, messageId: "unreadableSubscript" });
         return;
       }
 
       const written = `${node.optional ? "?." : "."}${member}`;
-      context.report({
+      inspection.report({
         node: node.property,
         messageId: "spelledSubscript",
         data: { member },
@@ -61,19 +58,15 @@ export const noComputedTestApiMember = createDontReviewItRule({
     };
 
     return {
-      ImportDeclaration(node: ESTree.ImportDeclaration) {
-        blocks.takeImport(node);
-        entries.takeImport(node);
-      },
-      VariableDeclarator(node: ESTree.VariableDeclarator) {
-        blocks.takeLocalBinding(node);
-        entries.takeLocalBinding(node);
-      },
-      MemberExpression(node: ESTree.MemberExpression) {
-        if (node.computed) subscripts.add(node);
-      },
-      "Program:exit"() {
-        const rootNames = new Set([...blocks.rootNames(), ...entries.rootNames()]);
+      "Program:exit"(program: ESTree.Program) {
+        const rootNames = new Set([
+          ...testBlockRootNames(program),
+          ...assertionEntryRootNames(program),
+        ]);
+        const subscripts = nodesOfType(program, "MemberExpression").flatMap((node) =>
+          node.computed ? [node] : [],
+        );
+
         for (const node of subscripts) {
           if (rootNames.has(chainRootName(node.object) ?? "")) reportSubscript(node);
         }
